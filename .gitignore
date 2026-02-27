@@ -1,0 +1,31 @@
+# OS / IDE
+.DS_Store
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# .NET build outputs
+**/bin/
+**/obj/
+TestResults/
+artifacts/
+coverage/
+*.coverage
+*.trx
+
+# Publish artifacts
+publish/
+publish.zip
+
+# Local DB files
+.mssql/data/
+*.mdf
+*.ldf
+
+# Logs / local overrides
+*.log
+*.local.json
