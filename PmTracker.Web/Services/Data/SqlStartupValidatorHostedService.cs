@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Data;
+using PmTracker.Web.Models.ViewModels;
 using System.Data;
 
 namespace PmTracker.Web.Services.Data;
@@ -7,6 +8,8 @@ namespace PmTracker.Web.Services.Data;
 public sealed class SqlStartupValidatorHostedService : IHostedService
 {
     private static readonly string[] RequiredProjectStatusCodes = { "PLAN", "RUN", "DONE", "DELETED" };
+    private static readonly string[] RequiredProjectRoleCodes = { ProjectRoleCodes.ProjectOwner, ProjectRoleCodes.Host };
+    private static readonly string[] RequiredSubsystemRoleCodes = { SubsystemRoleCodes.Lead, SubsystemRoleCodes.DeputyLead, SubsystemRoleCodes.Methodik };
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<SqlStartupValidatorHostedService> _logger;
@@ -43,16 +46,56 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             throw new InvalidOperationException("V DB chybí povinné kódy v ciselnik_stavu_projektu: " + string.Join(", ", missingCodes));
         }
 
+        var projectRoleCodes = await dbContext.CiselnikRoliProjektu
+            .AsNoTracking()
+            .Select(x => x.Kod)
+            .ToListAsync(cancellationToken);
+        var missingProjectRoleCodes = RequiredProjectRoleCodes
+            .Where(required => !projectRoleCodes.Any(code => string.Equals(code, required, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        if (missingProjectRoleCodes.Count > 0)
+        {
+            throw new InvalidOperationException("V DB chybí povinné kódy v ciselnik_roli_projektu: " + string.Join(", ", missingProjectRoleCodes));
+        }
+
+        var subsystemRoleCodes = await dbContext.CiselnikRoliSubsystemu
+            .AsNoTracking()
+            .Select(x => x.Kod)
+            .ToListAsync(cancellationToken);
+        var missingSubsystemRoleCodes = RequiredSubsystemRoleCodes
+            .Where(required => !subsystemRoleCodes.Any(code => string.Equals(code, required, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        if (missingSubsystemRoleCodes.Count > 0)
+        {
+            throw new InvalidOperationException("V DB chybí povinné kódy v ciselnik_roli_subsystemu: " + string.Join(", ", missingSubsystemRoleCodes));
+        }
+
         var hasEmailColumn = await HasColumnAsync(dbContext, "dbo.osoby", "email", cancellationToken);
         if (!hasEmailColumn)
         {
             throw new InvalidOperationException("V DB chybí sloupec dbo.osoby.email. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
         }
 
+        foreach (var requiredTable in new[] { "dbo.projekt_subsystemy", "dbo.ciselnik_roli_subsystemu", "dbo.obsazeni_subsystemu_projektu" })
+        {
+            if (!await HasTableAsync(dbContext, requiredTable, cancellationToken))
+            {
+                throw new InvalidOperationException($"V DB chybí tabulka {requiredTable}. Obnovte databázi přes PMTracker_insert_sql nebo spusťte upgrade skript.");
+            }
+        }
+
         var hasCommentAuthorColumn = await HasColumnAsync(dbContext, "dbo.vyjadreni", "autor_osoba_id", cancellationToken);
         if (!hasCommentAuthorColumn)
         {
             throw new InvalidOperationException("V DB chybí sloupec dbo.vyjadreni.autor_osoba_id. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
+        }
+
+        foreach (var requiredColumn in new[] { "datum_prirazeni", "datum_odebrani" })
+        {
+            if (!await HasColumnAsync(dbContext, "dbo.obsazeni_projektu", requiredColumn, cancellationToken))
+            {
+                throw new InvalidOperationException($"V DB chybí sloupec dbo.obsazeni_projektu.{requiredColumn}. Obnovte databázi přes PMTracker_insert_sql nebo spusťte upgrade skript.");
+            }
         }
 
         _logger.LogInformation("SQL startup validace proběhla úspěšně.");
@@ -92,6 +135,45 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             columnParam.ParameterName = "@columnName";
             columnParam.Value = columnName;
             command.Parameters.Add(columnParam);
+
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            return Convert.ToInt32(result) > 0;
+        }
+        finally
+        {
+            if (mustClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static async Task<bool> HasTableAsync(
+        PmTrackerDbContext dbContext,
+        string tableName,
+        CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var mustClose = connection.State != ConnectionState.Open;
+        if (mustClose)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT COUNT(*)
+                FROM sys.tables t
+                INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+                WHERE CONCAT(s.name, '.', t.name) = @tableName
+                """;
+
+            var tableParam = command.CreateParameter();
+            tableParam.ParameterName = "@tableName";
+            tableParam.Value = tableName;
+            command.Parameters.Add(tableParam);
 
             var result = await command.ExecuteScalarAsync(cancellationToken);
             return Convert.ToInt32(result) > 0;

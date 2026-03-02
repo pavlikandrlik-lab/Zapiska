@@ -30,8 +30,10 @@ internal static class IntegrationTestHelper
     public static CurrentUserContextViewModel BuildUser(
         int osobaId,
         bool isSuperAdmin = false,
-        IEnumerable<PermissionGrantViewModel>? grants = null)
+        IEnumerable<PermissionGrantViewModel>? grants = null,
+        IEnumerable<int>? visibleProjectIds = null)
     {
+        var grantList = grants?.ToList() ?? new List<PermissionGrantViewModel>();
         return new CurrentUserContextViewModel
         {
             OsobaId = osobaId,
@@ -43,7 +45,8 @@ internal static class IntegrationTestHelper
             OrganizacniCelekKod = "TEST",
             IsSuperAdmin = isSuperAdmin,
             RoleKody = Array.Empty<string>(),
-            PermissionGrants = grants?.ToList() ?? new List<PermissionGrantViewModel>()
+            VisibleProjectIds = visibleProjectIds?.Distinct().ToArray() ?? grantList.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
+            PermissionGrants = grantList
         };
     }
 
@@ -128,22 +131,110 @@ internal static class IntegrationTestHelper
 
         if (existing.HasValue)
         {
-            var row = await dbContext.Subsystemy.FirstAsync(x => x.Id == existing.Value);
-            row.VedouciOsobaId = leaderOsobaId;
-            await dbContext.SaveChangesAsync();
-            return row.Id;
+            return existing.Value;
         }
 
         var subsystem = new SubsystemEntity
         {
             Kod = marker,
-            Nazev = $"{marker} Subsystem",
-            VedouciOsobaId = leaderOsobaId
+            Nazev = $"{marker} Subsystem"
         };
 
         dbContext.Subsystemy.Add(subsystem);
         await dbContext.SaveChangesAsync();
         return subsystem.Id;
+    }
+
+    public static async Task<int> EnsureProjectSubsystemAsync(PmTrackerDbContext dbContext, int projectId, int subsystemId)
+    {
+        var existing = await dbContext.ProjektSubsystemy
+            .Where(x => x.ProjektId == projectId && x.SubsystemId == subsystemId && x.DatumOdebrani == null)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync();
+
+        if (existing.HasValue)
+        {
+            return existing.Value;
+        }
+
+        var entity = new ProjektSubsystemEntity
+        {
+            ProjektId = projectId,
+            SubsystemId = subsystemId,
+            DatumPrirazeni = DateTime.UtcNow
+        };
+
+        dbContext.ProjektSubsystemy.Add(entity);
+        await dbContext.SaveChangesAsync();
+        return entity.Id;
+    }
+
+    public static async Task EnsureActiveProjectRoleAssignmentAsync(
+        PmTrackerDbContext dbContext,
+        int projectId,
+        int osobaId,
+        string roleCode)
+    {
+        var roleId = await dbContext.CiselnikRoliProjektu
+            .Where(x => x.Kod == roleCode)
+            .Select(x => x.Id)
+            .FirstAsync();
+
+        var exists = await dbContext.ObsazeniProjektu.AnyAsync(x =>
+            x.ProjektId == projectId &&
+            x.OsobaId == osobaId &&
+            x.RoleId == roleId &&
+            x.DatumOdebrani == null);
+
+        if (exists)
+        {
+            return;
+        }
+
+        dbContext.ObsazeniProjektu.Add(new ObsazeniProjektuEntity
+        {
+            ProjektId = projectId,
+            OsobaId = osobaId,
+            RoleId = roleId,
+            DatumPrirazeni = DateTime.UtcNow
+        });
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    public static async Task EnsureActiveSubsystemRoleAssignmentAsync(
+        PmTrackerDbContext dbContext,
+        int projectId,
+        int subsystemId,
+        int osobaId,
+        string roleCode)
+    {
+        var projectSubsystemId = await EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        var roleId = await dbContext.CiselnikRoliSubsystemu
+            .Where(x => x.Kod == roleCode)
+            .Select(x => x.Id)
+            .FirstAsync();
+
+        var exists = await dbContext.ObsazeniSubsystemuProjektu.AnyAsync(x =>
+            x.ProjektSubsystemId == projectSubsystemId &&
+            x.OsobaId == osobaId &&
+            x.RoleSubsystemuId == roleId &&
+            x.DatumOdebrani == null);
+
+        if (exists)
+        {
+            return;
+        }
+
+        dbContext.ObsazeniSubsystemuProjektu.Add(new ObsazeniSubsystemuProjektuEntity
+        {
+            ProjektSubsystemId = projectSubsystemId,
+            OsobaId = osobaId,
+            RoleSubsystemuId = roleId,
+            DatumPrirazeni = DateTime.UtcNow
+        });
+
+        await dbContext.SaveChangesAsync();
     }
 
     public static async Task<int> EnsureRecordAsync(
@@ -163,6 +254,11 @@ internal static class IntegrationTestHelper
             .OrderBy(x => x.Id)
             .Select(x => x.Id)
             .FirstAsync();
+        var schemaVersion = await dbContext.HarmonogramSablony
+            .OrderByDescending(x => x.IsAktivni)
+            .ThenByDescending(x => x.Verze)
+            .Select(x => (int?)x.Verze)
+            .FirstOrDefaultAsync() ?? 1;
 
         var maxNumber = await dbContext.ProjektoveZaznamy
             .Where(x => x.ProjektId == projectId)
@@ -181,7 +277,8 @@ internal static class IntegrationTestHelper
             VlastnikId = ownerOsobaId,
             DatumZalozeni = DateTime.Today,
             DatumUkonceni = DateTime.Today.AddDays(30),
-            SubsystemId = subsystemId
+            SubsystemId = subsystemId,
+            HarmonogramSablonaVerze = schemaVersion
         };
 
         dbContext.ProjektoveZaznamy.Add(record);

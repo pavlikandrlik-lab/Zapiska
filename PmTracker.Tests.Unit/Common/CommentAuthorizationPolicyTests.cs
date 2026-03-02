@@ -13,6 +13,7 @@ public sealed class CommentAuthorizationPolicyTests
     {
         var user = BuildUser(
             osobaId: 5,
+            visibleProjectIds: [2],
             new PermissionGrantViewModel
             {
                 PermissionKey = PermissionKeys.RecordsEdit,
@@ -22,14 +23,15 @@ public sealed class CommentAuthorizationPolicyTests
                 ProjectIds = Array.Empty<int>()
             });
 
-        _sut.CanAddComment(user, projektId: 2, subsystemLeadOsobaId: 999).Should().BeTrue();
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [999]).Should().BeTrue();
     }
 
     [Fact]
-    public void CanCommentAsSubsystemLeader_ShouldAllowOnlyMatchingLeaderWithPermission()
+    public void CanCommentAsSubsystemLeader_ShouldAllowMatchingLeaderOrDeputyWithPermission()
     {
         var user = BuildUser(
             osobaId: 12,
+            visibleProjectIds: [2],
             new PermissionGrantViewModel
             {
                 PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
@@ -39,9 +41,9 @@ public sealed class CommentAuthorizationPolicyTests
                 ProjectIds = new[] { 2 }
             });
 
-        _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadOsobaId: 12).Should().BeTrue();
-        _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadOsobaId: 13).Should().BeFalse();
-        _sut.CanCommentAsSubsystemLeader(user, projektId: 3, subsystemLeadOsobaId: 12).Should().BeFalse();
+        _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12, 14]).Should().BeTrue();
+        _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [13, 14]).Should().BeFalse();
+        _sut.CanCommentAsSubsystemLeader(user, projektId: 3, subsystemLeadEquivalentOsobaIds: [12, 14]).Should().BeFalse();
     }
 
     [Fact]
@@ -49,6 +51,7 @@ public sealed class CommentAuthorizationPolicyTests
     {
         var user = BuildUser(
             osobaId: 20,
+            visibleProjectIds: [9],
             new PermissionGrantViewModel
             {
                 PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
@@ -58,11 +61,14 @@ public sealed class CommentAuthorizationPolicyTests
                 ProjectIds = Array.Empty<int>()
             });
 
-        _sut.CanModifyComment(user, projektId: 9, subsystemLeadOsobaId: 20, commentAuthorOsobaId: 20).Should().BeTrue();
-        _sut.CanModifyComment(user, projektId: 9, subsystemLeadOsobaId: 20, commentAuthorOsobaId: 30).Should().BeFalse();
+        _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 20).Should().BeTrue();
+        _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 30).Should().BeFalse();
     }
 
-    private static CurrentUserContextViewModel BuildUser(int osobaId, params PermissionGrantViewModel[] grants)
+    private static CurrentUserContextViewModel BuildUser(
+        int osobaId,
+        IReadOnlyList<int>? visibleProjectIds = null,
+        params PermissionGrantViewModel[] grants)
     {
         return new CurrentUserContextViewModel
         {
@@ -75,6 +81,7 @@ public sealed class CommentAuthorizationPolicyTests
             OrganizacniCelek = "Test",
             IsSuperAdmin = false,
             RoleKody = Array.Empty<string>(),
+            VisibleProjectIds = visibleProjectIds ?? grants.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
             PermissionGrants = grants
         };
     }

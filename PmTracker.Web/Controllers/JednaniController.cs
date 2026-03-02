@@ -14,7 +14,9 @@ public sealed class JednaniController : BaseController
 
     public IActionResult Index(int? projektId)
     {
-        var projekty = DataStore.BuildJednaniOverview().ToList();
+        var projekty = DataStore.BuildJednaniOverview()
+            .Where(project => CurrentUserContext.CanAccessProject(project.ProjektId))
+            .ToList();
 
         if (projektId.HasValue)
         {
@@ -32,6 +34,11 @@ public sealed class JednaniController : BaseController
     public IActionResult Detail(int id, string? returnUrl)
     {
         var model = DataStore.BuildJednaniDetail(id);
+        if (!CurrentUserContext.CanAccessProject(model.ProjektId))
+        {
+            return Forbid();
+        }
+
         var fallbackUrl = Url.Action("Index", "Jednani", new { projektId = model.ProjektId }) ?? "/Jednani";
         var isValidReturnUrl = !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl);
 
@@ -45,6 +52,11 @@ public sealed class JednaniController : BaseController
     public IActionResult TaskItemPartial(int jednaniId, int zaznamId)
     {
         var model = DataStore.BuildJednaniDetail(jednaniId);
+        if (!CurrentUserContext.CanAccessProject(model.ProjektId))
+        {
+            return Forbid();
+        }
+
         var ukol = model.Ukoly.FirstOrDefault(x => x.ZaznamId == zaznamId);
         if (ukol is null)
         {
@@ -55,7 +67,7 @@ public sealed class JednaniController : BaseController
             && string.Equals(model.Jednani.StavKod, model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase);
         var canEditRecordNotes = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId) && !isLocked;
         var canCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, model.ProjektId)
-            && CurrentUserContext.OsobaId == ukol.SubsystemVedouciOsobaId
+            && ukol.SubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId)
             && !isLocked;
         if (!canEditRecordNotes && !canCommentAsSubsystemLeader)
         {
@@ -70,6 +82,32 @@ public sealed class JednaniController : BaseController
             CanEditRecordNotes = canEditRecordNotes,
             CanCommentAsSubsystemLeader = canCommentAsSubsystemLeader,
             Ukol = ukol
+        });
+    }
+
+    [HttpGet]
+    public IActionResult AddMeetingParticipantModal(int projektId, int jednaniId)
+    {
+        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId))
+        {
+            return Forbid();
+        }
+
+        var model = DataStore.BuildJednaniDetail(jednaniId);
+        if (model.ProjektId != projektId)
+        {
+            return NotFound();
+        }
+
+        return View("~/Views/Jednani/AddMeetingParticipantModal.cshtml", new AddMeetingParticipantModalViewModel
+        {
+            Title = "Přidat osobu do účasti",
+            Command = new AddMeetingParticipantCommand
+            {
+                ProjektId = projektId,
+                JednaniId = jednaniId
+            },
+            DostupneOsoby = model.AvailableParticipantCandidates
         });
     }
 
@@ -132,6 +170,26 @@ public sealed class JednaniController : BaseController
         }
 
         return RedirectToAction(nameof(Detail), new { id = jednaniId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult AddMeetingParticipant(AddMeetingParticipantCommand command)
+    {
+        return ExecuteValidatedCommand(
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId),
+            invalidAjaxMessage: "Osobu nelze přidat do účasti.",
+            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
+            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.JednaniId }),
+            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = command.JednaniId }),
+            onAjaxSuccess: () => AjaxSuccessResult(
+                refreshScope: "page",
+                refreshUrl: Url.Action(nameof(Detail), new { id = command.JednaniId }),
+                projectId: command.ProjektId,
+                meetingId: command.JednaniId,
+                uiContext: "meeting",
+                message: "Osoba byla přidána do účasti."),
+            operation: () => DataStore.AddMeetingParticipant(command, CurrentUserContext));
     }
 
     [HttpPost]

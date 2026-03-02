@@ -11,7 +11,7 @@
     var editButtonLabel = canEditRecord ? "Upravit" : "GANTT";
     var userOsobaId = userContext?.OsobaId ?? 0;
     var hasSubsystemLeadPermission = userContext?.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId) ?? false;
-    var isLeaderForRecord = Model.AktualniSubsystemVedouciOsobaId > 0 && userOsobaId == Model.AktualniSubsystemVedouciOsobaId;
+    var isLeaderForRecord = userOsobaId > 0 && Model.AktualniSubsystemLeadEquivalentOsobaIds.Contains(userOsobaId);
     var canCommentAsSubsystemLeader = hasSubsystemLeadPermission && isLeaderForRecord;
     var canAddComment = canEditRecord || canCommentAsSubsystemLeader;
     var taskPrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = Model.Id, projektId, autoPrint = true }) ?? $"/Export/Ukol/{Model.Id}/Tisk?projektId={projektId}&autoPrint=true";

@@ -66,6 +66,15 @@ CREATE TABLE dbo.ciselnik_roli_projektu (
 );
 GO
 
+CREATE TABLE dbo.ciselnik_roli_subsystemu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_roli_subsystemu PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_roli_subsystemu_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_roli_subsystemu_kod UNIQUE (kod)
+);
+GO
+
 CREATE TABLE dbo.ciselnik_stavu_ucasti (
     id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_stavu_ucasti PRIMARY KEY,
     kod nvarchar(255) NOT NULL,
@@ -141,7 +150,6 @@ CREATE TABLE dbo.subsystemy (
     id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_subsystemy PRIMARY KEY,
     [kód] nvarchar(255) NOT NULL,
     nazev nvarchar(255) NOT NULL,
-    vedouci_osoba_id int NOT NULL,
     CONSTRAINT UQ_subsystemy_kod UNIQUE ([kód])
 );
 GO
@@ -150,7 +158,28 @@ CREATE TABLE dbo.obsazeni_projektu (
     id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_obsazeni_projektu PRIMARY KEY,
     projekt_id int NOT NULL,
     osoba_id int NOT NULL,
-    role_id int NOT NULL
+    role_id int NOT NULL,
+    datum_prirazeni datetime2 NOT NULL CONSTRAINT DF_obsazeni_projektu_datum_prirazeni DEFAULT (SYSUTCDATETIME()),
+    datum_odebrani datetime2 NULL
+);
+GO
+
+CREATE TABLE dbo.projekt_subsystemy (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_projekt_subsystemy PRIMARY KEY,
+    projekt_id int NOT NULL,
+    subsystem_id int NOT NULL,
+    datum_prirazeni datetime2 NOT NULL CONSTRAINT DF_projekt_subsystemy_datum_prirazeni DEFAULT (SYSUTCDATETIME()),
+    datum_odebrani datetime2 NULL
+);
+GO
+
+CREATE TABLE dbo.obsazeni_subsystemu_projektu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_obsazeni_subsystemu_projektu PRIMARY KEY,
+    projekt_subsystem_id int NOT NULL,
+    osoba_id int NOT NULL,
+    role_subsystemu_id int NOT NULL,
+    datum_prirazeni datetime2 NOT NULL CONSTRAINT DF_obsazeni_subsystemu_projektu_datum_prirazeni DEFAULT (SYSUTCDATETIME()),
+    datum_odebrani datetime2 NULL
 );
 GO
 
@@ -421,12 +450,16 @@ GO
 ALTER TABLE dbo.osoby ADD CONSTRAINT FK_osoby_organizacni_celek FOREIGN KEY (organizacni_celek_id) REFERENCES dbo.ciselnik_organizacni_celky(id);
 ALTER TABLE dbo.osoby ADD CONSTRAINT FK_osoby_organizace FOREIGN KEY (organizace_id) REFERENCES dbo.ciselnik_organizace(id);
 
-ALTER TABLE dbo.subsystemy ADD CONSTRAINT FK_subsystemy_vedouci_osoba FOREIGN KEY (vedouci_osoba_id) REFERENCES dbo.osoby(id);
 ALTER TABLE dbo.projekty ADD CONSTRAINT FK_projekty_stav FOREIGN KEY (stav_id) REFERENCES dbo.ciselnik_stavu_projektu(id);
 
 ALTER TABLE dbo.obsazeni_projektu ADD CONSTRAINT FK_obsazeni_projektu_projekt FOREIGN KEY (projekt_id) REFERENCES dbo.projekty(id);
 ALTER TABLE dbo.obsazeni_projektu ADD CONSTRAINT FK_obsazeni_projektu_osoba FOREIGN KEY (osoba_id) REFERENCES dbo.osoby(id);
 ALTER TABLE dbo.obsazeni_projektu ADD CONSTRAINT FK_obsazeni_projektu_role FOREIGN KEY (role_id) REFERENCES dbo.ciselnik_roli_projektu(id);
+ALTER TABLE dbo.projekt_subsystemy ADD CONSTRAINT FK_projekt_subsystemy_projekt FOREIGN KEY (projekt_id) REFERENCES dbo.projekty(id);
+ALTER TABLE dbo.projekt_subsystemy ADD CONSTRAINT FK_projekt_subsystemy_subsystem FOREIGN KEY (subsystem_id) REFERENCES dbo.subsystemy(id);
+ALTER TABLE dbo.obsazeni_subsystemu_projektu ADD CONSTRAINT FK_obsazeni_subsystemu_projektu_projekt_subsystem FOREIGN KEY (projekt_subsystem_id) REFERENCES dbo.projekt_subsystemy(id);
+ALTER TABLE dbo.obsazeni_subsystemu_projektu ADD CONSTRAINT FK_obsazeni_subsystemu_projektu_osoba FOREIGN KEY (osoba_id) REFERENCES dbo.osoby(id);
+ALTER TABLE dbo.obsazeni_subsystemu_projektu ADD CONSTRAINT FK_obsazeni_subsystemu_projektu_role FOREIGN KEY (role_subsystemu_id) REFERENCES dbo.ciselnik_roli_subsystemu(id);
 
 ALTER TABLE dbo.jednani ADD CONSTRAINT FK_jednani_projekt FOREIGN KEY (projekt_id) REFERENCES dbo.projekty(id);
 ALTER TABLE dbo.jednani ADD CONSTRAINT FK_jednani_stav FOREIGN KEY (stav_jednani_id) REFERENCES dbo.ciselnik_stavu_jednani(id);
@@ -501,7 +534,9 @@ GO
 CREATE UNIQUE INDEX UX_osoby_Guid_AD ON dbo.osoby(Guid_AD) WHERE Guid_AD IS NOT NULL;
 CREATE INDEX IX_osoby_ad_login ON dbo.osoby(ad_login) WHERE ad_login IS NOT NULL;
 
-CREATE UNIQUE INDEX UX_obsazeni_projektu_projekt_osoba_role ON dbo.obsazeni_projektu(projekt_id, osoba_id, role_id);
+CREATE UNIQUE INDEX UX_obsazeni_projektu_projekt_osoba_role_aktivni ON dbo.obsazeni_projektu(projekt_id, osoba_id, role_id) WHERE datum_odebrani IS NULL;
+CREATE UNIQUE INDEX UX_projekt_subsystemy_projekt_subsystem_aktivni ON dbo.projekt_subsystemy(projekt_id, subsystem_id) WHERE datum_odebrani IS NULL;
+CREATE UNIQUE INDEX UX_obsazeni_subsystemu_projektu_aktivni ON dbo.obsazeni_subsystemu_projektu(projekt_subsystem_id, osoba_id, role_subsystemu_id) WHERE datum_odebrani IS NULL;
 CREATE UNIQUE INDEX UX_jednani_projekt_cislo ON dbo.jednani(projekt_id, cislo_jednani);
 
 CREATE UNIQUE INDEX UX_projektove_zaznamy_projekt_cislo ON dbo.projektove_zaznamy(projekt_id, cislo_zaznamu);
@@ -624,12 +659,30 @@ GO
 
 MERGE dbo.ciselnik_roli_projektu AS target
 USING (VALUES
+    (N'VLASTNIK_PROJEKTU', N'Vlastník projektu', 1),
+    (N'HOST', N'Host', 1),
     (N'PM', N'Projektový manažer', 1),
     (N'GEST', N'Gestor', 1),
     (N'VED_SUB', N'Vedoucí subsystému', 1),
     (N'DOD_MAINT', N'Dodavatel maintenance', 1),
     (N'ANALYTIK', N'Analytik', 0),
     (N'DEV', N'Developer', 0)
+) AS source(kod, nazev, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_locked)
+    VALUES (source.kod, source.nazev, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_locked = source.is_locked;
+GO
+
+MERGE dbo.ciselnik_roli_subsystemu AS target
+USING (VALUES
+    (N'VEDOUCI_SUBSYSTEMU', N'Vedoucí subsystému', 1),
+    (N'ZASTUPCE_VEDOUCIHO_SUBSYSTEMU', N'Zástupce vedoucího subsystému', 1),
+    (N'METODIK_SUBSYSTEMU', N'Metodik subsystému', 1)
 ) AS source(kod, nazev, is_locked)
 ON target.kod = source.kod
 WHEN NOT MATCHED BY TARGET THEN
@@ -824,17 +877,16 @@ DECLARE @seedAdminId int = (
 
 MERGE dbo.subsystemy AS target
 USING (VALUES
-    (N'INTEGRACE', N'Integrace', @seedAdminId),
-    (N'JADRO', N'Jádro', @seedAdminId)
-) AS source(kod, nazev, vedouci_osoba_id)
+    (N'INTEGRACE', N'Integrace'),
+    (N'JADRO', N'Jádro')
+) AS source(kod, nazev)
 ON target.[kód] = source.kod
 WHEN NOT MATCHED BY TARGET THEN
-    INSERT ([kód], nazev, vedouci_osoba_id)
-    VALUES (source.kod, source.nazev, source.vedouci_osoba_id)
+    INSERT ([kód], nazev)
+    VALUES (source.kod, source.nazev)
 WHEN MATCHED THEN
     UPDATE SET
-        target.nazev = source.nazev,
-        target.vedouci_osoba_id = source.vedouci_osoba_id;
+        target.nazev = source.nazev;
 GO
 
 /* -------------------- AUTHZ seed -------------------- */

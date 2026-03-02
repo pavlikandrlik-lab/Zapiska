@@ -212,11 +212,32 @@ else if (Model.SectionKey == "role-akce")
                         <td class="table-actions">
                             @if (canManageSettings)
                             {
-                                <button class="btn small"
-                                        type="button"
-                                        data-modal-url="@Url.Action("RolePermissionModal", "Nastaveni", new { id = map.Id, userId = selectedUserId, projektId = selectedProjektId })">
-                                    Upravit
-                                </button>
+                                <div class="table-actions-inline">
+                                    @if (map.IsAllowed)
+                                    {
+                                        <button class="btn small"
+                                                type="button"
+                                                data-modal-url="@Url.Action("RolePermissionModal", "Nastaveni", new { id = map.Id, userId = selectedUserId, projektId = selectedProjektId })">
+                                            Upravit
+                                        </button>
+                                    }
+                                    <form class="table-action-inline-form"
+                                          asp-controller="Nastaveni"
+                                          asp-action="DeleteRolePermission"
+                                          method="post"
+                                          data-ajax-submit="true"
+                                          onsubmit="return confirm('Opravdu smazat mapování role a akce?');">
+                                        <input type="hidden" name="Id" value="@map.Id" />
+                                        @await Html.PartialAsync(
+                                            "_ContextHiddenFields",
+                                            new ContextHiddenFieldsViewModel
+                                            {
+                                                UserId = selectedUserId,
+                                                ProjektId = selectedProjektId
+                                            })
+                                        <button class="btn small ghost" type="submit">Smazat</button>
+                                    </form>
+                                </div>
                             }
                             else
                             {

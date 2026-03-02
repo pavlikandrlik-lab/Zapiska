@@ -25,6 +25,7 @@
             UserId = Model.UserId,
             ProjektId = Model.ProjektId
         })
+    <input type="hidden" name="IsAllowed" value="true" />
 
     <label>
         Role
@@ -55,14 +56,6 @@
         <select name="ScopeMode" required>
             <option value="ALL" selected="@("ALL".Equals(Model.Command.ScopeMode, StringComparison.OrdinalIgnoreCase))">ALL</option>
             <option value="INCLUDE" selected="@("INCLUDE".Equals(Model.Command.ScopeMode, StringComparison.OrdinalIgnoreCase))">INCLUDE</option>
-        </select>
-    </label>
-
-    <label>
-        Povolení
-        <select name="IsAllowed" required>
-            <option value="true" selected="@Model.Command.IsAllowed">Povoleno</option>
-            <option value="false" selected="@(!Model.Command.IsAllowed)">Zakázáno</option>
         </select>
     </label>
 

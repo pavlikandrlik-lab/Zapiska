@@ -66,3 +66,17 @@ Detailní checklist:
 - Změny business pravidel držet v datové/službové vrstvě, ne v JavaScriptu.
 - Všechny nové texty a štítky držet konzistentní s existující terminologií.
 - Při změně datového modelu vždy upravit `PMTracker_insert_sql` + aktualizovat dokumentaci.
+
+## 8. Verzování a changelog
+
+- Zdroj verze aplikace je `AppVersion` v `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/PmTracker.Web.csproj`.
+- Podklady pro release notes jsou vedené po verzích v adresáři:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/changelog/releases/`
+- Finální agregovaný changelog se generuje skriptem:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/scripts/generate-changelog.sh`
+- Uživatelé ho mají dostupný i v aplikaci v sekci Dokumentace:
+  - `/Dokumentace/Changelog`
+- Po navýšení `AppVersion` nebo úpravě release notes spusť:
+  - `./scripts/generate-changelog.sh`
+- Výstup skriptu je:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/CHANGELOG.md`

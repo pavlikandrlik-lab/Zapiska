@@ -140,9 +140,9 @@
                              data-person-picker-placeholder="Vyhledejte vedoucího podle jména nebo emailu..."
                              data-person-picker-empty="Nenalezeny odpovídající osoby.">
                             <input type="hidden" name="HodnotyNavic[0]" value="" data-person-picker-hidden required />
-                            <div class="office-searchbox">
+                            <div class="office-searchbox" data-floating-anchor>
                                 <input type="search" autocomplete="off" data-person-picker-input required />
-                                <div class="office-search-panel" data-person-picker-panel hidden>
+                                <div class="office-search-panel" data-person-picker-panel data-floating-panel data-floating-kind="person-search" data-floating-match-width="true" hidden>
                                     <div class="office-search-results" data-person-picker-results role="listbox" aria-label="Výsledky osob"></div>
                                 </div>
                             </div>

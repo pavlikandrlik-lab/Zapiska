@@ -36,6 +36,7 @@ public sealed class PermissionEvaluationServiceTests
             OrganizacniCelek = "Test",
             IsSuperAdmin = false,
             RoleKody = Array.Empty<string>(),
+            VisibleProjectIds = grants.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
             PermissionGrants = grants
         };
     }

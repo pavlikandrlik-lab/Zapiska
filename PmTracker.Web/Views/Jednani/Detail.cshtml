@@ -55,6 +55,16 @@
 <div class="meeting-layout">
     <aside class="card meeting-sidebar">
         <h2>Účast</h2>
+        @if (canEditMeetingFields)
+        {
+            <div class="meeting-notes-actions">
+                <button class="btn small"
+                        type="button"
+                        data-modal-url="@Url.Action("AddMeetingParticipantModal", "Jednani", new { projektId = Model.ProjektId, jednaniId = Model.Jednani.Id })">
+                    Přidat osobu
+                </button>
+            </div>
+        }
         <form asp-action="SaveAttendance" method="post">
             <input type="hidden" name="projektId" value="@Model.ProjektId" />
             <input type="hidden" name="jednaniId" value="@Model.Jednani.Id" />
@@ -187,7 +197,7 @@
                         || (hasSubsystemLeadPermission
                             && !isLocked
                             && userOsobaId > 0
-                            && userOsobaId == ukol.SubsystemVedouciOsobaId);
+                            && ukol.SubsystemLeadEquivalentOsobaIds.Contains(userOsobaId));
                     @await Html.PartialAsync("_TaskItemPartial", new JednaniTaskItemPartialViewModel
                     {
                         ProjektId = Model.ProjektId,

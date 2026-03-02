@@ -96,9 +96,9 @@ BEGIN TRY
 
     -- Subsystems
     IF NOT EXISTS (SELECT 1 FROM dbo.subsystemy WHERE [kód] = N'INTEGRACE')
-        INSERT INTO dbo.subsystemy([kód], nazev, vedouci_osoba_id) VALUES (N'INTEGRACE', N'Integrace', @osobaId);
+        INSERT INTO dbo.subsystemy([kód], nazev) VALUES (N'INTEGRACE', N'Integrace');
     IF NOT EXISTS (SELECT 1 FROM dbo.subsystemy WHERE [kód] = N'JADRO')
-        INSERT INTO dbo.subsystemy([kód], nazev, vedouci_osoba_id) VALUES (N'JADRO', N'Jádro', @osobaId);
+        INSERT INTO dbo.subsystemy([kód], nazev) VALUES (N'JADRO', N'Jádro');
 
     -- Demo project
     DECLARE @stavRunId int = (SELECT TOP (1) id FROM dbo.ciselnik_stavu_projektu WHERE kod = N'RUN' ORDER BY id);

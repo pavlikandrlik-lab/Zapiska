@@ -215,6 +215,13 @@ public sealed class UserContextResolver : IUserContextResolver
                     : Array.Empty<int>()
             })
             .ToList();
+        var visibleProjectIds = await _dbContext.ObsazeniProjektu
+            .AsNoTracking()
+            .Where(x => x.OsobaId == osoba.Id && !x.DatumOdebrani.HasValue)
+            .Select(x => x.ProjektId)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(cancellationToken);
 
         var displayName = BuildDisplayName(osoba.Titul, osoba.Jmeno, osoba.Prijmeni, osoba.Id);
 
@@ -229,6 +236,7 @@ public sealed class UserContextResolver : IUserContextResolver
             OrganizacniCelek = organizationalUnit?.Nazev ?? "-",
             IsSuperAdmin = isSuperAdmin,
             RoleKody = roleCodes,
+            VisibleProjectIds = visibleProjectIds,
             PermissionGrants = grants
         };
 

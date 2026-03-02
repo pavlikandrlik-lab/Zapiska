@@ -38,7 +38,7 @@
     </label>
     <label>
         Čas začátku
-        <div class="app-time-field" data-app-time-field>
+        <div class="app-time-field" data-app-time-field data-floating-anchor>
             <input class="app-time-display-input" type="text" data-app-time-display value="@Model.Command.CasZacatek.ToString("HH\\:mm")" readonly />
             <input type="hidden" name="CasZacatek" value="@Model.Command.CasZacatek.ToString("HH\\:mm")" data-app-time-value />
             <button class="app-time-trigger" type="button" data-app-time-open aria-label="Otevřít výběr času">
@@ -47,7 +47,7 @@
                     <path d="M12 7.8v4.6l3 1.8"></path>
                 </svg>
             </button>
-            <div class="app-time-panel" data-app-time-panel hidden>
+            <div class="app-time-panel" data-app-time-panel data-floating-panel data-floating-kind="time" hidden>
                 <div class="app-time-grid" data-app-time-grid role="listbox" aria-label="Výběr času"></div>
             </div>
         </div>

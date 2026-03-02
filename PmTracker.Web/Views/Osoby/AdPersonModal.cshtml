@@ -14,13 +14,13 @@
     <input type="hidden" name="VyhledavaciRetezec" value="" data-ad-query-hidden />
     <div class="office-picker" data-ad-picker data-search-url="@Model.SearchUrl">
         <label class="office-search-label">Vyhledávání v AD</label>
-        <div class="office-searchbox">
+        <div class="office-searchbox" data-floating-anchor>
             <input type="search"
                    autocomplete="off"
                    placeholder="Začněte psát jméno nebo email..."
                    data-ad-query-input
                    required />
-            <div class="office-search-panel" data-ad-search-panel hidden>
+            <div class="office-search-panel" data-ad-search-panel data-floating-panel data-floating-kind="ad-search" data-floating-match-width="true" hidden>
                 <div class="office-search-results" data-ad-results role="listbox" aria-label="Výsledky hledání AD"></div>
             </div>
         </div>

@@ -121,17 +121,54 @@ public sealed class AuthzPermissionDataStoreTests
     }
 
     [Fact]
-    public async Task SaveAuthzPermission_ShouldRejectUnknownCategory()
+    public async Task SaveAuthzPermission_ShouldOverrideCategoryFromCatalog_WhenKeyIsSupported()
     {
         var db = await _fixture.CreateDatabaseAsync("perm_badcat");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
         var store = IntegrationTestHelper.CreateDataStore(dbContext);
         var currentUser = IntegrationTestHelper.BuildUser(db.AdminOsobaId, isSuperAdmin: true);
 
-        var supportedKey = PermissionKeys.BuildLookupOptions().First().Value;
         var unknownCategoryId = (await dbContext.AuthzPermissionCategories.MaxAsync(x => (int?)x.Id) ?? 0) + 999;
+        var existingKeys = await dbContext.AuthzPermissions
+            .Select(x => x.Klic)
+            .ToListAsync();
+        var supportedKey = PermissionKeys.BuildLookupOptions()
+            .Select(x => x.Value)
+            .FirstOrDefault(key => existingKeys.All(existing => !string.Equals(existing, key, StringComparison.OrdinalIgnoreCase)));
 
-        var act = () => store.SaveAuthzPermission(new SaveAuthzPermissionCommand
+        if (supportedKey is null)
+        {
+            var existingPermission = await dbContext.AuthzPermissions
+                .OrderBy(x => x.Id)
+                .FirstAsync();
+            var catalogEntry = PermissionKeys.BuildCatalog().First(x => x.Key == existingPermission.Klic);
+            var expectedCategoryId = await dbContext.AuthzPermissionCategories
+                .Where(x => x.IsActive && x.Kod == catalogEntry.CategoryKod)
+                .Select(x => x.Id)
+                .FirstAsync();
+
+            store.SaveAuthzPermission(new SaveAuthzPermissionCommand
+            {
+                Id = existingPermission.Id,
+                Klic = existingPermission.Klic,
+                Nazev = existingPermission.Nazev,
+                CategoryId = unknownCategoryId,
+                ScopeLevel = existingPermission.ScopeLevel
+            }, currentUser);
+
+            var reloaded = await dbContext.AuthzPermissions.AsNoTracking().FirstAsync(x => x.Id == existingPermission.Id);
+            reloaded.CategoryId.Should().Be(expectedCategoryId);
+            reloaded.ScopeLevel.Should().Be(catalogEntry.ScopeLevel);
+            return;
+        }
+
+        var newCatalogEntry = PermissionKeys.BuildCatalog().First(x => x.Key == supportedKey);
+        var newExpectedCategoryId = await dbContext.AuthzPermissionCategories
+            .Where(x => x.IsActive && x.Kod == newCatalogEntry.CategoryKod)
+            .Select(x => x.Id)
+            .FirstAsync();
+
+        store.SaveAuthzPermission(new SaveAuthzPermissionCommand
         {
             Klic = supportedKey,
             Nazev = "Invalid category",
@@ -139,7 +176,8 @@ public sealed class AuthzPermissionDataStoreTests
             ScopeLevel = "PROJECT"
         }, currentUser);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*kategorie akcí neexistuje*");
+        var saved = await dbContext.AuthzPermissions.AsNoTracking().FirstAsync(x => x.Klic == supportedKey);
+        saved.CategoryId.Should().Be(newExpectedCategoryId);
+        saved.ScopeLevel.Should().Be(newCatalogEntry.ScopeLevel);
     }
 }

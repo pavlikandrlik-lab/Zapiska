@@ -259,7 +259,6 @@ public abstract class BaseController : Controller
             : CurrentUserContext.OrganizacniCelekKod;
         ViewBag.CurrentUserRoles = CurrentUserContext.RoleKody;
         ViewBag.IsGlobalAdmin = CurrentUserContext.IsSuperAdmin;
-        ViewBag.CanViewSettingsTab = CurrentUserContext.HasPermission(PermissionKeys.SettingsView);
 
         base.OnActionExecuting(context);
     }
