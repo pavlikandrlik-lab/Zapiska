@@ -1,0 +1,47 @@
+@model ProjectModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "project-modal-title";
+}
+
+<h2 id="project-modal-title">@Model.Title</h2>
+
+<form class="form-grid"
+      asp-controller="Projekty"
+      asp-action="SaveProject"
+      method="post"
+      data-ajax-submit="true">
+    @if (Model.Command.Id.HasValue)
+    {
+        <input type="hidden" name="Id" value="@Model.Command.Id.Value" />
+    }
+    <label>
+        Název (celý)
+        <input type="text" name="Nazev" value="@Model.Command.Nazev" required />
+    </label>
+    <label>
+        Zkratka
+        <input type="text" name="Zkratka" value="@Model.Command.Zkratka" required />
+    </label>
+    <label>
+        Stav
+        <select name="Stav" required>
+            @foreach (var stav in Model.StavyProjektu)
+            {
+                var selected = string.Equals(stav.Value, Model.Command.Stav, StringComparison.OrdinalIgnoreCase);
+                <option value="@stav.Value" selected="@selected">@stav.Label</option>
+            }
+        </select>
+    </label>
+    <label class="checkbox-inline">
+        <input type="checkbox" name="PouzivatIdentJednani" value="true" @((Model.Command.PouzivatIdentJednani) ? "checked=\"checked\"" : null) />
+        <span>Používat identifikátor záznamů podle jednání (808-1)</span>
+    </label>
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = Model.IsEdit ? "Uložit změny" : "Uložit"
+        })
+</form>

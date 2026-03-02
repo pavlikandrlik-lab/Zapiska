@@ -1,0 +1,101 @@
+@model ProfilPageViewModel
+@{
+    ViewData["Title"] = "Můj profil";
+}
+
+<section class="page-header">
+    <div>
+        <h1>Můj profil</h1>
+        <p class="muted">Identita uživatele.</p>
+    </div>
+</section>
+
+<div class="profile-layout">
+    <section class="card">
+        <h2>Identita</h2>
+        <dl class="profile-meta">
+            <div>
+                <dt>Jméno</dt>
+                <dd>@Model.Uzivatel.DisplayName</dd>
+            </div>
+            <div>
+                <dt>Email</dt>
+                <dd>@(string.IsNullOrWhiteSpace(Model.Uzivatel.Email) ? "-" : Model.Uzivatel.Email)</dd>
+            </div>
+            <div>
+                <dt>Organizační celek</dt>
+                <dd>@Model.Uzivatel.OrganizacniCelek</dd>
+            </div>
+            <div>
+                <dt>Role</dt>
+                <dd>@string.Join(", ", Model.Uzivatel.RoleKody)</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="card profile-print-preference-card">
+        <h2>Preferovaný formát tisku</h2>
+        <p class="muted">Nastavení je uloženo pouze v tomto prohlížeči na tomto počítači.</p>
+        <p><strong>Aktuálně:</strong> <span data-print-preference-current>není nastaven</span></p>
+        <button class="btn ghost" type="button" data-print-preference-reset>Zrušit uloženou volbu</button>
+    </section>
+</div>
+
+<section id="moje-prava" class="card profile-rights-card">
+    <div class="panel-header">
+        <div>
+            <h2>Moje práva</h2>
+            <p class="muted">Diagnostický náhled výsledných oprávnění podle rolí a rozsahů.</p>
+        </div>
+    </div>
+
+    <form class="profile-rights-filters" method="get" asp-controller="Profil" asp-action="Index" data-profile-rights-form>
+        <label>
+            Projekt
+            <select name="projektId" data-profile-rights-project>
+                <option value="">Všechny projekty (ALL)</option>
+                @foreach (var option in Model.MojePrava.AvailableProjects)
+                {
+                    var selected = Model.MojePrava.SelectedProjectId == option.Id;
+                    <option value="@option.Id" selected="@selected">@option.Label</option>
+                }
+            </select>
+        </label>
+    </form>
+
+    <div class="settings-effective-header">
+        <span><strong>Uživatel:</strong> @Model.MojePrava.Osoba</span>
+        <span><strong>Projekt:</strong> @Model.MojePrava.ProjektNazev</span>
+    </div>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Akce</th>
+                <th>Název</th>
+                <th>Výsledek</th>
+                <th>Rozsah</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Model.MojePrava.Rows)
+        {
+            <tr>
+                <td><code>@row.PermissionKlic</code></td>
+                <td>@row.PermissionNazev</td>
+                <td>
+                    @if (row.IsAllowed)
+                    {
+                        <span class="unlock">Povoleno</span>
+                    }
+                    else
+                    {
+                        <span class="lock">Zakázáno</span>
+                    }
+                </td>
+                <td>@row.ScopeSummary</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</section>

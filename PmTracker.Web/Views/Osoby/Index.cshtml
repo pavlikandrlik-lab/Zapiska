@@ -1,0 +1,74 @@
+@model OsobyIndexViewModel
+@{
+    ViewData["Title"] = "Osoby";
+    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
+    var canManagePeople = userContext?.HasPermission(PermissionKeys.PeopleManage) ?? false;
+}
+
+<section class="page-header">
+    <div>
+        <h1>Osoby</h1>
+        <p class="muted">Globální seznam identit včetně organizační příslušnosti.</p>
+    </div>
+    <div class="header-actions">
+        @if (canManagePeople)
+        {
+            <button class="btn" type="button" data-modal-url="@Url.Action("AdPersonModal", "Osoby")">Přidat z AD</button>
+            <button class="btn primary" type="button" data-modal-url="@Url.Action("ManualPersonModal", "Osoby")">Přidat ručně</button>
+        }
+        else
+        {
+            <span class="muted">Pouze čtení</span>
+        }
+    </div>
+</section>
+
+<section class="card" data-osoby-table-card>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Jméno</th>
+                <th>Příjmení</th>
+                <th>Titul</th>
+                <th>Email</th>
+                <th>Organizace</th>
+                <th>Organizační celek</th>
+                <th>AD</th>
+                @if (canManagePeople)
+                {
+                    <th class="table-actions">Akce</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var osoba in Model.Osoby)
+        {
+            <tr>
+                <td>@osoba.Jmeno</td>
+                <td>@osoba.Prijmeni</td>
+                <td>@(string.IsNullOrWhiteSpace(osoba.Titul) ? "-" : osoba.Titul)</td>
+                <td>@(string.IsNullOrWhiteSpace(osoba.Email) ? "-" : osoba.Email)</td>
+                <td>@(osoba.Organizace ?? "-")</td>
+                <td>@(osoba.OrganizacniCelek ?? "-")</td>
+                <td>@(osoba.JeAdUcet ? "Ano" : "Ne")</td>
+                @if (canManagePeople)
+                {
+                    <td class="table-actions">
+                        <button class="btn small"
+                                type="button"
+                                data-modal-url="@Url.Action("ManualPersonModal", "Osoby", new { id = osoba.Id })">Upravit</button>
+                        <form class="table-action-inline-form"
+                              asp-controller="Osoby"
+                              asp-action="Delete"
+                              method="post"
+                              onsubmit="return confirm('Opravdu odstranit osobu @($"{osoba.Jmeno} {osoba.Prijmeni}")?');">
+                            <input type="hidden" name="Id" value="@osoba.Id" />
+                            <button class="btn ghost small" type="submit">Odstranit</button>
+                        </form>
+                    </td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+</section>

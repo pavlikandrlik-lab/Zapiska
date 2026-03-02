@@ -1,0 +1,53 @@
+@model AppDateFieldViewModel
+@using System.Text.Encodings.Web
+@{
+    var containerClass = string.IsNullOrWhiteSpace(Model.ContainerCssClass)
+        ? "app-date-field"
+        : $"app-date-field {Model.ContainerCssClass}";
+    var extraAttributeMarkup = string.Empty;
+    if (Model.ExtraDataAttributes.Count > 0)
+    {
+        var parts = new List<string>();
+        foreach (var attribute in Model.ExtraDataAttributes)
+        {
+            if (string.IsNullOrWhiteSpace(attribute.Key))
+            {
+                continue;
+            }
+
+            var value = attribute.Value?.ToString();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            parts.Add($"{attribute.Key}=\"{HtmlEncoder.Default.Encode(value)}\"");
+        }
+
+        extraAttributeMarkup = string.Join(" ", parts);
+    }
+}
+<div class="@containerClass" data-app-date-field data-app-date-locked="@(Model.Locked ? "true" : "false")">
+    <input class="app-date-display-input" type="text" data-app-date-display value="@Model.DisplayValue" readonly />
+    <input type="hidden" name="@Model.Name" value="@Model.IsoValue" data-app-date-value @Html.Raw(extraAttributeMarkup) />
+    <button class="app-date-trigger" type="button" data-app-date-open aria-label="@Model.AriaLabel" @(Model.Locked ? "disabled=\"disabled\"" : null)>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="4.5" width="18" height="16.5" rx="2"></rect>
+            <line x1="8" y1="2.5" x2="8" y2="6.5"></line>
+            <line x1="16" y1="2.5" x2="16" y2="6.5"></line>
+            <line x1="3" y1="9" x2="21" y2="9"></line>
+        </svg>
+    </button>
+    <div class="app-date-panel" data-app-date-panel hidden>
+        <div class="app-date-nav">
+            <button class="app-date-nav-btn" type="button" data-app-date-prev aria-label="Předchozí měsíc">‹</button>
+            <select class="app-date-select app-date-month" data-app-date-month aria-label="Měsíc"></select>
+            <select class="app-date-select app-date-year" data-app-date-year aria-label="Rok"></select>
+            <button class="app-date-nav-btn" type="button" data-app-date-next aria-label="Další měsíc">›</button>
+        </div>
+        <div class="app-date-weekdays" aria-hidden="true">
+            <span>Po</span><span>Út</span><span>St</span><span>Čt</span><span>Pá</span><span>So</span><span>Ne</span>
+        </div>
+        <div class="app-date-grid" data-app-date-grid role="grid"></div>
+    </div>
+</div>

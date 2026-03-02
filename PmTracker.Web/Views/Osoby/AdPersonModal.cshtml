@@ -1,0 +1,75 @@
+@model AdPersonModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "ad-person-modal-title";
+}
+
+<h2 id="ad-person-modal-title">@Model.Title</h2>
+
+<form class="form-grid" asp-action="SaveAd" method="post" data-ajax-submit="true">
+    <input type="hidden" name="GuidAd" value="" data-ad-guid />
+    <input type="hidden" name="AdLogin" value="" data-ad-login />
+    <input type="hidden" name="AdCompany" value="" data-ad-company />
+    <input type="hidden" name="AdDepartment" value="" data-ad-department />
+    <input type="hidden" name="VyhledavaciRetezec" value="" data-ad-query-hidden />
+    <div class="office-picker" data-ad-picker data-search-url="@Model.SearchUrl">
+        <label class="office-search-label">Vyhledávání v AD</label>
+        <div class="office-searchbox">
+            <input type="search"
+                   autocomplete="off"
+                   placeholder="Začněte psát jméno nebo email..."
+                   data-ad-query-input
+                   required />
+            <div class="office-search-panel" data-ad-search-panel hidden>
+                <div class="office-search-results" data-ad-results role="listbox" aria-label="Výsledky hledání AD"></div>
+            </div>
+        </div>
+    </div>
+    <label>
+        Titul
+        <input type="text" name="Titul" value="" data-ad-titul readonly />
+    </label>
+    <label>
+        Jméno
+        <input type="text" name="Jmeno" value="" data-ad-jmeno required readonly />
+    </label>
+    <label>
+        Příjmení
+        <input type="text" name="Prijmeni" value="" data-ad-prijmeni required readonly />
+    </label>
+    <label>
+        Email
+        <input type="email" name="Email" value="" data-ad-email required readonly />
+    </label>
+    <label>
+        Organizace
+        <select name="Organizace" data-ad-org-select required>
+            @foreach (var organizace in Model.Organizace)
+            {
+                <option value="@organizace.Value">@organizace.Label</option>
+            }
+        </select>
+        <span class="ad-location-hint" data-ad-org-create-hint hidden>+ BUDE PŘIDÁNO DO ČÍSELNÍKU</span>
+    </label>
+    <label>
+        Organizační celek
+        <select name="OrganizacniCelek" data-ad-org-unit-select>
+            <option value="">(nevyplněno)</option>
+            @foreach (var celek in Model.OrganizacniCelky)
+            {
+                <option value="@celek.Value">@celek.Label</option>
+            }
+        </select>
+        <span class="ad-location-hint" data-ad-org-unit-create-hint hidden>+ BUDE PŘIDÁNO DO ČÍSELNÍKU</span>
+    </label>
+    <label class="checkbox-inline">
+        <input type="hidden" name="LocationLocked" value="false" />
+        <input type="checkbox" name="LocationLocked" value="true" />
+        Uzamknout přiřazení organizace a organizačního celku
+    </label>
+
+    <div class="form-actions">
+        <button class="btn" type="button" data-modal-close>Zrušit</button>
+        <button class="btn primary" type="submit" data-ad-submit disabled>Přidat</button>
+    </div>
+</form>

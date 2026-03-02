@@ -1,0 +1,71 @@
+@model ManualPersonModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "manual-person-modal-title";
+}
+
+<h2 id="manual-person-modal-title">@Model.Title</h2>
+
+<form class="form-grid" asp-action="SaveManual" method="post" data-ajax-submit="true">
+    @if (Model.Command.Id.HasValue)
+    {
+        <input type="hidden" name="Id" value="@Model.Command.Id.Value" />
+    }
+    <label>
+        Jméno
+        <input type="text" name="Jmeno" value="@Model.Command.Jmeno" required readonly="@Model.IsAdAccount" />
+    </label>
+    <label>
+        Příjmení
+        <input type="text" name="Prijmeni" value="@Model.Command.Prijmeni" required readonly="@Model.IsAdAccount" />
+    </label>
+    <label>
+        Titul
+        <input type="text" name="Titul" value="@Model.Command.Titul" readonly="@Model.IsAdAccount" />
+    </label>
+    <label>
+        Email
+        <input type="email" name="Email" value="@Model.Command.Email" placeholder="jmeno.prijmeni@organizace.cz" readonly="@Model.IsAdAccount" />
+    </label>
+    <label>
+        Organizace
+        <select name="Organizace">
+            @foreach (var organizace in Model.Organizace)
+            {
+                var selected = string.Equals(organizace.Value, Model.Command.Organizace, StringComparison.OrdinalIgnoreCase);
+                <option value="@organizace.Value" selected="@selected">@organizace.Label</option>
+            }
+        </select>
+    </label>
+    <label>
+        Organizační celek
+        <select name="OrganizacniCelek">
+            <option value="">(nevyplněno)</option>
+            @foreach (var celek in Model.OrganizacniCelky)
+            {
+                var selected = string.Equals(celek.Value, Model.Command.OrganizacniCelek, StringComparison.OrdinalIgnoreCase);
+                <option value="@celek.Value" selected="@selected">@celek.Label</option>
+            }
+        </select>
+    </label>
+    @if (Model.IsAdAccount)
+    {
+        <label class="checkbox-inline">
+            <input type="hidden" name="LocationLocked" value="false" />
+            <input type="checkbox" name="LocationLocked" value="true" checked="@Model.Command.LocationLocked" />
+            Uzamknout přiřazení organizace a organizačního celku
+        </label>
+        <p class="muted">Údaje identity osoby spravuje AD. V tomto formuláři měníte pouze organizační zařazení.</p>
+    }
+    else
+    {
+        <input type="hidden" name="LocationLocked" value="false" />
+    }
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = Model.IsEdit ? "Uložit změny" : "Uložit"
+        })
+</form>

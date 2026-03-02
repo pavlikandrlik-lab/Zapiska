@@ -1,0 +1,1010 @@
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+SET NOCOUNT ON;
+GO
+
+/*
+================================================================================
+ SECTION 1: SCHÉMATA + TABULKY + KONSTRAINTY + INDEXY (FINALNÍ STRUKTURA)
+================================================================================
+ Tento skript je určený pro novou/prázdnou databázi.
+*/
+
+/* -------------------- DBO: číselníky -------------------- */
+CREATE TABLE dbo.ciselnik_stavu_projektu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_stavu_projektu PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_stavu_projektu_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_stavu_projektu_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE dbo.ciselnik_stavu_ukolu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_stavu_ukolu PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_final bit NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_stavu_ukolu_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_stavu_ukolu_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE dbo.ciselnik_kategorii_zaznamu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_kategorii_zaznamu PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_kategorii_zaznamu_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_kategorii_zaznamu_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE dbo.ciselnik_typu_ukolu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_typu_ukolu PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_typu_ukolu_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_typu_ukolu_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE dbo.ciselnik_typu_externich_odkazu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_typu_externich_odkazu PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_typu_externich_odkazu_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_typu_externich_odkazu_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE dbo.ciselnik_roli_projektu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_roli_projektu PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_roli_projektu_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_roli_projektu_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE dbo.ciselnik_stavu_ucasti (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_stavu_ucasti PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_stavu_ucasti_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_stavu_ucasti_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE dbo.ciselnik_organizace (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_organizace PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_organizace_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_organizace_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE dbo.ciselnik_organizacni_celky (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_organizacni_celky PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_organizacni_celky_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_organizacni_celky_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE dbo.ciselnik_vyzvy (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_vyzvy PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    rok date NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_vyzvy_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_vyzvy_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE dbo.ciselnik_stavu_jednani (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_stavu_jednani PRIMARY KEY,
+    kod nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_stavu_jednani_is_locked DEFAULT (0),
+    CONSTRAINT UQ_ciselnik_stavu_jednani_kod UNIQUE (kod)
+);
+GO
+
+/* -------------------- DBO: hlavní tabulky -------------------- */
+CREATE TABLE dbo.osoby (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_osoby PRIMARY KEY,
+    jmeno nvarchar(255) NOT NULL,
+    prijmeni nvarchar(255) NOT NULL,
+    titul nvarchar(255) NULL,
+    email nvarchar(255) NULL,
+    ad_login nvarchar(255) NULL,
+    organizacni_celek_id int NULL,
+    organizace_id int NOT NULL,
+    Guid_AD uniqueidentifier NULL,
+    location_locked bit NOT NULL CONSTRAINT DF_osoby_location_locked DEFAULT (0)
+);
+GO
+
+CREATE TABLE dbo.projekty (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_projekty PRIMARY KEY,
+    zkratka nvarchar(255) NOT NULL,
+    cely_nazev nvarchar(255) NOT NULL,
+    stav_id int NOT NULL,
+    pouzivat_ident_jednani bit NOT NULL CONSTRAINT DF_projekty_pouzivat_ident_jednani DEFAULT (0),
+    CONSTRAINT UQ_projekty_zkratka UNIQUE (zkratka)
+);
+GO
+
+CREATE TABLE dbo.subsystemy (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_subsystemy PRIMARY KEY,
+    [kód] nvarchar(255) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    vedouci_osoba_id int NOT NULL,
+    CONSTRAINT UQ_subsystemy_kod UNIQUE ([kód])
+);
+GO
+
+CREATE TABLE dbo.obsazeni_projektu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_obsazeni_projektu PRIMARY KEY,
+    projekt_id int NOT NULL,
+    osoba_id int NOT NULL,
+    role_id int NOT NULL
+);
+GO
+
+CREATE TABLE dbo.jednani (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_jednani PRIMARY KEY,
+    projekt_id int NOT NULL,
+    cislo_jednani int NOT NULL,
+    datum_planovane date NOT NULL,
+    cas_zacatek time(0) NOT NULL,
+    misto nvarchar(255) NULL,
+    stav_jednani_id int NOT NULL,
+    uzamkl_osoba_id int NULL
+);
+GO
+
+CREATE TABLE dbo.harmonogram_sablony (
+    verze int IDENTITY(1,1) NOT NULL CONSTRAINT PK_harmonogram_sablony PRIMARY KEY,
+    delay_barva_hex nvarchar(7) NOT NULL CONSTRAINT DF_harmonogram_sablony_delay_barva_hex DEFAULT (N'#DC2626'),
+    is_aktivni bit NOT NULL CONSTRAINT DF_harmonogram_sablony_is_aktivni DEFAULT (0),
+    created_at datetime2 NOT NULL CONSTRAINT DF_harmonogram_sablony_created_at DEFAULT (SYSUTCDATETIME()),
+    created_by int NULL,
+    CONSTRAINT CK_harmonogram_sablony_delay_barva_hex CHECK (
+        delay_barva_hex LIKE N'#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]'
+    )
+);
+GO
+
+CREATE TABLE dbo.ciselnik_harmonogram_typu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_ciselnik_harmonogram_typu PRIMARY KEY,
+    kod nvarchar(120) NOT NULL,
+    nazev nvarchar(500) NOT NULL,
+    hodnota int NOT NULL,
+    is_locked bit NOT NULL CONSTRAINT DF_ciselnik_harmonogram_typu_is_locked DEFAULT (1),
+    sablona_verze int NOT NULL,
+    krok_key uniqueidentifier NOT NULL,
+    krok_poradi int NOT NULL,
+    je_zpozdeni bit NOT NULL,
+    barva_hex nvarchar(7) NULL,
+    CONSTRAINT CK_ciselnik_harmonogram_typu_krok_poradi_positive CHECK (krok_poradi > 0),
+    CONSTRAINT CK_ciselnik_harmonogram_typu_barva_hex CHECK (
+        barva_hex IS NULL OR barva_hex LIKE N'#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]'
+    )
+);
+GO
+
+CREATE TABLE dbo.projektove_zaznamy (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_projektove_zaznamy PRIMARY KEY,
+    projekt_id int NOT NULL,
+    kategorie_id int NOT NULL,
+    aktualni_typ_ukolu_id int NULL,
+    stav_ukolu_id int NULL,
+    cislo_zaznamu int NOT NULL,
+    cislo_viditelne nvarchar(32) NULL,
+    cislo_viditelne_typ tinyint NOT NULL CONSTRAINT DF_projektove_zaznamy_cislo_viditelne_typ DEFAULT (0),
+    cislo_viditelne_a int NOT NULL CONSTRAINT DF_projektove_zaznamy_cislo_viditelne_a DEFAULT (0),
+    cislo_viditelne_b int NOT NULL CONSTRAINT DF_projektove_zaznamy_cislo_viditelne_b DEFAULT (0),
+    cislo_jednani_zdroj_id int NULL,
+    nazev nvarchar(255) NOT NULL,
+    popis text NULL,
+    vlastnik_id int NOT NULL,
+    datum_zalozeni date NOT NULL,
+    datum_ukonceni date NOT NULL,
+    subsystem_id int NOT NULL,
+    harmonogram_sablona_verze int NOT NULL CONSTRAINT DF_projektove_zaznamy_harmonogram_sablona_verze DEFAULT (1),
+    CONSTRAINT CK_projektove_zaznamy_cislo_viditelne_typ CHECK (cislo_viditelne_typ IN (0, 1)),
+    CONSTRAINT CK_projektove_zaznamy_cislo_viditelne_consistency CHECK (
+        (cislo_viditelne_typ = 0 AND cislo_jednani_zdroj_id IS NULL AND cislo_viditelne_b = 0)
+        OR
+        (cislo_viditelne_typ = 1 AND cislo_jednani_zdroj_id IS NOT NULL AND cislo_viditelne_b > 0)
+    )
+);
+GO
+
+CREATE TABLE dbo.zaznam_harmonogram_hodnoty (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_harmonogram_hodnoty PRIMARY KEY,
+    zaznam_id int NOT NULL,
+    typ_id int NOT NULL,
+    hodnota_int int NOT NULL,
+    updated_at datetime2 NOT NULL CONSTRAINT DF_zaznam_harmonogram_hodnoty_updated_at DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative CHECK (hodnota_int >= 0)
+);
+GO
+
+CREATE TABLE dbo.zaznam_historie_zmen_typu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_historie_zmen_typu PRIMARY KEY,
+    zaznam_id int NOT NULL,
+    puvodni_typ_id int NOT NULL,
+    novy_typ_id int NOT NULL,
+    datum_zmeny datetime NOT NULL,
+    zmenil_osoba_id int NOT NULL
+);
+GO
+
+CREATE TABLE dbo.zaznam_historie_terminu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_historie_terminu PRIMARY KEY,
+    zaznam_id int NOT NULL,
+    puvodni_datum date NOT NULL,
+    nove_datum date NOT NULL,
+    datum_zmeny datetime NOT NULL,
+    duvod text NOT NULL
+);
+GO
+
+CREATE TABLE dbo.zaznam_historie_vlastnik (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_historie_vlastnik PRIMARY KEY,
+    zaznam_id int NOT NULL,
+    puvodni_vlastnik int NOT NULL,
+    novy_vlastnik int NOT NULL,
+    datum_zmeny datetime NOT NULL
+);
+GO
+
+CREATE TABLE dbo.zaznam_historie_subsystem (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_historie_subsystem PRIMARY KEY,
+    zaznam_id int NOT NULL,
+    puvodni_subsystem int NOT NULL,
+    novy_subsystem int NOT NULL,
+    datum_zmeny datetime NOT NULL
+);
+GO
+
+CREATE TABLE dbo.zaznam_historie_stavu_zaznamu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_historie_stavu_zaznamu PRIMARY KEY,
+    zaznam_id int NOT NULL,
+    puvodni_stav int NOT NULL,
+    novy_stav int NOT NULL,
+    datum_zmeny datetime NOT NULL
+);
+GO
+
+CREATE TABLE dbo.zaznam_historie_stavu_projektu (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_historie_stavu_projektu PRIMARY KEY,
+    zaznam_id int NOT NULL,
+    puvodni_stav int NOT NULL,
+    novy_stav int NOT NULL,
+    datum_zmeny datetime NOT NULL
+);
+GO
+
+CREATE TABLE dbo.zaznam_externi_odkazy (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_externi_odkazy PRIMARY KEY,
+    zaznam_id int NOT NULL,
+    typ_odkazu_id int NOT NULL,
+    cislo nvarchar(255) NOT NULL,
+    datum_objednani date NULL,
+    plan_dodani date NULL,
+    datum_dodani date NULL,
+    datum_prevzeti date NULL,
+    vyzva int NULL
+);
+GO
+
+CREATE TABLE dbo.zaznam_spoluprace (
+    zaznam_id int NOT NULL,
+    osoba_id int NOT NULL,
+    CONSTRAINT PK_zaznam_spoluprace PRIMARY KEY (zaznam_id, osoba_id)
+);
+GO
+
+CREATE TABLE dbo.ucast (
+    jednani_id int NOT NULL,
+    osoba_id int NOT NULL,
+    stav_ucasti_id int NOT NULL,
+    CONSTRAINT PK_ucast PRIMARY KEY (jednani_id, osoba_id)
+);
+GO
+
+CREATE TABLE dbo.vyjadreni (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_vyjadreni PRIMARY KEY,
+    zaznam_id int NOT NULL,
+    jednani_id int NOT NULL,
+    autor_osoba_id int NOT NULL,
+    text_vyjadreni text NOT NULL,
+    datum_vyjadreni datetime NOT NULL
+);
+GO
+
+/* -------------------- AUTHZ schéma -------------------- */
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'authz')
+BEGIN
+    EXEC(N'CREATE SCHEMA authz');
+END
+GO
+
+CREATE TABLE authz.superadmins (
+    osoba_id int NOT NULL CONSTRAINT PK_authz_superadmins PRIMARY KEY,
+    poznamka nvarchar(500) NULL,
+    created_at datetime2 NOT NULL CONSTRAINT DF_authz_superadmins_created_at DEFAULT (SYSUTCDATETIME()),
+    created_by int NULL
+);
+GO
+
+CREATE TABLE authz.permission_categories (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_authz_permission_categories PRIMARY KEY,
+    kod nvarchar(100) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    sort_order int NOT NULL CONSTRAINT DF_authz_permission_categories_sort_order DEFAULT (100),
+    is_active bit NOT NULL CONSTRAINT DF_authz_permission_categories_is_active DEFAULT (1),
+    CONSTRAINT UQ_authz_permission_categories_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE authz.permissions (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_authz_permissions PRIMARY KEY,
+    klic nvarchar(150) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    category_id int NOT NULL,
+    scope_level nvarchar(20) NOT NULL,
+    is_active bit NOT NULL CONSTRAINT DF_authz_permissions_is_active DEFAULT (1),
+    is_system bit NOT NULL CONSTRAINT DF_authz_permissions_is_system DEFAULT (1),
+    CONSTRAINT UQ_authz_permissions_klic UNIQUE (klic),
+    CONSTRAINT CK_authz_permissions_scope_level CHECK (scope_level IN (N'GLOBAL', N'PROJECT'))
+);
+GO
+
+CREATE TABLE authz.roles (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_authz_roles PRIMARY KEY,
+    kod nvarchar(100) NOT NULL,
+    nazev nvarchar(255) NOT NULL,
+    popis nvarchar(1000) NULL,
+    is_system bit NOT NULL CONSTRAINT DF_authz_roles_is_system DEFAULT (0),
+    is_active bit NOT NULL CONSTRAINT DF_authz_roles_is_active DEFAULT (1),
+    CONSTRAINT UQ_authz_roles_kod UNIQUE (kod)
+);
+GO
+
+CREATE TABLE authz.role_permissions (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_authz_role_permissions PRIMARY KEY,
+    role_id int NOT NULL,
+    permission_id int NOT NULL,
+    scope_mode nvarchar(20) NOT NULL,
+    is_allowed bit NOT NULL CONSTRAINT DF_authz_role_permissions_is_allowed DEFAULT (1),
+    CONSTRAINT UQ_authz_role_permissions_role_permission UNIQUE (role_id, permission_id),
+    CONSTRAINT CK_authz_role_permissions_scope_mode CHECK (scope_mode IN (N'ALL', N'INCLUDE'))
+);
+GO
+
+CREATE TABLE authz.role_permission_projects (
+    role_permission_id int NOT NULL,
+    projekt_id int NOT NULL,
+    CONSTRAINT PK_authz_role_permission_projects PRIMARY KEY (role_permission_id, projekt_id)
+);
+GO
+
+CREATE TABLE authz.user_roles (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_authz_user_roles PRIMARY KEY,
+    osoba_id int NOT NULL,
+    role_id int NOT NULL,
+    is_active bit NOT NULL CONSTRAINT DF_authz_user_roles_is_active DEFAULT (1),
+    created_at datetime2 NOT NULL CONSTRAINT DF_authz_user_roles_created_at DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT UQ_authz_user_roles_osoba_role UNIQUE (osoba_id, role_id)
+);
+GO
+
+CREATE TABLE authz.audit_log (
+    id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_authz_audit_log PRIMARY KEY,
+    actor_osoba_id int NULL,
+    entity_type nvarchar(120) NOT NULL,
+    entity_id nvarchar(120) NOT NULL,
+    action nvarchar(120) NOT NULL,
+    old_value nvarchar(max) NULL,
+    new_value nvarchar(max) NULL,
+    created_at datetime2 NOT NULL CONSTRAINT DF_authz_audit_log_created_at DEFAULT (SYSUTCDATETIME())
+);
+GO
+
+/* -------------------- FK constraints -------------------- */
+ALTER TABLE dbo.osoby ADD CONSTRAINT FK_osoby_organizacni_celek FOREIGN KEY (organizacni_celek_id) REFERENCES dbo.ciselnik_organizacni_celky(id);
+ALTER TABLE dbo.osoby ADD CONSTRAINT FK_osoby_organizace FOREIGN KEY (organizace_id) REFERENCES dbo.ciselnik_organizace(id);
+
+ALTER TABLE dbo.subsystemy ADD CONSTRAINT FK_subsystemy_vedouci_osoba FOREIGN KEY (vedouci_osoba_id) REFERENCES dbo.osoby(id);
+ALTER TABLE dbo.projekty ADD CONSTRAINT FK_projekty_stav FOREIGN KEY (stav_id) REFERENCES dbo.ciselnik_stavu_projektu(id);
+
+ALTER TABLE dbo.obsazeni_projektu ADD CONSTRAINT FK_obsazeni_projektu_projekt FOREIGN KEY (projekt_id) REFERENCES dbo.projekty(id);
+ALTER TABLE dbo.obsazeni_projektu ADD CONSTRAINT FK_obsazeni_projektu_osoba FOREIGN KEY (osoba_id) REFERENCES dbo.osoby(id);
+ALTER TABLE dbo.obsazeni_projektu ADD CONSTRAINT FK_obsazeni_projektu_role FOREIGN KEY (role_id) REFERENCES dbo.ciselnik_roli_projektu(id);
+
+ALTER TABLE dbo.jednani ADD CONSTRAINT FK_jednani_projekt FOREIGN KEY (projekt_id) REFERENCES dbo.projekty(id);
+ALTER TABLE dbo.jednani ADD CONSTRAINT FK_jednani_stav FOREIGN KEY (stav_jednani_id) REFERENCES dbo.ciselnik_stavu_jednani(id);
+ALTER TABLE dbo.jednani ADD CONSTRAINT FK_jednani_uzamkl_osoba FOREIGN KEY (uzamkl_osoba_id) REFERENCES dbo.osoby(id);
+
+ALTER TABLE dbo.harmonogram_sablony ADD CONSTRAINT FK_harmonogram_sablony_created_by FOREIGN KEY (created_by) REFERENCES dbo.osoby(id);
+ALTER TABLE dbo.ciselnik_harmonogram_typu ADD CONSTRAINT FK_ciselnik_harmonogram_typu_sablona FOREIGN KEY (sablona_verze) REFERENCES dbo.harmonogram_sablony(verze);
+
+ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_projekt FOREIGN KEY (projekt_id) REFERENCES dbo.projekty(id);
+ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_kategorie FOREIGN KEY (kategorie_id) REFERENCES dbo.ciselnik_kategorii_zaznamu(id);
+ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_typ_ukolu FOREIGN KEY (aktualni_typ_ukolu_id) REFERENCES dbo.ciselnik_typu_ukolu(id);
+ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_stav_ukolu FOREIGN KEY (stav_ukolu_id) REFERENCES dbo.ciselnik_stavu_ukolu(id);
+ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_vlastnik FOREIGN KEY (vlastnik_id) REFERENCES dbo.osoby(id);
+ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_subsystem FOREIGN KEY (subsystem_id) REFERENCES dbo.subsystemy(id);
+ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_harmonogram_sablona FOREIGN KEY (harmonogram_sablona_verze) REFERENCES dbo.harmonogram_sablony(verze);
+ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_cislo_jednani_zdroj FOREIGN KEY (cislo_jednani_zdroj_id) REFERENCES dbo.jednani(id);
+
+ALTER TABLE dbo.zaznam_harmonogram_hodnoty ADD CONSTRAINT FK_zaznam_harmonogram_hodnoty_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_harmonogram_hodnoty ADD CONSTRAINT FK_zaznam_harmonogram_hodnoty_typ FOREIGN KEY (typ_id) REFERENCES dbo.ciselnik_harmonogram_typu(id);
+
+ALTER TABLE dbo.zaznam_historie_zmen_typu ADD CONSTRAINT FK_zaznam_historie_zmen_typu_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_historie_zmen_typu ADD CONSTRAINT FK_zaznam_historie_zmen_typu_puvodni FOREIGN KEY (puvodni_typ_id) REFERENCES dbo.ciselnik_typu_ukolu(id);
+ALTER TABLE dbo.zaznam_historie_zmen_typu ADD CONSTRAINT FK_zaznam_historie_zmen_typu_novy FOREIGN KEY (novy_typ_id) REFERENCES dbo.ciselnik_typu_ukolu(id);
+ALTER TABLE dbo.zaznam_historie_zmen_typu ADD CONSTRAINT FK_zaznam_historie_zmen_typu_osoba FOREIGN KEY (zmenil_osoba_id) REFERENCES dbo.osoby(id);
+
+ALTER TABLE dbo.zaznam_historie_terminu ADD CONSTRAINT FK_zaznam_historie_terminu_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+
+ALTER TABLE dbo.zaznam_historie_vlastnik ADD CONSTRAINT FK_zaznam_historie_vlastnik_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_historie_vlastnik ADD CONSTRAINT FK_zaznam_historie_vlastnik_puvodni FOREIGN KEY (puvodni_vlastnik) REFERENCES dbo.osoby(id);
+ALTER TABLE dbo.zaznam_historie_vlastnik ADD CONSTRAINT FK_zaznam_historie_vlastnik_novy FOREIGN KEY (novy_vlastnik) REFERENCES dbo.osoby(id);
+
+ALTER TABLE dbo.zaznam_historie_subsystem ADD CONSTRAINT FK_zaznam_historie_subsystem_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_historie_subsystem ADD CONSTRAINT FK_zaznam_historie_subsystem_puvodni FOREIGN KEY (puvodni_subsystem) REFERENCES dbo.subsystemy(id);
+ALTER TABLE dbo.zaznam_historie_subsystem ADD CONSTRAINT FK_zaznam_historie_subsystem_novy FOREIGN KEY (novy_subsystem) REFERENCES dbo.subsystemy(id);
+
+ALTER TABLE dbo.zaznam_historie_stavu_zaznamu ADD CONSTRAINT FK_zaznam_historie_stavu_zaznamu_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_historie_stavu_zaznamu ADD CONSTRAINT FK_zaznam_historie_stavu_zaznamu_puvodni FOREIGN KEY (puvodni_stav) REFERENCES dbo.ciselnik_stavu_ukolu(id);
+ALTER TABLE dbo.zaznam_historie_stavu_zaznamu ADD CONSTRAINT FK_zaznam_historie_stavu_zaznamu_novy FOREIGN KEY (novy_stav) REFERENCES dbo.ciselnik_stavu_ukolu(id);
+
+ALTER TABLE dbo.zaznam_historie_stavu_projektu ADD CONSTRAINT FK_zaznam_historie_stavu_projektu_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_historie_stavu_projektu ADD CONSTRAINT FK_zaznam_historie_stavu_projektu_puvodni FOREIGN KEY (puvodni_stav) REFERENCES dbo.ciselnik_stavu_projektu(id);
+ALTER TABLE dbo.zaznam_historie_stavu_projektu ADD CONSTRAINT FK_zaznam_historie_stavu_projektu_novy FOREIGN KEY (novy_stav) REFERENCES dbo.ciselnik_stavu_projektu(id);
+
+ALTER TABLE dbo.zaznam_externi_odkazy ADD CONSTRAINT FK_zaznam_externi_odkazy_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_externi_odkazy ADD CONSTRAINT FK_zaznam_externi_odkazy_typ FOREIGN KEY (typ_odkazu_id) REFERENCES dbo.ciselnik_typu_externich_odkazu(id);
+ALTER TABLE dbo.zaznam_externi_odkazy ADD CONSTRAINT FK_zaznam_externi_odkazy_vyzva FOREIGN KEY (vyzva) REFERENCES dbo.ciselnik_vyzvy(id);
+
+ALTER TABLE dbo.zaznam_spoluprace ADD CONSTRAINT FK_zaznam_spoluprace_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_spoluprace ADD CONSTRAINT FK_zaznam_spoluprace_osoba FOREIGN KEY (osoba_id) REFERENCES dbo.osoby(id);
+
+ALTER TABLE dbo.ucast ADD CONSTRAINT FK_ucast_jednani FOREIGN KEY (jednani_id) REFERENCES dbo.jednani(id);
+ALTER TABLE dbo.ucast ADD CONSTRAINT FK_ucast_osoba FOREIGN KEY (osoba_id) REFERENCES dbo.osoby(id);
+ALTER TABLE dbo.ucast ADD CONSTRAINT FK_ucast_stav FOREIGN KEY (stav_ucasti_id) REFERENCES dbo.ciselnik_stavu_ucasti(id);
+
+ALTER TABLE dbo.vyjadreni ADD CONSTRAINT FK_vyjadreni_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.vyjadreni ADD CONSTRAINT FK_vyjadreni_jednani FOREIGN KEY (jednani_id) REFERENCES dbo.jednani(id);
+ALTER TABLE dbo.vyjadreni ADD CONSTRAINT FK_vyjadreni_autor_osoba FOREIGN KEY (autor_osoba_id) REFERENCES dbo.osoby(id);
+
+ALTER TABLE authz.permissions ADD CONSTRAINT FK_authz_permissions_category FOREIGN KEY (category_id) REFERENCES authz.permission_categories(id);
+ALTER TABLE authz.role_permissions ADD CONSTRAINT FK_authz_role_permissions_role FOREIGN KEY (role_id) REFERENCES authz.roles(id);
+ALTER TABLE authz.role_permissions ADD CONSTRAINT FK_authz_role_permissions_permission FOREIGN KEY (permission_id) REFERENCES authz.permissions(id);
+ALTER TABLE authz.role_permission_projects ADD CONSTRAINT FK_authz_role_permission_projects_role_permission FOREIGN KEY (role_permission_id) REFERENCES authz.role_permissions(id);
+ALTER TABLE authz.role_permission_projects ADD CONSTRAINT FK_authz_role_permission_projects_projekt FOREIGN KEY (projekt_id) REFERENCES dbo.projekty(id);
+ALTER TABLE authz.user_roles ADD CONSTRAINT FK_authz_user_roles_osoba FOREIGN KEY (osoba_id) REFERENCES dbo.osoby(id);
+ALTER TABLE authz.user_roles ADD CONSTRAINT FK_authz_user_roles_role FOREIGN KEY (role_id) REFERENCES authz.roles(id);
+ALTER TABLE authz.superadmins ADD CONSTRAINT FK_authz_superadmins_osoba FOREIGN KEY (osoba_id) REFERENCES dbo.osoby(id);
+ALTER TABLE authz.superadmins ADD CONSTRAINT FK_authz_superadmins_created_by FOREIGN KEY (created_by) REFERENCES dbo.osoby(id);
+ALTER TABLE authz.audit_log ADD CONSTRAINT FK_authz_audit_log_actor FOREIGN KEY (actor_osoba_id) REFERENCES dbo.osoby(id);
+GO
+
+/* -------------------- Indexy -------------------- */
+CREATE UNIQUE INDEX UX_osoby_Guid_AD ON dbo.osoby(Guid_AD) WHERE Guid_AD IS NOT NULL;
+CREATE INDEX IX_osoby_ad_login ON dbo.osoby(ad_login) WHERE ad_login IS NOT NULL;
+
+CREATE UNIQUE INDEX UX_obsazeni_projektu_projekt_osoba_role ON dbo.obsazeni_projektu(projekt_id, osoba_id, role_id);
+CREATE UNIQUE INDEX UX_jednani_projekt_cislo ON dbo.jednani(projekt_id, cislo_jednani);
+
+CREATE UNIQUE INDEX UX_projektove_zaznamy_projekt_cislo ON dbo.projektove_zaznamy(projekt_id, cislo_zaznamu);
+CREATE UNIQUE INDEX UX_projektove_zaznamy_projekt_cislo_viditelne ON dbo.projektove_zaznamy(projekt_id, cislo_viditelne) WHERE cislo_viditelne IS NOT NULL;
+CREATE UNIQUE INDEX UX_projektove_zaznamy_projekt_meeting_order ON dbo.projektove_zaznamy(projekt_id, cislo_viditelne_a, cislo_viditelne_b) WHERE cislo_viditelne_typ = 1;
+CREATE INDEX IX_projektove_zaznamy_projekt_sort ON dbo.projektove_zaznamy(projekt_id, cislo_viditelne_a, cislo_viditelne_b, cislo_zaznamu);
+
+CREATE INDEX IX_vyjadreni_autor_osoba_id ON dbo.vyjadreni(autor_osoba_id);
+
+CREATE UNIQUE INDEX UQ_harmonogram_sablony_aktivni ON dbo.harmonogram_sablony(is_aktivni) WHERE is_aktivni = 1;
+CREATE UNIQUE INDEX UQ_ciselnik_harmonogram_typu_sablona_kod ON dbo.ciselnik_harmonogram_typu(sablona_verze, kod);
+CREATE UNIQUE INDEX UQ_ciselnik_harmonogram_typu_sablona_krok_zpozdeni ON dbo.ciselnik_harmonogram_typu(sablona_verze, krok_poradi, je_zpozdeni);
+CREATE UNIQUE INDEX UQ_zaznam_harmonogram_hodnoty_zaznam_typ ON dbo.zaznam_harmonogram_hodnoty(zaznam_id, typ_id);
+GO
+
+/* -------------------- DB scoped settings -------------------- */
+IF EXISTS (
+    SELECT 1
+    FROM sys.database_scoped_configurations
+    WHERE name = N'IDENTITY_CACHE'
+      AND CAST(value AS int) <> 0
+)
+BEGIN
+    ALTER DATABASE SCOPED CONFIGURATION SET IDENTITY_CACHE = OFF;
+END
+GO
+
+
+/*
+================================================================================
+ SECTION 2: NAPLNĚNÍ TABULEK DATY (SEED)
+================================================================================
+*/
+
+/* -------------------- Povinné stavy projektu -------------------- */
+MERGE dbo.ciselnik_stavu_projektu AS target
+USING (VALUES
+    (N'PLAN', N'Plán', 1),
+    (N'RUN', N'Běží', 1),
+    (N'DONE', N'Hotovo', 1),
+    (N'DELETED', N'Smazáno', 1)
+) AS source(kod, nazev, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_locked)
+    VALUES (source.kod, source.nazev, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_locked = source.is_locked;
+GO
+
+/* -------------------- Ostatní číselníky -------------------- */
+MERGE dbo.ciselnik_stavu_ukolu AS target
+USING (VALUES
+    (N'OPEN', N'Rozpracováno', 0, 1),
+    (N'WAIT', N'Čeká se', 0, 1),
+    (N'DONE', N'Hotovo', 1, 1),
+    (N'CANCEL', N'Zrušeno', 1, 1)
+) AS source(kod, nazev, is_final, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_final, is_locked)
+    VALUES (source.kod, source.nazev, source.is_final, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_final = source.is_final,
+        target.is_locked = source.is_locked;
+GO
+
+MERGE dbo.ciselnik_kategorii_zaznamu AS target
+USING (VALUES
+    (N'UKOL', N'Úkol', 1),
+    (N'INFO', N'Informace', 1),
+    (N'ROZHODNUTI', N'Rozhodnutí', 1)
+) AS source(kod, nazev, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_locked)
+    VALUES (source.kod, source.nazev, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_locked = source.is_locked;
+GO
+
+MERGE dbo.ciselnik_typu_ukolu AS target
+USING (VALUES
+    (N'RU', N'Hlavní úkol rozvoje', 0),
+    (N'A', N'Akce', 0),
+    (N'P', N'Projekt', 0),
+    (N'mP', N'Miniprojekt', 0)
+) AS source(kod, nazev, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_locked)
+    VALUES (source.kod, source.nazev, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_locked = source.is_locked;
+GO
+
+MERGE dbo.ciselnik_typu_externich_odkazu AS target
+USING (VALUES
+    (N'PMP', N'Požadavek metodické podpory', 1),
+    (N'PNF', N'Požadavek nové funkcionality', 1),
+    (N'NES', N'Nesrovnalost', 1)
+) AS source(kod, nazev, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_locked)
+    VALUES (source.kod, source.nazev, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_locked = source.is_locked;
+GO
+
+MERGE dbo.ciselnik_roli_projektu AS target
+USING (VALUES
+    (N'PM', N'Projektový manažer', 1),
+    (N'GEST', N'Gestor', 1),
+    (N'VED_SUB', N'Vedoucí subsystému', 1),
+    (N'DOD_MAINT', N'Dodavatel maintenance', 1),
+    (N'ANALYTIK', N'Analytik', 0),
+    (N'DEV', N'Developer', 0)
+) AS source(kod, nazev, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_locked)
+    VALUES (source.kod, source.nazev, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_locked = source.is_locked;
+GO
+
+MERGE dbo.ciselnik_stavu_jednani AS target
+USING (VALUES
+    (N'DRAFT', N'Příprava', 1),
+    (N'OPEN', N'Otevřeno pro zápis', 1),
+    (N'CLOSED', N'Uzavřeno', 1)
+) AS source(kod, nazev, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_locked)
+    VALUES (source.kod, source.nazev, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_locked = source.is_locked;
+GO
+
+MERGE dbo.ciselnik_stavu_ucasti AS target
+USING (VALUES
+    (N'PRESENT', N'Přítomen', 1),
+    (N'EXCUSED', N'Omluven', 1),
+    (N'ABSENT', N'Nepřítomen', 1)
+) AS source(kod, nazev, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_locked)
+    VALUES (source.kod, source.nazev, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_locked = source.is_locked;
+GO
+
+MERGE dbo.ciselnik_organizace AS target
+USING (VALUES
+    (N'MO', N'Ministerstvo obrany', 1),
+    (N'DOD', N'Dodavatel', 1)
+) AS source(kod, nazev, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_locked)
+    VALUES (source.kod, source.nazev, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_locked = source.is_locked;
+GO
+
+MERGE dbo.ciselnik_organizacni_celky AS target
+USING (VALUES
+    (N'OI', N'Odbor informatiky', 1)
+) AS source(kod, nazev, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, is_locked)
+    VALUES (source.kod, source.nazev, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.is_locked = source.is_locked;
+GO
+
+MERGE dbo.ciselnik_vyzvy AS target
+USING (VALUES
+    (N'DV05', N'Dílčí výzva 05', CONVERT(date, '2025-01-01'), 0),
+    (N'DV06', N'Dílčí výzva 06', CONVERT(date, '2026-01-01'), 0),
+    (N'DV07', N'Dílčí výzva 07', CONVERT(date, '2027-01-01'), 0)
+) AS source(kod, nazev, rok, is_locked)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, rok, is_locked)
+    VALUES (source.kod, source.nazev, source.rok, source.is_locked)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.rok = source.rok,
+        target.is_locked = source.is_locked;
+GO
+
+/* -------------------- Harmonogram šablona + typy -------------------- */
+IF NOT EXISTS (SELECT 1 FROM dbo.harmonogram_sablony)
+BEGIN
+    INSERT INTO dbo.harmonogram_sablony (delay_barva_hex, is_aktivni, created_by)
+    VALUES (N'#DC2626', 1, NULL);
+END
+GO
+
+DECLARE @sablonaVerze int;
+SELECT TOP (1) @sablonaVerze = verze
+FROM dbo.harmonogram_sablony
+WHERE is_aktivni = 1
+ORDER BY verze DESC;
+
+IF @sablonaVerze IS NULL
+BEGIN
+    SELECT TOP (1) @sablonaVerze = verze
+    FROM dbo.harmonogram_sablony
+    ORDER BY verze DESC;
+
+    UPDATE dbo.harmonogram_sablony
+    SET is_aktivni = CASE WHEN verze = @sablonaVerze THEN 1 ELSE 0 END;
+END
+
+;WITH source_data AS (
+    SELECT
+        @sablonaVerze AS sablona_verze,
+        v.kod,
+        v.nazev,
+        v.hodnota,
+        v.krok_poradi,
+        v.je_zpozdeni,
+        v.barva_hex,
+        v.krok_key
+    FROM (VALUES
+        (N'HS01_DURATION', N'1. příprava zadání dodavateli', 1, 1, 0, N'#EF4444', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8301')),
+        (N'HS02_DURATION', N'2. konzultace termínů s dodavatelem před vytvořením zadání', 2, 2, 0, N'#F97316', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8302')),
+        (N'HS03_DURATION', N'3. odeslání zadání dodavateli', 3, 3, 0, N'#F59E0B', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8303')),
+        (N'HS04_DURATION', N'4. dodání návrhu řešení', 4, 4, 0, N'#84CC16', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8304')),
+        (N'HS05_DURATION', N'5. vypořádání připomínek', 5, 5, 0, N'#22C55E', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8305')),
+        (N'HS06_DURATION', N'6. odeslání požadavku na výrobu', 6, 6, 0, N'#14B8A6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8306')),
+        (N'HS07_DURATION', N'7. dodání funkcionality dodavatelem', 7, 7, 0, N'#06B6D4', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8307')),
+        (N'HS08_DURATION', N'8. připomínkování', 8, 8, 0, N'#3B82F6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8308')),
+        (N'HS09_DURATION', N'9. testování', 9, 9, 0, N'#6366F1', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8309')),
+        (N'HS10_DURATION', N'10. nasazení do provozu', 10, 10, 0, N'#8B5CF6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8310')),
+        (N'HS11_DURATION', N'11. fakturace', 11, 11, 0, N'#D946EF', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8311')),
+
+        (N'HS01_DELAY', N'1. příprava zadání dodavateli - zpoždění', 101, 1, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8301')),
+        (N'HS02_DELAY', N'2. konzultace termínů s dodavatelem před vytvořením zadání - zpoždění', 102, 2, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8302')),
+        (N'HS03_DELAY', N'3. odeslání zadání dodavateli - zpoždění', 103, 3, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8303')),
+        (N'HS04_DELAY', N'4. dodání návrhu řešení - zpoždění', 104, 4, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8304')),
+        (N'HS05_DELAY', N'5. vypořádání připomínek - zpoždění', 105, 5, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8305')),
+        (N'HS06_DELAY', N'6. odeslání požadavku na výrobu - zpoždění', 106, 6, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8306')),
+        (N'HS07_DELAY', N'7. dodání funkcionality dodavatelem - zpoždění', 107, 7, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8307')),
+        (N'HS08_DELAY', N'8. připomínkování - zpoždění', 108, 8, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8308')),
+        (N'HS09_DELAY', N'9. testování - zpoždění', 109, 9, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8309')),
+        (N'HS10_DELAY', N'10. nasazení do provozu - zpoždění', 110, 10, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8310')),
+        (N'HS11_DELAY', N'11. fakturace - zpoždění', 111, 11, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8311'))
+    ) v(kod, nazev, hodnota, krok_poradi, je_zpozdeni, barva_hex, krok_key)
+)
+MERGE dbo.ciselnik_harmonogram_typu AS target
+USING source_data AS source
+ON target.sablona_verze = source.sablona_verze AND target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, hodnota, is_locked, sablona_verze, krok_key, krok_poradi, je_zpozdeni, barva_hex)
+    VALUES (source.kod, source.nazev, source.hodnota, 1, source.sablona_verze, source.krok_key, source.krok_poradi, source.je_zpozdeni, source.barva_hex)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.hodnota = source.hodnota,
+        target.is_locked = 1,
+        target.krok_key = source.krok_key,
+        target.krok_poradi = source.krok_poradi,
+        target.je_zpozdeni = source.je_zpozdeni,
+        target.barva_hex = source.barva_hex;
+GO
+
+/* -------------------- Výchozí admin osoba -------------------- */
+DECLARE @organizaceMoId int = (
+    SELECT TOP (1) id FROM dbo.ciselnik_organizace WHERE kod = N'MO' ORDER BY id
+);
+DECLARE @orgCelekOiId int = (
+    SELECT TOP (1) id FROM dbo.ciselnik_organizacni_celky WHERE kod = N'OI' ORDER BY id
+);
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM dbo.osoby
+    WHERE jmeno = N'Pavel'
+      AND prijmeni = N'Admin'
+)
+BEGIN
+    INSERT INTO dbo.osoby (jmeno, prijmeni, titul, email, ad_login, organizacni_celek_id, organizace_id, Guid_AD, location_locked)
+    VALUES (N'Pavel', N'Admin', NULL, N'pavel.admin@zapiska.local', NULL, @orgCelekOiId, @organizaceMoId, NULL, 0);
+END
+
+DECLARE @seedAdminId int = (
+    SELECT TOP (1) id
+    FROM dbo.osoby
+    WHERE jmeno = N'Pavel' AND prijmeni = N'Admin'
+    ORDER BY id
+);
+
+MERGE dbo.subsystemy AS target
+USING (VALUES
+    (N'INTEGRACE', N'Integrace', @seedAdminId),
+    (N'JADRO', N'Jádro', @seedAdminId)
+) AS source(kod, nazev, vedouci_osoba_id)
+ON target.[kód] = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT ([kód], nazev, vedouci_osoba_id)
+    VALUES (source.kod, source.nazev, source.vedouci_osoba_id)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.vedouci_osoba_id = source.vedouci_osoba_id;
+GO
+
+/* -------------------- AUTHZ seed -------------------- */
+MERGE authz.permission_categories AS target
+USING (VALUES
+    (N'PROJECTS', N'Projekty', 10),
+    (N'RECORDS', N'Projektové záznamy', 20),
+    (N'MEETINGS', N'Jednání', 30),
+    (N'MASTER', N'Číselníky a osoby', 40),
+    (N'SETTINGS', N'Nastavení', 50)
+) AS source(kod, nazev, sort_order)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, sort_order, is_active)
+    VALUES (source.kod, source.nazev, source.sort_order, 1)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.sort_order = source.sort_order,
+        target.is_active = 1;
+GO
+
+MERGE authz.permissions AS target
+USING (
+    SELECT
+        s.klic,
+        s.nazev,
+        c.id AS category_id,
+        s.scope_level
+    FROM (VALUES
+        (N'projects.create', N'Vytvářet projekty', N'PROJECTS', N'PROJECT'),
+        (N'projects.edit', N'Upravovat projekty', N'PROJECTS', N'PROJECT'),
+        (N'projects.delete', N'Mazat projekty (soft-delete)', N'PROJECTS', N'PROJECT'),
+        (N'records.edit', N'Upravovat projektové záznamy', N'RECORDS', N'PROJECT'),
+        (N'records.schedule.add', N'Doplňovat harmonogram úkolu', N'RECORDS', N'PROJECT'),
+        (N'records.schedule.edit', N'Upravovat harmonogram úkolu', N'RECORDS', N'PROJECT'),
+        (N'meetings.create', N'Zakládat jednání', N'MEETINGS', N'PROJECT'),
+        (N'meetings.edit', N'Upravovat jednání', N'MEETINGS', N'PROJECT'),
+        (N'team.manage', N'Správa týmu projektu', N'PROJECTS', N'PROJECT'),
+        (N'people.manage', N'Správa osob', N'MASTER', N'GLOBAL'),
+        (N'ciselniky.edit', N'Editace číselníků', N'MASTER', N'GLOBAL'),
+        (N'settings.view', N'Zobrazit nastavení', N'SETTINGS', N'GLOBAL'),
+        (N'settings.manage', N'Správa nastavení', N'SETTINGS', N'GLOBAL')
+    ) AS s(klic, nazev, category_kod, scope_level)
+    INNER JOIN authz.permission_categories c ON c.kod = s.category_kod
+) AS source
+ON target.klic = source.klic
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (klic, nazev, category_id, scope_level, is_active, is_system)
+    VALUES (source.klic, source.nazev, source.category_id, source.scope_level, 1, 1)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.category_id = source.category_id,
+        target.scope_level = source.scope_level,
+        target.is_active = 1,
+        target.is_system = 1;
+GO
+
+MERGE authz.roles AS target
+USING (VALUES
+    (N'SUPERADMIN', N'Superadmin', N'Pevná role s plnými oprávněními.', 1),
+    (N'APP_ADMIN', N'Administrátor aplikace', N'Správa aplikace a základních entit.', 1)
+) AS source(kod, nazev, popis, is_system)
+ON target.kod = source.kod
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (kod, nazev, popis, is_system, is_active)
+    VALUES (source.kod, source.nazev, source.popis, source.is_system, 1)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.nazev = source.nazev,
+        target.popis = source.popis,
+        target.is_system = source.is_system,
+        target.is_active = 1;
+GO
+
+;WITH role_perm_source AS (
+    SELECT r.id AS role_id, p.id AS permission_id, CAST(N'ALL' AS nvarchar(20)) AS scope_mode
+    FROM authz.roles r
+    INNER JOIN authz.permissions p ON p.klic IN (
+        N'projects.create',
+        N'projects.edit',
+        N'projects.delete',
+        N'records.edit',
+        N'records.schedule.add',
+        N'records.schedule.edit',
+        N'meetings.create',
+        N'meetings.edit',
+        N'team.manage',
+        N'people.manage',
+        N'ciselniky.edit',
+        N'settings.view',
+        N'settings.manage'
+    )
+    WHERE r.kod = N'SUPERADMIN'
+
+    UNION ALL
+
+    SELECT r.id AS role_id, p.id AS permission_id, CAST(N'ALL' AS nvarchar(20)) AS scope_mode
+    FROM authz.roles r
+    INNER JOIN authz.permissions p ON p.klic IN (
+        N'projects.create',
+        N'projects.edit',
+        N'records.edit',
+        N'records.schedule.add',
+        N'records.schedule.edit',
+        N'meetings.create',
+        N'meetings.edit',
+        N'team.manage',
+        N'people.manage',
+        N'ciselniky.edit',
+        N'settings.view'
+    )
+    WHERE r.kod = N'APP_ADMIN'
+)
+MERGE authz.role_permissions AS target
+USING role_perm_source AS source
+ON target.role_id = source.role_id
+   AND target.permission_id = source.permission_id
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (role_id, permission_id, scope_mode, is_allowed)
+    VALUES (source.role_id, source.permission_id, source.scope_mode, 1)
+WHEN MATCHED THEN
+    UPDATE SET
+        target.scope_mode = source.scope_mode,
+        target.is_allowed = 1;
+GO
+
+DECLARE @appAdminRoleId int = (SELECT TOP (1) id FROM authz.roles WHERE kod = N'APP_ADMIN' ORDER BY id);
+DECLARE @seedAdminIdForAuthz int = (
+    SELECT TOP (1) id
+    FROM dbo.osoby
+    WHERE jmeno = N'Pavel' AND prijmeni = N'Admin'
+    ORDER BY id
+);
+
+IF NOT EXISTS (SELECT 1 FROM authz.superadmins WHERE osoba_id = @seedAdminIdForAuthz)
+BEGIN
+    INSERT INTO authz.superadmins (osoba_id, poznamka, created_at, created_by)
+    VALUES (@seedAdminIdForAuthz, N'Lokální seed admin bez AD', SYSUTCDATETIME(), @seedAdminIdForAuthz);
+END
+
+IF @appAdminRoleId IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM authz.user_roles WHERE osoba_id = @seedAdminIdForAuthz AND role_id = @appAdminRoleId)
+BEGIN
+    INSERT INTO authz.user_roles (osoba_id, role_id, is_active)
+    VALUES (@seedAdminIdForAuthz, @appAdminRoleId, 1);
+END
+GO
+
+/* -------------------- Validace seedu -------------------- */
+DECLARE @missingCodes TABLE (code nvarchar(255));
+INSERT INTO @missingCodes (code)
+SELECT req.code
+FROM (VALUES (N'PLAN'), (N'RUN'), (N'DONE'), (N'DELETED')) AS req(code)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM dbo.ciselnik_stavu_projektu sp
+    WHERE UPPER(sp.kod) = req.code
+);
+
+IF EXISTS (SELECT 1 FROM @missingCodes)
+BEGIN
+    DECLARE @err nvarchar(max) = N'';
+    DECLARE @throwMessage nvarchar(max);
+    SELECT @err = CASE WHEN @err = N'' THEN code ELSE @err + N', ' + code END
+    FROM @missingCodes
+    ORDER BY code;
+
+    SET @throwMessage = N'Chybí povinné hodnoty v ciselnik_stavu_projektu: ' + @err;
+    THROW 52001, @throwMessage, 1;
+END
+GO

@@ -1,0 +1,40 @@
+@model ProjektyIndexViewModel
+@{
+    ViewData["Title"] = "Projekty";
+}
+
+<section class="page-header">
+    <div>
+        <h1>Projekty</h1>
+        <p class="muted">Přehled projektů dostupných pro přihlášeného uživatele.</p>
+    </div>
+    @if (Model.CanCreate)
+    {
+        <button class="btn primary" type="button" data-modal-url="@Url.Action("NewProjectModal", "Projekty")">Nový projekt</button>
+    }
+</section>
+
+<section class="project-grid" data-project-grid>
+    @foreach (var projekt in Model.Projekty)
+    {
+        <article class="project-card" data-href="@Url.Action("Detail", new { id = projekt.Id })" role="link" tabindex="0">
+            <div class="project-card-header">
+                <div>
+                    <div class="project-code">@projekt.Zkratka</div>
+                    <h2>@projekt.Nazev</h2>
+                </div>
+                <span class="badge">@projekt.Stav</span>
+            </div>
+            <div class="project-card-actions" data-stop-propagation="true">
+                @if (projekt.CanEdit)
+                {
+                    <button class="btn small" type="button" data-modal-url="@Url.Action("EditProjectModal", "Projekty", new { id = projekt.Id })">Upravit</button>
+                }
+                @if (projekt.CanDelete)
+                {
+                    <button class="btn small ghost" type="button" data-modal-url="@Url.Action("DeleteProjectModal", "Projekty", new { id = projekt.Id })">Smazat</button>
+                }
+            </div>
+        </article>
+    }
+</section>

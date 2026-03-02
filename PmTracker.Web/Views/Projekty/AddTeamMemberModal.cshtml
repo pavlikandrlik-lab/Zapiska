@@ -1,0 +1,58 @@
+@model TeamMemberModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "team-member-modal-title";
+    ViewData["ModalVariant"] = "wide";
+    ViewData["ModalOverflowVisible"] = true;
+}
+
+<h2 id="team-member-modal-title">@Model.Title</h2>
+
+<form class="form-grid"
+      asp-controller="Projekty"
+      asp-action="SaveTeamMember"
+      method="post"
+      data-ajax-submit="true">
+    <input type="hidden" name="ProjektId" value="@Model.Command.ProjektId" />
+    <div class="office-picker"
+         data-person-picker="single"
+         data-person-picker-placeholder="Vyhledejte osobu podle jména nebo emailu..."
+         data-person-picker-empty="Nenalezeny žádné odpovídající osoby.">
+        <input type="hidden" name="OsobaId" value="" data-person-picker-hidden required />
+        <label class="office-search-label">Osoba</label>
+        <div class="office-searchbox">
+            <input type="search" autocomplete="off" data-person-picker-input required />
+            <div class="office-search-panel" data-person-picker-panel hidden>
+                <div class="office-search-results" data-person-picker-results role="listbox" aria-label="Výsledky osob"></div>
+            </div>
+        </div>
+        <div class="person-picker-source" data-person-picker-source hidden>
+            @foreach (var osoba in Model.DostupniClenoveTymu)
+            {
+                <div data-id="@osoba.Id"
+                     data-label="@osoba.Osoba"
+                     data-email="@(osoba.Email ?? string.Empty)"
+                     data-org="@(osoba.Organizace ?? string.Empty)"
+                     data-unit="@(osoba.OrganizacniCelek ?? string.Empty)"></div>
+            }
+        </div>
+    </div>
+
+    <label>
+        Role
+        <select name="Role" required>
+            @foreach (var role in Model.RoleProjektu)
+            {
+                var selected = string.Equals(role.Value, Model.Command.Role, StringComparison.OrdinalIgnoreCase);
+                <option value="@role.Value" selected="@selected">@role.Label</option>
+            }
+        </select>
+    </label>
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = "Uložit"
+        })
+</form>

@@ -1,0 +1,34 @@
+@model DeleteProjectModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "project-delete-modal-title";
+}
+
+<h2 id="project-delete-modal-title">@Model.Title</h2>
+
+<div class="alert alert-error">
+    Chystáte se smazat projekt <strong>@Model.ProjektZkratka - @Model.ProjektNazev</strong>.
+</div>
+<p class="muted">Projekt bude označen stavem „Smazáno“. Tuto akci provádějte jen v případě, že je to opravdu záměr.</p>
+
+<form class="form-grid"
+      asp-controller="Projekty"
+      asp-action="DeleteProject"
+      method="post"
+      data-ajax-submit="true"
+      data-confirm-submit-toggle="true">
+    <input type="hidden" name="ProjektId" value="@Model.Command.ProjektId" />
+
+    <label class="confirm-delete-check">
+        <input type="checkbox" name="PotvrditSmazani" value="true" data-confirm-submit-checkbox />
+        Opravdu smazat projekt
+    </label>
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = "Potvrdit smazání",
+            DisableSubmit = true
+        })
+</form>

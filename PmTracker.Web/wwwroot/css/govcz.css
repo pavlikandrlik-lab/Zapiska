@@ -1,0 +1,79 @@
+:root {
+    --gov-color-primary: #0b3d91;
+    --gov-color-primary-strong: #0a2d66;
+    --gov-color-accent: #d9480f;
+    --gov-color-success: #2f9e44;
+    --gov-color-warning: #f08c00;
+    --gov-color-muted: #6b7280;
+    --gov-color-border: #e5e7eb;
+    --gov-color-bg: #f7f8fb;
+    --gov-color-surface: #ffffff;
+    --gov-shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
+    --gov-radius: 12px;
+    --gov-font: "SF Pro Text", "SF Pro Display", "Source Sans 3", "IBM Plex Sans", sans-serif;
+    --app-bg-start: #eef3fa;
+    --app-bg-mid: #f7f9fc;
+    --app-bg-end: #f7f8fb;
+    --app-nav-bg: rgba(255, 255, 255, 0.95);
+    --app-nav-hover: #f8fafc;
+    --app-nav-active-bg: #eaf0fb;
+    --app-nav-active-border: #c7d6f1;
+    --app-text-primary: #0f172a;
+    --app-muted: #6b7280;
+    --app-footer-bg: #19325a;
+    --app-footer-text: #d8e3f7;
+    --app-footer-title: #ffffff;
+}
+
+:root[data-theme="dark"] {
+    --gov-color-primary: #8bb3ff;
+    --gov-color-primary-strong: #78a3f7;
+    --gov-color-accent: #ff8d68;
+    --gov-color-success: #57c483;
+    --gov-color-warning: #f2b35d;
+    --gov-color-muted: #9ca7bd;
+    --gov-color-border: #2f3a52;
+    --gov-color-bg: #0f1624;
+    --gov-color-surface: #162033;
+    --gov-shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.35);
+    --app-bg-start: #0d1422;
+    --app-bg-mid: #0f1829;
+    --app-bg-end: #101a2b;
+    --app-nav-bg: rgba(22, 32, 51, 0.95);
+    --app-nav-hover: #1d2b43;
+    --app-nav-active-bg: #223454;
+    --app-nav-active-border: #34517e;
+    --app-text-primary: #e7edf9;
+    --app-muted: #9ca7bd;
+    --app-footer-bg: #0b1422;
+    --app-footer-text: #b8c8e8;
+    --app-footer-title: #f4f7ff;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: var(--gov-font);
+    color: var(--app-text-primary);
+    background: var(--gov-color-bg);
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+}

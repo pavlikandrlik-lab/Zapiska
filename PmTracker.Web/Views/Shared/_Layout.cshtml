@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Zápiska</title>
+    <link rel="stylesheet" href="~/css/govcz.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="app-body">
+    @{
+        var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).ToLowerInvariant();
+        string NavClass(string controller) => currentController == controller ? "app-nav-link active" : "app-nav-link";
+        var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
+        var roleList = userContext?.RoleKody is IReadOnlyList<string> roles
+            ? string.Join(", ", roles)
+            : string.Empty;
+        var canViewSettings = ViewBag.CanViewSettingsTab as bool? ?? false;
+    }
+    <a class="skip-link" href="#main">Přeskočit na obsah</a>
+
+    <header class="app-header">
+        <div class="app-topbar">
+            <div class="app-brand">
+                <div class="app-logo" aria-hidden="true">
+                    <img class="app-logo-image" src="~/images/zapiska-logo.svg" alt="" />
+                </div>
+                <div>
+                    <div class="app-title">Zápiska</div>
+                </div>
+            </div>
+
+            <div class="app-user-tools">
+                <label class="gov-theme-switch" for="theme-switch-main">
+                    <input id="theme-switch-main" type="checkbox" data-theme-switch aria-label="Přepnout tmavý režim" />
+                    <span class="gov-theme-switch-track" aria-hidden="true">
+                        <span class="gov-theme-switch-thumb"></span>
+                    </span>
+                    <span class="gov-theme-switch-label">Tmavý režim</span>
+                </label>
+
+                <div class="user-menu" data-user-menu>
+                    <button class="user-menu-toggle" type="button" data-user-menu-toggle aria-expanded="false">
+                        <span class="app-user-name">@ViewBag.CurrentUserName</span>
+                        <span class="app-user-org">@ViewBag.CurrentUserOrgCode</span>
+                    </button>
+                    <div class="user-menu-panel" data-user-menu-panel hidden>
+                        <div class="user-menu-meta">
+                            <strong>@ViewBag.CurrentUserName</strong>
+                            <span>@(string.IsNullOrWhiteSpace(ViewBag.CurrentUserEmail as string) ? "-" : ViewBag.CurrentUserEmail)</span>
+                            <span>@ViewBag.CurrentUserOrg</span>
+                            <span>@roleList</span>
+                        </div>
+                        <a class="user-menu-link" asp-controller="Profil" asp-action="Index">Můj profil</a>
+                        <a class="user-menu-link" asp-controller="Profil" asp-action="Index" asp-fragment="moje-prava">Moje práva</a>
+                        <button class="user-menu-link user-menu-link-btn" type="button" data-theme-cycle>Vzhled: přepnout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="app-nav" aria-label="Hlavní menu">
+            <a class="@NavClass("projekty")" asp-controller="Projekty" asp-action="Index">Projekty</a>
+            <a class="@NavClass("osoby")" asp-controller="Osoby" asp-action="Index">Osoby</a>
+            <a class="@NavClass("ciselniky")" asp-controller="Ciselniky" asp-action="Index">Číselníky</a>
+            <a class="@NavClass("jednani")" asp-controller="Jednani" asp-action="Index">Jednání</a>
+            @if (canViewSettings)
+            {
+                <a class="@NavClass("nastaveni")" asp-controller="Nastaveni" asp-action="Index">Nastavení</a>
+            }
+        </nav>
+    </header>
+
+    <main id="main" class="app-main">
+        @if (TempData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-error">@errorMessage</div>
+        }
+        @RenderBody()
+    </main>
+
+    <footer class="app-footer">
+        <div class="app-footer-grid">
+            <div>
+                <h3>Dokumenty</h3>
+                <a asp-controller="Dokumentace" asp-action="UzivatelskaPrirucka">Uživatelská příručka</a>
+                <a asp-controller="Dokumentace" asp-action="TechnickaDokumentace">Technická dokumentace</a>
+                <a asp-controller="Dokumentace" asp-action="Qa">Q and A</a>
+            </div>
+            <div>
+                <h3>Informace</h3>
+                <a href="https://servicedesk.fis.acr" target="_blank" rel="noopener noreferrer">Servicedesk</a>
+                <a href="https://www.fis.acr/fis" target="_blank" rel="noopener noreferrer">Portál FIS</a>
+                <a href="https://www.portalcechy.sis.acr" target="_blank" rel="noopener noreferrer">Portál ŠIS</a>
+            </div>
+            <div>
+                <h3>Podpora</h3>
+                <a href="tel:+420973200840">FIS: 973 200 840</a>
+                <a href="tel:+420973225500">ISSP: 973 225 500</a>
+                <a href="tel:+420973211111">ŠIS: 973 211 111</a>
+            </div>
+        </div>
+    </footer>
+
+    <div id="modal-root" class="modal-root" aria-hidden="true"></div>
+
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

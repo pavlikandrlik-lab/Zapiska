@@ -1,0 +1,14 @@
+@model ContextHiddenFieldsViewModel
+
+@if (Model.UserId.HasValue)
+{
+    <input type="hidden" name="userId" value="@Model.UserId.Value" />
+}
+@if (Model.ProjektId.HasValue)
+{
+    <input type="hidden" name="projektId" value="@Model.ProjektId.Value" />
+}
+@if (!string.IsNullOrWhiteSpace(Model.ReturnUrl))
+{
+    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+}

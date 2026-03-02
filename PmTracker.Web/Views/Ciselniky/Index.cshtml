@@ -1,0 +1,38 @@
+@model CiselnikyDashboardViewModel
+@{
+    ViewData["Title"] = "Číselníky";
+}
+
+<section class="page-header">
+    <div>
+        <h1>Číselníky</h1>
+        <p class="muted">Správa hodnot a ochrana systémových položek.</p>
+    </div>
+</section>
+
+<div class="ciselniky-layout" data-ciselnik-shell data-content-url="@Url.Action("Panel", "Ciselniky")">
+    <aside class="ciselniky-sidebar">
+        <div class="ciselniky-list">
+            @foreach (var ciselnik in Model.Ciselniky)
+            {
+                var isActive = ciselnik.Key == Model.VybranyCiselnik.Key;
+                <a class="ciselnik-tile @(isActive ? "active" : "")"
+                   asp-action="Index"
+                   asp-route-id="@ciselnik.Key"
+                   data-ciselnik-link
+                   data-key="@ciselnik.Key"
+                   aria-current="@(isActive ? "page" : null)">
+                    <div>
+                        <div class="ciselnik-title">@ciselnik.Nazev</div>
+                        <div class="muted">@ciselnik.PocetPolozek položek</div>
+                    </div>
+                    <span class="ciselnik-arrow">›</span>
+                </a>
+            }
+        </div>
+    </aside>
+
+    <section class="ciselniky-detail" data-ciselnik-panel>
+        @await Html.PartialAsync("_CiselnikDetail", Model.VybranyCiselnik)
+    </section>
+</div>

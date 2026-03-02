@@ -1,0 +1,42 @@
+@model AuthzRoleModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "authz-role-modal-title";
+}
+
+<h2 id="authz-role-modal-title">@(Model.IsEdit ? "Upravit roli" : "Nová role")</h2>
+
+<form class="form-grid"
+      asp-controller="Nastaveni"
+      asp-action="SaveRole"
+      method="post"
+      data-ajax-submit="true">
+    @if (Model.Command.Id.HasValue)
+    {
+        <input type="hidden" name="Id" value="@Model.Command.Id.Value" />
+    }
+    @await Html.PartialAsync(
+        "_ContextHiddenFields",
+        new ContextHiddenFieldsViewModel
+        {
+            UserId = Model.UserId,
+            ProjektId = Model.ProjektId
+        })
+
+    <label>
+        Kód
+        <input type="text" name="Kod" value="@Model.Command.Kod" maxlength="100" required />
+    </label>
+
+    <label>
+        Název
+        <input type="text" name="Nazev" value="@Model.Command.Nazev" maxlength="255" required />
+    </label>
+
+    <label>
+        Popis
+        <textarea name="Popis" rows="3" maxlength="1000">@Model.Command.Popis</textarea>
+    </label>
+
+    @await Html.PartialAsync("_ModalFormActions", new ModalFormActionsViewModel())
+</form>

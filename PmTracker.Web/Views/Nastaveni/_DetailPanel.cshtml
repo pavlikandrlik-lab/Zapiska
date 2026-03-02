@@ -1,0 +1,374 @@
+@model NastaveniPanelViewModel
+@{
+    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
+    var canManageSettings = userContext?.HasPermission(PermissionKeys.SettingsManage) ?? false;
+    var selectedUserId = int.TryParse(Context.Request.Query["userId"], out var parsedUserId) ? parsedUserId : (int?)null;
+    var selectedProjektId = int.TryParse(Context.Request.Query["projektId"], out var parsedProjektId) ? parsedProjektId : (int?)null;
+    var defaultAssignmentUserId = selectedUserId ?? Model.UserRoles.FirstOrDefault()?.OsobaId;
+}
+
+<section class="page-header page-header-compact">
+    <div>
+        <h2>@Model.Nazev</h2>
+        <p class="muted">@Model.Popis</p>
+    </div>
+</section>
+
+@if (Model.SectionKey == "role")
+{
+    <section class="card">
+        <div class="panel-header">
+            <h3>Role</h3>
+            @if (canManageSettings)
+            {
+                <button class="btn primary"
+                        type="button"
+                        data-modal-url="@Url.Action("RoleModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
+                    Nová role
+                </button>
+            }
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Kód</th>
+                    <th>Název</th>
+                    <th>Popis</th>
+                    <th>Systémová</th>
+                    <th>Aktivní</th>
+                    <th class="table-actions">Akce</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var role in Model.Role.OrderBy(x => x.Kod, StringComparer.CurrentCultureIgnoreCase))
+                {
+                    var toggleActiveValue = (!role.IsActive).ToString().ToLowerInvariant();
+                    <tr>
+                        <td>@role.Kod</td>
+                        <td>@role.Nazev</td>
+                        <td>@(string.IsNullOrWhiteSpace(role.Popis) ? "-" : role.Popis)</td>
+                        <td>@(role.IsSystem ? "Ano" : "Ne")</td>
+                        <td>@(role.IsActive ? "Ano" : "Ne")</td>
+                        <td class="table-actions">
+                            @if (canManageSettings)
+                            {
+                                <div class="table-actions-inline">
+                                    <button class="btn small"
+                                            type="button"
+                                            data-modal-url="@Url.Action("RoleModal", "Nastaveni", new { id = role.Id, userId = selectedUserId, projektId = selectedProjektId })"
+                                            disabled="@role.IsSystem">
+                                        Upravit
+                                    </button>
+                                    <form asp-controller="Nastaveni"
+                                          asp-action="ToggleRole"
+                                          method="post"
+                                          data-ajax-submit="true">
+                                        <input type="hidden" name="Id" value="@role.Id" />
+                                        <input type="hidden" name="IsActive" value="@toggleActiveValue" />
+                                        @if (selectedUserId.HasValue)
+                                        {
+                                            <input type="hidden" name="userId" value="@selectedUserId.Value" />
+                                        }
+                                        @if (selectedProjektId.HasValue)
+                                        {
+                                            <input type="hidden" name="projektId" value="@selectedProjektId.Value" />
+                                        }
+                                        <button class="btn small ghost" type="submit" disabled="@role.IsSystem">
+                                            @(role.IsActive ? "Deaktivovat" : "Aktivovat")
+                                        </button>
+                                    </form>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="muted">Pouze čtení</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+else if (Model.SectionKey == "akce")
+{
+    <section class="card">
+        <div class="panel-header">
+            <h3>Katalog akcí</h3>
+            @if (canManageSettings)
+            {
+                <button class="btn primary"
+                        type="button"
+                        data-modal-url="@Url.Action("PermissionModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
+                    Nová akce
+                </button>
+            }
+        </div>
+        @foreach (var category in Model.PermissionCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Nazev, StringComparer.CurrentCultureIgnoreCase))
+        {
+            <div class="settings-group">
+                <h4>@category.Nazev</h4>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Klíč</th>
+                            <th>Název</th>
+                            <th>Rozsah</th>
+                            <th>Aktivní</th>
+                            <th class="table-actions">Akce</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var permission in Model.Permissions.Where(p => p.CategoryKod == category.Kod).OrderBy(p => p.Klic, StringComparer.CurrentCultureIgnoreCase))
+                        {
+                            var toggleActiveValue = (!permission.IsActive).ToString().ToLowerInvariant();
+                            <tr>
+                                <td><code>@permission.Klic</code></td>
+                                <td>@permission.Nazev</td>
+                                <td>@permission.ScopeLevel</td>
+                                <td>@(permission.IsActive ? "Ano" : "Ne")</td>
+                                <td class="table-actions">
+                                    @if (canManageSettings)
+                                    {
+                                        <div class="table-actions-inline">
+                                            <button class="btn small"
+                                                    type="button"
+                                                    data-modal-url="@Url.Action("PermissionModal", "Nastaveni", new { id = permission.Id, userId = selectedUserId, projektId = selectedProjektId })"
+                                                    disabled="@permission.IsSystem">
+                                                Upravit
+                                            </button>
+                                            <form asp-controller="Nastaveni"
+                                                  asp-action="TogglePermission"
+                                                  method="post"
+                                                  data-ajax-submit="true">
+                                                <input type="hidden" name="Id" value="@permission.Id" />
+                                                <input type="hidden" name="IsActive" value="@toggleActiveValue" />
+                                                @if (selectedUserId.HasValue)
+                                                {
+                                                    <input type="hidden" name="userId" value="@selectedUserId.Value" />
+                                                }
+                                                @if (selectedProjektId.HasValue)
+                                                {
+                                                    <input type="hidden" name="projektId" value="@selectedProjektId.Value" />
+                                                }
+                                                <button class="btn small ghost" type="submit" disabled="@permission.IsSystem">
+                                                    @(permission.IsActive ? "Deaktivovat" : "Aktivovat")
+                                                </button>
+                                            </form>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">Pouze čtení</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+else if (Model.SectionKey == "role-akce")
+{
+    <section class="card">
+        <div class="panel-header">
+            <h3>Mapování role -> akce</h3>
+            @if (canManageSettings)
+            {
+                <button class="btn primary"
+                        type="button"
+                        data-modal-url="@Url.Action("RolePermissionModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
+                    Přidat mapování
+                </button>
+            }
+        </div>
+        <p class="muted settings-hint">
+            Striktní pravidlo pro „Všechny projekty“: jako povolení se počítá pouze <strong>GLOBAL</strong> nebo <strong>ALL</strong>.
+            Mapování <strong>INCLUDE</strong> bez vybraného projektu se v přehledu efektivních práv nebere jako povolené.
+        </p>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Role</th>
+                    <th>Akce</th>
+                    <th>Rozsah</th>
+                    <th>Projekty (INCLUDE)</th>
+                    <th>Povoleno</th>
+                    <th class="table-actions">Akce</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var map in Model.RolePermissionScopes.OrderBy(x => x.RoleKod, StringComparer.CurrentCultureIgnoreCase).ThenBy(x => x.PermissionKlic, StringComparer.CurrentCultureIgnoreCase))
+                {
+                    var selectedProjekty = Model.Projekty.Where(p => map.ProjektIds.Contains(p.Id)).Select(p => p.Nazev).ToList();
+                    <tr>
+                        <td>@map.RoleKod</td>
+                        <td><code>@map.PermissionKlic</code></td>
+                        <td>@map.ScopeMode</td>
+                        <td>@(selectedProjekty.Count == 0 ? "-" : string.Join(", ", selectedProjekty))</td>
+                        <td>@(map.IsAllowed ? "Ano" : "Ne")</td>
+                        <td class="table-actions">
+                            @if (canManageSettings)
+                            {
+                                <button class="btn small"
+                                        type="button"
+                                        data-modal-url="@Url.Action("RolePermissionModal", "Nastaveni", new { id = map.Id, userId = selectedUserId, projektId = selectedProjektId })">
+                                    Upravit
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="muted">Pouze čtení</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+else if (Model.SectionKey == "uzivatele-role")
+{
+    <section class="card">
+        <div class="panel-header">
+            <h3>Mapování uživatelů na role</h3>
+            @if (canManageSettings)
+            {
+                <button class="btn primary"
+                        type="button"
+                        data-modal-url="@Url.Action("UserRolesModal", "Nastaveni", new { osobaId = defaultAssignmentUserId, userId = selectedUserId, projektId = selectedProjektId })"
+                        disabled="@(!defaultAssignmentUserId.HasValue)">
+                    Přiřadit roli
+                </button>
+            }
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Osoba</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th class="table-actions">Akce</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.UserRoles.OrderBy(x => x.Osoba, StringComparer.CurrentCultureIgnoreCase))
+                {
+                    <tr>
+                        <td>@row.Osoba</td>
+                        <td>@(string.IsNullOrWhiteSpace(row.Email) ? "-" : row.Email)</td>
+                        <td>@(row.RoleKody.Count == 0 ? "-" : string.Join(", ", row.RoleKody))</td>
+                        <td class="table-actions">
+                            @if (canManageSettings)
+                            {
+                                <div class="settings-stack-actions">
+                                    <button class="btn small"
+                                            type="button"
+                                            data-modal-url="@Url.Action("UserRolesModal", "Nastaveni", new { osobaId = row.OsobaId, userId = selectedUserId, projektId = selectedProjektId })">
+                                        Upravit role
+                                    </button>
+                                    @foreach (var role in row.RoleAssignments)
+                                    {
+                                        <form asp-controller="Nastaveni"
+                                              asp-action="SaveUserRole"
+                                              method="post"
+                                              data-ajax-submit="true">
+                                            <input type="hidden" name="OsobaId" value="@row.OsobaId" />
+                                            <input type="hidden" name="RoleId" value="@role.RoleId" />
+                                            <input type="hidden" name="IsActive" value="false" />
+                                            @if (selectedUserId.HasValue)
+                                            {
+                                                <input type="hidden" name="userId" value="@selectedUserId.Value" />
+                                            }
+                                            @if (selectedProjektId.HasValue)
+                                            {
+                                                <input type="hidden" name="projektId" value="@selectedProjektId.Value" />
+                                            }
+                                            <button class="btn small ghost" type="submit">Odebrat @role.RoleKod</button>
+                                        </form>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="muted">Pouze čtení</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+else
+{
+    <section class="card">
+        <div class="panel-header">
+            <h3>Efektivní práva</h3>
+        </div>
+        <p class="muted settings-hint">
+            Pro volbu „Všechny projekty“ je oprávnění povoleno pouze při rozsahu <strong>GLOBAL</strong> nebo <strong>ALL</strong>.
+            Rozsah <strong>INCLUDE</strong> bez výběru projektu se nepočítá.
+        </p>
+        <form class="settings-effective-filters" method="get" asp-controller="Nastaveni" asp-action="Index" data-settings-filter-form>
+            <input type="hidden" name="section" value="efektivni-prava" />
+            <label>
+                Uživatel
+                <select name="userId" data-settings-filter-user>
+                    @foreach (var option in Model.EffectivePermissions.AvailableUsers)
+                    {
+                        var selected = Model.EffectivePermissions.SelectedUserId == option.Id;
+                        <option value="@option.Id" selected="@selected">@option.Label</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Projekt
+                <select name="projektId" data-settings-filter-project>
+                    <option value="">Všechny projekty (ALL)</option>
+                    @foreach (var option in Model.EffectivePermissions.AvailableProjects)
+                    {
+                        var selected = Model.EffectivePermissions.SelectedProjectId == option.Id;
+                        <option value="@option.Id" selected="@selected">@option.Label</option>
+                    }
+                </select>
+            </label>
+        </form>
+        <div class="settings-effective-header">
+            <span><strong>Uživatel:</strong> @Model.EffectivePermissions.Osoba</span>
+            <span><strong>Projekt:</strong> @Model.EffectivePermissions.ProjektNazev</span>
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Akce</th>
+                    <th>Název</th>
+                    <th>Výsledek</th>
+                    <th>Rozsah</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.EffectivePermissions.Rows)
+                {
+                    <tr>
+                        <td><code>@row.PermissionKlic</code></td>
+                        <td>@row.PermissionNazev</td>
+                        <td>
+                            @if (row.IsAllowed)
+                            {
+                                <span class="unlock">Povoleno</span>
+                            }
+                            else
+                            {
+                                <span class="lock">Zakázáno</span>
+                            }
+                        </td>
+                        <td>@row.ScopeSummary</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}

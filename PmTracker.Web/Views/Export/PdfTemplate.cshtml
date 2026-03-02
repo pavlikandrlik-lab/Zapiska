@@ -1,0 +1,510 @@
+@model PdfExportTemplateViewModel
+@{
+    Layout = null;
+
+    var variant = (Model.ExportVariant ?? "project_all").Trim().ToLowerInvariant();
+    var isMeeting = variant == "meeting";
+    var isProjectSummary = variant == "project_all";
+
+    var title = variant switch
+    {
+        "meeting" => $"Zápis z jednání projektu {Model.ProjektNazev} číslo {Model.JednaniCislo}",
+        "task_single" => $"Zápis úkolu projektu {Model.ProjektNazev}",
+        _ => $"Souhrnný zápis projektu {Model.ProjektNazev}"
+    };
+
+    var subsystemGroups = Model.Zaznamy
+        .GroupBy(x => x.Subsystem)
+        .OrderBy(x => x.Key, StringComparer.CurrentCultureIgnoreCase)
+        .ToList();
+
+    static int CategoryOrder(string? category)
+    {
+        var normalized = (category ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalized.Contains("info"))
+        {
+            return 1;
+        }
+
+        if (normalized.Contains("rozh"))
+        {
+            return 2;
+        }
+
+        if (normalized.Contains("ukol") || normalized.Contains("úkol"))
+        {
+            return 3;
+        }
+
+        return 4;
+    }
+}
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@title</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --border: #1f2937;
+            --muted: #3f3f46;
+            --thead-bg: #f3f4f6;
+            --head-bg: #d7ecfb;
+            --subsystem-bg: #eef5fb;
+        }
+
+        body {
+            margin: 0;
+            padding: 10mm;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 10pt;
+            line-height: 1.24;
+            color: #111;
+            background: #fff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .print-sheet {
+            max-width: 190mm;
+            margin: 0 auto;
+        }
+
+        .sheet-head {
+            border: 1px solid var(--border);
+            margin-bottom: 8px;
+        }
+
+        .sheet-head-title {
+            margin: 0;
+            padding: 8px 10px;
+            background: var(--head-bg);
+            border-bottom: 1px solid var(--border);
+            font-size: 18px;
+            line-height: 1.2;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .sheet-head-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px 24px;
+            padding: 8px 10px;
+            font-size: 10pt;
+        }
+
+        .sheet-head-meta div {
+            white-space: nowrap;
+        }
+
+        .attendance {
+            border-top: 1px solid var(--border);
+            padding: 8px 10px;
+            display: grid;
+            gap: 6px;
+            font-size: 10pt;
+        }
+
+        .attendance-row {
+            display: grid;
+            grid-template-columns: 130px 1fr;
+            gap: 10px;
+            align-items: start;
+        }
+
+        .attendance-label {
+            font-weight: 700;
+        }
+
+        .project-leadership {
+            border-top: 1px solid var(--border);
+            padding: 8px 10px;
+            display: grid;
+            gap: 3px;
+            font-size: 10pt;
+        }
+
+        .project-leadership-head,
+        .project-leadership-row {
+            display: grid;
+            grid-template-columns: 1fr 160px;
+            gap: 10px;
+            align-items: start;
+        }
+
+        .project-leadership-head {
+            font-weight: 700;
+        }
+
+        .records-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            background: #fff;
+        }
+
+        .records-table col.col-comments { width: 68%; }
+        .records-table col.col-people { width: 16%; }
+        .records-table col.col-deadlines { width: 16%; }
+
+        .records-table th,
+        .records-table td {
+            border: 1px solid var(--border);
+            vertical-align: top;
+            padding: 6px 7px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .records-table th {
+            background: var(--thead-bg);
+            font-weight: 700;
+            text-align: left;
+            font-size: 11pt;
+            letter-spacing: 0.01em;
+        }
+
+        .subsystem-row td {
+            background: var(--subsystem-bg);
+            font-size: 11pt;
+            font-weight: 700;
+            padding: 6px 8px;
+        }
+
+        .task-row td {
+            padding: 4px 6px;
+            font-size: 10pt;
+            line-height: 1.18;
+            font-family: "Times New Roman", Times, serif;
+        }
+
+        .task-row p {
+            margin: 0 0 3px;
+        }
+
+        .record-title-row {
+            margin: 0 0 2px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .record-title {
+            margin: 0;
+            font-size: 12pt;
+            font-weight: 700;
+            line-height: 1.2;
+            color: #000;
+        }
+
+        .record-title.paused {
+            display: inline-block;
+            background: rgb(246, 208, 176);
+            padding: 1px 5px;
+            border-radius: 2px;
+        }
+
+        .record-code-badge {
+            display: inline-block;
+            font-size: 10pt;
+            font-weight: 700;
+            border: 1px solid #6b7280;
+            padding: 0 4px;
+            margin-right: 0;
+            line-height: 1.15;
+            color: #111;
+            background: #fff;
+        }
+
+        .record-code-badge.paused {
+            background: rgb(246, 208, 176);
+        }
+
+        .record-subsystem-code {
+            flex: 0 0 auto;
+            font-size: 10pt;
+            font-weight: 700;
+            border: 1px solid #6b7280;
+            padding: 0 4px;
+            white-space: nowrap;
+            line-height: 1.15;
+        }
+
+        .record-meta {
+            margin: 0 0 3px;
+            font-size: 10pt;
+            color: #202020;
+        }
+
+        .record-desc,
+        .record-external {
+            margin: 0 0 3px;
+            font-size: 10pt;
+        }
+
+        .section-label {
+            margin: 0 0 2px;
+            font-size: 10pt;
+        }
+
+        .comment-list {
+            margin: 0;
+            padding-left: 0;
+            list-style: none;
+        }
+
+        .comment-item {
+            margin: 0 0 2px;
+            padding: 1px 2px;
+            border-radius: 2px;
+            background: transparent;
+        }
+
+        .comment-item.highlight {
+            border: 1px solid rgba(0, 0, 0, 0.28);
+        }
+
+        .comment-item-head {
+            font-size: 10pt;
+            color: var(--muted);
+            margin-bottom: 1px;
+        }
+
+        .comment-item-text {
+            margin: 0 0 1px;
+            color: #111;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .cell-empty {
+            font-style: italic;
+            color: #505050;
+        }
+
+        .people-list,
+        .date-list {
+            margin: 0;
+            padding-left: 0;
+            list-style: none;
+        }
+
+        .date-list li,
+        .people-list li {
+            margin-bottom: 1px;
+        }
+
+        .term-history {
+            margin: 0;
+            padding-left: 0;
+            list-style: none;
+        }
+
+        .term-history li {
+            margin-bottom: 1px;
+        }
+
+        .term-history s {
+            color: #4b5563;
+        }
+
+        tr.task-row {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        @@page {
+            size: A4 portrait;
+            margin: 10mm;
+        }
+
+        @@media print {
+            .print-sheet {
+                max-width: none;
+            }
+
+            thead {
+                display: table-header-group;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-sheet">
+        <header class="sheet-head">
+            <h1 class="sheet-head-title">@title</h1>
+            <div class="sheet-head-meta">
+                <div><strong>Projekt:</strong> @Model.ProjektNazev (@Model.ProjektZkratka)</div>
+                @if (isMeeting)
+                {
+                    <div><strong>Jednání:</strong> č. @Model.JednaniCislo</div>
+                    <div><strong>Datum:</strong> @Model.JednaniDatum?.ToString("dd.MM.yyyy")</div>
+                    <div><strong>Stav:</strong> @Model.JednaniStav</div>
+                    <div><strong>Místo:</strong> @(string.IsNullOrWhiteSpace(Model.JednaniMisto) ? "-" : Model.JednaniMisto)</div>
+                }
+                else
+                {
+                    <div><strong>Typ výstupu:</strong> @(variant == "task_single" ? "Jeden úkol" : "Kompletní projekt")</div>
+                }
+                <div><strong>Generoval:</strong> @Model.Vytvoril</div>
+                <div><strong>Vytvořeno:</strong> @Model.VytvorenoDne.ToString("dd.MM.yyyy HH:mm")</div>
+            </div>
+            @if (isProjectSummary && Model.VedeniProjektu.Count > 0)
+            {
+                <div class="project-leadership">
+                    <div class="project-leadership-head">
+                        <div>Osoba</div>
+                        <div>Role</div>
+                    </div>
+                    @foreach (var member in Model.VedeniProjektu)
+                    {
+                        <div class="project-leadership-row">
+                            <div>@member.Osoba</div>
+                            <div>@member.Role</div>
+                        </div>
+                    }
+                </div>
+            }
+            @if (Model.Dochazka.Count > 0)
+            {
+                <div class="attendance">
+                    @foreach (var attendanceGroup in Model.Dochazka)
+                    {
+                        <div class="attendance-row">
+                            <div class="attendance-label">@attendanceGroup.Stav:</div>
+                            <div>@string.Join(", ", attendanceGroup.Osoby)</div>
+                        </div>
+                    }
+                </div>
+            }
+        </header>
+
+        <table class="records-table">
+            <colgroup>
+                <col class="col-comments" />
+                <col class="col-people" />
+                <col class="col-deadlines" />
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>Vyjádření</th>
+                    <th>Osoby</th>
+                    <th>Termíny</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (subsystemGroups.Count == 0)
+                {
+                    <tr>
+                        <td colspan="3" class="cell-empty">Žádná data k tisku.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var subsystemGroup in subsystemGroups)
+                    {
+                        <tr class="subsystem-row">
+                            <td colspan="3">Subsystém: @subsystemGroup.Key</td>
+                        </tr>
+
+                        var orderedRecords = subsystemGroup
+                            .OrderBy(record => CategoryOrder(record.Kategorie))
+                            .ThenBy(record => record.Kategorie, StringComparer.CurrentCultureIgnoreCase)
+                            .ThenBy(record => record.CisloViditelneA)
+                            .ThenBy(record => record.CisloViditelneB)
+                            .ThenBy(record => record.CisloZaznamu)
+                            .ToList();
+
+                        foreach (var zaznam in orderedRecords)
+                        {
+                            var recordCode = string.IsNullOrWhiteSpace(zaznam.TypUkoluKod)
+                                ? (string.IsNullOrWhiteSpace(zaznam.KategorieKod) ? "-" : zaznam.KategorieKod)
+                                : zaznam.TypUkoluKod;
+                            var isPaused = (zaznam.Stav ?? string.Empty).Contains("pozastav", StringComparison.CurrentCultureIgnoreCase);
+                            var subsystemCode = string.IsNullOrWhiteSpace(zaznam.SubsystemKod) ? "-" : zaznam.SubsystemKod;
+                            <tr class="task-row">
+                                <td>
+                                    <div class="record-title-row">
+                                        <h2 class="record-title @(isPaused ? "paused" : string.Empty)"><span class="record-code-badge @(isPaused ? "paused" : string.Empty)">@recordCode@zaznam.CisloViditelne</span> - @zaznam.Nazev</h2>
+                                        <span class="record-subsystem-code">@subsystemCode</span>
+                                    </div>
+                                    <p class="record-meta"><strong>Stav:</strong> @zaznam.Stav | <strong>Typ úkolu:</strong> @(string.IsNullOrWhiteSpace(zaznam.TypUkolu) ? "-" : zaznam.TypUkolu)</p>
+                                    @if (!string.IsNullOrWhiteSpace(zaznam.Popis))
+                                    {
+                                        <p class="record-desc"><strong>Popis:</strong> @zaznam.Popis</p>
+                                    }
+                                    @if (zaznam.ExterniVazby.Count > 0)
+                                    {
+                                        <p class="record-external"><strong>Externí vazby:</strong> @string.Join("; ", zaznam.ExterniVazby)</p>
+                                    }
+
+                                    @if (zaznam.Vyjadreni.Count > 0)
+                                    {
+                                        <ul class="comment-list">
+                                            @foreach (var vyjadreni in zaznam.Vyjadreni)
+                                            {
+                                                var highlightStyle = !string.IsNullOrWhiteSpace(vyjadreni.HighlightColor)
+                                                    ? $"background:{vyjadreni.HighlightColor};"
+                                                    : string.Empty;
+                                                var meetingRef = vyjadreni.JednaniCislo.HasValue
+                                                    ? $" | jednání č. {vyjadreni.JednaniCislo}"
+                                                    : string.Empty;
+                                                <li class="comment-item @(string.IsNullOrWhiteSpace(vyjadreni.HighlightColor) ? string.Empty : "highlight")" style="@highlightStyle">
+                                                    <div class="comment-item-head">@vyjadreni.Datum.ToString("dd.MM.yyyy")@meetingRef | @vyjadreni.Autor</div>
+                                                    <p class="comment-item-text">@vyjadreni.Text</p>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </td>
+                                <td>
+                                    <p><strong>Vlastník:</strong> @zaznam.Vlastnik</p>
+                                    @if (zaznam.Spoluprace.Count > 0)
+                                    {
+                                        <p class="section-label"><strong>Spolupráce:</strong></p>
+                                        <ul class="people-list">
+                                            @foreach (var osoba in zaznam.Spoluprace)
+                                            {
+                                                <li>@osoba</li>
+                                            }
+                                        </ul>
+                                    }
+                                </td>
+                                <td>
+                                    <ul class="date-list">
+                                        <li><strong>Založeno:</strong> @zaznam.DatumZalozeni.ToString("dd.MM.yyyy")</li>
+                                        <li><strong>Aktuální termín:</strong> @(zaznam.Termin?.ToString("dd.MM.yyyy") ?? "-")</li>
+                                    </ul>
+                                    @if (zaznam.HistorieTerminu.Count > 0)
+                                    {
+                                        <p class="section-label"><strong>Historie termínů:</strong></p>
+                                        <ul class="term-history">
+                                            @foreach (var oldDate in zaznam.HistorieTerminu.OrderByDescending(date => date))
+                                            {
+                                                <li><s>@oldDate.ToString("dd.MM.yyyy")</s></li>
+                                            }
+                                        </ul>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.AutoPrint)
+    {
+        <script>
+            window.addEventListener("load", function () {
+                window.setTimeout(function () { window.print(); }, 120);
+            });
+        </script>
+    }
+</body>
+</html>

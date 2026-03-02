@@ -1,0 +1,58 @@
+@model UserRolesModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "authz-user-roles-modal-title";
+    var selectedRoleIds = Model.Command.RoleIds
+        .Select(x => x.ToString())
+        .ToHashSet(StringComparer.Ordinal);
+}
+
+<h2 id="authz-user-roles-modal-title">Upravit role uživatele</h2>
+<p class="muted">
+    <strong>@Model.OsobaLabel</strong>
+    @if (!string.IsNullOrWhiteSpace(Model.Email))
+    {
+        <span>- @Model.Email</span>
+    }
+</p>
+
+<form class="form-grid"
+      asp-controller="Nastaveni"
+      asp-action="SaveUserRolesForUser"
+      method="post"
+      data-ajax-submit="true">
+    <input type="hidden" name="OsobaId" value="@Model.Command.OsobaId" />
+    @await Html.PartialAsync(
+        "_ContextHiddenFields",
+        new ContextHiddenFieldsViewModel
+        {
+            UserId = Model.UserId,
+            ProjektId = Model.ProjektId
+        })
+
+    <fieldset class="settings-role-checklist">
+        <legend>Role</legend>
+        @if (Model.RoleOptions.Count == 0)
+        {
+            <p class="muted">Žádná aktivní role k přiřazení.</p>
+        }
+        else
+        {
+            @foreach (var option in Model.RoleOptions)
+            {
+                var selected = selectedRoleIds.Contains(option.Value);
+                <label class="settings-role-check">
+                    <input type="checkbox" name="RoleIds" value="@option.Value" checked="@selected" />
+                    <span>@option.Label</span>
+                </label>
+            }
+        }
+    </fieldset>
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = "Uložit role"
+        })
+</form>

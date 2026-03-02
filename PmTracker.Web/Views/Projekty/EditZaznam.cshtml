@@ -1,0 +1,679 @@
+@model ZaznamEditViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "record-modal-title";
+    ViewData["ModalVariant"] = "wide";
+    var selectedOwnerLabel = Model.Vlastnici
+        .FirstOrDefault(x => string.Equals(x.Value, Model.VlastnikId.ToString(), StringComparison.Ordinal))?.Label ?? string.Empty;
+    var datumZalozeniLocked = !Model.IsCreate;
+    var terminUkonceniIso = Model.TerminUkonceni?.ToString("yyyy-MM-dd") ?? string.Empty;
+    var terminUkonceniDisplay = Model.TerminUkonceni?.ToString("dd.MM.yyyy") ?? string.Empty;
+    var showTaskType = !string.IsNullOrWhiteSpace(Model.Kategorie)
+        && (Model.Kategorie.Contains("úkol", StringComparison.OrdinalIgnoreCase)
+            || Model.Kategorie.Contains("ukol", StringComparison.OrdinalIgnoreCase));
+    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
+    var canEditRecord = userContext?.HasPermission(PermissionKeys.RecordsEdit, Model.ProjektId) ?? false;
+    var canEditScheduleFull = canEditRecord
+        || (userContext?.HasPermission(PermissionKeys.RecordsScheduleEdit, Model.ProjektId) ?? false);
+    var canEditScheduleAddOnly = !canEditScheduleFull
+        && (userContext?.HasPermission(PermissionKeys.RecordsScheduleAdd, Model.ProjektId) ?? false);
+    var schedulePermissionMode = canEditScheduleFull
+        ? "full"
+        : (canEditScheduleAddOnly ? "add" : "none");
+    var canUseBasicTab = canEditRecord;
+    var defaultUiTab = (!canEditRecord && (canEditScheduleFull || canEditScheduleAddOnly) && Model.JeUkolKategorie)
+        ? "harmonogram"
+        : "zaznamy";
+    var requiresMeetingForNumber = Model.IsCreate && Model.PouzivatIdentJednani;
+    var createBlockedByMissingMeeting = requiresMeetingForNumber && !Model.MaDostupneJednaniProCislo;
+}
+
+<h2 id="record-modal-title">@(Model.IsCreate ? "Nový projektový záznam" : "Upravit záznam")</h2>
+<form class="form-grid"
+      asp-controller="Zaznamy"
+      asp-action="Save"
+      method="post"
+      data-ajax-submit="true"
+      data-record-owner-autofill="true"
+      data-record-form-tabs="true"
+      data-record-schedule-form="true"
+      data-schedule-permission-mode="@schedulePermissionMode"
+      data-is-create="@(Model.IsCreate ? "true" : "false")">
+    <input type="hidden" name="Id" value="@(Model.IsCreate ? null : Model.Id)" />
+    <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
+    <input type="hidden" name="CisloZaznamu" value="@Model.CisloZaznamu" />
+    <input type="hidden" name="UiTab" value="@defaultUiTab" data-record-active-tab-input />
+
+    <div class="record-modal-tabs" data-record-modal-tabs>
+        <button class="record-modal-tab @(defaultUiTab == "zaznamy" ? "active" : null)" type="button" data-record-modal-tab="zaznamy" @(canUseBasicTab ? null : "hidden=\"hidden\"")>Základní údaje</button>
+        <button class="record-modal-tab @(defaultUiTab == "harmonogram" ? "active" : null)" type="button" data-record-modal-tab="harmonogram" data-record-schedule-tab @(Model.JeUkolKategorie ? null : "hidden=\"hidden\"")>Harmonogram</button>
+    </div>
+
+    <div class="record-modal-panel @(defaultUiTab == "zaznamy" ? "active" : null)" data-record-modal-panel="zaznamy" @(defaultUiTab == "zaznamy" ? null : "hidden=\"hidden\"")>
+    <div class="record-form-row record-form-row-top" data-record-row-top data-has-type="@(showTaskType ? "true" : "false")">
+        <label>
+            Kategorie záznamu
+            <select name="Kategorie" data-kategorie-select>
+                @foreach (var kategorie in Model.KategorieZaznamu)
+                {
+                    if (kategorie == Model.Kategorie)
+                    {
+                        <option selected="selected">@kategorie</option>
+                    }
+                    else
+                    {
+                        <option>@kategorie</option>
+                    }
+                }
+            </select>
+        </label>
+        <label class="record-form-type-row" data-typ-ukolu-row>
+            Typ úkolu
+            <select name="TypUkolu">
+                <option value="">-</option>
+                @foreach (var typ in Model.TypyUkolu)
+                {
+                    if (typ == Model.TypUkolu)
+                    {
+                        <option selected="selected">@typ</option>
+                    }
+                    else
+                    {
+                        <option>@typ</option>
+                    }
+                }
+            </select>
+        </label>
+        <label>
+            Stav úkolu
+            <select name="Stav">
+                @foreach (var stav in Model.StavyUkolu)
+                {
+                    if (stav == Model.Stav)
+                    {
+                        <option selected="selected">@stav</option>
+                    }
+                    else
+                    {
+                        <option>@stav</option>
+                    }
+                }
+            </select>
+        </label>
+        <label class="record-form-number">
+            Číslo
+            <input type="text" value="@Model.CisloViditelne" disabled="disabled" />
+        </label>
+    </div>
+
+    @if (Model.IsCreate && Model.PouzivatIdentJednani)
+    {
+        <div class="record-form-row">
+            <label>
+                Jednání pro identifikátor
+                <select name="JednaniIdProCislo" required="required" @(Model.MaDostupneJednaniProCislo ? null : "disabled=\"disabled\"")>
+                    <option value="">Vyberte jednání</option>
+                    @foreach (var meeting in Model.JednaniProCisloOptions)
+                    {
+                        var selected = Model.JednaniIdProCislo.HasValue && Model.JednaniIdProCislo.Value == meeting.Id;
+                        <option value="@meeting.Id" selected="@selected">@meeting.Label</option>
+                    }
+                </select>
+            </label>
+        </div>
+        @if (!Model.MaDostupneJednaniProCislo)
+        {
+            <div class="alert danger">
+                Není dostupné žádné neuzavřené jednání. Založení záznamu je zablokováno.
+            </div>
+        }
+    }
+    else if (!Model.IsCreate && Model.MuzeDoplnitIdentifikatorJednani)
+    {
+        <div class="record-form-row">
+            <div class="record-identifier-assign">
+                <span class="muted">Tento záznam má ještě původní inkrementální číslo. Identifikátor z jednání lze doplnit jednorázově.</span>
+                <button class="btn small"
+                        type="button"
+                        data-modal-url="@Url.Action("AssignMeetingIdentifierModal", "Zaznamy", new { projektId = Model.ProjektId, zaznamId = Model.Id })">
+                    Doplnit identifikátor z jednání
+                </button>
+            </div>
+        </div>
+    }
+
+    <div class="record-form-row record-form-row-title">
+        <label>
+            Název
+            <input type="text" name="Nazev" value="@Model.Nazev" />
+        </label>
+    </div>
+
+    <div class="record-form-row">
+        <label>
+            Popis (volitelné)
+            <textarea rows="4" name="Popis">@Model.Popis</textarea>
+        </label>
+    </div>
+
+    <div class="record-form-row record-form-row-dates">
+        <label>
+            Datum založení
+            @await Html.PartialAsync(
+                "_AppDateField",
+                new AppDateFieldViewModel
+                {
+                    Name = "DatumZalozeni",
+                    IsoValue = Model.DatumZalozeni.ToString("yyyy-MM-dd"),
+                    DisplayValue = Model.DatumZalozeni.ToString("dd.MM.yyyy"),
+                    Locked = datumZalozeniLocked,
+                    AriaLabel = "Otevřít kalendář"
+                })
+        </label>
+        <label>
+            Termín ukončení
+            @await Html.PartialAsync(
+                "_AppDateField",
+                new AppDateFieldViewModel
+                {
+                    Name = "TerminUkonceni",
+                    IsoValue = terminUkonceniIso,
+                    DisplayValue = terminUkonceniDisplay,
+                    Locked = false,
+                    AriaLabel = "Otevřít kalendář"
+                })
+        </label>
+    </div>
+
+    <div class="record-form-row record-form-row-owner">
+        <label>
+            Subsystém
+            <select name="Subsystem" data-record-subsystem-select>
+                @foreach (var subsystem in Model.Subsystemy)
+                {
+                    var optionLabel = string.IsNullOrWhiteSpace(subsystem.Kod)
+                        ? subsystem.Nazev
+                        : $"{subsystem.Kod} - {subsystem.Nazev}";
+                    if (subsystem.Nazev == Model.Subsystem)
+                    {
+                        <option value="@subsystem.Kod" data-owner-id="@subsystem.VedouciOsobaId" selected="selected">@optionLabel</option>
+                    }
+                    else
+                    {
+                        <option value="@subsystem.Kod" data-owner-id="@subsystem.VedouciOsobaId">@optionLabel</option>
+                    }
+                }
+            </select>
+        </label>
+        <label>
+            Vlastník
+            <div class="office-picker"
+                 data-person-picker="single"
+                 data-record-owner-picker
+                 data-person-picker-placeholder="Vyhledejte vlastníka podle jména nebo emailu..."
+                 data-person-picker-empty="Nenalezeny odpovídající osoby.">
+                <input type="hidden" name="VlastnikId" value="@Model.VlastnikId" data-person-picker-hidden required />
+                <div class="office-searchbox">
+                    <input type="search" value="@selectedOwnerLabel" autocomplete="off" data-person-picker-input required />
+                    <div class="office-search-panel" data-person-picker-panel hidden>
+                        <div class="office-search-results" data-person-picker-results role="listbox" aria-label="Výsledky osob"></div>
+                    </div>
+                </div>
+                <div class="person-picker-source" data-person-picker-source hidden>
+                    @foreach (var osoba in Model.DostupniSpolupracovnici)
+                    {
+                        <div data-id="@osoba.OsobaId"
+                             data-label="@osoba.Osoba"
+                             data-email="@(osoba.Email ?? string.Empty)"
+                             data-org="@(osoba.Organizace ?? string.Empty)"
+                             data-unit="@(osoba.OrganizacniCelek ?? string.Empty)"></div>
+                    }
+                </div>
+            </div>
+        </label>
+    </div>
+
+    <div class="section-divider">Externí vazby</div>
+    <div data-external-links-editor>
+        <div class="external-links" data-external-links>
+            @for (var i = 0; i < Model.ExterniVazby.Count; i++)
+            {
+                var vazba = Model.ExterniVazby[i];
+                var datumObjednaniIso = vazba.DatumObjednani?.ToString("yyyy-MM-dd") ?? string.Empty;
+                var datumObjednaniDisplay = vazba.DatumObjednani?.ToString("dd.MM.yyyy") ?? string.Empty;
+                var planDodaniIso = vazba.PlanDodani?.ToString("yyyy-MM-dd") ?? string.Empty;
+                var planDodaniDisplay = vazba.PlanDodani?.ToString("dd.MM.yyyy") ?? string.Empty;
+                var datumDodaniIso = vazba.DatumDodani?.ToString("yyyy-MM-dd") ?? string.Empty;
+                var datumDodaniDisplay = vazba.DatumDodani?.ToString("dd.MM.yyyy") ?? string.Empty;
+                var datumPrevzetiIso = vazba.DatumPrevzeti?.ToString("yyyy-MM-dd") ?? string.Empty;
+                var datumPrevzetiDisplay = vazba.DatumPrevzeti?.ToString("dd.MM.yyyy") ?? string.Empty;
+                <div class="external-row" data-external-row>
+                    <input type="hidden" name="ExterniVazby[@i].Id" value="@vazba.Id" />
+                    <label>
+                        Typ odkazu
+                        <select name="ExterniVazby[@i].Typ">
+                            @foreach (var typ in Model.TypyExternichOdkazu)
+                            {
+                                if (typ == vazba.Typ)
+                                {
+                                    <option selected="selected">@typ</option>
+                                }
+                                else
+                                {
+                                    <option>@typ</option>
+                                }
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        Číslo
+                        <input type="text" name="ExterniVazby[@i].Cislo" value="@vazba.Cislo" />
+                    </label>
+                    <label>
+                        Výzva
+                        <select name="ExterniVazby[@i].Vyzva">
+                            <option value="">—</option>
+                            @foreach (var vyzva in Model.Vyzvy)
+                            {
+                                if (vyzva == vazba.Vyzva)
+                                {
+                                    <option selected="selected">@vyzva</option>
+                                }
+                                else
+                                {
+                                    <option>@vyzva</option>
+                                }
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        Datum objednání
+                        @await Html.PartialAsync(
+                            "_AppDateField",
+                            new AppDateFieldViewModel
+                            {
+                                Name = $"ExterniVazby[{i}].DatumObjednani",
+                                IsoValue = datumObjednaniIso,
+                                DisplayValue = datumObjednaniDisplay,
+                                Locked = false,
+                                AriaLabel = "Otevřít kalendář"
+                            })
+                    </label>
+                    <label>
+                        Plán dodání
+                        @await Html.PartialAsync(
+                            "_AppDateField",
+                            new AppDateFieldViewModel
+                            {
+                                Name = $"ExterniVazby[{i}].PlanDodani",
+                                IsoValue = planDodaniIso,
+                                DisplayValue = planDodaniDisplay,
+                                Locked = false,
+                                AriaLabel = "Otevřít kalendář"
+                            })
+                    </label>
+                    <label>
+                        Datum dodání
+                        @await Html.PartialAsync(
+                            "_AppDateField",
+                            new AppDateFieldViewModel
+                            {
+                                Name = $"ExterniVazby[{i}].DatumDodani",
+                                IsoValue = datumDodaniIso,
+                                DisplayValue = datumDodaniDisplay,
+                                Locked = false,
+                                AriaLabel = "Otevřít kalendář"
+                            })
+                    </label>
+                    <label>
+                        Datum převzetí
+                        @await Html.PartialAsync(
+                            "_AppDateField",
+                            new AppDateFieldViewModel
+                            {
+                                Name = $"ExterniVazby[{i}].DatumPrevzeti",
+                                IsoValue = datumPrevzetiIso,
+                                DisplayValue = datumPrevzetiDisplay,
+                                Locked = false,
+                                AriaLabel = "Otevřít kalendář"
+                            })
+                    </label>
+                    <div class="external-actions">
+                        <button class="btn small ghost" type="button" data-external-remove>Odebrat vazbu</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <template data-external-template>
+            <div class="external-row" data-external-row>
+                <input type="hidden" name="ExterniVazby[__index__].Id" value="0" />
+                <label>
+                    Typ odkazu
+                    <select name="ExterniVazby[__index__].Typ">
+                        @foreach (var typ in Model.TypyExternichOdkazu)
+                        {
+                            <option>@typ</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    Číslo
+                    <input type="text" name="ExterniVazby[__index__].Cislo" value="" />
+                </label>
+                <label>
+                    Výzva
+                    <select name="ExterniVazby[__index__].Vyzva">
+                        <option value="">—</option>
+                        @foreach (var vyzva in Model.Vyzvy)
+                        {
+                            <option>@vyzva</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    Datum objednání
+                    @await Html.PartialAsync(
+                        "_AppDateField",
+                        new AppDateFieldViewModel
+                        {
+                            Name = "ExterniVazby[__index__].DatumObjednani",
+                            IsoValue = string.Empty,
+                            DisplayValue = string.Empty,
+                            Locked = false,
+                            AriaLabel = "Otevřít kalendář"
+                        })
+                </label>
+                <label>
+                    Plán dodání
+                    @await Html.PartialAsync(
+                        "_AppDateField",
+                        new AppDateFieldViewModel
+                        {
+                            Name = "ExterniVazby[__index__].PlanDodani",
+                            IsoValue = string.Empty,
+                            DisplayValue = string.Empty,
+                            Locked = false,
+                            AriaLabel = "Otevřít kalendář"
+                        })
+                </label>
+                <label>
+                    Datum dodání
+                    @await Html.PartialAsync(
+                        "_AppDateField",
+                        new AppDateFieldViewModel
+                        {
+                            Name = "ExterniVazby[__index__].DatumDodani",
+                            IsoValue = string.Empty,
+                            DisplayValue = string.Empty,
+                            Locked = false,
+                            AriaLabel = "Otevřít kalendář"
+                        })
+                </label>
+                <label>
+                    Datum převzetí
+                    @await Html.PartialAsync(
+                        "_AppDateField",
+                        new AppDateFieldViewModel
+                        {
+                            Name = "ExterniVazby[__index__].DatumPrevzeti",
+                            IsoValue = string.Empty,
+                            DisplayValue = string.Empty,
+                            Locked = false,
+                            AriaLabel = "Otevřít kalendář"
+                        })
+                </label>
+                <div class="external-actions">
+                    <button class="btn small ghost" type="button" data-external-remove>Odebrat vazbu</button>
+                </div>
+            </div>
+        </template>
+
+        <button class="btn" type="button" data-external-add>Přidat externí vazbu</button>
+    </div>
+
+    <div class="section-divider">Spolupráce</div>
+    <div class="collab-picker">
+        <label>
+            Vyhledat osobu
+            <input type="search" placeholder="Jméno, organizace..." data-collab-search />
+        </label>
+        <div class="collab-options" data-collab-options>
+            @foreach (var osoba in Model.DostupniSpolupracovnici)
+            {
+                var isChecked = Model.VybraniSpolupracovniciIds.Contains(osoba.OsobaId);
+                var searchable = $"{osoba.Osoba} {osoba.Email} {osoba.Organizace} {osoba.OrganizacniCelek}".ToLowerInvariant();
+                <label class="collab-option" data-collab-option data-collab-label="@searchable">
+                    @if (isChecked)
+                    {
+                        <input type="checkbox" name="VybraniSpolupracovniciIds" value="@osoba.OsobaId" checked="checked" />
+                    }
+                    else
+                    {
+                        <input type="checkbox" name="VybraniSpolupracovniciIds" value="@osoba.OsobaId" />
+                    }
+                    <span class="collab-option-name">@osoba.Osoba</span>
+                    <span class="collab-option-email">@(string.IsNullOrWhiteSpace(osoba.Email) ? "-" : osoba.Email)</span>
+                    <span class="collab-option-origin">@(osoba.Organizace ?? "-") / @(osoba.OrganizacniCelek ?? "-")</span>
+                </label>
+            }
+        </div>
+    </div>
+    </div>
+
+    <div class="record-modal-panel @(defaultUiTab == "harmonogram" ? "active" : null)" data-record-modal-panel="harmonogram" data-record-schedule-panel @(defaultUiTab == "harmonogram" ? null : "hidden=\"hidden\"") @(Model.JeUkolKategorie ? null : "data-schedule-disabled=\"true\"")>
+        <p class="muted" data-record-schedule-note @(Model.JeUkolKategorie ? "hidden=\"hidden\"" : null)>Harmonogram je dostupný pouze pro záznamy v kategorii úkol.</p>
+        @{
+            var harmonogramInputIndex = 0;
+        }
+        <div class="schedule-editor" data-record-schedule-editor style="--record-schedule-delay-color:@Model.HarmonogramDelayBarvaHex;">
+            <div class="schedule-summary-grid">
+                <div><span class="label">Termín úkolu:</span> <strong data-schedule-summary-deadline>@Model.HarmonogramSouhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></div>
+                <div><span class="label">Plán dokončení:</span> <strong data-schedule-summary-baseline>@Model.HarmonogramSouhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></div>
+                <div><span class="label">Posun dokončení:</span> <strong data-schedule-summary-shifted>@Model.HarmonogramSouhrn.PosunuteDokonceni.ToString("dd.MM.yyyy")</strong></div>
+                <div><span class="label">Trvání:</span> <strong data-schedule-summary-duration>@Model.HarmonogramSouhrn.CelkoveTrvaniDni</strong> dnů</div>
+                <div><span class="label">Zpoždění:</span> <strong data-schedule-summary-delay>@Model.HarmonogramSouhrn.CelkoveZpozdeniDni</strong> dnů</div>
+                <div class="schedule-status-line @(Model.HarmonogramSouhrn.Stihame ? "ok" : "late")">
+                    <span class="label">Stav:</span>
+                    <strong data-schedule-summary-state>@(Model.HarmonogramSouhrn.Stihame ? "Stíháme" : "Nestíháme")</strong>
+                    <span data-schedule-summary-overrun>@(Model.HarmonogramSouhrn.Stihame ? string.Empty : $"(+{Model.HarmonogramSouhrn.PrekroceniDni} dnů)")</span>
+                </div>
+            </div>
+
+            <div class="schedule-mini-gantt" data-record-mini-gantt>
+                <div class="schedule-mini-gantt-row">
+                    <span>Plán</span>
+                    <div class="schedule-mini-gantt-track">
+                        <div class="schedule-mini-gantt-marker" data-schedule-gantt-deadline></div>
+                        @for (var stepIndex = 0; stepIndex < Model.HarmonogramKroky.Count; stepIndex++)
+                        {
+                            var krok = Model.HarmonogramKroky[stepIndex];
+                            <div class="schedule-mini-gantt-segment"
+                                 data-rainbow-segment-label-full="@krok.Nazev"
+                                 data-rainbow-segment-label-short="@krok.KrokIndex"
+                                 data-schedule-gantt-step-planned="@stepIndex"
+                                 style="background:@krok.BarvaHex;"></div>
+                        }
+                    </div>
+                </div>
+                <div class="schedule-mini-gantt-row">
+                    <span>Posun</span>
+                    <div class="schedule-mini-gantt-track">
+                        <div class="schedule-mini-gantt-marker" data-schedule-gantt-deadline></div>
+                        @for (var stepIndex = 0; stepIndex < Model.HarmonogramKroky.Count; stepIndex++)
+                        {
+                            var krok = Model.HarmonogramKroky[stepIndex];
+                            <div class="schedule-mini-gantt-segment"
+                                 data-rainbow-segment-label-full="@krok.Nazev"
+                                 data-rainbow-segment-label-short="@krok.KrokIndex"
+                                 data-schedule-gantt-step-actual="@stepIndex"
+                                 style="background:@krok.BarvaHex;"></div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="schedule-mini-legend">Plán / Posun / Termín</div>
+
+            <div class="schedule-table-wrap">
+                <table class="table schedule-table">
+                    <thead>
+                        <tr>
+                            <th>Krok</th>
+                            <th>Trvání / datum</th>
+                            <th>Zpoždění / datum</th>
+                            <th>Plán / Posun</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < Model.HarmonogramKroky.Count; i++)
+                        {
+                            var krok = Model.HarmonogramKroky[i];
+                            var durationInputIndex = harmonogramInputIndex++;
+                            var delayInputIndex = harmonogramInputIndex++;
+                            var durationStaticDisabled = krok.TrvaniTypId <= 0;
+                            var delayStaticDisabled = krok.ZpozdeniTypId <= 0;
+                            var stepStaticDisabled = durationStaticDisabled || delayStaticDisabled;
+                            var canEditDuration = canEditScheduleFull || (canEditScheduleAddOnly && krok.TrvaniDni <= 0);
+                            var canEditDelay = canEditScheduleFull || canEditScheduleAddOnly;
+                            var durationDisabled = !Model.JeUkolKategorie || durationStaticDisabled || !canEditDuration;
+                            var delayDisabled = !Model.JeUkolKategorie || delayStaticDisabled || !canEditDelay;
+                            var dateDisabled = !Model.JeUkolKategorie || stepStaticDisabled || !canEditDuration;
+                            var delayDateDisabled = !Model.JeUkolKategorie || delayStaticDisabled || !canEditDelay;
+                            <tr data-schedule-step-row data-step-index="@krok.KrokIndex">
+                                <td>@krok.Nazev</td>
+                                <td>
+                                    <div class="schedule-stacked-input">
+                                        <input type="hidden" name="HarmonogramHodnoty[@durationInputIndex].TypId" value="@krok.TrvaniTypId" />
+                                        <div class="schedule-stacked-main">
+                                            <div class="schedule-stacked-part schedule-stacked-part-top">
+                                                <input class="schedule-days-input schedule-days-input-stacked"
+                                                       type="number"
+                                                       min="0"
+                                                       name="HarmonogramHodnoty[@durationInputIndex].Hodnota"
+                                                       value="@krok.TrvaniDni"
+                                                       data-schedule-duration
+                                                       data-schedule-static-disabled="@(durationStaticDisabled ? "true" : "false")"
+                                                       data-schedule-original-duration="@krok.TrvaniDni"
+                                                       @((durationDisabled) ? "disabled=\"disabled\"" : null) />
+                                            </div>
+                                            <div class="schedule-stacked-part schedule-stacked-part-bottom">
+                                                @await Html.PartialAsync(
+                                                    "_AppDateField",
+                                                    new AppDateFieldViewModel
+                                                    {
+                                                        Name = $"UiHarmonogramDatumy[{i}]",
+                                                        IsoValue = krok.BaselineDatum.ToString("yyyy-MM-dd"),
+                                                        DisplayValue = krok.BaselineDatum.ToString("dd.MM.yyyy"),
+                                                        Locked = dateDisabled,
+                                                        AriaLabel = "Otevřít kalendář kroku harmonogramu",
+                                                        ContainerCssClass = "schedule-date-field schedule-date-field-stacked",
+                                                        ExtraDataAttributes = new Dictionary<string, object?>
+                                                        {
+                                                            ["data-schedule-date"] = "true",
+                                                            ["data-schedule-static-disabled"] = stepStaticDisabled ? "true" : "false",
+                                                            ["data-schedule-original-duration"] = krok.TrvaniDni.ToString()
+                                                        }
+                                                    })
+                                            </div>
+                                        </div>
+                                        <div class="schedule-stacked-stepper">
+                                            <button class="icon-btn schedule-step-btn"
+                                                    type="button"
+                                                    data-schedule-duration-inc
+                                                    aria-label="Přidat 1 den"
+                                                    @((durationDisabled) ? "disabled=\"disabled\"" : null)>
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                </svg>
+                                            </button>
+                                            <button class="icon-btn schedule-step-btn"
+                                                    type="button"
+                                                    data-schedule-duration-dec
+                                                    aria-label="Odebrat 1 den"
+                                                    @((durationDisabled) ? "disabled=\"disabled\"" : null)>
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="schedule-stacked-input">
+                                        <input type="hidden" name="HarmonogramHodnoty[@delayInputIndex].TypId" value="@krok.ZpozdeniTypId" />
+                                        <div class="schedule-stacked-main">
+                                            <div class="schedule-stacked-part schedule-stacked-part-top">
+                                                <input class="schedule-days-input schedule-days-input-stacked"
+                                                       type="number"
+                                                       min="0"
+                                                       name="HarmonogramHodnoty[@delayInputIndex].Hodnota"
+                                                       value="@krok.ZpozdeniDni"
+                                                       data-schedule-delay
+                                                       data-schedule-static-disabled="@(delayStaticDisabled ? "true" : "false")"
+                                                       @((delayDisabled) ? "disabled=\"disabled\"" : null) />
+                                            </div>
+                                            <div class="schedule-stacked-part schedule-stacked-part-bottom">
+                                                @await Html.PartialAsync(
+                                                    "_AppDateField",
+                                                    new AppDateFieldViewModel
+                                                    {
+                                                        Name = $"UiHarmonogramPosunuteDatumy[{i}]",
+                                                        IsoValue = krok.PosunuteDatum.ToString("yyyy-MM-dd"),
+                                                        DisplayValue = krok.PosunuteDatum.ToString("dd.MM.yyyy"),
+                                                        Locked = delayDateDisabled,
+                                                        AriaLabel = "Otevřít kalendář zpoždění kroku harmonogramu",
+                                                        ContainerCssClass = "schedule-date-field schedule-date-field-stacked",
+                                                        ExtraDataAttributes = new Dictionary<string, object?>
+                                                        {
+                                                            ["data-schedule-delay-date"] = "true",
+                                                            ["data-schedule-static-disabled"] = delayStaticDisabled ? "true" : "false"
+                                                        }
+                                                    })
+                                            </div>
+                                        </div>
+                                        <div class="schedule-stacked-stepper">
+                                            <button class="icon-btn schedule-step-btn"
+                                                    type="button"
+                                                    data-schedule-delay-inc
+                                                    aria-label="Přidat 1 den zpoždění"
+                                                    @((delayDisabled) ? "disabled=\"disabled\"" : null)>
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                </svg>
+                                            </button>
+                                            <button class="icon-btn schedule-step-btn"
+                                                    type="button"
+                                                    data-schedule-delay-dec
+                                                    aria-label="Odebrat 1 den zpoždění"
+                                                    @((delayDisabled) ? "disabled=\"disabled\"" : null)>
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="schedule-step-gantt-cell">
+                                    <div class="schedule-step-gantt-track" data-schedule-step-track>
+                                        <div class="schedule-step-gantt-bar planned" data-schedule-step-planned></div>
+                                        <div class="schedule-step-gantt-bar actual" data-schedule-step-actual></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = Model.IsCreate ? "Založit záznam" : "Uložit",
+            DisableSubmit = createBlockedByMissingMeeting
+        })
+</form>

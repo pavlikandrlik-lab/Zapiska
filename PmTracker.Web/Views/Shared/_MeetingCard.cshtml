@@ -1,0 +1,67 @@
+@model MeetingCardViewModel
+
+@* Shared card component used in both project detail and meetings index.
+   Keeps layout/actions consistent and removes duplicated markup. *@
+<article class="meeting-card" data-href="@Model.DetailUrl" role="link" tabindex="0">
+    <div class="meeting-card-top">
+        <div class="meeting-number">Jednání č. @Model.Jednani.CisloJednani</div>
+        <div class="meeting-card-actions">
+            <a class="icon-btn meeting-print-btn"
+               href="@Model.PrintPdfUrl"
+               target="_blank"
+               rel="noopener"
+               aria-label="Tisk jednání č. @Model.Jednani.CisloJednani"
+               data-stop-propagation="true"
+               data-print-trigger="true"
+               data-print-pdf-url="@Model.PrintPdfUrl"
+               data-print-word-url="@Model.PrintWordUrl"
+               data-print-label="Tisk jednání č. @Model.Jednani.CisloJednani">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+            </a>
+            @if (Model.CanDelete)
+            {
+                if (Model.UseAjaxDelete)
+                {
+                    <form class="table-action-inline-form" asp-controller="Projekty" asp-action="DeleteMeeting" method="post" data-stop-propagation="true" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
+                        <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
+                        <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
+                        <button class="icon-btn meeting-delete-btn" type="submit" aria-label="Smazat jednání č. @Model.Jednani.CisloJednani">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path>
+                                <path d="M19 6l-1 14a1 1 0 0 1-1 .9H7a1 1 0 0 1-1-.9L5 6"></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <form class="table-action-inline-form" asp-controller="Projekty" asp-action="DeleteMeeting" method="post" data-stop-propagation="true" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
+                        <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
+                        <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
+                        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                        <button class="icon-btn meeting-delete-btn" type="submit" aria-label="Smazat jednání č. @Model.Jednani.CisloJednani">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path>
+                                <path d="M19 6l-1 14a1 1 0 0 1-1 .9H7a1 1 0 0 1-1-.9L5 6"></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                        </button>
+                    </form>
+                }
+            }
+        </div>
+    </div>
+    <div class="meeting-date">@Model.Jednani.Datum.ToString("dd.MM.yyyy") v @Model.Jednani.CasZacatek.ToString("HH\\:mm")</div>
+    <div class="meeting-card-status">
+        <span class="badge meeting-status-badge">@Model.Jednani.Stav</span>
+    </div>
+</article>

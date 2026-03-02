@@ -1,0 +1,41 @@
+@model JednaniIndexViewModel
+@{
+    ViewData["Title"] = "Jednání";
+    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
+}
+
+<section class="page-header">
+    <div>
+        <h1>Jednání</h1>
+        <p class="muted">Přehled porad podle projektu.</p>
+    </div>
+</section>
+
+@foreach (var projekt in Model.Projekty)
+{
+    var canDeleteMeetings = userContext?.HasPermission(PermissionKeys.MeetingsEdit, projekt.ProjektId) ?? false;
+    <section class="card">
+        <div class="meeting-header">
+            <h2>@projekt.ProjektNazev</h2>
+        </div>
+        <div class="meeting-grid">
+            @foreach (var jednani in projekt.Jednani)
+            {
+                var detailUrl = Url.Action("Detail", new { id = jednani.Id }) ?? $"/Jednani/Detail/{jednani.Id}";
+                var meetingPdfUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{jednani.Id}/Tisk?autoPrint=true";
+                var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = jednani.Id }) ?? $"/Export/Jednani/{jednani.Id}/Word";
+                @await Html.PartialAsync("_MeetingCard", new MeetingCardViewModel
+                {
+                    ProjektId = projekt.ProjektId,
+                    CanDelete = canDeleteMeetings,
+                    UseAjaxDelete = false,
+                    ReturnUrl = $"{Context.Request.Path}{Context.Request.QueryString}",
+                    DetailUrl = detailUrl,
+                    PrintPdfUrl = meetingPdfUrl,
+                    PrintWordUrl = meetingWordUrl,
+                    Jednani = jednani
+                })
+            }
+        </div>
+    </section>
+}

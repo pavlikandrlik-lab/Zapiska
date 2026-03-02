@@ -1,0 +1,48 @@
+@model AssignMeetingIdentifierModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "assign-meeting-identifier-modal-title";
+    var hasMeetingOptions = Model.JednaniOptions.Count > 0;
+}
+
+<h2 id="assign-meeting-identifier-modal-title">@Model.Title</h2>
+
+<form class="form-grid"
+      asp-controller="Zaznamy"
+      asp-action="AssignMeetingIdentifier"
+      method="post"
+      data-ajax-submit="true">
+    <input type="hidden" name="ProjektId" value="@Model.Command.ProjektId" />
+    <input type="hidden" name="ZaznamId" value="@Model.Command.ZaznamId" />
+
+    <label>
+        Aktuální číslo záznamu
+        <input type="text" value="@Model.CisloViditelne" disabled="disabled" />
+    </label>
+
+    <label>
+        Jednání pro identifikátor
+        <select name="JednaniId" required="required" @(hasMeetingOptions ? null : "disabled=\"disabled\"")>
+            <option value="">Vyberte jednání</option>
+            @foreach (var meeting in Model.JednaniOptions)
+            {
+                <option value="@meeting.Id">@meeting.Label</option>
+            }
+        </select>
+    </label>
+
+    @if (!hasMeetingOptions)
+    {
+        <div class="alert danger">
+            Není dostupné žádné neuzavřené jednání.
+        </div>
+    }
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = "Doplnit identifikátor",
+            DisableSubmit = !hasMeetingOptions
+        })
+</form>

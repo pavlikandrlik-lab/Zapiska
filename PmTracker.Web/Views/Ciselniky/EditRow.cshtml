@@ -1,0 +1,115 @@
+@model CiselnikRadekEditViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "ciselnik-edit-row-modal-title";
+    var isSubsystemCiselnik = string.Equals(Model.Key, "subsystemy", StringComparison.OrdinalIgnoreCase);
+    var isHarmonogramCiselnik = string.Equals(Model.Key, "harmonogram-kroky", StringComparison.OrdinalIgnoreCase);
+    var selectedExtraValue = Model.HodnotaNavicRaw ?? Model.HodnotaNavic;
+    var selectedExtraColor = string.IsNullOrWhiteSpace(selectedExtraValue) ? "#DC2626" : selectedExtraValue;
+    var selectedOptionLabel = Model.HodnotaNavicVolby
+        .FirstOrDefault(x => string.Equals(x.Value, selectedExtraValue, StringComparison.Ordinal))
+        ?.Label ?? Model.HodnotaNavic ?? string.Empty;
+
+    static (string DisplayLabel, string Email) SplitPersonLabel(string rawLabel)
+    {
+        if (string.IsNullOrWhiteSpace(rawLabel))
+        {
+            return (string.Empty, string.Empty);
+        }
+
+        var trimmed = rawLabel.Trim();
+        var emailStart = trimmed.LastIndexOf(" <", StringComparison.Ordinal);
+        if (emailStart > 0 && trimmed.EndsWith('>'))
+        {
+            var label = trimmed[..emailStart].Trim();
+            var email = trimmed[(emailStart + 2)..^1].Trim();
+            return (label, email);
+        }
+
+        return (trimmed, string.Empty);
+    }
+}
+
+<h2 id="ciselnik-edit-row-modal-title">Upravit položku</h2>
+<p class="muted">@Model.CiselnikNazev</p>
+
+<form class="form-grid" asp-controller="Ciselniky" asp-action="SaveRow" method="post" data-ajax-submit="true">
+    <input type="hidden" name="Key" value="@Model.Key" />
+    <input type="hidden" name="Id" value="@Model.Id" />
+    <label>
+        Kód
+        <input type="text" name="Kod" value="@Model.Kod" required />
+    </label>
+    <label>
+        Název
+        <input type="text" name="Nazev" value="@Model.Nazev" required />
+    </label>
+    @if (!string.IsNullOrWhiteSpace(Model.SloupecNavic))
+    {
+        <label>
+            @Model.SloupecNavic
+            @if (isSubsystemCiselnik && Model.IsHodnotaNavicSelect)
+            {
+                <div class="office-picker"
+                     data-person-picker="single"
+                     data-person-picker-placeholder="Vyhledejte vedoucího podle jména nebo emailu..."
+                     data-person-picker-empty="Nenalezeny odpovídající osoby.">
+                    <input type="hidden" name="HodnotyNavic[0]" value="@selectedExtraValue" data-person-picker-hidden required />
+                    <div class="office-searchbox">
+                        <input type="search" value="@selectedOptionLabel" autocomplete="off" data-person-picker-input required />
+                        <div class="office-search-panel" data-person-picker-panel hidden>
+                            <div class="office-search-results" data-person-picker-results role="listbox" aria-label="Výsledky osob"></div>
+                        </div>
+                    </div>
+                    <div class="person-picker-source" data-person-picker-source hidden>
+                        @foreach (var option in Model.HodnotaNavicVolby)
+                        {
+                            var parsed = SplitPersonLabel(option.Label);
+                            <div data-id="@option.Value"
+                                 data-label="@parsed.DisplayLabel"
+                                 data-email="@parsed.Email"></div>
+                        }
+                    </div>
+                </div>
+            }
+            else if (Model.IsHodnotaNavicSelect)
+            {
+                <select name="HodnotyNavic[0]" required="@Model.IsHodnotaNavicRequired">
+                    <option value="">Vyberte osobu</option>
+                    @foreach (var option in Model.HodnotaNavicVolby)
+                    {
+                        var selected = string.Equals(option.Value, selectedExtraValue, StringComparison.Ordinal);
+                        <option value="@option.Value" selected="@selected">@option.Label</option>
+                    }
+                </select>
+            }
+            else
+            {
+                if (isHarmonogramCiselnik)
+                {
+                    <input type="color" name="HodnotyNavic[0]" value="@selectedExtraColor" />
+                }
+                else
+                {
+                    <input type="text" name="HodnotyNavic[0]" value="@Model.HodnotaNavic" />
+                }
+            }
+        </label>
+    }
+    @if (!isSubsystemCiselnik && !isHarmonogramCiselnik)
+    {
+        <label>
+            Zamčení položky
+            <select name="IsLocked">
+                <option value="false" selected="@(!Model.IsLocked)">Ne</option>
+                <option value="true" selected="@Model.IsLocked">Ano</option>
+            </select>
+        </label>
+    }
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = "Uložit změny"
+        })
+</form>

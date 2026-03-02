@@ -1,0 +1,39 @@
+@model NastaveniDashboardViewModel
+@{
+    ViewData["Title"] = "Nastavení";
+}
+
+<section class="page-header">
+    <div>
+        <h1>Nastavení</h1>
+        <p class="muted">Správa rolí, oprávnění a mapování přístupů.</p>
+    </div>
+</section>
+
+<div class="settings-layout" data-settings-shell data-panel-url="@Url.Action("Panel", "Nastaveni")">
+    <aside class="settings-sidebar card">
+        <h2>Sekce</h2>
+        <nav class="settings-nav" aria-label="Sekce nastavení">
+            @foreach (var sekce in Model.Sekce)
+            {
+                var active = sekce.Key == Model.AktivniPanel.SectionKey;
+                <a class="settings-link @(active ? "active" : "")"
+                   asp-action="Index"
+                   asp-route-section="@sekce.Key"
+                   asp-route-userId="@Model.SelectedUserId"
+                   asp-route-projektId="@Model.SelectedProjektId"
+                   data-settings-link
+                   data-key="@sekce.Key"
+                   aria-current="@(active ? "page" : null)">
+                    <span class="settings-link-title">@sekce.Nazev</span>
+                    <span class="settings-link-sub">@sekce.Popis</span>
+                    <span class="settings-link-count">@sekce.Pocet</span>
+                </a>
+            }
+        </nav>
+    </aside>
+
+    <section class="settings-panel" data-settings-panel>
+        @await Html.PartialAsync("_DetailPanel", Model.AktivniPanel)
+    </section>
+</div>

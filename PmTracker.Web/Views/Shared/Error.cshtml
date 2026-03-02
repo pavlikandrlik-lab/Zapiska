@@ -1,0 +1,13 @@
+@model ErrorViewModel
+@{
+    ViewData["Title"] = "Chyba";
+}
+
+<section class="card">
+    <h1>Došlo k chybě</h1>
+    <p>Omlouváme se, požadavek se nepodařilo zpracovat.</p>
+    @if (Model.ShowRequestId)
+    {
+        <p class="muted">Request ID: <span>@Model.RequestId</span></p>
+    }
+</section>

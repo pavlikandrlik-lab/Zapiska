@@ -1,0 +1,6 @@
+@model ModalFormActionsViewModel
+
+<div class="form-actions">
+    <button class="btn" type="button" data-modal-close>@Model.CancelLabel</button>
+    <button class="@Model.SubmitCssClass" type="submit" disabled="@(Model.DisableSubmit ? "disabled" : null)">@Model.SubmitLabel</button>
+</div>

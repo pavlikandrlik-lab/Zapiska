@@ -1,0 +1,30 @@
+@{
+    Layout = null;
+    var modalTitleId = ViewData["ModalTitleId"]?.ToString();
+    if (string.IsNullOrWhiteSpace(modalTitleId))
+    {
+        modalTitleId = "modal-title";
+    }
+
+    var variant = ViewData["ModalVariant"]?.ToString();
+    var modalVariantClass = string.Equals(variant, "wide", StringComparison.OrdinalIgnoreCase)
+        ? "modal--wide"
+        : "modal--default";
+
+    var overflowVisible = ViewData["ModalOverflowVisible"] is bool overflowBool
+        ? overflowBool
+        : string.Equals(ViewData["ModalOverflowVisible"]?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+    var overflowClass = overflowVisible ? "modal--overflow-visible" : string.Empty;
+}
+<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="@modalTitleId">
+    <div class="modal @modalVariantClass @overflowClass" data-modal-container tabindex="-1">
+        <div class="modal-header">
+            <button class="modal-close" type="button" data-modal-close aria-label="Zavřít dialog">
+                <span class="modal-close-icon" aria-hidden="true">&#10005;</span>
+            </button>
+        </div>
+        <div class="modal-content">
+            @RenderBody()
+        </div>
+    </div>
+</div>

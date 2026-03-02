@@ -1,0 +1,204 @@
+@model JednaniDetailViewModel
+@{
+    ViewData["Title"] = "Detail jednání";
+    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
+    var canEditMeeting = userContext?.HasPermission(PermissionKeys.MeetingsEdit, Model.ProjektId) ?? false;
+    var canEditRecords = userContext?.HasPermission(PermissionKeys.RecordsEdit, Model.ProjektId) ?? false;
+    var hasSubsystemLeadPermission = userContext?.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, Model.ProjektId) ?? false;
+    var userOsobaId = userContext?.OsobaId ?? 0;
+    var uzavrenyStav = Model.StavyJednani.FirstOrDefault(x => string.Equals(x.Value, Model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase));
+    var otevrenyStav = Model.StavyJednani.FirstOrDefault(x => string.Equals(x.Value, Model.OtevrenyStavKod, StringComparison.OrdinalIgnoreCase));
+    var isLocked = !string.IsNullOrWhiteSpace(Model.UzavrenyStavKod)
+        && string.Equals(Model.Jednani.StavKod, Model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase);
+    var canEditMeetingFields = canEditMeeting && !isLocked;
+    var canEditRecordNotes = canEditRecords && !isLocked;
+    var backUrl = ViewData["BackUrl"] as string ?? Url.Action("Index", "Jednani", new { projektId = Model.ProjektId }) ?? "/Jednani";
+    var backLabel = ViewData["BackLabel"] as string ?? "Zpět na jednání";
+    var meetingPrintUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = Model.Jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Tisk?autoPrint=true";
+    var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = Model.Jednani.Id }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Word";
+}
+
+<section class="page-header meeting-detail-header">
+    <div>
+        <h1>Jednání č. @Model.Jednani.CisloJednani</h1>
+        <p class="muted">@Model.ProjektNazev</p>
+        <p class="muted">@Model.Jednani.Datum.ToString("dd.MM.yyyy") v @Model.Jednani.CasZacatek.ToString("HH\\:mm") - <span class="badge">@Model.Jednani.Stav</span></p>
+        <p class="muted">Místo: @Model.Jednani.Misto</p>
+        @if (isLocked)
+        {
+            <p class="muted">Uzamkl: @(string.IsNullOrWhiteSpace(Model.Jednani.UzamklOsoba) ? "-" : Model.Jednani.UzamklOsoba)</p>
+        }
+    </div>
+    <div class="header-actions meeting-detail-actions">
+        <a class="btn ghost"
+           href="@meetingPrintUrl"
+           target="_blank"
+           rel="noopener"
+           data-print-trigger="true"
+           data-print-pdf-url="@meetingPrintUrl"
+           data-print-word-url="@meetingWordUrl"
+           data-print-label="Tisk jednání č. @Model.Jednani.CisloJednani">
+            Tisk
+        </a>
+        @if (canEditMeeting)
+        {
+            <form asp-controller="Projekty" asp-action="DeleteMeeting" method="post" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
+                <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
+                <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
+                <button class="btn ghost" type="submit">Smazat</button>
+            </form>
+        }
+        <a class="btn" href="@backUrl">@backLabel</a>
+    </div>
+</section>
+
+<div class="meeting-layout">
+    <aside class="card meeting-sidebar">
+        <h2>Účast</h2>
+        <form asp-action="SaveAttendance" method="post">
+            <input type="hidden" name="projektId" value="@Model.ProjektId" />
+            <input type="hidden" name="jednaniId" value="@Model.Jednani.Id" />
+            <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Osoba</th>
+                        <th>Stav účasti</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @for (var i = 0; i < Model.Ucast.Count; i++)
+                {
+                    var ucast = Model.Ucast[i];
+                    <tr>
+                        <td>
+                            @ucast.Osoba
+                            @if (!string.IsNullOrWhiteSpace(ucast.Email))
+                            {
+                                <div class="muted">@ucast.Email</div>
+                            }
+                            <input type="hidden" name="rows[@i].OsobaId" value="@ucast.OsobaId" />
+                        </td>
+                        <td>
+                            <select class="meeting-attendance-select" name="rows[@i].StavUcasti" disabled="@(!canEditMeetingFields)">
+                                @foreach (var stav in Model.StavyUcasti)
+                                {
+                                    var selected = string.Equals(stav.Value, ucast.StavUcastiKod, StringComparison.OrdinalIgnoreCase)
+                                        || string.Equals(stav.Label, ucast.StavUcasti, StringComparison.OrdinalIgnoreCase);
+                                    if (selected)
+                                    {
+                                        <option value="@stav.Value" selected="selected">@stav.Label</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@stav.Value">@stav.Label</option>
+                                    }
+                                }
+                            </select>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            @if (canEditMeetingFields)
+            {
+                <div class="meeting-notes-actions">
+                    <button class="btn small" type="submit">Uložit účast</button>
+                </div>
+            }
+        </form>
+    </aside>
+
+    <section class="meeting-content">
+        <div class="card">
+            <div class="meeting-status">
+                <div>
+                    <h2>Stav jednání</h2>
+                    <p class="muted">Upravte stav nebo jednání uzavřete / otevřete.</p>
+                    @if (isLocked)
+                    {
+                        <p class="tag">Jednání je uzamčeno ve stavu @(uzavrenyStav?.Label ?? Model.Jednani.Stav).</p>
+                    }
+                </div>
+                <div class="meeting-status-controls">
+                    <form asp-action="SaveStatus" method="post" class="inline-form">
+                        <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
+                        <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                        <select class="wide-select" name="Stav" disabled="@(!canEditMeetingFields)">
+                            @foreach (var stav in Model.StavyJednani)
+                            {
+                                var selected = string.Equals(stav.Value, Model.Jednani.StavKod, StringComparison.OrdinalIgnoreCase)
+                                    || string.Equals(stav.Label, Model.Jednani.Stav, StringComparison.OrdinalIgnoreCase);
+                                if (selected)
+                                {
+                                    <option value="@stav.Value" selected="selected">@stav.Label</option>
+                                }
+                                else
+                                {
+                                    <option value="@stav.Value">@stav.Label</option>
+                                }
+                            }
+                        </select>
+                        @if (canEditMeetingFields)
+                        {
+                            <button class="btn" type="submit">Uložit stav</button>
+                        }
+                    </form>
+                    @if (canEditMeeting)
+                    {
+                        if (isLocked)
+                        {
+                            if (otevrenyStav is not null)
+                            {
+                            <form asp-action="SaveStatus" method="post" class="inline-form">
+                                <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
+                                <input type="hidden" name="Stav" value="@otevrenyStav.Value" />
+                                <input type="hidden" name="OtevritJednani" value="true" />
+                                <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                <button class="btn" type="submit">Otevřít jednání</button>
+                            </form>
+                            }
+                        }
+                        else
+                        {
+                            if (uzavrenyStav is not null)
+                            {
+                            <form asp-action="SaveStatus" method="post" class="inline-form">
+                                <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
+                                <input type="hidden" name="Stav" value="@uzavrenyStav.Value" />
+                                <input type="hidden" name="UzavritJednani" value="true" />
+                                <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                <button class="btn ghost" type="submit">Uzavřít jednání</button>
+                            </form>
+                            }
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Zápis úkolů</h2>
+            <div class="task-list">
+                @for (var i = 0; i < Model.Ukoly.Count; i++)
+                {
+                    var ukol = Model.Ukoly[i];
+                    var canCommentTask = canEditRecordNotes
+                        || (hasSubsystemLeadPermission
+                            && !isLocked
+                            && userOsobaId > 0
+                            && userOsobaId == ukol.SubsystemVedouciOsobaId);
+                    @await Html.PartialAsync("_TaskItemPartial", new JednaniTaskItemPartialViewModel
+                    {
+                        ProjektId = Model.ProjektId,
+                        JednaniId = Model.Jednani.Id,
+                        JednaniCislo = Model.Jednani.CisloJednani,
+                        CanEditRecordNotes = canEditRecordNotes,
+                        CanCommentAsSubsystemLeader = canCommentTask && !canEditRecordNotes,
+                        Ukol = ukol
+                    })
+                }
+            </div>
+        </div>
+    </section>
+</div>

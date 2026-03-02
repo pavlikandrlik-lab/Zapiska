@@ -1,0 +1,43 @@
+@model DocumentationPageViewModel
+
+<section class="docs-page">
+    <nav class="docs-breadcrumb" aria-label="Drobečková navigace">
+        <a asp-controller="Projekty" asp-action="Index">Projekty</a>
+        <span>/</span>
+        <span>Dokumentace</span>
+    </nav>
+
+    <div class="docs-header">
+        <h1>@Model.Title</h1>
+        <p>@Model.Subtitle</p>
+    </div>
+
+    <div class="docs-layout">
+        <aside class="docs-sidebar" aria-label="Sekce dokumentace">
+            <h2>Obsah</h2>
+            @foreach (var item in Model.Navigation)
+            {
+                <a class="@(item.IsActive ? "docs-nav-link active" : "docs-nav-link")" href="@item.Path">@item.Label</a>
+            }
+        </aside>
+
+        <article class="docs-content wiki-like">
+            @Html.Raw(Model.HtmlContent)
+        </article>
+
+        <aside class="docs-toc" aria-label="Obsah stránky">
+            <h2>Na stránce</h2>
+            @if (Model.TocItems.Count == 0)
+            {
+                <p class="muted">Bez podnadpisů.</p>
+            }
+            else
+            {
+                @foreach (var item in Model.TocItems)
+                {
+                    <a class="@(item.Level == 3 ? "docs-toc-link level-3" : "docs-toc-link")" href="#@item.Id">@item.Label</a>
+                }
+            }
+        </aside>
+    </div>
+</section>

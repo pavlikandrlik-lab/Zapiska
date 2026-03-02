@@ -22,9 +22,13 @@ publish/
 publish.zip
 
 # Local DB files
+.mssql/
 .mssql/data/
 *.mdf
 *.ldf
+
+# Local tools cache
+.tools/
 
 # Logs / local overrides
 *.log

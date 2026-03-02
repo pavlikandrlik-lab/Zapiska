@@ -1,0 +1,76 @@
+@model MeetingModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "meeting-modal-title";
+}
+
+<h2 id="meeting-modal-title">@Model.Title</h2>
+
+<form class="form-grid"
+      asp-controller="Projekty"
+      asp-action="SaveMeeting"
+      method="post"
+      data-ajax-submit="true"
+      data-meeting-number-unique="true">
+    <input type="hidden" name="ProjektId" value="@Model.Command.ProjektId" />
+    <label>
+        Číslo jednání
+        <input type="number"
+               min="1"
+               name="CisloJednani"
+               value="@Model.Command.CisloJednani"
+               data-meeting-number-input
+               data-existing-meeting-numbers="@Model.ExistingMeetingNumbersCsv" />
+        <span class="field-error-message" data-meeting-number-warning hidden>Jednání s tímto číslem už v projektu existuje.</span>
+    </label>
+    <label>
+        Datum plánované
+        @await Html.PartialAsync(
+            "_AppDateField",
+            new AppDateFieldViewModel
+            {
+                Name = "DatumPlanovane",
+                IsoValue = Model.Command.DatumPlanovane.ToString("yyyy-MM-dd"),
+                DisplayValue = Model.Command.DatumPlanovane.ToString("dd.MM.yyyy"),
+                Locked = false,
+                AriaLabel = "Otevřít kalendář"
+            })
+    </label>
+    <label>
+        Čas začátku
+        <div class="app-time-field" data-app-time-field>
+            <input class="app-time-display-input" type="text" data-app-time-display value="@Model.Command.CasZacatek.ToString("HH\\:mm")" readonly />
+            <input type="hidden" name="CasZacatek" value="@Model.Command.CasZacatek.ToString("HH\\:mm")" data-app-time-value />
+            <button class="app-time-trigger" type="button" data-app-time-open aria-label="Otevřít výběr času">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="8.5"></circle>
+                    <path d="M12 7.8v4.6l3 1.8"></path>
+                </svg>
+            </button>
+            <div class="app-time-panel" data-app-time-panel hidden>
+                <div class="app-time-grid" data-app-time-grid role="listbox" aria-label="Výběr času"></div>
+            </div>
+        </div>
+    </label>
+    <label>
+        Místo
+        <input type="text" name="Misto" value="@Model.Command.Misto" placeholder="Zasedačka A" />
+    </label>
+    <label>
+        Stav jednání
+        <select name="StavJednani" required>
+            @foreach (var status in Model.StavyJednani)
+            {
+                var selected = string.Equals(status.Value, Model.Command.StavJednani, StringComparison.OrdinalIgnoreCase);
+                <option value="@status.Value" selected="@selected">@status.Label</option>
+            }
+        </select>
+    </label>
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = "Uložit"
+        })
+</form>

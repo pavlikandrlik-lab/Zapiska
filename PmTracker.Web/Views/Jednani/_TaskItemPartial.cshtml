@@ -1,0 +1,89 @@
+@model JednaniTaskItemPartialViewModel
+@{
+    var ukol = Model.Ukol;
+    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
+    var userOsobaId = userContext?.OsobaId ?? 0;
+    var canAddComment = Model.CanEditRecordNotes || Model.CanCommentAsSubsystemLeader;
+}
+
+<div class="task-item" data-task-record-id="@ukol.ZaznamId" data-comment-sort-section data-comment-sort-direction="asc">
+    <div class="task-title">#@ukol.CisloViditelne - @ukol.Popis</div>
+    @if (ukol.Vyjadreni.Count > 1)
+    {
+        <div class="record-comments-header compact">
+            <button type="button" class="btn small ghost comment-sort-toggle" data-comment-sort-toggle>
+                Řazení: jednání vzestupně
+            </button>
+        </div>
+    }
+    @if (ukol.Vyjadreni.Count == 0)
+    {
+        <p class="muted">Zatím bez vyjádření k tomuto jednání.</p>
+    }
+    else
+    {
+        <div class="comment-list" data-comment-list>
+            @foreach (var vyjadreni in ukol.Vyjadreni)
+            {
+                <div class="comment" data-comment-item data-comment-meeting="@Model.JednaniCislo" data-comment-id="@vyjadreni.Id">
+                    <div class="comment-header">
+                        <strong>@vyjadreni.Autor</strong>
+                        <span class="muted">@vyjadreni.Datum.ToString("dd.MM.yyyy HH:mm")</span>
+                    </div>
+                    <p class="comment-text">@vyjadreni.Text</p>
+                    @if (canAddComment)
+                    {
+                        <div class="comment-toolbar">
+                            @{
+                                var canEditThisComment = vyjadreni.LzeUpravit &&
+                                    (Model.CanEditRecordNotes || (Model.CanCommentAsSubsystemLeader && vyjadreni.AutorOsobaId == userOsobaId));
+                            }
+                            @if (canEditThisComment)
+                            {
+                                <details class="comment-edit-details">
+                                    <summary>Upravit</summary>
+                                    <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true">
+                                        <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                        <input type="hidden" name="meetingId" value="@Model.JednaniId" />
+                                        <input type="hidden" name="zaznamId" value="@ukol.ZaznamId" />
+                                        <input type="hidden" name="uiContext" value="meeting" />
+                                        <input type="hidden" name="Id" value="@vyjadreni.Id" />
+                                        <textarea rows="3" name="Text" required>@vyjadreni.Text</textarea>
+                                        <button class="btn small" type="submit">Uložit změnu</button>
+                                    </form>
+                                </details>
+                                <form class="comment-delete-form" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
+                                    <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                    <input type="hidden" name="meetingId" value="@Model.JednaniId" />
+                                    <input type="hidden" name="zaznamId" value="@ukol.ZaznamId" />
+                                    <input type="hidden" name="uiContext" value="meeting" />
+                                    <input type="hidden" name="Id" value="@vyjadreni.Id" />
+                                    <button class="btn small ghost" type="submit">Smazat</button>
+                                </form>
+                            }
+                            else if (!vyjadreni.LzeUpravit)
+                            {
+                                <span class="muted">Jednání je uzavřené, vyjádření je jen pro čtení.</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (canAddComment)
+    {
+        <form asp-controller="Zaznamy" asp-action="AddComment" method="post" class="meeting-note-add-form" data-ajax-submit="true">
+            <input type="hidden" name="projektId" value="@Model.ProjektId" />
+            <input type="hidden" name="meetingId" value="@Model.JednaniId" />
+            <input type="hidden" name="uiContext" value="meeting" />
+            <input type="hidden" name="ZaznamId" value="@ukol.ZaznamId" />
+            <input type="hidden" name="JednaniId" value="@Model.JednaniId" />
+            <textarea class="meeting-note-input" name="Text" rows="4" placeholder="Přidat vyjádření..." required></textarea>
+            <div class="meeting-notes-actions">
+                <button class="btn primary" type="submit">Uložit vyjádření</button>
+            </div>
+        </form>
+    }
+</div>
