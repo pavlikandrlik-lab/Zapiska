@@ -29,7 +29,12 @@
         "pmtracker.gantt.filter."
     ];
     const legacyProjectFilterKeys = [
-        "pmtracker.records.view"
+        "pmtracker.records.view",
+        "pmtracker.gantt.filters.open"
+    ];
+    const legacyGanttStoragePrefixes = [
+        "pmtracker.gantt.pinned.",
+        "pmtracker.gantt.expanded."
     ];
     const projectFilterConfigs = {
         records: {
@@ -57,31 +62,7 @@
             chipRowSelector: '[data-filter-chip-row="schedule"]',
             statusSelector: '[data-filter-save-status="schedule"]',
             fields: [
-                { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
-                { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
-                { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
-                { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
-                { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
-                { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní" },
-                { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé úkoly" },
-                { inputKey: "stihani", stateKey: "stihani", type: "select", chipLabel: "Stav harmonogramu" }
-            ]
-        },
-        gantt: {
-            rootSelector: '[data-project-filter-scope="gantt"]',
-            inputSelector: "[data-gantt-filter-key]",
-            keyAttribute: "data-gantt-filter-key",
-            chipRowSelector: '[data-filter-chip-row="gantt"]',
-            statusSelector: '[data-filter-save-status="gantt"]',
-            fields: [
-                { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
-                { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
-                { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
-                { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
-                { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
-                { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní" },
-                { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé úkoly" },
-                { inputKey: "stihani", stateKey: "stihani", type: "select", chipLabel: "Stav harmonogramu" }
+                { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" }
             ]
         }
     };
@@ -210,6 +191,18 @@
         refreshPrintPreferenceUi();
     }
 
+    function getRecordEditorPreferenceLabel(mode) {
+        if (mode === "modal") {
+            return "Otevřít v modalu";
+        }
+
+        if (mode === "page") {
+            return "Otevřít na stránce";
+        }
+
+        return "není nastaveno";
+    }
+
     function getPrintFormatLabel(format) {
         if (format === "pdf") {
             return "PDF";
@@ -229,6 +222,19 @@
         });
 
         document.querySelectorAll("[data-print-preference-reset]").forEach((element) => {
+            if (element instanceof HTMLButtonElement) {
+                element.disabled = preferred === null;
+            }
+        });
+    }
+
+    function refreshRecordEditorPreferenceUi() {
+        const preferred = getStoredRecordEditorPreference();
+        document.querySelectorAll("[data-record-editor-preference-current]").forEach((element) => {
+            element.textContent = getRecordEditorPreferenceLabel(preferred);
+        });
+
+        document.querySelectorAll("[data-record-editor-preference-reset]").forEach((element) => {
             if (element instanceof HTMLButtonElement) {
                 element.disabled = preferred === null;
             }
@@ -553,10 +559,12 @@
         }
 
         localStorage.setItem(recordEditorPreferenceStorageKey, mode);
+        refreshRecordEditorPreferenceUi();
     }
 
     function clearStoredRecordEditorPreference() {
         localStorage.removeItem(recordEditorPreferenceStorageKey);
+        refreshRecordEditorPreferenceUi();
     }
 
     function getCurrentLocalUrl() {
@@ -636,12 +644,12 @@
         window.location.assign(targetUrl);
     }
 
-    function handleRecordEditorChoice(trigger, mode, shouldRemember) {
+    function handleRecordEditorChoice(trigger, mode, shouldSkipRemember) {
         if (!(trigger instanceof HTMLElement)) {
             return;
         }
 
-        if (shouldRemember) {
+        if (!shouldSkipRemember) {
             setStoredRecordEditorPreference(mode);
         }
 
@@ -654,7 +662,6 @@
     }
 
     function createRecordEditorChooser(trigger) {
-        const preferred = getStoredRecordEditorPreference();
         const label = trigger.getAttribute("data-record-editor-label") || "Editor záznamu";
 
         const popover = document.createElement("div");
@@ -699,22 +706,13 @@
         rememberCheckbox.type = "checkbox";
         rememberCheckbox.setAttribute("data-record-editor-remember", "true");
         rememberLabel.appendChild(rememberCheckbox);
-        rememberLabel.append(" Pamatovat tuto volbu na tomto zařízení");
+        rememberLabel.append(" Neukládat pro tentokrát jako výchozí volbu");
         popover.appendChild(rememberLabel);
 
         const note = document.createElement("p");
         note.className = "record-editor-popover-note";
         note.textContent = "Pokud volbu neuložíte, systém se při dalším otevření zeptá znovu.";
         popover.appendChild(note);
-
-        if (preferred) {
-            const resetButton = document.createElement("button");
-            resetButton.type = "button";
-            resetButton.className = "record-editor-popover-reset";
-            resetButton.setAttribute("data-record-editor-clear-preference", "true");
-            resetButton.textContent = "Zrušit uloženou výchozí volbu";
-            popover.appendChild(resetButton);
-        }
 
         const closeButton = document.createElement("button");
         closeButton.type = "button";
@@ -735,13 +733,6 @@
                 return;
             }
 
-            if (target.closest("[data-record-editor-clear-preference]")) {
-                event.preventDefault();
-                clearStoredRecordEditorPreference();
-                closeRecordEditorChooser({ restoreFocus: true });
-                return;
-            }
-
             const choice = target.closest("[data-record-editor-mode]");
             if (!choice) {
                 return;
@@ -753,9 +744,9 @@
                 return;
             }
 
-            const remember = rememberCheckbox.checked;
+            const skipRemember = rememberCheckbox.checked;
             closeRecordEditorChooser({ restoreFocus: false });
-            handleRecordEditorChoice(trigger, mode, remember);
+            handleRecordEditorChoice(trigger, mode, skipRemember);
         });
 
         return popover;
@@ -1278,11 +1269,6 @@
 
         if (scope === "schedule") {
             applyProjectScheduleFilters();
-            return;
-        }
-
-        if (scope === "gantt") {
-            applyProjectGanttFilters();
         }
     }
 
@@ -1341,12 +1327,14 @@
         removeMatchingStorageKeys(localStorage, (key) =>
             key.startsWith(projectFilterStoragePrefix)
             || legacyProjectFilterKeys.includes(key)
-            || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix)));
+            || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix))
+            || legacyGanttStoragePrefixes.some((prefix) => key.startsWith(prefix)));
 
         removeMatchingStorageKeys(sessionStorage, (key) =>
             key.startsWith(projectFilterStoragePrefix)
             || legacyProjectFilterKeys.includes(key)
-            || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix)));
+            || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix))
+            || legacyGanttStoragePrefixes.some((prefix) => key.startsWith(prefix)));
     }
 
     function setFilterPanelOpen(open) {
@@ -1706,27 +1694,41 @@
         return current;
     }
 
+    function resolveActiveSubsystemIndicatorShell() {
+        const activePanel = document.querySelector(".tab-panel.active");
+        if (!(activePanel instanceof HTMLElement)) {
+            return null;
+        }
+
+        const groupedShell = activePanel.querySelector("[data-subsystem-grouped-shell]");
+        if (!(groupedShell instanceof HTMLElement) || groupedShell.hidden) {
+            return null;
+        }
+
+        return groupedShell;
+    }
+
     function updateSubsystemScrollIndicator() {
         const indicator = document.querySelector("[data-subsystem-scroll-indicator]");
+        const bubble = document.querySelector("[data-subsystem-scroll-indicator-bubble]");
         const label = document.querySelector("[data-subsystem-scroll-indicator-label]");
-        const recordsPanel = document.querySelector('[data-tab-panel="zaznamy"]');
-        const subsystemShell = document.querySelector('[data-records-view="subsystem"]');
 
-        if (!(indicator instanceof HTMLElement) || !(label instanceof HTMLElement)) {
+        if (!(indicator instanceof HTMLElement) || !(bubble instanceof HTMLElement) || !(label instanceof HTMLElement)) {
             return;
         }
 
-        const shouldHide = !(recordsPanel instanceof HTMLElement)
-            || !recordsPanel.classList.contains("active")
-            || !(subsystemShell instanceof HTMLElement)
-            || subsystemShell.hidden;
-
-        if (shouldHide) {
+        if (window.scrollY <= 0) {
             indicator.hidden = true;
             return;
         }
 
-        const visibleGroups = Array.from(subsystemShell.querySelectorAll("[data-subsystem-group]"))
+        const groupedShell = resolveActiveSubsystemIndicatorShell();
+        if (!(groupedShell instanceof HTMLElement)) {
+            indicator.hidden = true;
+            return;
+        }
+
+        const visibleGroups = Array.from(groupedShell.querySelectorAll("[data-subsystem-group]"))
             .filter((group) => group instanceof HTMLElement && !group.hidden);
 
         if (visibleGroups.length === 0) {
@@ -1734,8 +1736,8 @@
             return;
         }
 
-        const panelRect = recordsPanel.getBoundingClientRect();
-        if (panelRect.bottom <= 120 || panelRect.top >= window.innerHeight) {
+        const shellRect = groupedShell.getBoundingClientRect();
+        if (shellRect.bottom <= 120 || shellRect.top >= window.innerHeight) {
             indicator.hidden = true;
             return;
         }
@@ -1751,6 +1753,11 @@
             return;
         }
 
+        const bubbleTravel = Math.max(0, indicator.clientHeight - bubble.offsetHeight);
+        const currentRect = currentGroup.getBoundingClientRect();
+        const currentCenter = currentRect.top + (currentRect.height / 2);
+        const progress = Math.max(0, Math.min(1, (currentCenter - shellRect.top) / Math.max(shellRect.height, 1)));
+        bubble.style.transform = `translateY(${Math.round(progress * bubbleTravel)}px)`;
         label.textContent = subsystemName;
         indicator.hidden = false;
     }
@@ -1785,6 +1792,33 @@
         }
 
         scheduleSubsystemIndicatorSync();
+    }
+
+    function initScheduleExpandUi(scope) {
+        const root = scope instanceof Element ? scope : document;
+        root.querySelectorAll("[data-schedule-expand-toggle]").forEach((button) => {
+            if (!(button instanceof HTMLButtonElement) || button.dataset.scheduleExpandReady === "true") {
+                return;
+            }
+
+            button.dataset.scheduleExpandReady = "true";
+            button.addEventListener("click", () => {
+                const recordId = String(button.dataset.scheduleRecordId || "").trim();
+                if (!recordId) {
+                    return;
+                }
+
+                const details = root.querySelector(`[data-schedule-steps][data-schedule-record-id="${CSS.escape(recordId)}"]`);
+                if (!(details instanceof HTMLElement)) {
+                    return;
+                }
+
+                const expanded = details.hidden;
+                details.hidden = !expanded;
+                button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
+                button.setAttribute("aria-expanded", String(expanded));
+            });
+        });
     }
 
     function setScheduleFilterPanelOpen(open) {
@@ -1829,17 +1863,8 @@
         }
 
         const state = buildProjectFilterStateFromInputs("schedule");
-        const currentUserId = getProjectFilterCurrentUserId("schedule");
-        const hasCurrentUser = currentUserId && currentUserId !== "0";
         const filters = {
-            subsystem: normalizeFilterToken(state.subsystem),
-            kategorie: normalizeFilterToken(state.kategorie),
-            stav: normalizeFilterToken(state.stav),
-            typ: normalizeFilterToken(state.typ),
-            vlastnik: normalizeFilterToken(state.vlastnik),
-            onlyActive: Boolean(state.aktivni),
-            mine: Boolean(state.mine),
-            stihani: normalizeFilterToken(state.stihani)
+            subsystem: normalizeFilterToken(state.subsystem)
         };
 
         cards.forEach((item) => {
@@ -1848,29 +1873,24 @@
             }
 
             const subsystem = normalizeFilterToken(item.dataset.scheduleFilterSubsystemKod || item.dataset.scheduleFilterSubsystem);
-            const kategorie = normalizeFilterToken(item.dataset.scheduleFilterKategorieKod || item.dataset.scheduleFilterKategorie);
-            const stav = normalizeFilterToken(item.dataset.scheduleFilterStavKod || item.dataset.scheduleFilterStav);
-            const typ = normalizeFilterToken(item.dataset.scheduleFilterTypKod || item.dataset.scheduleFilterTyp);
-            const vlastnik = normalizeFilterToken(item.dataset.scheduleFilterVlastnikId || item.dataset.scheduleFilterVlastnik);
-            const isActive = item.dataset.scheduleFilterAktivni === "true";
-            const stihani = normalizeFilterToken(item.dataset.scheduleFilterStihani);
-            const matchesMine = !filters.mine || (hasCurrentUser && vlastnik === currentUserId);
-
-            const matches =
-                (!filters.subsystem || subsystem === filters.subsystem) &&
-                (!filters.kategorie || kategorie === filters.kategorie) &&
-                (!filters.stav || stav === filters.stav) &&
-                (!filters.typ || typ === filters.typ) &&
-                (!filters.vlastnik || vlastnik === filters.vlastnik) &&
-                (!filters.onlyActive || isActive) &&
-                matchesMine &&
-                (!filters.stihani || stihani === filters.stihani);
+            const matches = !filters.subsystem || subsystem === filters.subsystem;
 
             setRecordFilterVisibility(item, matches);
         });
 
+        document.querySelectorAll("[data-project-schedule-list] [data-subsystem-group]").forEach((group) => {
+            if (!(group instanceof HTMLElement)) {
+                return;
+            }
+
+            const hasVisibleItems = Array.from(group.querySelectorAll("[data-schedule-item]"))
+                .some((item) => item instanceof HTMLElement && !item.hidden);
+            group.hidden = !hasVisibleItems;
+        });
+
         renderStaticTimelineAxes(document.querySelector('[data-tab-panel="harmonogram"]'));
         queueRainbowSegmentRender(document.querySelector('[data-tab-panel="harmonogram"]'));
+        scheduleSubsystemIndicatorSync();
     }
 
     function setGanttFilterPanelOpen(open) {
@@ -2155,36 +2175,15 @@
         applyProjectScheduleFilters();
         renderStaticTimelineAxes(schedulePanel);
         queueRainbowSegmentRender(schedulePanel);
-    }
-
-    function initProjectGanttUi() {
-        const panel = document.querySelector("[data-gantt-panel]");
-        if (!(panel instanceof HTMLElement)) {
-            return;
-        }
-
-        const filterPanel = panel.querySelector("[data-gantt-filter-panel]");
-        if (filterPanel instanceof HTMLElement) {
-            const storedOpen = localStorage.getItem("pmtracker.gantt.filters.open");
-            setGanttFilterPanelOpen(storedOpen === "true");
-        }
-
-        restoreGanttFilterState();
-        setProjectFilterSaveStatus("gantt", "");
-        if (!(panel._ganttBoard instanceof ProjectGanttBoard)) {
-            const board = new ProjectGanttBoard(panel);
-            board.bind();
-            panel._ganttBoard = board;
-        }
-
-        applyProjectGanttFilters();
-        updateProjectGanttAxis(panel);
-        queueRainbowSegmentRender(panel);
+        initScheduleExpandUi(schedulePanel);
     }
 
     function setActiveTab(tabName) {
         if (!tabName) {
             return;
+        }
+        if (tabName === "gant") {
+            tabName = "harmonogram";
         }
         const tabs = document.querySelectorAll(".tab");
         const panels = document.querySelectorAll(".tab-panel");
@@ -2209,6 +2208,9 @@
     function syncTabQuery(tabName) {
         if (!tabName) {
             return;
+        }
+        if (tabName === "gant") {
+            tabName = "harmonogram";
         }
 
         const url = new URL(window.location.href);
@@ -6306,8 +6308,7 @@
 
     async function refreshProjectSchedulePanels() {
         const hasSchedulePanel = document.querySelector('[data-tab-panel="harmonogram"]') instanceof HTMLElement;
-        const hasGanttPanel = document.querySelector('[data-tab-panel="gant"]') instanceof HTMLElement;
-        if (!hasSchedulePanel && !hasGanttPanel) {
+        if (!hasSchedulePanel) {
             return;
         }
 
@@ -6315,7 +6316,6 @@
         refreshUrl.searchParams.set("tab", "harmonogram");
         const nextDoc = await fetchHtmlDocument(refreshUrl.toString());
         replaceSelectorFromDocument(nextDoc, '[data-tab-panel="harmonogram"]');
-        replaceSelectorFromDocument(nextDoc, '[data-tab-panel="gant"]');
         queueRainbowSegmentRender(document);
     }
 
@@ -6349,7 +6349,6 @@
             await refreshRecordCard(payload);
             initProjectRecordsUi();
             initProjectScheduleUi();
-            initProjectGanttUi();
             initCommentSortUi(document);
             return;
         }
@@ -6364,7 +6363,6 @@
             initProjectTabs();
             initProjectRecordsUi();
             initProjectScheduleUi();
-            initProjectGanttUi();
             initCommentSortUi(document);
             setActiveTab(activeTab);
             syncTabQuery(activeTab);
@@ -6506,7 +6504,6 @@
 
                 if (tab === "harmonogram" || tab === "gant") {
                     replaceSelectorFromDocument(nextDoc, '[data-tab-panel="harmonogram"]');
-                    replaceSelectorFromDocument(nextDoc, '[data-tab-panel="gant"]');
                 } else {
                     replaceSelectorFromDocument(nextDoc, `[data-tab-panel="${tab}"]`);
                 }
@@ -6515,7 +6512,6 @@
                 initProjectTabs();
                 initProjectRecordsUi();
                 initProjectScheduleUi();
-                initProjectGanttUi();
                 initCommentSortUi(document);
                 if (preserveRecordUi) {
                     restoreRecordUiState(recordUiState);
@@ -6612,10 +6608,12 @@
         const storedTab = localStorage.getItem("pmtracker.tab.active");
         const urlTab = new URL(window.location.href).searchParams.get("tab");
         const defaultTab = tabs[0].getAttribute("data-tab");
-        const tabToActivate = urlTab && availableTabs.has(urlTab)
-            ? urlTab
-            : storedTab && availableTabs.has(storedTab)
-                ? storedTab
+        const normalizedUrlTab = urlTab === "gant" ? "harmonogram" : urlTab;
+        const normalizedStoredTab = storedTab === "gant" ? "harmonogram" : storedTab;
+        const tabToActivate = normalizedUrlTab && availableTabs.has(normalizedUrlTab)
+            ? normalizedUrlTab
+            : normalizedStoredTab && availableTabs.has(normalizedStoredTab)
+                ? normalizedStoredTab
                 : defaultTab;
         setActiveTab(tabToActivate);
 
@@ -6791,6 +6789,17 @@
             return;
         }
 
+        const resetRecordEditorPreference = target.closest("[data-record-editor-preference-reset]");
+        if (resetRecordEditorPreference instanceof HTMLButtonElement) {
+            event.preventDefault();
+            clearStoredRecordEditorPreference();
+            const status = document.querySelector("[data-record-editor-preference-status]");
+            if (status instanceof HTMLElement) {
+                status.textContent = "Uložená výchozí volba byla odstraněna.";
+            }
+            return;
+        }
+
         const printTrigger = target.closest("[data-print-trigger]");
         if (printTrigger) {
             event.preventDefault();
@@ -6842,11 +6851,7 @@
         const recordEditorTrigger = target.closest("[data-record-editor-url]");
         if (recordEditorTrigger) {
             event.preventDefault();
-            if (recordEditorTrigger.hasAttribute("data-record-editor-choice")) {
-                showRecordEditorChooser(recordEditorTrigger instanceof HTMLElement ? recordEditorTrigger : null);
-            } else {
-                openRecordEditor(recordEditorTrigger instanceof HTMLElement ? recordEditorTrigger : null);
-            }
+            openRecordEditor(recordEditorTrigger instanceof HTMLElement ? recordEditorTrigger : null);
             return;
         }
 
@@ -6886,16 +6891,6 @@
             if (filterPanel instanceof HTMLElement) {
                 const isCollapsed = filterPanel.classList.contains("collapsed");
                 setScheduleFilterPanelOpen(isCollapsed);
-            }
-            return;
-        }
-
-        const gantFilterToggle = target.closest("[data-gantt-filter-toggle]");
-        if (gantFilterToggle) {
-            const filterPanel = document.querySelector("[data-gantt-filter-panel]");
-            if (filterPanel instanceof HTMLElement) {
-                const isCollapsed = filterPanel.classList.contains("collapsed");
-                setGanttFilterPanelOpen(isCollapsed);
             }
             return;
         }
@@ -6975,11 +6970,6 @@
             persistScheduleFilterState(scheduleFilterInput);
         }
 
-        const gantFilterInput = target.closest("[data-gantt-filter-key]");
-        if (gantFilterInput instanceof HTMLInputElement || gantFilterInput instanceof HTMLSelectElement) {
-            persistGanttFilterState(gantFilterInput);
-        }
-
         const categorySelect = target.closest("[data-kategorie-select]");
         if (categorySelect instanceof HTMLSelectElement) {
             updateTaskTypeVisibility(categorySelect);
@@ -7010,14 +7000,6 @@
                 return;
             }
             persistScheduleFilterState(scheduleFilterInput);
-        }
-
-        const gantFilterInput = target.closest("[data-gantt-filter-key]");
-        if (gantFilterInput instanceof HTMLInputElement || gantFilterInput instanceof HTMLSelectElement) {
-            if (gantFilterInput instanceof HTMLInputElement && gantFilterInput.type === "checkbox") {
-                return;
-            }
-            persistGanttFilterState(gantFilterInput);
         }
     });
 
@@ -7063,7 +7045,6 @@
     initProjectTabs();
     initProjectRecordsUi();
     initProjectScheduleUi();
-    initProjectGanttUi();
     initProjectRecordPageshowSync();
     initCommentSortUi(document);
     restoreRecordEditorReturnStateFromUrl();
@@ -7071,6 +7052,7 @@
     initTheme();
     initUserMenu();
     initPrintFormatChooser();
+    refreshRecordEditorPreferenceUi();
     initProfileRightsFilter();
     initCiselnikAjaxSwitch();
     initSettingsAjaxSwitch();

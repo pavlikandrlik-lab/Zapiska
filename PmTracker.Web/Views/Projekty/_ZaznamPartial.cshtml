@@ -87,26 +87,14 @@
                 </a>
                 @if (canEditRecord || canManageSchedule)
                 {
-                    <div class="record-editor-split">
-                        <button class="btn small"
-                                type="button"
-                                data-record-editor-url="@editRecordUrl"
-                                data-record-editor-project-id="@projektId"
-                                data-record-editor-label="@($"{editButtonLabel} záznam #{Model.CisloViditelne}")"
-                                data-stop-propagation="true">
-                            @editButtonLabel
-                        </button>
-                        <button class="btn small record-editor-split-choice"
-                                type="button"
-                                data-record-editor-url="@editRecordUrl"
-                                data-record-editor-project-id="@projektId"
-                                data-record-editor-label="@($"{editButtonLabel} záznam #{Model.CisloViditelne}")"
-                                data-record-editor-choice="true"
-                                data-stop-propagation="true"
-                                aria-label="Vybrat způsob otevření editoru záznamu #@Model.CisloViditelne">
-                            <span aria-hidden="true">▾</span>
-                        </button>
-                    </div>
+                    <button class="btn small"
+                            type="button"
+                            data-record-editor-url="@editRecordUrl"
+                            data-record-editor-project-id="@projektId"
+                            data-record-editor-label="@($"{editButtonLabel} záznam #{Model.CisloViditelne}")"
+                            data-stop-propagation="true">
+                        @editButtonLabel
+                    </button>
                 }
                 <span class="record-toggle-indicator" aria-hidden="true">›</span>
             </div>

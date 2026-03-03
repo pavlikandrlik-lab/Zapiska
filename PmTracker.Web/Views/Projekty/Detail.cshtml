@@ -34,7 +34,6 @@
 <div class="tabs" role="tablist">
     <button class="tab active" type="button" data-tab="zaznamy">Záznamy</button>
     <button class="tab" type="button" data-tab="harmonogram">Harmonogram</button>
-    <button class="tab" type="button" data-tab="gant">GANTT</button>
     <button class="tab" type="button" data-tab="jednani">Jednání</button>
     <button class="tab" type="button" data-tab="tym">Osoby (tým)</button>
 </div>
@@ -54,24 +53,13 @@
             </a>
             @if (canManageRecords)
             {
-                <div class="record-editor-split">
-                    <button class="btn primary"
-                            type="button"
-                            data-record-editor-url="@createRecordEditorUrl"
-                            data-record-editor-project-id="@Model.Projekt.Id"
-                            data-record-editor-label="Nový záznam">
-                        Nový záznam
-                    </button>
-                    <button class="btn primary record-editor-split-choice"
-                            type="button"
-                            data-record-editor-url="@createRecordEditorUrl"
-                            data-record-editor-project-id="@Model.Projekt.Id"
-                            data-record-editor-label="Nový záznam"
-                            data-record-editor-choice="true"
-                            aria-label="Vybrat způsob otevření nového záznamu">
-                        <span aria-hidden="true">▾</span>
-                    </button>
-                </div>
+                <button class="btn primary"
+                        type="button"
+                        data-record-editor-url="@createRecordEditorUrl"
+                        data-record-editor-project-id="@Model.Projekt.Id"
+                        data-record-editor-label="Nový záznam">
+                    Nový záznam
+                </button>
             }
         </div>
     </div>
@@ -177,10 +165,12 @@
         </div>
     </div>
 
-    <div class="records-shell" data-records-view="subsystem">
+    <div class="records-shell" data-records-view="subsystem" data-subsystem-grouped-shell>
         <aside class="subsystem-scroll-indicator" data-subsystem-scroll-indicator hidden aria-live="polite">
-            <span class="subsystem-scroll-indicator-title">Subsystém</span>
-            <strong class="subsystem-scroll-indicator-label" data-subsystem-scroll-indicator-label></strong>
+            <span class="subsystem-scroll-indicator-rail" data-subsystem-scroll-indicator-rail aria-hidden="true"></span>
+            <span class="subsystem-scroll-indicator-bubble" data-subsystem-scroll-indicator-bubble>
+                <strong class="subsystem-scroll-indicator-label" data-subsystem-scroll-indicator-label></strong>
+            </span>
         </aside>
         @foreach (var skupina in Model.SkupinySubsystemu)
         {
@@ -243,65 +233,6 @@
                         }
                     </select>
                 </label>
-                <label>
-                    Kategorie
-                    <select data-schedule-filter-key="kategorie">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.KategorieMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Stav úkolu
-                    <select data-schedule-filter-key="stav">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.StavyUkoluMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Typ úkolu
-                    <select data-schedule-filter-key="typ">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.TypyUkoluMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Vlastník
-                    <select data-schedule-filter-key="vlastnik">
-                        <option value="">Všichni</option>
-                        @foreach (var item in Model.Filtry.VlastniciMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label class="filter-inline">
-                    <input type="checkbox" data-schedule-filter-key="aktivni" />
-                    Pouze aktivní úkoly
-                </label>
-                <label class="gov-switch">
-                    <input type="checkbox" data-schedule-filter-key="mine" />
-                    <span class="gov-switch-track" aria-hidden="true">
-                        <span class="gov-switch-thumb"></span>
-                    </span>
-                    <span class="gov-switch-label">Jen mé úkoly</span>
-                </label>
-                <label>
-                    Stav harmonogramu
-                    <select data-schedule-filter-key="stihani">
-                        <option value="">Vše</option>
-                        <option value="stihame">Stíháme</option>
-                        <option value="nestihame">Nestíháme</option>
-                    </select>
-                </label>
             </div>
             <div class="filter-actions">
                 <button class="btn small ghost" type="button" data-filter-save-defaults="schedule">Uložit jako výchozí</button>
@@ -310,449 +241,157 @@
         </div>
     </div>
 
-    <div class="schedule-project-list" data-project-schedule-list>
+    <div class="schedule-project-list" data-project-schedule-list data-subsystem-grouped-shell>
         @if (harmonogramUkoly.Count == 0)
         {
             <p class="muted">V projektu zatím nejsou úkoly s harmonogramem.</p>
         }
         else
         {
-            @foreach (var item in harmonogramUkoly)
+            @foreach (var skupina in harmonogramUkoly
+                .GroupBy(item => new { item.SubsystemKod, item.Subsystem })
+                .OrderBy(group => group.Key.Subsystem))
             {
-                var ownerLabel = item.Vlastnik;
-                var axisStart = item.DatumZalozeni.Date;
-                var realEnd = item.Kroky.Count > 0 ? item.Kroky[^1].RealEnd.Date : axisStart;
-                var axisEnd = new[] { item.TerminUkonceni.Date, realEnd, axisStart }.Max();
-                var axisDays = Math.Max(1, (axisEnd - axisStart).Days);
-                Func<DateTime, double> toPercent = value => Math.Clamp(((value.Date - axisStart).Days * 100d) / axisDays, 0d, 100d);
-                Func<double, string> formatPercent = value => value.ToString("0.####", CultureInfo.InvariantCulture);
-                var deadlinePercent = toPercent(item.TerminUkonceni.Date);
-                <article class="schedule-card"
-                         data-schedule-item
-                         data-schedule-filter-subsystem="@item.Subsystem"
-                         data-schedule-filter-subsystem-kod="@item.SubsystemKod"
-                         data-schedule-filter-kategorie="@item.KategorieNazev"
-                         data-schedule-filter-kategorie-kod="@item.KategorieKod"
-                         data-schedule-filter-stav="@item.Stav"
-                         data-schedule-filter-stav-kod="@item.StavKod"
-                         data-schedule-filter-typ="@(item.TypUkolu ?? string.Empty)"
-                         data-schedule-filter-typ-kod="@(item.TypUkoluKod ?? string.Empty)"
-                         data-schedule-filter-vlastnik="@item.Vlastnik"
-                         data-schedule-filter-vlastnik-id="@item.VlastnikId"
-                         data-schedule-filter-aktivni="@item.IsAktivniStav.ToString().ToLowerInvariant()"
-                         data-schedule-filter-stihani="@(item.Stihame ? "stihame" : "nestihame")">
-                    <div class="schedule-card-header">
-                        <div>
-                            <div class="record-title">#@item.CisloViditelne - @item.Nazev</div>
-                            <div class="record-summary-meta">
-                                <span><span class="label">Stav úkolu:</span> @item.Stav</span>
-                                <span><span class="label">Typ:</span> @(string.IsNullOrWhiteSpace(item.TypUkolu) ? "-" : item.TypUkolu)</span>
-                                <span><span class="label">Subsystém:</span> @item.Subsystem</span>
-                                <span><span class="label">Vlastník:</span> @ownerLabel</span>
-                            </div>
-                        </div>
-                        <div class="schedule-card-actions">
-                            <span class="badge @(item.Stihame ? "schedule-badge-ok" : "schedule-badge-late")">@(item.Stihame ? "Stíháme" : "Nestíháme")</span>
-                            @if (canManageSchedules)
-                            {
-                                var scheduleEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = Model.Projekt.Id }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
-                                <div class="record-editor-split">
-                                    <button class="btn small"
-                                            type="button"
-                                            data-record-editor-url="@scheduleEditUrl"
-                                            data-record-editor-project-id="@Model.Projekt.Id"
-                                            data-record-editor-label="@($"Upravit záznam #{item.CisloViditelne}")">
-                                        Upravit
-                                    </button>
-                                    <button class="btn small record-editor-split-choice"
-                                            type="button"
-                                            data-record-editor-url="@scheduleEditUrl"
-                                            data-record-editor-project-id="@Model.Projekt.Id"
-                                            data-record-editor-label="@($"Upravit záznam #{item.CisloViditelne}")"
-                                            data-record-editor-choice="true"
-                                            aria-label="Vybrat způsob otevření editoru záznamu #@item.CisloViditelne">
-                                        <span aria-hidden="true">▾</span>
-                                    </button>
-                                </div>
-                            }
-                        </div>
-                    </div>
-
-                    <div class="schedule-card-timeline">
-                        <div class="timeline-axis schedule-timeline-axis"
-                             data-timeline-axis
-                             data-axis-start="@axisStart.ToString("yyyy-MM-dd")"
-                             data-axis-end="@axisEnd.ToString("yyyy-MM-dd")"></div>
-                        <div class="schedule-rainbow-row">
-                            <span class="schedule-rainbow-label">Plán</span>
-                            <div class="schedule-rainbow-track">
-                                <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
-                                @{
-                                    var previousPlanRight = 0d;
-                                }
-                                @foreach (var krok in item.Kroky)
-                                {
-                                    var rawLeft = toPercent(krok.PlanStart);
-                                    var rawRight = toPercent(krok.PlanEnd);
-                                    var left = Math.Max(previousPlanRight, rawLeft);
-                                    var right = Math.Max(left, rawRight);
-                                    var width = Math.Max(0d, right - left);
-                                    var widthStyle = width > 0d
-                                        ? $"calc({formatPercent(width)}% + 1px)"
-                                        : "0%";
-                                    previousPlanRight = right;
-                                    <span class="schedule-rainbow-segment"
-                                          data-rainbow-segment-label-full="@krok.Nazev"
-                                          data-rainbow-segment-label-short="@krok.KrokIndex"
-                                          style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
-                                          title="@($"{krok.Nazev}: {krok.PlanStart:dd.MM.yyyy} - {krok.PlanEnd:dd.MM.yyyy}")"></span>
-                                }
-                            </div>
-                        </div>
-                        <div class="schedule-rainbow-row">
-                            <span class="schedule-rainbow-label">Skutečnost</span>
-                            <div class="schedule-rainbow-track">
-                                <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
-                                @{
-                                    var previousRealRight = 0d;
-                                }
-                                @foreach (var krok in item.Kroky)
-                                {
-                                    var rawLeft = toPercent(krok.RealStart);
-                                    var rawRight = toPercent(krok.RealEnd);
-                                    var left = Math.Max(previousRealRight, rawLeft);
-                                    var right = Math.Max(left, rawRight);
-                                    var width = Math.Max(0d, right - left);
-                                    var widthStyle = width > 0d
-                                        ? $"calc({formatPercent(width)}% + 1px)"
-                                        : "0%";
-                                    previousRealRight = right;
-                                    <span class="schedule-rainbow-segment"
-                                          data-rainbow-segment-label-full="@krok.Nazev"
-                                          data-rainbow-segment-label-short="@krok.KrokIndex"
-                                          style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
-                                          title="@($"{krok.Nazev}: {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}")"></span>
-                                }
-                            </div>
-                        </div>
-                        <div class="schedule-rainbow-legend">
-                            <span>Plán: @item.BaselineDokonceni.ToString("dd.MM.yyyy")</span>
-                            <span>Skutečnost: @item.SkutecneDokonceni.ToString("dd.MM.yyyy")</span>
-                            <span>Termín úkolu: @item.TerminUkonceni.ToString("dd.MM.yyyy")</span>
-                            <span>Překročení: @(item.PrekroceniDni > 0 ? $"{item.PrekroceniDni} dnů" : "0 dnů")</span>
-                        </div>
-                    </div>
-                </article>
-            }
-        }
-    </div>
-</section>
-
-<section class="tab-panel" data-tab-panel="gant" data-gantt-panel data-project-id="@Model.Projekt.Id">
-    <div class="schedule-mini-legend">Legenda: krokové barvy / skutečnost / černá = termín úkolu</div>
-    <div class="schedule-step-legend">
-        @foreach (var krok in harmonogramLegendKroky)
-        {
-            <span class="schedule-step-legend-item">
-                <span class="schedule-step-dot" style="background:@krok.BarvaHex;" aria-hidden="true"></span>
-                <span>Krok @krok.KrokIndex</span>
-            </span>
-        }
-        <span class="schedule-step-legend-item">
-            <span class="schedule-step-dot schedule-step-delay-dot" style="background:@harmonogramDelayBarva;" aria-hidden="true"></span>
-            <span>Skutečnost</span>
-        </span>
-    </div>
-
-    <div class="filter-shell"
-         data-project-filter-scope="gantt"
-         data-project-id="@Model.Projekt.Id"
-         data-current-user-id="@(userContext?.OsobaId ?? 0)">
-        <button class="filter-toggle" type="button" data-gantt-filter-toggle>
-            Filtry
-            <span class="filter-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>
-                </svg>
-            </span>
-        </button>
-        <div class="active-filter-row" data-filter-chip-row="gantt" hidden="hidden"></div>
-        <div class="filter-panel collapsed" data-gantt-filter-panel>
-            <div class="filter-grid">
-                <label>
-                    Subsystém
-                    <select data-gantt-filter-key="subsystem">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.SubsystemyMoznosti)
+                <section class="schedule-subsystem-group" data-subsystem-group data-subsystem-name="@skupina.Key.Subsystem">
+                    <h3 class="schedule-subsystem-heading">@skupina.Key.Subsystem</h3>
+                    <div class="schedule-group-list">
+                        @foreach (var item in skupina)
                         {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Kategorie
-                    <select data-gantt-filter-key="kategorie">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.KategorieMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Stav úkolu
-                    <select data-gantt-filter-key="stav">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.StavyUkoluMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Typ úkolu
-                    <select data-gantt-filter-key="typ">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.TypyUkoluMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Vlastník
-                    <select data-gantt-filter-key="vlastnik">
-                        <option value="">Všichni</option>
-                        @foreach (var item in Model.Filtry.VlastniciMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label class="filter-inline">
-                    <input type="checkbox" data-gantt-filter-key="aktivni" />
-                    Pouze aktivní úkoly
-                </label>
-                <label class="gov-switch">
-                    <input type="checkbox" data-gantt-filter-key="mine" />
-                    <span class="gov-switch-track" aria-hidden="true">
-                        <span class="gov-switch-thumb"></span>
-                    </span>
-                    <span class="gov-switch-label">Jen mé úkoly</span>
-                </label>
-                <label>
-                    Stav harmonogramu
-                    <select data-gantt-filter-key="stihani">
-                        <option value="">Vše</option>
-                        <option value="stihame">Stíháme</option>
-                        <option value="nestihame">Nestíháme</option>
-                    </select>
-                </label>
-            </div>
-            <div class="filter-actions">
-                <button class="btn small ghost" type="button" data-filter-save-defaults="gantt">Uložit jako výchozí</button>
-                <span class="filter-save-status" data-filter-save-status="gantt" aria-live="polite"></span>
-            </div>
-        </div>
-    </div>
-
-    <div class="gantt-layout">
-        <aside class="gantt-picker" data-gantt-picker>
-            <h3>Zobrazené úkoly</h3>
-            @if (harmonogramUkoly.Count == 0)
-            {
-                <p class="muted">V projektu zatím nejsou úkoly s harmonogramem.</p>
-            }
-            else
-            {
-                @foreach (var item in harmonogramUkoly)
-                {
-                    <label class="gantt-picker-item"
-                           data-gantt-picker-item
-                           data-gantt-record-id="@item.ZaznamId"
-                           data-gantt-filter-subsystem="@item.Subsystem"
-                           data-gantt-filter-subsystem-kod="@item.SubsystemKod"
-                           data-gantt-filter-kategorie="@item.KategorieNazev"
-                           data-gantt-filter-kategorie-kod="@item.KategorieKod"
-                           data-gantt-filter-stav="@item.Stav"
-                           data-gantt-filter-stav-kod="@item.StavKod"
-                           data-gantt-filter-typ="@(item.TypUkolu ?? string.Empty)"
-                           data-gantt-filter-typ-kod="@(item.TypUkoluKod ?? string.Empty)"
-                           data-gantt-filter-vlastnik="@item.Vlastnik"
-                           data-gantt-filter-vlastnik-id="@item.VlastnikId"
-                           data-gantt-filter-aktivni="@item.IsAktivniStav.ToString().ToLowerInvariant()"
-                           data-gantt-filter-stihani="@(item.Stihame ? "stihame" : "nestihame")">
-                        <input type="checkbox" checked="checked" data-gantt-pin-input data-gantt-record-id="@item.ZaznamId" />
-                        <span>#@item.CisloViditelne - @item.Nazev</span>
-                    </label>
-                }
-            }
-        </aside>
-
-        <div class="gantt-board" data-gantt-board>
-            <div class="timeline-axis gantt-shared-axis" data-gantt-axis hidden="hidden"></div>
-            @if (harmonogramUkoly.Count == 0)
-            {
-                <p class="muted">V projektu zatím nejsou úkoly s harmonogramem.</p>
-            }
-            else
-            {
-                @foreach (var item in harmonogramUkoly)
-                {
-                    var ownerLabel = item.Vlastnik;
-                    var axisStart = item.DatumZalozeni.Date;
-                    var realEnd = item.Kroky.Count > 0 ? item.Kroky[^1].RealEnd.Date : axisStart;
-                    var axisEnd = new[] { item.TerminUkonceni.Date, realEnd, axisStart }.Max();
-                    var axisDays = Math.Max(1, (axisEnd - axisStart).Days);
-                    Func<DateTime, double> toPercent = value => Math.Clamp(((value.Date - axisStart).Days * 100d) / axisDays, 0d, 100d);
-                    Func<double, string> formatPercent = value => value.ToString("0.####", CultureInfo.InvariantCulture);
-                    var deadlinePercent = toPercent(item.TerminUkonceni.Date);
-                    <article class="gantt-task"
-                             data-gantt-item
-                             data-gantt-record-id="@item.ZaznamId"
-                             data-gantt-filter-subsystem="@item.Subsystem"
-                             data-gantt-filter-subsystem-kod="@item.SubsystemKod"
-                             data-gantt-filter-kategorie="@item.KategorieNazev"
-                             data-gantt-filter-kategorie-kod="@item.KategorieKod"
-                             data-gantt-filter-stav="@item.Stav"
-                             data-gantt-filter-stav-kod="@item.StavKod"
-                             data-gantt-filter-typ="@(item.TypUkolu ?? string.Empty)"
-                             data-gantt-filter-typ-kod="@(item.TypUkoluKod ?? string.Empty)"
-                             data-gantt-filter-vlastnik="@item.Vlastnik"
-                             data-gantt-filter-vlastnik-id="@item.VlastnikId"
-                             data-gantt-filter-aktivni="@item.IsAktivniStav.ToString().ToLowerInvariant()"
-                             data-gantt-filter-stihani="@(item.Stihame ? "stihame" : "nestihame")"
-                             data-gantt-axis-start="@axisStart.ToString("yyyy-MM-dd")"
-                             data-gantt-axis-end="@axisEnd.ToString("yyyy-MM-dd")">
-                        <div class="gantt-task-header">
-                            <div>
-                                <div class="record-title">#@item.CisloViditelne - @item.Nazev</div>
-                                <div class="record-summary-meta">
-                                    <span><span class="label">Stav:</span> @item.Stav</span>
-                                    <span><span class="label">Typ:</span> @(string.IsNullOrWhiteSpace(item.TypUkolu) ? "-" : item.TypUkolu)</span>
-                                    <span><span class="label">Subsystém:</span> @item.Subsystem</span>
-                                    <span><span class="label">Vlastník:</span> @ownerLabel</span>
-                                </div>
-                            </div>
-                            <div class="gantt-task-actions">
-                                <span class="badge @(item.Stihame ? "schedule-badge-ok" : "schedule-badge-late")">@(item.Stihame ? "Stíháme" : "Nestíháme")</span>
-                                <button class="btn small ghost" type="button" data-gantt-expand-toggle data-gantt-record-id="@item.ZaznamId">Rozpad</button>
-                                @if (canManageSchedules)
-                                {
-                                    var ganttEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = Model.Projekt.Id }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
-                                    <div class="record-editor-split">
-                                        <button class="btn small"
-                                                type="button"
-                                                data-record-editor-url="@ganttEditUrl"
-                                                data-record-editor-project-id="@Model.Projekt.Id"
-                                                data-record-editor-label="@($"Upravit záznam #{item.CisloViditelne}")">
-                                            Upravit
-                                        </button>
-                                        <button class="btn small record-editor-split-choice"
-                                                type="button"
-                                                data-record-editor-url="@ganttEditUrl"
-                                                data-record-editor-project-id="@Model.Projekt.Id"
-                                                data-record-editor-label="@($"Upravit záznam #{item.CisloViditelne}")"
-                                                data-record-editor-choice="true"
-                                                aria-label="Vybrat způsob otevření editoru záznamu #@item.CisloViditelne">
-                                            <span aria-hidden="true">▾</span>
-                                        </button>
+                            var ownerLabel = item.Vlastnik;
+                            var axisStart = item.DatumZalozeni.Date;
+                            var realEnd = item.Kroky.Count > 0 ? item.Kroky[^1].RealEnd.Date : axisStart;
+                            var axisEnd = new[] { item.TerminUkonceni.Date, realEnd, axisStart }.Max();
+                            var axisDays = Math.Max(1, (axisEnd - axisStart).Days);
+                            Func<DateTime, double> toPercent = value => Math.Clamp(((value.Date - axisStart).Days * 100d) / axisDays, 0d, 100d);
+                            Func<double, string> formatPercent = value => value.ToString("0.####", CultureInfo.InvariantCulture);
+                            var deadlinePercent = toPercent(item.TerminUkonceni.Date);
+                            <article class="schedule-card"
+                                     data-schedule-item
+                                     data-schedule-filter-subsystem="@item.Subsystem"
+                                     data-schedule-filter-subsystem-kod="@item.SubsystemKod">
+                                <div class="schedule-card-header">
+                                    <div>
+                                        <div class="record-title">#@item.CisloViditelne - @item.Nazev</div>
+                                        <div class="record-summary-meta">
+                                            <span><span class="label">Stav úkolu:</span> @item.Stav</span>
+                                            <span><span class="label">Typ:</span> @(string.IsNullOrWhiteSpace(item.TypUkolu) ? "-" : item.TypUkolu)</span>
+                                            <span><span class="label">Subsystém:</span> @item.Subsystem</span>
+                                            <span><span class="label">Vlastník:</span> @ownerLabel</span>
+                                        </div>
                                     </div>
-                                }
-                            </div>
-                        </div>
+                                    <div class="schedule-card-actions">
+                                        <span class="badge @(item.Stihame ? "schedule-badge-ok" : "schedule-badge-late")">@(item.Stihame ? "Stíháme" : "Nestíháme")</span>
+                                        <button class="btn small ghost" type="button" data-schedule-expand-toggle data-schedule-record-id="@item.ZaznamId">Rozpad</button>
+                                        @if (canManageSchedules)
+                                        {
+                                            var scheduleEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = Model.Projekt.Id }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
+                                            <button class="btn small"
+                                                    type="button"
+                                                    data-record-editor-url="@scheduleEditUrl"
+                                                    data-record-editor-project-id="@Model.Projekt.Id"
+                                                    data-record-editor-label="@($"Upravit záznam #{item.CisloViditelne}")">
+                                                Upravit
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
 
-                        <div class="schedule-card-timeline">
-                            <div class="timeline-axis schedule-timeline-axis"
-                                 data-timeline-axis
-                                 data-axis-start="@axisStart.ToString("yyyy-MM-dd")"
-                                 data-axis-end="@axisEnd.ToString("yyyy-MM-dd")"></div>
-                            <div class="schedule-rainbow-row">
-                                <span class="schedule-rainbow-label">Plán</span>
-                                <div class="schedule-rainbow-track">
-                                    <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
-                                    @{
-                                        var previousPlanRight = 0d;
-                                    }
+                                <div class="schedule-card-timeline">
+                                    <div class="timeline-axis schedule-timeline-axis"
+                                         data-timeline-axis
+                                         data-axis-start="@axisStart.ToString("yyyy-MM-dd")"
+                                         data-axis-end="@axisEnd.ToString("yyyy-MM-dd")"></div>
+                                    <div class="schedule-rainbow-row">
+                                        <span class="schedule-rainbow-label">Plán</span>
+                                        <div class="schedule-rainbow-track planned">
+                                            <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
+                                            @{
+                                                var previousPlanRight = 0d;
+                                            }
+                                            @foreach (var krok in item.Kroky)
+                                            {
+                                                var rawLeft = toPercent(krok.PlanStart);
+                                                var rawRight = toPercent(krok.PlanEnd);
+                                                var left = Math.Max(previousPlanRight, rawLeft);
+                                                var right = Math.Max(left, rawRight);
+                                                var width = Math.Max(0d, right - left);
+                                                var widthStyle = width > 0d
+                                                    ? $"calc({formatPercent(width)}% + 1px)"
+                                                    : "0%";
+                                                previousPlanRight = right;
+                                                <span class="schedule-rainbow-segment planned"
+                                                      data-rainbow-segment-label-full="@krok.Nazev"
+                                                      data-rainbow-segment-label-short="@krok.KrokIndex"
+                                                      style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
+                                                      title="@($"{krok.Nazev}: {krok.PlanStart:dd.MM.yyyy} - {krok.PlanEnd:dd.MM.yyyy}")"></span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="schedule-rainbow-row">
+                                        <span class="schedule-rainbow-label">Skutečnost</span>
+                                        <div class="schedule-rainbow-track actual">
+                                            <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
+                                            @{
+                                                var previousRealRight = 0d;
+                                            }
+                                            @foreach (var krok in item.Kroky)
+                                            {
+                                                var rawLeft = toPercent(krok.RealStart);
+                                                var rawRight = toPercent(krok.RealEnd);
+                                                var left = Math.Max(previousRealRight, rawLeft);
+                                                var right = Math.Max(left, rawRight);
+                                                var width = Math.Max(0d, right - left);
+                                                var widthStyle = width > 0d
+                                                    ? $"calc({formatPercent(width)}% + 1px)"
+                                                    : "0%";
+                                                previousRealRight = right;
+                                                <span class="schedule-rainbow-segment actual"
+                                                      data-rainbow-segment-label-full="@krok.Nazev"
+                                                      data-rainbow-segment-label-short="@krok.KrokIndex"
+                                                      style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
+                                                      title="@($"{krok.Nazev}: {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}")"></span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="schedule-rainbow-legend">
+                                        <span>Plán: @item.BaselineDokonceni.ToString("dd.MM.yyyy")</span>
+                                        <span>Skutečnost: @item.SkutecneDokonceni.ToString("dd.MM.yyyy")</span>
+                                        <span>Termín úkolu: @item.TerminUkonceni.ToString("dd.MM.yyyy")</span>
+                                        <span>Překročení: @(item.PrekroceniDni > 0 ? $"{item.PrekroceniDni} dnů" : "0 dnů")</span>
+                                    </div>
+                                </div>
+
+                                <div class="gantt-steps schedule-steps" data-schedule-steps data-schedule-record-id="@item.ZaznamId" hidden="hidden">
                                     @foreach (var krok in item.Kroky)
                                     {
-                                        var rawLeft = toPercent(krok.PlanStart);
-                                        var rawRight = toPercent(krok.PlanEnd);
-                                        var left = Math.Max(previousPlanRight, rawLeft);
-                                        var right = Math.Max(left, rawRight);
-                                        var width = Math.Max(0d, right - left);
-                                        var widthStyle = width > 0d
-                                            ? $"calc({formatPercent(width)}% + 1px)"
-                                            : "0%";
-                                        previousPlanRight = right;
-                                        <span class="schedule-rainbow-segment"
-                                              data-rainbow-segment-label-full="@krok.Nazev"
-                                              data-rainbow-segment-label-short="@krok.KrokIndex"
-                                              style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"></span>
+                                        var stepLeft = toPercent(krok.PlanStart);
+                                        var stepRight = toPercent(krok.PlanEnd);
+                                        var stepWidth = Math.Max(0d, stepRight - stepLeft);
+                                        var actualLeft = toPercent(krok.RealStart);
+                                        var actualRight = toPercent(krok.RealEnd);
+                                        var actualWidth = Math.Max(0d, actualRight - actualLeft);
+                                        var offsetLabel = krok.OdchylkaDni > 0
+                                            ? $"+{krok.OdchylkaDni} dnů"
+                                            : $"{krok.OdchylkaDni} dnů";
+                                        <div class="gantt-step-row">
+                                            <div class="gantt-step-name">
+                                                <span>@krok.Nazev</span>
+                                                <span class="gantt-step-offset @(krok.OdchylkaDni > 0 ? "late" : krok.OdchylkaDni < 0 ? "ahead" : null)">@offsetLabel</span>
+                                            </div>
+                                            <div class="gantt-step-track">
+                                                <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
+                                                <span class="gantt-step-segment planned" style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
+                                                <span class="gantt-step-segment actual" style="left:@formatPercent(actualLeft)%; width:@formatPercent(actualWidth)%; background:@item.DelayBarvaHex;"></span>
+                                            </div>
+                                        </div>
                                     }
                                 </div>
-                            </div>
-                            <div class="schedule-rainbow-row">
-                                <span class="schedule-rainbow-label">Skutečnost</span>
-                                <div class="schedule-rainbow-track">
-                                    <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
-                                    @{
-                                        var previousRealRight = 0d;
-                                    }
-                                    @foreach (var krok in item.Kroky)
-                                    {
-                                        var rawLeft = toPercent(krok.RealStart);
-                                        var rawRight = toPercent(krok.RealEnd);
-                                        var left = Math.Max(previousRealRight, rawLeft);
-                                        var right = Math.Max(left, rawRight);
-                                        var width = Math.Max(0d, right - left);
-                                        var widthStyle = width > 0d
-                                            ? $"calc({formatPercent(width)}% + 1px)"
-                                            : "0%";
-                                        previousRealRight = right;
-                                        <span class="schedule-rainbow-segment"
-                                              data-rainbow-segment-label-full="@krok.Nazev"
-                                              data-rainbow-segment-label-short="@krok.KrokIndex"
-                                              style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"></span>
-                                    }
-                                </div>
-                            </div>
-                            <div class="schedule-rainbow-legend">
-                                <span>Termín úkolu: @item.TerminUkonceni.ToString("dd.MM.yyyy")</span>
-                                <span>Skutečné dokončení: @item.SkutecneDokonceni.ToString("dd.MM.yyyy")</span>
-                                <span>Překročení: @(item.PrekroceniDni > 0 ? $"{item.PrekroceniDni} dnů" : "0 dnů")</span>
-                            </div>
-                        </div>
-
-                        <div class="gantt-steps" data-gantt-steps data-gantt-record-id="@item.ZaznamId" hidden="hidden">
-                            @foreach (var krok in item.Kroky)
-                            {
-                                var stepLeft = toPercent(krok.PlanStart);
-                                var stepRight = toPercent(krok.PlanEnd);
-                                var stepWidth = Math.Max(0d, stepRight - stepLeft);
-                                var actualLeft = toPercent(krok.RealStart);
-                                var actualRight = toPercent(krok.RealEnd);
-                                var actualWidth = Math.Max(0d, actualRight - actualLeft);
-                                var offsetLabel = krok.OdchylkaDni > 0
-                                    ? $"+{krok.OdchylkaDni} dnů"
-                                    : $"{krok.OdchylkaDni} dnů";
-                                <div class="gantt-step-row">
-                                    <div class="gantt-step-name">
-                                        <span>@krok.Nazev</span>
-                                        <span class="gantt-step-offset @(krok.OdchylkaDni > 0 ? "late" : krok.OdchylkaDni < 0 ? "ahead" : null)">@offsetLabel</span>
-                                    </div>
-                                    <div class="gantt-step-track">
-                                        <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
-                                        <span class="gantt-step-segment planned" style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
-                                        <span class="gantt-step-segment actual" style="left:@formatPercent(actualLeft)%; width:@formatPercent(actualWidth)%; background:@item.DelayBarvaHex;"></span>
-                                    </div>
-                                </div>
-                            }
-                        </div>
-                    </article>
-                }
+                            </article>
+                        }
+                    </div>
+                </section>
             }
-        </div>
+        }
     </div>
 </section>
 

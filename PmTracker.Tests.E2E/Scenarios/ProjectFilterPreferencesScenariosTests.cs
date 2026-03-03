@@ -52,16 +52,9 @@ public sealed class ProjectFilterPreferencesScenariosTests
         await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
         var scheduleShell = page.Locator("[data-project-filter-scope='schedule']");
         await OpenFiltersAsync(scheduleShell);
-        await ToggleSwitchAsync(scheduleShell, "Jen mé úkoly");
+        var selectedSubsystem = await scheduleShell.Locator("[data-schedule-filter-key='subsystem']").InputValueAsync();
         await scheduleShell.Locator("[data-filter-save-defaults='schedule']").ClickAsync();
         await Expect(scheduleShell.Locator("[data-filter-save-status='schedule']")).ToContainTextAsync("Výchozí filtry uloženy");
-
-        await page.GetByRole(AriaRole.Button, new() { Name = "GANTT" }).ClickAsync();
-        var ganttShell = page.Locator("[data-project-filter-scope='gantt']");
-        await OpenFiltersAsync(ganttShell);
-        await ToggleSwitchAsync(ganttShell, "Jen mé úkoly");
-        await ganttShell.Locator("[data-filter-save-defaults='gantt']").ClickAsync();
-        await Expect(ganttShell.Locator("[data-filter-save-status='gantt']")).ToContainTextAsync("Výchozí filtry uloženy");
 
         await page.ReloadAsync();
 
@@ -70,12 +63,9 @@ public sealed class ProjectFilterPreferencesScenariosTests
         await Expect(page.Locator("[data-project-filter-scope='records'] [data-filter-key='mine']")).ToBeCheckedAsync();
 
         await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
-        await OpenFiltersAsync(page.Locator("[data-project-filter-scope='schedule']"));
-        await Expect(page.Locator("[data-project-filter-scope='schedule'] [data-schedule-filter-key='mine']")).ToBeCheckedAsync();
-
-        await page.GetByRole(AriaRole.Button, new() { Name = "GANTT" }).ClickAsync();
-        await OpenFiltersAsync(page.Locator("[data-project-filter-scope='gantt']"));
-        await Expect(page.Locator("[data-project-filter-scope='gantt'] [data-gantt-filter-key='mine']")).ToBeCheckedAsync();
+        var restoredScheduleShell = page.Locator("[data-project-filter-scope='schedule']");
+        await OpenFiltersAsync(restoredScheduleShell);
+        await Expect(restoredScheduleShell.Locator("[data-schedule-filter-key='subsystem']")).ToHaveValueAsync(selectedSubsystem);
 
         await page.Context.CloseAsync();
     }
