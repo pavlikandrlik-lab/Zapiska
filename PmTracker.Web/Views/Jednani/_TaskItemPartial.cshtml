@@ -40,26 +40,28 @@
                             }
                             @if (canEditThisComment)
                             {
-                                <details class="comment-edit-details">
-                                    <summary>Upravit</summary>
-                                    <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true">
+                                <div class="comment-toolbar-actions">
+                                    <details class="comment-edit-details">
+                                        <summary class="comment-action-chip">Upravit</summary>
+                                        <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true">
+                                            <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                            <input type="hidden" name="meetingId" value="@Model.JednaniId" />
+                                            <input type="hidden" name="zaznamId" value="@ukol.ZaznamId" />
+                                            <input type="hidden" name="uiContext" value="meeting" />
+                                            <input type="hidden" name="Id" value="@vyjadreni.Id" />
+                                            <textarea rows="3" name="Text" required>@vyjadreni.Text</textarea>
+                                            <button class="btn small" type="submit">Uložit změnu</button>
+                                        </form>
+                                    </details>
+                                    <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
                                         <input type="hidden" name="projektId" value="@Model.ProjektId" />
                                         <input type="hidden" name="meetingId" value="@Model.JednaniId" />
                                         <input type="hidden" name="zaznamId" value="@ukol.ZaznamId" />
                                         <input type="hidden" name="uiContext" value="meeting" />
                                         <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                        <textarea rows="3" name="Text" required>@vyjadreni.Text</textarea>
-                                        <button class="btn small" type="submit">Uložit změnu</button>
+                                        <button class="btn small ghost" type="submit">Smazat</button>
                                     </form>
-                                </details>
-                                <form class="comment-delete-form" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
-                                    <input type="hidden" name="projektId" value="@Model.ProjektId" />
-                                    <input type="hidden" name="meetingId" value="@Model.JednaniId" />
-                                    <input type="hidden" name="zaznamId" value="@ukol.ZaznamId" />
-                                    <input type="hidden" name="uiContext" value="meeting" />
-                                    <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                    <button class="btn small ghost" type="submit">Smazat</button>
-                                </form>
+                                </div>
                             }
                             else if (!vyjadreni.LzeUpravit)
                             {

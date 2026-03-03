@@ -310,6 +310,11 @@ public sealed class ZaznamEditViewModel
     public required IReadOnlyList<ExterniOdkazEditViewModel> ExterniVazby { get; init; }
     public required IReadOnlyList<string> TypyExternichOdkazu { get; init; }
     public required IReadOnlyList<string> Vyzvy { get; init; }
+    public string Presentation { get; set; } = "modal";
+    public string? ReturnUrl { get; set; }
+    public string BackUrl { get; set; } = string.Empty;
+    public string ActiveEditorTab { get; set; } = "basic";
+    public bool UseAjaxSubmit { get; set; } = true;
 }
 
 public sealed class HarmonogramKrokEditViewModel

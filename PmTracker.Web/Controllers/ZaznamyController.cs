@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
@@ -8,6 +9,13 @@ namespace PmTracker.Web.Controllers;
 
 public sealed class ZaznamyController : BaseController
 {
+    private const string PresentationModal = "modal";
+    private const string PresentationPage = "page";
+    private const string EditorTabBasic = "basic";
+    private const string EditorTabExternal = "external";
+    private const string EditorTabCollaboration = "collaboration";
+    private const string EditorTabSchedule = "schedule";
+
     private readonly IRecordsService _recordsService;
 
     public ZaznamyController(
@@ -19,7 +27,7 @@ public sealed class ZaznamyController : BaseController
         _recordsService = recordsService;
     }
 
-    public IActionResult Edit(int id)
+    public IActionResult Edit(int id, string? presentation, string? returnUrl)
     {
         var model = _recordsService.BuildZaznamEdit(id);
         var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId);
@@ -31,10 +39,11 @@ public sealed class ZaznamyController : BaseController
             return Forbid();
         }
 
-        return View("~/Views/Projekty/EditZaznam.cshtml", model);
+        PrepareRecordEditorModel(model, presentation, returnUrl, canEditRecord, canManageSchedule);
+        return View(GetEditorViewPath(model.Presentation), model);
     }
 
-    public IActionResult Create(int projektId)
+    public IActionResult Create(int projektId, string? presentation, string? returnUrl)
     {
         if (!_recordsService.ProjektExists(projektId))
         {
@@ -47,7 +56,8 @@ public sealed class ZaznamyController : BaseController
         }
 
         var model = _recordsService.BuildZaznamCreate(projektId);
-        return View("~/Views/Projekty/EditZaznam.cshtml", model);
+        PrepareRecordEditorModel(model, presentation, returnUrl, canEditRecord: true, canManageSchedule: model.JeUkolKategorie);
+        return View(GetEditorViewPath(model.Presentation), model);
     }
 
     [HttpGet]
@@ -83,16 +93,16 @@ public sealed class ZaznamyController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult Save(SaveRecordCommand command)
     {
-        var uiTab = string.Equals(command.UiTab, "harmonogram", StringComparison.OrdinalIgnoreCase)
-            ? "harmonogram"
-            : "zaznamy";
+        var editorTab = NormalizeEditorTab(command.EditorTab);
+        var projectTab = NormalizeProjectTab(editorTab);
+        var presentation = NormalizePresentation(command.Presentation);
         var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId);
         var canEditSchedule = CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, command.ProjektId);
         var canAddSchedule = CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, command.ProjektId);
         var canSaveScheduleOnly = command.Id.HasValue
-            && string.Equals(uiTab, "harmonogram", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(editorTab, EditorTabSchedule, StringComparison.OrdinalIgnoreCase)
             && (canEditSchedule || canAddSchedule);
-        var redirectToProject = () => RedirectToAction("Detail", "Projekty", new { id = command.ProjektId, tab = "zaznamy" });
+        var redirectToProject = () => Redirect(BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab));
         var savedRecordId = 0;
 
         return ExecuteValidatedCommand(
@@ -103,6 +113,18 @@ public sealed class ZaznamyController : BaseController
             onSuccessRedirect: redirectToProject,
             onAjaxSuccess: () =>
             {
+                if (string.Equals(presentation, PresentationPage, StringComparison.OrdinalIgnoreCase))
+                {
+                    return AjaxSuccessResult(
+                        refreshScope: "page",
+                        refreshUrl: BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab),
+                        projectId: command.ProjektId,
+                        recordId: savedRecordId,
+                        uiContext: "project",
+                        tab: projectTab,
+                        message: "Záznam byl uložen.");
+                }
+
                 if (command.Id.HasValue)
                 {
                     return AjaxSuccessResult(
@@ -111,15 +133,15 @@ public sealed class ZaznamyController : BaseController
                         projectId: command.ProjektId,
                         recordId: savedRecordId,
                         uiContext: "project",
-                        tab: uiTab,
+                        tab: projectTab,
                         message: "Záznam byl uložen.");
                 }
 
                 return AjaxSuccessResult(
                     refreshScope: "projekty-detail-zaznamy-preserve",
-                    refreshUrl: Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = uiTab }),
+                    refreshUrl: Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = projectTab }),
                     projectId: command.ProjektId,
-                    tab: uiTab,
+                    tab: projectTab,
                     message: "Záznam byl uložen.");
             },
             operation: () => savedRecordId = _recordsService.SaveRecord(command, CurrentUserContext));
@@ -271,5 +293,96 @@ public sealed class ZaznamyController : BaseController
         }
 
         return RedirectToAction("Detail", "Projekty", new { id = projektId, tab = "zaznamy" });
+    }
+
+    private void PrepareRecordEditorModel(
+        ZaznamEditViewModel model,
+        string? requestedPresentation,
+        string? requestedReturnUrl,
+        bool canEditRecord,
+        bool canManageSchedule)
+    {
+        model.Presentation = ResolvePresentation(requestedPresentation);
+        model.ReturnUrl = NormalizeLocalReturnUrl(requestedReturnUrl);
+        model.BackUrl = NormalizeLocalReturnUrl(requestedReturnUrl)
+            ?? (Url.Action("Detail", "Projekty", new { id = model.ProjektId, tab = "zaznamy" }) ?? $"/Projekty/Detail/{model.ProjektId}?tab=zaznamy");
+        model.ActiveEditorTab = !canEditRecord && canManageSchedule && model.JeUkolKategorie
+            ? EditorTabSchedule
+            : EditorTabBasic;
+        model.UseAjaxSubmit = true;
+    }
+
+    private string GetEditorViewPath(string presentation)
+        => string.Equals(presentation, PresentationPage, StringComparison.OrdinalIgnoreCase)
+            ? "~/Views/Projekty/EditZaznamPage.cshtml"
+            : "~/Views/Projekty/EditZaznamModal.cshtml";
+
+    private string ResolvePresentation(string? requestedPresentation)
+    {
+        var normalized = NormalizePresentation(requestedPresentation);
+        if (!string.IsNullOrWhiteSpace(normalized))
+        {
+            return normalized;
+        }
+
+        return IsAjaxRequest() ? PresentationModal : PresentationPage;
+    }
+
+    private static string NormalizePresentation(string? requestedPresentation)
+    {
+        if (string.Equals(requestedPresentation, PresentationPage, StringComparison.OrdinalIgnoreCase))
+        {
+            return PresentationPage;
+        }
+
+        if (string.Equals(requestedPresentation, PresentationModal, StringComparison.OrdinalIgnoreCase))
+        {
+            return PresentationModal;
+        }
+
+        return string.Empty;
+    }
+
+    private static string NormalizeEditorTab(string? editorTab)
+    {
+        if (string.Equals(editorTab, EditorTabExternal, StringComparison.OrdinalIgnoreCase))
+        {
+            return EditorTabExternal;
+        }
+
+        if (string.Equals(editorTab, EditorTabCollaboration, StringComparison.OrdinalIgnoreCase))
+        {
+            return EditorTabCollaboration;
+        }
+
+        if (string.Equals(editorTab, EditorTabSchedule, StringComparison.OrdinalIgnoreCase))
+        {
+            return EditorTabSchedule;
+        }
+
+        return EditorTabBasic;
+    }
+
+    private static string NormalizeProjectTab(string editorTab)
+        => string.Equals(editorTab, EditorTabSchedule, StringComparison.OrdinalIgnoreCase)
+            ? "harmonogram"
+            : "zaznamy";
+
+    private string BuildRestoreReturnUrl(int projektId, string? returnUrl, string fallbackTab)
+    {
+        var candidate = NormalizeLocalReturnUrl(returnUrl)
+            ?? (Url.Action("Detail", "Projekty", new { id = projektId, tab = fallbackTab }) ?? $"/Projekty/Detail/{projektId}?tab={fallbackTab}");
+
+        return QueryHelpers.AddQueryString(candidate, "restoreRecordEditorState", "1");
+    }
+
+    private string? NormalizeLocalReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl))
+        {
+            return null;
+        }
+
+        return Url.IsLocalUrl(returnUrl) ? returnUrl : null;
     }
 }
