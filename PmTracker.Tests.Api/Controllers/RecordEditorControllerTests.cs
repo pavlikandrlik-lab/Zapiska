@@ -112,8 +112,9 @@ public sealed class RecordEditorControllerTests
                 ("ReturnUrl", returnUrl)));
 
         var response = await client.SendAsync(request);
+        var content = await response.Content.ReadAsStringAsync();
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, content);
         var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
         payload.Ok.Should().BeTrue();
         payload.RefreshScope.Should().Be("page");

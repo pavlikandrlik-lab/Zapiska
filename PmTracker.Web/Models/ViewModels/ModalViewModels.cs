@@ -24,6 +24,37 @@ public sealed class TeamMemberModalViewModel
     public IReadOnlyList<LookupOptionViewModel> RoleProjektu { get; init; } = Array.Empty<LookupOptionViewModel>();
 }
 
+public sealed class AssignProjectRoleModalViewModel
+{
+    public required string Title { get; init; }
+    public required AssignProjectRoleCommand Command { get; init; }
+    public IReadOnlyList<ProjectMemberCandidateViewModel> DostupneOsoby { get; init; } = Array.Empty<ProjectMemberCandidateViewModel>();
+    public IReadOnlyList<LookupOptionViewModel> RoleProjektu { get; init; } = Array.Empty<LookupOptionViewModel>();
+}
+
+public sealed class AssignProjectSubsystemModalViewModel
+{
+    public required string Title { get; init; }
+    public required AssignProjectSubsystemCommand Command { get; init; }
+    public IReadOnlyList<LookupOptionViewModel> Subsystemy { get; init; } = Array.Empty<LookupOptionViewModel>();
+}
+
+public sealed class AssignProjectSubsystemRoleModalViewModel
+{
+    public required string Title { get; init; }
+    public required AssignProjectSubsystemRoleCommand Command { get; init; }
+    public IReadOnlyList<ProjectSubsystemOptionViewModel> ProjektSubsystemy { get; init; } = Array.Empty<ProjectSubsystemOptionViewModel>();
+    public IReadOnlyList<ProjectMemberCandidateViewModel> DostupneOsoby { get; init; } = Array.Empty<ProjectMemberCandidateViewModel>();
+    public IReadOnlyList<LookupOptionViewModel> RoleSubsystemu { get; init; } = Array.Empty<LookupOptionViewModel>();
+}
+
+public sealed class AddMeetingParticipantModalViewModel
+{
+    public required string Title { get; init; }
+    public required AddMeetingParticipantCommand Command { get; init; }
+    public IReadOnlyList<MeetingParticipantCandidateViewModel> DostupneOsoby { get; init; } = Array.Empty<MeetingParticipantCandidateViewModel>();
+}
+
 public sealed class DeleteProjectModalViewModel
 {
     public required string Title { get; init; }

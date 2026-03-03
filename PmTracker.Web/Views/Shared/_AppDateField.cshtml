@@ -27,7 +27,7 @@
         extraAttributeMarkup = string.Join(" ", parts);
     }
 }
-<div class="@containerClass" data-app-date-field data-app-date-locked="@(Model.Locked ? "true" : "false")">
+<div class="@containerClass" data-app-date-field data-app-date-locked="@(Model.Locked ? "true" : "false")" data-floating-anchor>
     <input class="app-date-display-input" type="text" data-app-date-display value="@Model.DisplayValue" readonly />
     <input type="hidden" name="@Model.Name" value="@Model.IsoValue" data-app-date-value @Html.Raw(extraAttributeMarkup) />
     <button class="app-date-trigger" type="button" data-app-date-open aria-label="@Model.AriaLabel" @(Model.Locked ? "disabled=\"disabled\"" : null)>
@@ -38,7 +38,7 @@
             <line x1="3" y1="9" x2="21" y2="9"></line>
         </svg>
     </button>
-    <div class="app-date-panel" data-app-date-panel hidden>
+    <div class="app-date-panel" data-app-date-panel data-floating-panel data-floating-kind="date" hidden>
         <div class="app-date-nav">
             <button class="app-date-nav-btn" type="button" data-app-date-prev aria-label="Předchozí měsíc">‹</button>
             <select class="app-date-select app-date-month" data-app-date-month aria-label="Měsíc"></select>

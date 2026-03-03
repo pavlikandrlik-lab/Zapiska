@@ -38,4 +38,7 @@ public sealed class SettingsService : ISettingsService
 
     public void SaveRolePermission(SaveRolePermissionCommand command, CurrentUserContextViewModel currentUser) =>
         _dataStore.SaveRolePermission(command, currentUser);
+
+    public void DeleteRolePermission(DeleteRolePermissionCommand command, CurrentUserContextViewModel currentUser) =>
+        _dataStore.DeleteRolePermission(command, currentUser);
 }

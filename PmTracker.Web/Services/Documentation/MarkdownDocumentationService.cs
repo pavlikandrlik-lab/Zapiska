@@ -19,7 +19,8 @@ public sealed class MarkdownDocumentationService : IDocumentationService
         ["technicka"] = new("technicka", "Technická dokumentace", "Architektura, provozní pravidla, testování a údržba aplikace.", "/Dokumentace/Technicka-dokumentace", new[] { "technical-guide.md" }),
         ["admin"] = new("admin", "Administrační dokumentace", "Správa rolí, oprávnění, číselníků a provozu.", "/Dokumentace/Administracni-prirucka", new[] { "admin-guide.md" }),
         ["uzivatelska"] = new("uzivatelska", "Uživatelská příručka", "Praktický návod pro běžné uživatele aplikace.", "/Dokumentace/Uzivatelska-prirucka", new[] { "user-guide.md" }),
-        ["qa"] = new("qa", "Q and A", "Často kladené dotazy k provozu aplikace.", "/Dokumentace/qa", new[] { "qa.md" })
+        ["qa"] = new("qa", "Q and A", "Často kladené dotazy k provozu aplikace.", "/Dokumentace/qa", new[] { "qa.md" }),
+        ["changelog"] = new("changelog", "Changelog verzí", "Přehled změn mezi verzemi aplikace.", "/Dokumentace/Changelog", new[] { "changelog.md" })
     };
 
     private readonly IWebHostEnvironment _environment;
@@ -48,9 +49,9 @@ public sealed class MarkdownDocumentationService : IDocumentationService
         return new DocumentationPageViewModel
         {
             Key = source.Key,
+            SectionLabel = source.Title,
             Title = source.Title,
             Subtitle = source.Subtitle,
-            SectionLabel = source.Title,
             CanonicalPath = source.Path,
             HtmlContent = html,
             Navigation = BuildNavigation(source.Key),

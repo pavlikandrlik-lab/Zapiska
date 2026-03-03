@@ -171,7 +171,7 @@ public sealed class ZaznamyController : BaseController
     [HttpGet]
     public IActionResult RecordCardPartial(int projektId, int zaznamId)
     {
-        if (!CurrentUserContext.CanReadProject(projektId))
+        if (!CurrentUserContext.CanAccessProject(projektId))
         {
             return NotFound();
         }
@@ -187,7 +187,7 @@ public sealed class ZaznamyController : BaseController
         var canEditSchedule = record.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projektId);
         var canAddSchedule = record.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projektId);
         var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId)
-            && CurrentUserContext.OsobaId == record.AktualniSubsystemVedouciOsobaId;
+            && record.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
         if (!canEditRecord && !canCommentAsSubsystemLead && !canEditSchedule && !canAddSchedule)
         {
             return Forbid();

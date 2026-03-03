@@ -27,10 +27,17 @@ public sealed class ProjektDetailViewModel
     public required IReadOnlyList<SubsystemGroupViewModel> SkupinySubsystemu { get; init; }
     public required IReadOnlyList<ZaznamCardViewModel> Zaznamy { get; init; }
     public required IReadOnlyList<JednaniListItemViewModel> Jednani { get; init; }
-    public required IReadOnlyList<TeamMemberViewModel> Tym { get; init; }
-    public required IReadOnlyList<TeamCandidateViewModel> DostupniClenoveTymu { get; init; }
+    public required IReadOnlyList<ProjectRoleAssignmentViewModel> AktivniProjektoveRole { get; init; }
+    public required IReadOnlyList<ProjectRoleHistoryItemViewModel> HistorieProjektovychRoli { get; init; }
+    public required IReadOnlyList<ProjectSubsystemViewModel> AktivniSubsystemyProjektu { get; init; }
+    public required IReadOnlyList<ProjectSubsystemRoleAssignmentViewModel> AktivniSubsystemoveRole { get; init; }
+    public required IReadOnlyList<ProjectSubsystemRoleHistoryItemViewModel> HistorieSubsystemovychRoli { get; init; }
+    public required IReadOnlyList<ProjectMemberCandidateViewModel> DostupneOsobyProRole { get; init; }
+    public required IReadOnlyList<ProjectSubsystemOptionViewModel> DostupneProjektoveSubsystemy { get; init; }
     public required IReadOnlyList<ProjektHarmonogramUkolViewModel> HarmonogramUkoly { get; init; }
     public IReadOnlyList<LookupOptionViewModel> RoleProjektu { get; init; } = Array.Empty<LookupOptionViewModel>();
+    public IReadOnlyList<LookupOptionViewModel> RoleSubsystemu { get; init; } = Array.Empty<LookupOptionViewModel>();
+    public IReadOnlyList<LookupOptionViewModel> DostupneSubsystemy { get; init; } = Array.Empty<LookupOptionViewModel>();
     public required IReadOnlyList<JednaniOptionViewModel> OtevrenaJednani { get; init; }
     public IReadOnlyList<LookupOptionViewModel> StavyJednani { get; init; } = Array.Empty<LookupOptionViewModel>();
     public required ProjektFiltryViewModel Filtry { get; init; }
@@ -73,7 +80,7 @@ public sealed class ZaznamCardViewModel
     public required IReadOnlyList<string> HistorieTypuUkolu { get; init; }
     public required string AktualniSubsystemKod { get; init; }
     public required string AktualniSubsystem { get; init; }
-    public int AktualniSubsystemVedouciOsobaId { get; init; }
+    public required IReadOnlyList<int> AktualniSubsystemLeadEquivalentOsobaIds { get; init; }
     public required IReadOnlyList<ExterniOdkazViewModel> ExterniOdkazy { get; init; }
     public required IReadOnlyList<SpolupracovnikViewModel> Spoluprace { get; init; }
     public required IReadOnlyList<VyjadreniViewModel> Vyjadreni { get; init; }
@@ -107,17 +114,16 @@ public sealed class ProjektHarmonogramUkolViewModel
     public DateTime TerminUkonceni { get; init; }
     public DateTime BaselineDokonceni { get; init; }
     public DateTime SkutecneDokonceni { get; init; }
+    public DateTime PosunuteDokonceni => SkutecneDokonceni;
     public int CelkoveTrvaniDni { get; init; }
     public int CelkovaOdchylkaDni { get; init; }
+    public int CelkoveZpozdeniDni => CelkovaOdchylkaDni;
     public int DelkaDoTerminuDni { get; init; }
     public bool Stihame { get; init; }
     public int PrekroceniDni { get; init; }
     public required string DelayBarvaHex { get; init; }
     public bool MaVizualniTrvani { get; init; }
     public required IReadOnlyList<ProjektHarmonogramKrokViewModel> Kroky { get; init; }
-
-    public DateTime PosunuteDokonceni => SkutecneDokonceni;
-    public int CelkoveZpozdeniDni => CelkovaOdchylkaDni;
 }
 
 public sealed class ProjektHarmonogramKrokViewModel
@@ -126,13 +132,12 @@ public sealed class ProjektHarmonogramKrokViewModel
     public required string Nazev { get; init; }
     public int TrvaniDni { get; init; }
     public int OdchylkaDni { get; init; }
+    public int ZpozdeniDni => OdchylkaDni;
     public required string BarvaHex { get; init; }
     public DateTime PlanStart { get; init; }
     public DateTime PlanEnd { get; init; }
     public DateTime RealStart { get; init; }
     public DateTime RealEnd { get; init; }
-
-    public int ZpozdeniDni => OdchylkaDni;
 }
 
 public sealed class ExterniOdkazViewModel
@@ -159,6 +164,84 @@ public sealed class VyjadreniViewModel
     public int? JednaniCislo { get; init; }
     public DateTime? JednaniDatum { get; init; }
     public bool LzeUpravit { get; init; }
+}
+
+public sealed class ProjectMemberCandidateViewModel
+{
+    public int OsobaId { get; init; }
+    public required string Osoba { get; init; }
+    public string? Email { get; init; }
+    public string? Organizace { get; init; }
+    public string? OrganizacniCelek { get; init; }
+}
+
+public sealed class ProjectRoleAssignmentViewModel
+{
+    public int ProjektRoleId { get; init; }
+    public int OsobaId { get; init; }
+    public required string Osoba { get; init; }
+    public string? Email { get; init; }
+    public required string RoleKod { get; init; }
+    public required string RoleNazev { get; init; }
+    public string? Organizace { get; init; }
+    public string? OrganizacniCelek { get; init; }
+    public DateTime DatumPrirazeni { get; init; }
+}
+
+public sealed class ProjectRoleHistoryItemViewModel
+{
+    public int ProjektRoleId { get; init; }
+    public int OsobaId { get; init; }
+    public required string Osoba { get; init; }
+    public required string RoleKod { get; init; }
+    public required string RoleNazev { get; init; }
+    public DateTime DatumPrirazeni { get; init; }
+    public DateTime? DatumOdebrani { get; init; }
+}
+
+public sealed class ProjectSubsystemViewModel
+{
+    public int ProjektSubsystemId { get; init; }
+    public int SubsystemId { get; init; }
+    public required string Kod { get; init; }
+    public required string Nazev { get; init; }
+    public DateTime DatumPrirazeni { get; init; }
+}
+
+public sealed class ProjectSubsystemOptionViewModel
+{
+    public int ProjektSubsystemId { get; init; }
+    public int SubsystemId { get; init; }
+    public required string Label { get; init; }
+    public required string Kod { get; init; }
+    public required string Nazev { get; init; }
+}
+
+public sealed class ProjectSubsystemRoleAssignmentViewModel
+{
+    public int ProjektSubsystemRoleId { get; init; }
+    public int ProjektSubsystemId { get; init; }
+    public int OsobaId { get; init; }
+    public required string Osoba { get; init; }
+    public string? Email { get; init; }
+    public required string SubsystemKod { get; init; }
+    public required string SubsystemNazev { get; init; }
+    public required string RoleKod { get; init; }
+    public required string RoleNazev { get; init; }
+    public DateTime DatumPrirazeni { get; init; }
+}
+
+public sealed class ProjectSubsystemRoleHistoryItemViewModel
+{
+    public int ProjektSubsystemRoleId { get; init; }
+    public int OsobaId { get; init; }
+    public required string Osoba { get; init; }
+    public required string SubsystemKod { get; init; }
+    public required string SubsystemNazev { get; init; }
+    public required string RoleKod { get; init; }
+    public required string RoleNazev { get; init; }
+    public DateTime DatumPrirazeni { get; init; }
+    public DateTime? DatumOdebrani { get; init; }
 }
 
 public sealed class TeamMemberViewModel
@@ -249,10 +332,9 @@ public sealed class HarmonogramKrokEditViewModel
     public int ZpozdeniTypId { get; init; }
     public int TrvaniDni { get; init; }
     public int OdchylkaDni { get; init; }
+    public int ZpozdeniDni => OdchylkaDni;
     public DateTime BaselineDatum { get; init; }
     public DateTime SkutecneDatum { get; init; }
-
-    public int ZpozdeniDni => OdchylkaDni;
     public DateTime PosunuteDatum => SkutecneDatum;
 }
 
@@ -260,21 +342,20 @@ public sealed class HarmonogramSouhrnViewModel
 {
     public DateTime BaselineDokonceni { get; init; }
     public DateTime SkutecneDokonceni { get; init; }
+    public DateTime PosunuteDokonceni => SkutecneDokonceni;
     public DateTime TerminUkolu { get; init; }
     public int CelkoveTrvaniDni { get; init; }
     public int CelkovaOdchylkaDni { get; init; }
+    public int CelkoveZpozdeniDni => CelkovaOdchylkaDni;
     public bool Stihame { get; init; }
     public int PrekroceniDni { get; init; }
-
-    public DateTime PosunuteDokonceni => SkutecneDokonceni;
-    public int CelkoveZpozdeniDni => CelkovaOdchylkaDni;
 }
 
 public sealed class SubsystemOptionViewModel
 {
     public required string Kod { get; init; }
     public required string Nazev { get; init; }
-    public int VedouciOsobaId { get; init; }
+    public int DefaultOwnerOsobaId { get; init; }
 }
 
 public sealed class ProjektFiltryViewModel

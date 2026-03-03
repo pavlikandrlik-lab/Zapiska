@@ -11,11 +11,12 @@
     --schedule-step-10: #8b5cf6;
     --schedule-step-11: #d946ef;
     --schedule-delay: #dc2626;
+    --app-picker-panel-width: 250px;
 }
 
 .app-body {
     min-height: 100vh;
-    background: linear-gradient(180deg, var(--app-bg-start) 0%, var(--app-bg-mid) 42%, var(--app-bg-end) 100%);
+    background: var(--gov-color-bg);
     color: var(--app-text-primary);
     display: flex;
     flex-direction: column;
@@ -42,30 +43,32 @@
     z-index: 40;
     background: var(--gov-color-surface);
     border-bottom: 1px solid var(--gov-color-border);
-    box-shadow: var(--gov-shadow-soft);
+    box-shadow: 0 1px 0 rgba(11, 12, 12, 0.04);
 }
 
 .app-topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 16px;
-    padding: 10px 24px;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    gap: 20px;
+    padding: 14px 24px 12px;
+    border-bottom: 1px solid var(--gov-color-border);
 }
 
 .app-brand {
     display: flex;
-    gap: 12px;
+    gap: 16px;
     align-items: center;
 }
 
 .app-logo {
-    width: 38px;
-    height: 38px;
-    border-radius: 11px;
+    width: 42px;
+    height: 42px;
+    border-radius: 6px;
     overflow: hidden;
     flex-shrink: 0;
+    border: 1px solid var(--gov-color-border);
+    background: #ffffff;
 }
 
 .app-logo-image {
@@ -76,9 +79,9 @@
 }
 
 .app-title {
-    font-size: 16px;
+    font-size: 20px;
     font-weight: 700;
-    line-height: 1.1;
+    line-height: 1.2;
     white-space: nowrap;
 }
 
@@ -108,7 +111,8 @@
     gap: 14px;
 }
 
-.gov-theme-switch {
+.gov-theme-switch,
+.gov-switch {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -116,13 +120,15 @@
     cursor: pointer;
 }
 
-.gov-theme-switch input {
+.gov-theme-switch input,
+.gov-switch input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
 }
 
-.gov-theme-switch-track {
+.gov-theme-switch-track,
+.gov-switch-track {
     width: 44px;
     height: 24px;
     border-radius: 999px;
@@ -132,7 +138,8 @@
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.gov-theme-switch-thumb {
+.gov-theme-switch-thumb,
+.gov-switch-thumb {
     width: 18px;
     height: 18px;
     border-radius: 50%;
@@ -141,19 +148,22 @@
     transition: transform 0.2s ease;
 }
 
-.gov-theme-switch input:checked + .gov-theme-switch-track {
+.gov-theme-switch input:checked + .gov-theme-switch-track,
+.gov-switch input:checked + .gov-switch-track {
     background: var(--gov-color-primary);
     border-color: var(--gov-color-primary);
 }
 
-.gov-theme-switch input:checked + .gov-theme-switch-track .gov-theme-switch-thumb {
+.gov-theme-switch input:checked + .gov-theme-switch-track .gov-theme-switch-thumb,
+.gov-switch input:checked + .gov-switch-track .gov-switch-thumb {
     transform: translateX(20px);
 }
 
-.gov-theme-switch-label {
-    font-size: 13px;
+.gov-theme-switch-label,
+.gov-switch-label {
+    font-size: 14px;
     color: var(--app-muted);
-    font-weight: 600;
+    font-weight: 500;
 }
 
 .user-menu {
@@ -162,9 +172,9 @@
 
 .user-menu-toggle {
     border: 1px solid var(--gov-color-border);
-    background: transparent;
-    border-radius: 10px;
-    padding: 6px 10px;
+    background: var(--gov-color-surface);
+    border-radius: 6px;
+    padding: 8px 12px;
     min-width: 190px;
     text-align: right;
     cursor: pointer;
@@ -183,11 +193,11 @@
     right: 0;
     top: calc(100% + 6px);
     width: 250px;
-    border-radius: 12px;
+    border-radius: 8px;
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
     box-shadow: var(--gov-shadow-soft);
-    padding: 10px;
+    padding: 8px;
     display: grid;
     gap: 4px;
     z-index: 20;
@@ -216,7 +226,7 @@
 
 .user-menu-link {
     display: block;
-    border-radius: 8px;
+    border-radius: 4px;
     padding: 8px 10px;
     font-size: 14px;
     color: inherit;
@@ -238,10 +248,10 @@
     position: fixed;
     min-width: 280px;
     max-width: min(360px, calc(100vw - 24px));
-    border-radius: 12px;
+    border-radius: 8px;
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
-    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.18);
+    box-shadow: var(--gov-shadow-soft);
     padding: 14px;
     z-index: 1200;
     display: grid;
@@ -315,10 +325,10 @@
     position: fixed;
     min-width: 300px;
     max-width: min(360px, calc(100vw - 24px));
-    border-radius: 16px;
+    border-radius: 8px;
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
-    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.22);
+    box-shadow: var(--gov-shadow-soft);
     padding: 18px 18px 14px;
     z-index: 1200;
     display: grid;
@@ -377,12 +387,12 @@
 
 .record-editor-popover-close {
     position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 28px;
-    height: 28px;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
     border: 1px solid var(--gov-color-border);
-    border-radius: 999px;
+    border-radius: 6px;
     background: transparent;
     color: var(--gov-color-muted);
     font-size: 18px;
@@ -401,44 +411,43 @@
 
 .app-nav {
     display: flex;
-    gap: 8px;
-    padding: 8px 24px;
+    gap: 18px;
+    padding: 0 24px;
     background: var(--app-nav-bg);
 }
 
 .app-nav-link {
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-weight: 600;
+    padding: 14px 2px 11px;
+    font-weight: 500;
     font-size: 14px;
     color: var(--app-text-primary);
-    border: 1px solid transparent;
+    border-bottom: 3px solid transparent;
 }
 
 .app-nav-link:hover {
-    border-color: var(--gov-color-border);
-    background: var(--app-nav-hover);
+    color: var(--gov-color-primary);
 }
 
 .app-nav-link.active {
-    background: var(--app-nav-active-bg);
-    border-color: var(--app-nav-active-border);
+    background: transparent;
+    border-bottom-color: var(--app-nav-active-border);
     color: var(--gov-color-primary);
 }
 
 .app-main {
     max-width: 1280px;
-    margin: 20px auto 44px;
-    padding: 0 20px;
+    margin: 24px auto 48px;
+    padding: 0 24px;
     width: 100%;
     flex: 1;
 }
 
 .alert {
-    border-radius: 10px;
-    padding: 10px 14px;
+    border-radius: 0;
+    padding: 12px 16px;
     margin-bottom: 12px;
     border: 1px solid transparent;
+    border-left-width: 4px;
 }
 
 .alert-error {
@@ -454,7 +463,7 @@
 .field-error-message {
     margin-top: 6px;
     color: #b42318;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     line-height: 1.3;
 }
@@ -468,33 +477,55 @@
     margin-top: auto;
     background: var(--app-footer-bg);
     color: var(--app-footer-text);
-    padding: 28px 24px 30px;
+    padding: 20px 24px 22px;
 }
 
 .app-footer-grid {
     max-width: 1280px;
     margin: 0 auto;
     display: grid;
-    gap: 20px;
+    gap: 14px;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .app-footer h3 {
-    margin: 0 0 10px;
+    margin: 0 0 8px;
     color: var(--app-footer-title);
-    font-size: 15px;
+    font-size: 14px;
 }
 
-.app-footer a {
+.app-footer a,
+.app-footer span {
     display: block;
     color: var(--app-footer-text);
-    font-size: 13px;
-    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 1.35;
+    margin-bottom: 6px;
     text-decoration: none;
 }
 
 .app-footer a:hover {
     text-decoration: underline;
+}
+
+.app-footer a:last-child,
+.app-footer span:last-child {
+    margin-bottom: 0;
+}
+
+.app-footer-meta {
+    max-width: 1280px;
+    margin: 12px auto 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--app-footer-divider);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.app-footer-version {
+    font-size: 11px;
+    color: var(--app-footer-meta);
+    letter-spacing: 0.02em;
 }
 
 .docs-page {
@@ -614,7 +645,7 @@
 .docs-toc {
     background: var(--gov-color-surface);
     border: 1px solid var(--gov-color-border);
-    border-radius: 14px;
+    border-radius: 8px;
     padding: 14px;
 }
 
@@ -635,18 +666,18 @@
     font-size: 14px;
     color: var(--gov-color-primary);
     text-decoration: none;
-    border-radius: 10px;
+    border-radius: 4px;
     padding: 8px 10px;
     margin-bottom: 4px;
 }
 
 .docs-nav-link:hover {
-    background: #eef4ff;
+    background: var(--app-nav-hover);
 }
 
 .docs-nav-link.active {
-    background: #d9e7ff;
-    color: #0f3173;
+    background: #dfeaf5;
+    color: var(--gov-color-primary-strong);
     font-weight: 700;
 }
 
@@ -817,7 +848,7 @@
     border: 1px solid var(--gov-color-border);
     border-radius: var(--gov-radius);
     padding: 16px;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    box-shadow: none;
     margin-bottom: 14px;
 }
 
@@ -829,19 +860,19 @@
 
 .project-card {
     border: 1px solid var(--gov-color-border);
-    border-radius: 16px;
+    border-radius: 8px;
     padding: 18px;
-    background: rgba(255, 255, 255, 0.9);
-    box-shadow: var(--gov-shadow-soft);
+    background: var(--gov-color-surface);
+    box-shadow: none;
     display: grid;
     gap: 12px;
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .project-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
+    border-color: var(--gov-color-primary);
+    background: #fafafa;
 }
 
 .project-card:focus-visible,
@@ -918,12 +949,12 @@
 
 .btn {
     border: 1px solid var(--gov-color-border);
-    background: #fff;
-    color: #0f172a;
+    background: var(--gov-color-surface);
+    color: var(--app-text-primary);
     text-decoration: none;
-    padding: 9px 16px;
-    border-radius: 999px;
-    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 500;
     font-size: 14px;
     text-align: center;
     cursor: pointer;
@@ -940,6 +971,7 @@
 .btn:hover {
     border-color: var(--gov-color-primary);
     color: var(--gov-color-primary);
+    background: #fafafa;
 }
 
 .btn.primary {
@@ -950,11 +982,13 @@
 
 .btn.primary:hover {
     background: var(--gov-color-primary-strong);
+    border-color: var(--gov-color-primary-strong);
+    color: #fff;
 }
 
 .btn.ghost {
     background: transparent;
-    color: var(--gov-color-muted);
+    color: var(--gov-color-primary);
 }
 
 .btn.small {
@@ -971,7 +1005,7 @@
 .icon-btn {
     width: 34px;
     height: 34px;
-    border-radius: 999px;
+    border-radius: 6px;
     border: 1px solid var(--gov-color-border);
     background: #fff;
     color: var(--gov-color-muted);
@@ -1004,13 +1038,13 @@ input[type="search"],
 select,
 textarea {
     width: 100%;
-    border-radius: 10px;
-    border: 1px solid #ccd7ea;
-    background: #fff;
-    padding: 11px 12px;
-    font-size: 15px;
+    border-radius: 6px;
+    border: 1px solid var(--gov-color-border);
+    background: var(--gov-color-surface);
+    padding: 10px 12px;
+    font-size: 16px;
     line-height: 1.35;
-    color: #0f172a;
+    color: var(--app-text-primary);
 }
 
 select {
@@ -1031,8 +1065,8 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-    border-color: #3568be;
-    box-shadow: inset 0 0 0 1px rgba(53, 104, 190, 0.35);
+    border-color: var(--gov-color-primary);
+    box-shadow: inset 0 0 0 1px rgba(0, 94, 165, 0.25);
     outline: none;
 }
 
@@ -1088,13 +1122,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     position: absolute;
     top: calc(100% + 8px);
     left: 0;
-    width: 250px;
-    max-width: min(250px, calc(100vw - 32px));
+    width: var(--app-picker-panel-width);
+    max-width: min(var(--app-picker-panel-width), calc(100vw - 32px));
     z-index: 280;
-    background: #f6f6f6;
-    border: 2px solid #262626;
-    border-radius: 11px;
-    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.22);
+    background: var(--gov-color-surface);
+    border: 1px solid var(--gov-color-border);
+    border-radius: 8px;
+    box-shadow: var(--gov-shadow-soft);
     padding: 8px 9px 9px;
 }
 
@@ -1102,13 +1136,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     position: absolute;
     top: calc(100% + 8px);
     left: 0;
-    width: 350px;
-    max-width: min(350px, calc(100vw - 48px));
+    width: var(--app-picker-panel-width);
+    max-width: min(var(--app-picker-panel-width), calc(100vw - 32px));
     z-index: 90;
-    background: #f6f6f6;
-    border: 2px solid #262626;
-    border-radius: 14px;
-    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.25);
+    background: var(--gov-color-surface);
+    border: 1px solid var(--gov-color-border);
+    border-radius: 8px;
+    box-shadow: var(--gov-shadow-soft);
     padding: 10px 12px 12px;
 }
 
@@ -1124,24 +1158,24 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: 26px;
     height: 26px;
     border: none;
-    border-radius: 8px;
+    border-radius: 4px;
     background: transparent;
-    color: #23528f;
+    color: var(--gov-color-primary);
     font-size: 21px;
     line-height: 1;
     cursor: pointer;
 }
 
 .app-date-nav-btn:hover {
-    background: rgba(35, 82, 143, 0.12);
+    background: var(--app-nav-hover);
 }
 
 .app-date-select {
     min-height: 30px;
-    border: 1px solid #b7b7b7;
-    border-radius: 9px;
-    background-color: #f4f4f4;
-    color: #5a5a5a;
+    border: 1px solid var(--gov-color-border);
+    border-radius: 6px;
+    background-color: var(--gov-color-surface);
+    color: var(--app-text-primary);
     font-size: 11px;
     font-weight: 600;
     padding: 5px 22px 5px 9px;
@@ -1155,7 +1189,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .app-date-weekdays span {
     text-align: center;
-    color: #23528f;
+    color: var(--gov-color-primary);
     font-size: 12px;
     font-weight: 700;
 }
@@ -1173,7 +1207,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: none;
     border-radius: 999px;
     background: transparent;
-    color: #23528f;
+    color: var(--app-text-primary);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
@@ -1183,7 +1217,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .app-date-day:hover {
-    background: rgba(35, 82, 143, 0.12);
+    background: var(--app-nav-hover);
 }
 
 .app-date-day.outside {
@@ -1191,13 +1225,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .app-date-day.selected {
-    background: #9fc3ea;
-    color: #23528f;
+    background: var(--app-nav-active-bg);
+    color: var(--gov-color-primary);
 }
 
 .app-time-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
     max-height: 236px;
     overflow: auto;
@@ -1206,10 +1240,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .app-time-option {
     min-height: 38px;
-    border: 1px solid #b7c8e7;
-    border-radius: 10px;
-    background: #fff;
-    color: #23528f;
+    border: 1px solid var(--gov-color-border);
+    border-radius: 6px;
+    background: var(--gov-color-surface);
+    color: var(--app-text-primary);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -1217,13 +1251,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .app-time-option:hover {
-    background: rgba(35, 82, 143, 0.12);
+    background: var(--app-nav-hover);
 }
 
 .app-time-option.selected {
-    background: #9fc3ea;
-    border-color: #9fc3ea;
-    color: #23528f;
+    background: var(--app-nav-active-bg);
+    border-color: var(--app-nav-active-border);
+    color: var(--gov-color-primary);
 }
 
 .btn:focus-visible,
@@ -1239,8 +1273,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     padding: 4px 10px;
     border-radius: 999px;
-    background: #e0f2fe;
-    color: #0369a1;
+    background: #dfeaf5;
+    color: var(--gov-color-primary-strong);
     font-size: 12px;
     font-weight: 600;
 }
@@ -1250,10 +1284,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     padding: 4px 10px;
     border-radius: 999px;
-    background: #f1f5f9;
+    background: #ededed;
     font-size: 12px;
     font-weight: 600;
-    color: #0f172a;
+    color: var(--app-text-primary);
 }
 
 .pill.ghost {
@@ -1266,8 +1300,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 999px;
-    background: #fff7ed;
-    color: #c2410c;
+    background: #f9e1de;
+    color: #8a1c16;
     font-size: 12px;
     font-weight: 600;
 }
@@ -1301,17 +1335,18 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .tab {
     padding: 10px 16px;
-    border-radius: 999px;
+    border-radius: 6px 6px 0 0;
     border: 1px solid var(--gov-color-border);
-    background: #fff;
-    font-weight: 600;
+    background: var(--gov-color-surface);
+    font-weight: 500;
     cursor: pointer;
 }
 
 .tab.active {
-    background: var(--gov-color-primary);
-    color: #fff;
-    border-color: var(--gov-color-primary);
+    background: var(--gov-color-surface);
+    color: var(--gov-color-primary);
+    border-color: var(--gov-color-border);
+    box-shadow: inset 0 -3px 0 var(--gov-color-primary);
 }
 
 .tab-panel {
@@ -1333,17 +1368,18 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .record-modal-tab {
     padding: 8px 14px;
-    border-radius: 999px;
+    border-radius: 6px 6px 0 0;
     border: 1px solid var(--gov-color-border);
-    background: #fff;
-    font-weight: 600;
+    background: var(--gov-color-surface);
+    font-weight: 500;
     cursor: pointer;
 }
 
 .record-modal-tab.active {
-    background: var(--gov-color-primary);
-    color: #fff;
-    border-color: var(--gov-color-primary);
+    background: var(--gov-color-surface);
+    color: var(--gov-color-primary);
+    border-color: var(--gov-color-border);
+    box-shadow: inset 0 -3px 0 var(--gov-color-primary);
 }
 
 .record-modal-panel[hidden] {
@@ -1428,10 +1464,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .record-editor-close-guard-dialog {
     width: min(420px, 100%);
-    border-radius: 16px;
+    border-radius: 8px;
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+    box-shadow: var(--gov-shadow-soft);
     padding: 18px;
 }
 
@@ -1467,9 +1503,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .schedule-summary-grid {
     border: 1px solid var(--gov-color-border);
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 10px 12px;
-    background: #f8fafc;
+    background: #fafafa;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 6px 10px;
@@ -1486,9 +1522,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .schedule-mini-gantt {
     border: 1px solid var(--gov-color-border);
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 10px 12px;
-    background: #fff;
+    background: var(--gov-color-surface);
     display: grid;
     gap: 8px;
 }
@@ -2654,9 +2690,24 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     z-index: 1;
 }
 
+.modal-floating-root,
+.app-floating-root {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+}
+
+.modal-floating-root {
+    z-index: 2;
+}
+
+.app-floating-root {
+    z-index: 1900;
+}
+
 .modal {
     background: var(--gov-color-surface);
-    border-radius: 16px;
+    border-radius: 8px;
     padding: 12px 14px 16px;
     width: min(760px, 100%);
     max-width: 100%;
@@ -2693,7 +2744,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: 34px;
     height: 34px;
     border: 1px solid var(--gov-color-border);
-    border-radius: 999px;
+    border-radius: 6px;
     background: var(--gov-color-surface);
     color: var(--app-text-primary);
     font-size: 18px;
@@ -2757,12 +2808,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .external-row {
     border: 1px solid var(--gov-color-border);
-    border-radius: 14px;
+    border-radius: 8px;
     padding: 12px;
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    background: #f8fafc;
+    background: #fafafa;
 }
 
 .external-actions {
@@ -2774,15 +2825,15 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: grid;
     gap: 8px;
     border: 1px solid var(--gov-color-border);
-    border-radius: 12px;
-    background: #f8fafc;
+    border-radius: 8px;
+    background: #fafafa;
     padding: 10px;
 }
 
 .collab-options {
     border: 1px solid var(--gov-color-border);
-    border-radius: 10px;
-    background: #fff;
+    border-radius: 6px;
+    background: var(--gov-color-surface);
     max-height: 220px;
     overflow: auto;
 }
@@ -2839,10 +2890,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .office-search-panel {
-    border: 1px solid #ccd7ea;
-    border-radius: 10px;
-    background: #fff;
-    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
+    border: 1px solid var(--gov-color-border);
+    border-radius: 6px;
+    background: var(--gov-color-surface);
+    box-shadow: var(--gov-shadow-soft);
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
@@ -2850,6 +2901,26 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     z-index: 50;
     max-height: 292px;
     overflow: auto;
+}
+
+.floating-panel {
+    position: fixed;
+    pointer-events: auto;
+    margin: 0;
+}
+
+.floating-panel--match-anchor {
+    max-width: calc(100vw - 16px);
+}
+
+.floating-panel--person-search,
+.floating-panel--ad-search {
+    max-height: min(420px, calc(100vh - 24px));
+}
+
+.floating-panel--date,
+.floating-panel--time {
+    max-width: calc(100vw - 16px);
 }
 
 .modal.modal--overflow-visible .office-search-panel {
@@ -2863,8 +2934,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .office-search-item {
     border: none;
-    border-bottom: 1px solid #e7edf7;
-    background: #fff;
+    border-bottom: 1px solid #d8dbdd;
+    background: var(--gov-color-surface);
     color: inherit;
     text-align: left;
     padding: 10px 12px;
@@ -2879,7 +2950,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .office-search-item:hover,
 .office-search-item.active {
-    background: #edf3ff;
+    background: var(--app-nav-hover);
 }
 
 .office-search-item.disabled {
@@ -3063,10 +3134,63 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: none;
 }
 
+.active-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.active-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--gov-color-border);
+    border-radius: 999px;
+    background: #edf3fb;
+    color: var(--app-text-primary);
+    padding: 6px 8px 6px 10px;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.active-filter-chip-label {
+    font-weight: 600;
+}
+
+.active-filter-chip-remove {
+    border: none;
+    background: transparent;
+    color: var(--app-muted);
+    border-radius: 999px;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+}
+
+.active-filter-chip-remove:hover {
+    background: rgba(15, 23, 42, 0.08);
+    color: var(--app-text-primary);
+}
+
+.active-filter-chip-remove:focus-visible {
+    outline: 2px solid var(--gov-color-primary);
+    outline-offset: 2px;
+}
+
 .filter-grid {
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.filter-grid .gov-switch {
+    padding-top: 22px;
 }
 
 .filter-inline {
@@ -3081,6 +3205,31 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .filter-inline-wide {
     grid-column: 1 / -1;
     padding-top: 4px;
+}
+
+.filter-grid .gov-switch.filter-inline-wide {
+    padding-top: 4px;
+}
+
+.filter-actions {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--gov-color-border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.filter-save-status {
+    font-size: 13px;
+    color: var(--gov-color-muted);
+}
+
+.stack-lg {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
 .meeting-grid {
@@ -3534,6 +3683,20 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin: 0 0 10px;
 }
 
+.profile-preferences-card {
+    align-content: start;
+}
+
+.profile-preferences-card p {
+    margin: 0 0 10px;
+}
+
+.profile-preference-status {
+    min-height: 20px;
+    font-size: 13px;
+    color: var(--gov-color-muted);
+}
+
 .profile-rights-filters {
     display: grid;
     gap: 10px;
@@ -3552,18 +3715,20 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 :root[data-theme="dark"] .app-header {
-    border-bottom-color: #2b3a55;
+    border-bottom-color: var(--gov-color-border);
 }
 
 :root[data-theme="dark"] .app-topbar {
-    border-bottom-color: rgba(148, 163, 184, 0.2);
+    border-bottom-color: var(--gov-color-border);
 }
 
-:root[data-theme="dark"] .gov-theme-switch-track {
+:root[data-theme="dark"] .gov-theme-switch-track,
+:root[data-theme="dark"] .gov-switch-track {
     background: #2d3a53;
 }
 
-:root[data-theme="dark"] .gov-theme-switch-thumb {
+:root[data-theme="dark"] .gov-theme-switch-thumb,
+:root[data-theme="dark"] .gov-switch-thumb {
     background: #dce5ff;
 }
 
@@ -3589,47 +3754,47 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 :root[data-theme="dark"] .office-search-panel,
 :root[data-theme="dark"] .search-results,
 :root[data-theme="dark"] .result-item {
-    background: #16233a;
+    background: var(--gov-color-surface);
 }
 
 :root[data-theme="dark"] .project-card {
-    background: #16233a;
+    background: var(--gov-color-surface);
 }
 
 :root[data-theme="dark"] .btn {
-    background: #18263c;
-    border-color: #3b4d6d;
-    color: #e6eefc;
+    background: var(--gov-color-surface);
+    border-color: var(--gov-color-border);
+    color: var(--app-text-primary);
 }
 
 :root[data-theme="dark"] .btn:hover {
-    background: #223450;
-    border-color: #7ca6f2;
-    color: #f4f8ff;
+    background: var(--app-nav-hover);
+    border-color: var(--gov-color-primary);
+    color: var(--gov-color-primary);
 }
 
 :root[data-theme="dark"] .btn.primary {
-    background: #8bb3ff;
-    border-color: #8bb3ff;
-    color: #0f1b2e;
+    background: var(--gov-color-primary);
+    border-color: var(--gov-color-primary);
+    color: #0f1419;
 }
 
 :root[data-theme="dark"] .btn.primary:hover {
-    background: #a2c1ff;
-    border-color: #a2c1ff;
-    color: #0f1b2e;
+    background: var(--gov-color-primary-strong);
+    border-color: var(--gov-color-primary-strong);
+    color: #0f1419;
 }
 
 :root[data-theme="dark"] .btn.ghost {
     background: transparent;
-    border-color: #3b4d6d;
-    color: #d3e2fc;
+    border-color: var(--gov-color-border);
+    color: var(--gov-color-primary);
 }
 
 :root[data-theme="dark"] .btn.ghost:hover {
-    background: rgba(59, 93, 145, 0.22);
-    border-color: #7ca6f2;
-    color: #eef4ff;
+    background: var(--app-nav-hover);
+    border-color: var(--gov-color-primary);
+    color: var(--gov-color-primary);
 }
 
 :root[data-theme="dark"] input[type="text"],
@@ -3727,8 +3892,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 :root[data-theme="dark"] .docs-sidebar,
 :root[data-theme="dark"] .docs-content,
 :root[data-theme="dark"] .docs-toc {
-    background: #13213a;
-    border-color: #31415e;
+    background: var(--gov-color-surface);
+    border-color: var(--gov-color-border);
 }
 
 :root[data-theme="dark"] .docs-header p,
@@ -3741,12 +3906,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 :root[data-theme="dark"] .docs-nav-link:hover {
-    background: #1c2d4d;
+    background: var(--app-nav-hover);
 }
 
 :root[data-theme="dark"] .docs-nav-link.active {
-    background: #2b4675;
-    color: #d8e7ff;
+    background: rgba(156, 200, 255, 0.12);
+    color: var(--gov-color-primary);
 }
 
 :root[data-theme="dark"] .docs-content code {
@@ -3770,9 +3935,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 :root[data-theme="dark"] .print-format-popover {
-    background: #111b2d;
-    border-color: #31415e;
-    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.5);
+    background: var(--gov-color-surface);
+    border-color: var(--gov-color-border);
+    box-shadow: var(--gov-shadow-soft);
 }
 
 :root[data-theme="dark"] .print-format-subtitle,
@@ -3787,7 +3952,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 :root[data-theme="dark"] .collab-picker,
 :root[data-theme="dark"] .collab-options {
-    background: #16233a;
+    background: var(--gov-color-surface);
 }
 
 :root[data-theme="dark"] .collab-option-email {
@@ -3795,17 +3960,17 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 :root[data-theme="dark"] .office-search-panel {
-    border-color: #2f4264;
-    box-shadow: 0 14px 30px rgba(2, 6, 23, 0.48);
+    border-color: var(--gov-color-border);
+    box-shadow: var(--gov-shadow-soft);
 }
 
 :root[data-theme="dark"] .office-search-item {
-    border-bottom-color: #2f4264;
+    border-bottom-color: var(--gov-color-border);
 }
 
 :root[data-theme="dark"] .office-search-item:hover,
 :root[data-theme="dark"] .office-search-item.active {
-    background: #22365a;
+    background: var(--app-nav-hover);
 }
 
 :root[data-theme="dark"] .office-search-secondary {
@@ -3867,21 +4032,21 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 :root[data-theme="dark"] .app-date-panel {
-    background: #101a2b;
-    border-color: #2f4264;
-    box-shadow: 0 14px 30px rgba(2, 6, 23, 0.52);
+    background: var(--gov-color-surface);
+    border-color: var(--gov-color-border);
+    box-shadow: var(--gov-shadow-soft);
 }
 
 :root[data-theme="dark"] .app-time-panel {
-    background: #101a2b;
-    border-color: #2f4264;
-    box-shadow: 0 14px 30px rgba(2, 6, 23, 0.52);
+    background: var(--gov-color-surface);
+    border-color: var(--gov-color-border);
+    box-shadow: var(--gov-shadow-soft);
 }
 
 :root[data-theme="dark"] .app-date-select {
-    border-color: #31415e;
-    background-color: #16233a;
-    color: #d5e3fb;
+    border-color: var(--gov-color-border);
+    background-color: var(--gov-color-surface);
+    color: var(--app-text-primary);
 }
 
 :root[data-theme="dark"] .app-date-nav-btn,
@@ -3899,24 +4064,24 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 :root[data-theme="dark"] .app-date-day.selected {
-    background: #274d82;
-    color: #dbeafe;
+    background: rgba(156, 200, 255, 0.18);
+    color: var(--gov-color-primary);
 }
 
 :root[data-theme="dark"] .app-time-option {
-    background: #16233a;
-    border-color: #31415e;
-    color: #9dc4ff;
+    background: var(--gov-color-surface);
+    border-color: var(--gov-color-border);
+    color: var(--app-text-primary);
 }
 
 :root[data-theme="dark"] .app-time-option:hover {
-    background: rgba(120, 170, 255, 0.16);
+    background: var(--app-nav-hover);
 }
 
 :root[data-theme="dark"] .app-time-option.selected {
-    background: #274d82;
-    border-color: #274d82;
-    color: #dbeafe;
+    background: rgba(156, 200, 255, 0.18);
+    border-color: var(--gov-color-primary);
+    color: var(--gov-color-primary);
 }
 
 :root[data-theme="dark"] .filter-shell {
@@ -3928,6 +4093,30 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 :root[data-theme="dark"] .filter-grid label,
 :root[data-theme="dark"] .filter-inline {
     color: #d9e5fb;
+}
+
+:root[data-theme="dark"] .active-filter-chip {
+    background: #223552;
+    border-color: #35507a;
+    color: #e6eefc;
+}
+
+:root[data-theme="dark"] .active-filter-chip-remove {
+    color: #b8caea;
+}
+
+:root[data-theme="dark"] .active-filter-chip-remove:hover {
+    background: rgba(230, 238, 252, 0.08);
+    color: #f8fbff;
+}
+
+:root[data-theme="dark"] .filter-actions {
+    border-top-color: #2f4264;
+}
+
+:root[data-theme="dark"] .filter-save-status,
+:root[data-theme="dark"] .profile-preference-status {
+    color: #c7d7f3;
 }
 
 :root[data-theme="dark"] input[type="checkbox"] {
@@ -4067,7 +4256,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     }
 
     .app-footer-grid {
-        gap: 14px;
+        gap: 10px;
     }
 }
 html {

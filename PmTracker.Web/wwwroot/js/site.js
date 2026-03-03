@@ -19,7 +19,72 @@
         closeGuard: null,
         closeGuardTrigger: null
     };
+    const floatingPanelRegistry = new Set();
     let rainbowMeasureCanvas = null;
+    let globalFloatingRoot = null;
+    const projectFilterStoragePrefix = "pmtracker.projectFilters.v1.project.";
+    const legacyProjectFilterPrefixes = [
+        "pmtracker.filter.",
+        "pmtracker.schedule.filter.",
+        "pmtracker.gantt.filter."
+    ];
+    const legacyProjectFilterKeys = [
+        "pmtracker.records.view"
+    ];
+    const projectFilterConfigs = {
+        records: {
+            rootSelector: '[data-project-filter-scope="records"]',
+            inputSelector: "[data-filter-key]",
+            keyAttribute: "data-filter-key",
+            chipRowSelector: '[data-filter-chip-row="records"]',
+            statusSelector: '[data-filter-save-status="records"]',
+            fields: [
+                { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+                { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
+                { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
+                { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
+                { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
+                { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní" },
+                { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé záznamy" },
+                { inputKey: "jednani-vyjadreni-stav", stateKey: "jednaniVyjadreniStav", type: "select", chipLabel: "Jednání-vyjádření" },
+                { inputKey: "groupBySubsystem", stateKey: "groupBySubsystem", type: "checkbox", skipChip: true }
+            ]
+        },
+        schedule: {
+            rootSelector: '[data-project-filter-scope="schedule"]',
+            inputSelector: "[data-schedule-filter-key]",
+            keyAttribute: "data-schedule-filter-key",
+            chipRowSelector: '[data-filter-chip-row="schedule"]',
+            statusSelector: '[data-filter-save-status="schedule"]',
+            fields: [
+                { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+                { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
+                { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
+                { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
+                { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
+                { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní" },
+                { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé úkoly" },
+                { inputKey: "stihani", stateKey: "stihani", type: "select", chipLabel: "Stav harmonogramu" }
+            ]
+        },
+        gantt: {
+            rootSelector: '[data-project-filter-scope="gantt"]',
+            inputSelector: "[data-gantt-filter-key]",
+            keyAttribute: "data-gantt-filter-key",
+            chipRowSelector: '[data-filter-chip-row="gantt"]',
+            statusSelector: '[data-filter-save-status="gantt"]',
+            fields: [
+                { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+                { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
+                { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
+                { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
+                { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
+                { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní" },
+                { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé úkoly" },
+                { inputKey: "stihani", stateKey: "stihani", type: "select", chipLabel: "Stav harmonogramu" }
+            ]
+        }
+    };
     const modalFocusableSelector = [
         "a[href]",
         "button:not([disabled])",
@@ -843,6 +908,7 @@
         if (!modalRoot) {
             return;
         }
+        closeAllFloatingPanels();
         modalRoot.innerHTML = "";
         modalRoot.appendChild(content);
         modalRoot.style.pointerEvents = "auto";
@@ -862,6 +928,7 @@
         }
 
         const focusTarget = modalState.lastTrigger;
+        closeAllFloatingPanels();
         modalRoot.innerHTML = "";
         modalRoot.style.pointerEvents = "none";
         modalRoot.setAttribute("aria-hidden", "true");
@@ -923,6 +990,365 @@
         }
     }
 
+    function getProjectFilterConfig(scope) {
+        return projectFilterConfigs[scope] || null;
+    }
+
+    function getProjectFilterRoot(scope) {
+        const config = getProjectFilterConfig(scope);
+        if (!config) {
+            return null;
+        }
+
+        const root = document.querySelector(config.rootSelector);
+        return root instanceof HTMLElement ? root : null;
+    }
+
+    function getProjectFilterInput(scope, inputKey) {
+        const config = getProjectFilterConfig(scope);
+        const root = getProjectFilterRoot(scope);
+        if (!config || !(root instanceof HTMLElement)) {
+            return null;
+        }
+
+        const input = root.querySelector(`${config.inputSelector}[${config.keyAttribute}="${inputKey}"]`);
+        return input instanceof HTMLInputElement || input instanceof HTMLSelectElement ? input : null;
+    }
+
+    function getProjectFilterProjectId(scope) {
+        const root = getProjectFilterRoot(scope);
+        const projectId = (root?.dataset.projectId || "").trim();
+        return projectId || "0";
+    }
+
+    function getProjectFilterCurrentUserId(scope) {
+        return normalizeFilterToken(getProjectFilterRoot(scope)?.dataset.currentUserId || "");
+    }
+
+    function getProjectFilterStorageKey(scope, kind) {
+        const projectId = getProjectFilterProjectId(scope);
+        if (!projectId || projectId === "0") {
+            return "";
+        }
+
+        return `${projectFilterStoragePrefix}${projectId}.${scope}.${kind}`;
+    }
+
+    function readJsonStorage(storage, key) {
+        if (!key) {
+            return null;
+        }
+
+        try {
+            const raw = storage.getItem(key);
+            if (!raw) {
+                return null;
+            }
+
+            const parsed = JSON.parse(raw);
+            return parsed && typeof parsed === "object" ? parsed : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function writeJsonStorage(storage, key, value) {
+        if (!key) {
+            return;
+        }
+
+        storage.setItem(key, JSON.stringify(value));
+    }
+
+    function hasSelectOptionValue(input, value) {
+        if (!(input instanceof HTMLSelectElement)) {
+            return false;
+        }
+
+        return Array.from(input.options).some((option) => option.value === value);
+    }
+
+    function readProjectFilterInputValue(input, field) {
+        if (input instanceof HTMLInputElement && field.type === "checkbox") {
+            return input.checked;
+        }
+
+        if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+            return input.value;
+        }
+
+        return field.type === "checkbox" ? false : "";
+    }
+
+    function normalizeProjectFilterState(scope, rawState, fallbackState) {
+        const config = getProjectFilterConfig(scope);
+        if (!config) {
+            return {};
+        }
+
+        const normalized = {};
+        const source = rawState && typeof rawState === "object" ? rawState : {};
+        const fallback = fallbackState && typeof fallbackState === "object" ? fallbackState : {};
+
+        config.fields.forEach((field) => {
+            const input = getProjectFilterInput(scope, field.inputKey);
+            const fallbackValue = fallback[field.stateKey];
+            const sourceValue = source[field.stateKey];
+
+            if (field.type === "checkbox") {
+                if (typeof sourceValue === "boolean") {
+                    normalized[field.stateKey] = sourceValue;
+                    return;
+                }
+
+                if (sourceValue === "true" || sourceValue === "false") {
+                    normalized[field.stateKey] = sourceValue === "true";
+                    return;
+                }
+
+                normalized[field.stateKey] = Boolean(fallbackValue);
+                return;
+            }
+
+            const fallbackText = typeof fallbackValue === "string" ? fallbackValue : "";
+            const candidate = typeof sourceValue === "string" ? sourceValue : fallbackText;
+
+            if (candidate && input instanceof HTMLSelectElement && !hasSelectOptionValue(input, candidate)) {
+                normalized[field.stateKey] = fallbackText && hasSelectOptionValue(input, fallbackText)
+                    ? fallbackText
+                    : "";
+                return;
+            }
+
+            normalized[field.stateKey] = candidate;
+        });
+
+        return normalized;
+    }
+
+    function buildProjectFilterStateFromInputs(scope) {
+        const config = getProjectFilterConfig(scope);
+        if (!config) {
+            return {};
+        }
+
+        const state = {};
+        config.fields.forEach((field) => {
+            const input = getProjectFilterInput(scope, field.inputKey);
+            state[field.stateKey] = readProjectFilterInputValue(input, field);
+        });
+
+        return state;
+    }
+
+    function applyProjectFilterStateToInputs(scope, state) {
+        const config = getProjectFilterConfig(scope);
+        if (!config) {
+            return;
+        }
+
+        config.fields.forEach((field) => {
+            const input = getProjectFilterInput(scope, field.inputKey);
+            if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            const value = state[field.stateKey];
+            if (field.type === "checkbox" && input instanceof HTMLInputElement) {
+                input.checked = Boolean(value);
+                return;
+            }
+
+            input.value = typeof value === "string" ? value : "";
+        });
+    }
+
+    function readStoredProjectFilterState(scope, kind, fallbackState) {
+        const storage = kind === "state" ? sessionStorage : localStorage;
+        const key = getProjectFilterStorageKey(scope, kind);
+        const rawState = readJsonStorage(storage, key);
+        if (!rawState) {
+            return null;
+        }
+
+        return normalizeProjectFilterState(scope, rawState, fallbackState);
+    }
+
+    function persistProjectFilterSessionState(scope) {
+        const currentState = buildProjectFilterStateFromInputs(scope);
+        const normalizedState = normalizeProjectFilterState(scope, currentState, currentState);
+        const key = getProjectFilterStorageKey(scope, "state");
+        writeJsonStorage(sessionStorage, key, normalizedState);
+        return normalizedState;
+    }
+
+    function setProjectFilterSaveStatus(scope, message) {
+        const config = getProjectFilterConfig(scope);
+        const root = getProjectFilterRoot(scope);
+        if (!config || !(root instanceof HTMLElement)) {
+            return;
+        }
+
+        const status = root.querySelector(config.statusSelector);
+        if (status instanceof HTMLElement) {
+            status.textContent = message || "";
+        }
+    }
+
+    function buildProjectFilterChipLabel(field, input) {
+        if (field.type === "checkbox") {
+            return field.chipLabel || "";
+        }
+
+        if (!(input instanceof HTMLSelectElement)) {
+            return "";
+        }
+
+        const option = input.selectedOptions[0];
+        const optionText = option?.textContent?.trim() || "";
+        if (!optionText) {
+            return "";
+        }
+
+        return `${field.chipLabel}: ${optionText}`;
+    }
+
+    function renderProjectFilterChips(scope) {
+        const config = getProjectFilterConfig(scope);
+        const root = getProjectFilterRoot(scope);
+        if (!config || !(root instanceof HTMLElement)) {
+            return;
+        }
+
+        const chipRow = root.querySelector(config.chipRowSelector);
+        if (!(chipRow instanceof HTMLElement)) {
+            return;
+        }
+
+        chipRow.innerHTML = "";
+        const state = buildProjectFilterStateFromInputs(scope);
+        const chips = [];
+
+        config.fields.forEach((field) => {
+            if (field.skipChip) {
+                return;
+            }
+
+            const value = state[field.stateKey];
+            const isActive = field.type === "checkbox" ? Boolean(value) : Boolean(value);
+            if (!isActive) {
+                return;
+            }
+
+            const input = getProjectFilterInput(scope, field.inputKey);
+            const label = buildProjectFilterChipLabel(field, input);
+            if (!label) {
+                return;
+            }
+
+            const chip = document.createElement("span");
+            chip.className = "active-filter-chip";
+
+            const text = document.createElement("span");
+            text.className = "active-filter-chip-label";
+            text.textContent = label;
+
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.className = "active-filter-chip-remove";
+            remove.setAttribute("data-filter-chip-remove", scope);
+            remove.setAttribute("data-filter-chip-key", field.inputKey);
+            remove.setAttribute("aria-label", `Odebrat filtr ${label}`);
+            remove.textContent = "×";
+
+            chip.append(text, remove);
+            chips.push(chip);
+        });
+
+        chipRow.hidden = chips.length === 0;
+        chips.forEach((chip) => chipRow.appendChild(chip));
+    }
+
+    function applyProjectFilterScope(scope) {
+        if (scope === "records") {
+            const state = buildProjectFilterStateFromInputs(scope);
+            applyRecordsView(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
+            return;
+        }
+
+        if (scope === "schedule") {
+            applyProjectScheduleFilters();
+            return;
+        }
+
+        if (scope === "gantt") {
+            applyProjectGanttFilters();
+        }
+    }
+
+    function handleProjectFilterInputChange(scope) {
+        persistProjectFilterSessionState(scope);
+        renderProjectFilterChips(scope);
+        setProjectFilterSaveStatus(scope, "");
+        applyProjectFilterScope(scope);
+    }
+
+    function restoreProjectFilterScope(scope) {
+        const fallbackState = buildProjectFilterStateFromInputs(scope);
+        const restoredState = readStoredProjectFilterState(scope, "state", fallbackState)
+            || readStoredProjectFilterState(scope, "defaults", fallbackState)
+            || fallbackState;
+
+        applyProjectFilterStateToInputs(scope, restoredState);
+        persistProjectFilterSessionState(scope);
+        renderProjectFilterChips(scope);
+        return restoredState;
+    }
+
+    function saveProjectFilterDefaults(scope) {
+        const state = persistProjectFilterSessionState(scope);
+        const key = getProjectFilterStorageKey(scope, "defaults");
+        writeJsonStorage(localStorage, key, state);
+        setProjectFilterSaveStatus(scope, "Výchozí filtry uloženy v tomto prohlížeči.");
+    }
+
+    function clearProjectFilterInput(scope, inputKey) {
+        const input = getProjectFilterInput(scope, inputKey);
+        if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+            return;
+        }
+
+        if (input instanceof HTMLInputElement && input.type === "checkbox") {
+            input.checked = false;
+        } else {
+            input.value = "";
+        }
+    }
+
+    function removeMatchingStorageKeys(storage, predicate) {
+        const keys = [];
+        for (let i = 0; i < storage.length; i += 1) {
+            const key = storage.key(i);
+            if (key && predicate(key)) {
+                keys.push(key);
+            }
+        }
+
+        keys.forEach((key) => storage.removeItem(key));
+    }
+
+    function clearProjectFilterPreferenceStorage() {
+        removeMatchingStorageKeys(localStorage, (key) =>
+            key.startsWith(projectFilterStoragePrefix)
+            || legacyProjectFilterKeys.includes(key)
+            || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix)));
+
+        removeMatchingStorageKeys(sessionStorage, (key) =>
+            key.startsWith(projectFilterStoragePrefix)
+            || legacyProjectFilterKeys.includes(key)
+            || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix)));
+    }
+
     function setFilterPanelOpen(open) {
         const filterPanel = document.querySelector("[data-filter-panel]");
         const filterToggle = document.querySelector("[data-filter-toggle]");
@@ -946,54 +1372,16 @@
             const mode = shell.getAttribute("data-records-view");
             shell.toggleAttribute("hidden", mode !== view);
         });
-        const toggle = document.querySelector("[data-view-toggle]");
-        if (toggle instanceof HTMLInputElement) {
-            toggle.checked = view === "subsystem";
-        }
-        localStorage.setItem("pmtracker.records.view", view);
         applyProjectRecordFilters();
         scheduleSubsystemIndicatorSync();
     }
 
     function restoreFilterState() {
-        document.querySelectorAll("[data-filter-key]").forEach((input) => {
-            if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
-                return;
-            }
-            const key = input.getAttribute("data-filter-key");
-            if (!key) {
-                return;
-            }
-            const stored = localStorage.getItem(`pmtracker.filter.${key}`);
-            if (stored === null) {
-                return;
-            }
-            if (input instanceof HTMLInputElement && input.type === "checkbox") {
-                input.checked = stored === "true";
-            } else if (input instanceof HTMLSelectElement) {
-                const hasStoredOption = Array.from(input.options).some((option) => option.value === stored);
-                if (!hasStoredOption) {
-                    input.value = "";
-                    localStorage.removeItem(`pmtracker.filter.${key}`);
-                    return;
-                }
-                input.value = stored;
-            } else {
-                input.value = stored;
-            }
-        });
+        return restoreProjectFilterScope("records");
     }
 
     function persistFilterState(input) {
-        const key = input.getAttribute("data-filter-key");
-        if (!key) {
-            return;
-        }
-        if (input instanceof HTMLInputElement && input.type === "checkbox") {
-            localStorage.setItem(`pmtracker.filter.${key}`, String(input.checked));
-        } else {
-            localStorage.setItem(`pmtracker.filter.${key}`, input.value);
-        }
+        handleProjectFilterInputChange("records");
     }
 
     function normalizeFilterText(value) {
@@ -1207,7 +1595,7 @@
     }
 
     function getFilterValue(key) {
-        const input = document.querySelector(`[data-filter-key="${key}"]`);
+        const input = getProjectFilterInput("records", key);
         if (input instanceof HTMLInputElement && input.type === "checkbox") {
             return input.checked;
         }
@@ -1232,14 +1620,18 @@
             return;
         }
 
+        const state = buildProjectFilterStateFromInputs("records");
+        const currentUserId = getProjectFilterCurrentUserId("records");
+        const hasCurrentUser = currentUserId && currentUserId !== "0";
         const filters = {
-            subsystem: normalizeFilterToken(getFilterValue("subsystem")),
-            kategorie: normalizeFilterToken(getFilterValue("kategorie")),
-            stav: normalizeFilterToken(getFilterValue("stav")),
-            typ: normalizeFilterToken(getFilterValue("typ")),
-            vlastnik: normalizeFilterToken(getFilterValue("vlastnik")),
-            onlyActive: Boolean(getFilterValue("aktivni")),
-            meetingCommentState: normalizeFilterToken(getFilterValue("jednani-vyjadreni-stav"))
+            subsystem: normalizeFilterToken(state.subsystem),
+            kategorie: normalizeFilterToken(state.kategorie),
+            stav: normalizeFilterToken(state.stav),
+            typ: normalizeFilterToken(state.typ),
+            vlastnik: normalizeFilterToken(state.vlastnik),
+            onlyActive: Boolean(state.aktivni),
+            mine: Boolean(state.mine),
+            meetingCommentState: normalizeFilterToken(state.jednaniVyjadreniStav)
         };
 
         cards.forEach((item) => {
@@ -1260,6 +1652,7 @@
                 .filter(Boolean);
             const matchesMeetingCommentState = !filters.meetingCommentState
                 || (isTask && commentMeetingStates.includes(filters.meetingCommentState));
+            const matchesMine = !filters.mine || (hasCurrentUser && vlastnik === currentUserId);
 
             const matches =
                 (!filters.subsystem || subsystem === filters.subsystem) &&
@@ -1268,6 +1661,7 @@
                 (!filters.typ || typ === filters.typ) &&
                 (!filters.vlastnik || vlastnik === filters.vlastnik) &&
                 (!filters.onlyActive || isActive) &&
+                matchesMine &&
                 matchesMeetingCommentState;
 
             setRecordFilterVisibility(item, matches);
@@ -1410,7 +1804,7 @@
     }
 
     function getScheduleFilterValue(key) {
-        const input = document.querySelector(`[data-schedule-filter-key="${key}"]`);
+        const input = getProjectFilterInput("schedule", key);
         if (input instanceof HTMLInputElement && input.type === "checkbox") {
             return input.checked;
         }
@@ -1421,37 +1815,11 @@
     }
 
     function restoreScheduleFilterState() {
-        document.querySelectorAll("[data-schedule-filter-key]").forEach((input) => {
-            if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
-                return;
-            }
-            const key = input.getAttribute("data-schedule-filter-key");
-            if (!key) {
-                return;
-            }
-            const stored = localStorage.getItem(`pmtracker.schedule.filter.${key}`);
-            if (stored === null) {
-                return;
-            }
-            if (input instanceof HTMLInputElement && input.type === "checkbox") {
-                input.checked = stored === "true";
-            } else {
-                input.value = stored;
-            }
-        });
+        return restoreProjectFilterScope("schedule");
     }
 
     function persistScheduleFilterState(input) {
-        const key = input.getAttribute("data-schedule-filter-key");
-        if (!key) {
-            return;
-        }
-
-        if (input instanceof HTMLInputElement && input.type === "checkbox") {
-            localStorage.setItem(`pmtracker.schedule.filter.${key}`, String(input.checked));
-        } else {
-            localStorage.setItem(`pmtracker.schedule.filter.${key}`, input.value);
-        }
+        handleProjectFilterInputChange("schedule");
     }
 
     function applyProjectScheduleFilters() {
@@ -1460,14 +1828,18 @@
             return;
         }
 
+        const state = buildProjectFilterStateFromInputs("schedule");
+        const currentUserId = getProjectFilterCurrentUserId("schedule");
+        const hasCurrentUser = currentUserId && currentUserId !== "0";
         const filters = {
-            subsystem: normalizeFilterToken(getScheduleFilterValue("subsystem")),
-            kategorie: normalizeFilterToken(getScheduleFilterValue("kategorie")),
-            stav: normalizeFilterToken(getScheduleFilterValue("stav")),
-            typ: normalizeFilterToken(getScheduleFilterValue("typ")),
-            vlastnik: normalizeFilterToken(getScheduleFilterValue("vlastnik")),
-            onlyActive: Boolean(getScheduleFilterValue("aktivni")),
-            stihani: normalizeFilterToken(getScheduleFilterValue("stihani"))
+            subsystem: normalizeFilterToken(state.subsystem),
+            kategorie: normalizeFilterToken(state.kategorie),
+            stav: normalizeFilterToken(state.stav),
+            typ: normalizeFilterToken(state.typ),
+            vlastnik: normalizeFilterToken(state.vlastnik),
+            onlyActive: Boolean(state.aktivni),
+            mine: Boolean(state.mine),
+            stihani: normalizeFilterToken(state.stihani)
         };
 
         cards.forEach((item) => {
@@ -1482,6 +1854,7 @@
             const vlastnik = normalizeFilterToken(item.dataset.scheduleFilterVlastnikId || item.dataset.scheduleFilterVlastnik);
             const isActive = item.dataset.scheduleFilterAktivni === "true";
             const stihani = normalizeFilterToken(item.dataset.scheduleFilterStihani);
+            const matchesMine = !filters.mine || (hasCurrentUser && vlastnik === currentUserId);
 
             const matches =
                 (!filters.subsystem || subsystem === filters.subsystem) &&
@@ -1490,6 +1863,7 @@
                 (!filters.typ || typ === filters.typ) &&
                 (!filters.vlastnik || vlastnik === filters.vlastnik) &&
                 (!filters.onlyActive || isActive) &&
+                matchesMine &&
                 (!filters.stihani || stihani === filters.stihani);
 
             setRecordFilterVisibility(item, matches);
@@ -1516,7 +1890,7 @@
     }
 
     function getGanttFilterValue(key) {
-        const input = document.querySelector(`[data-gantt-filter-key="${key}"]`);
+        const input = getProjectFilterInput("gantt", key);
         if (input instanceof HTMLInputElement && input.type === "checkbox") {
             return input.checked;
         }
@@ -1527,37 +1901,11 @@
     }
 
     function restoreGanttFilterState() {
-        document.querySelectorAll("[data-gantt-filter-key]").forEach((input) => {
-            if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
-                return;
-            }
-            const key = input.getAttribute("data-gantt-filter-key");
-            if (!key) {
-                return;
-            }
-            const stored = localStorage.getItem(`pmtracker.gantt.filter.${key}`);
-            if (stored === null) {
-                return;
-            }
-            if (input instanceof HTMLInputElement && input.type === "checkbox") {
-                input.checked = stored === "true";
-            } else {
-                input.value = stored;
-            }
-        });
+        return restoreProjectFilterScope("gantt");
     }
 
     function persistGanttFilterState(input) {
-        const key = input.getAttribute("data-gantt-filter-key");
-        if (!key) {
-            return;
-        }
-
-        if (input instanceof HTMLInputElement && input.type === "checkbox") {
-            localStorage.setItem(`pmtracker.gantt.filter.${key}`, String(input.checked));
-        } else {
-            localStorage.setItem(`pmtracker.gantt.filter.${key}`, input.value);
-        }
+        handleProjectFilterInputChange("gantt");
     }
 
     class ProjectGanttBoard {
@@ -1601,6 +1949,8 @@
         }
 
         getFilters() {
+            const currentUserId = getProjectFilterCurrentUserId("gantt");
+            const hasCurrentUser = currentUserId && currentUserId !== "0";
             return {
                 subsystem: normalizeFilterToken(getGanttFilterValue("subsystem")),
                 kategorie: normalizeFilterToken(getGanttFilterValue("kategorie")),
@@ -1608,6 +1958,9 @@
                 typ: normalizeFilterToken(getGanttFilterValue("typ")),
                 vlastnik: normalizeFilterToken(getGanttFilterValue("vlastnik")),
                 onlyActive: Boolean(getGanttFilterValue("aktivni")),
+                mine: Boolean(getGanttFilterValue("mine")),
+                currentUserId,
+                hasCurrentUser,
                 stihani: normalizeFilterToken(getGanttFilterValue("stihani"))
             };
         }
@@ -1624,6 +1977,7 @@
             const vlastnik = normalizeFilterToken(node.dataset.ganttFilterVlastnikId || node.dataset.ganttFilterVlastnik);
             const isActive = node.dataset.ganttFilterAktivni === "true";
             const stihani = normalizeFilterToken(node.dataset.ganttFilterStihani);
+            const matchesMine = !filters.mine || (filters.hasCurrentUser && vlastnik === filters.currentUserId);
 
             return (!filters.subsystem || subsystem === filters.subsystem)
                 && (!filters.kategorie || kategorie === filters.kategorie)
@@ -1631,6 +1985,7 @@
                 && (!filters.typ || typ === filters.typ)
                 && (!filters.vlastnik || vlastnik === filters.vlastnik)
                 && (!filters.onlyActive || isActive)
+                && matchesMine
                 && (!filters.stihani || stihani === filters.stihani);
         }
 
@@ -1739,6 +2094,14 @@
         }
     }
 
+    function applyProjectGanttFilters() {
+        const panel = document.querySelector("[data-gantt-panel]");
+        if (!(panel instanceof HTMLElement) || !(panel._ganttBoard instanceof ProjectGanttBoard)) {
+            return;
+        }
+        panel._ganttBoard.apply();
+    }
+
     function updateProjectGanttAxis(panel) {
         if (!(panel instanceof HTMLElement)) {
             return;
@@ -1775,14 +2138,6 @@
         renderTimelineAxis(axis, ordered[0], ordered[ordered.length - 1]);
     }
 
-    function applyProjectGanttFilters() {
-        const panel = document.querySelector("[data-gantt-panel]");
-        if (!(panel instanceof HTMLElement) || !(panel._ganttBoard instanceof ProjectGanttBoard)) {
-            return;
-        }
-        panel._ganttBoard.apply();
-    }
-
     function initProjectScheduleUi() {
         const schedulePanel = document.querySelector('[data-tab-panel="harmonogram"]');
         if (!(schedulePanel instanceof HTMLElement)) {
@@ -1796,6 +2151,7 @@
         }
 
         restoreScheduleFilterState();
+        setProjectFilterSaveStatus("schedule", "");
         applyProjectScheduleFilters();
         renderStaticTimelineAxes(schedulePanel);
         queueRainbowSegmentRender(schedulePanel);
@@ -1814,6 +2170,7 @@
         }
 
         restoreGanttFilterState();
+        setProjectFilterSaveStatus("gantt", "");
         if (!(panel._ganttBoard instanceof ProjectGanttBoard)) {
             const board = new ProjectGanttBoard(panel);
             board.bind();
@@ -2738,6 +3095,289 @@
             && a.getDate() === b.getDate();
     }
 
+    function getGlobalFloatingLayerRoot() {
+        if (globalFloatingRoot instanceof HTMLElement && globalFloatingRoot.isConnected) {
+            return globalFloatingRoot;
+        }
+
+        const root = document.createElement("div");
+        root.className = "app-floating-root";
+        root.setAttribute("data-app-floating-root", "true");
+        root.setAttribute("aria-hidden", "true");
+        document.body.appendChild(root);
+        globalFloatingRoot = root;
+        return root;
+    }
+
+    function getFloatingLayerRoot(container) {
+        const overlay = container instanceof Element
+            ? container.closest(".modal-overlay")
+            : null;
+
+        if (overlay instanceof HTMLElement) {
+            const modalRoot = overlay.querySelector("[data-modal-floating-root]");
+            if (modalRoot instanceof HTMLElement) {
+                return modalRoot;
+            }
+        }
+
+        return getGlobalFloatingLayerRoot();
+    }
+
+    function getFloatingPanelAnchor(panel) {
+        if (!(panel instanceof HTMLElement)) {
+            return null;
+        }
+
+        const storedAnchor = panel._pmtrackerFloatingAnchor;
+        if (storedAnchor instanceof HTMLElement && storedAnchor.isConnected) {
+            return storedAnchor;
+        }
+
+        const fallbackAnchor = panel.closest("[data-floating-anchor]");
+        return fallbackAnchor instanceof HTMLElement ? fallbackAnchor : null;
+    }
+
+    function applyFloatingPanelKind(panel, kind) {
+        if (!(panel instanceof HTMLElement)) {
+            return;
+        }
+
+        panel.classList.remove(
+            "floating-panel--person-search",
+            "floating-panel--ad-search",
+            "floating-panel--date",
+            "floating-panel--time");
+
+        switch (kind) {
+            case "person-search":
+                panel.classList.add("floating-panel--person-search");
+                break;
+            case "ad-search":
+                panel.classList.add("floating-panel--ad-search");
+                break;
+            case "date":
+                panel.classList.add("floating-panel--date");
+                break;
+            case "time":
+                panel.classList.add("floating-panel--time");
+                break;
+            default:
+                break;
+        }
+    }
+
+    function mountFloatingPanel(panel, anchor, options = {}) {
+        if (!(panel instanceof HTMLElement) || !(anchor instanceof HTMLElement)) {
+            return;
+        }
+
+        const root = getFloatingLayerRoot(anchor);
+        const existingMount = panel._pmtrackerFloatingMount;
+        const kind = options.kind
+            || panel.dataset.floatingKind
+            || "";
+        const matchWidth = options.matchWidth === true
+            || panel.dataset.floatingMatchWidth === "true";
+
+        if (!existingMount) {
+            const placeholder = document.createElement("span");
+            placeholder.hidden = true;
+            placeholder.style.display = "none";
+            panel.parentNode?.insertBefore(placeholder, panel);
+
+            panel._pmtrackerFloatingMount = {
+                placeholder,
+                originParent: panel.parentElement
+            };
+        }
+
+        if (panel.parentElement !== root) {
+            root.appendChild(panel);
+        }
+
+        panel._pmtrackerFloatingAnchor = anchor;
+        panel._pmtrackerFloatingOptions = {
+            gap: Number.isFinite(options.gap) ? options.gap : 8,
+            flipVertical: options.flipVertical !== false,
+            kind,
+            matchWidth
+        };
+
+        panel.classList.add("floating-panel");
+        panel.classList.toggle("floating-panel--match-anchor", matchWidth);
+        applyFloatingPanelKind(panel, kind);
+        floatingPanelRegistry.add(panel);
+        positionFloatingPanel(panel, anchor, panel._pmtrackerFloatingOptions);
+    }
+
+    function unmountFloatingPanel(panel) {
+        if (!(panel instanceof HTMLElement)) {
+            return;
+        }
+
+        const mount = panel._pmtrackerFloatingMount;
+        if (mount?.placeholder instanceof HTMLElement && mount.placeholder.parentNode) {
+            mount.placeholder.parentNode.insertBefore(panel, mount.placeholder);
+            mount.placeholder.remove();
+        }
+
+        panel.classList.remove(
+            "floating-panel",
+            "floating-panel--match-anchor",
+            "floating-panel--person-search",
+            "floating-panel--ad-search",
+            "floating-panel--date",
+            "floating-panel--time");
+        panel.style.removeProperty("position");
+        panel.style.removeProperty("left");
+        panel.style.removeProperty("right");
+        panel.style.removeProperty("top");
+        panel.style.removeProperty("bottom");
+        panel.style.removeProperty("width");
+        panel.style.removeProperty("max-width");
+        panel.style.removeProperty("min-width");
+        panel.style.removeProperty("max-height");
+        panel.style.removeProperty("overflow-y");
+        panel.style.removeProperty("visibility");
+
+        delete panel._pmtrackerFloatingMount;
+        delete panel._pmtrackerFloatingAnchor;
+        delete panel._pmtrackerFloatingOptions;
+        floatingPanelRegistry.delete(panel);
+    }
+
+    function closeAllFloatingPanels(scope, exceptPanel) {
+        floatingPanelRegistry.forEach((panel) => {
+            if (!(panel instanceof HTMLElement) || panel === exceptPanel) {
+                return;
+            }
+
+            const anchor = getFloatingPanelAnchor(panel);
+            if (scope instanceof Element || scope instanceof Document) {
+                const scopeContainsPanel = scope.contains(panel);
+                const scopeContainsAnchor = anchor instanceof HTMLElement && scope.contains(anchor);
+                if (!scopeContainsPanel && !scopeContainsAnchor) {
+                    return;
+                }
+            }
+
+            panel.hidden = true;
+            unmountFloatingPanel(panel);
+        });
+    }
+
+    function positionFloatingPanel(panel, anchor, options = {}) {
+        if (!(panel instanceof HTMLElement) || !(anchor instanceof HTMLElement) || panel.hidden) {
+            return;
+        }
+
+        const gap = Number.isFinite(options.gap) ? options.gap : 8;
+        const matchWidth = options.matchWidth === true || panel.dataset.floatingMatchWidth === "true";
+        const boundary = {
+            left: 8,
+            right: window.innerWidth - 8,
+            top: 8,
+            bottom: window.innerHeight - 8
+        };
+        const anchorRect = anchor.getBoundingClientRect();
+        if (anchorRect.width <= 0 || anchorRect.height <= 0) {
+            return;
+        }
+
+        panel.style.position = "fixed";
+        panel.style.visibility = "hidden";
+        panel.style.left = "0px";
+        panel.style.top = "0px";
+        panel.style.right = "auto";
+        panel.style.bottom = "auto";
+        panel.style.maxHeight = "";
+        panel.style.overflowY = "";
+        panel.style.maxWidth = `${Math.max(boundary.right - boundary.left, 0)}px`;
+        panel.style.width = matchWidth
+            ? `${Math.min(Math.round(anchorRect.width), Math.max(boundary.right - boundary.left, 0))}px`
+            : "";
+        panel.style.minWidth = matchWidth ? `${Math.min(Math.round(anchorRect.width), Math.max(boundary.right - boundary.left, 0))}px` : "";
+
+        let panelRect = panel.getBoundingClientRect();
+        const availableBelow = Math.max(0, boundary.bottom - anchorRect.bottom - gap);
+        const availableAbove = Math.max(0, anchorRect.top - boundary.top - gap);
+        const fitsBelow = availableBelow >= panelRect.height;
+        const fitsAbove = availableAbove >= panelRect.height;
+        let shouldOpenAbove = false;
+
+        if (fitsBelow) {
+            shouldOpenAbove = false;
+        } else if (fitsAbove) {
+            shouldOpenAbove = true;
+        } else {
+            shouldOpenAbove = availableAbove > availableBelow;
+        }
+
+        const availableOnSelectedSide = shouldOpenAbove ? availableAbove : availableBelow;
+        if (availableOnSelectedSide > 0 && availableOnSelectedSide < panelRect.height) {
+            const maxHeight = Math.floor(Math.max(availableOnSelectedSide - 4, 0));
+            if (maxHeight > 0) {
+                panel.style.maxHeight = `${maxHeight}px`;
+                panel.style.overflowY = "auto";
+                panelRect = panel.getBoundingClientRect();
+            }
+        }
+
+        let left = anchorRect.left;
+        if (left + panelRect.width > boundary.right) {
+            left = boundary.right - panelRect.width;
+        }
+        if (left < boundary.left) {
+            left = boundary.left;
+        }
+
+        let top = shouldOpenAbove
+            ? anchorRect.top - panelRect.height - gap
+            : anchorRect.bottom + gap;
+
+        if (top + panelRect.height > boundary.bottom) {
+            top = boundary.bottom - panelRect.height;
+        }
+        if (top < boundary.top) {
+            top = boundary.top;
+        }
+
+        panel.style.left = `${Math.round(left)}px`;
+        panel.style.top = `${Math.round(top)}px`;
+        panel.style.visibility = "";
+    }
+
+    function repositionFloatingPanels() {
+        floatingPanelRegistry.forEach((panel) => {
+            if (!(panel instanceof HTMLElement) || panel.hidden) {
+                return;
+            }
+
+            const anchor = getFloatingPanelAnchor(panel);
+            if (!(anchor instanceof HTMLElement) || !anchor.isConnected) {
+                panel.hidden = true;
+                unmountFloatingPanel(panel);
+                return;
+            }
+
+            positionFloatingPanel(panel, anchor, panel._pmtrackerFloatingOptions || {});
+        });
+    }
+
+    const queueFloatingPanelReposition = debounce(() => {
+        repositionFloatingPanels();
+    }, 16);
+
+    function isInteractionInsideFloatingControl(target, anchor, panel) {
+        if (!(target instanceof Element)) {
+            return false;
+        }
+
+        return (anchor instanceof HTMLElement && anchor.contains(target))
+            || (panel instanceof HTMLElement && panel.contains(target));
+    }
+
     function closeAllDatePanels(exceptField) {
         document.querySelectorAll("[data-app-date-field]").forEach((candidate) => {
             if (!(candidate instanceof HTMLElement)) {
@@ -2750,6 +3390,7 @@
             const panel = candidate.querySelector("[data-app-date-panel]");
             if (panel instanceof HTMLElement) {
                 panel.hidden = true;
+                unmountFloatingPanel(panel);
             }
         });
     }
@@ -2766,95 +3407,9 @@
             const panel = candidate.querySelector("[data-app-time-panel]");
             if (panel instanceof HTMLElement) {
                 panel.hidden = true;
+                unmountFloatingPanel(panel);
             }
         });
-    }
-
-    function resolveFloatingPanelBoundary(field) {
-        const clippingParent = field.closest(".modal-content")
-            || field.closest(".modal")
-            || null;
-
-        if (clippingParent instanceof HTMLElement) {
-            const parentRect = clippingParent.getBoundingClientRect();
-            return {
-                left: parentRect.left + 8,
-                right: parentRect.right - 8,
-                top: parentRect.top + 8,
-                bottom: parentRect.bottom - 8
-            };
-        }
-
-        return {
-            left: 8,
-            right: window.innerWidth - 8,
-            top: 8,
-            bottom: window.innerHeight - 8
-        };
-    }
-
-    function alignFloatingPanel(field, panel, options = {}) {
-        const gap = Number.isFinite(options.gap) ? options.gap : 8;
-        const flipVertical = options.flipVertical === true;
-        const boundary = resolveFloatingPanelBoundary(field);
-
-        panel.style.maxHeight = "";
-        panel.style.overflowY = "";
-        panel.style.left = "0px";
-        panel.style.right = "auto";
-        panel.style.top = `calc(100% + ${gap}px)`;
-        panel.style.bottom = "auto";
-
-        let panelRect = panel.getBoundingClientRect();
-        let offsetX = 0;
-
-        if (panelRect.right > boundary.right) {
-            offsetX -= panelRect.right - boundary.right;
-        }
-        if (panelRect.left + offsetX < boundary.left) {
-            offsetX += boundary.left - (panelRect.left + offsetX);
-        }
-
-        panel.style.left = `${Math.round(offsetX)}px`;
-
-        if (!flipVertical) {
-            return;
-        }
-
-        panelRect = panel.getBoundingClientRect();
-        const fieldRect = field.getBoundingClientRect();
-        const requiredHeight = panelRect.height + gap;
-        const availableBelow = Math.max(0, boundary.bottom - fieldRect.bottom);
-        const availableAbove = Math.max(0, fieldRect.top - boundary.top);
-        const fitsBelow = availableBelow >= requiredHeight;
-        const fitsAbove = availableAbove >= requiredHeight;
-
-        let shouldOpenAbove = false;
-        if (fitsBelow) {
-            shouldOpenAbove = false;
-        } else if (fitsAbove) {
-            shouldOpenAbove = true;
-        } else {
-            shouldOpenAbove = availableAbove > availableBelow;
-        }
-
-        if (shouldOpenAbove) {
-            panel.style.top = "auto";
-            panel.style.bottom = `calc(100% + ${gap}px)`;
-        } else {
-            panel.style.top = `calc(100% + ${gap}px)`;
-            panel.style.bottom = "auto";
-        }
-
-        // If panel does not fully fit on selected side, clamp height to keep it within modal/viewport.
-        const availableOnSelectedSide = shouldOpenAbove ? availableAbove : availableBelow;
-        if (availableOnSelectedSide > 0 && availableOnSelectedSide < requiredHeight) {
-            const maxHeight = Math.floor(Math.max(availableOnSelectedSide - 4, 0));
-            if (maxHeight > 0) {
-                panel.style.maxHeight = `${maxHeight}px`;
-                panel.style.overflowY = "auto";
-            }
-        }
     }
 
     function initCustomDatePickers(scope) {
@@ -2972,15 +3527,24 @@
                         selectedDate = dayDate;
                         viewDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), 1);
                         syncValue();
-                        panel.hidden = true;
+                        closePanel();
                     });
 
                     grid.appendChild(button);
                 }
+
+                if (!panel.hidden) {
+                    positionFloatingPanel(panel, field, panel._pmtrackerFloatingOptions || {
+                        gap: 8,
+                        flipVertical: true,
+                        kind: "date"
+                    });
+                }
             };
 
-            const alignPanel = () => {
-                alignFloatingPanel(field, panel, { gap: 8, flipVertical: true });
+            const closePanel = () => {
+                panel.hidden = true;
+                unmountFloatingPanel(panel);
             };
 
             const openPanel = () => {
@@ -2991,7 +3555,7 @@
                 closeAllTimePanels();
                 renderGrid();
                 panel.hidden = false;
-                alignPanel();
+                mountFloatingPanel(panel, field, { gap: 8, flipVertical: true, kind: "date" });
             };
 
             syncValue();
@@ -3000,7 +3564,7 @@
                 if (panel.hidden) {
                     openPanel();
                 } else {
-                    panel.hidden = true;
+                    closePanel();
                 }
             });
 
@@ -3052,14 +3616,22 @@
                 if (!(target instanceof Element)) {
                     return;
                 }
-                if (!field.contains(target)) {
-                    panel.hidden = true;
+                if (!isInteractionInsideFloatingControl(target, field, panel)) {
+                    closePanel();
                 }
             });
 
             document.addEventListener("keydown", (event) => {
                 if (event.key === "Escape") {
-                    panel.hidden = true;
+                    closePanel();
+                }
+            });
+
+            displayInput.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closePanel();
                 }
             });
         });
@@ -3100,8 +3672,9 @@
                 valueInput.value = normalizedTime;
             };
 
-            const alignPanel = () => {
-                alignFloatingPanel(field, panel, { gap: 8, flipVertical: false });
+            const closePanel = () => {
+                panel.hidden = true;
+                unmountFloatingPanel(panel);
             };
 
             const render = () => {
@@ -3124,11 +3697,19 @@
                         button.addEventListener("click", () => {
                             selected = { hours: hour, minutes: minute };
                             syncValue();
-                            panel.hidden = true;
+                            closePanel();
                         });
 
                         grid.appendChild(button);
                     }
+                }
+
+                if (!panel.hidden) {
+                    positionFloatingPanel(panel, field, panel._pmtrackerFloatingOptions || {
+                        gap: 8,
+                        flipVertical: true,
+                        kind: "time"
+                    });
                 }
             };
 
@@ -3140,7 +3721,7 @@
                 closeAllTimePanels(field);
                 render();
                 panel.hidden = false;
-                alignPanel();
+                mountFloatingPanel(panel, field, { gap: 8, flipVertical: true, kind: "time" });
             };
 
             syncValue();
@@ -3149,7 +3730,7 @@
                 if (panel.hidden) {
                     openPanel();
                 } else {
-                    panel.hidden = true;
+                    closePanel();
                 }
             });
 
@@ -3171,7 +3752,9 @@
                     event.preventDefault();
                     openPanel();
                 } else if (event.key === "Escape") {
-                    panel.hidden = true;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closePanel();
                 }
             });
 
@@ -3186,14 +3769,14 @@
                 if (!(target instanceof Element)) {
                     return;
                 }
-                if (!field.contains(target)) {
-                    panel.hidden = true;
+                if (!isInteractionInsideFloatingControl(target, field, panel)) {
+                    closePanel();
                 }
             });
 
             document.addEventListener("keydown", (event) => {
                 if (event.key === "Escape") {
-                    panel.hidden = true;
+                    closePanel();
                 }
             });
         });
@@ -3213,6 +3796,7 @@
             }
 
             const input = wrapper.querySelector("[data-person-picker-input]");
+            const anchor = wrapper.querySelector("[data-floating-anchor]");
             let hiddenInput = wrapper.querySelector("[data-person-picker-hidden]");
             if (!(hiddenInput instanceof HTMLInputElement)) {
                 const formScope = wrapper.closest("form");
@@ -3229,6 +3813,7 @@
             const message = wrapper.querySelector("[data-person-picker-message]");
 
             if (!(input instanceof HTMLInputElement)
+                || !(anchor instanceof HTMLElement)
                 || !(hiddenInput instanceof HTMLInputElement)
                 || !(source instanceof HTMLElement)
                 || !(panel instanceof HTMLElement)
@@ -3265,10 +3850,17 @@
             const closePanel = () => {
                 panel.hidden = true;
                 activeIndex = -1;
+                unmountFloatingPanel(panel);
             };
 
             const openPanel = () => {
                 panel.hidden = false;
+                mountFloatingPanel(panel, anchor, {
+                    gap: 6,
+                    flipVertical: true,
+                    kind: "person-search",
+                    matchWidth: true
+                });
             };
 
             const setMessage = (text) => {
@@ -3431,6 +4023,8 @@
 
             input.addEventListener("keydown", (event) => {
                 if (event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
                     closePanel();
                     return;
                 }
@@ -3505,7 +4099,7 @@
                     return;
                 }
 
-                if (!wrapper.contains(target)) {
+                if (!isInteractionInsideFloatingControl(target, anchor, panel)) {
                     closePanel();
                 }
             });
@@ -3520,6 +4114,7 @@
 
             const searchUrl = wrapper.dataset.searchUrl || "";
             const form = wrapper.closest("form");
+            const anchor = wrapper.querySelector("[data-floating-anchor]");
             const queryInput = wrapper.querySelector("[data-ad-query-input]");
             const queryHidden = form?.querySelector("[data-ad-query-hidden]");
             const guidInput = form?.querySelector("[data-ad-guid]");
@@ -3540,6 +4135,7 @@
 
             if (!searchUrl
                 || !(form instanceof HTMLFormElement)
+                || !(anchor instanceof HTMLElement)
                 || !(queryInput instanceof HTMLInputElement)
                 || !(queryHidden instanceof HTMLInputElement)
                 || !(guidInput instanceof HTMLInputElement)
@@ -3570,6 +4166,7 @@
             const closePanel = () => {
                 panel.hidden = true;
                 activeIndex = -1;
+                unmountFloatingPanel(panel);
             };
 
             const clearSelection = () => {
@@ -3788,6 +4385,12 @@
                 status.setAttribute("aria-live", "polite");
                 results.appendChild(status);
                 panel.hidden = false;
+                mountFloatingPanel(panel, anchor, {
+                    gap: 6,
+                    flipVertical: true,
+                    kind: "ad-search",
+                    matchWidth: true
+                });
             };
 
             const fillFromResult = (row) => {
@@ -3856,6 +4459,12 @@
                 });
 
                 panel.hidden = false;
+                mountFloatingPanel(panel, anchor, {
+                    gap: 6,
+                    flipVertical: true,
+                    kind: "ad-search",
+                    matchWidth: true
+                });
             };
 
             const performSearch = async () => {
@@ -3949,11 +4558,19 @@
                 probeAvailability();
                 if (currentResults.length > 0) {
                     panel.hidden = false;
+                    mountFloatingPanel(panel, anchor, {
+                        gap: 6,
+                        flipVertical: true,
+                        kind: "ad-search",
+                        matchWidth: true
+                    });
                 }
             });
 
             queryInput.addEventListener("keydown", (event) => {
                 if (event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
                     closePanel();
                     return;
                 }
@@ -4021,7 +4638,7 @@
                     return;
                 }
 
-                if (!wrapper.contains(target)) {
+                if (!isInteractionInsideFloatingControl(target, anchor, panel)) {
                     closePanel();
                 }
             });
@@ -5707,6 +6324,8 @@
             return;
         }
 
+        closeAllFloatingPanels();
+
         const scope = typeof payload.refreshScope === "string" ? payload.refreshScope : "";
         const refreshUrl = typeof payload.refreshUrl === "string" && payload.refreshUrl
             ? payload.refreshUrl
@@ -6015,22 +6634,6 @@
     }
 
     function initProjectRecordsUi() {
-        const viewToggle = document.querySelector("[data-view-toggle]");
-        if (viewToggle instanceof HTMLInputElement) {
-            const storedView = localStorage.getItem("pmtracker.records.view");
-            const view = storedView || (viewToggle.checked ? "subsystem" : "flat");
-            applyRecordsView(view);
-
-            if (viewToggle.dataset.viewToggleReady !== "true") {
-                viewToggle.dataset.viewToggleReady = "true";
-                viewToggle.addEventListener("change", () => {
-                    applyRecordsView(viewToggle.checked ? "subsystem" : "flat");
-                });
-            }
-        } else {
-            applyRecordsView("subsystem");
-        }
-
         const filterPanel = document.querySelector("[data-filter-panel]");
         const storedOpen = localStorage.getItem("pmtracker.filters.open");
         if (filterPanel) {
@@ -6038,15 +6641,9 @@
             setFilterPanelOpen(shouldOpen);
         }
 
-        restoreFilterState();
-        const meetingCommentStateFilter = document.querySelector('[data-filter-key="jednani-vyjadreni-stav"]');
-        if (meetingCommentStateFilter instanceof HTMLSelectElement
-            && meetingCommentStateFilter.value
-            && !Array.from(meetingCommentStateFilter.options).some((option) => option.value === meetingCommentStateFilter.value)) {
-            meetingCommentStateFilter.value = "";
-            persistFilterState(meetingCommentStateFilter);
-        }
-        applyProjectRecordFilters();
+        const state = restoreFilterState();
+        setProjectFilterSaveStatus("records", "");
+        applyRecordsView(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
         initSubsystemScrollIndicator();
     }
 
@@ -6183,10 +6780,43 @@
             return;
         }
 
+        const resetProjectFilterPreferences = target.closest("[data-project-filter-preferences-reset]");
+        if (resetProjectFilterPreferences instanceof HTMLButtonElement) {
+            event.preventDefault();
+            clearProjectFilterPreferenceStorage();
+            const status = document.querySelector("[data-project-filter-preferences-status]");
+            if (status instanceof HTMLElement) {
+                status.textContent = "Uložené projektové filtry byly odstraněny.";
+            }
+            return;
+        }
+
         const printTrigger = target.closest("[data-print-trigger]");
         if (printTrigger) {
             event.preventDefault();
             handlePrintTriggerClick(printTrigger);
+            return;
+        }
+
+        const filterChipRemove = target.closest("[data-filter-chip-remove]");
+        if (filterChipRemove instanceof HTMLButtonElement) {
+            event.preventDefault();
+            const scope = filterChipRemove.getAttribute("data-filter-chip-remove") || "";
+            const inputKey = filterChipRemove.getAttribute("data-filter-chip-key") || "";
+            if (scope && inputKey) {
+                clearProjectFilterInput(scope, inputKey);
+                handleProjectFilterInputChange(scope);
+            }
+            return;
+        }
+
+        const saveDefaultsButton = target.closest("[data-filter-save-defaults]");
+        if (saveDefaultsButton instanceof HTMLButtonElement) {
+            event.preventDefault();
+            const scope = saveDefaultsButton.getAttribute("data-filter-save-defaults") || "";
+            if (scope) {
+                saveProjectFilterDefaults(scope);
+            }
             return;
         }
 
@@ -6338,19 +6968,16 @@
         const filterInput = target.closest("[data-filter-key]");
         if (filterInput instanceof HTMLInputElement || filterInput instanceof HTMLSelectElement) {
             persistFilterState(filterInput);
-            applyProjectRecordFilters();
         }
 
         const scheduleFilterInput = target.closest("[data-schedule-filter-key]");
         if (scheduleFilterInput instanceof HTMLInputElement || scheduleFilterInput instanceof HTMLSelectElement) {
             persistScheduleFilterState(scheduleFilterInput);
-            applyProjectScheduleFilters();
         }
 
         const gantFilterInput = target.closest("[data-gantt-filter-key]");
         if (gantFilterInput instanceof HTMLInputElement || gantFilterInput instanceof HTMLSelectElement) {
             persistGanttFilterState(gantFilterInput);
-            applyProjectGanttFilters();
         }
 
         const categorySelect = target.closest("[data-kategorie-select]");
@@ -6375,7 +7002,6 @@
                 return;
             }
             persistFilterState(filterInput);
-            applyProjectRecordFilters();
         }
 
         const scheduleFilterInput = target.closest("[data-schedule-filter-key]");
@@ -6384,7 +7010,6 @@
                 return;
             }
             persistScheduleFilterState(scheduleFilterInput);
-            applyProjectScheduleFilters();
         }
 
         const gantFilterInput = target.closest("[data-gantt-filter-key]");
@@ -6393,7 +7018,6 @@
                 return;
             }
             persistGanttFilterState(gantFilterInput);
-            applyProjectGanttFilters();
         }
     });
 
@@ -6432,6 +7056,8 @@
     const rerenderRainbowLabelsOnResize = debounce(() => {
         renderAllRainbowSegmentLabels(document);
     }, 120);
+    window.addEventListener("scroll", queueFloatingPanelReposition, true);
+    window.addEventListener("resize", queueFloatingPanelReposition);
     window.addEventListener("resize", rerenderRainbowLabelsOnResize);
 
     initProjectTabs();

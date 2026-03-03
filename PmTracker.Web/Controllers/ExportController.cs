@@ -29,7 +29,7 @@ public sealed class ExportController : BaseController
             return RedirectToAction("Index", "Projekty");
         }
 
-        if (!CurrentUserContext.CanReadProject(projektId))
+        if (!CurrentUserContext.CanAccessProject(projektId))
         {
             return NotFound();
         }
@@ -46,7 +46,7 @@ public sealed class ExportController : BaseController
             return RedirectToAction("Index", "Projekty");
         }
 
-        if (!CurrentUserContext.CanReadProject(projektId))
+        if (!CurrentUserContext.CanAccessProject(projektId))
         {
             return NotFound();
         }
@@ -64,7 +64,7 @@ public sealed class ExportController : BaseController
             return RedirectToAction("Index", "Projekty");
         }
 
-        if (!CurrentUserContext.CanReadProject(detail.ProjektId))
+        if (!CurrentUserContext.CanAccessProject(detail.ProjektId))
         {
             return NotFound();
         }
@@ -82,7 +82,7 @@ public sealed class ExportController : BaseController
             return RedirectToAction("Index", "Projekty");
         }
 
-        if (!CurrentUserContext.CanReadProject(detail.ProjektId))
+        if (!CurrentUserContext.CanAccessProject(detail.ProjektId))
         {
             return NotFound();
         }
@@ -99,7 +99,7 @@ public sealed class ExportController : BaseController
             return RedirectToAction("Index", "Projekty");
         }
 
-        if (!CurrentUserContext.CanReadProject(projektId))
+        if (!CurrentUserContext.CanAccessProject(projektId))
         {
             return NotFound();
         }
@@ -116,7 +116,7 @@ public sealed class ExportController : BaseController
             return RedirectToAction("Index", "Projekty");
         }
 
-        if (!CurrentUserContext.CanReadProject(projektId))
+        if (!CurrentUserContext.CanAccessProject(projektId))
         {
             return NotFound();
         }
@@ -132,11 +132,6 @@ public sealed class ExportController : BaseController
         if (!DataStore.ProjektExists(projektId))
         {
             return RedirectToAction("Index", "Projekty");
-        }
-
-        if (!CurrentUserContext.CanReadProject(projektId))
-        {
-            return NotFound();
         }
 
         if (jednaniId.HasValue)

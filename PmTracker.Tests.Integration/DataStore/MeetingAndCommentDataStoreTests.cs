@@ -79,6 +79,9 @@ public sealed class MeetingAndCommentDataStoreTests
         var outsiderId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "OutComment");
         var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "COMPRJ");
         var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "COM_SUB", leaderId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, leaderId, ProjectRoleCodes.ProjectOwner);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, leaderId, SubsystemRoleCodes.Lead);
         var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, leaderId, subsystemId, "UKOL", "CommentPerm");
         var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "DRAFT", meetingNumber: 9200);
 

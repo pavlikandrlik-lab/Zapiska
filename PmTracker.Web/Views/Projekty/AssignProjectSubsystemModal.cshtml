@@ -1,0 +1,30 @@
+@model AssignProjectSubsystemModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "assign-project-subsystem-modal-title";
+}
+
+<h2 id="assign-project-subsystem-modal-title">@Model.Title</h2>
+
+<form class="form-grid"
+      asp-controller="Projekty"
+      asp-action="AssignProjectSubsystem"
+      method="post"
+      data-ajax-submit="true">
+    <input type="hidden" name="ProjektId" value="@Model.Command.ProjektId" />
+
+    <label>
+        Subsystém
+        <select name="SubsystemKod" required>
+            @foreach (var subsystem in Model.Subsystemy)
+            {
+                <option value="@subsystem.Value">@subsystem.Label</option>
+            }
+        </select>
+    </label>
+
+    @await Html.PartialAsync("_ModalFormActions", new ModalFormActionsViewModel
+    {
+        SubmitLabel = "Přiřadit subsystém"
+    })
+</form>

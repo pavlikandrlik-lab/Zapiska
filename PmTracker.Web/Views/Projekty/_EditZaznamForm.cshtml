@@ -229,11 +229,11 @@
                             : $"{subsystem.Kod} - {subsystem.Nazev}";
                         if (subsystem.Nazev == Model.Subsystem)
                         {
-                            <option value="@subsystem.Kod" data-owner-id="@subsystem.VedouciOsobaId" selected="selected">@optionLabel</option>
+                            <option value="@subsystem.Kod" data-owner-id="@subsystem.DefaultOwnerOsobaId" selected="selected">@optionLabel</option>
                         }
                         else
                         {
-                            <option value="@subsystem.Kod" data-owner-id="@subsystem.VedouciOsobaId">@optionLabel</option>
+                            <option value="@subsystem.Kod" data-owner-id="@subsystem.DefaultOwnerOsobaId">@optionLabel</option>
                         }
                     }
                 </select>
@@ -654,7 +654,7 @@
                                                        type="number"
                                                        min="@(-krok.TrvaniDni)"
                                                        name="HarmonogramHodnoty[@delayInputIndex].Hodnota"
-                                                       value="@krok.OdchylkaDni"
+                                                       value="@krok.ZpozdeniDni"
                                                        data-schedule-delay
                                                        data-schedule-static-disabled="@(delayStaticDisabled ? "true" : "false")"
                                                        @((delayDisabled) ? "disabled=\"disabled\"" : null) />

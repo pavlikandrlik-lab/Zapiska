@@ -20,9 +20,9 @@
          data-person-picker-empty="Nenalezeny žádné odpovídající osoby.">
         <input type="hidden" name="OsobaId" value="" data-person-picker-hidden required />
         <label class="office-search-label">Osoba</label>
-        <div class="office-searchbox">
+        <div class="office-searchbox" data-floating-anchor>
             <input type="search" autocomplete="off" data-person-picker-input required />
-            <div class="office-search-panel" data-person-picker-panel hidden>
+            <div class="office-search-panel" data-person-picker-panel data-floating-panel data-floating-kind="person-search" data-floating-match-width="true" hidden>
                 <div class="office-search-results" data-person-picker-results role="listbox" aria-label="Výsledky osob"></div>
             </div>
         </div>

@@ -21,6 +21,7 @@ public sealed class JednaniDetailViewModel
     public string? UzavrenyStavKod { get; init; }
     public required IReadOnlyList<UcastViewModel> Ucast { get; init; }
     public required IReadOnlyList<JednaniUkolViewModel> Ukoly { get; init; }
+    public required IReadOnlyList<MeetingParticipantCandidateViewModel> AvailableParticipantCandidates { get; init; }
     public required IReadOnlyList<LookupOptionViewModel> StavyJednani { get; init; }
     public required IReadOnlyList<LookupOptionViewModel> StavyUcasti { get; init; }
 }
@@ -41,8 +42,16 @@ public sealed class JednaniUkolViewModel
     public required string CisloViditelne { get; init; }
     public required string Popis { get; init; }
     public string? Zapis { get; init; }
-    public int SubsystemVedouciOsobaId { get; init; }
+    public required IReadOnlyList<int> SubsystemLeadEquivalentOsobaIds { get; init; }
     public required IReadOnlyList<JednaniVyjadreniViewModel> Vyjadreni { get; init; }
+}
+
+public sealed class MeetingParticipantCandidateViewModel
+{
+    public int OsobaId { get; init; }
+    public required string Osoba { get; init; }
+    public string? Email { get; init; }
+    public required IReadOnlyList<string> AktivniRole { get; init; }
 }
 
 public sealed class JednaniVyjadreniViewModel

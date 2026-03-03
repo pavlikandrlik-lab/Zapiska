@@ -11,14 +11,14 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
         _permissionEvaluationService = permissionEvaluationService;
     }
 
-    public bool CanCommentAsSubsystemLeader(CurrentUserContextViewModel currentUser, int projektId, int subsystemLeadOsobaId)
+    public bool CanCommentAsSubsystemLeader(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds)
     {
-        if (subsystemLeadOsobaId <= 0 || currentUser.OsobaId <= 0)
+        if (currentUser.OsobaId <= 0 || subsystemLeadEquivalentOsobaIds.Count == 0)
         {
             return false;
         }
 
-        if (currentUser.OsobaId != subsystemLeadOsobaId)
+        if (!subsystemLeadEquivalentOsobaIds.Contains(currentUser.OsobaId))
         {
             return false;
         }
@@ -26,17 +26,17 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
         return _permissionEvaluationService.HasPermission(currentUser, PermissionKeys.RecordsCommentSubsystemLead, projektId);
     }
 
-    public bool CanAddComment(CurrentUserContextViewModel currentUser, int projektId, int subsystemLeadOsobaId)
+    public bool CanAddComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds)
     {
         if (_permissionEvaluationService.HasPermission(currentUser, PermissionKeys.RecordsEdit, projektId))
         {
             return true;
         }
 
-        return CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadOsobaId);
+        return CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
     }
 
-    public bool CanModifyComment(CurrentUserContextViewModel currentUser, int projektId, int subsystemLeadOsobaId, int commentAuthorOsobaId)
+    public bool CanModifyComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, int commentAuthorOsobaId)
     {
         if (_permissionEvaluationService.HasPermission(currentUser, PermissionKeys.RecordsEdit, projektId))
         {
@@ -45,6 +45,6 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
 
         return commentAuthorOsobaId > 0
             && currentUser.OsobaId == commentAuthorOsobaId
-            && CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadOsobaId);
+            && CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
     }
 }

@@ -178,6 +178,72 @@ public sealed class SaveAttendanceCommand
     public string StavUcasti { get; set; } = string.Empty;
 }
 
+public sealed class AddMeetingParticipantCommand
+{
+    [Required]
+    public int ProjektId { get; set; }
+
+    [Required]
+    public int JednaniId { get; set; }
+
+    [Required(ErrorMessage = "Vyberte osobu z nabídky.")]
+    public int? OsobaId { get; set; }
+}
+
+public sealed class AssignProjectRoleCommand
+{
+    [Required]
+    public int ProjektId { get; set; }
+
+    [Required(ErrorMessage = "Vyberte osobu z nabídky.")]
+    public int? OsobaId { get; set; }
+
+    [Required]
+    public string RoleKod { get; set; } = string.Empty;
+}
+
+public sealed class DeactivateProjectRoleCommand
+{
+    [Required]
+    public int ProjektRoleId { get; set; }
+}
+
+public sealed class AssignProjectSubsystemCommand
+{
+    [Required]
+    public int ProjektId { get; set; }
+
+    [Required]
+    public string SubsystemKod { get; set; } = string.Empty;
+}
+
+public sealed class DeactivateProjectSubsystemCommand
+{
+    [Required]
+    public int ProjektSubsystemId { get; set; }
+}
+
+public sealed class AssignProjectSubsystemRoleCommand
+{
+    [Required]
+    public int ProjektId { get; set; }
+
+    [Required]
+    public int ProjektSubsystemId { get; set; }
+
+    [Required(ErrorMessage = "Vyberte osobu z nabídky.")]
+    public int? OsobaId { get; set; }
+
+    [Required]
+    public string RoleKod { get; set; } = string.Empty;
+}
+
+public sealed class DeactivateProjectSubsystemRoleCommand
+{
+    [Required]
+    public int ProjektSubsystemRoleId { get; set; }
+}
+
 public sealed class SaveTeamMemberCommand
 {
     [Required]
@@ -395,4 +461,10 @@ public sealed class SaveRolePermissionCommand
     public bool IsAllowed { get; set; } = true;
 
     public List<int> ProjektIds { get; set; } = new();
+}
+
+public sealed class DeleteRolePermissionCommand
+{
+    [Range(1, int.MaxValue, ErrorMessage = "Mapování role/akce nebylo vybráno.")]
+    public int Id { get; set; }
 }

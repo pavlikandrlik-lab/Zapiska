@@ -16,6 +16,7 @@ public sealed class PmTrackerDbContext : DbContext
     public DbSet<CiselnikTypuUkoluEntity> CiselnikTypuUkolu => Set<CiselnikTypuUkoluEntity>();
     public DbSet<CiselnikTypuExternichOdkazuEntity> CiselnikTypuExternichOdkazu => Set<CiselnikTypuExternichOdkazuEntity>();
     public DbSet<CiselnikRoliProjektuEntity> CiselnikRoliProjektu => Set<CiselnikRoliProjektuEntity>();
+    public DbSet<CiselnikRoleSubsystemuEntity> CiselnikRoliSubsystemu => Set<CiselnikRoleSubsystemuEntity>();
     public DbSet<CiselnikStavuUcastiEntity> CiselnikStavuUcasti => Set<CiselnikStavuUcastiEntity>();
     public DbSet<CiselnikOrganizaceEntity> CiselnikOrganizace => Set<CiselnikOrganizaceEntity>();
     public DbSet<CiselnikOrganizacniCelekEntity> CiselnikOrganizacniCelky => Set<CiselnikOrganizacniCelekEntity>();
@@ -27,6 +28,8 @@ public sealed class PmTrackerDbContext : DbContext
     public DbSet<OsobaEntity> Osoby => Set<OsobaEntity>();
     public DbSet<ProjektEntity> Projekty => Set<ProjektEntity>();
     public DbSet<ObsazeniProjektuEntity> ObsazeniProjektu => Set<ObsazeniProjektuEntity>();
+    public DbSet<ProjektSubsystemEntity> ProjektSubsystemy => Set<ProjektSubsystemEntity>();
+    public DbSet<ObsazeniSubsystemuProjektuEntity> ObsazeniSubsystemuProjektu => Set<ObsazeniSubsystemuProjektuEntity>();
     public DbSet<ProjektovyZaznamEntity> ProjektoveZaznamy => Set<ProjektovyZaznamEntity>();
     public DbSet<ZaznamHistorieZmenTypuEntity> ZaznamHistorieZmenTypu => Set<ZaznamHistorieZmenTypuEntity>();
     public DbSet<ZaznamHistorieTerminuEntity> ZaznamHistorieTerminu => Set<ZaznamHistorieTerminuEntity>();
@@ -112,6 +115,16 @@ public sealed class PmTrackerDbContext : DbContext
         modelBuilder.Entity<CiselnikRoliProjektuEntity>(entity =>
         {
             entity.ToTable("ciselnik_roli_projektu");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.Kod).HasColumnName("kod");
+            entity.Property(x => x.Nazev).HasColumnName("nazev");
+            entity.Property(x => x.IsLocked).HasColumnName("is_locked");
+        });
+
+        modelBuilder.Entity<CiselnikRoleSubsystemuEntity>(entity =>
+        {
+            entity.ToTable("ciselnik_roli_subsystemu");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).HasColumnName("id");
             entity.Property(x => x.Kod).HasColumnName("kod");
@@ -218,7 +231,6 @@ public sealed class PmTrackerDbContext : DbContext
             entity.Property(x => x.Id).HasColumnName("id");
             entity.Property(x => x.Kod).HasColumnName("kód");
             entity.Property(x => x.Nazev).HasColumnName("nazev");
-            entity.Property(x => x.VedouciOsobaId).HasColumnName("vedouci_osoba_id");
         });
 
         modelBuilder.Entity<OsobaEntity>(entity =>
@@ -252,10 +264,47 @@ public sealed class PmTrackerDbContext : DbContext
         {
             entity.ToTable("obsazeni_projektu");
             entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.ProjektId, x.OsobaId, x.RoleId })
+                .IsUnique()
+                .HasFilter("[datum_odebrani] IS NULL")
+                .HasDatabaseName("UX_obsazeni_projektu_projekt_osoba_role_aktivni");
             entity.Property(x => x.Id).HasColumnName("id");
             entity.Property(x => x.ProjektId).HasColumnName("projekt_id");
             entity.Property(x => x.OsobaId).HasColumnName("osoba_id");
             entity.Property(x => x.RoleId).HasColumnName("role_id");
+            entity.Property(x => x.DatumPrirazeni).HasColumnName("datum_prirazeni");
+            entity.Property(x => x.DatumOdebrani).HasColumnName("datum_odebrani");
+        });
+
+        modelBuilder.Entity<ProjektSubsystemEntity>(entity =>
+        {
+            entity.ToTable("projekt_subsystemy");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.ProjektId, x.SubsystemId })
+                .IsUnique()
+                .HasFilter("[datum_odebrani] IS NULL")
+                .HasDatabaseName("UX_projekt_subsystemy_projekt_subsystem_aktivni");
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.ProjektId).HasColumnName("projekt_id");
+            entity.Property(x => x.SubsystemId).HasColumnName("subsystem_id");
+            entity.Property(x => x.DatumPrirazeni).HasColumnName("datum_prirazeni");
+            entity.Property(x => x.DatumOdebrani).HasColumnName("datum_odebrani");
+        });
+
+        modelBuilder.Entity<ObsazeniSubsystemuProjektuEntity>(entity =>
+        {
+            entity.ToTable("obsazeni_subsystemu_projektu");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.ProjektSubsystemId, x.OsobaId, x.RoleSubsystemuId })
+                .IsUnique()
+                .HasFilter("[datum_odebrani] IS NULL")
+                .HasDatabaseName("UX_obsazeni_subsystemu_projektu_aktivni");
+            entity.Property(x => x.Id).HasColumnName("id");
+            entity.Property(x => x.ProjektSubsystemId).HasColumnName("projekt_subsystem_id");
+            entity.Property(x => x.OsobaId).HasColumnName("osoba_id");
+            entity.Property(x => x.RoleSubsystemuId).HasColumnName("role_subsystemu_id");
+            entity.Property(x => x.DatumPrirazeni).HasColumnName("datum_prirazeni");
+            entity.Property(x => x.DatumOdebrani).HasColumnName("datum_odebrani");
         });
 
         modelBuilder.Entity<ProjektovyZaznamEntity>(entity =>

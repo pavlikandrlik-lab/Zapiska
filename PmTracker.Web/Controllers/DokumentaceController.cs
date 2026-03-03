@@ -51,6 +51,12 @@ public sealed class DokumentaceController : BaseController
         return RenderPage("qa");
     }
 
+    [HttpGet("Changelog")]
+    public IActionResult Changelog()
+    {
+        return RenderPage("changelog");
+    }
+
     private IActionResult RenderPage(string key)
     {
         var model = _documentationService.BuildPage(key);

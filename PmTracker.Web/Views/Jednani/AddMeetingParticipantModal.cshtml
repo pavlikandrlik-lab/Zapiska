@@ -1,0 +1,48 @@
+@model AddMeetingParticipantModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "meeting-participant-modal-title";
+    ViewData["ModalVariant"] = "wide";
+    ViewData["ModalOverflowVisible"] = true;
+}
+
+<h2 id="meeting-participant-modal-title">@Model.Title</h2>
+
+<form class="form-grid"
+      asp-controller="Jednani"
+      asp-action="AddMeetingParticipant"
+      method="post"
+      data-ajax-submit="true">
+    <input type="hidden" name="ProjektId" value="@Model.Command.ProjektId" />
+    <input type="hidden" name="JednaniId" value="@Model.Command.JednaniId" />
+
+    <div class="office-picker"
+         data-person-picker="single"
+         data-person-picker-placeholder="Vyhledejte osobu podle jména nebo emailu..."
+         data-person-picker-empty="Nenalezeny žádné odpovídající osoby.">
+        <input type="hidden" name="OsobaId" value="" data-person-picker-hidden required />
+        <label class="office-search-label">Osoba</label>
+        <div class="office-searchbox" data-floating-anchor>
+            <input type="search" autocomplete="off" data-person-picker-input required />
+            <div class="office-search-panel" data-person-picker-panel data-floating-panel data-floating-kind="person-search" data-floating-match-width="true" hidden>
+                <div class="office-search-results" data-person-picker-results role="listbox" aria-label="Výsledky osob"></div>
+            </div>
+        </div>
+        <div class="person-picker-source" data-person-picker-source hidden>
+            @foreach (var osoba in Model.DostupneOsoby)
+            {
+                var roles = osoba.AktivniRole.Count == 0 ? string.Empty : string.Join(", ", osoba.AktivniRole);
+                <div data-id="@osoba.OsobaId"
+                     data-label="@osoba.Osoba"
+                     data-email="@(osoba.Email ?? string.Empty)"
+                     data-org="@roles"
+                     data-unit=""></div>
+            }
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_ModalFormActions", new ModalFormActionsViewModel
+    {
+        SubmitLabel = "Přidat do účasti"
+    })
+</form>

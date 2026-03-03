@@ -5,6 +5,9 @@ namespace PmTracker.Web.Models.ViewModels;
 
 public static class PermissionKeys
 {
+    public const string PeoplePrefix = "people.";
+    public const string CiselnikyPrefix = "ciselniky.";
+    public const string SettingsPrefix = "settings.";
     public const string ProjectsCreate = "projects.create";
     public const string ProjectsEdit = "projects.edit";
     public const string ProjectsDelete = "projects.delete";
@@ -114,14 +117,44 @@ public sealed class CurrentUserContextViewModel
     public required string OrganizacniCelek { get; init; }
     public bool IsSuperAdmin { get; init; }
     public required IReadOnlyList<string> RoleKody { get; init; }
+    public required IReadOnlyList<int> VisibleProjectIds { get; init; }
     public required IReadOnlyList<PermissionGrantViewModel> PermissionGrants { get; init; }
-    public IReadOnlyList<int> TeamProjectIds { get; init; } = Array.Empty<int>();
+
+    public bool CanAccessProject(int projektId)
+    {
+        if (IsSuperAdmin)
+        {
+            return true;
+        }
+
+        if (projektId <= 0)
+        {
+            return false;
+        }
+
+        if (VisibleProjectIds.Contains(projektId))
+        {
+            return true;
+        }
+
+        return PermissionGrants
+            .Where(g => g.IsAllowed && PermissionKeys.GrantsProjectRead(g.PermissionKey))
+            .Any(g =>
+                string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(g.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase) ||
+                (string.Equals(g.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase) && g.ProjectIds.Contains(projektId)));
+    }
 
     public bool HasPermission(string permissionKey, int? projektId = null)
     {
         if (IsSuperAdmin)
         {
             return true;
+        }
+
+        if (projektId.HasValue && !CanAccessProject(projektId.Value))
+        {
+            return false;
         }
 
         var grants = PermissionGrants
@@ -146,24 +179,28 @@ public sealed class CurrentUserContextViewModel
             (string.Equals(g.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase) && g.ProjectIds.Contains(projektId.Value)));
     }
 
-    public bool CanReadProject(int projektId)
+    public bool HasPermissionPrefix(string permissionPrefix)
     {
-        if (projektId <= 0)
-        {
-            return false;
-        }
-
-        if (IsSuperAdmin || TeamProjectIds.Contains(projektId))
+        if (IsSuperAdmin)
         {
             return true;
         }
 
-        return PermissionGrants
-            .Where(g => g.IsAllowed && PermissionKeys.GrantsProjectRead(g.PermissionKey))
-            .Any(g =>
-                string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(g.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase) ||
-                (string.Equals(g.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase) && g.ProjectIds.Contains(projektId)));
+        if (string.IsNullOrWhiteSpace(permissionPrefix))
+        {
+            return false;
+        }
+
+        var normalizedPrefix = permissionPrefix.Trim();
+        if (!normalizedPrefix.EndsWith(".", StringComparison.Ordinal))
+        {
+            normalizedPrefix += ".";
+        }
+
+        return PermissionGrants.Any(g =>
+            g.IsAllowed &&
+            !string.IsNullOrWhiteSpace(g.PermissionKey) &&
+            g.PermissionKey.StartsWith(normalizedPrefix, StringComparison.OrdinalIgnoreCase));
     }
 }
 

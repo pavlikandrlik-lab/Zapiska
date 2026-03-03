@@ -120,8 +120,7 @@ public sealed class ApiSqlFixture : IAsyncLifetime
         var subsystem = new SubsystemEntity
         {
             Kod = marker,
-            Nazev = $"{marker} API Subsystem",
-            VedouciOsobaId = leaderOsobaId
+            Nazev = $"{marker} API Subsystem"
         };
 
         dbContext.Subsystemy.Add(subsystem);
@@ -144,6 +143,19 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             .Select(x => (int?)x.Verze)
             .FirstOrDefaultAsync()
             ?? 1;
+        var hasProjectSubsystem = await dbContext.ProjektSubsystemy
+            .AnyAsync(x => x.ProjektId == projectId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue);
+        if (!hasProjectSubsystem)
+        {
+            dbContext.ProjektSubsystemy.Add(new ProjektSubsystemEntity
+            {
+                ProjektId = projectId,
+                SubsystemId = subsystemId,
+                DatumPrirazeni = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
         var number = (await dbContext.ProjektoveZaznamy.Where(x => x.ProjektId == projectId).Select(x => (int?)x.CisloZaznamu).MaxAsync() ?? 0) + 1;
 
         var row = new ProjektovyZaznamEntity
@@ -196,11 +208,17 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             .Select(x => x.Id)
             .FirstAsync();
 
-        var exists = await dbContext.ObsazeniProjektu
-            .AnyAsync(x => x.ProjektId == projectId && x.OsobaId == osobaId);
+        var existing = await dbContext.ObsazeniProjektu
+            .FirstOrDefaultAsync(x => x.ProjektId == projectId && x.OsobaId == osobaId);
 
-        if (exists)
+        if (existing is not null)
         {
+            if (existing.DatumOdebrani.HasValue)
+            {
+                existing.DatumOdebrani = null;
+                await dbContext.SaveChangesAsync();
+            }
+
             return;
         }
 
@@ -208,7 +226,8 @@ public sealed class ApiSqlFixture : IAsyncLifetime
         {
             ProjektId = projectId,
             OsobaId = osobaId,
-            RoleId = roleId
+            RoleId = roleId,
+            DatumPrirazeni = DateTime.UtcNow
         });
 
         await dbContext.SaveChangesAsync();

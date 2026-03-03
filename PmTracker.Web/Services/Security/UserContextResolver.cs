@@ -215,11 +215,12 @@ public sealed class UserContextResolver : IUserContextResolver
                     : Array.Empty<int>()
             })
             .ToList();
-        var teamProjectIds = await _dbContext.ObsazeniProjektu
+        var visibleProjectIds = await _dbContext.ObsazeniProjektu
             .AsNoTracking()
-            .Where(x => x.OsobaId == osoba.Id)
+            .Where(x => x.OsobaId == osoba.Id && !x.DatumOdebrani.HasValue)
             .Select(x => x.ProjektId)
             .Distinct()
+            .OrderBy(x => x)
             .ToListAsync(cancellationToken);
 
         var displayName = BuildDisplayName(osoba.Titul, osoba.Jmeno, osoba.Prijmeni, osoba.Id);
@@ -235,8 +236,8 @@ public sealed class UserContextResolver : IUserContextResolver
             OrganizacniCelek = organizationalUnit?.Nazev ?? "-",
             IsSuperAdmin = isSuperAdmin,
             RoleKody = roleCodes,
-            PermissionGrants = grants,
-            TeamProjectIds = teamProjectIds
+            VisibleProjectIds = visibleProjectIds,
+            PermissionGrants = grants
         };
 
         return UserContextResolutionResult.Success(context);

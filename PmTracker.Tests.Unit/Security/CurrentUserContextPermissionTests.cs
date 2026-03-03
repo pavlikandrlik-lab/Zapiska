@@ -36,6 +36,7 @@ public sealed class CurrentUserContextPermissionTests
     {
         var user = BuildUser(
             isSuperAdmin: false,
+            visibleProjectIds: [7],
             grants: new PermissionGrantViewModel
             {
                 PermissionKey = PermissionKeys.TeamManage,
@@ -55,6 +56,7 @@ public sealed class CurrentUserContextPermissionTests
     {
         var user = BuildUser(
             isSuperAdmin: false,
+            visibleProjectIds: [1234],
             grants: new PermissionGrantViewModel
             {
                 PermissionKey = PermissionKeys.MeetingsEdit,
@@ -114,58 +116,160 @@ public sealed class CurrentUserContextPermissionTests
     }
 
     [Fact]
-    public void CanReadProject_ShouldReturnTrue_ForProjectMember()
+    public void CanAccessProject_ShouldReturnTrue_ForVisibleProject()
     {
-        var user = BuildUser(isSuperAdmin: false, teamProjectIds: [17]);
+        var user = BuildUser(isSuperAdmin: false, visibleProjectIds: [5, 7]);
 
-        user.CanReadProject(17).Should().BeTrue();
-        user.CanReadProject(18).Should().BeFalse();
+        user.CanAccessProject(7).Should().BeTrue();
     }
 
     [Fact]
-    public void CanReadProject_ShouldReturnTrue_ForMatchingProjectGrant()
+    public void CanAccessProject_ShouldReturnTrue_ForMatchingProjectGrant()
     {
         var user = BuildUser(
             isSuperAdmin: false,
-            grants:
-            [
-                new PermissionGrantViewModel
-                {
-                    PermissionKey = PermissionKeys.MeetingsEdit,
-                    ScopeLevel = "PROJECT",
-                    ScopeMode = "INCLUDE",
-                    IsAllowed = true,
-                    ProjectIds = [23]
-                }
-            ]);
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.RecordsEdit,
+                ScopeLevel = "PROJECT",
+                ScopeMode = "INCLUDE",
+                IsAllowed = true,
+                ProjectIds = [3]
+            });
 
-        user.CanReadProject(23).Should().BeTrue();
-        user.CanReadProject(24).Should().BeFalse();
+        user.CanAccessProject(3).Should().BeTrue();
     }
 
     [Fact]
-    public void CanReadProject_ShouldIgnoreProjectsCreateGrant()
+    public void CanAccessProject_ShouldIgnoreProjectsCreateGrant()
     {
         var user = BuildUser(
             isSuperAdmin: false,
-            grants:
-            [
-                new PermissionGrantViewModel
-                {
-                    PermissionKey = PermissionKeys.ProjectsCreate,
-                    ScopeLevel = "PROJECT",
-                    ScopeMode = "ALL",
-                    IsAllowed = true,
-                    ProjectIds = Array.Empty<int>()
-                }
-            ]);
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.ProjectsCreate,
+                ScopeLevel = "PROJECT",
+                ScopeMode = "ALL",
+                IsAllowed = true,
+                ProjectIds = Array.Empty<int>()
+            });
 
-        user.CanReadProject(55).Should().BeFalse();
+        user.CanAccessProject(3).Should().BeFalse();
+    }
+
+    [Fact]
+    public void HasPermission_ShouldStillReturnTrue_ForGlobalPermissionWithoutProjectId()
+    {
+        var user = BuildUser(
+            isSuperAdmin: false,
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.SettingsView,
+                ScopeLevel = "GLOBAL",
+                ScopeMode = "ALL",
+                IsAllowed = true,
+                ProjectIds = Array.Empty<int>()
+            });
+
+        user.HasPermission(PermissionKeys.SettingsView).Should().BeTrue();
+    }
+
+    [Fact]
+    public void HasPermissionPrefix_ShouldAlwaysReturnTrue_ForSuperAdmin()
+    {
+        var user = BuildUser(isSuperAdmin: true);
+
+        user.HasPermissionPrefix(PermissionKeys.SettingsPrefix).Should().BeTrue();
+    }
+
+    [Fact]
+    public void HasPermissionPrefix_ShouldReturnFalse_WhenNoMatchingGrantExists()
+    {
+        var user = BuildUser(
+            isSuperAdmin: false,
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.ProjectsCreate,
+                ScopeLevel = "PROJECT",
+                ScopeMode = "ALL",
+                IsAllowed = true,
+                ProjectIds = Array.Empty<int>()
+            });
+
+        user.HasPermissionPrefix(PermissionKeys.PeoplePrefix).Should().BeFalse();
+    }
+
+    [Fact]
+    public void HasPermissionPrefix_ShouldReturnTrue_WhenAllowedGrantMatchesPrefix()
+    {
+        var user = BuildUser(
+            isSuperAdmin: false,
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.SettingsView,
+                ScopeLevel = "GLOBAL",
+                ScopeMode = "ALL",
+                IsAllowed = true,
+                ProjectIds = Array.Empty<int>()
+            });
+
+        user.HasPermissionPrefix(PermissionKeys.SettingsPrefix).Should().BeTrue();
+    }
+
+    [Fact]
+    public void HasPermissionPrefix_ShouldIgnoreDeniedGrant_WhenNoAllowedGrantMatches()
+    {
+        var user = BuildUser(
+            isSuperAdmin: false,
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.SettingsManage,
+                ScopeLevel = "GLOBAL",
+                ScopeMode = "ALL",
+                IsAllowed = false,
+                ProjectIds = Array.Empty<int>()
+            });
+
+        user.HasPermissionPrefix(PermissionKeys.SettingsPrefix).Should().BeFalse();
+    }
+
+    [Fact]
+    public void HasPermissionPrefix_ShouldBeCaseInsensitive()
+    {
+        var user = BuildUser(
+            isSuperAdmin: false,
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = "People.Manage",
+                ScopeLevel = "GLOBAL",
+                ScopeMode = "ALL",
+                IsAllowed = true,
+                ProjectIds = Array.Empty<int>()
+            });
+
+        user.HasPermissionPrefix(PermissionKeys.PeoplePrefix).Should().BeTrue();
+    }
+
+    [Fact]
+    public void HasPermissionPrefix_ShouldAcceptPrefixWithoutTrailingDot()
+    {
+        var user = BuildUser(
+            isSuperAdmin: false,
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.SettingsManage,
+                ScopeLevel = "GLOBAL",
+                ScopeMode = "ALL",
+                IsAllowed = true,
+                ProjectIds = Array.Empty<int>()
+            });
+
+        user.HasPermissionPrefix("settings").Should().BeTrue();
     }
 
     private static CurrentUserContextViewModel BuildUser(
         bool isSuperAdmin,
-        IReadOnlyList<int>? teamProjectIds = null,
+        IReadOnlyList<int>? visibleProjectIds = null,
         params PermissionGrantViewModel[] grants)
     {
         return new CurrentUserContextViewModel
@@ -179,8 +283,8 @@ public sealed class CurrentUserContextPermissionTests
             OrganizacniCelekKod = "TEST",
             IsSuperAdmin = isSuperAdmin,
             RoleKody = Array.Empty<string>(),
-            PermissionGrants = grants,
-            TeamProjectIds = teamProjectIds ?? Array.Empty<int>()
+            VisibleProjectIds = visibleProjectIds ?? grants.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
+            PermissionGrants = grants
         };
     }
 }

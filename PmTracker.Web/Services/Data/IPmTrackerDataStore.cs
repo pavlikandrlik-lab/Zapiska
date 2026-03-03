@@ -44,9 +44,16 @@ public interface IPmTrackerDataStore
     void SaveMeetingStatus(SaveMeetingStatusCommand command, CurrentUserContextViewModel currentUser);
     void SaveMeetingNote(SaveMeetingNoteCommand command, CurrentUserContextViewModel currentUser);
     void SaveAttendance(SaveAttendanceCommand command, CurrentUserContextViewModel currentUser);
+    void AddMeetingParticipant(AddMeetingParticipantCommand command, CurrentUserContextViewModel currentUser);
 
     void SaveTeamMember(SaveTeamMemberCommand command, CurrentUserContextViewModel currentUser);
     void RemoveTeamMember(RemoveTeamMemberCommand command, CurrentUserContextViewModel currentUser);
+    void AssignProjectRole(AssignProjectRoleCommand command, CurrentUserContextViewModel currentUser);
+    void DeactivateProjectRole(DeactivateProjectRoleCommand command, CurrentUserContextViewModel currentUser);
+    void AssignProjectSubsystem(AssignProjectSubsystemCommand command, CurrentUserContextViewModel currentUser);
+    void DeactivateProjectSubsystem(DeactivateProjectSubsystemCommand command, CurrentUserContextViewModel currentUser);
+    void AssignProjectSubsystemRole(AssignProjectSubsystemRoleCommand command, CurrentUserContextViewModel currentUser);
+    void DeactivateProjectSubsystemRole(DeactivateProjectSubsystemRoleCommand command, CurrentUserContextViewModel currentUser);
 
     int SaveManualPerson(SaveManualPersonCommand command, CurrentUserContextViewModel currentUser);
     int SaveAdPerson(SaveAdPersonCommand command, CurrentUserContextViewModel currentUser);
@@ -61,4 +68,5 @@ public interface IPmTrackerDataStore
     void SaveAuthzPermission(SaveAuthzPermissionCommand command, CurrentUserContextViewModel currentUser);
     void ToggleAuthzPermission(ToggleAuthzPermissionCommand command, CurrentUserContextViewModel currentUser);
     void SaveRolePermission(SaveRolePermissionCommand command, CurrentUserContextViewModel currentUser);
+    void DeleteRolePermission(DeleteRolePermissionCommand command, CurrentUserContextViewModel currentUser);
 }

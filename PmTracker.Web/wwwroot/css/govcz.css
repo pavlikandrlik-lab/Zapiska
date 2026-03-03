@@ -1,53 +1,57 @@
 :root {
-    --gov-color-primary: #0b3d91;
-    --gov-color-primary-strong: #0a2d66;
-    --gov-color-accent: #d9480f;
-    --gov-color-success: #2f9e44;
-    --gov-color-warning: #f08c00;
-    --gov-color-muted: #6b7280;
-    --gov-color-border: #e5e7eb;
-    --gov-color-bg: #f7f8fb;
+    --gov-color-primary: #005ea5;
+    --gov-color-primary-strong: #003d6b;
+    --gov-color-accent: #d4351c;
+    --gov-color-success: #00703c;
+    --gov-color-warning: #b58800;
+    --gov-color-muted: #505a5f;
+    --gov-color-border: #b1b4b6;
+    --gov-color-bg: #f3f2f1;
     --gov-color-surface: #ffffff;
-    --gov-shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
-    --gov-radius: 12px;
-    --gov-font: "SF Pro Text", "SF Pro Display", "Source Sans 3", "IBM Plex Sans", sans-serif;
-    --app-bg-start: #eef3fa;
-    --app-bg-mid: #f7f9fc;
-    --app-bg-end: #f7f8fb;
-    --app-nav-bg: rgba(255, 255, 255, 0.95);
-    --app-nav-hover: #f8fafc;
-    --app-nav-active-bg: #eaf0fb;
-    --app-nav-active-border: #c7d6f1;
-    --app-text-primary: #0f172a;
-    --app-muted: #6b7280;
-    --app-footer-bg: #19325a;
-    --app-footer-text: #d8e3f7;
+    --gov-shadow-soft: 0 2px 8px rgba(11, 12, 12, 0.08);
+    --gov-radius: 8px;
+    --gov-font: "Roboto", Arial, Helvetica, sans-serif;
+    --app-bg-start: #f3f2f1;
+    --app-bg-mid: #f3f2f1;
+    --app-bg-end: #f3f2f1;
+    --app-nav-bg: #ffffff;
+    --app-nav-hover: #f3f2f1;
+    --app-nav-active-bg: #ffffff;
+    --app-nav-active-border: #005ea5;
+    --app-text-primary: #0b0c0c;
+    --app-muted: #505a5f;
+    --app-footer-bg: #1d2a44;
+    --app-footer-text: #dfe7f3;
     --app-footer-title: #ffffff;
+    --app-footer-meta: #b4c3dc;
+    --app-footer-divider: rgba(223, 231, 243, 0.18);
 }
 
 :root[data-theme="dark"] {
-    --gov-color-primary: #8bb3ff;
-    --gov-color-primary-strong: #78a3f7;
-    --gov-color-accent: #ff8d68;
-    --gov-color-success: #57c483;
-    --gov-color-warning: #f2b35d;
-    --gov-color-muted: #9ca7bd;
-    --gov-color-border: #2f3a52;
-    --gov-color-bg: #0f1624;
-    --gov-color-surface: #162033;
-    --gov-shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.35);
-    --app-bg-start: #0d1422;
-    --app-bg-mid: #0f1829;
-    --app-bg-end: #101a2b;
-    --app-nav-bg: rgba(22, 32, 51, 0.95);
-    --app-nav-hover: #1d2b43;
-    --app-nav-active-bg: #223454;
-    --app-nav-active-border: #34517e;
-    --app-text-primary: #e7edf9;
-    --app-muted: #9ca7bd;
-    --app-footer-bg: #0b1422;
-    --app-footer-text: #b8c8e8;
-    --app-footer-title: #f4f7ff;
+    --gov-color-primary: #9cc8ff;
+    --gov-color-primary-strong: #c2ddff;
+    --gov-color-accent: #ff8a75;
+    --gov-color-success: #7ed9a6;
+    --gov-color-warning: #f5cf67;
+    --gov-color-muted: #a7b0ba;
+    --gov-color-border: #47515b;
+    --gov-color-bg: #0f1419;
+    --gov-color-surface: #1b2128;
+    --gov-shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.28);
+    --app-bg-start: #0f1419;
+    --app-bg-mid: #0f1419;
+    --app-bg-end: #0f1419;
+    --app-nav-bg: #1b2128;
+    --app-nav-hover: #25303b;
+    --app-nav-active-bg: #1b2128;
+    --app-nav-active-border: #9cc8ff;
+    --app-text-primary: #f3f5f7;
+    --app-muted: #a7b0ba;
+    --app-footer-bg: #0c1117;
+    --app-footer-text: #c9d6e8;
+    --app-footer-title: #ffffff;
+    --app-footer-meta: #a7bbd6;
+    --app-footer-divider: rgba(201, 214, 232, 0.18);
 }
 
 * {
@@ -59,6 +63,8 @@ body {
     font-family: var(--gov-font);
     color: var(--app-text-primary);
     background: var(--gov-color-bg);
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
 }
 
 a {

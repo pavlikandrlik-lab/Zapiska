@@ -4,7 +4,7 @@ namespace PmTracker.Web.Services.Common;
 
 public interface ICommentAuthorizationPolicy
 {
-    bool CanCommentAsSubsystemLeader(CurrentUserContextViewModel currentUser, int projektId, int subsystemLeadOsobaId);
-    bool CanAddComment(CurrentUserContextViewModel currentUser, int projektId, int subsystemLeadOsobaId);
-    bool CanModifyComment(CurrentUserContextViewModel currentUser, int projektId, int subsystemLeadOsobaId, int commentAuthorOsobaId);
+    bool CanCommentAsSubsystemLeader(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds);
+    bool CanAddComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds);
+    bool CanModifyComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, int commentAuthorOsobaId);
 }

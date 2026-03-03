@@ -37,9 +37,9 @@ public sealed class CiselnikRadekViewModel
     public required string Kod { get; init; }
     public required string Nazev { get; init; }
     public bool IsLocked { get; init; }
+    public bool CanChangeLockState { get; init; }
     public bool CanEdit { get; init; } = true;
     public bool CanDelete { get; init; } = true;
-    public bool CanChangeLockState { get; init; }
     public required IReadOnlyList<string> HodnotyNavic { get; init; }
     public IReadOnlyList<string> HodnotyNavicRaw { get; init; } = Array.Empty<string>();
 }

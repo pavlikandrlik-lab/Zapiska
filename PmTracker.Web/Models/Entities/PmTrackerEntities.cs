@@ -50,6 +50,14 @@ public sealed class CiselnikRoliProjektuEntity
     public bool IsLocked { get; set; }
 }
 
+public sealed class CiselnikRoleSubsystemuEntity
+{
+    public int Id { get; set; }
+    public string Kod { get; set; } = string.Empty;
+    public string Nazev { get; set; } = string.Empty;
+    public bool IsLocked { get; set; }
+}
+
 public sealed class CiselnikStavuUcastiEntity
 {
     public int Id { get; set; }
@@ -119,7 +127,6 @@ public sealed class SubsystemEntity
     public int Id { get; set; }
     public string Kod { get; set; } = string.Empty;
     public string Nazev { get; set; } = string.Empty;
-    public int VedouciOsobaId { get; set; }
 }
 
 public sealed class OsobaEntity
@@ -151,6 +158,27 @@ public sealed class ObsazeniProjektuEntity
     public int ProjektId { get; set; }
     public int OsobaId { get; set; }
     public int RoleId { get; set; }
+    public DateTime DatumPrirazeni { get; set; }
+    public DateTime? DatumOdebrani { get; set; }
+}
+
+public sealed class ProjektSubsystemEntity
+{
+    public int Id { get; set; }
+    public int ProjektId { get; set; }
+    public int SubsystemId { get; set; }
+    public DateTime DatumPrirazeni { get; set; }
+    public DateTime? DatumOdebrani { get; set; }
+}
+
+public sealed class ObsazeniSubsystemuProjektuEntity
+{
+    public int Id { get; set; }
+    public int ProjektSubsystemId { get; set; }
+    public int OsobaId { get; set; }
+    public int RoleSubsystemuId { get; set; }
+    public DateTime DatumPrirazeni { get; set; }
+    public DateTime? DatumOdebrani { get; set; }
 }
 
 public sealed class ProjektovyZaznamEntity

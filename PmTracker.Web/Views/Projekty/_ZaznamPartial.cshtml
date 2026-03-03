@@ -11,7 +11,7 @@
     var editButtonLabel = canEditRecord ? "Upravit" : "GANTT";
     var userOsobaId = userContext?.OsobaId ?? 0;
     var hasSubsystemLeadPermission = userContext?.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId) ?? false;
-    var isLeaderForRecord = Model.AktualniSubsystemVedouciOsobaId > 0 && userOsobaId == Model.AktualniSubsystemVedouciOsobaId;
+    var isLeaderForRecord = userOsobaId > 0 && Model.AktualniSubsystemLeadEquivalentOsobaIds.Contains(userOsobaId);
     var canCommentAsSubsystemLeader = hasSubsystemLeadPermission && isLeaderForRecord;
     var canAddComment = canEditRecord || canCommentAsSubsystemLeader;
     var taskPrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = Model.Id, projektId, autoPrint = true }) ?? $"/Export/Ukol/{Model.Id}/Tisk?projektId={projektId}&autoPrint=true";
@@ -138,7 +138,7 @@
                     }
                     <strong>@Model.AktualniSubsystem</strong>
                 </div>
-                @if (Model.JeUkol && (!string.IsNullOrWhiteSpace(Model.TypUkolu) || Model.HistorieTypuUkolu.Count > 0))
+                @if (!string.IsNullOrWhiteSpace(Model.TypUkolu))
                 {
                     <div>
                         <span class="label">Typ úkolu:</span>
@@ -146,7 +146,7 @@
                         {
                             <span class="history"><s>@typ</s></span>
                         }
-                        <strong>@(string.IsNullOrWhiteSpace(Model.TypUkolu) ? "-" : Model.TypUkolu)</strong>
+                        <strong>@Model.TypUkolu</strong>
                     </div>
                 }
             </div>

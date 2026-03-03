@@ -13,4 +13,5 @@ public interface ISettingsService
     void SaveUserRoleAssignment(SaveUserRoleAssignmentCommand command, CurrentUserContextViewModel currentUser);
     void SaveUserRolesForUser(SaveUserRolesForUserCommand command, CurrentUserContextViewModel currentUser);
     void SaveRolePermission(SaveRolePermissionCommand command, CurrentUserContextViewModel currentUser);
+    void DeleteRolePermission(DeleteRolePermissionCommand command, CurrentUserContextViewModel currentUser);
 }

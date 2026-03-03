@@ -1,3 +1,5 @@
+@inject PmTracker.Web.Services.Common.IApplicationVersionProvider ApplicationVersionProvider
+
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -15,7 +17,9 @@
         var roleList = userContext?.RoleKody is IReadOnlyList<string> roles
             ? string.Join(", ", roles)
             : string.Empty;
-        var canViewSettings = ViewBag.CanViewSettingsTab as bool? ?? false;
+        var canViewPeopleTab = userContext?.HasPermissionPrefix(PermissionKeys.PeoplePrefix) ?? false;
+        var canViewCiselnikyTab = userContext?.HasPermissionPrefix(PermissionKeys.CiselnikyPrefix) ?? false;
+        var canViewSettingsTab = userContext?.HasPermissionPrefix(PermissionKeys.SettingsPrefix) ?? false;
     }
     <a class="skip-link" href="#main">Přeskočit na obsah</a>
 
@@ -60,10 +64,16 @@
 
         <nav class="app-nav" aria-label="Hlavní menu">
             <a class="@NavClass("projekty")" asp-controller="Projekty" asp-action="Index">Projekty</a>
-            <a class="@NavClass("osoby")" asp-controller="Osoby" asp-action="Index">Osoby</a>
-            <a class="@NavClass("ciselniky")" asp-controller="Ciselniky" asp-action="Index">Číselníky</a>
+            @if (canViewPeopleTab)
+            {
+                <a class="@NavClass("osoby")" asp-controller="Osoby" asp-action="Index">Osoby</a>
+            }
+            @if (canViewCiselnikyTab)
+            {
+                <a class="@NavClass("ciselniky")" asp-controller="Ciselniky" asp-action="Index">Číselníky</a>
+            }
             <a class="@NavClass("jednani")" asp-controller="Jednani" asp-action="Index">Jednání</a>
-            @if (canViewSettings)
+            @if (canViewSettingsTab)
             {
                 <a class="@NavClass("nastaveni")" asp-controller="Nastaveni" asp-action="Index">Nastavení</a>
             }
@@ -85,6 +95,7 @@
                 <a asp-controller="Dokumentace" asp-action="UzivatelskaPrirucka">Uživatelská příručka</a>
                 <a asp-controller="Dokumentace" asp-action="TechnickaDokumentace">Technická dokumentace</a>
                 <a asp-controller="Dokumentace" asp-action="Qa">Q and A</a>
+                <a asp-controller="Dokumentace" asp-action="Changelog">Changelog verzí</a>
             </div>
             <div>
                 <h3>Informace</h3>
@@ -94,10 +105,13 @@
             </div>
             <div>
                 <h3>Podpora</h3>
-                <a href="tel:+420973200840">FIS: 973 200 840</a>
-                <a href="tel:+420973225500">ISSP: 973 225 500</a>
-                <a href="tel:+420973211111">ŠIS: 973 211 111</a>
+                <span>FIS: 973 200 840</span>
+                <span>ISSP: 973 225 500</span>
+                <span>ŠIS: 973 211 111</span>
             </div>
+        </div>
+        <div class="app-footer-meta">
+            <small class="app-footer-version">Verze @ApplicationVersionProvider.DisplayVersion</small>
         </div>
     </footer>
 

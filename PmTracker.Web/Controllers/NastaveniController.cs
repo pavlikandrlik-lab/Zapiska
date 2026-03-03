@@ -218,6 +218,11 @@ public sealed class NastaveniController : BaseController
             return NotFound();
         }
 
+        if (mapping is not null && !mapping.IsAllowed)
+        {
+            return Forbid();
+        }
+
         var selectedRoleId = mapping?.RoleId ?? roleId ?? panel.Role.Where(x => x.IsActive).OrderBy(x => x.Kod).Select(x => (int?)x.Id).FirstOrDefault() ?? 0;
         var selectedPermissionId = mapping?.PermissionId ?? permissionId ?? panel.Permissions.Where(x => x.IsActive).OrderBy(x => x.Klic).Select(x => (int?)x.Id).FirstOrDefault() ?? 0;
 
@@ -388,7 +393,28 @@ public sealed class NastaveniController : BaseController
                 refreshScope: "nastaveni-panel",
                 refreshUrl: BuildPanelRefreshUrl("role-akce", userId, projektId),
                 message: "Mapování role/akce bylo uloženo."),
-            operation: () => _settingsService.SaveRolePermission(command, CurrentUserContext));
+            operation: () =>
+            {
+                command.IsAllowed = true;
+                _settingsService.SaveRolePermission(command, CurrentUserContext);
+            });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult DeleteRolePermission(DeleteRolePermissionCommand command, int? userId, int? projektId)
+    {
+        return ExecuteValidatedCommand(
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+            invalidAjaxMessage: "Mapování role/akce nelze smazat.",
+            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
+            onInvalidRedirect: () => RedirectToAction(nameof(Index), new { section = "role-akce", userId, projektId })!,
+            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { section = "role-akce", userId, projektId })!,
+            onAjaxSuccess: () => AjaxSuccessResult(
+                refreshScope: "nastaveni-panel",
+                refreshUrl: BuildPanelRefreshUrl("role-akce", userId, projektId),
+                message: "Mapování role/akce bylo smazáno."),
+            operation: () => _settingsService.DeleteRolePermission(command, CurrentUserContext));
     }
 
     private static string NormalizeSection(string? section)
