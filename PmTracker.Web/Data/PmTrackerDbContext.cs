@@ -482,10 +482,7 @@ public sealed class PmTrackerDbContext : DbContext
 
         modelBuilder.Entity<ZaznamHarmonogramHodnotaEntity>(entity =>
         {
-            entity.ToTable("zaznam_harmonogram_hodnoty", table =>
-            {
-                table.HasCheckConstraint("CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative", "hodnota_int >= 0");
-            });
+            entity.ToTable("zaznam_harmonogram_hodnoty");
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.ZaznamId, x.TypId })
                 .IsUnique()

@@ -90,6 +90,16 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             throw new InvalidOperationException("V DB chybí sloupec dbo.vyjadreni.autor_osoba_id. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
         }
 
+        var hasLegacyScheduleConstraint = await HasCheckConstraintAsync(
+            dbContext,
+            "dbo.zaznam_harmonogram_hodnoty",
+            "CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative",
+            cancellationToken);
+        if (hasLegacyScheduleConstraint)
+        {
+            throw new InvalidOperationException("V DB je legacy constraint CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative, který blokuje zápornou skutečnost harmonogramu. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_0_signed_schedule_actual.sql.");
+        }
+
         foreach (var requiredColumn in new[] { "datum_prirazeni", "datum_odebrani" })
         {
             if (!await HasColumnAsync(dbContext, "dbo.obsazeni_projektu", requiredColumn, cancellationToken))
@@ -174,6 +184,51 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             tableParam.ParameterName = "@tableName";
             tableParam.Value = tableName;
             command.Parameters.Add(tableParam);
+
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            return Convert.ToInt32(result) > 0;
+        }
+        finally
+        {
+            if (mustClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static async Task<bool> HasCheckConstraintAsync(
+        PmTrackerDbContext dbContext,
+        string tableName,
+        string constraintName,
+        CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var mustClose = connection.State != ConnectionState.Open;
+        if (mustClose)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT COUNT(*)
+                FROM sys.check_constraints
+                WHERE parent_object_id = OBJECT_ID(@tableName)
+                  AND name = @constraintName
+                """;
+
+            var tableParam = command.CreateParameter();
+            tableParam.ParameterName = "@tableName";
+            tableParam.Value = tableName;
+            command.Parameters.Add(tableParam);
+
+            var constraintParam = command.CreateParameter();
+            constraintParam.ParameterName = "@constraintName";
+            constraintParam.Value = constraintName;
+            command.Parameters.Add(constraintParam);
 
             var result = await command.ExecuteScalarAsync(cancellationToken);
             return Convert.ToInt32(result) > 0;

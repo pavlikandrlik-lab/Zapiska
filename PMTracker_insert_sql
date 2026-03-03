@@ -258,8 +258,7 @@ CREATE TABLE dbo.zaznam_harmonogram_hodnoty (
     zaznam_id int NOT NULL,
     typ_id int NOT NULL,
     hodnota_int int NOT NULL,
-    updated_at datetime2 NOT NULL CONSTRAINT DF_zaznam_harmonogram_hodnoty_updated_at DEFAULT (SYSUTCDATETIME()),
-    CONSTRAINT CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative CHECK (hodnota_int >= 0)
+    updated_at datetime2 NOT NULL CONSTRAINT DF_zaznam_harmonogram_hodnoty_updated_at DEFAULT (SYSUTCDATETIME())
 );
 GO
 
