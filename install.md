@@ -66,6 +66,7 @@ Přenést na server:
 
 - obsah `publish/fdd` (nebo `publish/win-x64`),
 - SQL skript `/Users/Pavel.Andrlik/Documents/PM Tracker/PMTracker_insert_sql`.
+- při upgrade existující DB i `/Users/Pavel.Andrlik/Documents/PM Tracker/db_upgrade_1_1_0_signed_schedule_actual.sql`.
 
 ---
 
@@ -106,6 +107,16 @@ Očekávaný výsledek:
 - `Pavel Admin` existuje,
 - `pmt_count = 0`,
 - `authz.roles` má data.
+
+### 4.3 Upgrade existující databáze na signed skutečnost harmonogramu
+
+Pokud nenasazuješ čistou databázi, ale upgrade release `1.1.0`, spusť po standardním deployi i tento patch:
+
+```powershell
+sqlcmd -S $SQL_INSTANCE -E -d $DB_NAME -b -i "$DEPLOY_SQL_DIR\db_upgrade_1_1_0_signed_schedule_actual.sql"
+```
+
+Patch je idempotentní a jen odstraní legacy constraint `CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative`, který by jinak blokoval záporné hodnoty harmonogramové skutečnosti.
 
 ---
 

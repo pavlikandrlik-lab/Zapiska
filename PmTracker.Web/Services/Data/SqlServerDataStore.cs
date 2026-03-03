@@ -4757,6 +4757,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .Where(x => x > 0)
             .Distinct()
             .ToList();
+        var durationTypeSet = durationTypeIds.ToHashSet();
         var allowedTypeIds = durationTypeIds
             .Concat(delayTypeIds)
             .ToHashSet();
@@ -4768,11 +4769,19 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var submittedByType = submittedValues
             .Where(x => allowedTypeIds.Contains(x.TypId))
             .GroupBy(x => x.TypId)
-            .ToDictionary(group => group.Key, group => Math.Max(0, group.Last().Hodnota));
+            .ToDictionary(
+                group => group.Key,
+                group => durationTypeSet.Contains(group.Key)
+                    ? Math.Max(0, group.Last().Hodnota)
+                    : group.Last().Hodnota);
 
         var existingByType = _dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
             .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId))
-            .ToDictionary(x => x.TypId, x => Math.Max(0, x.HodnotaInt));
+            .ToDictionary(
+                x => x.TypId,
+                x => durationTypeSet.Contains(x.TypId)
+                    ? Math.Max(0, x.HodnotaInt)
+                    : x.HodnotaInt);
 
         var desired = new Dictionary<int, int>();
 
@@ -4818,6 +4827,11 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         IReadOnlyList<SaveRecordHarmonogramValueCommand> harmonogramValues,
         IReadOnlyList<HarmonogramTypPar> harmonogramTypy)
     {
+        var durationTypeSet = harmonogramTypy
+            .Select(x => x.TrvaniTypId)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToHashSet();
         var allowedTypeIds = harmonogramTypy
             .SelectMany(x => new[] { x.TrvaniTypId, x.ZpozdeniTypId })
             .Where(x => x > 0)
@@ -4835,9 +4849,11 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .Select(group => new
             {
                 TypId = group.Key,
-                Hodnota = Math.Max(0, group.Last().Hodnota)
+                Hodnota = durationTypeSet.Contains(group.Key)
+                    ? Math.Max(0, group.Last().Hodnota)
+                    : group.Last().Hodnota
             })
-            .Where(x => x.Hodnota > 0)
+            .Where(x => x.Hodnota != 0)
             .ToDictionary(x => x.TypId, x => x.Hodnota);
         var normalizedResult = normalized
             .Select(item => new SaveRecordHarmonogramValueCommand
