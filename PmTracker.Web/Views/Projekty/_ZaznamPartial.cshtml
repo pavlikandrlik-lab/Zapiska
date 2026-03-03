@@ -16,6 +16,7 @@
     var canAddComment = canEditRecord || canCommentAsSubsystemLeader;
     var taskPrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = Model.Id, projektId, autoPrint = true }) ?? $"/Export/Ukol/{Model.Id}/Tisk?projektId={projektId}&autoPrint=true";
     var taskPrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = Model.Id, projektId }) ?? $"/Export/Ukol/{Model.Id}/Word?projektId={projektId}";
+    var editRecordUrl = Url.Action("Edit", "Zaznamy", new { id = Model.Id, projektId }) ?? $"/Zaznamy/Edit/{Model.Id}";
 }
 
 <article class="record-card collapsed @colorClass"
@@ -86,7 +87,26 @@
                 </a>
                 @if (canEditRecord || canManageSchedule)
                 {
-                    <button class="btn small" type="button" data-modal-url="@Url.Action("Edit", "Zaznamy", new { id = Model.Id, projektId = projektId })" data-stop-propagation="true">@editButtonLabel</button>
+                    <div class="record-editor-split">
+                        <button class="btn small"
+                                type="button"
+                                data-record-editor-url="@editRecordUrl"
+                                data-record-editor-project-id="@projektId"
+                                data-record-editor-label="@($"{editButtonLabel} záznam #{Model.CisloViditelne}")"
+                                data-stop-propagation="true">
+                            @editButtonLabel
+                        </button>
+                        <button class="btn small record-editor-split-choice"
+                                type="button"
+                                data-record-editor-url="@editRecordUrl"
+                                data-record-editor-project-id="@projektId"
+                                data-record-editor-label="@($"{editButtonLabel} záznam #{Model.CisloViditelne}")"
+                                data-record-editor-choice="true"
+                                data-stop-propagation="true"
+                                aria-label="Vybrat způsob otevření editoru záznamu #@Model.CisloViditelne">
+                            <span aria-hidden="true">▾</span>
+                        </button>
+                    </div>
                 }
                 <span class="record-toggle-indicator" aria-hidden="true">›</span>
             </div>
@@ -221,24 +241,26 @@
                                         }
                                         @if (canEditThisComment)
                                         {
-                                            <details class="comment-edit-details">
-                                                <summary>Upravit</summary>
-                                                <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true">
+                                            <div class="comment-toolbar-actions">
+                                                <details class="comment-edit-details">
+                                                    <summary class="comment-action-chip">Upravit</summary>
+                                                    <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true">
+                                                        <input type="hidden" name="projektId" value="@projektId" />
+                                                        <input type="hidden" name="uiContext" value="project" />
+                                                        <input type="hidden" name="zaznamId" value="@Model.Id" />
+                                                        <input type="hidden" name="Id" value="@vyjadreni.Id" />
+                                                        <textarea rows="3" name="Text" required>@vyjadreni.Text</textarea>
+                                                        <button class="btn small" type="submit">Uložit změnu</button>
+                                                    </form>
+                                                </details>
+                                                <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
                                                     <input type="hidden" name="projektId" value="@projektId" />
                                                     <input type="hidden" name="uiContext" value="project" />
                                                     <input type="hidden" name="zaznamId" value="@Model.Id" />
                                                     <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                                    <textarea rows="3" name="Text" required>@vyjadreni.Text</textarea>
-                                                    <button class="btn small" type="submit">Uložit změnu</button>
+                                                    <button class="btn small ghost" type="submit">Smazat</button>
                                                 </form>
-                                            </details>
-                                            <form class="comment-delete-form" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
-                                                <input type="hidden" name="projektId" value="@projektId" />
-                                                <input type="hidden" name="uiContext" value="project" />
-                                                <input type="hidden" name="zaznamId" value="@Model.Id" />
-                                                <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                                <button class="btn small ghost" type="submit">Smazat</button>
-                                            </form>
+                                            </div>
                                         }
                                         else if (!vyjadreni.LzeUpravit)
                                         {

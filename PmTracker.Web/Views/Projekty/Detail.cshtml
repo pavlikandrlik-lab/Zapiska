@@ -18,6 +18,7 @@
     var harmonogramUkoly = Model.HarmonogramUkoly;
     var harmonogramLegendKroky = harmonogramUkoly.FirstOrDefault()?.Kroky ?? Array.Empty<ProjektHarmonogramKrokViewModel>();
     var harmonogramDelayBarva = harmonogramUkoly.FirstOrDefault()?.DelayBarvaHex ?? "#DC2626";
+    var createRecordEditorUrl = Url.Action("Create", "Zaznamy", new { projektId = Model.Projekt.Id }) ?? $"/Zaznamy/Create?projektId={Model.Projekt.Id}";
 }
 
 <section class="page-header page-header-compact">
@@ -38,9 +39,8 @@
     <button class="tab" type="button" data-tab="tym">Osoby (tým)</button>
 </div>
 
-<section class="tab-panel active" data-tab-panel="zaznamy">
+<section class="tab-panel active" data-tab-panel="zaznamy" data-project-detail-root data-project-id="@Model.Projekt.Id">
     <div class="panel-header">
-        <h2>Projektové záznamy</h2>
         <div class="panel-header-actions">
             <label class="toggle">
                 <input type="checkbox" checked="checked" data-view-toggle />
@@ -58,7 +58,24 @@
             </a>
             @if (canManageRecords)
             {
-                <button class="btn primary" type="button" data-modal-url="@Url.Action("Create", "Zaznamy", new { projektId = Model.Projekt.Id })">Nový záznam</button>
+                <div class="record-editor-split">
+                    <button class="btn primary"
+                            type="button"
+                            data-record-editor-url="@createRecordEditorUrl"
+                            data-record-editor-project-id="@Model.Projekt.Id"
+                            data-record-editor-label="Nový záznam">
+                        Nový záznam
+                    </button>
+                    <button class="btn primary record-editor-split-choice"
+                            type="button"
+                            data-record-editor-url="@createRecordEditorUrl"
+                            data-record-editor-project-id="@Model.Projekt.Id"
+                            data-record-editor-label="Nový záznam"
+                            data-record-editor-choice="true"
+                            aria-label="Vybrat způsob otevření nového záznamu">
+                        <span aria-hidden="true">▾</span>
+                    </button>
+                </div>
             }
         </div>
     </div>
@@ -168,9 +185,6 @@
 </section>
 
 <section class="tab-panel" data-tab-panel="harmonogram">
-    <div class="panel-header">
-        <h2>Harmonogram úkolů</h2>
-    </div>
     <div class="schedule-mini-legend">Legenda: Plán / Posun / Termín úkolu</div>
     <div class="schedule-step-legend">
         @foreach (var krok in harmonogramLegendKroky)
@@ -303,7 +317,25 @@
                             <span class="badge @(item.Stihame ? "schedule-badge-ok" : "schedule-badge-late")">@(item.Stihame ? "Stíháme" : "Nestíháme")</span>
                             @if (canManageSchedules)
                             {
-                                <button class="btn small" type="button" data-modal-url="@Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = Model.Projekt.Id })">Upravit</button>
+                                var scheduleEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = Model.Projekt.Id }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
+                                <div class="record-editor-split">
+                                    <button class="btn small"
+                                            type="button"
+                                            data-record-editor-url="@scheduleEditUrl"
+                                            data-record-editor-project-id="@Model.Projekt.Id"
+                                            data-record-editor-label="Upravit záznam #@item.CisloViditelne">
+                                        Upravit
+                                    </button>
+                                    <button class="btn small record-editor-split-choice"
+                                            type="button"
+                                            data-record-editor-url="@scheduleEditUrl"
+                                            data-record-editor-project-id="@Model.Projekt.Id"
+                                            data-record-editor-label="Upravit záznam #@item.CisloViditelne"
+                                            data-record-editor-choice="true"
+                                            aria-label="Vybrat způsob otevření editoru záznamu #@item.CisloViditelne">
+                                        <span aria-hidden="true">▾</span>
+                                    </button>
+                                </div>
                             }
                         </div>
                     </div>
@@ -375,9 +407,6 @@
 </section>
 
 <section class="tab-panel" data-tab-panel="gant" data-gantt-panel data-project-id="@Model.Projekt.Id">
-    <div class="panel-header">
-        <h2>GANTT</h2>
-    </div>
     <div class="schedule-mini-legend">Legenda: krokové barvy / barva zpoždění / černá = termín úkolu</div>
     <div class="schedule-step-legend">
         @foreach (var krok in harmonogramLegendKroky)
@@ -549,7 +578,25 @@
                                 <button class="btn small ghost" type="button" data-gantt-expand-toggle data-gantt-record-id="@item.ZaznamId">Rozpad</button>
                                 @if (canManageSchedules)
                                 {
-                                    <button class="btn small" type="button" data-modal-url="@Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = Model.Projekt.Id })">Upravit</button>
+                                    var ganttEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = Model.Projekt.Id }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
+                                    <div class="record-editor-split">
+                                        <button class="btn small"
+                                                type="button"
+                                                data-record-editor-url="@ganttEditUrl"
+                                                data-record-editor-project-id="@Model.Projekt.Id"
+                                                data-record-editor-label="Upravit záznam #@item.CisloViditelne">
+                                            Upravit
+                                        </button>
+                                        <button class="btn small record-editor-split-choice"
+                                                type="button"
+                                                data-record-editor-url="@ganttEditUrl"
+                                                data-record-editor-project-id="@Model.Projekt.Id"
+                                                data-record-editor-label="Upravit záznam #@item.CisloViditelne"
+                                                data-record-editor-choice="true"
+                                                aria-label="Vybrat způsob otevření editoru záznamu #@item.CisloViditelne">
+                                            <span aria-hidden="true">▾</span>
+                                        </button>
+                                    </div>
                                 }
                             </div>
                         </div>
@@ -645,13 +692,12 @@
 </section>
 
 <section class="tab-panel" data-tab-panel="jednani">
-    <div class="panel-header">
-        <h2>Jednání</h2>
-        @if (canCreateMeetings)
-        {
+    @if (canCreateMeetings)
+    {
+        <div class="panel-header">
             <button class="btn primary" type="button" data-modal-url="@Url.Action("NewMeetingModal", "Projekty", new { projektId = Model.Projekt.Id })">Nová porada</button>
-        }
-    </div>
+        </div>
+    }
 
     <div class="meeting-grid">
         @foreach (var jednani in Model.Jednani)
@@ -674,13 +720,12 @@
 </section>
 
 <section class="tab-panel" data-tab-panel="tym">
-    <div class="panel-header">
-        <h2>Tým</h2>
-        @if (canManageTeam)
-        {
+    @if (canManageTeam)
+    {
+        <div class="panel-header">
             <button class="btn primary" type="button" data-modal-url="@Url.Action("AddTeamMemberModal", "Projekty", new { projektId = Model.Projekt.Id })">Přidat člena</button>
-        }
-    </div>
+        </div>
+    }
 
     <section class="card">
         <table class="table">

@@ -311,6 +311,94 @@
     color: var(--gov-color-primary);
 }
 
+.record-editor-popover {
+    position: fixed;
+    min-width: 300px;
+    max-width: min(360px, calc(100vw - 24px));
+    border-radius: 16px;
+    border: 1px solid var(--gov-color-border);
+    background: var(--gov-color-surface);
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.22);
+    padding: 18px 18px 14px;
+    z-index: 1200;
+    display: grid;
+    gap: 10px;
+}
+
+.record-editor-popover-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.record-editor-popover-subtitle {
+    margin: 0;
+    font-size: 14px;
+    color: var(--app-muted);
+}
+
+.record-editor-popover-actions {
+    display: grid;
+    gap: 10px;
+}
+
+.record-editor-popover-actions .btn {
+    justify-content: center;
+}
+
+.record-editor-popover-remember {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.record-editor-popover-remember input[type="checkbox"] {
+    width: auto;
+    margin-top: 2px;
+}
+
+.record-editor-popover-note {
+    margin: 0;
+    font-size: 12px;
+    color: var(--app-muted);
+}
+
+.record-editor-popover-reset {
+    border: none;
+    background: transparent;
+    padding: 0;
+    color: var(--gov-color-primary);
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+.record-editor-popover-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--gov-color-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--gov-color-muted);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.record-editor-popover-close:hover {
+    border-color: var(--gov-color-primary);
+    color: var(--gov-color-primary);
+}
+
 .app-nav {
     display: flex;
     gap: 8px;
@@ -1166,6 +1254,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 /* Record modal tabs */
 .record-modal-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 8px;
 }
@@ -1187,6 +1276,115 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .record-modal-panel[hidden] {
     display: none !important;
+}
+
+.record-editor-split {
+    display: inline-flex;
+    align-items: stretch;
+    gap: 6px;
+}
+
+.record-editor-split .btn {
+    white-space: nowrap;
+}
+
+.record-editor-split-choice {
+    min-width: 42px;
+    padding-inline: 12px;
+}
+
+.record-editor-form {
+    display: grid;
+    gap: 16px;
+}
+
+.record-editor-actions {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 14px 0 4px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--gov-color-surface) 24px);
+    z-index: 5;
+}
+
+.record-editor-page-shell {
+    display: grid;
+    gap: 18px;
+}
+
+.record-editor-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.record-editor-page-header-copy {
+    display: grid;
+    gap: 6px;
+}
+
+.record-editor-page-header-copy h1,
+.record-editor-page-header-copy p {
+    margin: 0;
+}
+
+.record-editor-page-card {
+    overflow: visible;
+}
+
+.record-editor-close-guard {
+    position: fixed;
+    inset: 0;
+    z-index: 2700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.record-editor-close-guard-modal {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 20px;
+}
+
+.record-editor-close-guard-dialog {
+    width: min(420px, 100%);
+    border-radius: 16px;
+    border: 1px solid var(--gov-color-border);
+    background: var(--gov-color-surface);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+    padding: 18px;
+}
+
+.record-editor-close-guard-title {
+    margin: 0;
+    font-size: 20px;
+}
+
+.record-editor-close-guard-text {
+    margin: 10px 0 0;
+    color: var(--gov-color-muted);
+    line-height: 1.5;
+}
+
+.record-editor-close-guard-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.record-editor-close-guard-actions .btn:last-child {
+    background: #b42318;
+    border-color: #b42318;
+    color: #fff;
 }
 
 /* Schedule in modal */
@@ -2112,14 +2310,52 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin-top: 8px;
 }
 
+.comment-toolbar-actions {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
 .comment-edit-details {
-    width: 100%;
+    width: auto;
 }
 
 .comment-edit-details summary {
+    list-style: none;
     cursor: pointer;
-    font-weight: 700;
+}
+
+.comment-edit-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.comment-action-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--gov-color-border);
+    background: var(--gov-color-surface);
+    color: var(--gov-color-text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.comment-edit-details[open] {
+    width: 100%;
+}
+
+.comment-edit-details[open] .comment-action-chip {
+    border-color: var(--gov-color-primary);
     color: var(--gov-color-primary);
+}
+
+.comment-delete-form-inline {
+    margin: 0;
 }
 
 .comment-edit-form {
@@ -2367,7 +2603,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     overflow-x: hidden;
     overflow-y: auto;
     min-height: 0;
-    padding: 0 6px 0 2px;
+    padding: 0 6px 6px 2px;
     scrollbar-gutter: stable both-edges;
 }
 
@@ -3075,6 +3311,54 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .profile-rights-card {
     margin-top: 4px;
+}
+
+.profile-role-list {
+    display: grid;
+    gap: 12px;
+}
+
+.profile-role-card {
+    border: 1px solid var(--gov-color-border);
+    border-radius: 12px;
+    background: var(--gov-color-surface);
+    padding: 0 14px 14px;
+}
+
+.profile-role-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    padding: 14px 0;
+    font-weight: 700;
+}
+
+.profile-role-summary-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.profile-role-name {
+    font-size: 16px;
+}
+
+.profile-role-summary-meta {
+    color: var(--gov-color-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.profile-role-description {
+    margin: 0 0 12px;
+}
+
+.profile-role-table {
+    margin-top: 0;
 }
 
 .profile-print-preference-card {

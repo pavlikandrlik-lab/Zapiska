@@ -525,7 +525,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         return new ProfilPageViewModel
         {
             Uzivatel = currentUser,
-            MojePrava = BuildEffectivePermissionPreview(currentUser, currentUser.OsobaId, projektId)
+            MojeRole = BuildProfilRolePrava(currentUser.OsobaId)
         };
     }
 
@@ -3481,6 +3481,126 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         };
     }
 
+    private IReadOnlyList<ProfilRolePravaViewModel> BuildProfilRolePrava(int osobaId)
+    {
+        var roles = (
+            from userRole in _dbContext.AuthzUserRoles.AsNoTracking()
+            join role in _dbContext.AuthzRoles.AsNoTracking() on userRole.RoleId equals role.Id
+            where userRole.OsobaId == osobaId
+                && userRole.IsActive
+                && role.IsActive
+            orderby role.Kod, role.Nazev
+            select new
+            {
+                role.Id,
+                role.Kod,
+                role.Nazev,
+                role.Popis
+            })
+            .Distinct()
+            .ToList();
+
+        if (roles.Count == 0)
+        {
+            return [];
+        }
+
+        var roleIds = roles.Select(x => x.Id).ToList();
+        var rolePermissions = (
+            from rolePermission in _dbContext.AuthzRolePermissions.AsNoTracking()
+            join permission in _dbContext.AuthzPermissions.AsNoTracking() on rolePermission.PermissionId equals permission.Id
+            where roleIds.Contains(rolePermission.RoleId)
+                && permission.IsActive
+            select new
+            {
+                rolePermission.Id,
+                rolePermission.RoleId,
+                permission.Klic,
+                permission.Nazev,
+                rolePermission.ScopeMode,
+                rolePermission.IsAllowed
+            })
+            .ToList();
+
+        var includeRolePermissionIds = rolePermissions
+            .Where(x => Ci.Equals(x.ScopeMode, "INCLUDE"))
+            .Select(x => x.Id)
+            .Distinct()
+            .ToList();
+
+        var includedProjectIdsByRolePermissionId = _dbContext.AuthzRolePermissionProjects.AsNoTracking()
+            .Where(x => includeRolePermissionIds.Contains(x.RolePermissionId))
+            .GroupBy(x => x.RolePermissionId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<int>)group.Select(x => x.ProjektId).Distinct().ToList());
+
+        var projectCodesById = _dbContext.Projekty.AsNoTracking()
+            .OrderBy(x => x.Zkratka)
+            .Select(x => new
+            {
+                x.Id,
+                x.Zkratka
+            })
+            .ToDictionary(x => x.Id, x => x.Zkratka);
+
+        return roles
+            .Select(role => new ProfilRolePravaViewModel
+            {
+                RoleId = role.Id,
+                RoleKod = role.Kod,
+                RoleNazev = role.Nazev,
+                Popis = string.IsNullOrWhiteSpace(role.Popis) ? null : role.Popis.Trim(),
+                Akce = rolePermissions
+                    .Where(x => x.RoleId == role.Id)
+                    .OrderBy(x => x.Klic, StringComparer.CurrentCultureIgnoreCase)
+                    .Select(x => new ProfilRoleAkceViewModel
+                    {
+                        PermissionKlic = x.Klic,
+                        PermissionNazev = x.Nazev,
+                        IsAllowed = x.IsAllowed,
+                        ScopeSummary = BuildPermissionScopeSummary(
+                            x.ScopeMode,
+                            includedProjectIdsByRolePermissionId.GetValueOrDefault(x.Id, Array.Empty<int>()),
+                            projectCodesById)
+                    })
+                    .ToList()
+            })
+            .ToList();
+    }
+
+    private static string BuildPermissionScopeSummary(
+        string scopeMode,
+        IReadOnlyList<int> projectIds,
+        IReadOnlyDictionary<int, string> projectCodesById)
+    {
+        if (string.Equals(scopeMode, "ALL", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ALL";
+        }
+
+        if (!string.Equals(scopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(scopeMode) ? "-" : scopeMode.Trim().ToUpperInvariant();
+        }
+
+        if (projectIds.Count == 0)
+        {
+            return "INCLUDE (prázdné)";
+        }
+
+        var projectCodes = projectIds
+            .Select(projectId => projectCodesById.GetValueOrDefault(projectId))
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(code => code, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        return projectCodes.Count == 0
+            ? "INCLUDE (prázdné)"
+            : "INCLUDE: " + string.Join("; ", projectCodes);
+    }
+
     private List<PdfAttendanceGroupViewModel> BuildAttendanceGroups(int meetingId, int projectId)
     {
         var attendanceStates = _dbContext.CiselnikStavuUcasti.AsNoTracking().ToDictionary(x => x.Id);
@@ -4450,7 +4570,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             throw new InvalidOperationException("Bez oprávnění records.edit nelze zakládat nový záznam.");
         }
 
-        if (!string.Equals(command.UiTab, "harmonogram", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(command.EditorTab, "schedule", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Bez oprávnění records.edit lze ukládat pouze záložku Harmonogram.");
         }

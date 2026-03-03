@@ -2,6 +2,8 @@
     const modalRoot = document.getElementById("modal-root");
     const themeStorageKey = "pmtracker.theme.mode";
     const printFormatStorageKey = "pmtracker.print.preferredFormat";
+    const recordEditorPreferenceStorageKey = "pmtracker.recordEditor.preference";
+    const recordEditorReturnStateStoragePrefix = "pmtracker.recordEditor.returnState.project.";
     const mediaDark = window.matchMedia("(prefers-color-scheme: dark)");
     const modalState = {
         lastTrigger: null
@@ -10,6 +12,12 @@
         popover: null,
         trigger: null,
         hoverTimerId: 0
+    };
+    const recordEditorState = {
+        chooser: null,
+        chooserTrigger: null,
+        closeGuard: null,
+        closeGuardTrigger: null
     };
     let rainbowMeasureCanvas = null;
     const modalFocusableSelector = [
@@ -459,13 +467,324 @@
             if (printState.popover instanceof HTMLElement && printState.trigger instanceof HTMLElement) {
                 positionPrintChooser(printState.popover, printState.trigger);
             }
+
+            if (recordEditorState.chooser instanceof HTMLElement && recordEditorState.chooserTrigger instanceof HTMLElement) {
+                positionPrintChooser(recordEditorState.chooser, recordEditorState.chooserTrigger);
+            }
         }, true);
 
         window.addEventListener("resize", () => {
             if (printState.popover instanceof HTMLElement && printState.trigger instanceof HTMLElement) {
                 positionPrintChooser(printState.popover, printState.trigger);
             }
+
+            if (recordEditorState.chooser instanceof HTMLElement && recordEditorState.chooserTrigger instanceof HTMLElement) {
+                positionPrintChooser(recordEditorState.chooser, recordEditorState.chooserTrigger);
+            }
         });
+    }
+
+    function getStoredRecordEditorPreference() {
+        const value = localStorage.getItem(recordEditorPreferenceStorageKey);
+        if (value === "modal" || value === "page") {
+            return value;
+        }
+
+        return null;
+    }
+
+    function setStoredRecordEditorPreference(mode) {
+        if (mode !== "modal" && mode !== "page") {
+            return;
+        }
+
+        localStorage.setItem(recordEditorPreferenceStorageKey, mode);
+    }
+
+    function clearStoredRecordEditorPreference() {
+        localStorage.removeItem(recordEditorPreferenceStorageKey);
+    }
+
+    function getCurrentLocalUrl() {
+        return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    }
+
+    function getRecordEditorReturnStateKey(projectId) {
+        return `${recordEditorReturnStateStoragePrefix}${projectId}`;
+    }
+
+    function closeRecordEditorChooser(options) {
+        const settings = options || {};
+        const restoreFocus = Boolean(settings.restoreFocus);
+        const trigger = recordEditorState.chooserTrigger;
+
+        if (recordEditorState.chooser instanceof HTMLElement) {
+            recordEditorState.chooser.remove();
+        }
+
+        recordEditorState.chooser = null;
+        recordEditorState.chooserTrigger = null;
+
+        if (restoreFocus && trigger instanceof HTMLElement && trigger.isConnected) {
+            trigger.focus({ preventScroll: true });
+        }
+    }
+
+    function buildRecordEditorUrl(trigger, mode) {
+        if (!(trigger instanceof HTMLElement)) {
+            return "";
+        }
+
+        const rawUrl = trigger.getAttribute("data-record-editor-url") || "";
+        if (!rawUrl) {
+            return "";
+        }
+
+        const editorUrl = new URL(rawUrl, window.location.origin);
+        editorUrl.searchParams.set("presentation", mode === "page" ? "page" : "modal");
+        editorUrl.searchParams.set("returnUrl", getCurrentLocalUrl());
+        return `${editorUrl.pathname}${editorUrl.search}${editorUrl.hash}`;
+    }
+
+    function captureRecordEditorReturnState(trigger) {
+        if (!(trigger instanceof HTMLElement)) {
+            return;
+        }
+
+        const projectId = Number.parseInt(trigger.getAttribute("data-record-editor-project-id") || "", 10);
+        if (!Number.isInteger(projectId) || projectId <= 0) {
+            return;
+        }
+
+        const scopeRoot = document.querySelector(`[data-project-detail-root][data-project-id="${CSS.escape(String(projectId))}"]`)
+            || document.querySelector("[data-project-detail-root]");
+        const baseState = buildRecordUiState(scopeRoot instanceof HTMLElement ? scopeRoot : document);
+        const state = {
+            projectId,
+            returnUrl: getCurrentLocalUrl(),
+            activeTab: baseState.activeTab,
+            scrollY: baseState.scrollY,
+            expandedRecordIds: Array.isArray(baseState.expandedRecordIds) ? baseState.expandedRecordIds : [],
+            commentSortDirectionByRecordId: baseState.commentSortDirectionByRecordId || {},
+            capturedAt: new Date().toISOString()
+        };
+
+        sessionStorage.setItem(getRecordEditorReturnStateKey(projectId), JSON.stringify(state));
+    }
+
+    function navigateToRecordEditorPage(trigger) {
+        const targetUrl = buildRecordEditorUrl(trigger, "page");
+        if (!targetUrl) {
+            return;
+        }
+
+        captureRecordEditorReturnState(trigger);
+        window.location.assign(targetUrl);
+    }
+
+    function handleRecordEditorChoice(trigger, mode, shouldRemember) {
+        if (!(trigger instanceof HTMLElement)) {
+            return;
+        }
+
+        if (shouldRemember) {
+            setStoredRecordEditorPreference(mode);
+        }
+
+        if (mode === "page") {
+            navigateToRecordEditorPage(trigger);
+            return;
+        }
+
+        openUrlModal(buildRecordEditorUrl(trigger, "modal"), trigger);
+    }
+
+    function createRecordEditorChooser(trigger) {
+        const preferred = getStoredRecordEditorPreference();
+        const label = trigger.getAttribute("data-record-editor-label") || "Editor záznamu";
+
+        const popover = document.createElement("div");
+        popover.className = "record-editor-popover";
+        popover.setAttribute("role", "dialog");
+        popover.setAttribute("aria-modal", "false");
+        popover.setAttribute("data-record-editor-popover", "true");
+        popover.setAttribute("tabindex", "-1");
+
+        const title = document.createElement("h3");
+        title.className = "record-editor-popover-title";
+        title.textContent = "Vyberte způsob otevření";
+        popover.appendChild(title);
+
+        const subtitle = document.createElement("p");
+        subtitle.className = "record-editor-popover-subtitle";
+        subtitle.textContent = label;
+        popover.appendChild(subtitle);
+
+        const actions = document.createElement("div");
+        actions.className = "record-editor-popover-actions";
+
+        const modalButton = document.createElement("button");
+        modalButton.type = "button";
+        modalButton.className = "btn small";
+        modalButton.textContent = "Otevřít v modalu";
+        modalButton.setAttribute("data-record-editor-mode", "modal");
+        actions.appendChild(modalButton);
+
+        const pageButton = document.createElement("button");
+        pageButton.type = "button";
+        pageButton.className = "btn small";
+        pageButton.textContent = "Otevřít na stránce";
+        pageButton.setAttribute("data-record-editor-mode", "page");
+        actions.appendChild(pageButton);
+
+        popover.appendChild(actions);
+
+        const rememberLabel = document.createElement("label");
+        rememberLabel.className = "record-editor-popover-remember";
+        const rememberCheckbox = document.createElement("input");
+        rememberCheckbox.type = "checkbox";
+        rememberCheckbox.setAttribute("data-record-editor-remember", "true");
+        rememberLabel.appendChild(rememberCheckbox);
+        rememberLabel.append(" Pamatovat tuto volbu na tomto zařízení");
+        popover.appendChild(rememberLabel);
+
+        const note = document.createElement("p");
+        note.className = "record-editor-popover-note";
+        note.textContent = "Pokud volbu neuložíte, systém se při dalším otevření zeptá znovu.";
+        popover.appendChild(note);
+
+        if (preferred) {
+            const resetButton = document.createElement("button");
+            resetButton.type = "button";
+            resetButton.className = "record-editor-popover-reset";
+            resetButton.setAttribute("data-record-editor-clear-preference", "true");
+            resetButton.textContent = "Zrušit uloženou výchozí volbu";
+            popover.appendChild(resetButton);
+        }
+
+        const closeButton = document.createElement("button");
+        closeButton.type = "button";
+        closeButton.className = "record-editor-popover-close";
+        closeButton.setAttribute("aria-label", "Zavřít výběr způsobu otevření editoru");
+        closeButton.textContent = "×";
+        popover.appendChild(closeButton);
+
+        popover.addEventListener("click", (event) => {
+            const target = event.target;
+            if (!(target instanceof Element)) {
+                return;
+            }
+
+            if (target.closest(".record-editor-popover-close")) {
+                event.preventDefault();
+                closeRecordEditorChooser({ restoreFocus: true });
+                return;
+            }
+
+            if (target.closest("[data-record-editor-clear-preference]")) {
+                event.preventDefault();
+                clearStoredRecordEditorPreference();
+                closeRecordEditorChooser({ restoreFocus: true });
+                return;
+            }
+
+            const choice = target.closest("[data-record-editor-mode]");
+            if (!choice) {
+                return;
+            }
+
+            event.preventDefault();
+            const mode = choice.getAttribute("data-record-editor-mode");
+            if (mode !== "modal" && mode !== "page") {
+                return;
+            }
+
+            const remember = rememberCheckbox.checked;
+            closeRecordEditorChooser({ restoreFocus: false });
+            handleRecordEditorChoice(trigger, mode, remember);
+        });
+
+        return popover;
+    }
+
+    function showRecordEditorChooser(trigger) {
+        if (!(trigger instanceof HTMLElement)) {
+            return;
+        }
+
+        closeRecordEditorChooser({ restoreFocus: false });
+
+        const popover = createRecordEditorChooser(trigger);
+        document.body.appendChild(popover);
+        positionPrintChooser(popover, trigger);
+        recordEditorState.chooser = popover;
+        recordEditorState.chooserTrigger = trigger;
+
+        const firstAction = popover.querySelector("[data-record-editor-mode]");
+        if (firstAction instanceof HTMLElement) {
+            firstAction.focus({ preventScroll: true });
+        } else {
+            popover.focus({ preventScroll: true });
+        }
+    }
+
+    function openRecordEditor(trigger, forcedMode) {
+        if (!(trigger instanceof HTMLElement)) {
+            return;
+        }
+
+        const mode = forcedMode || getStoredRecordEditorPreference();
+        if (mode === "modal") {
+            openUrlModal(buildRecordEditorUrl(trigger, "modal"), trigger);
+            return;
+        }
+
+        if (mode === "page") {
+            navigateToRecordEditorPage(trigger);
+            return;
+        }
+
+        showRecordEditorChooser(trigger);
+    }
+
+    function restoreRecordEditorReturnStateFromUrl() {
+        const projectRoot = document.querySelector("[data-project-detail-root]");
+        if (!(projectRoot instanceof HTMLElement)) {
+            return;
+        }
+
+        const currentUrl = new URL(window.location.href);
+        if (currentUrl.searchParams.get("restoreRecordEditorState") !== "1") {
+            return;
+        }
+
+        const cleanupUrl = () => {
+            currentUrl.searchParams.delete("restoreRecordEditorState");
+            history.replaceState(history.state || {}, "", `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
+        };
+
+        const projectId = Number.parseInt(projectRoot.dataset.projectId || "", 10);
+        if (!Number.isInteger(projectId) || projectId <= 0) {
+            cleanupUrl();
+            return;
+        }
+
+        const storageKey = getRecordEditorReturnStateKey(projectId);
+        const rawState = sessionStorage.getItem(storageKey);
+        if (!rawState) {
+            cleanupUrl();
+            return;
+        }
+
+        try {
+            const state = JSON.parse(rawState);
+            restoreRecordUiState(state);
+        } catch (error) {
+            console.warn("Nepodařilo se obnovit návratový stav editoru záznamu.", error);
+        } finally {
+            sessionStorage.removeItem(storageKey);
+            cleanupUrl();
+        }
     }
 
     function getActiveModalOverlay() {
@@ -1951,7 +2270,7 @@
                         }
                     });
                 setScheduleDateFieldState();
-                setRecordFormTab(form, "zaznamy");
+                setRecordFormTab(form, "basic");
             } else {
                 schedulePanel.removeAttribute("data-schedule-disabled");
                 form.querySelectorAll("[data-schedule-duration]")
@@ -1993,11 +2312,11 @@
             return;
         }
 
-        const requestedTab = typeof tabKey === "string" ? tabKey : "zaznamy";
+        const requestedTab = typeof tabKey === "string" ? tabKey : "basic";
         const requestedButton = form.querySelector(`[data-record-modal-tab="${requestedTab}"]`);
         const normalizedTab = requestedButton instanceof HTMLElement && !requestedButton.hidden
             ? requestedTab
-            : "zaznamy";
+            : "basic";
 
         tabs.forEach((tab) => {
             if (!(tab instanceof HTMLElement)) {
@@ -2019,10 +2338,10 @@
 
         const activeTabInput = form.querySelector("[data-record-active-tab-input]");
         if (activeTabInput instanceof HTMLInputElement) {
-            activeTabInput.value = normalizedTab === "harmonogram" ? "harmonogram" : "zaznamy";
+            activeTabInput.value = normalizedTab;
         }
 
-        if (normalizedTab === "harmonogram") {
+        if (normalizedTab === "schedule") {
             if (!form._recordSchedulePlanner) {
                 initRecordSchedulePlanner(form);
             }
@@ -2031,7 +2350,7 @@
                 form._recordSchedulePlanner.recalcAll();
             }
 
-            const harmonogramPanel = form.querySelector('[data-record-modal-panel="harmonogram"]');
+            const harmonogramPanel = form.querySelector('[data-record-modal-panel="schedule"]');
             if (harmonogramPanel instanceof HTMLElement) {
                 queueRainbowSegmentRender(harmonogramPanel);
             }
@@ -3752,7 +4071,7 @@
 
             form.dataset.recordFormTabsReady = "true";
             const activeTabInput = form.querySelector("[data-record-active-tab-input]");
-            const initialTab = activeTabInput instanceof HTMLInputElement ? activeTabInput.value : "zaznamy";
+            const initialTab = activeTabInput instanceof HTMLInputElement ? activeTabInput.value : "basic";
             setRecordFormTab(form, initialTab);
 
             form.querySelectorAll("[data-record-modal-tab]").forEach((tabButton) => {
@@ -3761,7 +4080,7 @@
                 }
 
                 tabButton.addEventListener("click", () => {
-                    const tabKey = tabButton.dataset.recordModalTab || "zaznamy";
+                    const tabKey = tabButton.dataset.recordModalTab || "basic";
                     setRecordFormTab(form, tabKey);
                 });
             });
@@ -4272,6 +4591,263 @@
         initConfirmSubmitToggles(scope);
         initRecordFormTabs(scope);
         initRecordSchedulePlanner(scope);
+        initRecordEditorDirtyTracking(scope);
+    }
+
+    function shouldIgnoreRecordEditorField(name) {
+        if (!name) {
+            return true;
+        }
+
+        const normalized = String(name).trim().toLowerCase();
+        if (!normalized) {
+            return true;
+        }
+
+        return normalized === "__requestverificationtoken"
+            || normalized === "presentation"
+            || normalized === "returnurl"
+            || normalized === "editortab";
+    }
+
+    function buildRecordEditorFormSnapshot(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return "";
+        }
+
+        const entries = [];
+        const formData = new FormData(form);
+        formData.forEach((value, key) => {
+            if (shouldIgnoreRecordEditorField(key)) {
+                return;
+            }
+
+            const normalizedValue = value instanceof File
+                ? value.name
+                : String(value ?? "");
+            entries.push(`${key}=${normalizedValue}`);
+        });
+
+        entries.sort();
+        return entries.join("&");
+    }
+
+    function markRecordEditorFormClean(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
+    }
+
+    function isRecordEditorFormDirty(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return false;
+        }
+
+        return buildRecordEditorFormSnapshot(form) !== (form.dataset.recordEditorSnapshot || "");
+    }
+
+    function prepareRecordEditorFormNavigation(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        form.dataset.recordEditorNavigating = "true";
+        markRecordEditorFormClean(form);
+    }
+
+    function closeRecordEditorCloseGuard(options) {
+        const settings = options || {};
+        const restoreFocus = Boolean(settings.restoreFocus);
+        const trigger = recordEditorState.closeGuardTrigger;
+
+        if (recordEditorState.closeGuard instanceof HTMLElement) {
+            recordEditorState.closeGuard.remove();
+        }
+
+        recordEditorState.closeGuard = null;
+        recordEditorState.closeGuardTrigger = null;
+
+        if (restoreFocus && trigger instanceof HTMLElement && trigger.isConnected) {
+            trigger.focus({ preventScroll: true });
+        }
+    }
+
+    function promptRecordEditorDiscard(form, trigger) {
+        if (!(form instanceof HTMLFormElement) || !isRecordEditorFormDirty(form)) {
+            return Promise.resolve(true);
+        }
+
+        closeRecordEditorCloseGuard({ restoreFocus: false });
+
+        return new Promise((resolve) => {
+            const isModalForm = modalRoot instanceof HTMLElement && modalRoot.contains(form);
+            const host = isModalForm ? getActiveModalContainer() : document.body;
+            if (!(host instanceof HTMLElement)) {
+                resolve(window.confirm("Máte neuložené změny. Chcete je zahodit?"));
+                return;
+            }
+
+            const overlay = document.createElement("div");
+            overlay.className = `record-editor-close-guard${isModalForm ? " record-editor-close-guard-modal" : ""}`;
+            overlay.setAttribute("data-record-editor-close-guard", "true");
+
+            const dialog = document.createElement("div");
+            dialog.className = "record-editor-close-guard-dialog";
+            dialog.setAttribute("role", "alertdialog");
+            dialog.setAttribute("aria-modal", "true");
+            dialog.setAttribute("tabindex", "-1");
+
+            const title = document.createElement("h3");
+            title.className = "record-editor-close-guard-title";
+            title.textContent = "Máte neuložené změny.";
+            dialog.appendChild(title);
+
+            const text = document.createElement("p");
+            text.className = "record-editor-close-guard-text";
+            text.textContent = "Chcete pokračovat v úpravách, nebo změny zahodit?";
+            dialog.appendChild(text);
+
+            const actions = document.createElement("div");
+            actions.className = "record-editor-close-guard-actions";
+
+            const keepEditingButton = document.createElement("button");
+            keepEditingButton.type = "button";
+            keepEditingButton.className = "btn";
+            keepEditingButton.textContent = "Pokračovat v úpravách";
+            actions.appendChild(keepEditingButton);
+
+            const discardButton = document.createElement("button");
+            discardButton.type = "button";
+            discardButton.className = "btn danger";
+            discardButton.textContent = "Zahodit změny";
+            actions.appendChild(discardButton);
+
+            dialog.appendChild(actions);
+            overlay.appendChild(dialog);
+
+            const finish = (shouldDiscard, restoreFocus) => {
+                closeRecordEditorCloseGuard({ restoreFocus });
+                if (shouldDiscard) {
+                    prepareRecordEditorFormNavigation(form);
+                }
+                resolve(shouldDiscard);
+            };
+
+            overlay.addEventListener("click", (event) => {
+                if (event.target === overlay) {
+                    finish(false, true);
+                }
+            });
+
+            keepEditingButton.addEventListener("click", () => finish(false, true));
+            discardButton.addEventListener("click", () => finish(true, false));
+
+            host.appendChild(overlay);
+            recordEditorState.closeGuard = overlay;
+            recordEditorState.closeGuardTrigger = trigger instanceof HTMLElement ? trigger : null;
+
+            window.requestAnimationFrame(() => {
+                keepEditingButton.focus({ preventScroll: true });
+            });
+        });
+    }
+
+    async function requestRecordEditorModalClose(trigger) {
+        const editorForm = modalRoot?.querySelector('form[data-record-editor-form="true"]');
+        if (!(editorForm instanceof HTMLFormElement)) {
+            closeModal();
+            return;
+        }
+
+        const canClose = await promptRecordEditorDiscard(editorForm, trigger);
+        if (canClose) {
+            closeModal();
+        }
+    }
+
+    async function requestRecordEditorPageCancel(trigger) {
+        const editorForm = document.querySelector('form[data-record-editor-form="true"][data-record-editor-presentation="page"]');
+        if (!(editorForm instanceof HTMLFormElement)) {
+            const fallbackUrl = trigger instanceof HTMLElement
+                ? trigger.getAttribute("data-record-editor-back-url") || window.location.href
+                : window.location.href;
+            window.location.assign(fallbackUrl);
+            return;
+        }
+
+        const canClose = await promptRecordEditorDiscard(editorForm, trigger);
+        if (!canClose) {
+            return;
+        }
+
+        const targetUrl = editorForm.dataset.recordEditorBackUrl
+            || (trigger instanceof HTMLElement ? trigger.getAttribute("data-record-editor-back-url") : "")
+            || window.location.href;
+        window.location.assign(targetUrl);
+    }
+
+    function initRecordEditorDirtyTracking(scope) {
+        if (!(scope instanceof HTMLElement || scope instanceof Document)) {
+            return;
+        }
+
+        scope.querySelectorAll('form[data-record-editor-form="true"]').forEach((form) => {
+            if (!(form instanceof HTMLFormElement) || form.dataset.recordEditorDirtyReady === "true") {
+                return;
+            }
+
+            form.dataset.recordEditorDirtyReady = "true";
+            form.dataset.recordEditorNavigating = "false";
+
+            form.addEventListener("submit", () => {
+                form.dataset.recordEditorNavigating = "true";
+            });
+
+            window.requestAnimationFrame(() => {
+                if (form.isConnected) {
+                    markRecordEditorFormClean(form);
+                    form.dataset.recordEditorNavigating = "false";
+                }
+            });
+        });
+    }
+
+    function resolveRecordEditorTabForFieldKey(rawKey) {
+        const normalizedKey = normalizeServerFieldKey(rawKey).toLowerCase();
+        if (!normalizedKey) {
+            return "";
+        }
+
+        if (normalizedKey.startsWith("externivazby[")) {
+            return "external";
+        }
+
+        if (normalizedKey.startsWith("vybranispolupracovniciids")) {
+            return "collaboration";
+        }
+
+        if (normalizedKey.startsWith("harmonogramhodnoty[")
+            || normalizedKey.startsWith("uiharmonogramdatumy[")
+            || normalizedKey.startsWith("uiharmonogramposunutedatumy[")) {
+            return "schedule";
+        }
+
+        const basicPrefixes = [
+            "kategorie",
+            "typukolu",
+            "stav",
+            "nazev",
+            "popis",
+            "vlastnikid",
+            "datumzalozeni",
+            "terminukonceni",
+            "subsystem",
+            "jednaniidprocislo"
+        ];
+
+        return basicPrefixes.some((prefix) => normalizedKey.startsWith(prefix)) ? "basic" : "";
     }
 
     function normalizeServerFieldKey(rawKey) {
@@ -4389,6 +4965,7 @@
 
         const summaryMessages = [];
         const invalidTargets = [];
+        let firstInvalidTab = "";
 
         Object.entries(fieldErrors).forEach(([rawKey, messages]) => {
             if (!Array.isArray(messages) || messages.length === 0) {
@@ -4405,8 +4982,15 @@
 
             const field = findFieldByName(form, rawKey);
             if (!(field instanceof HTMLElement)) {
+                if (!firstInvalidTab) {
+                    firstInvalidTab = resolveRecordEditorTabForFieldKey(rawKey);
+                }
                 summaryMessages.push(...normalizedMessages);
                 return;
+            }
+
+            if (!firstInvalidTab) {
+                firstInvalidTab = resolveRecordEditorTabForFieldKey(rawKey);
             }
 
             const target = resolveErrorTarget(field, form) || field;
@@ -4442,6 +5026,10 @@
             merged.push(...summaryMessages);
             summary.textContent = merged.filter(Boolean).join(" | ");
             form.insertBefore(summary, form.firstElementChild);
+        }
+
+        if (firstInvalidTab) {
+            setRecordFormTab(form, firstInvalidTab);
         }
 
         if (invalidTargets.length > 0 && invalidTargets[0] instanceof HTMLElement) {
@@ -4870,6 +5458,16 @@
             return;
         }
 
+        if (scope === "page") {
+            const pageEditorForm = document.querySelector('form[data-record-editor-form="true"][data-record-editor-presentation="page"]');
+            if (pageEditorForm instanceof HTMLFormElement) {
+                prepareRecordEditorFormNavigation(pageEditorForm);
+            }
+
+            window.location.assign(refreshUrl);
+            return;
+        }
+
         if (scope === "record-card") {
             await refreshRecordCard(payload);
             initProjectRecordsUi();
@@ -5102,8 +5700,14 @@
 
                 const payload = await response.json();
                 if (!response.ok || !payload || payload.ok !== true) {
+                    target.dataset.recordEditorNavigating = "false";
                     renderModalFormErrors(target, payload || { message: "Uložení se nezdařilo." });
                     return;
+                }
+
+                if (target.matches('[data-record-editor-form="true"]')) {
+                    markRecordEditorFormClean(target);
+                    target.dataset.recordEditorNavigating = "true";
                 }
 
                 if (isModalForm) {
@@ -5111,6 +5715,7 @@
                 }
                 await refreshPageScope(payload);
             } catch (error) {
+                target.dataset.recordEditorNavigating = "false";
                 renderModalFormErrors(target, {
                     message: error instanceof Error ? error.message : "Uložení se nezdařilo."
                 });
@@ -5332,6 +5937,30 @@
             closePrintChooser({ restoreFocus: false });
         }
 
+        if (recordEditorState.chooser instanceof HTMLElement
+            && !target.closest("[data-record-editor-popover]")
+            && !target.closest("[data-record-editor-url]")) {
+            closeRecordEditorChooser({ restoreFocus: false });
+        }
+
+        const recordEditorCancel = target.closest("[data-record-editor-cancel]");
+        if (recordEditorCancel) {
+            event.preventDefault();
+            void requestRecordEditorPageCancel(recordEditorCancel instanceof HTMLElement ? recordEditorCancel : null);
+            return;
+        }
+
+        const recordEditorTrigger = target.closest("[data-record-editor-url]");
+        if (recordEditorTrigger) {
+            event.preventDefault();
+            if (recordEditorTrigger.hasAttribute("data-record-editor-choice")) {
+                showRecordEditorChooser(recordEditorTrigger instanceof HTMLElement ? recordEditorTrigger : null);
+            } else {
+                openRecordEditor(recordEditorTrigger instanceof HTMLElement ? recordEditorTrigger : null);
+            }
+            return;
+        }
+
         const openUrl = target.closest("[data-modal-url]");
         if (openUrl) {
             event.preventDefault();
@@ -5341,12 +5970,14 @@
 
         if (target.matches("[data-modal-close]") || target.closest("[data-modal-close]")) {
             event.preventDefault();
-            closeModal();
+            const closeTarget = target.closest("[data-modal-close]");
+            void requestRecordEditorModalClose(closeTarget instanceof HTMLElement ? closeTarget : null);
             return;
         }
 
         if (target.classList.contains("modal-overlay")) {
-            closeModal();
+            event.preventDefault();
+            void requestRecordEditorModalClose(target);
             return;
         }
 
@@ -5406,9 +6037,21 @@
     });
 
     document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && recordEditorState.closeGuard instanceof HTMLElement) {
+            event.preventDefault();
+            closeRecordEditorCloseGuard({ restoreFocus: true });
+            return;
+        }
+
         if (event.key === "Escape" && printState.popover instanceof HTMLElement && !isModalOpen()) {
             event.preventDefault();
             closePrintChooser({ restoreFocus: true });
+            return;
+        }
+
+        if (event.key === "Escape" && recordEditorState.chooser instanceof HTMLElement && !isModalOpen()) {
+            event.preventDefault();
+            closeRecordEditorChooser({ restoreFocus: true });
             return;
         }
 
@@ -5418,7 +6061,7 @@
 
         if (event.key === "Escape") {
             event.preventDefault();
-            closeModal();
+            void requestRecordEditorModalClose(document.activeElement instanceof HTMLElement ? document.activeElement : null);
             return;
         }
 
@@ -5509,6 +6152,24 @@
         }
     });
 
+    window.addEventListener("beforeunload", (event) => {
+        const pageEditorForm = document.querySelector('form[data-record-editor-form="true"][data-record-editor-presentation="page"]');
+        if (!(pageEditorForm instanceof HTMLFormElement)) {
+            return;
+        }
+
+        if (pageEditorForm.dataset.recordEditorNavigating === "true") {
+            return;
+        }
+
+        if (!isRecordEditorFormDirty(pageEditorForm)) {
+            return;
+        }
+
+        event.preventDefault();
+        event.returnValue = "";
+    });
+
     const rerenderRainbowLabelsOnResize = debounce(() => {
         renderAllRainbowSegmentLabels(document);
     }, 120);
@@ -5520,6 +6181,7 @@
     initProjectGanttUi();
     initProjectRecordPageshowSync();
     initCommentSortUi(document);
+    restoreRecordEditorReturnStateFromUrl();
 
     initTheme();
     initUserMenu();

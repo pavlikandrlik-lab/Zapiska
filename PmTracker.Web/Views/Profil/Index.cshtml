@@ -44,58 +44,73 @@
 <section id="moje-prava" class="card profile-rights-card">
     <div class="panel-header">
         <div>
-            <h2>Moje práva</h2>
-            <p class="muted">Diagnostický náhled výsledných oprávnění podle rolí a rozsahů.</p>
+            <h2>Moje role a práva</h2>
+            <p class="muted">Přehled přiřazených rolí a jejich akcí včetně rozsahu.</p>
         </div>
     </div>
 
-    <form class="profile-rights-filters" method="get" asp-controller="Profil" asp-action="Index" data-profile-rights-form>
-        <label>
-            Projekt
-            <select name="projektId" data-profile-rights-project>
-                <option value="">Všechny projekty (ALL)</option>
-                @foreach (var option in Model.MojePrava.AvailableProjects)
-                {
-                    var selected = Model.MojePrava.SelectedProjectId == option.Id;
-                    <option value="@option.Id" selected="@selected">@option.Label</option>
-                }
-            </select>
-        </label>
-    </form>
-
-    <div class="settings-effective-header">
-        <span><strong>Uživatel:</strong> @Model.MojePrava.Osoba</span>
-        <span><strong>Projekt:</strong> @Model.MojePrava.ProjektNazev</span>
-    </div>
-
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Akce</th>
-                <th>Název</th>
-                <th>Výsledek</th>
-                <th>Rozsah</th>
-            </tr>
-        </thead>
-        <tbody>
-        @foreach (var row in Model.MojePrava.Rows)
+    @if (Model.MojeRole.Count == 0)
+    {
+        <p class="muted">Uživatel nemá přiřazenou žádnou aktivní roli.</p>
+    }
+    else
+    {
+        <div class="profile-role-list">
+        @foreach (var role in Model.MojeRole)
         {
-            <tr>
-                <td><code>@row.PermissionKlic</code></td>
-                <td>@row.PermissionNazev</td>
-                <td>
-                    @if (row.IsAllowed)
-                    {
-                        <span class="unlock">Povoleno</span>
-                    }
-                    else
-                    {
-                        <span class="lock">Zakázáno</span>
-                    }
-                </td>
-                <td>@row.ScopeSummary</td>
-            </tr>
+            <details class="profile-role-card">
+                <summary class="profile-role-summary">
+                    <span class="profile-role-summary-main">
+                        <span class="profile-role-name">@role.RoleNazev</span>
+                        <code>@role.RoleKod</code>
+                    </span>
+                    <span class="profile-role-summary-meta">@role.Akce.Count akcí</span>
+                </summary>
+
+                @if (!string.IsNullOrWhiteSpace(role.Popis))
+                {
+                    <p class="muted profile-role-description">@role.Popis</p>
+                }
+
+                @if (role.Akce.Count == 0)
+                {
+                    <p class="muted">Tato role nemá přiřazenou žádnou akci.</p>
+                }
+                else
+                {
+                    <table class="table profile-role-table">
+                        <thead>
+                            <tr>
+                                <th>Akce</th>
+                                <th>Název</th>
+                                <th>Přístup</th>
+                                <th>Rozsah</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var action in role.Akce)
+                        {
+                            <tr>
+                                <td><code>@action.PermissionKlic</code></td>
+                                <td>@action.PermissionNazev</td>
+                                <td>
+                                    @if (action.IsAllowed)
+                                    {
+                                        <span class="unlock">Povoleno</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="lock">Zakázáno</span>
+                                    }
+                                </td>
+                                <td>@action.ScopeSummary</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </details>
         }
-        </tbody>
-    </table>
+        </div>
+    }
 </section>

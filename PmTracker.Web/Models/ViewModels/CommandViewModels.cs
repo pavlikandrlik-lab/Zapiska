@@ -70,7 +70,11 @@ public sealed class SaveRecordCommand
 
     public List<SaveRecordHarmonogramValueCommand> HarmonogramHodnoty { get; set; } = new();
 
-    public string? UiTab { get; set; }
+    public string? EditorTab { get; set; }
+
+    public string? Presentation { get; set; }
+
+    public string? ReturnUrl { get; set; }
 
     public int? JednaniIdProCislo { get; set; }
 }

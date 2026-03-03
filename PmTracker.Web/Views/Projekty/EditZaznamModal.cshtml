@@ -1,0 +1,8 @@
+@model ZaznamEditViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "record-modal-title";
+    ViewData["ModalVariant"] = "wide";
+}
+
+@await Html.PartialAsync("~/Views/Projekty/_EditZaznamForm.cshtml", Model)
