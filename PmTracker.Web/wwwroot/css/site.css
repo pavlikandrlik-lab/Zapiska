@@ -2936,6 +2936,49 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin-bottom: 20px;
 }
 
+.subsystem-scroll-indicator {
+    position: fixed;
+    top: 168px;
+    right: max(20px, calc((100vw - 1500px) / 2 + 20px));
+    z-index: 25;
+    width: min(220px, calc(100vw - 32px));
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--gov-color-border) 78%, #fff 22%);
+    border-radius: 16px;
+    background: color-mix(in srgb, #fff 88%, var(--gov-color-primary) 12%);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+    backdrop-filter: blur(14px);
+}
+
+.subsystem-scroll-indicator-title {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gov-color-text-secondary);
+}
+
+.subsystem-scroll-indicator-label {
+    display: block;
+    margin-top: 4px;
+    font-size: 1rem;
+    line-height: 1.35;
+    color: var(--gov-color-primary);
+}
+
+@media (max-width: 1400px) {
+    .subsystem-scroll-indicator {
+        right: 16px;
+    }
+}
+
+@media (max-width: 1180px) {
+    .subsystem-scroll-indicator {
+        display: none;
+    }
+}
+
 .card-list {
     display: grid;
     gap: 16px;

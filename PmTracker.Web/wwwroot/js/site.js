@@ -1384,6 +1384,7 @@
             shell.toggleAttribute("hidden", mode !== view);
         });
         applyProjectRecordFilters();
+        scheduleSubsystemIndicatorSync();
     }
 
     function restoreFilterState() {
@@ -1686,6 +1687,115 @@
                 .some((card) => card instanceof HTMLElement && !card.hidden);
             setRecordFilterVisibility(group, hasVisibleCards);
         });
+
+        scheduleSubsystemIndicatorSync();
+    }
+
+    function resolveCurrentSubsystemGroup(groups, anchorY) {
+        if (!Array.isArray(groups) || groups.length === 0) {
+            return null;
+        }
+
+        let current = groups[0];
+        for (const group of groups) {
+            if (!(group instanceof HTMLElement)) {
+                continue;
+            }
+
+            const rect = group.getBoundingClientRect();
+            if (rect.bottom <= anchorY) {
+                current = group;
+                continue;
+            }
+
+            if (rect.top <= anchorY) {
+                current = group;
+            }
+            break;
+        }
+
+        return current;
+    }
+
+    function updateSubsystemScrollIndicator() {
+        const indicator = document.querySelector("[data-subsystem-scroll-indicator]");
+        const label = document.querySelector("[data-subsystem-scroll-indicator-label]");
+        const recordsPanel = document.querySelector('[data-tab-panel="zaznamy"]');
+        const subsystemShell = document.querySelector('[data-records-view="subsystem"]');
+
+        if (!(indicator instanceof HTMLElement) || !(label instanceof HTMLElement)) {
+            return;
+        }
+
+        const shouldHide = !(recordsPanel instanceof HTMLElement)
+            || !recordsPanel.classList.contains("active")
+            || !(subsystemShell instanceof HTMLElement)
+            || subsystemShell.hidden;
+
+        if (shouldHide) {
+            indicator.hidden = true;
+            return;
+        }
+
+        const visibleGroups = Array.from(subsystemShell.querySelectorAll("[data-subsystem-group]"))
+            .filter((group) => group instanceof HTMLElement && !group.hidden);
+
+        if (visibleGroups.length === 0) {
+            indicator.hidden = true;
+            return;
+        }
+
+        const panelRect = recordsPanel.getBoundingClientRect();
+        if (panelRect.bottom <= 120 || panelRect.top >= window.innerHeight) {
+            indicator.hidden = true;
+            return;
+        }
+
+        const anchorY = Math.max(132, Math.min(window.innerHeight * 0.35, 220));
+        const currentGroup = resolveCurrentSubsystemGroup(visibleGroups, anchorY);
+        const subsystemName = currentGroup instanceof HTMLElement
+            ? (currentGroup.getAttribute("data-subsystem-name") || "").trim()
+            : "";
+
+        if (!subsystemName) {
+            indicator.hidden = true;
+            return;
+        }
+
+        label.textContent = subsystemName;
+        indicator.hidden = false;
+    }
+
+    function scheduleSubsystemIndicatorSync() {
+        if (!(document.body instanceof HTMLElement)) {
+            return;
+        }
+
+        const currentFrame = Number.parseInt(document.body.dataset.subsystemIndicatorFrame || "0", 10);
+        if (Number.isInteger(currentFrame) && currentFrame > 0) {
+            window.cancelAnimationFrame(currentFrame);
+        }
+
+        const nextFrame = window.requestAnimationFrame(() => {
+            document.body.dataset.subsystemIndicatorFrame = "0";
+            updateSubsystemScrollIndicator();
+        });
+        document.body.dataset.subsystemIndicatorFrame = String(nextFrame);
+    }
+
+    function initSubsystemScrollIndicator() {
+        const indicator = document.querySelector("[data-subsystem-scroll-indicator]");
+        if (!(indicator instanceof HTMLElement) || !(document.body instanceof HTMLElement)) {
+            return;
+        }
+
+        if (document.body.dataset.subsystemIndicatorReady !== "true") {
+            document.body.dataset.subsystemIndicatorReady = "true";
+            window.addEventListener("scroll", scheduleSubsystemIndicatorSync, { passive: true });
+            window.addEventListener("resize", scheduleSubsystemIndicatorSync);
+        }
+
+        scheduleSubsystemIndicatorSync();
     }
 
     function setScheduleFilterPanelOpen(open) {
@@ -2064,6 +2174,7 @@
         if (activePanel instanceof HTMLElement) {
             queueRainbowSegmentRender(activePanel);
         }
+        scheduleSubsystemIndicatorSync();
     }
 
     function syncTabQuery(tabName) {
@@ -6386,6 +6497,7 @@
         const state = restoreFilterState();
         setProjectFilterSaveStatus("records", "");
         applyRecordsView(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
+        initSubsystemScrollIndicator();
     }
 
     function initProjectRecordPageshowSync() {

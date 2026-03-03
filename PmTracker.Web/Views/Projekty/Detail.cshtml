@@ -178,9 +178,13 @@
     </div>
 
     <div class="records-shell" data-records-view="subsystem">
+        <aside class="subsystem-scroll-indicator" data-subsystem-scroll-indicator hidden aria-live="polite">
+            <span class="subsystem-scroll-indicator-title">Subsystém</span>
+            <strong class="subsystem-scroll-indicator-label" data-subsystem-scroll-indicator-label></strong>
+        </aside>
         @foreach (var skupina in Model.SkupinySubsystemu)
         {
-            <div class="subsystem-group">
+            <div class="subsystem-group" data-subsystem-group data-subsystem-name="@skupina.Nazev">
                 <h3>@skupina.Nazev</h3>
                 <div class="card-list">
                     @foreach (var zaznam in skupina.Zaznamy)
