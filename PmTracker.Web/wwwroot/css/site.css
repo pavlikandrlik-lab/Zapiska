@@ -3316,9 +3316,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .meeting-layout {
     display: grid;
-    grid-template-columns: minmax(260px, 320px) 1fr;
     gap: 20px;
-    align-items: start;
 }
 
 .meeting-content {
@@ -3326,13 +3324,29 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 20px;
 }
 
-.meeting-sidebar select {
-    width: 100%;
+.meeting-attendance-card {
+    overflow-x: auto;
 }
 
-.meeting-sidebar table td {
+.meeting-attendance-table {
+    min-width: 100%;
+}
+
+.meeting-attendance-table th:last-child,
+.meeting-attendance-table td:last-child {
+    width: 240px;
+    min-width: 240px;
+}
+
+.meeting-attendance-table td {
     padding-top: 6px;
     padding-bottom: 6px;
+}
+
+.meeting-attendance-select {
+    width: 100%;
+    min-width: 220px;
+    white-space: nowrap;
 }
 
 .meeting-status {

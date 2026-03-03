@@ -23,16 +23,18 @@ public sealed class PdfExportTemplateViewModel
     public required string SnapshotSummary { get; init; }
     public string? PreparationSummary { get; init; }
     public IReadOnlyList<PdfAttendanceGroupViewModel> Dochazka { get; init; } = Array.Empty<PdfAttendanceGroupViewModel>();
-    public IReadOnlyList<PdfProjectRoleMemberViewModel> VedeniProjektu { get; init; } = Array.Empty<PdfProjectRoleMemberViewModel>();
+    public IReadOnlyList<PdfRoleAssignmentViewModel> ProjektoveRole { get; init; } = Array.Empty<PdfRoleAssignmentViewModel>();
     public required IReadOnlyList<string> AppliedRuleSummary { get; init; }
     public required IReadOnlyList<PdfLegendItemViewModel> Legenda { get; init; }
     public required IReadOnlyList<PdfExportRecordViewModel> Zaznamy { get; init; }
 }
 
-public sealed class PdfProjectRoleMemberViewModel
+public sealed class PdfRoleAssignmentViewModel
 {
     public required string Osoba { get; init; }
+    public required string TypRole { get; init; }
     public required string Role { get; init; }
+    public string? Subsystem { get; init; }
 }
 
 public sealed class PdfAttendanceGroupViewModel

@@ -27,11 +27,9 @@ public sealed class ProjektDetailViewModel
     public required IReadOnlyList<SubsystemGroupViewModel> SkupinySubsystemu { get; init; }
     public required IReadOnlyList<ZaznamCardViewModel> Zaznamy { get; init; }
     public required IReadOnlyList<JednaniListItemViewModel> Jednani { get; init; }
-    public required IReadOnlyList<ProjectRoleAssignmentViewModel> AktivniProjektoveRole { get; init; }
-    public required IReadOnlyList<ProjectRoleHistoryItemViewModel> HistorieProjektovychRoli { get; init; }
+    public required IReadOnlyList<ProjectRoleGridRowViewModel> AktivniRole { get; init; }
+    public required IReadOnlyList<ProjectRoleHistoryGridRowViewModel> HistorieRoli { get; init; }
     public required IReadOnlyList<ProjectSubsystemViewModel> AktivniSubsystemyProjektu { get; init; }
-    public required IReadOnlyList<ProjectSubsystemRoleAssignmentViewModel> AktivniSubsystemoveRole { get; init; }
-    public required IReadOnlyList<ProjectSubsystemRoleHistoryItemViewModel> HistorieSubsystemovychRoli { get; init; }
     public required IReadOnlyList<ProjectMemberCandidateViewModel> DostupneOsobyProRole { get; init; }
     public required IReadOnlyList<ProjectSubsystemOptionViewModel> DostupneProjektoveSubsystemy { get; init; }
     public required IReadOnlyList<ProjektHarmonogramUkolViewModel> HarmonogramUkoly { get; init; }
@@ -186,6 +184,38 @@ public sealed class ProjectRoleAssignmentViewModel
     public string? Organizace { get; init; }
     public string? OrganizacniCelek { get; init; }
     public DateTime DatumPrirazeni { get; init; }
+}
+
+public sealed class ProjectRoleGridRowViewModel
+{
+    public int AssignmentId { get; init; }
+    public required string AssignmentKind { get; init; }
+    public int OsobaId { get; init; }
+    public required string Osoba { get; init; }
+    public string? Email { get; init; }
+    public required string RoleKod { get; init; }
+    public required string RoleNazev { get; init; }
+    public required string RoleTypeLabel { get; init; }
+    public string? SubsystemKod { get; init; }
+    public string? SubsystemNazev { get; init; }
+    public string? Organizace { get; init; }
+    public string? OrganizacniCelek { get; init; }
+    public DateTime DatumPrirazeni { get; init; }
+}
+
+public sealed class ProjectRoleHistoryGridRowViewModel
+{
+    public int AssignmentId { get; init; }
+    public required string AssignmentKind { get; init; }
+    public int OsobaId { get; init; }
+    public required string Osoba { get; init; }
+    public required string RoleKod { get; init; }
+    public required string RoleNazev { get; init; }
+    public required string RoleTypeLabel { get; init; }
+    public string? SubsystemKod { get; init; }
+    public string? SubsystemNazev { get; init; }
+    public DateTime DatumPrirazeni { get; init; }
+    public DateTime? DatumOdebrani { get; init; }
 }
 
 public sealed class ProjectRoleHistoryItemViewModel

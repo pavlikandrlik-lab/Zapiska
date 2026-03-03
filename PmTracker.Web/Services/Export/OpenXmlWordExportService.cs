@@ -64,12 +64,18 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
         table.Append(CreateHeaderKeyValueRow("Generoval", model.Vytvoril));
         table.Append(CreateHeaderKeyValueRow("Vytvořeno", model.VytvorenoDne.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)));
 
-        if (model.VedeniProjektu.Count > 0)
+        if (model.ProjektoveRole.Count > 0)
         {
-            var leadershipLines = model.VedeniProjektu
-                .Select(member => $"{member.Osoba} — {member.Role}")
+            var roleLines = model.ProjektoveRole
+                .Select(member =>
+                {
+                    var subsystemSuffix = string.IsNullOrWhiteSpace(member.Subsystem)
+                        ? string.Empty
+                        : $" ({member.Subsystem})";
+                    return $"{member.Osoba} — {member.TypRole}: {member.Role}{subsystemSuffix}";
+                })
                 .ToList();
-            table.Append(CreateHeaderMultilineRow("Vedení projektu", leadershipLines));
+            table.Append(CreateHeaderMultilineRow("Projektové role", roleLines));
         }
 
         if (model.Dochazka.Count > 0)

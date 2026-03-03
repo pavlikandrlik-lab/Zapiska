@@ -119,7 +119,7 @@
             font-weight: 700;
         }
 
-        .project-leadership {
+        .project-roles {
             border-top: 1px solid var(--border);
             padding: 8px 10px;
             display: grid;
@@ -127,15 +127,15 @@
             font-size: 10pt;
         }
 
-        .project-leadership-head,
-        .project-leadership-row {
+        .project-roles-head,
+        .project-roles-row {
             display: grid;
-            grid-template-columns: 1fr 160px;
+            grid-template-columns: minmax(0, 1.4fr) 120px minmax(0, 1fr) minmax(0, 1fr);
             gap: 10px;
             align-items: start;
         }
 
-        .project-leadership-head {
+        .project-roles-head {
             font-weight: 700;
         }
 
@@ -353,18 +353,22 @@
                 <div><strong>Generoval:</strong> @Model.Vytvoril</div>
                 <div><strong>Vytvořeno:</strong> @Model.VytvorenoDne.ToString("dd.MM.yyyy HH:mm")</div>
             </div>
-            @if (isProjectSummary && Model.VedeniProjektu.Count > 0)
+            @if (Model.ProjektoveRole.Count > 0)
             {
-                <div class="project-leadership">
-                    <div class="project-leadership-head">
+                <div class="project-roles">
+                    <div class="project-roles-head">
                         <div>Osoba</div>
+                        <div>Typ role</div>
                         <div>Role</div>
+                        <div>Subsystém</div>
                     </div>
-                    @foreach (var member in Model.VedeniProjektu)
+                    @foreach (var member in Model.ProjektoveRole)
                     {
-                        <div class="project-leadership-row">
+                        <div class="project-roles-row">
                             <div>@member.Osoba</div>
+                            <div>@member.TypRole</div>
                             <div>@member.Role</div>
+                            <div>@(string.IsNullOrWhiteSpace(member.Subsystem) ? "-" : member.Subsystem)</div>
                         </div>
                     }
                 </div>

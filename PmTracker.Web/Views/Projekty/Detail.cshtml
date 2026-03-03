@@ -791,7 +791,10 @@
                 <h3>Projektové role</h3>
                 @if (canManageTeam)
                 {
-                    <button class="btn primary" type="button" data-modal-url="@Url.Action("AssignProjectRoleModal", "Projekty", new { projektId = Model.Projekt.Id })">Přidat projektovou roli</button>
+                    <div class="header-actions">
+                        <button class="btn primary" type="button" data-modal-url="@Url.Action("AssignProjectRoleModal", "Projekty", new { projektId = Model.Projekt.Id })">Přidat projektovou roli</button>
+                        <button class="btn" type="button" data-modal-url="@Url.Action("AssignProjectSubsystemRoleModal", "Projekty", new { projektId = Model.Projekt.Id })">Přidat roli v subsystému</button>
+                    </div>
                 }
             </div>
             <table class="table">
@@ -799,7 +802,9 @@
                     <tr>
                         <th>Osoba</th>
                         <th>Email</th>
+                        <th>Typ role</th>
                         <th>Role</th>
+                        <th>Subsystém</th>
                         <th>Organizace</th>
                         <th>Organizační celek</th>
                         <th>Přiřazeno</th>
@@ -807,27 +812,44 @@
                     </tr>
                 </thead>
                 <tbody>
-                @foreach (var role in Model.AktivniProjektoveRole)
+                @foreach (var role in Model.AktivniRole)
                 {
                     <tr>
                         <td>@role.Osoba</td>
                         <td>@(string.IsNullOrWhiteSpace(role.Email) ? "-" : role.Email)</td>
+                        <td>@role.RoleTypeLabel</td>
                         <td>@role.RoleNazev</td>
+                        <td>@(string.IsNullOrWhiteSpace(role.SubsystemNazev) ? "-" : role.SubsystemNazev)</td>
                         <td>@(role.Organizace ?? "-")</td>
                         <td>@(role.OrganizacniCelek ?? "-")</td>
                         <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
                         <td class="table-actions">
                             @if (canManageTeam)
                             {
-                                <form asp-controller="Projekty"
-                                      asp-action="DeactivateProjectRole"
-                                      method="post"
-                                      data-ajax-submit="true"
-                                      onsubmit="return confirm('Opravdu deaktivovat projektovou roli?');">
-                                    <input type="hidden" name="projektId" value="@Model.Projekt.Id" />
-                                    <input type="hidden" name="ProjektRoleId" value="@role.ProjektRoleId" />
-                                    <button class="btn small ghost" type="submit">Deaktivovat</button>
-                                </form>
+                                @if (string.Equals(role.AssignmentKind, "PROJECT", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <form asp-controller="Projekty"
+                                          asp-action="DeactivateProjectRole"
+                                          method="post"
+                                          data-ajax-submit="true"
+                                          onsubmit="return confirm('Opravdu deaktivovat projektovou roli?');">
+                                        <input type="hidden" name="projektId" value="@Model.Projekt.Id" />
+                                        <input type="hidden" name="ProjektRoleId" value="@role.AssignmentId" />
+                                        <button class="btn small ghost" type="submit">Deaktivovat</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form asp-controller="Projekty"
+                                          asp-action="DeactivateProjectSubsystemRole"
+                                          method="post"
+                                          data-ajax-submit="true"
+                                          onsubmit="return confirm('Opravdu deaktivovat roli v subsystému?');">
+                                        <input type="hidden" name="projektId" value="@Model.Projekt.Id" />
+                                        <input type="hidden" name="ProjektSubsystemRoleId" value="@role.AssignmentId" />
+                                        <button class="btn small ghost" type="submit">Deaktivovat</button>
+                                    </form>
+                                }
                             }
                             else
                             {
@@ -890,102 +912,27 @@
 
         <section class="card">
             <div class="panel-header">
-                <h3>Role v subsystémech</h3>
-                @if (canManageTeam)
-                {
-                    <button class="btn primary" type="button" data-modal-url="@Url.Action("AssignProjectSubsystemRoleModal", "Projekty", new { projektId = Model.Projekt.Id })">Přidat roli v subsystému</button>
-                }
-            </div>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Subsystém</th>
-                        <th>Osoba</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Přiřazeno</th>
-                        <th class="table-actions">Akce</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var role in Model.AktivniSubsystemoveRole)
-                {
-                    <tr>
-                        <td>@role.SubsystemNazev</td>
-                        <td>@role.Osoba</td>
-                        <td>@(string.IsNullOrWhiteSpace(role.Email) ? "-" : role.Email)</td>
-                        <td>@role.RoleNazev</td>
-                        <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
-                        <td class="table-actions">
-                            @if (canManageTeam)
-                            {
-                                <form asp-controller="Projekty"
-                                      asp-action="DeactivateProjectSubsystemRole"
-                                      method="post"
-                                      data-ajax-submit="true"
-                                      onsubmit="return confirm('Opravdu deaktivovat roli v subsystému?');">
-                                    <input type="hidden" name="projektId" value="@Model.Projekt.Id" />
-                                    <input type="hidden" name="ProjektSubsystemRoleId" value="@role.ProjektSubsystemRoleId" />
-                                    <button class="btn small ghost" type="submit">Deaktivovat</button>
-                                </form>
-                            }
-                            else
-                            {
-                                <span class="muted">Pouze čtení</span>
-                            }
-                        </td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </section>
-
-        <section class="card">
-            <div class="panel-header">
                 <h3>Historie rolí</h3>
             </div>
-
-            <h4>Projektové role</h4>
             <table class="table">
                 <thead>
                     <tr>
                         <th>Osoba</th>
+                        <th>Typ role</th>
                         <th>Role</th>
-                        <th>Přiřazeno</th>
-                        <th>Odebráno</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var role in Model.HistorieProjektovychRoli)
-                {
-                    <tr>
-                        <td>@role.Osoba</td>
-                        <td>@role.RoleNazev</td>
-                        <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
-                        <td>@(role.DatumOdebrani?.ToString("dd.MM.yyyy HH:mm") ?? "-")</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-
-            <h4>Subsystemové role</h4>
-            <table class="table">
-                <thead>
-                    <tr>
                         <th>Subsystém</th>
-                        <th>Osoba</th>
-                        <th>Role</th>
                         <th>Přiřazeno</th>
                         <th>Odebráno</th>
                     </tr>
                 </thead>
                 <tbody>
-                @foreach (var role in Model.HistorieSubsystemovychRoli)
+                @foreach (var role in Model.HistorieRoli)
                 {
                     <tr>
-                        <td>@role.SubsystemNazev</td>
                         <td>@role.Osoba</td>
+                        <td>@role.RoleTypeLabel</td>
                         <td>@role.RoleNazev</td>
+                        <td>@(string.IsNullOrWhiteSpace(role.SubsystemNazev) ? "-" : role.SubsystemNazev)</td>
                         <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
                         <td>@(role.DatumOdebrani?.ToString("dd.MM.yyyy HH:mm") ?? "-")</td>
                     </tr>
