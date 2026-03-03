@@ -113,7 +113,60 @@ public sealed class CurrentUserContextPermissionTests
         user.HasPermission(PermissionKeys.RecordsEdit, 3).Should().BeTrue();
     }
 
-    private static CurrentUserContextViewModel BuildUser(bool isSuperAdmin, params PermissionGrantViewModel[] grants)
+    [Fact]
+    public void CanReadProject_ShouldReturnTrue_ForProjectMember()
+    {
+        var user = BuildUser(isSuperAdmin: false, teamProjectIds: [17]);
+
+        user.CanReadProject(17).Should().BeTrue();
+        user.CanReadProject(18).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanReadProject_ShouldReturnTrue_ForMatchingProjectGrant()
+    {
+        var user = BuildUser(
+            isSuperAdmin: false,
+            grants:
+            [
+                new PermissionGrantViewModel
+                {
+                    PermissionKey = PermissionKeys.MeetingsEdit,
+                    ScopeLevel = "PROJECT",
+                    ScopeMode = "INCLUDE",
+                    IsAllowed = true,
+                    ProjectIds = [23]
+                }
+            ]);
+
+        user.CanReadProject(23).Should().BeTrue();
+        user.CanReadProject(24).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanReadProject_ShouldIgnoreProjectsCreateGrant()
+    {
+        var user = BuildUser(
+            isSuperAdmin: false,
+            grants:
+            [
+                new PermissionGrantViewModel
+                {
+                    PermissionKey = PermissionKeys.ProjectsCreate,
+                    ScopeLevel = "PROJECT",
+                    ScopeMode = "ALL",
+                    IsAllowed = true,
+                    ProjectIds = Array.Empty<int>()
+                }
+            ]);
+
+        user.CanReadProject(55).Should().BeFalse();
+    }
+
+    private static CurrentUserContextViewModel BuildUser(
+        bool isSuperAdmin,
+        IReadOnlyList<int>? teamProjectIds = null,
+        params PermissionGrantViewModel[] grants)
     {
         return new CurrentUserContextViewModel
         {
@@ -126,7 +179,8 @@ public sealed class CurrentUserContextPermissionTests
             OrganizacniCelekKod = "TEST",
             IsSuperAdmin = isSuperAdmin,
             RoleKody = Array.Empty<string>(),
-            PermissionGrants = grants
+            PermissionGrants = grants,
+            TeamProjectIds = teamProjectIds ?? Array.Empty<int>()
         };
     }
 }

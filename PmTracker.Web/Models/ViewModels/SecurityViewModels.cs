@@ -42,6 +42,20 @@ public static class PermissionKeys
         Definitions.Select(x => x.Key),
         StringComparer.OrdinalIgnoreCase);
 
+    private static readonly HashSet<string> ProjectReadGrantKeys = new(
+    [
+        ProjectsEdit,
+        ProjectsDelete,
+        RecordsEdit,
+        RecordsScheduleAdd,
+        RecordsScheduleEdit,
+        RecordsCommentSubsystemLead,
+        MeetingsCreate,
+        MeetingsEdit,
+        TeamManage
+    ],
+        StringComparer.OrdinalIgnoreCase);
+
     public static IReadOnlyList<LookupOptionViewModel> BuildLookupOptions()
     {
         return Definitions
@@ -72,6 +86,11 @@ public static class PermissionKeys
         return !string.IsNullOrWhiteSpace(key) && SupportedKeys.Contains(key.Trim());
     }
 
+    public static bool GrantsProjectRead(string? key)
+    {
+        return !string.IsNullOrWhiteSpace(key) && ProjectReadGrantKeys.Contains(key.Trim());
+    }
+
     private sealed record PermissionKeyDefinition(string Key, string Nazev, string CategoryKod, string ScopeLevel, string Popis);
 }
 
@@ -96,6 +115,7 @@ public sealed class CurrentUserContextViewModel
     public bool IsSuperAdmin { get; init; }
     public required IReadOnlyList<string> RoleKody { get; init; }
     public required IReadOnlyList<PermissionGrantViewModel> PermissionGrants { get; init; }
+    public IReadOnlyList<int> TeamProjectIds { get; init; } = Array.Empty<int>();
 
     public bool HasPermission(string permissionKey, int? projektId = null)
     {
@@ -124,6 +144,26 @@ public sealed class CurrentUserContextViewModel
             string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(g.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase) ||
             (string.Equals(g.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase) && g.ProjectIds.Contains(projektId.Value)));
+    }
+
+    public bool CanReadProject(int projektId)
+    {
+        if (projektId <= 0)
+        {
+            return false;
+        }
+
+        if (IsSuperAdmin || TeamProjectIds.Contains(projektId))
+        {
+            return true;
+        }
+
+        return PermissionGrants
+            .Where(g => g.IsAllowed && PermissionKeys.GrantsProjectRead(g.PermissionKey))
+            .Any(g =>
+                string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(g.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase) ||
+                (string.Equals(g.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase) && g.ProjectIds.Contains(projektId)));
     }
 }
 

@@ -14,7 +14,9 @@ public sealed class ProjektyController : BaseController
 
     public IActionResult Index()
     {
-        var projekty = DataStore.BuildProjektyList();
+        var projekty = DataStore.BuildProjektyList()
+            .Where(project => CurrentUserContext.CanReadProject(project.Id))
+            .ToList();
         var projectStatusOptions = BuildProjectStatusOptions();
 
         var model = new ProjektyIndexViewModel
@@ -44,6 +46,11 @@ public sealed class ProjektyController : BaseController
         if (!DataStore.ProjektExists(id))
         {
             return RedirectToAction(nameof(Index));
+        }
+
+        if (!CurrentUserContext.CanReadProject(id))
+        {
+            return NotFound();
         }
 
         var model = DataStore.BuildProjektDetail(id);

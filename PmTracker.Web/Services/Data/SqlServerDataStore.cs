@@ -114,6 +114,11 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
         var roles = BuildUserRoleCodes(osoba.Id);
         var grants = BuildUserPermissionGrants(osoba.Id);
+        var teamProjectIds = _dbContext.ObsazeniProjektu.AsNoTracking()
+            .Where(x => x.OsobaId == osoba.Id)
+            .Select(x => x.ProjektId)
+            .Distinct()
+            .ToList();
         var isSuperadmin = _dbContext.AuthzSuperadmins.AsNoTracking().Any(x => x.OsobaId == osoba.Id)
             || roles.Any(x => Ci.Equals(x, "SUPERADMIN"));
 
@@ -133,7 +138,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             OrganizacniCelek = orgUnit?.Nazev ?? "-",
             IsSuperAdmin = isSuperadmin,
             RoleKody = roles,
-            PermissionGrants = grants
+            PermissionGrants = grants,
+            TeamProjectIds = teamProjectIds
         };
     }
 

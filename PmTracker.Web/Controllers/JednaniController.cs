@@ -14,7 +14,9 @@ public sealed class JednaniController : BaseController
 
     public IActionResult Index(int? projektId)
     {
-        var projekty = DataStore.BuildJednaniOverview().ToList();
+        var projekty = DataStore.BuildJednaniOverview()
+            .Where(project => CurrentUserContext.CanReadProject(project.ProjektId))
+            .ToList();
 
         if (projektId.HasValue)
         {
@@ -32,6 +34,11 @@ public sealed class JednaniController : BaseController
     public IActionResult Detail(int id, string? returnUrl)
     {
         var model = DataStore.BuildJednaniDetail(id);
+        if (!CurrentUserContext.CanReadProject(model.ProjektId))
+        {
+            return NotFound();
+        }
+
         var fallbackUrl = Url.Action("Index", "Jednani", new { projektId = model.ProjektId }) ?? "/Jednani";
         var isValidReturnUrl = !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl);
 
@@ -45,6 +52,11 @@ public sealed class JednaniController : BaseController
     public IActionResult TaskItemPartial(int jednaniId, int zaznamId)
     {
         var model = DataStore.BuildJednaniDetail(jednaniId);
+        if (!CurrentUserContext.CanReadProject(model.ProjektId))
+        {
+            return NotFound();
+        }
+
         var ukol = model.Ukoly.FirstOrDefault(x => x.ZaznamId == zaznamId);
         if (ukol is null)
         {

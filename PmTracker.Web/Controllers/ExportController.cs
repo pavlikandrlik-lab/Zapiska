@@ -29,6 +29,11 @@ public sealed class ExportController : BaseController
             return RedirectToAction("Index", "Projekty");
         }
 
+        if (!CurrentUserContext.CanReadProject(projektId))
+        {
+            return NotFound();
+        }
+
         var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
@@ -39,6 +44,11 @@ public sealed class ExportController : BaseController
         if (!DataStore.ProjektExists(projektId))
         {
             return RedirectToAction("Index", "Projekty");
+        }
+
+        if (!CurrentUserContext.CanReadProject(projektId))
+        {
+            return NotFound();
         }
 
         var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint: false);
@@ -54,6 +64,11 @@ public sealed class ExportController : BaseController
             return RedirectToAction("Index", "Projekty");
         }
 
+        if (!CurrentUserContext.CanReadProject(detail.ProjektId))
+        {
+            return NotFound();
+        }
+
         var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
@@ -65,6 +80,11 @@ public sealed class ExportController : BaseController
         if (!DataStore.ProjektExists(detail.ProjektId))
         {
             return RedirectToAction("Index", "Projekty");
+        }
+
+        if (!CurrentUserContext.CanReadProject(detail.ProjektId))
+        {
+            return NotFound();
         }
 
         var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint: false);
@@ -79,6 +99,11 @@ public sealed class ExportController : BaseController
             return RedirectToAction("Index", "Projekty");
         }
 
+        if (!CurrentUserContext.CanReadProject(projektId))
+        {
+            return NotFound();
+        }
+
         var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
@@ -89,6 +114,11 @@ public sealed class ExportController : BaseController
         if (!DataStore.ProjektExists(projektId))
         {
             return RedirectToAction("Index", "Projekty");
+        }
+
+        if (!CurrentUserContext.CanReadProject(projektId))
+        {
+            return NotFound();
         }
 
         var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint: false);
@@ -102,6 +132,11 @@ public sealed class ExportController : BaseController
         if (!DataStore.ProjektExists(projektId))
         {
             return RedirectToAction("Index", "Projekty");
+        }
+
+        if (!CurrentUserContext.CanReadProject(projektId))
+        {
+            return NotFound();
         }
 
         if (jednaniId.HasValue)
