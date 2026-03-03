@@ -45,6 +45,20 @@ public static class PermissionKeys
         Definitions.Select(x => x.Key),
         StringComparer.OrdinalIgnoreCase);
 
+    private static readonly HashSet<string> ProjectReadGrantKeys = new(
+    [
+        ProjectsEdit,
+        ProjectsDelete,
+        RecordsEdit,
+        RecordsScheduleAdd,
+        RecordsScheduleEdit,
+        RecordsCommentSubsystemLead,
+        MeetingsCreate,
+        MeetingsEdit,
+        TeamManage
+    ],
+        StringComparer.OrdinalIgnoreCase);
+
     public static IReadOnlyList<LookupOptionViewModel> BuildLookupOptions()
     {
         return Definitions
@@ -73,6 +87,11 @@ public static class PermissionKeys
     public static bool IsSupported(string? key)
     {
         return !string.IsNullOrWhiteSpace(key) && SupportedKeys.Contains(key.Trim());
+    }
+
+    public static bool GrantsProjectRead(string? key)
+    {
+        return !string.IsNullOrWhiteSpace(key) && ProjectReadGrantKeys.Contains(key.Trim());
     }
 
     private sealed record PermissionKeyDefinition(string Key, string Nazev, string CategoryKod, string ScopeLevel, string Popis);
@@ -108,7 +127,22 @@ public sealed class CurrentUserContextViewModel
             return true;
         }
 
-        return projektId > 0 && VisibleProjectIds.Contains(projektId);
+        if (projektId <= 0)
+        {
+            return false;
+        }
+
+        if (VisibleProjectIds.Contains(projektId))
+        {
+            return true;
+        }
+
+        return PermissionGrants
+            .Where(g => g.IsAllowed && PermissionKeys.GrantsProjectRead(g.PermissionKey))
+            .Any(g =>
+                string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(g.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase) ||
+                (string.Equals(g.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase) && g.ProjectIds.Contains(projektId)));
     }
 
     public bool HasPermission(string permissionKey, int? projektId = null)

@@ -36,7 +36,7 @@ public sealed class JednaniController : BaseController
         var model = DataStore.BuildJednaniDetail(id);
         if (!CurrentUserContext.CanAccessProject(model.ProjektId))
         {
-            return Forbid();
+            return NotFound();
         }
 
         var fallbackUrl = Url.Action("Index", "Jednani", new { projektId = model.ProjektId }) ?? "/Jednani";
@@ -54,7 +54,7 @@ public sealed class JednaniController : BaseController
         var model = DataStore.BuildJednaniDetail(jednaniId);
         if (!CurrentUserContext.CanAccessProject(model.ProjektId))
         {
-            return Forbid();
+            return NotFound();
         }
 
         var ukol = model.Ukoly.FirstOrDefault(x => x.ZaznamId == zaznamId);

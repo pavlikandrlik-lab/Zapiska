@@ -171,6 +171,11 @@ public sealed class ZaznamyController : BaseController
     [HttpGet]
     public IActionResult RecordCardPartial(int projektId, int zaznamId)
     {
+        if (!CurrentUserContext.CanAccessProject(projektId))
+        {
+            return NotFound();
+        }
+
         var model = _recordsService.BuildProjektDetail(projektId);
         var record = model.Zaznamy.FirstOrDefault(x => x.Id == zaznamId);
         if (record is null)

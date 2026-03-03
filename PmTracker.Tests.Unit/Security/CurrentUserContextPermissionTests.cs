@@ -124,21 +124,37 @@ public sealed class CurrentUserContextPermissionTests
     }
 
     [Fact]
-    public void HasPermission_ShouldReturnFalse_WhenProjectIsNotVisible()
+    public void CanAccessProject_ShouldReturnTrue_ForMatchingProjectGrant()
     {
         var user = BuildUser(
             isSuperAdmin: false,
-            visibleProjectIds: [2],
             grants: new PermissionGrantViewModel
             {
                 PermissionKey = PermissionKeys.RecordsEdit,
+                ScopeLevel = "PROJECT",
+                ScopeMode = "INCLUDE",
+                IsAllowed = true,
+                ProjectIds = [3]
+            });
+
+        user.CanAccessProject(3).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanAccessProject_ShouldIgnoreProjectsCreateGrant()
+    {
+        var user = BuildUser(
+            isSuperAdmin: false,
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.ProjectsCreate,
                 ScopeLevel = "PROJECT",
                 ScopeMode = "ALL",
                 IsAllowed = true,
                 ProjectIds = Array.Empty<int>()
             });
 
-        user.HasPermission(PermissionKeys.RecordsEdit, 3).Should().BeFalse();
+        user.CanAccessProject(3).Should().BeFalse();
     }
 
     [Fact]

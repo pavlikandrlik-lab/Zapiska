@@ -31,7 +31,7 @@ public sealed class ExportController : BaseController
 
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
-            return Forbid();
+            return NotFound();
         }
 
         var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint);
@@ -48,7 +48,7 @@ public sealed class ExportController : BaseController
 
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
-            return Forbid();
+            return NotFound();
         }
 
         var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint: false);
@@ -66,7 +66,7 @@ public sealed class ExportController : BaseController
 
         if (!CurrentUserContext.CanAccessProject(detail.ProjektId))
         {
-            return Forbid();
+            return NotFound();
         }
 
         var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint);
@@ -84,7 +84,7 @@ public sealed class ExportController : BaseController
 
         if (!CurrentUserContext.CanAccessProject(detail.ProjektId))
         {
-            return Forbid();
+            return NotFound();
         }
 
         var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint: false);
@@ -101,7 +101,7 @@ public sealed class ExportController : BaseController
 
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
-            return Forbid();
+            return NotFound();
         }
 
         var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint);
@@ -118,7 +118,7 @@ public sealed class ExportController : BaseController
 
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
-            return Forbid();
+            return NotFound();
         }
 
         var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint: false);

@@ -198,4 +198,38 @@ public sealed class ApiSqlFixture : IAsyncLifetime
         await dbContext.SaveChangesAsync();
         return meeting.Id;
     }
+
+    public async Task EnsureProjectTeamMemberAsync(int projectId, int osobaId)
+    {
+        await using var dbContext = CreateDbContext();
+
+        var roleId = await dbContext.CiselnikRoliProjektu
+            .OrderBy(x => x.Id)
+            .Select(x => x.Id)
+            .FirstAsync();
+
+        var existing = await dbContext.ObsazeniProjektu
+            .FirstOrDefaultAsync(x => x.ProjektId == projectId && x.OsobaId == osobaId);
+
+        if (existing is not null)
+        {
+            if (existing.DatumOdebrani.HasValue)
+            {
+                existing.DatumOdebrani = null;
+                await dbContext.SaveChangesAsync();
+            }
+
+            return;
+        }
+
+        dbContext.ObsazeniProjektu.Add(new ObsazeniProjektuEntity
+        {
+            ProjektId = projectId,
+            OsobaId = osobaId,
+            RoleId = roleId,
+            DatumPrirazeni = DateTime.UtcNow
+        });
+
+        await dbContext.SaveChangesAsync();
+    }
 }

@@ -50,7 +50,7 @@ public sealed class ProjektyController : BaseController
 
         if (!CurrentUserContext.CanAccessProject(id))
         {
-            return Forbid();
+            return NotFound();
         }
 
         var model = DataStore.BuildProjektDetail(id);
