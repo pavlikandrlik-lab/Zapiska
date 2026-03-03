@@ -3,10 +3,18 @@
 ## Pořadí spuštění SQL skriptů
 
 1. `PMTracker_insert_sql`
+2. volitelně pro lokální/dev/test: `db_seed_dev_admin.sql`
 
 ## Poznámky
 
 - Backend očekává schéma `dbo` + `authz`.
+- `PMTracker_insert_sql` je produkční baseline seed. Obsahuje jen systémové minimum:
+  - technicky povinné stavy projektu,
+  - fixní projektové a subsystemové role,
+  - bootstrap organizaci `MO` pro ruční založení první osoby,
+  - katalog oprávnění a systémové authz role.
+- `db_seed_dev_admin.sql` je lokální/dev/test vrstva navíc. Obsahuje demo/business číselníky, lokální osobu `Pavel Admin` a navázání prvního administrátora pro neprodukční provoz.
+- Produkční baseline záměrně nevytváří žádnou osobu, projekt ani superadmin účet.
 - Pro upgrade existující DB na release `1.1.0` spusťte navíc `db_upgrade_1_1_0_signed_schedule_actual.sql`.
 - `dbo.osoby.Guid_AD` musí být `uniqueidentifier NULL`.
 - `dbo.osoby.email` musí existovat jako `nvarchar(255) NULL`.
@@ -21,6 +29,10 @@
 - V provozu musí být `IDENTITY_CACHE = OFF`, aby po restartu SQL nedocházelo ke skokům ID (např. +1000).
 - Aplikace v režimu `SqlServer` startuje fail-fast: bez dostupné DB nebo bez povinných číselníků nespustí web.
 - `Guid_AD` je technický identifikátor pro párování identity. V UI se nezobrazuje.
+- První provozní superadmin se zakládá ručně do DB:
+  - `dbo.osoby.organizace_id` musí ukazovat na bootstrap organizaci `MO`,
+  - `dbo.osoby.organizacni_celek_id` může být `NULL`,
+  - následně se `osoba_id` vloží do `authz.superadmins`.
 
 ## Lokální připojení (macOS)
 

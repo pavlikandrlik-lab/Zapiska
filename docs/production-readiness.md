@@ -17,7 +17,10 @@ Tento dokument je provozní checklist před nasazením na Windows Server + IIS +
 - Spustit jednotný script `PMTracker_insert_sql`.
 - Ověřit minimálně:
   - `dbo.ciselnik_stavu_projektu` obsahuje `PLAN, RUN, DONE, DELETED`
-  - existuje seed osoba `Pavel Admin`
+  - `dbo.ciselnik_roli_projektu` obsahuje `VLASTNIK_PROJEKTU, HOST, ADM_PROJ`
+  - `dbo.ciselnik_roli_subsystemu` obsahuje `VEDOUCI_SUBSYSTEMU, ZASTUPCE_VEDOUCIHO_SUBSYSTEMU, METODIK_SUBSYSTEMU`
+  - existuje bootstrap organizace `MO`
+  - v baseline po instalaci ještě neexistuje žádná osoba ani superadmin
   - existují tabulky `authz.*`
 
 ## 3) Identita a přístupy
@@ -26,6 +29,10 @@ Tento dokument je provozní checklist před nasazením na Windows Server + IIS +
 - App mapuje uživatele přes GUID claim -> `dbo.osoby.Guid_AD`.
 - Superadmin se nastavuje v DB přes `authz.superadmins.osoba_id` (INT, FK na `dbo.osoby.id`).
 - Hodnota typu `acr\\login` se do `authz.superadmins` nevkládá.
+- První provozní osoba se zakládá ručně:
+  - `dbo.osoby.organizace_id` musí ukazovat na `MO`,
+  - `dbo.osoby.organizacni_celek_id` může být `NULL`,
+  - `Guid_AD` musí odpovídat produkční identitě uživatele.
 
 ## 4) IIS a app pool
 

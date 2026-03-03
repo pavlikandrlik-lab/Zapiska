@@ -588,85 +588,12 @@ WHEN MATCHED THEN
         target.is_locked = source.is_locked;
 GO
 
-/* -------------------- Ostatní číselníky -------------------- */
-MERGE dbo.ciselnik_stavu_ukolu AS target
-USING (VALUES
-    (N'OPEN', N'Rozpracováno', 0, 1),
-    (N'WAIT', N'Čeká se', 0, 1),
-    (N'DONE', N'Hotovo', 1, 1),
-    (N'CANCEL', N'Zrušeno', 1, 1)
-) AS source(kod, nazev, is_final, is_locked)
-ON target.kod = source.kod
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT (kod, nazev, is_final, is_locked)
-    VALUES (source.kod, source.nazev, source.is_final, source.is_locked)
-WHEN MATCHED THEN
-    UPDATE SET
-        target.nazev = source.nazev,
-        target.is_final = source.is_final,
-        target.is_locked = source.is_locked;
-GO
-
-MERGE dbo.ciselnik_kategorii_zaznamu AS target
-USING (VALUES
-    (N'UKOL', N'Úkol', 1),
-    (N'INFO', N'Informace', 1),
-    (N'ROZHODNUTI', N'Rozhodnutí', 1)
-) AS source(kod, nazev, is_locked)
-ON target.kod = source.kod
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT (kod, nazev, is_locked)
-    VALUES (source.kod, source.nazev, source.is_locked)
-WHEN MATCHED THEN
-    UPDATE SET
-        target.nazev = source.nazev,
-        target.is_locked = source.is_locked;
-GO
-
-MERGE dbo.ciselnik_typu_ukolu AS target
-USING (VALUES
-    (N'RU', N'Hlavní úkol rozvoje', 0),
-    (N'A', N'Akce', 0),
-    (N'P', N'Projekt', 0),
-    (N'mP', N'Miniprojekt', 0)
-) AS source(kod, nazev, is_locked)
-ON target.kod = source.kod
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT (kod, nazev, is_locked)
-    VALUES (source.kod, source.nazev, source.is_locked)
-WHEN MATCHED THEN
-    UPDATE SET
-        target.nazev = source.nazev,
-        target.is_locked = source.is_locked;
-GO
-
-MERGE dbo.ciselnik_typu_externich_odkazu AS target
-USING (VALUES
-    (N'PMP', N'Požadavek metodické podpory', 1),
-    (N'PNF', N'Požadavek nové funkcionality', 1),
-    (N'NES', N'Nesrovnalost', 1)
-) AS source(kod, nazev, is_locked)
-ON target.kod = source.kod
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT (kod, nazev, is_locked)
-    VALUES (source.kod, source.nazev, source.is_locked)
-WHEN MATCHED THEN
-    UPDATE SET
-        target.nazev = source.nazev,
-        target.is_locked = source.is_locked;
-GO
-
+/* -------------------- Systémové projektové role -------------------- */
 MERGE dbo.ciselnik_roli_projektu AS target
 USING (VALUES
     (N'VLASTNIK_PROJEKTU', N'Vlastník projektu', 1),
     (N'HOST', N'Host', 1),
-    (N'ADM_PROJ', N'Administrátor projektu', 1),
-    (N'PM', N'Projektový manažer', 1),
-    (N'GEST', N'Gestor', 1),
-    (N'VED_SUB', N'Vedoucí subsystému', 1),
-    (N'DOD_MAINT', N'Dodavatel maintenance', 1),
-    (N'ANALYTIK', N'Analytik', 0),
-    (N'DEV', N'Developer', 0)
+    (N'ADM_PROJ', N'Administrátor projektu', 1)
 ) AS source(kod, nazev, is_locked)
 ON target.kod = source.kod
 WHEN NOT MATCHED BY TARGET THEN
@@ -678,6 +605,7 @@ WHEN MATCHED THEN
         target.is_locked = source.is_locked;
 GO
 
+/* -------------------- Systémové subsystemové role -------------------- */
 MERGE dbo.ciselnik_roli_subsystemu AS target
 USING (VALUES
     (N'VEDOUCI_SUBSYSTEMU', N'Vedoucí subsystému', 1),
@@ -694,42 +622,10 @@ WHEN MATCHED THEN
         target.is_locked = source.is_locked;
 GO
 
-MERGE dbo.ciselnik_stavu_jednani AS target
-USING (VALUES
-    (N'DRAFT', N'Příprava', 1),
-    (N'OPEN', N'Otevřeno pro zápis', 1),
-    (N'CLOSED', N'Uzavřeno', 1)
-) AS source(kod, nazev, is_locked)
-ON target.kod = source.kod
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT (kod, nazev, is_locked)
-    VALUES (source.kod, source.nazev, source.is_locked)
-WHEN MATCHED THEN
-    UPDATE SET
-        target.nazev = source.nazev,
-        target.is_locked = source.is_locked;
-GO
-
-MERGE dbo.ciselnik_stavu_ucasti AS target
-USING (VALUES
-    (N'PRESENT', N'Přítomen', 1),
-    (N'EXCUSED', N'Omluven', 1),
-    (N'ABSENT', N'Nepřítomen', 1)
-) AS source(kod, nazev, is_locked)
-ON target.kod = source.kod
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT (kod, nazev, is_locked)
-    VALUES (source.kod, source.nazev, source.is_locked)
-WHEN MATCHED THEN
-    UPDATE SET
-        target.nazev = source.nazev,
-        target.is_locked = source.is_locked;
-GO
-
+/* -------------------- Bootstrap organizace pro ruční založení první osoby -------------------- */
 MERGE dbo.ciselnik_organizace AS target
 USING (VALUES
-    (N'MO', N'Ministerstvo obrany', 1),
-    (N'DOD', N'Dodavatel', 1)
+    (N'MO', N'Ministerstvo obrany', 1)
 ) AS source(kod, nazev, is_locked)
 ON target.kod = source.kod
 WHEN NOT MATCHED BY TARGET THEN
@@ -741,153 +637,14 @@ WHEN MATCHED THEN
         target.is_locked = source.is_locked;
 GO
 
-MERGE dbo.ciselnik_organizacni_celky AS target
-USING (VALUES
-    (N'OI', N'Odbor informatiky', 1)
-) AS source(kod, nazev, is_locked)
-ON target.kod = source.kod
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT (kod, nazev, is_locked)
-    VALUES (source.kod, source.nazev, source.is_locked)
-WHEN MATCHED THEN
-    UPDATE SET
-        target.nazev = source.nazev,
-        target.is_locked = source.is_locked;
-GO
-
-MERGE dbo.ciselnik_vyzvy AS target
-USING (VALUES
-    (N'DV05', N'Dílčí výzva 05', CONVERT(date, '2025-01-01'), 0),
-    (N'DV06', N'Dílčí výzva 06', CONVERT(date, '2026-01-01'), 0),
-    (N'DV07', N'Dílčí výzva 07', CONVERT(date, '2027-01-01'), 0)
-) AS source(kod, nazev, rok, is_locked)
-ON target.kod = source.kod
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT (kod, nazev, rok, is_locked)
-    VALUES (source.kod, source.nazev, source.rok, source.is_locked)
-WHEN MATCHED THEN
-    UPDATE SET
-        target.nazev = source.nazev,
-        target.rok = source.rok,
-        target.is_locked = source.is_locked;
-GO
-
-/* -------------------- Harmonogram šablona + typy -------------------- */
-IF NOT EXISTS (SELECT 1 FROM dbo.harmonogram_sablony)
-BEGIN
-    INSERT INTO dbo.harmonogram_sablony (delay_barva_hex, is_aktivni, created_by)
-    VALUES (N'#DC2626', 1, NULL);
-END
-GO
-
-DECLARE @sablonaVerze int;
-SELECT TOP (1) @sablonaVerze = verze
-FROM dbo.harmonogram_sablony
-WHERE is_aktivni = 1
-ORDER BY verze DESC;
-
-IF @sablonaVerze IS NULL
-BEGIN
-    SELECT TOP (1) @sablonaVerze = verze
-    FROM dbo.harmonogram_sablony
-    ORDER BY verze DESC;
-
-    UPDATE dbo.harmonogram_sablony
-    SET is_aktivni = CASE WHEN verze = @sablonaVerze THEN 1 ELSE 0 END;
-END
-
-;WITH source_data AS (
-    SELECT
-        @sablonaVerze AS sablona_verze,
-        v.kod,
-        v.nazev,
-        v.hodnota,
-        v.krok_poradi,
-        v.je_zpozdeni,
-        v.barva_hex,
-        v.krok_key
-    FROM (VALUES
-        (N'HS01_DURATION', N'1. příprava zadání dodavateli', 1, 1, 0, N'#EF4444', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8301')),
-        (N'HS02_DURATION', N'2. konzultace termínů s dodavatelem před vytvořením zadání', 2, 2, 0, N'#F97316', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8302')),
-        (N'HS03_DURATION', N'3. odeslání zadání dodavateli', 3, 3, 0, N'#F59E0B', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8303')),
-        (N'HS04_DURATION', N'4. dodání návrhu řešení', 4, 4, 0, N'#84CC16', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8304')),
-        (N'HS05_DURATION', N'5. vypořádání připomínek', 5, 5, 0, N'#22C55E', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8305')),
-        (N'HS06_DURATION', N'6. odeslání požadavku na výrobu', 6, 6, 0, N'#14B8A6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8306')),
-        (N'HS07_DURATION', N'7. dodání funkcionality dodavatelem', 7, 7, 0, N'#06B6D4', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8307')),
-        (N'HS08_DURATION', N'8. připomínkování', 8, 8, 0, N'#3B82F6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8308')),
-        (N'HS09_DURATION', N'9. testování', 9, 9, 0, N'#6366F1', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8309')),
-        (N'HS10_DURATION', N'10. nasazení do provozu', 10, 10, 0, N'#8B5CF6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8310')),
-        (N'HS11_DURATION', N'11. fakturace', 11, 11, 0, N'#D946EF', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8311')),
-
-        (N'HS01_DELAY', N'1. příprava zadání dodavateli - zpoždění', 101, 1, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8301')),
-        (N'HS02_DELAY', N'2. konzultace termínů s dodavatelem před vytvořením zadání - zpoždění', 102, 2, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8302')),
-        (N'HS03_DELAY', N'3. odeslání zadání dodavateli - zpoždění', 103, 3, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8303')),
-        (N'HS04_DELAY', N'4. dodání návrhu řešení - zpoždění', 104, 4, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8304')),
-        (N'HS05_DELAY', N'5. vypořádání připomínek - zpoždění', 105, 5, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8305')),
-        (N'HS06_DELAY', N'6. odeslání požadavku na výrobu - zpoždění', 106, 6, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8306')),
-        (N'HS07_DELAY', N'7. dodání funkcionality dodavatelem - zpoždění', 107, 7, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8307')),
-        (N'HS08_DELAY', N'8. připomínkování - zpoždění', 108, 8, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8308')),
-        (N'HS09_DELAY', N'9. testování - zpoždění', 109, 9, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8309')),
-        (N'HS10_DELAY', N'10. nasazení do provozu - zpoždění', 110, 10, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8310')),
-        (N'HS11_DELAY', N'11. fakturace - zpoždění', 111, 11, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8311'))
-    ) v(kod, nazev, hodnota, krok_poradi, je_zpozdeni, barva_hex, krok_key)
-)
-MERGE dbo.ciselnik_harmonogram_typu AS target
-USING source_data AS source
-ON target.sablona_verze = source.sablona_verze AND target.kod = source.kod
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT (kod, nazev, hodnota, is_locked, sablona_verze, krok_key, krok_poradi, je_zpozdeni, barva_hex)
-    VALUES (source.kod, source.nazev, source.hodnota, 1, source.sablona_verze, source.krok_key, source.krok_poradi, source.je_zpozdeni, source.barva_hex)
-WHEN MATCHED THEN
-    UPDATE SET
-        target.nazev = source.nazev,
-        target.hodnota = source.hodnota,
-        target.is_locked = 1,
-        target.krok_key = source.krok_key,
-        target.krok_poradi = source.krok_poradi,
-        target.je_zpozdeni = source.je_zpozdeni,
-        target.barva_hex = source.barva_hex;
-GO
-
-/* -------------------- Výchozí admin osoba -------------------- */
-DECLARE @organizaceMoId int = (
-    SELECT TOP (1) id FROM dbo.ciselnik_organizace WHERE kod = N'MO' ORDER BY id
-);
-DECLARE @orgCelekOiId int = (
-    SELECT TOP (1) id FROM dbo.ciselnik_organizacni_celky WHERE kod = N'OI' ORDER BY id
-);
-
-IF NOT EXISTS (
-    SELECT 1
-    FROM dbo.osoby
-    WHERE jmeno = N'Pavel'
-      AND prijmeni = N'Admin'
-)
-BEGIN
-    INSERT INTO dbo.osoby (jmeno, prijmeni, titul, email, ad_login, organizacni_celek_id, organizace_id, Guid_AD, location_locked)
-    VALUES (N'Pavel', N'Admin', NULL, N'pavel.admin@zapiska.local', NULL, @orgCelekOiId, @organizaceMoId, NULL, 0);
-END
-
-DECLARE @seedAdminId int = (
-    SELECT TOP (1) id
-    FROM dbo.osoby
-    WHERE jmeno = N'Pavel' AND prijmeni = N'Admin'
-    ORDER BY id
-);
-
-MERGE dbo.subsystemy AS target
-USING (VALUES
-    (N'INTEGRACE', N'Integrace'),
-    (N'JADRO', N'Jádro')
-) AS source(kod, nazev)
-ON target.[kód] = source.kod
-WHEN NOT MATCHED BY TARGET THEN
-    INSERT ([kód], nazev)
-    VALUES (source.kod, source.nazev)
-WHEN MATCHED THEN
-    UPDATE SET
-        target.nazev = source.nazev;
-GO
+/*
+Poznámka:
+- Business číselníky (kategorie záznamů, stavy úkolů, typy úkolů, subsystémy,
+  harmonogram, výzvy, stavy jednání, stavy účasti, organizační celky atd.)
+  záměrně nejsou součástí baseline seedu.
+- Lokální/demo data a první administrátor patří do samostatného dev seed scriptu
+  `db_seed_dev_admin.sql`.
+*/
 
 /* -------------------- AUTHZ seed -------------------- */
 MERGE authz.permission_categories AS target
@@ -1018,28 +775,6 @@ WHEN MATCHED THEN
         target.is_allowed = 1;
 GO
 
-DECLARE @appAdminRoleId int = (SELECT TOP (1) id FROM authz.roles WHERE kod = N'APP_ADMIN' ORDER BY id);
-DECLARE @seedAdminIdForAuthz int = (
-    SELECT TOP (1) id
-    FROM dbo.osoby
-    WHERE jmeno = N'Pavel' AND prijmeni = N'Admin'
-    ORDER BY id
-);
-
-IF NOT EXISTS (SELECT 1 FROM authz.superadmins WHERE osoba_id = @seedAdminIdForAuthz)
-BEGIN
-    INSERT INTO authz.superadmins (osoba_id, poznamka, created_at, created_by)
-    VALUES (@seedAdminIdForAuthz, N'Lokální seed admin bez AD', SYSUTCDATETIME(), @seedAdminIdForAuthz);
-END
-
-IF @appAdminRoleId IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM authz.user_roles WHERE osoba_id = @seedAdminIdForAuthz AND role_id = @appAdminRoleId)
-BEGIN
-    INSERT INTO authz.user_roles (osoba_id, role_id, is_active)
-    VALUES (@seedAdminIdForAuthz, @appAdminRoleId, 1);
-END
-GO
-
 /* -------------------- Validace seedu -------------------- */
 DECLARE @missingCodes TABLE (code nvarchar(255));
 INSERT INTO @missingCodes (code)
@@ -1061,5 +796,167 @@ BEGIN
 
     SET @throwMessage = N'Chybí povinné hodnoty v ciselnik_stavu_projektu: ' + @err;
     THROW 52001, @throwMessage, 1;
+END
+GO
+
+DECLARE @missingProjectRoleCodes TABLE (code nvarchar(255));
+INSERT INTO @missingProjectRoleCodes (code)
+SELECT req.code
+FROM (VALUES (N'VLASTNIK_PROJEKTU'), (N'HOST'), (N'ADM_PROJ')) AS req(code)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM dbo.ciselnik_roli_projektu rp
+    WHERE UPPER(rp.kod) = req.code
+);
+
+IF EXISTS (SELECT 1 FROM @missingProjectRoleCodes)
+BEGIN
+    DECLARE @projectRoleErr nvarchar(max) = N'';
+    DECLARE @projectRoleThrowMessage nvarchar(max);
+    SELECT @projectRoleErr = CASE WHEN @projectRoleErr = N'' THEN code ELSE @projectRoleErr + N', ' + code END
+    FROM @missingProjectRoleCodes
+    ORDER BY code;
+
+    SET @projectRoleThrowMessage = N'Chybí povinné hodnoty v ciselnik_roli_projektu: ' + @projectRoleErr;
+    THROW 52002, @projectRoleThrowMessage, 1;
+END
+GO
+
+DECLARE @missingSubsystemRoleCodes TABLE (code nvarchar(255));
+INSERT INTO @missingSubsystemRoleCodes (code)
+SELECT req.code
+FROM (VALUES (N'VEDOUCI_SUBSYSTEMU'), (N'ZASTUPCE_VEDOUCIHO_SUBSYSTEMU'), (N'METODIK_SUBSYSTEMU')) AS req(code)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM dbo.ciselnik_roli_subsystemu rs
+    WHERE UPPER(rs.kod) = req.code
+);
+
+IF EXISTS (SELECT 1 FROM @missingSubsystemRoleCodes)
+BEGIN
+    DECLARE @subsystemRoleErr nvarchar(max) = N'';
+    DECLARE @subsystemRoleThrowMessage nvarchar(max);
+    SELECT @subsystemRoleErr = CASE WHEN @subsystemRoleErr = N'' THEN code ELSE @subsystemRoleErr + N', ' + code END
+    FROM @missingSubsystemRoleCodes
+    ORDER BY code;
+
+    SET @subsystemRoleThrowMessage = N'Chybí povinné hodnoty v ciselnik_roli_subsystemu: ' + @subsystemRoleErr;
+    THROW 52003, @subsystemRoleThrowMessage, 1;
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM dbo.ciselnik_organizace
+    WHERE kod = N'MO'
+)
+BEGIN
+    THROW 52004, N'Chybí bootstrap organizace MO v ciselnik_organizace.', 1;
+END
+GO
+
+DECLARE @missingAuthzCategoryCodes TABLE (code nvarchar(255));
+INSERT INTO @missingAuthzCategoryCodes (code)
+SELECT req.code
+FROM (VALUES (N'PROJECTS'), (N'RECORDS'), (N'MEETINGS'), (N'MASTER'), (N'SETTINGS')) AS req(code)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM authz.permission_categories pc
+    WHERE UPPER(pc.kod) = req.code
+);
+
+IF EXISTS (SELECT 1 FROM @missingAuthzCategoryCodes)
+BEGIN
+    DECLARE @authzCategoryErr nvarchar(max) = N'';
+    DECLARE @authzCategoryThrowMessage nvarchar(max);
+    SELECT @authzCategoryErr = CASE WHEN @authzCategoryErr = N'' THEN code ELSE @authzCategoryErr + N', ' + code END
+    FROM @missingAuthzCategoryCodes
+    ORDER BY code;
+
+    SET @authzCategoryThrowMessage = N'Chybí povinné hodnoty v authz.permission_categories: ' + @authzCategoryErr;
+    THROW 52005, @authzCategoryThrowMessage, 1;
+END
+GO
+
+DECLARE @missingPermissionKeys TABLE (code nvarchar(255));
+INSERT INTO @missingPermissionKeys (code)
+SELECT req.code
+FROM (VALUES
+    (N'projects.create'),
+    (N'projects.edit'),
+    (N'projects.delete'),
+    (N'records.edit'),
+    (N'records.schedule.add'),
+    (N'records.schedule.edit'),
+    (N'records.comment.subsystemlead'),
+    (N'meetings.create'),
+    (N'meetings.edit'),
+    (N'team.manage'),
+    (N'people.manage'),
+    (N'ciselniky.edit'),
+    (N'settings.view'),
+    (N'settings.manage')
+) AS req(code)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM authz.permissions p
+    WHERE LOWER(p.klic) = req.code
+);
+
+IF EXISTS (SELECT 1 FROM @missingPermissionKeys)
+BEGIN
+    DECLARE @permissionErr nvarchar(max) = N'';
+    DECLARE @permissionThrowMessage nvarchar(max);
+    SELECT @permissionErr = CASE WHEN @permissionErr = N'' THEN code ELSE @permissionErr + N', ' + code END
+    FROM @missingPermissionKeys
+    ORDER BY code;
+
+    SET @permissionThrowMessage = N'Chybí povinné hodnoty v authz.permissions: ' + @permissionErr;
+    THROW 52006, @permissionThrowMessage, 1;
+END
+GO
+
+DECLARE @missingAuthzRoles TABLE (code nvarchar(255));
+INSERT INTO @missingAuthzRoles (code)
+SELECT req.code
+FROM (VALUES (N'SUPERADMIN'), (N'APP_ADMIN')) AS req(code)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM authz.roles r
+    WHERE UPPER(r.kod) = req.code
+);
+
+IF EXISTS (SELECT 1 FROM @missingAuthzRoles)
+BEGIN
+    DECLARE @authzRoleErr nvarchar(max) = N'';
+    DECLARE @authzRoleThrowMessage nvarchar(max);
+    SELECT @authzRoleErr = CASE WHEN @authzRoleErr = N'' THEN code ELSE @authzRoleErr + N', ' + code END
+    FROM @missingAuthzRoles
+    ORDER BY code;
+
+    SET @authzRoleThrowMessage = N'Chybí povinné hodnoty v authz.roles: ' + @authzRoleErr;
+    THROW 52007, @authzRoleThrowMessage, 1;
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM authz.role_permissions rp
+    INNER JOIN authz.roles r ON r.id = rp.role_id
+    WHERE r.kod = N'SUPERADMIN'
+)
+BEGIN
+    THROW 52008, N'Chybí seed mapování role -> akce pro roli SUPERADMIN.', 1;
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM authz.role_permissions rp
+    INNER JOIN authz.roles r ON r.id = rp.role_id
+    WHERE r.kod = N'APP_ADMIN'
+)
+BEGIN
+    THROW 52009, N'Chybí seed mapování role -> akce pro roli APP_ADMIN.', 1;
 END
 GO

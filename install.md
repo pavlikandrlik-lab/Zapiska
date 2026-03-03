@@ -88,24 +88,27 @@ sqlcmd -S $SQL_INSTANCE -E -d $DB_NAME -b -i "$DEPLOY_SQL_DIR\PMTracker_insert_s
 - schéma `dbo` a `authz`,
 - finální tabulky aplikace (včetně sloupců `ad_login`, `location_locked`, `autor_osoba_id`, harmonogramu a viditelných čísel záznamů),
 - povinné stavy projektu `PLAN/RUN/DONE/DELETED`,
+- fixní projektové a subsystemové role,
 - základní seed role/permission,
-- seed osobu `Pavel Admin` (bez demo projektu PMT).
+- bootstrap organizaci `MO` pro ruční založení první osoby.
 
 ### 4.2 Ověření po SQL instalaci
 
 ```powershell
 sqlcmd -S $SQL_INSTANCE -E -d $DB_NAME -Q "SET NOCOUNT ON;
 SELECT kod, nazev FROM dbo.ciselnik_stavu_projektu WHERE kod IN ('PLAN','RUN','DONE','DELETED') ORDER BY kod;
-SELECT id, jmeno, prijmeni, email FROM dbo.osoby WHERE jmeno=N'Pavel' AND prijmeni=N'Admin';
-SELECT COUNT(*) AS pmt_count FROM dbo.projekty WHERE zkratka='PMT';
+SELECT id, kod, nazev FROM dbo.ciselnik_organizace WHERE kod='MO';
+SELECT COUNT(*) AS osoby_count FROM dbo.osoby;
+SELECT COUNT(*) AS superadmins_count FROM authz.superadmins;
 SELECT COUNT(*) AS authz_roles FROM authz.roles;"
 ```
 
 Očekávaný výsledek:
 
 - 4 povinné stavy projektu existují,
-- `Pavel Admin` existuje,
-- `pmt_count = 0`,
+- bootstrap organizace `MO` existuje,
+- `osoby_count = 0`,
+- `superadmins_count = 0`,
 - `authz.roles` má data.
 
 ### 4.3 Upgrade existující databáze na signed skutečnost harmonogramu
@@ -126,18 +129,41 @@ Patch je idempotentní a jen odstraní legacy constraint `CK_zaznam_harmonogram_
 
 Do superadmin tabulky se **nevkládá** `acr\login`.
 
+Produkční baseline seed nevytváří žádnou osobu. První provozní účet je potřeba založit ručně:
+
+1. vložit osobu do `dbo.osoby`,
+2. nastavit jí korektní `Guid_AD` podle produkční identity,
+3. použít bootstrap organizaci `MO`,
+4. `organizacni_celek_id` může zůstat `NULL`,
+5. následně vložit `osoba_id` do `authz.superadmins`.
+
 ```powershell
 sqlcmd -S $SQL_INSTANCE -E -d $DB_NAME -Q "SET NOCOUNT ON;
+DECLARE @organizace_id int = (
+    SELECT TOP (1) id
+    FROM dbo.ciselnik_organizace
+    WHERE kod = 'MO'
+);
+IF @organizace_id IS NULL
+BEGIN
+    RAISERROR('Chybí bootstrap organizace MO.', 16, 1);
+    RETURN;
+END
+
+DECLARE @guid_ad uniqueidentifier = '00000000-0000-0000-0000-000000000000'; -- nahraď skutečným AD GUID
+
+IF NOT EXISTS (SELECT 1 FROM dbo.osoby WHERE Guid_AD = @guid_ad)
+BEGIN
+    INSERT INTO dbo.osoby (jmeno, prijmeni, titul, email, organizacni_celek_id, organizace_id, Guid_AD)
+    VALUES (N'Jméno', N'Příjmení', NULL, N'uzivatel@domena.cz', NULL, @organizace_id, @guid_ad);
+END
+
 DECLARE @osoba_id int = (
     SELECT TOP (1) id
     FROM dbo.osoby
-    WHERE email = 'andrlikp@your-domain.cz'
+    WHERE Guid_AD = @guid_ad
 );
-IF @osoba_id IS NULL
-BEGIN
-    RAISERROR('Osoba neexistuje v dbo.osoby. Nejdřív ji založte (AD sync/manual).', 16, 1);
-    RETURN;
-END
+
 IF NOT EXISTS (SELECT 1 FROM authz.superadmins WHERE osoba_id = @osoba_id)
 BEGIN
     INSERT INTO authz.superadmins (osoba_id, poznamka, created_at, created_by)
