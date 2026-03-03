@@ -89,7 +89,8 @@ GO
 MERGE dbo.ciselnik_roli_projektu AS target
 USING (VALUES
     (N'VLASTNIK_PROJEKTU', N'Vlastník projektu', 1),
-    (N'HOST', N'Host', 1)
+    (N'HOST', N'Host', 1),
+    (N'ADM_PROJ', N'Administrátor projektu', 1)
 ) AS source(kod, nazev, is_locked)
 ON target.kod = source.kod
 WHEN NOT MATCHED BY TARGET THEN

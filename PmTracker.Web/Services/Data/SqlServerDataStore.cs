@@ -2685,7 +2685,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 group => group.Key,
                 group => (IReadOnlyList<int>)group.Select(item => item.ProjektId).Distinct().ToList());
 
-        return rolePermissions
+        var explicitGrants = rolePermissions
             .Select(item => new PermissionGrantViewModel
             {
                 PermissionKey = item.Klic,
@@ -2696,6 +2696,23 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     ? includeMap.GetValueOrDefault(item.RolePermissionId, Array.Empty<int>())
                     : Array.Empty<int>()
             })
+            .ToList();
+
+        var implicitProjectRoleGrants = ProjectRolePermissionGrantBuilder.BuildImplicitProjectRoleGrants(
+            (
+                from assignment in _dbContext.ObsazeniProjektu.AsNoTracking()
+                join role in _dbContext.CiselnikRoliProjektu.AsNoTracking() on assignment.RoleId equals role.Id
+                where assignment.OsobaId == osobaId
+                    && !assignment.DatumOdebrani.HasValue
+                select new ProjectRoleAssignmentGrantSource
+                {
+                    RoleCode = role.Kod,
+                    ProjectId = assignment.ProjektId
+                })
+            .ToList());
+
+        return explicitGrants
+            .Concat(implicitProjectRoleGrants)
             .ToList();
     }
 

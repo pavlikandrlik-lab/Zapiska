@@ -4,6 +4,7 @@ public static class ProjectRoleCodes
 {
     public const string ProjectOwner = "VLASTNIK_PROJEKTU";
     public const string Host = "HOST";
+    public const string ProjectAdmin = "ADM_PROJ";
 }
 
 public static class SubsystemRoleCodes

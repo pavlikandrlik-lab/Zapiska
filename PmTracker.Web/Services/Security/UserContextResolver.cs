@@ -215,6 +215,21 @@ public sealed class UserContextResolver : IUserContextResolver
                     : Array.Empty<int>()
             })
             .ToList();
+
+        var implicitProjectRoleGrants = ProjectRolePermissionGrantBuilder.BuildImplicitProjectRoleGrants(
+            await (
+                from assignment in _dbContext.ObsazeniProjektu.AsNoTracking()
+                join role in _dbContext.CiselnikRoliProjektu.AsNoTracking() on assignment.RoleId equals role.Id
+                where assignment.OsobaId == osoba.Id
+                    && !assignment.DatumOdebrani.HasValue
+                select new ProjectRoleAssignmentGrantSource
+                {
+                    RoleCode = role.Kod,
+                    ProjectId = assignment.ProjektId
+                })
+            .ToListAsync(cancellationToken));
+        grants.AddRange(implicitProjectRoleGrants);
+
         var visibleProjectIds = await _dbContext.ObsazeniProjektu
             .AsNoTracking()
             .Where(x => x.OsobaId == osoba.Id && !x.DatumOdebrani.HasValue)

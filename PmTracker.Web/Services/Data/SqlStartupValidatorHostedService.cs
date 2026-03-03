@@ -8,7 +8,7 @@ namespace PmTracker.Web.Services.Data;
 public sealed class SqlStartupValidatorHostedService : IHostedService
 {
     private static readonly string[] RequiredProjectStatusCodes = { "PLAN", "RUN", "DONE", "DELETED" };
-    private static readonly string[] RequiredProjectRoleCodes = { ProjectRoleCodes.ProjectOwner, ProjectRoleCodes.Host };
+    private static readonly string[] RequiredProjectRoleCodes = { ProjectRoleCodes.ProjectOwner, ProjectRoleCodes.Host, ProjectRoleCodes.ProjectAdmin };
     private static readonly string[] RequiredSubsystemRoleCodes = { SubsystemRoleCodes.Lead, SubsystemRoleCodes.DeputyLead, SubsystemRoleCodes.Methodik };
 
     private readonly IServiceScopeFactory _scopeFactory;
