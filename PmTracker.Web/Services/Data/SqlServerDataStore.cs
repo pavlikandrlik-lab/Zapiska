@@ -8,6 +8,8 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Dictionaries;
+using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Services.Data;
 
@@ -569,7 +571,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         };
     }
 
-    public CiselnikyDashboardViewModel BuildCiselnikyDashboard(string? id)
+    public CiselnikyDashboardViewModel BuildCiselnikyDashboard(string? id, CurrentUserContextViewModel currentUser)
     {
         var items = BuildCiselnikItems();
         var selected = string.IsNullOrWhiteSpace(id)
@@ -579,13 +581,14 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         return new CiselnikyDashboardViewModel
         {
             Ciselniky = items,
-            VybranyCiselnik = BuildCiselnikDetail(selected)
+            VybranyCiselnik = BuildCiselnikDetail(selected, currentUser)
         };
     }
 
-    public CiselnikDetailViewModel BuildCiselnikDetail(string id)
+    public CiselnikDetailViewModel BuildCiselnikDetail(string id, CurrentUserContextViewModel currentUser)
     {
         var key = (id ?? string.Empty).Trim().ToLowerInvariant();
+        var canChangeLockState = currentUser.IsSuperAdmin;
 
         return key switch
         {
@@ -593,6 +596,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             {
                 Key = key,
                 Nazev = "Stavy projektů",
+                CanChangeLockState = canChangeLockState,
                 SloupceNavic = Array.Empty<string>(),
                 Polozky = _dbContext.CiselnikStavuProjektu.AsNoTracking().OrderBy(x => x.Nazev).Select(x => new CiselnikRadekViewModel
                 {
@@ -600,6 +604,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     Kod = x.Kod,
                     Nazev = x.Nazev,
                     IsLocked = x.IsLocked,
+                    CanChangeLockState = canChangeLockState,
                     HodnotyNavic = Array.Empty<string>()
                 }).ToList()
             },
@@ -607,6 +612,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             {
                 Key = key,
                 Nazev = "Stavy úkolů",
+                CanChangeLockState = canChangeLockState,
                 SloupceNavic = new[] { "Finální" },
                 Polozky = _dbContext.CiselnikStavuUkolu.AsNoTracking().OrderBy(x => x.Nazev).Select(x => new CiselnikRadekViewModel
                 {
@@ -614,6 +620,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     Kod = x.Kod,
                     Nazev = x.Nazev,
                     IsLocked = x.IsLocked,
+                    CanChangeLockState = canChangeLockState,
                     HodnotyNavic = new[] { x.IsFinal ? "Ano" : "Ne" }
                 }).ToList()
             },
@@ -623,70 +630,79 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 Kod = x.Kod,
                 Nazev = x.Nazev,
                 IsLocked = x.IsLocked,
+                CanChangeLockState = canChangeLockState,
                 HodnotyNavic = Array.Empty<string>()
-            })),
+            }), canChangeLockState),
             "typy-ukolu" => BuildSimpleCiselnikDetail(key, "Typy úkolů", _dbContext.CiselnikTypuUkolu.AsNoTracking().Select(x => new CiselnikRadekViewModel
             {
                 Id = x.Id,
                 Kod = x.Kod,
                 Nazev = x.Nazev,
                 IsLocked = x.IsLocked,
+                CanChangeLockState = canChangeLockState,
                 HodnotyNavic = Array.Empty<string>()
-            })),
+            }), canChangeLockState),
             "typy-externich-odkazu" => BuildSimpleCiselnikDetail(key, "Typy externích odkazů", _dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().Select(x => new CiselnikRadekViewModel
             {
                 Id = x.Id,
                 Kod = x.Kod,
                 Nazev = x.Nazev,
                 IsLocked = x.IsLocked,
+                CanChangeLockState = canChangeLockState,
                 HodnotyNavic = Array.Empty<string>()
-            })),
+            }), canChangeLockState),
             "role-projektu" => BuildSimpleCiselnikDetail(key, "Role projektu", _dbContext.CiselnikRoliProjektu.AsNoTracking().Select(x => new CiselnikRadekViewModel
             {
                 Id = x.Id,
                 Kod = x.Kod,
                 Nazev = x.Nazev,
                 IsLocked = x.IsLocked,
+                CanChangeLockState = canChangeLockState,
                 HodnotyNavic = Array.Empty<string>()
-            })),
+            }), canChangeLockState),
             "role-subsystemu" => BuildSimpleCiselnikDetail(key, "Role subsystému", _dbContext.CiselnikRoliSubsystemu.AsNoTracking().Select(x => new CiselnikRadekViewModel
             {
                 Id = x.Id,
                 Kod = x.Kod,
                 Nazev = x.Nazev,
                 IsLocked = x.IsLocked,
+                CanChangeLockState = canChangeLockState,
                 HodnotyNavic = Array.Empty<string>()
-            })),
+            }), canChangeLockState),
             "stavy-ucasti" => BuildSimpleCiselnikDetail(key, "Stavy účasti", _dbContext.CiselnikStavuUcasti.AsNoTracking().Select(x => new CiselnikRadekViewModel
             {
                 Id = x.Id,
                 Kod = x.Kod,
                 Nazev = x.Nazev,
                 IsLocked = x.IsLocked,
+                CanChangeLockState = canChangeLockState,
                 HodnotyNavic = Array.Empty<string>()
-            })),
+            }), canChangeLockState),
             "organizace" => BuildSimpleCiselnikDetail(key, "Organizace", _dbContext.CiselnikOrganizace.AsNoTracking().Select(x => new CiselnikRadekViewModel
             {
                 Id = x.Id,
                 Kod = x.Kod,
                 Nazev = x.Nazev,
                 IsLocked = x.IsLocked,
+                CanChangeLockState = canChangeLockState,
                 HodnotyNavic = Array.Empty<string>()
-            })),
+            }), canChangeLockState),
             "organizacni-celky" => BuildSimpleCiselnikDetail(key, "Organizační celky", _dbContext.CiselnikOrganizacniCelky.AsNoTracking().Select(x => new CiselnikRadekViewModel
             {
                 Id = x.Id,
                 Kod = x.Kod,
                 Nazev = x.Nazev,
                 IsLocked = x.IsLocked,
+                CanChangeLockState = canChangeLockState,
                 HodnotyNavic = Array.Empty<string>()
-            })),
-            "subsystemy" => BuildSubsystemyCiselnikDetail(key),
-            HarmonogramKrokyCiselnikKey => BuildHarmonogramKrokyCiselnikDetail(key),
+            }), canChangeLockState),
+            "subsystemy" => BuildSubsystemyCiselnikDetail(key, canChangeLockState),
+            HarmonogramKrokyCiselnikKey => BuildHarmonogramKrokyCiselnikDetail(key, canChangeLockState),
             "vyzvy" => new CiselnikDetailViewModel
             {
                 Key = key,
                 Nazev = "Výzvy",
+                CanChangeLockState = canChangeLockState,
                 SloupceNavic = new[] { "Rok" },
                 Polozky = _dbContext.CiselnikVyzvy.AsNoTracking().OrderBy(x => x.Kod).Select(x => new CiselnikRadekViewModel
                 {
@@ -694,6 +710,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     Kod = x.Kod,
                     Nazev = x.Nazev,
                     IsLocked = x.IsLocked,
+                    CanChangeLockState = canChangeLockState,
                     HodnotyNavic = new[] { x.Rok.ToString("yyyy", CultureInfo.InvariantCulture) }
                 }).ToList()
             },
@@ -703,16 +720,18 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 Kod = x.Kod,
                 Nazev = x.Nazev,
                 IsLocked = x.IsLocked,
+                CanChangeLockState = canChangeLockState,
                 HodnotyNavic = Array.Empty<string>()
-            })),
+            }), canChangeLockState),
             _ => BuildSimpleCiselnikDetail("stavy-projektu", "Stavy projektů", _dbContext.CiselnikStavuProjektu.AsNoTracking().Select(x => new CiselnikRadekViewModel
             {
                 Id = x.Id,
                 Kod = x.Kod,
                 Nazev = x.Nazev,
                 IsLocked = x.IsLocked,
+                CanChangeLockState = canChangeLockState,
                 HodnotyNavic = Array.Empty<string>()
-            }))
+            }), canChangeLockState)
         };
     }
 
@@ -2096,7 +2115,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     public void SaveCiselnikRow(SaveCiselnikRowCommand command, CurrentUserContextViewModel currentUser)
     {
         var key = (command.Key ?? string.Empty).Trim().ToLowerInvariant();
-        if (Ci.Equals(key, HarmonogramKrokyCiselnikKey) && !currentUser.IsSuperAdmin)
+        if (!DictionarySecurityPolicy.CanAccessDictionary(key, currentUser.IsSuperAdmin))
         {
             throw new InvalidOperationException("Číselník harmonogramu může upravovat pouze superadmin.");
         }
@@ -2106,6 +2125,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             throw new InvalidOperationException($"Neznámý číselník '{command.Key}'.");
         }
 
+        NormalizeDictionaryLockState(key, command, currentUser);
         handler(command);
 
         _dbContext.SaveChanges();
@@ -2115,12 +2135,17 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     public void DeleteCiselnikRow(DeleteCiselnikRowCommand command, CurrentUserContextViewModel currentUser)
     {
         var key = (command.Key ?? string.Empty).Trim().ToLowerInvariant();
-        if (Ci.Equals(key, HarmonogramKrokyCiselnikKey) && !currentUser.IsSuperAdmin)
+        if (!DictionarySecurityPolicy.CanAccessDictionary(key, currentUser.IsSuperAdmin))
         {
             throw new InvalidOperationException("Číselník harmonogramu může upravovat pouze superadmin.");
         }
 
-        var detail = BuildCiselnikDetail(key);
+        if (!currentUser.IsSuperAdmin && command.Id > 0 && TryGetDictionaryRowLockState(key, command.Id) == true)
+        {
+            throw new InvalidOperationException("Systémové položky číselníků může mazat pouze superadmin.");
+        }
+
+        var detail = BuildCiselnikDetail(key, currentUser);
         var rowForAudit = detail.Polozky.FirstOrDefault(x => x.Id == command.Id)
             ?? throw new InvalidOperationException($"Položka {command.Id} v číselníku '{command.Key}' nebyla nalezena.");
 
@@ -2147,6 +2172,36 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             "delete",
             JsonSerializer.Serialize(rowForAudit),
             null);
+    }
+
+    private void NormalizeDictionaryLockState(string key, SaveCiselnikRowCommand command, CurrentUserContextViewModel currentUser)
+    {
+        if (!currentUser.IsSuperAdmin && command.Id.HasValue && TryGetDictionaryRowLockState(key, command.Id.Value) == true)
+        {
+            throw new InvalidOperationException("Systémové položky číselníků může upravovat nebo odemykat pouze superadmin.");
+        }
+
+        command.IsLocked = DictionarySecurityPolicy.NormalizeRequestedLockState(key, command.IsLocked, currentUser.IsSuperAdmin);
+    }
+
+    private bool? TryGetDictionaryRowLockState(string key, int id)
+    {
+        return key switch
+        {
+            "stavy-projektu" => _dbContext.CiselnikStavuProjektu.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            "stavy-ukolu" => _dbContext.CiselnikStavuUkolu.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            "kategorie-zaznamu" => _dbContext.CiselnikKategoriiZaznamu.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            "typy-ukolu" => _dbContext.CiselnikTypuUkolu.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            "typy-externich-odkazu" => _dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            "role-projektu" => _dbContext.CiselnikRoliProjektu.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            "stavy-ucasti" => _dbContext.CiselnikStavuUcasti.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            "organizace" => _dbContext.CiselnikOrganizace.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            "organizacni-celky" => _dbContext.CiselnikOrganizacniCelky.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            "vyzvy" => _dbContext.CiselnikVyzvy.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            "stavy-jednani" => _dbContext.CiselnikStavuJednani.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefault(),
+            HarmonogramKrokyCiselnikKey => true,
+            _ => null
+        };
     }
 
     public void SaveUserRoleAssignment(SaveUserRoleAssignmentCommand command, CurrentUserContextViewModel currentUser)
@@ -2714,6 +2769,12 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .ToList()
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(group => group.Key, group => group.ToList());
+        var typeHistoryByRecord = _dbContext.ZaznamHistorieZmenTypu.AsNoTracking()
+            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .OrderBy(x => x.DatumZmeny)
+            .ToList()
+            .GroupBy(x => x.ZaznamId)
+            .ToDictionary(group => group.Key, group => group.ToList());
 
         var extTypeById = _dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().ToDictionary(x => x.Id);
         var vyzvaById = _dbContext.CiselnikVyzvy.AsNoTracking().ToDictionary(x => x.Id);
@@ -2749,6 +2810,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             var ownerHistory = ownerHistoryByRecord.GetValueOrDefault(record.Id, new List<ZaznamHistorieVlastnikEntity>());
             var termHistory = termHistoryByRecord.GetValueOrDefault(record.Id, new List<ZaznamHistorieTerminuEntity>());
             var subsystemHistory = subsystemHistoryByRecord.GetValueOrDefault(record.Id, new List<ZaznamHistorieSubsystemEntity>());
+            var taskTypeHistory = typeHistoryByRecord.GetValueOrDefault(record.Id, new List<ZaznamHistorieZmenTypuEntity>());
             var commentsForRecord = commentByRecord.GetValueOrDefault(record.Id, new List<VyjadreniEntity>());
             var category = categories.GetValueOrDefault(record.KategorieId);
             var isTask = IsTaskCategory(category?.Kod, category?.Nazev);
@@ -2864,6 +2926,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 HistorieTerminu = termHistory.Select(x => x.PuvodniDatum).Distinct().ToList(),
                 AktualniTermin = record.DatumUkonceni,
                 HistorieSubsystemu = subsystemHistory.Select(x => subsystems.GetValueOrDefault(x.PuvodniSubsystem)?.Nazev ?? "-").Distinct(Ci).ToList(),
+                HistorieTypuUkolu = taskTypeHistory.Select(x => taskTypes.GetValueOrDefault(x.PuvodniTypId)?.Nazev ?? "-").Distinct(Ci).ToList(),
                 AktualniSubsystemKod = string.IsNullOrWhiteSpace(currentSubsystem?.Kod) ? (currentSubsystem?.Nazev ?? string.Empty) : currentSubsystem.Kod,
                 AktualniSubsystem = currentSubsystem?.Nazev ?? "-",
                 AktualniSubsystemLeadEquivalentOsobaIds = leadEquivalentOsobaIdsBySubsystem.GetValueOrDefault(record.SubsystemId, []),
@@ -2895,8 +2958,29 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(
                 group => group.Key,
-                group => group.ToDictionary(item => item.TypId, item => Math.Max(0, item.HodnotaInt)));
+                group => group.ToDictionary(item => item.TypId, item => item.HodnotaInt));
         var schemaCache = new Dictionary<int, HarmonogramSchemaDefinition>();
+        var ownerIds = taskRecords.Select(x => x.AktualniVlastnikId).Distinct().ToList();
+        var ownerById = _dbContext.Osoby.AsNoTracking()
+            .Where(x => ownerIds.Contains(x.Id))
+            .Select(x => new
+            {
+                x.Id,
+                x.Titul,
+                x.Jmeno,
+                x.Prijmeni,
+                x.OrganizacniCelekId
+            })
+            .ToDictionary(x => x.Id);
+        var ownerOrgUnitIds = ownerById.Values
+            .Where(x => x.OrganizacniCelekId.HasValue)
+            .Select(x => x.OrganizacniCelekId!.Value)
+            .Distinct()
+            .ToList();
+        var ownerOrgCodes = _dbContext.CiselnikOrganizacniCelky.AsNoTracking()
+            .Where(x => ownerOrgUnitIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.Kod })
+            .ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Kod) ? null : x.Kod.Trim());
 
         return taskRecords
             .Select(record =>
@@ -2906,6 +2990,17 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 var harmonogramHodnoty = harmonogramByRecord.GetValueOrDefault(record.Id, new Dictionary<int, int>());
                 var vypocet = BuildHarmonogramVypocet(record.DatumZalozeni, schema.Kroky, harmonogramHodnoty);
                 var souhrn = BuildHarmonogramSouhrn(vypocet, deadline);
+                var owner = ownerById.GetValueOrDefault(record.AktualniVlastnikId);
+                var ownerOrgCode = owner?.OrganizacniCelekId is int orgId ? ownerOrgCodes.GetValueOrDefault(orgId) : null;
+                var ownerDisplay = owner is null
+                    ? record.AktualniVlastnik
+                    : BuildDisplayName(owner.Titul, owner.Jmeno, owner.Prijmeni, owner.Id);
+                var hasVisualDuration = souhrn.CelkoveTrvaniDni > 0;
+
+                if (!hasVisualDuration)
+                {
+                    return null;
+                }
 
                 return new ProjektHarmonogramUkolViewModel
                 {
@@ -2921,26 +3016,28 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     StavKod = record.StavKod,
                     SubsystemKod = record.AktualniSubsystemKod,
                     Subsystem = record.AktualniSubsystem,
-                    Vlastnik = record.AktualniVlastnik,
+                    Vlastnik = ownerDisplay,
+                    VlastnikOrgKod = ownerOrgCode,
                     VlastnikId = record.AktualniVlastnikId,
                     IsAktivniStav = record.IsAktivniStav,
                     DatumZalozeni = record.DatumZalozeni.Date,
                     TerminUkonceni = deadline,
                     BaselineDokonceni = souhrn.BaselineDokonceni,
-                    PosunuteDokonceni = souhrn.PosunuteDokonceni,
+                    SkutecneDokonceni = souhrn.SkutecneDokonceni,
                     CelkoveTrvaniDni = souhrn.CelkoveTrvaniDni,
-                    CelkoveZpozdeniDni = souhrn.CelkoveZpozdeniDni,
+                    CelkovaOdchylkaDni = souhrn.CelkovaOdchylkaDni,
                     DelkaDoTerminuDni = Math.Max(0, (deadline - record.DatumZalozeni.Date).Days),
                     Stihame = souhrn.Stihame,
                     PrekroceniDni = souhrn.PrekroceniDni,
                     DelayBarvaHex = schema.DelayBarvaHex,
+                    MaVizualniTrvani = hasVisualDuration,
                     Kroky = vypocet
                         .Select(krok => new ProjektHarmonogramKrokViewModel
                         {
                             KrokIndex = krok.KrokIndex,
                             Nazev = krok.Nazev,
                             TrvaniDni = krok.TrvaniDni,
-                            ZpozdeniDni = krok.ZpozdeniDni,
+                            OdchylkaDni = krok.ZpozdeniDni,
                             BarvaHex = krok.BarvaHex,
                             PlanStart = krok.PlanStartDatum.Date,
                             PlanEnd = krok.BaselineDatum.Date,
@@ -2950,6 +3047,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                         .ToList()
                 };
             })
+            .Where(x => x is not null)
+            .Cast<ProjektHarmonogramUkolViewModel>()
             .ToList();
     }
 
@@ -3182,66 +3281,78 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         IReadOnlyList<HarmonogramTypPar> harmonogramTypy,
         IReadOnlyDictionary<int, int>? harmonogramHodnoty)
     {
-        var types = harmonogramTypy.Count == 0
-            ? DefaultHarmonogramKroky
-                .Select(step => new HarmonogramTypPar(step.Poradi, step.Kod, step.Nazev, step.BarvaHex, 0, 0))
-                .ToList()
-            : harmonogramTypy.OrderBy(x => x.KrokIndex).ToList();
+        var definitions = (harmonogramTypy.Count == 0
+                ? DefaultHarmonogramKroky
+                    .Select(step => new HarmonogramTypPar(step.Poradi, step.Kod, step.Nazev, step.BarvaHex, 0, 0))
+                    .ToList()
+                : harmonogramTypy.OrderBy(x => x.KrokIndex).ToList())
+            .Select(type => new ScheduleTimelineStepDefinition
+            {
+                StepIndex = type.KrokIndex,
+                Code = type.Kod,
+                Name = type.Nazev,
+                ColorHex = NormalizeHexColor(type.BarvaHex, ResolveDefaultStepColor(type.KrokIndex)),
+                DurationTypeId = type.TrvaniTypId,
+                OffsetTypeId = type.ZpozdeniTypId
+            })
+            .ToList();
+        var computation = ScheduleTimelineCalculator.Compute(datumZalozeni, definitions, harmonogramHodnoty);
 
-        var values = harmonogramHodnoty ?? new Dictionary<int, int>();
-        var baselineCursor = datumZalozeni.Date;
-        var shiftedCursor = datumZalozeni.Date;
-        var result = new List<HarmonogramVypocetKroku>(types.Count);
-
-        foreach (var type in types)
-        {
-            var trvani = type.TrvaniTypId > 0 ? Math.Max(0, values.GetValueOrDefault(type.TrvaniTypId)) : 0;
-            var zpozdeni = type.ZpozdeniTypId > 0 ? Math.Max(0, values.GetValueOrDefault(type.ZpozdeniTypId)) : 0;
-
-            var planStart = baselineCursor;
-            var realStart = shiftedCursor;
-            baselineCursor = baselineCursor.AddDays(trvani);
-            shiftedCursor = shiftedCursor.AddDays(trvani + zpozdeni);
-
-            result.Add(new HarmonogramVypocetKroku(
-                type.KrokIndex,
-                type.Kod,
-                type.Nazev,
-                NormalizeHexColor(type.BarvaHex, ResolveDefaultStepColor(type.KrokIndex)),
-                type.TrvaniTypId,
-                type.ZpozdeniTypId,
-                trvani,
-                zpozdeni,
-                planStart,
-                baselineCursor,
-                realStart,
-                shiftedCursor));
-        }
-
-        return result;
+        return computation.Steps
+            .Select(step => new HarmonogramVypocetKroku(
+                step.StepIndex,
+                step.Code,
+                step.Name,
+                step.ColorHex,
+                step.DurationTypeId,
+                step.OffsetTypeId,
+                step.DurationDays,
+                step.OffsetDays,
+                step.PlanStartDate,
+                step.PlanEndDate,
+                step.ActualStartDate,
+                step.ActualEndDate))
+            .ToList();
     }
 
     private static HarmonogramSouhrnViewModel BuildHarmonogramSouhrn(
         IReadOnlyList<HarmonogramVypocetKroku> kroky,
         DateTime terminUkolu)
     {
-        var normalizedDeadline = terminUkolu.Date;
-        var baselineDokonceni = kroky.Count == 0 ? normalizedDeadline : kroky[^1].BaselineDatum.Date;
-        var posunuteDokonceni = kroky.Count == 0 ? normalizedDeadline : kroky[^1].PosunuteDatum.Date;
-        var celkoveTrvani = kroky.Sum(x => x.TrvaniDni);
-        var celkoveZpozdeni = kroky.Sum(x => x.ZpozdeniDni);
-        var stihame = posunuteDokonceni <= normalizedDeadline;
-        var prekroceni = stihame ? 0 : (posunuteDokonceni - normalizedDeadline).Days;
+        var summary = ScheduleTimelineCalculator.Summarize(
+            new ScheduleTimelineComputation
+            {
+                Steps = kroky
+                    .Select(step => new ScheduleTimelineStepResult
+                    {
+                        StepIndex = step.KrokIndex,
+                        Code = step.Kod,
+                        Name = step.Nazev,
+                        ColorHex = step.BarvaHex,
+                        DurationTypeId = step.TrvaniTypId,
+                        OffsetTypeId = step.ZpozdeniTypId,
+                        DurationDays = step.TrvaniDni,
+                        OffsetDays = step.ZpozdeniDni,
+                        PlanStartDate = step.PlanStartDatum,
+                        PlanEndDate = step.BaselineDatum,
+                        ActualStartDate = step.RealStartDatum,
+                        ActualEndDate = step.PosunuteDatum
+                    })
+                    .ToList(),
+                TotalDurationDays = kroky.Sum(x => x.TrvaniDni),
+                TotalOffsetDays = kroky.Sum(x => x.ZpozdeniDni)
+            },
+            terminUkolu);
 
         return new HarmonogramSouhrnViewModel
         {
-            BaselineDokonceni = baselineDokonceni,
-            PosunuteDokonceni = posunuteDokonceni,
-            TerminUkolu = normalizedDeadline,
-            CelkoveTrvaniDni = celkoveTrvani,
-            CelkoveZpozdeniDni = celkoveZpozdeni,
-            Stihame = stihame,
-            PrekroceniDni = Math.Max(0, prekroceni)
+            BaselineDokonceni = summary.BaselineCompletion,
+            SkutecneDokonceni = summary.ActualCompletion,
+            TerminUkolu = summary.Deadline,
+            CelkoveTrvaniDni = summary.TotalDurationDays,
+            CelkovaOdchylkaDni = summary.TotalOffsetDays,
+            Stihame = summary.IsOnTrack,
+            PrekroceniDni = Math.Max(0, summary.OverrunDays)
         };
     }
 
@@ -3700,7 +3811,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var harmonogramValues = (!isCreate && isTaskCategory && allowedTypeIds.Count > 0)
             ? _dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
                 .Where(x => x.ZaznamId == record.Id && allowedTypeIds.Contains(x.TypId))
-                .ToDictionary(x => x.TypId, x => Math.Max(0, x.HodnotaInt))
+                .ToDictionary(x => x.TypId, x => x.HodnotaInt)
             : new Dictionary<int, int>();
         var harmonogramKroky = BuildHarmonogramVypocet(record.DatumZalozeni, harmonogramTypy, harmonogramValues);
         var harmonogramSouhrn = BuildHarmonogramSouhrn(harmonogramKroky, record.DatumUkonceni);
@@ -3750,9 +3861,9 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 TrvaniTypId = krok.TrvaniTypId,
                 ZpozdeniTypId = krok.ZpozdeniTypId,
                 TrvaniDni = krok.TrvaniDni,
-                ZpozdeniDni = krok.ZpozdeniDni,
+                OdchylkaDni = krok.ZpozdeniDni,
                 BaselineDatum = krok.BaselineDatum,
-                PosunuteDatum = krok.PosunuteDatum
+                SkutecneDatum = krok.PosunuteDatum
             }).ToList(),
             HarmonogramSouhrn = harmonogramSouhrn,
             DostupniSpolupracovnici = people.Select(x => new SpolupracovnikOptionViewModel
@@ -3907,19 +4018,21 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         }).ToList();
     }
 
-    private CiselnikDetailViewModel BuildSimpleCiselnikDetail(string key, string name, IQueryable<CiselnikRadekViewModel> rows)
+    private CiselnikDetailViewModel BuildSimpleCiselnikDetail(string key, string name, IQueryable<CiselnikRadekViewModel> rows, bool canChangeLockState)
     {
         return new CiselnikDetailViewModel
         {
             Key = key,
             Nazev = name,
+            CanChangeLockState = canChangeLockState,
             SloupceNavic = Array.Empty<string>(),
             Polozky = rows.OrderBy(x => x.Nazev).ToList()
         };
     }
 
-    private CiselnikDetailViewModel BuildSubsystemyCiselnikDetail(string key)
+    private CiselnikDetailViewModel BuildSubsystemyCiselnikDetail(string key, bool canChangeLockState)
     {
+        _ = canChangeLockState;
         var subsystemRows = _dbContext.Subsystemy.AsNoTracking()
             .OrderBy(x => x.Nazev)
             .ToList();
@@ -3928,6 +4041,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         {
             Key = key,
             Nazev = "Subsystémy",
+            CanChangeLockState = false,
             SloupceNavic = Array.Empty<string>(),
             Polozky = subsystemRows
                 .Select(x => new CiselnikRadekViewModel
@@ -3936,13 +4050,14 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     Kod = x.Kod,
                     Nazev = x.Nazev,
                     IsLocked = false,
+                    CanChangeLockState = false,
                     HodnotyNavic = Array.Empty<string>()
                 })
                 .ToList()
         };
     }
 
-    private CiselnikDetailViewModel BuildHarmonogramKrokyCiselnikDetail(string key)
+    private CiselnikDetailViewModel BuildHarmonogramKrokyCiselnikDetail(string key, bool canChangeLockState)
     {
         var schema = GetActiveHarmonogramSchema();
         var rows = schema.Kroky
@@ -3953,6 +4068,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 Kod = step.Kod,
                 Nazev = step.Nazev,
                 IsLocked = false,
+                CanChangeLockState = canChangeLockState,
                 CanEdit = true,
                 CanDelete = true,
                 HodnotyNavic = new[] { step.BarvaHex },
@@ -3964,8 +4080,9 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         {
             Id = HarmonogramDelayColorPseudoRowId,
             Kod = HarmonogramDelayColorPseudoKod,
-            Nazev = "Globální barva zpoždění",
+            Nazev = "Globální barva skutečnosti",
             IsLocked = true,
+            CanChangeLockState = canChangeLockState,
             CanEdit = true,
             CanDelete = false,
             HodnotyNavic = new[] { schema.DelayBarvaHex },
@@ -3977,6 +4094,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             Key = key,
             Nazev = "Harmonogramové kroky",
             CanCreate = true,
+            CanChangeLockState = canChangeLockState,
             SloupceNavic = new[] { "Barva" },
             IsHodnotaNavicSelect = false,
             IsHodnotaNavicRequired = true,
@@ -5402,11 +5520,11 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var submittedByType = submittedValues
             .Where(x => allowedTypeIds.Contains(x.TypId))
             .GroupBy(x => x.TypId)
-            .ToDictionary(group => group.Key, group => Math.Max(0, group.Last().Hodnota));
+            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
 
         var existingByType = _dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
             .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId))
-            .ToDictionary(x => x.TypId, x => Math.Max(0, x.HodnotaInt));
+            .ToDictionary(x => x.TypId, x => x.HodnotaInt);
 
         var desired = new Dictionary<int, int>();
 
@@ -5433,7 +5551,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
             if (submittedByType.TryGetValue(typeId, out var submittedDuration))
             {
-                desired[typeId] = submittedDuration;
+                desired[typeId] = Math.Max(0, submittedDuration);
             }
         }
 
@@ -5469,9 +5587,14 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .Select(group => new
             {
                 TypId = group.Key,
-                Hodnota = Math.Max(0, group.Last().Hodnota)
+                Hodnota = harmonogramTypy.Any(step => step.TrvaniTypId == group.Key)
+                    ? Math.Max(0, group.Last().Hodnota)
+                    : group.Last().Hodnota
             })
-            .Where(x => x.Hodnota > 0)
+            .Where(x =>
+                harmonogramTypy.Any(step => step.TrvaniTypId == x.TypId)
+                    ? x.Hodnota > 0
+                    : x.Hodnota != 0)
             .ToDictionary(x => x.TypId, x => x.Hodnota);
         var normalizedResult = normalized
             .Select(item => new SaveRecordHarmonogramValueCommand

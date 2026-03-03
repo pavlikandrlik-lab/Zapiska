@@ -1,0 +1,23 @@
+@{
+    Layout = "_AccessLayout";
+    var statusCode = ViewData["AccessDeniedStatusCode"] as int? ?? 403;
+    var message = ViewData["AccessDeniedMessage"] as string ?? "Nemáte přístup do aplikace.";
+    var title = ViewData["Title"] as string ?? "Nemáte přístup do aplikace";
+}
+
+<section class="access-card">
+    <div class="access-card-badge">Zápiska</div>
+    <h1>@title</h1>
+    <p class="access-card-message">@message</p>
+    <div class="access-card-status">HTTP @statusCode</div>
+
+    <div class="access-card-help">
+        <h2>Co dělat dál</h2>
+        <p>Pokud očekáváte přístup, obraťte se na správce aplikace nebo na podporu.</p>
+        <div class="access-card-contacts">
+            <a href="tel:+420973200840">FIS: 973 200 840</a>
+            <a href="tel:+420973225500">ISSP: 973 225 500</a>
+            <a href="https://servicedesk.fis.acr" target="_blank" rel="noopener noreferrer">Servicedesk</a>
+        </div>
+    </div>
+</section>

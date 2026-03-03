@@ -515,9 +515,9 @@
             <div class="schedule-summary-grid">
                 <div><span class="label">Termín úkolu:</span> <strong data-schedule-summary-deadline>@Model.HarmonogramSouhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></div>
                 <div><span class="label">Plán dokončení:</span> <strong data-schedule-summary-baseline>@Model.HarmonogramSouhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></div>
-                <div><span class="label">Posun dokončení:</span> <strong data-schedule-summary-shifted>@Model.HarmonogramSouhrn.PosunuteDokonceni.ToString("dd.MM.yyyy")</strong></div>
+                <div><span class="label">Skutečné dokončení:</span> <strong data-schedule-summary-shifted>@Model.HarmonogramSouhrn.SkutecneDokonceni.ToString("dd.MM.yyyy")</strong></div>
                 <div><span class="label">Trvání:</span> <strong data-schedule-summary-duration>@Model.HarmonogramSouhrn.CelkoveTrvaniDni</strong> dnů</div>
-                <div><span class="label">Zpoždění:</span> <strong data-schedule-summary-delay>@Model.HarmonogramSouhrn.CelkoveZpozdeniDni</strong> dnů</div>
+                <div><span class="label">Celková odchylka:</span> <strong data-schedule-summary-delay>@Model.HarmonogramSouhrn.CelkovaOdchylkaDni</strong> dnů</div>
                 <div class="schedule-status-line @(Model.HarmonogramSouhrn.Stihame ? "ok" : "late")">
                     <span class="label">Stav:</span>
                     <strong data-schedule-summary-state>@(Model.HarmonogramSouhrn.Stihame ? "Stíháme" : "Nestíháme")</strong>
@@ -526,6 +526,7 @@
             </div>
 
             <div class="schedule-mini-gantt" data-record-mini-gantt>
+                <div class="timeline-axis schedule-timeline-axis" data-schedule-axis></div>
                 <div class="schedule-mini-gantt-row">
                     <span>Plán</span>
                     <div class="schedule-mini-gantt-track">
@@ -542,7 +543,7 @@
                     </div>
                 </div>
                 <div class="schedule-mini-gantt-row">
-                    <span>Posun</span>
+                    <span>Skutečnost</span>
                     <div class="schedule-mini-gantt-track">
                         <div class="schedule-mini-gantt-marker" data-schedule-gantt-deadline></div>
                         @for (var stepIndex = 0; stepIndex < Model.HarmonogramKroky.Count; stepIndex++)
@@ -557,7 +558,7 @@
                     </div>
                 </div>
             </div>
-            <div class="schedule-mini-legend">Plán / Posun / Termín</div>
+            <div class="schedule-mini-legend">Plán / Skutečnost / Termín</div>
 
             <div class="schedule-table-wrap">
                 <table class="table schedule-table">
@@ -565,8 +566,8 @@
                         <tr>
                             <th>Krok</th>
                             <th>Trvání / datum</th>
-                            <th>Zpoždění / datum</th>
-                            <th>Plán / Posun</th>
+                            <th>Skutečnost / datum</th>
+                            <th>Plán / Skutečnost</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -651,7 +652,7 @@
                                             <div class="schedule-stacked-part schedule-stacked-part-top">
                                                 <input class="schedule-days-input schedule-days-input-stacked"
                                                        type="number"
-                                                       min="0"
+                                                       min="@(-krok.TrvaniDni)"
                                                        name="HarmonogramHodnoty[@delayInputIndex].Hodnota"
                                                        value="@krok.ZpozdeniDni"
                                                        data-schedule-delay
@@ -664,10 +665,10 @@
                                                     new AppDateFieldViewModel
                                                     {
                                                         Name = $"UiHarmonogramPosunuteDatumy[{i}]",
-                                                        IsoValue = krok.PosunuteDatum.ToString("yyyy-MM-dd"),
-                                                        DisplayValue = krok.PosunuteDatum.ToString("dd.MM.yyyy"),
+                                                        IsoValue = krok.SkutecneDatum.ToString("yyyy-MM-dd"),
+                                                        DisplayValue = krok.SkutecneDatum.ToString("dd.MM.yyyy"),
                                                         Locked = delayDateDisabled,
-                                                        AriaLabel = "Otevřít kalendář zpoždění kroku harmonogramu",
+                                                        AriaLabel = "Otevřít kalendář skutečnosti kroku harmonogramu",
                                                         ContainerCssClass = "schedule-date-field schedule-date-field-stacked",
                                                         ExtraDataAttributes = new Dictionary<string, object?>
                                                         {
@@ -681,7 +682,7 @@
                                             <button class="icon-btn schedule-step-btn"
                                                     type="button"
                                                     data-schedule-delay-inc
-                                                    aria-label="Přidat 1 den zpoždění"
+                                                    aria-label="Přidat 1 den odchylky"
                                                     @((delayDisabled) ? "disabled=\"disabled\"" : null)>
                                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                     <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -691,7 +692,7 @@
                                             <button class="icon-btn schedule-step-btn"
                                                     type="button"
                                                     data-schedule-delay-dec
-                                                    aria-label="Odebrat 1 den zpoždění"
+                                                    aria-label="Odebrat 1 den odchylky"
                                                     @((delayDisabled) ? "disabled=\"disabled\"" : null)>
                                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                     <line x1="5" y1="12" x2="19" y2="12"></line>

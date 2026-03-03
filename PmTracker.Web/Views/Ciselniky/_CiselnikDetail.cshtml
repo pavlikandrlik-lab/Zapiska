@@ -93,13 +93,13 @@
                     @if (canEditThisCiselnik)
                     {
                         <div class="table-actions-inline">
-                            <button class="btn small" type="button" data-modal-url="@Url.Action("EditRow", "Ciselniky", new { key = Model.Key, id = polozka.Id })" disabled="@((locked && !isArchitect) || !polozka.CanEdit)">Upravit</button>
+                            <button class="btn small" type="button" data-modal-url="@Url.Action("EditRow", "Ciselniky", new { key = Model.Key, id = polozka.Id })" disabled="@((locked && !polozka.CanChangeLockState) || !polozka.CanEdit)">Upravit</button>
                             @if (polozka.CanDelete)
                             {
                                 <form class="table-action-inline-form" asp-controller="Ciselniky" asp-action="DeleteRow" method="post" onsubmit="return confirm('Opravdu chcete tuto položku smazat?');">
                                     <input type="hidden" name="Key" value="@Model.Key" />
                                     <input type="hidden" name="Id" value="@polozka.Id" />
-                                    <button class="btn small ghost" type="submit" disabled="@(locked && !isArchitect)">Smazat</button>
+                                    <button class="btn small ghost" type="submit" disabled="@(locked && !polozka.CanChangeLockState)">Smazat</button>
                                 </form>
                             }
                         </div>
@@ -180,7 +180,7 @@
                     }
                 </label>
             }
-            @if (!isSubsystemCiselnik && !isHarmonogramCiselnik)
+            @if (!isSubsystemCiselnik && !isHarmonogramCiselnik && Model.CanChangeLockState)
             {
                 <label class="filter-inline">
                     <input type="checkbox" name="IsLocked" value="true" />

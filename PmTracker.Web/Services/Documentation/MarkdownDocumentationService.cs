@@ -49,6 +49,7 @@ public sealed class MarkdownDocumentationService : IDocumentationService
         return new DocumentationPageViewModel
         {
             Key = source.Key,
+            SectionLabel = source.Title,
             Title = source.Title,
             Subtitle = source.Subtitle,
             CanonicalPath = source.Path,

@@ -28,6 +28,41 @@ public abstract class BaseController : Controller
         return string.Equals(header, "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
     }
 
+    protected bool WantsHtmlResponse()
+    {
+        if (IsAjaxRequest())
+        {
+            return false;
+        }
+
+        var accepts = HttpContext.Request.GetTypedHeaders().Accept;
+        if (accepts is null || accepts.Count == 0)
+        {
+            return true;
+        }
+
+        return accepts.Any(item =>
+        {
+            var mediaType = item.MediaType.Value;
+            return string.Equals(mediaType, "text/html", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(mediaType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(mediaType, "*/*", StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    private IActionResult AccessDeniedPageResult(int statusCode, string? message)
+    {
+        Response.StatusCode = statusCode;
+        ViewData["Title"] = statusCode == StatusCodes.Status401Unauthorized
+            ? "Ověření uživatele selhalo"
+            : "Nemáte přístup do aplikace";
+        ViewData["AccessDeniedStatusCode"] = statusCode;
+        ViewData["AccessDeniedMessage"] = string.IsNullOrWhiteSpace(message)
+            ? "Přístup k aplikaci nebylo možné ověřit."
+            : message;
+        return View("~/Views/Shared/AccessDenied.cshtml");
+    }
+
     protected Dictionary<string, string[]> BuildModelStateFieldErrors()
     {
         var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
@@ -240,11 +275,13 @@ public abstract class BaseController : Controller
 
         if (!resolved.IsSuccess || resolved.UserContext is null)
         {
-            context.Result = resolved.StatusCode switch
-            {
-                StatusCodes.Status401Unauthorized => new UnauthorizedObjectResult(new { error = resolved.ErrorMessage }),
-                _ => new ObjectResult(new { error = resolved.ErrorMessage }) { StatusCode = resolved.StatusCode }
-            };
+            context.Result = WantsHtmlResponse()
+                ? AccessDeniedPageResult(resolved.StatusCode, resolved.ErrorMessage)
+                : resolved.StatusCode switch
+                {
+                    StatusCodes.Status401Unauthorized => new UnauthorizedObjectResult(new { error = resolved.ErrorMessage }),
+                    _ => new ObjectResult(new { error = resolved.ErrorMessage }) { StatusCode = resolved.StatusCode }
+                };
             return;
         }
 

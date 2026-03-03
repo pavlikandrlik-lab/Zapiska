@@ -536,7 +536,7 @@ public sealed class ProjektyController : BaseController
 
     private IReadOnlyList<LookupOptionViewModel> BuildProjectStatusOptions()
     {
-        return DataStore.BuildCiselnikDetail("stavy-projektu").Polozky
+        return DataStore.BuildCiselnikDetail("stavy-projektu", CurrentUserContext).Polozky
             .OrderBy(x => x.Nazev, StringComparer.CurrentCultureIgnoreCase)
             .Select(x => new LookupOptionViewModel
             {
