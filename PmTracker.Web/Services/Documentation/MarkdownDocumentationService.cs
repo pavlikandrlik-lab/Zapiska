@@ -50,6 +50,7 @@ public sealed class MarkdownDocumentationService : IDocumentationService
             Key = source.Key,
             Title = source.Title,
             Subtitle = source.Subtitle,
+            SectionLabel = source.Title,
             CanonicalPath = source.Path,
             HtmlContent = html,
             Navigation = BuildNavigation(source.Key),

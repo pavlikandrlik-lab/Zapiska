@@ -23,6 +23,7 @@ public sealed class CiselnikDetailViewModel
     public required string Key { get; init; }
     public required string Nazev { get; init; }
     public bool CanCreate { get; init; } = true;
+    public bool CanChangeLockState { get; init; }
     public required IReadOnlyList<string> SloupceNavic { get; init; }
     public IReadOnlyList<LookupOptionViewModel> HodnotaNavicVolby { get; init; } = Array.Empty<LookupOptionViewModel>();
     public bool IsHodnotaNavicSelect { get; init; }
@@ -38,6 +39,7 @@ public sealed class CiselnikRadekViewModel
     public bool IsLocked { get; init; }
     public bool CanEdit { get; init; } = true;
     public bool CanDelete { get; init; } = true;
+    public bool CanChangeLockState { get; init; }
     public required IReadOnlyList<string> HodnotyNavic { get; init; }
     public IReadOnlyList<string> HodnotyNavicRaw { get; init; } = Array.Empty<string>();
 }
@@ -50,6 +52,7 @@ public sealed class CiselnikRadekEditViewModel
     public required string Kod { get; init; }
     public required string Nazev { get; init; }
     public bool IsLocked { get; init; }
+    public bool CanChangeLockState { get; init; }
     public string? SloupecNavic { get; init; }
     public string? HodnotaNavic { get; init; }
     public string? HodnotaNavicRaw { get; init; }

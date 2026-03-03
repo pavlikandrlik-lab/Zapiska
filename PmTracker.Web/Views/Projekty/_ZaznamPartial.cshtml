@@ -138,6 +138,17 @@
                     }
                     <strong>@Model.AktualniSubsystem</strong>
                 </div>
+                @if (Model.JeUkol && (!string.IsNullOrWhiteSpace(Model.TypUkolu) || Model.HistorieTypuUkolu.Count > 0))
+                {
+                    <div>
+                        <span class="label">Typ úkolu:</span>
+                        @foreach (var typ in Model.HistorieTypuUkolu)
+                        {
+                            <span class="history"><s>@typ</s></span>
+                        }
+                        <strong>@(string.IsNullOrWhiteSpace(Model.TypUkolu) ? "-" : Model.TypUkolu)</strong>
+                    </div>
+                }
             </div>
 
             @if (Model.ExterniOdkazy.Count > 0)

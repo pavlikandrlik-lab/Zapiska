@@ -12,9 +12,9 @@ public sealed class DictionariesService : IDictionariesService
         _dataStore = dataStore;
     }
 
-    public CiselnikyDashboardViewModel BuildCiselnikyDashboard(string? id) => _dataStore.BuildCiselnikyDashboard(id);
+    public CiselnikyDashboardViewModel BuildCiselnikyDashboard(string? id, CurrentUserContextViewModel currentUser) => _dataStore.BuildCiselnikyDashboard(id, currentUser);
 
-    public CiselnikDetailViewModel BuildCiselnikDetail(string id) => _dataStore.BuildCiselnikDetail(id);
+    public CiselnikDetailViewModel BuildCiselnikDetail(string id, CurrentUserContextViewModel currentUser) => _dataStore.BuildCiselnikDetail(id, currentUser);
 
     public void SaveCiselnikRow(SaveCiselnikRowCommand command, CurrentUserContextViewModel currentUser) =>
         _dataStore.SaveCiselnikRow(command, currentUser);

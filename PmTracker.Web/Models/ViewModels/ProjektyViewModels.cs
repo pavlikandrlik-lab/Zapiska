@@ -70,6 +70,7 @@ public sealed class ZaznamCardViewModel
     public required IReadOnlyList<DateTime> HistorieTerminu { get; init; }
     public DateTime? AktualniTermin { get; init; }
     public required IReadOnlyList<string> HistorieSubsystemu { get; init; }
+    public required IReadOnlyList<string> HistorieTypuUkolu { get; init; }
     public required string AktualniSubsystemKod { get; init; }
     public required string AktualniSubsystem { get; init; }
     public int AktualniSubsystemVedouciOsobaId { get; init; }
@@ -99,19 +100,24 @@ public sealed class ProjektHarmonogramUkolViewModel
     public required string SubsystemKod { get; init; }
     public required string Subsystem { get; init; }
     public required string Vlastnik { get; init; }
+    public string? VlastnikOrgKod { get; init; }
     public int VlastnikId { get; init; }
     public bool IsAktivniStav { get; init; }
     public DateTime DatumZalozeni { get; init; }
     public DateTime TerminUkonceni { get; init; }
     public DateTime BaselineDokonceni { get; init; }
-    public DateTime PosunuteDokonceni { get; init; }
+    public DateTime SkutecneDokonceni { get; init; }
     public int CelkoveTrvaniDni { get; init; }
-    public int CelkoveZpozdeniDni { get; init; }
+    public int CelkovaOdchylkaDni { get; init; }
     public int DelkaDoTerminuDni { get; init; }
     public bool Stihame { get; init; }
     public int PrekroceniDni { get; init; }
     public required string DelayBarvaHex { get; init; }
+    public bool MaVizualniTrvani { get; init; }
     public required IReadOnlyList<ProjektHarmonogramKrokViewModel> Kroky { get; init; }
+
+    public DateTime PosunuteDokonceni => SkutecneDokonceni;
+    public int CelkoveZpozdeniDni => CelkovaOdchylkaDni;
 }
 
 public sealed class ProjektHarmonogramKrokViewModel
@@ -119,12 +125,14 @@ public sealed class ProjektHarmonogramKrokViewModel
     public int KrokIndex { get; init; }
     public required string Nazev { get; init; }
     public int TrvaniDni { get; init; }
-    public int ZpozdeniDni { get; init; }
+    public int OdchylkaDni { get; init; }
     public required string BarvaHex { get; init; }
     public DateTime PlanStart { get; init; }
     public DateTime PlanEnd { get; init; }
     public DateTime RealStart { get; init; }
     public DateTime RealEnd { get; init; }
+
+    public int ZpozdeniDni => OdchylkaDni;
 }
 
 public sealed class ExterniOdkazViewModel
@@ -240,20 +248,26 @@ public sealed class HarmonogramKrokEditViewModel
     public int TrvaniTypId { get; init; }
     public int ZpozdeniTypId { get; init; }
     public int TrvaniDni { get; init; }
-    public int ZpozdeniDni { get; init; }
+    public int OdchylkaDni { get; init; }
     public DateTime BaselineDatum { get; init; }
-    public DateTime PosunuteDatum { get; init; }
+    public DateTime SkutecneDatum { get; init; }
+
+    public int ZpozdeniDni => OdchylkaDni;
+    public DateTime PosunuteDatum => SkutecneDatum;
 }
 
 public sealed class HarmonogramSouhrnViewModel
 {
     public DateTime BaselineDokonceni { get; init; }
-    public DateTime PosunuteDokonceni { get; init; }
+    public DateTime SkutecneDokonceni { get; init; }
     public DateTime TerminUkolu { get; init; }
     public int CelkoveTrvaniDni { get; init; }
-    public int CelkoveZpozdeniDni { get; init; }
+    public int CelkovaOdchylkaDni { get; init; }
     public bool Stihame { get; init; }
     public int PrekroceniDni { get; init; }
+
+    public DateTime PosunuteDokonceni => SkutecneDokonceni;
+    public int CelkoveZpozdeniDni => CelkovaOdchylkaDni;
 }
 
 public sealed class SubsystemOptionViewModel

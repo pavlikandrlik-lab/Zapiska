@@ -121,17 +121,6 @@
             }
         });
 
-        const quickTheme = menu.querySelector("[data-theme-cycle]");
-        if (quickTheme instanceof HTMLButtonElement) {
-            quickTheme.addEventListener("click", () => {
-                const currentMode = document.documentElement.getAttribute("data-theme-mode") || "auto";
-                if (currentMode === "dark") {
-                    setTheme("light", true);
-                } else {
-                    setTheme("dark", true);
-                }
-            });
-        }
     }
 
     function getStoredPrintFormat() {
@@ -1506,6 +1495,7 @@
             setRecordFilterVisibility(item, matches);
         });
 
+        renderStaticTimelineAxes(document.querySelector('[data-tab-panel="harmonogram"]'));
         queueRainbowSegmentRender(document.querySelector('[data-tab-panel="harmonogram"]'));
     }
 
@@ -1725,6 +1715,7 @@
 
             this.syncPinnedInputs();
             this.syncExpandedState();
+            updateProjectGanttAxis(this.panel);
             queueRainbowSegmentRender(this.panel);
         }
 
@@ -1746,6 +1737,42 @@
                 });
             });
         }
+    }
+
+    function updateProjectGanttAxis(panel) {
+        if (!(panel instanceof HTMLElement)) {
+            return;
+        }
+
+        const axis = panel.querySelector("[data-gantt-axis]");
+        if (!(axis instanceof HTMLElement)) {
+            return;
+        }
+
+        const visibleItems = Array.from(panel.querySelectorAll("[data-gantt-item]"))
+            .filter((node) => node instanceof HTMLElement && !node.hidden);
+        if (visibleItems.length === 0) {
+            axis.hidden = true;
+            axis.replaceChildren();
+            return;
+        }
+
+        const dates = visibleItems
+            .flatMap((item) => {
+                const startDate = parseIsoDate(item.dataset.ganttAxisStart);
+                const endDate = parseIsoDate(item.dataset.ganttAxisEnd);
+                return [startDate, endDate];
+            })
+            .filter((value) => value instanceof Date);
+        if (dates.length === 0) {
+            axis.hidden = true;
+            axis.replaceChildren();
+            return;
+        }
+
+        const ordered = dates.slice().sort((a, b) => a.getTime() - b.getTime());
+        axis.hidden = false;
+        renderTimelineAxis(axis, ordered[0], ordered[ordered.length - 1]);
     }
 
     function applyProjectGanttFilters() {
@@ -1770,6 +1797,7 @@
 
         restoreScheduleFilterState();
         applyProjectScheduleFilters();
+        renderStaticTimelineAxes(schedulePanel);
         queueRainbowSegmentRender(schedulePanel);
     }
 
@@ -1793,6 +1821,7 @@
         }
 
         applyProjectGanttFilters();
+        updateProjectGanttAxis(panel);
         queueRainbowSegmentRender(panel);
     }
 
@@ -2552,6 +2581,99 @@
         const next = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
         next.setDate(next.getDate() + days);
         return next;
+    }
+
+    function formatAxisDayMonth(date) {
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        return `${day}.${month}.`;
+    }
+
+    function formatAxisMonthYear(date) {
+        return new Intl.DateTimeFormat("cs-CZ", { month: "short", year: "numeric" }).format(date);
+    }
+
+    function buildTimelineAxisTicks(startDate, endDate) {
+        const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+        const totalDays = Math.max(1, diffCalendarDays(end, start));
+        const ticks = [];
+
+        const pushTick = (date, label) => {
+            const clampedDays = Math.max(0, Math.min(totalDays, diffCalendarDays(date, start)));
+            ticks.push({
+                date,
+                label,
+                left: (clampedDays * 100) / totalDays
+            });
+        };
+
+        if (totalDays <= 21) {
+            for (let dayOffset = 0; dayOffset <= totalDays; dayOffset += 1) {
+                const tickDate = addCalendarDays(start, dayOffset);
+                pushTick(tickDate, formatAxisDayMonth(tickDate));
+            }
+            return ticks;
+        }
+
+        if (totalDays <= 120) {
+            for (let dayOffset = 0; dayOffset <= totalDays; dayOffset += 7) {
+                const tickDate = addCalendarDays(start, dayOffset);
+                pushTick(tickDate, formatAxisDayMonth(tickDate));
+            }
+            if (ticks.length === 0 || ticks[ticks.length - 1].left < 100) {
+                pushTick(end, formatAxisDayMonth(end));
+            }
+            return ticks;
+        }
+
+        pushTick(start, formatAxisMonthYear(start));
+        const monthCursor = new Date(start.getFullYear(), start.getMonth(), 1);
+        monthCursor.setMonth(monthCursor.getMonth() + 1);
+        while (monthCursor < end) {
+            pushTick(new Date(monthCursor.getTime()), formatAxisMonthYear(monthCursor));
+            monthCursor.setMonth(monthCursor.getMonth() + 1);
+        }
+        if (ticks.length === 0 || ticks[ticks.length - 1].left < 100) {
+            pushTick(end, formatAxisMonthYear(end));
+        }
+        return ticks;
+    }
+
+    function renderTimelineAxis(container, startDate, endDate) {
+        if (!(container instanceof HTMLElement) || !(startDate instanceof Date) || !(endDate instanceof Date)) {
+            return;
+        }
+
+        container.replaceChildren();
+        buildTimelineAxisTicks(startDate, endDate).forEach((tick) => {
+            const tickNode = document.createElement("span");
+            tickNode.className = "timeline-axis-tick";
+            tickNode.style.left = `${tick.left.toFixed(4)}%`;
+
+            const labelNode = document.createElement("span");
+            labelNode.className = "timeline-axis-label";
+            labelNode.textContent = tick.label;
+            tickNode.appendChild(labelNode);
+            container.appendChild(tickNode);
+        });
+    }
+
+    function renderStaticTimelineAxes(scope) {
+        const root = scope instanceof HTMLElement || scope instanceof Document ? scope : document;
+        root.querySelectorAll("[data-timeline-axis][data-axis-start][data-axis-end]").forEach((container) => {
+            if (!(container instanceof HTMLElement)) {
+                return;
+            }
+
+            const startDate = parseIsoDate(container.dataset.axisStart);
+            const endDate = parseIsoDate(container.dataset.axisEnd);
+            if (!(startDate instanceof Date) || !(endDate instanceof Date)) {
+                return;
+            }
+
+            renderTimelineAxis(container, startDate, endDate);
+        });
     }
 
     function parseIsoDateTime(value) {
@@ -4212,7 +4334,7 @@
                 planCursor = new Date(planEnd.getTime());
 
                 const actualStart = new Date(actualCursor.getTime());
-                const actualEnd = addCalendarDays(actualStart, item.duration + item.delay);
+                const actualEnd = addCalendarDays(actualStart, Math.max(0, item.duration + item.delay));
                 actual.push({ start: actualStart, end: actualEnd });
                 actualCursor = new Date(actualEnd.getTime());
             });
@@ -4227,7 +4349,10 @@
                 toUtcDayStamp(deadlineDate),
                 toUtcDayStamp(actualEndDate));
             const totalDays = Math.max(1, Math.round((axisEndStamp - startStamp) / msPerDay));
-            return { totalDays };
+            return {
+                totalDays,
+                axisEndDate: addCalendarDays(startDate, totalDays)
+            };
         }
 
         static toPercent(valueDate, axisStart, totalDays) {
@@ -4255,6 +4380,8 @@
             this.summaryState = editor.querySelector("[data-schedule-summary-state]");
             this.summaryOverrun = editor.querySelector("[data-schedule-summary-overrun]");
             this.statusLine = editor.querySelector(".schedule-status-line");
+            this.timelineAxes = Array.from(editor.querySelectorAll("[data-schedule-axis]"))
+                .filter((node) => node instanceof HTMLElement);
             this.ganttDeadlineMarkers = Array.from(editor.querySelectorAll("[data-schedule-gantt-deadline]"))
                 .filter((node) => node instanceof HTMLElement);
             this.ganttPlannedSegments = Array.from(editor.querySelectorAll("[data-schedule-gantt-step-planned]"))
@@ -4291,7 +4418,7 @@
         readState() {
             return this.rows.map((entry) => {
                 const duration = this.normalizeInt(entry.durationInput);
-                const delay = this.normalizeInt(entry.delayInput);
+                const delay = this.normalizeIntWithMinimum(entry.delayInput, -duration);
                 return { duration, delay };
             });
         }
@@ -4328,11 +4455,18 @@
         }
 
         normalizeInt(input) {
+            return this.normalizeIntWithMinimum(input, 0);
+        }
+
+        normalizeIntWithMinimum(input, minimum) {
             if (!(input instanceof HTMLInputElement)) {
-                return 0;
+                return Math.max(minimum, 0);
             }
             const parsed = Number.parseInt((input.value || "").trim(), 10);
-            return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+            if (!Number.isFinite(parsed)) {
+                return Math.max(minimum, 0);
+            }
+            return Math.max(minimum, parsed);
         }
 
         setDateInputValue(input, value) {
@@ -4363,6 +4497,12 @@
                 return;
             }
 
+            const state = this.readState();
+            const current = state[stepIndex];
+            if (current) {
+                current.delay = Math.max(-current.duration, current.delay);
+                this.writeState(state);
+            }
             this.recalcAll();
         }
 
@@ -4407,7 +4547,7 @@
             const { plan } = this.computePlanAndActual(state, startDate);
             const planEnd = plan[stepIndex]?.end || startDate;
             const selectedDate = parseIsoDate(entry.delayDateInput.value) || planEnd;
-            const computedDelay = Math.max(0, diffCalendarDays(selectedDate, planEnd));
+            const computedDelay = Math.max(-state[stepIndex].duration, diffCalendarDays(selectedDate, planEnd));
             state[stepIndex] = { ...state[stepIndex], delay: computedDelay };
             this.writeState(state);
             this.recalcAll();
@@ -4434,7 +4574,7 @@
                 this.summaryDuration.textContent = String(totalDuration);
             }
             if (this.summaryDelay instanceof HTMLElement) {
-                this.summaryDelay.textContent = String(totalDelay);
+                this.summaryDelay.textContent = totalDelay > 0 ? `+${totalDelay}` : String(totalDelay);
             }
             if (this.summaryState instanceof HTMLElement) {
                 this.summaryState.textContent = stihame ? "Stíháme" : "Nestíháme";
@@ -4452,7 +4592,7 @@
 
         renderMiniGantt(plan, actual, startDate, deadlineDate) {
             const actualEnd = actual.length > 0 ? actual[actual.length - 1].end : startDate;
-            const { totalDays } = ScheduleTimelineEngine.buildScale(startDate, deadlineDate, actualEnd);
+            const { totalDays, axisEndDate } = ScheduleTimelineEngine.buildScale(startDate, deadlineDate, actualEnd);
             const deadlinePercent = ScheduleTimelineEngine.toPercent(deadlineDate, startDate, totalDays);
             const formatPercent = (value) => `${Number.isFinite(value) ? value.toFixed(4) : "0.0000"}%`;
             const formatSegmentWidth = (value) => {
@@ -4489,6 +4629,10 @@
                 marker.style.left = formatPercent(deadlinePercent);
             });
 
+            this.timelineAxes.forEach((axis) => {
+                renderTimelineAxis(axis, startDate, axisEndDate);
+            });
+
             renderContinuousSegments(this.ganttPlannedSegments, plan);
             renderContinuousSegments(this.ganttActualSegments, actual);
 
@@ -4498,7 +4642,7 @@
         renderStepRows(plan, actual, state) {
             const maxStepDays = Math.max(
                 1,
-                ...state.map((item) => item.duration + item.delay),
+                ...state.map((item) => Math.max(0, item.duration + item.delay)),
                 ...state.map((item) => item.duration)
             );
 
@@ -4519,14 +4663,14 @@
                 }
 
                 const plannedWidth = Math.max(0, Math.min(100, Math.round((state[index].duration * 100) / maxStepDays)));
-                const actualWidth = Math.max(0, Math.min(100, Math.round(((state[index].duration + state[index].delay) * 100) / maxStepDays)));
+                const actualWidth = Math.max(0, Math.min(100, Math.round((Math.max(0, state[index].duration + state[index].delay) * 100) / maxStepDays)));
                 if (entry.plannedBar instanceof HTMLElement) {
                     entry.plannedBar.style.width = `${plannedWidth}%`;
                 }
                 if (entry.actualBar instanceof HTMLElement) {
                     entry.actualBar.style.width = `${actualWidth}%`;
                 }
-                entry.row.classList.toggle("schedule-step-has-delay", state[index].delay > 0);
+                entry.row.classList.toggle("schedule-step-has-delay", state[index].delay !== 0);
             });
         }
 
@@ -4566,8 +4710,10 @@
                     return;
                 }
 
-                const currentValue = this.normalizeInt(input);
-                const nextValue = Math.max(0, currentValue + delta);
+                const matchingEntry = this.rows.find((entry) => entry.delayInput === input);
+                const minimum = matchingEntry ? -this.normalizeInt(matchingEntry.durationInput) : 0;
+                const currentValue = this.normalizeIntWithMinimum(input, minimum);
+                const nextValue = Math.max(minimum, currentValue + delta);
                 input.value = String(nextValue);
 
                 if (nextValue !== currentValue) {
@@ -4627,7 +4773,8 @@
                 if (entry.delayInput instanceof HTMLInputElement) {
                     entry.delayInput.addEventListener("input", () => this.recalcFromDelay(index));
                     entry.delayInput.addEventListener("change", () => {
-                        entry.delayInput.value = String(this.normalizeInt(entry.delayInput));
+                        const currentDuration = this.normalizeInt(entry.durationInput);
+                        entry.delayInput.value = String(this.normalizeIntWithMinimum(entry.delayInput, -currentDuration));
                         this.recalcFromDelay(index);
                     });
                 }

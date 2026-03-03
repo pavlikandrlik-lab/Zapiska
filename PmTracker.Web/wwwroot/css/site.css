@@ -520,6 +520,78 @@
     text-decoration: underline;
 }
 
+.access-body {
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at top, rgba(53, 104, 190, 0.14), transparent 42%),
+        linear-gradient(180deg, rgba(241, 245, 249, 0.9), rgba(248, 250, 252, 1));
+}
+
+.access-main {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 32px 16px;
+}
+
+.access-card {
+    width: min(680px, 100%);
+    background: var(--gov-color-surface);
+    border: 1px solid var(--gov-color-border);
+    border-radius: 22px;
+    box-shadow: var(--gov-shadow-soft);
+    padding: 28px;
+    display: grid;
+    gap: 16px;
+}
+
+.access-card-badge {
+    display: inline-flex;
+    width: fit-content;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(53, 104, 190, 0.12);
+    color: var(--gov-color-primary);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.access-card h1,
+.access-card h2,
+.access-card p {
+    margin: 0;
+}
+
+.access-card-message {
+    font-size: 16px;
+    color: var(--gov-color-text);
+}
+
+.access-card-status {
+    font-size: 13px;
+    color: var(--gov-color-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.access-card-help {
+    display: grid;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--gov-color-border);
+}
+
+.access-card-contacts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+}
+
+.access-card-contacts a {
+    color: var(--gov-color-primary);
+}
+
 .docs-header h1 {
     margin: 0 0 6px;
 }
@@ -1467,6 +1539,35 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     z-index: 5;
 }
 
+.timeline-axis {
+    position: relative;
+    height: 24px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.timeline-axis-tick {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(100, 116, 139, 0.3);
+}
+
+.timeline-axis-label {
+    position: absolute;
+    top: 0;
+    left: 4px;
+    font-size: 11px;
+    line-height: 1;
+    color: var(--gov-color-muted);
+    white-space: nowrap;
+}
+
+.schedule-timeline-axis {
+    margin-left: 44px;
+}
+
 .schedule-step-legend {
     display: flex;
     flex-wrap: wrap;
@@ -1941,6 +2042,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 12px;
 }
 
+.gantt-shared-axis {
+    margin-bottom: -2px;
+}
+
 .gantt-task {
     border: 1px solid var(--gov-color-border);
     border-radius: 12px;
@@ -1982,13 +2087,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
 }
 
-.gantt-step-row.delay .gantt-step-name {
-    color: var(--gov-color-muted);
-    font-size: 12px;
-}
-
 .gantt-step-name {
     font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
 }
 
 .gantt-step-track {
@@ -1999,8 +2103,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     overflow: hidden;
 }
 
-.gantt-step-segment,
-.gantt-step-delay {
+.gantt-step-segment {
     position: absolute;
     top: 0;
     bottom: 0;
@@ -2009,9 +2112,28 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border-radius: 999px;
 }
 
-.gantt-step-delay {
-    background: var(--schedule-delay);
-    opacity: 0.88;
+.gantt-step-segment.planned {
+    opacity: 0.32;
+}
+
+.gantt-step-segment.actual {
+    opacity: 0.92;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+
+.gantt-step-offset {
+    font-size: 12px;
+    color: var(--gov-color-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.gantt-step-offset.late {
+    color: #b91c1c;
+}
+
+.gantt-step-offset.ahead {
+    color: #166534;
 }
 
 .gantt-task[data-gantt-pinned="false"] {

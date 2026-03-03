@@ -20,8 +20,8 @@ public interface IPmTrackerDataStore
     OsobyIndexViewModel BuildOsoby();
     ProfilPageViewModel BuildProfilPage(CurrentUserContextViewModel currentUser, int? projektId);
 
-    CiselnikyDashboardViewModel BuildCiselnikyDashboard(string? id);
-    CiselnikDetailViewModel BuildCiselnikDetail(string id);
+    CiselnikyDashboardViewModel BuildCiselnikyDashboard(string? id, CurrentUserContextViewModel currentUser);
+    CiselnikDetailViewModel BuildCiselnikDetail(string id, CurrentUserContextViewModel currentUser);
 
     NastaveniDashboardViewModel BuildNastaveniDashboard(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId);
     NastaveniPanelViewModel BuildNastaveniPanel(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId);

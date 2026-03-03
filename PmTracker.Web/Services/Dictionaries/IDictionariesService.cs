@@ -4,8 +4,8 @@ namespace PmTracker.Web.Services.Dictionaries;
 
 public interface IDictionariesService
 {
-    CiselnikyDashboardViewModel BuildCiselnikyDashboard(string? id);
-    CiselnikDetailViewModel BuildCiselnikDetail(string id);
+    CiselnikyDashboardViewModel BuildCiselnikyDashboard(string? id, CurrentUserContextViewModel currentUser);
+    CiselnikDetailViewModel BuildCiselnikDetail(string id, CurrentUserContextViewModel currentUser);
     void SaveCiselnikRow(SaveCiselnikRowCommand command, CurrentUserContextViewModel currentUser);
     void DeleteCiselnikRow(DeleteCiselnikRowCommand command, CurrentUserContextViewModel currentUser);
 }

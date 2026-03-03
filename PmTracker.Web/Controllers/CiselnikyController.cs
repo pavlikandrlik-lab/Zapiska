@@ -21,19 +21,19 @@ public sealed class CiselnikyController : BaseController
 
     public IActionResult Index(string? id)
     {
-        var model = _dictionariesService.BuildCiselnikyDashboard(id);
+        var model = _dictionariesService.BuildCiselnikyDashboard(id, CurrentUserContext);
         return View(model);
     }
 
     public IActionResult Detail(string id)
     {
-        var model = _dictionariesService.BuildCiselnikyDashboard(id);
+        var model = _dictionariesService.BuildCiselnikyDashboard(id, CurrentUserContext);
         return View("Index", model);
     }
 
     public IActionResult Panel(string id)
     {
-        var detail = _dictionariesService.BuildCiselnikDetail(id);
+        var detail = _dictionariesService.BuildCiselnikDetail(id, CurrentUserContext);
         return PartialView("_CiselnikDetail", detail);
     }
 
@@ -44,19 +44,19 @@ public sealed class CiselnikyController : BaseController
             return Forbid();
         }
 
-        if (string.Equals(key, "harmonogram-kroky", StringComparison.OrdinalIgnoreCase) && !CurrentUserContext.IsSuperAdmin)
+        if (!DictionarySecurityPolicy.CanAccessDictionary(key, CurrentUserContext.IsSuperAdmin))
         {
             return Forbid();
         }
 
-        var detail = _dictionariesService.BuildCiselnikDetail(key);
+        var detail = _dictionariesService.BuildCiselnikDetail(key, CurrentUserContext);
         var row = detail.Polozky.FirstOrDefault(x => x.Id == id);
         if (row is null)
         {
             return NotFound();
         }
 
-        if (row.IsLocked && !CurrentUserContext.IsSuperAdmin)
+        if (!DictionarySecurityPolicy.CanModifyRow(key, row.IsLocked, CurrentUserContext.IsSuperAdmin))
         {
             return Forbid();
         }
@@ -69,6 +69,7 @@ public sealed class CiselnikyController : BaseController
             Kod = row.Kod,
             Nazev = row.Nazev,
             IsLocked = row.IsLocked,
+            CanChangeLockState = row.CanChangeLockState,
             SloupecNavic = detail.SloupceNavic.FirstOrDefault(),
             HodnotaNavic = row.HodnotyNavic.FirstOrDefault(),
             HodnotaNavicRaw = row.HodnotyNavicRaw.FirstOrDefault() ?? row.HodnotyNavic.FirstOrDefault(),
@@ -92,17 +93,16 @@ public sealed class CiselnikyController : BaseController
                     return false;
                 }
 
-                if (string.Equals(command.Key, "harmonogram-kroky", StringComparison.OrdinalIgnoreCase)
-                    && !CurrentUserContext.IsSuperAdmin)
+                if (!DictionarySecurityPolicy.CanAccessDictionary(command.Key, CurrentUserContext.IsSuperAdmin))
                 {
                     return false;
                 }
 
                 if (command.Id.HasValue && !CurrentUserContext.IsSuperAdmin)
                 {
-                    var detail = _dictionariesService.BuildCiselnikDetail(command.Key);
+                    var detail = _dictionariesService.BuildCiselnikDetail(command.Key, CurrentUserContext);
                     var row = detail.Polozky.FirstOrDefault(x => x.Id == command.Id.Value);
-                    if (row is not null && row.IsLocked)
+                    if (row is not null && !DictionarySecurityPolicy.CanModifyRow(command.Key, row.IsLocked, CurrentUserContext.IsSuperAdmin))
                     {
                         return false;
                     }
@@ -134,17 +134,16 @@ public sealed class CiselnikyController : BaseController
                     return false;
                 }
 
-                if (string.Equals(command.Key, "harmonogram-kroky", StringComparison.OrdinalIgnoreCase)
-                    && !CurrentUserContext.IsSuperAdmin)
+                if (!DictionarySecurityPolicy.CanAccessDictionary(command.Key, CurrentUserContext.IsSuperAdmin))
                 {
                     return false;
                 }
 
                 if (!CurrentUserContext.IsSuperAdmin)
                 {
-                    var detail = _dictionariesService.BuildCiselnikDetail(command.Key);
+                    var detail = _dictionariesService.BuildCiselnikDetail(command.Key, CurrentUserContext);
                     var row = detail.Polozky.FirstOrDefault(x => x.Id == command.Id);
-                    if (row is not null && row.IsLocked)
+                    if (row is not null && !DictionarySecurityPolicy.CanModifyRow(command.Key, row.IsLocked, CurrentUserContext.IsSuperAdmin))
                     {
                         return false;
                     }

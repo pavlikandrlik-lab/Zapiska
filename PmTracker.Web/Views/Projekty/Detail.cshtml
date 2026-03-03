@@ -189,7 +189,7 @@
 </section>
 
 <section class="tab-panel" data-tab-panel="harmonogram">
-    <div class="schedule-mini-legend">Legenda: Plán / Posun / Termín úkolu</div>
+    <div class="schedule-mini-legend">Legenda: Plán / Skutečnost / Termín úkolu</div>
     <div class="schedule-step-legend">
         @foreach (var krok in harmonogramLegendKroky)
         {
@@ -286,6 +286,9 @@
         {
             @foreach (var item in harmonogramUkoly)
             {
+                var ownerLabel = string.IsNullOrWhiteSpace(item.VlastnikOrgKod)
+                    ? item.Vlastnik
+                    : $"{item.Vlastnik} ({item.VlastnikOrgKod})";
                 var axisStart = item.DatumZalozeni.Date;
                 var realEnd = item.Kroky.Count > 0 ? item.Kroky[^1].RealEnd.Date : axisStart;
                 var axisEnd = new[] { item.TerminUkonceni.Date, realEnd, axisStart }.Max();
@@ -314,7 +317,7 @@
                                 <span><span class="label">Stav úkolu:</span> @item.Stav</span>
                                 <span><span class="label">Typ:</span> @(string.IsNullOrWhiteSpace(item.TypUkolu) ? "-" : item.TypUkolu)</span>
                                 <span><span class="label">Subsystém:</span> @item.Subsystem</span>
-                                <span><span class="label">Vlastník:</span> @item.Vlastnik</span>
+                                <span><span class="label">Vlastník:</span> @ownerLabel</span>
                             </div>
                         </div>
                         <div class="schedule-card-actions">
@@ -345,6 +348,10 @@
                     </div>
 
                     <div class="schedule-card-timeline">
+                        <div class="timeline-axis schedule-timeline-axis"
+                             data-timeline-axis
+                             data-axis-start="@axisStart.ToString("yyyy-MM-dd")"
+                             data-axis-end="@axisEnd.ToString("yyyy-MM-dd")"></div>
                         <div class="schedule-rainbow-row">
                             <span class="schedule-rainbow-label">Plán</span>
                             <div class="schedule-rainbow-track">
@@ -372,7 +379,7 @@
                             </div>
                         </div>
                         <div class="schedule-rainbow-row">
-                            <span class="schedule-rainbow-label">Posun</span>
+                            <span class="schedule-rainbow-label">Skutečnost</span>
                             <div class="schedule-rainbow-track">
                                 <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
                                 @{
@@ -399,7 +406,7 @@
                         </div>
                         <div class="schedule-rainbow-legend">
                             <span>Plán: @item.BaselineDokonceni.ToString("dd.MM.yyyy")</span>
-                            <span>Posun: @item.PosunuteDokonceni.ToString("dd.MM.yyyy")</span>
+                            <span>Skutečnost: @item.SkutecneDokonceni.ToString("dd.MM.yyyy")</span>
                             <span>Termín úkolu: @item.TerminUkonceni.ToString("dd.MM.yyyy")</span>
                             <span>Překročení: @(item.PrekroceniDni > 0 ? $"{item.PrekroceniDni} dnů" : "0 dnů")</span>
                         </div>
@@ -411,7 +418,7 @@
 </section>
 
 <section class="tab-panel" data-tab-panel="gant" data-gantt-panel data-project-id="@Model.Projekt.Id">
-    <div class="schedule-mini-legend">Legenda: krokové barvy / barva zpoždění / černá = termín úkolu</div>
+    <div class="schedule-mini-legend">Legenda: krokové barvy / skutečnost / černá = termín úkolu</div>
     <div class="schedule-step-legend">
         @foreach (var krok in harmonogramLegendKroky)
         {
@@ -422,7 +429,7 @@
         }
         <span class="schedule-step-legend-item">
             <span class="schedule-step-dot schedule-step-delay-dot" style="background:@harmonogramDelayBarva;" aria-hidden="true"></span>
-            <span>Zpoždění</span>
+            <span>Skutečnost</span>
         </span>
     </div>
 
@@ -537,6 +544,7 @@
         </aside>
 
         <div class="gantt-board" data-gantt-board>
+            <div class="timeline-axis gantt-shared-axis" data-gantt-axis hidden></div>
             @if (harmonogramUkoly.Count == 0)
             {
                 <p class="muted">V projektu zatím nejsou úkoly s harmonogramem.</p>
@@ -545,6 +553,9 @@
             {
                 @foreach (var item in harmonogramUkoly)
                 {
+                    var ownerLabel = string.IsNullOrWhiteSpace(item.VlastnikOrgKod)
+                        ? item.Vlastnik
+                        : $"{item.Vlastnik} ({item.VlastnikOrgKod})";
                     var axisStart = item.DatumZalozeni.Date;
                     var realEnd = item.Kroky.Count > 0 ? item.Kroky[^1].RealEnd.Date : axisStart;
                     var axisEnd = new[] { item.TerminUkonceni.Date, realEnd, axisStart }.Max();
@@ -566,7 +577,9 @@
                              data-gantt-filter-vlastnik="@item.Vlastnik"
                              data-gantt-filter-vlastnik-id="@item.VlastnikId"
                              data-gantt-filter-aktivni="@item.IsAktivniStav.ToString().ToLowerInvariant()"
-                             data-gantt-filter-stihani="@(item.Stihame ? "stihame" : "nestihame")">
+                             data-gantt-filter-stihani="@(item.Stihame ? "stihame" : "nestihame")"
+                             data-gantt-axis-start="@axisStart.ToString("yyyy-MM-dd")"
+                             data-gantt-axis-end="@axisEnd.ToString("yyyy-MM-dd")">
                         <div class="gantt-task-header">
                             <div>
                                 <div class="record-title">#@item.CisloViditelne - @item.Nazev</div>
@@ -574,7 +587,7 @@
                                     <span><span class="label">Stav:</span> @item.Stav</span>
                                     <span><span class="label">Typ:</span> @(string.IsNullOrWhiteSpace(item.TypUkolu) ? "-" : item.TypUkolu)</span>
                                     <span><span class="label">Subsystém:</span> @item.Subsystem</span>
-                                    <span><span class="label">Vlastník:</span> @item.Vlastnik</span>
+                                    <span><span class="label">Vlastník:</span> @ownerLabel</span>
                                 </div>
                             </div>
                             <div class="gantt-task-actions">
@@ -632,7 +645,7 @@
                                 </div>
                             </div>
                             <div class="schedule-rainbow-row">
-                                <span class="schedule-rainbow-label">Posun</span>
+                                <span class="schedule-rainbow-label">Skutečnost</span>
                                 <div class="schedule-rainbow-track">
                                     <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
                                     @{
@@ -658,7 +671,7 @@
                             </div>
                             <div class="schedule-rainbow-legend">
                                 <span>Termín úkolu: @item.TerminUkonceni.ToString("dd.MM.yyyy")</span>
-                                <span>Posun dokončení: @item.PosunuteDokonceni.ToString("dd.MM.yyyy")</span>
+                                <span>Skutečné dokončení: @item.SkutecneDokonceni.ToString("dd.MM.yyyy")</span>
                                 <span>Překročení: @(item.PrekroceniDni > 0 ? $"{item.PrekroceniDni} dnů" : "0 dnů")</span>
                             </div>
                         </div>
@@ -669,21 +682,21 @@
                                 var stepLeft = toPercent(krok.PlanStart);
                                 var stepRight = toPercent(krok.PlanEnd);
                                 var stepWidth = Math.Max(0d, stepRight - stepLeft);
-                                var delayLeft = toPercent(krok.PlanEnd);
-                                var delayRight = toPercent(krok.RealEnd);
-                                var delayWidth = Math.Max(0d, delayRight - delayLeft);
+                                var actualLeft = toPercent(krok.RealStart);
+                                var actualRight = toPercent(krok.RealEnd);
+                                var actualWidth = Math.Max(0d, actualRight - actualLeft);
+                                var offsetLabel = krok.OdchylkaDni > 0
+                                    ? $"+{krok.OdchylkaDni} dnů"
+                                    : $"{krok.OdchylkaDni} dnů";
                                 <div class="gantt-step-row">
-                                    <div class="gantt-step-name">@krok.Nazev</div>
-                                    <div class="gantt-step-track">
-                                        <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
-                                        <span class="gantt-step-segment" style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
+                                    <div class="gantt-step-name">
+                                        <span>@krok.Nazev</span>
+                                        <span class="gantt-step-offset @(krok.OdchylkaDni > 0 ? "late" : krok.OdchylkaDni < 0 ? "ahead" : null)">@offsetLabel</span>
                                     </div>
-                                </div>
-                                <div class="gantt-step-row delay">
-                                    <div class="gantt-step-name">zpoždění</div>
                                     <div class="gantt-step-track">
                                         <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
-                                        <span class="gantt-step-delay" style="left:@formatPercent(delayLeft)%; width:@formatPercent(delayWidth)%; background:@item.DelayBarvaHex;"></span>
+                                        <span class="gantt-step-segment planned" style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
+                                        <span class="gantt-step-segment actual" style="left:@formatPercent(actualLeft)%; width:@formatPercent(actualWidth)%; background:@item.DelayBarvaHex;"></span>
                                     </div>
                                 </div>
                             }
