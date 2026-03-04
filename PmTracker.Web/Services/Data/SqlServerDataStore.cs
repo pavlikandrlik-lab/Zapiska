@@ -1534,6 +1534,13 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         {
             var existing = _dbContext.Jednani.FirstOrDefault(x => x.Id == command.Id.Value)
                 ?? throw new InvalidOperationException($"Jednání {command.Id.Value} nebylo nalezeno.");
+            var existingStatus = _dbContext.CiselnikStavuJednani
+                .AsNoTracking()
+                .FirstOrDefault(x => x.Id == existing.StavJednaniId);
+            if (IsMeetingReadOnly(existing, existingStatus))
+            {
+                throw new InvalidOperationException("Uzavřené jednání nelze upravovat. Nejprve jednání otevřete.");
+            }
 
             existing.CisloJednani = command.CisloJednani;
             existing.DatumPlanovane = command.DatumPlanovane.Date;

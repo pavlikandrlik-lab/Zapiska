@@ -12,6 +12,10 @@
       method="post"
       data-ajax-submit="true"
       data-meeting-number-unique="true">
+    @if (Model.Command.Id.HasValue)
+    {
+        <input type="hidden" name="Id" value="@Model.Command.Id" />
+    }
     <input type="hidden" name="ProjektId" value="@Model.Command.ProjektId" />
     <label>
         Číslo jednání
@@ -20,6 +24,7 @@
                name="CisloJednani"
                value="@Model.Command.CisloJednani"
                data-meeting-number-input
+               data-current-meeting-number="@Model.Command.CisloJednani"
                data-existing-meeting-numbers="@Model.ExistingMeetingNumbersCsv" />
         <span class="field-error-message" data-meeting-number-warning hidden>Jednání s tímto číslem už v projektu existuje.</span>
     </label>

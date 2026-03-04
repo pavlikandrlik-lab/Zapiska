@@ -188,6 +188,51 @@ public sealed class ProjektyController : BaseController
     }
 
     [HttpGet]
+    public IActionResult EditMeetingModal(int projektId, int meetingId)
+    {
+        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId))
+        {
+            return Forbid();
+        }
+
+        if (!DataStore.ProjektExists(projektId))
+        {
+            return NotFound();
+        }
+
+        var projectDetail = DataStore.BuildProjektDetail(projektId);
+        var meeting = projectDetail.Jednani.FirstOrDefault(item => item.Id == meetingId);
+        if (meeting is null)
+        {
+            return NotFound();
+        }
+
+        if (IsMeetingClosed(projectDetail.StavyJednani, meeting))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        var model = new MeetingModalViewModel
+        {
+            Title = "Upravit poradu",
+            Command = new SaveMeetingCommand
+            {
+                Id = meeting.Id,
+                ProjektId = projektId,
+                CisloJednani = meeting.CisloJednani,
+                DatumPlanovane = meeting.Datum,
+                CasZacatek = meeting.CasZacatek,
+                Misto = meeting.Misto,
+                StavJednani = meeting.StavKod ?? projectDetail.StavyJednani.FirstOrDefault()?.Value ?? string.Empty
+            },
+            ExistingMeetingNumbersCsv = string.Join(",", projectDetail.Jednani.Select(item => item.CisloJednani).Distinct().OrderBy(item => item)),
+            StavyJednani = projectDetail.StavyJednani
+        };
+
+        return View("NewMeetingModal", model);
+    }
+
+    [HttpGet]
     public IActionResult AddTeamMemberModal(int projektId)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId))
@@ -328,8 +373,31 @@ public sealed class ProjektyController : BaseController
     public IActionResult SaveMeeting(SaveMeetingCommand command)
     {
         EnsureReadableMeetingTimeError();
+
+        if (command.Id.HasValue)
+        {
+            if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId))
+            {
+                return Forbid();
+            }
+
+            var projectDetail = DataStore.BuildProjektDetail(command.ProjektId);
+            var existingMeeting = projectDetail.Jednani.FirstOrDefault(item => item.Id == command.Id.Value);
+            if (existingMeeting is null)
+            {
+                return NotFound();
+            }
+
+            if (IsMeetingClosed(projectDetail.StavyJednani, existingMeeting))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden);
+            }
+        }
+
         return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, command.ProjektId),
+            hasPermission: () => command.Id.HasValue
+                ? CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId)
+                : CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, command.ProjektId),
             invalidAjaxMessage: "Poradu nelze uložit.",
             invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
             onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" }),
@@ -532,6 +600,22 @@ public sealed class ProjektyController : BaseController
         {
             ModelState.AddModelError(nameof(SaveMeetingCommand.CasZacatek), "Vyberte čas začátku ve formátu HH:mm.");
         }
+    }
+
+    private static bool IsMeetingClosed(IReadOnlyList<LookupOptionViewModel> statuses, JednaniListItemViewModel meeting)
+    {
+        var closedStatusCode = statuses
+            .Where(item => string.Equals(item.Value, "CLOSED", StringComparison.OrdinalIgnoreCase)
+                || item.Label.Contains("uzav", StringComparison.OrdinalIgnoreCase))
+            .Select(item => item.Value)
+            .FirstOrDefault();
+
+        if (!string.IsNullOrWhiteSpace(closedStatusCode))
+        {
+            return string.Equals(meeting.StavKod, closedStatusCode, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return !string.IsNullOrWhiteSpace(meeting.UzamklOsoba);
     }
 
     private IReadOnlyList<LookupOptionViewModel> BuildProjectStatusOptions()

@@ -49,6 +49,14 @@
            data-print-label="Tisk jednání č. @Model.Jednani.CisloJednani">
             Tisk
         </a>
+        @if (canEditMeetingFields)
+        {
+            <button class="btn"
+                    type="button"
+                    data-modal-url="@Url.Action("EditMeetingModal", "Projekty", new { projektId = Model.ProjektId, meetingId = Model.Jednani.Id })">
+                Upravit poradu
+            </button>
+        }
         @if (canEditMeeting)
         {
             <form asp-controller="Projekty" asp-action="DeleteMeeting" method="post" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">

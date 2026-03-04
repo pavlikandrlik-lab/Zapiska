@@ -40,6 +40,66 @@ public sealed class AjaxControllersTests
     }
 
     [Fact]
+    public async Task EditMeetingModal_ShouldRenderExistingMeetingValues_ForOpenMeeting()
+    {
+        var projectId = await _fixture.EnsureProjectAsync("APIMT_EDIT_GET");
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 126);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Projekty/EditMeetingModal?projektId={projectId}&meetingId={meetingId}&asUser={_fixture.AdminOsobaId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var html = await response.Content.ReadAsStringAsync();
+        html.Should().Contain("Upravit poradu");
+        html.Should().Contain($"name=\"Id\" value=\"{meetingId}\"");
+        html.Should().Contain("data-current-meeting-number=\"126\"");
+    }
+
+    [Fact]
+    public async Task SaveMeeting_ShouldUpdateExistingMeeting_ForOpenMeeting()
+    {
+        var projectId = await _fixture.EnsureProjectAsync("APIMT_EDIT_POST");
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 127);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Projekty/SaveMeeting?asUser={_fixture.AdminOsobaId}",
+            ApiTestHttpHelper.BuildForm(
+                ("Id", meetingId.ToString()),
+                ("ProjektId", projectId.ToString()),
+                ("CisloJednani", "128"),
+                ("DatumPlanovane", "2026-03-04"),
+                ("CasZacatek", "13:15"),
+                ("Misto", "Upraveno"),
+                ("StavJednani", "OPEN")));
+
+        var response = await client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+        payload.Ok.Should().BeTrue();
+        payload.RefreshScope.Should().Be("projekty-detail-jednani");
+
+        await using var dbContext = _fixture.CreateDbContext();
+        var meeting = await dbContext.Jednani.SingleAsync(x => x.Id == meetingId);
+        meeting.CisloJednani.Should().Be(128);
+        meeting.CasZacatek.Should().Be(new TimeOnly(13, 15));
+        meeting.Misto.Should().Be("Upraveno");
+    }
+
+    [Fact]
+    public async Task EditMeetingModal_ShouldReturnForbidden_ForClosedMeeting()
+    {
+        var projectId = await _fixture.EnsureProjectAsync("APIMT_EDIT_CLOSED");
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "CLOSED", 129);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Projekty/EditMeetingModal?projektId={projectId}&meetingId={meetingId}&asUser={_fixture.AdminOsobaId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task DeleteMeeting_ShouldReturnAjaxSuccessAndDeleteMeeting()
     {
         var projectId = await _fixture.EnsureProjectAsync("APIMT2");

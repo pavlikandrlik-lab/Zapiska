@@ -3474,6 +3474,16 @@
         applyProjectIndexFilters(document);
     }
 
+    function scheduleProjectStatusFilterInputSync(input) {
+        if (!(input instanceof HTMLInputElement)) {
+            return;
+        }
+
+        window.requestAnimationFrame(() => {
+            handleProjectStatusFilterInput(input);
+        });
+    }
+
     function toggleMeetingAttendancePanel(button) {
         if (!(button instanceof HTMLButtonElement)) {
             return;
@@ -7060,6 +7070,14 @@
         if (projectStatusFilterToggle) {
             toggleProjectStatusFilterPanel(projectStatusFilterToggle instanceof HTMLElement ? projectStatusFilterToggle : null);
             return;
+        }
+
+        const projectStatusFilterOption = target.closest("label.gov-switch");
+        if (projectStatusFilterOption instanceof HTMLLabelElement) {
+            const projectStatusFilterInput = projectStatusFilterOption.querySelector("[data-project-status-hide]");
+            if (projectStatusFilterInput instanceof HTMLInputElement) {
+                scheduleProjectStatusFilterInputSync(projectStatusFilterInput);
+            }
         }
 
         const recordToggle = target.closest("[data-record-toggle]");
