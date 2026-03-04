@@ -87,7 +87,6 @@ public sealed class DeleteRecordCommand
     [Required]
     public int ZaznamId { get; set; }
 
-    [Range(typeof(bool), "true", "true", ErrorMessage = "Potvrďte trvalé smazání záznamu.")]
     public bool PotvrditSmazani { get; set; }
 }
 

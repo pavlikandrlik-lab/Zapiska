@@ -241,4 +241,7 @@ public sealed class PermissionGrantViewModel
     public required string ScopeMode { get; init; } // ALL|INCLUDE
     public bool IsAllowed { get; init; }
     public required IReadOnlyList<int> ProjectIds { get; init; }
+    public string? SourceType { get; init; } // APP_ROLE|PROJECT_ROLE|SUBSYSTEM_ROLE
+    public string? SourceRoleCode { get; init; }
+    public int? SourceProjectId { get; init; }
 }

@@ -173,7 +173,7 @@ public sealed class ZaznamyController : BaseController
         return ExecuteValidatedCommand(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId),
             invalidAjaxMessage: "Záznam nelze smazat.",
-            invalidFallbackMessage: "potvrďte trvalé smazání záznamu.",
+            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
             onInvalidRedirect: redirect,
             onSuccessRedirect: redirect,
             onAjaxSuccess: () =>

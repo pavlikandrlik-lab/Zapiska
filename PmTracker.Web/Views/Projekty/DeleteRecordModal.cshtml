@@ -27,18 +27,12 @@
       asp-controller="Zaznamy"
       asp-action="DeleteRecord"
       method="post"
-      data-ajax-submit="true"
-      data-confirm-submit-toggle="true">
+      data-ajax-submit="true">
     <input type="hidden" name="ProjektId" value="@Model.Command.ProjektId" />
     <input type="hidden" name="ZaznamId" value="@Model.Command.ZaznamId" />
     <input type="hidden" name="returnUrl" value="@returnUrl" />
     <input type="hidden" name="tab" value="@tab" />
     <input type="hidden" name="uiContext" value="@uiContext" />
-
-    <label class="confirm-delete-check">
-        <input type="checkbox" name="PotvrditSmazani" value="true" data-confirm-submit-checkbox />
-        Opravdu chci záznam smazat natrvalo
-    </label>
 
     @await Html.PartialAsync(
         "_ModalFormActions",
@@ -46,6 +40,6 @@
         {
             SubmitLabel = "Potvrdit trvalé smazání",
             SubmitCssClass = "btn ghost danger",
-            DisableSubmit = true
+            DisableSubmit = false
         })
 </form>

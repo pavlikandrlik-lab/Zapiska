@@ -105,6 +105,7 @@ public sealed class EffectivePermissionRowViewModel
     public required string PermissionNazev { get; init; }
     public bool IsAllowed { get; init; }
     public required string ScopeSummary { get; init; }
+    public required string SourceSummary { get; init; }
 }
 
 public sealed class NastaveniProjektItemViewModel

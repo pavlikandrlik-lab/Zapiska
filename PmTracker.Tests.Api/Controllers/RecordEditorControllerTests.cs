@@ -221,7 +221,7 @@ public sealed class RecordEditorControllerTests
     }
 
     [Fact]
-    public async Task Edit_ShouldRenderScheduleMiniGantt_WithAlignedAxis_AndVarianceBars()
+    public async Task Edit_ShouldRenderScheduleMiniGantt_WithAlignedAxis_AndDualStepBars()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiEditScheduleAxis");
         var projectId = await _fixture.EnsureProjectAsync("APIRED4");
@@ -235,9 +235,9 @@ public sealed class RecordEditorControllerTests
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain("schedule-mini-gantt-grid");
         html.Should().Contain("schedule-mini-gantt-axis-track");
-        html.Should().Contain("data-schedule-step-actual-progress");
-        html.Should().Contain("data-schedule-step-variance-negative");
-        html.Should().Contain("data-schedule-step-variance-positive");
+        html.Should().Contain("data-schedule-step-planned");
+        html.Should().Contain("data-schedule-step-actual");
+        html.Should().Contain("schedule-step-gantt-stack");
     }
 
     [Fact]
@@ -413,6 +413,7 @@ public sealed class RecordEditorControllerTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain("record-delete-modal-title");
+        html.Should().NotContain("data-confirm-submit-checkbox");
         html.Should().Contain("Vyjádření:</span> 1");
         html.Should().Contain("Externí vazby:</span> 1");
         html.Should().Contain("Spolupráce:</span> 1");
@@ -528,8 +529,7 @@ public sealed class RecordEditorControllerTests
             $"/Zaznamy/DeleteRecord?asUser={_fixture.AdminOsobaId}&returnUrl=%2FProjekty%2FDetail%2F{projectId}%3Ftab%3Dzaznamy&uiContext=project&tab=zaznamy",
             ApiTestHttpHelper.BuildForm(
                 ("ProjektId", projectId.ToString()),
-                ("ZaznamId", recordId.ToString()),
-                ("PotvrditSmazani", "true")));
+                ("ZaznamId", recordId.ToString())));
 
         var response = await client.SendAsync(request);
         var content = await response.Content.ReadAsStringAsync();

@@ -741,11 +741,13 @@
                                     </div>
                                 </td>
                                 <td class="schedule-step-gantt-cell">
-                                    <div class="schedule-step-gantt-track" data-schedule-step-track>
-                                        <div class="schedule-step-gantt-bar planned" data-schedule-step-planned></div>
-                                        <div class="schedule-step-gantt-bar actual-progress" data-schedule-step-actual-progress></div>
-                                        <div class="schedule-step-gantt-bar variance-negative" data-schedule-step-variance-negative hidden></div>
-                                        <div class="schedule-step-gantt-bar variance-positive" data-schedule-step-variance-positive hidden></div>
+                                    <div class="schedule-step-gantt-stack" data-schedule-step-track style="--schedule-step-color:@krok.BarvaHex;">
+                                        <div class="schedule-step-gantt-track">
+                                            <div class="schedule-step-gantt-bar planned" data-schedule-step-planned></div>
+                                        </div>
+                                        <div class="schedule-step-gantt-track">
+                                            <div class="schedule-step-gantt-bar actual" data-schedule-step-actual></div>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>

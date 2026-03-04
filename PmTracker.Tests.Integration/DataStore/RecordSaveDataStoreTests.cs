@@ -31,6 +31,7 @@ public sealed class RecordSaveDataStoreTests
         var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RSCHEMA");
         var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RSCHEMA_SUB", ownerId);
         await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
 
         var categoryCode = await dbContext.CiselnikKategoriiZaznamu
             .OrderBy(x => x.Id)

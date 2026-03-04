@@ -51,7 +51,10 @@ public static class ProjectRolePermissionGrantBuilder
                     ScopeLevel = "PROJECT",
                     ScopeMode = "INCLUDE",
                     IsAllowed = true,
-                    ProjectIds = [assignment.ProjectId]
+                    ProjectIds = [assignment.ProjectId],
+                    SourceType = "PROJECT_ROLE",
+                    SourceRoleCode = assignment.RoleCode,
+                    SourceProjectId = assignment.ProjectId
                 });
             }
         }

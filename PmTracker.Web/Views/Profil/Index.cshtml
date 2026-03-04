@@ -129,3 +129,52 @@
         </div>
     }
 </section>
+
+<section class="card profile-rights-card">
+    <div class="panel-header">
+        <div>
+            <h2>Odvozená práva z projektu a subsystému</h2>
+            <p class="muted">Práva odvozená z aktivních projektových a subsystémových rolí.</p>
+        </div>
+    </div>
+
+    @if (Model.OdvozenaPrava.Count == 0)
+    {
+        <p class="muted">Nebyly nalezeny žádné odvozené granty.</p>
+    }
+    else
+    {
+        <table class="table profile-role-table">
+            <thead>
+                <tr>
+                    <th>Akce</th>
+                    <th>Název</th>
+                    <th>Přístup</th>
+                    <th>Rozsah</th>
+                    <th>Zdroj</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var pravo in Model.OdvozenaPrava)
+                {
+                    <tr>
+                        <td><code>@pravo.PermissionKlic</code></td>
+                        <td>@pravo.PermissionNazev</td>
+                        <td>
+                            @if (pravo.IsAllowed)
+                            {
+                                <span class="unlock">Povoleno</span>
+                            }
+                            else
+                            {
+                                <span class="lock">Zakázáno</span>
+                            }
+                        </td>
+                        <td>@pravo.ScopeSummary</td>
+                        <td>@pravo.SourceSummary</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>

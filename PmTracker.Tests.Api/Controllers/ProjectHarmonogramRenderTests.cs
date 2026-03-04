@@ -84,6 +84,7 @@ public sealed class ProjectHarmonogramRenderTests
         html.Should().Contain("schedule-overview-axis");
         html.Should().Contain("schedule-overview-marker today");
         html.Should().Contain("schedule-overview-marker deadline");
+        html.Should().NotContain("Legenda: Plán / Skutečnost / Termín úkolu");
         html.Should().NotContain("schedule-layered-track schedule-layered-track--overview");
 
         var overviewRowsBeforeAxis = Regex.IsMatch(
@@ -153,6 +154,6 @@ public sealed class ProjectHarmonogramRenderTests
         html.Should().Contain("schedule-layered-axis");
         html.Should().Contain("schedule-layered-track schedule-layered-track--step");
         html.Should().Contain("schedule-layered-marker today");
-        html.Should().Contain("schedule-layered-marker deadline");
+        html.Should().NotContain("schedule-layered-marker deadline");
     }
 }

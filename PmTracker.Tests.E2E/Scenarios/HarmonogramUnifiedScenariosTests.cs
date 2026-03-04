@@ -62,11 +62,12 @@ public sealed class HarmonogramUnifiedScenariosTests
         await Expect(firstCard.Locator(".schedule-overview-axis")).ToHaveCountAsync(1);
         await Expect(firstCard.Locator(".schedule-overview-marker.today")).ToHaveCountAsync(1);
         await Expect(firstCard.Locator(".schedule-overview-marker.deadline")).ToHaveCountAsync(1);
+        await Expect(page.Locator(".tab-panel[data-tab-panel='harmonogram'] .schedule-mini-legend")).ToHaveCountAsync(0);
         await Expect(firstCard.Locator(".schedule-layered-legend--steps")).ToHaveCountAsync(1);
         await Expect(firstCard.Locator(".schedule-layered-axis")).ToHaveCountAsync(1);
         (await firstCard.Locator(".schedule-layered-track--step").CountAsync()).Should().BeGreaterThan(0);
         (await firstCard.Locator(".schedule-layered-marker.today").CountAsync()).Should().BeGreaterThan(0);
-        (await firstCard.Locator(".schedule-layered-marker.deadline").CountAsync()).Should().BeGreaterThan(0);
+        await Expect(firstCard.Locator(".schedule-layered-marker.deadline")).ToHaveCountAsync(0);
 
         await page.Context.CloseAsync();
     }

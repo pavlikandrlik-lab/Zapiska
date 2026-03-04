@@ -275,10 +275,16 @@ public sealed class RecordDeleteDataStoreTests
 
         var model = store.BuildZaznamEdit(recordId);
         var ownerIds = model.DostupniVlastnici.Select(x => x.OsobaId).ToArray();
+        var collaborationIds = model.DostupniSpolupracovnici.Select(x => x.OsobaId).ToArray();
 
         ownerIds.Should().Contain(activeProjectMemberId);
         ownerIds.Should().Contain(activeSubsystemMemberId);
         ownerIds.Should().Contain(legacyOwnerId);
         ownerIds.Should().NotContain(outsiderId);
+
+        collaborationIds.Should().Contain(activeProjectMemberId);
+        collaborationIds.Should().Contain(activeSubsystemMemberId);
+        collaborationIds.Should().NotContain(legacyOwnerId);
+        collaborationIds.Should().NotContain(outsiderId);
     }
 }

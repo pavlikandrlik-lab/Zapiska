@@ -3054,7 +3054,8 @@
         }
 
         container.replaceChildren();
-        buildTimelineAxisTicks(startDate, endDate).forEach((tick) => {
+        const ticks = buildTimelineAxisTicks(startDate, endDate);
+        ticks.forEach((tick) => {
             const tickNode = document.createElement("span");
             tickNode.className = "timeline-axis-tick";
             tickNode.style.left = `${tick.left.toFixed(4)}%`;
@@ -3064,6 +3065,51 @@
             labelNode.textContent = tick.label;
             tickNode.appendChild(labelNode);
             container.appendChild(tickNode);
+        });
+
+        if (ticks.length === 0) {
+            return;
+        }
+
+        const containerWidth = Math.max(0, container.clientWidth);
+        if (containerWidth <= 0) {
+            return;
+        }
+
+        let previousLabelRight = -Infinity;
+        const minLabelGap = 6;
+        Array.from(container.querySelectorAll(".timeline-axis-tick")).forEach((tickNode) => {
+            if (!(tickNode instanceof HTMLElement)) {
+                return;
+            }
+
+            const labelNode = tickNode.querySelector(".timeline-axis-label");
+            if (!(labelNode instanceof HTMLElement)) {
+                return;
+            }
+
+            labelNode.hidden = false;
+            labelNode.style.left = "4px";
+
+            const leftPercentRaw = Number.parseFloat(tickNode.style.left || "0");
+            const leftPercent = Number.isFinite(leftPercentRaw) ? leftPercentRaw : 0;
+            const tickLeftPx = (leftPercent / 100) * containerWidth;
+            const labelWidth = labelNode.offsetWidth;
+
+            if (labelWidth <= 0 || labelWidth > containerWidth) {
+                labelNode.hidden = true;
+                return;
+            }
+
+            const desiredLeft = tickLeftPx + 4;
+            const clampedLeft = Math.max(0, Math.min(desiredLeft, containerWidth - labelWidth));
+            if (clampedLeft < previousLabelRight + minLabelGap) {
+                labelNode.hidden = true;
+                return;
+            }
+
+            labelNode.style.left = `${Math.round(clampedLeft - tickLeftPx)}px`;
+            previousLabelRight = clampedLeft + labelWidth;
         });
     }
 
@@ -3318,6 +3364,41 @@
         });
     }
 
+    function resolveRecordEditorFloatingBoundary(anchor, boundary, kind) {
+        if (!(anchor instanceof HTMLElement) || !boundary) {
+            return boundary;
+        }
+
+        if (kind !== "date" && kind !== "time") {
+            return boundary;
+        }
+
+        const recordEditorForm = anchor.closest('form[data-record-editor-form="true"]');
+        if (!(recordEditorForm instanceof HTMLElement)) {
+            return boundary;
+        }
+
+        const actionBar = recordEditorForm.querySelector(".record-editor-actions");
+        if (!(actionBar instanceof HTMLElement)) {
+            return boundary;
+        }
+
+        const actionBarRect = actionBar.getBoundingClientRect();
+        if (actionBarRect.height <= 0) {
+            return boundary;
+        }
+
+        const adjustedBottom = Math.min(boundary.bottom, actionBarRect.top - 8);
+        if (adjustedBottom <= boundary.top + 72) {
+            return boundary;
+        }
+
+        return {
+            ...boundary,
+            bottom: adjustedBottom
+        };
+    }
+
     function positionFloatingPanel(panel, anchor, options = {}) {
         if (!(panel instanceof HTMLElement) || !(anchor instanceof HTMLElement) || panel.hidden) {
             return;
@@ -3325,6 +3406,7 @@
 
         const gap = Number.isFinite(options.gap) ? options.gap : 8;
         const matchWidth = options.matchWidth === true || panel.dataset.floatingMatchWidth === "true";
+        const kind = typeof options.kind === "string" ? options.kind : "";
         const viewportBoundary = {
             left: 8,
             right: window.innerWidth - 8,
@@ -3332,7 +3414,7 @@
             bottom: window.innerHeight - 8
         };
         const modalContainer = anchor.closest("[data-modal-container]");
-        const boundary = modalContainer instanceof HTMLElement
+        const baseBoundary = modalContainer instanceof HTMLElement
             ? (() => {
                 const modalRect = modalContainer.getBoundingClientRect();
                 return {
@@ -3343,6 +3425,7 @@
                 };
             })()
             : viewportBoundary;
+        const boundary = resolveRecordEditorFloatingBoundary(anchor, baseBoundary, kind);
         const anchorRect = anchor.getBoundingClientRect();
         if (anchorRect.width <= 0 || anchorRect.height <= 0) {
             return;
@@ -5255,9 +5338,7 @@
                     delayInc: row.querySelector("[data-schedule-delay-inc]"),
                     delayDec: row.querySelector("[data-schedule-delay-dec]"),
                     plannedBar: row.querySelector("[data-schedule-step-planned]"),
-                    actualProgressBar: row.querySelector("[data-schedule-step-actual-progress]"),
-                    varianceNegativeBar: row.querySelector("[data-schedule-step-variance-negative]"),
-                    variancePositiveBar: row.querySelector("[data-schedule-step-variance-positive]")
+                    actualBar: row.querySelector("[data-schedule-step-actual]")
                 }));
         }
 
@@ -5501,8 +5582,7 @@
             const maxStepDays = Math.max(
                 1,
                 ...state.map((item) => item.duration),
-                ...state.map((item) => item.duration + Math.max(item.delay, 0)),
-                ...state.map((item) => Math.abs(item.delay))
+                ...state.map((item) => Math.max(0, item.duration + item.delay))
             );
 
             this.rows.forEach((entry, index) => {
@@ -5522,35 +5602,16 @@
                 }
 
                 const plannedWidth = Math.max(0, Math.min(100, Math.round((state[index].duration * 100) / maxStepDays)));
-                const actualProgressDays = Math.max(0, Math.min(state[index].duration, state[index].duration + state[index].delay));
-                const actualProgressWidth = Math.max(0, Math.min(100, Math.round((actualProgressDays * 100) / maxStepDays)));
-                const varianceWidth = Math.max(0, Math.min(100, Math.round((Math.abs(state[index].delay) * 100) / maxStepDays)));
+                const actualDays = Math.max(0, state[index].duration + state[index].delay);
+                const actualWidth = Math.max(0, Math.min(100, Math.round((actualDays * 100) / maxStepDays)));
                 if (entry.plannedBar instanceof HTMLElement) {
                     entry.plannedBar.style.width = `${plannedWidth}%`;
+                    entry.plannedBar.hidden = plannedWidth <= 0;
                 }
-                if (entry.actualProgressBar instanceof HTMLElement) {
-                    entry.actualProgressBar.style.width = `${actualProgressWidth}%`;
-                    entry.actualProgressBar.hidden = actualProgressWidth <= 0;
+                if (entry.actualBar instanceof HTMLElement) {
+                    entry.actualBar.style.width = `${actualWidth}%`;
+                    entry.actualBar.hidden = actualWidth <= 0;
                 }
-                if (entry.varianceNegativeBar instanceof HTMLElement) {
-                    if (state[index].delay < 0 && varianceWidth > 0) {
-                        entry.varianceNegativeBar.style.width = `${varianceWidth}%`;
-                        entry.varianceNegativeBar.hidden = false;
-                    } else {
-                        entry.varianceNegativeBar.style.width = "0%";
-                        entry.varianceNegativeBar.hidden = true;
-                    }
-                }
-                if (entry.variancePositiveBar instanceof HTMLElement) {
-                    if (state[index].delay > 0 && varianceWidth > 0) {
-                        entry.variancePositiveBar.style.width = `${varianceWidth}%`;
-                        entry.variancePositiveBar.hidden = false;
-                    } else {
-                        entry.variancePositiveBar.style.width = "0%";
-                        entry.variancePositiveBar.hidden = true;
-                    }
-                }
-                entry.row.classList.toggle("schedule-step-has-delay", state[index].delay !== 0);
             });
         }
 

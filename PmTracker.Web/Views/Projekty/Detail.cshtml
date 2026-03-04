@@ -17,8 +17,6 @@
     var projectPrintUrl = Url.Action("ProjektTisk", "Export", new { projektId = Model.Projekt.Id, autoPrint = true }) ?? $"/Export/Projekt/{Model.Projekt.Id}/Tisk?autoPrint=true";
     var projectWordUrl = Url.Action("ProjektWord", "Export", new { projektId = Model.Projekt.Id }) ?? $"/Export/Projekt/{Model.Projekt.Id}/Word";
     var harmonogramUkoly = Model.HarmonogramUkoly;
-    var harmonogramLegendKroky = harmonogramUkoly.FirstOrDefault()?.Kroky ?? Array.Empty<ProjektHarmonogramKrokViewModel>();
-    var harmonogramDelayBarva = harmonogramUkoly.FirstOrDefault()?.DelayBarvaHex ?? "#DC2626";
 }
 
 <section class="page-header page-header-compact">
@@ -200,17 +198,6 @@
 </section>
 
 <section class="tab-panel" data-tab-panel="harmonogram">
-    <div class="schedule-mini-legend">Legenda: Plán / Skutečnost / Termín úkolu</div>
-    <div class="schedule-step-legend">
-        @foreach (var krok in harmonogramLegendKroky)
-        {
-            <span class="schedule-step-legend-item">
-                <span class="schedule-step-dot" style="background:@krok.BarvaHex;" aria-hidden="true"></span>
-                <span>Krok @krok.KrokIndex</span>
-            </span>
-        }
-    </div>
-
     <div class="filter-shell"
          data-project-filter-scope="schedule"
          data-project-id="@Model.Projekt.Id"
@@ -282,7 +269,6 @@
                                 : compactAxisEnd;
                             var breakdownAxisDays = Math.Max(1, (breakdownAxisEnd - breakdownAxisStart).Days);
                             Func<DateTime, double> toBreakdownPercent = value => Math.Clamp(((value.Date - breakdownAxisStart).Days * 100d) / breakdownAxisDays, 0d, 100d);
-                            var breakdownDeadlinePercent = toBreakdownPercent(item.TerminUkonceni.Date);
                             var breakdownTodayPercent = toBreakdownPercent(DateTime.Today);
                             <article class="schedule-card"
                                      data-schedule-item
@@ -371,10 +357,10 @@
                                                         ? $"calc({formatPercent(width)}% + 1px)"
                                                         : "0%";
                                                     previousRealRight = right;
-                                                    <span class="schedule-overview-segment actual"
+                                                    <span class="schedule-overview-segment"
                                                           data-rainbow-segment-label-full="@krok.Nazev"
                                                           data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                          style="left:@formatPercent(left)%; width:@widthStyle; --schedule-overview-actual-color:@item.DelayBarvaHex;"
+                                                          style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
                                                           title="@($"{krok.Nazev}: skutečnost {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}")"></span>
                                                 }
                                             </div>
@@ -400,7 +386,6 @@
                                         <span><span class="schedule-layered-legend-swatch planned"></span>Plán</span>
                                         <span><span class="schedule-layered-legend-swatch actual"></span>Skutečnost</span>
                                         <span><span class="schedule-layered-legend-swatch today"></span>Dnes</span>
-                                        <span><span class="schedule-layered-legend-swatch deadline"></span>Termín</span>
                                     </div>
                                     <div class="schedule-layered-axis-row">
                                         <span class="schedule-layered-axis-spacer" aria-hidden="true"></span>
@@ -420,20 +405,23 @@
                                         var offsetLabel = krok.OdchylkaDni > 0
                                             ? $"+{krok.OdchylkaDni} dnů"
                                             : $"{krok.OdchylkaDni} dnů";
+                                        var hasVisualDuration = krok.TrvaniDni > 0;
                                         <div class="gantt-step-row">
                                             <div class="gantt-step-name">
                                                 <span>@krok.Nazev</span>
                                                 <span class="gantt-step-offset @(krok.OdchylkaDni > 0 ? "late" : krok.OdchylkaDni < 0 ? "ahead" : null)">@offsetLabel</span>
                                             </div>
                                             <div class="schedule-layered-track schedule-layered-track--step">
-                                                <div class="schedule-layered-marker today"
-                                                     style="left:@formatPercent(breakdownTodayPercent)%;"
-                                                     title="@compactTodayTitle"></div>
-                                                <div class="schedule-layered-marker deadline" style="left:@formatPercent(breakdownDeadlinePercent)%;"></div>
-                                                <span class="schedule-layered-segment planned"
-                                                      style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
-                                                <span class="schedule-layered-segment actual"
-                                                      style="left:@formatPercent(actualLeft)%; width:@formatPercent(actualWidth)%; --schedule-actual-color:@item.DelayBarvaHex;"></span>
+                                                @if (hasVisualDuration)
+                                                {
+                                                    <div class="schedule-layered-marker today"
+                                                         style="left:@formatPercent(breakdownTodayPercent)%;"
+                                                         title="@compactTodayTitle"></div>
+                                                    <span class="schedule-layered-segment planned"
+                                                          style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
+                                                    <span class="schedule-layered-segment actual"
+                                                          style="left:@formatPercent(actualLeft)%; width:@formatPercent(actualWidth)%; --schedule-actual-color:@item.DelayBarvaHex;"></span>
+                                                }
                                             </div>
                                         </div>
                                     }
