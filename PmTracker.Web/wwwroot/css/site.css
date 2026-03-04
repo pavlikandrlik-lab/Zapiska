@@ -971,6 +971,10 @@
     transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
+.project-card[hidden] {
+    display: none !important;
+}
+
 .project-card:hover {
     border-color: var(--gov-color-primary);
     background: #fafafa;
@@ -3930,7 +3934,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 :root[data-theme="dark"] .skip-link {
-    color: #111827;
+    color: #f8fbff;
 }
 
 :root[data-theme="dark"] .app-header {
@@ -4015,13 +4019,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 :root[data-theme="dark"] .btn.primary {
     background: var(--gov-color-primary);
     border-color: var(--gov-color-primary);
-    color: #0f1419;
+    color: #f8fbff;
 }
 
 :root[data-theme="dark"] .btn.primary:hover {
     background: var(--gov-color-primary-strong);
     border-color: var(--gov-color-primary-strong);
-    color: #0f1419;
+    color: #f8fbff;
 }
 
 :root[data-theme="dark"] .btn.ghost {

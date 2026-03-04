@@ -263,12 +263,14 @@
         };
     }
 
-    function syncProjectListStatusFilterInputs(shell) {
-        const root = shell instanceof ParentNode ? shell : document;
-        if (!(root instanceof ParentNode)) {
-            return;
-        }
+    function resolveQueryRoot(scope) {
+        return scope && typeof scope.querySelector === "function"
+            ? scope
+            : document;
+    }
 
+    function syncProjectListStatusFilterInputs(shell) {
+        const root = resolveQueryRoot(shell);
         const state = readProjectListStatusFilterState();
         root.querySelectorAll("[data-project-status-hide]").forEach((input) => {
             if (!(input instanceof HTMLInputElement)) {
@@ -3409,7 +3411,7 @@
     }
 
     function applyProjectIndexFilters(scope) {
-        const root = scope instanceof ParentNode ? scope : document;
+        const root = resolveQueryRoot(scope);
         const shell = root.querySelector("[data-project-list-shell]");
         if (!(shell instanceof HTMLElement)) {
             return;
@@ -3443,7 +3445,7 @@
     }
 
     function initProjectIndexStatusFilters(scope) {
-        const root = scope instanceof ParentNode ? scope : document;
+        const root = resolveQueryRoot(scope);
         const shell = root.querySelector("[data-project-list-shell]");
         if (!(shell instanceof HTMLElement)) {
             return;
@@ -3458,13 +3460,11 @@
         }
 
         document.querySelectorAll("[data-project-status-hide]").forEach((input) => {
-            if (!(input instanceof HTMLInputElement) || input.dataset.boundProjectStatusFilter !== "true") {
-                if (input instanceof HTMLInputElement) {
-                    input.dataset.boundProjectStatusFilter = "true";
-                    input.addEventListener("change", () => {
-                        handleProjectStatusFilterInput(input);
-                    });
-                }
+            if (input instanceof HTMLInputElement && input.dataset.boundProjectStatusFilter !== "true") {
+                input.dataset.boundProjectStatusFilter = "true";
+                input.addEventListener("change", () => {
+                    handleProjectStatusFilterInput(input);
+                });
             }
         });
 
