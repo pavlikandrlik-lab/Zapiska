@@ -52,6 +52,8 @@ public sealed class RecordEditorControllerTests
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain(expectedMarker);
         html.Should().Contain($"data-record-editor-presentation=\"{expectedPresentation}\"");
+        html.Should().Contain("data-record-owner-picker");
+        html.Should().Contain("office-searchbox\" data-floating-anchor");
     }
 
     [Fact]
