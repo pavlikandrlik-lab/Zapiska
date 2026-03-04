@@ -51,8 +51,8 @@
                 { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
                 { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
                 { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
-                { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Aktivní úkoly" },
-                { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Mé záznamy" },
+                { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní úkoly" },
+                { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé záznamy" },
                 { inputKey: "jednani-vyjadreni-stav", stateKey: "jednaniVyjadreniStav", type: "select", chipLabel: "Jednání-vyjádření" },
                 { inputKey: "groupBySubsystem", stateKey: "groupBySubsystem", type: "checkbox", skipChip: true }
             ]
@@ -1620,7 +1620,7 @@
         root
             .querySelectorAll(
                 ".schedule-overview-segment[data-rainbow-segment-label-short], "
-                ".schedule-layered-segment[data-rainbow-segment-label-short], "
+                + ".schedule-layered-segment[data-rainbow-segment-label-short], "
                 + ".schedule-mini-gantt-segment[data-rainbow-segment-label-short]")
             .forEach((segment) => {
                 renderRainbowSegmentLabel(segment);
