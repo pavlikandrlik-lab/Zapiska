@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Api.TestInfrastructure;
@@ -216,5 +217,27 @@ public sealed class RecordEditorControllerTests
 
         savedDuration.Should().Be(5);
         savedDelay.Should().Be(-2);
+    }
+
+    [Fact]
+    public async Task Create_ShouldRenderScheduleActualInput_WithoutClientSideMinimumClamp()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiCreateSignedDelay");
+        var projectId = await _fixture.EnsureProjectAsync("APIRED4");
+        await _fixture.EnsureSubsystemAsync("APIREDSUB4", ownerId);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Create?projektId={projectId}&asUser={_fixture.AdminOsobaId}&presentation=page");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+
+        var delayInputMatch = Regex.Match(
+            html,
+            "<input[^>]*data-schedule-delay[^>]*>",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        delayInputMatch.Success.Should().BeTrue(html);
+        delayInputMatch.Value.Should().NotContain("min=", "skutečnost musí podporovat záporné hodnoty už před prvním uložením");
     }
 }

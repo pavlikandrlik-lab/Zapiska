@@ -264,12 +264,13 @@
     }
 
     function syncProjectListStatusFilterInputs(shell) {
-        if (!(shell instanceof HTMLElement)) {
+        const root = shell instanceof ParentNode ? shell : document;
+        if (!(root instanceof ParentNode)) {
             return;
         }
 
         const state = readProjectListStatusFilterState();
-        shell.querySelectorAll("[data-project-status-hide]").forEach((input) => {
+        root.querySelectorAll("[data-project-status-hide]").forEach((input) => {
             if (!(input instanceof HTMLInputElement)) {
                 return;
             }
@@ -3414,9 +3415,9 @@
             return;
         }
 
-        syncProjectListStatusFilterInputs(shell);
+        syncProjectListStatusFilterInputs(root);
 
-        const hiddenStatusCodes = Array.from(shell.querySelectorAll("[data-project-status-hide]"))
+        const hiddenStatusCodes = Array.from(root.querySelectorAll("[data-project-status-hide]"))
             .filter((input) => input instanceof HTMLInputElement && input.checked)
             .map((input) => (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase())
             .filter((value) => value.length > 0);
@@ -3439,6 +3440,38 @@
         if (emptyState instanceof HTMLElement) {
             emptyState.hidden = visibleCount > 0;
         }
+    }
+
+    function toggleProjectStatusFilterPanel(button) {
+        if (!(button instanceof HTMLElement)) {
+            return;
+        }
+
+        const panel = document.querySelector("[data-project-status-filter-panel]");
+        if (!(panel instanceof HTMLElement)) {
+            return;
+        }
+
+        const isOpen = !panel.hidden;
+        const nextOpen = !isOpen;
+        panel.hidden = !nextOpen;
+        button.setAttribute("aria-expanded", String(nextOpen));
+    }
+
+    function handleProjectStatusFilterInput(input) {
+        if (!(input instanceof HTMLInputElement)) {
+            return;
+        }
+
+        const statusCode = (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
+        if (statusCode === "DONE") {
+            writeProjectListStatusFilterState(projectListHideDoneStorageKey, input.checked);
+        }
+        else if (statusCode === "DELETED") {
+            writeProjectListStatusFilterState(projectListHideDeletedStorageKey, input.checked);
+        }
+
+        applyProjectIndexFilters(document);
     }
 
     function toggleMeetingAttendancePanel(button) {
@@ -5149,7 +5182,7 @@
         readState() {
             return this.rows.map((entry) => {
                 const duration = this.normalizeInt(entry.durationInput);
-                const delay = this.normalizeIntWithMinimum(entry.delayInput, -duration);
+                const delay = this.normalizeSignedInt(entry.delayInput);
                 return { duration, delay };
             });
         }
@@ -5187,6 +5220,17 @@
 
         normalizeInt(input) {
             return this.normalizeIntWithMinimum(input, 0);
+        }
+
+        normalizeSignedInt(input) {
+            if (!(input instanceof HTMLInputElement)) {
+                return 0;
+            }
+            const parsed = Number.parseInt((input.value || "").trim(), 10);
+            if (!Number.isFinite(parsed)) {
+                return 0;
+            }
+            return parsed;
         }
 
         normalizeIntWithMinimum(input, minimum) {
@@ -5228,12 +5272,6 @@
                 return;
             }
 
-            const state = this.readState();
-            const current = state[stepIndex];
-            if (current) {
-                current.delay = Math.max(-current.duration, current.delay);
-                this.writeState(state);
-            }
             this.recalcAll();
         }
 
@@ -5278,7 +5316,7 @@
             const { plan } = this.computePlanAndActual(state, startDate);
             const planEnd = plan[stepIndex]?.end || startDate;
             const selectedDate = parseIsoDate(entry.delayDateInput.value) || planEnd;
-            const computedDelay = Math.max(-state[stepIndex].duration, diffCalendarDays(selectedDate, planEnd));
+            const computedDelay = diffCalendarDays(selectedDate, planEnd);
             state[stepIndex] = { ...state[stepIndex], delay: computedDelay };
             this.writeState(state);
             this.recalcAll();
@@ -5441,10 +5479,13 @@
                     return;
                 }
 
-                const matchingEntry = this.rows.find((entry) => entry.delayInput === input);
-                const minimum = matchingEntry ? -this.normalizeInt(matchingEntry.durationInput) : 0;
-                const currentValue = this.normalizeIntWithMinimum(input, minimum);
-                const nextValue = Math.max(minimum, currentValue + delta);
+                const isDelayInput = input.hasAttribute("data-schedule-delay");
+                const currentValue = isDelayInput
+                    ? this.normalizeSignedInt(input)
+                    : this.normalizeInt(input);
+                const nextValue = isDelayInput
+                    ? currentValue + delta
+                    : Math.max(0, currentValue + delta);
                 input.value = String(nextValue);
 
                 if (nextValue !== currentValue) {
@@ -7015,6 +7056,12 @@
             return;
         }
 
+        const projectStatusFilterToggle = target.closest("[data-project-status-filter-toggle]");
+        if (projectStatusFilterToggle) {
+            toggleProjectStatusFilterPanel(projectStatusFilterToggle instanceof HTMLElement ? projectStatusFilterToggle : null);
+            return;
+        }
+
         const recordToggle = target.closest("[data-record-toggle]");
         if (recordToggle) {
             if (target.closest("[data-stop-propagation]")) {
@@ -7098,6 +7145,10 @@
                 initRecordSchedulePlanner(form);
             }
         }
+
+        if (target instanceof HTMLInputElement && target.matches("[data-project-status-hide]")) {
+            handleProjectStatusFilterInput(target);
+        }
     });
 
     document.addEventListener("input", (event) => {
@@ -7122,16 +7173,6 @@
             persistScheduleFilterState(scheduleFilterInput);
         }
 
-        if (target instanceof HTMLInputElement && target.matches("[data-project-status-hide]")) {
-            const statusCode = (target.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
-            if (statusCode === "DONE") {
-                writeProjectListStatusFilterState(projectListHideDoneStorageKey, target.checked);
-            }
-            else if (statusCode === "DELETED") {
-                writeProjectListStatusFilterState(projectListHideDeletedStorageKey, target.checked);
-            }
-            applyProjectIndexFilters(document);
-        }
     });
 
     document.addEventListener("keydown", (event) => {
