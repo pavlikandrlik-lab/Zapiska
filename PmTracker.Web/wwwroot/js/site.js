@@ -3,6 +3,8 @@
     const themeStorageKey = "pmtracker.theme.mode";
     const printFormatStorageKey = "pmtracker.print.preferredFormat";
     const recordEditorPreferenceStorageKey = "pmtracker.recordEditor.preference";
+    const projectListHideDoneStorageKey = "pmtracker.projects.hideDone";
+    const projectListHideDeletedStorageKey = "pmtracker.projects.hideDeleted";
     const recordEditorReturnStateStoragePrefix = "pmtracker.recordEditor.returnState.project.";
     const mediaDark = window.matchMedia("(prefers-color-scheme: dark)");
     const modalState = {
@@ -49,8 +51,8 @@
                 { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
                 { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
                 { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
-                { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní" },
-                { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé záznamy" },
+                { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Aktivní úkoly" },
+                { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Mé záznamy" },
                 { inputKey: "jednani-vyjadreni-stav", stateKey: "jednaniVyjadreniStav", type: "select", chipLabel: "Jednání-vyjádření" },
                 { inputKey: "groupBySubsystem", stateKey: "groupBySubsystem", type: "checkbox", skipChip: true }
             ]
@@ -237,6 +239,49 @@
         document.querySelectorAll("[data-record-editor-preference-reset]").forEach((element) => {
             if (element instanceof HTMLButtonElement) {
                 element.disabled = preferred === null;
+            }
+        });
+    }
+
+    function readBooleanStorageDefaultTrue(key) {
+        const rawValue = window.localStorage.getItem(key);
+        if (rawValue === null) {
+            return true;
+        }
+
+        return rawValue === "true";
+    }
+
+    function writeProjectListStatusFilterState(key, value) {
+        window.localStorage.setItem(key, value ? "true" : "false");
+    }
+
+    function readProjectListStatusFilterState() {
+        return {
+            hideDone: readBooleanStorageDefaultTrue(projectListHideDoneStorageKey),
+            hideDeleted: readBooleanStorageDefaultTrue(projectListHideDeletedStorageKey)
+        };
+    }
+
+    function syncProjectListStatusFilterInputs(shell) {
+        if (!(shell instanceof HTMLElement)) {
+            return;
+        }
+
+        const state = readProjectListStatusFilterState();
+        shell.querySelectorAll("[data-project-status-hide]").forEach((input) => {
+            if (!(input instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const statusCode = (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
+            if (statusCode === "DONE") {
+                input.checked = state.hideDone;
+                return;
+            }
+
+            if (statusCode === "DELETED") {
+                input.checked = state.hideDeleted;
             }
         });
     }
@@ -3369,6 +3414,8 @@
             return;
         }
 
+        syncProjectListStatusFilterInputs(shell);
+
         const hiddenStatusCodes = Array.from(shell.querySelectorAll("[data-project-status-hide]"))
             .filter((input) => input instanceof HTMLInputElement && input.checked)
             .map((input) => (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase())
@@ -3392,6 +3439,27 @@
         if (emptyState instanceof HTMLElement) {
             emptyState.hidden = visibleCount > 0;
         }
+    }
+
+    function toggleMeetingAttendancePanel(button) {
+        if (!(button instanceof HTMLButtonElement)) {
+            return;
+        }
+
+        const card = button.closest("[data-meeting-attendance-card]");
+        if (!(card instanceof HTMLElement)) {
+            return;
+        }
+
+        const panel = card.querySelector("[data-meeting-attendance-panel]");
+        if (!(panel instanceof HTMLElement)) {
+            return;
+        }
+
+        const shouldOpen = panel.hidden;
+        panel.hidden = !shouldOpen;
+        button.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+        button.textContent = shouldOpen ? "Skrýt účast" : "Zobrazit účast";
     }
 
     function repositionFloatingPanels() {
@@ -6874,6 +6942,13 @@
             return;
         }
 
+        const attendanceToggle = target.closest("[data-meeting-attendance-toggle]");
+        if (attendanceToggle instanceof HTMLButtonElement) {
+            event.preventDefault();
+            toggleMeetingAttendancePanel(attendanceToggle);
+            return;
+        }
+
         if (printState.popover instanceof HTMLElement
             && !target.closest("[data-print-popover]")
             && !target.closest("[data-print-trigger]")) {
@@ -7048,6 +7123,13 @@
         }
 
         if (target instanceof HTMLInputElement && target.matches("[data-project-status-hide]")) {
+            const statusCode = (target.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
+            if (statusCode === "DONE") {
+                writeProjectListStatusFilterState(projectListHideDoneStorageKey, target.checked);
+            }
+            else if (statusCode === "DELETED") {
+                writeProjectListStatusFilterState(projectListHideDeletedStorageKey, target.checked);
+            }
             applyProjectIndexFilters(document);
         }
     });

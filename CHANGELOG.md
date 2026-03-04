@@ -2,6 +2,21 @@
 
 Tento soubor je generován skriptem `scripts/generate-changelog.sh` z verzovaných podkladů v `docs/changelog/releases/`.
 
+## 0.5 - 2026-03-04
+
+### Přidáno
+- Přehled projektů obsahuje malý filtr `Skrýt hotové` a `Skrýt smazané` s uložením volby do tohoto prohlížeče.
+
+### Změněno
+- Filtry v sekci `Záznamy` používají pro `Mé záznamy` a `Aktivní úkoly` sjednocený GOV switch styl.
+- Sekce `Účast` v detailu jednání je výchozí sbalená do kompaktního souhrnu a lze ji rozbalit jen při potřebě úprav.
+- Ovládací prvky `Uložit stav` a `Uzavřít jednání` jsou v detailu jednání srovnané do jednoho akčního bloku.
+
+### Opraveno
+- Uložení nového záznamu v modalu i na samostatné stránce už nepadá na `400 Bad Request`, pokud v databázi chyběla aktivní harmonogramová šablona.
+- První uložení záznamu na čerstvé databázi automaticky vytvoří chybějící aktivní harmonogramovou šablonu a její výchozí kroky.
+
+
 ## 0.4 - 2026-03-03
 
 ### Přidáno

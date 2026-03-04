@@ -3482,7 +3482,40 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .meeting-attendance-card {
+    display: grid;
+    gap: 12px;
     overflow-x: auto;
+}
+
+.meeting-attendance-header {
+    align-items: flex-start;
+}
+
+.meeting-attendance-summary {
+    display: grid;
+    gap: 6px;
+}
+
+.meeting-attendance-summary h2,
+.meeting-attendance-summary p {
+    margin: 0;
+}
+
+.meeting-attendance-header-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.meeting-attendance-panel[hidden] {
+    display: none !important;
+}
+
+.meeting-attendance-panel {
+    display: grid;
+    gap: 12px;
 }
 
 .meeting-attendance-table {
@@ -3519,6 +3552,15 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 10px;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
+}
+
+.meeting-status-controls .inline-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0;
 }
 
 .meeting-status-controls .wide-select {

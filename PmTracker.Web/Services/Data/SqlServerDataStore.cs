@@ -1123,8 +1123,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var statusId = ResolveStavUkoluId(command.Stav);
         var typeId = ResolveTypUkoluId(command.TypUkolu);
         var subsystemId = ResolveProjectSubsystemId(command.ProjektId, command.Subsystem);
-        var activeSchema = GetActiveHarmonogramSchema();
-        var defaultSchemaVersion = activeSchema.Verze > 0 ? activeSchema.Verze : 1;
+        var defaultSchemaVersion = EnsurePersistedActiveHarmonogramSchemaVersion();
         var ownerId = _dbContext.Osoby.AsNoTracking()
             .Where(x => x.Id == ownerIdValue)
             .Select(x => (int?)x.Id)
@@ -3172,6 +3171,41 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         }
     }
 
+    private int EnsurePersistedActiveHarmonogramSchemaVersion()
+    {
+        var activeSchema = _dbContext.HarmonogramSablony
+            .OrderByDescending(x => x.IsAktivni)
+            .ThenByDescending(x => x.Verze)
+            .FirstOrDefault(x => x.IsAktivni);
+
+        if (activeSchema is null)
+        {
+            activeSchema = new HarmonogramSablonaEntity
+            {
+                DelayBarvaHex = DefaultDelayBarvaHex,
+                IsAktivni = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = null
+            };
+            _dbContext.HarmonogramSablony.Add(activeSchema);
+            _dbContext.SaveChanges();
+        }
+
+        var hasRows = _dbContext.CiselnikHarmonogramTypu
+            .Any(x => x.SablonaVerze == activeSchema.Verze);
+
+        if (!hasRows)
+        {
+            var defaultRows = BuildDefaultHarmonogramTypeRows(activeSchema.Verze);
+            _dbContext.CiselnikHarmonogramTypu.AddRange(defaultRows);
+            _dbContext.SaveChanges();
+            NormalizeHarmonogramSchemaRows(activeSchema.Verze);
+            _dbContext.SaveChanges();
+        }
+
+        return activeSchema.Verze;
+    }
+
     private HarmonogramSchemaDefinition LoadHarmonogramSchema(int schemaVersion)
     {
         if (schemaVersion <= 0)
@@ -3266,6 +3300,42 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             DefaultHarmonogramKroky
                 .Select(step => new HarmonogramTypPar(step.Poradi, step.Kod, step.Nazev, step.BarvaHex, 0, 0))
                 .ToList());
+    }
+
+    private static List<HarmonogramTypEntity> BuildDefaultHarmonogramTypeRows(int schemaVersion)
+    {
+        var rows = new List<HarmonogramTypEntity>(DefaultHarmonogramKroky.Length * 2);
+
+        foreach (var step in DefaultHarmonogramKroky)
+        {
+            var stepKey = Guid.NewGuid();
+            rows.Add(new HarmonogramTypEntity
+            {
+                Kod = step.Kod,
+                Nazev = step.Nazev,
+                Hodnota = step.Poradi,
+                IsLocked = true,
+                SablonaVerze = schemaVersion,
+                KrokKey = stepKey,
+                KrokPoradi = step.Poradi,
+                JeZpozdeni = false,
+                BarvaHex = step.BarvaHex
+            });
+            rows.Add(new HarmonogramTypEntity
+            {
+                Kod = step.Kod.Replace("_DURATION", "_DELAY", StringComparison.OrdinalIgnoreCase),
+                Nazev = $"{step.Nazev} - zpoždění",
+                Hodnota = 100 + step.Poradi,
+                IsLocked = true,
+                SablonaVerze = schemaVersion,
+                KrokKey = stepKey,
+                KrokPoradi = step.Poradi,
+                JeZpozdeni = true,
+                BarvaHex = null
+            });
+        }
+
+        return rows;
     }
 
     private static string ResolveDefaultStepColor(int stepIndex)
