@@ -1619,7 +1619,7 @@
         const root = scope instanceof HTMLElement || scope instanceof Document ? scope : document;
         root
             .querySelectorAll(
-                ".schedule-rainbow-segment[data-rainbow-segment-label-short], "
+                ".schedule-layered-segment[data-rainbow-segment-label-short], "
                 + ".schedule-mini-gantt-segment[data-rainbow-segment-label-short]")
             .forEach((segment) => {
                 renderRainbowSegmentLabel(segment);

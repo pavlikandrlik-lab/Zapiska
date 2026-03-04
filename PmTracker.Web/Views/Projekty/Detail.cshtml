@@ -304,10 +304,14 @@
                                          data-timeline-axis
                                          data-axis-start="@axisStart.ToString("yyyy-MM-dd")"
                                          data-axis-end="@axisEnd.ToString("yyyy-MM-dd")"></div>
-                                    <div class="schedule-rainbow-row">
-                                        <span class="schedule-rainbow-label">Plán</span>
-                                        <div class="schedule-rainbow-track planned">
-                                            <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
+                                    <div class="schedule-layered-timeline">
+                                        <div class="schedule-layered-legend">
+                                            <span><span class="schedule-layered-legend-swatch planned"></span>Plán</span>
+                                            <span><span class="schedule-layered-legend-swatch actual"></span>Skutečnost</span>
+                                            <span><span class="schedule-layered-legend-swatch deadline"></span>Termín</span>
+                                        </div>
+                                        <div class="schedule-layered-track schedule-layered-track--overview">
+                                            <div class="schedule-layered-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
                                             @{
                                                 var previousPlanRight = 0d;
                                             }
@@ -322,18 +326,12 @@
                                                     ? $"calc({formatPercent(width)}% + 1px)"
                                                     : "0%";
                                                 previousPlanRight = right;
-                                                <span class="schedule-rainbow-segment planned"
+                                                <span class="schedule-layered-segment planned"
                                                       data-rainbow-segment-label-full="@krok.Nazev"
                                                       data-rainbow-segment-label-short="@krok.KrokIndex"
                                                       style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
-                                                      title="@($"{krok.Nazev}: {krok.PlanStart:dd.MM.yyyy} - {krok.PlanEnd:dd.MM.yyyy}")"></span>
+                                                      title="@($"{krok.Nazev}: plán {krok.PlanStart:dd.MM.yyyy} - {krok.PlanEnd:dd.MM.yyyy}")"></span>
                                             }
-                                        </div>
-                                    </div>
-                                    <div class="schedule-rainbow-row">
-                                        <span class="schedule-rainbow-label">Skutečnost</span>
-                                        <div class="schedule-rainbow-track actual">
-                                            <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
                                             @{
                                                 var previousRealRight = 0d;
                                             }
@@ -348,15 +346,15 @@
                                                     ? $"calc({formatPercent(width)}% + 1px)"
                                                     : "0%";
                                                 previousRealRight = right;
-                                                <span class="schedule-rainbow-segment actual"
+                                                <span class="schedule-layered-segment actual"
                                                       data-rainbow-segment-label-full="@krok.Nazev"
                                                       data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                      style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
-                                                      title="@($"{krok.Nazev}: {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}")"></span>
+                                                      style="left:@formatPercent(left)%; width:@widthStyle; --schedule-actual-color:@item.DelayBarvaHex;"
+                                                      title="@($"{krok.Nazev}: skutečnost {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}")"></span>
                                             }
                                         </div>
                                     </div>
-                                    <div class="schedule-rainbow-legend">
+                                    <div class="schedule-layered-summary">
                                         <span>Plán: @item.BaselineDokonceni.ToString("dd.MM.yyyy")</span>
                                         <span>Skutečnost: @item.SkutecneDokonceni.ToString("dd.MM.yyyy")</span>
                                         <span>Termín úkolu: @item.TerminUkonceni.ToString("dd.MM.yyyy")</span>
@@ -365,6 +363,11 @@
                                 </div>
 
                                 <div class="gantt-steps schedule-steps" data-schedule-steps data-schedule-record-id="@item.ZaznamId" hidden="hidden">
+                                    <div class="schedule-layered-legend schedule-layered-legend--steps">
+                                        <span><span class="schedule-layered-legend-swatch planned"></span>Plán</span>
+                                        <span><span class="schedule-layered-legend-swatch actual"></span>Skutečnost</span>
+                                        <span><span class="schedule-layered-legend-swatch deadline"></span>Termín</span>
+                                    </div>
                                     @foreach (var krok in item.Kroky)
                                     {
                                         var stepLeft = toPercent(krok.PlanStart);
@@ -381,10 +384,10 @@
                                                 <span>@krok.Nazev</span>
                                                 <span class="gantt-step-offset @(krok.OdchylkaDni > 0 ? "late" : krok.OdchylkaDni < 0 ? "ahead" : null)">@offsetLabel</span>
                                             </div>
-                                            <div class="gantt-step-track">
-                                                <div class="schedule-rainbow-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
-                                                <span class="gantt-step-segment planned" style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
-                                                <span class="gantt-step-segment actual" style="left:@formatPercent(actualLeft)%; width:@formatPercent(actualWidth)%; background:@item.DelayBarvaHex;"></span>
+                                            <div class="schedule-layered-track schedule-layered-track--step">
+                                                <div class="schedule-layered-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
+                                                <span class="schedule-layered-segment planned" style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
+                                                <span class="schedule-layered-segment actual" style="left:@formatPercent(actualLeft)%; width:@formatPercent(actualWidth)%; --schedule-actual-color:@item.DelayBarvaHex;"></span>
                                             </div>
                                         </div>
                                     }

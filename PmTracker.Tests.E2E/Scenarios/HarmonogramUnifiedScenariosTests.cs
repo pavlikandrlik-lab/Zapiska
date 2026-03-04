@@ -47,6 +47,68 @@ public sealed class HarmonogramUnifiedScenariosTests
         await page.Context.CloseAsync();
     }
 
+    [Fact]
+    public async Task Harmonogram_ShouldRenderVisibleActualLegend_AndLayeredTracksInOverviewAndBreakdown()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
+
+        if (await page.Locator(".schedule-card").CountAsync() == 0)
+        {
+            await Expect(page.GetByText("V projektu zatím nejsou úkoly s harmonogramem.")).ToBeVisibleAsync();
+            await page.Context.CloseAsync();
+            return;
+        }
+
+        var firstCard = page.Locator(".schedule-card").First;
+        await Expect(firstCard).ToBeVisibleAsync();
+
+        var actualLegend = firstCard.Locator(".schedule-layered-legend").First.GetByText("Skutečnost", new() { Exact = true });
+        var overviewTrack = firstCard.Locator(".schedule-layered-track--overview").First;
+        await Expect(actualLegend).ToBeVisibleAsync();
+        await Expect(overviewTrack).ToBeVisibleAsync();
+
+        var actualLegendBox = await actualLegend.BoundingBoxAsync();
+        var overviewTrackBox = await overviewTrack.BoundingBoxAsync();
+        actualLegendBox.Should().NotBeNull();
+        overviewTrackBox.Should().NotBeNull();
+        (actualLegendBox!.Y + actualLegendBox.Height).Should().BeLessThan(overviewTrackBox!.Y);
+
+        await Expect(firstCard.Locator(".schedule-rainbow-row")).ToHaveCountAsync(0);
+
+        var overviewPlannedSegment = firstCard.Locator(".schedule-layered-track--overview .schedule-layered-segment.planned").First;
+        var overviewActualSegment = firstCard.Locator(".schedule-layered-track--overview .schedule-layered-segment.actual").First;
+        var overviewPlannedBox = await overviewPlannedSegment.BoundingBoxAsync();
+        var overviewActualBox = await overviewActualSegment.BoundingBoxAsync();
+        overviewPlannedBox.Should().NotBeNull();
+        overviewActualBox.Should().NotBeNull();
+        overviewPlannedBox!.Height.Should().BeGreaterThan(overviewActualBox!.Height);
+
+        await firstCard.GetByRole(AriaRole.Button, new() { Name = "Rozpad" }).ClickAsync();
+
+        var stepLegend = firstCard.Locator(".schedule-layered-legend--steps").GetByText("Skutečnost", new() { Exact = true });
+        var stepTrack = firstCard.Locator(".schedule-layered-track--step").First;
+        await Expect(stepLegend).ToBeVisibleAsync();
+        await Expect(stepTrack).ToBeVisibleAsync();
+
+        var stepLegendBox = await stepLegend.BoundingBoxAsync();
+        var stepTrackBox = await stepTrack.BoundingBoxAsync();
+        stepLegendBox.Should().NotBeNull();
+        stepTrackBox.Should().NotBeNull();
+        (stepLegendBox!.Y + stepLegendBox.Height).Should().BeLessThan(stepTrackBox!.Y);
+
+        var stepPlannedSegment = firstCard.Locator(".schedule-layered-track--step .schedule-layered-segment.planned").First;
+        var stepActualSegment = firstCard.Locator(".schedule-layered-track--step .schedule-layered-segment.actual").First;
+        var stepPlannedBox = await stepPlannedSegment.BoundingBoxAsync();
+        var stepActualBox = await stepActualSegment.BoundingBoxAsync();
+        stepPlannedBox.Should().NotBeNull();
+        stepActualBox.Should().NotBeNull();
+        stepPlannedBox!.Height.Should().BeGreaterThan(stepActualBox!.Height);
+
+        await page.Context.CloseAsync();
+    }
+
     private static async Task OpenFiltersAsync(ILocator shell)
     {
         var toggle = shell.GetByRole(AriaRole.Button, new() { Name = "Filtry" });
