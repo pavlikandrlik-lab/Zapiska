@@ -37,6 +37,7 @@ public sealed class PermissionEvaluationServiceTests
             IsSuperAdmin = false,
             RoleKody = Array.Empty<string>(),
             VisibleProjectIds = grants.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
+            DeletedProjectIds = Array.Empty<int>(),
             PermissionGrants = grants
         };
     }

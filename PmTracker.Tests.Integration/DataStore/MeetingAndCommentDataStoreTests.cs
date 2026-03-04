@@ -26,7 +26,7 @@ public sealed class MeetingAndCommentDataStoreTests
         var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "DeleteOwner");
         var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "DEL_SUB", ownerId);
         var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "DELPRJ");
-        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "UKOL", "DeleteMeeting");
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "DeleteMeeting");
         var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9100);
 
         var attendanceStateId = await dbContext.CiselnikStavuUcasti.Select(x => x.Id).FirstAsync();
@@ -82,7 +82,7 @@ public sealed class MeetingAndCommentDataStoreTests
         await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, leaderId, ProjectRoleCodes.ProjectOwner);
         await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
         await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, leaderId, SubsystemRoleCodes.Lead);
-        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, leaderId, subsystemId, "UKOL", "CommentPerm");
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, leaderId, subsystemId, "U", "CommentPerm");
         var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "DRAFT", meetingNumber: 9200);
 
         var leaderContext = IntegrationTestHelper.BuildUser(

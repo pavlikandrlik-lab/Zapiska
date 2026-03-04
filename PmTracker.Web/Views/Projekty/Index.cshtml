@@ -1,6 +1,8 @@
 @model ProjektyIndexViewModel
 @{
     ViewData["Title"] = "Projekty";
+    var canHideDone = Model.StavyProjektu.Any(x => string.Equals(x.Value, "DONE", StringComparison.OrdinalIgnoreCase));
+    var canHideDeleted = Model.StavyProjektu.Any(x => string.Equals(x.Value, "DELETED", StringComparison.OrdinalIgnoreCase));
 }
 
 <section class="page-header">
@@ -14,27 +16,55 @@
     }
 </section>
 
-<section class="project-grid" data-project-grid>
-    @foreach (var projekt in Model.Projekty)
+<section class="project-list-shell" data-project-list-shell>
+    @if (canHideDone || canHideDeleted)
     {
-        <article class="project-card" data-href="@Url.Action("Detail", new { id = projekt.Id })" role="link" tabindex="0">
-            <div class="project-card-header">
-                <div>
-                    <div class="project-code">@projekt.Zkratka</div>
-                    <h2>@projekt.Nazev</h2>
-                </div>
-                <span class="badge">@projekt.Stav</span>
-            </div>
-            <div class="project-card-actions" data-stop-propagation="true">
-                @if (projekt.CanEdit)
-                {
-                    <button class="btn small" type="button" data-modal-url="@Url.Action("EditProjectModal", "Projekty", new { id = projekt.Id })">Upravit</button>
-                }
-                @if (projekt.CanDelete)
-                {
-                    <button class="btn small ghost" type="button" data-modal-url="@Url.Action("DeleteProjectModal", "Projekty", new { id = projekt.Id })">Smazat</button>
-                }
-            </div>
-        </article>
+        <div class="projects-status-filters" data-projects-status-filters>
+            @if (canHideDone)
+            {
+                <label class="project-status-filter">
+                    <input type="checkbox" data-project-status-hide="DONE" />
+                    <span>Skrýt hotové</span>
+                </label>
+            }
+            @if (canHideDeleted)
+            {
+                <label class="project-status-filter">
+                    <input type="checkbox" data-project-status-hide="DELETED" />
+                    <span>Skrýt smazané</span>
+                </label>
+            }
+        </div>
     }
+
+    <section class="project-grid" data-project-grid>
+        @foreach (var projekt in Model.Projekty)
+        {
+            <article class="project-card"
+                     data-href="@Url.Action("Detail", new { id = projekt.Id })"
+                     data-project-status-code="@projekt.StavKod"
+                     role="link"
+                     tabindex="0">
+                <div class="project-card-header">
+                    <div>
+                        <div class="project-code">@projekt.Zkratka</div>
+                        <h2>@projekt.Nazev</h2>
+                    </div>
+                    <span class="badge">@projekt.Stav</span>
+                </div>
+                <div class="project-card-actions" data-stop-propagation="true">
+                    @if (projekt.CanEdit)
+                    {
+                        <button class="btn small" type="button" data-modal-url="@Url.Action("EditProjectModal", "Projekty", new { id = projekt.Id })">Upravit</button>
+                    }
+                    @if (projekt.CanDelete)
+                    {
+                        <button class="btn small ghost" type="button" data-modal-url="@Url.Action("DeleteProjectModal", "Projekty", new { id = projekt.Id })">Smazat</button>
+                    }
+                </div>
+            </article>
+        }
+    </section>
+
+    <p class="muted projects-status-empty" data-project-grid-empty hidden>Žádné projekty neodpovídají zvolenému filtru.</p>
 </section>

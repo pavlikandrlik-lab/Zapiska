@@ -175,6 +175,46 @@ public sealed class CurrentUserContextPermissionTests
     }
 
     [Fact]
+    public void HasPermission_ShouldReturnFalse_ForProjectWritePermission_WhenProjectIsDeleted()
+    {
+        var user = BuildUser(
+            isSuperAdmin: false,
+            visibleProjectIds: [7],
+            deletedProjectIds: [7],
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.TeamManage,
+                ScopeLevel = "PROJECT",
+                ScopeMode = "INCLUDE",
+                IsAllowed = true,
+                ProjectIds = [7]
+            });
+
+        user.CanAccessProject(7).Should().BeTrue();
+        user.HasPermission(PermissionKeys.TeamManage, 7).Should().BeFalse();
+    }
+
+    [Fact]
+    public void HasPermission_ShouldReturnFalse_ForDeletedProject_EvenForSuperAdmin()
+    {
+        var user = BuildUser(
+            isSuperAdmin: true,
+            visibleProjectIds: [9],
+            deletedProjectIds: [9],
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.RecordsEdit,
+                ScopeLevel = "PROJECT",
+                ScopeMode = "ALL",
+                IsAllowed = true,
+                ProjectIds = Array.Empty<int>()
+            });
+
+        user.CanAccessProject(9).Should().BeTrue();
+        user.HasPermission(PermissionKeys.RecordsEdit, 9).Should().BeFalse();
+    }
+
+    [Fact]
     public void HasPermissionPrefix_ShouldAlwaysReturnTrue_ForSuperAdmin()
     {
         var user = BuildUser(isSuperAdmin: true);
@@ -270,6 +310,7 @@ public sealed class CurrentUserContextPermissionTests
     private static CurrentUserContextViewModel BuildUser(
         bool isSuperAdmin,
         IReadOnlyList<int>? visibleProjectIds = null,
+        IReadOnlyList<int>? deletedProjectIds = null,
         params PermissionGrantViewModel[] grants)
     {
         return new CurrentUserContextViewModel
@@ -284,6 +325,7 @@ public sealed class CurrentUserContextPermissionTests
             IsSuperAdmin = isSuperAdmin,
             RoleKody = Array.Empty<string>(),
             VisibleProjectIds = visibleProjectIds ?? grants.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
+            DeletedProjectIds = deletedProjectIds ?? Array.Empty<int>(),
             PermissionGrants = grants
         };
     }

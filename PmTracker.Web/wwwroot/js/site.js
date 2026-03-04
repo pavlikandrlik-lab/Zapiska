@@ -3276,12 +3276,24 @@
 
         const gap = Number.isFinite(options.gap) ? options.gap : 8;
         const matchWidth = options.matchWidth === true || panel.dataset.floatingMatchWidth === "true";
-        const boundary = {
+        const viewportBoundary = {
             left: 8,
             right: window.innerWidth - 8,
             top: 8,
             bottom: window.innerHeight - 8
         };
+        const modalContainer = anchor.closest("[data-modal-container]");
+        const boundary = modalContainer instanceof HTMLElement
+            ? (() => {
+                const modalRect = modalContainer.getBoundingClientRect();
+                return {
+                    left: Math.max(viewportBoundary.left, modalRect.left + 8),
+                    right: Math.min(viewportBoundary.right, modalRect.right - 8),
+                    top: Math.max(viewportBoundary.top, modalRect.top + 8),
+                    bottom: Math.min(viewportBoundary.bottom, modalRect.bottom - 8)
+                };
+            })()
+            : viewportBoundary;
         const anchorRect = anchor.getBoundingClientRect();
         if (anchorRect.width <= 0 || anchorRect.height <= 0) {
             return;
@@ -3348,6 +3360,38 @@
         panel.style.left = `${Math.round(left)}px`;
         panel.style.top = `${Math.round(top)}px`;
         panel.style.visibility = "";
+    }
+
+    function applyProjectIndexFilters(scope) {
+        const root = scope instanceof ParentNode ? scope : document;
+        const shell = root.querySelector("[data-project-list-shell]");
+        if (!(shell instanceof HTMLElement)) {
+            return;
+        }
+
+        const hiddenStatusCodes = Array.from(shell.querySelectorAll("[data-project-status-hide]"))
+            .filter((input) => input instanceof HTMLInputElement && input.checked)
+            .map((input) => (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase())
+            .filter((value) => value.length > 0);
+
+        let visibleCount = 0;
+        shell.querySelectorAll("[data-project-status-code]").forEach((card) => {
+            if (!(card instanceof HTMLElement)) {
+                return;
+            }
+
+            const statusCode = (card.getAttribute("data-project-status-code") || "").trim().toUpperCase();
+            const shouldHide = hiddenStatusCodes.includes(statusCode);
+            card.hidden = shouldHide;
+            if (!shouldHide) {
+                visibleCount += 1;
+            }
+        });
+
+        const emptyState = shell.querySelector("[data-project-grid-empty]");
+        if (emptyState instanceof HTMLElement) {
+            emptyState.hidden = visibleCount > 0;
+        }
     }
 
     function repositionFloatingPanels() {
@@ -6483,7 +6527,8 @@
 
         switch (scope) {
             case "projekty-index":
-                replaceSelectorFromDocument(nextDoc, "[data-project-grid]");
+                replaceSelectorFromDocument(nextDoc, "[data-project-list-shell]");
+                applyProjectIndexFilters(document);
                 break;
             case "osoby-index":
                 replaceSelectorFromDocument(nextDoc, "[data-osoby-table-card]");
@@ -7001,6 +7046,10 @@
             }
             persistScheduleFilterState(scheduleFilterInput);
         }
+
+        if (target instanceof HTMLInputElement && target.matches("[data-project-status-hide]")) {
+            applyProjectIndexFilters(document);
+        }
     });
 
     document.addEventListener("keydown", (event) => {
@@ -7058,5 +7107,6 @@
     initSettingsAjaxSwitch();
     initRecordFormEnhancements(document);
     initPermissionMetadataBindings(document);
+    applyProjectIndexFilters(document);
     initModalAjaxSubmit();
 })();

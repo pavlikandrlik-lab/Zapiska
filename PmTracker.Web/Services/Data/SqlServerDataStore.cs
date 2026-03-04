@@ -128,6 +128,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var roles = BuildUserRoleCodes(osoba.Id);
         var grants = BuildUserPermissionGrants(osoba.Id);
         var visibleProjectIds = BuildVisibleProjectIds(osoba.Id);
+        var deletedProjectIds = BuildDeletedProjectIds();
         var isSuperadmin = _dbContext.AuthzSuperadmins.AsNoTracking().Any(x => x.OsobaId == osoba.Id)
             || roles.Any(x => Ci.Equals(x, "SUPERADMIN"));
 
@@ -148,6 +149,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             IsSuperAdmin = isSuperadmin,
             RoleKody = roles,
             VisibleProjectIds = visibleProjectIds,
+            DeletedProjectIds = deletedProjectIds,
             PermissionGrants = grants
         };
     }
@@ -172,6 +174,34 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
         return projectRoleProjectIds
             .Concat(subsystemRoleProjectIds)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+    }
+
+    private List<int> BuildDeletedProjectIds()
+    {
+        var directMatches = (
+            from project in _dbContext.Projekty.AsNoTracking()
+            join status in _dbContext.CiselnikStavuProjektu.AsNoTracking() on project.StavId equals status.Id
+            where status.Kod == "DELETED"
+            select project.Id)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+
+        if (directMatches.Count > 0)
+        {
+            return directMatches;
+        }
+
+        return (
+            from project in _dbContext.Projekty.AsNoTracking()
+            join status in _dbContext.CiselnikStavuProjektu.AsNoTracking() on project.StavId equals status.Id
+            select new { project.Id, status.Nazev })
+            .AsEnumerable()
+            .Where(x => _textNormalizer.Normalize(x.Nazev).Contains("smaz"))
+            .Select(x => x.Id)
             .Distinct()
             .OrderBy(x => x)
             .ToList();
@@ -4418,6 +4448,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             IsSuperAdmin = _dbContext.AuthzSuperadmins.AsNoTracking().Any(x => x.OsobaId == selectedUser.Id),
             RoleKody = BuildUserRoleCodes(selectedUser.Id),
             VisibleProjectIds = BuildVisibleProjectIds(selectedUser.Id),
+            DeletedProjectIds = BuildDeletedProjectIds(),
             PermissionGrants = BuildUserPermissionGrants(selectedUser.Id)
         };
 
@@ -5017,7 +5048,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     private static bool IsTaskCategory(string? categoryCode, string? categoryName)
     {
         if (!string.IsNullOrWhiteSpace(categoryCode)
-            && Ci.Equals(categoryCode.Trim(), "UKOL"))
+            && (Ci.Equals(categoryCode.Trim(), "U") || Ci.Equals(categoryCode.Trim(), "UKOL")))
         {
             return true;
         }

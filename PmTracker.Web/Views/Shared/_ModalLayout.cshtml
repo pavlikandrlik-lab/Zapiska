@@ -7,9 +7,11 @@
     }
 
     var variant = ViewData["ModalVariant"]?.ToString();
-    var modalVariantClass = string.Equals(variant, "wide", StringComparison.OrdinalIgnoreCase)
-        ? "modal--wide"
-        : "modal--default";
+    var modalVariantClass = string.Equals(variant, "record-editor", StringComparison.OrdinalIgnoreCase)
+        ? "modal--record-editor"
+        : string.Equals(variant, "wide", StringComparison.OrdinalIgnoreCase)
+            ? "modal--wide"
+            : "modal--default";
 
     var overflowVisible = ViewData["ModalOverflowVisible"] is bool overflowBool
         ? overflowBool

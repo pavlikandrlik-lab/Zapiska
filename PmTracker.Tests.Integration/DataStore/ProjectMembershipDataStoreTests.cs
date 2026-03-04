@@ -178,7 +178,7 @@ public sealed class ProjectMembershipDataStoreTests
 
         await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
         await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, subsystemLeadId, SubsystemRoleCodes.Lead);
-        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "UKOL", "ExportRoleRecord");
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportRoleRecord");
 
         var projectPrint = store.BuildProjectPrintTemplate(projectId, currentUser, autoPrint: false);
         var meetingPrint = store.BuildMeetingPrintTemplate(meetingId, currentUser, autoPrint: false);

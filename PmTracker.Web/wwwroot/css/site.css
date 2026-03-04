@@ -918,6 +918,41 @@
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.project-list-shell {
+    display: grid;
+    gap: 12px;
+}
+
+.projects-status-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: -4px;
+}
+
+.project-status-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--gov-color-border);
+    border-radius: 999px;
+    background: var(--gov-color-surface);
+    font-size: 12px;
+    color: var(--gov-color-muted);
+}
+
+.project-status-filter input {
+    width: auto;
+    margin: 0;
+}
+
+.projects-status-empty {
+    margin: 0;
+    padding: 6px 2px 0;
+}
+
 .project-card {
     border: 1px solid var(--gov-color-border);
     border-radius: 8px;
@@ -2829,6 +2864,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: min(1080px, 100%);
 }
 
+.modal.modal--record-editor {
+    width: min(1180px, 100%);
+}
+
 .modal.modal--overflow-visible {
     overflow: visible;
 }
@@ -2883,6 +2922,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .modal.modal--wide .modal-content {
+    overflow-x: auto;
+}
+
+.modal.modal--record-editor .modal-content {
     overflow-x: auto;
 }
 
@@ -4284,6 +4327,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     accent-color: #84aef7;
 }
 
+.category-u .record-bar,
 .category-ukol .record-bar {
     background: #dc2626;
 }

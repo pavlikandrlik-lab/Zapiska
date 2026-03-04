@@ -59,6 +59,20 @@ public static class PermissionKeys
     ],
         StringComparer.OrdinalIgnoreCase);
 
+    private static readonly HashSet<string> ProjectWriteKeysBlockedForDeletedProjects = new(
+    [
+        ProjectsEdit,
+        ProjectsDelete,
+        RecordsEdit,
+        RecordsScheduleAdd,
+        RecordsScheduleEdit,
+        RecordsCommentSubsystemLead,
+        MeetingsCreate,
+        MeetingsEdit,
+        TeamManage
+    ],
+        StringComparer.OrdinalIgnoreCase);
+
     public static IReadOnlyList<LookupOptionViewModel> BuildLookupOptions()
     {
         return Definitions
@@ -94,6 +108,11 @@ public static class PermissionKeys
         return !string.IsNullOrWhiteSpace(key) && ProjectReadGrantKeys.Contains(key.Trim());
     }
 
+    public static bool IsBlockedForDeletedProject(string? key)
+    {
+        return !string.IsNullOrWhiteSpace(key) && ProjectWriteKeysBlockedForDeletedProjects.Contains(key.Trim());
+    }
+
     private sealed record PermissionKeyDefinition(string Key, string Nazev, string CategoryKod, string ScopeLevel, string Popis);
 }
 
@@ -118,7 +137,13 @@ public sealed class CurrentUserContextViewModel
     public bool IsSuperAdmin { get; init; }
     public required IReadOnlyList<string> RoleKody { get; init; }
     public required IReadOnlyList<int> VisibleProjectIds { get; init; }
+    public required IReadOnlyList<int> DeletedProjectIds { get; init; }
     public required IReadOnlyList<PermissionGrantViewModel> PermissionGrants { get; init; }
+
+    public bool IsProjectReadOnly(int projektId)
+    {
+        return projektId > 0 && DeletedProjectIds.Contains(projektId);
+    }
 
     public bool CanAccessProject(int projektId)
     {
@@ -147,6 +172,11 @@ public sealed class CurrentUserContextViewModel
 
     public bool HasPermission(string permissionKey, int? projektId = null)
     {
+        if (projektId.HasValue && IsProjectReadOnly(projektId.Value) && PermissionKeys.IsBlockedForDeletedProject(permissionKey))
+        {
+            return false;
+        }
+
         if (IsSuperAdmin)
         {
             return true;

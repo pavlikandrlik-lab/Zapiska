@@ -3,7 +3,7 @@
 Tento dokument odděluje:
 
 1. systémové minimum, které zůstává pevně v `PMTracker_insert_sql`,
-2. business číselníky, pro které budou dodávány konkrétní vstupy,
+2. minimální provozní business baseline, která je nově také součástí `PMTracker_insert_sql`,
 3. provozní data, která nejsou součástí baseline seedu.
 
 ## Systémové minimum v baseline seedu
@@ -34,24 +34,25 @@ Poznámka:
 
 ## Vlna 1: business kritické číselníky
 
-Tyto tabulky nejsou nutné pro samotný start webu, ale bez dat rozbíjejí reálné workflow:
+Tyto tabulky nejsou nutné pro samotný start webu, ale bez dat rozbíjejí reálné workflow. Níže je stav po zavedení minimální provozní baseline:
 
 | Pořadí | Tabulka | Co dodat | Povinné sloupce | Stav |
 | --- | --- | --- | --- | --- |
-| 1 | `dbo.ciselnik_kategorii_zaznamu` | seznam kategorií záznamů | `kod`, `nazev` | čeká na vstup |
-| 2 | `dbo.ciselnik_stavu_ukolu` | seznam stavů úkolů | `kod`, `nazev` | čeká na vstup |
-| 3 | `dbo.ciselnik_typu_ukolu` | seznam typů úkolů | `kod`, `nazev` | čeká na vstup |
+| 1 | `dbo.ciselnik_kategorii_zaznamu` | minimálně `U / Úkol` | `kod`, `nazev` | seeded v baseline |
+| 2 | `dbo.ciselnik_stavu_ukolu` | minimálně `OPEN`, `DONE` | `kod`, `nazev` | seeded v baseline |
+| 3 | `dbo.ciselnik_typu_ukolu` | `mp`, `A`, `P`, `RU` | `kod`, `nazev` | seeded v baseline |
 | 4 | `dbo.subsystemy` | globální katalog subsystémů | `kod`, `nazev` | čeká na vstup |
-| 5 | `dbo.ciselnik_stavu_jednani` | workflow stavy jednání | `kod`, `nazev` | čeká na vstup |
-| 6 | `dbo.ciselnik_stavu_ucasti` | stavy účasti pro snapshot jednání | `kod`, `nazev` | čeká na vstup |
-| 7 | `dbo.harmonogram_sablony` | seznam používaných šablon | `nazev`, `barva_zpozdeni` | čeká na vstup |
-| 8 | `dbo.ciselnik_harmonogram_typu` | kroky harmonogramu | `kod`, `nazev`, `krok_poradi`, `je_zpozdeni` | čeká na vstup |
+| 5 | `dbo.ciselnik_stavu_jednani` | minimálně `DRAFT`, `OPEN`, `CLOSED` | `kod`, `nazev` | seeded v baseline |
+| 6 | `dbo.ciselnik_stavu_ucasti` | minimálně `PRESENT`, `ONLINE`, `EXCUSED`, `ABSENT` | `kod`, `nazev` | seeded v baseline |
+| 7 | `dbo.harmonogram_sablony` | aspoň jedna aktivní šablona | `delay_barva_hex`, `is_aktivni` | seeded v baseline |
+| 8 | `dbo.ciselnik_harmonogram_typu` | výchozí kroky harmonogramu | `kod`, `nazev`, `krok_poradi`, `je_zpozdeni` | seeded v baseline |
 
 ### Poznámky k vlně 1
 
 - `dbo.ciselnik_kategorii_zaznamu`
   - ovlivňuje založení záznamu, filtrování i logiku typu záznamu,
-  - aplikace bere první kategorii jako default.
+  - baseline používá `U / Úkol`,
+  - kód `U` je zároveň požadovaný kvůli tisku do PDF.
 - `dbo.ciselnik_stavu_ukolu`
   - ovlivňuje default stav při založení záznamu a historii změn stavu.
 - `dbo.subsystemy`
@@ -67,7 +68,7 @@ Tyto tabulky je vhodné doplnit po první vlně:
 
 | Pořadí | Tabulka | Co dodat | Povinné sloupce | Stav |
 | --- | --- | --- | --- | --- |
-| 9 | `dbo.ciselnik_typu_externich_odkazu` | typy externích odkazů | `kod`, `nazev` | čeká na vstup |
+| 9 | `dbo.ciselnik_typu_externich_odkazu` | `PMP`, `PNF`, `NES` | `kod`, `nazev` | seeded v baseline |
 | 10 | `dbo.ciselnik_vyzvy` | katalog výzev | `kod`, `nazev`, `rok` | čeká na vstup |
 | 11 | `dbo.ciselnik_organizace` | seznam organizací | `kod`, `nazev` | čeká na vstup |
 | 12 | `dbo.ciselnik_organizacni_celky` | seznam organizačních celků | `kod`, `nazev` | čeká na vstup |

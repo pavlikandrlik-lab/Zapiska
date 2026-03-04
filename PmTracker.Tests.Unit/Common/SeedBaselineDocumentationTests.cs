@@ -28,6 +28,31 @@ public sealed class SeedBaselineDocumentationTests
     }
 
     [Fact]
+    public void ProductionBaselineSeed_ShouldContainMinimalOperationalDefaults()
+    {
+        var script = File.ReadAllText(Path.Combine(GetRepositoryRoot(), "PMTracker_insert_sql"));
+
+        script.Should().Contain("N'U', N'Úkol'");
+        script.Should().Contain("N'OPEN', N'Rozpracováno'");
+        script.Should().Contain("N'DONE', N'Hotovo'");
+        script.Should().Contain("N'DRAFT', N'Příprava'");
+        script.Should().Contain("N'CLOSED', N'Uzavřeno'");
+        script.Should().Contain("N'PRESENT', N'Přítomen'");
+        script.Should().Contain("N'ONLINE', N'Online'");
+        script.Should().Contain("N'EXCUSED', N'Omluven'");
+        script.Should().Contain("N'ABSENT', N'Nepřítomen'");
+        script.Should().Contain("N'mp', N'MiniProjekt'");
+        script.Should().Contain("N'A', N'Akce'");
+        script.Should().Contain("N'P', N'Projekt'");
+        script.Should().Contain("N'RU', N'Hlavní úkol rozvoje'");
+        script.Should().Contain("N'PMP', N'Požadavek metodické podpory'");
+        script.Should().Contain("N'PNF', N'Požadavek nové funkcionality'");
+        script.Should().Contain("N'NES', N'Nesrovnalost'");
+        script.Should().Contain("N'HS01_DURATION'");
+        script.Should().Contain("N'HS11_DELAY'");
+    }
+
+    [Fact]
     public void SeedReferenceDataMatrix_ShouldListAllPlannedBusinessTables()
     {
         var document = File.ReadAllText(Path.Combine(GetRepositoryRoot(), "docs", "seed-reference-data-matrix.md"));

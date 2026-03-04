@@ -41,19 +41,33 @@ BEGIN TRY
         INSERT INTO dbo.ciselnik_roli_projektu(kod, nazev, is_locked) VALUES (N'DEV', N'Developer', 0);
 
     -- Task dictionaries
-    IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_kategorii_zaznamu WHERE kod = N'UKOL')
-        INSERT INTO dbo.ciselnik_kategorii_zaznamu(kod, nazev, is_locked) VALUES (N'UKOL', N'Úkol', 1);
+    IF EXISTS (SELECT 1 FROM dbo.ciselnik_kategorii_zaznamu WHERE kod = N'UKOL')
+        AND NOT EXISTS (SELECT 1 FROM dbo.ciselnik_kategorii_zaznamu WHERE kod = N'U')
+        UPDATE dbo.ciselnik_kategorii_zaznamu
+        SET kod = N'U'
+        WHERE kod = N'UKOL';
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_kategorii_zaznamu WHERE kod = N'U')
+        INSERT INTO dbo.ciselnik_kategorii_zaznamu(kod, nazev, is_locked) VALUES (N'U', N'Úkol', 1);
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_kategorii_zaznamu WHERE kod = N'INFO')
         INSERT INTO dbo.ciselnik_kategorii_zaznamu(kod, nazev, is_locked) VALUES (N'INFO', N'Informace', 1);
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_kategorii_zaznamu WHERE kod = N'ROZHODNUTI')
         INSERT INTO dbo.ciselnik_kategorii_zaznamu(kod, nazev, is_locked) VALUES (N'ROZHODNUTI', N'Rozhodnutí', 1);
 
+    IF EXISTS (SELECT 1 FROM dbo.ciselnik_typu_ukolu WHERE kod = N'mP')
+        AND NOT EXISTS (SELECT 1 FROM dbo.ciselnik_typu_ukolu WHERE kod = N'mp')
+        UPDATE dbo.ciselnik_typu_ukolu
+        SET kod = N'mp', nazev = N'MiniProjekt'
+        WHERE kod = N'mP';
+
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_typu_ukolu WHERE kod = N'RU')
         INSERT INTO dbo.ciselnik_typu_ukolu(kod, nazev, is_locked) VALUES (N'RU', N'Hlavní úkol rozvoje', 0);
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_typu_ukolu WHERE kod = N'A')
         INSERT INTO dbo.ciselnik_typu_ukolu(kod, nazev, is_locked) VALUES (N'A', N'Akce', 0);
-    IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_typu_ukolu WHERE kod = N'mP')
-        INSERT INTO dbo.ciselnik_typu_ukolu(kod, nazev, is_locked) VALUES (N'mP', N'Miniprojekt', 0);
+    IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_typu_ukolu WHERE kod = N'P')
+        INSERT INTO dbo.ciselnik_typu_ukolu(kod, nazev, is_locked) VALUES (N'P', N'Projekt', 0);
+    IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_typu_ukolu WHERE kod = N'mp')
+        INSERT INTO dbo.ciselnik_typu_ukolu(kod, nazev, is_locked) VALUES (N'mp', N'MiniProjekt', 0);
 
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_stavu_ukolu WHERE kod = N'OPEN')
         INSERT INTO dbo.ciselnik_stavu_ukolu(kod, nazev, is_final, is_locked) VALUES (N'OPEN', N'Rozpracováno', 0, 1);

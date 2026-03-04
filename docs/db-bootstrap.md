@@ -8,12 +8,20 @@
 ## Poznámky
 
 - Backend očekává schéma `dbo` + `authz`.
-- `PMTracker_insert_sql` je produkční baseline seed. Obsahuje jen systémové minimum:
+- `PMTracker_insert_sql` je produkční baseline seed. Obsahuje:
   - technicky povinné stavy projektu,
   - fixní projektové a subsystemové role,
   - bootstrap organizaci `MO` pro ruční založení první osoby,
-  - katalog oprávnění a systémové authz role.
-- `db_seed_dev_admin.sql` je lokální/dev/test vrstva navíc. Obsahuje demo/business číselníky, lokální osobu `Pavel Admin` a navázání prvního administrátora pro neprodukční provoz.
+  - katalog oprávnění a systémové authz role,
+  - minimální provozní business baseline pro plnou funkčnost UI po fresh installu:
+    - kategorii záznamu `U / Úkol`,
+    - minimální stavy úkolů,
+    - minimální stavy jednání,
+    - minimální stavy účasti,
+    - typy úkolů `mp / MiniProjekt`, `A / Akce`, `P / Projekt`, `RU / Hlavní úkol rozvoje`,
+    - typy externích odkazů `PMP / Požadavek metodické podpory`, `PNF / Požadavek nové funkcionality`, `NES / Nesrovnalost`,
+    - výchozí aktivní harmonogramovou šablonu a její kroky.
+- `db_seed_dev_admin.sql` je lokální/dev/test vrstva navíc. Obsahuje demo data, lokální osobu `Pavel Admin`, další business číselníky a navázání prvního administrátora pro neprodukční provoz.
 - Produkční baseline záměrně nevytváří žádnou osobu, projekt ani superadmin účet.
 - Pro upgrade existující DB na release `1.1.0` spusťte navíc `db_upgrade_1_1_0_signed_schedule_actual.sql`.
 - `dbo.osoby.Guid_AD` musí být `uniqueidentifier NULL`.

@@ -230,13 +230,49 @@ public sealed class UserContextResolver : IUserContextResolver
             .ToListAsync(cancellationToken));
         grants.AddRange(implicitProjectRoleGrants);
 
-        var visibleProjectIds = await _dbContext.ObsazeniProjektu
+        var projectRoleProjectIds = await _dbContext.ObsazeniProjektu
             .AsNoTracking()
             .Where(x => x.OsobaId == osoba.Id && !x.DatumOdebrani.HasValue)
             .Select(x => x.ProjektId)
+            .ToListAsync(cancellationToken);
+
+        var subsystemRoleProjectIds = await (
+                from role in _dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
+                join projectSubsystem in _dbContext.ProjektSubsystemy.AsNoTracking() on role.ProjektSubsystemId equals projectSubsystem.Id
+                where role.OsobaId == osoba.Id
+                    && !role.DatumOdebrani.HasValue
+                    && !projectSubsystem.DatumOdebrani.HasValue
+                select projectSubsystem.ProjektId)
+            .ToListAsync(cancellationToken);
+
+        var visibleProjectIds = projectRoleProjectIds
+            .Concat(subsystemRoleProjectIds)
             .Distinct()
             .OrderBy(x => x)
+            .ToList();
+
+        var deletedProjectIds = await _dbContext.Projekty
+            .AsNoTracking()
+            .Join(
+                _dbContext.CiselnikStavuProjektu.AsNoTracking(),
+                project => project.StavId,
+                status => status.Id,
+                (project, status) => new
+                {
+                    project.Id,
+                    status.Kod,
+                    status.Nazev
+                })
             .ToListAsync(cancellationToken);
+
+        var resolvedDeletedProjectIds = deletedProjectIds
+            .Where(x =>
+                string.Equals(x.Kod, "DELETED", StringComparison.OrdinalIgnoreCase) ||
+                _textNormalizer.Normalize(x.Nazev).Contains("smaz"))
+            .Select(x => x.Id)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
 
         var displayName = BuildDisplayName(osoba.Titul, osoba.Jmeno, osoba.Prijmeni, osoba.Id);
 
@@ -252,6 +288,7 @@ public sealed class UserContextResolver : IUserContextResolver
             IsSuperAdmin = isSuperAdmin,
             RoleKody = roleCodes,
             VisibleProjectIds = visibleProjectIds,
+            DeletedProjectIds = resolvedDeletedProjectIds,
             PermissionGrants = grants
         };
 

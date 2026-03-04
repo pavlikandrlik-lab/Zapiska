@@ -69,7 +69,7 @@ public sealed class AjaxControllersTests
         var ownerId = await _fixture.EnsurePersonAsync("ApiCommentOwner");
         var projectId = await _fixture.EnsureProjectAsync("APIMT3");
         var subsystemId = await _fixture.EnsureSubsystemAsync("APISUB", ownerId);
-        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "UKOL", "Api Comment Record");
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "Api Comment Record");
         var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 125);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });

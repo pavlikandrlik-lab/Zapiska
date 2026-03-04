@@ -14,7 +14,7 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 5,
             visibleProjectIds: [2],
-            new PermissionGrantViewModel
+            grants: new PermissionGrantViewModel
             {
                 PermissionKey = PermissionKeys.RecordsEdit,
                 ScopeLevel = "PROJECT",
@@ -32,7 +32,7 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 12,
             visibleProjectIds: [2],
-            new PermissionGrantViewModel
+            grants: new PermissionGrantViewModel
             {
                 PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
                 ScopeLevel = "PROJECT",
@@ -52,7 +52,7 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 20,
             visibleProjectIds: [9],
-            new PermissionGrantViewModel
+            grants: new PermissionGrantViewModel
             {
                 PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
                 ScopeLevel = "PROJECT",
@@ -65,9 +65,30 @@ public sealed class CommentAuthorizationPolicyTests
         _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 30).Should().BeFalse();
     }
 
+    [Fact]
+    public void CanCommentAsSubsystemLeader_ShouldReturnFalse_ForDeletedProject()
+    {
+        var user = BuildUser(
+            osobaId: 12,
+            visibleProjectIds: [2],
+            deletedProjectIds: [2],
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
+                ScopeLevel = "PROJECT",
+                ScopeMode = "INCLUDE",
+                IsAllowed = true,
+                ProjectIds = new[] { 2 }
+            });
+
+        _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12]).Should().BeFalse();
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12]).Should().BeFalse();
+    }
+
     private static CurrentUserContextViewModel BuildUser(
         int osobaId,
         IReadOnlyList<int>? visibleProjectIds = null,
+        IReadOnlyList<int>? deletedProjectIds = null,
         params PermissionGrantViewModel[] grants)
     {
         return new CurrentUserContextViewModel
@@ -82,6 +103,7 @@ public sealed class CommentAuthorizationPolicyTests
             IsSuperAdmin = false,
             RoleKody = Array.Empty<string>(),
             VisibleProjectIds = visibleProjectIds ?? grants.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
+            DeletedProjectIds = deletedProjectIds ?? Array.Empty<int>(),
             PermissionGrants = grants
         };
     }

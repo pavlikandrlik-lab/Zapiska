@@ -31,7 +31,8 @@ internal static class IntegrationTestHelper
         int osobaId,
         bool isSuperAdmin = false,
         IEnumerable<PermissionGrantViewModel>? grants = null,
-        IEnumerable<int>? visibleProjectIds = null)
+        IEnumerable<int>? visibleProjectIds = null,
+        IEnumerable<int>? deletedProjectIds = null)
     {
         var grantList = grants?.ToList() ?? new List<PermissionGrantViewModel>();
         return new CurrentUserContextViewModel
@@ -46,6 +47,7 @@ internal static class IntegrationTestHelper
             IsSuperAdmin = isSuperAdmin,
             RoleKody = Array.Empty<string>(),
             VisibleProjectIds = visibleProjectIds?.Distinct().ToArray() ?? grantList.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
+            DeletedProjectIds = deletedProjectIds?.Distinct().ToArray() ?? Array.Empty<int>(),
             PermissionGrants = grantList
         };
     }

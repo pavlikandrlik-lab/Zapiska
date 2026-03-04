@@ -90,7 +90,15 @@ sqlcmd -S $SQL_INSTANCE -E -d $DB_NAME -b -i "$DEPLOY_SQL_DIR\PMTracker_insert_s
 - povinné stavy projektu `PLAN/RUN/DONE/DELETED`,
 - fixní projektové a subsystemové role,
 - základní seed role/permission,
-- bootstrap organizaci `MO` pro ruční založení první osoby.
+- bootstrap organizaci `MO` pro ruční založení první osoby,
+- minimální provozní business baseline:
+  - kategorie záznamu `U / Úkol`,
+  - výchozí stavy úkolů,
+  - výchozí stavy jednání,
+  - výchozí stavy účasti,
+  - typy úkolů `mp / MiniProjekt`, `A / Akce`, `P / Projekt`, `RU / Hlavní úkol rozvoje`,
+  - typy externích odkazů `PMP / Požadavek metodické podpory`, `PNF / Požadavek nové funkcionality`, `NES / Nesrovnalost`,
+  - aktivní harmonogramovou šablonu a její výchozí kroky.
 
 ### 4.2 Ověření po SQL instalaci
 

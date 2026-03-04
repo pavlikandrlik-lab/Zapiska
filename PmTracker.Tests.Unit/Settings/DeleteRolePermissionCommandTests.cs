@@ -38,6 +38,7 @@ public sealed class DeleteRolePermissionCommandTests
             OrganizacniCelekKod = "IT",
             RoleKody = [],
             VisibleProjectIds = [],
+            DeletedProjectIds = [],
             PermissionGrants = []
         };
 

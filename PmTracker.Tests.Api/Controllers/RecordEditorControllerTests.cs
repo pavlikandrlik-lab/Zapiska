@@ -29,7 +29,7 @@ public sealed class RecordEditorControllerTests
         var ownerId = await _fixture.EnsurePersonAsync("ApiEditPresenter");
         var projectId = await _fixture.EnsureProjectAsync("APIRED1");
         var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDSUB", ownerId);
-        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "UKOL", "API presentation record");
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API presentation record");
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var url = $"/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}";
@@ -58,7 +58,7 @@ public sealed class RecordEditorControllerTests
         var ownerId = await _fixture.EnsurePersonAsync("ApiEditSaver");
         var projectId = await _fixture.EnsureProjectAsync("APIRED2");
         var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDSUB2", ownerId);
-        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "UKOL", "API save page record");
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API save page record");
 
         await using var dbContext = _fixture.CreateDbContext();
         var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
@@ -128,7 +128,7 @@ public sealed class RecordEditorControllerTests
         var ownerId = await _fixture.EnsurePersonAsync("ApiScheduleSaver");
         var projectId = await _fixture.EnsureProjectAsync("APIRED3");
         var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDSUB3", ownerId);
-        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "UKOL", "API signed schedule record");
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API signed schedule record");
 
         await using var dbContext = _fixture.CreateDbContext();
         var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
