@@ -1,0 +1,51 @@
+@model DeleteRecordModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "record-delete-modal-title";
+    var returnUrl = ViewData["DeleteRecordReturnUrl"] as string;
+    var uiContext = ViewData["DeleteRecordUiContext"] as string ?? "project";
+    var tab = ViewData["DeleteRecordTab"] as string ?? "zaznamy";
+}
+
+<h2 id="record-delete-modal-title">@Model.Title</h2>
+
+<div class="alert alert-error">
+    Chystáte se natrvalo smazat záznam <strong>#@Model.CisloViditelne - @Model.Nazev</strong>.
+</div>
+<p class="muted">Budou smazána i navázaná vyjádření, externí vazby, spolupráce, harmonogram a historie změn. Tato akce je nevratná.</p>
+
+<div class="record-delete-summary">
+    <div><span class="label">Kategorie:</span> @Model.Kategorie</div>
+    <div><span class="label">Stav:</span> @Model.Stav</div>
+    <div><span class="label">Vyjádření:</span> @Model.VyjadreniCount</div>
+    <div><span class="label">Externí vazby:</span> @Model.ExterniVazbyCount</div>
+    <div><span class="label">Spolupráce:</span> @Model.SpolupraceCount</div>
+    <div><span class="label">Harmonogram:</span> @Model.HarmonogramCount</div>
+</div>
+
+<form class="form-grid"
+      asp-controller="Zaznamy"
+      asp-action="DeleteRecord"
+      method="post"
+      data-ajax-submit="true"
+      data-confirm-submit-toggle="true">
+    <input type="hidden" name="ProjektId" value="@Model.Command.ProjektId" />
+    <input type="hidden" name="ZaznamId" value="@Model.Command.ZaznamId" />
+    <input type="hidden" name="returnUrl" value="@returnUrl" />
+    <input type="hidden" name="tab" value="@tab" />
+    <input type="hidden" name="uiContext" value="@uiContext" />
+
+    <label class="confirm-delete-check">
+        <input type="checkbox" name="PotvrditSmazani" value="true" data-confirm-submit-checkbox />
+        Opravdu chci záznam smazat natrvalo
+    </label>
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = "Potvrdit trvalé smazání",
+            SubmitCssClass = "btn ghost danger",
+            DisableSubmit = true
+        })
+</form>

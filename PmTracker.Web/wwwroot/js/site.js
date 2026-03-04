@@ -1619,6 +1619,7 @@
         const root = scope instanceof HTMLElement || scope instanceof Document ? scope : document;
         root
             .querySelectorAll(
+                ".schedule-overview-segment[data-rainbow-segment-label-short], "
                 ".schedule-layered-segment[data-rainbow-segment-label-short], "
                 + ".schedule-mini-gantt-segment[data-rainbow-segment-label-short]")
             .forEach((segment) => {
@@ -4839,6 +4840,29 @@
 
             editor.dataset.externalLinksReady = "true";
             const rowNamePattern = /ExterniVazby\[\d+\]\./g;
+            const estimatedPriceTypes = new Set(["PMP", "PNF"]);
+
+            const syncEstimatedPriceField = (row) => {
+                if (!(row instanceof HTMLElement)) {
+                    return;
+                }
+
+                const typeSelect = row.querySelector("[data-external-type-select]");
+                const priceField = row.querySelector("[data-external-price-field]");
+                const priceInput = row.querySelector("[data-external-price-input]");
+                if (!(typeSelect instanceof HTMLSelectElement)
+                    || !(priceField instanceof HTMLElement)
+                    || !(priceInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                const shouldShow = estimatedPriceTypes.has(String(typeSelect.value || "").trim().toUpperCase());
+                priceField.hidden = !shouldShow;
+                priceInput.disabled = !shouldShow;
+                if (!shouldShow) {
+                    priceInput.value = "";
+                }
+            };
 
             const reindexRows = () => {
                 const rows = Array.from(rowsContainer.querySelectorAll("[data-external-row]"))
@@ -4880,7 +4904,28 @@
 
                 rowsContainer.appendChild(row);
                 initCustomDatePickers(row);
+                syncEstimatedPriceField(row);
                 reindexRows();
+            });
+
+            rowsContainer.querySelectorAll("[data-external-row]").forEach((row) => {
+                if (row instanceof HTMLElement) {
+                    syncEstimatedPriceField(row);
+                }
+            });
+
+            rowsContainer.addEventListener("change", (event) => {
+                const target = event.target;
+                if (!(target instanceof Element)) {
+                    return;
+                }
+
+                const typeSelect = target.closest("[data-external-type-select]");
+                if (!(typeSelect instanceof HTMLSelectElement)) {
+                    return;
+                }
+
+                syncEstimatedPriceField(typeSelect.closest("[data-external-row]"));
             });
 
             rowsContainer.addEventListener("click", (event) => {
@@ -4961,7 +5006,7 @@
     }
 
     function initRecordOwnerAutofill(scope) {
-        scope.querySelectorAll('form[data-record-owner-autofill="true"][data-is-create="true"]').forEach((form) => {
+        scope.querySelectorAll('form[data-record-owner-autofill="true"]').forEach((form) => {
             if (!(form instanceof HTMLFormElement) || form.dataset.recordOwnerAutofillReady === "true") {
                 return;
             }
@@ -4978,6 +5023,17 @@
 
             form.dataset.recordOwnerAutofillReady = "true";
 
+            const clearOwnerPicker = () => {
+                if (ownerHiddenInput instanceof HTMLInputElement) {
+                    ownerHiddenInput.value = "";
+                }
+
+                if (ownerInput instanceof HTMLInputElement) {
+                    ownerInput.value = "";
+                    ownerInput.setCustomValidity("");
+                }
+            };
+
             const applyOwnerFromSubsystem = () => {
                 const selectedOption = subsystemSelect.selectedOptions[0];
                 if (!(selectedOption instanceof HTMLOptionElement)) {
@@ -4986,6 +5042,7 @@
 
                 const ownerId = (selectedOption.dataset.ownerId || "").trim();
                 if (!ownerId) {
+                    clearOwnerPicker();
                     return;
                 }
 
@@ -5013,7 +5070,7 @@
                         }
                     }
                 }
-            }
+            };
 
             subsystemSelect.addEventListener("change", () => {
                 applyOwnerFromSubsystem();
@@ -5198,7 +5255,9 @@
                     delayInc: row.querySelector("[data-schedule-delay-inc]"),
                     delayDec: row.querySelector("[data-schedule-delay-dec]"),
                     plannedBar: row.querySelector("[data-schedule-step-planned]"),
-                    actualBar: row.querySelector("[data-schedule-step-actual]")
+                    actualProgressBar: row.querySelector("[data-schedule-step-actual-progress]"),
+                    varianceNegativeBar: row.querySelector("[data-schedule-step-variance-negative]"),
+                    variancePositiveBar: row.querySelector("[data-schedule-step-variance-positive]")
                 }));
         }
 
@@ -5441,8 +5500,9 @@
         renderStepRows(plan, actual, state) {
             const maxStepDays = Math.max(
                 1,
-                ...state.map((item) => Math.max(0, item.duration + item.delay)),
-                ...state.map((item) => item.duration)
+                ...state.map((item) => item.duration),
+                ...state.map((item) => item.duration + Math.max(item.delay, 0)),
+                ...state.map((item) => Math.abs(item.delay))
             );
 
             this.rows.forEach((entry, index) => {
@@ -5462,12 +5522,33 @@
                 }
 
                 const plannedWidth = Math.max(0, Math.min(100, Math.round((state[index].duration * 100) / maxStepDays)));
-                const actualWidth = Math.max(0, Math.min(100, Math.round((Math.max(0, state[index].duration + state[index].delay) * 100) / maxStepDays)));
+                const actualProgressDays = Math.max(0, Math.min(state[index].duration, state[index].duration + state[index].delay));
+                const actualProgressWidth = Math.max(0, Math.min(100, Math.round((actualProgressDays * 100) / maxStepDays)));
+                const varianceWidth = Math.max(0, Math.min(100, Math.round((Math.abs(state[index].delay) * 100) / maxStepDays)));
                 if (entry.plannedBar instanceof HTMLElement) {
                     entry.plannedBar.style.width = `${plannedWidth}%`;
                 }
-                if (entry.actualBar instanceof HTMLElement) {
-                    entry.actualBar.style.width = `${actualWidth}%`;
+                if (entry.actualProgressBar instanceof HTMLElement) {
+                    entry.actualProgressBar.style.width = `${actualProgressWidth}%`;
+                    entry.actualProgressBar.hidden = actualProgressWidth <= 0;
+                }
+                if (entry.varianceNegativeBar instanceof HTMLElement) {
+                    if (state[index].delay < 0 && varianceWidth > 0) {
+                        entry.varianceNegativeBar.style.width = `${varianceWidth}%`;
+                        entry.varianceNegativeBar.hidden = false;
+                    } else {
+                        entry.varianceNegativeBar.style.width = "0%";
+                        entry.varianceNegativeBar.hidden = true;
+                    }
+                }
+                if (entry.variancePositiveBar instanceof HTMLElement) {
+                    if (state[index].delay > 0 && varianceWidth > 0) {
+                        entry.variancePositiveBar.style.width = `${varianceWidth}%`;
+                        entry.variancePositiveBar.hidden = false;
+                    } else {
+                        entry.variancePositiveBar.style.width = "0%";
+                        entry.variancePositiveBar.hidden = true;
+                    }
                 }
                 entry.row.classList.toggle("schedule-step-has-delay", state[index].delay !== 0);
             });
@@ -5575,8 +5656,7 @@
                 if (entry.delayInput instanceof HTMLInputElement) {
                     entry.delayInput.addEventListener("input", () => this.recalcFromDelay(index));
                     entry.delayInput.addEventListener("change", () => {
-                        const currentDuration = this.normalizeInt(entry.durationInput);
-                        entry.delayInput.value = String(this.normalizeIntWithMinimum(entry.delayInput, -currentDuration));
+                        entry.delayInput.value = String(this.normalizeSignedInt(entry.delayInput));
                         this.recalcFromDelay(index);
                     });
                 }

@@ -1,3 +1,4 @@
+@using System.Globalization
 @model ZaznamCardViewModel
 @{
     var otevrenaJednani = ViewData["OtevrenaJednani"] as IReadOnlyList<JednaniOptionViewModel> ?? Array.Empty<JednaniOptionViewModel>();
@@ -146,6 +147,9 @@
                     {
                         var odkaz = Model.ExterniOdkazy[i];
                         var tooltipId = $"chip-tooltip-{Model.Id}-{i}";
+                        var estimatedPriceLabel = odkaz.PredpokladanaCena.HasValue
+                            ? $"{odkaz.PredpokladanaCena.Value.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ"))} Kč"
+                            : null;
                         <span class="chip-wrap">
                             @if (!string.IsNullOrWhiteSpace(odkaz.ServiceDeskUrl))
                             {
@@ -161,6 +165,10 @@
                                     {
                                         <span class="chip-sub">@odkaz.Vyzva</span>
                                     }
+                                    @if (!string.IsNullOrWhiteSpace(estimatedPriceLabel))
+                                    {
+                                        <span class="chip-sub">@estimatedPriceLabel</span>
+                                    }
                                 </a>
                             }
                             else
@@ -171,6 +179,10 @@
                                     @if (!string.IsNullOrWhiteSpace(odkaz.Vyzva))
                                     {
                                         <span class="chip-sub">@odkaz.Vyzva</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(estimatedPriceLabel))
+                                    {
+                                        <span class="chip-sub">@estimatedPriceLabel</span>
                                     }
                                 </span>
                             }
@@ -183,6 +195,10 @@
                                 <span class="chip-tooltip-row">
                                     <span>Výzva:</span>
                                     <strong>@(string.IsNullOrWhiteSpace(odkaz.Vyzva) ? "-" : odkaz.Vyzva)</strong>
+                                </span>
+                                <span class="chip-tooltip-row">
+                                    <span>Předpokl. cena:</span>
+                                    <strong>@(string.IsNullOrWhiteSpace(estimatedPriceLabel) ? "-" : estimatedPriceLabel)</strong>
                                 </span>
                                 <span class="chip-tooltip-row">
                                     <span>Objednáno:</span>

@@ -61,6 +61,21 @@ public sealed class ZaznamyController : BaseController
     }
 
     [HttpGet]
+    public IActionResult DeleteRecordModal(int projektId, int zaznamId, string? returnUrl, string? uiContext, string? tab)
+    {
+        if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
+        {
+            return Forbid();
+        }
+
+        var model = _recordsService.BuildDeleteRecordModal(projektId, zaznamId);
+        ViewData["DeleteRecordReturnUrl"] = NormalizeLocalReturnUrl(returnUrl);
+        ViewData["DeleteRecordUiContext"] = string.Equals(uiContext, "page", StringComparison.OrdinalIgnoreCase) ? "page" : "project";
+        ViewData["DeleteRecordTab"] = NormalizeDeleteTab(tab);
+        return View("~/Views/Projekty/DeleteRecordModal.cshtml", model);
+    }
+
+    [HttpGet]
     public IActionResult AssignMeetingIdentifierModal(int projektId, int zaznamId)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
@@ -145,6 +160,45 @@ public sealed class ZaznamyController : BaseController
                     message: "Záznam byl uložen.");
             },
             operation: () => savedRecordId = _recordsService.SaveRecord(command, CurrentUserContext));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult DeleteRecord(DeleteRecordCommand command, string? returnUrl, string? uiContext, string? tab)
+    {
+        var normalizedTab = NormalizeDeleteTab(tab);
+        var redirectUrl = BuildDeleteRecordReturnUrl(command.ProjektId, returnUrl, uiContext, normalizedTab);
+        var redirect = () => Redirect(redirectUrl);
+
+        return ExecuteValidatedCommand(
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId),
+            invalidAjaxMessage: "Záznam nelze smazat.",
+            invalidFallbackMessage: "potvrďte trvalé smazání záznamu.",
+            onInvalidRedirect: redirect,
+            onSuccessRedirect: redirect,
+            onAjaxSuccess: () =>
+            {
+                if (string.Equals(uiContext, "page", StringComparison.OrdinalIgnoreCase))
+                {
+                    return AjaxSuccessResult(
+                        refreshScope: "page",
+                        refreshUrl: redirectUrl,
+                        projectId: command.ProjektId,
+                        uiContext: "project",
+                        tab: normalizedTab,
+                        message: "Záznam byl smazán.");
+                }
+
+                return AjaxSuccessResult(
+                    refreshScope: "projekty-detail-zaznamy-preserve",
+                    refreshUrl: NormalizeLocalReturnUrl(returnUrl)
+                        ?? (Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = normalizedTab }) ?? $"/Projekty/Detail/{command.ProjektId}?tab={normalizedTab}"),
+                    projectId: command.ProjektId,
+                    uiContext: "project",
+                    tab: normalizedTab,
+                    message: "Záznam byl smazán.");
+            },
+            operation: () => _recordsService.DeleteRecord(command, CurrentUserContext));
     }
 
     [HttpPost]
@@ -372,6 +426,28 @@ public sealed class ZaznamyController : BaseController
         => string.Equals(editorTab, EditorTabSchedule, StringComparison.OrdinalIgnoreCase)
             ? "harmonogram"
             : "zaznamy";
+
+    private static string NormalizeDeleteTab(string? tab)
+    {
+        if (string.Equals(tab, "harmonogram", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tab, "gant", StringComparison.OrdinalIgnoreCase))
+        {
+            return "harmonogram";
+        }
+
+        return "zaznamy";
+    }
+
+    private string BuildDeleteRecordReturnUrl(int projektId, string? returnUrl, string? uiContext, string fallbackTab)
+    {
+        if (string.Equals(uiContext, "page", StringComparison.OrdinalIgnoreCase))
+        {
+            return BuildRestoreReturnUrl(projektId, returnUrl, fallbackTab);
+        }
+
+        return NormalizeLocalReturnUrl(returnUrl)
+            ?? (Url.Action("Detail", "Projekty", new { id = projektId, tab = fallbackTab }) ?? $"/Projekty/Detail/{projektId}?tab={fallbackTab}");
+    }
 
     private string BuildRestoreReturnUrl(int projektId, string? returnUrl, string fallbackTab)
     {

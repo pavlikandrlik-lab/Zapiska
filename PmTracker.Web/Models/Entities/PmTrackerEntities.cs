@@ -265,6 +265,7 @@ public sealed class ZaznamExterniOdkazEntity
     public int ZaznamId { get; set; }
     public int TypOdkazuId { get; set; }
     public string Cislo { get; set; } = string.Empty;
+    public decimal? PredpokladanaCena { get; set; }
     public DateTime? DatumObjednani { get; set; }
     public DateTime? PlanDodani { get; set; }
     public DateTime? DatumDodani { get; set; }

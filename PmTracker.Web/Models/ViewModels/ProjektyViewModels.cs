@@ -143,6 +143,7 @@ public sealed class ExterniOdkazViewModel
     public required string Typ { get; init; }
     public string? TypNazev { get; init; }
     public required string Cislo { get; init; }
+    public decimal? PredpokladanaCena { get; init; }
     public string? ServiceDeskTicketId { get; init; }
     public string? ServiceDeskUrl { get; init; }
     public string? Vyzva { get; init; }
@@ -341,6 +342,7 @@ public sealed class ZaznamEditViewModel
     public required string HarmonogramDelayBarvaHex { get; init; }
     public required IReadOnlyList<HarmonogramKrokEditViewModel> HarmonogramKroky { get; init; }
     public required HarmonogramSouhrnViewModel HarmonogramSouhrn { get; init; }
+    public required IReadOnlyList<SpolupracovnikOptionViewModel> DostupniVlastnici { get; init; }
     public required IReadOnlyList<SpolupracovnikOptionViewModel> DostupniSpolupracovnici { get; init; }
     public required IReadOnlyList<int> VybraniSpolupracovniciIds { get; init; }
     public required IReadOnlyList<ExterniOdkazEditViewModel> ExterniVazby { get; init; }
@@ -408,6 +410,7 @@ public sealed class ExterniOdkazEditViewModel
     public int Id { get; set; }
     public string? Typ { get; set; }
     public string? Cislo { get; set; }
+    public decimal? PredpokladanaCena { get; set; }
     public string? Vyzva { get; set; }
     public DateTime? DatumObjednani { get; set; }
     public DateTime? PlanDodani { get; set; }

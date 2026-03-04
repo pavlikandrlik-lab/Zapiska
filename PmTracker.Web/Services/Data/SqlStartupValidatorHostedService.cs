@@ -90,6 +90,12 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             throw new InvalidOperationException("V DB chybí sloupec dbo.vyjadreni.autor_osoba_id. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
         }
 
+        var hasEstimatedExternalLinkPriceColumn = await HasColumnAsync(dbContext, "dbo.zaznam_externi_odkazy", "predpokladana_cena", cancellationToken);
+        if (!hasEstimatedExternalLinkPriceColumn)
+        {
+            throw new InvalidOperationException("V DB chybí sloupec dbo.zaznam_externi_odkazy.predpokladana_cena. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_1_external_link_estimated_price.sql.");
+        }
+
         var hasLegacyScheduleConstraint = await HasCheckConstraintAsync(
             dbContext,
             "dbo.zaznam_harmonogram_hodnoty",

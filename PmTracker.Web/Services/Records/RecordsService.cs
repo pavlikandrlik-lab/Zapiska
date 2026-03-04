@@ -20,7 +20,11 @@ public sealed class RecordsService : IRecordsService
 
     public ZaznamEditViewModel BuildZaznamCreate(int projektId) => _dataStore.BuildZaznamCreate(projektId);
 
+    public DeleteRecordModalViewModel BuildDeleteRecordModal(int projektId, int zaznamId) => _dataStore.BuildDeleteRecordModal(projektId, zaznamId);
+
     public int SaveRecord(SaveRecordCommand command, CurrentUserContextViewModel currentUser) => _dataStore.SaveRecord(command, currentUser);
+
+    public void DeleteRecord(DeleteRecordCommand command, CurrentUserContextViewModel currentUser) => _dataStore.DeleteRecord(command, currentUser);
 
     public void AssignMeetingIdentifier(AssignMeetingIdentifierCommand command, CurrentUserContextViewModel currentUser) => _dataStore.AssignMeetingIdentifier(command, currentUser);
 

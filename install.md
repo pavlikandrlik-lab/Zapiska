@@ -67,6 +67,7 @@ Přenést na server:
 - obsah `publish/fdd` (nebo `publish/win-x64`),
 - SQL skript `/Users/Pavel.Andrlik/Documents/PM Tracker/PMTracker_insert_sql`.
 - při upgrade existující DB i `/Users/Pavel.Andrlik/Documents/PM Tracker/db_upgrade_1_1_0_signed_schedule_actual.sql`.
+- při upgrade existující DB i `/Users/Pavel.Andrlik/Documents/PM Tracker/db_upgrade_1_1_1_external_link_estimated_price.sql`.
 
 ---
 
@@ -125,6 +126,7 @@ Pokud nenasazuješ čistou databázi, ale upgrade release `1.1.0`, spusť po sta
 
 ```powershell
 sqlcmd -S $SQL_INSTANCE -E -d $DB_NAME -b -i "$DEPLOY_SQL_DIR\db_upgrade_1_1_0_signed_schedule_actual.sql"
+sqlcmd -S $SQL_INSTANCE -E -d $DB_NAME -b -i "$DEPLOY_SQL_DIR\db_upgrade_1_1_1_external_link_estimated_price.sql"
 ```
 
 Patch je idempotentní a jen odstraní legacy constraint `CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative`, který by jinak blokoval záporné hodnoty harmonogramové skutečnosti.

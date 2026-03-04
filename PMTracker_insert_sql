@@ -323,11 +323,13 @@ CREATE TABLE dbo.zaznam_externi_odkazy (
     zaznam_id int NOT NULL,
     typ_odkazu_id int NOT NULL,
     cislo nvarchar(255) NOT NULL,
+    predpokladana_cena decimal(18,2) NULL,
     datum_objednani date NULL,
     plan_dodani date NULL,
     datum_dodani date NULL,
     datum_prevzeti date NULL,
-    vyzva int NULL
+    vyzva int NULL,
+    CONSTRAINT CK_zaznam_externi_odkazy_predpokladana_cena_nonnegative CHECK (predpokladana_cena IS NULL OR predpokladana_cena >= 0)
 );
 GO
 

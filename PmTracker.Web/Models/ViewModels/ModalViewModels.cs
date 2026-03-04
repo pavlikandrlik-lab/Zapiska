@@ -64,6 +64,20 @@ public sealed class DeleteProjectModalViewModel
     public required string ProjektStav { get; init; }
 }
 
+public sealed class DeleteRecordModalViewModel
+{
+    public required string Title { get; init; }
+    public required DeleteRecordCommand Command { get; init; }
+    public required string CisloViditelne { get; init; }
+    public required string Nazev { get; init; }
+    public required string Kategorie { get; init; }
+    public required string Stav { get; init; }
+    public int VyjadreniCount { get; init; }
+    public int ExterniVazbyCount { get; init; }
+    public int SpolupraceCount { get; init; }
+    public int HarmonogramCount { get; init; }
+}
+
 public sealed class AssignMeetingIdentifierModalViewModel
 {
     public required string Title { get; init; }

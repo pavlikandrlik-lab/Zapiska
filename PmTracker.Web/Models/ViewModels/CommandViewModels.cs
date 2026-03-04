@@ -79,6 +79,18 @@ public sealed class SaveRecordCommand
     public int? JednaniIdProCislo { get; set; }
 }
 
+public sealed class DeleteRecordCommand
+{
+    [Required]
+    public int ProjektId { get; set; }
+
+    [Required]
+    public int ZaznamId { get; set; }
+
+    [Range(typeof(bool), "true", "true", ErrorMessage = "Potvrďte trvalé smazání záznamu.")]
+    public bool PotvrditSmazani { get; set; }
+}
+
 public sealed class AssignMeetingIdentifierCommand
 {
     [Required]
@@ -96,6 +108,7 @@ public sealed class SaveRecordExterniVazbaCommand
     public int Id { get; set; }
     public string? Typ { get; set; }
     public string? Cislo { get; set; }
+    public string? PredpokladanaCena { get; set; }
     public string? Vyzva { get; set; }
     public DateTime? DatumObjednani { get; set; }
     public DateTime? PlanDodani { get; set; }

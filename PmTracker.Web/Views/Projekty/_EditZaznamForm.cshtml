@@ -1,3 +1,4 @@
+@using System.Globalization
 @model ZaznamEditViewModel
 @{
     var selectedOwnerLabel = Model.Vlastnici
@@ -24,6 +25,19 @@
     var requiresMeetingForNumber = Model.IsCreate && Model.PouzivatIdentJednani;
     var createBlockedByMissingMeeting = requiresMeetingForNumber && !Model.MaDostupneJednaniProCislo;
     var isPagePresentation = string.Equals(Model.Presentation, "page", StringComparison.OrdinalIgnoreCase);
+    var deleteFallbackTab = string.Equals(defaultEditorTab, "schedule", StringComparison.OrdinalIgnoreCase)
+        ? "harmonogram"
+        : "zaznamy";
+    var deleteRecordModalUrl = !Model.IsCreate && canEditRecord
+        ? Url.Action("DeleteRecordModal", "Zaznamy", new
+        {
+            projektId = Model.ProjektId,
+            zaznamId = Model.Id,
+            returnUrl = Model.ReturnUrl,
+            tab = deleteFallbackTab,
+            uiContext = isPagePresentation ? "page" : "project"
+        })
+        : null;
 }
 
 @if (!isPagePresentation)
@@ -253,7 +267,7 @@
                         </div>
                     </div>
                     <div class="person-picker-source" data-person-picker-source hidden>
-                        @foreach (var osoba in Model.DostupniSpolupracovnici)
+                        @foreach (var osoba in Model.DostupniVlastnici)
                         {
                             <div data-id="@osoba.OsobaId"
                                  data-label="@osoba.Osoba"
@@ -276,6 +290,9 @@
                 @for (var i = 0; i < Model.ExterniVazby.Count; i++)
                 {
                     var vazba = Model.ExterniVazby[i];
+                    var showEstimatedPrice = string.Equals(vazba.Typ, "PMP", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(vazba.Typ, "PNF", StringComparison.OrdinalIgnoreCase);
+                    var estimatedPriceValue = vazba.PredpokladanaCena?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty;
                     var datumObjednaniIso = vazba.DatumObjednani?.ToString("yyyy-MM-dd") ?? string.Empty;
                     var datumObjednaniDisplay = vazba.DatumObjednani?.ToString("dd.MM.yyyy") ?? string.Empty;
                     var planDodaniIso = vazba.PlanDodani?.ToString("yyyy-MM-dd") ?? string.Empty;
@@ -288,7 +305,7 @@
                         <input type="hidden" name="ExterniVazby[@i].Id" value="@vazba.Id" />
                         <label>
                             Typ odkazu
-                            <select name="ExterniVazby[@i].Typ">
+                            <select name="ExterniVazby[@i].Typ" data-external-type-select>
                                 @foreach (var typ in Model.TypyExternichOdkazu)
                                 {
                                     if (typ == vazba.Typ)
@@ -305,6 +322,17 @@
                         <label>
                             Číslo
                             <input type="text" name="ExterniVazby[@i].Cislo" value="@vazba.Cislo" />
+                        </label>
+                        <label data-external-price-field hidden="@(showEstimatedPrice ? null : "hidden")">
+                            Předpokládaná cena
+                            <input type="number"
+                                   name="ExterniVazby[@i].PredpokladanaCena"
+                                   value="@estimatedPriceValue"
+                                   step="0.01"
+                                   min="0"
+                                   inputmode="decimal"
+                                   data-external-price-input
+                                   disabled="@(showEstimatedPrice ? null : "disabled")" />
                         </label>
                         <label>
                             Výzva
@@ -387,7 +415,7 @@
                     <input type="hidden" name="ExterniVazby[__index__].Id" value="0" />
                     <label>
                         Typ odkazu
-                        <select name="ExterniVazby[__index__].Typ">
+                        <select name="ExterniVazby[__index__].Typ" data-external-type-select>
                             @foreach (var typ in Model.TypyExternichOdkazu)
                             {
                                 <option>@typ</option>
@@ -397,6 +425,17 @@
                     <label>
                         Číslo
                         <input type="text" name="ExterniVazby[__index__].Cislo" value="" />
+                    </label>
+                    <label data-external-price-field hidden="hidden">
+                        Předpokládaná cena
+                        <input type="number"
+                               name="ExterniVazby[__index__].PredpokladanaCena"
+                               value=""
+                               step="0.01"
+                               min="0"
+                               inputmode="decimal"
+                               data-external-price-input
+                               disabled="disabled" />
                     </label>
                     <label>
                         Výzva
@@ -525,11 +564,12 @@
                 </div>
             </div>
 
-            <div class="schedule-mini-gantt" data-record-mini-gantt>
-                <div class="timeline-axis schedule-timeline-axis" data-schedule-axis></div>
+            <div class="schedule-mini-gantt schedule-mini-gantt-grid" data-record-mini-gantt>
+                <div class="schedule-mini-gantt-axis-spacer" aria-hidden="true"></div>
+                <div class="timeline-axis schedule-mini-gantt-axis-track" data-schedule-axis></div>
                 <div class="schedule-mini-gantt-row">
-                    <span>Plán</span>
-                    <div class="schedule-mini-gantt-track">
+                    <span class="schedule-mini-gantt-row-label">Plán</span>
+                    <div class="schedule-mini-gantt-track schedule-mini-gantt-row-track">
                         <div class="schedule-mini-gantt-marker" data-schedule-gantt-deadline></div>
                         @for (var stepIndex = 0; stepIndex < Model.HarmonogramKroky.Count; stepIndex++)
                         {
@@ -543,8 +583,8 @@
                     </div>
                 </div>
                 <div class="schedule-mini-gantt-row">
-                    <span>Skutečnost</span>
-                    <div class="schedule-mini-gantt-track">
+                    <span class="schedule-mini-gantt-row-label">Skutečnost</span>
+                    <div class="schedule-mini-gantt-track schedule-mini-gantt-row-track">
                         <div class="schedule-mini-gantt-marker" data-schedule-gantt-deadline></div>
                         @for (var stepIndex = 0; stepIndex < Model.HarmonogramKroky.Count; stepIndex++)
                         {
@@ -703,7 +743,9 @@
                                 <td class="schedule-step-gantt-cell">
                                     <div class="schedule-step-gantt-track" data-schedule-step-track>
                                         <div class="schedule-step-gantt-bar planned" data-schedule-step-planned></div>
-                                        <div class="schedule-step-gantt-bar actual" data-schedule-step-actual></div>
+                                        <div class="schedule-step-gantt-bar actual-progress" data-schedule-step-actual-progress></div>
+                                        <div class="schedule-step-gantt-bar variance-negative" data-schedule-step-variance-negative hidden></div>
+                                        <div class="schedule-step-gantt-bar variance-positive" data-schedule-step-variance-positive hidden></div>
                                     </div>
                                 </td>
                             </tr>
@@ -715,6 +757,14 @@
     </div>
 
     <div class="record-editor-actions @(isPagePresentation ? "record-editor-actions-page" : "record-editor-actions-modal")">
+        @if (!Model.IsCreate && !string.IsNullOrWhiteSpace(deleteRecordModalUrl))
+        {
+            <button class="btn ghost danger"
+                    type="button"
+                    data-modal-url="@deleteRecordModalUrl">
+                Smazat natrvalo
+            </button>
+        }
         @if (isPagePresentation)
         {
             <button class="btn"

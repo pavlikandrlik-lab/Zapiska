@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using PmTracker.Web.Models.Entities;
 using PmTracker.Tests.Api.TestInfrastructure;
 
 namespace PmTracker.Tests.Api.Controllers;
@@ -220,6 +221,108 @@ public sealed class RecordEditorControllerTests
     }
 
     [Fact]
+    public async Task Edit_ShouldRenderScheduleMiniGantt_WithAlignedAxis_AndVarianceBars()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiEditScheduleAxis");
+        var projectId = await _fixture.EnsureProjectAsync("APIRED4");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDSUB4", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API schedule layout record");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}&presentation=page");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("schedule-mini-gantt-grid");
+        html.Should().Contain("schedule-mini-gantt-axis-track");
+        html.Should().Contain("data-schedule-step-actual-progress");
+        html.Should().Contain("data-schedule-step-variance-negative");
+        html.Should().Contain("data-schedule-step-variance-positive");
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistEstimatedExternalLinkPrice_OnlyForPmpAndPnf()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiExternalPriceSaver");
+        var projectId = await _fixture.EnsureProjectAsync("APIRED5");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDSUB5", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API external price record");
+
+        await using var dbContext = _fixture.CreateDbContext();
+        var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == recordId)
+            .Select(x => new
+            {
+                x.Id,
+                x.ProjektId,
+                x.KategorieId,
+                x.StavUkoluId,
+                x.CisloZaznamu,
+                x.Nazev,
+                x.Popis,
+                x.VlastnikId,
+                x.DatumZalozeni,
+                x.DatumUkonceni,
+                x.SubsystemId
+            })
+            .FirstAsync();
+        var categoryName = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+            .Where(x => x.Id == record.KategorieId)
+            .Select(x => x.Nazev)
+            .FirstAsync();
+        var statusName = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+            .Where(x => x.Id == record.StavUkoluId)
+            .Select(x => x.Nazev)
+            .FirstAsync();
+        var subsystemCode = await dbContext.Subsystemy.AsNoTracking()
+            .Where(x => x.Id == record.SubsystemId)
+            .Select(x => x.Kod)
+            .FirstAsync();
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Zaznamy/Save?asUser={_fixture.AdminOsobaId}",
+            ApiTestHttpHelper.BuildForm(
+                ("Id", record.Id.ToString()),
+                ("ProjektId", record.ProjektId.ToString()),
+                ("Kategorie", categoryName),
+                ("Stav", statusName),
+                ("Nazev", record.Nazev),
+                ("Popis", record.Popis ?? string.Empty),
+                ("VlastnikId", record.VlastnikId.ToString()),
+                ("DatumZalozeni", record.DatumZalozeni.ToString("yyyy-MM-dd")),
+                ("TerminUkonceni", record.DatumUkonceni.ToString("yyyy-MM-dd")),
+                ("Subsystem", subsystemCode),
+                ("CisloZaznamu", record.CisloZaznamu.ToString()),
+                ("EditorTab", "external"),
+                ("Presentation", "modal"),
+                ("ExterniVazby[0].Typ", "PMP"),
+                ("ExterniVazby[0].Cislo", "PMP-123"),
+                ("ExterniVazby[0].PredpokladanaCena", "125000.50"),
+                ("ExterniVazby[1].Typ", "NES"),
+                ("ExterniVazby[1].Cislo", "NES-456"),
+                ("ExterniVazby[1].PredpokladanaCena", "999.99")));
+
+        var response = await client.SendAsync(request);
+        var content = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, content);
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+        payload.Ok.Should().BeTrue();
+
+        await using var verificationDbContext = _fixture.CreateDbContext();
+        var savedLinks = await (
+                from link in verificationDbContext.ZaznamExterniOdkazy.AsNoTracking()
+                join type in verificationDbContext.CiselnikTypuExternichOdkazu.AsNoTracking() on link.TypOdkazuId equals type.Id
+                where link.ZaznamId == recordId
+                select new { type.Kod, link.Cislo, link.PredpokladanaCena })
+            .ToListAsync();
+
+        savedLinks.Should().ContainSingle(x => x.Kod == "PMP" && x.Cislo == "PMP-123" && x.PredpokladanaCena == 125000.50m);
+        savedLinks.Should().ContainSingle(x => x.Kod == "NES" && x.Cislo == "NES-456" && x.PredpokladanaCena == null);
+    }
+
+    [Fact]
     public async Task Create_ShouldRenderScheduleActualInput_WithoutClientSideMinimumClamp()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiCreateSignedDelay");
@@ -239,5 +342,215 @@ public sealed class RecordEditorControllerTests
 
         delayInputMatch.Success.Should().BeTrue(html);
         delayInputMatch.Value.Should().NotContain("min=", "skutečnost musí podporovat záporné hodnoty už před prvním uložením");
+    }
+
+    [Fact]
+    public async Task DeleteRecordModal_ShouldRenderDependencySummary_ForEditableRecord()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiDeleteModalSummaryOwner");
+        var collaboratorId = await _fixture.EnsurePersonAsync("ApiDeleteModalSummaryCollaborator");
+        var projectId = await _fixture.EnsureProjectAsync("APIRED7");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDSUB7", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API delete summary record");
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 9801);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var externalTypeId = await dbContext.CiselnikTypuExternichOdkazu
+                .Where(x => x.Kod == "PMP")
+                .Select(x => x.Id)
+                .FirstAsync();
+            var scheduleTypeId = await dbContext.CiselnikHarmonogramTypu
+                .Where(x => !x.JeZpozdeni)
+                .OrderBy(x => x.KrokPoradi)
+                .Select(x => x.Id)
+                .FirstAsync();
+            var statusId = await dbContext.ProjektoveZaznamy
+                .Where(x => x.Id == recordId)
+                .Select(x => x.StavUkoluId)
+                .FirstAsync()
+                ?? throw new InvalidOperationException("Test record is missing task state.");
+
+            dbContext.Vyjadreni.Add(new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meetingId,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = "Delete summary comment",
+                DatumVyjadreni = DateTime.UtcNow
+            });
+            dbContext.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
+            {
+                ZaznamId = recordId,
+                TypOdkazuId = externalTypeId,
+                Cislo = "PMP-DELETE-SUMMARY"
+            });
+            dbContext.ZaznamSpoluprace.Add(new ZaznamSpolupraceEntity
+            {
+                ZaznamId = recordId,
+                OsobaId = collaboratorId
+            });
+            dbContext.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+            {
+                ZaznamId = recordId,
+                TypId = scheduleTypeId,
+                HodnotaInt = 5,
+                UpdatedAt = DateTime.UtcNow
+            });
+            dbContext.ZaznamHistorieStavuZaznamu.Add(new ZaznamHistorieStavuZaznamuEntity
+            {
+                ZaznamId = recordId,
+                PuvodniStav = statusId,
+                NovyStav = statusId,
+                DatumZmeny = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/DeleteRecordModal?projektId={projectId}&zaznamId={recordId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("record-delete-modal-title");
+        html.Should().Contain("Vyjádření:</span> 1");
+        html.Should().Contain("Externí vazby:</span> 1");
+        html.Should().Contain("Spolupráce:</span> 1");
+        html.Should().Contain("Harmonogram:</span> 1");
+    }
+
+    [Fact]
+    public async Task DeleteRecord_ShouldReturnAjaxSuccess_AndDeleteRelatedData()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiDeleteOwner");
+        var collaboratorId = await _fixture.EnsurePersonAsync("ApiDeleteCollaborator");
+        var projectId = await _fixture.EnsureProjectAsync("APIRED8");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDSUB8", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API hard delete record");
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 9802);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var externalTypeId = await dbContext.CiselnikTypuExternichOdkazu
+                .Where(x => x.Kod == "PMP")
+                .Select(x => x.Id)
+                .FirstAsync();
+            var scheduleTypeId = await dbContext.CiselnikHarmonogramTypu
+                .Where(x => !x.JeZpozdeni)
+                .OrderBy(x => x.KrokPoradi)
+                .Select(x => x.Id)
+                .FirstAsync();
+            var typeId = await dbContext.CiselnikTypuUkolu
+                .OrderBy(x => x.Id)
+                .Select(x => x.Id)
+                .FirstAsync();
+            var statusId = await dbContext.ProjektoveZaznamy
+                .Where(x => x.Id == recordId)
+                .Select(x => x.StavUkoluId)
+                .FirstAsync()
+                ?? throw new InvalidOperationException("Test record is missing task state.");
+
+            dbContext.Vyjadreni.Add(new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meetingId,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = "Delete me",
+                DatumVyjadreni = DateTime.UtcNow
+            });
+            dbContext.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
+            {
+                ZaznamId = recordId,
+                TypOdkazuId = externalTypeId,
+                Cislo = "PMP-DELETE"
+            });
+            dbContext.ZaznamSpoluprace.Add(new ZaznamSpolupraceEntity
+            {
+                ZaznamId = recordId,
+                OsobaId = collaboratorId
+            });
+            dbContext.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+            {
+                ZaznamId = recordId,
+                TypId = scheduleTypeId,
+                HodnotaInt = 3,
+                UpdatedAt = DateTime.UtcNow
+            });
+            dbContext.ZaznamHistorieZmenTypu.Add(new ZaznamHistorieZmenTypuEntity
+            {
+                ZaznamId = recordId,
+                PuvodniTypId = typeId,
+                NovyTypId = typeId,
+                DatumZmeny = DateTime.UtcNow,
+                ZmenilOsobaId = ownerId
+            });
+            dbContext.ZaznamHistorieTerminu.Add(new ZaznamHistorieTerminuEntity
+            {
+                ZaznamId = recordId,
+                PuvodniDatum = DateTime.Today,
+                NoveDatum = DateTime.Today.AddDays(1),
+                DatumZmeny = DateTime.UtcNow,
+                Duvod = "API delete test"
+            });
+            dbContext.ZaznamHistorieVlastnik.Add(new ZaznamHistorieVlastnikEntity
+            {
+                ZaznamId = recordId,
+                PuvodniVlastnik = ownerId,
+                NovyVlastnik = ownerId,
+                DatumZmeny = DateTime.UtcNow
+            });
+            dbContext.ZaznamHistorieSubsystem.Add(new ZaznamHistorieSubsystemEntity
+            {
+                ZaznamId = recordId,
+                PuvodniSubsystem = subsystemId,
+                NovySubsystem = subsystemId,
+                DatumZmeny = DateTime.UtcNow
+            });
+            dbContext.ZaznamHistorieStavuZaznamu.Add(new ZaznamHistorieStavuZaznamuEntity
+            {
+                ZaznamId = recordId,
+                PuvodniStav = statusId,
+                NovyStav = statusId,
+                DatumZmeny = DateTime.UtcNow
+            });
+            dbContext.ZaznamHistorieStavuProjektu.Add(new ZaznamHistorieStavuProjektuEntity
+            {
+                ZaznamId = recordId,
+                PuvodniStav = statusId,
+                NovyStav = statusId,
+                DatumZmeny = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Zaznamy/DeleteRecord?asUser={_fixture.AdminOsobaId}&returnUrl=%2FProjekty%2FDetail%2F{projectId}%3Ftab%3Dzaznamy&uiContext=project&tab=zaznamy",
+            ApiTestHttpHelper.BuildForm(
+                ("ProjektId", projectId.ToString()),
+                ("ZaznamId", recordId.ToString()),
+                ("PotvrditSmazani", "true")));
+
+        var response = await client.SendAsync(request);
+        var content = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, content);
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+        payload.Ok.Should().BeTrue();
+        payload.RefreshScope.Should().Be("projekty-detail-zaznamy-preserve");
+
+        await using var verificationDbContext = _fixture.CreateDbContext();
+        (await verificationDbContext.ProjektoveZaznamy.AnyAsync(x => x.Id == recordId)).Should().BeFalse();
+        (await verificationDbContext.Vyjadreni.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
+        (await verificationDbContext.ZaznamExterniOdkazy.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
+        (await verificationDbContext.ZaznamSpoluprace.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
+        (await verificationDbContext.ZaznamHarmonogramHodnoty.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
+        (await verificationDbContext.ZaznamHistorieZmenTypu.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
+
+        var auditExists = await verificationDbContext.AuthzAuditLog.AnyAsync(x =>
+            x.EntityType == "projektove_zaznamy" &&
+            x.EntityId == recordId.ToString() &&
+            x.Action == "hard_delete");
+        auditExists.Should().BeTrue();
     }
 }

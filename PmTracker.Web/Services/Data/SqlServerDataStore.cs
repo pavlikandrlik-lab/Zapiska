@@ -446,15 +446,69 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         return BuildZaznamEditForEntity(draft, isCreate: true, forceMeetingIdForNumber: selectedMeetingIdForNumber, projectUsesMeetingIdentifier: project.PouzivatIdentJednani, openMeetingOptions: openMeetingOptions);
     }
 
+    public DeleteRecordModalViewModel BuildDeleteRecordModal(int projektId, int zaznamId)
+    {
+        var record = _dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == zaznamId)
+            .Select(x => new
+            {
+                x.Id,
+                x.ProjektId,
+                x.KategorieId,
+                x.StavUkoluId,
+                x.Nazev,
+                x.CisloViditelne,
+                x.CisloZaznamu
+            })
+            .FirstOrDefault()
+            ?? throw new InvalidOperationException($"Záznam {zaznamId} nebyl nalezen.");
+
+        if (record.ProjektId != projektId)
+        {
+            throw new InvalidOperationException("Záznam nepatří do vybraného projektu.");
+        }
+
+        var categoryName = _dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+            .Where(x => x.Id == record.KategorieId)
+            .Select(x => x.Nazev)
+            .FirstOrDefault() ?? "-";
+        var stateName = record.StavUkoluId.HasValue
+            ? _dbContext.CiselnikStavuUkolu.AsNoTracking()
+                .Where(x => x.Id == record.StavUkoluId.Value)
+                .Select(x => x.Nazev)
+                .FirstOrDefault() ?? "-"
+            : "-";
+
+        return new DeleteRecordModalViewModel
+        {
+            Title = "Smazat záznam natrvalo",
+            Command = new DeleteRecordCommand
+            {
+                ProjektId = projektId,
+                ZaznamId = zaznamId
+            },
+            CisloViditelne = string.IsNullOrWhiteSpace(record.CisloViditelne)
+                ? record.CisloZaznamu.ToString(CultureInfo.InvariantCulture)
+                : record.CisloViditelne.Trim(),
+            Nazev = record.Nazev,
+            Kategorie = categoryName,
+            Stav = stateName,
+            VyjadreniCount = _dbContext.Vyjadreni.AsNoTracking().Count(x => x.ZaznamId == zaznamId),
+            ExterniVazbyCount = _dbContext.ZaznamExterniOdkazy.AsNoTracking().Count(x => x.ZaznamId == zaznamId),
+            SpolupraceCount = _dbContext.ZaznamSpoluprace.AsNoTracking().Count(x => x.ZaznamId == zaznamId),
+            HarmonogramCount = _dbContext.ZaznamHarmonogramHodnoty.AsNoTracking().Count(x => x.ZaznamId == zaznamId)
+        };
+    }
+
     public int GetNextCisloZaznamu(int projektId)
     {
-        var maxValue = _dbContext.ProjektoveZaznamy
+        var existingValues = _dbContext.ProjektoveZaznamy
             .AsNoTracking()
             .Where(x => x.ProjektId == projektId)
-            .Select(x => (int?)x.CisloZaznamu)
-            .Max();
+            .Select(x => x.CisloZaznamu)
+            .ToList();
 
-        return (maxValue ?? 0) + 1;
+        return RecordNumberAllocator.FindLowestAvailablePositive(existingValues);
     }
 
     public IReadOnlyList<JednaniProjektListItemViewModel> BuildJednaniOverview()
@@ -1322,6 +1376,119 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         }
 
         return entity.Id;
+    }
+
+    public void DeleteRecord(DeleteRecordCommand command, CurrentUserContextViewModel currentUser)
+    {
+        var record = _dbContext.ProjektoveZaznamy.FirstOrDefault(x => x.Id == command.ZaznamId)
+            ?? throw new InvalidOperationException($"Záznam {command.ZaznamId} nebyl nalezen.");
+
+        if (record.ProjektId != command.ProjektId)
+        {
+            throw new InvalidOperationException("Záznam nepatří do vybraného projektu.");
+        }
+
+        using var tx = _dbContext.Database.BeginTransaction(IsolationLevel.Serializable);
+
+        var historyTypeRows = _dbContext.ZaznamHistorieZmenTypu.Where(x => x.ZaznamId == command.ZaznamId).ToList();
+        var historyDeadlineRows = _dbContext.ZaznamHistorieTerminu.Where(x => x.ZaznamId == command.ZaznamId).ToList();
+        var historyOwnerRows = _dbContext.ZaznamHistorieVlastnik.Where(x => x.ZaznamId == command.ZaznamId).ToList();
+        var historySubsystemRows = _dbContext.ZaznamHistorieSubsystem.Where(x => x.ZaznamId == command.ZaznamId).ToList();
+        var historyStateRows = _dbContext.ZaznamHistorieStavuZaznamu.Where(x => x.ZaznamId == command.ZaznamId).ToList();
+        var historyProjectStateRows = _dbContext.ZaznamHistorieStavuProjektu.Where(x => x.ZaznamId == command.ZaznamId).ToList();
+        var externalLinkRows = _dbContext.ZaznamExterniOdkazy.Where(x => x.ZaznamId == command.ZaznamId).ToList();
+        var collaborationRows = _dbContext.ZaznamSpoluprace.Where(x => x.ZaznamId == command.ZaznamId).ToList();
+        var scheduleRows = _dbContext.ZaznamHarmonogramHodnoty.Where(x => x.ZaznamId == command.ZaznamId).ToList();
+        var commentRows = _dbContext.Vyjadreni.Where(x => x.ZaznamId == command.ZaznamId).ToList();
+        var oldRecord = JsonSerializer.Serialize(record);
+
+        if (historyTypeRows.Count > 0)
+        {
+            _dbContext.ZaznamHistorieZmenTypu.RemoveRange(historyTypeRows);
+        }
+
+        if (historyDeadlineRows.Count > 0)
+        {
+            _dbContext.ZaznamHistorieTerminu.RemoveRange(historyDeadlineRows);
+        }
+
+        if (historyOwnerRows.Count > 0)
+        {
+            _dbContext.ZaznamHistorieVlastnik.RemoveRange(historyOwnerRows);
+        }
+
+        if (historySubsystemRows.Count > 0)
+        {
+            _dbContext.ZaznamHistorieSubsystem.RemoveRange(historySubsystemRows);
+        }
+
+        if (historyStateRows.Count > 0)
+        {
+            _dbContext.ZaznamHistorieStavuZaznamu.RemoveRange(historyStateRows);
+        }
+
+        if (historyProjectStateRows.Count > 0)
+        {
+            _dbContext.ZaznamHistorieStavuProjektu.RemoveRange(historyProjectStateRows);
+        }
+
+        if (externalLinkRows.Count > 0)
+        {
+            _dbContext.ZaznamExterniOdkazy.RemoveRange(externalLinkRows);
+        }
+
+        if (collaborationRows.Count > 0)
+        {
+            _dbContext.ZaznamSpoluprace.RemoveRange(collaborationRows);
+        }
+
+        if (scheduleRows.Count > 0)
+        {
+            _dbContext.ZaznamHarmonogramHodnoty.RemoveRange(scheduleRows);
+        }
+
+        if (commentRows.Count > 0)
+        {
+            _dbContext.Vyjadreni.RemoveRange(commentRows);
+        }
+
+        if (historyTypeRows.Count > 0
+            || historyDeadlineRows.Count > 0
+            || historyOwnerRows.Count > 0
+            || historySubsystemRows.Count > 0
+            || historyStateRows.Count > 0
+            || historyProjectStateRows.Count > 0
+            || externalLinkRows.Count > 0
+            || collaborationRows.Count > 0
+            || scheduleRows.Count > 0
+            || commentRows.Count > 0)
+        {
+            _dbContext.SaveChanges();
+        }
+
+        _dbContext.ProjektoveZaznamy.Remove(record);
+        _dbContext.SaveChanges();
+        tx.Commit();
+
+        WriteAudit(
+            currentUser.OsobaId,
+            "projektove_zaznamy",
+            command.ZaznamId.ToString(CultureInfo.InvariantCulture),
+            "hard_delete",
+            oldRecord,
+            JsonSerializer.Serialize(new
+            {
+                DeletedComments = commentRows.Count,
+                DeletedExternalLinks = externalLinkRows.Count,
+                DeletedCollaborationRows = collaborationRows.Count,
+                DeletedScheduleRows = scheduleRows.Count,
+                DeletedTypeHistoryRows = historyTypeRows.Count,
+                DeletedDeadlineHistoryRows = historyDeadlineRows.Count,
+                DeletedOwnerHistoryRows = historyOwnerRows.Count,
+                DeletedSubsystemHistoryRows = historySubsystemRows.Count,
+                DeletedStateHistoryRows = historyStateRows.Count,
+                DeletedProjectStateHistoryRows = historyProjectStateRows.Count
+            }));
     }
 
     public void AssignMeetingIdentifier(AssignMeetingIdentifierCommand command, CurrentUserContextViewModel currentUser)
@@ -2932,6 +3099,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                         Typ = extTypeById.GetValueOrDefault(link.TypOdkazuId)?.Kod ?? "-",
                         TypNazev = extTypeById.GetValueOrDefault(link.TypOdkazuId)?.Nazev,
                         Cislo = link.Cislo,
+                        PredpokladanaCena = link.PredpokladanaCena,
                         ServiceDeskTicketId = ticketId,
                         ServiceDeskUrl = BuildServiceDeskUrl(ticketId),
                         Vyzva = link.Vyzva.HasValue ? vyzvaById.GetValueOrDefault(link.Vyzva.Value)?.Kod : null,
@@ -3835,6 +4003,45 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .ToList();
     }
 
+    private List<SpolupracovnikOptionViewModel> BuildRecordOwnerCandidates(int projectId, int? selectedOwnerId)
+    {
+        var rows = BuildActiveProjectMembershipRows(projectId)
+            .Select(item => new SpolupracovnikOptionViewModel
+            {
+                OsobaId = item.OsobaId,
+                Osoba = item.Osoba,
+                Email = item.Email,
+                Organizace = item.Organizace,
+                OrganizacniCelek = item.OrganizacniCelek
+            })
+            .ToList();
+
+        if (selectedOwnerId.HasValue && rows.All(item => item.OsobaId != selectedOwnerId.Value))
+        {
+            var organizations = _dbContext.CiselnikOrganizace.AsNoTracking().ToDictionary(x => x.Id);
+            var orgUnits = _dbContext.CiselnikOrganizacniCelky.AsNoTracking().ToDictionary(x => x.Id);
+            var selectedOwner = _dbContext.Osoby.AsNoTracking().FirstOrDefault(x => x.Id == selectedOwnerId.Value);
+            if (selectedOwner is not null)
+            {
+                rows.Add(new SpolupracovnikOptionViewModel
+                {
+                    OsobaId = selectedOwner.Id,
+                    Osoba = BuildDisplayName(selectedOwner.Titul, selectedOwner.Jmeno, selectedOwner.Prijmeni, selectedOwner.Id),
+                    Email = selectedOwner.Email?.Trim(),
+                    Organizace = organizations.GetValueOrDefault(selectedOwner.OrganizaceId)?.Nazev,
+                    OrganizacniCelek = selectedOwner.OrganizacniCelekId.HasValue
+                        ? orgUnits.GetValueOrDefault(selectedOwner.OrganizacniCelekId.Value)?.Nazev
+                        : null
+                });
+            }
+        }
+
+        return rows
+            .DistinctBy(item => item.OsobaId)
+            .OrderBy(item => item.Osoba, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
     private List<ProjectSubsystemOptionViewModel> BuildProjectSubsystemOptions(int projectId)
     {
         return BuildActiveProjectSubsystems(projectId)
@@ -4082,6 +4289,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var taskTypes = _dbContext.CiselnikTypuUkolu.AsNoTracking().OrderBy(x => x.Nazev).ToList();
         var projectSubsystems = BuildRecordEditorProjectSubsystems(record.ProjektId, record.SubsystemId);
         var defaultOwnerBySubsystemId = BuildRecordEditorDefaultOwnerOsobaIds(record.ProjektId);
+        var ownerCandidates = BuildRecordOwnerCandidates(record.ProjektId, record.VlastnikId);
         var people = _dbContext.Osoby.AsNoTracking().OrderBy(x => x.Prijmeni).ThenBy(x => x.Jmeno).ToList();
 
         var extTypes = _dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().OrderBy(x => x.Kod).ToList();
@@ -4116,6 +4324,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     Id = x.Id,
                     Typ = extTypes.FirstOrDefault(et => et.Id == x.TypOdkazuId)?.Kod ?? string.Empty,
                     Cislo = x.Cislo,
+                    PredpokladanaCena = x.PredpokladanaCena,
                     Vyzva = x.Vyzva.HasValue ? vyzvyById.GetValueOrDefault(x.Vyzva.Value) : null,
                     DatumObjednani = x.DatumObjednani,
                     PlanDodani = x.PlanDodani,
@@ -4176,10 +4385,12 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 DefaultOwnerOsobaId = defaultOwnerBySubsystemId.GetValueOrDefault(x.SubsystemId)
             }).ToList(),
             Subsystem = projectSubsystems.FirstOrDefault(x => x.SubsystemId == record.SubsystemId)?.Nazev ?? string.Empty,
-            Vlastnici = people.Select(x => new LookupOptionViewModel
+            Vlastnici = ownerCandidates.Select(x => new LookupOptionViewModel
             {
-                Value = x.Id.ToString(CultureInfo.InvariantCulture),
-                Label = BuildInlinePersonLabel(x.Titul, x.Jmeno, x.Prijmeni, x.Email, x.Id)
+                Value = x.OsobaId.ToString(CultureInfo.InvariantCulture),
+                Label = string.IsNullOrWhiteSpace(x.Email)
+                    ? x.Osoba
+                    : $"{x.Osoba} <{_textNormalizer.NormalizeEmail(x.Email)}>"
             }).ToList(),
             VlastnikId = record.VlastnikId,
             JeUkolKategorie = isTaskCategory,
@@ -4197,6 +4408,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 SkutecneDatum = krok.PosunuteDatum
             }).ToList(),
             HarmonogramSouhrn = harmonogramSouhrn,
+            DostupniVlastnici = ownerCandidates,
             DostupniSpolupracovnici = people.Select(x => new SpolupracovnikOptionViewModel
             {
                 OsobaId = x.Id,
@@ -4297,6 +4509,17 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var projectRecords = _dbContext.ProjektoveZaznamy.AsNoTracking()
             .Where(x => x.ProjektId == projectId)
             .ToList();
+        var stateCodesById = _dbContext.CiselnikStavuUkolu.AsNoTracking()
+            .ToDictionary(x => x.Id, x => x.Kod);
+        projectRecords = projectRecords
+            .Where(x =>
+            {
+                var stavKod = x.StavUkoluId.HasValue && stateCodesById.TryGetValue(x.StavUkoluId.Value, out var code)
+                    ? code
+                    : null;
+                return IsMeetingTaskVisible(stavKod);
+            })
+            .ToList();
         projectRecords = OrderRecordsByVisibleNumber(projectRecords).ToList();
         var leadEquivalentOsobaIdsBySubsystem = BuildLeadEquivalentOsobaIdsByProjectSubsystem(projectId);
 
@@ -4335,6 +4558,12 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 })
                 .ToList()
         }).ToList();
+    }
+
+    private static bool IsMeetingTaskVisible(string? stavKod)
+    {
+        return !Ci.Equals(stavKod, "END")
+            && !Ci.Equals(stavKod, "CANCELLED");
     }
 
     private CiselnikDetailViewModel BuildSimpleCiselnikDetail(string key, string name, IQueryable<CiselnikRadekViewModel> rows, bool canChangeLockState)
@@ -4918,7 +5147,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 .Select(link =>
                 {
                     var typeCode = externalTypeMap.GetValueOrDefault(link.TypOdkazuId)?.Kod ?? "-";
-                    return $"{typeCode} {link.Cislo}";
+                    return FormatExternalLinkDisplay(typeCode, link.Cislo, link.PredpokladanaCena);
                 })
                 .ToList();
 
@@ -5279,6 +5508,38 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .Select(x => (int?)x.Id)
             .FirstOrDefault()
             ?? throw new InvalidOperationException($"Typ externí vazby '{value}' neexistuje.");
+
+    private static bool SupportsEstimatedExternalLinkPrice(string? externalTypeCode)
+        => !string.IsNullOrWhiteSpace(externalTypeCode)
+            && (Ci.Equals(externalTypeCode, "PMP") || Ci.Equals(externalTypeCode, "PNF"));
+
+    private static decimal? NormalizeEstimatedExternalLinkPrice(string? externalTypeCode, string? estimatedPrice)
+    {
+        if (!SupportsEstimatedExternalLinkPrice(externalTypeCode) || string.IsNullOrWhiteSpace(estimatedPrice))
+        {
+            return null;
+        }
+
+        var normalizedValue = estimatedPrice.Trim();
+        if (!decimal.TryParse(normalizedValue, NumberStyles.Number, CultureInfo.CurrentCulture, out var parsed)
+            && !decimal.TryParse(normalizedValue, NumberStyles.Number, CultureInfo.InvariantCulture, out parsed))
+        {
+            throw new InvalidOperationException($"Předpokládaná cena externí vazby '{estimatedPrice}' není validní číslo.");
+        }
+
+        return decimal.Round(parsed, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static string FormatEstimatedPrice(decimal estimatedPrice)
+        => $"{estimatedPrice.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ"))} Kč";
+
+    private static string FormatExternalLinkDisplay(string typeCode, string number, decimal? estimatedPrice)
+    {
+        var header = $"{typeCode} {number}".Trim();
+        return estimatedPrice.HasValue
+            ? $"{header} ({FormatEstimatedPrice(estimatedPrice.Value)})"
+            : header;
+    }
 
     private int? ResolveTypUkoluId(string? value)
     {
@@ -5705,26 +5966,26 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
     private int GetNextCisloZaznamuTransactional(int projektId)
     {
-        var maxValue = _dbContext.ProjektoveZaznamy
+        var existingValues = _dbContext.ProjektoveZaznamy
             .FromSqlRaw("SELECT * FROM projektove_zaznamy WITH (UPDLOCK, HOLDLOCK) WHERE projekt_id = {0}", projektId)
-            .Select(x => (int?)x.CisloZaznamu)
-            .Max();
+            .Select(x => x.CisloZaznamu)
+            .ToList();
 
-        return (maxValue ?? 0) + 1;
+        return RecordNumberAllocator.FindLowestAvailablePositive(existingValues);
     }
 
     private int AllocateMeetingOrderTransactional(int projektId, int cisloJednani)
     {
-        var maxOrder = _dbContext.ProjektoveZaznamy
+        var existingOrders = _dbContext.ProjektoveZaznamy
             .FromSqlRaw(
                 "SELECT * FROM projektove_zaznamy WITH (UPDLOCK, HOLDLOCK) WHERE projekt_id = {0} AND cislo_viditelne_typ = {1} AND cislo_viditelne_a = {2}",
                 projektId,
                 RecordDisplayNumberTypeMeeting,
                 cisloJednani)
-            .Select(x => (int?)x.CisloViditelneB)
-            .Max();
+            .Select(x => x.CisloViditelneB)
+            .ToList();
 
-        return (maxOrder ?? 0) + 1;
+        return RecordNumberAllocator.FindLowestAvailablePositive(existingOrders);
     }
 
     private void ReplaceRecordCollaboration(int zaznamId, IReadOnlyList<int> selectedPersonIds)
@@ -5760,6 +6021,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 ZaznamId = zaznamId,
                 TypOdkazuId = typeId,
                 Cislo = link.Cislo.Trim(),
+                PredpokladanaCena = NormalizeEstimatedExternalLinkPrice(link.Typ, link.PredpokladanaCena),
                 DatumObjednani = link.DatumObjednani,
                 PlanDodani = link.PlanDodani,
                 DatumDodani = link.DatumDodani,

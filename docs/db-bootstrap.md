@@ -24,10 +24,12 @@
 - `db_seed_dev_admin.sql` je lokální/dev/test vrstva navíc. Obsahuje demo data, lokální osobu `Pavel Admin`, další business číselníky a navázání prvního administrátora pro neprodukční provoz.
 - Produkční baseline záměrně nevytváří žádnou osobu, projekt ani superadmin účet.
 - Pro upgrade existující DB na release `1.1.0` spusťte navíc `db_upgrade_1_1_0_signed_schedule_actual.sql`.
+- Pro upgrade existující DB na release `1.1.1` spusťte navíc `db_upgrade_1_1_1_external_link_estimated_price.sql`.
 - `dbo.osoby.Guid_AD` musí být `uniqueidentifier NULL`.
 - `dbo.osoby.email` musí existovat jako `nvarchar(255) NULL`.
 - `dbo.jednani.cas_zacatek` musí být `time(0) NOT NULL`.
 - `dbo.vyjadreni.autor_osoba_id` musí existovat jako `int NOT NULL` (+ FK na `dbo.osoby.id`).
+- `dbo.zaznam_externi_odkazy.predpokladana_cena` musí existovat jako `decimal(18,2) NULL`.
 - `dbo.ciselnik_harmonogram_typu` a `dbo.zaznam_harmonogram_hodnoty` musí existovat (harmonogram úkolů).
 - `dbo.zaznam_harmonogram_hodnoty.hodnota_int` musí umožnit záporné hodnoty pro harmonogramovou skutečnost; legacy constraint `CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative` už nesmí být nasazen.
 - `dbo.projektove_zaznamy` musí mít `cislo_zaznamu` s unikátním indexem `(projekt_id, cislo_zaznamu)`.

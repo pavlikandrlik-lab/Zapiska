@@ -261,13 +261,29 @@
                         @foreach (var item in skupina)
                         {
                             var ownerLabel = item.Vlastnik;
-                            var axisStart = item.DatumZalozeni.Date;
-                            var realEnd = item.Kroky.Count > 0 ? item.Kroky[^1].RealEnd.Date : axisStart;
-                            var axisEnd = new[] { item.TerminUkonceni.Date, realEnd, axisStart }.Max();
-                            var axisDays = Math.Max(1, (axisEnd - axisStart).Days);
-                            Func<DateTime, double> toPercent = value => Math.Clamp(((value.Date - axisStart).Days * 100d) / axisDays, 0d, 100d);
+                            var compactAxisStart = item.DatumZalozeni.Date;
+                            var compactAxisEnd = new[] { item.TerminUkonceni.Date, item.SkutecneDokonceni.Date, compactAxisStart }.Max();
+                            var compactAxisDays = Math.Max(1, (compactAxisEnd - compactAxisStart).Days);
+                            Func<DateTime, double> toCompactPercent = value => Math.Clamp(((value.Date - compactAxisStart).Days * 100d) / compactAxisDays, 0d, 100d);
                             Func<double, string> formatPercent = value => value.ToString("0.####", CultureInfo.InvariantCulture);
-                            var deadlinePercent = toPercent(item.TerminUkonceni.Date);
+                            var compactDeadlinePercent = toCompactPercent(item.TerminUkonceni.Date);
+                            var compactTodayPercent = toCompactPercent(DateTime.Today);
+                            var compactTodayTitle = $"Dnes: {DateTime.Today:dd.MM.yyyy}";
+                            var breakdownDates = item.Kroky.SelectMany(krok => new[]
+                            {
+                                krok.PlanStart.Date,
+                                krok.PlanEnd.Date,
+                                krok.RealStart.Date,
+                                krok.RealEnd.Date
+                            }).ToList();
+                            var breakdownAxisStart = breakdownDates.Count > 0 ? breakdownDates.Min() : compactAxisStart;
+                            var breakdownAxisEnd = breakdownDates.Count > 0
+                                ? new[] { breakdownDates.Max(), item.TerminUkonceni.Date, breakdownAxisStart }.Max()
+                                : compactAxisEnd;
+                            var breakdownAxisDays = Math.Max(1, (breakdownAxisEnd - breakdownAxisStart).Days);
+                            Func<DateTime, double> toBreakdownPercent = value => Math.Clamp(((value.Date - breakdownAxisStart).Days * 100d) / breakdownAxisDays, 0d, 100d);
+                            var breakdownDeadlinePercent = toBreakdownPercent(item.TerminUkonceni.Date);
+                            var breakdownTodayPercent = toBreakdownPercent(DateTime.Today);
                             <article class="schedule-card"
                                      data-schedule-item
                                      data-schedule-filter-subsystem="@item.Subsystem"
@@ -300,58 +316,75 @@
                                 </div>
 
                                 <div class="schedule-card-timeline">
-                                    <div class="timeline-axis schedule-timeline-axis"
-                                         data-timeline-axis
-                                         data-axis-start="@axisStart.ToString("yyyy-MM-dd")"
-                                         data-axis-end="@axisEnd.ToString("yyyy-MM-dd")"></div>
-                                    <div class="schedule-layered-timeline">
-                                        <div class="schedule-layered-legend">
-                                            <span><span class="schedule-layered-legend-swatch planned"></span>Plán</span>
-                                            <span><span class="schedule-layered-legend-swatch actual"></span>Skutečnost</span>
-                                            <span><span class="schedule-layered-legend-swatch deadline"></span>Termín</span>
+                                    <div class="schedule-overview-timeline">
+                                        <div class="schedule-overview-row">
+                                            <span class="schedule-overview-label">Plán</span>
+                                            <div class="schedule-overview-track">
+                                                <div class="schedule-overview-marker today"
+                                                     style="left:@formatPercent(compactTodayPercent)%;"
+                                                     title="@compactTodayTitle"></div>
+                                                <div class="schedule-overview-marker deadline"
+                                                     style="left:@formatPercent(compactDeadlinePercent)%;"
+                                                     title="@($"Termín úkolu: {item.TerminUkonceni:dd.MM.yyyy}")"></div>
+                                                @{
+                                                    var previousPlanRight = 0d;
+                                                }
+                                                @foreach (var krok in item.Kroky)
+                                                {
+                                                    var rawLeft = toCompactPercent(krok.PlanStart);
+                                                    var rawRight = toCompactPercent(krok.PlanEnd);
+                                                    var left = Math.Max(previousPlanRight, rawLeft);
+                                                    var right = Math.Max(left, rawRight);
+                                                    var width = Math.Max(0d, right - left);
+                                                    var widthStyle = width > 0d
+                                                        ? $"calc({formatPercent(width)}% + 1px)"
+                                                        : "0%";
+                                                    previousPlanRight = right;
+                                                    <span class="schedule-overview-segment"
+                                                          data-rainbow-segment-label-full="@krok.Nazev"
+                                                          data-rainbow-segment-label-short="@krok.KrokIndex"
+                                                          style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
+                                                          title="@($"{krok.Nazev}: plán {krok.PlanStart:dd.MM.yyyy} - {krok.PlanEnd:dd.MM.yyyy}")"></span>
+                                                }
+                                            </div>
                                         </div>
-                                        <div class="schedule-layered-track schedule-layered-track--overview">
-                                            <div class="schedule-layered-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
-                                            @{
-                                                var previousPlanRight = 0d;
-                                            }
-                                            @foreach (var krok in item.Kroky)
-                                            {
-                                                var rawLeft = toPercent(krok.PlanStart);
-                                                var rawRight = toPercent(krok.PlanEnd);
-                                                var left = Math.Max(previousPlanRight, rawLeft);
-                                                var right = Math.Max(left, rawRight);
-                                                var width = Math.Max(0d, right - left);
-                                                var widthStyle = width > 0d
-                                                    ? $"calc({formatPercent(width)}% + 1px)"
-                                                    : "0%";
-                                                previousPlanRight = right;
-                                                <span class="schedule-layered-segment planned"
-                                                      data-rainbow-segment-label-full="@krok.Nazev"
-                                                      data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                      style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
-                                                      title="@($"{krok.Nazev}: plán {krok.PlanStart:dd.MM.yyyy} - {krok.PlanEnd:dd.MM.yyyy}")"></span>
-                                            }
-                                            @{
-                                                var previousRealRight = 0d;
-                                            }
-                                            @foreach (var krok in item.Kroky)
-                                            {
-                                                var rawLeft = toPercent(krok.RealStart);
-                                                var rawRight = toPercent(krok.RealEnd);
-                                                var left = Math.Max(previousRealRight, rawLeft);
-                                                var right = Math.Max(left, rawRight);
-                                                var width = Math.Max(0d, right - left);
-                                                var widthStyle = width > 0d
-                                                    ? $"calc({formatPercent(width)}% + 1px)"
-                                                    : "0%";
-                                                previousRealRight = right;
-                                                <span class="schedule-layered-segment actual"
-                                                      data-rainbow-segment-label-full="@krok.Nazev"
-                                                      data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                      style="left:@formatPercent(left)%; width:@widthStyle; --schedule-actual-color:@item.DelayBarvaHex;"
-                                                      title="@($"{krok.Nazev}: skutečnost {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}")"></span>
-                                            }
+                                        <div class="schedule-overview-row">
+                                            <span class="schedule-overview-label">Skutečnost</span>
+                                            <div class="schedule-overview-track">
+                                                <div class="schedule-overview-marker today"
+                                                     style="left:@formatPercent(compactTodayPercent)%;"
+                                                     title="@compactTodayTitle"></div>
+                                                <div class="schedule-overview-marker deadline"
+                                                     style="left:@formatPercent(compactDeadlinePercent)%;"
+                                                     title="@($"Termín úkolu: {item.TerminUkonceni:dd.MM.yyyy}")"></div>
+                                                @{
+                                                    var previousRealRight = 0d;
+                                                }
+                                                @foreach (var krok in item.Kroky)
+                                                {
+                                                    var rawLeft = toCompactPercent(krok.RealStart);
+                                                    var rawRight = toCompactPercent(krok.RealEnd);
+                                                    var left = Math.Max(previousRealRight, rawLeft);
+                                                    var right = Math.Max(left, rawRight);
+                                                    var width = Math.Max(0d, right - left);
+                                                    var widthStyle = width > 0d
+                                                        ? $"calc({formatPercent(width)}% + 1px)"
+                                                        : "0%";
+                                                    previousRealRight = right;
+                                                    <span class="schedule-overview-segment actual"
+                                                          data-rainbow-segment-label-full="@krok.Nazev"
+                                                          data-rainbow-segment-label-short="@krok.KrokIndex"
+                                                          style="left:@formatPercent(left)%; width:@widthStyle; --schedule-overview-actual-color:@item.DelayBarvaHex;"
+                                                          title="@($"{krok.Nazev}: skutečnost {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}")"></span>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="schedule-overview-axis-row">
+                                            <span class="schedule-overview-axis-spacer" aria-hidden="true"></span>
+                                            <div class="timeline-axis schedule-overview-axis"
+                                                 data-timeline-axis
+                                                 data-axis-start="@compactAxisStart.ToString("yyyy-MM-dd")"
+                                                 data-axis-end="@compactAxisEnd.ToString("yyyy-MM-dd")"></div>
                                         </div>
                                     </div>
                                     <div class="schedule-layered-summary">
@@ -366,15 +399,23 @@
                                     <div class="schedule-layered-legend schedule-layered-legend--steps">
                                         <span><span class="schedule-layered-legend-swatch planned"></span>Plán</span>
                                         <span><span class="schedule-layered-legend-swatch actual"></span>Skutečnost</span>
+                                        <span><span class="schedule-layered-legend-swatch today"></span>Dnes</span>
                                         <span><span class="schedule-layered-legend-swatch deadline"></span>Termín</span>
+                                    </div>
+                                    <div class="schedule-layered-axis-row">
+                                        <span class="schedule-layered-axis-spacer" aria-hidden="true"></span>
+                                        <div class="timeline-axis schedule-layered-axis"
+                                             data-timeline-axis
+                                             data-axis-start="@breakdownAxisStart.ToString("yyyy-MM-dd")"
+                                             data-axis-end="@breakdownAxisEnd.ToString("yyyy-MM-dd")"></div>
                                     </div>
                                     @foreach (var krok in item.Kroky)
                                     {
-                                        var stepLeft = toPercent(krok.PlanStart);
-                                        var stepRight = toPercent(krok.PlanEnd);
+                                        var stepLeft = toBreakdownPercent(krok.PlanStart);
+                                        var stepRight = toBreakdownPercent(krok.PlanEnd);
                                         var stepWidth = Math.Max(0d, stepRight - stepLeft);
-                                        var actualLeft = toPercent(krok.RealStart);
-                                        var actualRight = toPercent(krok.RealEnd);
+                                        var actualLeft = toBreakdownPercent(krok.RealStart);
+                                        var actualRight = toBreakdownPercent(krok.RealEnd);
                                         var actualWidth = Math.Max(0d, actualRight - actualLeft);
                                         var offsetLabel = krok.OdchylkaDni > 0
                                             ? $"+{krok.OdchylkaDni} dnů"
@@ -385,9 +426,14 @@
                                                 <span class="gantt-step-offset @(krok.OdchylkaDni > 0 ? "late" : krok.OdchylkaDni < 0 ? "ahead" : null)">@offsetLabel</span>
                                             </div>
                                             <div class="schedule-layered-track schedule-layered-track--step">
-                                                <div class="schedule-layered-marker deadline" style="left:@formatPercent(deadlinePercent)%;"></div>
-                                                <span class="schedule-layered-segment planned" style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
-                                                <span class="schedule-layered-segment actual" style="left:@formatPercent(actualLeft)%; width:@formatPercent(actualWidth)%; --schedule-actual-color:@item.DelayBarvaHex;"></span>
+                                                <div class="schedule-layered-marker today"
+                                                     style="left:@formatPercent(breakdownTodayPercent)%;"
+                                                     title="@compactTodayTitle"></div>
+                                                <div class="schedule-layered-marker deadline" style="left:@formatPercent(breakdownDeadlinePercent)%;"></div>
+                                                <span class="schedule-layered-segment planned"
+                                                      style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
+                                                <span class="schedule-layered-segment actual"
+                                                      style="left:@formatPercent(actualLeft)%; width:@formatPercent(actualWidth)%; --schedule-actual-color:@item.DelayBarvaHex;"></span>
                                             </div>
                                         </div>
                                     }

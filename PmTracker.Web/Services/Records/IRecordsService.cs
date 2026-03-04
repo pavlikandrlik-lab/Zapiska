@@ -8,7 +8,9 @@ public interface IRecordsService
     ProjektDetailViewModel BuildProjektDetail(int id);
     ZaznamEditViewModel BuildZaznamEdit(int id);
     ZaznamEditViewModel BuildZaznamCreate(int projektId);
+    DeleteRecordModalViewModel BuildDeleteRecordModal(int projektId, int zaznamId);
     int SaveRecord(SaveRecordCommand command, CurrentUserContextViewModel currentUser);
+    void DeleteRecord(DeleteRecordCommand command, CurrentUserContextViewModel currentUser);
     void AssignMeetingIdentifier(AssignMeetingIdentifierCommand command, CurrentUserContextViewModel currentUser);
     void AddComment(AddCommentCommand command, CurrentUserContextViewModel currentUser);
     void UpdateComment(UpdateCommentCommand command, CurrentUserContextViewModel currentUser);

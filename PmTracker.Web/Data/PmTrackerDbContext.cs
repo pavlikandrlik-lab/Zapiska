@@ -430,6 +430,7 @@ public sealed class PmTrackerDbContext : DbContext
             entity.Property(x => x.ZaznamId).HasColumnName("zaznam_id");
             entity.Property(x => x.TypOdkazuId).HasColumnName("typ_odkazu_id");
             entity.Property(x => x.Cislo).HasColumnName("cislo");
+            entity.Property(x => x.PredpokladanaCena).HasColumnName("predpokladana_cena").HasColumnType("decimal(18,2)");
             entity.Property(x => x.DatumObjednani).HasColumnName("datum_objednani");
             entity.Property(x => x.PlanDodani).HasColumnName("plan_dodani");
             entity.Property(x => x.DatumDodani).HasColumnName("datum_dodani");
