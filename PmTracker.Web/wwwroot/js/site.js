@@ -3442,6 +3442,36 @@
         }
     }
 
+    function initProjectIndexStatusFilters(scope) {
+        const root = scope instanceof ParentNode ? scope : document;
+        const shell = root.querySelector("[data-project-list-shell]");
+        if (!(shell instanceof HTMLElement)) {
+            return;
+        }
+
+        const toggleButton = document.querySelector("[data-project-status-filter-toggle]");
+        if (toggleButton instanceof HTMLButtonElement && toggleButton.dataset.boundProjectStatusFilter !== "true") {
+            toggleButton.dataset.boundProjectStatusFilter = "true";
+            toggleButton.addEventListener("click", () => {
+                toggleProjectStatusFilterPanel(toggleButton);
+            });
+        }
+
+        document.querySelectorAll("[data-project-status-hide]").forEach((input) => {
+            if (!(input instanceof HTMLInputElement) || input.dataset.boundProjectStatusFilter !== "true") {
+                if (input instanceof HTMLInputElement) {
+                    input.dataset.boundProjectStatusFilter = "true";
+                    input.addEventListener("change", () => {
+                        handleProjectStatusFilterInput(input);
+                    });
+                }
+            }
+        });
+
+        syncProjectListStatusFilterInputs(document);
+        applyProjectIndexFilters(root);
+    }
+
     function toggleProjectStatusFilterPanel(button) {
         if (!(button instanceof HTMLElement)) {
             return;
@@ -3472,16 +3502,6 @@
         }
 
         applyProjectIndexFilters(document);
-    }
-
-    function scheduleProjectStatusFilterInputSync(input) {
-        if (!(input instanceof HTMLInputElement)) {
-            return;
-        }
-
-        window.requestAnimationFrame(() => {
-            handleProjectStatusFilterInput(input);
-        });
     }
 
     function toggleMeetingAttendancePanel(button) {
@@ -6647,7 +6667,7 @@
         switch (scope) {
             case "projekty-index":
                 replaceSelectorFromDocument(nextDoc, "[data-project-list-shell]");
-                applyProjectIndexFilters(document);
+                initProjectIndexStatusFilters(document);
                 break;
             case "osoby-index":
                 replaceSelectorFromDocument(nextDoc, "[data-osoby-table-card]");
@@ -7066,20 +7086,6 @@
             return;
         }
 
-        const projectStatusFilterToggle = target.closest("[data-project-status-filter-toggle]");
-        if (projectStatusFilterToggle) {
-            toggleProjectStatusFilterPanel(projectStatusFilterToggle instanceof HTMLElement ? projectStatusFilterToggle : null);
-            return;
-        }
-
-        const projectStatusFilterOption = target.closest("label.gov-switch");
-        if (projectStatusFilterOption instanceof HTMLLabelElement) {
-            const projectStatusFilterInput = projectStatusFilterOption.querySelector("[data-project-status-hide]");
-            if (projectStatusFilterInput instanceof HTMLInputElement) {
-                scheduleProjectStatusFilterInputSync(projectStatusFilterInput);
-            }
-        }
-
         const recordToggle = target.closest("[data-record-toggle]");
         if (recordToggle) {
             if (target.closest("[data-stop-propagation]")) {
@@ -7164,9 +7170,6 @@
             }
         }
 
-        if (target instanceof HTMLInputElement && target.matches("[data-project-status-hide]")) {
-            handleProjectStatusFilterInput(target);
-        }
     });
 
     document.addEventListener("input", (event) => {
@@ -7248,6 +7251,6 @@
     initSettingsAjaxSwitch();
     initRecordFormEnhancements(document);
     initPermissionMetadataBindings(document);
-    applyProjectIndexFilters(document);
+    initProjectIndexStatusFilters(document);
     initModalAjaxSubmit();
 })();
