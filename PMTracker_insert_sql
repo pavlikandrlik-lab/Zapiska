@@ -238,7 +238,7 @@ CREATE TABLE dbo.projektove_zaznamy (
     cislo_viditelne_b int NOT NULL CONSTRAINT DF_projektove_zaznamy_cislo_viditelne_b DEFAULT (0),
     cislo_jednani_zdroj_id int NULL,
     nazev nvarchar(255) NOT NULL,
-    cil nvarchar(100) NULL,
+    cil nvarchar(85) NULL,
     popis text NULL,
     vlastnik_id int NOT NULL,
     datum_zalozeni date NOT NULL,

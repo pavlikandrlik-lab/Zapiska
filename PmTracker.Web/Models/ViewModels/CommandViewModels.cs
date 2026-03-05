@@ -48,7 +48,7 @@ public sealed class SaveRecordCommand
     [StringLength(255)]
     public string Nazev { get; set; } = string.Empty;
 
-    [StringLength(100)]
+    [StringLength(85)]
     public string? Cil { get; set; }
 
     public string? Popis { get; set; }

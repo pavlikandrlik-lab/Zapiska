@@ -5,7 +5,7 @@ Tento soubor je generován skriptem `scripts/generate-changelog.sh` z verzovaný
 ## 0.7 - 2026-03-05
 
 ### Přidáno
-- Projektové záznamy mají nové pole `Cíl` (`dbo.projektove_zaznamy.cil`, max 100 znaků) napojené end-to-end přes editor, backend, PDF a WORD export.
+- Projektové záznamy mají nové pole `Cíl` (`dbo.projektove_zaznamy.cil`, max 85 znaků) napojené end-to-end přes editor, backend, PDF a WORD export.
 - Startup SQL validace kontroluje existenci sloupce `dbo.projektove_zaznamy.cil` při startu aplikace.
 
 ### Změněno
