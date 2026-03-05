@@ -3088,7 +3088,7 @@
             ? Math.max(0, Math.trunc(settings.retryAttempt))
             : 0;
         const containerWidth = Math.max(0, container.clientWidth);
-        if (containerWidth <= 0) {
+        if (containerWidth <= 0 || (containerWidth <= 32 && retryAttempt < 10)) {
             queueTimelineAxisRetry(container, startDate, endDate, retryAttempt);
             return;
         }
@@ -3139,7 +3139,11 @@
             const leftPercentRaw = Number.parseFloat(tickNode.style.left || "0");
             const leftPercent = Number.isFinite(leftPercentRaw) ? leftPercentRaw : 0;
             const tickLeftPx = (leftPercent / 100) * containerWidth;
-            const labelWidth = labelNode.offsetWidth;
+            const measuredLabelWidth = labelNode.offsetWidth;
+            const computedStyle = window.getComputedStyle(labelNode);
+            const fallbackFontSpec = `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+            const fallbackLabelWidth = Math.ceil(measureTextWidth(labelNode.textContent || "", fallbackFontSpec));
+            const labelWidth = measuredLabelWidth > 0 ? measuredLabelWidth : fallbackLabelWidth;
             const forceVisible = index === 0 || index === lastIndex;
 
             if (labelWidth <= 0 || labelWidth > containerWidth) {
