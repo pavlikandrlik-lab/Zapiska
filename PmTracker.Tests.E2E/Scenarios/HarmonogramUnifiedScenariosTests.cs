@@ -67,6 +67,46 @@ public sealed class HarmonogramUnifiedScenariosTests
     }
 
     [Fact]
+    public async Task RecordEditorScheduleTab_ShouldRenderTwoAxes_WithVisibleDateLabels()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
+        await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
+        await page.ReloadAsync();
+
+        if (await page.Locator(".schedule-card").CountAsync() == 0)
+        {
+            await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
+            await page.Context.CloseAsync();
+            return;
+        }
+
+        await page.Locator(".schedule-card .btn.small", new() { HasTextString = "Upravit" }).First.ClickAsync();
+
+        var modal = page.Locator(".modal-overlay");
+        var form = modal.Locator("form[data-record-editor-form='true']");
+        await Expect(form).ToBeVisibleAsync();
+
+        await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+
+        var axes = form.Locator("[data-schedule-axis]");
+        await Expect(axes).ToHaveCountAsync(2);
+
+        var firstAxisLabels = axes.Nth(0).Locator(".timeline-axis-label:not([hidden])");
+        var secondAxisLabels = axes.Nth(1).Locator(".timeline-axis-label:not([hidden])");
+        await Expect(firstAxisLabels.First).ToBeVisibleAsync();
+        await Expect(secondAxisLabels.First).ToBeVisibleAsync();
+
+        (await firstAxisLabels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
+        (await secondAxisLabels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
+        ((await firstAxisLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+        ((await secondAxisLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
     public async Task Harmonogram_ShouldRenderVisibleActualLegend_AndLayeredTracksInOverviewAndBreakdown()
     {
         var page = await _fixture.NewPageAsync();

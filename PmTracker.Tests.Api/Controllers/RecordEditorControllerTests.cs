@@ -240,6 +240,7 @@ public sealed class RecordEditorControllerTests
         html.Should().Contain("data-schedule-step-planned");
         html.Should().Contain("data-schedule-step-actual");
         html.Should().Contain("schedule-step-gantt-stack");
+        Regex.Matches(html, "data-schedule-axis").Count.Should().Be(2);
     }
 
     [Fact]

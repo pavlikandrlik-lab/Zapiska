@@ -1906,6 +1906,25 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     white-space: nowrap;
 }
 
+.schedule-table-axis-row td {
+    padding-top: 2px;
+    padding-bottom: 4px;
+    border: 0;
+}
+
+.schedule-table-axis-spacer {
+    border: 0;
+}
+
+.schedule-step-gantt-axis-cell {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.schedule-step-gantt-axis {
+    margin-bottom: 0;
+}
+
 .schedule-days-input {
     min-width: 0;
     width: 100%;

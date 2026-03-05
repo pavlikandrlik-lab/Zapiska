@@ -2901,6 +2901,8 @@
                 form._recordSchedulePlanner.recalcAll();
             }
 
+            queueRecordSchedulePlannerRecalc(form, 0);
+
             const harmonogramPanel = form.querySelector('[data-record-modal-panel="schedule"]');
             if (harmonogramPanel instanceof HTMLElement) {
                 queueRainbowSegmentRender(harmonogramPanel);
@@ -3017,6 +3019,30 @@
         return Math.max(5, Math.min(10, estimated));
     }
 
+    function queueTimelineAxisRetry(container, startDate, endDate, attempt) {
+        if (!(container instanceof HTMLElement) || !(startDate instanceof Date) || !(endDate instanceof Date)) {
+            return;
+        }
+
+        const retryAttempt = Number.isFinite(attempt) ? Math.trunc(attempt) : 0;
+        if (retryAttempt >= 10 || !container.isConnected) {
+            return;
+        }
+
+        const pendingFrame = Number.parseInt(container.dataset.axisRetryFrame || "0", 10);
+        if (Number.isInteger(pendingFrame) && pendingFrame > 0) {
+            window.cancelAnimationFrame(pendingFrame);
+        }
+
+        const frameId = window.requestAnimationFrame(() => {
+            container.dataset.axisRetryFrame = "0";
+            renderTimelineAxis(container, startDate, endDate, {
+                retryAttempt: retryAttempt + 1
+            });
+        });
+        container.dataset.axisRetryFrame = String(frameId);
+    }
+
     function buildTimelineAxisTicks(startDate, endDate, desiredTickCount) {
         const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
         const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
@@ -3052,17 +3078,26 @@
         });
     }
 
-    function renderTimelineAxis(container, startDate, endDate) {
+    function renderTimelineAxis(container, startDate, endDate, options) {
         if (!(container instanceof HTMLElement) || !(startDate instanceof Date) || !(endDate instanceof Date)) {
             return;
         }
 
+        const settings = options && typeof options === "object" ? options : {};
+        const retryAttempt = Number.isFinite(settings.retryAttempt)
+            ? Math.max(0, Math.trunc(settings.retryAttempt))
+            : 0;
         const containerWidth = Math.max(0, container.clientWidth);
         if (containerWidth <= 0) {
-            container.replaceChildren();
+            queueTimelineAxisRetry(container, startDate, endDate, retryAttempt);
             return;
         }
 
+        const pendingFrame = Number.parseInt(container.dataset.axisRetryFrame || "0", 10);
+        if (Number.isInteger(pendingFrame) && pendingFrame > 0) {
+            window.cancelAnimationFrame(pendingFrame);
+        }
+        container.dataset.axisRetryFrame = "0";
         container.replaceChildren();
         const desiredTickCount = resolveTimelineAxisTickTargetCount(containerWidth);
         const ticks = buildTimelineAxisTicks(startDate, endDate, desiredTickCount);
@@ -3138,6 +3173,32 @@
             }
 
             renderTimelineAxis(container, startDate, endDate);
+        });
+    }
+
+    function queueRecordSchedulePlannerRecalc(form, attempt) {
+        if (!(form instanceof HTMLFormElement) || !form.isConnected) {
+            return;
+        }
+
+        const retryAttempt = Number.isFinite(attempt) ? Math.max(0, Math.trunc(attempt)) : 0;
+        const schedulePanel = form.querySelector('[data-record-modal-panel="schedule"]');
+        if (schedulePanel instanceof HTMLElement && schedulePanel.hidden) {
+            return;
+        }
+
+        const planner = form._recordSchedulePlanner;
+        if (planner && typeof planner.recalcAll === "function") {
+            planner.recalcAll();
+            return;
+        }
+
+        if (retryAttempt >= 6) {
+            return;
+        }
+
+        window.requestAnimationFrame(() => {
+            queueRecordSchedulePlannerRecalc(form, retryAttempt + 1);
         });
     }
 
@@ -5803,6 +5864,7 @@
             planner.recalcAll();
             form._recordSchedulePlanner = planner;
             form.dataset.recordScheduleReady = "true";
+            queueRecordSchedulePlannerRecalc(form, 0);
         });
     }
 
@@ -7409,9 +7471,18 @@
     const rerenderRainbowLabelsOnResize = debounce(() => {
         renderAllRainbowSegmentLabels(document);
     }, 120);
+    const rerenderTimelineAxesOnResize = debounce(() => {
+        renderStaticTimelineAxes(document.querySelector(".tab-panel.active"));
+        document.querySelectorAll('form[data-record-schedule-form="true"]').forEach((form) => {
+            if (form instanceof HTMLFormElement) {
+                queueRecordSchedulePlannerRecalc(form, 0);
+            }
+        });
+    }, 140);
     window.addEventListener("scroll", queueFloatingPanelReposition, true);
     window.addEventListener("resize", queueFloatingPanelReposition);
     window.addEventListener("resize", rerenderRainbowLabelsOnResize);
+    window.addEventListener("resize", rerenderTimelineAxesOnResize);
 
     initProjectTabs();
     initProjectRecordsUi();
