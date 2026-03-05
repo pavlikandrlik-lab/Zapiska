@@ -1766,7 +1766,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     bottom: 0;
     width: 2px;
     left: 0;
-    background: #ea580c;
+    background: #111111;
     opacity: 0.95;
     z-index: 6;
     pointer-events: none;
@@ -1786,9 +1786,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     font-weight: 600;
     padding: 1px 4px;
     border-radius: 4px;
-    color: #9a3412;
-    background: rgba(255, 237, 213, 0.96);
-    box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.45);
+    color: #111111;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.22);
 }
 
 .schedule-timeline-axis {
@@ -2196,7 +2196,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-overview-marker.today {
-    background: #ea580c;
+    background: #111111;
 }
 
 .schedule-overview-axis-row {
@@ -2296,7 +2296,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-layered-marker.today {
-    background: #ea580c;
+    background: #111111;
 }
 
 .schedule-layered-legend {
@@ -2354,7 +2354,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: 2px;
     height: 16px;
     border-radius: 999px;
-    background: #ea580c;
+    background: #111111;
 }
 
 .schedule-layered-summary {
@@ -4493,13 +4493,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 :root[data-theme="dark"] .timeline-axis-marker.today {
-    background: #fb923c;
+    background: #111111;
 }
 
 :root[data-theme="dark"] .timeline-axis-today-label {
-    color: #ffedd5;
-    background: rgba(154, 52, 18, 0.6);
-    box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.55);
+    color: #f8fafc;
+    background: rgba(15, 23, 42, 0.92);
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.45);
 }
 
 :root[data-theme="dark"] .schedule-overview-segment,
@@ -4524,7 +4524,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 :root[data-theme="dark"] .schedule-overview-marker.today,
 :root[data-theme="dark"] .schedule-layered-marker.today,
 :root[data-theme="dark"] .schedule-layered-legend-swatch.today {
-    background: #fb923c;
+    background: #111111;
 }
 
 :root[data-theme="dark"] .subsystem-scroll-indicator-rail {

@@ -100,6 +100,9 @@ public sealed class HarmonogramUnifiedScenariosTests
         (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
         ((await labels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
         await Expect(axes.First.Locator(".timeline-axis-marker.today")).ToHaveCountAsync(1);
+        var modalAxisTodayColor = await axes.First.Locator(".timeline-axis-marker.today").EvaluateAsync<string>(
+            "node => getComputedStyle(node).backgroundColor");
+        modalAxisTodayColor.Should().Be("rgb(17, 17, 17)");
 
         await page.Context.CloseAsync();
     }
@@ -180,6 +183,10 @@ public sealed class HarmonogramUnifiedScenariosTests
         (await firstCard.Locator(".schedule-layered-marker.today").CountAsync()).Should().BeGreaterThan(0);
         await Expect(firstCard.Locator(".schedule-layered-marker.deadline")).ToHaveCountAsync(0);
 
+        var overviewTodayColor = await firstCard.Locator(".schedule-overview-marker.today").First.EvaluateAsync<string>(
+            "node => getComputedStyle(node).backgroundColor");
+        overviewTodayColor.Should().Be("rgb(17, 17, 17)");
+
         var overviewLabels = firstCard.Locator(".schedule-overview-axis .timeline-axis-label:not([hidden])");
         var overviewLabelCount = await overviewLabels.CountAsync();
         overviewLabelCount.Should().BeGreaterThanOrEqualTo(5);
@@ -205,6 +212,9 @@ public sealed class HarmonogramUnifiedScenariosTests
         ((await layeredLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
         ((await layeredLabels.Last.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
         await Expect(firstCard.Locator(".schedule-layered-axis .timeline-axis-marker.today")).ToHaveCountAsync(1);
+        var layeredTodayColor = await firstCard.Locator(".schedule-layered-marker.today").First.EvaluateAsync<string>(
+            "node => getComputedStyle(node).backgroundColor");
+        layeredTodayColor.Should().Be("rgb(17, 17, 17)");
 
         await page.Context.CloseAsync();
     }

@@ -1866,6 +1866,13 @@
                 details.hidden = !expanded;
                 button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
                 button.setAttribute("aria-expanded", String(expanded));
+
+                if (expanded) {
+                    renderStaticTimelineAxes(details);
+                    window.requestAnimationFrame(() => {
+                        renderStaticTimelineAxes(details);
+                    });
+                }
             });
         });
     }
@@ -3098,6 +3105,12 @@
         const axisStart = startStamp <= endStamp ? startDate : endDate;
         const axisEnd = startStamp <= endStamp ? endDate : startDate;
         const totalDays = Math.max(1, diffCalendarDays(axisEnd, axisStart));
+        const edgeInsetPx = Math.max(6, Math.min(12, Math.round(containerWidth * 0.02)));
+        const usableAxisWidth = Math.max(1, containerWidth - (edgeInsetPx * 2));
+        const percentToAxisPx = (percentValue) => {
+            const normalized = Math.max(0, Math.min(100, Number.isFinite(percentValue) ? percentValue : 0));
+            return edgeInsetPx + ((normalized / 100) * usableAxisWidth);
+        };
 
         const pendingFrame = Number.parseInt(container.dataset.axisRetryFrame || "0", 10);
         if (Number.isInteger(pendingFrame) && pendingFrame > 0) {
@@ -3113,7 +3126,9 @@
             if (index === 0 || index === ticks.length - 1) {
                 tickNode.classList.add("edge");
             }
-            tickNode.style.left = `${tick.left.toFixed(4)}%`;
+            const tickLeftPx = percentToAxisPx(tick.left);
+            tickNode.dataset.axisLeftPx = tickLeftPx.toFixed(4);
+            tickNode.style.left = `${tickLeftPx.toFixed(4)}px`;
 
             const labelNode = document.createElement("span");
             labelNode.className = "timeline-axis-label";
@@ -3145,9 +3160,12 @@
             if (!(tickNode instanceof HTMLElement)) {
                 return 0;
             }
-            const leftPercentRaw = Number.parseFloat(tickNode.style.left || "0");
-            const leftPercent = Number.isFinite(leftPercentRaw) ? leftPercentRaw : 0;
-            return (leftPercent / 100) * containerWidth;
+            const serializedPx = Number.parseFloat(tickNode.dataset.axisLeftPx || "");
+            if (Number.isFinite(serializedPx)) {
+                return serializedPx;
+            }
+            const measuredLeft = Number.parseFloat(tickNode.style.left || "0");
+            return Number.isFinite(measuredLeft) ? measuredLeft : 0;
         };
         const placeLabel = (tickNode, labelNode, index, forceVisible) => {
             const tickLeftPx = resolveTickLeftPx(tickNode);
@@ -3155,9 +3173,10 @@
             const labelWidth = Math.max(1, Math.min(containerWidth, labelWidthRaw > 0 ? labelWidthRaw : 1));
             labelNode.style.maxWidth = `${Math.max(1, containerWidth)}px`;
 
-            let desiredLeft = tickLeftPx + 4;
+            const sidePadding = 6;
+            let desiredLeft = tickLeftPx + sidePadding;
             if (index === lastIndex) {
-                desiredLeft = tickLeftPx - labelWidth - 4;
+                desiredLeft = tickLeftPx - labelWidth - sidePadding;
             } else if (index > 0) {
                 desiredLeft = tickLeftPx - (labelWidth / 2);
             }
@@ -3211,8 +3230,8 @@
             const labelWidth = Math.max(1, Math.min(containerWidth, labelWidthRaw > 0 ? labelWidthRaw : 1));
             labelNode.style.maxWidth = `${Math.max(1, containerWidth)}px`;
             const desiredLeft = alignEnd
-                ? Math.max(0, containerWidth - labelWidth)
-                : 0;
+                ? Math.max(0, containerWidth - labelWidth - edgeInsetPx)
+                : edgeInsetPx;
             const clampedLeft = Math.max(0, Math.min(desiredLeft, Math.max(0, containerWidth - labelWidth)));
             labelNode.hidden = false;
             labelNode.style.left = `${Math.round(clampedLeft - tickLeftPx)}px`;
@@ -3230,6 +3249,7 @@
         const rawTodayOffset = diffCalendarDays(todayDate, axisStart);
         const normalizedTodayOffset = Math.max(0, Math.min(totalDays, rawTodayOffset));
         const todayPercent = (normalizedTodayOffset * 100) / totalDays;
+        const todayLeftPx = percentToAxisPx(todayPercent);
         const todayMarker = document.createElement("span");
         todayMarker.className = "timeline-axis-marker today";
         if (rawTodayOffset < 0) {
@@ -3237,7 +3257,7 @@
         } else if (rawTodayOffset > totalDays) {
             todayMarker.classList.add("after-range");
         }
-        todayMarker.style.left = `${todayPercent.toFixed(4)}%`;
+        todayMarker.style.left = `${todayLeftPx.toFixed(4)}px`;
         todayMarker.title = `Dnes: ${formatDisplayDate(todayDate)}`;
 
         const todayLabel = document.createElement("span");
@@ -3248,7 +3268,7 @@
 
         const todayLabelWidthRaw = resolveLabelWidth(todayLabel);
         const todayLabelWidth = Math.max(1, Math.min(containerWidth, todayLabelWidthRaw > 0 ? todayLabelWidthRaw : 1));
-        const todayMarkerLeftPx = (todayPercent / 100) * containerWidth;
+        const todayMarkerLeftPx = todayLeftPx;
         const desiredTodayLeft = todayMarkerLeftPx - (todayLabelWidth / 2);
         const clampedTodayLeft = Math.max(0, Math.min(desiredTodayLeft, Math.max(0, containerWidth - todayLabelWidth)));
         todayLabel.style.maxWidth = `${Math.max(1, containerWidth)}px`;
