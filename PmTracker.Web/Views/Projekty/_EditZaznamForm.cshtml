@@ -248,13 +248,16 @@
                         var optionLabel = string.IsNullOrWhiteSpace(subsystem.Kod)
                             ? subsystem.Nazev
                             : $"{subsystem.Kod} - {subsystem.Nazev}";
+                        var defaultOwnerIdAttribute = subsystem.DefaultOwnerOsobaId > 0
+                            ? subsystem.DefaultOwnerOsobaId.ToString(CultureInfo.InvariantCulture)
+                            : string.Empty;
                         if (subsystem.Nazev == Model.Subsystem)
                         {
-                            <option value="@subsystem.Kod" data-owner-id="@subsystem.DefaultOwnerOsobaId" selected="selected">@optionLabel</option>
+                            <option value="@subsystem.Kod" data-owner-id="@defaultOwnerIdAttribute" selected="selected">@optionLabel</option>
                         }
                         else
                         {
-                            <option value="@subsystem.Kod" data-owner-id="@subsystem.DefaultOwnerOsobaId">@optionLabel</option>
+                            <option value="@subsystem.Kod" data-owner-id="@defaultOwnerIdAttribute">@optionLabel</option>
                         }
                     }
                 </select>

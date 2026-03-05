@@ -5306,14 +5306,39 @@
                 }
             };
 
-            const applyOwnerFromSubsystem = () => {
+            const resolveSelectedOwnerId = () => {
                 const selectedOption = subsystemSelect.selectedOptions[0];
                 if (!(selectedOption instanceof HTMLOptionElement)) {
+                    return "";
+                }
+
+                const rawOwnerId = (selectedOption.dataset.ownerId || "").trim();
+                const parsedOwnerId = Number.parseInt(rawOwnerId, 10);
+                if (!Number.isInteger(parsedOwnerId) || parsedOwnerId <= 0) {
+                    return "";
+                }
+
+                return String(parsedOwnerId);
+            };
+
+            const findOwnerItem = (ownerId) => {
+                if (!ownerId || !(ownerSource instanceof HTMLElement)) {
+                    return null;
+                }
+
+                return Array.from(ownerSource.querySelectorAll("[data-id]"))
+                    .find((item) => item instanceof HTMLElement && (item.dataset.id || "").trim() === ownerId);
+            };
+
+            const applyOwnerFromSubsystem = () => {
+                const ownerId = resolveSelectedOwnerId();
+                if (!ownerId) {
+                    clearOwnerPicker();
                     return;
                 }
 
-                const ownerId = (selectedOption.dataset.ownerId || "").trim();
-                if (!ownerId) {
+                const ownerItem = findOwnerItem(ownerId);
+                if (!(ownerItem instanceof HTMLElement)) {
                     clearOwnerPicker();
                     return;
                 }
@@ -5326,21 +5351,15 @@
                     }
                 }));
 
-                // Fallback for cases where picker source is not initialized yet.
-                if (ownerHiddenInput instanceof HTMLInputElement
-                    && ownerHiddenInput.value !== ownerId) {
+                if (ownerHiddenInput instanceof HTMLInputElement) {
                     ownerHiddenInput.value = ownerId;
+                }
 
-                    if (ownerInput instanceof HTMLInputElement
-                        && ownerSource instanceof HTMLElement) {
-                        const ownerItem = Array.from(ownerSource.querySelectorAll("[data-id]"))
-                            .find((item) => item instanceof HTMLElement && (item.dataset.id || "").trim() === ownerId);
-                        if (ownerItem instanceof HTMLElement) {
-                            const label = (ownerItem.dataset.label || "").trim();
-                            const email = (ownerItem.dataset.email || "").trim();
-                            ownerInput.value = email ? `${label} <${email}>` : label;
-                        }
-                    }
+                if (ownerInput instanceof HTMLInputElement) {
+                    const label = (ownerItem.dataset.label || "").trim();
+                    const email = (ownerItem.dataset.email || "").trim();
+                    ownerInput.value = email ? `${label} <${email}>` : label;
+                    ownerInput.setCustomValidity("");
                 }
             };
 
@@ -5355,7 +5374,10 @@
                 }
             });
 
-            applyOwnerFromSubsystem();
+            if (ownerHiddenInput instanceof HTMLInputElement
+                && !ownerHiddenInput.value.trim()) {
+                applyOwnerFromSubsystem();
+            }
         });
     }
 

@@ -414,8 +414,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 .Select(x => (int?)x.OsobaId)
             .FirstOrDefault()
             ?? _dbContext.Osoby.AsNoTracking().OrderBy(x => x.Id).Select(x => x.Id).First();
-        var activeSchema = GetActiveHarmonogramSchema();
-        var activeSchemaVersion = activeSchema.Verze > 0 ? activeSchema.Verze : 1;
+        var activeSchemaVersion = EnsurePersistedActiveHarmonogramSchemaVersion();
         var nextRecordNumber = GetNextCisloZaznamu(projektId);
         var createVisibleNumber = project.PouzivatIdentJednani
             ? string.Empty
@@ -1392,6 +1391,17 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         {
             var scheduleSchema = GetSchemaForRecord(entity);
             normalizedScheduleValues = ReplaceRecordScheduleValues(entity.Id, command.HarmonogramHodnoty, scheduleSchema.Kroky);
+        }
+        else if (!isTaskCategory)
+        {
+            var existingScheduleValues = _dbContext.ZaznamHarmonogramHodnoty
+                .Where(x => x.ZaznamId == entity.Id)
+                .ToList();
+            if (existingScheduleValues.Count > 0)
+            {
+                _dbContext.ZaznamHarmonogramHodnoty.RemoveRange(existingScheduleValues);
+                normalizedScheduleValues = [];
+            }
         }
         _dbContext.SaveChanges();
         tx.Commit();
