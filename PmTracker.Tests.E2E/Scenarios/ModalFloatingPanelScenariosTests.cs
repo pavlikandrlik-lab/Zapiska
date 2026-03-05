@@ -63,6 +63,57 @@ public sealed class ModalFloatingPanelScenariosTests
     }
 
     [Fact]
+    public async Task RecordEditorOwnerPicker_ShouldAvoidActionBar_AndKeepSideStableWhileTyping()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=zaznamy&asUser={_fixture.AdminOsobaId}");
+        await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
+        await page.ReloadAsync();
+
+        await page.GetByRole(AriaRole.Button, new() { Name = "Nový záznam" }).ClickAsync();
+
+        var modal = page.Locator(".modal-overlay");
+        await Expect(modal.Locator("form[data-record-editor-form='true']")).ToBeVisibleAsync();
+
+        var content = modal.Locator(".modal-content");
+        await content.EvaluateAsync(
+            """
+            (node) => {
+                if (!(node instanceof HTMLElement)) {
+                    return;
+                }
+
+                node.scrollTop = node.scrollHeight;
+            }
+            """);
+
+        var ownerInput = modal.Locator("[data-record-owner-picker] [data-person-picker-input]");
+        await ownerInput.FillAsync("a");
+
+        var panel = modal.Locator("[data-modal-floating-root] [data-person-picker-panel]");
+        await Expect(panel).ToBeVisibleAsync();
+
+        var actionBar = modal.Locator(".record-editor-actions");
+        await Expect(actionBar).ToBeVisibleAsync();
+
+        var firstState = await ReadPickerStateAsync(page, panel, ownerInput, actionBar);
+
+        var firstLabel = await panel.Locator(".office-search-item .office-search-primary").First.InnerTextAsync();
+        await ownerInput.FillAsync(firstLabel);
+        await page.WaitForTimeoutAsync(320);
+        await Expect(panel).ToBeVisibleAsync();
+
+        var secondState = await ReadPickerStateAsync(page, panel, ownerInput, actionBar);
+
+        firstState.Side.Should().Be(secondState.Side, "panel nesmí při změně počtu výsledků přeskakovat nad/pod input");
+        firstState.IntersectsActionBar.Should().BeFalse();
+        secondState.IntersectsActionBar.Should().BeFalse();
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
     public async Task ModalDatePicker_ShouldEscapeModalContentClipping()
     {
         var page = await _fixture.NewPageAsync();
@@ -114,5 +165,30 @@ public sealed class ModalFloatingPanelScenariosTests
     private static ILocatorAssertions Expect(ILocator locator)
     {
         return Assertions.Expect(locator);
+    }
+
+    private static async Task<(string Side, bool IntersectsActionBar)> ReadPickerStateAsync(
+        IPage page,
+        ILocator panel,
+        ILocator input,
+        ILocator actionBar)
+    {
+        var panelBox = await panel.BoundingBoxAsync();
+        var inputBox = await input.BoundingBoxAsync();
+        var actionBarBox = await actionBar.BoundingBoxAsync();
+
+        panelBox.Should().NotBeNull();
+        inputBox.Should().NotBeNull();
+        actionBarBox.Should().NotBeNull();
+
+        var side = panelBox!.Y + panelBox.Height <= inputBox!.Y + 1 ? "above" : "below";
+        var intersectsActionBar = panelBox.Y < actionBarBox!.Y + actionBarBox.Height
+            && panelBox.Y + panelBox.Height > actionBarBox.Y;
+
+        var viewportHeight = await page.EvaluateAsync<int>("() => window.innerHeight");
+        (panelBox.Y >= 0).Should().BeTrue();
+        (panelBox.Y + panelBox.Height <= viewportHeight + 1).Should().BeTrue();
+
+        return (side, intersectsActionBar);
     }
 }

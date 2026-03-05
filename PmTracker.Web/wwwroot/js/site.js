@@ -3001,51 +3001,52 @@
         return new Intl.DateTimeFormat("cs-CZ", { month: "short", year: "numeric" }).format(date);
     }
 
-    function buildTimelineAxisTicks(startDate, endDate) {
+    function resolveTimelineAxisTickTargetCount(containerWidth) {
+        if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
+            return 2;
+        }
+
+        if (containerWidth < 320) {
+            return 2;
+        }
+
+        const estimated = Math.round(containerWidth / 120);
+        return Math.max(5, Math.min(10, estimated));
+    }
+
+    function buildTimelineAxisTicks(startDate, endDate, desiredTickCount) {
         const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
         const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
         const totalDays = Math.max(1, diffCalendarDays(end, start));
-        const ticks = [];
+        const maxDistinctTicks = totalDays + 1;
+        const requestedTicks = Number.isFinite(desiredTickCount) ? Math.trunc(desiredTickCount) : 7;
+        const tickCount = Math.max(2, Math.min(maxDistinctTicks, requestedTicks));
+        const useMonthYearLabels = totalDays > 120;
+        const formatTickLabel = useMonthYearLabels ? formatAxisMonthYear : formatAxisDayMonth;
+        const selectedOffsets = new Set([0, totalDays]);
 
-        const pushTick = (date, label) => {
-            const clampedDays = Math.max(0, Math.min(totalDays, diffCalendarDays(date, start)));
-            ticks.push({
+        for (let index = 1; index < tickCount - 1; index += 1) {
+            const offset = Math.round((index * totalDays) / (tickCount - 1));
+            selectedOffsets.add(Math.max(0, Math.min(totalDays, offset)));
+        }
+
+        for (let dayOffset = 1; selectedOffsets.size < tickCount && dayOffset < totalDays; dayOffset += 1) {
+            selectedOffsets.add(dayOffset);
+        }
+
+        const orderedOffsets = Array.from(selectedOffsets)
+            .map((value) => Number.parseInt(String(value), 10))
+            .filter((value) => Number.isFinite(value))
+            .sort((a, b) => a - b);
+
+        return orderedOffsets.map((dayOffset) => {
+            const date = addCalendarDays(start, dayOffset);
+            return {
                 date,
-                label,
-                left: (clampedDays * 100) / totalDays
-            });
-        };
-
-        if (totalDays <= 21) {
-            for (let dayOffset = 0; dayOffset <= totalDays; dayOffset += 1) {
-                const tickDate = addCalendarDays(start, dayOffset);
-                pushTick(tickDate, formatAxisDayMonth(tickDate));
-            }
-            return ticks;
-        }
-
-        if (totalDays <= 120) {
-            for (let dayOffset = 0; dayOffset <= totalDays; dayOffset += 7) {
-                const tickDate = addCalendarDays(start, dayOffset);
-                pushTick(tickDate, formatAxisDayMonth(tickDate));
-            }
-            if (ticks.length === 0 || ticks[ticks.length - 1].left < 100) {
-                pushTick(end, formatAxisDayMonth(end));
-            }
-            return ticks;
-        }
-
-        pushTick(start, formatAxisMonthYear(start));
-        const monthCursor = new Date(start.getFullYear(), start.getMonth(), 1);
-        monthCursor.setMonth(monthCursor.getMonth() + 1);
-        while (monthCursor < end) {
-            pushTick(new Date(monthCursor.getTime()), formatAxisMonthYear(monthCursor));
-            monthCursor.setMonth(monthCursor.getMonth() + 1);
-        }
-        if (ticks.length === 0 || ticks[ticks.length - 1].left < 100) {
-            pushTick(end, formatAxisMonthYear(end));
-        }
-        return ticks;
+                label: formatTickLabel(date),
+                left: (dayOffset * 100) / totalDays
+            };
+        });
     }
 
     function renderTimelineAxis(container, startDate, endDate) {
@@ -3053,8 +3054,15 @@
             return;
         }
 
+        const containerWidth = Math.max(0, container.clientWidth);
+        if (containerWidth <= 0) {
+            container.replaceChildren();
+            return;
+        }
+
         container.replaceChildren();
-        const ticks = buildTimelineAxisTicks(startDate, endDate);
+        const desiredTickCount = resolveTimelineAxisTickTargetCount(containerWidth);
+        const ticks = buildTimelineAxisTicks(startDate, endDate, desiredTickCount);
         ticks.forEach((tick) => {
             const tickNode = document.createElement("span");
             tickNode.className = "timeline-axis-tick";
@@ -3071,14 +3079,13 @@
             return;
         }
 
-        const containerWidth = Math.max(0, container.clientWidth);
-        if (containerWidth <= 0) {
-            return;
-        }
-
         let previousLabelRight = -Infinity;
         const minLabelGap = 6;
-        Array.from(container.querySelectorAll(".timeline-axis-tick")).forEach((tickNode) => {
+        const tickNodes = Array.from(container.querySelectorAll(".timeline-axis-tick"))
+            .filter((tickNode) => tickNode instanceof HTMLElement);
+        const lastIndex = tickNodes.length - 1;
+
+        tickNodes.forEach((tickNode, index) => {
             if (!(tickNode instanceof HTMLElement)) {
                 return;
             }
@@ -3095,15 +3102,16 @@
             const leftPercent = Number.isFinite(leftPercentRaw) ? leftPercentRaw : 0;
             const tickLeftPx = (leftPercent / 100) * containerWidth;
             const labelWidth = labelNode.offsetWidth;
+            const forceVisible = index === 0 || index === lastIndex;
 
             if (labelWidth <= 0 || labelWidth > containerWidth) {
-                labelNode.hidden = true;
+                labelNode.hidden = !forceVisible;
                 return;
             }
 
             const desiredLeft = tickLeftPx + 4;
             const clampedLeft = Math.max(0, Math.min(desiredLeft, containerWidth - labelWidth));
-            if (clampedLeft < previousLabelRight + minLabelGap) {
+            if (!forceVisible && clampedLeft < previousLabelRight + minLabelGap) {
                 labelNode.hidden = true;
                 return;
             }
@@ -3298,7 +3306,8 @@
             gap: Number.isFinite(options.gap) ? options.gap : 8,
             flipVertical: options.flipVertical !== false,
             kind,
-            matchWidth
+            matchWidth,
+            lockVerticalSide: options.lockVerticalSide === true
         };
 
         panel.classList.add("floating-panel");
@@ -3341,6 +3350,7 @@
         delete panel._pmtrackerFloatingMount;
         delete panel._pmtrackerFloatingAnchor;
         delete panel._pmtrackerFloatingOptions;
+        delete panel._pmtrackerVerticalSide;
         floatingPanelRegistry.delete(panel);
     }
 
@@ -3369,7 +3379,12 @@
             return boundary;
         }
 
-        if (kind !== "date" && kind !== "time") {
+        if (kind !== "date" && kind !== "time" && kind !== "person-search") {
+            return boundary;
+        }
+
+        const modalContainer = anchor.closest("[data-modal-container]");
+        if (!(modalContainer instanceof HTMLElement)) {
             return boundary;
         }
 
@@ -3407,6 +3422,7 @@
         const gap = Number.isFinite(options.gap) ? options.gap : 8;
         const matchWidth = options.matchWidth === true || panel.dataset.floatingMatchWidth === "true";
         const kind = typeof options.kind === "string" ? options.kind : "";
+        const lockVerticalSide = options.lockVerticalSide === true;
         const viewportBoundary = {
             left: 8,
             right: window.innerWidth - 8,
@@ -3451,13 +3467,28 @@
         const fitsBelow = availableBelow >= panelRect.height;
         const fitsAbove = availableAbove >= panelRect.height;
         let shouldOpenAbove = false;
+        const storedVerticalSide = panel._pmtrackerVerticalSide === "above" || panel._pmtrackerVerticalSide === "below"
+            ? panel._pmtrackerVerticalSide
+            : null;
 
-        if (fitsBelow) {
-            shouldOpenAbove = false;
-        } else if (fitsAbove) {
-            shouldOpenAbove = true;
+        if (!lockVerticalSide) {
+            delete panel._pmtrackerVerticalSide;
+        }
+
+        if (lockVerticalSide && storedVerticalSide) {
+            shouldOpenAbove = storedVerticalSide === "above";
         } else {
-            shouldOpenAbove = availableAbove > availableBelow;
+            if (fitsBelow) {
+                shouldOpenAbove = false;
+            } else if (fitsAbove) {
+                shouldOpenAbove = true;
+            } else {
+                shouldOpenAbove = availableAbove > availableBelow;
+            }
+
+            if (lockVerticalSide) {
+                panel._pmtrackerVerticalSide = shouldOpenAbove ? "above" : "below";
+            }
         }
 
         const availableOnSelectedSide = shouldOpenAbove ? availableAbove : availableBelow;
@@ -4107,6 +4138,8 @@
 
             let filtered = [];
             let activeIndex = -1;
+            const lockVerticalSide = anchor.closest("[data-modal-container]") instanceof HTMLElement
+                && anchor.closest('form[data-record-editor-form="true"][data-record-editor-presentation="modal"]') instanceof HTMLElement;
 
             const closePanel = () => {
                 panel.hidden = true;
@@ -4120,7 +4153,8 @@
                     gap: 6,
                     flipVertical: true,
                     kind: "person-search",
-                    matchWidth: true
+                    matchWidth: true,
+                    lockVerticalSide
                 });
             };
 

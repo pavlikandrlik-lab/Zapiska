@@ -82,6 +82,9 @@ public sealed class ProjectHarmonogramRenderTests
         html.Should().Contain(">Skutečnost<");
         html.Should().Contain("schedule-overview-track");
         html.Should().Contain("schedule-overview-axis");
+        html.Should().Contain("data-timeline-axis");
+        html.Should().Contain("data-axis-start=");
+        html.Should().Contain("data-axis-end=");
         html.Should().Contain("schedule-overview-marker today");
         html.Should().Contain("schedule-overview-marker deadline");
         html.Should().NotContain("Legenda: Plán / Skutečnost / Termín úkolu");
@@ -152,6 +155,9 @@ public sealed class ProjectHarmonogramRenderTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain("schedule-layered-axis");
+        html.Should().Contain("data-timeline-axis");
+        html.Should().Contain("data-axis-start=");
+        html.Should().Contain("data-axis-end=");
         html.Should().Contain("schedule-layered-track schedule-layered-track--step");
         html.Should().Contain("schedule-layered-marker today");
         html.Should().NotContain("schedule-layered-marker deadline");

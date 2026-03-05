@@ -69,6 +69,31 @@ public sealed class HarmonogramUnifiedScenariosTests
         (await firstCard.Locator(".schedule-layered-marker.today").CountAsync()).Should().BeGreaterThan(0);
         await Expect(firstCard.Locator(".schedule-layered-marker.deadline")).ToHaveCountAsync(0);
 
+        var overviewLabels = firstCard.Locator(".schedule-overview-axis .timeline-axis-label:not([hidden])");
+        var overviewLabelCount = await overviewLabels.CountAsync();
+        overviewLabelCount.Should().BeGreaterThanOrEqualTo(5);
+        overviewLabelCount.Should().BeLessThanOrEqualTo(10);
+        ((await overviewLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+        ((await overviewLabels.Last.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+
+        var expandToggle = firstCard.Locator("[data-schedule-expand-toggle]");
+        if (await expandToggle.CountAsync() > 0)
+        {
+            var expanded = await expandToggle.First.GetAttributeAsync("aria-expanded");
+            if (expanded is null || !expanded.Equals("true", StringComparison.OrdinalIgnoreCase))
+            {
+                await expandToggle.First.ClickAsync();
+            }
+        }
+
+        await page.WaitForTimeoutAsync(120);
+        var layeredLabels = firstCard.Locator(".schedule-layered-axis .timeline-axis-label:not([hidden])");
+        var layeredLabelCount = await layeredLabels.CountAsync();
+        layeredLabelCount.Should().BeGreaterThanOrEqualTo(5);
+        layeredLabelCount.Should().BeLessThanOrEqualTo(10);
+        ((await layeredLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+        ((await layeredLabels.Last.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+
         await page.Context.CloseAsync();
     }
 
