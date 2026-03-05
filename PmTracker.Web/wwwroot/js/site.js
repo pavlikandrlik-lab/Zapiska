@@ -3093,6 +3093,12 @@
             return;
         }
 
+        const startStamp = toUtcDayStamp(startDate);
+        const endStamp = toUtcDayStamp(endDate);
+        const axisStart = startStamp <= endStamp ? startDate : endDate;
+        const axisEnd = startStamp <= endStamp ? endDate : startDate;
+        const totalDays = Math.max(1, diffCalendarDays(axisEnd, axisStart));
+
         const pendingFrame = Number.parseInt(container.dataset.axisRetryFrame || "0", 10);
         if (Number.isInteger(pendingFrame) && pendingFrame > 0) {
             window.cancelAnimationFrame(pendingFrame);
@@ -3100,10 +3106,13 @@
         container.dataset.axisRetryFrame = "0";
         container.replaceChildren();
         const desiredTickCount = resolveTimelineAxisTickTargetCount(containerWidth);
-        const ticks = buildTimelineAxisTicks(startDate, endDate, desiredTickCount);
-        ticks.forEach((tick) => {
+        const ticks = buildTimelineAxisTicks(axisStart, axisEnd, desiredTickCount);
+        ticks.forEach((tick, index) => {
             const tickNode = document.createElement("span");
             tickNode.className = "timeline-axis-tick";
+            if (index === 0 || index === ticks.length - 1) {
+                tickNode.classList.add("edge");
+            }
             tickNode.style.left = `${tick.left.toFixed(4)}%`;
 
             const labelNode = document.createElement("span");
@@ -3132,6 +3141,37 @@
             const fallbackLabelWidth = Math.ceil(measureTextWidth(labelNode.textContent || "", fallbackFontSpec));
             return measuredLabelWidth > 0 ? measuredLabelWidth : fallbackLabelWidth;
         };
+        const resolveTickLeftPx = (tickNode) => {
+            if (!(tickNode instanceof HTMLElement)) {
+                return 0;
+            }
+            const leftPercentRaw = Number.parseFloat(tickNode.style.left || "0");
+            const leftPercent = Number.isFinite(leftPercentRaw) ? leftPercentRaw : 0;
+            return (leftPercent / 100) * containerWidth;
+        };
+        const placeLabel = (tickNode, labelNode, index, forceVisible) => {
+            const tickLeftPx = resolveTickLeftPx(tickNode);
+            const labelWidthRaw = resolveLabelWidth(labelNode);
+            const labelWidth = Math.max(1, Math.min(containerWidth, labelWidthRaw > 0 ? labelWidthRaw : 1));
+            labelNode.style.maxWidth = `${Math.max(1, containerWidth)}px`;
+
+            let desiredLeft = tickLeftPx + 4;
+            if (index === lastIndex) {
+                desiredLeft = tickLeftPx - labelWidth - 4;
+            } else if (index > 0) {
+                desiredLeft = tickLeftPx - (labelWidth / 2);
+            }
+
+            const clampedLeft = Math.max(0, Math.min(desiredLeft, Math.max(0, containerWidth - labelWidth)));
+            if (!forceVisible && clampedLeft < previousLabelRight + minLabelGap) {
+                labelNode.hidden = true;
+                return;
+            }
+
+            labelNode.hidden = false;
+            labelNode.style.left = `${Math.round(clampedLeft - tickLeftPx)}px`;
+            previousLabelRight = Math.max(previousLabelRight, clampedLeft + labelWidth);
+        };
 
         tickNodes.forEach((tickNode, index) => {
             if (!(tickNode instanceof HTMLElement)) {
@@ -3145,42 +3185,17 @@
 
             labelNode.hidden = false;
             labelNode.style.left = "4px";
-
-            const leftPercentRaw = Number.parseFloat(tickNode.style.left || "0");
-            const leftPercent = Number.isFinite(leftPercentRaw) ? leftPercentRaw : 0;
-            const tickLeftPx = (leftPercent / 100) * containerWidth;
-            const labelWidth = resolveLabelWidth(labelNode);
             const forceVisible = index === 0 || index === lastIndex;
-
-            if (labelWidth <= 0 || labelWidth > containerWidth) {
-                labelNode.hidden = !forceVisible;
-                return;
-            }
-
-            const desiredLeft = tickLeftPx + 4;
-            const clampedLeft = Math.max(0, Math.min(desiredLeft, containerWidth - labelWidth));
-            if (!forceVisible && clampedLeft < previousLabelRight + minLabelGap) {
-                labelNode.hidden = true;
-                return;
-            }
-
-            labelNode.style.left = `${Math.round(clampedLeft - tickLeftPx)}px`;
-            previousLabelRight = clampedLeft + labelWidth;
+            placeLabel(tickNode, labelNode, index, forceVisible);
         });
 
         const resolveTickLabelNode = (tickNode) => tickNode instanceof HTMLElement
             ? tickNode.querySelector(".timeline-axis-label")
             : null;
-        const visibleLabelCount = tickNodes
+        const visibleLabelNodes = tickNodes
             .map(resolveTickLabelNode)
-            .filter((labelNode) => labelNode instanceof HTMLElement && !labelNode.hidden && String(labelNode.textContent || "").trim())
-            .length;
+            .filter((labelNode) => labelNode instanceof HTMLElement && !labelNode.hidden && String(labelNode.textContent || "").trim());
 
-        if (visibleLabelCount > 0 || tickNodes.length === 0) {
-            return;
-        }
-
-        // Hard fail-safe: if collision logic hides everything, force at least start/end labels.
         const forceLabelVisible = (tickNode, alignEnd) => {
             if (!(tickNode instanceof HTMLElement)) {
                 return;
@@ -3191,25 +3206,53 @@
                 return;
             }
 
-            const leftPercentRaw = Number.parseFloat(tickNode.style.left || "0");
-            const leftPercent = Number.isFinite(leftPercentRaw) ? leftPercentRaw : 0;
-            const tickLeftPx = (leftPercent / 100) * containerWidth;
-            const labelWidth = resolveLabelWidth(labelNode);
+            const tickLeftPx = resolveTickLeftPx(tickNode);
+            const labelWidthRaw = resolveLabelWidth(labelNode);
+            const labelWidth = Math.max(1, Math.min(containerWidth, labelWidthRaw > 0 ? labelWidthRaw : 1));
+            labelNode.style.maxWidth = `${Math.max(1, containerWidth)}px`;
             const desiredLeft = alignEnd
-                ? Math.max(0, containerWidth - Math.max(1, labelWidth))
+                ? Math.max(0, containerWidth - labelWidth)
                 : 0;
-            const clampedLeft = Math.max(0, Math.min(desiredLeft, Math.max(0, containerWidth - Math.max(1, labelWidth))));
+            const clampedLeft = Math.max(0, Math.min(desiredLeft, Math.max(0, containerWidth - labelWidth)));
             labelNode.hidden = false;
             labelNode.style.left = `${Math.round(clampedLeft - tickLeftPx)}px`;
         };
 
-        if (tickNodes.length === 1) {
+        if (visibleLabelNodes.length < 2 && tickNodes.length >= 2) {
             forceLabelVisible(tickNodes[0], false);
-            return;
+            forceLabelVisible(tickNodes[lastIndex], true);
+        } else if (visibleLabelNodes.length === 0 && tickNodes.length === 1) {
+            forceLabelVisible(tickNodes[0], false);
         }
 
-        forceLabelVisible(tickNodes[0], false);
-        forceLabelVisible(tickNodes[lastIndex], true);
+        const todayValue = settings.todayDate instanceof Date ? settings.todayDate : new Date();
+        const todayDate = new Date(todayValue.getFullYear(), todayValue.getMonth(), todayValue.getDate());
+        const rawTodayOffset = diffCalendarDays(todayDate, axisStart);
+        const normalizedTodayOffset = Math.max(0, Math.min(totalDays, rawTodayOffset));
+        const todayPercent = (normalizedTodayOffset * 100) / totalDays;
+        const todayMarker = document.createElement("span");
+        todayMarker.className = "timeline-axis-marker today";
+        if (rawTodayOffset < 0) {
+            todayMarker.classList.add("before-range");
+        } else if (rawTodayOffset > totalDays) {
+            todayMarker.classList.add("after-range");
+        }
+        todayMarker.style.left = `${todayPercent.toFixed(4)}%`;
+        todayMarker.title = `Dnes: ${formatDisplayDate(todayDate)}`;
+
+        const todayLabel = document.createElement("span");
+        todayLabel.className = "timeline-axis-today-label";
+        todayLabel.textContent = "Dnes";
+        todayMarker.appendChild(todayLabel);
+        container.appendChild(todayMarker);
+
+        const todayLabelWidthRaw = resolveLabelWidth(todayLabel);
+        const todayLabelWidth = Math.max(1, Math.min(containerWidth, todayLabelWidthRaw > 0 ? todayLabelWidthRaw : 1));
+        const todayMarkerLeftPx = (todayPercent / 100) * containerWidth;
+        const desiredTodayLeft = todayMarkerLeftPx - (todayLabelWidth / 2);
+        const clampedTodayLeft = Math.max(0, Math.min(desiredTodayLeft, Math.max(0, containerWidth - todayLabelWidth)));
+        todayLabel.style.maxWidth = `${Math.max(1, containerWidth)}px`;
+        todayLabel.style.left = `${Math.round(clampedTodayLeft - todayMarkerLeftPx)}px`;
     }
 
     function renderStaticTimelineAxes(scope) {
@@ -5487,9 +5530,7 @@
                     durationInc: row.querySelector("[data-schedule-duration-inc]"),
                     durationDec: row.querySelector("[data-schedule-duration-dec]"),
                     delayInc: row.querySelector("[data-schedule-delay-inc]"),
-                    delayDec: row.querySelector("[data-schedule-delay-dec]"),
-                    plannedBar: row.querySelector("[data-schedule-step-planned]"),
-                    actualBar: row.querySelector("[data-schedule-step-actual]")
+                    delayDec: row.querySelector("[data-schedule-delay-dec]")
                 }));
         }
 
@@ -5730,12 +5771,6 @@
         }
 
         renderStepRows(plan, actual, state) {
-            const maxStepDays = Math.max(
-                1,
-                ...state.map((item) => item.duration),
-                ...state.map((item) => Math.max(0, item.duration + item.delay))
-            );
-
             this.rows.forEach((entry, index) => {
                 const planEnd = plan[index]?.end;
                 const actualEnd = actual[index]?.end;
@@ -5752,17 +5787,6 @@
                     this.setDateInputValue(entry.delayDateInput, actualEnd);
                 }
 
-                const plannedWidth = Math.max(0, Math.min(100, Math.round((state[index].duration * 100) / maxStepDays)));
-                const actualDays = Math.max(0, state[index].duration + state[index].delay);
-                const actualWidth = Math.max(0, Math.min(100, Math.round((actualDays * 100) / maxStepDays)));
-                if (entry.plannedBar instanceof HTMLElement) {
-                    entry.plannedBar.style.width = `${plannedWidth}%`;
-                    entry.plannedBar.hidden = plannedWidth <= 0;
-                }
-                if (entry.actualBar instanceof HTMLElement) {
-                    entry.actualBar.style.width = `${actualWidth}%`;
-                    entry.actualBar.hidden = actualWidth <= 0;
-                }
             });
         }
 

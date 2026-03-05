@@ -223,7 +223,7 @@ public sealed class RecordEditorControllerTests
     }
 
     [Fact]
-    public async Task Edit_ShouldRenderScheduleMiniGantt_WithAlignedAxis_AndDualStepBars()
+    public async Task Edit_ShouldRenderScheduleMiniGantt_WithAlignedAxis_WithoutPerStepDuplicateBars()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiEditScheduleAxis");
         var projectId = await _fixture.EnsureProjectAsync("APIRED4");
@@ -237,10 +237,10 @@ public sealed class RecordEditorControllerTests
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain("schedule-mini-gantt-grid");
         html.Should().Contain("schedule-mini-gantt-axis-track");
-        html.Should().Contain("data-schedule-step-planned");
-        html.Should().Contain("data-schedule-step-actual");
-        html.Should().Contain("schedule-step-gantt-stack");
-        Regex.Matches(html, "data-schedule-axis").Count.Should().Be(2);
+        html.Should().NotContain("data-schedule-step-planned");
+        html.Should().NotContain("data-schedule-step-actual");
+        html.Should().NotContain("schedule-step-gantt-stack");
+        Regex.Matches(html, "data-schedule-axis").Count.Should().Be(1);
     }
 
     [Fact]

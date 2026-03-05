@@ -62,12 +62,13 @@ public sealed class HarmonogramUnifiedScenariosTests
         var labels = firstCard.Locator(".schedule-overview-axis .timeline-axis-label:not([hidden])");
         await Expect(labels.First).ToBeVisibleAsync();
         (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
+        await Expect(firstCard.Locator(".schedule-overview-axis .timeline-axis-marker.today")).ToHaveCountAsync(1);
 
         await page.Context.CloseAsync();
     }
 
     [Fact]
-    public async Task RecordEditorScheduleTab_ShouldRenderTwoAxes_WithVisibleDateLabels()
+    public async Task RecordEditorScheduleTab_ShouldRenderSingleMiniGanttAxis_WithVisibleDateLabels()
     {
         var page = await _fixture.NewPageAsync();
 
@@ -91,17 +92,14 @@ public sealed class HarmonogramUnifiedScenariosTests
         await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
 
         var axes = form.Locator("[data-schedule-axis]");
-        await Expect(axes).ToHaveCountAsync(2);
+        await Expect(axes).ToHaveCountAsync(1);
 
-        var firstAxisLabels = axes.Nth(0).Locator(".timeline-axis-label:not([hidden])");
-        var secondAxisLabels = axes.Nth(1).Locator(".timeline-axis-label:not([hidden])");
-        await Expect(firstAxisLabels.First).ToBeVisibleAsync();
-        await Expect(secondAxisLabels.First).ToBeVisibleAsync();
+        var labels = axes.First.Locator(".timeline-axis-label:not([hidden])");
+        await Expect(labels.First).ToBeVisibleAsync();
 
-        (await firstAxisLabels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
-        (await secondAxisLabels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
-        ((await firstAxisLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
-        ((await secondAxisLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+        (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
+        ((await labels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+        await Expect(axes.First.Locator(".timeline-axis-marker.today")).ToHaveCountAsync(1);
 
         await page.Context.CloseAsync();
     }
@@ -177,6 +175,7 @@ public sealed class HarmonogramUnifiedScenariosTests
         await Expect(page.Locator(".tab-panel[data-tab-panel='harmonogram'] .schedule-mini-legend")).ToHaveCountAsync(0);
         await Expect(firstCard.Locator(".schedule-layered-legend--steps")).ToHaveCountAsync(1);
         await Expect(firstCard.Locator(".schedule-layered-axis")).ToHaveCountAsync(1);
+        await Expect(firstCard.Locator(".schedule-overview-axis .timeline-axis-marker.today")).ToHaveCountAsync(1);
         (await firstCard.Locator(".schedule-layered-track--step").CountAsync()).Should().BeGreaterThan(0);
         (await firstCard.Locator(".schedule-layered-marker.today").CountAsync()).Should().BeGreaterThan(0);
         await Expect(firstCard.Locator(".schedule-layered-marker.deadline")).ToHaveCountAsync(0);
@@ -205,6 +204,68 @@ public sealed class HarmonogramUnifiedScenariosTests
         layeredLabelCount.Should().BeLessThanOrEqualTo(10);
         ((await layeredLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
         ((await layeredLabels.Last.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+        await Expect(firstCard.Locator(".schedule-layered-axis .timeline-axis-marker.today")).ToHaveCountAsync(1);
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
+    public async Task HarmonogramAxes_ShouldKeepDateLabelsVisible_AfterRepeatedTabSwitches()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?asUser={_fixture.AdminOsobaId}");
+
+        for (var attempt = 0; attempt < 3; attempt += 1)
+        {
+            await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+            if (await page.Locator(".schedule-card").CountAsync() > 0)
+            {
+                var firstCard = page.Locator(".schedule-card").First;
+                var labels = firstCard.Locator(".schedule-overview-axis .timeline-axis-label:not([hidden])");
+                await Expect(labels.First).ToBeVisibleAsync();
+                (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
+                await Expect(firstCard.Locator(".schedule-overview-axis .timeline-axis-marker.today")).ToHaveCountAsync(1);
+            }
+
+            await page.GetByRole(AriaRole.Button, new() { Name = "Záznamy" }).ClickAsync();
+        }
+
+        await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+        if (await page.Locator(".schedule-card").CountAsync() == 0)
+        {
+            await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
+            await page.Context.CloseAsync();
+            return;
+        }
+
+        await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
+        await page.ReloadAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+
+        if (await page.Locator(".schedule-card").CountAsync() == 0)
+        {
+            await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
+            await page.Context.CloseAsync();
+            return;
+        }
+
+        await page.Locator(".schedule-card .btn.small", new() { HasTextString = "Upravit" }).First.ClickAsync();
+        var modal = page.Locator(".modal-overlay");
+        var form = modal.Locator("form[data-record-editor-form='true']");
+        await Expect(form).ToBeVisibleAsync();
+
+        for (var attempt = 0; attempt < 3; attempt += 1)
+        {
+            await modal.GetByRole(AriaRole.Button, new() { Name = "Základní" }).ClickAsync();
+            await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+
+            var axis = form.Locator("[data-schedule-axis]").First;
+            var labels = axis.Locator(".timeline-axis-label:not([hidden])");
+            await Expect(labels.First).ToBeVisibleAsync();
+            (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
+            await Expect(axis.Locator(".timeline-axis-marker.today")).ToHaveCountAsync(1);
+        }
 
         await page.Context.CloseAsync();
     }

@@ -607,16 +607,9 @@
                             <th>Krok</th>
                             <th>Trvání / datum</th>
                             <th>Skutečnost / datum</th>
-                            <th>Plán / Skutečnost</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr class="schedule-table-axis-row" aria-hidden="true">
-                            <td colspan="3" class="schedule-table-axis-spacer"></td>
-                            <td class="schedule-step-gantt-axis-cell">
-                                <div class="timeline-axis schedule-step-gantt-axis" data-schedule-axis></div>
-                            </td>
-                        </tr>
                         @for (var i = 0; i < Model.HarmonogramKroky.Count; i++)
                         {
                             var krok = Model.HarmonogramKroky[i];
@@ -743,16 +736,6 @@
                                                     <line x1="5" y1="12" x2="19" y2="12"></line>
                                                 </svg>
                                             </button>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="schedule-step-gantt-cell">
-                                    <div class="schedule-step-gantt-stack" data-schedule-step-track style="--schedule-step-color:@krok.BarvaHex;">
-                                        <div class="schedule-step-gantt-track">
-                                            <div class="schedule-step-gantt-bar planned" data-schedule-step-planned></div>
-                                        </div>
-                                        <div class="schedule-step-gantt-track">
-                                            <div class="schedule-step-gantt-bar actual" data-schedule-step-actual></div>
                                         </div>
                                     </div>
                                 </td>
