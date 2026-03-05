@@ -1669,6 +1669,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     grid-template-columns: 80px 1fr;
     gap: 10px;
     align-items: center;
+    grid-column: 1 / -1;
 }
 
 .schedule-mini-gantt-row-label,

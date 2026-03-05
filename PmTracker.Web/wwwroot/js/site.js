@@ -3122,6 +3122,16 @@
         const tickNodes = Array.from(container.querySelectorAll(".timeline-axis-tick"))
             .filter((tickNode) => tickNode instanceof HTMLElement);
         const lastIndex = tickNodes.length - 1;
+        const resolveLabelWidth = (labelNode) => {
+            if (!(labelNode instanceof HTMLElement)) {
+                return 0;
+            }
+            const measuredLabelWidth = labelNode.offsetWidth;
+            const computedStyle = window.getComputedStyle(labelNode);
+            const fallbackFontSpec = `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+            const fallbackLabelWidth = Math.ceil(measureTextWidth(labelNode.textContent || "", fallbackFontSpec));
+            return measuredLabelWidth > 0 ? measuredLabelWidth : fallbackLabelWidth;
+        };
 
         tickNodes.forEach((tickNode, index) => {
             if (!(tickNode instanceof HTMLElement)) {
@@ -3139,11 +3149,7 @@
             const leftPercentRaw = Number.parseFloat(tickNode.style.left || "0");
             const leftPercent = Number.isFinite(leftPercentRaw) ? leftPercentRaw : 0;
             const tickLeftPx = (leftPercent / 100) * containerWidth;
-            const measuredLabelWidth = labelNode.offsetWidth;
-            const computedStyle = window.getComputedStyle(labelNode);
-            const fallbackFontSpec = `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
-            const fallbackLabelWidth = Math.ceil(measureTextWidth(labelNode.textContent || "", fallbackFontSpec));
-            const labelWidth = measuredLabelWidth > 0 ? measuredLabelWidth : fallbackLabelWidth;
+            const labelWidth = resolveLabelWidth(labelNode);
             const forceVisible = index === 0 || index === lastIndex;
 
             if (labelWidth <= 0 || labelWidth > containerWidth) {
@@ -3161,6 +3167,49 @@
             labelNode.style.left = `${Math.round(clampedLeft - tickLeftPx)}px`;
             previousLabelRight = clampedLeft + labelWidth;
         });
+
+        const resolveTickLabelNode = (tickNode) => tickNode instanceof HTMLElement
+            ? tickNode.querySelector(".timeline-axis-label")
+            : null;
+        const visibleLabelCount = tickNodes
+            .map(resolveTickLabelNode)
+            .filter((labelNode) => labelNode instanceof HTMLElement && !labelNode.hidden && String(labelNode.textContent || "").trim())
+            .length;
+
+        if (visibleLabelCount > 0 || tickNodes.length === 0) {
+            return;
+        }
+
+        // Hard fail-safe: if collision logic hides everything, force at least start/end labels.
+        const forceLabelVisible = (tickNode, alignEnd) => {
+            if (!(tickNode instanceof HTMLElement)) {
+                return;
+            }
+
+            const labelNode = tickNode.querySelector(".timeline-axis-label");
+            if (!(labelNode instanceof HTMLElement)) {
+                return;
+            }
+
+            const leftPercentRaw = Number.parseFloat(tickNode.style.left || "0");
+            const leftPercent = Number.isFinite(leftPercentRaw) ? leftPercentRaw : 0;
+            const tickLeftPx = (leftPercent / 100) * containerWidth;
+            const labelWidth = resolveLabelWidth(labelNode);
+            const desiredLeft = alignEnd
+                ? Math.max(0, containerWidth - Math.max(1, labelWidth))
+                : 0;
+            const clampedLeft = Math.max(0, Math.min(desiredLeft, Math.max(0, containerWidth - Math.max(1, labelWidth))));
+            labelNode.hidden = false;
+            labelNode.style.left = `${Math.round(clampedLeft - tickLeftPx)}px`;
+        };
+
+        if (tickNodes.length === 1) {
+            forceLabelVisible(tickNodes[0], false);
+            return;
+        }
+
+        forceLabelVisible(tickNodes[0], false);
+        forceLabelVisible(tickNodes[lastIndex], true);
     }
 
     function renderStaticTimelineAxes(scope) {

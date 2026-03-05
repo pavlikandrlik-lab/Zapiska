@@ -107,6 +107,55 @@ public sealed class HarmonogramUnifiedScenariosTests
     }
 
     [Fact]
+    public async Task RecordEditorScheduleTab_ShouldRenderPlanAndActualMiniGanttAsTwoSeparateRows()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
+        await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
+        await page.ReloadAsync();
+
+        if (await page.Locator(".schedule-card").CountAsync() == 0)
+        {
+            await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
+            await page.Context.CloseAsync();
+            return;
+        }
+
+        await page.Locator(".schedule-card .btn.small", new() { HasTextString = "Upravit" }).First.ClickAsync();
+
+        var modal = page.Locator(".modal-overlay");
+        var form = modal.Locator("form[data-record-editor-form='true']");
+        await Expect(form).ToBeVisibleAsync();
+        await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+
+        var rows = form.Locator("[data-record-mini-gantt] .schedule-mini-gantt-row");
+        await Expect(rows).ToHaveCountAsync(2);
+        await Expect(rows.Nth(0).Locator(".schedule-mini-gantt-row-label")).ToContainTextAsync("Plán");
+        await Expect(rows.Nth(1).Locator(".schedule-mini-gantt-row-label")).ToContainTextAsync("Skutečnost");
+
+        var firstRowTrack = rows.Nth(0).Locator(".schedule-mini-gantt-track");
+        var secondRowTrack = rows.Nth(1).Locator(".schedule-mini-gantt-track");
+        await Expect(firstRowTrack).ToBeVisibleAsync();
+        await Expect(secondRowTrack).ToBeVisibleAsync();
+
+        var firstRowBox = await rows.Nth(0).BoundingBoxAsync();
+        var secondRowBox = await rows.Nth(1).BoundingBoxAsync();
+        firstRowBox.Should().NotBeNull();
+        secondRowBox.Should().NotBeNull();
+        secondRowBox!.Y.Should().BeGreaterThan(firstRowBox!.Y);
+
+        var firstTrackBox = await firstRowTrack.BoundingBoxAsync();
+        var secondTrackBox = await secondRowTrack.BoundingBoxAsync();
+        firstTrackBox.Should().NotBeNull();
+        secondTrackBox.Should().NotBeNull();
+        firstTrackBox!.Width.Should().BeGreaterThan(40);
+        secondTrackBox!.Width.Should().BeGreaterThan(40);
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
     public async Task Harmonogram_ShouldRenderVisibleActualLegend_AndLayeredTracksInOverviewAndBreakdown()
     {
         var page = await _fixture.NewPageAsync();
