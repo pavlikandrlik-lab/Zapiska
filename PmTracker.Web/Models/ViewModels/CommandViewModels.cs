@@ -48,6 +48,9 @@ public sealed class SaveRecordCommand
     [StringLength(255)]
     public string Nazev { get; set; } = string.Empty;
 
+    [StringLength(100)]
+    public string? Cil { get; set; }
+
     public string? Popis { get; set; }
 
     [Required(ErrorMessage = "Vyberte vlastníka z nabídky.")]

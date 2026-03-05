@@ -47,7 +47,10 @@
                     }
                 </div>
                 <div class="record-title">#@Model.CisloViditelne - @Model.Nazev</div>
-                <div class="record-subtitle">@Model.Popis</div>
+                @if (!string.IsNullOrWhiteSpace(Model.Cil))
+                {
+                    <div class="record-subtitle record-goal-subtitle">@Model.Cil</div>
+                }
                 <div class="record-summary-meta">
                     <span><span class="label">Termín:</span> @(Model.AktualniTermin?.ToString("dd.MM.yyyy") ?? "-")</span>
                     <span><span class="label">Založeno:</span> @Model.DatumZalozeni.ToString("dd.MM.yyyy")</span>
@@ -139,6 +142,13 @@
                     </div>
                 }
             </div>
+
+            @if (!string.IsNullOrWhiteSpace(Model.Popis))
+            {
+                <div class="record-description">
+                    <span class="label">Popis:</span>@Model.Popis
+                </div>
+            }
 
             @if (Model.ExterniOdkazy.Count > 0)
             {

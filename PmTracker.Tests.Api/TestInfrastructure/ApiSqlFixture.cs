@@ -165,6 +165,7 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             StavUkoluId = stateId,
             CisloZaznamu = number,
             Nazev = marker,
+            Cil = marker,
             Popis = marker,
             VlastnikId = ownerOsobaId,
             DatumZalozeni = DateTime.Today,

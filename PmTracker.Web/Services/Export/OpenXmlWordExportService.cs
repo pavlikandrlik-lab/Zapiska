@@ -285,6 +285,19 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
             before: 0,
             after: 25));
 
+        if (!string.IsNullOrWhiteSpace(record.Cil))
+        {
+            cell.Append(CreateRichParagraph(
+                new[]
+                {
+                    new TextSegment("Cíl: ", Bold: true, Italic: true),
+                    new TextSegment(record.Cil, Italic: true)
+                },
+                sizeHalfPoints: BaseFontHalfPoints,
+                before: 0,
+                after: 25));
+        }
+
         if (!string.IsNullOrWhiteSpace(record.Popis))
         {
             cell.Append(CreateRichParagraph(

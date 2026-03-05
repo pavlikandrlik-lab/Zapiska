@@ -69,6 +69,7 @@ public sealed class ZaznamCardViewModel
     public string? TypUkolu { get; init; }
     public string? StavKod { get; init; }
     public required string Stav { get; init; }
+    public required string Cil { get; init; }
     public required string Popis { get; init; }
     public required IReadOnlyList<string> HistorieVlastniku { get; init; }
     public required string AktualniVlastnik { get; init; }
@@ -325,6 +326,7 @@ public sealed class ZaznamEditViewModel
     public int? JednaniIdProCislo { get; init; }
     public required IReadOnlyList<JednaniOptionViewModel> JednaniProCisloOptions { get; init; }
     public required string Nazev { get; init; }
+    public required string Cil { get; init; }
     public required string Kategorie { get; init; }
     public required string Popis { get; init; }
     public string? TypUkolu { get; init; }

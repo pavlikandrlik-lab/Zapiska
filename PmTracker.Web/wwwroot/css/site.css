@@ -1188,6 +1188,10 @@ textarea {
     min-height: 120px;
 }
 
+.record-description-textarea {
+    min-height: 96px;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -2588,6 +2592,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin-top: 3px;
 }
 
+.record-goal-subtitle {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .record-summary-meta {
     display: flex;
     align-items: center;
@@ -2644,6 +2654,14 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .record-history strong {
     color: #0f172a;
     margin-left: 6px;
+}
+
+.record-description {
+    margin: 10px 0 8px;
+    font-size: 13px;
+    color: var(--gov-color-muted);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .label {

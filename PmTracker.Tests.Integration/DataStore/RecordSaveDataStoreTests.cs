@@ -54,6 +54,7 @@ public sealed class RecordSaveDataStoreTests
             Kategorie = categoryCode,
             Stav = statusCode,
             Nazev = "Schema bootstrap record",
+            Cil = "  Schema bootstrap goal  ",
             Popis = "Test",
             VlastnikId = ownerId,
             DatumZalozeni = new DateTime(2026, 3, 4),
@@ -67,6 +68,7 @@ public sealed class RecordSaveDataStoreTests
 
         var saved = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
         saved.HarmonogramSablonaVerze.Should().BeGreaterThan(0);
+        saved.Cil.Should().Be("Schema bootstrap goal");
         (await dbContext.HarmonogramSablony.AsNoTracking()
             .AnyAsync(x => x.Verze == saved.HarmonogramSablonaVerze)).Should().BeTrue();
     }

@@ -54,6 +54,34 @@ public sealed class RecordEditorControllerTests
         html.Should().Contain($"data-record-editor-presentation=\"{expectedPresentation}\"");
         html.Should().Contain("data-record-owner-picker");
         html.Should().Contain("office-searchbox\" data-floating-anchor");
+        html.Should().Contain("name=\"Cil\"");
+    }
+
+    [Fact]
+    public async Task RecordCardPartial_ShouldRenderGoalInSubtitle_AndDescriptionInExpandedBody()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiCardGoalOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIREDCIL");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDCILSUB", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API card goal record");
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var record = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == recordId);
+            record.Cil = "Jednoradkovy cil pro kartu";
+            record.Popis = "Detailni popis po rozbaleni";
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/RecordCardPartial?projektId={projectId}&zaznamId={recordId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("record-goal-subtitle");
+        html.Should().Contain("Jednoradkovy cil pro kartu");
+        html.Should().Contain("<span class=\"label\">Popis:</span>");
+        html.Should().Contain("Detailni popis po rozbaleni");
     }
 
     [Fact]
@@ -75,6 +103,7 @@ public sealed class RecordEditorControllerTests
                 x.StavUkoluId,
                 x.CisloZaznamu,
                 x.Nazev,
+                x.Cil,
                 x.Popis,
                 x.VlastnikId,
                 x.DatumZalozeni,
@@ -105,6 +134,7 @@ public sealed class RecordEditorControllerTests
                 ("Kategorie", categoryName),
                 ("Stav", statusName),
                 ("Nazev", $"{record.Nazev} updated"),
+                ("Cil", record.Cil ?? string.Empty),
                 ("Popis", record.Popis ?? string.Empty),
                 ("VlastnikId", record.VlastnikId.ToString()),
                 ("DatumZalozeni", record.DatumZalozeni.ToString("yyyy-MM-dd")),
@@ -145,6 +175,7 @@ public sealed class RecordEditorControllerTests
                 x.StavUkoluId,
                 x.CisloZaznamu,
                 x.Nazev,
+                x.Cil,
                 x.Popis,
                 x.VlastnikId,
                 x.DatumZalozeni,
@@ -188,6 +219,7 @@ public sealed class RecordEditorControllerTests
                 ("Kategorie", categoryName),
                 ("Stav", statusName),
                 ("Nazev", record.Nazev),
+                ("Cil", record.Cil ?? string.Empty),
                 ("Popis", record.Popis ?? string.Empty),
                 ("VlastnikId", record.VlastnikId.ToString()),
                 ("DatumZalozeni", record.DatumZalozeni.ToString("yyyy-MM-dd")),
@@ -262,6 +294,7 @@ public sealed class RecordEditorControllerTests
                 x.StavUkoluId,
                 x.CisloZaznamu,
                 x.Nazev,
+                x.Cil,
                 x.Popis,
                 x.VlastnikId,
                 x.DatumZalozeni,
@@ -291,6 +324,7 @@ public sealed class RecordEditorControllerTests
                 ("Kategorie", categoryName),
                 ("Stav", statusName),
                 ("Nazev", record.Nazev),
+                ("Cil", record.Cil ?? string.Empty),
                 ("Popis", record.Popis ?? string.Empty),
                 ("VlastnikId", record.VlastnikId.ToString()),
                 ("DatumZalozeni", record.DatumZalozeni.ToString("yyyy-MM-dd")),

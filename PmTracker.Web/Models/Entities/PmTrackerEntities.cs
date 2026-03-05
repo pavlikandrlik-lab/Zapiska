@@ -195,6 +195,7 @@ public sealed class ProjektovyZaznamEntity
     public int CisloViditelneB { get; set; }
     public int? CisloJednaniZdrojId { get; set; }
     public string Nazev { get; set; } = string.Empty;
+    public string? Cil { get; set; }
     public string? Popis { get; set; }
     public int VlastnikId { get; set; }
     public DateTime DatumZalozeni { get; set; }

@@ -240,10 +240,15 @@
             color: #202020;
         }
 
+        .record-goal,
         .record-desc,
         .record-external {
             margin: 0 0 3px;
             font-size: 10pt;
+        }
+
+        .record-goal {
+            font-style: italic;
         }
 
         .section-label {
@@ -437,6 +442,10 @@
                                         <span class="record-subsystem-code">@subsystemCode</span>
                                     </div>
                                     <p class="record-meta"><strong>Stav:</strong> @zaznam.Stav | <strong>Typ úkolu:</strong> @(string.IsNullOrWhiteSpace(zaznam.TypUkolu) ? "-" : zaznam.TypUkolu)</p>
+                                    @if (!string.IsNullOrWhiteSpace(zaznam.Cil))
+                                    {
+                                        <p class="record-goal"><strong>Cíl:</strong> @zaznam.Cil</p>
+                                    }
                                     @if (!string.IsNullOrWhiteSpace(zaznam.Popis))
                                     {
                                         <p class="record-desc"><strong>Popis:</strong> @zaznam.Popis</p>

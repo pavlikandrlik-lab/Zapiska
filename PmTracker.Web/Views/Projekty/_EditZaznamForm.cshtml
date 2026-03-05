@@ -196,10 +196,17 @@
             </label>
         </div>
 
+        <div class="record-form-row record-form-row-title">
+            <label>
+                Cíl (volitelné)
+                <input type="text" name="Cil" value="@Model.Cil" maxlength="100" />
+            </label>
+        </div>
+
         <div class="record-form-row">
             <label>
                 Popis (volitelné)
-                <textarea rows="4" name="Popis">@Model.Popis</textarea>
+                <textarea class="record-description-textarea" rows="3" name="Popis">@Model.Popis</textarea>
             </label>
         </div>
 

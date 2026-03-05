@@ -275,6 +275,7 @@ internal static class IntegrationTestHelper
             StavUkoluId = taskStateId,
             CisloZaznamu = maxNumber + 1,
             Nazev = $"{marker} Record",
+            Cil = $"{marker} Cíl",
             Popis = $"{marker} Popis",
             VlastnikId = ownerOsobaId,
             DatumZalozeni = DateTime.Today,

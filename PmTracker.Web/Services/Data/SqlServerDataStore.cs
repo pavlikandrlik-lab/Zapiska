@@ -435,6 +435,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             CisloViditelneB = 0,
             CisloJednaniZdrojId = null,
             Nazev = string.Empty,
+            Cil = string.Empty,
             Popis = string.Empty,
             VlastnikId = defaultOwnerId,
             DatumZalozeni = DateTime.Today,
@@ -1240,6 +1241,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             entity.StavUkoluId = statusId;
             entity.AktualniTypUkoluId = typeId;
             entity.Nazev = command.Nazev.Trim();
+            entity.Cil = string.IsNullOrWhiteSpace(command.Cil) ? null : command.Cil.Trim();
             entity.Popis = string.IsNullOrWhiteSpace(command.Popis) ? null : command.Popis.Trim();
             entity.VlastnikId = ownerId;
             entity.DatumUkonceni = command.TerminUkonceni.Date;
@@ -1371,6 +1373,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 CisloViditelneB = cisloViditelneB,
                 CisloJednaniZdrojId = cisloJednaniZdrojId,
                 Nazev = command.Nazev.Trim(),
+                Cil = string.IsNullOrWhiteSpace(command.Cil) ? null : command.Cil.Trim(),
                 Popis = string.IsNullOrWhiteSpace(command.Popis) ? null : command.Popis.Trim(),
                 VlastnikId = ownerId,
                 DatumZalozeni = command.DatumZalozeni.Date,
@@ -3183,6 +3186,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     : true,
                 JeUkol = isTask,
                 VyjadreniJednaniStavyKody = commentMeetingStateCodes,
+                Cil = record.Cil ?? string.Empty,
                 Popis = record.Popis ?? string.Empty,
                 HistorieVlastniku = ownerHistory.Select(x => BuildInlinePersonLabelFromOsoba(people.GetValueOrDefault(x.PuvodniVlastnik))).Distinct(Ci).ToList(),
                 AktualniVlastnik = BuildInlinePersonLabelFromOsoba(currentOwner),
@@ -4401,6 +4405,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             JednaniIdProCislo = selectedMeetingId,
             JednaniProCisloOptions = meetingOptions,
             Nazev = record.Nazev,
+            Cil = record.Cil ?? string.Empty,
             Kategorie = selectedCategory?.Nazev ?? string.Empty,
             Popis = record.Popis ?? string.Empty,
             TypUkolu = record.AktualniTypUkoluId.HasValue ? taskTypes.FirstOrDefault(x => x.Id == record.AktualniTypUkoluId.Value)?.Nazev : null,
@@ -5268,6 +5273,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 CisloViditelneA = ResolveVisibleNumberPartA(record),
                 CisloViditelneB = ResolveVisibleNumberPartB(record),
                 Nazev = record.Nazev,
+                Cil = record.Cil,
                 Popis = record.Popis,
                 KategorieKod = category?.Kod ?? "-",
                 Kategorie = category?.Nazev ?? "-",

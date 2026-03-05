@@ -57,6 +57,7 @@ public sealed class PdfExportRecordViewModel
     public int CisloViditelneA { get; init; }
     public int CisloViditelneB { get; init; }
     public required string Nazev { get; init; }
+    public string? Cil { get; init; }
     public string? Popis { get; init; }
     public required string KategorieKod { get; init; }
     public required string Kategorie { get; init; }
