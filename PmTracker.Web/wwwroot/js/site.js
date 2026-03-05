@@ -3107,6 +3107,7 @@
         const totalDays = Math.max(1, diffCalendarDays(axisEnd, axisStart));
         const edgeInsetPx = Math.max(2, Math.min(4, Math.round(containerWidth * 0.006)));
         const usableAxisWidth = Math.max(1, containerWidth - (edgeInsetPx * 2));
+        const labelGlobalShiftLeftPx = 14;
         const percentToAxisPx = (percentValue) => {
             const normalized = Math.max(0, Math.min(100, Number.isFinite(percentValue) ? percentValue : 0));
             return edgeInsetPx + ((normalized / 100) * usableAxisWidth);
@@ -3181,6 +3182,8 @@
                 desiredLeft = tickLeftPx - (labelWidth / 2);
             }
 
+            desiredLeft -= labelGlobalShiftLeftPx;
+
             const clampedLeft = Math.max(0, Math.min(desiredLeft, Math.max(0, containerWidth - labelWidth)));
             if (!forceVisible && clampedLeft < previousLabelRight + minLabelGap) {
                 labelNode.hidden = true;
@@ -3232,7 +3235,8 @@
             const desiredLeft = alignEnd
                 ? Math.max(0, containerWidth - labelWidth - edgeInsetPx)
                 : edgeInsetPx;
-            const clampedLeft = Math.max(0, Math.min(desiredLeft, Math.max(0, containerWidth - labelWidth)));
+            const shiftedDesiredLeft = desiredLeft - labelGlobalShiftLeftPx;
+            const clampedLeft = Math.max(0, Math.min(shiftedDesiredLeft, Math.max(0, containerWidth - labelWidth)));
             labelNode.hidden = false;
             labelNode.style.left = `${Math.round(clampedLeft - tickLeftPx)}px`;
         };
