@@ -44,6 +44,29 @@ public sealed class HarmonogramUnifiedScenariosTests
     }
 
     [Fact]
+    public async Task HarmonogramAxis_ShouldRenderDates_AfterSwitchingFromAnotherTab()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?asUser={_fixture.AdminOsobaId}");
+        await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+
+        if (await page.Locator(".schedule-card").CountAsync() == 0)
+        {
+            await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
+            await page.Context.CloseAsync();
+            return;
+        }
+
+        var firstCard = page.Locator(".schedule-card").First;
+        var labels = firstCard.Locator(".schedule-overview-axis .timeline-axis-label:not([hidden])");
+        await Expect(labels.First).ToBeVisibleAsync();
+        (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
     public async Task Harmonogram_ShouldRenderVisibleActualLegend_AndLayeredTracksInOverviewAndBreakdown()
     {
         var page = await _fixture.NewPageAsync();

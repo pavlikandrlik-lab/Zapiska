@@ -2249,6 +2249,9 @@
         });
         localStorage.setItem("pmtracker.tab.active", tabName);
         if (activePanel instanceof HTMLElement) {
+            if (tabName === "harmonogram") {
+                renderStaticTimelineAxes(activePanel);
+            }
             queueRainbowSegmentRender(activePanel);
         }
         scheduleSubsystemIndicatorSync();
