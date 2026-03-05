@@ -62,7 +62,6 @@ public sealed class HarmonogramUnifiedScenariosTests
         var labels = firstCard.Locator(".schedule-overview-axis .timeline-axis-label:not([hidden])");
         await Expect(labels.First).ToBeVisibleAsync();
         (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
-        await Expect(firstCard.Locator(".schedule-overview-axis .timeline-axis-marker.today")).ToHaveCountAsync(1);
 
         await page.Context.CloseAsync();
     }
@@ -99,10 +98,6 @@ public sealed class HarmonogramUnifiedScenariosTests
 
         (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
         ((await labels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
-        await Expect(axes.First.Locator(".timeline-axis-marker.today")).ToHaveCountAsync(1);
-        var modalAxisTodayColor = await axes.First.Locator(".timeline-axis-marker.today").EvaluateAsync<string>(
-            "node => getComputedStyle(node).backgroundColor");
-        modalAxisTodayColor.Should().Be("rgb(17, 17, 17)");
 
         await page.Context.CloseAsync();
     }
@@ -178,7 +173,6 @@ public sealed class HarmonogramUnifiedScenariosTests
         await Expect(page.Locator(".tab-panel[data-tab-panel='harmonogram'] .schedule-mini-legend")).ToHaveCountAsync(0);
         await Expect(firstCard.Locator(".schedule-layered-legend--steps")).ToHaveCountAsync(1);
         await Expect(firstCard.Locator(".schedule-layered-axis")).ToHaveCountAsync(1);
-        await Expect(firstCard.Locator(".schedule-overview-axis .timeline-axis-marker.today")).ToHaveCountAsync(1);
         (await firstCard.Locator(".schedule-layered-track--step").CountAsync()).Should().BeGreaterThan(0);
         (await firstCard.Locator(".schedule-layered-marker.today").CountAsync()).Should().BeGreaterThan(0);
         await Expect(firstCard.Locator(".schedule-layered-marker.deadline")).ToHaveCountAsync(0);
@@ -211,7 +205,6 @@ public sealed class HarmonogramUnifiedScenariosTests
         layeredLabelCount.Should().BeLessThanOrEqualTo(10);
         ((await layeredLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
         ((await layeredLabels.Last.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
-        await Expect(firstCard.Locator(".schedule-layered-axis .timeline-axis-marker.today")).ToHaveCountAsync(1);
         var layeredTodayColor = await firstCard.Locator(".schedule-layered-marker.today").First.EvaluateAsync<string>(
             "node => getComputedStyle(node).backgroundColor");
         layeredTodayColor.Should().Be("rgb(17, 17, 17)");
@@ -235,7 +228,6 @@ public sealed class HarmonogramUnifiedScenariosTests
                 var labels = firstCard.Locator(".schedule-overview-axis .timeline-axis-label:not([hidden])");
                 await Expect(labels.First).ToBeVisibleAsync();
                 (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
-                await Expect(firstCard.Locator(".schedule-overview-axis .timeline-axis-marker.today")).ToHaveCountAsync(1);
             }
 
             await page.GetByRole(AriaRole.Button, new() { Name = "Záznamy" }).ClickAsync();
@@ -274,7 +266,6 @@ public sealed class HarmonogramUnifiedScenariosTests
             var labels = axis.Locator(".timeline-axis-label:not([hidden])");
             await Expect(labels.First).ToBeVisibleAsync();
             (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
-            await Expect(axis.Locator(".timeline-axis-marker.today")).ToHaveCountAsync(1);
         }
 
         await page.Context.CloseAsync();

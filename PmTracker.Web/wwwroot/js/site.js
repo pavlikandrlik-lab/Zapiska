@@ -3105,7 +3105,7 @@
         const axisStart = startStamp <= endStamp ? startDate : endDate;
         const axisEnd = startStamp <= endStamp ? endDate : startDate;
         const totalDays = Math.max(1, diffCalendarDays(axisEnd, axisStart));
-        const edgeInsetPx = Math.max(6, Math.min(12, Math.round(containerWidth * 0.02)));
+        const edgeInsetPx = Math.max(2, Math.min(4, Math.round(containerWidth * 0.006)));
         const usableAxisWidth = Math.max(1, containerWidth - (edgeInsetPx * 2));
         const percentToAxisPx = (percentValue) => {
             const normalized = Math.max(0, Math.min(100, Number.isFinite(percentValue) ? percentValue : 0));
@@ -3173,7 +3173,7 @@
             const labelWidth = Math.max(1, Math.min(containerWidth, labelWidthRaw > 0 ? labelWidthRaw : 1));
             labelNode.style.maxWidth = `${Math.max(1, containerWidth)}px`;
 
-            const sidePadding = 6;
+            const sidePadding = 12;
             let desiredLeft = tickLeftPx + sidePadding;
             if (index === lastIndex) {
                 desiredLeft = tickLeftPx - labelWidth - sidePadding;
@@ -3244,35 +3244,6 @@
             forceLabelVisible(tickNodes[0], false);
         }
 
-        const todayValue = settings.todayDate instanceof Date ? settings.todayDate : new Date();
-        const todayDate = new Date(todayValue.getFullYear(), todayValue.getMonth(), todayValue.getDate());
-        const rawTodayOffset = diffCalendarDays(todayDate, axisStart);
-        const normalizedTodayOffset = Math.max(0, Math.min(totalDays, rawTodayOffset));
-        const todayPercent = (normalizedTodayOffset * 100) / totalDays;
-        const todayLeftPx = percentToAxisPx(todayPercent);
-        const todayMarker = document.createElement("span");
-        todayMarker.className = "timeline-axis-marker today";
-        if (rawTodayOffset < 0) {
-            todayMarker.classList.add("before-range");
-        } else if (rawTodayOffset > totalDays) {
-            todayMarker.classList.add("after-range");
-        }
-        todayMarker.style.left = `${todayLeftPx.toFixed(4)}px`;
-        todayMarker.title = `Dnes: ${formatDisplayDate(todayDate)}`;
-
-        const todayLabel = document.createElement("span");
-        todayLabel.className = "timeline-axis-today-label";
-        todayLabel.textContent = "Dnes";
-        todayMarker.appendChild(todayLabel);
-        container.appendChild(todayMarker);
-
-        const todayLabelWidthRaw = resolveLabelWidth(todayLabel);
-        const todayLabelWidth = Math.max(1, Math.min(containerWidth, todayLabelWidthRaw > 0 ? todayLabelWidthRaw : 1));
-        const todayMarkerLeftPx = todayLeftPx;
-        const desiredTodayLeft = todayMarkerLeftPx - (todayLabelWidth / 2);
-        const clampedTodayLeft = Math.max(0, Math.min(desiredTodayLeft, Math.max(0, containerWidth - todayLabelWidth)));
-        todayLabel.style.maxWidth = `${Math.max(1, containerWidth)}px`;
-        todayLabel.style.left = `${Math.round(clampedTodayLeft - todayMarkerLeftPx)}px`;
     }
 
     function renderStaticTimelineAxes(scope) {
