@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Data.SqlClient;
 using Microsoft.Playwright;
 using PmTracker.Tests.E2E.TestInfrastructure;
 
@@ -271,8 +272,179 @@ public sealed class HarmonogramUnifiedScenariosTests
         await page.Context.CloseAsync();
     }
 
+    [Fact]
+    public async Task RecordCreateSchedule_ShouldAllowDurationControls_AndReturnJsonOnSave()
+    {
+        var page = await _fixture.NewPageAsync();
+        const string createdRecordName = "E2E create schedule edit";
+
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=zaznamy&asUser={_fixture.AdminOsobaId}");
+            await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
+            await page.ReloadAsync();
+
+            await page.GetByRole(AriaRole.Button, new() { Name = "Nový záznam" }).ClickAsync();
+
+            var modal = page.Locator(".modal-overlay");
+            var form = modal.Locator("form[data-record-editor-form='true']");
+            await Expect(form).ToBeVisibleAsync();
+
+            await form.Locator("input[name='Nazev']").FillAsync(createdRecordName);
+            var subsystemSelect = form.Locator("select[name='Subsystem']");
+            var subsystemOptions = await subsystemSelect.Locator("option").CountAsync();
+            subsystemOptions.Should().BeGreaterThan(0, "nový záznam musí mít minimálně jeden aktivní subsystém");
+            var subsystemValue = await subsystemSelect.InputValueAsync();
+            subsystemValue.Should().NotBeNullOrWhiteSpace("subsystém je povinný pro uložení záznamu");
+
+            var ownerCandidates = await form.Locator("[data-record-owner-picker] [data-person-picker-source] [data-id]").CountAsync();
+            ownerCandidates.Should().BeGreaterThan(0, "vlastník musí být vybratelný ze seznamu osob projektu");
+            await form.EvaluateAsync(
+                @"formElement => {
+                    const firstCandidate = formElement.querySelector('[data-record-owner-picker] [data-person-picker-source] [data-id]');
+                    const hiddenInput = formElement.querySelector('[data-record-owner-picker] [data-person-picker-hidden]');
+                    const queryInput = formElement.querySelector('[data-record-owner-picker] [data-person-picker-input]');
+                    if (!(firstCandidate instanceof HTMLElement)
+                        || !(hiddenInput instanceof HTMLInputElement)
+                        || !(queryInput instanceof HTMLInputElement)) {
+                        return;
+                    }
+
+                    const id = (firstCandidate.dataset.id || '').trim();
+                    const label = (firstCandidate.dataset.label || '').trim();
+                    const email = (firstCandidate.dataset.email || '').trim();
+                    hiddenInput.value = id;
+                    queryInput.value = email ? `${label} <${email}>` : label;
+                    queryInput.setCustomValidity('');
+                }");
+
+            var categorySelect = form.Locator("select[name='Kategorie']");
+            var taskCategoryValue = await categorySelect.EvaluateAsync<string>(
+                @"select => {
+                    const option = Array.from(select.options).find(item => /ukol|úkol/i.test((item.textContent || '').trim()));
+                    return option ? option.value : '';
+                }");
+            taskCategoryValue.Should().NotBeNullOrWhiteSpace();
+            await categorySelect.SelectOptionAsync(new SelectOptionValue { Value = taskCategoryValue });
+
+            await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+
+            var firstDurationInput = form.Locator("[data-schedule-duration]").First;
+            var firstDurationInc = form.Locator("[data-schedule-duration-inc]").First;
+
+            await Expect(firstDurationInput).ToBeEnabledAsync();
+            await Expect(firstDurationInc).ToBeEnabledAsync();
+
+            var initialDurationValue = await firstDurationInput.InputValueAsync();
+            var initialDuration = int.TryParse(initialDurationValue, out var parsedDuration) ? parsedDuration : 0;
+
+            await firstDurationInc.ClickAsync();
+            await Expect(firstDurationInput).ToHaveValueAsync((initialDuration + 1).ToString());
+
+            var durationAfterStepper = await firstDurationInput.InputValueAsync();
+            var firstDateInput = form.Locator("[data-schedule-date]").First;
+            await firstDateInput.EvaluateAsync(
+                @"input => {
+                    const parseIso = (value) => {
+                        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((value || '').trim());
+                        if (!match) {
+                            return null;
+                        }
+
+                        return new Date(Number.parseInt(match[1], 10), Number.parseInt(match[2], 10) - 1, Number.parseInt(match[3], 10));
+                    };
+                    const toIso = (value) => {
+                        const year = value.getFullYear();
+                        const month = String(value.getMonth() + 1).padStart(2, '0');
+                        const day = String(value.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                    };
+
+                    const selected = parseIso(input.value) || new Date();
+                    selected.setDate(selected.getDate() + 3);
+                    input.value = toIso(selected);
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }");
+
+            (await firstDurationInput.InputValueAsync()).Should().NotBe(durationAfterStepper);
+
+            var saveResponseTask = page.WaitForResponseAsync(response =>
+                response.Request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase)
+                && response.Url.Contains("/Zaznamy/Save", StringComparison.OrdinalIgnoreCase));
+
+            await form.Locator("button[type='submit']").ClickAsync();
+
+            var saveResponse = await saveResponseTask;
+            var saveStatusCode = saveResponse.Status;
+            var savePayload = await saveResponse.TextAsync();
+            saveResponse.Ok.Should().BeTrue($"status: {saveStatusCode}, payload: {savePayload}");
+
+            var headers = await saveResponse.AllHeadersAsync();
+            headers.TryGetValue("content-type", out var contentType);
+            contentType.Should().NotBeNullOrWhiteSpace();
+            contentType!.Should().Contain("application/json");
+
+            await Expect(page.Locator(".modal-overlay")).ToHaveCountAsync(0);
+        }
+        finally
+        {
+            await DeleteRecordByNameAsync(createdRecordName);
+            await page.Context.CloseAsync();
+        }
+    }
+
     private static ILocatorAssertions Expect(ILocator locator)
     {
         return Assertions.Expect(locator);
+    }
+
+    private async Task DeleteRecordByNameAsync(string recordName)
+    {
+        await using var connection = new SqlConnection(_fixture.Database.ConnectionString);
+        await connection.OpenAsync();
+
+        await using var findCommand = connection.CreateCommand();
+        findCommand.CommandText = """
+            SELECT TOP (1) id
+            FROM dbo.projektove_zaznamy
+            WHERE projekt_id = @projectId
+              AND nazev = @recordName
+            ORDER BY id DESC;
+            """;
+        findCommand.Parameters.AddWithValue("@projectId", _fixture.ProjectId);
+        findCommand.Parameters.AddWithValue("@recordName", recordName);
+        var result = await findCommand.ExecuteScalarAsync();
+        if (result is null || result == DBNull.Value)
+        {
+            return;
+        }
+
+        var recordId = Convert.ToInt32(result);
+        var dependentTables = new[]
+        {
+            "zaznam_harmonogram_hodnoty",
+            "zaznam_spoluprace",
+            "zaznam_externi_odkazy",
+            "vyjadreni",
+            "zaznam_historie_zmen_typu",
+            "zaznam_historie_terminu",
+            "zaznam_historie_vlastnik",
+            "zaznam_historie_subsystem",
+            "zaznam_historie_stavu_zaznamu",
+            "zaznam_historie_stavu_projektu"
+        };
+
+        foreach (var table in dependentTables)
+        {
+            await using var deleteDependencyCommand = connection.CreateCommand();
+            deleteDependencyCommand.CommandText = $"DELETE FROM dbo.{table} WHERE zaznam_id = @recordId;";
+            deleteDependencyCommand.Parameters.AddWithValue("@recordId", recordId);
+            await deleteDependencyCommand.ExecuteNonQueryAsync();
+        }
+
+        await using var deleteRecordCommand = connection.CreateCommand();
+        deleteRecordCommand.CommandText = "DELETE FROM dbo.projektove_zaznamy WHERE id = @recordId;";
+        deleteRecordCommand.Parameters.AddWithValue("@recordId", recordId);
+        await deleteRecordCommand.ExecuteNonQueryAsync();
     }
 }

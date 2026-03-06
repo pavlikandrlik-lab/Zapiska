@@ -5937,7 +5937,22 @@
     }
 
     function initRecordSchedulePlanner(scope) {
+        if (!(scope instanceof HTMLElement || scope instanceof Document)) {
+            return;
+        }
+
+        const forms = [];
+        if (scope instanceof HTMLFormElement && scope.matches('form[data-record-schedule-form="true"]')) {
+            forms.push(scope);
+        }
+
         scope.querySelectorAll('form[data-record-schedule-form="true"]').forEach((form) => {
+            if (form instanceof HTMLFormElement) {
+                forms.push(form);
+            }
+        });
+
+        forms.forEach((form) => {
             if (!(form instanceof HTMLFormElement) || form.dataset.recordScheduleReady === "true") {
                 return;
             }

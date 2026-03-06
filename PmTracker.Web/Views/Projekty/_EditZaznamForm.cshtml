@@ -245,19 +245,24 @@
                 <select name="Subsystem" data-record-subsystem-select>
                     @foreach (var subsystem in Model.Subsystemy)
                     {
+                        var subsystemValue = string.IsNullOrWhiteSpace(subsystem.Kod)
+                            ? subsystem.Nazev
+                            : subsystem.Kod;
                         var optionLabel = string.IsNullOrWhiteSpace(subsystem.Kod)
                             ? subsystem.Nazev
                             : $"{subsystem.Kod} - {subsystem.Nazev}";
                         var defaultOwnerIdAttribute = subsystem.DefaultOwnerOsobaId > 0
                             ? subsystem.DefaultOwnerOsobaId.ToString(CultureInfo.InvariantCulture)
                             : string.Empty;
-                        if (subsystem.Nazev == Model.Subsystem)
+                        var isSelected = string.Equals(subsystem.Nazev, Model.Subsystem, StringComparison.Ordinal)
+                            || string.Equals(subsystem.Kod, Model.Subsystem, StringComparison.Ordinal);
+                        if (isSelected)
                         {
-                            <option value="@subsystem.Kod" data-owner-id="@defaultOwnerIdAttribute" selected="selected">@optionLabel</option>
+                            <option value="@subsystemValue" data-owner-id="@defaultOwnerIdAttribute" selected="selected">@optionLabel</option>
                         }
                         else
                         {
-                            <option value="@subsystem.Kod" data-owner-id="@defaultOwnerIdAttribute">@optionLabel</option>
+                            <option value="@subsystemValue" data-owner-id="@defaultOwnerIdAttribute">@optionLabel</option>
                         }
                     }
                 </select>
