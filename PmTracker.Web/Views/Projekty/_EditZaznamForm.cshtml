@@ -1,5 +1,6 @@
 @using System.Globalization
 @model ZaznamEditViewModel
+@inject PmTracker.Web.Services.Common.IRichTextContentService RichTextContentService
 @{
     var selectedOwnerLabel = Model.Vlastnici
         .FirstOrDefault(x => string.Equals(x.Value, Model.VlastnikId.ToString(), StringComparison.Ordinal))?.Label ?? string.Empty;
@@ -38,6 +39,7 @@
             uiContext = isPagePresentation ? "page" : "project"
         })
         : null;
+    var safeDescriptionHtml = RichTextContentService.ToSafeHtml(Model.Popis);
 }
 
 @if (!isPagePresentation)
@@ -199,14 +201,22 @@
         <div class="record-form-row record-form-row-title">
             <label>
                 Cíl (volitelné)
-                <input type="text" name="Cil" value="@Model.Cil" maxlength="85" />
+                <textarea class="record-goal-textarea"
+                          rows="1"
+                          name="Cil"
+                          maxlength="500"
+                          data-record-goal-autogrow="true">@Model.Cil</textarea>
             </label>
         </div>
 
         <div class="record-form-row">
             <label>
                 Popis (volitelné)
-                <textarea class="record-description-textarea" rows="3" name="Popis">@Model.Popis</textarea>
+                <textarea class="record-description-textarea"
+                          rows="3"
+                          name="Popis"
+                          data-rich-text="true"
+                          data-rich-text-min-height="96">@safeDescriptionHtml</textarea>
             </label>
         </div>
 

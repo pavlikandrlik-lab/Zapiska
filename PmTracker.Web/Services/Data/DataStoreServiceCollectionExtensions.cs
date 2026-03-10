@@ -43,6 +43,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IPersonIdentityMatcher, PersonIdentityMatcher>();
         services.AddScoped<IPermissionEvaluationService, PermissionEvaluationService>();
         services.AddScoped<ICommentAuthorizationPolicy, CommentAuthorizationPolicy>();
+        services.AddScoped<IRichTextContentService, RichTextContentService>();
         services.AddScoped<IRecordsService, RecordsService>();
         services.AddScoped<IPeopleService, PeopleService>();
         services.AddScoped<IDictionariesService, DictionariesService>();

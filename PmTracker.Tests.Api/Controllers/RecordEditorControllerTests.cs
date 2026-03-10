@@ -54,7 +54,16 @@ public sealed class RecordEditorControllerTests
         html.Should().Contain($"data-record-editor-presentation=\"{expectedPresentation}\"");
         html.Should().Contain("data-record-owner-picker");
         html.Should().Contain("office-searchbox\" data-floating-anchor");
-        html.Should().Contain("name=\"Cil\"");
+        Regex.IsMatch(
+            html,
+            "<textarea[^>]*name=\"Cil\"[^>]*maxlength=\"500\"[^>]*data-record-goal-autogrow=\"true\"",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            .Should().BeTrue("editor musí renderovat Cíl jako auto-grow textarea s limitem 500 znaků");
+        Regex.IsMatch(
+            html,
+            "<textarea[^>]*name=\"Popis\"[^>]*data-rich-text=\"true\"",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            .Should().BeTrue("editor musí renderovat Popis jako rich text textarea");
     }
 
     [Fact]
@@ -82,6 +91,30 @@ public sealed class RecordEditorControllerTests
         html.Should().Contain("Jednoradkovy cil pro kartu");
         html.Should().Contain("<span class=\"label\">Popis:</span>");
         html.Should().Contain("Detailni popis po rozbaleni");
+    }
+
+    [Fact]
+    public async Task RecordCardPartial_ShouldRenderRichDescriptionAsHtml()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiCardRichOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIREDRICH");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDRICHSUB", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API card rich record");
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var record = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == recordId);
+            record.Popis = "<p><strong>Bold</strong> a <a href=\"https://example.com\">odkaz</a></p>";
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/RecordCardPartial?projektId={projectId}&zaznamId={recordId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("<strong>Bold</strong>");
+        html.Should().Contain("href=\"https://example.com/\"");
+        html.Should().NotContain("&lt;strong&gt;Bold&lt;/strong&gt;");
     }
 
     [Fact]
@@ -154,6 +187,84 @@ public sealed class RecordEditorControllerTests
         payload.RefreshScope.Should().Be("page");
         payload.RefreshUrl.Should().Contain(returnUrl);
         payload.RefreshUrl.Should().Contain("restoreRecordEditorState=1");
+    }
+
+    [Fact]
+    public async Task Save_ShouldPersistGoalWithFiveHundredCharacters_AndLineBreaks()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiLongGoalOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIREDGOAL500");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDGOALSUB", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API save long goal");
+
+        await using var dbContext = _fixture.CreateDbContext();
+        var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == recordId)
+            .Select(x => new
+            {
+                x.Id,
+                x.ProjektId,
+                x.KategorieId,
+                x.StavUkoluId,
+                x.CisloZaznamu,
+                x.Nazev,
+                x.Popis,
+                x.VlastnikId,
+                x.DatumZalozeni,
+                x.DatumUkonceni,
+                x.SubsystemId
+            })
+            .FirstAsync();
+        var categoryName = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+            .Where(x => x.Id == record.KategorieId)
+            .Select(x => x.Nazev)
+            .FirstAsync();
+        var statusName = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+            .Where(x => x.Id == record.StavUkoluId)
+            .Select(x => x.Nazev)
+            .FirstAsync();
+        var subsystemCode = await dbContext.Subsystemy.AsNoTracking()
+            .Where(x => x.Id == record.SubsystemId)
+            .Select(x => x.Kod)
+            .FirstAsync();
+
+        var firstLine = new string('A', 249);
+        var secondLine = new string('B', 250);
+        var goal = $"{firstLine}\n{secondLine}";
+        goal.Length.Should().Be(500);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Zaznamy/Save?asUser={_fixture.AdminOsobaId}",
+            ApiTestHttpHelper.BuildForm(
+                ("Id", record.Id.ToString()),
+                ("ProjektId", record.ProjektId.ToString()),
+                ("Kategorie", categoryName),
+                ("Stav", statusName),
+                ("Nazev", $"{record.Nazev} updated"),
+                ("Cil", goal),
+                ("Popis", record.Popis ?? string.Empty),
+                ("VlastnikId", record.VlastnikId.ToString()),
+                ("DatumZalozeni", record.DatumZalozeni.ToString("yyyy-MM-dd")),
+                ("TerminUkonceni", record.DatumUkonceni.ToString("yyyy-MM-dd")),
+                ("Subsystem", subsystemCode),
+                ("CisloZaznamu", record.CisloZaznamu.ToString()),
+                ("EditorTab", "basic"),
+                ("Presentation", "modal")));
+
+        var response = await client.SendAsync(request);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, content);
+
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+        payload.Ok.Should().BeTrue();
+
+        await using var verificationDbContext = _fixture.CreateDbContext();
+        var savedGoal = await verificationDbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == recordId)
+            .Select(x => x.Cil)
+            .SingleAsync();
+        savedGoal.Should().Be(goal);
     }
 
     [Fact]

@@ -75,6 +75,59 @@ public sealed class RecordSaveDataStoreTests
     }
 
     [Fact]
+    public async Task SaveRecord_ShouldPersistFiveHundredCharacterGoal_WithPreservedLineBreak()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_save_goal_500_with_break");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordGoal500Admin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordGoal500Owner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RGOAL500");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RGOAL500_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var categoryCode = await dbContext.CiselnikKategoriiZaznamu
+            .OrderBy(x => x.Id)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var statusCode = await dbContext.CiselnikStavuUkolu
+            .OrderBy(x => x.Id)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var subsystemCode = await dbContext.Subsystemy
+            .Where(x => x.Id == subsystemId)
+            .Select(x => x.Kod)
+            .SingleAsync();
+        var firstLine = new string('A', 249);
+        var secondLine = new string('B', 250);
+        var goalWithPadding = $"  {firstLine}\n{secondLine}  ";
+        var normalizedGoal = $"{firstLine}\n{secondLine}";
+        normalizedGoal.Length.Should().Be(500);
+
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
+
+        var recordId = store.SaveRecord(new SaveRecordCommand
+        {
+            ProjektId = projectId,
+            Kategorie = categoryCode,
+            Stav = statusCode,
+            Nazev = "Record with long goal",
+            Cil = goalWithPadding,
+            Popis = "Goal verification",
+            VlastnikId = ownerId,
+            DatumZalozeni = new DateTime(2026, 3, 10),
+            TerminUkonceni = new DateTime(2026, 3, 25),
+            Subsystem = subsystemCode
+        }, currentUser);
+
+        var saved = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
+        saved.Cil.Should().Be(normalizedGoal);
+        saved.Cil!.Length.Should().Be(500);
+    }
+
+    [Fact]
     public async Task BuildZaznamCreate_ShouldBootstrapPersistedScheduleSchema_WhenCatalogIsEmpty()
     {
         var db = await _fixture.CreateDatabaseAsync("record_create_bootstrap_schema");
@@ -197,5 +250,59 @@ public sealed class RecordSaveDataStoreTests
 
         (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
             .AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SaveRecord_ShouldSanitizeRichDescriptionHtml()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_save_rich_description");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordRichDescAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordRichDescOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RRICHDSC");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RRICHDSC_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var categoryCode = await dbContext.CiselnikKategoriiZaznamu
+            .OrderBy(x => x.Id)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var statusCode = await dbContext.CiselnikStavuUkolu
+            .OrderBy(x => x.Id)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var subsystemCode = await dbContext.Subsystemy
+            .Where(x => x.Id == subsystemId)
+            .Select(x => x.Kod)
+            .SingleAsync();
+
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
+        var recordId = store.SaveRecord(new SaveRecordCommand
+        {
+            ProjektId = projectId,
+            Kategorie = categoryCode,
+            Stav = statusCode,
+            Nazev = "Record with rich description",
+            Cil = "Goal",
+            Popis = "<p><strong>Safe</strong><script>alert(1)</script><a href=\"javascript:alert(1)\">bad</a><a href=\"https://example.com\">ok</a></p>",
+            VlastnikId = ownerId,
+            DatumZalozeni = new DateTime(2026, 3, 10),
+            TerminUkonceni = new DateTime(2026, 3, 25),
+            Subsystem = subsystemCode
+        }, currentUser);
+
+        var savedDescription = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == recordId)
+            .Select(x => x.Popis)
+            .SingleAsync();
+
+        savedDescription.Should().NotBeNullOrWhiteSpace();
+        savedDescription.Should().Contain("<strong>Safe</strong>");
+        savedDescription.Should().Contain("https://example.com");
+        savedDescription.Should().NotContain("<script");
+        savedDescription.Should().NotContain("javascript:");
     }
 }

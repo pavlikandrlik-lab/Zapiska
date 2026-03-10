@@ -143,4 +143,52 @@ public sealed class MeetingAndCommentDataStoreTests
         store.DeleteComment(new DeleteCommentCommand { Id = comment.Id }, leaderContext);
         (await dbContext.Vyjadreni.AnyAsync(x => x.Id == comment.Id)).Should().BeFalse();
     }
+
+    [Fact]
+    public async Task AddComment_AndUpdateComment_ShouldSanitizeHtml_AndRejectEmptyRichText()
+    {
+        var db = await _fixture.CreateDatabaseAsync("comment_rich_text_sanitize");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RichCommentOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCHPRJ");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCH_SUB", ownerId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, ownerId, SubsystemRoleCodes.Lead);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "RichComment");
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "DRAFT", meetingNumber: 9400);
+
+        var ownerContext = IntegrationTestHelper.BuildUser(
+            ownerId,
+            isSuperAdmin: false,
+            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId) });
+
+        store.AddComment(new AddCommentCommand
+        {
+            ZaznamId = recordId,
+            JednaniId = meetingId,
+            Text = "<p><strong>Safe</strong><script>alert(1)</script><a href=\"javascript:alert(1)\">bad</a><a href=\"https://example.com\">ok</a></p>"
+        }, ownerContext);
+
+        var savedComment = await dbContext.Vyjadreni
+            .AsNoTracking()
+            .OrderByDescending(x => x.Id)
+            .FirstAsync(x => x.ZaznamId == recordId && x.JednaniId == meetingId);
+
+        savedComment.TextVyjadreni.Should().Contain("<strong>Safe</strong>");
+        savedComment.TextVyjadreni.Should().Contain("https://example.com");
+        savedComment.TextVyjadreni.Should().NotContain("<script");
+        savedComment.TextVyjadreni.Should().NotContain("javascript:");
+
+        var emptyUpdate = () => store.UpdateComment(new UpdateCommentCommand
+        {
+            Id = savedComment.Id,
+            Text = "<p><br></p>"
+        }, ownerContext);
+
+        emptyUpdate.Should().Throw<InvalidOperationException>()
+            .WithMessage("*nesmí být prázdné*");
+    }
 }

@@ -74,6 +74,7 @@
         "input:not([disabled]):not([type='hidden'])",
         "select:not([disabled])",
         "textarea:not([disabled])",
+        "[contenteditable='true']",
         "[tabindex]:not([tabindex='-1'])"
     ].join(", ");
 
@@ -5465,6 +5466,135 @@
         });
     }
 
+    function initRecordGoalAutoGrow(scope) {
+        scope.querySelectorAll("textarea[data-record-goal-autogrow='true']").forEach((textarea) => {
+            if (!(textarea instanceof HTMLTextAreaElement) || textarea.dataset.recordGoalAutogrowReady === "true") {
+                return;
+            }
+
+            textarea.dataset.recordGoalAutogrowReady = "true";
+            const resize = () => {
+                const minHeight = Number.parseFloat(window.getComputedStyle(textarea).minHeight || "0");
+                textarea.style.height = "auto";
+                const nextHeight = Math.max(textarea.scrollHeight, Number.isFinite(minHeight) ? minHeight : 0);
+                textarea.style.height = `${Math.round(nextHeight)}px`;
+            };
+
+            textarea.addEventListener("input", resize);
+            textarea.addEventListener("change", resize);
+            window.requestAnimationFrame(resize);
+        });
+    }
+
+    function looksLikeHtml(value) {
+        return /<\s*\/?\s*[a-z][^>]*>/i.test(value || "");
+    }
+
+    function initRichTextEditors(scope) {
+        if (!(scope instanceof HTMLElement || scope instanceof Document)) {
+            return;
+        }
+
+        if (typeof window.Quill !== "function") {
+            return;
+        }
+
+        const quillCtor = window.Quill;
+        scope.querySelectorAll("textarea[data-rich-text='true']").forEach((textarea) => {
+            if (!(textarea instanceof HTMLTextAreaElement)
+                || textarea.disabled
+                || textarea.dataset.richTextReady === "true") {
+                return;
+            }
+
+            const host = document.createElement("div");
+            host.className = "richtext-host";
+            textarea.insertAdjacentElement("beforebegin", host);
+            host.appendChild(textarea);
+            textarea.classList.add("richtext-source-hidden");
+            textarea.setAttribute("aria-hidden", "true");
+            textarea.setAttribute("tabindex", "-1");
+
+            const editorShell = document.createElement("div");
+            editorShell.className = "richtext-editor-shell";
+            host.appendChild(editorShell);
+
+            const placeholder = (textarea.getAttribute("placeholder") || "").trim();
+            const quill = new quillCtor(editorShell, {
+                theme: "snow",
+                placeholder,
+                modules: {
+                    toolbar: [
+                        ["bold", "italic", "underline"],
+                        ["link"],
+                        [{ indent: "-1" }, { indent: "+1" }]
+                    ]
+                }
+            });
+
+            textarea.dataset.richTextReady = "true";
+            textarea._richTextEditor = quill;
+
+            const editorNode = editorShell.querySelector(".ql-editor");
+            const configuredMinHeight = Number.parseFloat((textarea.dataset.richTextMinHeight || "").trim());
+            const minHeight = Number.isFinite(configuredMinHeight)
+                ? configuredMinHeight
+                : Math.max(88, Number.parseInt(textarea.getAttribute("rows") || "4", 10) * 22);
+            if (editorNode instanceof HTMLElement) {
+                editorNode.style.minHeight = `${Math.round(minHeight)}px`;
+            }
+
+            const syncTextarea = () => {
+                const text = (quill.getText() || "").replace(/\u00a0/g, " ").trim();
+                if (!text) {
+                    textarea.value = "";
+                    return;
+                }
+
+                const html = (quill.root?.innerHTML || "").trim();
+                textarea.value = html && html !== "<p><br></p>" ? html : "";
+            };
+
+            const resize = () => {
+                if (!(editorNode instanceof HTMLElement)) {
+                    return;
+                }
+
+                editorNode.style.height = "auto";
+                const nextHeight = Math.max(editorNode.scrollHeight, minHeight);
+                editorNode.style.height = `${Math.round(nextHeight)}px`;
+            };
+
+            const initialValue = textarea.value || "";
+            if (initialValue.trim().length > 0) {
+                if (looksLikeHtml(initialValue)) {
+                    quill.clipboard.dangerouslyPasteHTML(initialValue);
+                } else {
+                    quill.setText(initialValue);
+                }
+            } else {
+                quill.setText("");
+            }
+
+            const form = textarea.closest("form");
+            if (form instanceof HTMLFormElement) {
+                form.addEventListener("submit", syncTextarea);
+            }
+
+            quill.on("text-change", () => {
+                syncTextarea();
+                resize();
+            });
+
+            quill.on("editor-change", () => {
+                resize();
+            });
+
+            syncTextarea();
+            window.requestAnimationFrame(resize);
+        });
+    }
+
     class ScheduleTimelineEngine {
         static computePlanAndActual(state, startDate) {
             const plan = [];
@@ -5999,6 +6129,8 @@
         initMeetingNumberValidation(scope);
         initConfirmSubmitToggles(scope);
         initRecordFormTabs(scope);
+        initRecordGoalAutoGrow(scope);
+        initRichTextEditors(scope);
         initRecordSchedulePlanner(scope);
         initRecordEditorDirtyTracking(scope);
     }
@@ -7034,11 +7166,19 @@
                             : scope === "projekty-detail-jednani"
                                 ? "jednani"
                                 : "tym");
+                const targetTabPanelKey = tab === "harmonogram" || tab === "gant"
+                    ? "harmonogram"
+                    : tab;
 
-                if (tab === "harmonogram" || tab === "gant") {
+                if (targetTabPanelKey === "harmonogram") {
                     replaceSelectorFromDocument(nextDoc, '[data-tab-panel="harmonogram"]');
                 } else {
-                    replaceSelectorFromDocument(nextDoc, `[data-tab-panel="${tab}"]`);
+                    replaceSelectorFromDocument(nextDoc, `[data-tab-panel="${targetTabPanelKey}"]`);
+                }
+
+                const refreshedPanel = document.querySelector(`[data-tab-panel="${targetTabPanelKey}"]`);
+                if (refreshedPanel instanceof HTMLElement) {
+                    initRecordFormEnhancements(refreshedPanel);
                 }
                 setActiveTab(tab);
                 syncTabQuery(tab);

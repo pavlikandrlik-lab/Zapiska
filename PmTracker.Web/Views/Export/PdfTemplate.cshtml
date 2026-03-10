@@ -1,4 +1,5 @@
 @model PdfExportTemplateViewModel
+@inject PmTracker.Web.Services.Common.IRichTextContentService RichTextContentService
 @{
     Layout = null;
 
@@ -249,6 +250,46 @@
 
         .record-goal {
             font-style: italic;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .record-desc,
+        .comment-item-text {
+            line-height: 1.3;
+        }
+
+        .record-desc p,
+        .comment-item-text p {
+            margin: 0 0 2px;
+        }
+
+        .record-desc p:last-child,
+        .comment-item-text p:last-child {
+            margin-bottom: 0;
+        }
+
+        .record-desc .ql-indent-1,
+        .comment-item-text .ql-indent-1 { margin-left: 1.2rem; }
+        .record-desc .ql-indent-2,
+        .comment-item-text .ql-indent-2 { margin-left: 2.4rem; }
+        .record-desc .ql-indent-3,
+        .comment-item-text .ql-indent-3 { margin-left: 3.6rem; }
+        .record-desc .ql-indent-4,
+        .comment-item-text .ql-indent-4 { margin-left: 4.8rem; }
+        .record-desc .ql-indent-5,
+        .comment-item-text .ql-indent-5 { margin-left: 6rem; }
+        .record-desc .ql-indent-6,
+        .comment-item-text .ql-indent-6 { margin-left: 7.2rem; }
+        .record-desc .ql-indent-7,
+        .comment-item-text .ql-indent-7 { margin-left: 8.4rem; }
+        .record-desc .ql-indent-8,
+        .comment-item-text .ql-indent-8 { margin-left: 9.6rem; }
+
+        .record-desc a,
+        .comment-item-text a {
+            color: #0f4d8a;
+            text-decoration: underline;
         }
 
         .section-label {
@@ -448,7 +489,14 @@
                                     }
                                     @if (!string.IsNullOrWhiteSpace(zaznam.Popis))
                                     {
-                                        <p class="record-desc"><strong>Popis:</strong> @zaznam.Popis</p>
+                                        var safeRecordDescriptionHtml = RichTextContentService.ToSafeHtml(zaznam.Popis);
+                                        if (!string.IsNullOrWhiteSpace(safeRecordDescriptionHtml))
+                                        {
+                                        <div class="record-desc">
+                                            <strong>Popis:</strong>
+                                            @Html.Raw(safeRecordDescriptionHtml)
+                                        </div>
+                                        }
                                     }
                                     @if (zaznam.ExterniVazby.Count > 0)
                                     {
@@ -468,7 +516,7 @@
                                                     : string.Empty;
                                                 <li class="comment-item @(string.IsNullOrWhiteSpace(vyjadreni.HighlightColor) ? string.Empty : "highlight")" style="@highlightStyle">
                                                     <div class="comment-item-head">@vyjadreni.Datum.ToString("dd.MM.yyyy")@meetingRef | @vyjadreni.Autor</div>
-                                                    <p class="comment-item-text">@vyjadreni.Text</p>
+                                                    <div class="comment-item-text">@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
                                                 </li>
                                             }
                                         </ul>

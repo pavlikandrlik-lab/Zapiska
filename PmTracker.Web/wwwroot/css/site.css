@@ -1192,6 +1192,60 @@ textarea {
     min-height: 96px;
 }
 
+.record-goal-textarea {
+    min-height: 44px;
+    max-height: 280px;
+    resize: none;
+    overflow-y: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.richtext-host {
+    position: relative;
+}
+
+.richtext-source-hidden {
+    position: absolute !important;
+    left: -10000px !important;
+    top: auto !important;
+    width: 1px !important;
+    height: 1px !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.richtext-host .ql-toolbar.ql-snow {
+    border-radius: 6px 6px 0 0;
+    border-color: var(--gov-color-border);
+    background: color-mix(in srgb, var(--gov-color-surface) 96%, #e2e8f0);
+}
+
+.richtext-host .ql-container.ql-snow {
+    border-radius: 0 0 6px 6px;
+    border-color: var(--gov-color-border);
+    background: var(--gov-color-surface);
+    color: var(--app-text-primary);
+    font-size: 16px;
+    height: auto;
+}
+
+.richtext-host .ql-editor {
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    padding: 10px 12px;
+    overflow-y: hidden;
+}
+
+.richtext-host .ql-editor p {
+    margin: 0 0 6px;
+}
+
+.richtext-host .ql-editor p:last-child {
+    margin-bottom: 0;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -2593,9 +2647,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .record-goal-subtitle {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .record-summary-meta {
@@ -2660,8 +2713,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin: 10px 0 8px;
     font-size: 13px;
     color: var(--gov-color-muted);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+}
+
+.record-description .label {
+    display: block;
+    margin-bottom: 4px;
 }
 
 .label {
@@ -2804,8 +2860,35 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .comment-text {
     margin: 0;
-    white-space: pre-wrap;
+}
+
+.richtext-render {
+    color: inherit;
+    line-height: 1.4;
     overflow-wrap: anywhere;
+}
+
+.richtext-render p {
+    margin: 0 0 6px;
+}
+
+.richtext-render p:last-child {
+    margin-bottom: 0;
+}
+
+.richtext-render .ql-indent-1 { margin-left: 1.5rem; }
+.richtext-render .ql-indent-2 { margin-left: 3rem; }
+.richtext-render .ql-indent-3 { margin-left: 4.5rem; }
+.richtext-render .ql-indent-4 { margin-left: 6rem; }
+.richtext-render .ql-indent-5 { margin-left: 7.5rem; }
+.richtext-render .ql-indent-6 { margin-left: 9rem; }
+.richtext-render .ql-indent-7 { margin-left: 10.5rem; }
+.richtext-render .ql-indent-8 { margin-left: 12rem; }
+
+.richtext-render a {
+    color: var(--gov-color-primary);
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
 }
 
 .comment-header {
@@ -4292,6 +4375,29 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 :root[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     filter: invert(0.9);
+}
+
+:root[data-theme="dark"] .richtext-host .ql-toolbar.ql-snow {
+    background: #16233a;
+    border-color: #31415e;
+}
+
+:root[data-theme="dark"] .richtext-host .ql-container.ql-snow {
+    background: #111b2d;
+    border-color: #31415e;
+    color: #e6edfa;
+}
+
+:root[data-theme="dark"] .richtext-host .ql-snow .ql-stroke {
+    stroke: #d7e5ff;
+}
+
+:root[data-theme="dark"] .richtext-host .ql-snow .ql-fill {
+    fill: #d7e5ff;
+}
+
+:root[data-theme="dark"] .richtext-host .ql-snow .ql-picker {
+    color: #d7e5ff;
 }
 
 :root[data-theme="dark"] .record-form-number input[disabled] {

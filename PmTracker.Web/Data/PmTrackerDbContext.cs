@@ -327,7 +327,7 @@ public sealed class PmTrackerDbContext : DbContext
             entity.Property(x => x.CisloViditelneB).HasColumnName("cislo_viditelne_b");
             entity.Property(x => x.CisloJednaniZdrojId).HasColumnName("cislo_jednani_zdroj_id");
             entity.Property(x => x.Nazev).HasColumnName("nazev");
-            entity.Property(x => x.Cil).HasColumnName("cil").HasMaxLength(85);
+            entity.Property(x => x.Cil).HasColumnName("cil").HasMaxLength(500);
             entity.Property(x => x.Popis).HasColumnName("popis");
             entity.Property(x => x.VlastnikId).HasColumnName("vlastnik_id");
             entity.Property(x => x.DatumZalozeni).HasColumnName("datum_zalozeni");

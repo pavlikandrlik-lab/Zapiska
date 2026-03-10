@@ -101,6 +101,13 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         {
             throw new InvalidOperationException("V DB chybí sloupec dbo.projektove_zaznamy.cil. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
         }
+        var recordGoalMaxLength = await GetCharacterMaxLengthAsync(dbContext, "dbo.projektove_zaznamy", "cil", cancellationToken);
+        if (recordGoalMaxLength.HasValue && recordGoalMaxLength.Value > 0 && recordGoalMaxLength.Value < 500)
+        {
+            throw new InvalidOperationException(
+                $"Sloupec dbo.projektove_zaznamy.cil má délku {recordGoalMaxLength.Value}, ale aplikace vyžaduje alespoň 500 znaků. " +
+                "Upravte DB ručně: ALTER TABLE dbo.projektove_zaznamy ALTER COLUMN cil NVARCHAR(500) NULL;");
+        }
 
         var hasLegacyScheduleConstraint = await HasCheckConstraintAsync(
             dbContext,
@@ -168,6 +175,76 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
                 await connection.CloseAsync();
             }
         }
+    }
+
+    private static async Task<int?> GetCharacterMaxLengthAsync(
+        PmTrackerDbContext dbContext,
+        string tableName,
+        string columnName,
+        CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var mustClose = connection.State != ConnectionState.Open;
+        if (mustClose)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            var (schemaName, tableOnlyName) = SplitSchemaAndTable(tableName);
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT CHARACTER_MAXIMUM_LENGTH
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = @schemaName
+                  AND TABLE_NAME = @tableName
+                  AND COLUMN_NAME = @columnName
+                """;
+
+            var schemaParam = command.CreateParameter();
+            schemaParam.ParameterName = "@schemaName";
+            schemaParam.Value = schemaName;
+            command.Parameters.Add(schemaParam);
+
+            var tableParam = command.CreateParameter();
+            tableParam.ParameterName = "@tableName";
+            tableParam.Value = tableOnlyName;
+            command.Parameters.Add(tableParam);
+
+            var columnParam = command.CreateParameter();
+            columnParam.ParameterName = "@columnName";
+            columnParam.Value = columnName;
+            command.Parameters.Add(columnParam);
+
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            return result is null || result == DBNull.Value
+                ? null
+                : Convert.ToInt32(result);
+        }
+        finally
+        {
+            if (mustClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static (string SchemaName, string TableName) SplitSchemaAndTable(string tableName)
+    {
+        if (string.IsNullOrWhiteSpace(tableName))
+        {
+            return ("dbo", string.Empty);
+        }
+
+        var parts = tableName.Split('.', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 2)
+        {
+            return (parts[0], parts[1]);
+        }
+
+        return ("dbo", tableName.Trim());
     }
 
     private static async Task<bool> HasTableAsync(

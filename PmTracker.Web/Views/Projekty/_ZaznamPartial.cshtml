@@ -1,5 +1,6 @@
 @using System.Globalization
 @model ZaznamCardViewModel
+@inject PmTracker.Web.Services.Common.IRichTextContentService RichTextContentService
 @{
     var otevrenaJednani = ViewData["OtevrenaJednani"] as IReadOnlyList<JednaniOptionViewModel> ?? Array.Empty<JednaniOptionViewModel>();
     var colorClass = "category-" + Model.KategorieKod.ToLowerInvariant();
@@ -18,6 +19,7 @@
     var taskPrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = Model.Id, projektId, autoPrint = true }) ?? $"/Export/Ukol/{Model.Id}/Tisk?projektId={projektId}&autoPrint=true";
     var taskPrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = Model.Id, projektId }) ?? $"/Export/Ukol/{Model.Id}/Word?projektId={projektId}";
     var editRecordUrl = Url.Action("Edit", "Zaznamy", new { id = Model.Id, projektId }) ?? $"/Zaznamy/Edit/{Model.Id}";
+    var safeDescriptionHtml = RichTextContentService.ToSafeHtml(Model.Popis);
 }
 
 <article class="record-card collapsed @colorClass"
@@ -143,10 +145,11 @@
                 }
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(Model.Popis))
+            @if (!string.IsNullOrWhiteSpace(safeDescriptionHtml))
             {
                 <div class="record-description">
-                    <span class="label">Popis:</span>@Model.Popis
+                    <span class="label">Popis:</span>
+                    <div class="richtext-render">@Html.Raw(safeDescriptionHtml)</div>
                 </div>
             }
 
@@ -256,7 +259,7 @@
                                     <strong>@vyjadreni.Autor</strong>
                                     <span class="muted">@vyjadreni.Datum.ToString("dd.MM.yyyy")</span>
                                 </div>
-                                <p class="comment-text">@vyjadreni.Text</p>
+                                <div class="comment-text richtext-render">@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
                                 @if (canAddComment)
                                 {
                                     <div class="comment-toolbar">
@@ -274,7 +277,11 @@
                                                         <input type="hidden" name="uiContext" value="project" />
                                                         <input type="hidden" name="zaznamId" value="@Model.Id" />
                                                         <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                                        <textarea rows="3" name="Text" required>@vyjadreni.Text</textarea>
+                                                        <textarea rows="3"
+                                                                  name="Text"
+                                                                  required
+                                                                  data-rich-text="true"
+                                                                  data-rich-text-min-height="92">@RichTextContentService.ToSafeHtml(vyjadreni.Text)</textarea>
                                                         <button class="btn small" type="submit">Uložit změnu</button>
                                                     </form>
                                                 </details>
@@ -309,25 +316,29 @@
                     </div>
                 }
 
-                <form class="comment-form" asp-controller="Zaznamy" asp-action="AddComment" method="post" data-ajax-submit="true">
-                    <input type="hidden" name="projektId" value="@projektId" />
-                    <input type="hidden" name="uiContext" value="project" />
-                    <input type="hidden" name="ZaznamId" value="@Model.Id" />
-                    <textarea rows="4" name="Text" placeholder="Přidat vyjádření..." disabled="@(!canAddComment)"></textarea>
-                    <div class="comment-actions">
-                        <select class="wide-select" name="JednaniId" disabled="@(!canAddComment)" required="@(canAddComment ? "required" : null)">
-                            <option value="">Vazba na jednání</option>
-                            @foreach (var jednani in otevrenaJednani)
-                            {
-                                <option value="@jednani.Id">@jednani.Label</option>
-                            }
-                        </select>
-                        @if (canAddComment)
-                        {
+                @if (canAddComment)
+                {
+                    <form class="comment-form" asp-controller="Zaznamy" asp-action="AddComment" method="post" data-ajax-submit="true">
+                        <input type="hidden" name="projektId" value="@projektId" />
+                        <input type="hidden" name="uiContext" value="project" />
+                        <input type="hidden" name="ZaznamId" value="@Model.Id" />
+                        <textarea rows="4"
+                                  name="Text"
+                                  placeholder="Přidat vyjádření..."
+                                  data-rich-text="true"
+                                  data-rich-text-min-height="132"></textarea>
+                        <div class="comment-actions">
+                            <select class="wide-select" name="JednaniId" required>
+                                <option value="">Vazba na jednání</option>
+                                @foreach (var jednani in otevrenaJednani)
+                                {
+                                    <option value="@jednani.Id">@jednani.Label</option>
+                                }
+                            </select>
                             <button class="btn small primary" type="submit">Uložit</button>
-                        }
-                    </div>
-                </form>
+                        </div>
+                    </form>
+                }
             </div>
         </div>
     </div>

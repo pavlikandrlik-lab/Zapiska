@@ -1,4 +1,5 @@
 @model JednaniTaskItemPartialViewModel
+@inject PmTracker.Web.Services.Common.IRichTextContentService RichTextContentService
 @{
     var ukol = Model.Ukol;
     var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
@@ -30,7 +31,7 @@
                         <strong>@vyjadreni.Autor</strong>
                         <span class="muted">@vyjadreni.Datum.ToString("dd.MM.yyyy HH:mm")</span>
                     </div>
-                    <p class="comment-text">@vyjadreni.Text</p>
+                    <div class="comment-text richtext-render">@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
                     @if (canAddComment)
                     {
                         <div class="comment-toolbar">
@@ -49,7 +50,11 @@
                                             <input type="hidden" name="zaznamId" value="@ukol.ZaznamId" />
                                             <input type="hidden" name="uiContext" value="meeting" />
                                             <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                            <textarea rows="3" name="Text" required>@vyjadreni.Text</textarea>
+                                            <textarea rows="3"
+                                                      name="Text"
+                                                      required
+                                                      data-rich-text="true"
+                                                      data-rich-text-min-height="92">@RichTextContentService.ToSafeHtml(vyjadreni.Text)</textarea>
                                             <button class="btn small" type="submit">Uložit změnu</button>
                                         </form>
                                     </details>
@@ -82,7 +87,13 @@
             <input type="hidden" name="uiContext" value="meeting" />
             <input type="hidden" name="ZaznamId" value="@ukol.ZaznamId" />
             <input type="hidden" name="JednaniId" value="@Model.JednaniId" />
-            <textarea class="meeting-note-input" name="Text" rows="4" placeholder="Přidat vyjádření..." required></textarea>
+            <textarea class="meeting-note-input"
+                      name="Text"
+                      rows="4"
+                      placeholder="Přidat vyjádření..."
+                      required
+                      data-rich-text="true"
+                      data-rich-text-min-height="132"></textarea>
             <div class="meeting-notes-actions">
                 <button class="btn primary" type="submit">Uložit vyjádření</button>
             </div>

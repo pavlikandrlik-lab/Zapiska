@@ -39,6 +39,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
     private readonly PmTrackerDbContext _dbContext;
     private readonly ITextNormalizer _textNormalizer;
+    private readonly IRichTextContentService _richTextContentService;
     private readonly IPersonIdentityMatcher _personIdentityMatcher;
     private readonly ICommentAuthorizationPolicy _commentAuthorizationPolicy;
     private readonly IReadOnlyDictionary<string, Action<SaveCiselnikRowCommand>> _ciselnikSaveHandlers;
@@ -90,11 +91,13 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     public SqlServerDataStore(
         PmTrackerDbContext dbContext,
         ITextNormalizer textNormalizer,
+        IRichTextContentService richTextContentService,
         IPersonIdentityMatcher personIdentityMatcher,
         ICommentAuthorizationPolicy commentAuthorizationPolicy)
     {
         _dbContext = dbContext;
         _textNormalizer = textNormalizer;
+        _richTextContentService = richTextContentService;
         _personIdentityMatcher = personIdentityMatcher;
         _commentAuthorizationPolicy = commentAuthorizationPolicy;
         _ciselnikSaveHandlers = BuildCiselnikSaveHandlers();
@@ -1241,7 +1244,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             entity.AktualniTypUkoluId = typeId;
             entity.Nazev = command.Nazev.Trim();
             entity.Cil = string.IsNullOrWhiteSpace(command.Cil) ? null : command.Cil.Trim();
-            entity.Popis = string.IsNullOrWhiteSpace(command.Popis) ? null : command.Popis.Trim();
+            var normalizedDescription = _richTextContentService.NormalizeForStorage(command.Popis?.Trim());
+            entity.Popis = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription;
             entity.VlastnikId = ownerId;
             entity.DatumUkonceni = command.TerminUkonceni.Date;
             entity.SubsystemId = subsystemId;
@@ -1359,6 +1363,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 cisloViditelne = $"{meeting.CisloJednani}-{nextOrder}";
             }
 
+            var normalizedDescription = _richTextContentService.NormalizeForStorage(command.Popis?.Trim());
             entity = new ProjektovyZaznamEntity
             {
                 ProjektId = command.ProjektId,
@@ -1373,7 +1378,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 CisloJednaniZdrojId = cisloJednaniZdrojId,
                 Nazev = command.Nazev.Trim(),
                 Cil = string.IsNullOrWhiteSpace(command.Cil) ? null : command.Cil.Trim(),
-                Popis = string.IsNullOrWhiteSpace(command.Popis) ? null : command.Popis.Trim(),
+                Popis = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription,
                 VlastnikId = ownerId,
                 DatumZalozeni = command.DatumZalozeni.Date,
                 DatumUkonceni = command.TerminUkonceni.Date,
@@ -1595,8 +1600,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
     public void AddComment(AddCommentCommand command, CurrentUserContextViewModel currentUser)
     {
-        var normalizedText = NormalizeCommentText(command.Text);
-        if (string.IsNullOrWhiteSpace(normalizedText))
+        var normalizedText = _richTextContentService.NormalizeForStorage(command.Text);
+        if (!_richTextContentService.HasVisibleText(normalizedText))
         {
             throw new InvalidOperationException("Vyjádření nesmí být prázdné.");
         }
@@ -1644,8 +1649,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
     public void UpdateComment(UpdateCommentCommand command, CurrentUserContextViewModel currentUser)
     {
-        var normalizedText = NormalizeCommentText(command.Text);
-        if (string.IsNullOrWhiteSpace(normalizedText))
+        var normalizedText = _richTextContentService.NormalizeForStorage(command.Text);
+        if (!_richTextContentService.HasVisibleText(normalizedText))
         {
             throw new InvalidOperationException("Vyjádření nesmí být prázdné.");
         }
@@ -1680,18 +1685,6 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         comment.DatumVyjadreni = DateTime.Now;
         _dbContext.SaveChanges();
         WriteAudit(currentUser.OsobaId, "vyjadreni", comment.Id.ToString(CultureInfo.InvariantCulture), "update", old, JsonSerializer.Serialize(comment));
-    }
-
-    private static string NormalizeCommentText(string? value)
-    {
-        if (value is null)
-        {
-            return string.Empty;
-        }
-
-        return value
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace("\r", "\n", StringComparison.Ordinal);
     }
 
     public void DeleteComment(DeleteCommentCommand command, CurrentUserContextViewModel currentUser)
@@ -2969,8 +2962,24 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 })
             .ToList());
 
+        var implicitSubsystemRoleGrants = SubsystemRolePermissionGrantBuilder.BuildImplicitSubsystemRoleGrants(
+            (
+                from assignment in _dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
+                join role in _dbContext.CiselnikRoliSubsystemu.AsNoTracking() on assignment.RoleSubsystemuId equals role.Id
+                join projectSubsystem in _dbContext.ProjektSubsystemy.AsNoTracking() on assignment.ProjektSubsystemId equals projectSubsystem.Id
+                where assignment.OsobaId == osobaId
+                    && !assignment.DatumOdebrani.HasValue
+                    && !projectSubsystem.DatumOdebrani.HasValue
+                select new SubsystemRoleAssignmentGrantSource
+                {
+                    RoleCode = role.Kod,
+                    ProjectId = projectSubsystem.ProjektId
+                })
+            .ToList());
+
         return explicitGrants
             .Concat(implicitProjectRoleGrants)
+            .Concat(implicitSubsystemRoleGrants)
             .ToList();
     }
 
@@ -5033,6 +5042,17 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             return $"Projektová role: {roleCode}";
         }
 
+        if (string.Equals(grant.SourceType, "SUBSYSTEM_ROLE", StringComparison.OrdinalIgnoreCase))
+        {
+            var roleCode = string.IsNullOrWhiteSpace(grant.SourceRoleCode) ? "subsystémová role" : grant.SourceRoleCode;
+            if (grant.SourceProjectId.HasValue && projectCodesById.TryGetValue(grant.SourceProjectId.Value, out var projectCode))
+            {
+                return $"Subsystémová role: {roleCode} ({projectCode})";
+            }
+
+            return $"Subsystémová role: {roleCode}";
+        }
+
         if (grant.ProjectIds.Count == 1 && projectCodesById.TryGetValue(grant.ProjectIds[0], out var singleProjectCode))
         {
             return $"Implicitní grant ({singleProjectCode})";
@@ -5240,7 +5260,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     Autor = BuildDisplayNameFromOsoba(author),
                     Datum = comment.DatumVyjadreni,
                     Text = comment.TextVyjadreni,
-                    Delka = comment.TextVyjadreni?.Length ?? 0,
+                    Delka = _richTextContentService.ToPlainText(comment.TextVyjadreni).Length,
                     JednaniCislo = commentMeeting?.CisloJednani,
                     JednaniDatum = commentMeeting?.DatumPlanovane,
                     JednaniStav = commentState?.Nazev,
@@ -5305,7 +5325,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         return exportRows;
     }
 
-    private static List<VyjadreniEntity> ApplyCommentLimit(List<VyjadreniEntity> comments, int taskCount)
+    private List<VyjadreniEntity> ApplyCommentLimit(List<VyjadreniEntity> comments, int taskCount)
     {
         const int maxCommentsPerTask = 5;
         const int totalBudget = 39;
@@ -5320,7 +5340,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 break;
             }
 
-            var estimatedLines = 2 + (int)Math.Ceiling((comment.TextVyjadreni?.Length ?? 0) / 115d);
+            var commentTextLength = _richTextContentService.ToPlainText(comment.TextVyjadreni).Length;
+            var estimatedLines = 2 + (int)Math.Ceiling(commentTextLength / 115d);
             if (selected.Count > 0 && usedLines + estimatedLines > budgetPerTask)
             {
                 break;

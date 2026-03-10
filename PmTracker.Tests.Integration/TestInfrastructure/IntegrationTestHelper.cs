@@ -21,10 +21,11 @@ internal static class IntegrationTestHelper
     public static SqlServerDataStore CreateDataStore(PmTrackerDbContext dbContext)
     {
         var textNormalizer = new TextNormalizer();
+        var richTextContentService = new RichTextContentService();
         var identityMatcher = new PersonIdentityMatcher(textNormalizer);
         var permissionEvaluation = new PermissionEvaluationService();
         var commentAuthorization = new CommentAuthorizationPolicy(permissionEvaluation);
-        return new SqlServerDataStore(dbContext, textNormalizer, identityMatcher, commentAuthorization);
+        return new SqlServerDataStore(dbContext, textNormalizer, richTextContentService, identityMatcher, commentAuthorization);
     }
 
     public static CurrentUserContextViewModel BuildUser(
