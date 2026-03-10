@@ -2,6 +2,23 @@
 
 Tento soubor je generován skriptem `scripts/generate-changelog.sh` z verzovaných podkladů v `docs/changelog/releases/`.
 
+## 0.8 - 2026-03-10
+
+### Přidáno
+- Pole `Popis` a `Vyjádření` používají rich text editor s omezeným formátováním (`bold`, `italic`, `underline`, `odkaz`, `odsazení`) a auto-grow chováním.
+- Serverová vrstva pro rich text zpracování (`normalizace`, `sanitizace`, `legacy převod plain text -> safe HTML`) je sjednocená do samostatné služby.
+- PDF a WORD exporty zachovávají formátování vyjádření včetně klikatelných odkazů.
+
+### Změněno
+- Render `Popis` a `Vyjádření` v UI je převeden na bezpečný HTML výstup po sanitizaci.
+- Výpočet délky komentářů pro export používá čistou textovou délku bez HTML tagů.
+- Uživatel bez oprávnění přidávat vyjádření nově v kartě záznamu nevidí formulář pro zadání vyjádření ani výběr jednání.
+
+### Opraveno
+- Opraveno znovu-inicializování rich text editoru po AJAX refreshi panelů detailu projektu.
+- Opraveno CSS Quill kontejneru, aby neblokoval kliknutí na tlačítko `Uložit`.
+
+
 ## 0.7 - 2026-03-05
 
 ### Přidáno
