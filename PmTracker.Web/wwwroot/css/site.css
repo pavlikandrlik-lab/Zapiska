@@ -530,6 +530,48 @@
     margin-bottom: 14px;
 }
 
+.modal-submit-summary-text {
+    margin: 0;
+}
+
+.modal-submit-meta {
+    margin-top: 8px;
+    font-size: 12px;
+    font-family: "IBM Plex Mono", "Menlo", "Consolas", monospace;
+    color: #9a3412;
+}
+
+.modal-submit-diagnostics {
+    margin-top: 10px;
+    border-top: 1px solid #f4b6b0;
+    padding-top: 8px;
+}
+
+.modal-submit-diagnostics > summary {
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.modal-submit-diagnostics-actions {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.modal-submit-diagnostics-log {
+    margin: 0;
+    max-height: 220px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: #fff;
+    border: 1px solid #f4b6b0;
+    padding: 8px;
+    color: #6b211b;
+    font-family: "IBM Plex Mono", "Menlo", "Consolas", monospace;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
 .field-error-message {
     margin-top: 6px;
     color: #b42318;

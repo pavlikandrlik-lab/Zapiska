@@ -22,7 +22,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Projekt/{projektId:int}/Tisk")]
-    public IActionResult ProjektTisk(int projektId, bool autoPrint = true)
+    public IActionResult ProjektTisk(int projektId, bool autoPrint = true, string? commentSortDirection = null)
     {
         if (!DataStore.ProjektExists(projektId))
         {
@@ -34,12 +34,12 @@ public sealed class ExportController : BaseController
             return NotFound();
         }
 
-        var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint);
+        var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint, commentSortDirection);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
     [HttpGet("Projekt/{projektId:int}/Word")]
-    public IActionResult ProjektWord(int projektId)
+    public IActionResult ProjektWord(int projektId, string? commentSortDirection = null)
     {
         if (!DataStore.ProjektExists(projektId))
         {
@@ -51,12 +51,12 @@ public sealed class ExportController : BaseController
             return NotFound();
         }
 
-        var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint: false);
+        var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint: false, commentSortDirection);
         return BuildWordResult(model);
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Tisk")]
-    public IActionResult JednaniTisk(int jednaniId, bool autoPrint = true)
+    public IActionResult JednaniTisk(int jednaniId, bool autoPrint = true, string? commentSortDirection = null)
     {
         var detail = DataStore.BuildJednaniDetail(jednaniId);
         if (!DataStore.ProjektExists(detail.ProjektId))
@@ -69,12 +69,12 @@ public sealed class ExportController : BaseController
             return NotFound();
         }
 
-        var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint);
+        var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint, commentSortDirection);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Word")]
-    public IActionResult JednaniWord(int jednaniId)
+    public IActionResult JednaniWord(int jednaniId, string? commentSortDirection = null)
     {
         var detail = DataStore.BuildJednaniDetail(jednaniId);
         if (!DataStore.ProjektExists(detail.ProjektId))
@@ -87,12 +87,12 @@ public sealed class ExportController : BaseController
             return NotFound();
         }
 
-        var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint: false);
+        var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint: false, commentSortDirection);
         return BuildWordResult(model);
     }
 
     [HttpGet("Ukol/{zaznamId:int}/Tisk")]
-    public IActionResult UkolTisk(int zaznamId, int projektId, bool autoPrint = true)
+    public IActionResult UkolTisk(int zaznamId, int projektId, bool autoPrint = true, string? commentSortDirection = null)
     {
         if (!DataStore.ProjektExists(projektId))
         {
@@ -104,12 +104,12 @@ public sealed class ExportController : BaseController
             return NotFound();
         }
 
-        var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint);
+        var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint, commentSortDirection);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
     [HttpGet("Ukol/{zaznamId:int}/Word")]
-    public IActionResult UkolWord(int zaznamId, int projektId)
+    public IActionResult UkolWord(int zaznamId, int projektId, string? commentSortDirection = null)
     {
         if (!DataStore.ProjektExists(projektId))
         {
@@ -121,13 +121,13 @@ public sealed class ExportController : BaseController
             return NotFound();
         }
 
-        var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint: false);
+        var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint: false, commentSortDirection);
         return BuildWordResult(model);
     }
 
     // Kompatibilita na staré export URL - přesměrování na nové varianty tisku.
     [HttpGet("Dialog")]
-    public IActionResult Dialog(int projektId, int? jednaniId, bool autoPrint = true)
+    public IActionResult Dialog(int projektId, int? jednaniId, bool autoPrint = true, string? commentSortDirection = null)
     {
         if (!DataStore.ProjektExists(projektId))
         {
@@ -136,10 +136,10 @@ public sealed class ExportController : BaseController
 
         if (jednaniId.HasValue)
         {
-            return RedirectToAction(nameof(JednaniTisk), new { jednaniId = jednaniId.Value, autoPrint });
+            return RedirectToAction(nameof(JednaniTisk), new { jednaniId = jednaniId.Value, autoPrint, commentSortDirection });
         }
 
-        return RedirectToAction(nameof(ProjektTisk), new { projektId, autoPrint });
+        return RedirectToAction(nameof(ProjektTisk), new { projektId, autoPrint, commentSortDirection });
     }
 
     [HttpPost("Pdf")]
@@ -147,10 +147,10 @@ public sealed class ExportController : BaseController
     {
         if (request.JednaniId.HasValue)
         {
-            return RedirectToAction(nameof(JednaniTisk), new { jednaniId = request.JednaniId.Value, autoPrint = true });
+            return RedirectToAction(nameof(JednaniTisk), new { jednaniId = request.JednaniId.Value, autoPrint = true, commentSortDirection = request.CommentSortDirection });
         }
 
-        return RedirectToAction(nameof(ProjektTisk), new { projektId = request.ProjektId, autoPrint = true });
+        return RedirectToAction(nameof(ProjektTisk), new { projektId = request.ProjektId, autoPrint = true, commentSortDirection = request.CommentSortDirection });
     }
 
     private FileResult BuildWordResult(PdfExportTemplateViewModel model)

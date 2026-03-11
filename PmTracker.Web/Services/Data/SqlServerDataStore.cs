@@ -88,6 +88,27 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         bool HasSubsystemRole,
         IReadOnlyList<string> AktivniRole);
 
+    private sealed record SaveRecordProjectContext(
+        int Id,
+        bool PouzivatIdentJednani);
+
+    private sealed record SaveRecordMeetingContext(
+        int Id,
+        int CisloJednani);
+
+    private sealed record SaveRecordValidationContext(
+        int OwnerId,
+        int KategorieId,
+        int StavUkoluId,
+        int? TypUkoluId,
+        int SubsystemId,
+        int DefaultSchemaVersion,
+        bool IsTaskCategory,
+        SaveRecordProjectContext Project,
+        ProjektovyZaznamEntity? ExistingRecord,
+        SaveRecordMeetingContext? MeetingForNumbering,
+        IReadOnlyList<int> NormalizedCollaborationIds);
+
     public SqlServerDataStore(
         PmTrackerDbContext dbContext,
         ITextNormalizer textNormalizer,
@@ -1003,7 +1024,11 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         };
     }
 
-    public PdfExportTemplateViewModel BuildProjectPrintTemplate(int projektId, CurrentUserContextViewModel currentUser, bool autoPrint)
+    public PdfExportTemplateViewModel BuildProjectPrintTemplate(
+        int projektId,
+        CurrentUserContextViewModel currentUser,
+        bool autoPrint,
+        string? commentSortDirection = null)
     {
         if (!ProjektExists(projektId))
         {
@@ -1011,7 +1036,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         }
 
         var project = _dbContext.Projekty.AsNoTracking().First(x => x.Id == projektId);
-        var records = BuildExportRecords(projektId, null, null, 0, false);
+        var normalizedCommentSortDirection = NormalizeCommentSortDirection(commentSortDirection);
+        var records = BuildExportRecords(projektId, null, null, 0, false, normalizedCommentSortDirection);
 
         return new PdfExportTemplateViewModel
         {
@@ -1037,7 +1063,11 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         };
     }
 
-    public PdfExportTemplateViewModel BuildMeetingPrintTemplate(int jednaniId, CurrentUserContextViewModel currentUser, bool autoPrint)
+    public PdfExportTemplateViewModel BuildMeetingPrintTemplate(
+        int jednaniId,
+        CurrentUserContextViewModel currentUser,
+        bool autoPrint,
+        string? commentSortDirection = null)
     {
         var meeting = _dbContext.Jednani.AsNoTracking().FirstOrDefault(x => x.Id == jednaniId)
             ?? throw new InvalidOperationException($"Jednání {jednaniId} nebylo nalezeno.");
@@ -1045,7 +1075,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var project = _dbContext.Projekty.AsNoTracking().First(x => x.Id == meeting.ProjektId);
         var status = _dbContext.CiselnikStavuJednani.AsNoTracking().FirstOrDefault(x => x.Id == meeting.StavJednaniId);
 
-        var records = BuildExportRecords(project.Id, meeting.Id, null, meeting.CisloJednani, true);
+        var normalizedCommentSortDirection = NormalizeCommentSortDirection(commentSortDirection);
+        var records = BuildExportRecords(project.Id, meeting.Id, null, meeting.CisloJednani, true, normalizedCommentSortDirection);
 
         return new PdfExportTemplateViewModel
         {
@@ -1071,7 +1102,12 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         };
     }
 
-    public PdfExportTemplateViewModel BuildTaskPrintTemplate(int projektId, int zaznamId, CurrentUserContextViewModel currentUser, bool autoPrint)
+    public PdfExportTemplateViewModel BuildTaskPrintTemplate(
+        int projektId,
+        int zaznamId,
+        CurrentUserContextViewModel currentUser,
+        bool autoPrint,
+        string? commentSortDirection = null)
     {
         var project = _dbContext.Projekty.AsNoTracking().FirstOrDefault(x => x.Id == projektId)
             ?? throw new InvalidOperationException($"Projekt {projektId} nebyl nalezen.");
@@ -1081,7 +1117,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .OrderByDescending(x => x.CisloJednani)
             .FirstOrDefault();
 
-        var records = BuildExportRecords(projektId, lastMeeting?.Id, zaznamId, lastMeeting?.CisloJednani ?? 0, true);
+        var normalizedCommentSortDirection = NormalizeCommentSortDirection(commentSortDirection);
+        var records = BuildExportRecords(projektId, lastMeeting?.Id, zaznamId, lastMeeting?.CisloJednani ?? 0, true, normalizedCommentSortDirection);
 
         return new PdfExportTemplateViewModel
         {
@@ -1174,66 +1211,17 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
             return SaveRecordScheduleOnly(command, currentUser, canEditScheduleFull);
         }
-
-        if (!command.VlastnikId.HasValue || command.VlastnikId.Value <= 0)
-        {
-            throw new InvalidOperationException("Vyberte vlastníka z nabídky osob.");
-        }
-
-        var ownerIdValue = command.VlastnikId.Value;
-        var categoryId = ResolveKategorieId(command.Kategorie);
-        var category = _dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
-            .Where(x => x.Id == categoryId)
-            .Select(x => new { x.Kod, x.Nazev })
-            .FirstOrDefault();
-        var isTaskCategory = IsTaskCategory(category?.Kod, category?.Nazev);
-        var statusId = ResolveStavUkoluId(command.Stav);
-        var typeId = ResolveTypUkoluId(command.TypUkolu);
-        var subsystemId = ResolveProjectSubsystemId(command.ProjektId, command.Subsystem);
-        var defaultSchemaVersion = EnsurePersistedActiveHarmonogramSchemaVersion();
-        var project = _dbContext.Projekty.AsNoTracking()
-            .Where(x => x.Id == command.ProjektId)
-            .Select(x => new
-            {
-                x.Id,
-                x.PouzivatIdentJednani
-            })
-            .FirstOrDefault()
-            ?? throw new InvalidOperationException($"Projekt {command.ProjektId} nebyl nalezen.");
-        var existingRecord = command.Id.HasValue
-            ? _dbContext.ProjektoveZaznamy.AsNoTracking().FirstOrDefault(x => x.Id == command.Id.Value)
-            : null;
-        if (command.Id.HasValue && existingRecord is null)
-        {
-            throw new InvalidOperationException($"Záznam {command.Id.Value} nebyl nalezen.");
-        }
-
-        if (existingRecord is not null && existingRecord.ProjektId != command.ProjektId)
-        {
-            throw new InvalidOperationException("Záznam nepatří do vybraného projektu.");
-        }
-
-        var allowedOwnerIds = BuildRecordOwnerCandidates(command.ProjektId, existingRecord?.VlastnikId)
-            .Select(x => x.OsobaId)
-            .ToHashSet();
-        if (!allowedOwnerIds.Contains(ownerIdValue))
-        {
-            throw new InvalidOperationException("Vyberte vlastníka z nabídky osob projektu.");
-        }
-
-        var allowedCollaborationIds = BuildRecordOwnerCandidates(command.ProjektId, null)
-            .Select(x => x.OsobaId)
-            .ToHashSet();
-        var normalizedCollaborationIds = command.VybraniSpolupracovniciIds
-            .Where(x => x > 0)
-            .Distinct()
-            .ToList();
-        if (normalizedCollaborationIds.Any(x => !allowedCollaborationIds.Contains(x)))
-        {
-            throw new InvalidOperationException("Spolupracovníci musí být vybráni z osob projektu.");
-        }
-
-        var ownerId = ownerIdValue;
+        var validation = ValidateRecordSaveCommand(command);
+        var ownerId = validation.OwnerId;
+        var categoryId = validation.KategorieId;
+        var statusId = validation.StavUkoluId;
+        var typeId = validation.TypUkoluId;
+        var subsystemId = validation.SubsystemId;
+        var defaultSchemaVersion = validation.DefaultSchemaVersion;
+        var isTaskCategory = validation.IsTaskCategory;
+        var project = validation.Project;
+        var existingRecord = validation.ExistingRecord;
+        var normalizedCollaborationIds = validation.NormalizedCollaborationIds;
 
         using var tx = _dbContext.Database.BeginTransaction(IsolationLevel.Serializable);
 
@@ -1337,33 +1325,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
             if (project.PouzivatIdentJednani)
             {
-                var meetingRows = _dbContext.Jednani.AsNoTracking()
-                    .Where(x => x.ProjektId == command.ProjektId)
-                    .ToList();
-                var meetingStateById = _dbContext.CiselnikStavuJednani.AsNoTracking()
-                    .ToDictionary(x => x.Id);
-                var openMeetingIds = meetingRows
-                    .Where(x => !IsMeetingReadOnly(x, meetingStateById.GetValueOrDefault(x.StavJednaniId)))
-                    .Select(x => x.Id)
-                    .ToHashSet();
-                if (openMeetingIds.Count == 0)
-                {
-                    throw new InvalidOperationException("Není dostupné žádné neuzavřené jednání.");
-                }
-
-                if (!command.JednaniIdProCislo.HasValue || command.JednaniIdProCislo.Value <= 0)
-                {
-                    throw new InvalidOperationException("Pro tento režim vyberte jednání.");
-                }
-
-                var meeting = meetingRows
-                    .FirstOrDefault(x => x.Id == command.JednaniIdProCislo.Value)
-                    ?? throw new InvalidOperationException("Vybrané jednání neexistuje.");
-                if (!openMeetingIds.Contains(meeting.Id))
-                {
-                    throw new InvalidOperationException("Vybrané jednání je uzavřené. Vyberte neuzavřené jednání.");
-                }
-
+                var meeting = validation.MeetingForNumbering
+                    ?? throw new InvalidOperationException("Vybrané jednání pro identifikátor nebylo validováno.");
                 var nextOrder = AllocateMeetingOrderTransactional(command.ProjektId, meeting.CisloJednani);
                 cisloViditelneTyp = RecordDisplayNumberTypeMeeting;
                 cisloViditelneA = meeting.CisloJednani;
@@ -1433,6 +1396,622 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         }
 
         return entity.Id;
+    }
+
+    private SaveRecordValidationContext ValidateRecordSaveCommand(SaveRecordCommand command)
+    {
+        var issues = new List<RecordValidationIssue>();
+
+        ValidateAllowedControlCharacters(command.Nazev, "Nazev", "basic", "Název", issues);
+        ValidateAllowedControlCharacters(command.Cil, "Cil", "basic", "Cíl", issues);
+        ValidateAllowedControlCharacters(command.Popis, "Popis", "basic", "Popis", issues);
+
+        if (command.TerminUkonceni.Date < command.DatumZalozeni.Date)
+        {
+            AddRecordValidationIssue(
+                issues,
+                "TerminUkonceni",
+                "Termín ukončení nesmí být dříve než datum založení.",
+                "basic",
+                "termin_not_before_start",
+                command.TerminUkonceni.ToString("O", CultureInfo.InvariantCulture));
+        }
+
+        if (!command.VlastnikId.HasValue || command.VlastnikId.Value <= 0)
+        {
+            AddRecordValidationIssue(
+                issues,
+                "VlastnikId",
+                "Vyberte vlastníka z nabídky osob.",
+                "basic",
+                "owner_required",
+                command.VlastnikId?.ToString(CultureInfo.InvariantCulture));
+        }
+
+        var ownerId = command.VlastnikId.GetValueOrDefault();
+        var categoryId = TryResolveForValidation(
+            issues,
+            "Kategorie",
+            "basic",
+            "category_not_found",
+            command.Kategorie,
+            () => ResolveKategorieId(command.Kategorie));
+        var statusId = TryResolveForValidation(
+            issues,
+            "Stav",
+            "basic",
+            "task_status_not_found",
+            command.Stav,
+            () => ResolveStavUkoluId(command.Stav));
+        var subsystemId = TryResolveForValidation(
+            issues,
+            "Subsystem",
+            "basic",
+            "subsystem_invalid_or_inactive",
+            command.Subsystem,
+            () => ResolveProjectSubsystemId(command.ProjektId, command.Subsystem));
+
+        int? typeId = null;
+        if (!string.IsNullOrWhiteSpace(command.TypUkolu))
+        {
+            typeId = ResolveTypUkoluId(command.TypUkolu);
+            if (!typeId.HasValue)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    "TypUkolu",
+                    $"Typ úkolu '{command.TypUkolu}' neexistuje.",
+                    "basic",
+                    "task_type_not_found",
+                    command.TypUkolu);
+            }
+        }
+
+        var category = categoryId.HasValue
+            ? _dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+                .Where(x => x.Id == categoryId.Value)
+                .Select(x => new { x.Kod, x.Nazev })
+                .FirstOrDefault()
+            : null;
+        var isTaskCategory = IsTaskCategory(category?.Kod, category?.Nazev);
+        var defaultSchemaVersion = EnsurePersistedActiveHarmonogramSchemaVersion();
+
+        var project = _dbContext.Projekty.AsNoTracking()
+            .Where(x => x.Id == command.ProjektId)
+            .Select(x => new SaveRecordProjectContext(x.Id, x.PouzivatIdentJednani))
+            .FirstOrDefault();
+        if (project is null)
+        {
+            AddRecordValidationIssue(
+                issues,
+                "ProjektId",
+                $"Projekt {command.ProjektId} nebyl nalezen.",
+                "basic",
+                "project_not_found",
+                command.ProjektId.ToString(CultureInfo.InvariantCulture));
+        }
+
+        var existingRecord = command.Id.HasValue
+            ? _dbContext.ProjektoveZaznamy.AsNoTracking().FirstOrDefault(x => x.Id == command.Id.Value)
+            : null;
+        if (command.Id.HasValue && existingRecord is null)
+        {
+            AddRecordValidationIssue(
+                issues,
+                "Id",
+                $"Záznam {command.Id.Value} nebyl nalezen.",
+                "basic",
+                "record_not_found",
+                command.Id.Value.ToString(CultureInfo.InvariantCulture));
+        }
+        else if (existingRecord is not null && existingRecord.ProjektId != command.ProjektId)
+        {
+            AddRecordValidationIssue(
+                issues,
+                "Id",
+                "Záznam nepatří do vybraného projektu.",
+                "basic",
+                "record_project_mismatch",
+                command.Id?.ToString(CultureInfo.InvariantCulture));
+        }
+
+        SaveRecordMeetingContext? meetingForNumbering = null;
+        if (project?.PouzivatIdentJednani == true && !command.Id.HasValue)
+        {
+            var meetingRows = _dbContext.Jednani.AsNoTracking()
+                .Where(x => x.ProjektId == command.ProjektId)
+                .ToList();
+            var meetingStateById = _dbContext.CiselnikStavuJednani.AsNoTracking().ToDictionary(x => x.Id);
+            var openMeetings = meetingRows
+                .Where(row => !IsMeetingReadOnly(row, meetingStateById.GetValueOrDefault(row.StavJednaniId)))
+                .ToList();
+
+            if (openMeetings.Count == 0)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    "JednaniIdProCislo",
+                    "Není dostupné žádné neuzavřené jednání.",
+                    "basic",
+                    "open_meeting_required",
+                    null);
+            }
+            else if (!command.JednaniIdProCislo.HasValue || command.JednaniIdProCislo.Value <= 0)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    "JednaniIdProCislo",
+                    "Pro tento režim vyberte jednání.",
+                    "basic",
+                    "meeting_selection_required",
+                    command.JednaniIdProCislo?.ToString(CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                var selectedMeeting = meetingRows.FirstOrDefault(x => x.Id == command.JednaniIdProCislo.Value);
+                if (selectedMeeting is null)
+                {
+                    AddRecordValidationIssue(
+                        issues,
+                        "JednaniIdProCislo",
+                        "Vybrané jednání neexistuje.",
+                        "basic",
+                        "meeting_not_found",
+                        command.JednaniIdProCislo.Value.ToString(CultureInfo.InvariantCulture));
+                }
+                else if (openMeetings.All(x => x.Id != selectedMeeting.Id))
+                {
+                    AddRecordValidationIssue(
+                        issues,
+                        "JednaniIdProCislo",
+                        "Vybrané jednání je uzavřené. Vyberte neuzavřené jednání.",
+                        "basic",
+                        "meeting_closed",
+                        command.JednaniIdProCislo.Value.ToString(CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    meetingForNumbering = new SaveRecordMeetingContext(selectedMeeting.Id, selectedMeeting.CisloJednani);
+                }
+            }
+        }
+
+        var normalizedCollaborationIds = command.VybraniSpolupracovniciIds
+            .Where(x => x > 0)
+            .Distinct()
+            .ToList();
+
+        if (project is not null)
+        {
+            var allowedOwnerIds = BuildRecordOwnerCandidates(command.ProjektId, existingRecord?.VlastnikId)
+                .Select(x => x.OsobaId)
+                .ToHashSet();
+            if (ownerId > 0 && !allowedOwnerIds.Contains(ownerId))
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    "VlastnikId",
+                    "Vyberte vlastníka z nabídky osob projektu.",
+                    "basic",
+                    "owner_not_allowed",
+                    ownerId.ToString(CultureInfo.InvariantCulture));
+            }
+
+            var allowedCollaborationIds = BuildRecordOwnerCandidates(command.ProjektId, null)
+                .Select(x => x.OsobaId)
+                .ToHashSet();
+            var invalidCollaborationIds = normalizedCollaborationIds
+                .Where(x => !allowedCollaborationIds.Contains(x))
+                .Distinct()
+                .ToList();
+            if (invalidCollaborationIds.Count > 0)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    "VybraniSpolupracovniciIds",
+                    "Spolupracovníci musí být vybráni z osob projektu.",
+                    "collaboration",
+                    "collaborator_not_allowed",
+                    string.Join(", ", invalidCollaborationIds));
+            }
+        }
+
+        ValidateExternalLinks(command.ExterniVazby, issues);
+        ValidateScheduleValues(command, isTaskCategory, existingRecord, defaultSchemaVersion, issues);
+
+        if (issues.Count > 0)
+        {
+            throw new RecordValidationException(
+                "Záznam nelze uložit. Opravte označená pole v jednotlivých záložkách.",
+                issues,
+                BuildRecordValidationDiagnosticLog(command, issues));
+        }
+
+        return new SaveRecordValidationContext(
+            ownerId,
+            categoryId!.Value,
+            statusId!.Value,
+            typeId,
+            subsystemId!.Value,
+            defaultSchemaVersion,
+            isTaskCategory,
+            project!,
+            existingRecord,
+            meetingForNumbering,
+            normalizedCollaborationIds);
+    }
+
+    private static int? TryResolveForValidation(
+        List<RecordValidationIssue> issues,
+        string fieldKey,
+        string tab,
+        string rule,
+        string? value,
+        Func<int> resolver)
+    {
+        try
+        {
+            return resolver();
+        }
+        catch (InvalidOperationException ex)
+        {
+            AddRecordValidationIssue(issues, fieldKey, ex.Message, tab, rule, value);
+            return null;
+        }
+    }
+
+    private static void ValidateAllowedControlCharacters(
+        string? value,
+        string fieldKey,
+        string tab,
+        string fieldLabel,
+        List<RecordValidationIssue> issues)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return;
+        }
+
+        var invalid = FindFirstInvalidControlCharacter(value);
+        if (!invalid.HasValue)
+        {
+            return;
+        }
+
+        AddRecordValidationIssue(
+            issues,
+            fieldKey,
+            $"{fieldLabel} obsahuje nepovolený řídicí znak na pozici {invalid.Value.Index + 1} ({FormatUnicodeCodePoint(invalid.Value.CodePoint)}). Povolené jsou pouze CR, LF a TAB.",
+            tab,
+            "invalid_control_character",
+            value);
+    }
+
+    private void ValidateExternalLinks(
+        IReadOnlyList<SaveRecordExterniVazbaCommand> links,
+        List<RecordValidationIssue> issues)
+    {
+        if (links.Count == 0)
+        {
+            return;
+        }
+
+        var typeRows = _dbContext.CiselnikTypuExternichOdkazu.AsNoTracking()
+            .Select(x => new { x.Id, x.Kod, x.Nazev })
+            .ToList();
+        var vyzvaRows = _dbContext.CiselnikVyzvy.AsNoTracking()
+            .Select(x => new { x.Id, x.Kod, x.Nazev })
+            .ToList();
+
+        for (var index = 0; index < links.Count; index++)
+        {
+            var link = links[index];
+            var typeValue = (link.Typ ?? string.Empty).Trim();
+            var cisloValue = (link.Cislo ?? string.Empty).Trim();
+            var priceValue = (link.PredpokladanaCena ?? string.Empty).Trim();
+            var vyzvaValue = (link.Vyzva ?? string.Empty).Trim();
+            var rowPrefix = $"ExterniVazby[{index}]";
+
+            var hasType = !string.IsNullOrWhiteSpace(typeValue);
+            var hasCislo = !string.IsNullOrWhiteSpace(cisloValue);
+            if (!hasType && !hasCislo && string.IsNullOrWhiteSpace(priceValue) && string.IsNullOrWhiteSpace(vyzvaValue)
+                && !link.DatumObjednani.HasValue && !link.PlanDodani.HasValue && !link.DatumDodani.HasValue && !link.DatumPrevzeti.HasValue)
+            {
+                continue;
+            }
+
+            if (!hasType)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.Typ",
+                    "Vyplňte typ odkazu.",
+                    "external",
+                    "external_type_required",
+                    typeValue);
+            }
+
+            if (!hasCislo)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.Cislo",
+                    "Vyplňte číslo externí vazby.",
+                    "external",
+                    "external_number_required",
+                    cisloValue);
+            }
+
+            var selectedType = hasType
+                ? typeRows.FirstOrDefault(x => string.Equals(x.Kod, typeValue, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(x.Nazev, typeValue, StringComparison.OrdinalIgnoreCase))
+                : null;
+            if (hasType && selectedType is null)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.Typ",
+                    $"Typ externí vazby '{typeValue}' neexistuje.",
+                    "external",
+                    "external_type_not_found",
+                    typeValue);
+            }
+
+            if (!string.IsNullOrWhiteSpace(vyzvaValue))
+            {
+                var vyzvaExists = vyzvaRows.Any(x => string.Equals(x.Kod, vyzvaValue, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(x.Nazev, vyzvaValue, StringComparison.OrdinalIgnoreCase));
+                if (!vyzvaExists)
+                {
+                    AddRecordValidationIssue(
+                        issues,
+                        $"{rowPrefix}.Vyzva",
+                        $"Výzva '{vyzvaValue}' neexistuje.",
+                        "external",
+                        "external_vyzva_not_found",
+                        vyzvaValue);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(priceValue))
+            {
+                try
+                {
+                    NormalizeEstimatedExternalLinkPrice(selectedType?.Kod ?? typeValue, priceValue);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    AddRecordValidationIssue(
+                        issues,
+                        $"{rowPrefix}.PredpokladanaCena",
+                        ex.Message,
+                        "external",
+                        "external_price_invalid",
+                        priceValue);
+                }
+            }
+
+            if (link.PlanDodani.HasValue && link.DatumObjednani.HasValue && link.PlanDodani.Value.Date < link.DatumObjednani.Value.Date)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.PlanDodani",
+                    "Plán dodání nesmí být dříve než datum objednání.",
+                    "external",
+                    "external_plan_before_order",
+                    link.PlanDodani.Value.ToString("O", CultureInfo.InvariantCulture));
+            }
+
+            if (link.DatumDodani.HasValue && link.DatumObjednani.HasValue && link.DatumDodani.Value.Date < link.DatumObjednani.Value.Date)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.DatumDodani",
+                    "Datum dodání nesmí být dříve než datum objednání.",
+                    "external",
+                    "external_delivery_before_order",
+                    link.DatumDodani.Value.ToString("O", CultureInfo.InvariantCulture));
+            }
+
+            if (link.DatumPrevzeti.HasValue && link.DatumDodani.HasValue && link.DatumPrevzeti.Value.Date < link.DatumDodani.Value.Date)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.DatumPrevzeti",
+                    "Datum převzetí nesmí být dříve než datum dodání.",
+                    "external",
+                    "external_takeover_before_delivery",
+                    link.DatumPrevzeti.Value.ToString("O", CultureInfo.InvariantCulture));
+            }
+        }
+    }
+
+    private void ValidateScheduleValues(
+        SaveRecordCommand command,
+        bool isTaskCategory,
+        ProjektovyZaznamEntity? existingRecord,
+        int defaultSchemaVersion,
+        List<RecordValidationIssue> issues)
+    {
+        if (!isTaskCategory || command.HarmonogramHodnoty.Count == 0)
+        {
+            return;
+        }
+
+        IReadOnlyList<HarmonogramTypPar> harmonogramTypy;
+        try
+        {
+            var schemaCache = new Dictionary<int, HarmonogramSchemaDefinition>();
+            var schema = existingRecord is not null && existingRecord.HarmonogramSablonaVerze > 0
+                ? GetSchemaForRecord(existingRecord.HarmonogramSablonaVerze, schemaCache)
+                : GetSchemaForRecord(defaultSchemaVersion, schemaCache);
+            harmonogramTypy = schema.Kroky;
+        }
+        catch (InvalidOperationException ex)
+        {
+            AddRecordValidationIssue(
+                issues,
+                "HarmonogramHodnoty",
+                ex.Message,
+                "schedule",
+                "schedule_schema_unavailable",
+                null);
+            return;
+        }
+
+        var durationTypeIds = harmonogramTypy
+            .Select(x => x.TrvaniTypId)
+            .Where(x => x > 0)
+            .ToHashSet();
+        var allowedTypeIds = harmonogramTypy
+            .SelectMany(x => new[] { x.TrvaniTypId, x.ZpozdeniTypId })
+            .Where(x => x > 0)
+            .ToHashSet();
+
+        var firstIndexByType = new Dictionary<int, int>();
+        for (var index = 0; index < command.HarmonogramHodnoty.Count; index++)
+        {
+            var item = command.HarmonogramHodnoty[index];
+            var rowPrefix = $"HarmonogramHodnoty[{index}]";
+
+            if (item.TypId <= 0)
+            {
+                if (item.Hodnota != 0)
+                {
+                    AddRecordValidationIssue(
+                        issues,
+                        $"{rowPrefix}.TypId",
+                        "Typ harmonogramové hodnoty musí být platný.",
+                        "schedule",
+                        "schedule_type_required",
+                        item.TypId.ToString(CultureInfo.InvariantCulture));
+                }
+
+                continue;
+            }
+
+            if (!allowedTypeIds.Contains(item.TypId))
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.TypId",
+                    $"Typ harmonogramové hodnoty {item.TypId} není v aktivním schématu.",
+                    "schedule",
+                    "schedule_type_not_allowed",
+                    item.TypId.ToString(CultureInfo.InvariantCulture));
+                continue;
+            }
+
+            if (firstIndexByType.TryGetValue(item.TypId, out var firstIndex))
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.TypId",
+                    $"Typ harmonogramové hodnoty {item.TypId} je zadaný vícekrát (první výskyt na řádku {firstIndex + 1}).",
+                    "schedule",
+                    "schedule_type_duplicate",
+                    item.TypId.ToString(CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                firstIndexByType[item.TypId] = index;
+            }
+
+            if (durationTypeIds.Contains(item.TypId) && item.Hodnota < 0)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.Hodnota",
+                    "Trvání kroku harmonogramu nesmí být záporné.",
+                    "schedule",
+                    "schedule_duration_negative",
+                    item.Hodnota.ToString(CultureInfo.InvariantCulture));
+            }
+        }
+    }
+
+    private static void AddRecordValidationIssue(
+        ICollection<RecordValidationIssue> issues,
+        string fieldKey,
+        string message,
+        string tab,
+        string? rule,
+        string? value)
+    {
+        if (string.IsNullOrWhiteSpace(fieldKey) || string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        issues.Add(new RecordValidationIssue(fieldKey, message.Trim(), tab, rule, value));
+    }
+
+    private static (int Index, int CodePoint)? FindFirstInvalidControlCharacter(string value)
+    {
+        for (var index = 0; index < value.Length; index++)
+        {
+            var current = value[index];
+            if (char.IsControl(current) && current != '\r' && current != '\n' && current != '\t')
+            {
+                return (index, char.ConvertToUtf32(value, index));
+            }
+
+            if (char.IsHighSurrogate(current) && index + 1 < value.Length && char.IsLowSurrogate(value[index + 1]))
+            {
+                index++;
+            }
+        }
+
+        return null;
+    }
+
+    private static string FormatUnicodeCodePoint(int codePoint)
+    {
+        return codePoint <= 0xFFFF
+            ? $"U+{codePoint:X4}"
+            : $"U+{codePoint:X6}";
+    }
+
+    private static string BuildRecordValidationDiagnosticLog(
+        SaveRecordCommand command,
+        IReadOnlyList<RecordValidationIssue> issues)
+    {
+        var builder = new StringBuilder(4096);
+        builder.AppendLine("Record save validation failed.");
+        builder.AppendLine("Issues:");
+        for (var index = 0; index < issues.Count; index++)
+        {
+            var issue = issues[index];
+            builder.Append(index + 1)
+                .Append(". [Tab: ")
+                .Append(issue.Tab)
+                .Append("] [Field: ")
+                .Append(issue.FieldKey)
+                .Append("] ")
+                .Append(issue.Message);
+            if (!string.IsNullOrWhiteSpace(issue.Rule))
+            {
+                builder.Append(" [Rule: ")
+                    .Append(issue.Rule)
+                    .Append(']');
+            }
+
+            if (issue.Value is not null)
+            {
+                builder.Append(" [Value: ")
+                    .Append(issue.Value)
+                    .Append(']');
+            }
+
+            builder.AppendLine();
+        }
+
+        builder.AppendLine("CommandValues:");
+        builder.AppendLine(JsonSerializer.Serialize(command, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        }));
+        return builder.ToString().TrimEnd();
     }
 
     public void DeleteRecord(DeleteRecordCommand command, CurrentUserContextViewModel currentUser)
@@ -5198,7 +5777,38 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         return 100;
     }
 
-    private List<PdfExportRecordViewModel> BuildExportRecords(int projectId, int? anchorMeetingId, int? specificRecordId, int anchorMeetingNumber, bool limitComments)
+    private static string NormalizeCommentSortDirection(string? commentSortDirection)
+        => string.Equals(commentSortDirection, "desc", StringComparison.OrdinalIgnoreCase)
+            ? "desc"
+            : "asc";
+
+    private static List<VyjadreniEntity> OrderCommentsForExport(
+        IReadOnlyList<VyjadreniEntity> comments,
+        IReadOnlyDictionary<int, JednaniEntity> meetingById,
+        string commentSortDirection)
+    {
+        var normalizedDirection = NormalizeCommentSortDirection(commentSortDirection);
+        if (normalizedDirection == "desc")
+        {
+            return comments
+                .OrderByDescending(comment => meetingById.GetValueOrDefault(comment.JednaniId)?.CisloJednani ?? 0)
+                .ThenByDescending(comment => comment.Id)
+                .ToList();
+        }
+
+        return comments
+            .OrderBy(comment => meetingById.GetValueOrDefault(comment.JednaniId)?.CisloJednani ?? 0)
+            .ThenBy(comment => comment.Id)
+            .ToList();
+    }
+
+    private List<PdfExportRecordViewModel> BuildExportRecords(
+        int projectId,
+        int? anchorMeetingId,
+        int? specificRecordId,
+        int anchorMeetingNumber,
+        bool limitComments,
+        string commentSortDirection)
     {
         var records = _dbContext.ProjektoveZaznamy.AsNoTracking()
             .Where(x => x.ProjektId == projectId)
@@ -5214,7 +5824,6 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
         var comments = _dbContext.Vyjadreni.AsNoTracking()
             .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
-            .OrderByDescending(x => x.DatumVyjadreni)
             .ToList();
 
         var meetings = _dbContext.Jednani.AsNoTracking()
@@ -5269,9 +5878,10 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var exportRows = records.Select(record =>
         {
             var commentsForRecord = commentGroups.GetValueOrDefault(record.Id, new List<VyjadreniEntity>());
+            var orderedCommentsForRecord = OrderCommentsForExport(commentsForRecord, meetingById, commentSortDirection);
             var selectedComments = limitComments
-                ? ApplyCommentLimit(commentsForRecord, records.Count)
-                : commentsForRecord;
+                ? ApplyCommentLimit(orderedCommentsForRecord, records.Count)
+                : orderedCommentsForRecord;
 
             var commentRows = selectedComments.Select(comment =>
             {
@@ -5351,7 +5961,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         return exportRows;
     }
 
-    private List<VyjadreniEntity> ApplyCommentLimit(List<VyjadreniEntity> comments, int taskCount)
+    private List<VyjadreniEntity> ApplyCommentLimit(IReadOnlyList<VyjadreniEntity> comments, int taskCount)
     {
         const int maxCommentsPerTask = 5;
         const int totalBudget = 39;
@@ -5359,7 +5969,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
         var selected = new List<VyjadreniEntity>();
         var usedLines = 0;
-        foreach (var comment in comments.OrderByDescending(x => x.DatumVyjadreni))
+        foreach (var comment in comments)
         {
             if (selected.Count >= maxCommentsPerTask)
             {

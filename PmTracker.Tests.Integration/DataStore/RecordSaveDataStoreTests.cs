@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Integration.TestInfrastructure;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Data;
 
 namespace PmTracker.Tests.Integration.DataStore;
 
@@ -424,5 +425,95 @@ public sealed class RecordSaveDataStoreTests
         savedDescription.Should().Contain("https://example.com");
         savedDescription.Should().NotContain("<script");
         savedDescription.Should().NotContain("javascript:");
+    }
+
+    [Fact]
+    public async Task SaveRecord_ShouldAggregateCrossTabValidationIssues_WithDiagnosticLog()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_save_cross_tab_validation");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordCrossTabAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordCrossTabOwner");
+        var outsiderId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordCrossTabOutsider");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCROSSTAB");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCROSSTAB_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var categoryCode = await dbContext.CiselnikKategoriiZaznamu
+            .Where(x => x.Kod == "U" || x.Kod == "UKOL")
+            .OrderBy(x => x.Id)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var statusCode = await dbContext.CiselnikStavuUkolu
+            .OrderBy(x => x.Id)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var subsystemCode = await dbContext.Subsystemy
+            .Where(x => x.Id == subsystemId)
+            .Select(x => x.Kod)
+            .SingleAsync();
+
+        var createModel = store.BuildZaznamCreate(projectId);
+        var durationTypeId = createModel.HarmonogramKroky
+            .Select(x => x.TrvaniTypId)
+            .First(x => x > 0);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
+
+        var command = new SaveRecordCommand
+        {
+            ProjektId = projectId,
+            Kategorie = categoryCode,
+            Stav = statusCode,
+            Nazev = "Record validation",
+            Cil = "valid",
+            Popis = $"Text s nepovolenym znakem {char.ConvertFromUtf32(1)} uvnitr",
+            VlastnikId = ownerId,
+            DatumZalozeni = new DateTime(2026, 4, 1),
+            TerminUkonceni = new DateTime(2026, 4, 20),
+            Subsystem = subsystemCode,
+            VybraniSpolupracovniciIds = new List<int> { outsiderId },
+            ExterniVazby = new List<SaveRecordExterniVazbaCommand>
+            {
+                new()
+                {
+                    Typ = "PMP",
+                    Cislo = "",
+                    PredpokladanaCena = "neni-cislo"
+                }
+            },
+            HarmonogramHodnoty = new List<SaveRecordHarmonogramValueCommand>
+            {
+                new()
+                {
+                    TypId = durationTypeId,
+                    Hodnota = -4
+                },
+                new()
+                {
+                    TypId = 999999,
+                    Hodnota = 5
+                }
+            }
+        };
+
+        var action = () => store.SaveRecord(command, currentUser);
+        var exception = action.Should().Throw<RecordValidationException>().Which;
+
+        exception.FieldErrors.Keys.Should().Contain("Popis");
+        exception.FieldErrors.Keys.Should().Contain("ExterniVazby[0].Cislo");
+        exception.FieldErrors.Keys.Should().Contain("ExterniVazby[0].PredpokladanaCena");
+        exception.FieldErrors.Keys.Should().Contain("VybraniSpolupracovniciIds");
+        exception.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[0].Hodnota");
+        exception.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[1].TypId");
+
+        var popisError = exception.FieldErrors["Popis"].Single();
+        popisError.Should().Contain("U+0001");
+        popisError.Should().Contain("pozici");
+        exception.DiagnosticLog.Should().Contain("CommandValues");
+        exception.DiagnosticLog.Should().Contain("Record save validation failed.");
+        exception.DiagnosticLog.Should().Contain("Popis");
     }
 }

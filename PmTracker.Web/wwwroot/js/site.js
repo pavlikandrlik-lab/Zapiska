@@ -2,6 +2,7 @@
     const modalRoot = document.getElementById("modal-root");
     const themeStorageKey = "pmtracker.theme.mode";
     const printFormatStorageKey = "pmtracker.print.preferredFormat";
+    const commentSortDirectionStorageKey = "pmtracker.comments.sortDirection";
     const recordEditorPreferenceStorageKey = "pmtracker.recordEditor.preference";
     const projectListHideDoneStorageKey = "pmtracker.projects.hideDone";
     const projectListHideDeletedStorageKey = "pmtracker.projects.hideDeleted";
@@ -194,6 +195,19 @@
         refreshPrintPreferenceUi();
     }
 
+    function normalizeCommentSortDirection(direction) {
+        return direction === "desc" ? "desc" : "asc";
+    }
+
+    function getStoredCommentSortDirection() {
+        const value = localStorage.getItem(commentSortDirectionStorageKey);
+        return normalizeCommentSortDirection(value);
+    }
+
+    function setStoredCommentSortDirection(direction) {
+        localStorage.setItem(commentSortDirectionStorageKey, normalizeCommentSortDirection(direction));
+    }
+
     function getRecordEditorPreferenceLabel(mode) {
         if (mode === "modal") {
             return "Otevřít v modalu";
@@ -320,11 +334,57 @@
             return "";
         }
 
+        const commentSortDirection = resolveCommentSortDirectionFromTrigger(trigger);
         if (format === "word") {
-            return trigger.getAttribute("data-print-word-url") || "";
+            return appendCommentSortDirectionToPrintUrl(trigger.getAttribute("data-print-word-url") || "", commentSortDirection);
         }
 
-        return trigger.getAttribute("data-print-pdf-url") || trigger.getAttribute("href") || "";
+        return appendCommentSortDirectionToPrintUrl(
+            trigger.getAttribute("data-print-pdf-url") || trigger.getAttribute("href") || "",
+            commentSortDirection);
+    }
+
+    function appendCommentSortDirectionToPrintUrl(rawUrl, commentSortDirection) {
+        if (!rawUrl) {
+            return "";
+        }
+
+        try {
+            const url = new URL(rawUrl, window.location.origin);
+            url.searchParams.set("commentSortDirection", normalizeCommentSortDirection(commentSortDirection));
+            return `${url.pathname}${url.search}${url.hash}`;
+        } catch (error) {
+            return rawUrl;
+        }
+    }
+
+    function resolveCommentSortDirectionFromTrigger(trigger) {
+        if (!(trigger instanceof Element)) {
+            return getStoredCommentSortDirection();
+        }
+
+        const directSection = trigger.closest("[data-comment-sort-section]");
+        if (directSection instanceof HTMLElement) {
+            return normalizeCommentSortDirection(directSection.getAttribute("data-comment-sort-direction"));
+        }
+
+        const cardSection = trigger.closest(".record-card")?.querySelector("[data-comment-sort-section]");
+        if (cardSection instanceof HTMLElement) {
+            return normalizeCommentSortDirection(cardSection.getAttribute("data-comment-sort-direction"));
+        }
+
+        const taskSection = trigger.closest(".task-item")?.querySelector("[data-comment-sort-section]");
+        if (taskSection instanceof HTMLElement) {
+            return normalizeCommentSortDirection(taskSection.getAttribute("data-comment-sort-direction"));
+        }
+
+        const visibleSection = Array.from(document.querySelectorAll("[data-comment-sort-section]"))
+            .find((section) => section instanceof HTMLElement && !isElementInHiddenTree(section));
+        if (visibleSection instanceof HTMLElement) {
+            return normalizeCommentSortDirection(visibleSection.getAttribute("data-comment-sort-direction"));
+        }
+
+        return getStoredCommentSortDirection();
     }
 
     function openPrintUrl(url) {
@@ -6464,6 +6524,7 @@
             "typukolu",
             "stav",
             "nazev",
+            "cil",
             "popis",
             "vlastnikid",
             "datumzalozeni",
@@ -6473,6 +6534,120 @@
         ];
 
         return basicPrefixes.some((prefix) => normalizedKey.startsWith(prefix)) ? "basic" : "";
+    }
+
+    function resolveRecordEditorTabLabel(tabKey) {
+        switch ((tabKey || "").toLowerCase()) {
+            case "basic":
+                return "Základní údaje";
+            case "external":
+                return "Externí vazby";
+            case "collaboration":
+                return "Spolupráce";
+            case "schedule":
+                return "Harmonogram";
+            default:
+                return "";
+        }
+    }
+
+    function resolveRecordEditorFieldLabel(rawKey) {
+        const normalizedKey = normalizeServerFieldKey(rawKey);
+        if (!normalizedKey) {
+            return "";
+        }
+
+        const lower = normalizedKey.toLowerCase();
+        const direct = {
+            "kategorie": "Kategorie záznamu",
+            "typukolu": "Typ úkolu",
+            "stav": "Stav úkolu",
+            "nazev": "Název",
+            "cil": "Cíl",
+            "popis": "Popis",
+            "vlastnikid": "Vlastník",
+            "datumzalozeni": "Datum založení",
+            "terminukonceni": "Termín ukončení",
+            "subsystem": "Subsystém",
+            "jednaniidprocislo": "Jednání pro identifikátor",
+            "vybranispolupracovniciids": "Spolupráce",
+            "harmonogramhodnoty": "Harmonogram"
+        };
+        if (direct[lower]) {
+            return direct[lower];
+        }
+
+        const externalMatch = /^externivazby\[(\d+)\]\.([a-z0-9_]+)$/i.exec(normalizedKey);
+        if (externalMatch) {
+            const row = Number.parseInt(externalMatch[1], 10) + 1;
+            const fieldRaw = externalMatch[2].toLowerCase();
+            const fieldLabelByKey = {
+                "typ": "Typ odkazu",
+                "cislo": "Číslo",
+                "predpokladanacena": "Předpokládaná cena",
+                "vyzva": "Výzva",
+                "datumobjednani": "Datum objednání",
+                "plandodani": "Plán dodání",
+                "datumdodani": "Datum dodání",
+                "datumprevzeti": "Datum převzetí"
+            };
+            const fieldLabel = fieldLabelByKey[fieldRaw] || externalMatch[2];
+            return `Řádek ${row}: ${fieldLabel}`;
+        }
+
+        const scheduleMatch = /^harmonogramhodnoty\[(\d+)\]\.([a-z0-9_]+)$/i.exec(normalizedKey);
+        if (scheduleMatch) {
+            const row = Number.parseInt(scheduleMatch[1], 10) + 1;
+            const fieldRaw = scheduleMatch[2].toLowerCase();
+            const fieldLabelByKey = {
+                "typid": "Typ kroku",
+                "hodnota": "Hodnota"
+            };
+            const fieldLabel = fieldLabelByKey[fieldRaw] || scheduleMatch[2];
+            return `Řádek ${row}: ${fieldLabel}`;
+        }
+
+        return normalizedKey;
+    }
+
+    function buildContextualSummaryMessage(rawKey, message) {
+        const trimmedMessage = String(message || "").trim();
+        if (!trimmedMessage) {
+            return "";
+        }
+
+        const tabKey = resolveRecordEditorTabForFieldKey(rawKey);
+        const tabLabel = resolveRecordEditorTabLabel(tabKey);
+        const fieldLabel = resolveRecordEditorFieldLabel(rawKey);
+        const context = [tabLabel, fieldLabel].filter(Boolean).join(" / ");
+        return context ? `[${context}] ${trimmedMessage}` : trimmedMessage;
+    }
+
+    async function copyTextToClipboard(text) {
+        const value = String(text || "");
+        if (!value) {
+            return false;
+        }
+
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            try {
+                await navigator.clipboard.writeText(value);
+                return true;
+            } catch (error) {
+                // Fallback below.
+            }
+        }
+
+        const helper = document.createElement("textarea");
+        helper.value = value;
+        helper.setAttribute("readonly", "readonly");
+        helper.style.position = "fixed";
+        helper.style.opacity = "0";
+        document.body.appendChild(helper);
+        helper.select();
+        const copied = document.execCommand("copy");
+        document.body.removeChild(helper);
+        return copied;
     }
 
     function normalizeServerFieldKey(rawKey) {
@@ -6588,7 +6763,7 @@
             ? payload.fieldErrors
             : {};
 
-        const summaryMessages = [];
+        const summaryMessages = new Set();
         const invalidTargets = [];
         let firstInvalidTab = "";
 
@@ -6610,7 +6785,12 @@
                 if (!firstInvalidTab) {
                     firstInvalidTab = resolveRecordEditorTabForFieldKey(rawKey);
                 }
-                summaryMessages.push(...normalizedMessages);
+                normalizedMessages.forEach((message) => {
+                    const contextual = buildContextualSummaryMessage(rawKey, message);
+                    if (contextual) {
+                        summaryMessages.add(contextual);
+                    }
+                });
                 return;
             }
 
@@ -6628,7 +6808,12 @@
                 || target.parentElement
                 || form;
             if (!(errorHost instanceof HTMLElement)) {
-                summaryMessages.push(...normalizedMessages);
+                normalizedMessages.forEach((message) => {
+                    const contextual = buildContextualSummaryMessage(rawKey, message);
+                    if (contextual) {
+                        summaryMessages.add(contextual);
+                    }
+                });
                 return;
             }
 
@@ -6636,10 +6821,20 @@
             errorLine.className = "field-error-message";
             errorLine.textContent = normalizedMessages.join(" ");
             errorHost.appendChild(errorLine);
+
+            normalizedMessages.forEach((message) => {
+                const contextual = buildContextualSummaryMessage(rawKey, message);
+                if (contextual) {
+                    summaryMessages.add(contextual);
+                }
+            });
         });
 
         const topMessage = payload && typeof payload.message === "string" ? payload.message.trim() : "";
-        if (topMessage || summaryMessages.length > 0) {
+        const errorCode = payload && typeof payload.errorCode === "string" ? payload.errorCode.trim() : "";
+        const traceId = payload && typeof payload.traceId === "string" ? payload.traceId.trim() : "";
+        const diagnosticLog = payload && typeof payload.diagnosticLog === "string" ? payload.diagnosticLog.trim() : "";
+        if (topMessage || summaryMessages.size > 0 || errorCode || traceId || diagnosticLog) {
             const summary = document.createElement("div");
             summary.className = "alert alert-error modal-submit-summary";
             summary.setAttribute("role", "alert");
@@ -6648,8 +6843,61 @@
             if (topMessage) {
                 merged.push(topMessage);
             }
-            merged.push(...summaryMessages);
-            summary.textContent = merged.filter(Boolean).join(" | ");
+            merged.push(...Array.from(summaryMessages));
+            const summaryText = merged.filter(Boolean).join(" | ");
+            if (summaryText) {
+                const messageLine = document.createElement("div");
+                messageLine.className = "modal-submit-summary-text";
+                messageLine.textContent = summaryText;
+                summary.appendChild(messageLine);
+            }
+
+            if (errorCode || traceId) {
+                const metaLine = document.createElement("div");
+                metaLine.className = "modal-submit-meta";
+                const metaParts = [];
+                if (errorCode) {
+                    metaParts.push(`Kód chyby: ${errorCode}`);
+                }
+                if (traceId) {
+                    metaParts.push(`TraceId: ${traceId}`);
+                }
+                metaLine.textContent = metaParts.join(" | ");
+                summary.appendChild(metaLine);
+            }
+
+            if (diagnosticLog) {
+                const diagnosticBlock = document.createElement("details");
+                diagnosticBlock.className = "modal-submit-diagnostics";
+
+                const diagnosticSummary = document.createElement("summary");
+                diagnosticSummary.textContent = "Diagnostický log";
+                diagnosticBlock.appendChild(diagnosticSummary);
+
+                const actions = document.createElement("div");
+                actions.className = "modal-submit-diagnostics-actions";
+                const copyButton = document.createElement("button");
+                copyButton.type = "button";
+                copyButton.className = "btn small ghost";
+                copyButton.textContent = "Kopírovat log";
+                copyButton.addEventListener("click", async () => {
+                    const copied = await copyTextToClipboard(diagnosticLog);
+                    copyButton.textContent = copied ? "Zkopírováno" : "Kopírování selhalo";
+                    window.setTimeout(() => {
+                        copyButton.textContent = "Kopírovat log";
+                    }, 1800);
+                });
+                actions.appendChild(copyButton);
+                diagnosticBlock.appendChild(actions);
+
+                const logPre = document.createElement("pre");
+                logPre.className = "modal-submit-diagnostics-log";
+                logPre.textContent = diagnosticLog;
+                diagnosticBlock.appendChild(logPre);
+
+                summary.appendChild(diagnosticBlock);
+            }
+
             form.insertBefore(summary, form.firstElementChild);
         }
 
@@ -7448,6 +7696,7 @@
             return;
         }
 
+        const normalizedDirection = normalizeCommentSortDirection(direction);
         const list = section.querySelector("[data-comment-list]");
         if (!(list instanceof HTMLElement)) {
             return;
@@ -7466,14 +7715,30 @@
             const bMeeting = Number(b.getAttribute("data-comment-meeting") || "0");
             const aId = Number(a.getAttribute("data-comment-id") || "0");
             const bId = Number(b.getAttribute("data-comment-id") || "0");
-            if (direction === "desc") {
+            if (normalizedDirection === "desc") {
                 return (bMeeting - aMeeting) || (bId - aId);
             }
             return (aMeeting - bMeeting) || (aId - bId);
         });
 
         items.forEach((item) => list.appendChild(item));
-        section.setAttribute("data-comment-sort-direction", direction);
+        section.setAttribute("data-comment-sort-direction", normalizedDirection);
+    }
+
+    function applyCommentSortToAllSections(direction, scope) {
+        const root = scope instanceof Element ? scope : document;
+        const normalizedDirection = normalizeCommentSortDirection(direction);
+        root.querySelectorAll("[data-comment-sort-section]").forEach((section) => {
+            if (!(section instanceof HTMLElement)) {
+                return;
+            }
+
+            applyCommentSort(section, normalizedDirection);
+            const toggle = section.querySelector("[data-comment-sort-toggle]");
+            if (toggle instanceof HTMLButtonElement) {
+                setCommentSortButtonLabel(toggle, normalizedDirection);
+            }
+        });
     }
 
     function initCommentSortUi(scope) {
@@ -7488,9 +7753,8 @@
                 return;
             }
 
-            const defaultDirection = section.getAttribute("data-comment-sort-direction") === "desc"
-                ? "desc"
-                : "asc";
+            const defaultDirection = normalizeCommentSortDirection(
+                section.getAttribute("data-comment-sort-direction") || getStoredCommentSortDirection());
             applyCommentSort(section, defaultDirection);
 
             const toggle = section.querySelector("[data-comment-sort-toggle]");
@@ -7507,8 +7771,8 @@
             toggle.addEventListener("click", () => {
                 const current = section.getAttribute("data-comment-sort-direction") === "desc" ? "desc" : "asc";
                 const next = current === "asc" ? "desc" : "asc";
-                applyCommentSort(section, next);
-                setCommentSortButtonLabel(toggle, next);
+                setStoredCommentSortDirection(next);
+                applyCommentSortToAllSections(next, document);
             });
         });
     }

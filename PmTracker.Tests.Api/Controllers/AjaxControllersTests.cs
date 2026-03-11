@@ -2,6 +2,7 @@ using System.Net;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Api.TestInfrastructure;
+using PmTracker.Web.Models.Entities;
 
 namespace PmTracker.Tests.Api.Controllers;
 
@@ -154,6 +155,83 @@ public sealed class AjaxControllersTests
     }
 
     [Fact]
+    public async Task SaveRecord_ShouldReturnCrossTabFieldErrorsAndDiagnosticLog_WhenValidationFails()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiRecordOwner");
+        var outsiderId = await _fixture.EnsurePersonAsync("ApiRecordOutsider");
+        var projectId = await _fixture.EnsureProjectAsync("APIRECVAL");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIRECVAL_SUB", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var hasProjectSubsystem = await dbContext.ProjektSubsystemy
+                .AnyAsync(x => x.ProjektId == projectId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue);
+            if (!hasProjectSubsystem)
+            {
+                dbContext.ProjektSubsystemy.Add(new ProjektSubsystemEntity
+                {
+                    ProjektId = projectId,
+                    SubsystemId = subsystemId,
+                    DatumPrirazeni = DateTime.UtcNow
+                });
+                await dbContext.SaveChangesAsync();
+            }
+        }
+
+        await using var lookupContext = _fixture.CreateDbContext();
+        var categoryCode = await lookupContext.CiselnikKategoriiZaznamu
+            .Where(x => x.Kod == "U" || x.Kod == "UKOL")
+            .OrderBy(x => x.Id)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var statusCode = await lookupContext.CiselnikStavuUkolu
+            .OrderBy(x => x.Id)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var subsystemCode = await lookupContext.Subsystemy
+            .Where(x => x.Id == subsystemId)
+            .Select(x => x.Kod)
+            .SingleAsync();
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Zaznamy/Save?asUser={_fixture.AdminOsobaId}",
+            ApiTestHttpHelper.BuildForm(
+                ("ProjektId", projectId.ToString()),
+                ("Kategorie", categoryCode),
+                ("Stav", statusCode),
+                ("Nazev", "API record validation"),
+                ("Cil", "Test"),
+                ("Popis", $"Popis s neplatnym znakem {char.ConvertFromUtf32(1)}"),
+                ("VlastnikId", ownerId.ToString()),
+                ("DatumZalozeni", "2026-05-05"),
+                ("TerminUkonceni", "2026-05-20"),
+                ("Subsystem", subsystemCode),
+                ("VybraniSpolupracovniciIds", outsiderId.ToString()),
+                ("ExterniVazby[0].Typ", "PMP"),
+                ("ExterniVazby[0].Cislo", ""),
+                ("ExterniVazby[0].PredpokladanaCena", "abc"),
+                ("HarmonogramHodnoty[0].TypId", "999999"),
+                ("HarmonogramHodnoty[0].Hodnota", "3")));
+
+        var response = await client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+        payload.Ok.Should().BeFalse();
+        payload.ErrorCode.Should().Be("RECORD_VALIDATION_FAILED");
+        payload.TraceId.Should().NotBeNullOrWhiteSpace();
+        payload.DiagnosticLog.Should().NotBeNullOrWhiteSpace();
+        payload.DiagnosticLog.Should().Contain("CommandValues");
+        payload.FieldErrors.Keys.Should().Contain("Popis");
+        payload.FieldErrors.Keys.Should().Contain("ExterniVazby[0].Cislo");
+        payload.FieldErrors.Keys.Should().Contain("ExterniVazby[0].PredpokladanaCena");
+        payload.FieldErrors.Keys.Should().Contain("VybraniSpolupracovniciIds");
+        payload.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[0].TypId");
+    }
+
+    [Fact]
     public async Task SavePermission_ShouldReturnAjaxError_ForUnsupportedKey()
     {
         await using var dbContext = _fixture.CreateDbContext();
@@ -174,5 +252,8 @@ public sealed class AjaxControllersTests
         var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
         payload.Ok.Should().BeFalse();
         payload.Message.Should().Contain("není v seznamu podporovaných akcí");
+        payload.ErrorCode.Should().Be("OPERATION_FAILED");
+        payload.TraceId.Should().NotBeNullOrWhiteSpace();
+        payload.DiagnosticLog.Should().NotBeNullOrWhiteSpace();
     }
 }

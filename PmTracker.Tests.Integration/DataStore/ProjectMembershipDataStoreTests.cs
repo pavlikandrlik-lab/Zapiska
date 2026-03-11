@@ -2,6 +2,7 @@ using System.Globalization;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Integration.TestInfrastructure;
+using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 
 namespace PmTracker.Tests.Integration.DataStore;
@@ -189,5 +190,131 @@ public sealed class ProjectMembershipDataStoreTests
         meetingPrint.ProjektoveRole.Should().Contain(row => row.TypRole == "Projektová");
         meetingPrint.ProjektoveRole.Should().Contain(row => row.TypRole == "Subsystémová");
         taskPrint.ProjektoveRole.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task TaskPrintTemplate_ShouldRespectRequestedCommentSortDirection()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_comment_sort_direction");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportSortAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportSortOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "EXPSORT");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "EXPSORT_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportSortRecord");
+        var meeting1Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9401);
+        var meeting2Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9402);
+        var meeting3Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9403);
+
+        dbContext.Vyjadreni.AddRange(
+            new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meeting2Id,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = "Meeting 2 comment",
+                DatumVyjadreni = new DateTime(2026, 6, 2, 9, 0, 0)
+            },
+            new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meeting1Id,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = "Meeting 1 comment",
+                DatumVyjadreni = new DateTime(2026, 6, 1, 9, 0, 0)
+            },
+            new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meeting3Id,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = "Meeting 3 comment",
+                DatumVyjadreni = new DateTime(2026, 6, 3, 9, 0, 0)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var ascModel = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false, commentSortDirection: "asc");
+        var descModel = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false, commentSortDirection: "desc");
+
+        ascModel.Zaznamy.Should().ContainSingle();
+        descModel.Zaznamy.Should().ContainSingle();
+
+        var ascMeetingNumbers = ascModel.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
+        var descMeetingNumbers = descModel.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
+
+        ascMeetingNumbers.Should().Equal(9401, 9402, 9403);
+        descMeetingNumbers.Should().Equal(9403, 9402, 9401);
+    }
+
+    [Fact]
+    public async Task ProjectAndMeetingPrintTemplates_ShouldRespectRequestedCommentSortDirection()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_comment_sort_direction_all_templates");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportSortAllAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportSortAllOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "EXPSORTALL");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "EXPSORTALL_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportSortAllRecord");
+        var meeting1Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9501);
+        var meeting2Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9502);
+        var meeting3Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9503);
+
+        dbContext.Vyjadreni.AddRange(
+            new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meeting2Id,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = "Meeting 2 comment",
+                DatumVyjadreni = new DateTime(2026, 7, 2, 9, 0, 0)
+            },
+            new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meeting1Id,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = "Meeting 1 comment",
+                DatumVyjadreni = new DateTime(2026, 7, 1, 9, 0, 0)
+            },
+            new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meeting3Id,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = "Meeting 3 comment",
+                DatumVyjadreni = new DateTime(2026, 7, 3, 9, 0, 0)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var projectAsc = store.BuildProjectPrintTemplate(projectId, currentUser, autoPrint: false, commentSortDirection: "asc");
+        var projectDesc = store.BuildProjectPrintTemplate(projectId, currentUser, autoPrint: false, commentSortDirection: "desc");
+        var meetingAsc = store.BuildMeetingPrintTemplate(meeting3Id, currentUser, autoPrint: false, commentSortDirection: "asc");
+        var meetingDesc = store.BuildMeetingPrintTemplate(meeting3Id, currentUser, autoPrint: false, commentSortDirection: "desc");
+
+        projectAsc.Zaznamy.Should().ContainSingle();
+        projectDesc.Zaznamy.Should().ContainSingle();
+        meetingAsc.Zaznamy.Should().ContainSingle();
+        meetingDesc.Zaznamy.Should().ContainSingle();
+
+        var projectAscMeetingNumbers = projectAsc.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
+        var projectDescMeetingNumbers = projectDesc.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
+        var meetingAscMeetingNumbers = meetingAsc.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
+        var meetingDescMeetingNumbers = meetingDesc.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
+
+        projectAscMeetingNumbers.Should().Equal(9501, 9502, 9503);
+        projectDescMeetingNumbers.Should().Equal(9503, 9502, 9501);
+        meetingAscMeetingNumbers.Should().Equal(9501, 9502, 9503);
+        meetingDescMeetingNumbers.Should().Equal(9503, 9502, 9501);
     }
 }
