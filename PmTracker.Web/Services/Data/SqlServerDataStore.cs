@@ -5909,7 +5909,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 .Select(link =>
                 {
                     var typeCode = externalTypeMap.GetValueOrDefault(link.TypOdkazuId)?.Kod ?? "-";
-                    return FormatExternalLinkDisplay(typeCode, link.Cislo, link.PredpokladanaCena);
+                    return FormatExternalLinkDisplay(typeCode, link.Cislo, link.PredpokladanaCena, link.PlanDodani);
                 })
                 .ToList();
 
@@ -6006,17 +6006,17 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
         if (!anchorIsPreparation)
         {
-            return commentMeeting.Id == anchorMeeting.Id ? "#8ec6e9" : null;
+            return commentMeeting.Id == anchorMeeting.Id ? "#0F4D8A" : null;
         }
 
         if (commentMeeting.Id == anchorMeeting.Id)
         {
-            return "#f1978c";
+            return "#A63A2B";
         }
 
         if (previousMeetingNumber.HasValue && commentMeeting.CisloJednani == previousMeetingNumber.Value)
         {
-            return "#8ec6e9";
+            return "#0F4D8A";
         }
 
         return null;
@@ -6297,11 +6297,22 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     private static string FormatEstimatedPrice(decimal estimatedPrice)
         => $"{estimatedPrice.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ"))} Kč";
 
-    private static string FormatExternalLinkDisplay(string typeCode, string number, decimal? estimatedPrice)
+    private static string FormatExternalLinkDisplay(string typeCode, string number, decimal? estimatedPrice, DateTime? plannedDelivery)
     {
         var header = $"{typeCode} {number}".Trim();
-        return estimatedPrice.HasValue
-            ? $"{header} ({FormatEstimatedPrice(estimatedPrice.Value)})"
+        var details = new List<string>();
+        if (estimatedPrice.HasValue)
+        {
+            details.Add(FormatEstimatedPrice(estimatedPrice.Value));
+        }
+
+        if (plannedDelivery.HasValue)
+        {
+            details.Add($"plán dodání: {plannedDelivery.Value:dd.MM.yyyy}");
+        }
+
+        return details.Count > 0
+            ? $"{header} ({string.Join(", ", details)})"
             : header;
     }
 

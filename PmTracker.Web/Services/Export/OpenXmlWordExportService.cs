@@ -73,7 +73,7 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
         table.Append(CreateHeaderKeyValueRow("Generoval", model.Vytvoril));
         table.Append(CreateHeaderKeyValueRow("Vytvořeno", model.VytvorenoDne.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)));
 
-        if (model.ProjektoveRole.Count > 0)
+        if (!isMeeting && model.ProjektoveRole.Count > 0)
         {
             var roleLines = model.ProjektoveRole
                 .Select(member =>
@@ -271,7 +271,7 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
             ? (string.IsNullOrWhiteSpace(record.KategorieKod) ? "-" : record.KategorieKod)
             : record.TypUkoluKod;
         var isPaused = (record.Stav ?? string.Empty).Contains("pozastav", StringComparison.CurrentCultureIgnoreCase);
-        var pausedFill = isPaused ? "F6D0B0" : null;
+        var pausedFill = isPaused ? "FDF4E8" : null;
 
         cell.Append(CreateParagraph(
             $"{code}{record.CisloViditelne} - {record.Nazev}",
@@ -338,16 +338,18 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
 
         foreach (var comment in record.Vyjadreni)
         {
-            var meetingRef = comment.JednaniCislo.HasValue ? $" | jednání č. {comment.JednaniCislo}" : string.Empty;
-            var titleText = $"{comment.Datum:dd.MM.yyyy}{meetingRef} | {comment.Autor}";
-            var fillColor = NormalizeHexColor(comment.HighlightColor);
+            var meetingRef = comment.JednaniCislo.HasValue
+                ? $"jednání č. {comment.JednaniCislo}{(comment.JednaniDatum.HasValue ? $" ({comment.JednaniDatum.Value:dd.MM.yyyy})" : string.Empty)}"
+                : "jednání";
+            var titleText = $"{meetingRef} | {comment.Autor} | {comment.Datum:dd.MM.yyyy}";
+            var commentTextColor = NormalizeHexColor(comment.HighlightColor);
             cell.Append(CreateParagraph(
                 titleText,
                 bold: true,
                 sizeHalfPoints: BaseFontHalfPoints,
                 before: 20,
                 after: 0,
-                shadingHex: fillColor));
+                colorHex: commentTextColor));
             var safeCommentHtml = _richTextContentService.ToSafeHtml(comment.Text);
             if (!string.IsNullOrWhiteSpace(safeCommentHtml))
             {
@@ -358,7 +360,8 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
                     prefixSegment: null,
                     beforeFirst: 0,
                     afterLast: 20,
-                    shadingHex: fillColor);
+                    shadingHex: null,
+                    textColorHex: commentTextColor);
             }
         }
     }
@@ -439,6 +442,7 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
         int sizeHalfPoints = BaseFontHalfPoints,
         JustificationValues? justification = null,
         string? shadingHex = null,
+        string? colorHex = null,
         int before = 0,
         int after = 0)
     {
@@ -467,7 +471,7 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
         var paragraph = new Paragraph(paragraphProperties);
         foreach (var segment in segments)
         {
-            var runProperties = CreateRunProperties(sizeHalfPoints, segment.Bold, segment.Italic, segment.Strike, segment.Underline);
+            var runProperties = CreateRunProperties(sizeHalfPoints, segment.Bold, segment.Italic, segment.Strike, segment.Underline, colorHex);
             AppendSegmentText(
                 paragraph,
                 runProperties,
@@ -512,7 +516,8 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
         TextSegment? prefixSegment,
         int beforeFirst,
         int afterLast,
-        string? shadingHex)
+        string? shadingHex,
+        string? textColorHex = null)
     {
         var parsed = ParseRichHtml(safeHtml);
         if (parsed.Count == 0)
@@ -539,7 +544,8 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
                     bold: segment.Bold,
                     italic: segment.Italic,
                     strike: segment.Strike,
-                    underline: segment.Underline);
+                    underline: segment.Underline,
+                    colorHex: textColorHex);
                 AppendSegmentText(paragraph, prefixRunProperties, segment.Text ?? string.Empty, segment.PreserveLineBreaks);
             }
 
@@ -562,7 +568,7 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
                     token.Italic,
                     strike: false,
                     underline: token.Underline || !string.IsNullOrWhiteSpace(token.LinkHref),
-                    colorHex: string.IsNullOrWhiteSpace(token.LinkHref) ? null : "0563C1");
+                    colorHex: string.IsNullOrWhiteSpace(token.LinkHref) ? textColorHex : "0563C1");
 
                 if (!string.IsNullOrWhiteSpace(token.LinkHref)
                     && Uri.TryCreate(token.LinkHref, UriKind.Absolute, out var hyperlinkUri))
@@ -806,6 +812,7 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
         int sizeHalfPoints = BaseFontHalfPoints,
         JustificationValues? justification = null,
         string? shadingHex = null,
+        string? colorHex = null,
         int before = 0,
         int after = 0,
         bool preserveLineBreaks = false)
@@ -833,7 +840,7 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
         }
 
         var paragraph = new Paragraph(paragraphProperties);
-        var runProperties = CreateRunProperties(sizeHalfPoints, bold, italic, strike, underline: false);
+        var runProperties = CreateRunProperties(sizeHalfPoints, bold, italic, strike, underline: false, colorHex);
         var normalizedText = (text ?? string.Empty)
             .Replace("\r\n", "\n", StringComparison.Ordinal)
             .Replace("\r", "\n", StringComparison.Ordinal);

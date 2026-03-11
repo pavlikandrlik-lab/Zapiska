@@ -204,7 +204,7 @@
 
         .record-title.paused {
             display: inline-block;
-            background: rgb(246, 208, 176);
+            background: #fdf4e8;
             padding: 1px 5px;
             border-radius: 2px;
         }
@@ -222,7 +222,7 @@
         }
 
         .record-code-badge.paused {
-            background: rgb(246, 208, 176);
+            background: #fdf4e8;
         }
 
         .record-subsystem-code {
@@ -307,22 +307,18 @@
             margin: 0 0 2px;
             padding: 1px 2px;
             border-radius: 2px;
-            background: transparent;
-        }
-
-        .comment-item.highlight {
-            border: 1px solid rgba(0, 0, 0, 0.28);
         }
 
         .comment-item-head {
             font-size: 10pt;
-            color: var(--muted);
+            color: inherit;
+            font-weight: 700;
             margin-bottom: 1px;
         }
 
         .comment-item-text {
             margin: 0 0 1px;
-            color: #111;
+            color: inherit;
             white-space: pre-wrap;
             overflow-wrap: anywhere;
         }
@@ -399,7 +395,7 @@
                 <div><strong>Generoval:</strong> @Model.Vytvoril</div>
                 <div><strong>Vytvořeno:</strong> @Model.VytvorenoDne.ToString("dd.MM.yyyy HH:mm")</div>
             </div>
-            @if (Model.ProjektoveRole.Count > 0)
+            @if (!isMeeting && Model.ProjektoveRole.Count > 0)
             {
                 <div class="project-roles">
                     <div class="project-roles-head">
@@ -509,13 +505,14 @@
                                             @foreach (var vyjadreni in zaznam.Vyjadreni)
                                             {
                                                 var highlightStyle = !string.IsNullOrWhiteSpace(vyjadreni.HighlightColor)
-                                                    ? $"background:{vyjadreni.HighlightColor};"
+                                                    ? $"color:{vyjadreni.HighlightColor};"
                                                     : string.Empty;
                                                 var meetingRef = vyjadreni.JednaniCislo.HasValue
-                                                    ? $" | jednání č. {vyjadreni.JednaniCislo}"
-                                                    : string.Empty;
-                                                <li class="comment-item @(string.IsNullOrWhiteSpace(vyjadreni.HighlightColor) ? string.Empty : "highlight")" style="@highlightStyle">
-                                                    <div class="comment-item-head">@vyjadreni.Datum.ToString("dd.MM.yyyy")@meetingRef | @vyjadreni.Autor</div>
+                                                    ? $"jednání č. {vyjadreni.JednaniCislo}{(vyjadreni.JednaniDatum.HasValue ? $" ({vyjadreni.JednaniDatum.Value:dd.MM.yyyy})" : string.Empty)}"
+                                                    : "jednání";
+                                                var commentHeader = $"{meetingRef} | {vyjadreni.Autor} | {vyjadreni.Datum:dd.MM.yyyy}";
+                                                <li class="comment-item" style="@highlightStyle">
+                                                    <div class="comment-item-head">@commentHeader</div>
                                                     <div class="comment-item-text">@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
                                                 </li>
                                             }

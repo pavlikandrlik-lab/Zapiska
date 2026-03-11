@@ -317,4 +317,56 @@ public sealed class ProjectMembershipDataStoreTests
         meetingAscMeetingNumbers.Should().Equal(9501, 9502, 9503);
         meetingDescMeetingNumbers.Should().Equal(9503, 9502, 9501);
     }
+
+    [Fact]
+    public async Task TaskPrintTemplate_ShouldIncludePlannedDeliveryDateOnlyForExternalLinksThatHaveIt()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_external_planned_delivery");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportExternalAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportExternalOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "EXPEXT");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "EXPEXT_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportExternalRecord");
+        await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9601);
+
+        var pmpTypeId = await dbContext.CiselnikTypuExternichOdkazu
+            .Where(x => x.Kod == "PMP")
+            .Select(x => x.Id)
+            .FirstAsync();
+        var nesTypeId = await dbContext.CiselnikTypuExternichOdkazu
+            .Where(x => x.Kod == "NES")
+            .Select(x => x.Id)
+            .FirstAsync();
+
+        dbContext.ZaznamExterniOdkazy.AddRange(
+            new ZaznamExterniOdkazEntity
+            {
+                ZaznamId = recordId,
+                TypOdkazuId = pmpTypeId,
+                Cislo = "PMP-123",
+                PlanDodani = new DateTime(2026, 4, 15)
+            },
+            new ZaznamExterniOdkazEntity
+            {
+                ZaznamId = recordId,
+                TypOdkazuId = nesTypeId,
+                Cislo = "NES-456",
+                PlanDodani = null
+            });
+        await dbContext.SaveChangesAsync();
+
+        var model = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false);
+        model.Zaznamy.Should().ContainSingle();
+
+        var externalLinks = model.Zaznamy.Single().ExterniVazby;
+        externalLinks.Should().Contain("PMP PMP-123 (plán dodání: 15.04.2026)");
+        externalLinks.Should().Contain("NES NES-456");
+        externalLinks.Should().NotContain(link => link.Contains("NES NES-456 (", StringComparison.Ordinal));
+    }
 }
