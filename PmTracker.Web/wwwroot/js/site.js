@@ -2987,6 +2987,33 @@
         return `${day}.${month}.${year}`;
     }
 
+    function setAppDateFieldValue(valueInput, isoValue) {
+        if (!(valueInput instanceof HTMLInputElement)) {
+            return false;
+        }
+
+        const normalizedIso = typeof isoValue === "string" ? isoValue.trim() : "";
+        const parsed = parseIsoDate(normalizedIso);
+        if (!(parsed instanceof Date)) {
+            return false;
+        }
+
+        const previous = valueInput.value || "";
+        valueInput.value = normalizedIso;
+
+        const dateField = valueInput.closest("[data-app-date-field]");
+        const displayInput = dateField?.querySelector("[data-app-date-display]");
+        if (displayInput instanceof HTMLInputElement) {
+            displayInput.value = formatDisplayDate(parsed);
+        }
+
+        if (previous !== normalizedIso) {
+            valueInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+
+        return true;
+    }
+
     const msPerDay = 24 * 60 * 60 * 1000;
 
     function toUtcDayStamp(date) {
@@ -5486,8 +5513,54 @@
         });
     }
 
+    function initRecordMeetingDateSync(scope) {
+        scope.querySelectorAll('form[data-record-editor-form="true"][data-is-create="true"]').forEach((form) => {
+            if (!(form instanceof HTMLFormElement) || form.dataset.recordMeetingDateSyncReady === "true") {
+                return;
+            }
+
+            const meetingSelect = form.querySelector("[data-record-meeting-number-select]");
+            const startDateInput = form.querySelector('[data-app-date-value][name="DatumZalozeni"]');
+            if (!(meetingSelect instanceof HTMLSelectElement) || !(startDateInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            form.dataset.recordMeetingDateSyncReady = "true";
+            const syncToSelectedMeeting = () => {
+                const selectedOption = meetingSelect.options[meetingSelect.selectedIndex];
+                const meetingDateIso = selectedOption?.dataset.recordMeetingDate || "";
+                if (!meetingDateIso) {
+                    return;
+                }
+
+                setAppDateFieldValue(startDateInput, meetingDateIso);
+            };
+
+            meetingSelect.addEventListener("change", syncToSelectedMeeting);
+            syncToSelectedMeeting();
+        });
+    }
+
     function looksLikeHtml(value) {
         return /<\s*\/?\s*[a-z][^>]*>/i.test(value || "");
+    }
+
+    function getOrCreateRichTextSourceContainer(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return null;
+        }
+
+        const existing = form.querySelector("[data-rich-text-source-container]");
+        if (existing instanceof HTMLElement) {
+            return existing;
+        }
+
+        const container = document.createElement("div");
+        container.className = "richtext-source-container";
+        container.setAttribute("data-rich-text-source-container", "true");
+        container.setAttribute("aria-hidden", "true");
+        form.appendChild(container);
+        return container;
     }
 
     function initRichTextEditors(scope) {
@@ -5510,7 +5583,18 @@
             const host = document.createElement("div");
             host.className = "richtext-host";
             textarea.insertAdjacentElement("beforebegin", host);
-            host.appendChild(textarea);
+            const form = textarea.closest("form");
+            const labelParent = textarea.closest("label");
+            if (labelParent instanceof HTMLLabelElement && form instanceof HTMLFormElement) {
+                const sourceContainer = getOrCreateRichTextSourceContainer(form);
+                if (sourceContainer instanceof HTMLElement) {
+                    sourceContainer.appendChild(textarea);
+                } else {
+                    host.appendChild(textarea);
+                }
+            } else {
+                host.appendChild(textarea);
+            }
             textarea.classList.add("richtext-source-hidden");
             textarea.setAttribute("aria-hidden", "true");
             textarea.setAttribute("tabindex", "-1");
@@ -5576,7 +5660,6 @@
                 quill.setText("");
             }
 
-            const form = textarea.closest("form");
             if (form instanceof HTMLFormElement) {
                 form.addEventListener("submit", syncTextarea);
             }
@@ -6130,6 +6213,7 @@
         initConfirmSubmitToggles(scope);
         initRecordFormTabs(scope);
         initRecordGoalAutoGrow(scope);
+        initRecordMeetingDateSync(scope);
         initRichTextEditors(scope);
         initRecordSchedulePlanner(scope);
         initRecordEditorDirtyTracking(scope);

@@ -16,6 +16,12 @@
     var backLabel = ViewData["BackLabel"] as string ?? "Zpět na jednání";
     var meetingPrintUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = Model.Jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Tisk?autoPrint=true";
     var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = Model.Jednani.Id }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Word";
+    var createRecordInMeetingUrl = Url.Action("Create", "Zaznamy", new
+    {
+        projektId = Model.ProjektId,
+        jednaniId = Model.Jednani.Id,
+        uiContext = "meeting"
+    }) ?? $"/Zaznamy/Create?projektId={Model.ProjektId}&jednaniId={Model.Jednani.Id}&uiContext=meeting";
     var attendancePanelId = $"meeting-attendance-panel-{Model.Jednani.Id}";
     var attendanceSummaryItems = Model.Ucast
         .GroupBy(x => string.IsNullOrWhiteSpace(x.StavUcasti) ? "Bez stavu" : x.StavUcasti)
@@ -219,7 +225,18 @@
         </div>
 
         <div class="card">
-            <h2>Zápis úkolů</h2>
+            <div class="meeting-task-header">
+                <h2>Zápis úkolů</h2>
+                @if (canEditRecords)
+                {
+                    <button class="btn primary"
+                            type="button"
+                            data-record-editor-url="@createRecordInMeetingUrl"
+                            data-record-editor-label="Nový záznam">
+                        Nový záznam
+                    </button>
+                }
+            </div>
             <div class="task-list">
                 @for (var i = 0; i < Model.Ukoly.Count; i++)
                 {

@@ -7,7 +7,7 @@ public interface IRecordsService
     bool ProjektExists(int id);
     ProjektDetailViewModel BuildProjektDetail(int id);
     ZaznamEditViewModel BuildZaznamEdit(int id);
-    ZaznamEditViewModel BuildZaznamCreate(int projektId);
+    ZaznamEditViewModel BuildZaznamCreate(int projektId, int? jednaniId = null);
     DeleteRecordModalViewModel BuildDeleteRecordModal(int projektId, int zaznamId);
     int SaveRecord(SaveRecordCommand command, CurrentUserContextViewModel currentUser);
     void DeleteRecord(DeleteRecordCommand command, CurrentUserContextViewModel currentUser);

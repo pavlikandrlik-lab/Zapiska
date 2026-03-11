@@ -154,6 +154,126 @@ public sealed class RecordSaveDataStoreTests
     }
 
     [Fact]
+    public async Task BuildZaznamCreate_ShouldPrefillMeetingAndStartDate_WhenContextMeetingIsOpen_AndMeetingNumberingIsEnabled()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_create_context_meeting_open");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordContextMeetingOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCMEETOPEN");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCMEETOPEN_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var project = await dbContext.Projekty.FirstAsync(x => x.Id == projectId);
+        project.PouzivatIdentJednani = true;
+        await dbContext.SaveChangesAsync();
+
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", 920);
+        var meetingDate = new DateTime(2026, 5, 14);
+        var meeting = await dbContext.Jednani.FirstAsync(x => x.Id == meetingId);
+        meeting.DatumPlanovane = meetingDate;
+        await dbContext.SaveChangesAsync();
+
+        var model = store.BuildZaznamCreate(projectId, meetingId);
+
+        model.PouzivatIdentJednani.Should().BeTrue();
+        model.JednaniIdProCislo.Should().Be(meetingId);
+        model.DatumZalozeni.Date.Should().Be(meetingDate.Date);
+        model.JednaniProCisloOptions.Should().ContainSingle(x => x.Id == meetingId && x.Datum.Date == meetingDate.Date);
+    }
+
+    [Fact]
+    public async Task BuildZaznamCreate_ShouldFallbackToOpenMeeting_WhenContextMeetingIsClosed_AndMeetingNumberingIsEnabled()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_create_context_meeting_closed");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordContextClosedOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCMEETCLS");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCMEETCLS_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var project = await dbContext.Projekty.FirstAsync(x => x.Id == projectId);
+        project.PouzivatIdentJednani = true;
+        await dbContext.SaveChangesAsync();
+
+        var openMeetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", 931);
+        var openMeetingDate = new DateTime(2026, 6, 10);
+        var openMeeting = await dbContext.Jednani.FirstAsync(x => x.Id == openMeetingId);
+        openMeeting.DatumPlanovane = openMeetingDate;
+
+        var closedMeetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "CLOSED", 940);
+        var closedMeeting = await dbContext.Jednani.FirstAsync(x => x.Id == closedMeetingId);
+        closedMeeting.DatumPlanovane = new DateTime(2026, 6, 25);
+        await dbContext.SaveChangesAsync();
+
+        var model = store.BuildZaznamCreate(projectId, closedMeetingId);
+
+        model.JednaniIdProCislo.Should().Be(openMeetingId);
+        model.DatumZalozeni.Date.Should().Be(openMeetingDate.Date);
+    }
+
+    [Fact]
+    public async Task BuildZaznamCreate_ShouldUseContextMeetingDate_WhenProjectDoesNotUseMeetingNumbering()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_create_context_meeting_plain");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordContextPlainOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCMEETPLN");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCMEETPLN_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var contextMeetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", 951);
+        var contextMeetingDate = new DateTime(2026, 7, 3);
+        var contextMeeting = await dbContext.Jednani.FirstAsync(x => x.Id == contextMeetingId);
+        contextMeeting.DatumPlanovane = contextMeetingDate;
+        await dbContext.SaveChangesAsync();
+
+        var model = store.BuildZaznamCreate(projectId, contextMeetingId);
+
+        model.PouzivatIdentJednani.Should().BeFalse();
+        model.JednaniIdProCislo.Should().BeNull();
+        model.DatumZalozeni.Date.Should().Be(contextMeetingDate.Date);
+    }
+
+    [Fact]
+    public async Task BuildZaznamCreate_ShouldKeepContextMeetingDate_WhenNoOpenMeetingExists_ForMeetingNumbering()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_create_context_meeting_no_open");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordContextNoOpenOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCMEETNOP");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCMEETNOP_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var project = await dbContext.Projekty.FirstAsync(x => x.Id == projectId);
+        project.PouzivatIdentJednani = true;
+        await dbContext.SaveChangesAsync();
+
+        var contextMeetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "CLOSED", 961);
+        var contextMeetingDate = new DateTime(2026, 7, 24);
+        var contextMeeting = await dbContext.Jednani.FirstAsync(x => x.Id == contextMeetingId);
+        contextMeeting.DatumPlanovane = contextMeetingDate;
+        await dbContext.SaveChangesAsync();
+
+        var model = store.BuildZaznamCreate(projectId, contextMeetingId);
+
+        model.MaDostupneJednaniProCislo.Should().BeFalse();
+        model.JednaniIdProCislo.Should().BeNull();
+        model.DatumZalozeni.Date.Should().Be(contextMeetingDate.Date);
+    }
+
+    [Fact]
     public async Task SaveRecord_ShouldClearScheduleValues_WhenCategoryIsNotTask()
     {
         var db = await _fixture.CreateDatabaseAsync("record_save_clear_non_task_schedule");

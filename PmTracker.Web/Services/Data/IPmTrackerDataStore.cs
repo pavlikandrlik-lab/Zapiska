@@ -10,7 +10,7 @@ public interface IPmTrackerDataStore
     IReadOnlyList<ProjektListItemViewModel> BuildProjektyList();
     ProjektDetailViewModel BuildProjektDetail(int id);
     ZaznamEditViewModel BuildZaznamEdit(int id);
-    ZaznamEditViewModel BuildZaznamCreate(int projektId);
+    ZaznamEditViewModel BuildZaznamCreate(int projektId, int? jednaniId = null);
     DeleteRecordModalViewModel BuildDeleteRecordModal(int projektId, int zaznamId);
     int GetNextCisloZaznamu(int projektId);
 

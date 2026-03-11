@@ -392,7 +392,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         return BuildZaznamEditForEntity(record, isCreate: false);
     }
 
-    public ZaznamEditViewModel BuildZaznamCreate(int projektId)
+    public ZaznamEditViewModel BuildZaznamCreate(int projektId, int? jednaniId = null)
     {
         var project = _dbContext.Projekty.AsNoTracking()
             .FirstOrDefault(x => x.Id == projektId)
@@ -402,10 +402,19 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var defaultStatus = _dbContext.CiselnikStavuUkolu.AsNoTracking().OrderBy(x => x.Nazev).FirstOrDefault();
         var activeProjectSubsystems = BuildActiveProjectSubsystems(projektId);
         var defaultSubsystem = activeProjectSubsystems.FirstOrDefault();
-        var openMeetingOptions = BuildOpenMeetingOptions(BuildJednaniList(projektId));
+        var meetings = BuildJednaniList(projektId);
+        var meetingById = meetings.ToDictionary(x => x.Id);
+        var openMeetingOptions = BuildOpenMeetingOptions(meetings);
+        var contextMeeting = jednaniId.HasValue ? meetingById.GetValueOrDefault(jednaniId.Value) : null;
         var selectedMeetingIdForNumber = project.PouzivatIdentJednani
-            ? (int?)openMeetingOptions.FirstOrDefault()?.Id
+            ? ResolveSelectedMeetingIdForNumber(openMeetingOptions, contextMeeting?.Id)
             : null;
+        var selectedMeetingForNumber = selectedMeetingIdForNumber.HasValue
+            ? openMeetingOptions.FirstOrDefault(x => x.Id == selectedMeetingIdForNumber.Value)
+            : null;
+        var defaultStartDate = selectedMeetingForNumber?.Datum
+            ?? contextMeeting?.Datum
+            ?? DateTime.Today;
         var defaultSubsystemOwnerId = defaultSubsystem is null
             ? null
             : (int?)BuildDefaultOwnerOsobaIdsByProjectSubsystem(projektId).GetValueOrDefault(defaultSubsystem.SubsystemId);
@@ -440,7 +449,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             Cil = string.Empty,
             Popis = string.Empty,
             VlastnikId = defaultOwnerId,
-            DatumZalozeni = DateTime.Today,
+            DatumZalozeni = defaultStartDate.Date,
             DatumUkonceni = DateTime.Today,
             SubsystemId = defaultSubsystem?.SubsystemId ?? 0,
             HarmonogramSablonaVerze = activeSchemaVersion
@@ -4476,18 +4485,35 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     private List<JednaniOptionViewModel> BuildOpenMeetingOptions(IReadOnlyList<JednaniListItemViewModel> meetings)
     {
         return meetings
-            .Where(x =>
-                !string.IsNullOrWhiteSpace(x.StavKod)
-                && !Ci.Equals(x.StavKod, "CLOSED")
-                && !x.Stav.Contains("uzav", StringComparison.OrdinalIgnoreCase)
-                && string.IsNullOrWhiteSpace(x.UzamklOsoba))
+            .Where(IsMeetingOpenForRecordNumbering)
             .OrderByDescending(x => x.CisloJednani)
             .Select(x => new JednaniOptionViewModel
             {
                 Id = x.Id,
-                Label = $"Jednání č. {x.CisloJednani} ({x.Datum:dd.MM.yyyy})"
+                Label = $"Jednání č. {x.CisloJednani} ({x.Datum:dd.MM.yyyy})",
+                Datum = x.Datum.Date
             })
             .ToList();
+    }
+
+    private static int? ResolveSelectedMeetingIdForNumber(
+        IReadOnlyList<JednaniOptionViewModel> openMeetingOptions,
+        int? contextMeetingId)
+    {
+        if (contextMeetingId.HasValue && openMeetingOptions.Any(x => x.Id == contextMeetingId.Value))
+        {
+            return contextMeetingId.Value;
+        }
+
+        return openMeetingOptions.FirstOrDefault()?.Id;
+    }
+
+    private bool IsMeetingOpenForRecordNumbering(JednaniListItemViewModel meeting)
+    {
+        return !string.IsNullOrWhiteSpace(meeting.StavKod)
+            && !Ci.Equals(meeting.StavKod, "CLOSED")
+            && !meeting.Stav.Contains("uzav", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(meeting.UzamklOsoba);
     }
 
     private List<UcastViewModel> BuildMeetingAttendance(int meetingId, int projectId)

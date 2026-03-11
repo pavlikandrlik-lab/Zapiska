@@ -15,6 +15,8 @@ public sealed class ZaznamyController : BaseController
     private const string EditorTabExternal = "external";
     private const string EditorTabCollaboration = "collaboration";
     private const string EditorTabSchedule = "schedule";
+    private const string UiContextProject = "project";
+    private const string UiContextMeeting = "meeting";
 
     private readonly IRecordsService _recordsService;
 
@@ -43,7 +45,7 @@ public sealed class ZaznamyController : BaseController
         return View(GetEditorViewPath(model.Presentation), model);
     }
 
-    public IActionResult Create(int projektId, string? presentation, string? returnUrl)
+    public IActionResult Create(int projektId, int? jednaniId, string? uiContext, string? presentation, string? returnUrl)
     {
         if (!_recordsService.ProjektExists(projektId))
         {
@@ -55,8 +57,19 @@ public sealed class ZaznamyController : BaseController
             return Forbid();
         }
 
-        var model = _recordsService.BuildZaznamCreate(projektId);
-        PrepareRecordEditorModel(model, presentation, returnUrl, canEditRecord: true, canManageSchedule: model.JeUkolKategorie);
+        var normalizedUiContext = NormalizeRecordEditorUiContext(uiContext, jednaniId);
+        var contextMeetingId = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
+            ? jednaniId
+            : null;
+        var model = _recordsService.BuildZaznamCreate(projektId, contextMeetingId);
+        PrepareRecordEditorModel(
+            model,
+            presentation,
+            returnUrl,
+            canEditRecord: true,
+            canManageSchedule: model.JeUkolKategorie,
+            uiContext: normalizedUiContext,
+            meetingId: contextMeetingId);
         return View(GetEditorViewPath(model.Presentation), model);
     }
 
@@ -117,25 +130,37 @@ public sealed class ZaznamyController : BaseController
         var canSaveScheduleOnly = command.Id.HasValue
             && string.Equals(editorTab, EditorTabSchedule, StringComparison.OrdinalIgnoreCase)
             && (canEditSchedule || canAddSchedule);
-        var redirectToProject = () => Redirect(BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab));
+        var normalizedUiContext = NormalizeRecordEditorUiContext(command.UiContext, command.MeetingId);
+        var contextMeetingId = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
+            ? command.MeetingId
+            : null;
+        var redirectAfterSave = () => RedirectRecordEditorSaveTarget(command.ProjektId, command.ReturnUrl, projectTab, normalizedUiContext, contextMeetingId);
         var savedRecordId = 0;
 
         return ExecuteValidatedCommand(
             hasPermission: () => canEditRecord || canSaveScheduleOnly,
             invalidAjaxMessage: "Záznam nelze uložit.",
             invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: redirectToProject,
-            onSuccessRedirect: redirectToProject,
+            onInvalidRedirect: redirectAfterSave,
+            onSuccessRedirect: redirectAfterSave,
             onAjaxSuccess: () =>
             {
+                var meetingDetailUrl = contextMeetingId.HasValue
+                    ? BuildMeetingDetailUrl(contextMeetingId.Value)
+                    : null;
+
                 if (string.Equals(presentation, PresentationPage, StringComparison.OrdinalIgnoreCase))
                 {
+                    var refreshUrl = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(meetingDetailUrl)
+                        ? meetingDetailUrl
+                        : BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab);
                     return AjaxSuccessResult(
                         refreshScope: "page",
-                        refreshUrl: BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab),
+                        refreshUrl: refreshUrl,
                         projectId: command.ProjektId,
                         recordId: savedRecordId,
-                        uiContext: "project",
+                        meetingId: contextMeetingId,
+                        uiContext: normalizedUiContext,
                         tab: projectTab,
                         message: "Záznam byl uložen.");
                 }
@@ -147,8 +172,21 @@ public sealed class ZaznamyController : BaseController
                         refreshUrl: Url.Action(nameof(RecordCardPartial), new { projektId = command.ProjektId, zaznamId = savedRecordId }),
                         projectId: command.ProjektId,
                         recordId: savedRecordId,
-                        uiContext: "project",
+                        uiContext: UiContextProject,
                         tab: projectTab,
+                        message: "Záznam byl uložen.");
+                }
+
+                if (string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(meetingDetailUrl))
+                {
+                    return AjaxSuccessResult(
+                        refreshScope: "page",
+                        refreshUrl: meetingDetailUrl,
+                        projectId: command.ProjektId,
+                        recordId: savedRecordId,
+                        meetingId: contextMeetingId,
+                        uiContext: UiContextMeeting,
                         message: "Záznam byl uložen.");
                 }
 
@@ -156,6 +194,7 @@ public sealed class ZaznamyController : BaseController
                     refreshScope: "projekty-detail-zaznamy-preserve",
                     refreshUrl: Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = projectTab }),
                     projectId: command.ProjektId,
+                    uiContext: UiContextProject,
                     tab: projectTab,
                     message: "Záznam byl uložen.");
             },
@@ -359,12 +398,23 @@ public sealed class ZaznamyController : BaseController
         string? requestedPresentation,
         string? requestedReturnUrl,
         bool canEditRecord,
-        bool canManageSchedule)
+        bool canManageSchedule,
+        string? uiContext = null,
+        int? meetingId = null)
     {
+        var normalizedUiContext = NormalizeRecordEditorUiContext(uiContext, meetingId);
+        var normalizedMeetingId = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
+            ? meetingId
+            : null;
         model.Presentation = ResolvePresentation(requestedPresentation);
         model.ReturnUrl = NormalizeLocalReturnUrl(requestedReturnUrl);
+        model.UiContext = normalizedUiContext;
+        model.MeetingId = normalizedMeetingId;
+        var fallbackBackUrl = normalizedMeetingId.HasValue
+            ? BuildMeetingDetailUrl(normalizedMeetingId.Value)
+            : (Url.Action("Detail", "Projekty", new { id = model.ProjektId, tab = "zaznamy" }) ?? $"/Projekty/Detail/{model.ProjektId}?tab=zaznamy");
         model.BackUrl = NormalizeLocalReturnUrl(requestedReturnUrl)
-            ?? (Url.Action("Detail", "Projekty", new { id = model.ProjektId, tab = "zaznamy" }) ?? $"/Projekty/Detail/{model.ProjektId}?tab=zaznamy");
+            ?? fallbackBackUrl;
         model.ActiveEditorTab = !canEditRecord && canManageSchedule && model.JeUkolKategorie
             ? EditorTabSchedule
             : EditorTabBasic;
@@ -455,6 +505,31 @@ public sealed class ZaznamyController : BaseController
             ?? (Url.Action("Detail", "Projekty", new { id = projektId, tab = fallbackTab }) ?? $"/Projekty/Detail/{projektId}?tab={fallbackTab}");
 
         return QueryHelpers.AddQueryString(candidate, "restoreRecordEditorState", "1");
+    }
+
+    private string BuildMeetingDetailUrl(int meetingId)
+        => Url.Action("Detail", "Jednani", new { id = meetingId }) ?? $"/Jednani/Detail/{meetingId}";
+
+    private IActionResult RedirectRecordEditorSaveTarget(int projektId, string? returnUrl, string fallbackTab, string uiContext, int? meetingId)
+    {
+        if (string.Equals(uiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && meetingId.HasValue)
+        {
+            return Redirect(BuildMeetingDetailUrl(meetingId.Value));
+        }
+
+        return Redirect(BuildRestoreReturnUrl(projektId, returnUrl, fallbackTab));
+    }
+
+    private static string NormalizeRecordEditorUiContext(string? uiContext, int? meetingId)
+    {
+        if (string.Equals(uiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
+            && meetingId.HasValue
+            && meetingId.Value > 0)
+        {
+            return UiContextMeeting;
+        }
+
+        return UiContextProject;
     }
 
     private string? NormalizeLocalReturnUrl(string? returnUrl)

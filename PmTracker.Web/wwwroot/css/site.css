@@ -1215,6 +1215,14 @@ textarea {
     pointer-events: none !important;
 }
 
+.richtext-source-container {
+    position: absolute !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+
 .richtext-host .ql-toolbar.ql-snow {
     border-radius: 6px 6px 0 0;
     border-color: var(--gov-color-border);
@@ -2927,18 +2935,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .comment-action-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 32px;
-    padding: 6px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--gov-color-border);
-    background: var(--gov-color-surface);
-    color: var(--gov-color-text);
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 1.2;
+    text-decoration: none;
 }
 
 .comment-edit-details[open] {
@@ -2947,7 +2944,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .comment-edit-details[open] .comment-action-chip {
     border-color: var(--gov-color-primary);
-    color: var(--gov-color-primary);
 }
 
 .comment-delete-form-inline {
@@ -3793,6 +3789,19 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .meeting-content {
     display: grid;
     gap: 20px;
+}
+
+.meeting-task-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.meeting-task-header h2 {
+    margin: 0;
 }
 
 .meeting-attendance-card {

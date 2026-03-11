@@ -493,6 +493,111 @@ public sealed class RecordEditorControllerTests
     }
 
     [Fact]
+    public async Task Create_ShouldPrefillMeetingContextAndStartDate_WhenOpenedFromMeetingDetail()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiCreateMeetingCtxOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIREDCMEET");
+        await _fixture.EnsureSubsystemAsync("APIREDCMEETSUB", ownerId);
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 9850);
+        var meetingDate = new DateTime(2026, 8, 21);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var project = await dbContext.Projekty.FirstAsync(x => x.Id == projectId);
+            project.PouzivatIdentJednani = true;
+            var meeting = await dbContext.Jednani.FirstAsync(x => x.Id == meetingId);
+            meeting.DatumPlanovane = meetingDate;
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Create?projektId={projectId}&jednaniId={meetingId}&uiContext=meeting&asUser={_fixture.AdminOsobaId}&presentation=modal");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain($"name=\"MeetingId\" value=\"{meetingId}\"");
+        html.Should().Contain("name=\"UiContext\" value=\"meeting\"");
+        html.Should().Contain("name=\"JednaniIdProCislo\"");
+        html.Should().Contain($"data-record-meeting-date=\"{meetingDate:yyyy-MM-dd}\"");
+        html.Should().Contain($"name=\"DatumZalozeni\" value=\"{meetingDate:yyyy-MM-dd}\"");
+    }
+
+    [Fact]
+    public async Task Save_ShouldReturnMeetingDetailRefresh_WhenCreatingFromMeetingContext()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiSaveMeetingCtxOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIREDSMCTX");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDSMCTXSUB", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 9851);
+        var meetingDate = new DateTime(2026, 9, 2);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var hasProjectSubsystem = await dbContext.ProjektSubsystemy
+                .AnyAsync(x => x.ProjektId == projectId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue);
+            if (!hasProjectSubsystem)
+            {
+                dbContext.ProjektSubsystemy.Add(new ProjektSubsystemEntity
+                {
+                    ProjektId = projectId,
+                    SubsystemId = subsystemId,
+                    DatumPrirazeni = DateTime.UtcNow
+                });
+            }
+
+            var meeting = await dbContext.Jednani.FirstAsync(x => x.Id == meetingId);
+            meeting.DatumPlanovane = meetingDate;
+            await dbContext.SaveChangesAsync();
+        }
+
+        await using var dbContextForLookup = _fixture.CreateDbContext();
+        var categoryName = await dbContextForLookup.CiselnikKategoriiZaznamu.AsNoTracking()
+            .OrderBy(x => x.Id)
+            .Select(x => x.Nazev)
+            .FirstAsync();
+        var statusName = await dbContextForLookup.CiselnikStavuUkolu.AsNoTracking()
+            .OrderBy(x => x.Id)
+            .Select(x => x.Nazev)
+            .FirstAsync();
+        var subsystemCode = await dbContextForLookup.Subsystemy.AsNoTracking()
+            .Where(x => x.Id == subsystemId)
+            .Select(x => x.Kod)
+            .FirstAsync();
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Zaznamy/Save?asUser={_fixture.AdminOsobaId}",
+            ApiTestHttpHelper.BuildForm(
+                ("ProjektId", projectId.ToString()),
+                ("Kategorie", categoryName),
+                ("Stav", statusName),
+                ("Nazev", "Meeting-context create"),
+                ("Cil", "Meeting-context create"),
+                ("Popis", "<p>Meeting-context create</p>"),
+                ("VlastnikId", ownerId.ToString()),
+                ("DatumZalozeni", meetingDate.ToString("yyyy-MM-dd")),
+                ("TerminUkonceni", meetingDate.AddDays(10).ToString("yyyy-MM-dd")),
+                ("Subsystem", subsystemCode),
+                ("CisloZaznamu", "0"),
+                ("EditorTab", "basic"),
+                ("Presentation", "modal"),
+                ("UiContext", "meeting"),
+                ("MeetingId", meetingId.ToString())));
+
+        var response = await client.SendAsync(request);
+        var content = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, content);
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+        payload.Ok.Should().BeTrue();
+        payload.RefreshScope.Should().Be("page");
+        payload.UiContext.Should().Be("meeting");
+        payload.MeetingId.Should().Be(meetingId);
+        payload.RefreshUrl.Should().Contain($"/Jednani/Detail/{meetingId}");
+    }
+
+    [Fact]
     public async Task DeleteRecordModal_ShouldRenderDependencySummary_ForEditableRecord()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiDeleteModalSummaryOwner");

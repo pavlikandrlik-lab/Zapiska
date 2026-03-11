@@ -67,6 +67,8 @@
     <input type="hidden" name="EditorTab" value="@defaultEditorTab" data-record-active-tab-input />
     <input type="hidden" name="Presentation" value="@Model.Presentation" />
     <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+    <input type="hidden" name="UiContext" value="@Model.UiContext" />
+    <input type="hidden" name="MeetingId" value="@(Model.MeetingId?.ToString(CultureInfo.InvariantCulture))" />
 
     <div class="record-modal-tabs" data-record-modal-tabs>
         <button class="record-modal-tab @(defaultEditorTab == "basic" ? "active" : null)"
@@ -160,12 +162,19 @@
             <div class="record-form-row">
                 <label>
                     Jednání pro identifikátor
-                    <select name="JednaniIdProCislo" required="required" @(Model.MaDostupneJednaniProCislo ? null : "disabled=\"disabled\"")>
+                    <select name="JednaniIdProCislo"
+                            data-record-meeting-number-select="true"
+                            required="required"
+                            @(Model.MaDostupneJednaniProCislo ? null : "disabled=\"disabled\"")>
                         <option value="">Vyberte jednání</option>
                         @foreach (var meeting in Model.JednaniProCisloOptions)
                         {
                             var selected = Model.JednaniIdProCislo.HasValue && Model.JednaniIdProCislo.Value == meeting.Id;
-                            <option value="@meeting.Id" selected="@selected">@meeting.Label</option>
+                            <option value="@meeting.Id"
+                                    data-record-meeting-date="@meeting.Datum.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
+                                    selected="@selected">
+                                @meeting.Label
+                            </option>
                         }
                     </select>
                 </label>

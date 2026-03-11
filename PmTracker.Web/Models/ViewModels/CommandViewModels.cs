@@ -80,6 +80,10 @@ public sealed class SaveRecordCommand
     public string? ReturnUrl { get; set; }
 
     public int? JednaniIdProCislo { get; set; }
+
+    public string? UiContext { get; set; }
+
+    public int? MeetingId { get; set; }
 }
 
 public sealed class DeleteRecordCommand

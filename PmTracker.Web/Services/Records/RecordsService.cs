@@ -18,7 +18,7 @@ public sealed class RecordsService : IRecordsService
 
     public ZaznamEditViewModel BuildZaznamEdit(int id) => _dataStore.BuildZaznamEdit(id);
 
-    public ZaznamEditViewModel BuildZaznamCreate(int projektId) => _dataStore.BuildZaznamCreate(projektId);
+    public ZaznamEditViewModel BuildZaznamCreate(int projektId, int? jednaniId = null) => _dataStore.BuildZaznamCreate(projektId, jednaniId);
 
     public DeleteRecordModalViewModel BuildDeleteRecordModal(int projektId, int zaznamId) => _dataStore.BuildDeleteRecordModal(projektId, zaznamId);
 

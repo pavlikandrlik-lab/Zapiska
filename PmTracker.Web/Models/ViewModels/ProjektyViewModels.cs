@@ -311,6 +311,7 @@ public sealed class JednaniOptionViewModel
 {
     public int Id { get; init; }
     public required string Label { get; init; }
+    public DateTime Datum { get; init; }
 }
 
 public sealed class ZaznamEditViewModel
@@ -350,6 +351,8 @@ public sealed class ZaznamEditViewModel
     public required IReadOnlyList<ExterniOdkazEditViewModel> ExterniVazby { get; init; }
     public required IReadOnlyList<string> TypyExternichOdkazu { get; init; }
     public required IReadOnlyList<string> Vyzvy { get; init; }
+    public string UiContext { get; set; } = "project";
+    public int? MeetingId { get; set; }
     public string Presentation { get; set; } = "modal";
     public string? ReturnUrl { get; set; }
     public string BackUrl { get; set; } = string.Empty;
