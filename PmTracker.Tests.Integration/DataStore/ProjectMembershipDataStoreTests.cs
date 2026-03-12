@@ -193,7 +193,7 @@ public sealed class ProjectMembershipDataStoreTests
     }
 
     [Fact]
-    public async Task TaskPrintTemplate_ShouldRespectRequestedCommentSortDirection()
+    public async Task TaskPrintTemplate_ShouldOrderCommentsAscending()
     {
         var db = await _fixture.CreateDatabaseAsync("export_comment_sort_direction");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
@@ -238,21 +238,15 @@ public sealed class ProjectMembershipDataStoreTests
             });
         await dbContext.SaveChangesAsync();
 
-        var ascModel = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false, commentSortDirection: "asc");
-        var descModel = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false, commentSortDirection: "desc");
+        var model = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false);
 
-        ascModel.Zaznamy.Should().ContainSingle();
-        descModel.Zaznamy.Should().ContainSingle();
-
-        var ascMeetingNumbers = ascModel.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
-        var descMeetingNumbers = descModel.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
-
-        ascMeetingNumbers.Should().Equal(9401, 9402, 9403);
-        descMeetingNumbers.Should().Equal(9403, 9402, 9401);
+        model.Zaznamy.Should().ContainSingle();
+        var meetingNumbers = model.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
+        meetingNumbers.Should().Equal(9401, 9402, 9403);
     }
 
     [Fact]
-    public async Task ProjectAndMeetingPrintTemplates_ShouldRespectRequestedCommentSortDirection()
+    public async Task ProjectAndMeetingPrintTemplates_ShouldOrderCommentsAscending()
     {
         var db = await _fixture.CreateDatabaseAsync("export_comment_sort_direction_all_templates");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
@@ -297,25 +291,58 @@ public sealed class ProjectMembershipDataStoreTests
             });
         await dbContext.SaveChangesAsync();
 
-        var projectAsc = store.BuildProjectPrintTemplate(projectId, currentUser, autoPrint: false, commentSortDirection: "asc");
-        var projectDesc = store.BuildProjectPrintTemplate(projectId, currentUser, autoPrint: false, commentSortDirection: "desc");
-        var meetingAsc = store.BuildMeetingPrintTemplate(meeting3Id, currentUser, autoPrint: false, commentSortDirection: "asc");
-        var meetingDesc = store.BuildMeetingPrintTemplate(meeting3Id, currentUser, autoPrint: false, commentSortDirection: "desc");
+        var projectModel = store.BuildProjectPrintTemplate(projectId, currentUser, autoPrint: false);
+        var meetingModel = store.BuildMeetingPrintTemplate(meeting3Id, currentUser, autoPrint: false);
 
-        projectAsc.Zaznamy.Should().ContainSingle();
-        projectDesc.Zaznamy.Should().ContainSingle();
-        meetingAsc.Zaznamy.Should().ContainSingle();
-        meetingDesc.Zaznamy.Should().ContainSingle();
+        projectModel.Zaznamy.Should().ContainSingle();
+        meetingModel.Zaznamy.Should().ContainSingle();
 
-        var projectAscMeetingNumbers = projectAsc.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
-        var projectDescMeetingNumbers = projectDesc.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
-        var meetingAscMeetingNumbers = meetingAsc.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
-        var meetingDescMeetingNumbers = meetingDesc.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
+        var projectMeetingNumbers = projectModel.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
+        var meetingMeetingNumbers = meetingModel.Zaznamy.Single().Vyjadreni.Select(x => x.JednaniCislo).ToList();
 
-        projectAscMeetingNumbers.Should().Equal(9501, 9502, 9503);
-        projectDescMeetingNumbers.Should().Equal(9503, 9502, 9501);
-        meetingAscMeetingNumbers.Should().Equal(9501, 9502, 9503);
-        meetingDescMeetingNumbers.Should().Equal(9503, 9502, 9501);
+        projectMeetingNumbers.Should().Equal(9501, 9502, 9503);
+        meetingMeetingNumbers.Should().Equal(9501, 9502, 9503);
+    }
+
+    [Fact]
+    public async Task TaskPrintTemplate_ShouldKeepNewestCommentsWhenCommentLimitApplies()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_comment_limit_newest");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportLimitAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportLimitOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "EXPLIMIT");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "EXPLIMIT_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportLimitRecord");
+
+        for (var index = 1; index <= 7; index++)
+        {
+            var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9700 + index);
+            dbContext.Vyjadreni.Add(new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meetingId,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = $"Meeting {index} comment",
+                DatumVyjadreni = new DateTime(2026, 8, index, 9, 0, 0)
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var model = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false);
+        model.Zaznamy.Should().ContainSingle();
+
+        var meetingNumbers = model.Zaznamy.Single().Vyjadreni
+            .Select(x => x.JednaniCislo)
+            .ToList();
+
+        meetingNumbers.Should().Equal(9703, 9704, 9705, 9706, 9707);
     }
 
     [Fact]

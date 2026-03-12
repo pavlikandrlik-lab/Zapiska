@@ -334,57 +334,11 @@
             return "";
         }
 
-        const commentSortDirection = resolveCommentSortDirectionFromTrigger(trigger);
         if (format === "word") {
-            return appendCommentSortDirectionToPrintUrl(trigger.getAttribute("data-print-word-url") || "", commentSortDirection);
+            return trigger.getAttribute("data-print-word-url") || "";
         }
 
-        return appendCommentSortDirectionToPrintUrl(
-            trigger.getAttribute("data-print-pdf-url") || trigger.getAttribute("href") || "",
-            commentSortDirection);
-    }
-
-    function appendCommentSortDirectionToPrintUrl(rawUrl, commentSortDirection) {
-        if (!rawUrl) {
-            return "";
-        }
-
-        try {
-            const url = new URL(rawUrl, window.location.origin);
-            url.searchParams.set("commentSortDirection", normalizeCommentSortDirection(commentSortDirection));
-            return `${url.pathname}${url.search}${url.hash}`;
-        } catch (error) {
-            return rawUrl;
-        }
-    }
-
-    function resolveCommentSortDirectionFromTrigger(trigger) {
-        if (!(trigger instanceof Element)) {
-            return getStoredCommentSortDirection();
-        }
-
-        const directSection = trigger.closest("[data-comment-sort-section]");
-        if (directSection instanceof HTMLElement) {
-            return normalizeCommentSortDirection(directSection.getAttribute("data-comment-sort-direction"));
-        }
-
-        const cardSection = trigger.closest(".record-card")?.querySelector("[data-comment-sort-section]");
-        if (cardSection instanceof HTMLElement) {
-            return normalizeCommentSortDirection(cardSection.getAttribute("data-comment-sort-direction"));
-        }
-
-        const taskSection = trigger.closest(".task-item")?.querySelector("[data-comment-sort-section]");
-        if (taskSection instanceof HTMLElement) {
-            return normalizeCommentSortDirection(taskSection.getAttribute("data-comment-sort-direction"));
-        }
-
-        const visibleSection = Array.from(document.querySelectorAll("[data-comment-sort-section]"))
-            .find((section) => section instanceof HTMLElement && !isElementInHiddenTree(section));
-        if (visibleSection instanceof HTMLElement) {
-            return normalizeCommentSortDirection(visibleSection.getAttribute("data-comment-sort-direction"));
-        }
-
-        return getStoredCommentSortDirection();
+        return trigger.getAttribute("data-print-pdf-url") || trigger.getAttribute("href") || "";
     }
 
     function openPrintUrl(url) {
@@ -7548,6 +7502,10 @@
         }
     }
 
+    function isPlainObject(value) {
+        return value !== null && typeof value === "object" && !Array.isArray(value);
+    }
+
     function resolveAjaxResponseTraceId(response) {
         if (!(response instanceof Response) || !(response.headers instanceof Headers)) {
             return "";
@@ -7567,6 +7525,31 @@
         }
 
         return `${text.slice(0, limit)}\n...[truncated ${text.length - limit} chars]`;
+    }
+
+    function buildAjaxDiagnosticLines(errorCode, traceId, action, method, response, contentType, rawBody, extraLines) {
+        const status = response instanceof Response ? response.status : 0;
+        const statusText = response instanceof Response ? (response.statusText || "") : "";
+        const responseUrl = response instanceof Response ? (response.url || action || window.location.href) : (action || window.location.href);
+        const body = truncateDiagnosticBody(rawBody, 12000);
+        const lines = [
+            `TimestampUtc: ${new Date().toISOString()}`,
+            `ErrorCode: ${errorCode}`,
+            `TraceId: ${traceId || "-"}`,
+            "ClientSource: site.js:initModalAjaxSubmit",
+            `Request: ${(method || "POST").toUpperCase()} ${action || window.location.href}`,
+            `ResponseUrl: ${responseUrl}`,
+            `Status: ${status}${statusText ? ` ${statusText}` : ""}`,
+            `ContentType: ${contentType || "-"}`,
+            "Body:",
+            body || "<empty>"
+        ];
+
+        if (Array.isArray(extraLines) && extraLines.length > 0) {
+            lines.push(...extraLines.filter((line) => String(line || "").trim().length > 0));
+        }
+
+        return lines;
     }
 
     function buildNonJsonAjaxFailureMessage(response, rawBody) {
@@ -7591,23 +7574,17 @@
     }
 
     function buildNonJsonAjaxErrorPayload(response, action, method, contentType, rawBody) {
-        const status = response instanceof Response ? response.status : 0;
-        const statusText = response instanceof Response ? (response.statusText || "") : "";
-        const responseUrl = response instanceof Response ? (response.url || action || window.location.href) : (action || window.location.href);
         const traceId = resolveAjaxResponseTraceId(response);
         const message = buildNonJsonAjaxFailureMessage(response, rawBody);
-        const body = truncateDiagnosticBody(rawBody, 12000);
-        const diagnosticLines = [
-            `TimestampUtc: ${new Date().toISOString()}`,
-            "ErrorCode: NON_JSON_RESPONSE",
-            `TraceId: ${traceId || "-"}`,
-            `Request: ${(method || "POST").toUpperCase()} ${action || window.location.href}`,
-            `ResponseUrl: ${responseUrl}`,
-            `Status: ${status}${statusText ? ` ${statusText}` : ""}`,
-            `ContentType: ${contentType || "-"}`,
-            "Body:",
-            body || "<empty>"
-        ];
+        const diagnosticLines = buildAjaxDiagnosticLines(
+            "NON_JSON_RESPONSE",
+            traceId,
+            action,
+            method,
+            response,
+            contentType,
+            rawBody,
+            null);
 
         const payload = {
             ok: false,
@@ -7627,6 +7604,118 @@
         }
 
         return payload;
+    }
+
+    function buildUnexpectedJsonContractPayload(response, action, method, contentType, rawBody, parsedPayload) {
+        const plainPayload = isPlainObject(parsedPayload) ? parsedPayload : {};
+        const traceId = resolveAjaxResponseTraceId(response);
+        const payloadKeys = Object.keys(plainPayload);
+        const messageFromPayload = typeof plainPayload.message === "string"
+            ? plainPayload.message.trim()
+            : typeof plainPayload.error === "string"
+                ? plainPayload.error.trim()
+                : "";
+        const message = messageFromPayload || "Server vrátil nečekaný JSON kontrakt.";
+        const errorCode = "UNEXPECTED_JSON_CONTRACT";
+        const diagnosticLines = buildAjaxDiagnosticLines(
+            errorCode,
+            traceId,
+            action,
+            method,
+            response,
+            contentType,
+            rawBody,
+            [
+                `PayloadKeys: ${payloadKeys.length > 0 ? payloadKeys.join(", ") : "-"}`,
+                `PayloadType: ${Array.isArray(parsedPayload) ? "array" : typeof parsedPayload}`
+            ]);
+
+        return {
+            ok: false,
+            message,
+            errorCode,
+            traceId,
+            diagnosticLog: diagnosticLines.join("\n"),
+            fieldErrors: {}
+        };
+    }
+
+    function ensureAjaxErrorPayloadDiagnostics(parsedPayload, response, action, method, contentType, rawBody) {
+        if (!isPlainObject(parsedPayload)) {
+            return buildNonJsonAjaxErrorPayload(response, action, method, contentType, rawBody);
+        }
+
+        if (typeof parsedPayload.ok !== "boolean") {
+            return buildUnexpectedJsonContractPayload(response, action, method, contentType, rawBody, parsedPayload);
+        }
+
+        if (parsedPayload.ok === true) {
+            return parsedPayload;
+        }
+
+        const normalized = { ...parsedPayload };
+        if (!isPlainObject(normalized.fieldErrors)) {
+            normalized.fieldErrors = {};
+        }
+
+        if (typeof normalized.errorCode !== "string" || !normalized.errorCode.trim()) {
+            const status = response instanceof Response ? response.status : 0;
+            normalized.errorCode = status > 0 ? `HTTP_${status}` : "AJAX_OPERATION_FAILED";
+        }
+
+        if (typeof normalized.traceId !== "string" || !normalized.traceId.trim()) {
+            normalized.traceId = resolveAjaxResponseTraceId(response);
+        }
+
+        if (typeof normalized.diagnosticLog !== "string" || !normalized.diagnosticLog.trim()) {
+            const diagnosticLines = buildAjaxDiagnosticLines(
+                normalized.errorCode,
+                normalized.traceId,
+                action,
+                method,
+                response,
+                contentType,
+                rawBody,
+                [
+                    "Details:",
+                    "Server error payload did not include diagnosticLog.",
+                    `PayloadKeys: ${Object.keys(parsedPayload).join(", ") || "-"}`
+                ]);
+            normalized.diagnosticLog = diagnosticLines.join("\n");
+        }
+
+        return normalized;
+    }
+
+    function buildAjaxExceptionPayload(error, action, method) {
+        const errorCode = "CLIENT_AJAX_EXCEPTION";
+        const exceptionName = error instanceof Error ? error.name : "UnknownError";
+        const exceptionMessage = error instanceof Error ? error.message : String(error || "Unknown error");
+        const exceptionStack = error instanceof Error && typeof error.stack === "string"
+            ? truncateDiagnosticBody(error.stack, 12000)
+            : "";
+        const diagnosticLines = [
+            `TimestampUtc: ${new Date().toISOString()}`,
+            `ErrorCode: ${errorCode}`,
+            "TraceId: -",
+            "ClientSource: site.js:initModalAjaxSubmit",
+            `Request: ${(method || "POST").toUpperCase()} ${action || window.location.href}`,
+            `NavigatorOnline: ${navigator.onLine ? "true" : "false"}`,
+            `ExceptionName: ${exceptionName}`,
+            `ExceptionMessage: ${exceptionMessage}`
+        ];
+        if (exceptionStack) {
+            diagnosticLines.push("ExceptionStack:", exceptionStack);
+        }
+
+        return {
+            ok: false,
+            message: "Požadavek se nepodařilo dokončit na klientu.",
+            errorCode,
+            traceId: "",
+            diagnosticLog: diagnosticLines.join("\n"),
+            fieldErrors: {}
+        };
     }
 
     function initModalAjaxSubmit() {
@@ -7674,14 +7763,16 @@
 
                 const contentType = (response.headers.get("content-type") || "").toLowerCase();
                 const rawBody = await response.text();
-                const payload = contentType.includes("application/json")
+                const parsedPayload = contentType.includes("application/json")
                     ? parseJsonPayload(rawBody)
                     : null;
-                if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-                    target.dataset.recordEditorNavigating = "false";
-                    renderModalFormErrors(target, buildNonJsonAjaxErrorPayload(response, action, method, contentType, rawBody));
-                    return;
-                }
+                const payload = ensureAjaxErrorPayloadDiagnostics(
+                    parsedPayload,
+                    response,
+                    action,
+                    method,
+                    contentType,
+                    rawBody);
 
                 if (!response.ok || !payload || payload.ok !== true) {
                     target.dataset.recordEditorNavigating = "false";
@@ -7700,9 +7791,9 @@
                 await refreshPageScope(payload);
             } catch (error) {
                 target.dataset.recordEditorNavigating = "false";
-                renderModalFormErrors(target, {
-                    message: error instanceof Error ? error.message : "Uložení se nezdařilo."
-                });
+                const action = target.getAttribute("action") || window.location.href;
+                const method = (target.getAttribute("method") || "post").toUpperCase();
+                renderModalFormErrors(target, buildAjaxExceptionPayload(error, action, method));
             } finally {
                 setFormSubmitting(target, false);
             }

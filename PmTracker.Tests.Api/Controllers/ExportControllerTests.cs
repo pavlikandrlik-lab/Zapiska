@@ -62,8 +62,10 @@ public sealed class ExportControllerTests
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain("class=\"attendance\"");
         html.Should().NotContain("class=\"project-roles\"");
+        html.Should().Contain("<th>Záznamy a vyjádření</th>");
         html.Should().Contain("551 (17.02.2026) | Ing. ApiExportOwner Api | 18.02.2026");
         html.Should().Contain("class=\"comment-item\" style=\"color:#0F4D8A;\"");
+        html.Should().Contain("content: '\\2022';");
         html.Should().NotContain("comment-item highlight");
         html.Should().NotContain("style=\"background:");
     }

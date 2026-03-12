@@ -58,7 +58,7 @@
 
         body {
             margin: 0;
-            padding: 10mm;
+            padding: 5mm;
             font-family: "Times New Roman", Times, serif;
             font-size: 10pt;
             line-height: 1.24;
@@ -69,7 +69,7 @@
         }
 
         .print-sheet {
-            max-width: 190mm;
+            max-width: 200mm;
             margin: 0 auto;
         }
 
@@ -147,9 +147,9 @@
             background: #fff;
         }
 
-        .records-table col.col-comments { width: 68%; }
+        .records-table col.col-comments { width: 72%; }
         .records-table col.col-people { width: 16%; }
-        .records-table col.col-deadlines { width: 16%; }
+        .records-table col.col-deadlines { width: 12%; }
 
         .records-table th,
         .records-table td {
@@ -260,8 +260,14 @@
         }
 
         .record-desc p,
-        .comment-item-text p {
+        .record-desc ol,
+        .record-desc ul,
+        .comment-item-text p,
+        .comment-item-text ol,
+        .comment-item-text ul {
             margin: 0 0 2px;
+            padding: 0;
+            counter-reset: list-0 list-1 list-2 list-3 list-4 list-5 list-6 list-7 list-8 list-9;
         }
 
         .record-desc p:last-child,
@@ -273,8 +279,139 @@
         .record-desc ol,
         .comment-item-text ul,
         .comment-item-text ol {
-            margin: 0 0 2px;
-            padding-left: 1.25rem;
+            padding-left: 1.5em;
+        }
+
+        .record-desc ul > li,
+        .record-desc ol > li,
+        .comment-item-text ul > li,
+        .comment-item-text ol > li {
+            list-style-type: none;
+        }
+
+        .record-desc ul > li::before,
+        .comment-item-text ul > li::before {
+            content: '\2022';
+        }
+
+        .record-desc ol > li::before,
+        .comment-item-text ol > li::before {
+            content: counter(list-0, decimal) '. ';
+        }
+
+        .record-desc li::before,
+        .comment-item-text li::before {
+            display: inline-block;
+            white-space: nowrap;
+            width: 1.2em;
+        }
+
+        .record-desc li:not(.ql-direction-rtl)::before,
+        .comment-item-text li:not(.ql-direction-rtl)::before {
+            margin-left: -1.5em;
+            margin-right: 0.3em;
+            text-align: right;
+        }
+
+        .record-desc ol li:not(.ql-direction-rtl),
+        .record-desc ul li:not(.ql-direction-rtl),
+        .comment-item-text ol li:not(.ql-direction-rtl),
+        .comment-item-text ul li:not(.ql-direction-rtl) {
+            padding-left: 1.5em;
+        }
+
+        .record-desc ol > li,
+        .comment-item-text ol > li {
+            counter-reset: list-1 list-2 list-3 list-4 list-5 list-6 list-7 list-8 list-9;
+            counter-increment: list-0;
+        }
+
+        .record-desc ol > li.ql-indent-1,
+        .comment-item-text ol > li.ql-indent-1 {
+            counter-increment: list-1;
+            counter-reset: list-2 list-3 list-4 list-5 list-6 list-7 list-8 list-9;
+        }
+
+        .record-desc ol > li.ql-indent-1::before,
+        .comment-item-text ol > li.ql-indent-1::before {
+            content: counter(list-1, lower-alpha) '. ';
+        }
+
+        .record-desc ol > li.ql-indent-2,
+        .comment-item-text ol > li.ql-indent-2 {
+            counter-increment: list-2;
+            counter-reset: list-3 list-4 list-5 list-6 list-7 list-8 list-9;
+        }
+
+        .record-desc ol > li.ql-indent-2::before,
+        .comment-item-text ol > li.ql-indent-2::before {
+            content: counter(list-2, lower-roman) '. ';
+        }
+
+        .record-desc ol > li.ql-indent-3,
+        .comment-item-text ol > li.ql-indent-3 {
+            counter-increment: list-3;
+            counter-reset: list-4 list-5 list-6 list-7 list-8 list-9;
+        }
+
+        .record-desc ol > li.ql-indent-3::before,
+        .comment-item-text ol > li.ql-indent-3::before {
+            content: counter(list-3, decimal) '. ';
+        }
+
+        .record-desc ol > li.ql-indent-4,
+        .comment-item-text ol > li.ql-indent-4 {
+            counter-increment: list-4;
+            counter-reset: list-5 list-6 list-7 list-8 list-9;
+        }
+
+        .record-desc ol > li.ql-indent-4::before,
+        .comment-item-text ol > li.ql-indent-4::before {
+            content: counter(list-4, lower-alpha) '. ';
+        }
+
+        .record-desc ol > li.ql-indent-5,
+        .comment-item-text ol > li.ql-indent-5 {
+            counter-increment: list-5;
+            counter-reset: list-6 list-7 list-8 list-9;
+        }
+
+        .record-desc ol > li.ql-indent-5::before,
+        .comment-item-text ol > li.ql-indent-5::before {
+            content: counter(list-5, lower-roman) '. ';
+        }
+
+        .record-desc ol > li.ql-indent-6,
+        .comment-item-text ol > li.ql-indent-6 {
+            counter-increment: list-6;
+            counter-reset: list-7 list-8 list-9;
+        }
+
+        .record-desc ol > li.ql-indent-6::before,
+        .comment-item-text ol > li.ql-indent-6::before {
+            content: counter(list-6, decimal) '. ';
+        }
+
+        .record-desc ol > li.ql-indent-7,
+        .comment-item-text ol > li.ql-indent-7 {
+            counter-increment: list-7;
+            counter-reset: list-8 list-9;
+        }
+
+        .record-desc ol > li.ql-indent-7::before,
+        .comment-item-text ol > li.ql-indent-7::before {
+            content: counter(list-7, lower-alpha) '. ';
+        }
+
+        .record-desc ol > li.ql-indent-8,
+        .comment-item-text ol > li.ql-indent-8 {
+            counter-increment: list-8;
+            counter-reset: list-9;
+        }
+
+        .record-desc ol > li.ql-indent-8::before,
+        .comment-item-text ol > li.ql-indent-8::before {
+            content: counter(list-8, lower-roman) '. ';
         }
 
         .record-desc li,
@@ -287,22 +424,39 @@
             margin-bottom: 0;
         }
 
-        .record-desc .ql-indent-1,
-        .comment-item-text .ql-indent-1 { margin-left: 1.2rem; }
-        .record-desc .ql-indent-2,
-        .comment-item-text .ql-indent-2 { margin-left: 2.4rem; }
-        .record-desc .ql-indent-3,
-        .comment-item-text .ql-indent-3 { margin-left: 3.6rem; }
-        .record-desc .ql-indent-4,
-        .comment-item-text .ql-indent-4 { margin-left: 4.8rem; }
-        .record-desc .ql-indent-5,
-        .comment-item-text .ql-indent-5 { margin-left: 6rem; }
-        .record-desc .ql-indent-6,
-        .comment-item-text .ql-indent-6 { margin-left: 7.2rem; }
-        .record-desc .ql-indent-7,
-        .comment-item-text .ql-indent-7 { margin-left: 8.4rem; }
-        .record-desc .ql-indent-8,
-        .comment-item-text .ql-indent-8 { margin-left: 9.6rem; }
+        .record-desc p.ql-indent-1,
+        .comment-item-text p.ql-indent-1 { padding-left: 3em; }
+        .record-desc p.ql-indent-2,
+        .comment-item-text p.ql-indent-2 { padding-left: 6em; }
+        .record-desc p.ql-indent-3,
+        .comment-item-text p.ql-indent-3 { padding-left: 9em; }
+        .record-desc p.ql-indent-4,
+        .comment-item-text p.ql-indent-4 { padding-left: 12em; }
+        .record-desc p.ql-indent-5,
+        .comment-item-text p.ql-indent-5 { padding-left: 15em; }
+        .record-desc p.ql-indent-6,
+        .comment-item-text p.ql-indent-6 { padding-left: 18em; }
+        .record-desc p.ql-indent-7,
+        .comment-item-text p.ql-indent-7 { padding-left: 21em; }
+        .record-desc p.ql-indent-8,
+        .comment-item-text p.ql-indent-8 { padding-left: 24em; }
+
+        .record-desc li.ql-indent-1:not(.ql-direction-rtl),
+        .comment-item-text li.ql-indent-1:not(.ql-direction-rtl) { padding-left: 4.5em; }
+        .record-desc li.ql-indent-2:not(.ql-direction-rtl),
+        .comment-item-text li.ql-indent-2:not(.ql-direction-rtl) { padding-left: 7.5em; }
+        .record-desc li.ql-indent-3:not(.ql-direction-rtl),
+        .comment-item-text li.ql-indent-3:not(.ql-direction-rtl) { padding-left: 10.5em; }
+        .record-desc li.ql-indent-4:not(.ql-direction-rtl),
+        .comment-item-text li.ql-indent-4:not(.ql-direction-rtl) { padding-left: 13.5em; }
+        .record-desc li.ql-indent-5:not(.ql-direction-rtl),
+        .comment-item-text li.ql-indent-5:not(.ql-direction-rtl) { padding-left: 16.5em; }
+        .record-desc li.ql-indent-6:not(.ql-direction-rtl),
+        .comment-item-text li.ql-indent-6:not(.ql-direction-rtl) { padding-left: 19.5em; }
+        .record-desc li.ql-indent-7:not(.ql-direction-rtl),
+        .comment-item-text li.ql-indent-7:not(.ql-direction-rtl) { padding-left: 22.5em; }
+        .record-desc li.ql-indent-8:not(.ql-direction-rtl),
+        .comment-item-text li.ql-indent-8:not(.ql-direction-rtl) { padding-left: 25.5em; }
 
         .record-desc a,
         .comment-item-text a {
@@ -379,7 +533,7 @@
 
         @@page {
             size: A4 portrait;
-            margin: 10mm;
+            margin: 5mm;
         }
 
         @@media print {
@@ -455,7 +609,7 @@
             </colgroup>
             <thead>
                 <tr>
-                    <th>Vyjádření</th>
+                    <th>Záznamy a vyjádření</th>
                     <th>Osoby</th>
                     <th>Termíny</th>
                 </tr>

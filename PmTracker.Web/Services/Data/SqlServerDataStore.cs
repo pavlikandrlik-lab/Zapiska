@@ -1027,8 +1027,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     public PdfExportTemplateViewModel BuildProjectPrintTemplate(
         int projektId,
         CurrentUserContextViewModel currentUser,
-        bool autoPrint,
-        string? commentSortDirection = null)
+        bool autoPrint)
     {
         if (!ProjektExists(projektId))
         {
@@ -1036,8 +1035,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         }
 
         var project = _dbContext.Projekty.AsNoTracking().First(x => x.Id == projektId);
-        var normalizedCommentSortDirection = NormalizeCommentSortDirection(commentSortDirection);
-        var records = BuildExportRecords(projektId, null, null, 0, false, normalizedCommentSortDirection);
+        var records = BuildExportRecords(projektId, null, null, 0, false);
 
         return new PdfExportTemplateViewModel
         {
@@ -1066,8 +1064,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     public PdfExportTemplateViewModel BuildMeetingPrintTemplate(
         int jednaniId,
         CurrentUserContextViewModel currentUser,
-        bool autoPrint,
-        string? commentSortDirection = null)
+        bool autoPrint)
     {
         var meeting = _dbContext.Jednani.AsNoTracking().FirstOrDefault(x => x.Id == jednaniId)
             ?? throw new InvalidOperationException($"Jednání {jednaniId} nebylo nalezeno.");
@@ -1075,8 +1072,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var project = _dbContext.Projekty.AsNoTracking().First(x => x.Id == meeting.ProjektId);
         var status = _dbContext.CiselnikStavuJednani.AsNoTracking().FirstOrDefault(x => x.Id == meeting.StavJednaniId);
 
-        var normalizedCommentSortDirection = NormalizeCommentSortDirection(commentSortDirection);
-        var records = BuildExportRecords(project.Id, meeting.Id, null, meeting.CisloJednani, true, normalizedCommentSortDirection);
+        var records = BuildExportRecords(project.Id, meeting.Id, null, meeting.CisloJednani, true);
 
         return new PdfExportTemplateViewModel
         {
@@ -1106,8 +1102,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         int projektId,
         int zaznamId,
         CurrentUserContextViewModel currentUser,
-        bool autoPrint,
-        string? commentSortDirection = null)
+        bool autoPrint)
     {
         var project = _dbContext.Projekty.AsNoTracking().FirstOrDefault(x => x.Id == projektId)
             ?? throw new InvalidOperationException($"Projekt {projektId} nebyl nalezen.");
@@ -1117,8 +1112,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .OrderByDescending(x => x.CisloJednani)
             .FirstOrDefault();
 
-        var normalizedCommentSortDirection = NormalizeCommentSortDirection(commentSortDirection);
-        var records = BuildExportRecords(projektId, lastMeeting?.Id, zaznamId, lastMeeting?.CisloJednani ?? 0, true, normalizedCommentSortDirection);
+        var records = BuildExportRecords(projektId, lastMeeting?.Id, zaznamId, lastMeeting?.CisloJednani ?? 0, true);
 
         return new PdfExportTemplateViewModel
         {
@@ -5777,25 +5771,10 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         return 100;
     }
 
-    private static string NormalizeCommentSortDirection(string? commentSortDirection)
-        => string.Equals(commentSortDirection, "desc", StringComparison.OrdinalIgnoreCase)
-            ? "desc"
-            : "asc";
-
     private static List<VyjadreniEntity> OrderCommentsForExport(
         IReadOnlyList<VyjadreniEntity> comments,
-        IReadOnlyDictionary<int, JednaniEntity> meetingById,
-        string commentSortDirection)
+        IReadOnlyDictionary<int, JednaniEntity> meetingById)
     {
-        var normalizedDirection = NormalizeCommentSortDirection(commentSortDirection);
-        if (normalizedDirection == "desc")
-        {
-            return comments
-                .OrderByDescending(comment => meetingById.GetValueOrDefault(comment.JednaniId)?.CisloJednani ?? 0)
-                .ThenByDescending(comment => comment.Id)
-                .ToList();
-        }
-
         return comments
             .OrderBy(comment => meetingById.GetValueOrDefault(comment.JednaniId)?.CisloJednani ?? 0)
             .ThenBy(comment => comment.Id)
@@ -5807,8 +5786,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         int? anchorMeetingId,
         int? specificRecordId,
         int anchorMeetingNumber,
-        bool limitComments,
-        string commentSortDirection)
+        bool limitComments)
     {
         var records = _dbContext.ProjektoveZaznamy.AsNoTracking()
             .Where(x => x.ProjektId == projectId)
@@ -5878,7 +5856,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var exportRows = records.Select(record =>
         {
             var commentsForRecord = commentGroups.GetValueOrDefault(record.Id, new List<VyjadreniEntity>());
-            var orderedCommentsForRecord = OrderCommentsForExport(commentsForRecord, meetingById, commentSortDirection);
+            var orderedCommentsForRecord = OrderCommentsForExport(commentsForRecord, meetingById);
             var selectedComments = limitComments
                 ? ApplyCommentLimit(orderedCommentsForRecord, records.Count)
                 : orderedCommentsForRecord;
@@ -5969,8 +5947,9 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
         var selected = new List<VyjadreniEntity>();
         var usedLines = 0;
-        foreach (var comment in comments)
+        for (var index = comments.Count - 1; index >= 0; index--)
         {
+            var comment = comments[index];
             if (selected.Count >= maxCommentsPerTask)
             {
                 break;
@@ -5987,6 +5966,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             usedLines += estimatedLines;
         }
 
+        selected.Reverse();
         return selected;
     }
 

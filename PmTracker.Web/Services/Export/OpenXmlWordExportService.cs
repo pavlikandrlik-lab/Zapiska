@@ -31,8 +31,8 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
             var body = mainPart.Document.Body ?? throw new InvalidOperationException("Word body nebyl inicializován.");
 
             AppendHeaderTable(body, model);
-
             AppendRecordsTable(body, mainPart, model.Zaznamy);
+            AppendSectionProperties(body);
             mainPart.Document.Save();
         }
 
@@ -119,6 +119,32 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
             new GridColumn { Width = "7400" }));
 
         return table;
+    }
+
+    private static void AppendSectionProperties(Body body)
+    {
+        if (body.Elements<SectionProperties>().Any())
+        {
+            return;
+        }
+
+        body.Append(new SectionProperties(
+            new PageSize
+            {
+                Width = 11906U,
+                Height = 16838U,
+                Orient = PageOrientationValues.Portrait
+            },
+            new PageMargin
+            {
+                Top = 720,
+                Right = 720U,
+                Bottom = 720,
+                Left = 720U,
+                Header = 420U,
+                Footer = 420U,
+                Gutter = 0U
+            }));
     }
 
     private static TableRow CreateHeaderTitleRow(string title)
@@ -224,9 +250,9 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
             new TableLayout { Type = TableLayoutValues.Fixed }));
 
         table.Append(new TableGrid(
-            new GridColumn { Width = "7600" },
+            new GridColumn { Width = "8100" },
             new GridColumn { Width = "2100" },
-            new GridColumn { Width = "2100" }));
+            new GridColumn { Width = "1600" }));
 
         return table;
     }
@@ -234,7 +260,7 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
     private static TableRow CreateHeaderRow()
     {
         return new TableRow(
-            CreateCell("Vyjádření", bold: true, fillColor: "F3F4F6"),
+            CreateCell("Záznamy a vyjádření", bold: true, fillColor: "F3F4F6"),
             CreateCell("Osoby", bold: true, fillColor: "F3F4F6"),
             CreateCell("Termíny", bold: true, fillColor: "F3F4F6"));
     }
@@ -254,9 +280,9 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
 
     private TableRow CreateRecordRow(MainDocumentPart mainPart, PdfExportRecordViewModel record)
     {
-        var commentsCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "7600" }));
+        var commentsCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "8100" }));
         var peopleCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "2100" }));
-        var deadlinesCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "2100" }));
+        var deadlinesCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "1600" }));
 
         AppendRecordCommentsCell(commentsCell, mainPart, record);
         AppendRecordPeopleCell(peopleCell, record);

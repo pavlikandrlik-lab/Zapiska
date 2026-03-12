@@ -103,6 +103,7 @@ public sealed class OpenXmlWordExportServiceTests
         var allText = string.Concat(body!.Descendants<Text>().Select(x => x.Text));
         allText.Should().NotContain("Role Osoba");
         allText.Should().Contain("Přítomen");
+        allText.Should().Contain("Záznamy a vyjádření");
 
         const string expectedHeader = "jednání č. 551 (17.02.2026) | Test Autor | 18.02.2026";
         var commentHeaderParagraph = body.Descendants<Paragraph>()

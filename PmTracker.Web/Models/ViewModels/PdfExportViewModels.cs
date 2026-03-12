@@ -4,7 +4,6 @@ public sealed class PdfExportRequestViewModel
 {
     public int ProjektId { get; set; }
     public int? JednaniId { get; set; }
-    public string? CommentSortDirection { get; set; }
 }
 
 public sealed class PdfExportTemplateViewModel
