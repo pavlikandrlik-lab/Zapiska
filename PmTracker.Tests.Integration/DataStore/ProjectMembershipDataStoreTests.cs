@@ -437,6 +437,48 @@ public sealed class ProjectMembershipDataStoreTests
     }
 
     [Fact]
+    public async Task TaskPrintTemplate_ShouldCountExplicitLineBreaksInCommentBudget()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_comment_limit_line_breaks");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportLineBreakAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportLineBreakOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "EXPLINEBREAK");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "EXPLINEBREAK_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportLineBreakRecord");
+
+        var multilineBody = string.Join('\n', Enumerable.Repeat("line", 8));
+        for (var index = 1; index <= 4; index++)
+        {
+            var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9820 + index);
+            dbContext.Vyjadreni.Add(new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meetingId,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = multilineBody,
+                DatumVyjadreni = new DateTime(2026, 9, 20 + index, 9, 0, 0)
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var model = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false);
+        model.Zaznamy.Should().ContainSingle();
+
+        var meetingNumbers = model.Zaznamy.Single().Vyjadreni
+            .Select(x => x.JednaniCislo)
+            .ToList();
+
+        meetingNumbers.Should().Equal(9823, 9824);
+    }
+
+    [Fact]
     public async Task TaskPrintTemplate_ShouldIncludePlannedDeliveryDateOnlyForExternalLinksThatHaveIt()
     {
         var db = await _fixture.CreateDatabaseAsync("export_external_planned_delivery");

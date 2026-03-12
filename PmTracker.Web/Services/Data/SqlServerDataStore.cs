@@ -5942,7 +5942,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     private List<VyjadreniEntity> ApplyCommentLimit(IReadOnlyList<VyjadreniEntity> comments)
     {
         const int lineBudgetPerTask = 20;
-        const int estimatedCharsPerLine = 115;
+        const int estimatedCharsPerLine = 95;
 
         var selected = new List<VyjadreniEntity>();
         var usedLines = 0;
@@ -5950,8 +5950,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         for (var index = comments.Count - 1; index >= 0; index--)
         {
             var comment = comments[index];
-            var commentTextLength = _richTextContentService.ToPlainText(comment.TextVyjadreni).Length;
-            var estimatedTextLines = Math.Max(1, (int)Math.Ceiling(commentTextLength / (double)estimatedCharsPerLine));
+            var commentPlainText = _richTextContentService.ToPlainText(comment.TextVyjadreni);
+            var estimatedTextLines = EstimateCommentTextLines(commentPlainText, estimatedCharsPerLine);
             var estimatedLines = 1 + estimatedTextLines; // 1 řádek hlavička + text
 
             // Vždy ponech aspoň nejnovější vyjádření celé,
@@ -5967,6 +5967,26 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
         selected.Reverse();
         return selected;
+    }
+
+    private static int EstimateCommentTextLines(string plainText, int estimatedCharsPerLine)
+    {
+        if (string.IsNullOrWhiteSpace(plainText))
+        {
+            return 1;
+        }
+
+        var normalized = plainText
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        var estimatedLines = 0;
+        var rows = normalized.Split('\n');
+        foreach (var row in rows)
+        {
+            estimatedLines += Math.Max(1, (int)Math.Ceiling(row.Length / (double)estimatedCharsPerLine));
+        }
+
+        return Math.Max(1, estimatedLines);
     }
 
     private static string? ResolveHighlightColor(
