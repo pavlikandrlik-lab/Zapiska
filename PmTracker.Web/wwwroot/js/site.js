@@ -7527,20 +7527,79 @@
         return `${text.slice(0, limit)}\n...[truncated ${text.length - limit} chars]`;
     }
 
-    function buildAjaxDiagnosticLines(errorCode, traceId, action, method, response, contentType, rawBody, extraLines) {
+    function buildResponseHeadersSnapshot(response, maxHeaders) {
+        if (!(response instanceof Response) || !(response.headers instanceof Headers)) {
+            return "<none>";
+        }
+
+        const limit = Number.isFinite(maxHeaders) ? Math.max(5, Number(maxHeaders)) : 80;
+        const entries = Array.from(response.headers.entries());
+        if (entries.length === 0) {
+            return "<none>";
+        }
+
+        return entries
+            .slice(0, limit)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join("\n");
+    }
+
+    function buildFormDataSnapshot(formData, maxFields) {
+        if (!(formData instanceof FormData)) {
+            return "<unavailable>";
+        }
+
+        const limit = Number.isFinite(maxFields) ? Math.max(5, Number(maxFields)) : 120;
+        const lines = [];
+        let count = 0;
+        for (const [key, rawValue] of formData.entries()) {
+            count += 1;
+            if (count > limit) {
+                break;
+            }
+
+            if (rawValue instanceof File) {
+                lines.push(`${key}=<file:${rawValue.name};size=${rawValue.size}>`);
+                continue;
+            }
+
+            const value = truncateDiagnosticBody(String(rawValue || ""), 300);
+            lines.push(`${key}=${value}`);
+        }
+
+        if (count === 0) {
+            return "<empty>";
+        }
+
+        if (count > limit) {
+            lines.push(`...[truncated ${count - limit} fields]`);
+        }
+
+        return lines.join("\n");
+    }
+
+    function buildAjaxDiagnosticLines(errorCode, traceId, action, method, response, contentType, rawBody, requestFormSnapshot, extraLines) {
         const status = response instanceof Response ? response.status : 0;
         const statusText = response instanceof Response ? (response.statusText || "") : "";
         const responseUrl = response instanceof Response ? (response.url || action || window.location.href) : (action || window.location.href);
         const body = truncateDiagnosticBody(rawBody, 12000);
+        const redirected = response instanceof Response ? response.redirected : false;
+        const headersSnapshot = buildResponseHeadersSnapshot(response, 80);
         const lines = [
             `TimestampUtc: ${new Date().toISOString()}`,
             `ErrorCode: ${errorCode}`,
             `TraceId: ${traceId || "-"}`,
             "ClientSource: site.js:initModalAjaxSubmit",
+            "ExpectedContract: ModalSubmitResultViewModel { ok:boolean, message?, errorCode?, traceId?, diagnosticLog?, fieldErrors? }",
             `Request: ${(method || "POST").toUpperCase()} ${action || window.location.href}`,
             `ResponseUrl: ${responseUrl}`,
             `Status: ${status}${statusText ? ` ${statusText}` : ""}`,
+            `Redirected: ${redirected ? "true" : "false"}`,
             `ContentType: ${contentType || "-"}`,
+            "ResponseHeaders:",
+            headersSnapshot,
+            "RequestFormData:",
+            requestFormSnapshot || "<unavailable>",
             "Body:",
             body || "<empty>"
         ];
@@ -7573,7 +7632,7 @@
         return "Server vrátil neočekávanou odpověď.";
     }
 
-    function buildNonJsonAjaxErrorPayload(response, action, method, contentType, rawBody) {
+    function buildNonJsonAjaxErrorPayload(response, action, method, contentType, rawBody, requestFormSnapshot) {
         const traceId = resolveAjaxResponseTraceId(response);
         const message = buildNonJsonAjaxFailureMessage(response, rawBody);
         const diagnosticLines = buildAjaxDiagnosticLines(
@@ -7584,6 +7643,7 @@
             response,
             contentType,
             rawBody,
+            requestFormSnapshot,
             null);
 
         const payload = {
@@ -7606,7 +7666,7 @@
         return payload;
     }
 
-    function buildUnexpectedJsonContractPayload(response, action, method, contentType, rawBody, parsedPayload) {
+    function buildUnexpectedJsonContractPayload(response, action, method, contentType, rawBody, parsedPayload, requestFormSnapshot) {
         const plainPayload = isPlainObject(parsedPayload) ? parsedPayload : {};
         const traceId = resolveAjaxResponseTraceId(response);
         const payloadKeys = Object.keys(plainPayload);
@@ -7625,6 +7685,7 @@
             response,
             contentType,
             rawBody,
+            requestFormSnapshot,
             [
                 `PayloadKeys: ${payloadKeys.length > 0 ? payloadKeys.join(", ") : "-"}`,
                 `PayloadType: ${Array.isArray(parsedPayload) ? "array" : typeof parsedPayload}`
@@ -7640,13 +7701,13 @@
         };
     }
 
-    function ensureAjaxErrorPayloadDiagnostics(parsedPayload, response, action, method, contentType, rawBody) {
+    function ensureAjaxErrorPayloadDiagnostics(parsedPayload, response, action, method, contentType, rawBody, requestFormSnapshot) {
         if (!isPlainObject(parsedPayload)) {
-            return buildNonJsonAjaxErrorPayload(response, action, method, contentType, rawBody);
+            return buildNonJsonAjaxErrorPayload(response, action, method, contentType, rawBody, requestFormSnapshot);
         }
 
         if (typeof parsedPayload.ok !== "boolean") {
-            return buildUnexpectedJsonContractPayload(response, action, method, contentType, rawBody, parsedPayload);
+            return buildUnexpectedJsonContractPayload(response, action, method, contentType, rawBody, parsedPayload, requestFormSnapshot);
         }
 
         if (parsedPayload.ok === true) {
@@ -7676,6 +7737,7 @@
                 response,
                 contentType,
                 rawBody,
+                requestFormSnapshot,
                 [
                     "Details:",
                     "Server error payload did not include diagnosticLog.",
@@ -7687,7 +7749,7 @@
         return normalized;
     }
 
-    function buildAjaxExceptionPayload(error, action, method) {
+    function buildAjaxExceptionPayload(error, action, method, requestFormSnapshot) {
         const errorCode = "CLIENT_AJAX_EXCEPTION";
         const exceptionName = error instanceof Error ? error.name : "UnknownError";
         const exceptionMessage = error instanceof Error ? error.message : String(error || "Unknown error");
@@ -7699,8 +7761,11 @@
             `ErrorCode: ${errorCode}`,
             "TraceId: -",
             "ClientSource: site.js:initModalAjaxSubmit",
+            "ExpectedContract: ModalSubmitResultViewModel { ok:boolean, message?, errorCode?, traceId?, diagnosticLog?, fieldErrors? }",
             `Request: ${(method || "POST").toUpperCase()} ${action || window.location.href}`,
             `NavigatorOnline: ${navigator.onLine ? "true" : "false"}`,
+            "RequestFormData:",
+            requestFormSnapshot || "<unavailable>",
             `ExceptionName: ${exceptionName}`,
             `ExceptionMessage: ${exceptionMessage}`
         ];
@@ -7752,9 +7817,11 @@
             try {
                 const action = target.getAttribute("action") || window.location.href;
                 const method = (target.getAttribute("method") || "post").toUpperCase();
+                const formData = new FormData(target);
+                const requestFormSnapshot = buildFormDataSnapshot(formData, 120);
                 const response = await fetch(action, {
                     method,
-                    body: new FormData(target),
+                    body: formData,
                     headers: {
                         "X-Requested-With": "XMLHttpRequest"
                     },
@@ -7772,7 +7839,8 @@
                     action,
                     method,
                     contentType,
-                    rawBody);
+                    rawBody,
+                    requestFormSnapshot);
 
                 if (!response.ok || !payload || payload.ok !== true) {
                     target.dataset.recordEditorNavigating = "false";
@@ -7793,7 +7861,8 @@
                 target.dataset.recordEditorNavigating = "false";
                 const action = target.getAttribute("action") || window.location.href;
                 const method = (target.getAttribute("method") || "post").toUpperCase();
-                renderModalFormErrors(target, buildAjaxExceptionPayload(error, action, method));
+                const fallbackSnapshot = buildFormDataSnapshot(new FormData(target), 120);
+                renderModalFormErrors(target, buildAjaxExceptionPayload(error, action, method, fallbackSnapshot));
             } finally {
                 setFormSubmitting(target, false);
             }
