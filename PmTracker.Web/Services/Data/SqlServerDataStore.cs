@@ -5941,8 +5941,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
     private List<VyjadreniEntity> ApplyCommentLimit(IReadOnlyList<VyjadreniEntity> comments, int taskCount)
     {
-        const int maxCommentsPerTask = 5;
-        const int totalBudget = 39;
+        const int maxCommentsPerTask = 10;
+        const int totalBudget = 78;
         var budgetPerTask = Math.Max(10, (int)Math.Floor(totalBudget / Math.Max(taskCount, 1d)));
 
         var selected = new List<VyjadreniEntity>();

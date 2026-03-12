@@ -320,7 +320,7 @@ public sealed class ProjectMembershipDataStoreTests
         await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
         var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportLimitRecord");
 
-        for (var index = 1; index <= 7; index++)
+        for (var index = 1; index <= 12; index++)
         {
             var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9700 + index);
             dbContext.Vyjadreni.Add(new VyjadreniEntity
@@ -342,7 +342,7 @@ public sealed class ProjectMembershipDataStoreTests
             .Select(x => x.JednaniCislo)
             .ToList();
 
-        meetingNumbers.Should().Equal(9703, 9704, 9705, 9706, 9707);
+        meetingNumbers.Should().Equal(9703, 9704, 9705, 9706, 9707, 9708, 9709, 9710, 9711, 9712);
     }
 
     [Fact]

@@ -351,15 +351,19 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
 
         if (record.ExterniVazby.Count > 0)
         {
-            cell.Append(CreateRichParagraph(
-                new[]
-                {
-                    new TextSegment("Externí vazby: ", Bold: true),
-                    new TextSegment(string.Join("; ", record.ExterniVazby))
-                },
-                sizeHalfPoints: BaseFontHalfPoints,
-                before: 0,
-                after: 25));
+            for (var index = 0; index < record.ExterniVazby.Count; index++)
+            {
+                var (header, details) = SplitExternalLinkDisplay(record.ExterniVazby[index]);
+                cell.Append(CreateRichParagraph(
+                    new[]
+                    {
+                        new TextSegment(header, Bold: true),
+                        new TextSegment(details)
+                    },
+                    sizeHalfPoints: BaseFontHalfPoints,
+                    before: 0,
+                    after: index == record.ExterniVazby.Count - 1 ? 45 : 20));
+            }
         }
 
         foreach (var comment in record.Vyjadreni)
@@ -1022,6 +1026,18 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
         var green = ClampColor(match.Groups["g"].Value);
         var blue = ClampColor(match.Groups["b"].Value);
         return $"{red:X2}{green:X2}{blue:X2}";
+    }
+
+    private static (string Header, string Details) SplitExternalLinkDisplay(string value)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        var detailsIndex = normalized.IndexOf(" (", StringComparison.Ordinal);
+        if (detailsIndex <= 0 || !normalized.EndsWith(')'))
+        {
+            return (normalized, string.Empty);
+        }
+
+        return (normalized[..detailsIndex], normalized[detailsIndex..]);
     }
 
     private static int ClampColor(string raw)

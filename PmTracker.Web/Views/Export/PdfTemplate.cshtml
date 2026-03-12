@@ -39,6 +39,18 @@
 
         return 4;
     }
+
+    static (string Header, string Details) SplitExternalLinkDisplay(string value)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        var detailsIndex = normalized.IndexOf(" (", StringComparison.Ordinal);
+        if (detailsIndex <= 0 || !normalized.EndsWith(')'))
+        {
+            return (normalized, string.Empty);
+        }
+
+        return (normalized[..detailsIndex], normalized[detailsIndex..]);
+    }
 }
 <!DOCTYPE html>
 <html lang="cs">
@@ -242,10 +254,28 @@
         }
 
         .record-goal,
-        .record-desc,
-        .record-external {
+        .record-desc {
             margin: 0 0 3px;
             font-size: 10pt;
+        }
+
+        .record-external-block {
+            margin: 0 0 6px;
+            font-size: 10pt;
+        }
+
+        .record-external-list {
+            margin: 0;
+            padding-left: 0;
+            list-style: none;
+        }
+
+        .record-external-list li {
+            margin-bottom: 1px;
+        }
+
+        .record-external-list li:last-child {
+            margin-bottom: 0;
         }
 
         .record-goal {
@@ -668,7 +698,17 @@
                                     }
                                     @if (zaznam.ExterniVazby.Count > 0)
                                     {
-                                        <p class="record-external"><strong>Externí vazby:</strong> @string.Join("; ", zaznam.ExterniVazby)</p>
+                                        <div class="record-external-block">
+                                            <ul class="record-external-list">
+                                                @foreach (var externalLink in zaznam.ExterniVazby)
+                                                {
+                                                    var externalParts = SplitExternalLinkDisplay(externalLink);
+                                                    <li>
+                                                        <strong>@externalParts.Header</strong>@externalParts.Details
+                                                    </li>
+                                                }
+                                            </ul>
+                                        </div>
                                     }
 
                                     @if (zaznam.Vyjadreni.Count > 0)
