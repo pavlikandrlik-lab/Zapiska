@@ -5858,7 +5858,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             var commentsForRecord = commentGroups.GetValueOrDefault(record.Id, new List<VyjadreniEntity>());
             var orderedCommentsForRecord = OrderCommentsForExport(commentsForRecord, meetingById);
             var selectedComments = limitComments
-                ? ApplyCommentLimit(orderedCommentsForRecord, records.Count)
+                ? ApplyCommentLimit(orderedCommentsForRecord)
                 : orderedCommentsForRecord;
 
             var commentRows = selectedComments.Select(comment =>
@@ -5939,25 +5939,24 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         return exportRows;
     }
 
-    private List<VyjadreniEntity> ApplyCommentLimit(IReadOnlyList<VyjadreniEntity> comments, int taskCount)
+    private List<VyjadreniEntity> ApplyCommentLimit(IReadOnlyList<VyjadreniEntity> comments)
     {
-        const int maxCommentsPerTask = 10;
-        const int totalBudget = 78;
-        var budgetPerTask = Math.Max(10, (int)Math.Floor(totalBudget / Math.Max(taskCount, 1d)));
+        const int lineBudgetPerTask = 20;
+        const int estimatedCharsPerLine = 115;
 
         var selected = new List<VyjadreniEntity>();
         var usedLines = 0;
+
         for (var index = comments.Count - 1; index >= 0; index--)
         {
             var comment = comments[index];
-            if (selected.Count >= maxCommentsPerTask)
-            {
-                break;
-            }
-
             var commentTextLength = _richTextContentService.ToPlainText(comment.TextVyjadreni).Length;
-            var estimatedLines = 2 + (int)Math.Ceiling(commentTextLength / 115d);
-            if (selected.Count > 0 && usedLines + estimatedLines > budgetPerTask)
+            var estimatedTextLines = Math.Max(1, (int)Math.Ceiling(commentTextLength / (double)estimatedCharsPerLine));
+            var estimatedLines = 1 + estimatedTextLines; // 1 řádek hlavička + text
+
+            // Vždy ponech aspoň nejnovější vyjádření celé,
+            // i když samo překročí budget.
+            if (selected.Count > 0 && usedLines + estimatedLines > lineBudgetPerTask)
             {
                 break;
             }

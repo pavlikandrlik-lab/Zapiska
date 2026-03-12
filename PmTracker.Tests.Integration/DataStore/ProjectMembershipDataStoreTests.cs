@@ -346,6 +346,97 @@ public sealed class ProjectMembershipDataStoreTests
     }
 
     [Fact]
+    public async Task TaskPrintTemplate_ShouldUseLineBudgetForCommentLimit()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_comment_limit_line_budget");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportLineBudgetAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportLineBudgetOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "EXPLINE");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "EXPLINE_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportLineBudgetRecord");
+
+        var longBody = new string('X', 600);
+        for (var index = 1; index <= 6; index++)
+        {
+            var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9800 + index);
+            dbContext.Vyjadreni.Add(new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meetingId,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = longBody,
+                DatumVyjadreni = new DateTime(2026, 9, index, 9, 0, 0)
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var model = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false);
+        model.Zaznamy.Should().ContainSingle();
+
+        var meetingNumbers = model.Zaznamy.Single().Vyjadreni
+            .Select(x => x.JednaniCislo)
+            .ToList();
+
+        meetingNumbers.Should().Equal(9805, 9806);
+    }
+
+    [Fact]
+    public async Task TaskPrintTemplate_ShouldKeepAtLeastNewestComment_WhenItExceedsLineBudget()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_comment_limit_line_budget_keep_newest");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportLineBudgetNewestAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportLineBudgetNewestOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "EXPLINELAST");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "EXPLINELAST_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportLineBudgetNewestRecord");
+
+        var meeting1Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9811);
+        var meeting2Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9812);
+
+        dbContext.Vyjadreni.AddRange(
+            new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meeting1Id,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = "Older short comment",
+                DatumVyjadreni = new DateTime(2026, 9, 11, 9, 0, 0)
+            },
+            new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meeting2Id,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = new string('Y', 5000),
+                DatumVyjadreni = new DateTime(2026, 9, 12, 9, 0, 0)
+            });
+
+        await dbContext.SaveChangesAsync();
+
+        var model = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false);
+        model.Zaznamy.Should().ContainSingle();
+
+        var meetingNumbers = model.Zaznamy.Single().Vyjadreni
+            .Select(x => x.JednaniCislo)
+            .ToList();
+
+        meetingNumbers.Should().Equal(9812);
+    }
+
+    [Fact]
     public async Task TaskPrintTemplate_ShouldIncludePlannedDeliveryDateOnlyForExternalLinksThatHaveIt()
     {
         var db = await _fixture.CreateDatabaseAsync("export_external_planned_delivery");
