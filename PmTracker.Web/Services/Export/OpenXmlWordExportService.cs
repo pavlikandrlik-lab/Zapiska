@@ -664,6 +664,12 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
                 continue;
             }
 
+            if (node is XElement listElement && IsListElement(listElement))
+            {
+                AppendListParagraphs(listElement, paragraphs, baseIndentLevel: 0);
+                continue;
+            }
+
             if (node is XText textNode)
             {
                 if (string.IsNullOrWhiteSpace(textNode.Value))
@@ -687,6 +693,82 @@ public sealed partial class OpenXmlWordExportService : IWordExportService
         }
 
         return paragraphs;
+    }
+
+    private static void AppendListParagraphs(XElement listElement, List<HtmlParagraphModel> paragraphs, int baseIndentLevel)
+    {
+        var defaultListTag = listElement.Name.LocalName.Equals("ol", StringComparison.OrdinalIgnoreCase)
+            ? "ol"
+            : "ul";
+        var orderedIndex = 0;
+
+        foreach (var node in listElement.Nodes())
+        {
+            if (node is not XElement listItemElement
+                || !listItemElement.Name.LocalName.Equals("li", StringComparison.OrdinalIgnoreCase))
+            {
+                if (node is XElement nestedListElement && IsListElement(nestedListElement))
+                {
+                    AppendListParagraphs(nestedListElement, paragraphs, baseIndentLevel + 1);
+                }
+
+                continue;
+            }
+
+            var resolvedListTag = ResolveListTag(defaultListTag, listItemElement);
+            var marker = resolvedListTag == "ol"
+                ? $"{++orderedIndex}. "
+                : "• ";
+            if (resolvedListTag != "ol")
+            {
+                orderedIndex = 0;
+            }
+
+            var tokens = new List<HtmlInlineToken>
+            {
+                new(marker, false, false, false, null, false)
+            };
+
+            foreach (var child in listItemElement.Nodes())
+            {
+                if (child is XElement nestedList && IsListElement(nestedList))
+                {
+                    continue;
+                }
+
+                AppendInlineTokens(child, default, tokens);
+            }
+
+            var itemIndentLevel = baseIndentLevel + ParseIndentLevel(listItemElement.Attribute("class")?.Value);
+            paragraphs.Add(new HtmlParagraphModel(itemIndentLevel, tokens));
+
+            foreach (var nestedList in listItemElement.Elements().Where(IsListElement))
+            {
+                AppendListParagraphs(nestedList, paragraphs, itemIndentLevel + 1);
+            }
+        }
+    }
+
+    private static bool IsListElement(XElement element)
+    {
+        return element.Name.LocalName.Equals("ul", StringComparison.OrdinalIgnoreCase)
+            || element.Name.LocalName.Equals("ol", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ResolveListTag(string defaultListTag, XElement listItemElement)
+    {
+        var listMode = (listItemElement.Attribute("data-list")?.Value ?? string.Empty).Trim();
+        if (listMode.Equals("bullet", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ul";
+        }
+
+        if (listMode.Equals("ordered", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ol";
+        }
+
+        return defaultListTag;
     }
 
     private static void AppendInlineTokens(XNode node, HtmlStyleState style, List<HtmlInlineToken> target)

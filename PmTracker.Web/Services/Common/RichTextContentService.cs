@@ -12,6 +12,9 @@ public sealed partial class RichTextContentService : IRichTextContentService
     {
         "p",
         "br",
+        "ul",
+        "ol",
+        "li",
         "strong",
         "b",
         "em",
@@ -74,6 +77,7 @@ public sealed partial class RichTextContentService : IRichTextContentService
 
         var withBreaks = BreakTagRegex().Replace(html, "\n");
         withBreaks = ParagraphClosingTagRegex().Replace(withBreaks, "\n");
+        withBreaks = ListItemClosingTagRegex().Replace(withBreaks, "\n");
         var withoutTags = AnyTagRegex().Replace(withBreaks, string.Empty);
         var decoded = NormalizeLineEndings(WebUtility.HtmlDecode(withoutTags));
         return decoded.Trim();
@@ -189,12 +193,101 @@ public sealed partial class RichTextContentService : IRichTextContentService
             return;
         }
 
+        if (tagName == "ul" || tagName == "ol")
+        {
+            AppendSanitizedList(element, tagName, builder);
+            return;
+        }
+
+        if (tagName == "li")
+        {
+            AppendSanitizedListItem(element, builder);
+            return;
+        }
+
         builder.Append('<').Append(tagName).Append('>');
         foreach (var child in element.Nodes())
         {
             AppendSanitizedNode(child, builder);
         }
         builder.Append("</").Append(tagName).Append('>');
+    }
+
+    private static void AppendSanitizedList(XElement listElement, string defaultListTag, StringBuilder builder)
+    {
+        var currentListTag = string.Empty;
+        foreach (var node in listElement.Nodes())
+        {
+            if (node is XElement listItemElement
+                && listItemElement.Name.LocalName.Equals("li", StringComparison.OrdinalIgnoreCase))
+            {
+                var resolvedListTag = ResolveListTag(defaultListTag, listItemElement);
+                if (!string.Equals(currentListTag, resolvedListTag, StringComparison.Ordinal))
+                {
+                    if (currentListTag.Length > 0)
+                    {
+                        builder.Append("</").Append(currentListTag).Append('>');
+                    }
+
+                    builder.Append('<').Append(resolvedListTag).Append('>');
+                    currentListTag = resolvedListTag;
+                }
+
+                AppendSanitizedListItem(listItemElement, builder);
+                continue;
+            }
+
+            if (currentListTag.Length > 0)
+            {
+                builder.Append("</").Append(currentListTag).Append('>');
+                currentListTag = string.Empty;
+            }
+
+            AppendSanitizedNode(node, builder);
+        }
+
+        if (currentListTag.Length > 0)
+        {
+            builder.Append("</").Append(currentListTag).Append('>');
+        }
+    }
+
+    private static string ResolveListTag(string defaultListTag, XElement listItemElement)
+    {
+        var listMode = (listItemElement.Attribute("data-list")?.Value ?? string.Empty).Trim();
+        if (listMode.Equals("bullet", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ul";
+        }
+
+        if (listMode.Equals("ordered", StringComparison.OrdinalIgnoreCase))
+        {
+            return "ol";
+        }
+
+        return defaultListTag;
+    }
+
+    private static void AppendSanitizedListItem(XElement listItemElement, StringBuilder builder)
+    {
+        var indentClass = ExtractAllowedIndentClass(listItemElement.Attribute("class")?.Value);
+        if (indentClass is null)
+        {
+            builder.Append("<li>");
+        }
+        else
+        {
+            builder.Append("<li class=\"")
+                .Append(indentClass)
+                .Append("\">");
+        }
+
+        foreach (var child in listItemElement.Nodes())
+        {
+            AppendSanitizedNode(child, builder);
+        }
+
+        builder.Append("</li>");
     }
 
     private static string? ExtractAllowedIndentClass(string? classValue)
@@ -264,6 +357,7 @@ public sealed partial class RichTextContentService : IRichTextContentService
 
         var withBreaks = BreakTagRegex().Replace(html, "\n");
         withBreaks = ParagraphClosingTagRegex().Replace(withBreaks, "\n");
+        withBreaks = ListItemClosingTagRegex().Replace(withBreaks, "\n");
         var withoutTags = AnyTagRegex().Replace(withBreaks, string.Empty);
         var decoded = WebUtility.HtmlDecode(withoutTags);
 
@@ -298,6 +392,9 @@ public sealed partial class RichTextContentService : IRichTextContentService
 
     [GeneratedRegex(@"</\s*p\s*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ParagraphClosingTagRegex();
+
+    [GeneratedRegex(@"</\s*li\s*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ListItemClosingTagRegex();
 
     [GeneratedRegex(@"<[^>]+>", RegexOptions.CultureInvariant)]
     private static partial Regex AnyTagRegex();

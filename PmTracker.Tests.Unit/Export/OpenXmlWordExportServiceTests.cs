@@ -126,4 +126,100 @@ public sealed class OpenXmlWordExportServiceTests
         hyperlinkRun.Should().NotBeNull();
         hyperlinkRun!.RunProperties?.Color?.Val?.Value.Should().Be("0563C1");
     }
+
+    [Fact]
+    public void BuildDocument_ShouldRenderOrderedAndBulletLists_AsSeparateLines()
+    {
+        var sut = new OpenXmlWordExportService(new RichTextContentService());
+        var model = CreateModelWithCommentHtml("<ol><li>První</li><li>Druhý</li></ol><ul><li>Třetí</li></ul>");
+
+        var payload = sut.BuildDocument(model);
+
+        using var stream = new MemoryStream(payload);
+        using var document = WordprocessingDocument.Open(stream, false);
+        var body = document.MainDocumentPart?.Document?.Body;
+        body.Should().NotBeNull();
+
+        var paragraphTexts = body!.Descendants<Paragraph>()
+            .Select(paragraph => paragraph.InnerText)
+            .ToList();
+
+        paragraphTexts.Should().Contain(text => text.Contains("1. První", StringComparison.Ordinal));
+        paragraphTexts.Should().Contain(text => text.Contains("2. Druhý", StringComparison.Ordinal));
+        paragraphTexts.Should().Contain(text => text.Contains("• Třetí", StringComparison.Ordinal));
+    }
+
+    private static PdfExportTemplateViewModel CreateModelWithCommentHtml(string commentHtml)
+    {
+        return new PdfExportTemplateViewModel
+        {
+            ExportVariant = "meeting",
+            AutoPrint = false,
+            ProjektId = 10,
+            ProjektZkratka = "EXP",
+            ProjektNazev = "Export projekt",
+            JednaniId = 20,
+            JednaniCislo = 551,
+            JednaniDatum = new DateTime(2026, 2, 17),
+            JednaniMisto = "A1",
+            JednaniStav = "Otevřeno",
+            Vytvoril = "Tester",
+            VytvorenoDne = new DateTime(2026, 2, 18, 12, 0, 0),
+            SnapshotSummary = string.Empty,
+            PreparationSummary = null,
+            ProjektoveRole = [],
+            AppliedRuleSummary = ["Automatický meeting výstup"],
+            Legenda = [],
+            Dochazka =
+            [
+                new PdfAttendanceGroupViewModel
+                {
+                    Stav = "Přítomen",
+                    Osoby = ["Ing. Test Autor"]
+                }
+            ],
+            Zaznamy =
+            [
+                new PdfExportRecordViewModel
+                {
+                    ZaznamId = 30,
+                    CisloZaznamu = 1,
+                    CisloViditelne = "1",
+                    CisloViditelneA = 1,
+                    CisloViditelneB = 0,
+                    Nazev = "Test úkol",
+                    Cil = null,
+                    Popis = null,
+                    KategorieKod = "U",
+                    Kategorie = "Úkol",
+                    TypUkoluKod = null,
+                    TypUkolu = null,
+                    Stav = "Otevřeno",
+                    Vlastnik = "Ing. Test Autor",
+                    SubsystemKod = "SUB",
+                    Subsystem = "Subsystem",
+                    DatumZalozeni = new DateTime(2026, 2, 1),
+                    HistorieTerminu = [],
+                    Termin = new DateTime(2026, 3, 1),
+                    ExterniVazby = [],
+                    Spoluprace = [],
+                    Vyjadreni =
+                    [
+                        new PdfExportCommentViewModel
+                        {
+                            Autor = "Test Autor",
+                            Datum = new DateTime(2026, 2, 18, 9, 0, 0),
+                            Text = commentHtml,
+                            Delka = 26,
+                            JednaniCislo = 551,
+                            JednaniDatum = new DateTime(2026, 2, 17),
+                            JednaniStav = "Otevřeno",
+                            IsNew = true,
+                            HighlightColor = "#0F4D8A"
+                        }
+                    ]
+                }
+            ]
+        };
+    }
 }

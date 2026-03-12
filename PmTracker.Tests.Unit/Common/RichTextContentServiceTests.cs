@@ -67,4 +67,38 @@ public sealed class RichTextContentServiceTests
 
         decoded.Should().Contain("Tučné vyjádření");
     }
+
+    [Fact]
+    public void ToSafeHtml_ShouldAllowLists_AndNormalizeQuillListMarkup()
+    {
+        const string input = "<ol><li data-list=\"bullet\">A</li><li data-list=\"ordered\">B</li></ol>";
+
+        var result = _sut.ToSafeHtml(input);
+
+        result.Should().Be("<ul><li>A</li></ul><ol><li>B</li></ol>");
+    }
+
+    [Fact]
+    public void ToSafeHtml_ShouldPreserveAllowedListIndentClass_AndDropDisallowedClasses()
+    {
+        const string input = "<ul><li class=\"foo ql-indent-2 bar\">A</li><li class=\"ql-indent-9\">B</li></ul>";
+
+        var result = _sut.ToSafeHtml(input);
+
+        result.Should().Contain("<li class=\"ql-indent-2\">A</li>");
+        result.Should().Contain("<li>B</li>");
+        result.Should().NotContain("ql-indent-9");
+        result.Should().NotContain("foo");
+        result.Should().NotContain("bar");
+    }
+
+    [Fact]
+    public void ToPlainText_ShouldPreserveLineBreaksBetweenListItems()
+    {
+        const string input = "<ul><li>První</li><li>Druhý</li></ul>";
+
+        var result = _sut.ToPlainText(input);
+
+        result.Should().Be("První\nDruhý");
+    }
 }

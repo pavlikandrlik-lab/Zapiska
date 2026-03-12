@@ -188,6 +188,38 @@ public abstract class BaseController : Controller
         });
     }
 
+    protected ObjectResult AjaxForbiddenResult(string message = "Nemáte oprávnění k provedení této operace.")
+    {
+        var errorCode = AjaxErrorCodes.OperationFailed;
+        var traceId = ResolveTraceId();
+        var fieldErrors = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        var diagnosticLog = BuildDiagnosticLog(
+            errorCode,
+            traceId,
+            message,
+            fieldErrors,
+            details: "Permission check failed for AJAX request.",
+            exception: null);
+        LogAjaxFailure(
+            LogLevel.Warning,
+            errorCode,
+            traceId,
+            message,
+            fieldErrors,
+            diagnosticLog,
+            exception: null);
+
+        return StatusCode(StatusCodes.Status403Forbidden, new ModalSubmitResultViewModel
+        {
+            Ok = false,
+            Message = message,
+            ErrorCode = errorCode,
+            TraceId = traceId,
+            DiagnosticLog = diagnosticLog,
+            FieldErrors = fieldErrors
+        });
+    }
+
     protected JsonResult AjaxSuccessResult(
         string refreshScope,
         string? refreshUrl = null,
@@ -253,6 +285,11 @@ public abstract class BaseController : Controller
     {
         if (!hasPermission())
         {
+            if (IsAjaxRequest())
+            {
+                return AjaxForbiddenResult();
+            }
+
             return Forbid();
         }
 

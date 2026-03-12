@@ -155,6 +155,55 @@ public sealed class AjaxControllersTests
     }
 
     [Fact]
+    public async Task SaveRecord_ShouldReturnJsonForbiddenPayload_WhenUserLacksPermission()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiNoPermissionOwner");
+        var outsiderId = await _fixture.EnsurePersonAsync("ApiNoPermissionOutsider");
+        var projectId = await _fixture.EnsureProjectAsync("APINOPERM");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APINOPERM_SUB", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+
+        await using var lookupContext = _fixture.CreateDbContext();
+        var categoryCode = await lookupContext.CiselnikKategoriiZaznamu
+            .Where(x => x.Kod == "U" || x.Kod == "UKOL")
+            .OrderBy(x => x.Id)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var statusCode = await lookupContext.CiselnikStavuUkolu
+            .OrderBy(x => x.Id)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var subsystemCode = await lookupContext.Subsystemy
+            .Where(x => x.Id == subsystemId)
+            .Select(x => x.Kod)
+            .SingleAsync();
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Zaznamy/Save?asUser={outsiderId}",
+            ApiTestHttpHelper.BuildForm(
+                ("ProjektId", projectId.ToString()),
+                ("Kategorie", categoryCode),
+                ("Stav", statusCode),
+                ("Nazev", "No permission record save"),
+                ("VlastnikId", ownerId.ToString()),
+                ("DatumZalozeni", "2026-06-01"),
+                ("TerminUkonceni", "2026-06-15"),
+                ("Subsystem", subsystemCode)));
+
+        var response = await client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+        payload.Ok.Should().BeFalse();
+        payload.ErrorCode.Should().Be("OPERATION_FAILED");
+        payload.Message.Should().Contain("Nemáte oprávnění");
+        payload.TraceId.Should().NotBeNullOrWhiteSpace();
+        payload.DiagnosticLog.Should().Contain("Permission check failed");
+    }
+
+    [Fact]
     public async Task SaveRecord_ShouldReturnCrossTabFieldErrorsAndDiagnosticLog_WhenValidationFails()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiRecordOwner");

@@ -1296,6 +1296,20 @@ textarea {
     margin-bottom: 0;
 }
 
+.richtext-host .ql-editor ul,
+.richtext-host .ql-editor ol {
+    margin: 0 0 6px;
+    padding-left: 1.5rem;
+}
+
+.richtext-host .ql-editor li {
+    margin: 0 0 4px;
+}
+
+.richtext-host .ql-editor li:last-child {
+    margin-bottom: 0;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -2923,6 +2937,20 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .richtext-render p:last-child {
+    margin-bottom: 0;
+}
+
+.richtext-render ul,
+.richtext-render ol {
+    margin: 0 0 6px;
+    padding-left: 1.5rem;
+}
+
+.richtext-render li {
+    margin: 0 0 4px;
+}
+
+.richtext-render li:last-child {
     margin-bottom: 0;
 }
 

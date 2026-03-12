@@ -5031,7 +5031,10 @@
                         throw new Error(`HTTP ${response.status}`);
                     }
 
-                    const payload = await response.json();
+                    const payload = parseJsonPayload(await response.text());
+                    if (!payload || typeof payload !== "object") {
+                        throw new Error("INVALID_AD_PAYLOAD");
+                    }
                     if (!payload.available) {
                         adAvailabilityKnown = true;
                         adIsUnavailable = true;
@@ -5074,7 +5077,10 @@
                         throw new Error(`HTTP ${response.status}`);
                     }
 
-                    const payload = await response.json();
+                    const payload = parseJsonPayload(await response.text());
+                    if (!payload || typeof payload !== "object") {
+                        throw new Error("INVALID_AD_PROBE_PAYLOAD");
+                    }
                     adAvailabilityKnown = true;
                     adIsUnavailable = !payload.available;
                     if (adIsUnavailable) {
@@ -5671,6 +5677,7 @@
                     toolbar: [
                         ["bold", "italic", "underline"],
                         ["link"],
+                        [{ list: "ordered" }, { list: "bullet" }],
                         [{ indent: "-1" }, { indent: "+1" }]
                     ]
                 }
@@ -7528,6 +7535,100 @@
         }
     }
 
+    function parseJsonPayload(rawText) {
+        const text = String(rawText || "").trim();
+        if (!text) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function resolveAjaxResponseTraceId(response) {
+        if (!(response instanceof Response) || !(response.headers instanceof Headers)) {
+            return "";
+        }
+
+        return response.headers.get("x-trace-id")
+            || response.headers.get("trace-id")
+            || response.headers.get("request-id")
+            || "";
+    }
+
+    function truncateDiagnosticBody(value, maxLength) {
+        const text = String(value || "");
+        const limit = Number.isFinite(maxLength) ? Math.max(256, Number(maxLength)) : 12000;
+        if (text.length <= limit) {
+            return text;
+        }
+
+        return `${text.slice(0, limit)}\n...[truncated ${text.length - limit} chars]`;
+    }
+
+    function buildNonJsonAjaxFailureMessage(response, rawBody) {
+        const status = response instanceof Response ? response.status : 0;
+        const body = String(rawBody || "").toLowerCase();
+        if (status === 401 || status === 403) {
+            return "Relace vypršela nebo nemáte oprávnění. Obnovte stránku a zkuste akci znovu.";
+        }
+
+        if (status === 400
+            && (body.includes("antiforgery")
+                || body.includes("requestverificationtoken")
+                || body.includes("csrf"))) {
+            return "Bezpečnostní token formuláře vypršel nebo je neplatný. Obnovte stránku a akci opakujte.";
+        }
+
+        if (status >= 500) {
+            return "Server během zpracování požadavku selhal. Zkuste akci opakovat.";
+        }
+
+        return "Server vrátil neočekávanou odpověď.";
+    }
+
+    function buildNonJsonAjaxErrorPayload(response, action, method, contentType, rawBody) {
+        const status = response instanceof Response ? response.status : 0;
+        const statusText = response instanceof Response ? (response.statusText || "") : "";
+        const responseUrl = response instanceof Response ? (response.url || action || window.location.href) : (action || window.location.href);
+        const traceId = resolveAjaxResponseTraceId(response);
+        const message = buildNonJsonAjaxFailureMessage(response, rawBody);
+        const body = truncateDiagnosticBody(rawBody, 12000);
+        const diagnosticLines = [
+            `TimestampUtc: ${new Date().toISOString()}`,
+            "ErrorCode: NON_JSON_RESPONSE",
+            `TraceId: ${traceId || "-"}`,
+            `Request: ${(method || "POST").toUpperCase()} ${action || window.location.href}`,
+            `ResponseUrl: ${responseUrl}`,
+            `Status: ${status}${statusText ? ` ${statusText}` : ""}`,
+            `ContentType: ${contentType || "-"}`,
+            "Body:",
+            body || "<empty>"
+        ];
+
+        const payload = {
+            ok: false,
+            message,
+            errorCode: "NON_JSON_RESPONSE",
+            traceId,
+            diagnosticLog: diagnosticLines.join("\n"),
+            fieldErrors: {}
+        };
+
+        if (message.includes("token formuláře")) {
+            payload.fieldErrors = {
+                "__RequestVerificationToken": [
+                    "Token formuláře není platný nebo vypršel."
+                ]
+            };
+        }
+
+        return payload;
+    }
+
     function initModalAjaxSubmit() {
         if (!(document.body instanceof HTMLElement) || document.body.dataset.modalAjaxReady === "true") {
             return;
@@ -7572,11 +7673,16 @@
                 });
 
                 const contentType = (response.headers.get("content-type") || "").toLowerCase();
-                if (!contentType.includes("application/json")) {
-                    throw new Error("Server nevrátil JSON odpověď.");
+                const rawBody = await response.text();
+                const payload = contentType.includes("application/json")
+                    ? parseJsonPayload(rawBody)
+                    : null;
+                if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+                    target.dataset.recordEditorNavigating = "false";
+                    renderModalFormErrors(target, buildNonJsonAjaxErrorPayload(response, action, method, contentType, rawBody));
+                    return;
                 }
 
-                const payload = await response.json();
                 if (!response.ok || !payload || payload.ok !== true) {
                     target.dataset.recordEditorNavigating = "false";
                     renderModalFormErrors(target, payload || { message: "Uložení se nezdařilo." });

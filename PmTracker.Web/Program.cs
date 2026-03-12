@@ -1,10 +1,14 @@
 using Microsoft.AspNetCore.Server.IISIntegration;
+using PmTracker.Web.Filters;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options =>
+{
+    options.Filters.Add<AjaxAntiforgeryResultFilter>();
+});
 builder.Services.AddAuthentication(IISDefaults.AuthenticationScheme);
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
