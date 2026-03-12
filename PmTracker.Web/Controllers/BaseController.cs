@@ -27,6 +27,12 @@ public abstract class BaseController : Controller
 
     protected IPmTrackerDataStore DataStore => _dataStore;
 
+    protected DateTime GetLocalNow()
+    {
+        var timeProvider = HttpContext.RequestServices.GetService<TimeProvider>() ?? TimeProvider.System;
+        return timeProvider.GetLocalNow().LocalDateTime;
+    }
+
     protected bool IsAjaxRequest()
     {
         var header = HttpContext.Request.Headers["X-Requested-With"].ToString();
@@ -122,34 +128,15 @@ public abstract class BaseController : Controller
     protected BadRequestObjectResult AjaxInvalidModelResult(string? message = null)
     {
         var errorCode = AjaxErrorCodes.RequestValidationFailed;
-        var traceId = ResolveTraceId();
         var fieldErrors = BuildModelStateFieldErrors();
         var responseMessage = string.IsNullOrWhiteSpace(message) ? "Formulář obsahuje neplatné hodnoty." : message;
-        var diagnosticLog = BuildDiagnosticLog(
-            errorCode,
-            traceId,
+        return BadRequest(BuildAjaxFailurePayload(
             responseMessage,
+            errorCode,
             fieldErrors,
             details: "ModelState validation failed.",
-            exception: null);
-        LogAjaxFailure(
-            LogLevel.Warning,
-            errorCode,
-            traceId,
-            responseMessage,
-            fieldErrors,
-            diagnosticLog,
-            exception: null);
-
-        return BadRequest(new ModalSubmitResultViewModel
-        {
-            Ok = false,
-            Message = responseMessage,
-            ErrorCode = errorCode,
-            TraceId = traceId,
-            DiagnosticLog = diagnosticLog,
-            FieldErrors = fieldErrors
-        });
+            exception: null,
+            logLevel: LogLevel.Warning));
     }
 
     protected BadRequestObjectResult AjaxErrorResult(
@@ -159,65 +146,27 @@ public abstract class BaseController : Controller
         Dictionary<string, string[]>? fieldErrors = null,
         string? details = null)
     {
-        var traceId = ResolveTraceId();
         var resolvedFieldErrors = fieldErrors ?? new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
-        var diagnosticLog = BuildDiagnosticLog(
-            errorCode,
-            traceId,
+        return BadRequest(BuildAjaxFailurePayload(
             message,
+            errorCode,
             resolvedFieldErrors,
             details,
-            exception);
-        LogAjaxFailure(
-            exception is null ? LogLevel.Warning : LogLevel.Error,
-            errorCode,
-            traceId,
-            message,
-            resolvedFieldErrors,
-            diagnosticLog,
-            exception);
-
-        return BadRequest(new ModalSubmitResultViewModel
-        {
-            Ok = false,
-            Message = message,
-            ErrorCode = errorCode,
-            TraceId = traceId,
-            DiagnosticLog = diagnosticLog,
-            FieldErrors = resolvedFieldErrors
-        });
+            exception,
+            exception is null ? LogLevel.Warning : LogLevel.Error));
     }
 
     protected ObjectResult AjaxForbiddenResult(string message = "Nemáte oprávnění k provedení této operace.")
     {
         var errorCode = AjaxErrorCodes.OperationFailed;
-        var traceId = ResolveTraceId();
         var fieldErrors = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
-        var diagnosticLog = BuildDiagnosticLog(
-            errorCode,
-            traceId,
+        return StatusCode(StatusCodes.Status403Forbidden, BuildAjaxFailurePayload(
             message,
+            errorCode,
             fieldErrors,
             details: "Permission check failed for AJAX request.",
-            exception: null);
-        LogAjaxFailure(
-            LogLevel.Warning,
-            errorCode,
-            traceId,
-            message,
-            fieldErrors,
-            diagnosticLog,
-            exception: null);
-
-        return StatusCode(StatusCodes.Status403Forbidden, new ModalSubmitResultViewModel
-        {
-            Ok = false,
-            Message = message,
-            ErrorCode = errorCode,
-            TraceId = traceId,
-            DiagnosticLog = diagnosticLog,
-            FieldErrors = fieldErrors
-        });
+            exception: null,
+            logLevel: LogLevel.Warning));
     }
 
     protected JsonResult AjaxSuccessResult(
@@ -503,6 +452,42 @@ public abstract class BaseController : Controller
         return builder.ToString().TrimEnd();
     }
 
+    private ModalSubmitResultViewModel BuildAjaxFailurePayload(
+        string message,
+        string errorCode,
+        Dictionary<string, string[]> fieldErrors,
+        string? details,
+        Exception? exception,
+        LogLevel logLevel)
+    {
+        var traceId = ResolveTraceId();
+        var diagnosticLog = BuildDiagnosticLog(
+            errorCode,
+            traceId,
+            message,
+            fieldErrors,
+            details,
+            exception);
+        LogAjaxFailure(
+            logLevel,
+            errorCode,
+            traceId,
+            message,
+            fieldErrors,
+            diagnosticLog,
+            exception);
+
+        return new ModalSubmitResultViewModel
+        {
+            Ok = false,
+            Message = message,
+            ErrorCode = errorCode,
+            TraceId = traceId,
+            DiagnosticLog = diagnosticLog,
+            FieldErrors = fieldErrors
+        };
+    }
+
     private void LogAjaxFailure(
         LogLevel level,
         string errorCode,
@@ -542,11 +527,9 @@ public abstract class BaseController : Controller
             diagnosticLog);
     }
 
-    public override void OnActionExecuting(ActionExecutingContext context)
+    public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        var resolved = _userContextResolver.ResolveAsync(context.HttpContext, context.HttpContext.RequestAborted)
-            .GetAwaiter()
-            .GetResult();
+        var resolved = await _userContextResolver.ResolveAsync(context.HttpContext, context.HttpContext.RequestAborted);
 
         if (!resolved.IsSuccess || resolved.UserContext is null)
         {
@@ -572,6 +555,6 @@ public abstract class BaseController : Controller
         ViewBag.CurrentUserRoles = CurrentUserContext.RoleKody;
         ViewBag.IsGlobalAdmin = CurrentUserContext.IsSuperAdmin;
 
-        base.OnActionExecuting(context);
+        await next();
     }
 }

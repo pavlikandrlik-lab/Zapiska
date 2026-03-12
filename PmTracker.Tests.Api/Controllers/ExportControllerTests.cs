@@ -17,6 +17,29 @@ public sealed class ExportControllerTests
     }
 
     [Fact]
+    public async Task ProjektTisk_ShouldRedirectToProjectsIndex_WhenProjectDoesNotExist()
+    {
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Export/Projekt/999999/Tisk?asUser={_fixture.AdminOsobaId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        response.Headers.Location.Should().NotBeNull();
+        response.Headers.Location!.ToString().Should().Be("/");
+    }
+
+    [Fact]
+    public async Task ProjektTisk_ShouldReturnNotFound_WhenUserCannotAccessProject()
+    {
+        var userId = await _fixture.EnsurePersonAsync("ApiExportNoRead");
+        var projectId = await _fixture.EnsureProjectAsync("APIEXP_HIDE");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Export/Projekt/{projectId}/Tisk?asUser={userId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task JednaniTisk_ShouldRenderAttendanceWithoutProjectRoles_AndUseCommentHeaderOrderWithTextColor()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiExportOwner");
@@ -30,6 +53,14 @@ public sealed class ExportControllerTests
         {
             var meeting = await dbContext.Jednani.FirstAsync(x => x.Id == meetingId);
             meeting.DatumPlanovane = new DateTime(2026, 2, 17);
+            var record = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == recordId);
+            record.DatumZalozeni = new DateTime(2026, 2, 1);
+            record.DatumUkonceni = new DateTime(2026, 2, 28);
+            record.StavUkoluId = await dbContext.CiselnikStavuUkolu
+                .Where(x => !x.IsFinal)
+                .OrderBy(x => x.Id)
+                .Select(x => x.Id)
+                .FirstAsync();
 
             var presentStateId = await dbContext.CiselnikStavuUcasti
                 .Where(x => x.Kod == "PRESENT")

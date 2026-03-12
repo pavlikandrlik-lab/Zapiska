@@ -22,6 +22,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     private const string DefaultDelayBarvaHex = "#DC2626";
     private const byte RecordDisplayNumberTypeIncrement = 0;
     private const byte RecordDisplayNumberTypeMeeting = 1;
+    private static readonly IReadOnlyDictionary<int, int> EmptyIntMap = new Dictionary<int, int>();
     private static readonly (int Poradi, string Kod, string Nazev, string BarvaHex)[] DefaultHarmonogramKroky =
     [
         (1, "HS01_DURATION", "1. příprava zadání dodavateli", "#EF4444"),
@@ -42,6 +43,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     private readonly IRichTextContentService _richTextContentService;
     private readonly IPersonIdentityMatcher _personIdentityMatcher;
     private readonly ICommentAuthorizationPolicy _commentAuthorizationPolicy;
+    private readonly TimeProvider _timeProvider;
     private readonly IReadOnlyDictionary<string, Action<SaveCiselnikRowCommand>> _ciselnikSaveHandlers;
     private readonly IReadOnlyDictionary<string, Action<DeleteCiselnikRowCommand>> _ciselnikDeleteHandlers;
 
@@ -114,16 +116,21 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         ITextNormalizer textNormalizer,
         IRichTextContentService richTextContentService,
         IPersonIdentityMatcher personIdentityMatcher,
-        ICommentAuthorizationPolicy commentAuthorizationPolicy)
+        ICommentAuthorizationPolicy commentAuthorizationPolicy,
+        TimeProvider timeProvider)
     {
         _dbContext = dbContext;
         _textNormalizer = textNormalizer;
         _richTextContentService = richTextContentService;
         _personIdentityMatcher = personIdentityMatcher;
         _commentAuthorizationPolicy = commentAuthorizationPolicy;
+        _timeProvider = timeProvider;
         _ciselnikSaveHandlers = BuildCiselnikSaveHandlers();
         _ciselnikDeleteHandlers = BuildCiselnikDeleteHandlers();
     }
+
+    private DateTime GetLocalNow()
+        => _timeProvider.GetLocalNow().LocalDateTime;
 
     public CurrentUserContextViewModel BuildCurrentUserContext(string? asProfile)
     {
@@ -1050,7 +1057,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             JednaniMisto = null,
             JednaniStav = "Projekt",
             Vytvoril = currentUser.DisplayName,
-            VytvorenoDne = DateTime.Now,
+            VytvorenoDne = GetLocalNow(),
             SnapshotSummary = "Tisk kompletního projektu bez filtru.",
             PreparationSummary = null,
             ProjektoveRole = BuildProjectExportRoleRows(project.Id),
@@ -1087,7 +1094,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             JednaniMisto = meeting.Misto,
             JednaniStav = status?.Nazev ?? "-",
             Vytvoril = currentUser.DisplayName,
-            VytvorenoDne = DateTime.Now,
+            VytvorenoDne = GetLocalNow(),
             SnapshotSummary = string.Empty,
             PreparationSummary = null,
             ProjektoveRole = BuildProjectExportRoleRows(project.Id),
@@ -1127,7 +1134,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             JednaniMisto = lastMeeting?.Misto,
             JednaniStav = "Úkol",
             Vytvoril = currentUser.DisplayName,
-            VytvorenoDne = DateTime.Now,
+            VytvorenoDne = GetLocalNow(),
             SnapshotSummary = "Tisk jednoho úkolu.",
             PreparationSummary = null,
             ProjektoveRole = Array.Empty<PdfRoleAssignmentViewModel>(),
@@ -1263,7 +1270,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     ZaznamId = entity.Id,
                     PuvodniVlastnik = oldOwner,
                     NovyVlastnik = entity.VlastnikId,
-                    DatumZmeny = DateTime.Now
+                    DatumZmeny = GetLocalNow()
                 });
             }
 
@@ -1274,7 +1281,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     ZaznamId = entity.Id,
                     PuvodniDatum = oldDate.Date,
                     NoveDatum = entity.DatumUkonceni.Date,
-                    DatumZmeny = DateTime.Now,
+                    DatumZmeny = GetLocalNow(),
                     Duvod = "Úprava záznamu"
                 });
             }
@@ -1286,7 +1293,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     ZaznamId = entity.Id,
                     PuvodniSubsystem = oldSubsystem,
                     NovySubsystem = entity.SubsystemId,
-                    DatumZmeny = DateTime.Now
+                    DatumZmeny = GetLocalNow()
                 });
             }
 
@@ -1297,7 +1304,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     ZaznamId = entity.Id,
                     PuvodniTypId = oldType.Value,
                     NovyTypId = entity.AktualniTypUkoluId.Value,
-                    DatumZmeny = DateTime.Now,
+                    DatumZmeny = GetLocalNow(),
                     ZmenilOsobaId = currentUser.OsobaId
                 });
             }
@@ -2233,7 +2240,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             JednaniId = command.JednaniId,
             AutorOsobaId = currentUser.OsobaId,
             TextVyjadreni = normalizedText,
-            DatumVyjadreni = DateTime.Now
+            DatumVyjadreni = GetLocalNow()
         };
 
         _dbContext.Vyjadreni.Add(note);
@@ -2276,7 +2283,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
         var old = JsonSerializer.Serialize(comment);
         comment.TextVyjadreni = normalizedText;
-        comment.DatumVyjadreni = DateTime.Now;
+        comment.DatumVyjadreni = GetLocalNow();
         _dbContext.SaveChanges();
         WriteAudit(currentUser.OsobaId, "vyjadreni", comment.Id.ToString(CultureInfo.InvariantCulture), "update", old, JsonSerializer.Serialize(comment));
     }
@@ -3619,6 +3626,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .Where(x => x.ProjektId == projectId)
             .ToList();
         records = OrderRecordsByVisibleNumber(records).ToList();
+        var recordIds = records.Select(record => record.Id).ToArray();
 
         var categories = _dbContext.CiselnikKategoriiZaznamu.AsNoTracking().ToDictionary(x => x.Id);
         var taskTypes = _dbContext.CiselnikTypuUkolu.AsNoTracking().ToDictionary(x => x.Id);
@@ -3628,27 +3636,27 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var people = _dbContext.Osoby.AsNoTracking().ToDictionary(x => x.Id);
 
         var ownerHistoryByRecord = _dbContext.ZaznamHistorieVlastnik.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .OrderBy(x => x.DatumZmeny)
             .ToList()
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(group => group.Key, group => group.ToList());
 
         var termHistoryByRecord = _dbContext.ZaznamHistorieTerminu.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .OrderBy(x => x.DatumZmeny)
             .ToList()
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(group => group.Key, group => group.ToList());
 
         var subsystemHistoryByRecord = _dbContext.ZaznamHistorieSubsystem.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .OrderBy(x => x.DatumZmeny)
             .ToList()
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(group => group.Key, group => group.ToList());
         var typeHistoryByRecord = _dbContext.ZaznamHistorieZmenTypu.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .OrderBy(x => x.DatumZmeny)
             .ToList()
             .GroupBy(x => x.ZaznamId)
@@ -3657,7 +3665,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var extTypeById = _dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().ToDictionary(x => x.Id);
         var vyzvaById = _dbContext.CiselnikVyzvy.AsNoTracking().ToDictionary(x => x.Id);
         var externalByRecord = _dbContext.ZaznamExterniOdkazy.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .OrderBy(x => x.Id)
             .ToList()
             .GroupBy(x => x.ZaznamId)
@@ -3666,13 +3674,13 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var organizations = _dbContext.CiselnikOrganizace.AsNoTracking().ToDictionary(x => x.Id);
         var orgUnits = _dbContext.CiselnikOrganizacniCelky.AsNoTracking().ToDictionary(x => x.Id);
         var collaborationByRecord = _dbContext.ZaznamSpoluprace.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .ToList()
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(group => group.Key, group => group.ToList());
 
         var comments = _dbContext.Vyjadreni.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .OrderBy(x => x.Id)
             .ToList();
 
@@ -3685,11 +3693,21 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
         return records.Select(record =>
         {
-            var ownerHistory = ownerHistoryByRecord.GetValueOrDefault(record.Id, new List<ZaznamHistorieVlastnikEntity>());
-            var termHistory = termHistoryByRecord.GetValueOrDefault(record.Id, new List<ZaznamHistorieTerminuEntity>());
-            var subsystemHistory = subsystemHistoryByRecord.GetValueOrDefault(record.Id, new List<ZaznamHistorieSubsystemEntity>());
-            var taskTypeHistory = typeHistoryByRecord.GetValueOrDefault(record.Id, new List<ZaznamHistorieZmenTypuEntity>());
-            var commentsForRecord = commentByRecord.GetValueOrDefault(record.Id, new List<VyjadreniEntity>());
+            IReadOnlyList<ZaznamHistorieVlastnikEntity> ownerHistory = ownerHistoryByRecord.TryGetValue(record.Id, out var ownerHistoryValues)
+                ? ownerHistoryValues
+                : Array.Empty<ZaznamHistorieVlastnikEntity>();
+            IReadOnlyList<ZaznamHistorieTerminuEntity> termHistory = termHistoryByRecord.TryGetValue(record.Id, out var termHistoryValues)
+                ? termHistoryValues
+                : Array.Empty<ZaznamHistorieTerminuEntity>();
+            IReadOnlyList<ZaznamHistorieSubsystemEntity> subsystemHistory = subsystemHistoryByRecord.TryGetValue(record.Id, out var subsystemHistoryValues)
+                ? subsystemHistoryValues
+                : Array.Empty<ZaznamHistorieSubsystemEntity>();
+            IReadOnlyList<ZaznamHistorieZmenTypuEntity> taskTypeHistory = typeHistoryByRecord.TryGetValue(record.Id, out var taskTypeHistoryValues)
+                ? taskTypeHistoryValues
+                : Array.Empty<ZaznamHistorieZmenTypuEntity>();
+            IReadOnlyList<VyjadreniEntity> commentsForRecord = commentByRecord.TryGetValue(record.Id, out var commentValues)
+                ? commentValues
+                : Array.Empty<VyjadreniEntity>();
             var category = categories.GetValueOrDefault(record.KategorieId);
             var isTask = IsTaskCategory(category?.Kod, category?.Nazev);
 
@@ -3740,7 +3758,10 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     && state.Kod.Equals("DRAFT", StringComparison.OrdinalIgnoreCase);
             });
 
-            var externalLinks = externalByRecord.GetValueOrDefault(record.Id, new List<ZaznamExterniOdkazEntity>())
+            IReadOnlyList<ZaznamExterniOdkazEntity> externalByRecordValues = externalByRecord.TryGetValue(record.Id, out var externalValues)
+                ? externalValues
+                : Array.Empty<ZaznamExterniOdkazEntity>();
+            var externalLinks = externalByRecordValues
                 .Select(link =>
                 {
                     var ticketId = ExtractServiceDeskTicketId(link.Cislo);
@@ -3761,7 +3782,10 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 })
                 .ToList();
 
-            var collaboration = collaborationByRecord.GetValueOrDefault(record.Id, new List<ZaznamSpolupraceEntity>())
+            IReadOnlyList<ZaznamSpolupraceEntity> collaborationValues = collaborationByRecord.TryGetValue(record.Id, out var collaborationRows)
+                ? collaborationRows
+                : Array.Empty<ZaznamSpolupraceEntity>();
+            var collaboration = collaborationValues
                 .Select(x =>
                 {
                     var person = people.GetValueOrDefault(x.OsobaId);
@@ -3867,7 +3891,9 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             {
                 var deadline = (record.AktualniTermin ?? record.DatumZalozeni).Date;
                 var schema = GetSchemaForRecord(record.HarmonogramSablonaVerze, schemaCache);
-                var harmonogramHodnoty = harmonogramByRecord.GetValueOrDefault(record.Id, new Dictionary<int, int>());
+                var harmonogramHodnoty = harmonogramByRecord.TryGetValue(record.Id, out var harmonogramValues)
+                    ? harmonogramValues
+                    : EmptyIntMap;
                 var vypocet = BuildHarmonogramVypocet(record.DatumZalozeni, schema.Kroky, harmonogramHodnoty);
                 var souhrn = BuildHarmonogramSouhrn(vypocet, deadline);
                 var owner = ownerById.GetValueOrDefault(record.AktualniVlastnikId);
@@ -5205,8 +5231,9 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             Popis = record.Nazev,
             Zapis = string.Empty,
             SubsystemLeadEquivalentOsobaIds = leadEquivalentOsobaIdsBySubsystem.GetValueOrDefault(record.SubsystemId, []),
-            Vyjadreni = commentsByRecord
-                .GetValueOrDefault(record.Id, new List<VyjadreniEntity>())
+            Vyjadreni = (commentsByRecord.TryGetValue(record.Id, out var commentsForRecord)
+                    ? (IEnumerable<VyjadreniEntity>)commentsForRecord
+                    : Array.Empty<VyjadreniEntity>())
                 .Select(comment => new JednaniVyjadreniViewModel
                 {
                     Id = comment.Id,
@@ -5806,6 +5833,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .Where(x => !specificRecordId.HasValue || x.Id == specificRecordId.Value)
             .ToList();
         records = OrderRecordsByVisibleNumber(records).ToList();
+        var recordIds = records.Select(record => record.Id).ToArray();
 
         var categories = _dbContext.CiselnikKategoriiZaznamu.AsNoTracking().ToDictionary(x => x.Id);
         var taskTypes = _dbContext.CiselnikTypuUkolu.AsNoTracking().ToDictionary(x => x.Id);
@@ -5814,7 +5842,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var people = _dbContext.Osoby.AsNoTracking().ToDictionary(x => x.Id);
 
         var comments = _dbContext.Vyjadreni.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .ToList();
 
         var meetings = _dbContext.Jednani.AsNoTracking()
@@ -5826,19 +5854,19 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var externalTypeMap = _dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().ToDictionary(x => x.Id);
 
         var externalLinksByRecord = _dbContext.ZaznamExterniOdkazy.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .ToList()
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(group => group.Key, group => group.ToList());
 
         var collaboration = _dbContext.ZaznamSpoluprace.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .ToList()
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(group => group.Key, group => group.ToList());
 
         var termHistory = _dbContext.ZaznamHistorieTerminu.AsNoTracking()
-            .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+            .Where(x => recordIds.Contains(x.ZaznamId))
             .OrderByDescending(x => x.DatumZmeny)
             .ToList()
             .GroupBy(x => x.ZaznamId)
@@ -5857,7 +5885,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         if (applyMeetingSnapshotRules && anchorMeeting is not null)
         {
             var statusHistoryByRecord = _dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking()
-                .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+                .Where(x => recordIds.Contains(x.ZaznamId))
                 .OrderByDescending(x => x.DatumZmeny)
                 .ThenByDescending(x => x.Id)
                 .ToList()
@@ -5871,7 +5899,9 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 .Where(record => IsRecordVisibleForMeetingPrint(
                     record,
                     taskStates,
-                    statusHistoryByRecord.GetValueOrDefault(record.Id, new List<ZaznamHistorieStavuZaznamuEntity>()),
+                    statusHistoryByRecord.TryGetValue(record.Id, out var statusHistoryValues)
+                        ? statusHistoryValues
+                        : Array.Empty<ZaznamHistorieStavuZaznamuEntity>(),
                     anchorMeetingDate,
                     previousMeetingDate))
                 .ToList();
@@ -5891,7 +5921,9 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
 
         var exportRows = records.Select(record =>
         {
-            var commentsForRecord = commentGroups.GetValueOrDefault(record.Id, new List<VyjadreniEntity>());
+            IReadOnlyList<VyjadreniEntity> commentsForRecord = commentGroups.TryGetValue(record.Id, out var groupedComments)
+                ? groupedComments
+                : Array.Empty<VyjadreniEntity>();
             var orderedCommentsForRecord = OrderCommentsForExport(commentsForRecord, meetingById);
             var selectedComments = limitComments
                 ? ApplyCommentLimit(orderedCommentsForRecord)
@@ -5919,7 +5951,10 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 };
             }).ToList();
 
-            var external = externalLinksByRecord.GetValueOrDefault(record.Id, new List<ZaznamExterniOdkazEntity>())
+            IReadOnlyList<ZaznamExterniOdkazEntity> externalRows = externalLinksByRecord.TryGetValue(record.Id, out var externalValues)
+                ? externalValues
+                : Array.Empty<ZaznamExterniOdkazEntity>();
+            var external = externalRows
                 .Select(link =>
                 {
                     var typeCode = externalTypeMap.GetValueOrDefault(link.TypOdkazuId)?.Kod ?? "-";
@@ -5927,13 +5962,19 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                 })
                 .ToList();
 
-            var peopleCollab = collaboration.GetValueOrDefault(record.Id, new List<ZaznamSpolupraceEntity>())
+            IReadOnlyList<ZaznamSpolupraceEntity> collaborationRows = collaboration.TryGetValue(record.Id, out var collaborationValues)
+                ? collaborationValues
+                : Array.Empty<ZaznamSpolupraceEntity>();
+            var peopleCollab = collaborationRows
                 .Select(item => BuildDisplayNameFromOsoba(people.GetValueOrDefault(item.OsobaId)))
                 .Distinct(Ci)
                 .OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
 
-            var historyDates = termHistory.GetValueOrDefault(record.Id, new List<ZaznamHistorieTerminuEntity>())
+            IReadOnlyList<ZaznamHistorieTerminuEntity> termHistoryRows = termHistory.TryGetValue(record.Id, out var termHistoryValues)
+                ? termHistoryValues
+                : Array.Empty<ZaznamHistorieTerminuEntity>();
+            var historyDates = termHistoryRows
                 .Select(x => x.PuvodniDatum)
                 .Distinct()
                 .OrderByDescending(x => x)

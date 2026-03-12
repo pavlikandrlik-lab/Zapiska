@@ -12,6 +12,7 @@
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/08-operations-runbooks.md`
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/09-testing-quality.md`
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/10-troubleshooting-recovery.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/11-architecture-refactor-prompt-sequence.md`
 
 ## 2. Uživatelská dokumentace
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/user-guide.md`

@@ -25,7 +25,7 @@ internal static class IntegrationTestHelper
         var identityMatcher = new PersonIdentityMatcher(textNormalizer);
         var permissionEvaluation = new PermissionEvaluationService();
         var commentAuthorization = new CommentAuthorizationPolicy(permissionEvaluation);
-        return new SqlServerDataStore(dbContext, textNormalizer, richTextContentService, identityMatcher, commentAuthorization);
+        return new SqlServerDataStore(dbContext, textNormalizer, richTextContentService, identityMatcher, commentAuthorization, TimeProvider.System);
     }
 
     public static CurrentUserContextViewModel BuildUser(

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using PmTracker.Web.Data;
 using PmTracker.Web.Services.ActiveDirectory;
@@ -17,6 +18,7 @@ public static class DataStoreServiceCollectionExtensions
 {
     public static IServiceCollection AddPmTrackerDataStore(this IServiceCollection services, IConfiguration configuration)
     {
+        services.TryAddSingleton(TimeProvider.System);
         services.Configure<PmTrackerDataOptions>(configuration.GetSection(PmTrackerDataOptions.SectionName));
         services.Configure<ActiveDirectoryOptions>(configuration.GetSection(ActiveDirectoryOptions.SectionName));
         services.AddDbContext<PmTrackerDbContext>((sp, optionsBuilder) =>

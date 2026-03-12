@@ -168,6 +168,7 @@ public sealed class ProjektyController : BaseController
         var detail = DataStore.BuildProjektDetail(projektId);
         var nextMeetingNumber = detail.Jednani.Any() ? detail.Jednani.Max(item => item.CisloJednani) + 1 : 1;
         var defaultStatus = detail.StavyJednani.FirstOrDefault()?.Value ?? string.Empty;
+        var localNow = GetLocalNow();
 
         var model = new MeetingModalViewModel
         {
@@ -176,8 +177,8 @@ public sealed class ProjektyController : BaseController
             {
                 ProjektId = projektId,
                 CisloJednani = nextMeetingNumber,
-                DatumPlanovane = DateTime.Today,
-                CasZacatek = TimeOnly.FromDateTime(DateTime.Now),
+                DatumPlanovane = localNow.Date,
+                CasZacatek = TimeOnly.FromDateTime(localNow),
                 StavJednani = defaultStatus
             },
             ExistingMeetingNumbersCsv = string.Join(",", detail.Jednani.Select(item => item.CisloJednani).Distinct().OrderBy(item => item)),

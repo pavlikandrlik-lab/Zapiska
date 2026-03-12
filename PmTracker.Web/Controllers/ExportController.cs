@@ -24,14 +24,10 @@ public sealed class ExportController : BaseController
     [HttpGet("Projekt/{projektId:int}/Tisk")]
     public IActionResult ProjektTisk(int projektId, bool autoPrint = true)
     {
-        if (!DataStore.ProjektExists(projektId))
+        var accessCheck = EnsureProjectReadable(projektId);
+        if (accessCheck is not null)
         {
-            return RedirectToAction("Index", "Projekty");
-        }
-
-        if (!CurrentUserContext.CanAccessProject(projektId))
-        {
-            return NotFound();
+            return accessCheck;
         }
 
         var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint);
@@ -41,14 +37,10 @@ public sealed class ExportController : BaseController
     [HttpGet("Projekt/{projektId:int}/Word")]
     public IActionResult ProjektWord(int projektId)
     {
-        if (!DataStore.ProjektExists(projektId))
+        var accessCheck = EnsureProjectReadable(projektId);
+        if (accessCheck is not null)
         {
-            return RedirectToAction("Index", "Projekty");
-        }
-
-        if (!CurrentUserContext.CanAccessProject(projektId))
-        {
-            return NotFound();
+            return accessCheck;
         }
 
         var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint: false);
@@ -59,14 +51,10 @@ public sealed class ExportController : BaseController
     public IActionResult JednaniTisk(int jednaniId, bool autoPrint = true)
     {
         var detail = DataStore.BuildJednaniDetail(jednaniId);
-        if (!DataStore.ProjektExists(detail.ProjektId))
+        var accessCheck = EnsureProjectReadable(detail.ProjektId);
+        if (accessCheck is not null)
         {
-            return RedirectToAction("Index", "Projekty");
-        }
-
-        if (!CurrentUserContext.CanAccessProject(detail.ProjektId))
-        {
-            return NotFound();
+            return accessCheck;
         }
 
         var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint);
@@ -77,14 +65,10 @@ public sealed class ExportController : BaseController
     public IActionResult JednaniWord(int jednaniId)
     {
         var detail = DataStore.BuildJednaniDetail(jednaniId);
-        if (!DataStore.ProjektExists(detail.ProjektId))
+        var accessCheck = EnsureProjectReadable(detail.ProjektId);
+        if (accessCheck is not null)
         {
-            return RedirectToAction("Index", "Projekty");
-        }
-
-        if (!CurrentUserContext.CanAccessProject(detail.ProjektId))
-        {
-            return NotFound();
+            return accessCheck;
         }
 
         var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint: false);
@@ -94,14 +78,10 @@ public sealed class ExportController : BaseController
     [HttpGet("Ukol/{zaznamId:int}/Tisk")]
     public IActionResult UkolTisk(int zaznamId, int projektId, bool autoPrint = true)
     {
-        if (!DataStore.ProjektExists(projektId))
+        var accessCheck = EnsureProjectReadable(projektId);
+        if (accessCheck is not null)
         {
-            return RedirectToAction("Index", "Projekty");
-        }
-
-        if (!CurrentUserContext.CanAccessProject(projektId))
-        {
-            return NotFound();
+            return accessCheck;
         }
 
         var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint);
@@ -111,14 +91,10 @@ public sealed class ExportController : BaseController
     [HttpGet("Ukol/{zaznamId:int}/Word")]
     public IActionResult UkolWord(int zaznamId, int projektId)
     {
-        if (!DataStore.ProjektExists(projektId))
+        var accessCheck = EnsureProjectReadable(projektId);
+        if (accessCheck is not null)
         {
-            return RedirectToAction("Index", "Projekty");
-        }
-
-        if (!CurrentUserContext.CanAccessProject(projektId))
-        {
-            return NotFound();
+            return accessCheck;
         }
 
         var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint: false);
@@ -156,13 +132,28 @@ public sealed class ExportController : BaseController
     private FileResult BuildWordResult(PdfExportTemplateViewModel model)
     {
         var payload = _wordExportService.BuildDocument(model);
-        return File(payload, WordContentType, BuildWordFileName(model));
+        return File(payload, WordContentType, BuildWordFileName(model, GetLocalNow()));
     }
 
-    private static string BuildWordFileName(PdfExportTemplateViewModel model)
+    private IActionResult? EnsureProjectReadable(int projektId)
+    {
+        if (!DataStore.ProjektExists(projektId))
+        {
+            return RedirectToAction("Index", "Projekty");
+        }
+
+        if (!CurrentUserContext.CanAccessProject(projektId))
+        {
+            return NotFound();
+        }
+
+        return null;
+    }
+
+    private static string BuildWordFileName(PdfExportTemplateViewModel model, DateTime localNow)
     {
         var projectCode = string.IsNullOrWhiteSpace(model.ProjektZkratka) ? "Projekt" : model.ProjektZkratka.Trim();
         var safeProjectCode = string.Concat(projectCode.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
-        return $"Zapis_{safeProjectCode}_{DateTime.Now:yyyyMMdd_HHmm}.docx";
+        return $"Zapis_{safeProjectCode}_{localNow:yyyyMMdd_HHmm}.docx";
     }
 }
