@@ -9,6 +9,8 @@ public sealed class DocumentationPageViewModel
     public required string CanonicalPath { get; init; }
     public required string HtmlContent { get; init; }
     public IReadOnlyList<DocumentationNavItemViewModel> Navigation { get; init; } = Array.Empty<DocumentationNavItemViewModel>();
+    public IReadOnlyList<DocumentationNavItemViewModel> TechnicalNavigation { get; init; } = Array.Empty<DocumentationNavItemViewModel>();
+    public IReadOnlyList<DocumentationNavItemViewModel> SupportingNavigation { get; init; } = Array.Empty<DocumentationNavItemViewModel>();
     public IReadOnlyList<DocumentationTocItemViewModel> TocItems { get; init; } = Array.Empty<DocumentationTocItemViewModel>();
 }
 

@@ -19,30 +19,82 @@ public sealed class DokumentaceController : BaseController
         _documentationService = documentationService;
     }
 
-    [HttpGet("Technicka-dokumentace")]
-    public IActionResult TechnickaDokumentace()
+    [HttpGet("")]
+    public IActionResult Index()
     {
-        return RenderPage("technicka");
+        return RedirectToAction(nameof(StromDokumentace));
     }
 
-    [HttpGet("Instalacni-prirucka")]
-    public IActionResult InstalacniPrirucka()
+    [HttpGet("Technicka/Strom-dokumentace")]
+    public IActionResult StromDokumentace()
     {
-        // Backward-compatible route: installation docs are kept as markdown-only,
-        // so in-app navigation points users to technical docs instead.
-        return RedirectToAction(nameof(TechnickaDokumentace));
+        return RenderPage("tech-documentation-tree");
     }
 
-    [HttpGet("Administracni-prirucka")]
-    public IActionResult AdministracniPrirucka()
+    [HttpGet("Technicka/Systemovy-kontext")]
+    public IActionResult SystemovyKontext()
     {
-        return RenderPage("admin");
+        return RenderPage("tech-system-context");
+    }
+
+    [HttpGet("Technicka/Architektura")]
+    public IActionResult Architektura()
+    {
+        return RenderPage("tech-architecture");
+    }
+
+    [HttpGet("Technicka/Runtime-konfigurace")]
+    public IActionResult RuntimeKonfigurace()
+    {
+        return RenderPage("tech-runtime-configuration");
+    }
+
+    [HttpGet("Technicka/Instalace-a-deployment-iis")]
+    public IActionResult InstalaceADeploymentIis()
+    {
+        return RenderPage("tech-installation-deployment-iis");
+    }
+
+    [HttpGet("Technicka/Web-server-iis")]
+    public IActionResult WebServerIis()
+    {
+        return RenderPage("tech-web-server-iis-config");
+    }
+
+    [HttpGet("Technicka/Databaze-bootstrap-a-migrace")]
+    public IActionResult DatabazeBootstrapAMigrace()
+    {
+        return RenderPage("tech-database-bootstrap-migrations");
+    }
+
+    [HttpGet("Technicka/Bezpecnost-a-opravneni")]
+    public IActionResult BezpecnostAOpravneni()
+    {
+        return RenderPage("tech-security-authz");
+    }
+
+    [HttpGet("Technicka/Provozni-runbooky")]
+    public IActionResult ProvozniRunbooky()
+    {
+        return RenderPage("tech-operations-runbooks");
+    }
+
+    [HttpGet("Technicka/Testovani-a-kvalita")]
+    public IActionResult TestovaniAKvalita()
+    {
+        return RenderPage("tech-testing-quality");
+    }
+
+    [HttpGet("Technicka/Troubleshooting-a-recovery")]
+    public IActionResult TroubleshootingARecovery()
+    {
+        return RenderPage("tech-troubleshooting-recovery");
     }
 
     [HttpGet("Uzivatelska-prirucka")]
     public IActionResult UzivatelskaPrirucka()
     {
-        return RenderPage("uzivatelska");
+        return RenderPage("user-guide");
     }
 
     [HttpGet("qa")]

@@ -7,6 +7,14 @@
     const projectListHideDoneStorageKey = "pmtracker.projects.hideDone";
     const projectListHideDeletedStorageKey = "pmtracker.projects.hideDeleted";
     const recordEditorReturnStateStoragePrefix = "pmtracker.recordEditor.returnState.project.";
+    const recordEditorDraftStoragePrefix = "pmtracker.recordEditor.draft.";
+    const recordEditorDraftTtlMs = 12 * 60 * 60 * 1000;
+    const sessionStaleErrorCode = "SESSION_STALE_CLIENT_BLOCK";
+    const sessionExpiredErrorCode = "SESSION_EXPIRED";
+    const keepAliveEndpointPath = "/App/KeepAlive";
+    const keepAliveIntervalMs = 5 * 60 * 1000;
+    const keepAliveTimeoutMs = 10 * 1000;
+    const keepAliveFailureThreshold = 2;
     const mediaDark = window.matchMedia("(prefers-color-scheme: dark)");
     const modalState = {
         lastTrigger: null
@@ -21,6 +29,15 @@
         chooserTrigger: null,
         closeGuard: null,
         closeGuardTrigger: null
+    };
+    const sessionState = {
+        intervalId: 0,
+        inFlightPromise: null,
+        stale: false,
+        consecutiveFailures: 0,
+        lastSuccessUtc: "",
+        lastTraceId: "",
+        lastFailureReason: ""
     };
     const floatingPanelRegistry = new Set();
     let rainbowMeasureCanvas = null;
@@ -6278,6 +6295,356 @@
         return entries.join("&");
     }
 
+    function getRecordEditorDraftStorageKey(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return "";
+        }
+
+        const projectId = Number.parseInt(form.dataset.recordEditorProjectId || "", 10);
+        if (!Number.isInteger(projectId) || projectId <= 0) {
+            return "";
+        }
+
+        const idInput = form.querySelector('input[name="Id"]');
+        const rawRecordId = idInput instanceof HTMLInputElement
+            ? idInput.value.trim()
+            : "";
+        const recordId = rawRecordId || "new";
+        const presentation = (form.dataset.recordEditorPresentation || "modal").trim().toLowerCase();
+        return `${recordEditorDraftStoragePrefix}${projectId}.${recordId}.${presentation}`;
+    }
+
+    function buildRecordEditorDraftValues(form) {
+        const values = {};
+        if (!(form instanceof HTMLFormElement)) {
+            return values;
+        }
+
+        const formData = new FormData(form);
+        formData.forEach((value, key) => {
+            if (shouldIgnoreRecordEditorField(key) || value instanceof File) {
+                return;
+            }
+
+            const normalized = String(value ?? "");
+            if (!Array.isArray(values[key])) {
+                values[key] = [];
+            }
+            values[key].push(normalized);
+        });
+
+        return values;
+    }
+
+    function buildRecordEditorDraftSnapshotFromValues(values) {
+        if (!values || typeof values !== "object") {
+            return "";
+        }
+
+        const entries = [];
+        Object.entries(values).forEach(([key, list]) => {
+            if (shouldIgnoreRecordEditorField(key) || !Array.isArray(list)) {
+                return;
+            }
+
+            list.forEach((value) => {
+                entries.push(`${key}=${String(value ?? "")}`);
+            });
+        });
+
+        entries.sort();
+        return entries.join("&");
+    }
+
+    function normalizeRecordEditorDraftValues(rawValues) {
+        if (!rawValues || typeof rawValues !== "object") {
+            return {};
+        }
+
+        const normalized = {};
+        Object.entries(rawValues).forEach(([key, list]) => {
+            if (shouldIgnoreRecordEditorField(key)) {
+                return;
+            }
+
+            if (Array.isArray(list)) {
+                const values = list.map((item) => String(item ?? ""));
+                normalized[key] = values;
+                return;
+            }
+
+            normalized[key] = [String(list ?? "")];
+        });
+
+        return normalized;
+    }
+
+    function clearRecordEditorDraftSaveTimer(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const timerId = Number.parseInt(form.dataset.recordEditorDraftTimerId || "", 10);
+        if (Number.isFinite(timerId) && timerId > 0) {
+            window.clearTimeout(timerId);
+        }
+        delete form.dataset.recordEditorDraftTimerId;
+    }
+
+    function clearRecordEditorDraft(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        clearRecordEditorDraftSaveTimer(form);
+        const storageKey = getRecordEditorDraftStorageKey(form);
+        if (!storageKey) {
+            return;
+        }
+
+        sessionStorage.removeItem(storageKey);
+    }
+
+    function saveRecordEditorDraft(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        if (form.dataset.recordEditorNavigating === "true") {
+            return;
+        }
+
+        const storageKey = getRecordEditorDraftStorageKey(form);
+        if (!storageKey) {
+            return;
+        }
+
+        if (!isRecordEditorFormDirty(form)) {
+            sessionStorage.removeItem(storageKey);
+            return;
+        }
+
+        const values = buildRecordEditorDraftValues(form);
+        const snapshot = buildRecordEditorDraftSnapshotFromValues(values);
+        if (!snapshot) {
+            sessionStorage.removeItem(storageKey);
+            return;
+        }
+
+        const payload = {
+            version: 1,
+            savedAtUtc: new Date().toISOString(),
+            values
+        };
+        sessionStorage.setItem(storageKey, JSON.stringify(payload));
+    }
+
+    function scheduleRecordEditorDraftSave(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        clearRecordEditorDraftSaveTimer(form);
+        const timerId = window.setTimeout(() => {
+            delete form.dataset.recordEditorDraftTimerId;
+            saveRecordEditorDraft(form);
+        }, 1500);
+        form.dataset.recordEditorDraftTimerId = String(timerId);
+    }
+
+    function readRecordEditorDraft(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return null;
+        }
+
+        const storageKey = getRecordEditorDraftStorageKey(form);
+        if (!storageKey) {
+            return null;
+        }
+
+        const raw = sessionStorage.getItem(storageKey);
+        if (!raw) {
+            return null;
+        }
+
+        try {
+            const parsed = JSON.parse(raw);
+            const savedAtUtc = typeof parsed.savedAtUtc === "string" ? parsed.savedAtUtc : "";
+            const savedAtMs = savedAtUtc ? Date.parse(savedAtUtc) : NaN;
+            if (!Number.isFinite(savedAtMs) || (Date.now() - savedAtMs) > recordEditorDraftTtlMs) {
+                sessionStorage.removeItem(storageKey);
+                return null;
+            }
+
+            const values = normalizeRecordEditorDraftValues(parsed.values);
+            const snapshot = buildRecordEditorDraftSnapshotFromValues(values);
+            if (!snapshot) {
+                sessionStorage.removeItem(storageKey);
+                return null;
+            }
+
+            return {
+                key: storageKey,
+                values,
+                snapshot
+            };
+        } catch (error) {
+            sessionStorage.removeItem(storageKey);
+            return null;
+        }
+    }
+
+    function setRecordEditorRichTextValue(textarea, nextValue) {
+        if (!(textarea instanceof HTMLTextAreaElement)) {
+            return;
+        }
+
+        const normalized = String(nextValue ?? "");
+        textarea.value = normalized;
+        const editor = textarea._richTextEditor;
+        if (!editor) {
+            return;
+        }
+
+        if (!normalized.trim()) {
+            if (typeof editor.setText === "function") {
+                editor.setText("");
+            }
+            return;
+        }
+
+        if (looksLikeHtml(normalized)
+            && editor.clipboard
+            && typeof editor.clipboard.dangerouslyPasteHTML === "function") {
+            editor.clipboard.dangerouslyPasteHTML(normalized);
+            return;
+        }
+
+        if (typeof editor.setText === "function") {
+            editor.setText(normalized);
+        }
+    }
+
+    function applyRecordEditorDraft(form, values) {
+        if (!(form instanceof HTMLFormElement) || !values || typeof values !== "object") {
+            return false;
+        }
+
+        const controls = Array.from(form.querySelectorAll("[name]"))
+            .filter((control) =>
+                control instanceof HTMLInputElement
+                || control instanceof HTMLTextAreaElement
+                || control instanceof HTMLSelectElement);
+        if (controls.length === 0) {
+            return false;
+        }
+
+        const groupedControls = new Map();
+        controls.forEach((control) => {
+            const name = control.getAttribute("name") || "";
+            if (!name || shouldIgnoreRecordEditorField(name)) {
+                return;
+            }
+
+            if (!groupedControls.has(name)) {
+                groupedControls.set(name, []);
+            }
+            groupedControls.get(name).push(control);
+        });
+
+        groupedControls.forEach((group, name) => {
+            const incoming = Array.isArray(values[name])
+                ? values[name].map((item) => String(item ?? ""))
+                : [];
+            if (group.length === 0) {
+                return;
+            }
+
+            const first = group[0];
+            if (first instanceof HTMLInputElement && first.type === "radio") {
+                group.forEach((radio) => {
+                    if (radio instanceof HTMLInputElement) {
+                        radio.checked = incoming.includes(radio.value);
+                    }
+                });
+                return;
+            }
+
+            if (first instanceof HTMLInputElement && first.type === "checkbox") {
+                group.forEach((checkbox) => {
+                    if (checkbox instanceof HTMLInputElement) {
+                        checkbox.checked = incoming.includes(checkbox.value);
+                    }
+                });
+                return;
+            }
+
+            if (first instanceof HTMLSelectElement && first.multiple) {
+                const selected = new Set(incoming);
+                group.forEach((selectControl) => {
+                    if (!(selectControl instanceof HTMLSelectElement)) {
+                        return;
+                    }
+
+                    Array.from(selectControl.options).forEach((option) => {
+                        option.selected = selected.has(option.value);
+                    });
+                });
+                return;
+            }
+
+            const nextValue = incoming.length > 0 ? incoming[0] : "";
+            group.forEach((control) => {
+                if (control instanceof HTMLTextAreaElement && control.dataset.richText === "true") {
+                    setRecordEditorRichTextValue(control, nextValue);
+                    return;
+                }
+
+                if (control instanceof HTMLInputElement
+                    || control instanceof HTMLTextAreaElement
+                    || control instanceof HTMLSelectElement) {
+                    control.value = nextValue;
+                }
+            });
+        });
+
+        controls.forEach((control) => {
+            if (!(control instanceof HTMLElement)) {
+                return;
+            }
+
+            control.dispatchEvent(new Event("input", { bubbles: true }));
+            control.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+
+        return true;
+    }
+
+    function maybeRestoreRecordEditorDraft(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const draft = readRecordEditorDraft(form);
+        if (!draft) {
+            return;
+        }
+
+        const initialSnapshot = form.dataset.recordEditorSnapshot || "";
+        if (!draft.snapshot || draft.snapshot === initialSnapshot) {
+            clearRecordEditorDraft(form);
+            return;
+        }
+
+        const shouldRestore = window.confirm("Byla nalezena rozpracovaná verze záznamu. Chcete ji obnovit?");
+        if (!shouldRestore) {
+            clearRecordEditorDraft(form);
+            return;
+        }
+
+        applyRecordEditorDraft(form, draft.values);
+    }
+
     function markRecordEditorFormClean(form) {
         if (!(form instanceof HTMLFormElement)) {
             return;
@@ -6300,6 +6667,7 @@
         }
 
         form.dataset.recordEditorNavigating = "true";
+        clearRecordEditorDraft(form);
         markRecordEditorFormClean(form);
     }
 
@@ -6449,11 +6817,19 @@
 
             form.addEventListener("submit", () => {
                 form.dataset.recordEditorNavigating = "true";
+                clearRecordEditorDraftSaveTimer(form);
+            });
+            form.addEventListener("input", () => {
+                scheduleRecordEditorDraftSave(form);
+            });
+            form.addEventListener("change", () => {
+                scheduleRecordEditorDraftSave(form);
             });
 
             window.requestAnimationFrame(() => {
                 if (form.isConnected) {
-                    markRecordEditorFormClean(form);
+                    form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
+                    maybeRestoreRecordEditorDraft(form);
                     form.dataset.recordEditorNavigating = "false";
                 }
             });
@@ -6825,6 +7201,22 @@
                 }
                 metaLine.textContent = metaParts.join(" | ");
                 summary.appendChild(metaLine);
+            }
+
+            const normalizedErrorCode = (errorCode || "").toUpperCase();
+            if (normalizedErrorCode === sessionStaleErrorCode
+                || normalizedErrorCode === sessionExpiredErrorCode) {
+                const recoveryActions = document.createElement("div");
+                recoveryActions.className = "modal-submit-diagnostics-actions";
+                const reloadButton = document.createElement("button");
+                reloadButton.type = "button";
+                reloadButton.className = "btn small";
+                reloadButton.textContent = "Obnovit stránku";
+                reloadButton.addEventListener("click", () => {
+                    window.location.reload();
+                });
+                recoveryActions.appendChild(reloadButton);
+                summary.appendChild(recoveryActions);
             }
 
             if (diagnosticLog) {
@@ -7502,6 +7894,217 @@
         }
     }
 
+    function hasAjaxSubmitFormsInDom() {
+        return document.querySelector('form[data-ajax-submit="true"]') instanceof HTMLFormElement;
+    }
+
+    function setSessionStaleState(stale, reason) {
+        sessionState.stale = Boolean(stale);
+        if (sessionState.stale) {
+            if (reason) {
+                sessionState.lastFailureReason = String(reason);
+            }
+            return;
+        }
+
+        sessionState.consecutiveFailures = 0;
+        sessionState.lastFailureReason = "";
+    }
+
+    function updateRequestVerificationTokens(nextToken) {
+        const token = String(nextToken || "").trim();
+        if (!token) {
+            return false;
+        }
+
+        let updated = 0;
+        document.querySelectorAll('input[name="__RequestVerificationToken"]').forEach((input) => {
+            if (!(input instanceof HTMLInputElement)) {
+                return;
+            }
+
+            input.value = token;
+            updated += 1;
+        });
+
+        return updated > 0;
+    }
+
+    function buildKeepAliveFailureReason(response, payload, error) {
+        if (isPlainObject(payload) && typeof payload.message === "string" && payload.message.trim()) {
+            return payload.message.trim();
+        }
+
+        if (response instanceof Response) {
+            const status = response.status || 0;
+            const statusText = response.statusText || "";
+            return status > 0
+                ? `HTTP ${status}${statusText ? ` ${statusText}` : ""}`
+                : "KeepAlive response failed.";
+        }
+
+        if (error instanceof Error && error.message) {
+            return error.message;
+        }
+
+        return "KeepAlive request failed.";
+    }
+
+    async function performKeepAliveRequest(source, force) {
+        if (!force && document.hidden) {
+            return true;
+        }
+
+        if (!force && !hasAjaxSubmitFormsInDom()) {
+            return true;
+        }
+
+        const abortController = typeof AbortController === "function"
+            ? new AbortController()
+            : null;
+        const timeoutId = window.setTimeout(() => {
+            if (abortController) {
+                abortController.abort();
+            }
+        }, keepAliveTimeoutMs);
+
+        try {
+            const response = await fetch(keepAliveEndpointPath, {
+                method: "GET",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json"
+                },
+                credentials: "same-origin",
+                cache: "no-store",
+                signal: abortController ? abortController.signal : undefined
+            });
+            const rawBody = await response.text();
+            const payload = parseJsonPayload(rawBody);
+            if (isPlainObject(payload) && typeof payload.traceId === "string" && payload.traceId.trim()) {
+                sessionState.lastTraceId = payload.traceId.trim();
+            }
+
+            const hasToken = isPlainObject(payload)
+                && typeof payload.requestVerificationToken === "string"
+                && payload.requestVerificationToken.trim().length > 0;
+            if (response.ok && isPlainObject(payload) && payload.ok === true && hasToken) {
+                updateRequestVerificationTokens(payload.requestVerificationToken);
+                sessionState.lastSuccessUtc = new Date().toISOString();
+                setSessionStaleState(false, "");
+                return true;
+            }
+
+            sessionState.consecutiveFailures += 1;
+            const reason = buildKeepAliveFailureReason(response, payload, null);
+            sessionState.lastFailureReason = reason;
+            if (sessionState.consecutiveFailures >= keepAliveFailureThreshold) {
+                setSessionStaleState(true, `${source}: ${reason}`);
+            }
+            return false;
+        } catch (error) {
+            sessionState.consecutiveFailures += 1;
+            const reason = buildKeepAliveFailureReason(null, null, error);
+            sessionState.lastFailureReason = reason;
+            if (sessionState.consecutiveFailures >= keepAliveFailureThreshold) {
+                setSessionStaleState(true, `${source}: ${reason}`);
+            }
+            return false;
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    }
+
+    async function ensureSessionKeepAlive(source, force) {
+        if (sessionState.stale && !force) {
+            return false;
+        }
+
+        if (sessionState.inFlightPromise && typeof sessionState.inFlightPromise.then === "function") {
+            return sessionState.inFlightPromise;
+        }
+
+        sessionState.inFlightPromise = performKeepAliveRequest(source, Boolean(force))
+            .finally(() => {
+                sessionState.inFlightPromise = null;
+            });
+        return sessionState.inFlightPromise;
+    }
+
+    function buildSessionStalePayload(action, method, requestFormSnapshot, details, isRecordEditorForm) {
+        const traceId = sessionState.lastTraceId || "";
+        const lines = [
+            `TimestampUtc: ${new Date().toISOString()}`,
+            `ErrorCode: ${sessionStaleErrorCode}`,
+            `TraceId: ${traceId || "-"}`,
+            "ClientSource: site.js:SessionCoordinator",
+            `Request: ${(method || "POST").toUpperCase()} ${action || window.location.href}`,
+            `LastKeepAliveSuccessUtc: ${sessionState.lastSuccessUtc || "-"}`,
+            `KeepAliveFailuresInRow: ${sessionState.consecutiveFailures}`,
+            `KeepAliveLastFailure: ${sessionState.lastFailureReason || "-"}`,
+            `RecordEditorForm: ${isRecordEditorForm ? "true" : "false"}`,
+            "RequestFormData:",
+            requestFormSnapshot || "<unavailable>"
+        ];
+        if (details) {
+            lines.push("Details:", String(details));
+        }
+
+        const message = isRecordEditorForm
+            ? "Relace vypršela během úprav. Uložení je zablokováno, obnovte stránku. Rozpracovaný návrh záznamu zůstává uložen."
+            : "Relace vypršela během úprav. Uložení je zablokováno, obnovte stránku a akci opakujte.";
+
+        return {
+            ok: false,
+            message,
+            errorCode: sessionStaleErrorCode,
+            traceId,
+            diagnosticLog: lines.join("\n"),
+            fieldErrors: {}
+        };
+    }
+
+    function shouldAttemptSessionRecovery(payload) {
+        if (!isPlainObject(payload)) {
+            return false;
+        }
+
+        const code = typeof payload.errorCode === "string" ? payload.errorCode.trim().toUpperCase() : "";
+        if (!code) {
+            return false;
+        }
+
+        return code === "REQUEST_VALIDATION_FAILED"
+            || code === sessionExpiredErrorCode
+            || code === "HTTP_401"
+            || code === "HTTP_403"
+            || code === "NON_JSON_RESPONSE"
+            || code === "EMPTY_AJAX_RESPONSE";
+    }
+
+    function initSessionCoordinator() {
+        if (!(document.body instanceof HTMLElement) || document.body.dataset.sessionCoordinatorReady === "true") {
+            return;
+        }
+
+        const scheduleKeepAlive = () => {
+            void ensureSessionKeepAlive("scheduled", false);
+        };
+
+        document.body.dataset.sessionCoordinatorReady = "true";
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) {
+                scheduleKeepAlive();
+            }
+        });
+        window.addEventListener("focus", () => {
+            scheduleKeepAlive();
+        });
+
+        sessionState.intervalId = window.setInterval(scheduleKeepAlive, keepAliveIntervalMs);
+        window.setTimeout(scheduleKeepAlive, 3000);
+    }
+
     function isPlainObject(value) {
         return value !== null && typeof value === "object" && !Array.isArray(value);
     }
@@ -7634,9 +8237,11 @@
 
     function buildNonJsonAjaxErrorPayload(response, action, method, contentType, rawBody, requestFormSnapshot) {
         const traceId = resolveAjaxResponseTraceId(response);
+        const isEmptyBody = String(rawBody || "").trim().length === 0;
+        const errorCode = isEmptyBody ? "EMPTY_AJAX_RESPONSE" : "NON_JSON_RESPONSE";
         const message = buildNonJsonAjaxFailureMessage(response, rawBody);
         const diagnosticLines = buildAjaxDiagnosticLines(
-            "NON_JSON_RESPONSE",
+            errorCode,
             traceId,
             action,
             method,
@@ -7649,7 +8254,7 @@
         const payload = {
             ok: false,
             message,
-            errorCode: "NON_JSON_RESPONSE",
+            errorCode,
             traceId,
             diagnosticLog: diagnosticLines.join("\n"),
             fieldErrors: {}
@@ -7802,6 +8407,7 @@
 
             event.preventDefault();
             clearModalFormErrors(target);
+            const isRecordEditorForm = target.matches('[data-record-editor-form="true"]');
 
             if (!validateRequiredPersonPickers(target)) {
                 return;
@@ -7812,43 +8418,86 @@
                 return;
             }
 
+            const action = target.getAttribute("action") || window.location.href;
+            const method = (target.getAttribute("method") || "post").toUpperCase();
+            const blockedSnapshot = buildFormDataSnapshot(new FormData(target), 120);
+            if (sessionState.stale) {
+                target.dataset.recordEditorNavigating = "false";
+                renderModalFormErrors(
+                    target,
+                    buildSessionStalePayload(
+                        action,
+                        method,
+                        blockedSnapshot,
+                        "Submit blocked because session is stale.",
+                        isRecordEditorForm));
+                return;
+            }
+
             setFormSubmitting(target, true);
 
             try {
-                const action = target.getAttribute("action") || window.location.href;
-                const method = (target.getAttribute("method") || "post").toUpperCase();
-                const formData = new FormData(target);
-                const requestFormSnapshot = buildFormDataSnapshot(formData, 120);
-                const response = await fetch(action, {
-                    method,
-                    body: formData,
-                    headers: {
-                        "X-Requested-With": "XMLHttpRequest"
-                    },
-                    credentials: "same-origin"
-                });
+                const executeSubmitAttempt = async () => {
+                    const formData = new FormData(target);
+                    const requestFormSnapshot = buildFormDataSnapshot(formData, 120);
+                    const response = await fetch(action, {
+                        method,
+                        body: formData,
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        },
+                        credentials: "same-origin"
+                    });
 
-                const contentType = (response.headers.get("content-type") || "").toLowerCase();
-                const rawBody = await response.text();
-                const parsedPayload = contentType.includes("application/json")
-                    ? parseJsonPayload(rawBody)
-                    : null;
-                const payload = ensureAjaxErrorPayloadDiagnostics(
-                    parsedPayload,
-                    response,
-                    action,
-                    method,
-                    contentType,
-                    rawBody,
-                    requestFormSnapshot);
+                    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+                    const rawBody = await response.text();
+                    const parsedPayload = parseJsonPayload(rawBody);
+                    const payload = ensureAjaxErrorPayloadDiagnostics(
+                        parsedPayload,
+                        response,
+                        action,
+                        method,
+                        contentType,
+                        rawBody,
+                        requestFormSnapshot);
 
-                if (!response.ok || !payload || payload.ok !== true) {
+                    return {
+                        response,
+                        payload,
+                        requestFormSnapshot
+                    };
+                };
+
+                let result = await executeSubmitAttempt();
+                const firstAttemptFailed = !result.response.ok || !result.payload || result.payload.ok !== true;
+                if (firstAttemptFailed && shouldAttemptSessionRecovery(result.payload)) {
+                    const recovered = await ensureSessionKeepAlive("submit-recovery", true);
+                    if (recovered) {
+                        result = await executeSubmitAttempt();
+                    }
+                }
+
+                if (sessionState.stale) {
                     target.dataset.recordEditorNavigating = "false";
-                    renderModalFormErrors(target, payload || { message: "Uložení se nezdařilo." });
+                    renderModalFormErrors(
+                        target,
+                        buildSessionStalePayload(
+                            action,
+                            method,
+                            result.requestFormSnapshot,
+                            "Submit blocked after repeated keepalive failures.",
+                            isRecordEditorForm));
                     return;
                 }
 
-                if (target.matches('[data-record-editor-form="true"]')) {
+                if (!result.response.ok || !result.payload || result.payload.ok !== true) {
+                    target.dataset.recordEditorNavigating = "false";
+                    renderModalFormErrors(target, result.payload || { message: "Uložení se nezdařilo." });
+                    return;
+                }
+
+                if (isRecordEditorForm) {
+                    clearRecordEditorDraft(target);
                     markRecordEditorFormClean(target);
                     target.dataset.recordEditorNavigating = "true";
                 }
@@ -7856,11 +8505,9 @@
                 if (isModalForm) {
                     closeModal();
                 }
-                await refreshPageScope(payload);
+                await refreshPageScope(result.payload);
             } catch (error) {
                 target.dataset.recordEditorNavigating = "false";
-                const action = target.getAttribute("action") || window.location.href;
-                const method = (target.getAttribute("method") || "post").toUpperCase();
                 const fallbackSnapshot = buildFormDataSnapshot(new FormData(target), 120);
                 renderModalFormErrors(target, buildAjaxExceptionPayload(error, action, method, fallbackSnapshot));
             } finally {
@@ -8364,5 +9011,6 @@
     initRecordFormEnhancements(document);
     initPermissionMetadataBindings(document);
     initProjectIndexStatusFilters(document);
+    initSessionCoordinator();
     initModalAjaxSubmit();
 })();

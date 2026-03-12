@@ -1,35 +1,25 @@
-# Zápiska – Dokumentační rozcestník
+# PM Tracker - Dokumentační rozcestník
 
-## 1. Instalační dokumentace
+## 1. Technická dokumentace (ISO 26514 + SOP)
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/00-documentation-tree.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/01-system-context.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/02-architecture.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/03-runtime-configuration.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/04-installation-deployment-iis.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/05-web-server-iis-config.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/06-database-bootstrap-migrations.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/07-security-authz.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/08-operations-runbooks.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/09-testing-quality.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/10-troubleshooting-recovery.md`
 
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/install.md`  
-  Kompletní postup instalace a nasazení (IIS, SQL, appsettings, smoke test).
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/db-bootstrap.md`  
-  Technické pořadí SQL kroků a databázové požadavky.
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/production-readiness.md`  
-  Go-live checklist před ostrým provozem.
+## 2. Uživatelská dokumentace
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/user-guide.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/qa.md`
 
-## 2. Administrační dokumentace
+## 3. Release dokumentace
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/changelog/releases/`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/CHANGELOG.md`
 
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/admin-guide.md`  
-  Provozní správa rolí, oprávnění, číselníků a uživatelů.
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/navod-administrace-akci-opravneni.md`  
-  Detailní interní pravidla pro model oprávnění.
-
-## 3. Uživatelská dokumentace
-
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/user-guide.md`  
-  Návod pro práci s projekty, záznamy, jednáními a exporty.
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/qa.md`  
-  Nejčastější dotazy a řešení běžných situací.
-
-## 4. Technická a vývojová dokumentace
-
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical-guide.md`  
-  Architektura, datový model, provozní zásady, odkazy na navazující dokumenty.
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/testing-guide.md`  
-  Testovací pipeline a skripty.
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/test-matrix.md`  
-  Matice pokrytí testů.
-- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/dry-oop-refactor.md`  
-  Architektonické poznámky k DRY/OOP refaktoru.
+## 4. Instalační vstupní dokument
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/install.md`

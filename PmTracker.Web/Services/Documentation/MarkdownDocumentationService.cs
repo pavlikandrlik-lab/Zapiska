@@ -12,16 +12,110 @@ public sealed class MarkdownDocumentationService : IDocumentationService
         "<h([23])\\s+id=\"([^\"]+)\">(.*?)</h\\1>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.Singleline);
 
-    // One central map keeps routing + source files aligned.
-    // Installation markdown remains in repo but is intentionally not exposed in-app.
-    private static readonly IReadOnlyDictionary<string, DocumentationSource> Sources = new Dictionary<string, DocumentationSource>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["technicka"] = new("technicka", "Technická dokumentace", "Architektura, provozní pravidla, testování a údržba aplikace.", "/Dokumentace/Technicka-dokumentace", new[] { "technical-guide.md" }),
-        ["admin"] = new("admin", "Administrační dokumentace", "Správa rolí, oprávnění, číselníků a provozu.", "/Dokumentace/Administracni-prirucka", new[] { "admin-guide.md" }),
-        ["uzivatelska"] = new("uzivatelska", "Uživatelská příručka", "Praktický návod pro běžné uživatele aplikace.", "/Dokumentace/Uzivatelska-prirucka", new[] { "user-guide.md" }),
-        ["qa"] = new("qa", "Q and A", "Často kladené dotazy k provozu aplikace.", "/Dokumentace/qa", new[] { "qa.md" }),
-        ["changelog"] = new("changelog", "Changelog verzí", "Přehled změn mezi verzemi aplikace.", "/Dokumentace/Changelog", new[] { "changelog.md" })
-    };
+    private static readonly IReadOnlyList<DocumentationSource> Sources =
+    [
+        new(
+            "tech-documentation-tree",
+            "Strom dokumentace",
+            "Rekurzivní strom oblastí, podoblastí a listových uzlů.",
+            "/Dokumentace/Technicka/Strom-dokumentace",
+            ["technical/00-documentation-tree.md"],
+            DocumentationArea.Technical),
+        new(
+            "tech-system-context",
+            "Systémový kontext",
+            "Hranice systému, integrace a provozní ownership.",
+            "/Dokumentace/Technicka/Systemovy-kontext",
+            ["technical/01-system-context.md"],
+            DocumentationArea.Technical),
+        new(
+            "tech-architecture",
+            "Architektura",
+            "Komponenty, vrstvy a pravidla návrhu změn.",
+            "/Dokumentace/Technicka/Architektura",
+            ["technical/02-architecture.md"],
+            DocumentationArea.Technical),
+        new(
+            "tech-runtime-configuration",
+            "Runtime konfigurace",
+            "Povinné klíče konfigurace, environment a fail-fast pravidla.",
+            "/Dokumentace/Technicka/Runtime-konfigurace",
+            ["technical/03-runtime-configuration.md"],
+            DocumentationArea.Technical),
+        new(
+            "tech-installation-deployment-iis",
+            "Instalace a deployment (IIS)",
+            "End-to-end instalační a release postup pro IIS in-process.",
+            "/Dokumentace/Technicka/Instalace-a-deployment-iis",
+            ["technical/04-installation-deployment-iis.md"],
+            DocumentationArea.Technical),
+        new(
+            "tech-web-server-iis-config",
+            "Konfigurace web serveru IIS",
+            "Standard app pool, site, auth a web.config nastavení.",
+            "/Dokumentace/Technicka/Web-server-iis",
+            ["technical/05-web-server-iis-config.md"],
+            DocumentationArea.Technical),
+        new(
+            "tech-database-bootstrap-migrations",
+            "Databáze, bootstrap a migrace",
+            "Pořadí SQL kroků, baseline, patching a DBA rollback.",
+            "/Dokumentace/Technicka/Databaze-bootstrap-a-migrace",
+            ["technical/06-database-bootstrap-migrations.md"],
+            DocumentationArea.Technical),
+        new(
+            "tech-security-authz",
+            "Bezpečnost a autorizace",
+            "Windows auth, permission model a správa efektivních práv.",
+            "/Dokumentace/Technicka/Bezpecnost-a-opravneni",
+            ["technical/07-security-authz.md"],
+            DocumentationArea.Technical),
+        new(
+            "tech-operations-runbooks",
+            "Provozní runbooky",
+            "SOP postupy pro restart, cutover, onboarding a incident response.",
+            "/Dokumentace/Technicka/Provozni-runbooky",
+            ["technical/08-operations-runbooks.md"],
+            DocumentationArea.Technical),
+        new(
+            "tech-testing-quality",
+            "Testování a kvalita",
+            "Test pipeline, coverage, mutation a dokumentační quality gate.",
+            "/Dokumentace/Technicka/Testovani-a-kvalita",
+            ["technical/09-testing-quality.md"],
+            DocumentationArea.Technical),
+        new(
+            "tech-troubleshooting-recovery",
+            "Troubleshooting a recovery",
+            "Incident triáž, rozhodovací strom recovery a post-incident audit.",
+            "/Dokumentace/Technicka/Troubleshooting-a-recovery",
+            ["technical/10-troubleshooting-recovery.md"],
+            DocumentationArea.Technical),
+        new(
+            "user-guide",
+            "Uživatelská příručka",
+            "Praktický návod pro běžné uživatele aplikace.",
+            "/Dokumentace/Uzivatelska-prirucka",
+            ["user-guide.md"],
+            DocumentationArea.Supporting),
+        new(
+            "qa",
+            "Q and A",
+            "Často kladené dotazy k provozu aplikace.",
+            "/Dokumentace/qa",
+            ["qa.md"],
+            DocumentationArea.Supporting),
+        new(
+            "changelog",
+            "Changelog verzí",
+            "Přehled změn mezi verzemi aplikace.",
+            "/Dokumentace/Changelog",
+            ["changelog.md"],
+            DocumentationArea.Supporting)
+    ];
+
+    private static readonly IReadOnlyDictionary<string, DocumentationSource> SourceLookup =
+        Sources.ToDictionary(source => source.Key, StringComparer.OrdinalIgnoreCase);
 
     private readonly IWebHostEnvironment _environment;
     private readonly MarkdownPipeline _pipeline;
@@ -38,7 +132,7 @@ public sealed class MarkdownDocumentationService : IDocumentationService
     public DocumentationPageViewModel BuildPage(string key)
     {
         var normalizedKey = NormalizeKey(key);
-        if (!Sources.TryGetValue(normalizedKey, out var source))
+        if (!SourceLookup.TryGetValue(normalizedKey, out var source))
         {
             throw new InvalidOperationException($"Neznámá dokumentační stránka '{key}'.");
         }
@@ -49,19 +143,23 @@ public sealed class MarkdownDocumentationService : IDocumentationService
         return new DocumentationPageViewModel
         {
             Key = source.Key,
-            SectionLabel = source.Title,
+            SectionLabel = source.Area == DocumentationArea.Technical
+                ? "Technická dokumentace"
+                : "Uživatelská a provozní dokumentace",
             Title = source.Title,
             Subtitle = source.Subtitle,
             CanonicalPath = source.Path,
             HtmlContent = html,
             Navigation = BuildNavigation(source.Key),
+            TechnicalNavigation = BuildNavigation(source.Key, DocumentationArea.Technical),
+            SupportingNavigation = BuildNavigation(source.Key, DocumentationArea.Supporting),
             TocItems = BuildToc(html)
         };
     }
 
     private static string NormalizeKey(string key)
     {
-        return string.IsNullOrWhiteSpace(key) ? "technicka" : key.Trim().ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(key) ? "tech-documentation-tree" : key.Trim().ToLowerInvariant();
     }
 
     private string LoadMarkdown(IReadOnlyList<string> files)
@@ -85,8 +183,6 @@ public sealed class MarkdownDocumentationService : IDocumentationService
 
     private string ResolveDocsRoot()
     {
-        // Prefer file layout from the running app (publish output),
-        // fallback to the same location during local development.
         var contentRootDocs = Path.Combine(_environment.ContentRootPath, "DocsContent");
         if (Directory.Exists(contentRootDocs))
         {
@@ -103,9 +199,10 @@ public sealed class MarkdownDocumentationService : IDocumentationService
             $"Nebyla nalezena složka s dokumentací 'DocsContent'. Zkoušeno: '{contentRootDocs}', '{runtimeDocs}'.");
     }
 
-    private static IReadOnlyList<DocumentationNavItemViewModel> BuildNavigation(string activeKey)
+    private static IReadOnlyList<DocumentationNavItemViewModel> BuildNavigation(string activeKey, DocumentationArea? area = null)
     {
-        return Sources.Values
+        return Sources
+            .Where(source => !area.HasValue || source.Area == area.Value)
             .Select(source => new DocumentationNavItemViewModel
             {
                 Key = source.Key,
@@ -159,10 +256,17 @@ public sealed class MarkdownDocumentationService : IDocumentationService
         return WebUtility.HtmlDecode(withoutTags).Trim();
     }
 
+    private enum DocumentationArea
+    {
+        Technical,
+        Supporting
+    }
+
     private sealed record DocumentationSource(
         string Key,
         string Title,
         string Subtitle,
         string Path,
-        IReadOnlyList<string> Files);
+        IReadOnlyList<string> Files,
+        DocumentationArea Area);
 }

@@ -5,6 +5,35 @@ namespace PmTracker.Tests.Unit.Common;
 public sealed class SeedBaselineDocumentationTests
 {
     [Fact]
+    public void DocumentationStructure_ShouldUseTechnicalFolderWithoutLegacyPages()
+    {
+        var root = GetRepositoryRoot();
+        var expectedTechnicalPages = new[]
+        {
+            "00-documentation-tree.md",
+            "01-system-context.md",
+            "02-architecture.md",
+            "03-runtime-configuration.md",
+            "04-installation-deployment-iis.md",
+            "05-web-server-iis-config.md",
+            "06-database-bootstrap-migrations.md",
+            "07-security-authz.md",
+            "08-operations-runbooks.md",
+            "09-testing-quality.md",
+            "10-troubleshooting-recovery.md"
+        };
+
+        foreach (var page in expectedTechnicalPages)
+        {
+            File.Exists(Path.Combine(root, "docs", "technical", page)).Should().BeTrue();
+        }
+
+        File.Exists(Path.Combine(root, "docs", "technical-guide.md")).Should().BeFalse();
+        File.Exists(Path.Combine(root, "docs", "admin-guide.md")).Should().BeFalse();
+        File.Exists(Path.Combine(root, "docs", "db-bootstrap.md")).Should().BeFalse();
+    }
+
+    [Fact]
     public void ProductionBaselineSeed_ShouldNotContainLocalAdminBootstrap()
     {
         var script = File.ReadAllText(Path.Combine(GetRepositoryRoot(), "PMTracker_insert_sql"));
@@ -53,9 +82,9 @@ public sealed class SeedBaselineDocumentationTests
     }
 
     [Fact]
-    public void SeedReferenceDataMatrix_ShouldListAllPlannedBusinessTables()
+    public void DatabaseBootstrapDocumentation_ShouldListAllPlannedBusinessTables()
     {
-        var document = File.ReadAllText(Path.Combine(GetRepositoryRoot(), "docs", "seed-reference-data-matrix.md"));
+        var document = File.ReadAllText(Path.Combine(GetRepositoryRoot(), "docs", "technical", "06-database-bootstrap-migrations.md"));
 
         document.Should().Contain("dbo.ciselnik_kategorii_zaznamu");
         document.Should().Contain("dbo.ciselnik_stavu_ukolu");
@@ -72,14 +101,14 @@ public sealed class SeedBaselineDocumentationTests
     }
 
     [Fact]
-    public void DbBootstrapDocumentation_ShouldDescribeHybridSeedModel()
+    public void DatabaseBootstrapDocumentation_ShouldDescribeHybridSeedModel()
     {
-        var document = File.ReadAllText(Path.Combine(GetRepositoryRoot(), "docs", "db-bootstrap.md"));
+        var document = File.ReadAllText(Path.Combine(GetRepositoryRoot(), "docs", "technical", "06-database-bootstrap-migrations.md"));
 
         document.Should().Contain("PMTracker_insert_sql");
         document.Should().Contain("db_seed_dev_admin.sql");
-        document.Should().Contain("Produkční baseline");
-        document.Should().Contain("nevytváří žádnou osobu");
+        document.Should().Contain("Produkční baseline", "dokument musí popisovat produkční bootstrap režim");
+        document.Should().Contain("První superadmin", "dokument musí obsahovat onboarding první provozní osoby");
     }
 
     private static string GetRepositoryRoot()

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Server.IISIntegration;
 using PmTracker.Web.Filters;
+using PmTracker.Web.Middleware;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 
@@ -22,10 +23,21 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["X-Trace-Id"] = context.TraceIdentifier;
+        return Task.CompletedTask;
+    });
+    await next();
+});
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+app.UseMiddleware<AjaxResponseContractGuardMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();

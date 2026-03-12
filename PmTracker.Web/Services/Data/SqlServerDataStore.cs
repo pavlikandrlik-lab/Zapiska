@@ -1035,7 +1035,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         }
 
         var project = _dbContext.Projekty.AsNoTracking().First(x => x.Id == projektId);
-        var records = BuildExportRecords(projektId, null, null, 0, false);
+        var records = BuildExportRecords(projektId, null, null, 0, false, applyMeetingSnapshotRules: false);
 
         return new PdfExportTemplateViewModel
         {
@@ -1072,7 +1072,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var project = _dbContext.Projekty.AsNoTracking().First(x => x.Id == meeting.ProjektId);
         var status = _dbContext.CiselnikStavuJednani.AsNoTracking().FirstOrDefault(x => x.Id == meeting.StavJednaniId);
 
-        var records = BuildExportRecords(project.Id, meeting.Id, null, meeting.CisloJednani, true);
+        var records = BuildExportRecords(project.Id, meeting.Id, null, meeting.CisloJednani, true, applyMeetingSnapshotRules: true);
 
         return new PdfExportTemplateViewModel
         {
@@ -1112,7 +1112,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .OrderByDescending(x => x.CisloJednani)
             .FirstOrDefault();
 
-        var records = BuildExportRecords(projektId, lastMeeting?.Id, zaznamId, lastMeeting?.CisloJednani ?? 0, true);
+        var records = BuildExportRecords(projektId, lastMeeting?.Id, zaznamId, lastMeeting?.CisloJednani ?? 0, true, applyMeetingSnapshotRules: false);
 
         return new PdfExportTemplateViewModel
         {
@@ -1229,6 +1229,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             var oldDate = entity.DatumUkonceni;
             var oldSubsystem = entity.SubsystemId;
             var oldType = entity.AktualniTypUkoluId;
+            var oldStatus = entity.StavUkoluId;
 
             entity.KategorieId = categoryId;
             entity.StavUkoluId = statusId;
@@ -1298,6 +1299,17 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
                     NovyTypId = entity.AktualniTypUkoluId.Value,
                     DatumZmeny = DateTime.Now,
                     ZmenilOsobaId = currentUser.OsobaId
+                });
+            }
+
+            if (oldStatus != entity.StavUkoluId && oldStatus.HasValue && entity.StavUkoluId.HasValue)
+            {
+                _dbContext.ZaznamHistorieStavuZaznamu.Add(new ZaznamHistorieStavuZaznamuEntity
+                {
+                    ZaznamId = entity.Id,
+                    PuvodniStav = oldStatus.Value,
+                    NovyStav = entity.StavUkoluId.Value,
+                    DatumZmeny = DateTime.UtcNow
                 });
             }
         }
@@ -5786,7 +5798,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         int? anchorMeetingId,
         int? specificRecordId,
         int anchorMeetingNumber,
-        bool limitComments)
+        bool limitComments,
+        bool applyMeetingSnapshotRules)
     {
         var records = _dbContext.ProjektoveZaznamy.AsNoTracking()
             .Where(x => x.ProjektId == projectId)
@@ -5834,12 +5847,35 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         var meetingById = meetings.ToDictionary(x => x.Id);
         var anchorMeeting = anchorMeetingId.HasValue ? meetings.FirstOrDefault(x => x.Id == anchorMeetingId.Value) : null;
         var anchorState = anchorMeeting is null ? null : meetingStateMap.GetValueOrDefault(anchorMeeting.StavJednaniId);
-        var previousMeetingNumber = anchorMeeting is null
+        var previousMeeting = anchorMeeting is null
             ? null
             : meetings.Where(x => x.CisloJednani < anchorMeeting.CisloJednani)
                 .OrderByDescending(x => x.CisloJednani)
-                .Select(x => (int?)x.CisloJednani)
                 .FirstOrDefault();
+        var previousMeetingNumber = previousMeeting?.CisloJednani;
+
+        if (applyMeetingSnapshotRules && anchorMeeting is not null)
+        {
+            var statusHistoryByRecord = _dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking()
+                .Where(x => records.Select(r => r.Id).Contains(x.ZaznamId))
+                .OrderByDescending(x => x.DatumZmeny)
+                .ThenByDescending(x => x.Id)
+                .ToList()
+                .GroupBy(x => x.ZaznamId)
+                .ToDictionary(group => group.Key, group => group.ToList());
+
+            var anchorMeetingDate = anchorMeeting.DatumPlanovane.Date;
+            var previousMeetingDate = previousMeeting?.DatumPlanovane.Date;
+
+            records = records
+                .Where(record => IsRecordVisibleForMeetingPrint(
+                    record,
+                    taskStates,
+                    statusHistoryByRecord.GetValueOrDefault(record.Id, new List<ZaznamHistorieStavuZaznamuEntity>()),
+                    anchorMeetingDate,
+                    previousMeetingDate))
+                .ToList();
+        }
 
         var filteredComments = anchorMeeting is null
             ? comments
@@ -5937,6 +5973,63 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         }).ToList();
 
         return exportRows;
+    }
+
+    private static bool IsRecordVisibleForMeetingPrint(
+        ProjektovyZaznamEntity record,
+        IReadOnlyDictionary<int, CiselnikStavuUkoluEntity> taskStates,
+        IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> statusHistory,
+        DateTime anchorMeetingDate,
+        DateTime? previousMeetingDate)
+    {
+        if (record.DatumZalozeni.Date > anchorMeetingDate.Date)
+        {
+            return false;
+        }
+
+        var statusAtAnchorMeeting = ResolveTaskStatusAtDate(record.StavUkoluId, statusHistory, anchorMeetingDate);
+        if (!IsFinalTaskStatus(statusAtAnchorMeeting, taskStates))
+        {
+            return true;
+        }
+
+        if (!previousMeetingDate.HasValue)
+        {
+            return false;
+        }
+
+        var statusAtPreviousMeeting = ResolveTaskStatusAtDate(record.StavUkoluId, statusHistory, previousMeetingDate.Value);
+        return !IsFinalTaskStatus(statusAtPreviousMeeting, taskStates);
+    }
+
+    private static int? ResolveTaskStatusAtDate(
+        int? currentStatusId,
+        IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> statusHistory,
+        DateTime targetDate)
+    {
+        var resolvedStatusId = currentStatusId;
+        foreach (var change in statusHistory)
+        {
+            if (change.DatumZmeny.Date <= targetDate.Date)
+            {
+                continue;
+            }
+
+            if (resolvedStatusId.HasValue && resolvedStatusId.Value == change.NovyStav)
+            {
+                resolvedStatusId = change.PuvodniStav;
+            }
+        }
+
+        return resolvedStatusId;
+    }
+
+    private static bool IsFinalTaskStatus(
+        int? statusId,
+        IReadOnlyDictionary<int, CiselnikStavuUkoluEntity> taskStates)
+    {
+        return statusId.HasValue
+            && taskStates.GetValueOrDefault(statusId.Value)?.IsFinal == true;
     }
 
     private List<VyjadreniEntity> ApplyCommentLimit(IReadOnlyList<VyjadreniEntity> comments)

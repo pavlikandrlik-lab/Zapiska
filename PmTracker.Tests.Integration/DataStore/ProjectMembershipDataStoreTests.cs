@@ -2,6 +2,7 @@ using System.Globalization;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Integration.TestInfrastructure;
+using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 
@@ -260,9 +261,13 @@ public sealed class ProjectMembershipDataStoreTests
 
         await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
         var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportSortAllRecord");
+        var openStateId = await EnsureTaskStateAsync(dbContext, "EXPSORTALL_OPEN", "Export sort open", isFinal: false);
         var meeting1Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9501);
         var meeting2Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9502);
         var meeting3Id = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9503);
+        var record = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == recordId);
+        record.StavUkoluId = openStateId;
+        await dbContext.SaveChangesAsync();
 
         dbContext.Vyjadreni.AddRange(
             new VyjadreniEntity
@@ -528,5 +533,144 @@ public sealed class ProjectMembershipDataStoreTests
         externalLinks.Should().Contain("PMP PMP-123 (plán dodání: 15.04.2026)");
         externalLinks.Should().Contain("NES NES-456");
         externalLinks.Should().NotContain(link => link.Contains("NES NES-456 (", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task MeetingPrintTemplate_ShouldExcludeRecordsCreatedAfterMeetingDate_OnlyForMeetingPrint()
+    {
+        var db = await _fixture.CreateDatabaseAsync("meeting_print_date_snapshot_scope");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "MeetingDateSnapshotAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "MeetingDateSnapshotOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "MEETDATE");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "MEETDATE_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        var openStateId = await EnsureTaskStateAsync(dbContext, "MEETDATE_OPEN", "Meeting date open", isFinal: false);
+
+        var olderRecordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "OlderRecord");
+        var futureRecordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "FutureRecord");
+        var previousMeetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 860);
+        var anchorMeetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 861);
+
+        var records = await dbContext.ProjektoveZaznamy
+            .Where(x => x.Id == olderRecordId || x.Id == futureRecordId)
+            .ToListAsync();
+        records.Single(x => x.Id == olderRecordId).DatumZalozeni = new DateTime(2025, 9, 3);
+        records.Single(x => x.Id == olderRecordId).StavUkoluId = openStateId;
+        records.Single(x => x.Id == futureRecordId).DatumZalozeni = new DateTime(2025, 9, 10);
+        records.Single(x => x.Id == futureRecordId).StavUkoluId = openStateId;
+
+        var meetings = await dbContext.Jednani
+            .Where(x => x.Id == previousMeetingId || x.Id == anchorMeetingId)
+            .ToListAsync();
+        meetings.Single(x => x.Id == previousMeetingId).DatumPlanovane = new DateTime(2025, 8, 21);
+        meetings.Single(x => x.Id == anchorMeetingId).DatumPlanovane = new DateTime(2025, 9, 4);
+        await dbContext.SaveChangesAsync();
+
+        var meetingModel = store.BuildMeetingPrintTemplate(anchorMeetingId, currentUser, autoPrint: false);
+        var projectModel = store.BuildProjectPrintTemplate(projectId, currentUser, autoPrint: false);
+        var taskModel = store.BuildTaskPrintTemplate(projectId, futureRecordId, currentUser, autoPrint: false);
+
+        var meetingRecordIds = meetingModel.Zaznamy.Select(x => x.ZaznamId).ToList();
+        meetingRecordIds.Should().Contain(olderRecordId);
+        meetingRecordIds.Should().NotContain(futureRecordId);
+
+        var projectRecordIds = projectModel.Zaznamy.Select(x => x.ZaznamId).ToList();
+        projectRecordIds.Should().Contain(olderRecordId);
+        projectRecordIds.Should().Contain(futureRecordId);
+
+        taskModel.Zaznamy.Should().ContainSingle(x => x.ZaznamId == futureRecordId);
+    }
+
+    [Fact]
+    public async Task MeetingPrintTemplate_ShouldShowFinalRecordOnlyWhenItWasOpenOnPreviousMeeting()
+    {
+        var db = await _fixture.CreateDatabaseAsync("meeting_print_final_from_previous_state");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "MeetingFinalSnapshotAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "MeetingFinalSnapshotOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "MEETFINAL");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "MEETFINAL_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        var openStateId = await EnsureTaskStateAsync(dbContext, "MEETFINAL_OPEN", "Meeting final open", isFinal: false);
+        var doneStateId = await EnsureTaskStateAsync(dbContext, "MEETFINAL_DONE", "Meeting final done", isFinal: true);
+
+        var becameFinalRecordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "BecameFinal");
+        var alreadyFinalRecordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "AlreadyFinal");
+        var activeRecordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ActiveNow");
+
+        var previousMeetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 860);
+        var anchorMeetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 861);
+
+        var records = await dbContext.ProjektoveZaznamy
+            .Where(x => x.Id == becameFinalRecordId || x.Id == alreadyFinalRecordId || x.Id == activeRecordId)
+            .ToListAsync();
+        records.Single(x => x.Id == becameFinalRecordId).DatumZalozeni = new DateTime(2025, 8, 1);
+        records.Single(x => x.Id == becameFinalRecordId).StavUkoluId = doneStateId;
+        records.Single(x => x.Id == alreadyFinalRecordId).DatumZalozeni = new DateTime(2025, 8, 1);
+        records.Single(x => x.Id == alreadyFinalRecordId).StavUkoluId = doneStateId;
+        records.Single(x => x.Id == activeRecordId).DatumZalozeni = new DateTime(2025, 8, 1);
+        records.Single(x => x.Id == activeRecordId).StavUkoluId = openStateId;
+
+        dbContext.ZaznamHistorieStavuZaznamu.AddRange(
+            new ZaznamHistorieStavuZaznamuEntity
+            {
+                ZaznamId = becameFinalRecordId,
+                PuvodniStav = openStateId,
+                NovyStav = doneStateId,
+                DatumZmeny = new DateTime(2025, 8, 30)
+            },
+            new ZaznamHistorieStavuZaznamuEntity
+            {
+                ZaznamId = alreadyFinalRecordId,
+                PuvodniStav = openStateId,
+                NovyStav = doneStateId,
+                DatumZmeny = new DateTime(2025, 8, 10)
+            });
+
+        var meetings = await dbContext.Jednani
+            .Where(x => x.Id == previousMeetingId || x.Id == anchorMeetingId)
+            .ToListAsync();
+        meetings.Single(x => x.Id == previousMeetingId).DatumPlanovane = new DateTime(2025, 8, 20);
+        meetings.Single(x => x.Id == anchorMeetingId).DatumPlanovane = new DateTime(2025, 9, 4);
+        await dbContext.SaveChangesAsync();
+
+        var meetingModel = store.BuildMeetingPrintTemplate(anchorMeetingId, currentUser, autoPrint: false);
+        var meetingRecordIds = meetingModel.Zaznamy.Select(x => x.ZaznamId).ToList();
+
+        meetingRecordIds.Should().Contain(becameFinalRecordId);
+        meetingRecordIds.Should().Contain(activeRecordId);
+        meetingRecordIds.Should().NotContain(alreadyFinalRecordId);
+    }
+
+    private static async Task<int> EnsureTaskStateAsync(PmTrackerDbContext dbContext, string code, string name, bool isFinal)
+    {
+        var existing = await dbContext.CiselnikStavuUkolu.FirstOrDefaultAsync(x => x.Kod == code);
+        if (existing is not null)
+        {
+            existing.Nazev = name;
+            existing.IsFinal = isFinal;
+            await dbContext.SaveChangesAsync();
+            return existing.Id;
+        }
+
+        var created = new CiselnikStavuUkoluEntity
+        {
+            Kod = code,
+            Nazev = name,
+            IsFinal = isFinal,
+            IsLocked = false
+        };
+        dbContext.CiselnikStavuUkolu.Add(created);
+        await dbContext.SaveChangesAsync();
+        return created.Id;
     }
 }

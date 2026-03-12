@@ -29,6 +29,14 @@ internal static class ApiTestHttpHelper
         return request;
     }
 
+    public static HttpRequestMessage BuildAjaxGet(string url)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add("X-Requested-With", "XMLHttpRequest");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        return request;
+    }
+
     public static async Task<ModalSubmitResultViewModel> ReadModalResultAsync(HttpResponseMessage response)
     {
         var json = await response.Content.ReadAsStringAsync();

@@ -50,7 +50,7 @@ public static class RepositoryPaths
 
     private static IReadOnlyList<string> LoadScriptsFromBootstrapDocumentation()
     {
-        var docPath = Path.Combine(Root, "docs", "db-bootstrap.md");
+        var docPath = Path.Combine(Root, "docs", "technical", "06-database-bootstrap-migrations.md");
         if (!File.Exists(docPath))
         {
             return Array.Empty<string>();

@@ -2,7 +2,7 @@
 
 <section class="docs-page">
     <nav class="docs-breadcrumb" aria-label="Drobečková navigace">
-        <a asp-controller="Dokumentace" asp-action="TechnickaDokumentace">Dokumentace</a>
+        <a asp-controller="Dokumentace" asp-action="StromDokumentace">Dokumentace</a>
         <span>/</span>
         <span>@Model.SectionLabel</span>
     </nav>
@@ -14,10 +14,19 @@
 
     <div class="docs-layout">
         <aside class="docs-sidebar" aria-label="Sekce dokumentace">
-            <h2>Obsah</h2>
-            @foreach (var item in Model.Navigation)
+            <h2>Technická dokumentace</h2>
+            @foreach (var item in Model.TechnicalNavigation)
             {
                 <a class="@(item.IsActive ? "docs-nav-link active" : "docs-nav-link")" href="@item.Path">@item.Label</a>
+            }
+
+            @if (Model.SupportingNavigation.Count > 0)
+            {
+                <h2>Uživatelské a provozní</h2>
+                @foreach (var item in Model.SupportingNavigation)
+                {
+                    <a class="@(item.IsActive ? "docs-nav-link active" : "docs-nav-link")" href="@item.Path">@item.Label</a>
+                }
             }
         </aside>
 

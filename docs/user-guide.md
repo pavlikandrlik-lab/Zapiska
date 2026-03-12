@@ -1,113 +1,49 @@
-# Zápiska – Uživatelská příručka
+# PM Tracker - Uživatelská příručka
 
-## 1. K čemu aplikace slouží
+## 1) Účel
+Uživatelská příručka popisuje běžnou práci v aplikaci PM Tracker: projekty, záznamy, jednání, osoby, číselníky a exporty.
 
-Zápiska je nástroj pro řízení projektů, zápisy z jednání a průběžnou evidenci úkolů.
+## 2) Rychlá orientace
+- `Projekty`: centrální vstup do práce s projektem.
+- `Jednání`: plánování a evidence porad.
+- `Osoby`: přehled osob dle oprávnění.
+- `Číselníky`: referenční data (dle role).
+- `Nastavení`: správa oprávnění (jen oprávněné role).
+- Poznámka: osoby se z AD nepřenášejí automaticky; pro přístup musí být osoba založena i v aplikaci.
 
-Hlavní části:
+## 3) Projekty
+- V přehledu vidíš jen projekty, ke kterým máš přístup.
+- Detail projektu obsahuje záznamy, jednání a tým.
+- Editační prvky se zobrazují pouze při odpovídajícím oprávnění.
 
-- **Projekty** – přehled projektů a jejich detail,
-- **Záznamy** – úkoly, informace a rozhodnutí v projektu,
-- **Jednání** – porady a zápis úkolů,
-- **Osoby** – seznam uživatelů a kontaktů,
-- **Číselníky** – referenční hodnoty (jen dle oprávnění).
+## 4) Záznamy a vyjádření
+- Záznam obsahuje stav, vlastníka, termíny, subsystém a externí vazby.
+- Vyjádření podporuje více řádků a vazbu na konkrétní jednání.
+- U uzavřeného jednání může být zápis vyjádření omezen.
 
-## 2. Základní orientace
+## 5) Jednání
+- Číslo jednání musí být unikátní v rámci projektu.
+- Uzavřené jednání je standardně read-only.
+- Účastníci a stavy účasti jsou řízeny číselníky.
 
-- Horní menu přepíná moduly.
-- Vpravo nahoře je profil uživatele a tmavý režim.
-- V patičce jsou odkazy na dokumentaci, informace a podporu.
+## 6) Exporty
+Podporované exporty:
+- Tisk projektu
+- Tisk jednání
+- Tisk úkolu/záznamu
+- Výstupy: PDF/HTML a Word (.docx)
 
-## 3. Práce s projekty
+## 7) Nejčastější problémy uživatele
+- Nevidíš tlačítko `Upravit`: chybí oprávnění nebo scope.
+- Nelze uložit změnu: položka je zamčená (`is_locked=1`) nebo chybí právo editace.
+- Nefunguje externí odkaz: vazba neobsahuje validní ticket ID.
 
-### 3.1 Přehled projektů
-
-- vidíš jen projekty, ke kterým máš přístup,
-- kliknutím na dlaždici otevřeš detail projektu.
-
-### 3.2 Detail projektu
-
-Záložky:
-
-- **Záznamy**
-- **Jednání**
-- **Osoby (tým)**
-
-Co se stane po změně:
-
-- úpravy projektu se ukládají okamžitě po potvrzení formuláře,
-- chybné nebo nevalidní hodnoty vrátí chybovou hlášku.
-
-## 4. Práce se záznamy (úkoly)
-
-Na kartě záznamu vidíš:
-
-- stav, typ, vlastníka, termín, subsystém,
-- historii změn (vlastník/termín/subsystém),
-- externí vazby (PMP/PNF/NES),
-- vyjádření.
-
-### Externí vazby
-
-- najetí myší zobrazí detail vazby (tooltip),
-- klik na vazbu otevře ServiceDesk detail tiketu v nové kartě.
-
-### Vyjádření
-
-- podporují více řádků,
-- mohou být navázaná na konkrétní jednání,
-- řazení může být podle jednání.
-
-## 5. Práce s jednáními
-
-V modulu `Jednání` můžeš:
-
-- založit nové jednání (pokud máš právo),
-- upravit stav jednání,
-- zapisovat účast a vyjádření k úkolům.
-
-Důležité:
-
-- uzavřené jednání je read-only pro zápis,
-- číslo jednání musí být v projektu unikátní.
-
-## 6. Tisk a export
-
-K dispozici jsou tiskové varianty:
-
-- tisk projektu,
-- tisk konkrétního jednání,
-- tisk jednoho úkolu.
-
-Podporované formáty:
-
-- PDF/HTML tisk,
-- Word export (.docx).
-
-## 7. Co nedělat
-
-1. Neměň systémové číselníky bez konzultace se správcem.
-2. Nezadávej testovací nebo duplicitní čísla jednání v produkci.
-3. Nemazej významné texty ve vyjádřeních bez dohody v týmu.
-4. Nezakládej osoby ručně, pokud má být účet vedený přes AD.
-
-## 8. Nejčastější situace
-
-### Nevidím tlačítko „Upravit“
-
-Pravděpodobně nemáš potřebné oprávnění pro daný projekt/modul.
-
-### Nejdu přidat vyjádření
-
-- jednání může být uzavřené,
-- nebo nemáš právo zápisu.
-
-### Odkaz na externí vazbu nefunguje
-
-Číslo vazby možná neobsahuje ticket ID (číslice). V takovém případě je vazba pouze informativní.
-
-## 9. Podpora
-
+## 8) Podpora
 - FIS: 973 200 840
 - ISSP: 973 225 500
 - ŠIS: 973 211 111
+- Servicedesk: [https://servicedesk.fis.acr](https://servicedesk.fis.acr)
+
+## 9) Související dokumenty
+- Technická dokumentace (in-app): `/Dokumentace/Technicka/Strom-dokumentace`
+- Q and A: `/Dokumentace/qa`

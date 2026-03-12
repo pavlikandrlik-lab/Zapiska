@@ -6,6 +6,9 @@ public static class AjaxErrorCodes
     public const string RecordValidationFailed = "RECORD_VALIDATION_FAILED";
     public const string OperationFailed = "OPERATION_FAILED";
     public const string UnexpectedServerError = "UNEXPECTED_SERVER_ERROR";
+    public const string SessionExpired = "SESSION_EXPIRED";
+    public const string NonJsonResponse = "NON_JSON_RESPONSE";
+    public const string EmptyAjaxResponse = "EMPTY_AJAX_RESPONSE";
 }
 
 public sealed record RecordValidationIssue(
