@@ -230,6 +230,22 @@ public sealed class UserContextResolver : IUserContextResolver
             .ToListAsync(cancellationToken));
         grants.AddRange(implicitProjectRoleGrants);
 
+        var implicitSubsystemRoleGrants = SubsystemRolePermissionGrantBuilder.BuildImplicitSubsystemRoleGrants(
+            await (
+                from assignment in _dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
+                join role in _dbContext.CiselnikRoliSubsystemu.AsNoTracking() on assignment.RoleSubsystemuId equals role.Id
+                join projectSubsystem in _dbContext.ProjektSubsystemy.AsNoTracking() on assignment.ProjektSubsystemId equals projectSubsystem.Id
+                where assignment.OsobaId == osoba.Id
+                    && !assignment.DatumOdebrani.HasValue
+                    && !projectSubsystem.DatumOdebrani.HasValue
+                select new SubsystemRoleAssignmentGrantSource
+                {
+                    RoleCode = role.Kod,
+                    ProjectId = projectSubsystem.ProjektId
+                })
+            .ToListAsync(cancellationToken));
+        grants.AddRange(implicitSubsystemRoleGrants);
+
         var projectRoleProjectIds = await _dbContext.ObsazeniProjektu
             .AsNoTracking()
             .Where(x => x.OsobaId == osoba.Id && !x.DatumOdebrani.HasValue)
