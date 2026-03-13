@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Modules.Meetings;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Security;
 
@@ -7,14 +8,23 @@ namespace PmTracker.Web.Controllers;
 
 public sealed class JednaniController : BaseController
 {
-    public JednaniController(IPmTrackerDataStore dataStore, IUserContextResolver userContextResolver)
+    private readonly IMeetingsQueries _meetingsQueries;
+    private readonly IMeetingsCommands _meetingsCommands;
+
+    public JednaniController(
+        IPmTrackerDataStore dataStore,
+        IUserContextResolver userContextResolver,
+        IMeetingsQueries meetingsQueries,
+        IMeetingsCommands meetingsCommands)
         : base(dataStore, userContextResolver)
     {
+        _meetingsQueries = meetingsQueries;
+        _meetingsCommands = meetingsCommands;
     }
 
     public IActionResult Index(int? projektId)
     {
-        var projekty = DataStore.BuildJednaniOverview()
+        var projekty = _meetingsQueries.BuildJednaniOverview()
             .Where(project => CurrentUserContext.CanAccessProject(project.ProjektId))
             .ToList();
 
@@ -33,7 +43,7 @@ public sealed class JednaniController : BaseController
 
     public IActionResult Detail(int id, string? returnUrl)
     {
-        var model = DataStore.BuildJednaniDetail(id);
+        var model = _meetingsQueries.BuildJednaniDetail(id);
         if (!CurrentUserContext.CanAccessProject(model.ProjektId))
         {
             return NotFound();
@@ -51,7 +61,7 @@ public sealed class JednaniController : BaseController
     [HttpGet]
     public IActionResult TaskItemPartial(int jednaniId, int zaznamId)
     {
-        var model = DataStore.BuildJednaniDetail(jednaniId);
+        var model = _meetingsQueries.BuildJednaniDetail(jednaniId);
         if (!CurrentUserContext.CanAccessProject(model.ProjektId))
         {
             return NotFound();
@@ -93,7 +103,7 @@ public sealed class JednaniController : BaseController
             return Forbid();
         }
 
-        var model = DataStore.BuildJednaniDetail(jednaniId);
+        var model = _meetingsQueries.BuildJednaniDetail(jednaniId);
         if (model.ProjektId != projektId)
         {
             return NotFound();
@@ -115,7 +125,7 @@ public sealed class JednaniController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult SaveStatus(SaveMeetingStatusCommand command, string? returnUrl)
     {
-        var meeting = DataStore.BuildJednaniDetail(command.JednaniId);
+        var meeting = _meetingsQueries.BuildJednaniDetail(command.JednaniId);
         if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, meeting.ProjektId))
         {
             return Forbid();
@@ -123,7 +133,7 @@ public sealed class JednaniController : BaseController
 
         try
         {
-            DataStore.SaveMeetingStatus(command, CurrentUserContext);
+            _meetingsCommands.SaveMeetingStatus(command, CurrentUserContext);
         }
         catch (Exception ex)
         {
@@ -151,7 +161,7 @@ public sealed class JednaniController : BaseController
         {
             foreach (var row in rows.Where(x => x.OsobaId > 0 && !string.IsNullOrWhiteSpace(x.StavUcasti)))
             {
-                DataStore.SaveAttendance(new SaveAttendanceCommand
+                _meetingsCommands.SaveAttendance(new SaveAttendanceCommand
                 {
                     JednaniId = jednaniId,
                     OsobaId = row.OsobaId,
@@ -189,7 +199,7 @@ public sealed class JednaniController : BaseController
                 meetingId: command.JednaniId,
                 uiContext: "meeting",
                 message: "Osoba byla přidána do účasti."),
-            operation: () => DataStore.AddMeetingParticipant(command, CurrentUserContext));
+            operation: () => _meetingsCommands.AddMeetingParticipant(command, CurrentUserContext));
     }
 
     [HttpPost]
@@ -205,7 +215,7 @@ public sealed class JednaniController : BaseController
         {
             foreach (var row in rows.Where(x => x.ZaznamId > 0 && !string.IsNullOrWhiteSpace(x.Text)))
             {
-                DataStore.SaveMeetingNote(new SaveMeetingNoteCommand
+                _meetingsCommands.SaveMeetingNote(new SaveMeetingNoteCommand
                 {
                     JednaniId = jednaniId,
                     ZaznamId = row.ZaznamId,

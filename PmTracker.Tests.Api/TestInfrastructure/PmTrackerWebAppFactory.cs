@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -39,6 +40,14 @@ public sealed class PmTrackerWebAppFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IAntiforgery>();
             services.AddSingleton<IAntiforgery, NoOpAntiforgery>();
+            services
+                .AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+                    options.DefaultForbidScheme = TestAuthHandler.SchemeName;
+                })
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
 
             services.PostConfigure<MvcOptions>(options =>
             {

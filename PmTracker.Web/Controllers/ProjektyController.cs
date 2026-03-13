@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Modules.Meetings;
+using PmTracker.Web.Modules.Projects;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Security;
 
@@ -7,14 +9,29 @@ namespace PmTracker.Web.Controllers;
 
 public sealed class ProjektyController : BaseController
 {
-    public ProjektyController(IPmTrackerDataStore dataStore, IUserContextResolver userContextResolver)
+    private readonly IProjectsQueries _projectsQueries;
+    private readonly IProjectsCommands _projectsCommands;
+    private readonly IMeetingsQueries _meetingsQueries;
+    private readonly IMeetingsCommands _meetingsCommands;
+
+    public ProjektyController(
+        IPmTrackerDataStore dataStore,
+        IUserContextResolver userContextResolver,
+        IProjectsQueries projectsQueries,
+        IProjectsCommands projectsCommands,
+        IMeetingsQueries meetingsQueries,
+        IMeetingsCommands meetingsCommands)
         : base(dataStore, userContextResolver)
     {
+        _projectsQueries = projectsQueries;
+        _projectsCommands = projectsCommands;
+        _meetingsQueries = meetingsQueries;
+        _meetingsCommands = meetingsCommands;
     }
 
     public IActionResult Index()
     {
-        var projekty = DataStore.BuildProjektyList()
+        var projekty = _projectsQueries.BuildProjektyList()
             .Where(project => CurrentUserContext.CanAccessProject(project.Id))
             .ToList();
         var projectStatusOptions = BuildProjectStatusOptions();
@@ -43,7 +60,7 @@ public sealed class ProjektyController : BaseController
 
     public IActionResult Detail(int id)
     {
-        if (!DataStore.ProjektExists(id))
+        if (!_projectsQueries.ProjektExists(id))
         {
             return RedirectToAction(nameof(Index));
         }
@@ -53,7 +70,7 @@ public sealed class ProjektyController : BaseController
             return NotFound();
         }
 
-        var model = DataStore.BuildProjektDetail(id);
+        var model = _projectsQueries.BuildProjektDetail(id);
         return View(model);
     }
 
@@ -94,7 +111,7 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        var project = DataStore.BuildProjektyList().FirstOrDefault(item => item.Id == id);
+        var project = _projectsQueries.BuildProjektyList().FirstOrDefault(item => item.Id == id);
         if (project is null)
         {
             return NotFound();
@@ -131,7 +148,7 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        var project = DataStore.BuildProjektyList().FirstOrDefault(item => item.Id == id);
+        var project = _projectsQueries.BuildProjektyList().FirstOrDefault(item => item.Id == id);
         if (project is null)
         {
             return NotFound();
@@ -160,12 +177,12 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        if (!DataStore.ProjektExists(projektId))
+        if (!_meetingsQueries.ProjektExists(projektId))
         {
             return NotFound();
         }
 
-        var detail = DataStore.BuildProjektDetail(projektId);
+        var detail = _meetingsQueries.BuildProjektDetail(projektId);
         var nextMeetingNumber = detail.Jednani.Any() ? detail.Jednani.Max(item => item.CisloJednani) + 1 : 1;
         var defaultStatus = detail.StavyJednani.FirstOrDefault()?.Value ?? string.Empty;
         var localNow = GetLocalNow();
@@ -196,12 +213,12 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        if (!DataStore.ProjektExists(projektId))
+        if (!_meetingsQueries.ProjektExists(projektId))
         {
             return NotFound();
         }
 
-        var projectDetail = DataStore.BuildProjektDetail(projektId);
+        var projectDetail = _meetingsQueries.BuildProjektDetail(projektId);
         var meeting = projectDetail.Jednani.FirstOrDefault(item => item.Id == meetingId);
         if (meeting is null)
         {
@@ -241,12 +258,12 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        if (!DataStore.ProjektExists(projektId))
+        if (!_projectsQueries.ProjektExists(projektId))
         {
             return NotFound();
         }
 
-        var detail = DataStore.BuildProjektDetail(projektId);
+        var detail = _projectsQueries.BuildProjektDetail(projektId);
         var defaultRole = detail.RoleProjektu.FirstOrDefault()?.Value ?? string.Empty;
         var model = new TeamMemberModalViewModel
         {
@@ -280,7 +297,7 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        var detail = DataStore.BuildProjektDetail(projektId);
+        var detail = _projectsQueries.BuildProjektDetail(projektId);
         return View("AssignProjectRoleModal", new AssignProjectRoleModalViewModel
         {
             Title = "Přidat projektovou roli",
@@ -298,7 +315,7 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        var detail = DataStore.BuildProjektDetail(projektId);
+        var detail = _projectsQueries.BuildProjektDetail(projektId);
         return View("AssignProjectSubsystemModal", new AssignProjectSubsystemModalViewModel
         {
             Title = "Přiřadit subsystém projektu",
@@ -315,7 +332,7 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        var detail = DataStore.BuildProjektDetail(projektId);
+        var detail = _projectsQueries.BuildProjektDetail(projektId);
         return View("AssignProjectSubsystemRoleModal", new AssignProjectSubsystemRoleModalViewModel
         {
             Title = "Přidat roli v subsystému",
@@ -346,7 +363,7 @@ public sealed class ProjektyController : BaseController
                 refreshUrl: Url.Action(nameof(Index), "Projekty"),
                 projectId: savedProjectId,
                 message: "Projekt byl uložen."),
-            operation: () => savedProjectId = DataStore.SaveProject(command, CurrentUserContext),
+            operation: () => savedProjectId = _projectsCommands.SaveProject(command, CurrentUserContext),
             onExceptionRedirect: _ => RedirectToAction(nameof(Index)));
     }
 
@@ -365,7 +382,7 @@ public sealed class ProjektyController : BaseController
                 refreshUrl: Url.Action(nameof(Index), "Projekty"),
                 projectId: command.ProjektId,
                 message: "Projekt byl smazán."),
-            operation: () => DataStore.SoftDeleteProject(command, CurrentUserContext),
+            operation: () => _projectsCommands.SoftDeleteProject(command, CurrentUserContext),
             onExceptionRedirect: _ => RedirectToAction(nameof(Index)));
     }
 
@@ -382,7 +399,7 @@ public sealed class ProjektyController : BaseController
                 return Forbid();
             }
 
-            var projectDetail = DataStore.BuildProjektDetail(command.ProjektId);
+            var projectDetail = _meetingsQueries.BuildProjektDetail(command.ProjektId);
             var existingMeeting = projectDetail.Jednani.FirstOrDefault(item => item.Id == command.Id.Value);
             if (existingMeeting is null)
             {
@@ -409,7 +426,7 @@ public sealed class ProjektyController : BaseController
                 projectId: command.ProjektId,
                 tab: "jednani",
                 message: "Porada byla uložena."),
-            operation: () => DataStore.SaveMeeting(command, CurrentUserContext));
+            operation: () => _meetingsCommands.SaveMeeting(command, CurrentUserContext));
     }
 
     [HttpPost]
@@ -435,7 +452,7 @@ public sealed class ProjektyController : BaseController
                 projectId: command.ProjektId,
                 tab: "jednani",
                 message: "Porada byla smazána."),
-            operation: () => DataStore.DeleteMeeting(command, CurrentUserContext));
+            operation: () => _meetingsCommands.DeleteMeeting(command, CurrentUserContext));
     }
 
     [HttpPost]
@@ -621,13 +638,6 @@ public sealed class ProjektyController : BaseController
 
     private IReadOnlyList<LookupOptionViewModel> BuildProjectStatusOptions()
     {
-        return DataStore.BuildCiselnikDetail("stavy-projektu", CurrentUserContext).Polozky
-            .OrderBy(x => x.Nazev, StringComparer.CurrentCultureIgnoreCase)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = x.Kod,
-                Label = x.Nazev
-            })
-            .ToList();
+        return _projectsQueries.BuildProjectStatusOptions(CurrentUserContext);
     }
 }

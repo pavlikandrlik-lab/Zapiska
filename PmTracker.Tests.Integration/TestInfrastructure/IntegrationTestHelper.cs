@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Modules.Export;
+using PmTracker.Web.Modules.Settings;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 
@@ -18,15 +20,56 @@ internal static class IntegrationTestHelper
         return new PmTrackerDbContext(options);
     }
 
-    public static SqlServerDataStore CreateDataStore(PmTrackerDbContext dbContext)
+    public static SqlServerDataStore CreateDataStore(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
     {
         var textNormalizer = new TextNormalizer();
         var richTextContentService = new RichTextContentService();
         var identityMatcher = new PersonIdentityMatcher(textNormalizer);
         var permissionEvaluation = new PermissionEvaluationService();
         var commentAuthorization = new CommentAuthorizationPolicy(permissionEvaluation);
-        return new SqlServerDataStore(dbContext, textNormalizer, richTextContentService, identityMatcher, commentAuthorization, TimeProvider.System);
+        var resolvedTimeProvider = timeProvider ?? TimeProvider.System;
+        var exportTemplateQueries = new ExportTemplateQueries(dbContext, textNormalizer, richTextContentService, identityMatcher);
+        var exportTemplateUseCase = new ExportTemplateUseCase(exportTemplateQueries, resolvedTimeProvider);
+        var userAuthorizationSnapshotBuilder = new UserAuthorizationSnapshotBuilder(dbContext, textNormalizer);
+        var settingsAuthzQueries = new SettingsAuthzQueries(dbContext, userAuthorizationSnapshotBuilder, identityMatcher, textNormalizer);
+        var settingsAuthzCommands = new SettingsAuthzCommands(dbContext, resolvedTimeProvider);
+
+        return new SqlServerDataStore(
+            dbContext,
+            textNormalizer,
+            richTextContentService,
+            identityMatcher,
+            commentAuthorization,
+            resolvedTimeProvider,
+            exportTemplateUseCase,
+            userAuthorizationSnapshotBuilder,
+            settingsAuthzQueries,
+            settingsAuthzCommands);
     }
+
+    public static ExportTemplateUseCase CreateExportTemplateUseCase(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
+    {
+        var textNormalizer = new TextNormalizer();
+        var richTextContentService = new RichTextContentService();
+        var identityMatcher = new PersonIdentityMatcher(textNormalizer);
+        return new ExportTemplateUseCase(
+            new ExportTemplateQueries(dbContext, textNormalizer, richTextContentService, identityMatcher),
+            timeProvider ?? TimeProvider.System);
+    }
+
+    public static SettingsAuthzQueries CreateSettingsAuthzQueries(PmTrackerDbContext dbContext)
+    {
+        var textNormalizer = new TextNormalizer();
+        var identityMatcher = new PersonIdentityMatcher(textNormalizer);
+        return new SettingsAuthzQueries(
+            dbContext,
+            new UserAuthorizationSnapshotBuilder(dbContext, textNormalizer),
+            identityMatcher,
+            textNormalizer);
+    }
+
+    public static SettingsAuthzCommands CreateSettingsAuthzCommands(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
+        => new(dbContext, timeProvider ?? TimeProvider.System);
 
     public static CurrentUserContextViewModel BuildUser(
         int osobaId,
@@ -201,7 +244,6 @@ internal static class IntegrationTestHelper
             RoleId = roleId,
             DatumPrirazeni = DateTime.UtcNow
         });
-
         await dbContext.SaveChangesAsync();
     }
 
@@ -236,7 +278,6 @@ internal static class IntegrationTestHelper
             RoleSubsystemuId = roleId,
             DatumPrirazeni = DateTime.UtcNow
         });
-
         await dbContext.SaveChangesAsync();
     }
 
@@ -252,7 +293,6 @@ internal static class IntegrationTestHelper
             .Where(x => x.Kod == categoryCode)
             .Select(x => x.Id)
             .FirstAsync();
-
         var taskStateId = await dbContext.CiselnikStavuUkolu
             .OrderBy(x => x.Id)
             .Select(x => x.Id)
@@ -316,7 +356,6 @@ internal static class IntegrationTestHelper
 
         dbContext.Jednani.Add(meeting);
         await dbContext.SaveChangesAsync();
-
         return meeting.Id;
     }
 }

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Server.IISIntegration;
 using PmTracker.Web.Filters;
 using PmTracker.Web.Middleware;
+using PmTracker.Web.Modules;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 
@@ -13,7 +14,9 @@ builder.Services.AddControllersWithViews(options =>
 builder.Services.AddAuthentication(IISDefaults.AuthenticationScheme);
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
-builder.Services.AddPmTrackerDataStore(builder.Configuration);
+builder.Services
+    .AddPmTrackerDataStore(builder.Configuration)
+    .AddPmTrackerModules();
 
 var app = builder.Build();
 

@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using FluentAssertions;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Data;
+using PmTracker.Web.Modules.Settings;
 using PmTracker.Web.Services.Settings;
 
 namespace PmTracker.Tests.Unit.Settings;
@@ -21,11 +21,12 @@ public sealed class DeleteRolePermissionCommandTests
     }
 
     [Fact]
-    public void DeleteRolePermission_ShouldDelegateToDataStore()
+    public void DeleteRolePermission_ShouldDelegateToSettingsCommands()
     {
-        var dataStore = DispatchProxy.Create<IPmTrackerDataStore, RecordingDataStoreProxy>();
-        var recorder = (RecordingDataStoreProxy)(object)dataStore;
-        var sut = new SettingsService(dataStore);
+        var queries = DispatchProxy.Create<ISettingsAuthzQueries, RecordingProxy>();
+        var commands = DispatchProxy.Create<ISettingsAuthzCommands, RecordingProxy>();
+        var recorder = (RecordingProxy)(object)commands;
+        var sut = new SettingsService(queries, commands);
         var command = new DeleteRolePermissionCommand { Id = 42 };
         var currentUser = new CurrentUserContextViewModel
         {
@@ -44,7 +45,7 @@ public sealed class DeleteRolePermissionCommandTests
 
         sut.DeleteRolePermission(command, currentUser);
 
-        recorder.LastMethodName.Should().Be(nameof(IPmTrackerDataStore.DeleteRolePermission));
+        recorder.LastMethodName.Should().Be(nameof(ISettingsAuthzCommands.DeleteRolePermission));
         recorder.LastArguments.Should().ContainInOrder(command, currentUser);
     }
 
@@ -55,7 +56,7 @@ public sealed class DeleteRolePermissionCommandTests
         return validationResults;
     }
 
-    private class RecordingDataStoreProxy : DispatchProxy
+    private class RecordingProxy : DispatchProxy
     {
         public string? LastMethodName { get; private set; }
         public object?[] LastArguments { get; private set; } = [];

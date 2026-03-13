@@ -1,44 +1,39 @@
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Data;
+using PmTracker.Web.Modules.Settings;
 
 namespace PmTracker.Web.Services.Settings;
 
-public sealed class SettingsService : ISettingsService
+public sealed class SettingsService(
+    ISettingsAuthzQueries queries,
+    ISettingsAuthzCommands commands) : ISettingsService
 {
-    private readonly IPmTrackerDataStore _dataStore;
-
-    public SettingsService(IPmTrackerDataStore dataStore)
-    {
-        _dataStore = dataStore;
-    }
-
     public NastaveniDashboardViewModel BuildNastaveniDashboard(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId) =>
-        _dataStore.BuildNastaveniDashboard(section, currentUser, userId, projektId);
+        queries.BuildNastaveniDashboard(section, currentUser, userId, projektId);
 
     public NastaveniPanelViewModel BuildNastaveniPanel(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId) =>
-        _dataStore.BuildNastaveniPanel(section, currentUser, userId, projektId);
+        queries.BuildNastaveniPanel(section, currentUser, userId, projektId);
 
     public void SaveAuthzRole(SaveAuthzRoleCommand command, CurrentUserContextViewModel currentUser) =>
-        _dataStore.SaveAuthzRole(command, currentUser);
+        commands.SaveAuthzRole(command, currentUser);
 
     public void ToggleAuthzRole(ToggleAuthzRoleCommand command, CurrentUserContextViewModel currentUser) =>
-        _dataStore.ToggleAuthzRole(command, currentUser);
+        commands.ToggleAuthzRole(command, currentUser);
 
     public void SaveAuthzPermission(SaveAuthzPermissionCommand command, CurrentUserContextViewModel currentUser) =>
-        _dataStore.SaveAuthzPermission(command, currentUser);
+        commands.SaveAuthzPermission(command, currentUser);
 
     public void ToggleAuthzPermission(ToggleAuthzPermissionCommand command, CurrentUserContextViewModel currentUser) =>
-        _dataStore.ToggleAuthzPermission(command, currentUser);
+        commands.ToggleAuthzPermission(command, currentUser);
 
     public void SaveUserRoleAssignment(SaveUserRoleAssignmentCommand command, CurrentUserContextViewModel currentUser) =>
-        _dataStore.SaveUserRoleAssignment(command, currentUser);
+        commands.SaveUserRoleAssignment(command, currentUser);
 
     public void SaveUserRolesForUser(SaveUserRolesForUserCommand command, CurrentUserContextViewModel currentUser) =>
-        _dataStore.SaveUserRolesForUser(command, currentUser);
+        commands.SaveUserRolesForUser(command, currentUser);
 
     public void SaveRolePermission(SaveRolePermissionCommand command, CurrentUserContextViewModel currentUser) =>
-        _dataStore.SaveRolePermission(command, currentUser);
+        commands.SaveRolePermission(command, currentUser);
 
     public void DeleteRolePermission(DeleteRolePermissionCommand command, CurrentUserContextViewModel currentUser) =>
-        _dataStore.DeleteRolePermission(command, currentUser);
+        commands.DeleteRolePermission(command, currentUser);
 }

@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Modules.Export;
+using PmTracker.Web.Modules.Settings;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Dictionaries;
 using PmTracker.Web.Services.Schedules;
@@ -44,6 +46,10 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     private readonly IPersonIdentityMatcher _personIdentityMatcher;
     private readonly ICommentAuthorizationPolicy _commentAuthorizationPolicy;
     private readonly TimeProvider _timeProvider;
+    private readonly IExportTemplateUseCase _exportTemplateUseCase;
+    private readonly IUserAuthorizationSnapshotBuilder _userAuthorizationSnapshotBuilder;
+    private readonly ISettingsAuthzQueries _settingsAuthzQueries;
+    private readonly ISettingsAuthzCommands _settingsAuthzCommands;
     private readonly IReadOnlyDictionary<string, Action<SaveCiselnikRowCommand>> _ciselnikSaveHandlers;
     private readonly IReadOnlyDictionary<string, Action<DeleteCiselnikRowCommand>> _ciselnikDeleteHandlers;
 
@@ -117,7 +123,11 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         IRichTextContentService richTextContentService,
         IPersonIdentityMatcher personIdentityMatcher,
         ICommentAuthorizationPolicy commentAuthorizationPolicy,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IExportTemplateUseCase exportTemplateUseCase,
+        IUserAuthorizationSnapshotBuilder userAuthorizationSnapshotBuilder,
+        ISettingsAuthzQueries settingsAuthzQueries,
+        ISettingsAuthzCommands settingsAuthzCommands)
     {
         _dbContext = dbContext;
         _textNormalizer = textNormalizer;
@@ -125,6 +135,10 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         _personIdentityMatcher = personIdentityMatcher;
         _commentAuthorizationPolicy = commentAuthorizationPolicy;
         _timeProvider = timeProvider;
+        _exportTemplateUseCase = exportTemplateUseCase;
+        _userAuthorizationSnapshotBuilder = userAuthorizationSnapshotBuilder;
+        _settingsAuthzQueries = settingsAuthzQueries;
+        _settingsAuthzCommands = settingsAuthzCommands;
         _ciselnikSaveHandlers = BuildCiselnikSaveHandlers();
         _ciselnikDeleteHandlers = BuildCiselnikDeleteHandlers();
     }
@@ -156,12 +170,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             throw new InvalidOperationException($"Osoba '{asProfile}' nebyla v DB nalezena.");
         }
 
-        var roles = BuildUserRoleCodes(osoba.Id);
-        var grants = BuildUserPermissionGrants(osoba.Id);
-        var visibleProjectIds = BuildVisibleProjectIds(osoba.Id);
-        var deletedProjectIds = BuildDeletedProjectIds();
-        var isSuperadmin = _dbContext.AuthzSuperadmins.AsNoTracking().Any(x => x.OsobaId == osoba.Id)
-            || roles.Any(x => Ci.Equals(x, "SUPERADMIN"));
+        var authzSnapshot = _userAuthorizationSnapshotBuilder.Build(osoba.Id);
 
         var orgUnit = _dbContext.CiselnikOrganizacniCelky.AsNoTracking()
             .Where(x => x.Id == osoba.OrganizacniCelekId)
@@ -177,66 +186,16 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             Email = osoba.Email?.Trim() ?? string.Empty,
             OrganizacniCelekKod = string.IsNullOrWhiteSpace(orgUnit?.Kod) ? null : orgUnit.Kod.Trim(),
             OrganizacniCelek = orgUnit?.Nazev ?? "-",
-            IsSuperAdmin = isSuperadmin,
-            RoleKody = roles,
-            VisibleProjectIds = visibleProjectIds,
-            DeletedProjectIds = deletedProjectIds,
-            PermissionGrants = grants
+            IsSuperAdmin = authzSnapshot.IsSuperAdmin,
+            RoleKody = authzSnapshot.RoleKody,
+            VisibleProjectIds = authzSnapshot.VisibleProjectIds,
+            DeletedProjectIds = authzSnapshot.DeletedProjectIds,
+            PermissionGrants = authzSnapshot.PermissionGrants
         };
     }
 
     public bool ProjektExists(int id)
         => _dbContext.Projekty.AsNoTracking().Any(x => x.Id == id);
-
-    private List<int> BuildVisibleProjectIds(int osobaId)
-    {
-        var projectRoleProjectIds = _dbContext.ObsazeniProjektu.AsNoTracking()
-            .Where(x => x.OsobaId == osobaId && !x.DatumOdebrani.HasValue)
-            .Select(x => x.ProjektId)
-            .ToList();
-        var subsystemRoleProjectIds = (
-            from role in _dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
-            join projectSubsystem in _dbContext.ProjektSubsystemy.AsNoTracking() on role.ProjektSubsystemId equals projectSubsystem.Id
-            where role.OsobaId == osobaId
-                && !role.DatumOdebrani.HasValue
-                && !projectSubsystem.DatumOdebrani.HasValue
-            select projectSubsystem.ProjektId)
-            .ToList();
-
-        return projectRoleProjectIds
-            .Concat(subsystemRoleProjectIds)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToList();
-    }
-
-    private List<int> BuildDeletedProjectIds()
-    {
-        var directMatches = (
-            from project in _dbContext.Projekty.AsNoTracking()
-            join status in _dbContext.CiselnikStavuProjektu.AsNoTracking() on project.StavId equals status.Id
-            where status.Kod == "DELETED"
-            select project.Id)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToList();
-
-        if (directMatches.Count > 0)
-        {
-            return directMatches;
-        }
-
-        return (
-            from project in _dbContext.Projekty.AsNoTracking()
-            join status in _dbContext.CiselnikStavuProjektu.AsNoTracking() on project.StavId equals status.Id
-            select new { project.Id, status.Nazev })
-            .AsEnumerable()
-            .Where(x => _textNormalizer.Normalize(x.Nazev).Contains("smaz"))
-            .Select(x => x.Id)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToList();
-    }
 
     public IReadOnlyList<ProjektListItemViewModel> BuildProjektyList()
     {
@@ -880,192 +839,17 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     }
 
     public NastaveniDashboardViewModel BuildNastaveniDashboard(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId)
-    {
-        var panel = BuildNastaveniPanel(section, currentUser, userId, projektId);
-        var sections = BuildNastaveniSections(currentUser, panel);
-
-        return new NastaveniDashboardViewModel
-        {
-            Sekce = sections,
-            AktivniPanel = panel,
-            SelectedUserId = panel.EffectivePermissions.SelectedUserId,
-            SelectedProjektId = panel.EffectivePermissions.SelectedProjectId
-        };
-    }
+        => _settingsAuthzQueries.BuildNastaveniDashboard(section, currentUser, userId, projektId);
 
     public NastaveniPanelViewModel BuildNastaveniPanel(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId)
-    {
-        var canManage = currentUser.HasPermission(PermissionKeys.SettingsManage);
-        var normalized = NormalizeSettingsSection(section, canManage);
-
-        var categories = _dbContext.AuthzPermissionCategories.AsNoTracking().OrderBy(x => x.SortOrder).ThenBy(x => x.Kod)
-            .Select(x => new PermissionCategoryViewModel
-            {
-                Id = x.Id,
-                Kod = x.Kod,
-                Nazev = x.Nazev,
-                SortOrder = x.SortOrder
-            })
-            .ToList();
-
-        var permissionRows = _dbContext.AuthzPermissions.AsNoTracking().OrderBy(x => x.Klic).ToList();
-        var permissions = permissionRows
-            .Select(x => new PermissionViewModel
-            {
-                Id = x.Id,
-                Klic = x.Klic,
-                Nazev = x.Nazev,
-                CategoryKod = categories.FirstOrDefault(c => c.Id == x.CategoryId)?.Kod ?? "-",
-                ScopeLevel = x.ScopeLevel,
-                IsActive = x.IsActive,
-                IsSystem = x.IsSystem
-            })
-            .ToList();
-
-        var roles = _dbContext.AuthzRoles.AsNoTracking().OrderBy(x => x.Kod)
-            .Select(x => new RoleViewModel
-            {
-                Id = x.Id,
-                Kod = x.Kod,
-                Nazev = x.Nazev,
-                Popis = x.Popis ?? string.Empty,
-                IsSystem = x.IsSystem,
-                IsActive = x.IsActive
-            })
-            .ToList();
-
-        var rolePermissionProjects = _dbContext.AuthzRolePermissionProjects.AsNoTracking().ToList();
-
-        var rolePermissionScopes = _dbContext.AuthzRolePermissions.AsNoTracking()
-            .OrderBy(x => x.RoleId)
-            .ThenBy(x => x.PermissionId)
-            .ToList()
-            .Select(x => new RolePermissionScopeViewModel
-            {
-                Id = x.Id,
-                RoleId = x.RoleId,
-                RoleKod = roles.FirstOrDefault(role => role.Id == x.RoleId)?.Kod ?? "-",
-                PermissionId = x.PermissionId,
-                PermissionKlic = permissions.FirstOrDefault(permission => permission.Id == x.PermissionId)?.Klic ?? "-",
-                ScopeMode = x.ScopeMode,
-                IsAllowed = x.IsAllowed,
-                ProjektIds = rolePermissionProjects.Where(p => p.RolePermissionId == x.Id).Select(p => p.ProjektId).Distinct().ToList()
-            })
-            .ToList();
-
-        var users = _dbContext.Osoby.AsNoTracking()
-            .OrderBy(x => x.Prijmeni)
-            .ThenBy(x => x.Jmeno)
-            .Select(x => new { x.Id, x.Titul, x.Jmeno, x.Prijmeni, x.Email })
-            .ToList();
-
-        var userRoleRows = _dbContext.AuthzUserRoles.AsNoTracking()
-            .Where(x => x.IsActive)
-            .Join(
-                _dbContext.AuthzRoles.AsNoTracking(),
-                userRole => userRole.RoleId,
-                role => role.Id,
-                (userRole, role) => new
-                {
-                    userRole.OsobaId,
-                    userRole.RoleId,
-                    RoleKod = role.Kod,
-                    RoleIsActive = role.IsActive
-                })
-            .Where(x => x.RoleIsActive)
-            .ToList();
-
-        var userRoleByOsobaId = userRoleRows
-            .GroupBy(x => x.OsobaId)
-            .ToDictionary(group => group.Key, group => group
-                .OrderBy(x => x.RoleKod, StringComparer.CurrentCultureIgnoreCase)
-                .Select(x => new UserRoleItemViewModel
-                {
-                    RoleId = x.RoleId,
-                    RoleKod = x.RoleKod
-                })
-                .ToList());
-
-        var userRoleAssignments = users.Select(user =>
-        {
-            var userRoles = userRoleByOsobaId.TryGetValue(user.Id, out var assignedRoles)
-                ? assignedRoles
-                : new List<UserRoleItemViewModel>();
-            return new UserRoleAssignmentViewModel
-            {
-                OsobaId = user.Id,
-                Osoba = BuildDisplayName(user.Titul, user.Jmeno, user.Prijmeni, user.Id),
-                Email = user.Email?.Trim() ?? string.Empty,
-                RoleKody = userRoles.Select(x => x.RoleKod).ToList(),
-                RoleAssignments = userRoles
-            };
-        }).ToList();
-
-        var projects = _dbContext.Projekty.AsNoTracking().OrderBy(x => x.Zkratka)
-            .Select(x => new NastaveniProjektItemViewModel { Id = x.Id, Nazev = x.CelyNazev })
-            .ToList();
-
-        var effectivePermissions = BuildEffectivePermissionPreview(currentUser, userId, projektId);
-
-        var (title, description) = normalized switch
-        {
-            "akce" => ("Akce", "Katalog akcí aplikace."),
-            "role-akce" => ("Mapování rolí na akce", "Nastavení oprávnění a rozsahů ALL / INCLUDE."),
-            "uzivatele-role" => ("Přiřazení rolí uživatelům", "Mapování rolí na osoby."),
-            "efektivni-prava" => ("Kontrola efektivních práv", "Diagnostický pohled na finální práva uživatele."),
-            _ => ("Role", "Správa rolí administrátorů.")
-        };
-
-        return new NastaveniPanelViewModel
-        {
-            SectionKey = normalized,
-            Nazev = title,
-            Popis = description,
-            Role = roles,
-            PermissionCategories = categories,
-            Permissions = permissions,
-            RolePermissionScopes = rolePermissionScopes,
-            UserRoles = userRoleAssignments,
-            EffectivePermissions = effectivePermissions,
-            Projekty = projects
-        };
-    }
+        => _settingsAuthzQueries.BuildNastaveniPanel(section, currentUser, userId, projektId);
 
     public PdfExportTemplateViewModel BuildProjectPrintTemplate(
         int projektId,
         CurrentUserContextViewModel currentUser,
         bool autoPrint)
     {
-        if (!ProjektExists(projektId))
-        {
-            throw new InvalidOperationException($"Projekt {projektId} nebyl nalezen.");
-        }
-
-        var project = _dbContext.Projekty.AsNoTracking().First(x => x.Id == projektId);
-        var records = BuildExportRecords(projektId, null, null, 0, false, applyMeetingSnapshotRules: false);
-
-        return new PdfExportTemplateViewModel
-        {
-            ExportVariant = "project_all",
-            AutoPrint = autoPrint,
-            ProjektId = project.Id,
-            ProjektZkratka = project.Zkratka,
-            ProjektNazev = project.CelyNazev,
-            JednaniId = null,
-            JednaniCislo = null,
-            JednaniDatum = null,
-            JednaniMisto = null,
-            JednaniStav = "Projekt",
-            Vytvoril = currentUser.DisplayName,
-            VytvorenoDne = GetLocalNow(),
-            SnapshotSummary = "Tisk kompletního projektu bez filtru.",
-            PreparationSummary = null,
-            ProjektoveRole = BuildProjectExportRoleRows(project.Id),
-            AppliedRuleSummary = new[] { "Bez omezení" },
-            Legenda = Array.Empty<PdfLegendItemViewModel>(),
-            Zaznamy = records,
-            Dochazka = Array.Empty<PdfAttendanceGroupViewModel>()
-        };
+        return _exportTemplateUseCase.BuildProjectTemplate(projektId, currentUser, autoPrint);
     }
 
     public PdfExportTemplateViewModel BuildMeetingPrintTemplate(
@@ -1073,36 +857,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         CurrentUserContextViewModel currentUser,
         bool autoPrint)
     {
-        var meeting = _dbContext.Jednani.AsNoTracking().FirstOrDefault(x => x.Id == jednaniId)
-            ?? throw new InvalidOperationException($"Jednání {jednaniId} nebylo nalezeno.");
-
-        var project = _dbContext.Projekty.AsNoTracking().First(x => x.Id == meeting.ProjektId);
-        var status = _dbContext.CiselnikStavuJednani.AsNoTracking().FirstOrDefault(x => x.Id == meeting.StavJednaniId);
-
-        var records = BuildExportRecords(project.Id, meeting.Id, null, meeting.CisloJednani, true, applyMeetingSnapshotRules: true);
-
-        return new PdfExportTemplateViewModel
-        {
-            ExportVariant = "meeting",
-            AutoPrint = autoPrint,
-            ProjektId = project.Id,
-            ProjektZkratka = project.Zkratka,
-            ProjektNazev = project.CelyNazev,
-            JednaniId = meeting.Id,
-            JednaniCislo = meeting.CisloJednani,
-            JednaniDatum = meeting.DatumPlanovane,
-            JednaniMisto = meeting.Misto,
-            JednaniStav = status?.Nazev ?? "-",
-            Vytvoril = currentUser.DisplayName,
-            VytvorenoDne = GetLocalNow(),
-            SnapshotSummary = string.Empty,
-            PreparationSummary = null,
-            ProjektoveRole = BuildProjectExportRoleRows(project.Id),
-            AppliedRuleSummary = new[] { "Automatický meeting výstup" },
-            Legenda = Array.Empty<PdfLegendItemViewModel>(),
-            Zaznamy = records,
-            Dochazka = BuildAttendanceGroups(meeting.Id, project.Id)
-        };
+        return _exportTemplateUseCase.BuildMeetingTemplate(jednaniId, currentUser, autoPrint);
     }
 
     public PdfExportTemplateViewModel BuildTaskPrintTemplate(
@@ -1111,38 +866,7 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         CurrentUserContextViewModel currentUser,
         bool autoPrint)
     {
-        var project = _dbContext.Projekty.AsNoTracking().FirstOrDefault(x => x.Id == projektId)
-            ?? throw new InvalidOperationException($"Projekt {projektId} nebyl nalezen.");
-
-        var lastMeeting = _dbContext.Jednani.AsNoTracking()
-            .Where(x => x.ProjektId == projektId)
-            .OrderByDescending(x => x.CisloJednani)
-            .FirstOrDefault();
-
-        var records = BuildExportRecords(projektId, lastMeeting?.Id, zaznamId, lastMeeting?.CisloJednani ?? 0, true, applyMeetingSnapshotRules: false);
-
-        return new PdfExportTemplateViewModel
-        {
-            ExportVariant = "task_single",
-            AutoPrint = autoPrint,
-            ProjektId = project.Id,
-            ProjektZkratka = project.Zkratka,
-            ProjektNazev = project.CelyNazev,
-            JednaniId = lastMeeting?.Id,
-            JednaniCislo = lastMeeting?.CisloJednani,
-            JednaniDatum = lastMeeting?.DatumPlanovane,
-            JednaniMisto = lastMeeting?.Misto,
-            JednaniStav = "Úkol",
-            Vytvoril = currentUser.DisplayName,
-            VytvorenoDne = GetLocalNow(),
-            SnapshotSummary = "Tisk jednoho úkolu.",
-            PreparationSummary = null,
-            ProjektoveRole = Array.Empty<PdfRoleAssignmentViewModel>(),
-            AppliedRuleSummary = new[] { "Automatický task výstup" },
-            Legenda = Array.Empty<PdfLegendItemViewModel>(),
-            Zaznamy = records,
-            Dochazka = Array.Empty<PdfAttendanceGroupViewModel>()
-        };
+        return _exportTemplateUseCase.BuildTaskTemplate(projektId, zaznamId, currentUser, autoPrint);
     }
 
     public int SaveProject(SaveProjectCommand command, CurrentUserContextViewModel currentUser)
@@ -3053,536 +2777,28 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
     }
 
     public void SaveUserRoleAssignment(SaveUserRoleAssignmentCommand command, CurrentUserContextViewModel currentUser)
-    {
-        if (!_dbContext.Osoby.AsNoTracking().Any(x => x.Id == command.OsobaId))
-        {
-            throw new InvalidOperationException("Vybraná osoba neexistuje.");
-        }
-
-        var role = _dbContext.AuthzRoles.FirstOrDefault(x => x.Id == command.RoleId);
-        if (role is null)
-        {
-            throw new InvalidOperationException("Vybraná role neexistuje.");
-        }
-
-        var row = _dbContext.AuthzUserRoles.FirstOrDefault(x => x.OsobaId == command.OsobaId && x.RoleId == command.RoleId);
-        var oldValue = row is null ? null : JsonSerializer.Serialize(row);
-        if (row is null)
-        {
-            row = new AuthzUserRoleEntity
-            {
-                OsobaId = command.OsobaId,
-                RoleId = command.RoleId,
-                IsActive = command.IsActive,
-                CreatedAt = DateTime.UtcNow
-            };
-            _dbContext.AuthzUserRoles.Add(row);
-        }
-        else
-        {
-            row.IsActive = command.IsActive;
-        }
-
-        _dbContext.SaveChanges();
-        WriteAudit(currentUser.OsobaId, "authz.user_roles", row.Id.ToString(CultureInfo.InvariantCulture), "upsert", oldValue, JsonSerializer.Serialize(row));
-    }
+        => _settingsAuthzCommands.SaveUserRoleAssignment(command, currentUser);
 
     public void SaveUserRolesForUser(SaveUserRolesForUserCommand command, CurrentUserContextViewModel currentUser)
-    {
-        if (!_dbContext.Osoby.AsNoTracking().Any(x => x.Id == command.OsobaId))
-        {
-            throw new InvalidOperationException("Vybraná osoba neexistuje.");
-        }
-
-        var requestedRoleIds = (command.RoleIds ?? new List<int>())
-            .Where(x => x > 0)
-            .Distinct()
-            .ToList();
-
-        var roleRows = _dbContext.AuthzRoles.AsNoTracking()
-            .Where(x => requestedRoleIds.Contains(x.Id))
-            .Select(x => new { x.Id, x.IsActive })
-            .ToList();
-
-        if (roleRows.Count != requestedRoleIds.Count)
-        {
-            throw new InvalidOperationException("Vybraná role neexistuje.");
-        }
-
-        if (roleRows.Any(x => !x.IsActive))
-        {
-            throw new InvalidOperationException("Nelze přiřadit neaktivní roli.");
-        }
-
-        var oldRows = _dbContext.AuthzUserRoles.AsNoTracking()
-            .Where(x => x.OsobaId == command.OsobaId)
-            .OrderBy(x => x.RoleId)
-            .ToList();
-
-        var existingRows = _dbContext.AuthzUserRoles
-            .Where(x => x.OsobaId == command.OsobaId)
-            .ToList();
-
-        var requestedSet = requestedRoleIds.ToHashSet();
-        var existingByRoleId = existingRows.ToDictionary(x => x.RoleId);
-        foreach (var existing in existingRows)
-        {
-            existing.IsActive = requestedSet.Contains(existing.RoleId);
-        }
-
-        foreach (var roleId in requestedRoleIds)
-        {
-            if (existingByRoleId.ContainsKey(roleId))
-            {
-                continue;
-            }
-
-            _dbContext.AuthzUserRoles.Add(new AuthzUserRoleEntity
-            {
-                OsobaId = command.OsobaId,
-                RoleId = roleId,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
-            });
-        }
-
-        _dbContext.SaveChanges();
-
-        var newRows = _dbContext.AuthzUserRoles.AsNoTracking()
-            .Where(x => x.OsobaId == command.OsobaId)
-            .OrderBy(x => x.RoleId)
-            .ToList();
-
-        WriteAudit(
-            currentUser.OsobaId,
-            "authz.user_roles",
-            command.OsobaId.ToString(CultureInfo.InvariantCulture),
-            "replace",
-            JsonSerializer.Serialize(oldRows),
-            JsonSerializer.Serialize(newRows));
-    }
+        => _settingsAuthzCommands.SaveUserRolesForUser(command, currentUser);
 
     public void SaveAuthzRole(SaveAuthzRoleCommand command, CurrentUserContextViewModel currentUser)
-    {
-        var kod = command.Kod.Trim();
-        var nazev = command.Nazev.Trim();
-        var popis = string.IsNullOrWhiteSpace(command.Popis) ? null : command.Popis.Trim();
-        if (string.IsNullOrWhiteSpace(kod) || string.IsNullOrWhiteSpace(nazev))
-        {
-            throw new InvalidOperationException("Vyplňte kód i název role.");
-        }
-
-        var duplicateExists = _dbContext.AuthzRoles.AsNoTracking()
-            .Where(x => !command.Id.HasValue || x.Id != command.Id.Value)
-            .Select(x => x.Kod)
-            .ToList()
-            .Any(existingCode => Ci.Equals(existingCode, kod));
-        if (duplicateExists)
-        {
-            throw new InvalidOperationException($"Role s kódem '{kod}' už existuje.");
-        }
-
-        AuthzRoleEntity role;
-        string action;
-        string? oldValue = null;
-
-        if (command.Id is int roleId)
-        {
-            role = _dbContext.AuthzRoles.FirstOrDefault(x => x.Id == roleId)
-                ?? throw new InvalidOperationException("Role nebyla nalezena.");
-
-            if (role.IsSystem)
-            {
-                throw new InvalidOperationException("Systémovou roli nelze upravit.");
-            }
-
-            oldValue = JsonSerializer.Serialize(role);
-            role.Kod = kod;
-            role.Nazev = nazev;
-            role.Popis = popis;
-            action = "update";
-        }
-        else
-        {
-            role = new AuthzRoleEntity
-            {
-                Kod = kod,
-                Nazev = nazev,
-                Popis = popis,
-                IsSystem = false,
-                IsActive = true
-            };
-            _dbContext.AuthzRoles.Add(role);
-            action = "create";
-        }
-
-        _dbContext.SaveChanges();
-
-        WriteAudit(
-            currentUser.OsobaId,
-            "authz.roles",
-            role.Id.ToString(CultureInfo.InvariantCulture),
-            action,
-            oldValue,
-            JsonSerializer.Serialize(role));
-    }
+        => _settingsAuthzCommands.SaveAuthzRole(command, currentUser);
 
     public void ToggleAuthzRole(ToggleAuthzRoleCommand command, CurrentUserContextViewModel currentUser)
-    {
-        var role = _dbContext.AuthzRoles.FirstOrDefault(x => x.Id == command.Id)
-            ?? throw new InvalidOperationException("Role nebyla nalezena.");
-
-        if (role.IsSystem)
-        {
-            throw new InvalidOperationException("Systémovou roli nelze deaktivovat.");
-        }
-
-        var oldValue = JsonSerializer.Serialize(role);
-        role.IsActive = command.IsActive;
-        _dbContext.SaveChanges();
-
-        WriteAudit(
-            currentUser.OsobaId,
-            "authz.roles",
-            role.Id.ToString(CultureInfo.InvariantCulture),
-            command.IsActive ? "activate" : "deactivate",
-            oldValue,
-            JsonSerializer.Serialize(role));
-    }
+        => _settingsAuthzCommands.ToggleAuthzRole(command, currentUser);
 
     public void SaveAuthzPermission(SaveAuthzPermissionCommand command, CurrentUserContextViewModel currentUser)
-    {
-        var klic = command.Klic.Trim();
-        var nazev = command.Nazev.Trim();
-        var scopeLevel = (command.ScopeLevel ?? string.Empty).Trim().ToUpperInvariant();
-        var categoryId = command.CategoryId;
-        if (string.IsNullOrWhiteSpace(klic) || string.IsNullOrWhiteSpace(nazev))
-        {
-            throw new InvalidOperationException("Vyplňte klíč i název akce.");
-        }
-
-        if (!PermissionKeys.IsSupported(klic))
-        {
-            throw new InvalidOperationException($"Klíč '{klic}' není v seznamu podporovaných akcí. Vyberte klíč z nabídky.");
-        }
-
-        var catalogEntry = PermissionKeys.BuildCatalog()
-            .FirstOrDefault(x => Ci.Equals(x.Key, klic));
-        if (catalogEntry is not null)
-        {
-            var categoryCode = catalogEntry.CategoryKod.Trim();
-            var mappedCategoryId = _dbContext.AuthzPermissionCategories.AsNoTracking()
-                .Where(x => x.IsActive && x.Kod == categoryCode)
-                .Select(x => (int?)x.Id)
-                .FirstOrDefault();
-
-            if (!mappedCategoryId.HasValue)
-            {
-                throw new InvalidOperationException($"Katalog akcí odkazuje na neexistující kategorii '{categoryCode}'.");
-            }
-
-            categoryId = mappedCategoryId.Value;
-            scopeLevel = catalogEntry.ScopeLevel;
-        }
-
-        if (!Ci.Equals(scopeLevel, "GLOBAL") && !Ci.Equals(scopeLevel, "PROJECT"))
-        {
-            throw new InvalidOperationException("Neplatný rozsah akce.");
-        }
-
-        if (!_dbContext.AuthzPermissionCategories.AsNoTracking().Any(x => x.Id == categoryId && x.IsActive))
-        {
-            throw new InvalidOperationException("Vybraná kategorie akcí neexistuje.");
-        }
-
-        var duplicateExists = _dbContext.AuthzPermissions.AsNoTracking()
-            .Where(x => !command.Id.HasValue || x.Id != command.Id.Value)
-            .Select(x => x.Klic)
-            .ToList()
-            .Any(existingKey => Ci.Equals(existingKey, klic));
-        if (duplicateExists)
-        {
-            throw new InvalidOperationException($"Akce s klíčem '{klic}' už existuje.");
-        }
-
-        AuthzPermissionEntity permission;
-        string action;
-        string? oldValue = null;
-
-        if (command.Id is int permissionId)
-        {
-            permission = _dbContext.AuthzPermissions.FirstOrDefault(x => x.Id == permissionId)
-                ?? throw new InvalidOperationException("Akce nebyla nalezena.");
-
-            if (permission.IsSystem)
-            {
-                throw new InvalidOperationException("Systémovou akci nelze upravit.");
-            }
-
-            oldValue = JsonSerializer.Serialize(permission);
-            permission.Klic = klic;
-            permission.Nazev = nazev;
-            permission.CategoryId = categoryId;
-            permission.ScopeLevel = scopeLevel;
-            action = "update";
-        }
-        else
-        {
-            permission = new AuthzPermissionEntity
-            {
-                Klic = klic,
-                Nazev = nazev,
-                CategoryId = categoryId,
-                ScopeLevel = scopeLevel,
-                IsActive = true,
-                IsSystem = false
-            };
-            _dbContext.AuthzPermissions.Add(permission);
-            action = "create";
-        }
-
-        _dbContext.SaveChanges();
-
-        WriteAudit(
-            currentUser.OsobaId,
-            "authz.permissions",
-            permission.Id.ToString(CultureInfo.InvariantCulture),
-            action,
-            oldValue,
-            JsonSerializer.Serialize(permission));
-    }
+        => _settingsAuthzCommands.SaveAuthzPermission(command, currentUser);
 
     public void ToggleAuthzPermission(ToggleAuthzPermissionCommand command, CurrentUserContextViewModel currentUser)
-    {
-        var permission = _dbContext.AuthzPermissions.FirstOrDefault(x => x.Id == command.Id)
-            ?? throw new InvalidOperationException("Akce nebyla nalezena.");
-
-        if (permission.IsSystem)
-        {
-            throw new InvalidOperationException("Systémovou akci nelze deaktivovat.");
-        }
-
-        var oldValue = JsonSerializer.Serialize(permission);
-        permission.IsActive = command.IsActive;
-        _dbContext.SaveChanges();
-
-        WriteAudit(
-            currentUser.OsobaId,
-            "authz.permissions",
-            permission.Id.ToString(CultureInfo.InvariantCulture),
-            command.IsActive ? "activate" : "deactivate",
-            oldValue,
-            JsonSerializer.Serialize(permission));
-    }
+        => _settingsAuthzCommands.ToggleAuthzPermission(command, currentUser);
 
     public void SaveRolePermission(SaveRolePermissionCommand command, CurrentUserContextViewModel currentUser)
-    {
-        var scopeMode = string.Equals(command.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase)
-            ? "INCLUDE"
-            : string.Equals(command.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase)
-                ? "ALL"
-                : throw new InvalidOperationException("Neplatný rozsah mapování role/akce.");
-
-        if (!_dbContext.AuthzRoles.AsNoTracking().Any(x => x.Id == command.RoleId))
-        {
-            throw new InvalidOperationException("Vybraná role neexistuje.");
-        }
-
-        if (!_dbContext.AuthzPermissions.AsNoTracking().Any(x => x.Id == command.PermissionId))
-        {
-            throw new InvalidOperationException("Vybraná akce neexistuje.");
-        }
-
-        AuthzRolePermissionEntity? row = null;
-        if (command.Id.HasValue)
-        {
-            row = _dbContext.AuthzRolePermissions.FirstOrDefault(x => x.Id == command.Id.Value)
-                ?? throw new InvalidOperationException("Mapování role/akce nebylo nalezeno.");
-        }
-        else
-        {
-            row = _dbContext.AuthzRolePermissions.FirstOrDefault(x => x.RoleId == command.RoleId && x.PermissionId == command.PermissionId);
-        }
-
-        var currentRolePermissionId = row?.Id;
-        var duplicateExists = _dbContext.AuthzRolePermissions.AsNoTracking()
-            .Any(x => x.RoleId == command.RoleId
-                      && x.PermissionId == command.PermissionId
-                      && (!currentRolePermissionId.HasValue || x.Id != currentRolePermissionId.Value));
-        if (duplicateExists)
-        {
-            throw new InvalidOperationException("Pro zvolenou roli a akci už mapování existuje.");
-        }
-
-        var oldValue = row is null ? null : JsonSerializer.Serialize(row);
-        if (row is null)
-        {
-            row = new AuthzRolePermissionEntity
-            {
-                RoleId = command.RoleId,
-                PermissionId = command.PermissionId,
-                ScopeMode = scopeMode,
-                IsAllowed = command.IsAllowed
-            };
-            _dbContext.AuthzRolePermissions.Add(row);
-        }
-        else
-        {
-            row.RoleId = command.RoleId;
-            row.PermissionId = command.PermissionId;
-            row.ScopeMode = scopeMode;
-            row.IsAllowed = command.IsAllowed;
-        }
-
-        _dbContext.SaveChanges();
-
-        var currentProjects = _dbContext.AuthzRolePermissionProjects.Where(x => x.RolePermissionId == row.Id).ToList();
-        _dbContext.AuthzRolePermissionProjects.RemoveRange(currentProjects);
-        if (scopeMode == "INCLUDE")
-        {
-            var projectIds = (command.ProjektIds ?? new List<int>()).Where(x => x > 0).Distinct().ToList();
-            var validProjectIds = _dbContext.Projekty.AsNoTracking()
-                .Where(x => projectIds.Contains(x.Id))
-                .Select(x => x.Id)
-                .ToHashSet();
-            var missingProjectIds = projectIds.Where(x => !validProjectIds.Contains(x)).ToList();
-            if (missingProjectIds.Count > 0)
-            {
-                throw new InvalidOperationException("Vybrané projekty pro INCLUDE mapování neexistují.");
-            }
-
-            foreach (var projectId in projectIds)
-            {
-                _dbContext.AuthzRolePermissionProjects.Add(new AuthzRolePermissionProjectEntity
-                {
-                    RolePermissionId = row.Id,
-                    ProjektId = projectId
-                });
-            }
-        }
-
-        _dbContext.SaveChanges();
-        WriteAudit(currentUser.OsobaId, "authz.role_permissions", row.Id.ToString(CultureInfo.InvariantCulture), "upsert", oldValue, JsonSerializer.Serialize(command));
-    }
+        => _settingsAuthzCommands.SaveRolePermission(command, currentUser);
 
     public void DeleteRolePermission(DeleteRolePermissionCommand command, CurrentUserContextViewModel currentUser)
-    {
-        var row = _dbContext.AuthzRolePermissions.FirstOrDefault(x => x.Id == command.Id)
-            ?? throw new InvalidOperationException("Mapování role/akce nebylo nalezeno.");
-
-        var oldValue = JsonSerializer.Serialize(row);
-        var linkedProjects = _dbContext.AuthzRolePermissionProjects
-            .Where(x => x.RolePermissionId == command.Id)
-            .ToList();
-
-        if (linkedProjects.Count > 0)
-        {
-            _dbContext.AuthzRolePermissionProjects.RemoveRange(linkedProjects);
-        }
-
-        _dbContext.AuthzRolePermissions.Remove(row);
-        _dbContext.SaveChanges();
-
-        WriteAudit(
-            currentUser.OsobaId,
-            "authz.role_permissions",
-            command.Id.ToString(CultureInfo.InvariantCulture),
-            "delete",
-            oldValue,
-            JsonSerializer.Serialize(command));
-    }
-
-    private IReadOnlyList<string> BuildUserRoleCodes(int osobaId)
-    {
-        return _dbContext.AuthzUserRoles.AsNoTracking()
-            .Where(x => x.OsobaId == osobaId && x.IsActive)
-            .Join(_dbContext.AuthzRoles.AsNoTracking(), ur => ur.RoleId, role => role.Id, (ur, role) => role)
-            .Where(role => role.IsActive)
-            .Select(role => role.Kod)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToList();
-    }
-
-    private IReadOnlyList<PermissionGrantViewModel> BuildUserPermissionGrants(int osobaId)
-    {
-        var rolePermissions = (
-            from ur in _dbContext.AuthzUserRoles.AsNoTracking()
-            join role in _dbContext.AuthzRoles.AsNoTracking() on ur.RoleId equals role.Id
-            join rp in _dbContext.AuthzRolePermissions.AsNoTracking() on ur.RoleId equals rp.RoleId
-            join p in _dbContext.AuthzPermissions.AsNoTracking() on rp.PermissionId equals p.Id
-            where ur.OsobaId == osobaId && ur.IsActive && role.IsActive && p.IsActive
-            select new
-            {
-                RolePermissionId = rp.Id,
-                RoleKod = role.Kod,
-                p.Klic,
-                p.ScopeLevel,
-                rp.ScopeMode,
-                rp.IsAllowed
-            }).ToList();
-
-        var rolePermissionIds = rolePermissions
-            .Where(x => Ci.Equals(x.ScopeMode, "INCLUDE"))
-            .Select(x => x.RolePermissionId)
-            .Distinct()
-            .ToList();
-
-        var includeMap = _dbContext.AuthzRolePermissionProjects.AsNoTracking()
-            .Where(x => rolePermissionIds.Contains(x.RolePermissionId))
-            .GroupBy(x => x.RolePermissionId)
-            .ToDictionary(
-                group => group.Key,
-                group => (IReadOnlyList<int>)group.Select(item => item.ProjektId).Distinct().ToList());
-
-        var explicitGrants = rolePermissions
-            .Select(item => new PermissionGrantViewModel
-            {
-                PermissionKey = item.Klic,
-                ScopeLevel = item.ScopeLevel,
-                ScopeMode = item.ScopeMode,
-                IsAllowed = item.IsAllowed,
-                ProjectIds = Ci.Equals(item.ScopeMode, "INCLUDE")
-                    ? includeMap.GetValueOrDefault(item.RolePermissionId, Array.Empty<int>())
-                    : Array.Empty<int>(),
-                SourceType = "APP_ROLE",
-                SourceRoleCode = item.RoleKod
-            })
-            .ToList();
-
-        var implicitProjectRoleGrants = ProjectRolePermissionGrantBuilder.BuildImplicitProjectRoleGrants(
-            (
-                from assignment in _dbContext.ObsazeniProjektu.AsNoTracking()
-                join role in _dbContext.CiselnikRoliProjektu.AsNoTracking() on assignment.RoleId equals role.Id
-                where assignment.OsobaId == osobaId
-                    && !assignment.DatumOdebrani.HasValue
-                select new ProjectRoleAssignmentGrantSource
-                {
-                    RoleCode = role.Kod,
-                    ProjectId = assignment.ProjektId
-                })
-            .ToList());
-
-        var implicitSubsystemRoleGrants = SubsystemRolePermissionGrantBuilder.BuildImplicitSubsystemRoleGrants(
-            (
-                from assignment in _dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
-                join role in _dbContext.CiselnikRoliSubsystemu.AsNoTracking() on assignment.RoleSubsystemuId equals role.Id
-                join projectSubsystem in _dbContext.ProjektSubsystemy.AsNoTracking() on assignment.ProjektSubsystemId equals projectSubsystem.Id
-                where assignment.OsobaId == osobaId
-                    && !assignment.DatumOdebrani.HasValue
-                    && !projectSubsystem.DatumOdebrani.HasValue
-                select new SubsystemRoleAssignmentGrantSource
-                {
-                    RoleCode = role.Kod,
-                    ProjectId = projectSubsystem.ProjektId
-                })
-            .ToList());
-
-        return explicitGrants
-            .Concat(implicitProjectRoleGrants)
-            .Concat(implicitSubsystemRoleGrants)
-            .ToList();
-    }
+        => _settingsAuthzCommands.DeleteRolePermission(command, currentUser);
 
     private static string ResolveVisibleRecordNumber(ProjektovyZaznamEntity record)
     {
@@ -4733,19 +3949,6 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             .ToList();
     }
 
-    private List<PdfRoleAssignmentViewModel> BuildProjectExportRoleRows(int projectId)
-    {
-        return BuildUnifiedActiveProjectRoleRows(projectId)
-            .Select(member => new PdfRoleAssignmentViewModel
-            {
-                Osoba = member.Osoba,
-                TypRole = member.RoleTypeLabel,
-                Role = member.RoleNazev,
-                Subsystem = member.SubsystemNazev
-            })
-            .ToList();
-    }
-
     private Dictionary<int, List<int>> BuildLeadEquivalentOsobaIdsByProjectSubsystem(int projectId)
     {
         var leadRoleIds = _dbContext.CiselnikRoliSubsystemu.AsNoTracking()
@@ -5364,155 +4567,9 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         return Math.Max(0, schema.Kroky.Count + 1);
     }
 
-    private List<NastaveniSectionItemViewModel> BuildNastaveniSections(CurrentUserContextViewModel currentUser, NastaveniPanelViewModel panel)
-    {
-        var sections = new List<NastaveniSectionItemViewModel>
-        {
-            new() { Key = "role", Nazev = "Role", Popis = "Správa rolí", Pocet = panel.Role.Count },
-            new() { Key = "akce", Nazev = "Akce", Popis = "Katalog akcí", Pocet = panel.Permissions.Count },
-            new() { Key = "role-akce", Nazev = "Role -> Akce", Popis = "Mapování role/akce", Pocet = panel.RolePermissionScopes.Count },
-            new() { Key = "uzivatele-role", Nazev = "Uživatelé -> Role", Popis = "Přiřazení rolí", Pocet = panel.UserRoles.Count }
-        };
-
-        if (currentUser.HasPermission(PermissionKeys.SettingsManage))
-        {
-            sections.Add(new NastaveniSectionItemViewModel
-            {
-                Key = "efektivni-prava",
-                Nazev = "Efektivní práva",
-                Popis = "Kontrola výsledných práv",
-                Pocet = panel.EffectivePermissions.Rows.Count
-            });
-        }
-
-        return sections;
-    }
-
-    private string NormalizeSettingsSection(string? section, bool canManageSettings)
-    {
-        var normalized = (section ?? "role").Trim().ToLowerInvariant();
-        if (normalized == "efektivni-prava" && !canManageSettings)
-        {
-            return "role";
-        }
-
-        var valid = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "role", "akce", "role-akce", "uzivatele-role", "efektivni-prava"
-        };
-
-        return valid.Contains(normalized) ? normalized : "role";
-    }
-
-    private EffectivePermissionsPreviewViewModel BuildEffectivePermissionPreview(CurrentUserContextViewModel currentUser, int? selectedUserId, int? selectedProjectId)
-    {
-        var users = _dbContext.Osoby.AsNoTracking().OrderBy(x => x.Prijmeni).ThenBy(x => x.Jmeno).ToList();
-        var projects = _dbContext.Projekty.AsNoTracking().OrderBy(x => x.Zkratka).ToList();
-
-        var userId = selectedUserId ?? currentUser.OsobaId;
-        var selectedUser = users.FirstOrDefault(x => x.Id == userId) ?? users.FirstOrDefault();
-        if (selectedUser is null)
-        {
-            return new EffectivePermissionsPreviewViewModel
-            {
-                SelectedUserId = currentUser.OsobaId,
-                SelectedProjectId = selectedProjectId,
-                OsobaId = currentUser.OsobaId,
-                Osoba = currentUser.DisplayName,
-                ProjektId = selectedProjectId,
-                ProjektNazev = selectedProjectId.HasValue
-                    ? projects.FirstOrDefault(x => x.Id == selectedProjectId.Value)?.CelyNazev ?? "-"
-                    : "Všechny projekty",
-                AvailableUsers = Array.Empty<EffectiveRightsFilterOptionViewModel>(),
-                AvailableProjects = Array.Empty<EffectiveRightsFilterOptionViewModel>(),
-                Rows = Array.Empty<EffectivePermissionRowViewModel>()
-            };
-        }
-
-        var previewContext = new CurrentUserContextViewModel
-        {
-            OsobaId = selectedUser.Id,
-            Jmeno = selectedUser.Jmeno,
-            Prijmeni = selectedUser.Prijmeni,
-            DisplayName = BuildDisplayName(selectedUser.Titul, selectedUser.Jmeno, selectedUser.Prijmeni, selectedUser.Id),
-            Email = selectedUser.Email?.Trim() ?? string.Empty,
-            OrganizacniCelekKod = null,
-            OrganizacniCelek = "-",
-            IsSuperAdmin = _dbContext.AuthzSuperadmins.AsNoTracking().Any(x => x.OsobaId == selectedUser.Id),
-            RoleKody = BuildUserRoleCodes(selectedUser.Id),
-            VisibleProjectIds = BuildVisibleProjectIds(selectedUser.Id),
-            DeletedProjectIds = BuildDeletedProjectIds(),
-            PermissionGrants = BuildUserPermissionGrants(selectedUser.Id)
-        };
-
-        var permissions = _dbContext.AuthzPermissions.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Klic).ToList();
-        var projectCodesById = projects.ToDictionary(x => x.Id, x => x.Zkratka);
-
-        var rows = permissions.Select(permission =>
-        {
-            var allowed = previewContext.HasPermission(permission.Klic, selectedProjectId);
-            var grants = previewContext.PermissionGrants.Where(x => Ci.Equals(x.PermissionKey, permission.Klic)).ToList();
-            var scopeSummary = grants.Count == 0
-                ? "-"
-                : string.Join(", ", grants.Select(x =>
-                {
-                    if (Ci.Equals(x.ScopeMode, "ALL"))
-                    {
-                        return "ALL";
-                    }
-
-                    if (x.ProjectIds.Count == 0)
-                    {
-                        return "INCLUDE (prázdné)";
-                    }
-
-                    var names = projects.Where(p => x.ProjectIds.Contains(p.Id)).Select(p => p.Zkratka).ToList();
-                    return "INCLUDE: " + string.Join("; ", names);
-                }));
-            var sourceSummary = grants.Count == 0
-                ? "-"
-                : string.Join(", ", grants
-                    .Select(grant => BuildGrantSourceSummary(grant, projectCodesById))
-                    .Where(summary => !string.IsNullOrWhiteSpace(summary))
-                    .Distinct(StringComparer.CurrentCultureIgnoreCase));
-
-            return new EffectivePermissionRowViewModel
-            {
-                PermissionKlic = permission.Klic,
-                PermissionNazev = permission.Nazev,
-                IsAllowed = allowed,
-                ScopeSummary = scopeSummary,
-                SourceSummary = string.IsNullOrWhiteSpace(sourceSummary) ? "-" : sourceSummary
-            };
-        }).ToList();
-
-        return new EffectivePermissionsPreviewViewModel
-        {
-            SelectedUserId = selectedUser.Id,
-            SelectedProjectId = selectedProjectId,
-            OsobaId = selectedUser.Id,
-            Osoba = BuildInlinePersonLabel(selectedUser.Titul, selectedUser.Jmeno, selectedUser.Prijmeni, selectedUser.Email, selectedUser.Id),
-            ProjektId = selectedProjectId,
-            ProjektNazev = selectedProjectId.HasValue
-                ? projects.FirstOrDefault(x => x.Id == selectedProjectId.Value)?.CelyNazev ?? "-"
-                : "Všechny projekty",
-            AvailableUsers = users.Select(user => new EffectiveRightsFilterOptionViewModel
-            {
-                Id = user.Id,
-                Label = BuildInlinePersonLabel(user.Titul, user.Jmeno, user.Prijmeni, user.Email, user.Id)
-            }).ToList(),
-            AvailableProjects = projects.Select(project => new EffectiveRightsFilterOptionViewModel
-            {
-                Id = project.Id,
-                Label = project.CelyNazev
-            }).ToList(),
-            Rows = rows
-        };
-    }
-
     private IReadOnlyList<ProfilOdvozenePravoViewModel> BuildProfilOdvozenaPrava(int osobaId)
     {
-        var grants = BuildUserPermissionGrants(osobaId)
+        var grants = _userAuthorizationSnapshotBuilder.Build(osobaId).PermissionGrants
             .Where(grant => !Ci.Equals(grant.SourceType, "APP_ROLE"))
             .ToList();
         if (grants.Count == 0)
@@ -5697,462 +4754,6 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         }
 
         return "Implicitní grant";
-    }
-
-    private List<PdfAttendanceGroupViewModel> BuildAttendanceGroups(int meetingId, int projectId)
-    {
-        var attendanceRows = _dbContext.Ucast.AsNoTracking()
-            .Where(x => x.JednaniId == meetingId)
-            .ToList();
-        if (attendanceRows.Count == 0)
-        {
-            return BuildLegacyMeetingAttendance(meetingId, projectId)
-                .GroupBy(x => x.StavUcasti)
-                .Select(group => new PdfAttendanceGroupViewModel
-                {
-                    Stav = group.Key,
-                    Osoby = group.Select(x => x.Osoba).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList()
-                })
-                .ToList();
-        }
-
-        var attendanceStates = _dbContext.CiselnikStavuUcasti.AsNoTracking().ToDictionary(x => x.Id);
-        var people = _dbContext.Osoby.AsNoTracking().ToDictionary(x => x.Id);
-
-        return attendanceRows
-            .GroupBy(x => x.StavUcastiId)
-            .Select(group =>
-            {
-                var state = attendanceStates.GetValueOrDefault(group.Key);
-                var names = group
-                    .Select(item => BuildDisplayNameFromOsoba(people.GetValueOrDefault(item.OsobaId)))
-                    .Where(name => !string.IsNullOrWhiteSpace(name))
-                    .Distinct(Ci)
-                    .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
-                    .ToList();
-
-                return new
-                {
-                    State = state,
-                    Names = names
-                };
-            })
-            .Where(group => group.Names.Count > 0)
-            .OrderBy(group => AttendancePrintOrder(group.State))
-            .ThenBy(group => group.State?.Nazev ?? "Bez stavu", StringComparer.CurrentCultureIgnoreCase)
-            .Select(group => new PdfAttendanceGroupViewModel
-            {
-                Stav = group.State?.Nazev ?? "Bez stavu",
-                Osoby = group.Names
-            })
-            .ToList();
-    }
-
-    private List<UcastViewModel> BuildLegacyMeetingAttendance(int meetingId, int projectId)
-    {
-        var stateRows = _dbContext.CiselnikStavuUcasti.AsNoTracking().OrderBy(x => x.Id).ToList();
-        var states = stateRows.ToDictionary(x => x.Id);
-        var defaultState = ResolveDefaultAttendanceState(stateRows);
-
-        return BuildLegacyMeetingAttendance(projectId, states, defaultState);
-    }
-
-    private int AttendancePrintOrder(CiselnikStavuUcastiEntity? state)
-    {
-        if (state is null)
-        {
-            return 100;
-        }
-
-        if (Ci.Equals(state.Kod, "PRESENT"))
-        {
-            return 1;
-        }
-
-        if (Ci.Equals(state.Kod, "ONLINE"))
-        {
-            return 2;
-        }
-
-        if (Ci.Equals(state.Kod, "EXCUSED"))
-        {
-            return 3;
-        }
-
-        if (Ci.Equals(state.Kod, "MISSING") || Ci.Equals(state.Kod, "ABSENT"))
-        {
-            return 4;
-        }
-
-        var normalizedName = _textNormalizer.Normalize(state.Nazev);
-        if (normalizedName.Contains("videokonference", StringComparison.OrdinalIgnoreCase)
-            || normalizedName.Contains("online", StringComparison.OrdinalIgnoreCase))
-        {
-            return 2;
-        }
-
-        if (normalizedName.Contains("neomluven", StringComparison.OrdinalIgnoreCase)
-            || normalizedName.Contains("nepritomen", StringComparison.OrdinalIgnoreCase))
-        {
-            return 4;
-        }
-
-        if (normalizedName.Contains("omluven", StringComparison.OrdinalIgnoreCase))
-        {
-            return 3;
-        }
-
-        if (normalizedName.Contains("pritomen", StringComparison.OrdinalIgnoreCase))
-        {
-            return 1;
-        }
-
-        return 100;
-    }
-
-    private static List<VyjadreniEntity> OrderCommentsForExport(
-        IReadOnlyList<VyjadreniEntity> comments,
-        IReadOnlyDictionary<int, JednaniEntity> meetingById)
-    {
-        return comments
-            .OrderBy(comment => meetingById.GetValueOrDefault(comment.JednaniId)?.CisloJednani ?? 0)
-            .ThenBy(comment => comment.Id)
-            .ToList();
-    }
-
-    private List<PdfExportRecordViewModel> BuildExportRecords(
-        int projectId,
-        int? anchorMeetingId,
-        int? specificRecordId,
-        int anchorMeetingNumber,
-        bool limitComments,
-        bool applyMeetingSnapshotRules)
-    {
-        var records = _dbContext.ProjektoveZaznamy.AsNoTracking()
-            .Where(x => x.ProjektId == projectId)
-            .Where(x => !specificRecordId.HasValue || x.Id == specificRecordId.Value)
-            .ToList();
-        records = OrderRecordsByVisibleNumber(records).ToList();
-        var recordIds = records.Select(record => record.Id).ToArray();
-
-        var categories = _dbContext.CiselnikKategoriiZaznamu.AsNoTracking().ToDictionary(x => x.Id);
-        var taskTypes = _dbContext.CiselnikTypuUkolu.AsNoTracking().ToDictionary(x => x.Id);
-        var taskStates = _dbContext.CiselnikStavuUkolu.AsNoTracking().ToDictionary(x => x.Id);
-        var subsystems = _dbContext.Subsystemy.AsNoTracking().ToDictionary(x => x.Id);
-        var people = _dbContext.Osoby.AsNoTracking().ToDictionary(x => x.Id);
-
-        var comments = _dbContext.Vyjadreni.AsNoTracking()
-            .Where(x => recordIds.Contains(x.ZaznamId))
-            .ToList();
-
-        var meetings = _dbContext.Jednani.AsNoTracking()
-            .Where(x => x.ProjektId == projectId)
-            .OrderByDescending(x => x.CisloJednani)
-            .ToList();
-
-        var meetingStateMap = _dbContext.CiselnikStavuJednani.AsNoTracking().ToDictionary(x => x.Id);
-        var externalTypeMap = _dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().ToDictionary(x => x.Id);
-
-        var externalLinksByRecord = _dbContext.ZaznamExterniOdkazy.AsNoTracking()
-            .Where(x => recordIds.Contains(x.ZaznamId))
-            .ToList()
-            .GroupBy(x => x.ZaznamId)
-            .ToDictionary(group => group.Key, group => group.ToList());
-
-        var collaboration = _dbContext.ZaznamSpoluprace.AsNoTracking()
-            .Where(x => recordIds.Contains(x.ZaznamId))
-            .ToList()
-            .GroupBy(x => x.ZaznamId)
-            .ToDictionary(group => group.Key, group => group.ToList());
-
-        var termHistory = _dbContext.ZaznamHistorieTerminu.AsNoTracking()
-            .Where(x => recordIds.Contains(x.ZaznamId))
-            .OrderByDescending(x => x.DatumZmeny)
-            .ToList()
-            .GroupBy(x => x.ZaznamId)
-            .ToDictionary(group => group.Key, group => group.ToList());
-
-        var meetingById = meetings.ToDictionary(x => x.Id);
-        var anchorMeeting = anchorMeetingId.HasValue ? meetings.FirstOrDefault(x => x.Id == anchorMeetingId.Value) : null;
-        var anchorState = anchorMeeting is null ? null : meetingStateMap.GetValueOrDefault(anchorMeeting.StavJednaniId);
-        var previousMeeting = anchorMeeting is null
-            ? null
-            : meetings.Where(x => x.CisloJednani < anchorMeeting.CisloJednani)
-                .OrderByDescending(x => x.CisloJednani)
-                .FirstOrDefault();
-        var previousMeetingNumber = previousMeeting?.CisloJednani;
-
-        if (applyMeetingSnapshotRules && anchorMeeting is not null)
-        {
-            var statusHistoryByRecord = _dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking()
-                .Where(x => recordIds.Contains(x.ZaznamId))
-                .OrderByDescending(x => x.DatumZmeny)
-                .ThenByDescending(x => x.Id)
-                .ToList()
-                .GroupBy(x => x.ZaznamId)
-                .ToDictionary(group => group.Key, group => group.ToList());
-
-            var anchorMeetingDate = anchorMeeting.DatumPlanovane.Date;
-            var previousMeetingDate = previousMeeting?.DatumPlanovane.Date;
-
-            records = records
-                .Where(record => IsRecordVisibleForMeetingPrint(
-                    record,
-                    taskStates,
-                    statusHistoryByRecord.TryGetValue(record.Id, out var statusHistoryValues)
-                        ? statusHistoryValues
-                        : Array.Empty<ZaznamHistorieStavuZaznamuEntity>(),
-                    anchorMeetingDate,
-                    previousMeetingDate))
-                .ToList();
-        }
-
-        var filteredComments = anchorMeeting is null
-            ? comments
-            : comments
-                .Where(comment =>
-                    meetingById.TryGetValue(comment.JednaniId, out var commentMeeting)
-                    && commentMeeting.CisloJednani <= anchorMeeting.CisloJednani)
-                .ToList();
-
-        var commentGroups = filteredComments
-            .GroupBy(x => x.ZaznamId)
-            .ToDictionary(group => group.Key, group => group.ToList());
-
-        var exportRows = records.Select(record =>
-        {
-            IReadOnlyList<VyjadreniEntity> commentsForRecord = commentGroups.TryGetValue(record.Id, out var groupedComments)
-                ? groupedComments
-                : Array.Empty<VyjadreniEntity>();
-            var orderedCommentsForRecord = OrderCommentsForExport(commentsForRecord, meetingById);
-            var selectedComments = limitComments
-                ? ApplyCommentLimit(orderedCommentsForRecord)
-                : orderedCommentsForRecord;
-
-            var commentRows = selectedComments.Select(comment =>
-            {
-                meetingById.TryGetValue(comment.JednaniId, out var commentMeeting);
-                var commentState = commentMeeting is null ? null : meetingStateMap.GetValueOrDefault(commentMeeting.StavJednaniId);
-                var author = people.GetValueOrDefault(comment.AutorOsobaId) ?? people.GetValueOrDefault(record.VlastnikId);
-
-                var highlightColor = ResolveHighlightColor(anchorMeeting, anchorState, previousMeetingNumber, commentMeeting);
-
-                return new PdfExportCommentViewModel
-                {
-                    Autor = BuildDisplayNameFromOsoba(author),
-                    Datum = comment.DatumVyjadreni,
-                    Text = comment.TextVyjadreni,
-                    Delka = _richTextContentService.ToPlainText(comment.TextVyjadreni).Length,
-                    JednaniCislo = commentMeeting?.CisloJednani,
-                    JednaniDatum = commentMeeting?.DatumPlanovane,
-                    JednaniStav = commentState?.Nazev,
-                    IsNew = !string.IsNullOrWhiteSpace(highlightColor),
-                    HighlightColor = highlightColor
-                };
-            }).ToList();
-
-            IReadOnlyList<ZaznamExterniOdkazEntity> externalRows = externalLinksByRecord.TryGetValue(record.Id, out var externalValues)
-                ? externalValues
-                : Array.Empty<ZaznamExterniOdkazEntity>();
-            var external = externalRows
-                .Select(link =>
-                {
-                    var typeCode = externalTypeMap.GetValueOrDefault(link.TypOdkazuId)?.Kod ?? "-";
-                    return FormatExternalLinkDisplay(typeCode, link.Cislo, link.PredpokladanaCena, link.PlanDodani);
-                })
-                .ToList();
-
-            IReadOnlyList<ZaznamSpolupraceEntity> collaborationRows = collaboration.TryGetValue(record.Id, out var collaborationValues)
-                ? collaborationValues
-                : Array.Empty<ZaznamSpolupraceEntity>();
-            var peopleCollab = collaborationRows
-                .Select(item => BuildDisplayNameFromOsoba(people.GetValueOrDefault(item.OsobaId)))
-                .Distinct(Ci)
-                .OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase)
-                .ToList();
-
-            IReadOnlyList<ZaznamHistorieTerminuEntity> termHistoryRows = termHistory.TryGetValue(record.Id, out var termHistoryValues)
-                ? termHistoryValues
-                : Array.Empty<ZaznamHistorieTerminuEntity>();
-            var historyDates = termHistoryRows
-                .Select(x => x.PuvodniDatum)
-                .Distinct()
-                .OrderByDescending(x => x)
-                .ToList();
-
-            var category = categories.GetValueOrDefault(record.KategorieId);
-            var taskType = record.AktualniTypUkoluId.HasValue
-                ? taskTypes.GetValueOrDefault(record.AktualniTypUkoluId.Value)
-                : null;
-            var subsystem = subsystems.GetValueOrDefault(record.SubsystemId);
-
-            return new PdfExportRecordViewModel
-            {
-                ZaznamId = record.Id,
-                CisloZaznamu = record.CisloZaznamu,
-                CisloViditelne = ResolveVisibleRecordNumber(record),
-                CisloViditelneA = ResolveVisibleNumberPartA(record),
-                CisloViditelneB = ResolveVisibleNumberPartB(record),
-                Nazev = record.Nazev,
-                Cil = record.Cil,
-                Popis = record.Popis,
-                KategorieKod = category?.Kod ?? "-",
-                Kategorie = category?.Nazev ?? "-",
-                TypUkoluKod = taskType?.Kod,
-                TypUkolu = taskType?.Nazev,
-                Stav = record.StavUkoluId.HasValue ? taskStates.GetValueOrDefault(record.StavUkoluId.Value)?.Nazev ?? "-" : "-",
-                Vlastnik = BuildDisplayNameFromOsoba(people.GetValueOrDefault(record.VlastnikId)),
-                SubsystemKod = subsystem?.Kod ?? "-",
-                Subsystem = subsystem?.Nazev ?? "-",
-                DatumZalozeni = record.DatumZalozeni,
-                HistorieTerminu = historyDates,
-                Termin = record.DatumUkonceni,
-                ExterniVazby = external,
-                Spoluprace = peopleCollab,
-                Vyjadreni = commentRows
-            };
-        }).ToList();
-
-        return exportRows;
-    }
-
-    private static bool IsRecordVisibleForMeetingPrint(
-        ProjektovyZaznamEntity record,
-        IReadOnlyDictionary<int, CiselnikStavuUkoluEntity> taskStates,
-        IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> statusHistory,
-        DateTime anchorMeetingDate,
-        DateTime? previousMeetingDate)
-    {
-        if (record.DatumZalozeni.Date > anchorMeetingDate.Date)
-        {
-            return false;
-        }
-
-        var statusAtAnchorMeeting = ResolveTaskStatusAtDate(record.StavUkoluId, statusHistory, anchorMeetingDate);
-        if (!IsFinalTaskStatus(statusAtAnchorMeeting, taskStates))
-        {
-            return true;
-        }
-
-        if (!previousMeetingDate.HasValue)
-        {
-            return false;
-        }
-
-        var statusAtPreviousMeeting = ResolveTaskStatusAtDate(record.StavUkoluId, statusHistory, previousMeetingDate.Value);
-        return !IsFinalTaskStatus(statusAtPreviousMeeting, taskStates);
-    }
-
-    private static int? ResolveTaskStatusAtDate(
-        int? currentStatusId,
-        IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> statusHistory,
-        DateTime targetDate)
-    {
-        var resolvedStatusId = currentStatusId;
-        foreach (var change in statusHistory)
-        {
-            if (change.DatumZmeny.Date <= targetDate.Date)
-            {
-                continue;
-            }
-
-            if (resolvedStatusId.HasValue && resolvedStatusId.Value == change.NovyStav)
-            {
-                resolvedStatusId = change.PuvodniStav;
-            }
-        }
-
-        return resolvedStatusId;
-    }
-
-    private static bool IsFinalTaskStatus(
-        int? statusId,
-        IReadOnlyDictionary<int, CiselnikStavuUkoluEntity> taskStates)
-    {
-        return statusId.HasValue
-            && taskStates.GetValueOrDefault(statusId.Value)?.IsFinal == true;
-    }
-
-    private List<VyjadreniEntity> ApplyCommentLimit(IReadOnlyList<VyjadreniEntity> comments)
-    {
-        const int lineBudgetPerTask = 20;
-        const int estimatedCharsPerLine = 95;
-
-        var selected = new List<VyjadreniEntity>();
-        var usedLines = 0;
-
-        for (var index = comments.Count - 1; index >= 0; index--)
-        {
-            var comment = comments[index];
-            var commentPlainText = _richTextContentService.ToPlainText(comment.TextVyjadreni);
-            var estimatedTextLines = EstimateCommentTextLines(commentPlainText, estimatedCharsPerLine);
-            var estimatedLines = 1 + estimatedTextLines; // 1 řádek hlavička + text
-
-            // Vždy ponech aspoň nejnovější vyjádření celé,
-            // i když samo překročí budget.
-            if (selected.Count > 0 && usedLines + estimatedLines > lineBudgetPerTask)
-            {
-                break;
-            }
-
-            selected.Add(comment);
-            usedLines += estimatedLines;
-        }
-
-        selected.Reverse();
-        return selected;
-    }
-
-    private static int EstimateCommentTextLines(string plainText, int estimatedCharsPerLine)
-    {
-        if (string.IsNullOrWhiteSpace(plainText))
-        {
-            return 1;
-        }
-
-        var normalized = plainText
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace('\r', '\n');
-        var estimatedLines = 0;
-        var rows = normalized.Split('\n');
-        foreach (var row in rows)
-        {
-            estimatedLines += Math.Max(1, (int)Math.Ceiling(row.Length / (double)estimatedCharsPerLine));
-        }
-
-        return Math.Max(1, estimatedLines);
-    }
-
-    private static string? ResolveHighlightColor(
-        JednaniEntity? anchorMeeting,
-        CiselnikStavuJednaniEntity? anchorState,
-        int? previousMeetingNumber,
-        JednaniEntity? commentMeeting)
-    {
-        if (anchorMeeting is null || commentMeeting is null || anchorState is null)
-        {
-            return null;
-        }
-
-        var anchorIsPreparation = anchorState.Kod.Equals("DRAFT", StringComparison.OrdinalIgnoreCase)
-            || anchorState.Nazev.Contains("příprav", StringComparison.OrdinalIgnoreCase);
-
-        if (!anchorIsPreparation)
-        {
-            return commentMeeting.Id == anchorMeeting.Id ? "#0F4D8A" : null;
-        }
-
-        if (commentMeeting.Id == anchorMeeting.Id)
-        {
-            return "#A63A2B";
-        }
-
-        if (previousMeetingNumber.HasValue && commentMeeting.CisloJednani == previousMeetingNumber.Value)
-        {
-            return "#0F4D8A";
-        }
-
-        return null;
     }
 
     private bool CanModifyComment(VyjadreniEntity comment, ProjektovyZaznamEntity record, CurrentUserContextViewModel currentUser)
@@ -6425,28 +5026,6 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
         }
 
         return decimal.Round(parsed, 2, MidpointRounding.AwayFromZero);
-    }
-
-    private static string FormatEstimatedPrice(decimal estimatedPrice)
-        => $"{estimatedPrice.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ"))} Kč";
-
-    private static string FormatExternalLinkDisplay(string typeCode, string number, decimal? estimatedPrice, DateTime? plannedDelivery)
-    {
-        var header = $"{typeCode} {number}".Trim();
-        var details = new List<string>();
-        if (estimatedPrice.HasValue)
-        {
-            details.Add(FormatEstimatedPrice(estimatedPrice.Value));
-        }
-
-        if (plannedDelivery.HasValue)
-        {
-            details.Add($"plán dodání: {plannedDelivery.Value:dd.MM.yyyy}");
-        }
-
-        return details.Count > 0
-            ? $"{header} ({string.Join(", ", details)})"
-            : header;
     }
 
     private int? ResolveTypUkoluId(string? value)
@@ -6971,6 +5550,8 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             throw new InvalidOperationException("Harmonogram lze upravovat pouze u záznamů kategorie úkol.");
         }
 
+        EnsureScheduleAddScopeAccess(entity, currentUser, canEditScheduleFull);
+
         var schema = GetSchemaForRecord(entity);
         var harmonogramTypy = schema.Kroky;
         var valuesToPersist = canEditScheduleFull
@@ -6991,6 +5572,30 @@ public sealed class SqlServerDataStore : IPmTrackerDataStore
             JsonSerializer.Serialize(normalizedScheduleValues));
 
         return entity.Id;
+    }
+
+    private void EnsureScheduleAddScopeAccess(
+        ProjektovyZaznamEntity entity,
+        CurrentUserContextViewModel currentUser,
+        bool canEditScheduleFull)
+    {
+        if (canEditScheduleFull)
+        {
+            return;
+        }
+
+        if (currentUser.OsobaId > 0 && entity.VlastnikId == currentUser.OsobaId)
+        {
+            return;
+        }
+
+        var subsystemLeadEquivalentOsobaIds = ResolveLeadEquivalentOsobaIds(entity.ProjektId, entity.SubsystemId);
+        if (currentUser.OsobaId > 0 && subsystemLeadEquivalentOsobaIds.Contains(currentUser.OsobaId))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException("Nemáte oprávnění doplňovat harmonogram tohoto úkolu.");
     }
 
     private List<SaveRecordHarmonogramValueCommand> BuildScheduleValuesForAddOnly(

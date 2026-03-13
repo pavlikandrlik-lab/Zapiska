@@ -81,6 +81,43 @@ public sealed class RolePermissionDataStoreTests
         savedProjectIds.Should().BeEquivalentTo(projectIds);
     }
 
+    [Fact]
+    public async Task DeleteRolePermission_ShouldRemoveIncludeProjectLinks()
+    {
+        var db = await _fixture.CreateDatabaseAsync("roleperm_delete_include");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+        var currentUser = IntegrationTestHelper.BuildUser(db.AdminOsobaId, isSuperAdmin: true);
+
+        var roleId = await CreateCustomRoleAsync(dbContext, "RLPDEL");
+        var permissionId = await dbContext.AuthzPermissions.Select(x => x.Id).FirstAsync();
+        var projectIds = await dbContext.Projekty.OrderBy(x => x.Id).Select(x => x.Id).Take(2).ToListAsync();
+        projectIds.Should().NotBeEmpty();
+
+        store.SaveRolePermission(new SaveRolePermissionCommand
+        {
+            RoleId = roleId,
+            PermissionId = permissionId,
+            ScopeMode = "INCLUDE",
+            IsAllowed = true,
+            ProjektIds = projectIds
+        }, currentUser);
+
+        var mappingId = await dbContext.AuthzRolePermissions
+            .AsNoTracking()
+            .Where(x => x.RoleId == roleId && x.PermissionId == permissionId)
+            .Select(x => x.Id)
+            .SingleAsync();
+
+        store.DeleteRolePermission(new DeleteRolePermissionCommand
+        {
+            Id = mappingId
+        }, currentUser);
+
+        (await dbContext.AuthzRolePermissions.AsNoTracking().AnyAsync(x => x.Id == mappingId)).Should().BeFalse();
+        (await dbContext.AuthzRolePermissionProjects.AsNoTracking().AnyAsync(x => x.RolePermissionId == mappingId)).Should().BeFalse();
+    }
+
     private static async Task<int> CreateCustomRoleAsync(DbContext dbContext, string codePrefix)
     {
         var role = new AuthzRoleEntity

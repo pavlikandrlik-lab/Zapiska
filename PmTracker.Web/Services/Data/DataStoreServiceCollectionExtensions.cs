@@ -5,11 +5,8 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Services.ActiveDirectory;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Dictionaries;
-using PmTracker.Web.Services.Export;
 using PmTracker.Web.Services.People;
-using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Security;
-using PmTracker.Web.Services.Settings;
 using PmTracker.Web.Services.Documentation;
 
 namespace PmTracker.Web.Services.Data;
@@ -46,12 +43,9 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IPermissionEvaluationService, PermissionEvaluationService>();
         services.AddScoped<ICommentAuthorizationPolicy, CommentAuthorizationPolicy>();
         services.AddScoped<IRichTextContentService, RichTextContentService>();
-        services.AddScoped<IRecordsService, RecordsService>();
         services.AddScoped<IPeopleService, PeopleService>();
         services.AddScoped<IDictionariesService, DictionariesService>();
-        services.AddScoped<ISettingsService, SettingsService>();
         services.AddScoped<IDocumentationService, MarkdownDocumentationService>();
-        services.AddScoped<IWordExportService, OpenXmlWordExportService>();
         services.AddScoped<SqlServerDataStore>();
         services.AddHostedService<SqlStartupValidatorHostedService>();
         services.AddScoped<IPmTrackerDataStore>(sp => sp.GetRequiredService<SqlServerDataStore>());

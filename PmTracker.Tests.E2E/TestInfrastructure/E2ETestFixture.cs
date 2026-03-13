@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Data.SqlClient;
 using Microsoft.Playwright;
@@ -13,8 +14,14 @@ public sealed class E2ECollection : ICollectionFixture<E2ETestFixture>
 
 public sealed class E2ETestFixture : IAsyncLifetime
 {
+    private const int MaxBufferedProcessLines = 400;
+
     private readonly SqlServerTestDatabaseManager _databaseManager = new();
+    private readonly ConcurrentQueue<string> _webStdoutLines = new();
+    private readonly ConcurrentQueue<string> _webStderrLines = new();
     private Process? _webProcess;
+    private Task? _webStdoutPumpTask;
+    private Task? _webStderrPumpTask;
     private IPlaywright? _playwright;
     private IBrowser? _browser;
 
@@ -62,6 +69,8 @@ public sealed class E2ETestFixture : IAsyncLifetime
             }
         }
 
+        await DrainWebProcessLogsAsync();
+
         await _databaseManager.DisposeAsync();
     }
 
@@ -93,8 +102,13 @@ public sealed class E2ETestFixture : IAsyncLifetime
         startInfo.Environment["PmTracker__Data__Provider"] = "SqlServer";
         startInfo.Environment["PmTracker__Data__SqlServer__ConnectionStringName"] = "PmTrackerDb";
         startInfo.Environment["PmTracker__Data__SqlServer__CommandTimeoutSeconds"] = "60";
+        startInfo.Environment["Logging__LogLevel__Default"] = "Warning";
+        startInfo.Environment["Logging__LogLevel__Microsoft"] = "Warning";
+        startInfo.Environment["Logging__LogLevel__Microsoft__AspNetCore"] = "Warning";
 
         _webProcess = Process.Start(startInfo) ?? throw new InvalidOperationException("Nepodařilo se spustit web aplikaci pro E2E testy.");
+        _webStdoutPumpTask = PumpProcessOutputAsync(_webProcess.StandardOutput, _webStdoutLines);
+        _webStderrPumpTask = PumpProcessOutputAsync(_webProcess.StandardError, _webStderrLines);
     }
 
     private async Task WaitForWebReadinessAsync()
@@ -124,8 +138,9 @@ public sealed class E2ETestFixture : IAsyncLifetime
 
             if (_webProcess is { HasExited: true })
             {
-                var stdout = await _webProcess.StandardOutput.ReadToEndAsync();
-                var stderr = await _webProcess.StandardError.ReadToEndAsync();
+                await DrainWebProcessLogsAsync();
+                var stdout = FormatBufferedOutput(_webStdoutLines);
+                var stderr = FormatBufferedOutput(_webStderrLines);
                 throw new InvalidOperationException($"E2E web proces skončil předčasně.\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
             }
 
@@ -133,6 +148,37 @@ public sealed class E2ETestFixture : IAsyncLifetime
         }
 
         throw new TimeoutException("E2E web aplikace nenaběhla do 90 sekund.");
+    }
+
+    private static async Task PumpProcessOutputAsync(StreamReader reader, ConcurrentQueue<string> target)
+    {
+        while (true)
+        {
+            var line = await reader.ReadLineAsync();
+            if (line is null)
+            {
+                return;
+            }
+
+            target.Enqueue(line);
+            while (target.Count > MaxBufferedProcessLines && target.TryDequeue(out _))
+            {
+            }
+        }
+    }
+
+    private async Task DrainWebProcessLogsAsync()
+    {
+        await Task.WhenAll(
+            _webStdoutPumpTask ?? Task.CompletedTask,
+            _webStderrPumpTask ?? Task.CompletedTask);
+    }
+
+    private static string FormatBufferedOutput(ConcurrentQueue<string> source)
+    {
+        return source.IsEmpty
+            ? "<empty>"
+            : string.Join(Environment.NewLine, source);
     }
 
     private static bool IsHeadedModeEnabled()
