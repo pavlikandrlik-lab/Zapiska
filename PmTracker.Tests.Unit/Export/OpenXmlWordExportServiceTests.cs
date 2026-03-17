@@ -12,7 +12,7 @@ public sealed class OpenXmlWordExportServiceTests
     [Fact]
     public void BuildDocument_MeetingVariant_ShouldHideProjectRoles_AndRenderCommentAsColoredTextWithoutShading()
     {
-        var sut = new OpenXmlWordExportService(new RichTextContentService());
+        var sut = CreateSut();
         var model = new PdfExportTemplateViewModel
         {
             ExportVariant = "meeting",
@@ -131,7 +131,7 @@ public sealed class OpenXmlWordExportServiceTests
     [Fact]
     public void BuildDocument_ShouldRenderOrderedAndBulletLists_AsSeparateLines()
     {
-        var sut = new OpenXmlWordExportService(new RichTextContentService());
+        var sut = CreateSut();
         var model = CreateModelWithCommentHtml("<ol><li>První</li><li>Druhý</li></ol><ul><li>Třetí</li></ul>");
 
         var payload = sut.BuildDocument(model);
@@ -148,6 +148,26 @@ public sealed class OpenXmlWordExportServiceTests
         paragraphTexts.Should().Contain(text => text.Contains("1. První", StringComparison.Ordinal));
         paragraphTexts.Should().Contain(text => text.Contains("2. Druhý", StringComparison.Ordinal));
         paragraphTexts.Should().Contain(text => text.Contains("• Třetí", StringComparison.Ordinal));
+    }
+
+    private static OpenXmlWordExportService CreateSut()
+    {
+        var richText = new RichTextContentService();
+        var richHtmlParagraphWriter = new OpenXmlWordRichHtmlParagraphWriter();
+        var recordHeaderWriter = new OpenXmlWordRecordHeaderWriter(richText, richHtmlParagraphWriter);
+        var commentsCellWriter = new OpenXmlWordRecordCommentsCellWriter(
+            richText,
+            richHtmlParagraphWriter,
+            recordHeaderWriter);
+        var peopleCellWriter = new OpenXmlWordRecordPeopleCellWriter();
+        var deadlinesCellWriter = new OpenXmlWordRecordDeadlinesCellWriter();
+
+        return new OpenXmlWordExportService(
+            new OpenXmlWordHeaderSectionWriter(),
+            new OpenXmlWordRecordsSectionWriter(
+                commentsCellWriter,
+                peopleCellWriter,
+                deadlinesCellWriter));
     }
 
     private static PdfExportTemplateViewModel CreateModelWithCommentHtml(string commentHtml)

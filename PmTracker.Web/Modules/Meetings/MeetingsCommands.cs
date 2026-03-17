@@ -1,25 +1,31 @@
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Data;
+using PmTracker.Web.Modules.Meetings.Commands;
 
 namespace PmTracker.Web.Modules.Meetings;
 
-public sealed class MeetingsCommands(IPmTrackerDataStore dataStore) : IMeetingsCommands
+public sealed class MeetingsCommands(
+    ISaveMeetingCommandHandler saveMeetingCommandHandler,
+    IDeleteMeetingCommandHandler deleteMeetingCommandHandler,
+    ISaveMeetingStatusCommandHandler saveMeetingStatusCommandHandler,
+    ISaveMeetingNoteCommandHandler saveMeetingNoteCommandHandler,
+    ISaveAttendanceCommandHandler saveAttendanceCommandHandler,
+    IAddMeetingParticipantCommandHandler addMeetingParticipantCommandHandler) : IMeetingsCommands
 {
     public int SaveMeeting(SaveMeetingCommand command, CurrentUserContextViewModel currentUser)
-        => dataStore.SaveMeeting(command, currentUser);
+        => saveMeetingCommandHandler.Handle(command, currentUser);
 
     public void DeleteMeeting(DeleteMeetingCommand command, CurrentUserContextViewModel currentUser)
-        => dataStore.DeleteMeeting(command, currentUser);
+        => deleteMeetingCommandHandler.Handle(command, currentUser);
 
     public void SaveMeetingStatus(SaveMeetingStatusCommand command, CurrentUserContextViewModel currentUser)
-        => dataStore.SaveMeetingStatus(command, currentUser);
+        => saveMeetingStatusCommandHandler.Handle(command, currentUser);
 
     public void SaveMeetingNote(SaveMeetingNoteCommand command, CurrentUserContextViewModel currentUser)
-        => dataStore.SaveMeetingNote(command, currentUser);
+        => saveMeetingNoteCommandHandler.Handle(command, currentUser);
 
     public void SaveAttendance(SaveAttendanceCommand command, CurrentUserContextViewModel currentUser)
-        => dataStore.SaveAttendance(command, currentUser);
+        => saveAttendanceCommandHandler.Handle(command, currentUser);
 
     public void AddMeetingParticipant(AddMeetingParticipantCommand command, CurrentUserContextViewModel currentUser)
-        => dataStore.AddMeetingParticipant(command, currentUser);
+        => addMeetingParticipantCommandHandler.Handle(command, currentUser);
 }

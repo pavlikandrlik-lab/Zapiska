@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Integration.TestInfrastructure;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Modules.Settings;
+using PmTracker.Web.Services.Settings;
 
 namespace PmTracker.Tests.Integration.Settings;
 
@@ -32,11 +34,30 @@ public sealed class SettingsAuthzModuleTests
     }
 
     [Fact]
+    public async Task SettingsService_ShouldMatchDataStoreDelegation()
+    {
+        var db = await _fixture.CreateDatabaseAsync("settings_service_delegate");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+        var queries = IntegrationTestHelper.CreateSettingsAuthzQueries(dbContext);
+        var commands = IntegrationTestHelper.CreateSettingsAuthzCommands(dbContext);
+        var service = new SettingsService(new SettingsDataStore(queries, commands));
+        var currentUser = IntegrationTestHelper.BuildUser(db.AdminOsobaId, isSuperAdmin: true);
+
+        var dashboardFromService = service.BuildNastaveniDashboard("role-akce", currentUser, userId: db.AdminOsobaId, projektId: null);
+        var dashboardFromDataStore = store.BuildNastaveniDashboard("role-akce", currentUser, userId: db.AdminOsobaId, projektId: null);
+
+        dashboardFromDataStore.Should().BeEquivalentTo(dashboardFromService);
+    }
+
+    [Fact]
     public async Task SaveRolePermission_ShouldPersistIncludeProjects_WhenCalledViaModuleService()
     {
         var db = await _fixture.CreateDatabaseAsync("settings_commands_roleperm");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
-        var commands = IntegrationTestHelper.CreateSettingsAuthzCommands(dbContext);
+        var settingsService = new SettingsService(new SettingsDataStore(
+            IntegrationTestHelper.CreateSettingsAuthzQueries(dbContext),
+            IntegrationTestHelper.CreateSettingsAuthzCommands(dbContext)));
         var currentUser = IntegrationTestHelper.BuildUser(db.AdminOsobaId, isSuperAdmin: true);
 
         var roleId = await CreateCustomRoleAsync(dbContext, "STMOD");
@@ -45,7 +66,7 @@ public sealed class SettingsAuthzModuleTests
 
         projectIds.Should().NotBeEmpty();
 
-        commands.SaveRolePermission(new SaveRolePermissionCommand
+        settingsService.SaveRolePermission(new SaveRolePermissionCommand
         {
             RoleId = roleId,
             PermissionId = permissionId,

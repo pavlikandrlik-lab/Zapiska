@@ -13,6 +13,8 @@
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/09-testing-quality.md`
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/10-troubleshooting-recovery.md`
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/11-architecture-refactor-prompt-sequence.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/12-architecture-refactor-baseline.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/13-target-architecture-blueprint.md`
 
 ## 2. Uživatelská dokumentace
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/user-guide.md`

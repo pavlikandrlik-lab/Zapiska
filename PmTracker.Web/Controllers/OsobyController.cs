@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.ActiveDirectory;
-using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.People;
 using PmTracker.Web.Services.Security;
 
@@ -13,11 +12,10 @@ public sealed class OsobyController : BaseController
     private readonly IPeopleService _peopleService;
 
     public OsobyController(
-        IPmTrackerDataStore dataStore,
         IUserContextResolver userContextResolver,
         IActiveDirectoryService activeDirectoryService,
         IPeopleService peopleService)
-        : base(dataStore, userContextResolver)
+        : base(userContextResolver)
     {
         _activeDirectoryService = activeDirectoryService;
         _peopleService = peopleService;
@@ -136,7 +134,7 @@ public sealed class OsobyController : BaseController
         return ExecuteValidatedCommand(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.PeopleManage),
             invalidAjaxMessage: "Osobu nelze uložit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
             onSuccessRedirect: () => RedirectToAction(nameof(Index)),
             onAjaxSuccess: () => AjaxSuccessResult(
@@ -153,7 +151,7 @@ public sealed class OsobyController : BaseController
         return ExecuteValidatedCommand(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.PeopleManage),
             invalidAjaxMessage: "AD osobu nelze uložit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
             onSuccessRedirect: () => RedirectToAction(nameof(Index)),
             onAjaxSuccess: () => AjaxSuccessResult(
@@ -170,7 +168,7 @@ public sealed class OsobyController : BaseController
         return ExecuteValidatedCommand(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.PeopleManage),
             invalidAjaxMessage: "Osobu nelze odstranit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
             onSuccessRedirect: () => RedirectToAction(nameof(Index)),
             onAjaxSuccess: () => AjaxSuccessResult(

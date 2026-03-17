@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Integration.TestInfrastructure;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Modules.Projects;
+using PmTracker.Web.Modules.Projects.Commands;
+using PmTracker.Web.Modules.Projects.Queries;
 
 namespace PmTracker.Tests.Integration.Projects;
 
@@ -22,7 +24,12 @@ public sealed class ProjectsModuleTests
         var db = await _fixture.CreateDatabaseAsync("projects_queries_delegate");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
         var store = IntegrationTestHelper.CreateDataStore(dbContext);
-        var queries = new ProjectsQueries(store);
+        var projectsDataStore = new ProjectsDataStore(store);
+        var queries = new ProjectsQueries(
+            new ProjektExistsQueryHandler(projectsDataStore),
+            new BuildProjektyListQueryHandler(projectsDataStore),
+            new BuildProjektDetailQueryHandler(projectsDataStore),
+            new BuildProjectStatusOptionsQueryHandler(projectsDataStore));
         var currentUser = IntegrationTestHelper.BuildUser(db.AdminOsobaId, isSuperAdmin: true);
 
         var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ProjectsQueriesOwner");
@@ -61,7 +68,18 @@ public sealed class ProjectsModuleTests
         var db = await _fixture.CreateDatabaseAsync("projects_commands_delegate");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
         var store = IntegrationTestHelper.CreateDataStore(dbContext);
-        var commands = new ProjectsCommands(store);
+        var projectsDataStore = new ProjectsDataStore(store);
+        var commands = new ProjectsCommands(
+            new SaveProjectCommandHandler(projectsDataStore),
+            new SoftDeleteProjectCommandHandler(projectsDataStore),
+            new SaveTeamMemberCommandHandler(projectsDataStore),
+            new RemoveTeamMemberCommandHandler(projectsDataStore),
+            new AssignProjectRoleCommandHandler(projectsDataStore),
+            new DeactivateProjectRoleCommandHandler(projectsDataStore),
+            new AssignProjectSubsystemCommandHandler(projectsDataStore),
+            new DeactivateProjectSubsystemCommandHandler(projectsDataStore),
+            new AssignProjectSubsystemRoleCommandHandler(projectsDataStore),
+            new DeactivateProjectSubsystemRoleCommandHandler(projectsDataStore));
         var currentUser = IntegrationTestHelper.BuildUser(db.AdminOsobaId, isSuperAdmin: true);
 
         var activeStatusCode = (await dbContext.CiselnikStavuProjektu

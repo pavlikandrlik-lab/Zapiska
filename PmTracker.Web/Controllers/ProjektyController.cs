@@ -2,26 +2,27 @@ using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Modules.Meetings;
 using PmTracker.Web.Modules.Projects;
-using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
 public sealed class ProjektyController : BaseController
 {
+    private const string TeamTab = "tym";
+    private const string TeamRefreshScope = "projekty-detail-tym";
+
     private readonly IProjectsQueries _projectsQueries;
     private readonly IProjectsCommands _projectsCommands;
     private readonly IMeetingsQueries _meetingsQueries;
     private readonly IMeetingsCommands _meetingsCommands;
 
     public ProjektyController(
-        IPmTrackerDataStore dataStore,
         IUserContextResolver userContextResolver,
         IProjectsQueries projectsQueries,
         IProjectsCommands projectsCommands,
         IMeetingsQueries meetingsQueries,
         IMeetingsCommands meetingsCommands)
-        : base(dataStore, userContextResolver)
+        : base(userContextResolver)
     {
         _projectsQueries = projectsQueries;
         _projectsCommands = projectsCommands;
@@ -355,7 +356,7 @@ public sealed class ProjektyController : BaseController
                 ? CurrentUserContext.HasPermission(PermissionKeys.ProjectsCreate)
                 : CurrentUserContext.HasPermission(PermissionKeys.ProjectsEdit, command.Id),
             invalidAjaxMessage: "Projekt nelze uložit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
             onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = savedProjectId }),
             onAjaxSuccess: () => AjaxSuccessResult(
@@ -417,7 +418,7 @@ public sealed class ProjektyController : BaseController
                 ? CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId)
                 : CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, command.ProjektId),
             invalidAjaxMessage: "Poradu nelze uložit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" }),
             onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" }),
             onAjaxSuccess: () => AjaxSuccessResult(
@@ -459,144 +460,93 @@ public sealed class ProjektyController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult SaveTeamMember(SaveTeamMemberCommand command)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, command.ProjektId),
+        return ExecuteTeamValidatedAction(
+            projektId: command.ProjektId,
             invalidAjaxMessage: "Člena týmu nelze uložit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "projekty-detail-tym",
-                refreshUrl: Url.Action(nameof(Detail), "Projekty", new { id = command.ProjektId, tab = "tym" }),
-                projectId: command.ProjektId,
-                tab: "tym",
-                message: "Člen týmu byl uložen."),
-            operation: () => DataStore.SaveTeamMember(command, CurrentUserContext));
+            invalidFallbackMessage: InvalidFormFallbackMessage,
+            successMessage: "Člen týmu byl uložen.",
+            operation: () => _projectsCommands.SaveTeamMember(command, CurrentUserContext));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public IActionResult RemoveTeamMember(RemoveTeamMemberCommand command)
     {
-        return ExecuteCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, command.ProjektId),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-            onAjaxSuccess: null,
-            operation: () => DataStore.RemoveTeamMember(command, CurrentUserContext));
+        return ExecuteTeamAction(
+            projektId: command.ProjektId,
+            operation: () => _projectsCommands.RemoveTeamMember(command, CurrentUserContext));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public IActionResult AssignProjectRole(AssignProjectRoleCommand command)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, command.ProjektId),
+        return ExecuteTeamValidatedAction(
+            projektId: command.ProjektId,
             invalidAjaxMessage: "Projektovou roli nelze přiřadit.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "projekty-detail-tym",
-                refreshUrl: Url.Action(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-                projectId: command.ProjektId,
-                tab: "tym",
-                message: "Projektová role byla přiřazena."),
-            operation: () => DataStore.AssignProjectRole(command, CurrentUserContext));
+            invalidFallbackMessage: InvalidFormFallbackMessage,
+            successMessage: "Projektová role byla přiřazena.",
+            operation: () => _projectsCommands.AssignProjectRole(command, CurrentUserContext));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public IActionResult DeactivateProjectRole(DeactivateProjectRoleCommand command, int projektId)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
+        return ExecuteTeamValidatedAction(
+            projektId: projektId,
             invalidAjaxMessage: "Projektovou roli nelze deaktivovat.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = projektId, tab = "tym" }),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = projektId, tab = "tym" }),
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "projekty-detail-tym",
-                refreshUrl: Url.Action(nameof(Detail), new { id = projektId, tab = "tym" }),
-                projectId: projektId,
-                tab: "tym",
-                message: "Projektová role byla deaktivována."),
-            operation: () => DataStore.DeactivateProjectRole(command, CurrentUserContext));
+            invalidFallbackMessage: InvalidFormFallbackMessage,
+            successMessage: "Projektová role byla deaktivována.",
+            operation: () => _projectsCommands.DeactivateProjectRole(command, CurrentUserContext));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public IActionResult AssignProjectSubsystem(AssignProjectSubsystemCommand command)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, command.ProjektId),
+        return ExecuteTeamValidatedAction(
+            projektId: command.ProjektId,
             invalidAjaxMessage: "Subsystém nelze přiřadit.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "projekty-detail-tym",
-                refreshUrl: Url.Action(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-                projectId: command.ProjektId,
-                tab: "tym",
-                message: "Subsystém byl přiřazen k projektu."),
-            operation: () => DataStore.AssignProjectSubsystem(command, CurrentUserContext));
+            invalidFallbackMessage: InvalidFormFallbackMessage,
+            successMessage: "Subsystém byl přiřazen k projektu.",
+            operation: () => _projectsCommands.AssignProjectSubsystem(command, CurrentUserContext));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public IActionResult DeactivateProjectSubsystem(DeactivateProjectSubsystemCommand command, int projektId)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
+        return ExecuteTeamValidatedAction(
+            projektId: projektId,
             invalidAjaxMessage: "Subsystém projektu nelze deaktivovat.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = projektId, tab = "tym" }),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = projektId, tab = "tym" }),
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "projekty-detail-tym",
-                refreshUrl: Url.Action(nameof(Detail), new { id = projektId, tab = "tym" }),
-                projectId: projektId,
-                tab: "tym",
-                message: "Subsystém projektu byl deaktivován."),
-            operation: () => DataStore.DeactivateProjectSubsystem(command, CurrentUserContext));
+            invalidFallbackMessage: InvalidFormFallbackMessage,
+            successMessage: "Subsystém projektu byl deaktivován.",
+            operation: () => _projectsCommands.DeactivateProjectSubsystem(command, CurrentUserContext));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public IActionResult AssignProjectSubsystemRole(AssignProjectSubsystemRoleCommand command)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, command.ProjektId),
+        return ExecuteTeamValidatedAction(
+            projektId: command.ProjektId,
             invalidAjaxMessage: "Subsystemovou roli nelze přiřadit.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "projekty-detail-tym",
-                refreshUrl: Url.Action(nameof(Detail), new { id = command.ProjektId, tab = "tym" }),
-                projectId: command.ProjektId,
-                tab: "tym",
-                message: "Role v subsystému byla přiřazena."),
-            operation: () => DataStore.AssignProjectSubsystemRole(command, CurrentUserContext));
+            invalidFallbackMessage: InvalidFormFallbackMessage,
+            successMessage: "Role v subsystému byla přiřazena.",
+            operation: () => _projectsCommands.AssignProjectSubsystemRole(command, CurrentUserContext));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public IActionResult DeactivateProjectSubsystemRole(DeactivateProjectSubsystemRoleCommand command, int projektId)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
+        return ExecuteTeamValidatedAction(
+            projektId: projektId,
             invalidAjaxMessage: "Subsystemovou roli nelze deaktivovat.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = projektId, tab = "tym" }),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = projektId, tab = "tym" }),
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "projekty-detail-tym",
-                refreshUrl: Url.Action(nameof(Detail), new { id = projektId, tab = "tym" }),
-                projectId: projektId,
-                tab: "tym",
-                message: "Role v subsystému byla deaktivována."),
-            operation: () => DataStore.DeactivateProjectSubsystemRole(command, CurrentUserContext));
+            invalidFallbackMessage: InvalidFormFallbackMessage,
+            successMessage: "Role v subsystému byla deaktivována.",
+            operation: () => _projectsCommands.DeactivateProjectSubsystemRole(command, CurrentUserContext));
     }
 
     private void EnsureReadableMeetingTimeError()
@@ -640,4 +590,43 @@ public sealed class ProjektyController : BaseController
     {
         return _projectsQueries.BuildProjectStatusOptions(CurrentUserContext);
     }
+
+    private IActionResult ExecuteTeamValidatedAction(
+        int projektId,
+        string invalidAjaxMessage,
+        string invalidFallbackMessage,
+        string successMessage,
+        Action operation)
+    {
+        return ExecuteValidatedCommand(
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
+            invalidAjaxMessage: invalidAjaxMessage,
+            invalidFallbackMessage: invalidFallbackMessage,
+            onInvalidRedirect: () => RedirectToTeamTab(projektId),
+            onSuccessRedirect: () => RedirectToTeamTab(projektId),
+            onAjaxSuccess: () => BuildTeamAjaxSuccess(projektId, successMessage),
+            operation: operation);
+    }
+
+    private IActionResult ExecuteTeamAction(int projektId, Action operation)
+    {
+        return ExecuteCommand(
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
+            onSuccessRedirect: () => RedirectToTeamTab(projektId),
+            onAjaxSuccess: null,
+            operation: operation);
+    }
+
+    private JsonResult BuildTeamAjaxSuccess(int projektId, string successMessage)
+    {
+        return AjaxSuccessResult(
+            refreshScope: TeamRefreshScope,
+            refreshUrl: Url.Action(nameof(Detail), new { id = projektId, tab = TeamTab }),
+            projectId: projektId,
+            tab: TeamTab,
+            message: successMessage);
+    }
+
+    private RedirectToActionResult RedirectToTeamTab(int projektId)
+        => RedirectToAction(nameof(Detail), new { id = projektId, tab = TeamTab })!;
 }

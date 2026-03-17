@@ -14,18 +14,16 @@ namespace PmTracker.Web.Controllers;
 
 public abstract class BaseController : Controller
 {
-    private readonly IPmTrackerDataStore _dataStore;
+    protected const string InvalidFormFallbackMessage = "Formulář obsahuje neplatné hodnoty.";
+
     private readonly IUserContextResolver _userContextResolver;
 
     protected CurrentUserContextViewModel CurrentUserContext { get; private set; } = null!;
 
-    protected BaseController(IPmTrackerDataStore dataStore, IUserContextResolver userContextResolver)
+    protected BaseController(IUserContextResolver userContextResolver)
     {
-        _dataStore = dataStore;
         _userContextResolver = userContextResolver;
     }
-
-    protected IPmTrackerDataStore DataStore => _dataStore;
 
     protected DateTime GetLocalNow()
     {
@@ -129,7 +127,7 @@ public abstract class BaseController : Controller
     {
         var errorCode = AjaxErrorCodes.RequestValidationFailed;
         var fieldErrors = BuildModelStateFieldErrors();
-        var responseMessage = string.IsNullOrWhiteSpace(message) ? "Formulář obsahuje neplatné hodnoty." : message;
+        var responseMessage = string.IsNullOrWhiteSpace(message) ? InvalidFormFallbackMessage : message;
         return BadRequest(BuildAjaxFailurePayload(
             responseMessage,
             errorCode,

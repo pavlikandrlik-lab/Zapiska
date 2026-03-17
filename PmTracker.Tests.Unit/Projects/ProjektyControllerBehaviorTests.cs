@@ -164,7 +164,6 @@ public sealed class ProjektyControllerBehaviorTests
         };
 
         var controller = new ProjektyController(
-            dataStore: null!,
             userContextResolver: null!,
             projectsQueries: queries,
             projectsCommands: null!,

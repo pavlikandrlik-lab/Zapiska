@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Integration.TestInfrastructure;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Modules.Meetings;
+using PmTracker.Web.Modules.Meetings.Commands;
+using PmTracker.Web.Modules.Meetings.Queries;
 
 namespace PmTracker.Tests.Integration.Meetings;
 
@@ -22,7 +24,12 @@ public sealed class MeetingsModuleTests
         var db = await _fixture.CreateDatabaseAsync("meetings_queries_delegate");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
         var store = IntegrationTestHelper.CreateDataStore(dbContext);
-        var queries = new MeetingsQueries(store);
+        var meetingsDataStore = new MeetingsDataStore(store);
+        var queries = new MeetingsQueries(
+            new ProjektExistsQueryHandler(meetingsDataStore),
+            new BuildProjektDetailQueryHandler(meetingsDataStore),
+            new BuildJednaniOverviewQueryHandler(meetingsDataStore),
+            new BuildJednaniDetailQueryHandler(meetingsDataStore));
 
         var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "MeetingsQueriesOwner");
         var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "MTGQRY");
@@ -54,7 +61,14 @@ public sealed class MeetingsModuleTests
         var db = await _fixture.CreateDatabaseAsync("meetings_commands_delegate");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
         var store = IntegrationTestHelper.CreateDataStore(dbContext);
-        var commands = new MeetingsCommands(store);
+        var meetingsDataStore = new MeetingsDataStore(store);
+        var commands = new MeetingsCommands(
+            new SaveMeetingCommandHandler(meetingsDataStore),
+            new DeleteMeetingCommandHandler(meetingsDataStore),
+            new SaveMeetingStatusCommandHandler(meetingsDataStore),
+            new SaveMeetingNoteCommandHandler(meetingsDataStore),
+            new SaveAttendanceCommandHandler(meetingsDataStore),
+            new AddMeetingParticipantCommandHandler(meetingsDataStore));
         var currentUser = IntegrationTestHelper.BuildUser(db.AdminOsobaId, isSuperAdmin: true);
 
         var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "MTGCMD");

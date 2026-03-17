@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Modules.Meetings;
-using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
@@ -12,11 +11,10 @@ public sealed class JednaniController : BaseController
     private readonly IMeetingsCommands _meetingsCommands;
 
     public JednaniController(
-        IPmTrackerDataStore dataStore,
         IUserContextResolver userContextResolver,
         IMeetingsQueries meetingsQueries,
         IMeetingsCommands meetingsCommands)
-        : base(dataStore, userContextResolver)
+        : base(userContextResolver)
     {
         _meetingsQueries = meetingsQueries;
         _meetingsCommands = meetingsCommands;
@@ -189,7 +187,7 @@ public sealed class JednaniController : BaseController
         return ExecuteValidatedCommand(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId),
             invalidAjaxMessage: "Osobu nelze přidat do účasti.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.JednaniId }),
             onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = command.JednaniId }),
             onAjaxSuccess: () => AjaxSuccessResult(

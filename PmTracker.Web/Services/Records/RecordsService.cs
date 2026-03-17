@@ -1,36 +1,41 @@
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Records.Commands;
+using PmTracker.Web.Services.Records.Queries;
 
 namespace PmTracker.Web.Services.Records;
 
-public sealed class RecordsService : IRecordsService
+public sealed class RecordsService(
+    IProjektExistsQueryHandler projektExistsQueryHandler,
+    IBuildProjektDetailQueryHandler buildProjektDetailQueryHandler,
+    IBuildZaznamEditQueryHandler buildZaznamEditQueryHandler,
+    IBuildZaznamCreateQueryHandler buildZaznamCreateQueryHandler,
+    IBuildDeleteRecordModalQueryHandler buildDeleteRecordModalQueryHandler,
+    ISaveRecordCommandHandler saveRecordCommandHandler,
+    IDeleteRecordCommandHandler deleteRecordCommandHandler,
+    IAssignMeetingIdentifierCommandHandler assignMeetingIdentifierCommandHandler,
+    IAddCommentCommandHandler addCommentCommandHandler,
+    IUpdateCommentCommandHandler updateCommentCommandHandler,
+    IDeleteCommentCommandHandler deleteCommentCommandHandler) : IRecordsService
 {
-    private readonly IPmTrackerDataStore _dataStore;
+    public bool ProjektExists(int id) => projektExistsQueryHandler.Handle(id);
 
-    public RecordsService(IPmTrackerDataStore dataStore)
-    {
-        _dataStore = dataStore;
-    }
+    public ProjektDetailViewModel BuildProjektDetail(int id) => buildProjektDetailQueryHandler.Handle(id);
 
-    public bool ProjektExists(int id) => _dataStore.ProjektExists(id);
+    public ZaznamEditViewModel BuildZaznamEdit(int id) => buildZaznamEditQueryHandler.Handle(id);
 
-    public ProjektDetailViewModel BuildProjektDetail(int id) => _dataStore.BuildProjektDetail(id);
+    public ZaznamEditViewModel BuildZaznamCreate(int projektId, int? jednaniId = null) => buildZaznamCreateQueryHandler.Handle(projektId, jednaniId);
 
-    public ZaznamEditViewModel BuildZaznamEdit(int id) => _dataStore.BuildZaznamEdit(id);
+    public DeleteRecordModalViewModel BuildDeleteRecordModal(int projektId, int zaznamId) => buildDeleteRecordModalQueryHandler.Handle(projektId, zaznamId);
 
-    public ZaznamEditViewModel BuildZaznamCreate(int projektId, int? jednaniId = null) => _dataStore.BuildZaznamCreate(projektId, jednaniId);
+    public int SaveRecord(SaveRecordCommand command, CurrentUserContextViewModel currentUser) => saveRecordCommandHandler.Handle(command, currentUser);
 
-    public DeleteRecordModalViewModel BuildDeleteRecordModal(int projektId, int zaznamId) => _dataStore.BuildDeleteRecordModal(projektId, zaznamId);
+    public void DeleteRecord(DeleteRecordCommand command, CurrentUserContextViewModel currentUser) => deleteRecordCommandHandler.Handle(command, currentUser);
 
-    public int SaveRecord(SaveRecordCommand command, CurrentUserContextViewModel currentUser) => _dataStore.SaveRecord(command, currentUser);
+    public void AssignMeetingIdentifier(AssignMeetingIdentifierCommand command, CurrentUserContextViewModel currentUser) => assignMeetingIdentifierCommandHandler.Handle(command, currentUser);
 
-    public void DeleteRecord(DeleteRecordCommand command, CurrentUserContextViewModel currentUser) => _dataStore.DeleteRecord(command, currentUser);
+    public void AddComment(AddCommentCommand command, CurrentUserContextViewModel currentUser) => addCommentCommandHandler.Handle(command, currentUser);
 
-    public void AssignMeetingIdentifier(AssignMeetingIdentifierCommand command, CurrentUserContextViewModel currentUser) => _dataStore.AssignMeetingIdentifier(command, currentUser);
+    public void UpdateComment(UpdateCommentCommand command, CurrentUserContextViewModel currentUser) => updateCommentCommandHandler.Handle(command, currentUser);
 
-    public void AddComment(AddCommentCommand command, CurrentUserContextViewModel currentUser) => _dataStore.AddComment(command, currentUser);
-
-    public void UpdateComment(UpdateCommentCommand command, CurrentUserContextViewModel currentUser) => _dataStore.UpdateComment(command, currentUser);
-
-    public void DeleteComment(DeleteCommentCommand command, CurrentUserContextViewModel currentUser) => _dataStore.DeleteComment(command, currentUser);
+    public void DeleteComment(DeleteCommentCommand command, CurrentUserContextViewModel currentUser) => deleteCommentCommandHandler.Handle(command, currentUser);
 }

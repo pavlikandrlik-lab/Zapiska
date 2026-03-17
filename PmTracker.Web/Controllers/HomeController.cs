@@ -1,14 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
 public sealed class HomeController : BaseController
 {
-    public HomeController(IPmTrackerDataStore dataStore, IUserContextResolver userContextResolver)
-        : base(dataStore, userContextResolver)
+    public HomeController(IUserContextResolver userContextResolver)
+        : base(userContextResolver)
     {
     }
 

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Data;
+using PmTracker.Web.Modules.Export;
 using PmTracker.Web.Services.Export;
 using PmTracker.Web.Services.Security;
 
@@ -10,14 +10,16 @@ namespace PmTracker.Web.Controllers;
 public sealed class ExportController : BaseController
 {
     private const string WordContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    private readonly IExportQueries _exportQueries;
     private readonly IWordExportService _wordExportService;
 
     public ExportController(
-        IPmTrackerDataStore dataStore,
         IUserContextResolver userContextResolver,
+        IExportQueries exportQueries,
         IWordExportService wordExportService)
-        : base(dataStore, userContextResolver)
+        : base(userContextResolver)
     {
+        _exportQueries = exportQueries;
         _wordExportService = wordExportService;
     }
 
@@ -30,7 +32,7 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint);
+        var model = _exportQueries.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
@@ -43,35 +45,35 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        var model = DataStore.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint: false);
+        var model = _exportQueries.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint: false);
         return BuildWordResult(model);
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Tisk")]
     public IActionResult JednaniTisk(int jednaniId, bool autoPrint = true)
     {
-        var detail = DataStore.BuildJednaniDetail(jednaniId);
-        var accessCheck = EnsureProjectReadable(detail.ProjektId);
+        var projectId = _exportQueries.ResolveMeetingProjectId(jednaniId);
+        var accessCheck = EnsureProjectReadable(projectId);
         if (accessCheck is not null)
         {
             return accessCheck;
         }
 
-        var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint);
+        var model = _exportQueries.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Word")]
     public IActionResult JednaniWord(int jednaniId)
     {
-        var detail = DataStore.BuildJednaniDetail(jednaniId);
-        var accessCheck = EnsureProjectReadable(detail.ProjektId);
+        var projectId = _exportQueries.ResolveMeetingProjectId(jednaniId);
+        var accessCheck = EnsureProjectReadable(projectId);
         if (accessCheck is not null)
         {
             return accessCheck;
         }
 
-        var model = DataStore.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint: false);
+        var model = _exportQueries.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint: false);
         return BuildWordResult(model);
     }
 
@@ -84,7 +86,7 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint);
+        var model = _exportQueries.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
@@ -97,7 +99,7 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        var model = DataStore.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint: false);
+        var model = _exportQueries.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint: false);
         return BuildWordResult(model);
     }
 
@@ -105,7 +107,7 @@ public sealed class ExportController : BaseController
     [HttpGet("Dialog")]
     public IActionResult Dialog(int projektId, int? jednaniId, bool autoPrint = true)
     {
-        if (!DataStore.ProjektExists(projektId))
+        if (!_exportQueries.ProjektExists(projektId))
         {
             return RedirectToAction("Index", "Projekty");
         }
@@ -137,7 +139,7 @@ public sealed class ExportController : BaseController
 
     private IActionResult? EnsureProjectReadable(int projektId)
     {
-        if (!DataStore.ProjektExists(projektId))
+        if (!_exportQueries.ProjektExists(projektId))
         {
             return RedirectToAction("Index", "Projekty");
         }

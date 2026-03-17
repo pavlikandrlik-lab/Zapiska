@@ -3,6 +3,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Modules.Export;
+using PmTracker.Web.Modules.Export.Queries;
 using PmTracker.Web.Modules.Settings;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
@@ -28,11 +29,65 @@ internal static class IntegrationTestHelper
         var permissionEvaluation = new PermissionEvaluationService();
         var commentAuthorization = new CommentAuthorizationPolicy(permissionEvaluation);
         var resolvedTimeProvider = timeProvider ?? TimeProvider.System;
-        var exportTemplateQueries = new ExportTemplateQueries(dbContext, textNormalizer, richTextContentService, identityMatcher);
+        var exportCommentProjectionBuilder = new ExportCommentProjectionBuilder(richTextContentService);
+        var exportRoleProjectionBuilder = new ExportRoleProjectionBuilder(dbContext, identityMatcher);
+        var exportAttendanceProjectionBuilder = new ExportAttendanceProjectionBuilder(dbContext, textNormalizer, identityMatcher);
+        var exportRecordVisibilityEvaluator = new ExportRecordVisibilityEvaluator();
+        var exportRecordProjectionBuilder = new ExportRecordProjectionBuilder(
+            dbContext,
+            richTextContentService,
+            identityMatcher,
+            exportCommentProjectionBuilder,
+            exportRecordVisibilityEvaluator);
+        var exportTemplateSummaryBuilder = new ExportTemplateSummaryBuilder();
+        var exportTemplateQueries = new ExportTemplateQueries(
+            dbContext,
+            exportRoleProjectionBuilder,
+            exportAttendanceProjectionBuilder,
+            exportRecordProjectionBuilder,
+            exportTemplateSummaryBuilder);
         var exportTemplateUseCase = new ExportTemplateUseCase(exportTemplateQueries, resolvedTimeProvider);
         var userAuthorizationSnapshotBuilder = new UserAuthorizationSnapshotBuilder(dbContext, textNormalizer);
         var settingsAuthzQueries = new SettingsAuthzQueries(dbContext, userAuthorizationSnapshotBuilder, identityMatcher, textNormalizer);
         var settingsAuthzCommands = new SettingsAuthzCommands(dbContext, resolvedTimeProvider);
+        var recordCommentCommandsUseCase = new RecordCommentCommandsUseCase(
+            dbContext,
+            richTextContentService,
+            commentAuthorization,
+            resolvedTimeProvider);
+        var profilePageQueriesUseCase = new ProfilePageQueriesUseCase(
+            dbContext,
+            userAuthorizationSnapshotBuilder);
+        var meetingListQueriesUseCase = new MeetingListQueriesUseCase(
+            dbContext,
+            textNormalizer,
+            identityMatcher);
+        var projectDetailQueriesUseCase = new ProjectDetailQueriesUseCase(dbContext);
+        var meetingDetailQueriesUseCase = new MeetingDetailQueriesUseCase(
+            dbContext,
+            meetingListQueriesUseCase,
+            textNormalizer,
+            identityMatcher);
+        var meetingWriteCommandsUseCase = new MeetingWriteCommandsUseCase(
+            dbContext,
+            textNormalizer,
+            recordCommentCommandsUseCase);
+        var projectListQueriesUseCase = new ProjectListQueriesUseCase(dbContext);
+        var projectCommandsUseCase = new ProjectCommandsUseCase(
+            dbContext,
+            textNormalizer);
+        var peoplePageQueriesUseCase = new PeoplePageQueriesUseCase(dbContext);
+        var dictionariesQueriesUseCase = new DictionariesQueriesUseCase(dbContext);
+        var dictionariesCommandsUseCase = new DictionariesCommandsUseCase(dbContext);
+        var personCommandsUseCase = new PersonCommandsUseCase(
+            dbContext,
+            textNormalizer);
+        var recordEditorQueriesUseCase = new RecordEditorQueriesUseCase(dbContext);
+        var recordWriteCommandsUseCase = new RecordWriteCommandsUseCase(
+            dbContext,
+            richTextContentService,
+            resolvedTimeProvider);
+        var projectAssignmentCommandsUseCase = new ProjectAssignmentCommandsUseCase(dbContext);
 
         return new SqlServerDataStore(
             dbContext,
@@ -44,7 +99,22 @@ internal static class IntegrationTestHelper
             exportTemplateUseCase,
             userAuthorizationSnapshotBuilder,
             settingsAuthzQueries,
-            settingsAuthzCommands);
+            settingsAuthzCommands,
+            recordCommentCommandsUseCase,
+            profilePageQueriesUseCase,
+            meetingListQueriesUseCase,
+            meetingDetailQueriesUseCase,
+            meetingWriteCommandsUseCase,
+            projectListQueriesUseCase,
+            projectCommandsUseCase,
+            projectDetailQueriesUseCase,
+            peoplePageQueriesUseCase,
+            dictionariesQueriesUseCase,
+            dictionariesCommandsUseCase,
+            personCommandsUseCase,
+            recordEditorQueriesUseCase,
+            recordWriteCommandsUseCase,
+            projectAssignmentCommandsUseCase);
     }
 
     public static ExportTemplateUseCase CreateExportTemplateUseCase(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
@@ -52,8 +122,24 @@ internal static class IntegrationTestHelper
         var textNormalizer = new TextNormalizer();
         var richTextContentService = new RichTextContentService();
         var identityMatcher = new PersonIdentityMatcher(textNormalizer);
+        var exportCommentProjectionBuilder = new ExportCommentProjectionBuilder(richTextContentService);
+        var exportRoleProjectionBuilder = new ExportRoleProjectionBuilder(dbContext, identityMatcher);
+        var exportAttendanceProjectionBuilder = new ExportAttendanceProjectionBuilder(dbContext, textNormalizer, identityMatcher);
+        var exportRecordVisibilityEvaluator = new ExportRecordVisibilityEvaluator();
+        var exportRecordProjectionBuilder = new ExportRecordProjectionBuilder(
+            dbContext,
+            richTextContentService,
+            identityMatcher,
+            exportCommentProjectionBuilder,
+            exportRecordVisibilityEvaluator);
+        var exportTemplateSummaryBuilder = new ExportTemplateSummaryBuilder();
         return new ExportTemplateUseCase(
-            new ExportTemplateQueries(dbContext, textNormalizer, richTextContentService, identityMatcher),
+            new ExportTemplateQueries(
+                dbContext,
+                exportRoleProjectionBuilder,
+                exportAttendanceProjectionBuilder,
+                exportRecordProjectionBuilder,
+                exportTemplateSummaryBuilder),
             timeProvider ?? TimeProvider.System);
     }
 

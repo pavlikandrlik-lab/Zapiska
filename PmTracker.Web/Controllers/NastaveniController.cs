@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Data;
+using PmTracker.Web.Modules.Settings;
 using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Settings;
 
@@ -9,14 +9,16 @@ namespace PmTracker.Web.Controllers;
 public sealed class NastaveniController : BaseController
 {
     private readonly ISettingsService _settingsService;
+    private readonly ISettingsModalModelFactory _settingsModalModelFactory;
 
     public NastaveniController(
-        IPmTrackerDataStore dataStore,
         IUserContextResolver userContextResolver,
-        ISettingsService settingsService)
-        : base(dataStore, userContextResolver)
+        ISettingsService settingsService,
+        ISettingsModalModelFactory settingsModalModelFactory)
+        : base(userContextResolver)
     {
         _settingsService = settingsService;
+        _settingsModalModelFactory = settingsModalModelFactory;
     }
 
     public IActionResult Index(string? section, int? userId, int? projektId)
@@ -76,23 +78,7 @@ public sealed class NastaveniController : BaseController
             return Forbid();
         }
 
-        var model = new AuthzRoleModalViewModel
-        {
-            Command = role is null
-                ? new SaveAuthzRoleCommand()
-                : new SaveAuthzRoleCommand
-                {
-                    Id = role.Id,
-                    Kod = role.Kod,
-                    Nazev = role.Nazev,
-                    Popis = role.Popis
-                },
-            UserId = userId,
-            ProjektId = projektId,
-            IsEdit = role is not null
-        };
-
-        return View(model);
+        return View(_settingsModalModelFactory.BuildRoleModal(role, userId, projektId));
     }
 
     [HttpGet]
@@ -118,44 +104,7 @@ public sealed class NastaveniController : BaseController
             return Forbid();
         }
 
-        var categoryId = permission is null
-            ? panel.PermissionCategories.OrderBy(x => x.SortOrder).ThenBy(x => x.Nazev, StringComparer.CurrentCultureIgnoreCase).FirstOrDefault()?.Id ?? 0
-            : panel.PermissionCategories.FirstOrDefault(x => string.Equals(x.Kod, permission.CategoryKod, StringComparison.OrdinalIgnoreCase))?.Id ?? 0;
-        var permissionCatalog = PermissionKeys.BuildCatalog();
-        var selectedCatalogEntry = permissionCatalog.FirstOrDefault(x =>
-            string.Equals(x.Key, permission?.Klic, StringComparison.OrdinalIgnoreCase));
-        if (selectedCatalogEntry is not null)
-        {
-            categoryId = panel.PermissionCategories
-                .FirstOrDefault(x => string.Equals(x.Kod, selectedCatalogEntry.CategoryKod, StringComparison.OrdinalIgnoreCase))
-                ?.Id ?? categoryId;
-        }
-
-        var model = new AuthzPermissionModalViewModel
-        {
-            Command = permission is null
-                ? new SaveAuthzPermissionCommand
-                {
-                    CategoryId = categoryId,
-                    ScopeLevel = selectedCatalogEntry?.ScopeLevel ?? "PROJECT"
-                }
-                : new SaveAuthzPermissionCommand
-                {
-                    Id = permission.Id,
-                    Klic = permission.Klic,
-                    Nazev = permission.Nazev,
-                    CategoryId = categoryId,
-                    ScopeLevel = selectedCatalogEntry?.ScopeLevel ?? permission.ScopeLevel
-                },
-            Categories = panel.PermissionCategories.OrderBy(x => x.SortOrder).ThenBy(x => x.Nazev, StringComparer.CurrentCultureIgnoreCase).ToList(),
-            AvailableKeys = BuildPermissionKeyOptions(permission?.Klic),
-            PermissionCatalog = permissionCatalog,
-            UserId = userId,
-            ProjektId = projektId,
-            IsEdit = permission is not null
-        };
-
-        return View(model);
+        return View(_settingsModalModelFactory.BuildPermissionModal(panel, permission, userId, projektId));
     }
 
     [HttpGet]
@@ -173,31 +122,7 @@ public sealed class NastaveniController : BaseController
             return NotFound();
         }
 
-        var roleOptions = panel.Role
-            .Where(x => x.IsActive)
-            .OrderBy(x => x.Kod, StringComparer.CurrentCultureIgnoreCase)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = x.Id.ToString(),
-                Label = $"{x.Kod} - {x.Nazev}"
-            })
-            .ToList();
-
-        var model = new UserRolesModalViewModel
-        {
-            Command = new SaveUserRolesForUserCommand
-            {
-                OsobaId = user.OsobaId,
-                RoleIds = user.RoleAssignments.Select(x => x.RoleId).ToList()
-            },
-            OsobaLabel = user.Osoba,
-            Email = user.Email,
-            RoleOptions = roleOptions,
-            UserId = userId,
-            ProjektId = projektId
-        };
-
-        return View(model);
+        return View(_settingsModalModelFactory.BuildUserRolesModal(user, panel.Role, userId, projektId));
     }
 
     [HttpGet]
@@ -223,76 +148,19 @@ public sealed class NastaveniController : BaseController
             return Forbid();
         }
 
-        var selectedRoleId = mapping?.RoleId ?? roleId ?? panel.Role.Where(x => x.IsActive).OrderBy(x => x.Kod).Select(x => (int?)x.Id).FirstOrDefault() ?? 0;
-        var selectedPermissionId = mapping?.PermissionId ?? permissionId ?? panel.Permissions.Where(x => x.IsActive).OrderBy(x => x.Klic).Select(x => (int?)x.Id).FirstOrDefault() ?? 0;
-
-        var model = new RolePermissionModalViewModel
-        {
-            Command = mapping is null
-                ? new SaveRolePermissionCommand
-                {
-                    RoleId = selectedRoleId,
-                    PermissionId = selectedPermissionId,
-                    ScopeMode = "ALL",
-                    IsAllowed = true
-                }
-                : new SaveRolePermissionCommand
-                {
-                    Id = mapping.Id,
-                    RoleId = mapping.RoleId,
-                    PermissionId = mapping.PermissionId,
-                    ScopeMode = mapping.ScopeMode,
-                    IsAllowed = mapping.IsAllowed,
-                    ProjektIds = mapping.ProjektIds.ToList()
-                },
-            RoleOptions = panel.Role
-                .Where(x => x.IsActive)
-                .OrderBy(x => x.Kod, StringComparer.CurrentCultureIgnoreCase)
-                .Select(x => new LookupOptionViewModel
-                {
-                    Value = x.Id.ToString(),
-                    Label = $"{x.Kod} - {x.Nazev}"
-                })
-                .ToList(),
-            PermissionOptions = panel.Permissions
-                .Where(x => x.IsActive)
-                .OrderBy(x => x.Klic, StringComparer.CurrentCultureIgnoreCase)
-                .Select(x => new LookupOptionViewModel
-                {
-                    Value = x.Id.ToString(),
-                    Label = $"{x.Klic} - {x.Nazev}"
-                })
-                .ToList(),
-            ProjectOptions = panel.Projekty
-                .OrderBy(x => x.Nazev, StringComparer.CurrentCultureIgnoreCase)
-                .Select(x => new LookupOptionViewModel
-                {
-                    Value = x.Id.ToString(),
-                    Label = x.Nazev
-                })
-                .ToList(),
-            UserId = userId,
-            ProjektId = projektId,
-            IsEdit = mapping is not null
-        };
-
-        return View(model);
+        return View(_settingsModalModelFactory.BuildRolePermissionModal(panel, mapping, roleId, permissionId, userId, projektId));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public IActionResult SaveRole(SaveAuthzRoleCommand command, int? userId, int? projektId)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+        return ExecuteSettingsValidatedAction(
+            section: "role",
             invalidAjaxMessage: "Roli nelze uložit.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Index), new { section = "role", userId, projektId })!,
-            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { section = "role", userId, projektId })!,
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "nastaveni-panel",
-                refreshUrl: BuildPanelRefreshUrl("role", userId, projektId),
-                message: "Role byla uložena."),
+            successMessage: "Role byla uložena.",
+            userId: userId,
+            projektId: projektId,
             operation: () => _settingsService.SaveAuthzRole(command, CurrentUserContext));
     }
 
@@ -300,13 +168,11 @@ public sealed class NastaveniController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult ToggleRole(ToggleAuthzRoleCommand command, int? userId, int? projektId)
     {
-        return ExecuteCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
-            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { section = "role", userId, projektId })!,
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "nastaveni-panel",
-                refreshUrl: BuildPanelRefreshUrl("role", userId, projektId),
-                message: "Stav role byl upraven."),
+        return ExecuteSettingsAction(
+            section: "role",
+            successMessage: "Stav role byl upraven.",
+            userId: userId,
+            projektId: projektId,
             operation: () => _settingsService.ToggleAuthzRole(command, CurrentUserContext));
     }
 
@@ -314,19 +180,16 @@ public sealed class NastaveniController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult SavePermission(SaveAuthzPermissionCommand command, int? userId, int? projektId)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+        return ExecuteSettingsValidatedAction(
+            section: "akce",
             invalidAjaxMessage: "Akci nelze uložit.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Index), new { section = "akce", userId, projektId })!,
-            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { section = "akce", userId, projektId })!,
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "nastaveni-panel",
-                refreshUrl: BuildPanelRefreshUrl("akce", userId, projektId),
-                message: "Akce byla uložena."),
+            successMessage: "Akce byla uložena.",
+            userId: userId,
+            projektId: projektId,
             operation: () =>
             {
-                ApplyPermissionCatalogDefaults(command);
+                var panel = _settingsService.BuildNastaveniPanel("akce", CurrentUserContext, null, null);
+                _settingsModalModelFactory.ApplyPermissionCatalogDefaults(command, panel.PermissionCategories);
                 _settingsService.SaveAuthzPermission(command, CurrentUserContext);
             });
     }
@@ -335,13 +198,11 @@ public sealed class NastaveniController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult TogglePermission(ToggleAuthzPermissionCommand command, int? userId, int? projektId)
     {
-        return ExecuteCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
-            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { section = "akce", userId, projektId })!,
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "nastaveni-panel",
-                refreshUrl: BuildPanelRefreshUrl("akce", userId, projektId),
-                message: "Stav akce byl upraven."),
+        return ExecuteSettingsAction(
+            section: "akce",
+            successMessage: "Stav akce byl upraven.",
+            userId: userId,
+            projektId: projektId,
             operation: () => _settingsService.ToggleAuthzPermission(command, CurrentUserContext));
     }
 
@@ -349,16 +210,12 @@ public sealed class NastaveniController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult SaveUserRole(SaveUserRoleAssignmentCommand command, int? userId, int? projektId)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+        return ExecuteSettingsValidatedAction(
+            section: "uzivatele-role",
             invalidAjaxMessage: "Přiřazení role nelze uložit.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Index), new { section = "uzivatele-role", userId, projektId })!,
-            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { section = "uzivatele-role", userId, projektId })!,
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "nastaveni-panel",
-                refreshUrl: BuildPanelRefreshUrl("uzivatele-role", userId, projektId),
-                message: "Přiřazení role bylo uloženo."),
+            successMessage: "Přiřazení role bylo uloženo.",
+            userId: userId,
+            projektId: projektId,
             operation: () => _settingsService.SaveUserRoleAssignment(command, CurrentUserContext));
     }
 
@@ -366,16 +223,12 @@ public sealed class NastaveniController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult SaveUserRolesForUser(SaveUserRolesForUserCommand command, int? userId, int? projektId)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+        return ExecuteSettingsValidatedAction(
+            section: "uzivatele-role",
             invalidAjaxMessage: "Role uživatele nelze uložit.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Index), new { section = "uzivatele-role", userId, projektId })!,
-            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { section = "uzivatele-role", userId, projektId })!,
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "nastaveni-panel",
-                refreshUrl: BuildPanelRefreshUrl("uzivatele-role", userId, projektId),
-                message: "Role uživatele byly uloženy."),
+            successMessage: "Role uživatele byly uloženy.",
+            userId: userId,
+            projektId: projektId,
             operation: () => _settingsService.SaveUserRolesForUser(command, CurrentUserContext));
     }
 
@@ -383,16 +236,12 @@ public sealed class NastaveniController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult SaveRolePermission(SaveRolePermissionCommand command, int? userId, int? projektId)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+        return ExecuteSettingsValidatedAction(
+            section: "role-akce",
             invalidAjaxMessage: "Mapování role/akce nelze uložit.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Index), new { section = "role-akce", userId, projektId })!,
-            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { section = "role-akce", userId, projektId })!,
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "nastaveni-panel",
-                refreshUrl: BuildPanelRefreshUrl("role-akce", userId, projektId),
-                message: "Mapování role/akce bylo uloženo."),
+            successMessage: "Mapování role/akce bylo uloženo.",
+            userId: userId,
+            projektId: projektId,
             operation: () =>
             {
                 command.IsAllowed = true;
@@ -404,16 +253,12 @@ public sealed class NastaveniController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult DeleteRolePermission(DeleteRolePermissionCommand command, int? userId, int? projektId)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+        return ExecuteSettingsValidatedAction(
+            section: "role-akce",
             invalidAjaxMessage: "Mapování role/akce nelze smazat.",
-            invalidFallbackMessage: "Formulář obsahuje neplatné hodnoty.",
-            onInvalidRedirect: () => RedirectToAction(nameof(Index), new { section = "role-akce", userId, projektId })!,
-            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { section = "role-akce", userId, projektId })!,
-            onAjaxSuccess: () => AjaxSuccessResult(
-                refreshScope: "nastaveni-panel",
-                refreshUrl: BuildPanelRefreshUrl("role-akce", userId, projektId),
-                message: "Mapování role/akce bylo smazáno."),
+            successMessage: "Mapování role/akce bylo smazáno.",
+            userId: userId,
+            projektId: projektId,
             operation: () => _settingsService.DeleteRolePermission(command, CurrentUserContext));
     }
 
@@ -427,45 +272,45 @@ public sealed class NastaveniController : BaseController
         return Url.Action(nameof(Panel), new { section, userId, projektId }) ?? Url.Action(nameof(Panel), new { section })!;
     }
 
-    private static IReadOnlyList<LookupOptionViewModel> BuildPermissionKeyOptions(string? selectedKey)
+    private IActionResult ExecuteSettingsValidatedAction(
+        string section,
+        string invalidAjaxMessage,
+        string successMessage,
+        int? userId,
+        int? projektId,
+        Action operation)
     {
-        var options = PermissionKeys.BuildLookupOptions().ToList();
-        if (!string.IsNullOrWhiteSpace(selectedKey) &&
-            !options.Any(x => string.Equals(x.Value, selectedKey, StringComparison.OrdinalIgnoreCase)))
-        {
-            options.Insert(0, new LookupOptionViewModel
-            {
-                Value = selectedKey.Trim(),
-                Label = $"{selectedKey.Trim()} - historický klíč (mimo aktuální kód)"
-            });
-        }
-
-        return options;
+        return ExecuteValidatedCommand(
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+            invalidAjaxMessage: invalidAjaxMessage,
+            invalidFallbackMessage: InvalidFormFallbackMessage,
+            onInvalidRedirect: () => RedirectToSection(section, userId, projektId),
+            onSuccessRedirect: () => RedirectToSection(section, userId, projektId),
+            onAjaxSuccess: () => AjaxSuccessResult(
+                refreshScope: "nastaveni-panel",
+                refreshUrl: BuildPanelRefreshUrl(section, userId, projektId),
+                message: successMessage),
+            operation: operation);
     }
 
-    private void ApplyPermissionCatalogDefaults(SaveAuthzPermissionCommand command)
+    private IActionResult ExecuteSettingsAction(
+        string section,
+        string successMessage,
+        int? userId,
+        int? projektId,
+        Action operation)
     {
-        if (string.IsNullOrWhiteSpace(command.Klic))
-        {
-            return;
-        }
-
-        var catalogEntry = PermissionKeys.BuildCatalog()
-            .FirstOrDefault(x => string.Equals(x.Key, command.Klic.Trim(), StringComparison.OrdinalIgnoreCase));
-        if (catalogEntry is null)
-        {
-            return;
-        }
-
-        var panel = _settingsService.BuildNastaveniPanel("akce", CurrentUserContext, null, null);
-        var category = panel.PermissionCategories
-            .FirstOrDefault(x => string.Equals(x.Kod, catalogEntry.CategoryKod, StringComparison.OrdinalIgnoreCase));
-
-        if (category is not null)
-        {
-            command.CategoryId = category.Id;
-        }
-
-        command.ScopeLevel = catalogEntry.ScopeLevel;
+        return ExecuteCommand(
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+            onSuccessRedirect: () => RedirectToSection(section, userId, projektId),
+            onAjaxSuccess: () => AjaxSuccessResult(
+                refreshScope: "nastaveni-panel",
+                refreshUrl: BuildPanelRefreshUrl(section, userId, projektId),
+                message: successMessage),
+            operation: operation);
     }
+
+    private RedirectToActionResult RedirectToSection(string section, int? userId, int? projektId)
+        => RedirectToAction(nameof(Index), new { section, userId, projektId })!;
+
 }

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Data;
+using PmTracker.Web.Modules.Records;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Security;
 
@@ -19,14 +19,16 @@ public sealed class ZaznamyController : BaseController
     private const string UiContextMeeting = "meeting";
 
     private readonly IRecordsService _recordsService;
+    private readonly IRecordUiFlowResolver _recordUiFlowResolver;
 
     public ZaznamyController(
-        IPmTrackerDataStore dataStore,
         IUserContextResolver userContextResolver,
-        IRecordsService recordsService)
-        : base(dataStore, userContextResolver)
+        IRecordsService recordsService,
+        IRecordUiFlowResolver recordUiFlowResolver)
+        : base(userContextResolver)
     {
         _recordsService = recordsService;
+        _recordUiFlowResolver = recordUiFlowResolver;
     }
 
     public IActionResult Edit(int id, string? presentation, string? returnUrl)
@@ -140,64 +142,16 @@ public sealed class ZaznamyController : BaseController
         return ExecuteValidatedCommand(
             hasPermission: () => canEditRecord || canSaveScheduleOnly,
             invalidAjaxMessage: "Záznam nelze uložit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirectAfterSave,
             onSuccessRedirect: redirectAfterSave,
-            onAjaxSuccess: () =>
-            {
-                var meetingDetailUrl = contextMeetingId.HasValue
-                    ? BuildMeetingDetailUrl(contextMeetingId.Value)
-                    : null;
-
-                if (string.Equals(presentation, PresentationPage, StringComparison.OrdinalIgnoreCase))
-                {
-                    var refreshUrl = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(meetingDetailUrl)
-                        ? meetingDetailUrl
-                        : BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab);
-                    return AjaxSuccessResult(
-                        refreshScope: "page",
-                        refreshUrl: refreshUrl,
-                        projectId: command.ProjektId,
-                        recordId: savedRecordId,
-                        meetingId: contextMeetingId,
-                        uiContext: normalizedUiContext,
-                        tab: projectTab,
-                        message: "Záznam byl uložen.");
-                }
-
-                if (command.Id.HasValue)
-                {
-                    return AjaxSuccessResult(
-                        refreshScope: "record-card-with-schedules",
-                        refreshUrl: Url.Action(nameof(RecordCardPartial), new { projektId = command.ProjektId, zaznamId = savedRecordId }),
-                        projectId: command.ProjektId,
-                        recordId: savedRecordId,
-                        uiContext: UiContextProject,
-                        tab: projectTab,
-                        message: "Záznam byl uložen.");
-                }
-
-                if (string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(meetingDetailUrl))
-                {
-                    return AjaxSuccessResult(
-                        refreshScope: "page",
-                        refreshUrl: meetingDetailUrl,
-                        projectId: command.ProjektId,
-                        recordId: savedRecordId,
-                        meetingId: contextMeetingId,
-                        uiContext: UiContextMeeting,
-                        message: "Záznam byl uložen.");
-                }
-
-                return AjaxSuccessResult(
-                    refreshScope: "projekty-detail-zaznamy-preserve",
-                    refreshUrl: Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = projectTab }),
-                    projectId: command.ProjektId,
-                    uiContext: UiContextProject,
-                    tab: projectTab,
-                    message: "Záznam byl uložen.");
-            },
+            onAjaxSuccess: () => BuildSaveAjaxSuccessResult(
+                command,
+                savedRecordId,
+                projectTab,
+                presentation,
+                normalizedUiContext,
+                contextMeetingId),
             operation: () => savedRecordId = _recordsService.SaveRecord(command, CurrentUserContext));
     }
 
@@ -212,31 +166,10 @@ public sealed class ZaznamyController : BaseController
         return ExecuteValidatedCommand(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId),
             invalidAjaxMessage: "Záznam nelze smazat.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
             onSuccessRedirect: redirect,
-            onAjaxSuccess: () =>
-            {
-                if (string.Equals(uiContext, "page", StringComparison.OrdinalIgnoreCase))
-                {
-                    return AjaxSuccessResult(
-                        refreshScope: "page",
-                        refreshUrl: redirectUrl,
-                        projectId: command.ProjektId,
-                        uiContext: "project",
-                        tab: normalizedTab,
-                        message: "Záznam byl smazán.");
-                }
-
-                return AjaxSuccessResult(
-                    refreshScope: "projekty-detail-zaznamy-preserve",
-                    refreshUrl: NormalizeLocalReturnUrl(returnUrl)
-                        ?? (Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = normalizedTab }) ?? $"/Projekty/Detail/{command.ProjektId}?tab={normalizedTab}"),
-                    projectId: command.ProjektId,
-                    uiContext: "project",
-                    tab: normalizedTab,
-                    message: "Záznam byl smazán.");
-            },
+            onAjaxSuccess: () => BuildDeleteRecordAjaxSuccessResult(command.ProjektId, redirectUrl, returnUrl, uiContext, normalizedTab),
             operation: () => _recordsService.DeleteRecord(command, CurrentUserContext));
     }
 
@@ -247,7 +180,7 @@ public sealed class ZaznamyController : BaseController
         return ExecuteValidatedCommand(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId),
             invalidAjaxMessage: "Identifikátor z jednání nelze doplnit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction("Detail", "Projekty", new { id = command.ProjektId, tab = "zaznamy" }),
             onSuccessRedirect: () => RedirectToAction("Detail", "Projekty", new { id = command.ProjektId, tab = "zaznamy" }),
             onAjaxSuccess: () => AjaxSuccessResult(
@@ -295,11 +228,11 @@ public sealed class ZaznamyController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult AddComment(int projektId, AddCommentCommand command, string? uiContext, int? meetingId, string? returnUrl)
     {
-        var redirect = () => RedirectToContextOrDefault(uiContext, projektId, meetingId ?? command.JednaniId, returnUrl);
+        var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId ?? command.JednaniId, returnUrl);
         return ExecuteValidatedCommand(
             hasPermission: () => true,
             invalidAjaxMessage: "Vyjádření nelze uložit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
             onSuccessRedirect: redirect,
             onAjaxSuccess: () => BuildCommentAjaxSuccessResult(uiContext, projektId, command.ZaznamId, meetingId ?? command.JednaniId, "Vyjádření bylo uloženo."),
@@ -310,11 +243,11 @@ public sealed class ZaznamyController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult UpdateComment(int projektId, UpdateCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, string? returnUrl)
     {
-        var redirect = () => RedirectToContextOrDefault(uiContext, projektId, meetingId, returnUrl);
+        var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId, returnUrl);
         return ExecuteValidatedCommand(
             hasPermission: () => true,
             invalidAjaxMessage: "Vyjádření nelze upravit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
             onSuccessRedirect: redirect,
             onAjaxSuccess: () =>
@@ -333,7 +266,7 @@ public sealed class ZaznamyController : BaseController
     [ValidateAntiForgeryToken]
     public IActionResult DeleteComment(int projektId, DeleteCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, string? returnUrl)
     {
-        var redirect = () => RedirectToContextOrDefault(uiContext, projektId, meetingId, returnUrl);
+        var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId, returnUrl);
         return ExecuteCommand(
             hasPermission: () => true,
             onSuccessRedirect: redirect,
@@ -351,46 +284,116 @@ public sealed class ZaznamyController : BaseController
 
     private IActionResult BuildCommentAjaxSuccessResult(string? uiContext, int projektId, int zaznamId, int? meetingId, string message)
     {
-        if (string.Equals(uiContext, "meeting", StringComparison.OrdinalIgnoreCase) && meetingId.HasValue)
-        {
-            return AjaxSuccessResult(
-                refreshScope: "meeting-task-item",
-                refreshUrl: Url.Action("TaskItemPartial", "Jednani", new { jednaniId = meetingId.Value, zaznamId }),
-                projectId: projektId,
-                recordId: zaznamId,
-                meetingId: meetingId,
-                uiContext: "meeting",
-                message: message);
-        }
-
+        var flow = _recordUiFlowResolver.ResolveCommentAjaxFlow(uiContext, projektId, zaznamId, meetingId);
         return AjaxSuccessResult(
-            refreshScope: "record-card",
-            refreshUrl: Url.Action(nameof(RecordCardPartial), new { projektId, zaznamId }),
+            refreshScope: flow.RefreshScope,
+            refreshUrl: Url.Action(flow.ActionName, flow.ControllerName, flow.RouteValues),
             projectId: projektId,
             recordId: zaznamId,
-            uiContext: "project",
-            tab: "zaznamy",
+            meetingId: flow.MeetingId,
+            uiContext: flow.UiContext,
+            tab: flow.Tab,
             message: message);
     }
 
-    private IActionResult RedirectToContextOrDefault(string? uiContext, int projektId, int? meetingId, string? returnUrl)
+    private IActionResult BuildSaveAjaxSuccessResult(
+        SaveRecordCommand command,
+        int savedRecordId,
+        string projectTab,
+        string presentation,
+        string normalizedUiContext,
+        int? contextMeetingId)
     {
-        if (string.Equals(uiContext, "meeting", StringComparison.OrdinalIgnoreCase) && meetingId.HasValue)
+        var meetingDetailUrl = contextMeetingId.HasValue
+            ? BuildMeetingDetailUrl(contextMeetingId.Value)
+            : null;
+
+        if (string.Equals(presentation, PresentationPage, StringComparison.OrdinalIgnoreCase))
         {
-            return RedirectToAction("Detail", "Jednani", new { id = meetingId.Value });
+            var refreshUrl = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(meetingDetailUrl)
+                ? meetingDetailUrl
+                : BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab);
+            return AjaxSuccessResult(
+                refreshScope: "page",
+                refreshUrl: refreshUrl,
+                projectId: command.ProjektId,
+                recordId: savedRecordId,
+                meetingId: contextMeetingId,
+                uiContext: normalizedUiContext,
+                tab: projectTab,
+                message: "Záznam byl uložen.");
         }
 
-        if (string.Equals(uiContext, "project", StringComparison.OrdinalIgnoreCase))
+        if (command.Id.HasValue)
         {
-            return RedirectToAction("Detail", "Projekty", new { id = projektId, tab = "zaznamy" });
+            return AjaxSuccessResult(
+                refreshScope: "record-card-with-schedules",
+                refreshUrl: Url.Action(nameof(RecordCardPartial), new { projektId = command.ProjektId, zaznamId = savedRecordId }),
+                projectId: command.ProjektId,
+                recordId: savedRecordId,
+                uiContext: UiContextProject,
+                tab: projectTab,
+                message: "Záznam byl uložen.");
         }
 
-        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+        if (string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(meetingDetailUrl))
         {
-            return Redirect(returnUrl);
+            return AjaxSuccessResult(
+                refreshScope: "page",
+                refreshUrl: meetingDetailUrl,
+                projectId: command.ProjektId,
+                recordId: savedRecordId,
+                meetingId: contextMeetingId,
+                uiContext: UiContextMeeting,
+                message: "Záznam byl uložen.");
         }
 
-        return RedirectToAction("Detail", "Projekty", new { id = projektId, tab = "zaznamy" });
+        return AjaxSuccessResult(
+            refreshScope: "projekty-detail-zaznamy-preserve",
+            refreshUrl: Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = projectTab }),
+            projectId: command.ProjektId,
+            uiContext: UiContextProject,
+            tab: projectTab,
+            message: "Záznam byl uložen.");
+    }
+
+    private IActionResult BuildDeleteRecordAjaxSuccessResult(int projektId, string redirectUrl, string? returnUrl, string? uiContext, string normalizedTab)
+    {
+        if (string.Equals(uiContext, "page", StringComparison.OrdinalIgnoreCase))
+        {
+            return AjaxSuccessResult(
+                refreshScope: "page",
+                refreshUrl: redirectUrl,
+                projectId: projektId,
+                uiContext: UiContextProject,
+                tab: normalizedTab,
+                message: "Záznam byl smazán.");
+        }
+
+        return AjaxSuccessResult(
+            refreshScope: "projekty-detail-zaznamy-preserve",
+            refreshUrl: NormalizeLocalReturnUrl(returnUrl)
+                ?? (Url.Action("Detail", "Projekty", new { id = projektId, tab = normalizedTab }) ?? $"/Projekty/Detail/{projektId}?tab={normalizedTab}"),
+            projectId: projektId,
+            uiContext: UiContextProject,
+            tab: normalizedTab,
+            message: "Záznam byl smazán.");
+    }
+
+    private IActionResult ResolveCommentRedirect(string? uiContext, int projektId, int? meetingId, string? returnUrl)
+    {
+        var flow = _recordUiFlowResolver.ResolveCommentRedirectFlow(
+            uiContext,
+            projektId,
+            meetingId,
+            NormalizeLocalReturnUrl(returnUrl));
+        if (flow.IsLocalRedirect)
+        {
+            return Redirect(flow.LocalUrl!);
+        }
+
+        return RedirectToAction(flow.ActionName, flow.ControllerName, flow.RouteValues)!;
     }
 
     private void PrepareRecordEditorModel(

@@ -21,12 +21,11 @@ public sealed class DeleteRolePermissionCommandTests
     }
 
     [Fact]
-    public void DeleteRolePermission_ShouldDelegateToSettingsCommands()
+    public void DeleteRolePermission_ShouldDelegateToSettingsDataStore()
     {
-        var queries = DispatchProxy.Create<ISettingsAuthzQueries, RecordingProxy>();
-        var commands = DispatchProxy.Create<ISettingsAuthzCommands, RecordingProxy>();
-        var recorder = (RecordingProxy)(object)commands;
-        var sut = new SettingsService(queries, commands);
+        var dataStore = DispatchProxy.Create<ISettingsDataStore, RecordingProxy>();
+        var recorder = (RecordingProxy)(object)dataStore;
+        var sut = new SettingsService(dataStore);
         var command = new DeleteRolePermissionCommand { Id = 42 };
         var currentUser = new CurrentUserContextViewModel
         {
@@ -45,7 +44,7 @@ public sealed class DeleteRolePermissionCommandTests
 
         sut.DeleteRolePermission(command, currentUser);
 
-        recorder.LastMethodName.Should().Be(nameof(ISettingsAuthzCommands.DeleteRolePermission));
+        recorder.LastMethodName.Should().Be(nameof(ISettingsDataStore.DeleteRolePermission));
         recorder.LastArguments.Should().ContainInOrder(command, currentUser);
     }
 

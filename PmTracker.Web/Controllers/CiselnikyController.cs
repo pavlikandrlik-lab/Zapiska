@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Dictionaries;
 using PmTracker.Web.Services.Security;
 
@@ -11,10 +10,9 @@ public sealed class CiselnikyController : BaseController
     private readonly IDictionariesService _dictionariesService;
 
     public CiselnikyController(
-        IPmTrackerDataStore dataStore,
         IUserContextResolver userContextResolver,
         IDictionariesService dictionariesService)
-        : base(dataStore, userContextResolver)
+        : base(userContextResolver)
     {
         _dictionariesService = dictionariesService;
     }
@@ -111,7 +109,7 @@ public sealed class CiselnikyController : BaseController
                 return true;
             },
             invalidAjaxMessage: "Položku číselníku nelze uložit.",
-            invalidFallbackMessage: "formulář obsahuje neplatné hodnoty.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index), new { id = command.Key }),
             onSuccessRedirect: () => RedirectToAction(nameof(Index), new { id = command.Key }),
             onAjaxSuccess: () => AjaxSuccessResult(
