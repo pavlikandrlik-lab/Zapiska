@@ -3,12 +3,13 @@
     ViewData["Title"] = "Číselníky";
 }
 
-<section class="page-header">
-    <div>
-        <h1>Číselníky</h1>
-        <p class="muted">Správa hodnot a ochrana systémových položek.</p>
-    </div>
-</section>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = "Správa hodnot a ochrana systémových položek.",
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel
+})
 
 <div class="ciselniky-layout" data-ciselnik-shell data-content-url="@Url.Action("Panel", "Ciselniky")">
     <aside class="ciselniky-sidebar">

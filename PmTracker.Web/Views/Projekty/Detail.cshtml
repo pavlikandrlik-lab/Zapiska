@@ -1,33 +1,19 @@
 @model ProjektDetailViewModel
-@using System.Globalization
 @{
     ViewData["Title"] = $"Projekt {Model.Projekt.Zkratka}";
     ViewData["OtevrenaJednani"] = Model.OtevrenaJednani;
     ViewData["ProjektId"] = Model.Projekt.Id;
-    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
-    var canCreateMeetings = userContext?.HasPermission(PermissionKeys.MeetingsCreate, Model.Projekt.Id) ?? false;
-    var canDeleteMeetings = userContext?.HasPermission(PermissionKeys.MeetingsEdit, Model.Projekt.Id) ?? false;
-    var canManageTeam = userContext?.HasPermission(PermissionKeys.TeamManage, Model.Projekt.Id) ?? false;
-    var canManageRecords = userContext?.HasPermission(PermissionKeys.RecordsEdit, Model.Projekt.Id) ?? false;
-    var canManageSchedules = canManageRecords
-        || (userContext?.HasPermission(PermissionKeys.RecordsScheduleEdit, Model.Projekt.Id) ?? false)
-        || (userContext?.HasPermission(PermissionKeys.RecordsScheduleAdd, Model.Projekt.Id) ?? false);
-    var createRecordEditorUrl = Url.Action("Create", "Zaznamy", new { projektId = Model.Projekt.Id }) ?? $"/Zaznamy/Create?projektId={Model.Projekt.Id}";
-    var returnToProjectUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "jednani" }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=jednani";
-    var projectPrintUrl = Url.Action("ProjektTisk", "Export", new { projektId = Model.Projekt.Id, autoPrint = true }) ?? $"/Export/Projekt/{Model.Projekt.Id}/Tisk?autoPrint=true";
-    var projectWordUrl = Url.Action("ProjektWord", "Export", new { projektId = Model.Projekt.Id }) ?? $"/Export/Projekt/{Model.Projekt.Id}/Word";
     var harmonogramUkoly = Model.HarmonogramUkoly;
 }
 
-<section class="page-header page-header-compact">
-    <div class="project-header-row">
-        <a class="btn small ghost" asp-controller="Projekty" asp-action="Index">Zpět na přehled</a>
-        <span class="project-header-divider">|</span>
-        <h1 class="project-title-inline">@Model.Projekt.Nazev</h1>
-        <span class="pill">Zkratka: @Model.Projekt.Zkratka</span>
-        <span class="badge project-status-inline">@Model.Projekt.Stav</span>
-    </div>
-</section>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = $"Zkratka: {Model.Projekt.Zkratka}",
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel,
+    Badge = Model.Projekt.Stav
+})
 
 <div class="tabs" role="tablist">
     <button class="tab active" type="button" data-tab="zaznamy">Záznamy</button>
@@ -40,20 +26,20 @@
     <div class="panel-header">
         <div class="panel-header-actions">
             <a class="btn ghost"
-               href="@projectPrintUrl"
+               href="@Model.ProjectPrintUrl"
                target="_blank"
                rel="noopener"
                data-print-trigger="true"
-               data-print-pdf-url="@projectPrintUrl"
-               data-print-word-url="@projectWordUrl"
+               data-print-pdf-url="@Model.ProjectPrintUrl"
+               data-print-word-url="@Model.ProjectWordUrl"
                data-print-label="Tisk projektu">
                 Tisk projektu
             </a>
-            @if (canManageRecords)
+            @if (Model.CanManageRecords)
             {
                 <button class="btn primary"
                         type="button"
-                        data-record-editor-url="@createRecordEditorUrl"
+                        data-record-editor-url="@Model.CreateRecordEditorUrl"
                         data-record-editor-project-id="@Model.Projekt.Id"
                         data-record-editor-label="Nový záznam">
                     Nový záznam
@@ -65,7 +51,7 @@
     <div class="filter-shell"
          data-project-filter-scope="records"
          data-project-id="@Model.Projekt.Id"
-         data-current-user-id="@(userContext?.OsobaId ?? 0)">
+         data-current-user-id="@Model.CurrentUserOsobaId">
         <button class="filter-toggle" type="button" data-filter-toggle>
             Filtry
             <span class="filter-icon" aria-hidden="true">
@@ -201,7 +187,7 @@
     <div class="filter-shell"
          data-project-filter-scope="schedule"
          data-project-id="@Model.Projekt.Id"
-         data-current-user-id="@(userContext?.OsobaId ?? 0)">
+         data-current-user-id="@Model.CurrentUserOsobaId">
         <button class="filter-toggle" type="button" data-schedule-filter-toggle>
             Filtry
             <span class="filter-icon" aria-hidden="true">
@@ -247,29 +233,6 @@
                     <div class="schedule-group-list">
                         @foreach (var item in skupina)
                         {
-                            var ownerLabel = item.Vlastnik;
-                            var compactAxisStart = item.DatumZalozeni.Date;
-                            var compactAxisEnd = new[] { item.TerminUkonceni.Date, item.SkutecneDokonceni.Date, compactAxisStart }.Max();
-                            var compactAxisDays = Math.Max(1, (compactAxisEnd - compactAxisStart).Days);
-                            Func<DateTime, double> toCompactPercent = value => Math.Clamp(((value.Date - compactAxisStart).Days * 100d) / compactAxisDays, 0d, 100d);
-                            Func<double, string> formatPercent = value => value.ToString("0.####", CultureInfo.InvariantCulture);
-                            var compactDeadlinePercent = toCompactPercent(item.TerminUkonceni.Date);
-                            var compactTodayPercent = toCompactPercent(DateTime.Today);
-                            var compactTodayTitle = $"Dnes: {DateTime.Today:dd.MM.yyyy}";
-                            var breakdownDates = item.Kroky.SelectMany(krok => new[]
-                            {
-                                krok.PlanStart.Date,
-                                krok.PlanEnd.Date,
-                                krok.RealStart.Date,
-                                krok.RealEnd.Date
-                            }).ToList();
-                            var breakdownAxisStart = breakdownDates.Count > 0 ? breakdownDates.Min() : compactAxisStart;
-                            var breakdownAxisEnd = breakdownDates.Count > 0
-                                ? new[] { breakdownDates.Max(), item.TerminUkonceni.Date, breakdownAxisStart }.Max()
-                                : compactAxisEnd;
-                            var breakdownAxisDays = Math.Max(1, (breakdownAxisEnd - breakdownAxisStart).Days);
-                            Func<DateTime, double> toBreakdownPercent = value => Math.Clamp(((value.Date - breakdownAxisStart).Days * 100d) / breakdownAxisDays, 0d, 100d);
-                            var breakdownTodayPercent = toBreakdownPercent(DateTime.Today);
                             <article class="schedule-card"
                                      data-schedule-item
                                      data-schedule-filter-subsystem="@item.Subsystem"
@@ -281,18 +244,17 @@
                                             <span><span class="label">Stav úkolu:</span> @item.Stav</span>
                                             <span><span class="label">Typ:</span> @(string.IsNullOrWhiteSpace(item.TypUkolu) ? "-" : item.TypUkolu)</span>
                                             <span><span class="label">Subsystém:</span> @item.Subsystem</span>
-                                            <span><span class="label">Vlastník:</span> @ownerLabel</span>
+                                            <span><span class="label">Vlastník:</span> @item.Vlastnik</span>
                                         </div>
                                     </div>
                                     <div class="schedule-card-actions">
                                         <span class="badge @(item.Stihame ? "schedule-badge-ok" : "schedule-badge-late")">@(item.Stihame ? "Stíháme" : "Nestíháme")</span>
                                         <button class="btn small ghost" type="button" data-schedule-expand-toggle data-schedule-record-id="@item.ZaznamId">Rozpad</button>
-                                        @if (canManageSchedules)
+                                        @if (item.CanManageSchedule)
                                         {
-                                            var scheduleEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = Model.Projekt.Id }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
                                             <button class="btn small"
                                                     type="button"
-                                                    data-record-editor-url="@scheduleEditUrl"
+                                                    data-record-editor-url="@item.ScheduleEditUrl"
                                                     data-record-editor-project-id="@Model.Projekt.Id"
                                                     data-record-editor-label="@($"Upravit záznam #{item.CisloViditelne}")">
                                                 Upravit
@@ -307,30 +269,18 @@
                                             <span class="schedule-overview-label">Plán</span>
                                             <div class="schedule-overview-track">
                                                 <div class="schedule-overview-marker today"
-                                                     style="left:@formatPercent(compactTodayPercent)%;"
-                                                     title="@compactTodayTitle"></div>
+                                                     style="left:@item.FormatCompactTodayPercent%;"
+                                                     title="@item.CompactTodayTitle"></div>
                                                 <div class="schedule-overview-marker deadline"
-                                                     style="left:@formatPercent(compactDeadlinePercent)%;"
+                                                     style="left:@item.FormatCompactDeadlinePercent%;"
                                                      title="@($"Termín úkolu: {item.TerminUkonceni:dd.MM.yyyy}")"></div>
-                                                @{
-                                                    var previousPlanRight = 0d;
-                                                }
                                                 @foreach (var krok in item.Kroky)
                                                 {
-                                                    var rawLeft = toCompactPercent(krok.PlanStart);
-                                                    var rawRight = toCompactPercent(krok.PlanEnd);
-                                                    var left = Math.Max(previousPlanRight, rawLeft);
-                                                    var right = Math.Max(left, rawRight);
-                                                    var width = Math.Max(0d, right - left);
-                                                    var widthStyle = width > 0d
-                                                        ? $"calc({formatPercent(width)}% + 1px)"
-                                                        : "0%";
-                                                    previousPlanRight = right;
                                                     <span class="schedule-overview-segment"
                                                           data-rainbow-segment-label-full="@krok.Nazev"
                                                           data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                          style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
-                                                          title="@($"{krok.Nazev}: plán {krok.PlanStart:dd.MM.yyyy} - {krok.PlanEnd:dd.MM.yyyy}")"></span>
+                                                          style="left:@krok.CompactPlanLeftPercent%; width:@krok.CompactPlanWidthStyle; background:@krok.BarvaHex;"
+                                                          title="@krok.CompactPlanTitle"></span>
                                                 }
                                             </div>
                                         </div>
@@ -338,30 +288,18 @@
                                             <span class="schedule-overview-label">Skutečnost</span>
                                             <div class="schedule-overview-track">
                                                 <div class="schedule-overview-marker today"
-                                                     style="left:@formatPercent(compactTodayPercent)%;"
-                                                     title="@compactTodayTitle"></div>
+                                                     style="left:@item.FormatCompactTodayPercent%;"
+                                                     title="@item.CompactTodayTitle"></div>
                                                 <div class="schedule-overview-marker deadline"
-                                                     style="left:@formatPercent(compactDeadlinePercent)%;"
+                                                     style="left:@item.FormatCompactDeadlinePercent%;"
                                                      title="@($"Termín úkolu: {item.TerminUkonceni:dd.MM.yyyy}")"></div>
-                                                @{
-                                                    var previousRealRight = 0d;
-                                                }
                                                 @foreach (var krok in item.Kroky)
                                                 {
-                                                    var rawLeft = toCompactPercent(krok.RealStart);
-                                                    var rawRight = toCompactPercent(krok.RealEnd);
-                                                    var left = Math.Max(previousRealRight, rawLeft);
-                                                    var right = Math.Max(left, rawRight);
-                                                    var width = Math.Max(0d, right - left);
-                                                    var widthStyle = width > 0d
-                                                        ? $"calc({formatPercent(width)}% + 1px)"
-                                                        : "0%";
-                                                    previousRealRight = right;
                                                     <span class="schedule-overview-segment"
                                                           data-rainbow-segment-label-full="@krok.Nazev"
                                                           data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                          style="left:@formatPercent(left)%; width:@widthStyle; background:@krok.BarvaHex;"
-                                                          title="@($"{krok.Nazev}: skutečnost {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}")"></span>
+                                                          style="left:@krok.CompactActualLeftPercent%; width:@krok.CompactActualWidthStyle; background:@krok.BarvaHex;"
+                                                          title="@krok.CompactActualTitle"></span>
                                                 }
                                             </div>
                                         </div>
@@ -369,8 +307,8 @@
                                             <span class="schedule-overview-axis-spacer" aria-hidden="true"></span>
                                             <div class="timeline-axis schedule-overview-axis"
                                                  data-timeline-axis
-                                                 data-axis-start="@compactAxisStart.ToString("yyyy-MM-dd")"
-                                                 data-axis-end="@compactAxisEnd.ToString("yyyy-MM-dd")"></div>
+                                                 data-axis-start="@item.CompactAxisStart.ToString("yyyy-MM-dd")"
+                                                 data-axis-end="@item.CompactAxisEnd.ToString("yyyy-MM-dd")"></div>
                                         </div>
                                     </div>
                                     <div class="schedule-layered-summary">
@@ -391,36 +329,26 @@
                                         <span class="schedule-layered-axis-spacer" aria-hidden="true"></span>
                                         <div class="timeline-axis schedule-layered-axis"
                                              data-timeline-axis
-                                             data-axis-start="@breakdownAxisStart.ToString("yyyy-MM-dd")"
-                                             data-axis-end="@breakdownAxisEnd.ToString("yyyy-MM-dd")"></div>
+                                             data-axis-start="@item.BreakdownAxisStart.ToString("yyyy-MM-dd")"
+                                             data-axis-end="@item.BreakdownAxisEnd.ToString("yyyy-MM-dd")"></div>
                                     </div>
                                     @foreach (var krok in item.Kroky)
                                     {
-                                        var stepLeft = toBreakdownPercent(krok.PlanStart);
-                                        var stepRight = toBreakdownPercent(krok.PlanEnd);
-                                        var stepWidth = Math.Max(0d, stepRight - stepLeft);
-                                        var actualLeft = toBreakdownPercent(krok.RealStart);
-                                        var actualRight = toBreakdownPercent(krok.RealEnd);
-                                        var actualWidth = Math.Max(0d, actualRight - actualLeft);
-                                        var offsetLabel = krok.OdchylkaDni > 0
-                                            ? $"+{krok.OdchylkaDni} dnů"
-                                            : $"{krok.OdchylkaDni} dnů";
-                                        var hasVisualDuration = krok.TrvaniDni > 0;
                                         <div class="gantt-step-row">
                                             <div class="gantt-step-name">
                                                 <span>@krok.Nazev</span>
-                                                <span class="gantt-step-offset @(krok.OdchylkaDni > 0 ? "late" : krok.OdchylkaDni < 0 ? "ahead" : null)">@offsetLabel</span>
+                                                <span class="gantt-step-offset @krok.OffsetCssClass">@krok.OffsetLabel</span>
                                             </div>
                                             <div class="schedule-layered-track schedule-layered-track--step">
-                                                @if (hasVisualDuration)
+                                                @if (krok.HasBreakdownVisualDuration)
                                                 {
                                                     <div class="schedule-layered-marker today"
-                                                         style="left:@formatPercent(breakdownTodayPercent)%;"
-                                                         title="@compactTodayTitle"></div>
+                                                         style="left:@item.FormatBreakdownTodayPercent%;"
+                                                         title="@item.CompactTodayTitle"></div>
                                                     <span class="schedule-layered-segment planned"
-                                                          style="left:@formatPercent(stepLeft)%; width:@formatPercent(stepWidth)%; background:@krok.BarvaHex;"></span>
+                                                          style="left:@krok.BreakdownPlanLeftPercent%; width:@krok.BreakdownPlanWidthPercent%; background:@krok.BarvaHex;"></span>
                                                     <span class="schedule-layered-segment actual"
-                                                          style="left:@formatPercent(actualLeft)%; width:@formatPercent(actualWidth)%; --schedule-actual-color:@item.DelayBarvaHex;"></span>
+                                                          style="left:@krok.BreakdownActualLeftPercent%; width:@krok.BreakdownActualWidthPercent%; --schedule-actual-color:@item.DelayBarvaHex;"></span>
                                                 }
                                             </div>
                                         </div>
@@ -436,7 +364,7 @@
 </section>
 
 <section class="tab-panel" data-tab-panel="jednani">
-    @if (canCreateMeetings)
+    @if (Model.CanCreateMeetings)
     {
         <div class="panel-header">
             <button class="btn primary" type="button" data-modal-url="@Url.Action("NewMeetingModal", "Projekty", new { projektId = Model.Projekt.Id })">Nová porada</button>
@@ -446,13 +374,13 @@
     <div class="meeting-grid">
         @foreach (var jednani in Model.Jednani)
         {
-            var detailUrl = Url.Action("Detail", "Jednani", new { id = jednani.Id, returnUrl = returnToProjectUrl }) ?? $"/Jednani/Detail/{jednani.Id}";
+            var detailUrl = Url.Action("Detail", "Jednani", new { id = jednani.Id, returnUrl = Model.ReturnToProjectUrl }) ?? $"/Jednani/Detail/{jednani.Id}";
             var meetingPdfUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{jednani.Id}/Tisk?autoPrint=true";
             var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = jednani.Id }) ?? $"/Export/Jednani/{jednani.Id}/Word";
             @await Html.PartialAsync("_MeetingCard", new MeetingCardViewModel
             {
                 ProjektId = Model.Projekt.Id,
-                CanDelete = canDeleteMeetings,
+                CanDelete = Model.CanEditMeetings,
                 UseAjaxDelete = true,
                 DetailUrl = detailUrl,
                 PrintPdfUrl = meetingPdfUrl,
@@ -468,7 +396,7 @@
         <section class="card">
             <div class="panel-header">
                 <h3>Projektové role</h3>
-                @if (canManageTeam)
+                @if (Model.CanManageTeam)
                 {
                     <div class="header-actions">
                         <button class="btn primary" type="button" data-modal-url="@Url.Action("AssignProjectRoleModal", "Projekty", new { projektId = Model.Projekt.Id })">Přidat projektovou roli</button>
@@ -503,7 +431,7 @@
                         <td>@(role.OrganizacniCelek ?? "-")</td>
                         <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
                         <td class="table-actions">
-                            @if (canManageTeam)
+                            @if (Model.CanManageTeam)
                             {
                                 @if (string.Equals(role.AssignmentKind, "PROJECT", StringComparison.OrdinalIgnoreCase))
                                 {
@@ -544,7 +472,7 @@
         <section class="card">
             <div class="panel-header">
                 <h3>Subsystémy projektu</h3>
-                @if (canManageTeam)
+                @if (Model.CanManageTeam)
                 {
                     <button class="btn primary" type="button" data-modal-url="@Url.Action("AssignProjectSubsystemModal", "Projekty", new { projektId = Model.Projekt.Id })">Přiřadit subsystém</button>
                 }
@@ -566,7 +494,7 @@
                         <td>@subsystem.Nazev</td>
                         <td>@subsystem.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
                         <td class="table-actions">
-                            @if (canManageTeam)
+                            @if (Model.CanManageTeam)
                             {
                                 <form asp-controller="Projekty"
                                       asp-action="DeactivateProjectSubsystem"

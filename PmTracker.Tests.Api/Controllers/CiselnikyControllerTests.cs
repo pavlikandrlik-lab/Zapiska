@@ -24,10 +24,11 @@ public sealed class CiselnikyControllerTests
 
         var response = await client.GetAsync($"/Ciselniky/Panel?id=typy-ukolu&asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
+        var decodedHtml = WebUtility.HtmlDecode(html);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain("Klíč: typy-ukolu");
-        html.Should().Contain("Nová položka");
+        decodedHtml.Should().Contain("Klíč: typy-ukolu");
+        decodedHtml.Should().Contain("Nová položka");
     }
 
     [Fact]

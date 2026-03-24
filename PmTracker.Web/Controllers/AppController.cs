@@ -23,10 +23,10 @@ public sealed class AppController : Controller
 
     [HttpGet("KeepAlive")]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-    public async Task<IActionResult> KeepAlive(CancellationToken cancellationToken)
+    public async Task<IActionResult> KeepAlive(CancellationToken ct)
     {
         var traceId = ResolveTraceId(HttpContext);
-        var resolution = await _userContextResolver.ResolveAsync(HttpContext, cancellationToken);
+        var resolution = await _userContextResolver.ResolveAsync(HttpContext, ct);
         if (!resolution.IsSuccess || resolution.UserContext is null)
         {
             var message = string.IsNullOrWhiteSpace(resolution.ErrorMessage)

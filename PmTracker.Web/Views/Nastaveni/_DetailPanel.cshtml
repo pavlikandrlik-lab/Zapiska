@@ -1,25 +1,24 @@
 @model NastaveniPanelViewModel
 @{
-    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
-    var canManageSettings = userContext?.HasPermission(PermissionKeys.SettingsManage) ?? false;
     var selectedUserId = int.TryParse(Context.Request.Query["userId"], out var parsedUserId) ? parsedUserId : (int?)null;
     var selectedProjektId = int.TryParse(Context.Request.Query["projektId"], out var parsedProjektId) ? parsedProjektId : (int?)null;
     var defaultAssignmentUserId = selectedUserId ?? Model.UserRoles.FirstOrDefault()?.OsobaId;
 }
 
-<section class="page-header page-header-compact">
-    <div>
-        <h2>@Model.Nazev</h2>
-        <p class="muted">@Model.Popis</p>
-    </div>
-</section>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = Model.Popis,
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel
+})
 
 @if (Model.SectionKey == "role")
 {
     <section class="card">
         <div class="panel-header">
             <h3>Role</h3>
-            @if (canManageSettings)
+            @if (Model.CanManageSettings)
             {
                 <button class="btn primary"
                         type="button"
@@ -50,7 +49,7 @@
                         <td>@(role.IsSystem ? "Ano" : "Ne")</td>
                         <td>@(role.IsActive ? "Ano" : "Ne")</td>
                         <td class="table-actions">
-                            @if (canManageSettings)
+                            @if (Model.CanManageSettings)
                             {
                                 <div class="table-actions-inline">
                                     <button class="btn small"
@@ -95,7 +94,7 @@ else if (Model.SectionKey == "akce")
     <section class="card">
         <div class="panel-header">
             <h3>Katalog akcí</h3>
-            @if (canManageSettings)
+            @if (Model.CanManageSettings)
             {
                 <button class="btn primary"
                         type="button"
@@ -128,7 +127,7 @@ else if (Model.SectionKey == "akce")
                                 <td>@permission.ScopeLevel</td>
                                 <td>@(permission.IsActive ? "Ano" : "Ne")</td>
                                 <td class="table-actions">
-                                    @if (canManageSettings)
+                                    @if (Model.CanManageSettings)
                                     {
                                         <div class="table-actions-inline">
                                             <button class="btn small"
@@ -175,7 +174,7 @@ else if (Model.SectionKey == "role-akce")
     <section class="card">
         <div class="panel-header">
             <h3>Mapování role -> akce</h3>
-            @if (canManageSettings)
+            @if (Model.CanManageSettings)
             {
                 <button class="btn primary"
                         type="button"
@@ -210,7 +209,7 @@ else if (Model.SectionKey == "role-akce")
                         <td>@(selectedProjekty.Count == 0 ? "-" : string.Join(", ", selectedProjekty))</td>
                         <td>@(map.IsAllowed ? "Ano" : "Ne")</td>
                         <td class="table-actions">
-                            @if (canManageSettings)
+                            @if (Model.CanManageSettings)
                             {
                                 <div class="table-actions-inline">
                                     @if (map.IsAllowed)
@@ -255,7 +254,7 @@ else if (Model.SectionKey == "uzivatele-role")
     <section class="card">
         <div class="panel-header">
             <h3>Mapování uživatelů na role</h3>
-            @if (canManageSettings)
+            @if (Model.CanManageSettings)
             {
                 <button class="btn primary"
                         type="button"
@@ -282,7 +281,7 @@ else if (Model.SectionKey == "uzivatele-role")
                         <td>@(string.IsNullOrWhiteSpace(row.Email) ? "-" : row.Email)</td>
                         <td>@(row.RoleKody.Count == 0 ? "-" : string.Join(", ", row.RoleKody))</td>
                         <td class="table-actions">
-                            @if (canManageSettings)
+                            @if (Model.CanManageSettings)
                             {
                                 <div class="settings-stack-actions">
                                     <button class="btn small"

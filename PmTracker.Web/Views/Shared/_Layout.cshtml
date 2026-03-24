@@ -14,13 +14,10 @@
     @{
         var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).ToLowerInvariant();
         string NavClass(string controller) => currentController == controller ? "app-nav-link active" : "app-nav-link";
-        var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
-        var roleList = userContext?.RoleKody is IReadOnlyList<string> roles
+        var nav = ViewData["NavPermissions"] as NavPermissionsViewModel;
+        var roleList = nav?.CurrentUserRoles is { Count: > 0 } roles
             ? string.Join(", ", roles)
             : string.Empty;
-        var canViewPeopleTab = userContext?.HasPermissionPrefix(PermissionKeys.PeoplePrefix) ?? false;
-        var canViewCiselnikyTab = userContext?.HasPermissionPrefix(PermissionKeys.CiselnikyPrefix) ?? false;
-        var canViewSettingsTab = userContext?.HasPermissionPrefix(PermissionKeys.SettingsPrefix) ?? false;
     }
     <a class="skip-link" href="#main">Přeskočit na obsah</a>
 
@@ -56,14 +53,14 @@
 
                 <div class="user-menu" data-user-menu>
                     <button class="user-menu-toggle" type="button" data-user-menu-toggle aria-expanded="false" aria-haspopup="menu">
-                        <span class="app-user-name">@ViewBag.CurrentUserName</span>
-                        <span class="app-user-org">@ViewBag.CurrentUserOrgCode</span>
+                        <span class="app-user-name">@nav?.CurrentUserDisplayName</span>
+                        <span class="app-user-org">@nav?.CurrentUserOrgCode</span>
                     </button>
                     <div class="user-menu-panel" data-user-menu-panel hidden>
                         <div class="user-menu-meta">
-                            <strong>@ViewBag.CurrentUserName</strong>
-                            <span>@(string.IsNullOrWhiteSpace(ViewBag.CurrentUserEmail as string) ? "-" : ViewBag.CurrentUserEmail)</span>
-                            <span>@ViewBag.CurrentUserOrg</span>
+                            <strong>@nav?.CurrentUserDisplayName</strong>
+                            <span>@(string.IsNullOrWhiteSpace(nav?.CurrentUserEmail) ? "-" : nav?.CurrentUserEmail)</span>
+                            <span>@nav?.CurrentUserOrg</span>
                             <span>@roleList</span>
                         </div>
                         <a class="user-menu-link" asp-controller="Profil" asp-action="Index">Můj profil</a>
@@ -75,16 +72,16 @@
 
         <nav class="app-nav" aria-label="Hlavní menu">
             <a class="@NavClass("projekty")" asp-controller="Projekty" asp-action="Index">Projekty</a>
-            @if (canViewPeopleTab)
+            @if (nav?.CanViewPeople == true)
             {
                 <a class="@NavClass("osoby")" asp-controller="Osoby" asp-action="Index">Osoby</a>
             }
-            @if (canViewCiselnikyTab)
+            @if (nav?.CanViewCiselniky == true)
             {
                 <a class="@NavClass("ciselniky")" asp-controller="Ciselniky" asp-action="Index">Číselníky</a>
             }
             <a class="@NavClass("jednani")" asp-controller="Jednani" asp-action="Index">Jednání</a>
-            @if (canViewSettingsTab)
+            @if (nav?.CanViewSettings == true)
             {
                 <a class="@NavClass("nastaveni")" asp-controller="Nastaveni" asp-action="Index">Nastavení</a>
             }
@@ -129,7 +126,7 @@
     <div id="modal-root" class="modal-root" aria-hidden="true"></div>
 
     <script src="~/lib/quill/quill.min.js" asp-append-version="true"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script type="module" src="~/js/site.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)
 </body>
 </html>

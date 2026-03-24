@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Dictionaries;
 using PmTracker.Web.Services.Security;
@@ -7,35 +8,42 @@ namespace PmTracker.Web.Controllers;
 
 public sealed class CiselnikyController : BaseController
 {
-    private readonly IDictionariesService _dictionariesService;
+    private readonly IDictionaryService _dictionaryService;
 
     public CiselnikyController(
         IUserContextResolver userContextResolver,
-        IDictionariesService dictionariesService)
-        : base(userContextResolver)
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory,
+        IDictionaryService dictionaryService)
+        : base(userContextResolver, timeProvider, loggerFactory)
     {
-        _dictionariesService = dictionariesService;
+        _dictionaryService = dictionaryService;
     }
 
-    public IActionResult Index(string? id)
+    public async Task<IActionResult> Index(string? id, CancellationToken ct)
     {
-        var model = _dictionariesService.BuildCiselnikyDashboard(id, CurrentUserContext);
+        var model = await _dictionaryService.BuildCiselnikyDashboardAsync(id, CurrentUserContext, ct);
+        model.PageTitle = "Číselníky";
+        PrepareDictionaryDetailPresentation(model.VybranyCiselnik);
         return View(model);
     }
 
-    public IActionResult Detail(string id)
+    public async Task<IActionResult> Detail(string id, CancellationToken ct)
     {
-        var model = _dictionariesService.BuildCiselnikyDashboard(id, CurrentUserContext);
+        var model = await _dictionaryService.BuildCiselnikyDashboardAsync(id, CurrentUserContext, ct);
+        model.PageTitle = "Číselníky";
+        PrepareDictionaryDetailPresentation(model.VybranyCiselnik);
         return View("Index", model);
     }
 
-    public IActionResult Panel(string id)
+    public async Task<IActionResult> Panel(string id, CancellationToken ct)
     {
-        var detail = _dictionariesService.BuildCiselnikDetail(id, CurrentUserContext);
+        var detail = await _dictionaryService.BuildCiselnikDetailAsync(id, CurrentUserContext, ct);
+        PrepareDictionaryDetailPresentation(detail);
         return PartialView("_CiselnikDetail", detail);
     }
 
-    public IActionResult EditRow(string key, int id)
+    public async Task<IActionResult> EditRow(string key, int id, CancellationToken ct)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.CiselnikyEdit))
         {
@@ -47,7 +55,7 @@ public sealed class CiselnikyController : BaseController
             return Forbid();
         }
 
-        var detail = _dictionariesService.BuildCiselnikDetail(key, CurrentUserContext);
+        var detail = await _dictionaryService.BuildCiselnikDetailAsync(key, CurrentUserContext, ct);
         var row = detail.Polozky.FirstOrDefault(x => x.Id == id);
         if (row is null)
         {
@@ -81,10 +89,10 @@ public sealed class CiselnikyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveRow(SaveCiselnikRowCommand command)
+    public async Task<IActionResult> SaveRow(SaveCiselnikRowCommand command, CancellationToken ct = default)
     {
-        return ExecuteValidatedCommand(
-            hasPermission: () =>
+        return await ExecuteValidatedCommandAsync(
+            hasPermission: async () =>
             {
                 if (!CurrentUserContext.HasPermission(PermissionKeys.CiselnikyEdit))
                 {
@@ -98,7 +106,7 @@ public sealed class CiselnikyController : BaseController
 
                 if (command.Id.HasValue && !CurrentUserContext.IsSuperAdmin)
                 {
-                    var detail = _dictionariesService.BuildCiselnikDetail(command.Key, CurrentUserContext);
+                    var detail = await _dictionaryService.BuildCiselnikDetailAsync(command.Key, CurrentUserContext, ct);
                     var row = detail.Polozky.FirstOrDefault(x => x.Id == command.Id.Value);
                     if (row is not null && !DictionarySecurityPolicy.CanModifyRow(command.Key, row.IsLocked, CurrentUserContext.IsSuperAdmin))
                     {
@@ -111,21 +119,21 @@ public sealed class CiselnikyController : BaseController
             invalidAjaxMessage: "Položku číselníku nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index), new { id = command.Key }),
-            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { id = command.Key }),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Index), new { id = command.Key })),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "ciselniky-detail",
                 refreshUrl: Url.Action(nameof(Panel), "Ciselniky", new { id = command.Key }),
                 ciselnikKey: command.Key,
-                message: "Položka číselníku byla uložena."),
-            operation: () => _dictionariesService.SaveCiselnikRow(command, CurrentUserContext));
+                message: "Položka číselníku byla uložena.")),
+            operation: () => _dictionaryService.SaveCiselnikRowAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult DeleteRow(DeleteCiselnikRowCommand command)
+    public async Task<IActionResult> DeleteRow(DeleteCiselnikRowCommand command, CancellationToken ct = default)
     {
-        return ExecuteCommand(
-            hasPermission: () =>
+        return await ExecuteCommandAsync(
+            hasPermission: async () =>
             {
                 if (!CurrentUserContext.HasPermission(PermissionKeys.CiselnikyEdit))
                 {
@@ -139,7 +147,7 @@ public sealed class CiselnikyController : BaseController
 
                 if (!CurrentUserContext.IsSuperAdmin)
                 {
-                    var detail = _dictionariesService.BuildCiselnikDetail(command.Key, CurrentUserContext);
+                    var detail = await _dictionaryService.BuildCiselnikDetailAsync(command.Key, CurrentUserContext, ct);
                     var row = detail.Polozky.FirstOrDefault(x => x.Id == command.Id);
                     if (row is not null && !DictionarySecurityPolicy.CanModifyRow(command.Key, row.IsLocked, CurrentUserContext.IsSuperAdmin))
                     {
@@ -149,8 +157,16 @@ public sealed class CiselnikyController : BaseController
 
                 return true;
             },
-            onSuccessRedirect: () => RedirectToAction(nameof(Index), new { id = command.Key }),
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Index), new { id = command.Key })),
             onAjaxSuccess: null,
-            operation: () => _dictionariesService.DeleteCiselnikRow(command, CurrentUserContext));
+            operation: () => _dictionaryService.DeleteCiselnikRowAsync(command, CurrentUserContext, ct));
+    }
+
+    private void PrepareDictionaryDetailPresentation(CiselnikDetailViewModel detail)
+    {
+        AttachCurrentUser(detail);
+        detail.PageTitle = detail.Nazev;
+        detail.CanEditCiselnik = CurrentUserContext.HasPermission(PermissionKeys.CiselnikyEdit);
+        detail.IsArchitect = CurrentUserContext.IsSuperAdmin;
     }
 }

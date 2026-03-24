@@ -5,17 +5,17 @@ namespace PmTracker.Web.Services.Data;
 
 public interface IRecordWriteCommandsComposition
 {
-    int GetNextCisloZaznamuTransactional(int projektId);
+    Task<int> GetNextCisloZaznamuTransactionalAsync(int projektId, CancellationToken ct = default);
 
-    int AllocateMeetingOrderTransactional(int projektId, int cisloJednani);
+    Task<int> AllocateMeetingOrderTransactionalAsync(int projektId, int cisloJednani, CancellationToken ct = default);
 
-    IReadOnlyList<SpolupracovnikOptionViewModel> BuildRecordOwnerCandidates(int projectId, int? selectedOwnerId);
+    Task<IReadOnlyList<SpolupracovnikOptionViewModel>> BuildRecordOwnerCandidatesAsync(int projectId, int? selectedOwnerId, CancellationToken ct = default);
 
-    int EnsurePersistedActiveHarmonogramSchemaVersion();
+    Task<int> EnsurePersistedActiveHarmonogramSchemaVersionAsync(CancellationToken ct = default);
 
-    IReadOnlyList<RecordScheduleTypeDefinition> ResolveScheduleTypeDefinitionsForRecord(ProjektovyZaznamEntity record);
+    Task<IReadOnlyList<RecordScheduleTypeDefinition>> ResolveScheduleTypeDefinitionsForRecordAsync(ProjektovyZaznamEntity record, CancellationToken ct = default);
 
-    IReadOnlyList<RecordScheduleTypeDefinition> ResolveScheduleTypeDefinitionsForSchemaVersion(int schemaVersion);
+    Task<IReadOnlyList<RecordScheduleTypeDefinition>> ResolveScheduleTypeDefinitionsForSchemaVersionAsync(int schemaVersion, CancellationToken ct = default);
 
-    IReadOnlyList<int> ResolveLeadEquivalentOsobaIds(int projectId, int subsystemId);
+    Task<IReadOnlyList<int>> ResolveLeadEquivalentOsobaIdsAsync(int projectId, int subsystemId, CancellationToken ct = default);
 }

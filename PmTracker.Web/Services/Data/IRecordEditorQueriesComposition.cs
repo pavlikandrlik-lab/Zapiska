@@ -5,26 +5,27 @@ namespace PmTracker.Web.Services.Data;
 
 public interface IRecordEditorQueriesComposition
 {
-    ZaznamEditViewModel BuildZaznamEditForEntity(
+    Task<ZaznamEditViewModel> BuildZaznamEditForEntityAsync(
         ProjektovyZaznamEntity record,
         bool isCreate,
         int? forceMeetingIdForNumber = null,
         bool? projectUsesMeetingIdentifier = null,
-        IReadOnlyList<JednaniOptionViewModel>? openMeetingOptions = null);
+        IReadOnlyList<JednaniOptionViewModel>? openMeetingOptions = null,
+        CancellationToken ct = default);
 
-    IReadOnlyList<ProjectSubsystemViewModel> BuildActiveProjectSubsystems(int projectId);
+    Task<IReadOnlyList<ProjectSubsystemViewModel>> BuildActiveProjectSubsystemsAsync(int projectId, CancellationToken ct = default);
 
-    IReadOnlyList<JednaniListItemViewModel> BuildJednaniList(int projectId);
+    Task<IReadOnlyList<JednaniListItemViewModel>> BuildJednaniListAsync(int projectId, CancellationToken ct = default);
 
-    IReadOnlyList<JednaniOptionViewModel> BuildOpenMeetingOptions(IReadOnlyList<JednaniListItemViewModel> meetings);
+    Task<IReadOnlyList<JednaniOptionViewModel>> BuildOpenMeetingOptionsAsync(IReadOnlyList<JednaniListItemViewModel> meetings, CancellationToken ct = default);
 
     int? ResolveSelectedMeetingIdForNumber(
         IReadOnlyList<JednaniOptionViewModel> openMeetingOptions,
         int? contextMeetingId);
 
-    IReadOnlyDictionary<int, int> BuildDefaultOwnerOsobaIdsByProjectSubsystem(int projectId);
+    Task<IReadOnlyDictionary<int, int>> BuildDefaultOwnerOsobaIdsByProjectSubsystemAsync(int projectId, CancellationToken ct = default);
 
-    int EnsurePersistedActiveHarmonogramSchemaVersion();
+    Task<int> EnsurePersistedActiveHarmonogramSchemaVersionAsync(CancellationToken ct = default);
 
-    int GetNextCisloZaznamu(int projectId);
+    Task<int> GetNextCisloZaznamuAsync(int projectId, CancellationToken ct = default);
 }

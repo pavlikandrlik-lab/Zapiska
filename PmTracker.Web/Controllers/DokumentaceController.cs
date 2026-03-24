@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PmTracker.Web.Services.Documentation;
 using PmTracker.Web.Services.Security;
 
@@ -11,8 +12,10 @@ public sealed class DokumentaceController : BaseController
 
     public DokumentaceController(
         IUserContextResolver userContextResolver,
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory,
         IDocumentationService documentationService)
-        : base(userContextResolver)
+        : base(userContextResolver, timeProvider, loggerFactory)
     {
         _documentationService = documentationService;
     }

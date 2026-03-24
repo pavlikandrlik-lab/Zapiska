@@ -10,16 +10,10 @@
     var showTaskType = !string.IsNullOrWhiteSpace(Model.Kategorie)
         && (Model.Kategorie.Contains("úkol", StringComparison.OrdinalIgnoreCase)
             || Model.Kategorie.Contains("ukol", StringComparison.OrdinalIgnoreCase));
-    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
-    var canEditRecord = userContext?.HasPermission(PermissionKeys.RecordsEdit, Model.ProjektId) ?? false;
-    var canEditScheduleFull = canEditRecord
-        || (userContext?.HasPermission(PermissionKeys.RecordsScheduleEdit, Model.ProjektId) ?? false);
-    var canEditScheduleAddOnly = !canEditScheduleFull
-        && (userContext?.HasPermission(PermissionKeys.RecordsScheduleAdd, Model.ProjektId) ?? false);
-    var schedulePermissionMode = canEditScheduleFull
+    var schedulePermissionMode = Model.CanEditScheduleFull
         ? "full"
-        : (canEditScheduleAddOnly ? "add" : "none");
-    var canUseBasicTabs = canEditRecord;
+        : (Model.CanEditScheduleAddOnly ? "add" : "none");
+    var canUseBasicTabs = Model.CanEditRecord;
     var defaultEditorTab = string.Equals(Model.ActiveEditorTab, "schedule", StringComparison.OrdinalIgnoreCase) && Model.JeUkolKategorie
         ? "schedule"
         : "basic";
@@ -29,7 +23,7 @@
     var deleteFallbackTab = string.Equals(defaultEditorTab, "schedule", StringComparison.OrdinalIgnoreCase)
         ? "harmonogram"
         : "zaznamy";
-    var deleteRecordModalUrl = !Model.IsCreate && canEditRecord
+    var deleteRecordModalUrl = !Model.IsCreate && Model.CanEditRecord
         ? Url.Action("DeleteRecordModal", "Zaznamy", new
         {
             projektId = Model.ProjektId,
@@ -652,8 +646,8 @@
                             var durationStaticDisabled = krok.TrvaniTypId <= 0;
                             var delayStaticDisabled = krok.ZpozdeniTypId <= 0;
                             var stepStaticDisabled = durationStaticDisabled || delayStaticDisabled;
-                            var canEditDuration = canEditScheduleFull || (canEditScheduleAddOnly && krok.TrvaniDni <= 0);
-                            var canEditDelay = canEditScheduleFull || canEditScheduleAddOnly;
+                            var canEditDuration = Model.CanEditScheduleFull || (Model.CanEditScheduleAddOnly && krok.TrvaniDni <= 0);
+                            var canEditDelay = Model.CanEditScheduleFull || Model.CanEditScheduleAddOnly;
                             var durationDisabled = !Model.JeUkolKategorie || durationStaticDisabled || !canEditDuration;
                             var delayDisabled = !Model.JeUkolKategorie || delayStaticDisabled || !canEditDelay;
                             var dateDisabled = !Model.JeUkolKategorie || stepStaticDisabled || !canEditDuration;

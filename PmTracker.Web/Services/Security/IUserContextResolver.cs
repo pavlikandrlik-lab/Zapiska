@@ -4,7 +4,7 @@ namespace PmTracker.Web.Services.Security;
 
 public interface IUserContextResolver
 {
-    Task<UserContextResolutionResult> ResolveAsync(HttpContext httpContext, CancellationToken cancellationToken = default);
+    Task<UserContextResolutionResult> ResolveAsync(HttpContext httpContext, CancellationToken ct = default);
 }
 
 public sealed class UserContextResolutionResult

@@ -22,12 +22,12 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         _logger = logger;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PmTrackerDbContext>();
 
-        if (!await dbContext.Database.CanConnectAsync(cancellationToken))
+        if (!await dbContext.Database.CanConnectAsync(ct))
         {
             throw new InvalidOperationException("Nelze se připojit k SQL Server databázi (PmTracker). Aplikace běží bez fallbacku, start se ukončí.");
         }
@@ -35,7 +35,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         var projectStatusCodes = await dbContext.CiselnikStavuProjektu
             .AsNoTracking()
             .Select(x => x.Kod)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
 
         var missingCodes = RequiredProjectStatusCodes
             .Where(required => !projectStatusCodes.Any(code => string.Equals(code, required, StringComparison.OrdinalIgnoreCase)))
@@ -49,7 +49,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         var projectRoleCodes = await dbContext.CiselnikRoliProjektu
             .AsNoTracking()
             .Select(x => x.Kod)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
         var missingProjectRoleCodes = RequiredProjectRoleCodes
             .Where(required => !projectRoleCodes.Any(code => string.Equals(code, required, StringComparison.OrdinalIgnoreCase)))
             .ToList();
@@ -61,7 +61,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         var subsystemRoleCodes = await dbContext.CiselnikRoliSubsystemu
             .AsNoTracking()
             .Select(x => x.Kod)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
         var missingSubsystemRoleCodes = RequiredSubsystemRoleCodes
             .Where(required => !subsystemRoleCodes.Any(code => string.Equals(code, required, StringComparison.OrdinalIgnoreCase)))
             .ToList();
@@ -70,7 +70,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             throw new InvalidOperationException("V DB chybí povinné kódy v ciselnik_roli_subsystemu: " + string.Join(", ", missingSubsystemRoleCodes));
         }
 
-        var hasEmailColumn = await HasColumnAsync(dbContext, "dbo.osoby", "email", cancellationToken);
+        var hasEmailColumn = await HasColumnAsync(dbContext, "dbo.osoby", "email", ct);
         if (!hasEmailColumn)
         {
             throw new InvalidOperationException("V DB chybí sloupec dbo.osoby.email. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
@@ -78,30 +78,30 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
 
         foreach (var requiredTable in new[] { "dbo.projekt_subsystemy", "dbo.ciselnik_roli_subsystemu", "dbo.obsazeni_subsystemu_projektu" })
         {
-            if (!await HasTableAsync(dbContext, requiredTable, cancellationToken))
+            if (!await HasTableAsync(dbContext, requiredTable, ct))
             {
                 throw new InvalidOperationException($"V DB chybí tabulka {requiredTable}. Obnovte databázi přes PMTracker_insert_sql nebo spusťte upgrade skript.");
             }
         }
 
-        var hasCommentAuthorColumn = await HasColumnAsync(dbContext, "dbo.vyjadreni", "autor_osoba_id", cancellationToken);
+        var hasCommentAuthorColumn = await HasColumnAsync(dbContext, "dbo.vyjadreni", "autor_osoba_id", ct);
         if (!hasCommentAuthorColumn)
         {
             throw new InvalidOperationException("V DB chybí sloupec dbo.vyjadreni.autor_osoba_id. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
         }
 
-        var hasEstimatedExternalLinkPriceColumn = await HasColumnAsync(dbContext, "dbo.zaznam_externi_odkazy", "predpokladana_cena", cancellationToken);
+        var hasEstimatedExternalLinkPriceColumn = await HasColumnAsync(dbContext, "dbo.zaznam_externi_odkazy", "predpokladana_cena", ct);
         if (!hasEstimatedExternalLinkPriceColumn)
         {
             throw new InvalidOperationException("V DB chybí sloupec dbo.zaznam_externi_odkazy.predpokladana_cena. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_1_external_link_estimated_price.sql.");
         }
 
-        var hasRecordGoalColumn = await HasColumnAsync(dbContext, "dbo.projektove_zaznamy", "cil", cancellationToken);
+        var hasRecordGoalColumn = await HasColumnAsync(dbContext, "dbo.projektove_zaznamy", "cil", ct);
         if (!hasRecordGoalColumn)
         {
             throw new InvalidOperationException("V DB chybí sloupec dbo.projektove_zaznamy.cil. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
         }
-        var recordGoalMaxLength = await GetCharacterMaxLengthAsync(dbContext, "dbo.projektove_zaznamy", "cil", cancellationToken);
+        var recordGoalMaxLength = await GetCharacterMaxLengthAsync(dbContext, "dbo.projektove_zaznamy", "cil", ct);
         if (recordGoalMaxLength.HasValue && recordGoalMaxLength.Value > 0 && recordGoalMaxLength.Value < 500)
         {
             throw new InvalidOperationException(
@@ -113,7 +113,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             dbContext,
             "dbo.zaznam_harmonogram_hodnoty",
             "CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative",
-            cancellationToken);
+            ct);
         if (hasLegacyScheduleConstraint)
         {
             throw new InvalidOperationException("V DB je legacy constraint CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative, který blokuje zápornou skutečnost harmonogramu. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_0_signed_schedule_actual.sql.");
@@ -121,7 +121,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
 
         foreach (var requiredColumn in new[] { "datum_prirazeni", "datum_odebrani" })
         {
-            if (!await HasColumnAsync(dbContext, "dbo.obsazeni_projektu", requiredColumn, cancellationToken))
+            if (!await HasColumnAsync(dbContext, "dbo.obsazeni_projektu", requiredColumn, ct))
             {
                 throw new InvalidOperationException($"V DB chybí sloupec dbo.obsazeni_projektu.{requiredColumn}. Obnovte databázi přes PMTracker_insert_sql nebo spusťte upgrade skript.");
             }
@@ -130,19 +130,19 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         _logger.LogInformation("SQL startup validace proběhla úspěšně.");
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
 
     private static async Task<bool> HasColumnAsync(
         PmTrackerDbContext dbContext,
         string tableName,
         string columnName,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
         var connection = dbContext.Database.GetDbConnection();
         var mustClose = connection.State != ConnectionState.Open;
         if (mustClose)
         {
-            await connection.OpenAsync(cancellationToken);
+            await connection.OpenAsync(ct);
         }
 
         try
@@ -165,7 +165,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             columnParam.Value = columnName;
             command.Parameters.Add(columnParam);
 
-            var result = await command.ExecuteScalarAsync(cancellationToken);
+            var result = await command.ExecuteScalarAsync(ct);
             return Convert.ToInt32(result) > 0;
         }
         finally
@@ -181,13 +181,13 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         PmTrackerDbContext dbContext,
         string tableName,
         string columnName,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
         var connection = dbContext.Database.GetDbConnection();
         var mustClose = connection.State != ConnectionState.Open;
         if (mustClose)
         {
-            await connection.OpenAsync(cancellationToken);
+            await connection.OpenAsync(ct);
         }
 
         try
@@ -217,7 +217,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             columnParam.Value = columnName;
             command.Parameters.Add(columnParam);
 
-            var result = await command.ExecuteScalarAsync(cancellationToken);
+            var result = await command.ExecuteScalarAsync(ct);
             return result is null || result == DBNull.Value
                 ? null
                 : Convert.ToInt32(result);
@@ -250,13 +250,13 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
     private static async Task<bool> HasTableAsync(
         PmTrackerDbContext dbContext,
         string tableName,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
         var connection = dbContext.Database.GetDbConnection();
         var mustClose = connection.State != ConnectionState.Open;
         if (mustClose)
         {
-            await connection.OpenAsync(cancellationToken);
+            await connection.OpenAsync(ct);
         }
 
         try
@@ -274,7 +274,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             tableParam.Value = tableName;
             command.Parameters.Add(tableParam);
 
-            var result = await command.ExecuteScalarAsync(cancellationToken);
+            var result = await command.ExecuteScalarAsync(ct);
             return Convert.ToInt32(result) > 0;
         }
         finally
@@ -290,13 +290,13 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         PmTrackerDbContext dbContext,
         string tableName,
         string constraintName,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
         var connection = dbContext.Database.GetDbConnection();
         var mustClose = connection.State != ConnectionState.Open;
         if (mustClose)
         {
-            await connection.OpenAsync(cancellationToken);
+            await connection.OpenAsync(ct);
         }
 
         try
@@ -319,7 +319,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             constraintParam.Value = constraintName;
             command.Parameters.Add(constraintParam);
 
-            var result = await command.ExecuteScalarAsync(cancellationToken);
+            var result = await command.ExecuteScalarAsync(ct);
             return Convert.ToInt32(result) > 0;
         }
         finally

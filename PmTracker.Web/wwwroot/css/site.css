@@ -879,10 +879,19 @@
 .page-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     gap: 16px;
     margin-bottom: 14px;
     padding: 10px 0 4px;
+}
+
+.page-header-content {
+    display: grid;
+    gap: 4px;
+}
+
+.page-header-content .badge {
+    width: fit-content;
 }
 
 .page-header h1 {
@@ -900,31 +909,11 @@
     margin: 5px 0 0;
 }
 
-.page-header-compact {
-    margin-bottom: 12px;
-    padding: 8px 0;
-}
-
-.project-header-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px 12px;
-}
-
-.project-title-inline {
-    margin: 0;
-    font-size: 25px;
-    line-height: 1.15;
-}
-
-.project-header-divider {
-    color: var(--app-muted);
-    font-size: 14px;
-}
-
-.project-status-inline {
-    margin-left: auto;
+.page-header + .header-actions,
+.page-header + .projects-header-actions,
+.page-header + .meeting-detail-header {
+    margin-top: -4px;
+    margin-bottom: 14px;
 }
 
 .header-actions {
@@ -1667,28 +1656,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     padding: 14px 0 4px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--gov-color-surface) 24px);
     z-index: 5;
-}
-
-.record-editor-page-shell {
-    display: grid;
-    gap: 18px;
-}
-
-.record-editor-page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-}
-
-.record-editor-page-header-copy {
-    display: grid;
-    gap: 6px;
-}
-
-.record-editor-page-header-copy h1,
-.record-editor-page-header-copy p {
-    margin: 0;
 }
 
 .record-editor-page-card {
@@ -3964,6 +3931,15 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     min-width: 128px;
 }
 
+.meeting-detail-header {
+    display: grid;
+    gap: 6px;
+}
+
+.meeting-detail-header p {
+    margin: 0;
+}
+
 .meeting-detail-header .muted {
     color: color-mix(in srgb, var(--app-text-primary) 65%, transparent);
 }
@@ -4929,10 +4905,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     .comment-actions {
         flex-direction: column;
         align-items: stretch;
-    }
-
-    .project-status-inline {
-        margin-left: 0;
     }
 
     .meeting-layout,

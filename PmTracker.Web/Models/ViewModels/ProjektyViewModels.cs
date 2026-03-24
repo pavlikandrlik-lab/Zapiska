@@ -2,6 +2,9 @@ namespace PmTracker.Web.Models.ViewModels;
 
 public sealed class ProjektyIndexViewModel
 {
+    public string PageTitle { get; set; } = string.Empty;
+    public string? BackUrl { get; set; }
+    public string? BackLabel { get; set; }
     public required IReadOnlyList<ProjektListItemViewModel> Projekty { get; init; }
     public IReadOnlyList<LookupOptionViewModel> StavyProjektu { get; init; } = Array.Empty<LookupOptionViewModel>();
     public bool IsAdmin { get; init; }
@@ -20,8 +23,11 @@ public sealed class ProjektListItemViewModel
     public bool CanDelete { get; init; }
 }
 
-public sealed class ProjektDetailViewModel
+public sealed class ProjektDetailViewModel : BaseViewModel
 {
+    public string PageTitle { get; set; } = string.Empty;
+    public string? BackUrl { get; set; }
+    public string? BackLabel { get; set; }
     public required ProjektHeaderViewModel Projekt { get; init; }
     public bool DleSubsystemu { get; init; }
     public required IReadOnlyList<SubsystemGroupViewModel> SkupinySubsystemu { get; init; }
@@ -39,6 +45,16 @@ public sealed class ProjektDetailViewModel
     public required IReadOnlyList<JednaniOptionViewModel> OtevrenaJednani { get; init; }
     public IReadOnlyList<LookupOptionViewModel> StavyJednani { get; init; } = Array.Empty<LookupOptionViewModel>();
     public required ProjektFiltryViewModel Filtry { get; init; }
+    public bool CanCreateMeetings { get; set; }
+    public bool CanEditMeetings { get; set; }
+    public bool CanManageTeam { get; set; }
+    public bool CanManageRecords { get; set; }
+    public bool CanManageSchedules { get; set; }
+    public int CurrentUserOsobaId { get; set; }
+    public string? CreateRecordEditorUrl { get; set; }
+    public string? ReturnToProjectUrl { get; set; }
+    public string? ProjectPrintUrl { get; set; }
+    public string? ProjectWordUrl { get; set; }
 }
 
 public sealed class ProjektHeaderViewModel
@@ -89,6 +105,14 @@ public sealed class ZaznamCardViewModel
     public required IReadOnlyList<string> VyjadreniJednaniStavyKody { get; init; }
     public bool MaVyjadreniProPripravuJednani { get; init; }
     public DateTime DatumZalozeni { get; init; }
+    public bool CanEditRecord { get; set; }
+    public bool CanEditSchedule { get; set; }
+    public bool CanAddSchedule { get; set; }
+    public bool CanManageSchedule { get; set; }
+    public bool CanCommentAsSubsystemLeader { get; set; }
+    public bool CanAddComment { get; set; }
+    public string EditButtonLabel { get; set; } = "Upravit";
+    public int CurrentUserOsobaId { get; set; }
 }
 
 public sealed class ProjektHarmonogramUkolViewModel
@@ -123,6 +147,19 @@ public sealed class ProjektHarmonogramUkolViewModel
     public required string DelayBarvaHex { get; init; }
     public bool MaVizualniTrvani { get; init; }
     public required IReadOnlyList<ProjektHarmonogramKrokViewModel> Kroky { get; init; }
+    public DateTime CompactAxisStart { get; set; }
+    public DateTime CompactAxisEnd { get; set; }
+    public DateTime BreakdownAxisStart { get; set; }
+    public DateTime BreakdownAxisEnd { get; set; }
+    public double CompactDeadlinePercent { get; set; }
+    public double CompactTodayPercent { get; set; }
+    public double BreakdownTodayPercent { get; set; }
+    public string FormatCompactDeadlinePercent { get; set; } = string.Empty;
+    public string FormatCompactTodayPercent { get; set; } = string.Empty;
+    public string FormatBreakdownTodayPercent { get; set; } = string.Empty;
+    public string CompactTodayTitle { get; set; } = string.Empty;
+    public bool CanManageSchedule { get; set; }
+    public string? ScheduleEditUrl { get; set; }
 }
 
 public sealed class ProjektHarmonogramKrokViewModel
@@ -137,6 +174,19 @@ public sealed class ProjektHarmonogramKrokViewModel
     public DateTime PlanEnd { get; init; }
     public DateTime RealStart { get; init; }
     public DateTime RealEnd { get; init; }
+    public bool HasBreakdownVisualDuration { get; set; }
+    public string OffsetLabel { get; set; } = string.Empty;
+    public string? OffsetCssClass { get; set; }
+    public string CompactPlanLeftPercent { get; set; } = string.Empty;
+    public string CompactPlanWidthStyle { get; set; } = string.Empty;
+    public string CompactPlanTitle { get; set; } = string.Empty;
+    public string CompactActualLeftPercent { get; set; } = string.Empty;
+    public string CompactActualWidthStyle { get; set; } = string.Empty;
+    public string CompactActualTitle { get; set; } = string.Empty;
+    public string BreakdownPlanLeftPercent { get; set; } = string.Empty;
+    public string BreakdownPlanWidthPercent { get; set; } = string.Empty;
+    public string BreakdownActualLeftPercent { get; set; } = string.Empty;
+    public string BreakdownActualWidthPercent { get; set; } = string.Empty;
 }
 
 public sealed class ExterniOdkazViewModel
@@ -316,6 +366,8 @@ public sealed class JednaniOptionViewModel
 
 public sealed class ZaznamEditViewModel
 {
+    public string PageTitle { get; set; } = string.Empty;
+    public string? BackLabel { get; set; }
     public int Id { get; init; }
     public int CisloZaznamu { get; init; }
     public required string CisloViditelne { get; init; }
@@ -358,6 +410,9 @@ public sealed class ZaznamEditViewModel
     public string BackUrl { get; set; } = string.Empty;
     public string ActiveEditorTab { get; set; } = "basic";
     public bool UseAjaxSubmit { get; set; } = true;
+    public bool CanEditRecord { get; set; }
+    public bool CanEditScheduleFull { get; set; }
+    public bool CanEditScheduleAddOnly { get; set; }
 }
 
 public sealed class HarmonogramKrokEditViewModel

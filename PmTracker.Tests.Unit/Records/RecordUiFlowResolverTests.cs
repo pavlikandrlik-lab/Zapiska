@@ -1,5 +1,5 @@
 using FluentAssertions;
-using PmTracker.Web.Modules.Records;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Tests.Unit.Records;
 

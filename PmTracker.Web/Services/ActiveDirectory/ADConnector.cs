@@ -1,9 +1,11 @@
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
+using System.Runtime.Versioning;
 using System.Security.Principal;
 
 namespace PmTracker.Web.Services.ActiveDirectory;
 
+[SupportedOSPlatform("windows")]
 internal static class ADConnector
 {
     public static IReadOnlyList<ADInfo> GetADUsers(string query, string domain, int maxResults)

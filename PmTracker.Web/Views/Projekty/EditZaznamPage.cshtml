@@ -3,21 +3,15 @@
     ViewData["Title"] = Model.IsCreate ? "Nový projektový záznam" : $"Upravit záznam {Model.CisloViditelne}";
 }
 
-<section class="record-editor-page-shell">
-    <div class="record-editor-page-header">
-        <a class="btn small ghost"
-           href="@Model.BackUrl"
-           data-record-editor-cancel
-           data-record-editor-back-url="@Model.BackUrl">
-            Zpět do projektu
-        </a>
-        <div class="record-editor-page-header-copy">
-            <h1>@(Model.IsCreate ? "Nový projektový záznam" : "Upravit záznam")</h1>
-            <p class="muted">Po uložení se vrátíte zpět do projektu do stejného pracovního kontextu.</p>
-        </div>
-    </div>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = "Po uložení se vrátíte zpět do projektu do stejného pracovního kontextu.",
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel,
+    UseRecordEditorBackNavigation = true
+})
 
-    <section class="card record-editor-page-card">
-        @await Html.PartialAsync("~/Views/Projekty/_EditZaznamForm.cshtml", Model)
-    </section>
+<section class="card record-editor-page-card record-editor-page-shell">
+    @await Html.PartialAsync("~/Views/Projekty/_EditZaznamForm.cshtml", Model)
 </section>

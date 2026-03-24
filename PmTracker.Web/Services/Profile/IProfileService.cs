@@ -4,5 +4,5 @@ namespace PmTracker.Web.Services.Profile;
 
 public interface IProfileService
 {
-    ProfilPageViewModel BuildProfilPage(CurrentUserContextViewModel currentUser, int? projektId);
+    Task<ProfilPageViewModel> BuildProfilPageAsync(CurrentUserContextViewModel currentUser, int? projektId, CancellationToken ct = default);
 }

@@ -2,8 +2,6 @@
 @inject PmTracker.Web.Services.Common.IRichTextContentService RichTextContentService
 @{
     var ukol = Model.Ukol;
-    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
-    var userOsobaId = userContext?.OsobaId ?? 0;
     var canAddComment = Model.CanEditRecordNotes || Model.CanCommentAsSubsystemLeader;
 }
 
@@ -37,7 +35,7 @@
                         <div class="comment-toolbar">
                             @{
                                 var canEditThisComment = vyjadreni.LzeUpravit &&
-                                    (Model.CanEditRecordNotes || (Model.CanCommentAsSubsystemLeader && vyjadreni.AutorOsobaId == userOsobaId));
+                                    (Model.CanEditRecordNotes || (Model.CanCommentAsSubsystemLeader && vyjadreni.AutorOsobaId == Model.CurrentUserOsobaId));
                             }
                             @if (canEditThisComment)
                             {

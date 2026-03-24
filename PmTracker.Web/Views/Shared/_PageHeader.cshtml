@@ -1,0 +1,31 @@
+@model PageHeaderViewModel
+
+<section class="page-header">
+    @if (!string.IsNullOrWhiteSpace(Model.BackUrl))
+    {
+        if (Model.UseRecordEditorBackNavigation)
+        {
+            <a class="btn small ghost"
+               href="@Model.BackUrl"
+               data-record-editor-cancel
+               data-record-editor-back-url="@Model.BackUrl">
+                @(Model.BackLabel ?? "Zpět")
+            </a>
+        }
+        else
+        {
+            <a class="btn small ghost" href="@Model.BackUrl">@(Model.BackLabel ?? "Zpět")</a>
+        }
+    }
+    <div class="page-header-content">
+        <h1>@Model.Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.Subtitle))
+        {
+            <p class="muted">@Model.Subtitle</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Badge))
+        {
+            <span class="badge">@Model.Badge</span>
+        }
+    </div>
+</section>

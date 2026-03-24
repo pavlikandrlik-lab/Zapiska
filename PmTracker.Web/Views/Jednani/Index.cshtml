@@ -1,19 +1,18 @@
 @model JednaniIndexViewModel
 @{
     ViewData["Title"] = "Jednání";
-    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
 }
 
-<section class="page-header">
-    <div>
-        <h1>Jednání</h1>
-        <p class="muted">Přehled porad podle projektu.</p>
-    </div>
-</section>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = "Přehled porad podle projektu.",
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel
+})
 
 @foreach (var projekt in Model.Projekty)
 {
-    var canDeleteMeetings = userContext?.HasPermission(PermissionKeys.MeetingsEdit, projekt.ProjektId) ?? false;
     <section class="card">
         <div class="meeting-header">
             <h2>@projekt.ProjektNazev</h2>
@@ -27,7 +26,7 @@
                 @await Html.PartialAsync("_MeetingCard", new MeetingCardViewModel
                 {
                     ProjektId = projekt.ProjektId,
-                    CanDelete = canDeleteMeetings,
+                    CanDelete = projekt.CanDeleteMeetings,
                     UseAjaxDelete = false,
                     ReturnUrl = $"{Context.Request.Path}{Context.Request.QueryString}",
                     DetailUrl = detailUrl,

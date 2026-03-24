@@ -4,8 +4,8 @@ namespace PmTracker.Web.Services.People;
 
 public interface IPeopleService
 {
-    OsobyIndexViewModel BuildOsoby();
-    int SaveManualPerson(SaveManualPersonCommand command, CurrentUserContextViewModel currentUser);
-    int SaveAdPerson(SaveAdPersonCommand command, CurrentUserContextViewModel currentUser);
-    void DeletePerson(DeletePersonCommand command, CurrentUserContextViewModel currentUser);
+    Task<OsobyIndexViewModel> BuildOsobyAsync(CancellationToken ct = default);
+    Task<int> SaveManualPersonAsync(SaveManualPersonCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
+    Task<int> SaveAdPersonAsync(SaveAdPersonCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
+    Task DeletePersonAsync(DeletePersonCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
 }

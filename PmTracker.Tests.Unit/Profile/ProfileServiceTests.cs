@@ -1,5 +1,7 @@
 using FluentAssertions;
-using PmTracker.Web.Models.ViewModels;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Profile;
 
 namespace PmTracker.Tests.Unit.Profile;
@@ -7,48 +9,29 @@ namespace PmTracker.Tests.Unit.Profile;
 public sealed class ProfileServiceTests
 {
     [Fact]
-    public void BuildProfilPage_ShouldDelegateToDataStore()
+    public void AddPmTrackerDataStore_ShouldResolveProfileFacadeAlias()
     {
-        var expected = new ProfilPageViewModel
-        {
-            Uzivatel = new CurrentUserContextViewModel
-            {
-                OsobaId = 17,
-                Jmeno = "Unit",
-                Prijmeni = "Tester",
-                DisplayName = "Unit Tester",
-                Email = "unit@test.local",
-                OrganizacniCelek = "QA",
-                OrganizacniCelekKod = "QA",
-                IsSuperAdmin = false,
-                RoleKody = [],
-                VisibleProjectIds = [],
-                DeletedProjectIds = [],
-                PermissionGrants = []
-            },
-            MojeRole = [],
-            OdvozenaPrava = []
-        };
-        var dataStore = new FakeProfileDataStore(expected);
-        var sut = new ProfileService(dataStore);
+        var services = new ServiceCollection();
+        services.AddPmTrackerDataStore(BuildConfiguration());
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        using var scope = provider.CreateScope();
 
-        var result = sut.BuildProfilPage(expected.Uzivatel, projektId: 123);
+        var concrete = scope.ServiceProvider.GetRequiredService<ProfileService>();
+        var facade = scope.ServiceProvider.GetRequiredService<IProfileService>();
 
-        result.Should().BeSameAs(expected);
-        dataStore.LastProjectId.Should().Be(123);
-        dataStore.LastUser.Should().BeSameAs(expected.Uzivatel);
+        facade.Should().BeSameAs(concrete);
     }
 
-    private sealed class FakeProfileDataStore(ProfilPageViewModel response) : IProfileDataStore
+    private static IConfiguration BuildConfiguration()
     {
-        public CurrentUserContextViewModel? LastUser { get; private set; }
-        public int? LastProjectId { get; private set; }
-
-        public ProfilPageViewModel BuildProfilPage(CurrentUserContextViewModel currentUser, int? projektId)
-        {
-            LastUser = currentUser;
-            LastProjectId = projektId;
-            return response;
-        }
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:PmTracker"] = "Server=(localdb)\\mssqllocaldb;Database=PmTracker.Tests;Trusted_Connection=True;TrustServerCertificate=True;",
+                ["PmTrackerData:Provider"] = "SqlServer",
+                ["PmTrackerData:SqlServer:ConnectionStringName"] = "PmTracker",
+                ["PmTrackerData:SqlServer:CommandTimeoutSeconds"] = "30"
+            })
+            .Build();
     }
 }

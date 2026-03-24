@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using PmTracker.Web.Models.ViewModels;
@@ -17,18 +16,31 @@ public abstract class BaseController : Controller
     protected const string InvalidFormFallbackMessage = "Formulář obsahuje neplatné hodnoty.";
 
     private readonly IUserContextResolver _userContextResolver;
+    private readonly TimeProvider _timeProvider;
+    private readonly ILoggerFactory _loggerFactory;
 
     protected CurrentUserContextViewModel CurrentUserContext { get; private set; } = null!;
 
-    protected BaseController(IUserContextResolver userContextResolver)
+    protected BaseController(
+        IUserContextResolver userContextResolver,
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory)
     {
         _userContextResolver = userContextResolver;
+        _timeProvider = timeProvider;
+        _loggerFactory = loggerFactory;
     }
 
     protected DateTime GetLocalNow()
     {
-        var timeProvider = HttpContext.RequestServices.GetService<TimeProvider>() ?? TimeProvider.System;
-        return timeProvider.GetLocalNow().LocalDateTime;
+        return _timeProvider.GetLocalNow().LocalDateTime;
+    }
+
+    protected T AttachCurrentUser<T>(T model)
+        where T : BaseViewModel
+    {
+        model.CurrentUserContext = CurrentUserContext;
+        return model;
     }
 
     protected bool IsAjaxRequest()
@@ -223,6 +235,66 @@ public abstract class BaseController : Controller
             onExceptionRedirect);
     }
 
+    protected async Task<IActionResult> ExecuteValidatedCommandAsync(
+        Func<bool> hasPermission,
+        string invalidAjaxMessage,
+        string invalidFallbackMessage,
+        Func<IActionResult> onInvalidRedirect,
+        Func<Task<IActionResult>> onSuccessRedirect,
+        Func<Task<IActionResult>>? onAjaxSuccess,
+        Func<Task> operation,
+        Func<Exception, Task<IActionResult>>? onExceptionRedirect = null)
+    {
+        if (!ModelState.IsValid)
+        {
+            if (IsAjaxRequest())
+            {
+                return AjaxInvalidModelResult(invalidAjaxMessage);
+            }
+
+            var fieldErrors = BuildModelStateFieldErrors();
+            TempData["ErrorMessage"] = $"{invalidAjaxMessage}: {JoinFieldErrors(fieldErrors, invalidFallbackMessage)}";
+            return onInvalidRedirect();
+        }
+
+        return await ExecuteCommandAsync(
+            hasPermission,
+            onSuccessRedirect,
+            onAjaxSuccess,
+            operation,
+            onExceptionRedirect);
+    }
+
+    protected async Task<IActionResult> ExecuteValidatedCommandAsync(
+        Func<Task<bool>> hasPermission,
+        string invalidAjaxMessage,
+        string invalidFallbackMessage,
+        Func<IActionResult> onInvalidRedirect,
+        Func<Task<IActionResult>> onSuccessRedirect,
+        Func<Task<IActionResult>>? onAjaxSuccess,
+        Func<Task> operation,
+        Func<Exception, Task<IActionResult>>? onExceptionRedirect = null)
+    {
+        if (!ModelState.IsValid)
+        {
+            if (IsAjaxRequest())
+            {
+                return AjaxInvalidModelResult(invalidAjaxMessage);
+            }
+
+            var fieldErrors = BuildModelStateFieldErrors();
+            TempData["ErrorMessage"] = $"{invalidAjaxMessage}: {JoinFieldErrors(fieldErrors, invalidFallbackMessage)}";
+            return onInvalidRedirect();
+        }
+
+        return await ExecuteCommandAsync(
+            hasPermission,
+            onSuccessRedirect,
+            onAjaxSuccess,
+            operation,
+            onExceptionRedirect);
+    }
+
     protected IActionResult ExecuteCommand(
         Func<bool> hasPermission,
         Func<IActionResult> onSuccessRedirect,
@@ -285,6 +357,136 @@ public abstract class BaseController : Controller
             }
 
             return onSuccessRedirect();
+        }
+    }
+
+    protected async Task<IActionResult> ExecuteCommandAsync(
+        Func<bool> hasPermission,
+        Func<Task<IActionResult>> onSuccessRedirect,
+        Func<Task<IActionResult>>? onAjaxSuccess,
+        Func<Task> operation,
+        Func<Exception, Task<IActionResult>>? onExceptionRedirect = null)
+    {
+        if (!hasPermission())
+        {
+            if (IsAjaxRequest())
+            {
+                return AjaxForbiddenResult();
+            }
+
+            return Forbid();
+        }
+
+        try
+        {
+            await operation();
+            if (IsAjaxRequest() && onAjaxSuccess is not null)
+            {
+                return await onAjaxSuccess();
+            }
+
+            return await onSuccessRedirect();
+        }
+        catch (Exception ex)
+        {
+            if (IsAjaxRequest())
+            {
+                if (ex is RecordValidationException validationException)
+                {
+                    return AjaxErrorResult(
+                        validationException.Message,
+                        validationException.ErrorCode,
+                        validationException,
+                        validationException.FieldErrors,
+                        validationException.DiagnosticLog);
+                }
+
+                if (ex is InvalidOperationException invalidOperationException)
+                {
+                    return AjaxErrorResult(
+                        invalidOperationException.Message,
+                        AjaxErrorCodes.OperationFailed,
+                        invalidOperationException);
+                }
+
+                return AjaxErrorResult(
+                    "Operaci se nepodařilo dokončit.",
+                    AjaxErrorCodes.UnexpectedServerError,
+                    ex);
+            }
+
+            TempData["ErrorMessage"] = ex.Message;
+            if (onExceptionRedirect is not null)
+            {
+                return await onExceptionRedirect(ex);
+            }
+
+            return await onSuccessRedirect();
+        }
+    }
+
+    protected async Task<IActionResult> ExecuteCommandAsync(
+        Func<Task<bool>> hasPermission,
+        Func<Task<IActionResult>> onSuccessRedirect,
+        Func<Task<IActionResult>>? onAjaxSuccess,
+        Func<Task> operation,
+        Func<Exception, Task<IActionResult>>? onExceptionRedirect = null)
+    {
+        if (!await hasPermission())
+        {
+            if (IsAjaxRequest())
+            {
+                return AjaxForbiddenResult();
+            }
+
+            return Forbid();
+        }
+
+        try
+        {
+            await operation();
+            if (IsAjaxRequest() && onAjaxSuccess is not null)
+            {
+                return await onAjaxSuccess();
+            }
+
+            return await onSuccessRedirect();
+        }
+        catch (Exception ex)
+        {
+            if (IsAjaxRequest())
+            {
+                if (ex is RecordValidationException validationException)
+                {
+                    return AjaxErrorResult(
+                        validationException.Message,
+                        validationException.ErrorCode,
+                        validationException,
+                        validationException.FieldErrors,
+                        validationException.DiagnosticLog);
+                }
+
+                if (ex is InvalidOperationException invalidOperationException)
+                {
+                    return AjaxErrorResult(
+                        invalidOperationException.Message,
+                        AjaxErrorCodes.OperationFailed,
+                        invalidOperationException);
+                }
+
+                return AjaxErrorResult(
+                    "Operaci se nepodařilo dokončit.",
+                    AjaxErrorCodes.UnexpectedServerError,
+                    ex);
+            }
+
+            TempData["ErrorMessage"] = ex.Message;
+            if (onExceptionRedirect is not null)
+            {
+                return await onExceptionRedirect(ex);
+            }
+
+            return await onSuccessRedirect();
         }
     }
 
@@ -495,13 +697,7 @@ public abstract class BaseController : Controller
         string diagnosticLog,
         Exception? exception)
     {
-        var loggerFactory = HttpContext.RequestServices.GetService<ILoggerFactory>();
-        var logger = loggerFactory?.CreateLogger(GetType().FullName ?? nameof(BaseController));
-        if (logger is null)
-        {
-            return;
-        }
-
+        var logger = _loggerFactory.CreateLogger(GetType().FullName ?? nameof(BaseController));
         var fieldErrorCount = fieldErrors.Values.Sum(values => values.Length);
         if (level == LogLevel.Error)
         {
@@ -542,16 +738,19 @@ public abstract class BaseController : Controller
         }
 
         CurrentUserContext = resolved.UserContext;
-
-        ViewBag.CurrentUserContext = CurrentUserContext;
-        ViewBag.CurrentUserName = CurrentUserContext.DisplayName;
-        ViewBag.CurrentUserEmail = CurrentUserContext.Email;
-        ViewBag.CurrentUserOrg = CurrentUserContext.OrganizacniCelek;
-        ViewBag.CurrentUserOrgCode = string.IsNullOrWhiteSpace(CurrentUserContext.OrganizacniCelekKod)
-            ? CurrentUserContext.OrganizacniCelek
-            : CurrentUserContext.OrganizacniCelekKod;
-        ViewBag.CurrentUserRoles = CurrentUserContext.RoleKody;
-        ViewBag.IsGlobalAdmin = CurrentUserContext.IsSuperAdmin;
+        ViewData["NavPermissions"] = new NavPermissionsViewModel
+        {
+            CanViewPeople = CurrentUserContext.HasPermissionPrefix(PermissionKeys.PeoplePrefix),
+            CanViewCiselniky = CurrentUserContext.HasPermissionPrefix(PermissionKeys.CiselnikyPrefix),
+            CanViewSettings = CurrentUserContext.HasPermissionPrefix(PermissionKeys.SettingsPrefix),
+            CurrentUserDisplayName = CurrentUserContext.DisplayName,
+            CurrentUserEmail = CurrentUserContext.Email,
+            CurrentUserOrg = CurrentUserContext.OrganizacniCelek,
+            CurrentUserOrgCode = string.IsNullOrWhiteSpace(CurrentUserContext.OrganizacniCelekKod)
+                ? CurrentUserContext.OrganizacniCelek
+                : CurrentUserContext.OrganizacniCelekKod,
+            CurrentUserRoles = CurrentUserContext.RoleKody
+        };
 
         await next();
     }

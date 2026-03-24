@@ -3,12 +3,13 @@
     ViewData["Title"] = "Můj profil";
 }
 
-<section class="page-header">
-    <div>
-        <h1>Můj profil</h1>
-        <p class="muted">Identita uživatele.</p>
-    </div>
-</section>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = "Identita uživatele.",
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel
+})
 
 <div class="profile-layout">
     <section class="card">

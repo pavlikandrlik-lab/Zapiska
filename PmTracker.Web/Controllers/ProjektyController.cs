@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Modules.Meetings;
-using PmTracker.Web.Modules.Projects;
+using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
@@ -11,34 +11,31 @@ public sealed class ProjektyController : BaseController
     private const string TeamTab = "tym";
     private const string TeamRefreshScope = "projekty-detail-tym";
 
-    private readonly IProjectsQueries _projectsQueries;
-    private readonly IProjectsCommands _projectsCommands;
-    private readonly IMeetingsQueries _meetingsQueries;
-    private readonly IMeetingsCommands _meetingsCommands;
+    private readonly IProjectService _projectService;
+    private readonly IMeetingService _meetingService;
 
     public ProjektyController(
         IUserContextResolver userContextResolver,
-        IProjectsQueries projectsQueries,
-        IProjectsCommands projectsCommands,
-        IMeetingsQueries meetingsQueries,
-        IMeetingsCommands meetingsCommands)
-        : base(userContextResolver)
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory,
+        IProjectService projectService,
+        IMeetingService meetingService)
+        : base(userContextResolver, timeProvider, loggerFactory)
     {
-        _projectsQueries = projectsQueries;
-        _projectsCommands = projectsCommands;
-        _meetingsQueries = meetingsQueries;
-        _meetingsCommands = meetingsCommands;
+        _projectService = projectService;
+        _meetingService = meetingService;
     }
 
-    public IActionResult Index()
+    public async Task<IActionResult> Index(CancellationToken ct = default)
     {
-        var projekty = _projectsQueries.BuildProjektyList()
+        var projekty = (await _projectService.BuildProjektyListAsync(ct))
             .Where(project => CurrentUserContext.CanAccessProject(project.Id))
             .ToList();
-        var projectStatusOptions = BuildProjectStatusOptions();
+        var projectStatusOptions = await BuildProjectStatusOptionsAsync(ct);
 
         var model = new ProjektyIndexViewModel
         {
+            PageTitle = "Projekty",
             IsAdmin = CurrentUserContext.IsSuperAdmin,
             CanCreate = CurrentUserContext.HasPermission(PermissionKeys.ProjectsCreate),
             StavyProjektu = projectStatusOptions,
@@ -59,9 +56,9 @@ public sealed class ProjektyController : BaseController
         return View(model);
     }
 
-    public IActionResult Detail(int id)
+    public async Task<IActionResult> Detail(int id, CancellationToken ct = default)
     {
-        if (!_projectsQueries.ProjektExists(id))
+        if (!await _projectService.ProjektExistsAsync(id, ct))
         {
             return RedirectToAction(nameof(Index));
         }
@@ -71,19 +68,20 @@ public sealed class ProjektyController : BaseController
             return NotFound();
         }
 
-        var model = _projectsQueries.BuildProjektDetail(id);
+        var model = await _projectService.BuildProjektDetailAsync(id, ct);
+        PrepareProjectDetailPresentation(model);
         return View(model);
     }
 
     [HttpGet]
-    public IActionResult NewProjectModal()
+    public async Task<IActionResult> NewProjectModal(CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.ProjectsCreate))
         {
             return Forbid();
         }
 
-        var statusOptions = BuildProjectStatusOptions();
+        var statusOptions = await BuildProjectStatusOptionsAsync(ct);
         var defaultStatus = statusOptions
             .FirstOrDefault(option => string.Equals(option.Value, "PLAN", StringComparison.OrdinalIgnoreCase))
             ?.Value
@@ -105,20 +103,20 @@ public sealed class ProjektyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult EditProjectModal(int id)
+    public async Task<IActionResult> EditProjectModal(int id, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.ProjectsEdit, id))
         {
             return Forbid();
         }
 
-        var project = _projectsQueries.BuildProjektyList().FirstOrDefault(item => item.Id == id);
+        var project = (await _projectService.BuildProjektyListAsync(ct)).FirstOrDefault(item => item.Id == id);
         if (project is null)
         {
             return NotFound();
         }
 
-        var statusOptions = BuildProjectStatusOptions();
+        var statusOptions = await BuildProjectStatusOptionsAsync(ct);
         var selectedStatus = statusOptions.Any(option => string.Equals(option.Value, project.StavKod, StringComparison.OrdinalIgnoreCase))
             ? project.StavKod
             : statusOptions.FirstOrDefault(option => string.Equals(option.Label, project.Stav, StringComparison.CurrentCultureIgnoreCase))?.Value;
@@ -142,14 +140,14 @@ public sealed class ProjektyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult DeleteProjectModal(int id)
+    public async Task<IActionResult> DeleteProjectModal(int id, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.ProjectsDelete, id))
         {
             return Forbid();
         }
 
-        var project = _projectsQueries.BuildProjektyList().FirstOrDefault(item => item.Id == id);
+        var project = (await _projectService.BuildProjektyListAsync(ct)).FirstOrDefault(item => item.Id == id);
         if (project is null)
         {
             return NotFound();
@@ -171,19 +169,19 @@ public sealed class ProjektyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult NewMeetingModal(int projektId)
+    public async Task<IActionResult> NewMeetingModal(int projektId, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, projektId))
         {
             return Forbid();
         }
 
-        if (!_meetingsQueries.ProjektExists(projektId))
+        if (!await _projectService.ProjektExistsAsync(projektId, ct))
         {
             return NotFound();
         }
 
-        var detail = _meetingsQueries.BuildProjektDetail(projektId);
+        var detail = await _projectService.BuildProjektDetailAsync(projektId, ct);
         var nextMeetingNumber = detail.Jednani.Any() ? detail.Jednani.Max(item => item.CisloJednani) + 1 : 1;
         var defaultStatus = detail.StavyJednani.FirstOrDefault()?.Value ?? string.Empty;
         var localNow = GetLocalNow();
@@ -207,19 +205,19 @@ public sealed class ProjektyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult EditMeetingModal(int projektId, int meetingId)
+    public async Task<IActionResult> EditMeetingModal(int projektId, int meetingId, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId))
         {
             return Forbid();
         }
 
-        if (!_meetingsQueries.ProjektExists(projektId))
+        if (!await _projectService.ProjektExistsAsync(projektId, ct))
         {
             return NotFound();
         }
 
-        var projectDetail = _meetingsQueries.BuildProjektDetail(projektId);
+        var projectDetail = await _projectService.BuildProjektDetailAsync(projektId, ct);
         var meeting = projectDetail.Jednani.FirstOrDefault(item => item.Id == meetingId);
         if (meeting is null)
         {
@@ -252,19 +250,19 @@ public sealed class ProjektyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult AddTeamMemberModal(int projektId)
+    public async Task<IActionResult> AddTeamMemberModal(int projektId, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId))
         {
             return Forbid();
         }
 
-        if (!_projectsQueries.ProjektExists(projektId))
+        if (!await _projectService.ProjektExistsAsync(projektId, ct))
         {
             return NotFound();
         }
 
-        var detail = _projectsQueries.BuildProjektDetail(projektId);
+        var detail = await _projectService.BuildProjektDetailAsync(projektId, ct);
         var defaultRole = detail.RoleProjektu.FirstOrDefault()?.Value ?? string.Empty;
         var model = new TeamMemberModalViewModel
         {
@@ -291,14 +289,14 @@ public sealed class ProjektyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult AssignProjectRoleModal(int projektId)
+    public async Task<IActionResult> AssignProjectRoleModal(int projektId, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId))
         {
             return Forbid();
         }
 
-        var detail = _projectsQueries.BuildProjektDetail(projektId);
+        var detail = await _projectService.BuildProjektDetailAsync(projektId, ct);
         return View("AssignProjectRoleModal", new AssignProjectRoleModalViewModel
         {
             Title = "Přidat projektovou roli",
@@ -309,14 +307,14 @@ public sealed class ProjektyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult AssignProjectSubsystemModal(int projektId)
+    public async Task<IActionResult> AssignProjectSubsystemModal(int projektId, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId))
         {
             return Forbid();
         }
 
-        var detail = _projectsQueries.BuildProjektDetail(projektId);
+        var detail = await _projectService.BuildProjektDetailAsync(projektId, ct);
         return View("AssignProjectSubsystemModal", new AssignProjectSubsystemModalViewModel
         {
             Title = "Přiřadit subsystém projektu",
@@ -326,14 +324,14 @@ public sealed class ProjektyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult AssignProjectSubsystemRoleModal(int projektId)
+    public async Task<IActionResult> AssignProjectSubsystemRoleModal(int projektId, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId))
         {
             return Forbid();
         }
 
-        var detail = _projectsQueries.BuildProjektDetail(projektId);
+        var detail = await _projectService.BuildProjektDetailAsync(projektId, ct);
         return View("AssignProjectSubsystemRoleModal", new AssignProjectSubsystemRoleModalViewModel
         {
             Title = "Přidat roli v subsystému",
@@ -346,50 +344,50 @@ public sealed class ProjektyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveProject(SaveProjectCommand command)
+    public Task<IActionResult> SaveProject(SaveProjectCommand command, CancellationToken ct = default)
     {
         var isCreate = !command.Id.HasValue;
         var savedProjectId = 0;
 
-        return ExecuteValidatedCommand(
+        return ExecuteValidatedCommandAsync(
             hasPermission: () => isCreate
                 ? CurrentUserContext.HasPermission(PermissionKeys.ProjectsCreate)
                 : CurrentUserContext.HasPermission(PermissionKeys.ProjectsEdit, command.Id),
             invalidAjaxMessage: "Projekt nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = savedProjectId }),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Detail), new { id = savedProjectId })!),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "projekty-index",
                 refreshUrl: Url.Action(nameof(Index), "Projekty"),
                 projectId: savedProjectId,
-                message: "Projekt byl uložen."),
-            operation: () => savedProjectId = _projectsCommands.SaveProject(command, CurrentUserContext),
-            onExceptionRedirect: _ => RedirectToAction(nameof(Index)));
+                message: "Projekt byl uložen.")),
+            operation: async () => savedProjectId = await _projectService.SaveProjectAsync(command, CurrentUserContext, ct),
+            onExceptionRedirect: _ => Task.FromResult<IActionResult>(RedirectToAction(nameof(Index))!));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult DeleteProject(SoftDeleteProjectCommand command)
+    public Task<IActionResult> DeleteProject(SoftDeleteProjectCommand command, CancellationToken ct = default)
     {
-        return ExecuteValidatedCommand(
+        return ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.ProjectsDelete, command.ProjektId),
             invalidAjaxMessage: "Projekt nelze smazat.",
             invalidFallbackMessage: "Potvrďte smazání projektu.",
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
-            onSuccessRedirect: () => RedirectToAction(nameof(Index)),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Index))!),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "projekty-index",
                 refreshUrl: Url.Action(nameof(Index), "Projekty"),
                 projectId: command.ProjektId,
-                message: "Projekt byl smazán."),
-            operation: () => _projectsCommands.SoftDeleteProject(command, CurrentUserContext),
-            onExceptionRedirect: _ => RedirectToAction(nameof(Index)));
+                message: "Projekt byl smazán.")),
+            operation: () => _projectService.SoftDeleteProjectAsync(command, CurrentUserContext, ct),
+            onExceptionRedirect: _ => Task.FromResult<IActionResult>(RedirectToAction(nameof(Index))!));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveMeeting(SaveMeetingCommand command)
+    public async Task<IActionResult> SaveMeeting(SaveMeetingCommand command, CancellationToken ct = default)
     {
         EnsureReadableMeetingTimeError();
 
@@ -400,7 +398,7 @@ public sealed class ProjektyController : BaseController
                 return Forbid();
             }
 
-            var projectDetail = _meetingsQueries.BuildProjektDetail(command.ProjektId);
+            var projectDetail = await _projectService.BuildProjektDetailAsync(command.ProjektId, ct);
             var existingMeeting = projectDetail.Jednani.FirstOrDefault(item => item.Id == command.Id.Value);
             if (existingMeeting is null)
             {
@@ -413,26 +411,26 @@ public sealed class ProjektyController : BaseController
             }
         }
 
-        return ExecuteValidatedCommand(
+        return await ExecuteValidatedCommandAsync(
             hasPermission: () => command.Id.HasValue
                 ? CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId)
                 : CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, command.ProjektId),
             invalidAjaxMessage: "Poradu nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" }),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" }),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" })!),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "projekty-detail-jednani",
                 refreshUrl: Url.Action(nameof(Detail), "Projekty", new { id = command.ProjektId, tab = "jednani" }),
                 projectId: command.ProjektId,
                 tab: "jednani",
-                message: "Porada byla uložena."),
-            operation: () => _meetingsCommands.SaveMeeting(command, CurrentUserContext));
+                message: "Porada byla uložena.")),
+            operation: () => _meetingService.SaveMeetingAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult DeleteMeeting(DeleteMeetingCommand command, string? returnUrl)
+    public Task<IActionResult> DeleteMeeting(DeleteMeetingCommand command, string? returnUrl, CancellationToken ct = default)
     {
         IActionResult RedirectAfterDelete()
         {
@@ -444,109 +442,109 @@ public sealed class ProjektyController : BaseController
             return RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" });
         }
 
-        return ExecuteCommand(
+        return ExecuteCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId),
-            onSuccessRedirect: RedirectAfterDelete,
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectAfterDelete()),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "projekty-detail-jednani",
                 refreshUrl: Url.Action(nameof(Detail), "Projekty", new { id = command.ProjektId, tab = "jednani" }),
                 projectId: command.ProjektId,
                 tab: "jednani",
-                message: "Porada byla smazána."),
-            operation: () => _meetingsCommands.DeleteMeeting(command, CurrentUserContext));
+                message: "Porada byla smazána.")),
+            operation: () => _meetingService.DeleteMeetingAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveTeamMember(SaveTeamMemberCommand command)
+    public Task<IActionResult> SaveTeamMember(SaveTeamMemberCommand command, CancellationToken ct = default)
     {
-        return ExecuteTeamValidatedAction(
+        return ExecuteTeamValidatedActionAsync(
             projektId: command.ProjektId,
             invalidAjaxMessage: "Člena týmu nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Člen týmu byl uložen.",
-            operation: () => _projectsCommands.SaveTeamMember(command, CurrentUserContext));
+            operation: () => _projectService.SaveTeamMemberAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult RemoveTeamMember(RemoveTeamMemberCommand command)
+    public Task<IActionResult> RemoveTeamMember(RemoveTeamMemberCommand command, CancellationToken ct = default)
     {
-        return ExecuteTeamAction(
+        return ExecuteTeamActionAsync(
             projektId: command.ProjektId,
-            operation: () => _projectsCommands.RemoveTeamMember(command, CurrentUserContext));
+            operation: () => _projectService.RemoveTeamMemberAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult AssignProjectRole(AssignProjectRoleCommand command)
+    public Task<IActionResult> AssignProjectRole(AssignProjectRoleCommand command, CancellationToken ct = default)
     {
-        return ExecuteTeamValidatedAction(
+        return ExecuteTeamValidatedActionAsync(
             projektId: command.ProjektId,
             invalidAjaxMessage: "Projektovou roli nelze přiřadit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Projektová role byla přiřazena.",
-            operation: () => _projectsCommands.AssignProjectRole(command, CurrentUserContext));
+            operation: () => _projectService.AssignProjectRoleAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult DeactivateProjectRole(DeactivateProjectRoleCommand command, int projektId)
+    public Task<IActionResult> DeactivateProjectRole(DeactivateProjectRoleCommand command, int projektId, CancellationToken ct = default)
     {
-        return ExecuteTeamValidatedAction(
+        return ExecuteTeamValidatedActionAsync(
             projektId: projektId,
             invalidAjaxMessage: "Projektovou roli nelze deaktivovat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Projektová role byla deaktivována.",
-            operation: () => _projectsCommands.DeactivateProjectRole(command, CurrentUserContext));
+            operation: () => _projectService.DeactivateProjectRoleAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult AssignProjectSubsystem(AssignProjectSubsystemCommand command)
+    public Task<IActionResult> AssignProjectSubsystem(AssignProjectSubsystemCommand command, CancellationToken ct = default)
     {
-        return ExecuteTeamValidatedAction(
+        return ExecuteTeamValidatedActionAsync(
             projektId: command.ProjektId,
             invalidAjaxMessage: "Subsystém nelze přiřadit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Subsystém byl přiřazen k projektu.",
-            operation: () => _projectsCommands.AssignProjectSubsystem(command, CurrentUserContext));
+            operation: () => _projectService.AssignProjectSubsystemAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult DeactivateProjectSubsystem(DeactivateProjectSubsystemCommand command, int projektId)
+    public Task<IActionResult> DeactivateProjectSubsystem(DeactivateProjectSubsystemCommand command, int projektId, CancellationToken ct = default)
     {
-        return ExecuteTeamValidatedAction(
+        return ExecuteTeamValidatedActionAsync(
             projektId: projektId,
             invalidAjaxMessage: "Subsystém projektu nelze deaktivovat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Subsystém projektu byl deaktivován.",
-            operation: () => _projectsCommands.DeactivateProjectSubsystem(command, CurrentUserContext));
+            operation: () => _projectService.DeactivateProjectSubsystemAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult AssignProjectSubsystemRole(AssignProjectSubsystemRoleCommand command)
+    public Task<IActionResult> AssignProjectSubsystemRole(AssignProjectSubsystemRoleCommand command, CancellationToken ct = default)
     {
-        return ExecuteTeamValidatedAction(
+        return ExecuteTeamValidatedActionAsync(
             projektId: command.ProjektId,
             invalidAjaxMessage: "Subsystemovou roli nelze přiřadit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Role v subsystému byla přiřazena.",
-            operation: () => _projectsCommands.AssignProjectSubsystemRole(command, CurrentUserContext));
+            operation: () => _projectService.AssignProjectSubsystemRoleAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult DeactivateProjectSubsystemRole(DeactivateProjectSubsystemRoleCommand command, int projektId)
+    public Task<IActionResult> DeactivateProjectSubsystemRole(DeactivateProjectSubsystemRoleCommand command, int projektId, CancellationToken ct = default)
     {
-        return ExecuteTeamValidatedAction(
+        return ExecuteTeamValidatedActionAsync(
             projektId: projektId,
             invalidAjaxMessage: "Subsystemovou roli nelze deaktivovat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Role v subsystému byla deaktivována.",
-            operation: () => _projectsCommands.DeactivateProjectSubsystemRole(command, CurrentUserContext));
+            operation: () => _projectService.DeactivateProjectSubsystemRoleAsync(command, CurrentUserContext, ct));
     }
 
     private void EnsureReadableMeetingTimeError()
@@ -586,33 +584,75 @@ public sealed class ProjektyController : BaseController
         return !string.IsNullOrWhiteSpace(meeting.UzamklOsoba);
     }
 
-    private IReadOnlyList<LookupOptionViewModel> BuildProjectStatusOptions()
+    private Task<IReadOnlyList<LookupOptionViewModel>> BuildProjectStatusOptionsAsync(CancellationToken ct = default)
+        => _projectService.BuildProjectStatusOptionsAsync(CurrentUserContext, ct);
+
+    private void PrepareProjectDetailPresentation(ProjektDetailViewModel model)
     {
-        return _projectsQueries.BuildProjectStatusOptions(CurrentUserContext);
+        AttachCurrentUser(model);
+
+        var projectId = model.Projekt.Id;
+        var canManageRecords = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projectId);
+        var canManageSchedules = canManageRecords
+            || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projectId)
+            || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projectId);
+
+        model.CanCreateMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, projectId);
+        model.CanEditMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projectId);
+        model.CanManageTeam = CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projectId);
+        model.CanManageRecords = canManageRecords;
+        model.CanManageSchedules = canManageSchedules;
+        model.PageTitle = model.Projekt.Nazev;
+        model.BackUrl = Url.Action("Index", "Projekty") ?? "/Projekty";
+        model.BackLabel = "Zpět na přehled";
+        model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+        model.CreateRecordEditorUrl = Url.Action("Create", "Zaznamy", new { projektId = projectId }) ?? $"/Zaznamy/Create?projektId={projectId}";
+        model.ReturnToProjectUrl = Url.Action("Detail", "Projekty", new { id = projectId, tab = "jednani" }) ?? $"/Projekty/Detail/{projectId}?tab=jednani";
+        model.ProjectPrintUrl = Url.Action("ProjektTisk", "Export", new { projektId = projectId, autoPrint = true }) ?? $"/Export/Projekt/{projectId}/Tisk?autoPrint=true";
+        model.ProjectWordUrl = Url.Action("ProjektWord", "Export", new { projektId = projectId }) ?? $"/Export/Projekt/{projectId}/Word";
+
+        foreach (var record in model.Zaznamy)
+        {
+            record.CanEditRecord = canManageRecords;
+            record.CanEditSchedule = record.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projectId);
+            record.CanAddSchedule = record.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projectId);
+            record.CanManageSchedule = record.CanEditSchedule || record.CanAddSchedule;
+            record.CanCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId)
+                && record.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
+            record.CanAddComment = record.CanEditRecord || record.CanCommentAsSubsystemLeader;
+            record.EditButtonLabel = record.CanEditRecord ? "Upravit" : "GANTT";
+            record.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+        }
+
+        foreach (var item in model.HarmonogramUkoly)
+        {
+            item.CanManageSchedule = canManageSchedules;
+            item.ScheduleEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = projectId }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
+        }
     }
 
-    private IActionResult ExecuteTeamValidatedAction(
+    private Task<IActionResult> ExecuteTeamValidatedActionAsync(
         int projektId,
         string invalidAjaxMessage,
         string invalidFallbackMessage,
         string successMessage,
-        Action operation)
+        Func<Task> operation)
     {
-        return ExecuteValidatedCommand(
+        return ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
             invalidAjaxMessage: invalidAjaxMessage,
             invalidFallbackMessage: invalidFallbackMessage,
             onInvalidRedirect: () => RedirectToTeamTab(projektId),
-            onSuccessRedirect: () => RedirectToTeamTab(projektId),
-            onAjaxSuccess: () => BuildTeamAjaxSuccess(projektId, successMessage),
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToTeamTab(projektId)),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(BuildTeamAjaxSuccess(projektId, successMessage)),
             operation: operation);
     }
 
-    private IActionResult ExecuteTeamAction(int projektId, Action operation)
+    private Task<IActionResult> ExecuteTeamActionAsync(int projektId, Func<Task> operation)
     {
-        return ExecuteCommand(
+        return ExecuteCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
-            onSuccessRedirect: () => RedirectToTeamTab(projektId),
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToTeamTab(projektId)),
             onAjaxSuccess: null,
             operation: operation);
     }

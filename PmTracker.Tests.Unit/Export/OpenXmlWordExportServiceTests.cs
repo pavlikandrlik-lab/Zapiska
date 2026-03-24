@@ -152,22 +152,7 @@ public sealed class OpenXmlWordExportServiceTests
 
     private static OpenXmlWordExportService CreateSut()
     {
-        var richText = new RichTextContentService();
-        var richHtmlParagraphWriter = new OpenXmlWordRichHtmlParagraphWriter();
-        var recordHeaderWriter = new OpenXmlWordRecordHeaderWriter(richText, richHtmlParagraphWriter);
-        var commentsCellWriter = new OpenXmlWordRecordCommentsCellWriter(
-            richText,
-            richHtmlParagraphWriter,
-            recordHeaderWriter);
-        var peopleCellWriter = new OpenXmlWordRecordPeopleCellWriter();
-        var deadlinesCellWriter = new OpenXmlWordRecordDeadlinesCellWriter();
-
-        return new OpenXmlWordExportService(
-            new OpenXmlWordHeaderSectionWriter(),
-            new OpenXmlWordRecordsSectionWriter(
-                commentsCellWriter,
-                peopleCellWriter,
-                deadlinesCellWriter));
+        return new OpenXmlWordExportService(new RichTextContentService());
     }
 
     private static PdfExportTemplateViewModel CreateModelWithCommentHtml(string commentHtml)

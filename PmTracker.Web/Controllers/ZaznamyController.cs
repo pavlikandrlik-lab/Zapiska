@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Modules.Records;
+using PmTracker.Web.Services;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Security;
 
@@ -18,22 +19,24 @@ public sealed class ZaznamyController : BaseController
     private const string UiContextProject = "project";
     private const string UiContextMeeting = "meeting";
 
-    private readonly IRecordsService _recordsService;
+    private readonly IRecordService _recordService;
     private readonly IRecordUiFlowResolver _recordUiFlowResolver;
 
     public ZaznamyController(
         IUserContextResolver userContextResolver,
-        IRecordsService recordsService,
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory,
+        IRecordService recordService,
         IRecordUiFlowResolver recordUiFlowResolver)
-        : base(userContextResolver)
+        : base(userContextResolver, timeProvider, loggerFactory)
     {
-        _recordsService = recordsService;
+        _recordService = recordService;
         _recordUiFlowResolver = recordUiFlowResolver;
     }
 
-    public IActionResult Edit(int id, string? presentation, string? returnUrl)
+    public async Task<IActionResult> Edit(int id, string? presentation, string? returnUrl, CancellationToken ct = default)
     {
-        var model = _recordsService.BuildZaznamEdit(id);
+        var model = await _recordService.BuildZaznamEditAsync(id, ct);
         var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId);
         var canManageSchedule = model.JeUkolKategorie
             && (CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, model.ProjektId)
@@ -47,9 +50,9 @@ public sealed class ZaznamyController : BaseController
         return View(GetEditorViewPath(model.Presentation), model);
     }
 
-    public IActionResult Create(int projektId, int? jednaniId, string? uiContext, string? presentation, string? returnUrl)
+    public async Task<IActionResult> Create(int projektId, int? jednaniId, string? uiContext, string? presentation, string? returnUrl, CancellationToken ct = default)
     {
-        if (!_recordsService.ProjektExists(projektId))
+        if (!await _recordService.ProjektExistsAsync(projektId, ct))
         {
             return RedirectToAction("Index", "Projekty");
         }
@@ -63,7 +66,7 @@ public sealed class ZaznamyController : BaseController
         var contextMeetingId = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
             ? jednaniId
             : null;
-        var model = _recordsService.BuildZaznamCreate(projektId, contextMeetingId);
+        var model = await _recordService.BuildZaznamCreateAsync(projektId, contextMeetingId, ct);
         PrepareRecordEditorModel(
             model,
             presentation,
@@ -76,14 +79,14 @@ public sealed class ZaznamyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult DeleteRecordModal(int projektId, int zaznamId, string? returnUrl, string? uiContext, string? tab)
+    public async Task<IActionResult> DeleteRecordModal(int projektId, int zaznamId, string? returnUrl, string? uiContext, string? tab, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
         {
             return Forbid();
         }
 
-        var model = _recordsService.BuildDeleteRecordModal(projektId, zaznamId);
+        var model = await _recordService.BuildDeleteRecordModalAsync(projektId, zaznamId, ct);
         ViewData["DeleteRecordReturnUrl"] = NormalizeLocalReturnUrl(returnUrl);
         ViewData["DeleteRecordUiContext"] = string.Equals(uiContext, "page", StringComparison.OrdinalIgnoreCase) ? "page" : "project";
         ViewData["DeleteRecordTab"] = NormalizeDeleteTab(tab);
@@ -91,14 +94,14 @@ public sealed class ZaznamyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult AssignMeetingIdentifierModal(int projektId, int zaznamId)
+    public async Task<IActionResult> AssignMeetingIdentifierModal(int projektId, int zaznamId, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
         {
             return Forbid();
         }
 
-        var model = _recordsService.BuildZaznamEdit(zaznamId);
+        var model = await _recordService.BuildZaznamEditAsync(zaznamId, ct);
         if (model.ProjektId != projektId)
         {
             return NotFound();
@@ -121,7 +124,7 @@ public sealed class ZaznamyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Save(SaveRecordCommand command)
+    public async Task<IActionResult> Save(SaveRecordCommand command, CancellationToken ct = default)
     {
         var editorTab = NormalizeEditorTab(command.EditorTab);
         var projectTab = NormalizeProjectTab(editorTab);
@@ -139,70 +142,70 @@ public sealed class ZaznamyController : BaseController
         var redirectAfterSave = () => RedirectRecordEditorSaveTarget(command.ProjektId, command.ReturnUrl, projectTab, normalizedUiContext, contextMeetingId);
         var savedRecordId = 0;
 
-        return ExecuteValidatedCommand(
+        return await ExecuteValidatedCommandAsync(
             hasPermission: () => canEditRecord || canSaveScheduleOnly,
             invalidAjaxMessage: "Záznam nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirectAfterSave,
-            onSuccessRedirect: redirectAfterSave,
-            onAjaxSuccess: () => BuildSaveAjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(redirectAfterSave()),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(BuildSaveAjaxSuccessResult(
                 command,
                 savedRecordId,
                 projectTab,
                 presentation,
                 normalizedUiContext,
-                contextMeetingId),
-            operation: () => savedRecordId = _recordsService.SaveRecord(command, CurrentUserContext));
+                contextMeetingId)),
+            operation: async () => savedRecordId = await _recordService.SaveRecordAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult DeleteRecord(DeleteRecordCommand command, string? returnUrl, string? uiContext, string? tab)
+    public async Task<IActionResult> DeleteRecord(DeleteRecordCommand command, string? returnUrl, string? uiContext, string? tab, CancellationToken ct = default)
     {
         var normalizedTab = NormalizeDeleteTab(tab);
         var redirectUrl = BuildDeleteRecordReturnUrl(command.ProjektId, returnUrl, uiContext, normalizedTab);
         var redirect = () => Redirect(redirectUrl);
 
-        return ExecuteValidatedCommand(
+        return await ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId),
             invalidAjaxMessage: "Záznam nelze smazat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
-            onSuccessRedirect: redirect,
-            onAjaxSuccess: () => BuildDeleteRecordAjaxSuccessResult(command.ProjektId, redirectUrl, returnUrl, uiContext, normalizedTab),
-            operation: () => _recordsService.DeleteRecord(command, CurrentUserContext));
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(redirect()),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(BuildDeleteRecordAjaxSuccessResult(command.ProjektId, redirectUrl, returnUrl, uiContext, normalizedTab)),
+            operation: () => _recordService.DeleteRecordAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult AssignMeetingIdentifier(AssignMeetingIdentifierCommand command)
+    public async Task<IActionResult> AssignMeetingIdentifier(AssignMeetingIdentifierCommand command, CancellationToken ct = default)
     {
-        return ExecuteValidatedCommand(
+        return await ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId),
             invalidAjaxMessage: "Identifikátor z jednání nelze doplnit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction("Detail", "Projekty", new { id = command.ProjektId, tab = "zaznamy" }),
-            onSuccessRedirect: () => RedirectToAction("Detail", "Projekty", new { id = command.ProjektId, tab = "zaznamy" }),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction("Detail", "Projekty", new { id = command.ProjektId, tab = "zaznamy" })!),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "record-card",
                 refreshUrl: Url.Action(nameof(RecordCardPartial), new { projektId = command.ProjektId, zaznamId = command.ZaznamId }),
                 projectId: command.ProjektId,
                 recordId: command.ZaznamId,
                 uiContext: "project",
                 tab: "zaznamy",
-                message: "Identifikátor z jednání byl doplněn."),
-            operation: () => _recordsService.AssignMeetingIdentifier(command, CurrentUserContext));
+                message: "Identifikátor z jednání byl doplněn.")),
+            operation: () => _recordService.AssignMeetingIdentifierAsync(command, CurrentUserContext, ct));
     }
 
     [HttpGet]
-    public IActionResult RecordCardPartial(int projektId, int zaznamId)
+    public async Task<IActionResult> RecordCardPartial(int projektId, int zaznamId, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
             return NotFound();
         }
 
-        var model = _recordsService.BuildProjektDetail(projektId);
+        var model = await _recordService.BuildProjektDetailAsync(projektId, ct);
         var record = model.Zaznamy.FirstOrDefault(x => x.Id == zaznamId);
         if (record is null)
         {
@@ -219,6 +222,15 @@ public sealed class ZaznamyController : BaseController
             return Forbid();
         }
 
+        record.CanEditRecord = canEditRecord;
+        record.CanEditSchedule = canEditSchedule;
+        record.CanAddSchedule = canAddSchedule;
+        record.CanManageSchedule = canEditSchedule || canAddSchedule;
+        record.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
+        record.CanAddComment = canEditRecord || canCommentAsSubsystemLead;
+        record.EditButtonLabel = canEditRecord ? "Upravit" : "GANTT";
+        record.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+
         ViewData["OtevrenaJednani"] = model.OtevrenaJednani;
         ViewData["ProjektId"] = projektId;
         return PartialView("~/Views/Projekty/_ZaznamPartial.cshtml", record);
@@ -226,60 +238,52 @@ public sealed class ZaznamyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult AddComment(int projektId, AddCommentCommand command, string? uiContext, int? meetingId, string? returnUrl)
+    public async Task<IActionResult> AddComment(int projektId, AddCommentCommand command, string? uiContext, int? meetingId, string? returnUrl, CancellationToken ct = default)
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId ?? command.JednaniId, returnUrl);
-        return ExecuteValidatedCommand(
+        return await ExecuteValidatedCommandAsync(
             hasPermission: () => true,
             invalidAjaxMessage: "Vyjádření nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
-            onSuccessRedirect: redirect,
-            onAjaxSuccess: () => BuildCommentAjaxSuccessResult(uiContext, projektId, command.ZaznamId, meetingId ?? command.JednaniId, "Vyjádření bylo uloženo."),
-            operation: () => _recordsService.AddComment(command, CurrentUserContext));
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(redirect()),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(BuildCommentAjaxSuccessResult(uiContext, projektId, command.ZaznamId, meetingId ?? command.JednaniId, "Vyjádření bylo uloženo.")),
+            operation: () => _recordService.AddCommentAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult UpdateComment(int projektId, UpdateCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, string? returnUrl)
+    public async Task<IActionResult> UpdateComment(int projektId, UpdateCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, string? returnUrl, CancellationToken ct = default)
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId, returnUrl);
-        return ExecuteValidatedCommand(
+        return await ExecuteValidatedCommandAsync(
             hasPermission: () => true,
             invalidAjaxMessage: "Vyjádření nelze upravit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
-            onSuccessRedirect: redirect,
-            onAjaxSuccess: () =>
-            {
-                if (!zaznamId.HasValue || zaznamId.Value <= 0)
-                {
-                    return AjaxErrorResult("Chybí ID záznamu pro obnovu vyjádření.");
-                }
-
-                return BuildCommentAjaxSuccessResult(uiContext, projektId, zaznamId.Value, meetingId, "Vyjádření bylo upraveno.");
-            },
-            operation: () => _recordsService.UpdateComment(command, CurrentUserContext));
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(redirect()),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(
+            (
+                !zaznamId.HasValue || zaznamId.Value <= 0
+                    ? AjaxErrorResult("Chybí ID záznamu pro obnovu vyjádření.")
+                    : BuildCommentAjaxSuccessResult(uiContext, projektId, zaznamId.Value, meetingId, "Vyjádření bylo upraveno.")
+            )),
+            operation: () => _recordService.UpdateCommentAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult DeleteComment(int projektId, DeleteCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, string? returnUrl)
+    public async Task<IActionResult> DeleteComment(int projektId, DeleteCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, string? returnUrl, CancellationToken ct = default)
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId, returnUrl);
-        return ExecuteCommand(
+        return await ExecuteCommandAsync(
             hasPermission: () => true,
-            onSuccessRedirect: redirect,
-            onAjaxSuccess: () =>
-            {
-                if (!zaznamId.HasValue || zaznamId.Value <= 0)
-                {
-                    return AjaxErrorResult("Chybí ID záznamu pro obnovu vyjádření.");
-                }
-
-                return BuildCommentAjaxSuccessResult(uiContext, projektId, zaznamId.Value, meetingId, "Vyjádření bylo smazáno.");
-            },
-            operation: () => _recordsService.DeleteComment(command, CurrentUserContext));
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(redirect()),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(
+                !zaznamId.HasValue || zaznamId.Value <= 0
+                    ? AjaxErrorResult("Chybí ID záznamu pro obnovu vyjádření.")
+                    : BuildCommentAjaxSuccessResult(uiContext, projektId, zaznamId.Value, meetingId, "Vyjádření bylo smazáno.")),
+            operation: () => _recordService.DeleteCommentAsync(command, CurrentUserContext, ct));
     }
 
     private IActionResult BuildCommentAjaxSuccessResult(string? uiContext, int projektId, int zaznamId, int? meetingId, string message)
@@ -418,6 +422,12 @@ public sealed class ZaznamyController : BaseController
             : (Url.Action("Detail", "Projekty", new { id = model.ProjektId, tab = "zaznamy" }) ?? $"/Projekty/Detail/{model.ProjektId}?tab=zaznamy");
         model.BackUrl = NormalizeLocalReturnUrl(requestedReturnUrl)
             ?? fallbackBackUrl;
+        model.PageTitle = model.IsCreate ? "Nový projektový záznam" : "Upravit záznam";
+        model.BackLabel = normalizedMeetingId.HasValue ? "Zpět na jednání" : "Zpět do projektu";
+        model.CanEditRecord = canEditRecord;
+        model.CanEditScheduleFull = canEditRecord || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, model.ProjektId);
+        model.CanEditScheduleAddOnly = !model.CanEditScheduleFull
+            && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, model.ProjektId);
         model.ActiveEditorTab = !canEditRecord && canManageSchedule && model.JeUkolKategorie
             ? EditorTabSchedule
             : EditorTabBasic;
@@ -482,8 +492,7 @@ public sealed class ZaznamyController : BaseController
 
     private static string NormalizeDeleteTab(string? tab)
     {
-        if (string.Equals(tab, "harmonogram", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(tab, "gant", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(tab, "harmonogram", StringComparison.OrdinalIgnoreCase))
         {
             return "harmonogram";
         }

@@ -2,6 +2,9 @@ namespace PmTracker.Web.Models.ViewModels;
 
 public sealed class ProfilPageViewModel
 {
+    public string PageTitle { get; set; } = string.Empty;
+    public string? BackUrl { get; set; }
+    public string? BackLabel { get; set; }
     public required CurrentUserContextViewModel Uzivatel { get; init; }
     public required IReadOnlyList<ProfilRolePravaViewModel> MojeRole { get; init; }
     public required IReadOnlyList<ProfilOdvozenePravoViewModel> OdvozenaPrava { get; init; }

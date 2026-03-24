@@ -1,38 +1,38 @@
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Modules.Settings;
 
 namespace PmTracker.Web.Services.Settings;
 
 public sealed class SettingsService(
-    ISettingsDataStore dataStore) : ISettingsService
+    ISettingsAuthzQueries queries,
+    ISettingsAuthzCommands commands) : ISettingsService
 {
-    public NastaveniDashboardViewModel BuildNastaveniDashboard(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId) =>
-        dataStore.BuildNastaveniDashboard(section, currentUser, userId, projektId);
+    public Task<NastaveniDashboardViewModel> BuildNastaveniDashboardAsync(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId, CancellationToken ct = default) =>
+        queries.BuildNastaveniDashboardAsync(section, currentUser, userId, projektId, ct);
 
-    public NastaveniPanelViewModel BuildNastaveniPanel(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId) =>
-        dataStore.BuildNastaveniPanel(section, currentUser, userId, projektId);
+    public Task<NastaveniPanelViewModel> BuildNastaveniPanelAsync(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId, CancellationToken ct = default) =>
+        queries.BuildNastaveniPanelAsync(section, currentUser, userId, projektId, ct);
 
-    public void SaveAuthzRole(SaveAuthzRoleCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.SaveAuthzRole(command, currentUser);
+    public Task SaveAuthzRoleAsync(SaveAuthzRoleCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) =>
+        commands.SaveAuthzRoleAsync(command, currentUser, ct);
 
-    public void ToggleAuthzRole(ToggleAuthzRoleCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.ToggleAuthzRole(command, currentUser);
+    public Task ToggleAuthzRoleAsync(ToggleAuthzRoleCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) =>
+        commands.ToggleAuthzRoleAsync(command, currentUser, ct);
 
-    public void SaveAuthzPermission(SaveAuthzPermissionCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.SaveAuthzPermission(command, currentUser);
+    public Task SaveAuthzPermissionAsync(SaveAuthzPermissionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) =>
+        commands.SaveAuthzPermissionAsync(command, currentUser, ct);
 
-    public void ToggleAuthzPermission(ToggleAuthzPermissionCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.ToggleAuthzPermission(command, currentUser);
+    public Task ToggleAuthzPermissionAsync(ToggleAuthzPermissionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) =>
+        commands.ToggleAuthzPermissionAsync(command, currentUser, ct);
 
-    public void SaveUserRoleAssignment(SaveUserRoleAssignmentCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.SaveUserRoleAssignment(command, currentUser);
+    public Task SaveUserRoleAssignmentAsync(SaveUserRoleAssignmentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) =>
+        commands.SaveUserRoleAssignmentAsync(command, currentUser, ct);
 
-    public void SaveUserRolesForUser(SaveUserRolesForUserCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.SaveUserRolesForUser(command, currentUser);
+    public Task SaveUserRolesForUserAsync(SaveUserRolesForUserCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) =>
+        commands.SaveUserRolesForUserAsync(command, currentUser, ct);
 
-    public void SaveRolePermission(SaveRolePermissionCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.SaveRolePermission(command, currentUser);
+    public Task SaveRolePermissionAsync(SaveRolePermissionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) =>
+        commands.SaveRolePermissionAsync(command, currentUser, ct);
 
-    public void DeleteRolePermission(DeleteRolePermissionCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.DeleteRolePermission(command, currentUser);
+    public Task DeleteRolePermissionAsync(DeleteRolePermissionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) =>
+        commands.DeleteRolePermissionAsync(command, currentUser, ct);
 }

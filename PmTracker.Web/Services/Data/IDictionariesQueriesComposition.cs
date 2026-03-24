@@ -4,7 +4,7 @@ namespace PmTracker.Web.Services.Data;
 
 public interface IDictionariesQueriesComposition
 {
-    CiselnikDetailViewModel BuildHarmonogramKrokyCiselnikDetail(string key, bool canChangeLockState);
+    Task<CiselnikDetailViewModel> BuildHarmonogramKrokyCiselnikDetailAsync(string key, bool canChangeLockState, CancellationToken ct = default);
 
-    int CountHarmonogramCatalogRows();
+    Task<int> CountHarmonogramCatalogRowsAsync(CancellationToken ct = default);
 }

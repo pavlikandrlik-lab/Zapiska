@@ -1,82 +1,107 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Modules.Meetings;
+using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
 public sealed class JednaniController : BaseController
 {
-    private readonly IMeetingsQueries _meetingsQueries;
-    private readonly IMeetingsCommands _meetingsCommands;
+    private readonly IMeetingService _meetingService;
 
     public JednaniController(
         IUserContextResolver userContextResolver,
-        IMeetingsQueries meetingsQueries,
-        IMeetingsCommands meetingsCommands)
-        : base(userContextResolver)
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory,
+        IMeetingService meetingService)
+        : base(userContextResolver, timeProvider, loggerFactory)
     {
-        _meetingsQueries = meetingsQueries;
-        _meetingsCommands = meetingsCommands;
+        _meetingService = meetingService;
     }
 
-    public IActionResult Index(int? projektId)
+    public async Task<IActionResult> Index(int? projektId, CancellationToken ct = default)
     {
-        var projekty = _meetingsQueries.BuildJednaniOverview()
-            .Where(project => CurrentUserContext.CanAccessProject(project.ProjektId))
-            .ToList();
+        var projekty = await _meetingService.BuildJednaniOverviewAsync(ct);
+        var filteredProjects = projekty
+            .Where(project => CurrentUserContext.CanAccessProject(project.ProjektId));
 
         if (projektId.HasValue)
         {
-            projekty = projekty.Where(p => p.ProjektId == projektId.Value).ToList();
+            filteredProjects = filteredProjects.Where(project => project.ProjektId == projektId.Value);
         }
 
-        var model = new JednaniIndexViewModel
+        return View(new JednaniIndexViewModel
         {
-            Projekty = projekty
-        };
-
-        return View(model);
+            CurrentUserContext = CurrentUserContext,
+            PageTitle = "Jednání",
+            Projekty = filteredProjects.ToList()
+                .Select(project => new JednaniProjektListItemViewModel
+                {
+                    ProjektId = project.ProjektId,
+                    ProjektNazev = project.ProjektNazev,
+                    Jednani = project.Jednani,
+                    CanDeleteMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, project.ProjektId)
+                })
+                .ToList()
+        });
     }
 
-    public IActionResult Detail(int id, string? returnUrl)
+    public async Task<IActionResult> Detail(int id, string? returnUrl, CancellationToken ct = default)
     {
-        var model = _meetingsQueries.BuildJednaniDetail(id);
+        var model = AttachCurrentUser(await _meetingService.BuildJednaniDetailAsync(id, ct));
         if (!CurrentUserContext.CanAccessProject(model.ProjektId))
         {
             return NotFound();
         }
 
+        model.CanEditMeeting = CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, model.ProjektId);
+        model.CanEditRecords = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId);
+        model.HasSubsystemLeadPermission = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, model.ProjektId);
+        model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+        model.PageTitle = $"Jednání č. {model.Jednani.CisloJednani}";
+
         var fallbackUrl = Url.Action("Index", "Jednani", new { projektId = model.ProjektId }) ?? "/Jednani";
         var isValidReturnUrl = !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl);
 
-        ViewData["BackUrl"] = isValidReturnUrl ? returnUrl : fallbackUrl;
-        ViewData["BackLabel"] = isValidReturnUrl ? "Zpět na projekt" : "Zpět na jednání";
+        model.BackUrl = isValidReturnUrl ? returnUrl : fallbackUrl;
+        model.BackLabel = isValidReturnUrl ? "Zpět na projekt" : "Zpět na jednání";
 
         return View(model);
     }
 
     [HttpGet]
-    public IActionResult TaskItemPartial(int jednaniId, int zaznamId)
+    public async Task<IActionResult> TaskItemPartial(int jednaniId, int zaznamId, CancellationToken ct = default)
     {
-        var model = _meetingsQueries.BuildJednaniDetail(jednaniId);
-        if (!CurrentUserContext.CanAccessProject(model.ProjektId))
+        var projektId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
+        if (!projektId.HasValue)
         {
             return NotFound();
         }
 
-        var ukol = model.Ukoly.FirstOrDefault(x => x.ZaznamId == zaznamId);
+        if (!CurrentUserContext.CanAccessProject(projektId.Value))
+        {
+            return NotFound();
+        }
+
+        var ukol = await _meetingService.GetSingleTaskAsync(jednaniId, zaznamId, ct);
         if (ukol is null)
         {
             return NotFound();
         }
 
-        var isLocked = !string.IsNullOrWhiteSpace(model.UzavrenyStavKod)
-            && string.Equals(model.Jednani.StavKod, model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase);
-        var canEditRecordNotes = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId) && !isLocked;
-        var canCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, model.ProjektId)
+        var meetings = await _meetingService.BuildJednaniListAsync(projektId.Value, ct);
+        var meeting = meetings.FirstOrDefault(x => x.Id == jednaniId);
+        if (meeting is null)
+        {
+            return NotFound();
+        }
+
+        var canEditRecordNotes = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId.Value)
+            && ukol.LzeUpravovatVyjadreni;
+        var canCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId.Value)
             && ukol.SubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId)
-            && !isLocked;
+            && ukol.LzeUpravovatVyjadreni;
         if (!canEditRecordNotes && !canCommentAsSubsystemLeader)
         {
             return Forbid();
@@ -84,25 +109,26 @@ public sealed class JednaniController : BaseController
 
         return PartialView("_TaskItemPartial", new JednaniTaskItemPartialViewModel
         {
-            ProjektId = model.ProjektId,
-            JednaniId = model.Jednani.Id,
-            JednaniCislo = model.Jednani.CisloJednani,
+            ProjektId = projektId.Value,
+            JednaniId = meeting.Id,
+            JednaniCislo = meeting.CisloJednani,
             CanEditRecordNotes = canEditRecordNotes,
             CanCommentAsSubsystemLeader = canCommentAsSubsystemLeader,
+            CurrentUserOsobaId = CurrentUserContext.OsobaId,
             Ukol = ukol
         });
     }
 
     [HttpGet]
-    public IActionResult AddMeetingParticipantModal(int projektId, int jednaniId)
+    public async Task<IActionResult> AddMeetingParticipantModal(int projektId, int jednaniId, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId))
         {
             return Forbid();
         }
 
-        var model = _meetingsQueries.BuildJednaniDetail(jednaniId);
-        if (model.ProjektId != projektId)
+        var actualProjectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
+        if (actualProjectId != projektId)
         {
             return NotFound();
         }
@@ -115,23 +141,28 @@ public sealed class JednaniController : BaseController
                 ProjektId = projektId,
                 JednaniId = jednaniId
             },
-            DostupneOsoby = model.AvailableParticipantCandidates
+            DostupneOsoby = await _meetingService.BuildMeetingParticipantCandidatesAsync(projektId, jednaniId, ct)
         });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveStatus(SaveMeetingStatusCommand command, string? returnUrl)
+    public async Task<IActionResult> SaveStatus(SaveMeetingStatusCommand command, string? returnUrl, CancellationToken ct = default)
     {
-        var meeting = _meetingsQueries.BuildJednaniDetail(command.JednaniId);
-        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, meeting.ProjektId))
+        var projektId = await _meetingService.GetMeetingProjectIdAsync(command.JednaniId, ct);
+        if (!projektId.HasValue)
+        {
+            return NotFound();
+        }
+
+        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId.Value))
         {
             return Forbid();
         }
 
         try
         {
-            _meetingsCommands.SaveMeetingStatus(command, CurrentUserContext);
+            await _meetingService.SaveMeetingStatusAsync(command, CurrentUserContext, ct);
         }
         catch (Exception ex)
         {
@@ -143,12 +174,12 @@ public sealed class JednaniController : BaseController
             return Redirect(returnUrl);
         }
 
-        return RedirectToAction(nameof(Detail), new { id = command.JednaniId });
+        return RedirectToAction(nameof(Detail), new { id = command.JednaniId })!;
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveAttendance(int projektId, int jednaniId, List<MeetingAttendanceRowInput> rows, string? returnUrl)
+    public async Task<IActionResult> SaveAttendance(int projektId, int jednaniId, List<MeetingAttendanceRowInput> rows, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId))
         {
@@ -157,15 +188,11 @@ public sealed class JednaniController : BaseController
 
         try
         {
-            foreach (var row in rows.Where(x => x.OsobaId > 0 && !string.IsNullOrWhiteSpace(x.StavUcasti)))
-            {
-                _meetingsCommands.SaveAttendance(new SaveAttendanceCommand
-                {
-                    JednaniId = jednaniId,
-                    OsobaId = row.OsobaId,
-                    StavUcasti = row.StavUcasti
-                }, CurrentUserContext);
-            }
+            await _meetingService.SaveAttendanceBatchAsync(
+                jednaniId,
+                rows.Select(x => (x.OsobaId, x.StavUcasti)),
+                CurrentUserContext,
+                ct);
         }
         catch (Exception ex)
         {
@@ -177,32 +204,32 @@ public sealed class JednaniController : BaseController
             return Redirect(returnUrl);
         }
 
-        return RedirectToAction(nameof(Detail), new { id = jednaniId });
+        return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult AddMeetingParticipant(AddMeetingParticipantCommand command)
+    public Task<IActionResult> AddMeetingParticipant(AddMeetingParticipantCommand command, CancellationToken ct = default)
     {
-        return ExecuteValidatedCommand(
+        return ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId),
             invalidAjaxMessage: "Osobu nelze přidat do účasti.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
-            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.JednaniId }),
-            onSuccessRedirect: () => RedirectToAction(nameof(Detail), new { id = command.JednaniId }),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.JednaniId })!,
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Detail), new { id = command.JednaniId })!),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "page",
                 refreshUrl: Url.Action(nameof(Detail), new { id = command.JednaniId }),
                 projectId: command.ProjektId,
                 meetingId: command.JednaniId,
                 uiContext: "meeting",
-                message: "Osoba byla přidána do účasti."),
-            operation: () => _meetingsCommands.AddMeetingParticipant(command, CurrentUserContext));
+                message: "Osoba byla přidána do účasti.")),
+            operation: () => _meetingService.AddMeetingParticipantAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveNotes(int projektId, int jednaniId, List<MeetingNoteRowInput> rows, string? returnUrl)
+    public async Task<IActionResult> SaveNotes(int projektId, int jednaniId, List<MeetingNoteRowInput> rows, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
         {
@@ -211,15 +238,11 @@ public sealed class JednaniController : BaseController
 
         try
         {
-            foreach (var row in rows.Where(x => x.ZaznamId > 0 && !string.IsNullOrWhiteSpace(x.Text)))
-            {
-                _meetingsCommands.SaveMeetingNote(new SaveMeetingNoteCommand
-                {
-                    JednaniId = jednaniId,
-                    ZaznamId = row.ZaznamId,
-                    Text = row.Text
-                }, CurrentUserContext);
-            }
+            await _meetingService.SaveMeetingNotesBatchAsync(
+                jednaniId,
+                rows.Select(x => (x.ZaznamId, x.Text)),
+                CurrentUserContext,
+                ct);
         }
         catch (Exception ex)
         {
@@ -231,7 +254,7 @@ public sealed class JednaniController : BaseController
             return Redirect(returnUrl);
         }
 
-        return RedirectToAction(nameof(Detail), new { id = jednaniId });
+        return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
     }
 
     public sealed class MeetingNoteRowInput

@@ -4,18 +4,7 @@
 @{
     var otevrenaJednani = ViewData["OtevrenaJednani"] as IReadOnlyList<JednaniOptionViewModel> ?? Array.Empty<JednaniOptionViewModel>();
     var colorClass = "category-" + Model.KategorieKod.ToLowerInvariant();
-    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
     var projektId = ViewData["ProjektId"] as int? ?? 0;
-    var canEditRecord = userContext?.HasPermission(PermissionKeys.RecordsEdit, projektId) ?? false;
-    var canEditSchedule = Model.JeUkol && (userContext?.HasPermission(PermissionKeys.RecordsScheduleEdit, projektId) ?? false);
-    var canAddSchedule = Model.JeUkol && (userContext?.HasPermission(PermissionKeys.RecordsScheduleAdd, projektId) ?? false);
-    var canManageSchedule = canEditSchedule || canAddSchedule;
-    var editButtonLabel = canEditRecord ? "Upravit" : "GANTT";
-    var userOsobaId = userContext?.OsobaId ?? 0;
-    var hasSubsystemLeadPermission = userContext?.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId) ?? false;
-    var isLeaderForRecord = userOsobaId > 0 && Model.AktualniSubsystemLeadEquivalentOsobaIds.Contains(userOsobaId);
-    var canCommentAsSubsystemLeader = hasSubsystemLeadPermission && isLeaderForRecord;
-    var canAddComment = canEditRecord || canCommentAsSubsystemLeader;
     var taskPrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = Model.Id, projektId, autoPrint = true }) ?? $"/Export/Ukol/{Model.Id}/Tisk?projektId={projektId}&autoPrint=true";
     var taskPrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = Model.Id, projektId }) ?? $"/Export/Ukol/{Model.Id}/Word?projektId={projektId}";
     var editRecordUrl = Url.Action("Edit", "Zaznamy", new { id = Model.Id, projektId }) ?? $"/Zaznamy/Edit/{Model.Id}";
@@ -91,15 +80,15 @@
                         <rect x="6" y="14" width="12" height="8"></rect>
                     </svg>
                 </a>
-                @if (canEditRecord || canManageSchedule)
+                @if (Model.CanEditRecord || Model.CanManageSchedule)
                 {
                     <button class="btn small"
                             type="button"
                             data-record-editor-url="@editRecordUrl"
                             data-record-editor-project-id="@projektId"
-                            data-record-editor-label="@($"{editButtonLabel} záznam #{Model.CisloViditelne}")"
+                            data-record-editor-label="@($"{Model.EditButtonLabel} záznam #{Model.CisloViditelne}")"
                             data-stop-propagation="true">
-                        @editButtonLabel
+                        @Model.EditButtonLabel
                     </button>
                 }
                 <span class="record-toggle-indicator" aria-hidden="true">›</span>
@@ -260,12 +249,13 @@
                                     <span class="muted">@vyjadreni.Datum.ToString("dd.MM.yyyy")</span>
                                 </div>
                                 <div class="comment-text richtext-render">@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
-                                @if (canAddComment)
+                                @if (Model.CanAddComment)
                                 {
                                     <div class="comment-toolbar">
                                         @{
-                                            var canEditThisComment = vyjadreni.LzeUpravit &&
-                                                (canEditRecord || (canCommentAsSubsystemLeader && vyjadreni.AutorOsobaId == userOsobaId));
+                                            var canEditThisComment = vyjadreni.LzeUpravit
+                                                && (Model.CanEditRecord
+                                                    || (Model.CanCommentAsSubsystemLeader && vyjadreni.AutorOsobaId == Model.CurrentUserOsobaId));
                                         }
                                         @if (canEditThisComment)
                                         {
@@ -316,7 +306,7 @@
                     </div>
                 }
 
-                @if (canAddComment)
+                @if (Model.CanAddComment)
                 {
                     <form class="comment-form" asp-controller="Zaznamy" asp-action="AddComment" method="post" data-ajax-submit="true">
                         <input type="hidden" name="projektId" value="@projektId" />

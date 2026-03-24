@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Modules.Settings;
 using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Settings;
 
@@ -13,15 +13,17 @@ public sealed class NastaveniController : BaseController
 
     public NastaveniController(
         IUserContextResolver userContextResolver,
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory,
         ISettingsService settingsService,
         ISettingsModalModelFactory settingsModalModelFactory)
-        : base(userContextResolver)
+        : base(userContextResolver, timeProvider, loggerFactory)
     {
         _settingsService = settingsService;
         _settingsModalModelFactory = settingsModalModelFactory;
     }
 
-    public IActionResult Index(string? section, int? userId, int? projektId)
+    public async Task<IActionResult> Index(string? section, int? userId, int? projektId, CancellationToken ct)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsView))
         {
@@ -34,11 +36,13 @@ public sealed class NastaveniController : BaseController
             return RedirectToAction(nameof(Index), new { section = "role" });
         }
 
-        var model = _settingsService.BuildNastaveniDashboard(normalizedSection, CurrentUserContext, userId, projektId);
+        var model = AttachCurrentUser(await _settingsService.BuildNastaveniDashboardAsync(normalizedSection, CurrentUserContext, userId, projektId, ct));
+        model.PageTitle = "Nastavení";
+        PrepareSettingsPanelPresentation(model.AktivniPanel);
         return View(model);
     }
 
-    public IActionResult Panel(string? section, int? userId, int? projektId)
+    public async Task<IActionResult> Panel(string? section, int? userId, int? projektId, CancellationToken ct)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsView))
         {
@@ -51,19 +55,38 @@ public sealed class NastaveniController : BaseController
             return Unauthorized();
         }
 
-        var panel = _settingsService.BuildNastaveniPanel(normalizedSection, CurrentUserContext, userId, projektId);
+        var panel = await _settingsService.BuildNastaveniPanelAsync(normalizedSection, CurrentUserContext, userId, projektId, ct);
+        PrepareSettingsPanelPresentation(panel);
         return PartialView("_DetailPanel", panel);
     }
 
     [HttpGet]
-    public IActionResult RoleModal(int? id, int? userId, int? projektId)
+    public async Task<IActionResult> UserRolesModal(int osobaId, int? userId, int? projektId, CancellationToken ct)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
         {
             return Forbid();
         }
 
-        var panel = _settingsService.BuildNastaveniPanel("role", CurrentUserContext, userId, projektId);
+        var panel = await _settingsService.BuildNastaveniPanelAsync("uzivatele-role", CurrentUserContext, userId, projektId, ct);
+        var user = panel.UserRoles.FirstOrDefault(x => x.OsobaId == osobaId);
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        return View(_settingsModalModelFactory.BuildUserRolesModal(user, panel.Role, userId, projektId));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> RoleModal(int? id, int? userId, int? projektId, CancellationToken ct)
+    {
+        if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
+        {
+            return Forbid();
+        }
+
+        var panel = await _settingsService.BuildNastaveniPanelAsync("role", CurrentUserContext, userId, projektId, ct);
         var role = id.HasValue
             ? panel.Role.FirstOrDefault(x => x.Id == id.Value)
             : null;
@@ -82,14 +105,14 @@ public sealed class NastaveniController : BaseController
     }
 
     [HttpGet]
-    public IActionResult PermissionModal(int? id, int? userId, int? projektId)
+    public async Task<IActionResult> PermissionModal(int? id, int? userId, int? projektId, CancellationToken ct)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
         {
             return Forbid();
         }
 
-        var panel = _settingsService.BuildNastaveniPanel("akce", CurrentUserContext, userId, projektId);
+        var panel = await _settingsService.BuildNastaveniPanelAsync("akce", CurrentUserContext, userId, projektId, ct);
         var permission = id.HasValue
             ? panel.Permissions.FirstOrDefault(x => x.Id == id.Value)
             : null;
@@ -108,32 +131,14 @@ public sealed class NastaveniController : BaseController
     }
 
     [HttpGet]
-    public IActionResult UserRolesModal(int osobaId, int? userId, int? projektId)
+    public async Task<IActionResult> RolePermissionModal(int? id, int? roleId, int? permissionId, int? userId, int? projektId, CancellationToken ct)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
         {
             return Forbid();
         }
 
-        var panel = _settingsService.BuildNastaveniPanel("uzivatele-role", CurrentUserContext, userId, projektId);
-        var user = panel.UserRoles.FirstOrDefault(x => x.OsobaId == osobaId);
-        if (user is null)
-        {
-            return NotFound();
-        }
-
-        return View(_settingsModalModelFactory.BuildUserRolesModal(user, panel.Role, userId, projektId));
-    }
-
-    [HttpGet]
-    public IActionResult RolePermissionModal(int? id, int? roleId, int? permissionId, int? userId, int? projektId)
-    {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
-        {
-            return Forbid();
-        }
-
-        var panel = _settingsService.BuildNastaveniPanel("role-akce", CurrentUserContext, userId, projektId);
+        var panel = await _settingsService.BuildNastaveniPanelAsync("role-akce", CurrentUserContext, userId, projektId, ct);
         var mapping = id.HasValue
             ? panel.RolePermissionScopes.FirstOrDefault(x => x.Id == id.Value)
             : null;
@@ -153,118 +158,121 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveRole(SaveAuthzRoleCommand command, int? userId, int? projektId)
+    public Task<IActionResult> SaveRole(SaveAuthzRoleCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
-        return ExecuteSettingsValidatedAction(
+        return ExecuteSettingsValidatedActionAsync(
             section: "role",
             invalidAjaxMessage: "Roli nelze uložit.",
             successMessage: "Role byla uložena.",
             userId: userId,
             projektId: projektId,
-            operation: () => _settingsService.SaveAuthzRole(command, CurrentUserContext));
+            operation: () => _settingsService.SaveAuthzRoleAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult ToggleRole(ToggleAuthzRoleCommand command, int? userId, int? projektId)
+    public Task<IActionResult> ToggleRole(ToggleAuthzRoleCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
-        return ExecuteSettingsAction(
+        return ExecuteSettingsActionAsync(
             section: "role",
             successMessage: "Stav role byl upraven.",
             userId: userId,
             projektId: projektId,
-            operation: () => _settingsService.ToggleAuthzRole(command, CurrentUserContext));
+            operation: () => _settingsService.ToggleAuthzRoleAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SavePermission(SaveAuthzPermissionCommand command, int? userId, int? projektId)
+    public Task<IActionResult> SavePermission(SaveAuthzPermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
-        return ExecuteSettingsValidatedAction(
+        return ExecuteSettingsValidatedActionAsync(
             section: "akce",
             invalidAjaxMessage: "Akci nelze uložit.",
             successMessage: "Akce byla uložena.",
             userId: userId,
             projektId: projektId,
-            operation: () =>
+            operation: async () =>
             {
-                var panel = _settingsService.BuildNastaveniPanel("akce", CurrentUserContext, null, null);
+                var panel = await _settingsService.BuildNastaveniPanelAsync("akce", CurrentUserContext, null, null, ct);
                 _settingsModalModelFactory.ApplyPermissionCatalogDefaults(command, panel.PermissionCategories);
-                _settingsService.SaveAuthzPermission(command, CurrentUserContext);
+                await _settingsService.SaveAuthzPermissionAsync(command, CurrentUserContext, ct);
             });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult TogglePermission(ToggleAuthzPermissionCommand command, int? userId, int? projektId)
+    public Task<IActionResult> TogglePermission(ToggleAuthzPermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
-        return ExecuteSettingsAction(
+        return ExecuteSettingsActionAsync(
             section: "akce",
             successMessage: "Stav akce byl upraven.",
             userId: userId,
             projektId: projektId,
-            operation: () => _settingsService.ToggleAuthzPermission(command, CurrentUserContext));
+            operation: () => _settingsService.ToggleAuthzPermissionAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveUserRole(SaveUserRoleAssignmentCommand command, int? userId, int? projektId)
+    public Task<IActionResult> SaveUserRole(SaveUserRoleAssignmentCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
-        return ExecuteSettingsValidatedAction(
+        return ExecuteSettingsValidatedActionAsync(
             section: "uzivatele-role",
             invalidAjaxMessage: "Přiřazení role nelze uložit.",
             successMessage: "Přiřazení role bylo uloženo.",
             userId: userId,
             projektId: projektId,
-            operation: () => _settingsService.SaveUserRoleAssignment(command, CurrentUserContext));
+            operation: () => _settingsService.SaveUserRoleAssignmentAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveUserRolesForUser(SaveUserRolesForUserCommand command, int? userId, int? projektId)
+    public Task<IActionResult> SaveUserRolesForUser(SaveUserRolesForUserCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
-        return ExecuteSettingsValidatedAction(
+        return ExecuteSettingsValidatedActionAsync(
             section: "uzivatele-role",
             invalidAjaxMessage: "Role uživatele nelze uložit.",
             successMessage: "Role uživatele byly uloženy.",
             userId: userId,
             projektId: projektId,
-            operation: () => _settingsService.SaveUserRolesForUser(command, CurrentUserContext));
+            operation: () => _settingsService.SaveUserRolesForUserAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveRolePermission(SaveRolePermissionCommand command, int? userId, int? projektId)
+    public Task<IActionResult> SaveRolePermission(SaveRolePermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
-        return ExecuteSettingsValidatedAction(
+        return ExecuteSettingsValidatedActionAsync(
             section: "role-akce",
             invalidAjaxMessage: "Mapování role/akce nelze uložit.",
             successMessage: "Mapování role/akce bylo uloženo.",
             userId: userId,
             projektId: projektId,
-            operation: () =>
+            operation: async () =>
             {
                 command.IsAllowed = true;
-                _settingsService.SaveRolePermission(command, CurrentUserContext);
+                await _settingsService.SaveRolePermissionAsync(command, CurrentUserContext, ct);
             });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult DeleteRolePermission(DeleteRolePermissionCommand command, int? userId, int? projektId)
+    public Task<IActionResult> DeleteRolePermission(DeleteRolePermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
-        return ExecuteSettingsValidatedAction(
+        return ExecuteSettingsValidatedActionAsync(
             section: "role-akce",
             invalidAjaxMessage: "Mapování role/akce nelze smazat.",
             successMessage: "Mapování role/akce bylo smazáno.",
             userId: userId,
             projektId: projektId,
-            operation: () => _settingsService.DeleteRolePermission(command, CurrentUserContext));
+            operation: () => _settingsService.DeleteRolePermissionAsync(command, CurrentUserContext, ct));
     }
 
     private static string NormalizeSection(string? section)
     {
-        return (section ?? "role").Trim().ToLowerInvariant();
+        var normalized = (section ?? "role").Trim().ToLowerInvariant();
+        return normalized is "role" or "akce" or "role-akce" or "uzivatele-role" or "efektivni-prava"
+            ? normalized
+            : "role";
     }
 
     private string BuildPanelRefreshUrl(string section, int? userId, int? projektId)
@@ -272,45 +280,52 @@ public sealed class NastaveniController : BaseController
         return Url.Action(nameof(Panel), new { section, userId, projektId }) ?? Url.Action(nameof(Panel), new { section })!;
     }
 
-    private IActionResult ExecuteSettingsValidatedAction(
+    private Task<IActionResult> ExecuteSettingsValidatedActionAsync(
         string section,
         string invalidAjaxMessage,
         string successMessage,
         int? userId,
         int? projektId,
-        Action operation)
+        Func<Task> operation)
     {
-        return ExecuteValidatedCommand(
+        return ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
             invalidAjaxMessage: invalidAjaxMessage,
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToSection(section, userId, projektId),
-            onSuccessRedirect: () => RedirectToSection(section, userId, projektId),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToSection(section, userId, projektId)),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "nastaveni-panel",
                 refreshUrl: BuildPanelRefreshUrl(section, userId, projektId),
-                message: successMessage),
+                message: successMessage)),
             operation: operation);
     }
 
-    private IActionResult ExecuteSettingsAction(
+    private Task<IActionResult> ExecuteSettingsActionAsync(
         string section,
         string successMessage,
         int? userId,
         int? projektId,
-        Action operation)
+        Func<Task> operation)
     {
-        return ExecuteCommand(
+        return ExecuteCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
-            onSuccessRedirect: () => RedirectToSection(section, userId, projektId),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToSection(section, userId, projektId)),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "nastaveni-panel",
                 refreshUrl: BuildPanelRefreshUrl(section, userId, projektId),
-                message: successMessage),
+                message: successMessage)),
             operation: operation);
     }
 
     private RedirectToActionResult RedirectToSection(string section, int? userId, int? projektId)
         => RedirectToAction(nameof(Index), new { section, userId, projektId })!;
+
+    private void PrepareSettingsPanelPresentation(NastaveniPanelViewModel panel)
+    {
+        AttachCurrentUser(panel);
+        panel.PageTitle = panel.Nazev;
+        panel.CanManageSettings = CurrentUserContext.HasPermission(PermissionKeys.SettingsManage);
+    }
 
 }

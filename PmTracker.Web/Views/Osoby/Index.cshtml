@@ -1,27 +1,27 @@
 @model OsobyIndexViewModel
 @{
     ViewData["Title"] = "Osoby";
-    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
-    var canManagePeople = userContext?.HasPermission(PermissionKeys.PeopleManage) ?? false;
 }
 
-<section class="page-header">
-    <div>
-        <h1>Osoby</h1>
-        <p class="muted">Globální seznam identit včetně organizační příslušnosti.</p>
-    </div>
-    <div class="header-actions">
-        @if (canManagePeople)
-        {
-            <button class="btn" type="button" data-modal-url="@Url.Action("AdPersonModal", "Osoby")">Přidat z AD</button>
-            <button class="btn primary" type="button" data-modal-url="@Url.Action("ManualPersonModal", "Osoby")">Přidat ručně</button>
-        }
-        else
-        {
-            <span class="muted">Pouze čtení</span>
-        }
-    </div>
-</section>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = "Globální seznam identit včetně organizační příslušnosti.",
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel
+})
+
+<div class="header-actions">
+    @if (Model.CanManagePeople)
+    {
+        <button class="btn" type="button" data-modal-url="@Url.Action("AdPersonModal", "Osoby")">Přidat z AD</button>
+        <button class="btn primary" type="button" data-modal-url="@Url.Action("ManualPersonModal", "Osoby")">Přidat ručně</button>
+    }
+    else
+    {
+        <span class="muted">Pouze čtení</span>
+    }
+</div>
 
 <section class="card" data-osoby-table-card>
     <table class="table">
@@ -34,7 +34,7 @@
                 <th>Organizace</th>
                 <th>Organizační celek</th>
                 <th>AD</th>
-                @if (canManagePeople)
+                @if (Model.CanManagePeople)
                 {
                     <th class="table-actions">Akce</th>
                 }
@@ -51,7 +51,7 @@
                 <td>@(osoba.Organizace ?? "-")</td>
                 <td>@(osoba.OrganizacniCelek ?? "-")</td>
                 <td>@(osoba.JeAdUcet ? "Ano" : "Ne")</td>
-                @if (canManagePeople)
+                @if (Model.CanManagePeople)
                 {
                     <td class="table-actions">
                         <button class="btn small"

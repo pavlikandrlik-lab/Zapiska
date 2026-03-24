@@ -1,19 +1,12 @@
 @model JednaniDetailViewModel
 @{
     ViewData["Title"] = "Detail jednání";
-    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
-    var canEditMeeting = userContext?.HasPermission(PermissionKeys.MeetingsEdit, Model.ProjektId) ?? false;
-    var canEditRecords = userContext?.HasPermission(PermissionKeys.RecordsEdit, Model.ProjektId) ?? false;
-    var hasSubsystemLeadPermission = userContext?.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, Model.ProjektId) ?? false;
-    var userOsobaId = userContext?.OsobaId ?? 0;
     var uzavrenyStav = Model.StavyJednani.FirstOrDefault(x => string.Equals(x.Value, Model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase));
     var otevrenyStav = Model.StavyJednani.FirstOrDefault(x => string.Equals(x.Value, Model.OtevrenyStavKod, StringComparison.OrdinalIgnoreCase));
     var isLocked = !string.IsNullOrWhiteSpace(Model.UzavrenyStavKod)
         && string.Equals(Model.Jednani.StavKod, Model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase);
-    var canEditMeetingFields = canEditMeeting && !isLocked;
-    var canEditRecordNotes = canEditRecords && !isLocked;
-    var backUrl = ViewData["BackUrl"] as string ?? Url.Action("Index", "Jednani", new { projektId = Model.ProjektId }) ?? "/Jednani";
-    var backLabel = ViewData["BackLabel"] as string ?? "Zpět na jednání";
+    var canEditMeetingFields = Model.CanEditMeeting && !isLocked;
+    var canEditRecordNotes = Model.CanEditRecords && !isLocked;
     var meetingPrintUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = Model.Jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Tisk?autoPrint=true";
     var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = Model.Jednani.Id }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Word";
     var createRecordInMeetingUrl = Url.Action("Create", "Zaznamy", new
@@ -33,17 +26,22 @@
         : $"Celkem {Model.Ucast.Count} osob · {string.Join(" · ", attendanceSummaryItems)}";
 }
 
-<section class="page-header meeting-detail-header">
-    <div>
-        <h1>Jednání č. @Model.Jednani.CisloJednani</h1>
-        <p class="muted">@Model.ProjektNazev</p>
-        <p class="muted">@Model.Jednani.Datum.ToString("dd.MM.yyyy") v @Model.Jednani.CasZacatek.ToString("HH\\:mm") - <span class="badge">@Model.Jednani.Stav</span></p>
-        <p class="muted">Místo: @Model.Jednani.Misto</p>
-        @if (isLocked)
-        {
-            <p class="muted">Uzamkl: @(string.IsNullOrWhiteSpace(Model.Jednani.UzamklOsoba) ? "-" : Model.Jednani.UzamklOsoba)</p>
-        }
-    </div>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = Model.ProjektNazev,
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel,
+    Badge = Model.Jednani.Stav
+})
+
+<section class="meeting-detail-header">
+    <p class="muted">@Model.Jednani.Datum.ToString("dd.MM.yyyy") v @Model.Jednani.CasZacatek.ToString("HH\\:mm")</p>
+    <p class="muted">Místo: @Model.Jednani.Misto</p>
+    @if (isLocked)
+    {
+        <p class="muted">Uzamkl: @(string.IsNullOrWhiteSpace(Model.Jednani.UzamklOsoba) ? "-" : Model.Jednani.UzamklOsoba)</p>
+    }
     <div class="header-actions meeting-detail-actions">
         <a class="btn ghost"
            href="@meetingPrintUrl"
@@ -63,7 +61,7 @@
                 Upravit poradu
             </button>
         }
-        @if (canEditMeeting)
+        @if (Model.CanEditMeeting)
         {
             <form asp-controller="Projekty" asp-action="DeleteMeeting" method="post" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
                 <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
@@ -71,7 +69,6 @@
                 <button class="btn ghost" type="submit">Smazat</button>
             </form>
         }
-        <a class="btn" href="@backUrl">@backLabel</a>
     </div>
 </section>
 
@@ -191,7 +188,7 @@
                             <button class="btn" type="submit">Uložit stav</button>
                         }
                     </form>
-                    @if (canEditMeeting)
+                    @if (Model.CanEditMeeting)
                     {
                         if (isLocked)
                         {
@@ -227,7 +224,7 @@
         <div class="card">
             <div class="meeting-task-header">
                 <h2>Zápis úkolů</h2>
-                @if (canEditRecords)
+                @if (Model.CanEditRecords)
                 {
                     <button class="btn primary"
                             type="button"
@@ -242,10 +239,10 @@
                 {
                     var ukol = Model.Ukoly[i];
                     var canCommentTask = canEditRecordNotes
-                        || (hasSubsystemLeadPermission
+                        || (Model.HasSubsystemLeadPermission
                             && !isLocked
-                            && userOsobaId > 0
-                            && ukol.SubsystemLeadEquivalentOsobaIds.Contains(userOsobaId));
+                            && Model.CurrentUserOsobaId > 0
+                            && ukol.SubsystemLeadEquivalentOsobaIds.Contains(Model.CurrentUserOsobaId));
                     @await Html.PartialAsync("_TaskItemPartial", new JednaniTaskItemPartialViewModel
                     {
                         ProjektId = Model.ProjektId,
@@ -253,6 +250,7 @@
                         JednaniCislo = Model.Jednani.CisloJednani,
                         CanEditRecordNotes = canEditRecordNotes,
                         CanCommentAsSubsystemLeader = canCommentTask && !canEditRecordNotes,
+                        CurrentUserOsobaId = Model.CurrentUserOsobaId,
                         Ukol = ukol
                     })
                 }

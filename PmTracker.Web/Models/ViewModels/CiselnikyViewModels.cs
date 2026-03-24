@@ -1,3 +1,5 @@
+using System;
+
 namespace PmTracker.Web.Models.ViewModels;
 
 public sealed class CiselnikyIndexViewModel
@@ -7,6 +9,9 @@ public sealed class CiselnikyIndexViewModel
 
 public sealed class CiselnikyDashboardViewModel
 {
+    public string PageTitle { get; set; } = string.Empty;
+    public string? BackUrl { get; set; }
+    public string? BackLabel { get; set; }
     public required IReadOnlyList<CiselnikListItemViewModel> Ciselniky { get; init; }
     public required CiselnikDetailViewModel VybranyCiselnik { get; init; }
 }
@@ -18,8 +23,11 @@ public sealed class CiselnikListItemViewModel
     public int PocetPolozek { get; init; }
 }
 
-public sealed class CiselnikDetailViewModel
+public sealed class CiselnikDetailViewModel : BaseViewModel
 {
+    public string PageTitle { get; set; } = string.Empty;
+    public string? BackUrl { get; set; }
+    public string? BackLabel { get; set; }
     public required string Key { get; init; }
     public required string Nazev { get; init; }
     public bool CanCreate { get; init; } = true;
@@ -29,6 +37,14 @@ public sealed class CiselnikDetailViewModel
     public bool IsHodnotaNavicSelect { get; init; }
     public bool IsHodnotaNavicRequired { get; init; }
     public required IReadOnlyList<CiselnikRadekViewModel> Polozky { get; init; }
+    public bool CanEditCiselnik { get; set; }
+    public bool IsArchitect { get; set; }
+
+    public bool IsSubsystemCiselnik => string.Equals(Key, "subsystemy", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsHarmonogramCiselnik => string.Equals(Key, "harmonogram-kroky", StringComparison.OrdinalIgnoreCase);
+
+    public bool CanEditThisCiselnik => CanEditCiselnik && (!IsHarmonogramCiselnik || IsArchitect);
 }
 
 public sealed class CiselnikRadekViewModel

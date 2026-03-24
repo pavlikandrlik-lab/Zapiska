@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Core.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Net.Http.Headers;
 using PmTracker.Web.Models.ViewModels;
@@ -55,8 +56,7 @@ public sealed class AjaxAntiforgeryResultFilter(ILogger<AjaxAntiforgeryResultFil
 
     private static bool IsAntiforgeryValidationResult(IActionResult result)
     {
-        var typeName = result.GetType().Name;
-        return typeName.Contains("Antiforgery", StringComparison.OrdinalIgnoreCase);
+        return result is IAntiforgeryValidationFailedResult;
     }
 
     private static string ResolveTraceId(HttpContext context)

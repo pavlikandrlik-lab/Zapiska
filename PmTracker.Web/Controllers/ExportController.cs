@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Modules.Export;
 using PmTracker.Web.Services.Export;
+using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
@@ -10,104 +11,122 @@ namespace PmTracker.Web.Controllers;
 public sealed class ExportController : BaseController
 {
     private const string WordContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    private readonly IExportQueries _exportQueries;
+    private readonly IExportTemplateUseCase _exportTemplateUseCase;
+    private readonly IProjectService _projectService;
+    private readonly IMeetingService _meetingService;
     private readonly IWordExportService _wordExportService;
 
     public ExportController(
         IUserContextResolver userContextResolver,
-        IExportQueries exportQueries,
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory,
+        IExportTemplateUseCase exportTemplateUseCase,
+        IProjectService projectService,
+        IMeetingService meetingService,
         IWordExportService wordExportService)
-        : base(userContextResolver)
+        : base(userContextResolver, timeProvider, loggerFactory)
     {
-        _exportQueries = exportQueries;
+        _exportTemplateUseCase = exportTemplateUseCase;
+        _projectService = projectService;
+        _meetingService = meetingService;
         _wordExportService = wordExportService;
     }
 
     [HttpGet("Projekt/{projektId:int}/Tisk")]
-    public IActionResult ProjektTisk(int projektId, bool autoPrint = true)
+    public async Task<IActionResult> ProjektTisk(int projektId, bool autoPrint = true, CancellationToken ct = default)
     {
-        var accessCheck = EnsureProjectReadable(projektId);
+        var accessCheck = await EnsureProjectReadableAsync(projektId, ct);
         if (accessCheck is not null)
         {
             return accessCheck;
         }
 
-        var model = _exportQueries.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint);
+        var model = await _exportTemplateUseCase.BuildProjectTemplateAsync(projektId, CurrentUserContext, autoPrint, ct);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
     [HttpGet("Projekt/{projektId:int}/Word")]
-    public IActionResult ProjektWord(int projektId)
+    public async Task<IActionResult> ProjektWord(int projektId, CancellationToken ct = default)
     {
-        var accessCheck = EnsureProjectReadable(projektId);
+        var accessCheck = await EnsureProjectReadableAsync(projektId, ct);
         if (accessCheck is not null)
         {
             return accessCheck;
         }
 
-        var model = _exportQueries.BuildProjectPrintTemplate(projektId, CurrentUserContext, autoPrint: false);
+        var model = await _exportTemplateUseCase.BuildProjectTemplateAsync(projektId, CurrentUserContext, autoPrint: false, ct);
         return BuildWordResult(model);
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Tisk")]
-    public IActionResult JednaniTisk(int jednaniId, bool autoPrint = true)
+    public async Task<IActionResult> JednaniTisk(int jednaniId, bool autoPrint = true, CancellationToken ct = default)
     {
-        var projectId = _exportQueries.ResolveMeetingProjectId(jednaniId);
-        var accessCheck = EnsureProjectReadable(projectId);
+        var projectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
+        if (!projectId.HasValue)
+        {
+            return NotFound();
+        }
+
+        var accessCheck = await EnsureProjectReadableAsync(projectId.Value, ct);
         if (accessCheck is not null)
         {
             return accessCheck;
         }
 
-        var model = _exportQueries.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint);
+        var model = await _exportTemplateUseCase.BuildMeetingTemplateAsync(jednaniId, CurrentUserContext, autoPrint, ct);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Word")]
-    public IActionResult JednaniWord(int jednaniId)
+    public async Task<IActionResult> JednaniWord(int jednaniId, CancellationToken ct = default)
     {
-        var projectId = _exportQueries.ResolveMeetingProjectId(jednaniId);
-        var accessCheck = EnsureProjectReadable(projectId);
+        var projectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
+        if (!projectId.HasValue)
+        {
+            return NotFound();
+        }
+
+        var accessCheck = await EnsureProjectReadableAsync(projectId.Value, ct);
         if (accessCheck is not null)
         {
             return accessCheck;
         }
 
-        var model = _exportQueries.BuildMeetingPrintTemplate(jednaniId, CurrentUserContext, autoPrint: false);
+        var model = await _exportTemplateUseCase.BuildMeetingTemplateAsync(jednaniId, CurrentUserContext, autoPrint: false, ct);
         return BuildWordResult(model);
     }
 
     [HttpGet("Ukol/{zaznamId:int}/Tisk")]
-    public IActionResult UkolTisk(int zaznamId, int projektId, bool autoPrint = true)
+    public async Task<IActionResult> UkolTisk(int zaznamId, int projektId, bool autoPrint = true, CancellationToken ct = default)
     {
-        var accessCheck = EnsureProjectReadable(projektId);
+        var accessCheck = await EnsureProjectReadableAsync(projektId, ct);
         if (accessCheck is not null)
         {
             return accessCheck;
         }
 
-        var model = _exportQueries.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint);
+        var model = await _exportTemplateUseCase.BuildTaskTemplateAsync(projektId, zaznamId, CurrentUserContext, autoPrint, ct);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
     [HttpGet("Ukol/{zaznamId:int}/Word")]
-    public IActionResult UkolWord(int zaznamId, int projektId)
+    public async Task<IActionResult> UkolWord(int zaznamId, int projektId, CancellationToken ct = default)
     {
-        var accessCheck = EnsureProjectReadable(projektId);
+        var accessCheck = await EnsureProjectReadableAsync(projektId, ct);
         if (accessCheck is not null)
         {
             return accessCheck;
         }
 
-        var model = _exportQueries.BuildTaskPrintTemplate(projektId, zaznamId, CurrentUserContext, autoPrint: false);
+        var model = await _exportTemplateUseCase.BuildTaskTemplateAsync(projektId, zaznamId, CurrentUserContext, autoPrint: false, ct);
         return BuildWordResult(model);
     }
 
     // Kompatibilita na staré export URL - přesměrování na nové varianty tisku.
     [HttpGet("Dialog")]
-    public IActionResult Dialog(int projektId, int? jednaniId, bool autoPrint = true)
+    public async Task<IActionResult> Dialog(int projektId, int? jednaniId, bool autoPrint = true, CancellationToken ct = default)
     {
-        if (!_exportQueries.ProjektExists(projektId))
+        if (!await _projectService.ProjektExistsAsync(projektId, ct))
         {
             return RedirectToAction("Index", "Projekty");
         }
@@ -137,9 +156,9 @@ public sealed class ExportController : BaseController
         return File(payload, WordContentType, BuildWordFileName(model, GetLocalNow()));
     }
 
-    private IActionResult? EnsureProjectReadable(int projektId)
+    private async Task<IActionResult?> EnsureProjectReadableAsync(int projektId, CancellationToken ct)
     {
-        if (!_exportQueries.ProjektExists(projektId))
+        if (!await _projectService.ProjektExistsAsync(projektId, ct))
         {
             return RedirectToAction("Index", "Projekty");
         }

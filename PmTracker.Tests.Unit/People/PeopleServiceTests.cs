@@ -1,5 +1,7 @@
 using FluentAssertions;
-using PmTracker.Web.Models.ViewModels;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.People;
 
 namespace PmTracker.Tests.Unit.People;
@@ -7,32 +9,29 @@ namespace PmTracker.Tests.Unit.People;
 public sealed class PeopleServiceTests
 {
     [Fact]
-    public void BuildOsoby_ShouldDelegateToDataStore()
+    public void AddPmTrackerDataStore_ShouldResolvePeopleFacadeAlias()
     {
-        var expected = new OsobyIndexViewModel
-        {
-            Osoby = [],
-            Organizace = [],
-            OrganizacniCelky = []
-        };
-        var dataStore = new FakePeopleDataStore(expected);
-        var sut = new PeopleService(dataStore);
+        var services = new ServiceCollection();
+        services.AddPmTrackerDataStore(BuildConfiguration());
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        using var scope = provider.CreateScope();
 
-        var result = sut.BuildOsoby();
+        var concrete = scope.ServiceProvider.GetRequiredService<PeopleService>();
+        var facade = scope.ServiceProvider.GetRequiredService<IPeopleService>();
 
-        result.Should().BeSameAs(expected);
+        facade.Should().BeSameAs(concrete);
     }
 
-    private sealed class FakePeopleDataStore(OsobyIndexViewModel people) : IPeopleDataStore
+    private static IConfiguration BuildConfiguration()
     {
-        public OsobyIndexViewModel BuildOsoby() => people;
-
-        public int SaveManualPerson(SaveManualPersonCommand command, CurrentUserContextViewModel currentUser) => 1;
-
-        public int SaveAdPerson(SaveAdPersonCommand command, CurrentUserContextViewModel currentUser) => 1;
-
-        public void DeletePerson(DeletePersonCommand command, CurrentUserContextViewModel currentUser)
-        {
-        }
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:PmTracker"] = "Server=(localdb)\\mssqllocaldb;Database=PmTracker.Tests;Trusted_Connection=True;TrustServerCertificate=True;",
+                ["PmTrackerData:Provider"] = "SqlServer",
+                ["PmTrackerData:SqlServer:ConnectionStringName"] = "PmTracker",
+                ["PmTrackerData:SqlServer:CommandTimeoutSeconds"] = "30"
+            })
+            .Build();
     }
 }

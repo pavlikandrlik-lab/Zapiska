@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Mvc.Core.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -81,7 +82,7 @@ public sealed class AjaxAntiforgeryResultFilterTests
         return new ActionContext(httpContext, new RouteData(), new ActionDescriptor());
     }
 
-    private sealed class FakeAntiforgeryValidationFailedResult : IActionResult
+    private sealed class FakeAntiforgeryValidationFailedResult : IAntiforgeryValidationFailedResult
     {
         public Task ExecuteResultAsync(ActionContext context) => Task.CompletedTask;
     }

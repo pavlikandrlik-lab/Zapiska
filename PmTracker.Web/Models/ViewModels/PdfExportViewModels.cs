@@ -27,6 +27,18 @@ public sealed class PdfExportTemplateViewModel
     public required IReadOnlyList<string> AppliedRuleSummary { get; init; }
     public required IReadOnlyList<PdfLegendItemViewModel> Legenda { get; init; }
     public required IReadOnlyList<PdfExportRecordViewModel> Zaznamy { get; init; }
+    public string NormalizedVariant { get; init; } = "project_all";
+    public bool IsMeeting { get; init; }
+    public bool IsProjectSummary { get; init; }
+    public string DocumentTitle { get; init; } = string.Empty;
+    public string ExportTypeLabel { get; init; } = string.Empty;
+    public IReadOnlyList<PdfExportSubsystemGroupViewModel> SubsystemGroups { get; init; } = Array.Empty<PdfExportSubsystemGroupViewModel>();
+}
+
+public sealed class PdfExportSubsystemGroupViewModel
+{
+    public required string Subsystem { get; init; }
+    public required IReadOnlyList<PdfExportRecordViewModel> Records { get; init; }
 }
 
 public sealed class PdfRoleAssignmentViewModel

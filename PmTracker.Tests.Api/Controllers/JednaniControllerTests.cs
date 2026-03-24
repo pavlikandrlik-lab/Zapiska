@@ -129,14 +129,14 @@ public sealed class JednaniControllerTests
     }
 
     [Fact]
-    public async Task AddMeetingParticipantModal_ShouldReturnInternalServerError_WhenMeetingDoesNotExist()
+    public async Task AddMeetingParticipantModal_ShouldReturnNotFound_WhenMeetingDoesNotExist()
     {
         var projectId = await _fixture.EnsureProjectAsync("APIMTG_MODAL_MISSING");
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Jednani/AddMeetingParticipantModal?projektId={projectId}&jednaniId=999999999&asUser={_fixture.AdminOsobaId}");
 
-        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

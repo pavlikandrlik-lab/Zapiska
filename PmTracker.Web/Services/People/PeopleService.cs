@@ -1,17 +1,17 @@
+using PmTracker.Web.Data;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Common;
+
 namespace PmTracker.Web.Services.People;
 
-public sealed class PeopleService(
-    IPeopleDataStore dataStore) : IPeopleService
+public sealed partial class PeopleService : IPeopleService
 {
-    public OsobyIndexViewModel BuildOsoby() => dataStore.BuildOsoby();
+    private readonly PmTrackerDbContext dbContext;
+    private readonly ITextNormalizer textNormalizer;
 
-    public int SaveManualPerson(SaveManualPersonCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.SaveManualPerson(command, currentUser);
-
-    public int SaveAdPerson(SaveAdPersonCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.SaveAdPerson(command, currentUser);
-
-    public void DeletePerson(DeletePersonCommand command, CurrentUserContextViewModel currentUser) =>
-        dataStore.DeletePerson(command, currentUser);
+    public PeopleService(PmTrackerDbContext dbContext, ITextNormalizer textNormalizer)
+    {
+        this.dbContext = dbContext;
+        this.textNormalizer = textNormalizer;
+    }
 }

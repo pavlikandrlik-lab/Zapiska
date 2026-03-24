@@ -1,12 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
 public sealed class ObsazeniController : BaseController
 {
-    public ObsazeniController(IUserContextResolver userContextResolver)
-        : base(userContextResolver)
+    public ObsazeniController(
+        IUserContextResolver userContextResolver,
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory)
+        : base(userContextResolver, timeProvider, loggerFactory)
     {
     }
 

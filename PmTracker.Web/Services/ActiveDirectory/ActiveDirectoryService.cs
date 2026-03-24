@@ -1,6 +1,7 @@
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Globalization;
+using System.Runtime.Versioning;
 using System.Text;
 using Microsoft.Extensions.Options;
 
@@ -19,7 +20,7 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService
         _logger = logger;
     }
 
-    public async Task<ActiveDirectorySearchResponse> SearchUsersAsync(string? query, CancellationToken cancellationToken = default)
+    public async Task<ActiveDirectorySearchResponse> SearchUsersAsync(string? query, CancellationToken ct = default)
     {
         var rawQuery = (query ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(rawQuery))
@@ -31,17 +32,26 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService
             };
         }
 
+        if (!OperatingSystem.IsWindows())
+        {
+            _logger.LogInformation("AD search is not available on non-Windows platform.");
+            return NotAvailable(UnavailableMessage(_options.Domain));
+        }
+
         var maxResults = Math.Clamp(_options.MaxResults, 5, 50);
         var timeoutSeconds = Math.Clamp(_options.QueryTimeoutSeconds, 2, 30);
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
 
         try
         {
+            // CA1416 nedokáže přes lambda boundary odvodit předchozí OperatingSystem guard.
+#pragma warning disable CA1416
             var users = await Task.Run(
-                () => ADConnector.GetADUsers(rawQuery, _options.Domain, maxResults * 2),
+                () => GetWindowsAdUsers(rawQuery, _options.Domain, maxResults * 2),
                 timeoutCts.Token);
+#pragma warning restore CA1416
 
             var ranked = RankResults(users, rawQuery, maxResults);
             return new ActiveDirectorySearchResponse
@@ -50,7 +60,7 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService
                 Results = ranked
             };
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             _logger.LogWarning("AD search timeout for query '{Query}'.", rawQuery);
             return NotAvailable(UnavailableMessage(_options.Domain));
@@ -91,6 +101,10 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService
             Results = Array.Empty<ActiveDirectoryPersonResult>()
         };
     }
+
+    [SupportedOSPlatform("windows")]
+    private static IReadOnlyList<ADInfo> GetWindowsAdUsers(string query, string? domain, int maxResults)
+        => ADConnector.GetADUsers(query, domain ?? string.Empty, maxResults);
 
     private static string UnavailableMessage(string? domain)
     {

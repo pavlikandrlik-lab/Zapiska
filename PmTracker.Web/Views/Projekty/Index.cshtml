@@ -5,55 +5,57 @@
     var canHideDeleted = Model.StavyProjektu.Any(x => string.Equals(x.Value, "DELETED", StringComparison.OrdinalIgnoreCase));
 }
 
-<section class="page-header">
-    <div>
-        <h1>Projekty</h1>
-        <p class="muted">Přehled projektů dostupných pro přihlášeného uživatele.</p>
-    </div>
-    <div class="projects-header-actions">
-        @if (Model.CanCreate)
-        {
-            <button class="btn primary" type="button" data-modal-url="@Url.Action("NewProjectModal", "Projekty")">Nový projekt</button>
-        }
-        @if (canHideDone || canHideDeleted)
-        {
-            <button class="filter-toggle project-filter-toggle"
-                    type="button"
-                    data-project-status-filter-toggle
-                    aria-expanded="false"
-                    aria-controls="project-status-filter-panel">
-                <span>Filtry</span>
-                <span class="filter-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 6h16l-6 7v5l-4-2v-3z"></path>
-                    </svg>
-                </span>
-            </button>
-            <div class="projects-status-filters-panel" id="project-status-filter-panel" data-project-status-filter-panel hidden>
-                @if (canHideDone)
-                {
-                    <label class="gov-switch">
-                        <input type="checkbox" data-project-status-hide="DONE" />
-                        <span class="gov-switch-track" aria-hidden="true">
-                            <span class="gov-switch-thumb"></span>
-                        </span>
-                        <span class="gov-switch-label">Skrýt hotové</span>
-                    </label>
-                }
-                @if (canHideDeleted)
-                {
-                    <label class="gov-switch">
-                        <input type="checkbox" data-project-status-hide="DELETED" />
-                        <span class="gov-switch-track" aria-hidden="true">
-                            <span class="gov-switch-thumb"></span>
-                        </span>
-                        <span class="gov-switch-label">Skrýt smazané</span>
-                    </label>
-                }
-            </div>
-        }
-    </div>
-</section>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = "Přehled projektů dostupných pro přihlášeného uživatele.",
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel
+})
+
+<div class="projects-header-actions">
+    @if (Model.CanCreate)
+    {
+        <button class="btn primary" type="button" data-modal-url="@Url.Action("NewProjectModal", "Projekty")">Nový projekt</button>
+    }
+    @if (canHideDone || canHideDeleted)
+    {
+        <button class="filter-toggle project-filter-toggle"
+                type="button"
+                data-project-status-filter-toggle
+                aria-expanded="false"
+                aria-controls="project-status-filter-panel">
+            <span>Filtry</span>
+            <span class="filter-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 6h16l-6 7v5l-4-2v-3z"></path>
+                </svg>
+            </span>
+        </button>
+        <div class="projects-status-filters-panel" id="project-status-filter-panel" data-project-status-filter-panel hidden>
+            @if (canHideDone)
+            {
+                <label class="gov-switch">
+                    <input type="checkbox" data-project-status-hide="DONE" />
+                    <span class="gov-switch-track" aria-hidden="true">
+                        <span class="gov-switch-thumb"></span>
+                    </span>
+                    <span class="gov-switch-label">Skrýt hotové</span>
+                </label>
+            }
+            @if (canHideDeleted)
+            {
+                <label class="gov-switch">
+                    <input type="checkbox" data-project-status-hide="DELETED" />
+                    <span class="gov-switch-track" aria-hidden="true">
+                        <span class="gov-switch-thumb"></span>
+                    </span>
+                    <span class="gov-switch-label">Skrýt smazané</span>
+                </label>
+            }
+        </div>
+    }
+</div>
 
 <section class="project-list-shell" data-project-list-shell>
     <section class="project-grid" data-project-grid>

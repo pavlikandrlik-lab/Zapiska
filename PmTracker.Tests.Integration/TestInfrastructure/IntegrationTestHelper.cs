@@ -1,12 +1,15 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Modules.Export;
-using PmTracker.Web.Modules.Export.Queries;
-using PmTracker.Web.Modules.Settings;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Export;
+using PmTracker.Web.Services.Settings;
 
 namespace PmTracker.Tests.Integration.TestInfrastructure;
 
@@ -21,141 +24,47 @@ internal static class IntegrationTestHelper
         return new PmTrackerDbContext(options);
     }
 
-    public static SqlServerDataStore CreateDataStore(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
+    public static IntegrationTestDataStore CreateDataStore(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
     {
-        var textNormalizer = new TextNormalizer();
-        var richTextContentService = new RichTextContentService();
-        var identityMatcher = new PersonIdentityMatcher(textNormalizer);
-        var permissionEvaluation = new PermissionEvaluationService();
-        var commentAuthorization = new CommentAuthorizationPolicy(permissionEvaluation);
-        var resolvedTimeProvider = timeProvider ?? TimeProvider.System;
-        var exportCommentProjectionBuilder = new ExportCommentProjectionBuilder(richTextContentService);
-        var exportRoleProjectionBuilder = new ExportRoleProjectionBuilder(dbContext, identityMatcher);
-        var exportAttendanceProjectionBuilder = new ExportAttendanceProjectionBuilder(dbContext, textNormalizer, identityMatcher);
-        var exportRecordVisibilityEvaluator = new ExportRecordVisibilityEvaluator();
-        var exportRecordProjectionBuilder = new ExportRecordProjectionBuilder(
-            dbContext,
-            richTextContentService,
-            identityMatcher,
-            exportCommentProjectionBuilder,
-            exportRecordVisibilityEvaluator);
-        var exportTemplateSummaryBuilder = new ExportTemplateSummaryBuilder();
-        var exportTemplateQueries = new ExportTemplateQueries(
-            dbContext,
-            exportRoleProjectionBuilder,
-            exportAttendanceProjectionBuilder,
-            exportRecordProjectionBuilder,
-            exportTemplateSummaryBuilder);
-        var exportTemplateUseCase = new ExportTemplateUseCase(exportTemplateQueries, resolvedTimeProvider);
-        var userAuthorizationSnapshotBuilder = new UserAuthorizationSnapshotBuilder(dbContext, textNormalizer);
-        var settingsAuthzQueries = new SettingsAuthzQueries(dbContext, userAuthorizationSnapshotBuilder, identityMatcher, textNormalizer);
-        var settingsAuthzCommands = new SettingsAuthzCommands(dbContext, resolvedTimeProvider);
-        var recordCommentCommandsUseCase = new RecordCommentCommandsUseCase(
-            dbContext,
-            richTextContentService,
-            commentAuthorization,
-            resolvedTimeProvider);
-        var profilePageQueriesUseCase = new ProfilePageQueriesUseCase(
-            dbContext,
-            userAuthorizationSnapshotBuilder);
-        var meetingListQueriesUseCase = new MeetingListQueriesUseCase(
-            dbContext,
-            textNormalizer,
-            identityMatcher);
-        var projectDetailQueriesUseCase = new ProjectDetailQueriesUseCase(dbContext);
-        var meetingDetailQueriesUseCase = new MeetingDetailQueriesUseCase(
-            dbContext,
-            meetingListQueriesUseCase,
-            textNormalizer,
-            identityMatcher);
-        var meetingWriteCommandsUseCase = new MeetingWriteCommandsUseCase(
-            dbContext,
-            textNormalizer,
-            recordCommentCommandsUseCase);
-        var projectListQueriesUseCase = new ProjectListQueriesUseCase(dbContext);
-        var projectCommandsUseCase = new ProjectCommandsUseCase(
-            dbContext,
-            textNormalizer);
-        var peoplePageQueriesUseCase = new PeoplePageQueriesUseCase(dbContext);
-        var dictionariesQueriesUseCase = new DictionariesQueriesUseCase(dbContext);
-        var dictionariesCommandsUseCase = new DictionariesCommandsUseCase(dbContext);
-        var personCommandsUseCase = new PersonCommandsUseCase(
-            dbContext,
-            textNormalizer);
-        var recordEditorQueriesUseCase = new RecordEditorQueriesUseCase(dbContext);
-        var recordWriteCommandsUseCase = new RecordWriteCommandsUseCase(
-            dbContext,
-            richTextContentService,
-            resolvedTimeProvider);
-        var projectAssignmentCommandsUseCase = new ProjectAssignmentCommandsUseCase(dbContext);
-
-        return new SqlServerDataStore(
-            dbContext,
-            textNormalizer,
-            richTextContentService,
-            identityMatcher,
-            commentAuthorization,
-            resolvedTimeProvider,
-            exportTemplateUseCase,
-            userAuthorizationSnapshotBuilder,
-            settingsAuthzQueries,
-            settingsAuthzCommands,
-            recordCommentCommandsUseCase,
-            profilePageQueriesUseCase,
-            meetingListQueriesUseCase,
-            meetingDetailQueriesUseCase,
-            meetingWriteCommandsUseCase,
-            projectListQueriesUseCase,
-            projectCommandsUseCase,
-            projectDetailQueriesUseCase,
-            peoplePageQueriesUseCase,
-            dictionariesQueriesUseCase,
-            dictionariesCommandsUseCase,
-            personCommandsUseCase,
-            recordEditorQueriesUseCase,
-            recordWriteCommandsUseCase,
-            projectAssignmentCommandsUseCase);
+        return new IntegrationTestDataStore(BuildServiceProvider(dbContext, timeProvider));
     }
 
-    public static ExportTemplateUseCase CreateExportTemplateUseCase(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
+    public static IExportTemplateUseCase CreateExportTemplateUseCase(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
     {
-        var textNormalizer = new TextNormalizer();
-        var richTextContentService = new RichTextContentService();
-        var identityMatcher = new PersonIdentityMatcher(textNormalizer);
-        var exportCommentProjectionBuilder = new ExportCommentProjectionBuilder(richTextContentService);
-        var exportRoleProjectionBuilder = new ExportRoleProjectionBuilder(dbContext, identityMatcher);
-        var exportAttendanceProjectionBuilder = new ExportAttendanceProjectionBuilder(dbContext, textNormalizer, identityMatcher);
-        var exportRecordVisibilityEvaluator = new ExportRecordVisibilityEvaluator();
-        var exportRecordProjectionBuilder = new ExportRecordProjectionBuilder(
-            dbContext,
-            richTextContentService,
-            identityMatcher,
-            exportCommentProjectionBuilder,
-            exportRecordVisibilityEvaluator);
-        var exportTemplateSummaryBuilder = new ExportTemplateSummaryBuilder();
-        return new ExportTemplateUseCase(
-            new ExportTemplateQueries(
-                dbContext,
-                exportRoleProjectionBuilder,
-                exportAttendanceProjectionBuilder,
-                exportRecordProjectionBuilder,
-                exportTemplateSummaryBuilder),
-            timeProvider ?? TimeProvider.System);
+        return BuildServiceProvider(dbContext, timeProvider).GetRequiredService<IExportTemplateUseCase>();
     }
 
-    public static SettingsAuthzQueries CreateSettingsAuthzQueries(PmTrackerDbContext dbContext)
+    public static ISettingsAuthzQueries CreateSettingsAuthzQueries(PmTrackerDbContext dbContext)
     {
-        var textNormalizer = new TextNormalizer();
-        var identityMatcher = new PersonIdentityMatcher(textNormalizer);
-        return new SettingsAuthzQueries(
-            dbContext,
-            new UserAuthorizationSnapshotBuilder(dbContext, textNormalizer),
-            identityMatcher,
-            textNormalizer);
+        return BuildServiceProvider(dbContext).GetRequiredService<ISettingsAuthzQueries>();
     }
 
-    public static SettingsAuthzCommands CreateSettingsAuthzCommands(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
-        => new(dbContext, timeProvider ?? TimeProvider.System);
+    public static ISettingsAuthzCommands CreateSettingsAuthzCommands(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
+        => BuildServiceProvider(dbContext, timeProvider).GetRequiredService<ISettingsAuthzCommands>();
+
+    private static IServiceProvider BuildServiceProvider(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:PmTracker"] = "Server=(localdb)\\mssqllocaldb;Database=PmTracker.Tests;Trusted_Connection=True;TrustServerCertificate=True;",
+                ["PmTrackerData:Provider"] = "SqlServer",
+                ["PmTrackerData:SqlServer:ConnectionStringName"] = "PmTracker",
+                ["PmTrackerData:SqlServer:CommandTimeoutSeconds"] = "30"
+            })
+            .Build();
+        var environment = new TestWebHostEnvironment();
+
+        services.AddLogging();
+        services.AddSingleton<IWebHostEnvironment>(environment);
+        services.AddSingleton<IHostEnvironment>(environment);
+        services.AddPmTrackerDataStore(configuration);
+        services.AddSingleton(dbContext);
+        services.AddSingleton(timeProvider ?? TimeProvider.System);
+
+        return services.BuildServiceProvider();
+    }
 
     public static CurrentUserContextViewModel BuildUser(
         int osobaId,
@@ -380,9 +289,14 @@ internal static class IntegrationTestHelper
             .Select(x => x.Id)
             .FirstAsync();
         var taskStateId = await dbContext.CiselnikStavuUkolu
+            .Where(x => !x.IsFinal)
             .OrderBy(x => x.Id)
-            .Select(x => x.Id)
-            .FirstAsync();
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync()
+            ?? await dbContext.CiselnikStavuUkolu
+                .OrderBy(x => x.Id)
+                .Select(x => x.Id)
+                .FirstAsync();
         var schemaVersion = await dbContext.HarmonogramSablony
             .OrderByDescending(x => x.IsAktivni)
             .ThenByDescending(x => x.Verze)

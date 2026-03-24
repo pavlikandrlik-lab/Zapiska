@@ -1,72 +1,72 @@
 using FluentAssertions;
+using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Dictionaries;
 
 namespace PmTracker.Tests.Unit.Dictionaries;
 
-public sealed class DictionariesServiceTests
+public sealed class DictionaryServiceTests
 {
     [Fact]
-    public void BuildCiselnikyDashboard_ShouldDelegateToDataStore()
+    public async Task SaveHarmonogramStepRowAsync_ShouldDelegateToHarmonogramService()
     {
-        var expected = new CiselnikyDashboardViewModel
+        var harmonogramService = new FakeHarmonogramService();
+        var sut = new DictionaryService(null!, harmonogramService);
+        var command = new SaveCiselnikRowCommand
         {
-            Ciselniky = [],
-            VybranyCiselnik = new CiselnikDetailViewModel
-            {
-                Key = "test",
-                Nazev = "Test",
-                SloupceNavic = [],
-                Polozky = []
-            }
+            Key = "harmonogram-kroky",
+            Kod = "K1",
+            Nazev = "Krok 1"
         };
-        var dataStore = new FakeDictionariesDataStore(expected);
-        var sut = new DictionariesService(dataStore);
-        var user = BuildUser();
 
-        var result = sut.BuildCiselnikyDashboard("test", user);
+        await sut.SaveHarmonogramStepRowAsync(command);
 
-        result.Should().BeSameAs(expected);
-        dataStore.LastDashboardUser.Should().BeSameAs(user);
+        harmonogramService.LastSaveCommand.Should().BeSameAs(command);
     }
 
-    private static CurrentUserContextViewModel BuildUser()
+    [Fact]
+    public async Task DeleteHarmonogramStepRowAsync_ShouldDelegateToHarmonogramService()
     {
-        return new CurrentUserContextViewModel
+        var harmonogramService = new FakeHarmonogramService();
+        var sut = new DictionaryService(null!, harmonogramService);
+        var command = new DeleteCiselnikRowCommand
         {
-            OsobaId = 17,
-            Jmeno = "Unit",
-            Prijmeni = "Tester",
-            DisplayName = "Unit Tester",
-            Email = "unit@test.local",
-            OrganizacniCelek = "QA",
-            OrganizacniCelekKod = "QA",
-            IsSuperAdmin = true,
-            RoleKody = [],
-            VisibleProjectIds = [],
-            DeletedProjectIds = [],
-            PermissionGrants = []
+            Key = "harmonogram-kroky",
+            Id = 17
         };
+
+        await sut.DeleteHarmonogramStepRowAsync(command);
+
+        harmonogramService.LastDeleteCommand.Should().BeSameAs(command);
     }
 
-    private sealed class FakeDictionariesDataStore(CiselnikyDashboardViewModel dashboard) : IDictionariesDataStore
+    private sealed class FakeHarmonogramService : IHarmonogramService
     {
-        public CurrentUserContextViewModel? LastDashboardUser { get; private set; }
+        public SaveCiselnikRowCommand? LastSaveCommand { get; private set; }
+        public DeleteCiselnikRowCommand? LastDeleteCommand { get; private set; }
 
-        public CiselnikyDashboardViewModel BuildCiselnikyDashboard(string? id, CurrentUserContextViewModel currentUser)
+        public Task<HarmonogramSchemaDefinition> GetActiveHarmonogramSchemaAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<HarmonogramSchemaDefinition> GetSchemaForRecordAsync(ProjektovyZaznamEntity record, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<HarmonogramSchemaDefinition> GetSchemaForRecordAsync(int schemaVersion, CancellationToken ct = default) => throw new NotSupportedException();
+        public IReadOnlyList<RecordScheduleTypeDefinition> BuildRecordScheduleTypeDefinitions(HarmonogramSchemaDefinition schema) => throw new NotSupportedException();
+        public IReadOnlyList<HarmonogramVypocetKroku> BuildHarmonogramVypocetPublic(DateTime datumZalozeni, IReadOnlyList<HarmonogramTypPar> typy, IReadOnlyDictionary<int, int>? hodnoty) => throw new NotSupportedException();
+        public HarmonogramSouhrnViewModel BuildHarmonogramSouhrn(IReadOnlyList<HarmonogramVypocetKroku> kroky, DateTime terminUkolu) => throw new NotSupportedException();
+        public Task<int> EnsurePersistedActiveHarmonogramSchemaVersionAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CiselnikDetailViewModel> BuildHarmonogramKrokyCiselnikDetailAsync(string key, bool canChangeLockState, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> CountHarmonogramCatalogRowsAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CiselnikDetailViewModel> BuildCiselnikDetailAsync(string id, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();
+
+        public Task SaveHarmonogramStepRowAsync(SaveCiselnikRowCommand command, CancellationToken ct = default)
         {
-            LastDashboardUser = currentUser;
-            return dashboard;
+            LastSaveCommand = command;
+            return Task.CompletedTask;
         }
 
-        public CiselnikDetailViewModel BuildCiselnikDetail(string id, CurrentUserContextViewModel currentUser) => dashboard.VybranyCiselnik;
-
-        public void SaveCiselnikRow(SaveCiselnikRowCommand command, CurrentUserContextViewModel currentUser)
+        public Task DeleteHarmonogramStepRowAsync(DeleteCiselnikRowCommand command, CancellationToken ct = default)
         {
-        }
-
-        public void DeleteCiselnikRow(DeleteCiselnikRowCommand command, CurrentUserContextViewModel currentUser)
-        {
+            LastDeleteCommand = command;
+            return Task.CompletedTask;
         }
     }
 }

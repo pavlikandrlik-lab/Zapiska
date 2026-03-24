@@ -1,12 +1,5 @@
 @model CiselnikDetailViewModel
 @{
-    var isArchitect = ViewBag.IsGlobalAdmin as bool? ?? false;
-    var userContext = ViewBag.CurrentUserContext as CurrentUserContextViewModel;
-    var canEditCiselnik = userContext?.HasPermission(PermissionKeys.CiselnikyEdit) ?? false;
-    var isSubsystemCiselnik = string.Equals(Model.Key, "subsystemy", StringComparison.OrdinalIgnoreCase);
-    var isHarmonogramCiselnik = string.Equals(Model.Key, "harmonogram-kroky", StringComparison.OrdinalIgnoreCase);
-    var canEditThisCiselnik = canEditCiselnik && (!isHarmonogramCiselnik || isArchitect);
-
     static (string DisplayLabel, string Email) SplitPersonLabel(string rawLabel)
     {
         if (string.IsNullOrWhiteSpace(rawLabel))
@@ -27,18 +20,20 @@
     }
 }
 
-<section class="page-header">
-    <div>
-        <h2>@Model.Nazev</h2>
-        <p class="muted">Klíč: @Model.Key</p>
-    </div>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = $"Klíč: {Model.Key}",
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel
+})
+
+@if (Model.CanEditThisCiselnik && Model.CanCreate)
+{
     <div class="header-actions">
-        @if (canEditThisCiselnik && Model.CanCreate)
-        {
-            <a class="btn primary" href="#ciselnik-novy-radek">Nová položka</a>
-        }
+        <a class="btn primary" href="#ciselnik-novy-radek">Nová položka</a>
     </div>
-</section>
+}
 
 <section class="card">
     <table class="table">
@@ -66,7 +61,7 @@
                 @foreach (var hodnota in polozka.HodnotyNavic)
                 {
                     <td>
-                        @if (isHarmonogramCiselnik && !string.IsNullOrWhiteSpace(hodnota))
+                        @if (Model.IsHarmonogramCiselnik && !string.IsNullOrWhiteSpace(hodnota))
                         {
                             <span class="ciselnik-color-chip">
                                 <span class="ciselnik-color-swatch" style="background:@hodnota;" aria-hidden="true"></span>
@@ -90,7 +85,7 @@
                     }
                 </td>
                 <td class="table-actions">
-                    @if (canEditThisCiselnik)
+                    @if (Model.CanEditThisCiselnik)
                     {
                         <div class="table-actions-inline">
                             <button class="btn small" type="button" data-modal-url="@Url.Action("EditRow", "Ciselniky", new { key = Model.Key, id = polozka.Id })" disabled="@((locked && !polozka.CanChangeLockState) || !polozka.CanEdit)">Upravit</button>
@@ -115,7 +110,7 @@
     </table>
 </section>
 
-@if (canEditThisCiselnik && Model.CanCreate)
+@if (Model.CanEditThisCiselnik && Model.CanCreate)
 {
     <section class="card" id="ciselnik-novy-radek">
         <h3>Nová položka</h3>
@@ -133,7 +128,7 @@
             {
                 <label>
                     @Model.SloupceNavic[0]
-                    @if (isSubsystemCiselnik && Model.IsHodnotaNavicSelect)
+                    @if (Model.IsSubsystemCiselnik && Model.IsHodnotaNavicSelect)
                     {
                         <div class="office-picker"
                              data-person-picker="single"
@@ -169,7 +164,7 @@
                     }
                     else
                     {
-                        if (isHarmonogramCiselnik)
+                        if (Model.IsHarmonogramCiselnik)
                         {
                             <input type="color" name="HodnotyNavic[0]" value="#EF4444" />
                         }
@@ -180,7 +175,7 @@
                     }
                 </label>
             }
-            @if (!isSubsystemCiselnik && !isHarmonogramCiselnik && Model.CanChangeLockState)
+            @if (!Model.IsSubsystemCiselnik && !Model.IsHarmonogramCiselnik && Model.CanChangeLockState)
             {
                 <label class="filter-inline">
                     <input type="checkbox" name="IsLocked" value="true" />

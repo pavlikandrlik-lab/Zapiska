@@ -3,43 +3,6 @@
 @{
     Layout = null;
 
-    var variant = (Model.ExportVariant ?? "project_all").Trim().ToLowerInvariant();
-    var isMeeting = variant == "meeting";
-    var isProjectSummary = variant == "project_all";
-
-    var title = variant switch
-    {
-        "meeting" => $"Zápis z jednání projektu {Model.ProjektNazev} číslo {Model.JednaniCislo}",
-        "task_single" => $"Zápis úkolu projektu {Model.ProjektNazev}",
-        _ => $"Souhrnný zápis projektu {Model.ProjektNazev}"
-    };
-
-    var subsystemGroups = Model.Zaznamy
-        .GroupBy(x => x.Subsystem)
-        .OrderBy(x => x.Key, StringComparer.CurrentCultureIgnoreCase)
-        .ToList();
-
-    static int CategoryOrder(string? category)
-    {
-        var normalized = (category ?? string.Empty).Trim().ToLowerInvariant();
-        if (normalized.Contains("info"))
-        {
-            return 1;
-        }
-
-        if (normalized.Contains("rozh"))
-        {
-            return 2;
-        }
-
-        if (normalized.Contains("ukol") || normalized.Contains("úkol"))
-        {
-            return 3;
-        }
-
-        return 4;
-    }
-
     static (string Header, string Details) SplitExternalLinkDisplay(string value)
     {
         var normalized = (value ?? string.Empty).Trim();
@@ -57,7 +20,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@title</title>
+    <title>@Model.DocumentTitle</title>
     <style>
         :root {
             color-scheme: light;
@@ -580,10 +543,10 @@
 <body>
     <div class="print-sheet">
         <header class="sheet-head">
-            <h1 class="sheet-head-title">@title</h1>
+            <h1 class="sheet-head-title">@Model.DocumentTitle</h1>
             <div class="sheet-head-meta">
                 <div><strong>Projekt:</strong> @Model.ProjektNazev (@Model.ProjektZkratka)</div>
-                @if (isMeeting)
+                @if (Model.IsMeeting)
                 {
                     <div><strong>Jednání:</strong> č. @Model.JednaniCislo</div>
                     <div><strong>Datum:</strong> @Model.JednaniDatum?.ToString("dd.MM.yyyy")</div>
@@ -592,12 +555,12 @@
                 }
                 else
                 {
-                    <div><strong>Typ výstupu:</strong> @(variant == "task_single" ? "Jeden úkol" : "Kompletní projekt")</div>
+                    <div><strong>Typ výstupu:</strong> @Model.ExportTypeLabel</div>
                 }
                 <div><strong>Generoval:</strong> @Model.Vytvoril</div>
                 <div><strong>Vytvořeno:</strong> @Model.VytvorenoDne.ToString("dd.MM.yyyy HH:mm")</div>
             </div>
-            @if (!isMeeting && Model.ProjektoveRole.Count > 0)
+            @if (!Model.IsMeeting && Model.ProjektoveRole.Count > 0)
             {
                 <div class="project-roles">
                     <div class="project-roles-head">
@@ -645,7 +608,7 @@
                 </tr>
             </thead>
             <tbody>
-                @if (subsystemGroups.Count == 0)
+                @if (Model.SubsystemGroups.Count == 0)
                 {
                     <tr>
                         <td colspan="3" class="cell-empty">Žádná data k tisku.</td>
@@ -653,21 +616,13 @@
                 }
                 else
                 {
-                    @foreach (var subsystemGroup in subsystemGroups)
+                    @foreach (var subsystemGroup in Model.SubsystemGroups)
                     {
                         <tr class="subsystem-row">
-                            <td colspan="3">Subsystém: @subsystemGroup.Key</td>
+                            <td colspan="3">Subsystém: @subsystemGroup.Subsystem</td>
                         </tr>
 
-                        var orderedRecords = subsystemGroup
-                            .OrderBy(record => CategoryOrder(record.Kategorie))
-                            .ThenBy(record => record.Kategorie, StringComparer.CurrentCultureIgnoreCase)
-                            .ThenBy(record => record.CisloViditelneA)
-                            .ThenBy(record => record.CisloViditelneB)
-                            .ThenBy(record => record.CisloZaznamu)
-                            .ToList();
-
-                        foreach (var zaznam in orderedRecords)
+                        foreach (var zaznam in subsystemGroup.Records)
                         {
                             var recordCode = string.IsNullOrWhiteSpace(zaznam.TypUkoluKod)
                                 ? (string.IsNullOrWhiteSpace(zaznam.KategorieKod) ? "-" : zaznam.KategorieKod)

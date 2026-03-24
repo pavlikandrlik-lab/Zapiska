@@ -1,9 +1,0 @@
-using PmTracker.Web.Models.ViewModels;
-
-namespace PmTracker.Web.Modules.Meetings.Queries;
-
-public sealed class BuildProjektDetailQueryHandler(IMeetingsDataStore dataStore) : IBuildProjektDetailQueryHandler
-{
-    public ProjektDetailViewModel Handle(int id)
-        => dataStore.BuildProjektDetail(id);
-}

@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Integration.TestInfrastructure;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Modules.Export;
 
 namespace PmTracker.Tests.Integration.Export;
 
@@ -18,12 +17,11 @@ public sealed class ExportTemplateUseCaseTests
     }
 
     [Fact]
-    public async Task BuildMeetingTemplate_ShouldMatchDataStoreDelegation()
+    public async Task BuildMeetingTemplate_ShouldBuildMeetingSnapshotWithResolvedMetadata()
     {
         var db = await _fixture.CreateDatabaseAsync("export_use_case_delegate");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
         var fixedTimeProvider = new FixedTimeProvider(new DateTimeOffset(2026, 7, 1, 8, 30, 0, TimeSpan.Zero));
-        var store = IntegrationTestHelper.CreateDataStore(dbContext, fixedTimeProvider);
         var useCase = IntegrationTestHelper.CreateExportTemplateUseCase(dbContext, fixedTimeProvider);
 
         var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportUseCaseAdmin");
@@ -48,10 +46,19 @@ public sealed class ExportTemplateUseCaseTests
         });
         await dbContext.SaveChangesAsync();
 
-        var fromUseCase = useCase.BuildMeetingTemplate(meetingId, currentUser, autoPrint: false);
-        var fromDataStore = store.BuildMeetingPrintTemplate(meetingId, currentUser, autoPrint: false);
+        var model = await useCase.BuildMeetingTemplateAsync(meetingId, currentUser, autoPrint: false);
 
-        fromDataStore.Should().BeEquivalentTo(fromUseCase);
+        model.ExportVariant.Should().Be("meeting");
+        model.AutoPrint.Should().BeFalse();
+        model.ProjektId.Should().Be(projectId);
+        model.JednaniId.Should().Be(meetingId);
+        model.JednaniCislo.Should().Be(9501);
+        model.Vytvoril.Should().Be(currentUser.DisplayName);
+        model.VytvorenoDne.Should().Be(fixedTimeProvider.GetLocalNow().LocalDateTime);
+        model.Zaznamy.Should().ContainSingle(item => item.ZaznamId == recordId);
+        model.Zaznamy.Single(item => item.ZaznamId == recordId)
+            .Vyjadreni.Should()
+            .ContainSingle(comment => comment.Text.Contains("Export use case comment", StringComparison.Ordinal));
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset localNow) : TimeProvider

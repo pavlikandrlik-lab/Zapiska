@@ -1,6 +1,6 @@
 using FluentAssertions;
 using PmTracker.Web.Models.Entities;
-using PmTracker.Web.Modules.Export.Queries;
+using PmTracker.Web.Services.Export.Queries;
 using PmTracker.Web.Services.Common;
 
 namespace PmTracker.Tests.Unit.Export;

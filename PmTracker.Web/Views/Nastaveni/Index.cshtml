@@ -3,12 +3,13 @@
     ViewData["Title"] = "Nastavení";
 }
 
-<section class="page-header">
-    <div>
-        <h1>Nastavení</h1>
-        <p class="muted">Správa rolí, oprávnění a mapování přístupů.</p>
-    </div>
-</section>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = "Správa rolí, oprávnění a mapování přístupů.",
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel
+})
 
 <div class="settings-layout" data-settings-shell data-panel-url="@Url.Action("Panel", "Nastaveni")">
     <aside class="settings-sidebar card">

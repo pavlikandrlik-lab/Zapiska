@@ -1,9 +1,8 @@
 using Microsoft.AspNetCore.Server.IISIntegration;
 using PmTracker.Web.Filters;
-using PmTracker.Web.Middleware;
-using PmTracker.Web.Modules;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,10 +14,15 @@ builder.Services.AddAuthentication(IISDefaults.AuthenticationScheme);
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
 builder.Services
-    .AddPmTrackerDataStore(builder.Configuration)
-    .AddPmTrackerModules();
+    .AddPmTrackerDataStore(builder.Configuration);
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var permissionSeeder = scope.ServiceProvider.GetRequiredService<PermissionSeeder>();
+    await permissionSeeder.SeedAsync(CancellationToken.None);
+}
 
 if (!app.Environment.IsDevelopment())
 {
@@ -40,7 +44,6 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
-app.UseMiddleware<AjaxResponseContractGuardMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();

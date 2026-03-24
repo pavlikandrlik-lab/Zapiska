@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.ActiveDirectory;
 using PmTracker.Web.Services.People;
@@ -13,22 +14,26 @@ public sealed class OsobyController : BaseController
 
     public OsobyController(
         IUserContextResolver userContextResolver,
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory,
         IActiveDirectoryService activeDirectoryService,
         IPeopleService peopleService)
-        : base(userContextResolver)
+        : base(userContextResolver, timeProvider, loggerFactory)
     {
         _activeDirectoryService = activeDirectoryService;
         _peopleService = peopleService;
     }
 
-    public IActionResult Index()
+    public async Task<IActionResult> Index(CancellationToken ct)
     {
-        var model = _peopleService.BuildOsoby();
+        var model = AttachCurrentUser(await _peopleService.BuildOsobyAsync(ct));
+        model.PageTitle = "Osoby";
+        model.CanManagePeople = CurrentUserContext.HasPermission(PermissionKeys.PeopleManage);
         return View(model);
     }
 
     [HttpGet]
-    public IActionResult AdPersonModal()
+    public async Task<IActionResult> AdPersonModal(CancellationToken ct)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.PeopleManage))
         {
@@ -36,7 +41,7 @@ public sealed class OsobyController : BaseController
         }
 
         var searchUrl = Url.Action(nameof(SearchAd), "Osoby") ?? "/Osoby/SearchAd";
-        var osobyModel = _peopleService.BuildOsoby();
+        var osobyModel = await _peopleService.BuildOsobyAsync(ct);
         var model = new AdPersonModalViewModel
         {
             Title = "Přidat osobu z AD",
@@ -49,14 +54,14 @@ public sealed class OsobyController : BaseController
     }
 
     [HttpGet]
-    public IActionResult ManualPersonModal(int? id)
+    public async Task<IActionResult> ManualPersonModal(int? id, CancellationToken ct)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.PeopleManage))
         {
             return Forbid();
         }
 
-        var osobyModel = _peopleService.BuildOsoby();
+        var osobyModel = await _peopleService.BuildOsobyAsync(ct);
         OsobaListItemViewModel? osoba = null;
 
         if (id.HasValue)
@@ -97,14 +102,14 @@ public sealed class OsobyController : BaseController
     }
 
     [HttpGet]
-    public async Task<IActionResult> SearchAd([FromQuery(Name = "q")] string? query, CancellationToken cancellationToken)
+    public async Task<IActionResult> SearchAd([FromQuery(Name = "q")] string? query, CancellationToken ct)
     {
         if (!CurrentUserContext.HasPermission(PermissionKeys.PeopleManage))
         {
             return Forbid();
         }
 
-        var response = await _activeDirectoryService.SearchUsersAsync(query, cancellationToken);
+        var response = await _activeDirectoryService.SearchUsersAsync(query, ct);
 
         return Json(new
         {
@@ -129,52 +134,52 @@ public sealed class OsobyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveManual(SaveManualPersonCommand command)
+    public async Task<IActionResult> SaveManual(SaveManualPersonCommand command, CancellationToken ct = default)
     {
-        return ExecuteValidatedCommand(
+        return await ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.PeopleManage),
             invalidAjaxMessage: "Osobu nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
-            onSuccessRedirect: () => RedirectToAction(nameof(Index)),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Index))),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "osoby-index",
                 refreshUrl: Url.Action(nameof(Index), "Osoby"),
-                message: "Osoba byla uložena."),
-            operation: () => _peopleService.SaveManualPerson(command, CurrentUserContext));
+                message: "Osoba byla uložena.")),
+            operation: () => _peopleService.SaveManualPersonAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult SaveAd(SaveAdPersonCommand command)
+    public async Task<IActionResult> SaveAd(SaveAdPersonCommand command, CancellationToken ct = default)
     {
-        return ExecuteValidatedCommand(
+        return await ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.PeopleManage),
             invalidAjaxMessage: "AD osobu nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
-            onSuccessRedirect: () => RedirectToAction(nameof(Index)),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Index))),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "osoby-index",
                 refreshUrl: Url.Action(nameof(Index), "Osoby"),
-                message: "AD osoba byla uložena."),
-            operation: () => _peopleService.SaveAdPerson(command, CurrentUserContext));
+                message: "AD osoba byla uložena.")),
+            operation: () => _peopleService.SaveAdPersonAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Delete(DeletePersonCommand command)
+    public async Task<IActionResult> Delete(DeletePersonCommand command, CancellationToken ct = default)
     {
-        return ExecuteValidatedCommand(
+        return await ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.PeopleManage),
             invalidAjaxMessage: "Osobu nelze odstranit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
-            onSuccessRedirect: () => RedirectToAction(nameof(Index)),
-            onAjaxSuccess: () => AjaxSuccessResult(
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Index))),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "osoby-index",
                 refreshUrl: Url.Action(nameof(Index), "Osoby"),
-                message: "Osoba byla odstraněna."),
-            operation: () => _peopleService.DeletePerson(command, CurrentUserContext));
+                message: "Osoba byla odstraněna.")),
+            operation: () => _peopleService.DeletePersonAsync(command, CurrentUserContext, ct));
     }
 }

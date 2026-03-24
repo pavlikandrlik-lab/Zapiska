@@ -1,7 +1,10 @@
 namespace PmTracker.Web.Models.ViewModels;
 
-public sealed class NastaveniDashboardViewModel
+public sealed class NastaveniDashboardViewModel : BaseViewModel
 {
+    public string PageTitle { get; set; } = string.Empty;
+    public string? BackUrl { get; set; }
+    public string? BackLabel { get; set; }
     public required IReadOnlyList<NastaveniSectionItemViewModel> Sekce { get; init; }
     public required NastaveniPanelViewModel AktivniPanel { get; init; }
     public int? SelectedUserId { get; init; }
@@ -16,8 +19,11 @@ public sealed class NastaveniSectionItemViewModel
     public int Pocet { get; init; }
 }
 
-public sealed class NastaveniPanelViewModel
+public sealed class NastaveniPanelViewModel : BaseViewModel
 {
+    public string PageTitle { get; set; } = string.Empty;
+    public string? BackUrl { get; set; }
+    public string? BackLabel { get; set; }
     public required string SectionKey { get; init; }
     public required string Nazev { get; init; }
     public required string Popis { get; init; }
@@ -28,6 +34,7 @@ public sealed class NastaveniPanelViewModel
     public required IReadOnlyList<UserRoleAssignmentViewModel> UserRoles { get; init; }
     public required EffectivePermissionsPreviewViewModel EffectivePermissions { get; init; }
     public required IReadOnlyList<NastaveniProjektItemViewModel> Projekty { get; init; }
+    public bool CanManageSettings { get; set; }
 }
 
 public sealed class PermissionCategoryViewModel

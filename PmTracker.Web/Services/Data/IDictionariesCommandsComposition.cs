@@ -4,9 +4,9 @@ namespace PmTracker.Web.Services.Data;
 
 public interface IDictionariesCommandsComposition
 {
-    CiselnikDetailViewModel BuildCiselnikDetail(string id, CurrentUserContextViewModel currentUser);
+    Task<CiselnikDetailViewModel> BuildCiselnikDetailAsync(string id, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
 
-    void SaveHarmonogramStepRow(SaveCiselnikRowCommand command);
+    Task SaveHarmonogramStepRowAsync(SaveCiselnikRowCommand command, CancellationToken ct = default);
 
-    void DeleteHarmonogramStepRow(DeleteCiselnikRowCommand command);
+    Task DeleteHarmonogramStepRowAsync(DeleteCiselnikRowCommand command, CancellationToken ct = default);
 }

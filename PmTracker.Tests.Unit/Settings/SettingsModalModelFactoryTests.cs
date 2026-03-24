@@ -1,6 +1,6 @@
 using FluentAssertions;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Modules.Settings;
+using PmTracker.Web.Services.Settings;
 
 namespace PmTracker.Tests.Unit.Settings;
 

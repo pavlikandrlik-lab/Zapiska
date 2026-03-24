@@ -45,7 +45,7 @@ public sealed class UserContextResolver : IUserContextResolver
         _personIdentityMatcher = personIdentityMatcher;
     }
 
-    public async Task<UserContextResolutionResult> ResolveAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
+    public async Task<UserContextResolutionResult> ResolveAsync(HttpContext httpContext, CancellationToken ct = default)
     {
         int? osobaId = null;
 
@@ -54,7 +54,7 @@ public sealed class UserContextResolver : IUserContextResolver
             var asUser = httpContext.Request.Query["asUser"].ToString();
             if (!string.IsNullOrWhiteSpace(asUser))
             {
-                osobaId = await ResolveOsobaIdFromAsUserAsync(asUser, cancellationToken);
+                osobaId = await ResolveOsobaIdFromAsUserAsync(asUser, ct);
                 if (!osobaId.HasValue)
                 {
                     return UserContextResolutionResult.Forbidden($"Uživatel '{asUser}' nebyl nalezen v tabulce osoby.");
@@ -73,7 +73,7 @@ public sealed class UserContextResolver : IUserContextResolver
                         .AsNoTracking()
                         .OrderBy(x => x.Id)
                         .Select(x => (int?)x.Id)
-                        .FirstOrDefaultAsync(cancellationToken);
+                        .FirstOrDefaultAsync(ct);
 
                     if (!osobaId.HasValue)
                     {
@@ -97,7 +97,7 @@ public sealed class UserContextResolver : IUserContextResolver
                         .AsNoTracking()
                         .Where(x => x.GuidAd == objectGuid)
                         .Select(x => (int?)x.Id)
-                        .FirstOrDefaultAsync(cancellationToken);
+                        .FirstOrDefaultAsync(ct);
                 }
 
                 if (!osobaId.HasValue)
@@ -113,7 +113,7 @@ public sealed class UserContextResolver : IUserContextResolver
                                 x.Id,
                                 x.AdLogin
                             })
-                            .ToListAsync(cancellationToken);
+                            .ToListAsync(ct);
 
                         osobaId = people
                             .FirstOrDefault(person => LoginEquals(person.AdLogin, loginCandidates))
@@ -142,7 +142,7 @@ public sealed class UserContextResolver : IUserContextResolver
                 x.AdLogin,
                 x.OrganizacniCelekId
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(ct);
 
         if (osoba is null)
         {
@@ -153,7 +153,7 @@ public sealed class UserContextResolver : IUserContextResolver
             .AsNoTracking()
             .Where(x => x.Id == osoba.OrganizacniCelekId)
             .Select(x => new { x.Kod, x.Nazev })
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(ct);
 
         var roleCodes = await (
                 from ur in _dbContext.AuthzUserRoles.AsNoTracking()
@@ -162,11 +162,11 @@ public sealed class UserContextResolver : IUserContextResolver
                 orderby role.Kod
                 select role.Kod)
             .Distinct()
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
 
         var isSuperAdmin = await _dbContext.AuthzSuperadmins
             .AsNoTracking()
-            .AnyAsync(x => x.OsobaId == osoba.Id, cancellationToken);
+            .AnyAsync(x => x.OsobaId == osoba.Id, ct);
 
         if (!isSuperAdmin)
         {
@@ -186,7 +186,7 @@ public sealed class UserContextResolver : IUserContextResolver
                     rp.IsAllowed,
                     RolePermissionId = rp.Id
                 })
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
 
         var rolePermissionIds = grantsRaw
             .Where(x => string.Equals(x.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase))
@@ -201,7 +201,7 @@ public sealed class UserContextResolver : IUserContextResolver
             .ToDictionaryAsync(
                 group => group.Key,
                 group => (IReadOnlyList<int>)group.Select(item => item.ProjektId).Distinct().ToList(),
-                cancellationToken);
+                ct);
 
         var grants = grantsRaw
             .Select(raw => new PermissionGrantViewModel
@@ -227,7 +227,7 @@ public sealed class UserContextResolver : IUserContextResolver
                     RoleCode = role.Kod,
                     ProjectId = assignment.ProjektId
                 })
-            .ToListAsync(cancellationToken));
+            .ToListAsync(ct));
         grants.AddRange(implicitProjectRoleGrants);
 
         var implicitSubsystemRoleGrants = SubsystemRolePermissionGrantBuilder.BuildImplicitSubsystemRoleGrants(
@@ -243,14 +243,14 @@ public sealed class UserContextResolver : IUserContextResolver
                     RoleCode = role.Kod,
                     ProjectId = projectSubsystem.ProjektId
                 })
-            .ToListAsync(cancellationToken));
+            .ToListAsync(ct));
         grants.AddRange(implicitSubsystemRoleGrants);
 
         var projectRoleProjectIds = await _dbContext.ObsazeniProjektu
             .AsNoTracking()
             .Where(x => x.OsobaId == osoba.Id && !x.DatumOdebrani.HasValue)
             .Select(x => x.ProjektId)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
 
         var subsystemRoleProjectIds = await (
                 from role in _dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
@@ -259,7 +259,7 @@ public sealed class UserContextResolver : IUserContextResolver
                     && !role.DatumOdebrani.HasValue
                     && !projectSubsystem.DatumOdebrani.HasValue
                 select projectSubsystem.ProjektId)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
 
         var visibleProjectIds = projectRoleProjectIds
             .Concat(subsystemRoleProjectIds)
@@ -279,7 +279,7 @@ public sealed class UserContextResolver : IUserContextResolver
                     status.Kod,
                     status.Nazev
                 })
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
 
         var resolvedDeletedProjectIds = deletedProjectIds
             .Where(x =>
@@ -311,14 +311,14 @@ public sealed class UserContextResolver : IUserContextResolver
         return UserContextResolutionResult.Success(context);
     }
 
-    private async Task<int?> ResolveOsobaIdFromAsUserAsync(string asUser, CancellationToken cancellationToken)
+    private async Task<int?> ResolveOsobaIdFromAsUserAsync(string asUser, CancellationToken ct)
     {
         if (int.TryParse(asUser, out var osobaId))
         {
             return await _dbContext.Osoby.AsNoTracking()
                 .Where(x => x.Id == osobaId)
                 .Select(x => (int?)x.Id)
-                .FirstOrDefaultAsync(cancellationToken);
+                .FirstOrDefaultAsync(ct);
         }
 
         if (Guid.TryParse(asUser, out var guid))
@@ -326,7 +326,7 @@ public sealed class UserContextResolver : IUserContextResolver
             return await _dbContext.Osoby.AsNoTracking()
                 .Where(x => x.GuidAd == guid)
                 .Select(x => (int?)x.Id)
-                .FirstOrDefaultAsync(cancellationToken);
+                .FirstOrDefaultAsync(ct);
         }
 
         var normalized = _textNormalizer.Normalize(asUser);
@@ -342,7 +342,7 @@ public sealed class UserContextResolver : IUserContextResolver
                 x.Email,
                 x.AdLogin
             })
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
 
         var loginCandidates = BuildNormalizedLoginCandidates(asUser);
         var exact = candidates.FirstOrDefault(x =>
