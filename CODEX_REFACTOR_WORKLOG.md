@@ -4432,3 +4432,203 @@ Datum: 2026-03-23
   - ruční browser checklist ze specu nebyl explicitně odklikaný v DevTools, i když E2E scénáře jsou zelené
 - `16`:
   - lokální `dotnet run` stále blokuje starší vývojová databáze mimo repo
+
+## 2026-03-24 - Oprava 401 login regrese pro HTML requesty
+
+### Příznak
+
+- Uživatel s korektními daty končil na `401` místo reálného auth challenge flow.
+- Problém nebyl v datech uživatele ani v párování osoby, ale v tom, jak aplikace reagovala na unauthenticated HTML request.
+
+### Příčina
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/BaseController.cs`
+  - metoda `OnActionExecutionAsync(...)`
+  - při `UserContextResolutionResult.Unauthorized(...)`
+  - vracela pro HTML request rovnou vlastní access denied page
+  - tím se přeskočil framework auth challenge mechanismus
+- Důsledek:
+  - browser dostal aplikační `401` stránku
+  - ale neproběhlo skutečné `Challenge()`
+  - validní uživatel se tak neměl jak autentizovat přes server/browser mechanismus
+
+### Implementovaná oprava
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/BaseController.cs`
+  - jsem doplnil speciální větev:
+    - pokud resolver vrátí `401`
+    - a request chce HTML odpověď
+    - controller vrátí `Challenge()`
+- Chování po opravě:
+  - HTML request bez autentizovaného uživatele spustí standardní auth challenge flow
+  - AJAX request si dál drží stávající JSON/`401` chování
+  - `403` access denied flow zůstává beze změny
+
+### Test coverage
+
+- Přidal jsem nový unit test soubor:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Common/BaseControllerAuthFlowTests.cs`
+- Testy kryjí obě relevantní větve:
+  - `OnActionExecutionAsync_ShouldChallengeHtmlRequest_WhenUserIsUnauthorized`
+  - `OnActionExecutionAsync_ShouldKeepUnauthorizedPayload_ForAjaxRequest`
+
+### Ověření
+
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj --no-build`
+  - `110/110`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/PmTracker.Tests.Api.csproj --no-build`
+  - `252/252`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - celý solution matrix zelený
+  - `PmTracker.Web.Tests` = `6/6`
+  - `PmTracker.Tests.Unit` = `110/110`
+  - `PmTracker.Tests.Api` = `252/252`
+  - `PmTracker.Tests.E2E` = `28/28`
+  - `PmTracker.Tests.Integration` = `62/62`
+
+### Poznámka
+
+- Tato oprava řeší aplikační regresi v auth flow pro HTML requesty.
+- Není to totéž jako dřívější lokální runtime blokace na starší vývojové DB (`dbo.projektove_zaznamy.cil`).
+
+## 2026-03-24 - Dočištění auth challenge opravy bez service locatoru
+
+### Kontext
+
+- Po předchozí opravě HTML `401` flow už autentizace nepadala na access denied stránku, ale v některých host konfiguracích se chyba posunula na `500`.
+- Příčina:
+  - `BaseController` vracel `Challenge()` i v prostředí, kde sice existoval auth scheme název, ale nebyl k dispozici použitelný challenge handler.
+- Zároveň bylo potřeba držet čistou strukturu:
+  - bez `RequestServices.GetService(...)`
+  - bez service locatoru v controlleru
+  - bez dalších improvizovaných větví
+
+### Finální stav opravy
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/BaseController.cs`
+  - jsem ponechal HTML auth větev pouze pro `401`
+  - challenge se nyní skládá přes konstruktorově injektované:
+    - `IAuthenticationSchemeProvider`
+    - `IAuthenticationHandlerProvider`
+  - přidaný helper `BuildChallengeResultAsync()`:
+    - vezme default challenge scheme nebo fallback authenticate scheme
+    - ověří, že pro něj opravdu existuje handler
+    - vrátí `ChallengeResult` jen pokud je handler dostupný
+    - jinak vrátí `null`
+  - pokud handler chybí:
+    - controller nespadne na `500`
+    - vrátí stávající HTML access denied `401` stránku
+- AJAX větev zůstává beze změny:
+  - dál vrací `401` JSON payload
+
+### Strukturní doplnění
+
+- Všechny odvozené controllery v `PmTracker.Web/Controllers`
+  - už přijímají auth providery přes konstruktor
+  - a předávají je do `BaseController`
+- Nevznikl žádný service locator ani runtime `GetService(...)` hack
+
+### Test support
+
+- Přidal jsem sdílené test stuby do:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Common/TestAuthenticationProviders.cs`
+- Obsah:
+  - `StubAuthenticationSchemeProvider`
+  - `StubAuthenticationHandlerProvider`
+  - `StubAuthenticationHandler`
+- Důvod:
+  - jednotné a čisté vytváření controllerů v unit testech po změně konstruktoru
+
+### Upravené testy
+
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Common/BaseControllerAuthFlowTests.cs`
+  - zachovaný test HTML challenge větve
+  - zachovaný test AJAX `401` payload větve
+  - nový test fallback větve:
+    - `OnActionExecutionAsync_ShouldFallbackToAccessDeniedPage_WhenChallengeHandlerIsUnavailable`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Meetings/JednaniControllerBehaviorTests.cs`
+  - doplněné auth stuby do konstruktoru controlleru
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Projects/ProjektyControllerBehaviorTests.cs`
+  - doplněné auth stuby do konstruktoru controlleru
+
+### Ověření
+
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj --no-build`
+  - `110/110`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - celý solution matrix zelený
+  - `PmTracker.Web.Tests` = `6/6`
+  - `PmTracker.Tests.Unit` = `111/111`
+  - `PmTracker.Tests.Api` = `252/252`
+  - `PmTracker.Tests.E2E` = `28/28`
+  - `PmTracker.Tests.Integration` = `62/62`
+
+## 2026-03-24 - Návrat auth flow na logiku odpovídající main
+
+### Kontext
+
+- Po porovnání aktuální pracovní verze s `main` se ukázalo, že login regrese nevzniká v:
+  - `UserContextResolver`
+  - AD párování `GuidAd` / `AdLogin`
+  - IIS auth registraci v `Program.cs`
+- Rozdíl oproti fungujícímu stavu byl jen v dodatečně přidané necommitnuté větvi v `BaseController`:
+  - HTML `401` se snažilo převést na `ChallengeResult`
+  - kvůli tomu byly přidány auth providery do konstruktorů všech controllerů
+
+### Provedená oprava
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/BaseController.cs`
+  - jsem odstranil `IAuthenticationSchemeProvider`
+  - jsem odstranil `IAuthenticationHandlerProvider`
+  - jsem odstranil helper `BuildChallengeResultAsync()`
+  - jsem odstranil speciální HTML `401 -> ChallengeResult` větev
+- Tím je auth flow zpět na chování odpovídající funkčnímu `main`:
+  - IIS autentizuje uživatele
+  - `UserContextResolver` rozhodne `401` / `403` / success
+  - `BaseController` už jen vrátí access denied HTML nebo AJAX payload
+
+### Cleanup konstruktorů
+
+- Ze všech odvozených controllerů jsem odstranil dočasně přidané auth provider dependency:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/HomeController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ProjektyController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/JednaniController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ZaznamyController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/OsobyController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/NastaveniController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/CiselnikyController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ProfilController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ExportController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/DokumentaceController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ObsazeniController.cs`
+
+### Testy
+
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Common/BaseControllerAuthFlowTests.cs`
+  - jsem srovnal na aktuální cílové chování:
+    - HTML unauthorized = access denied page
+    - AJAX unauthorized = `401` payload
+- Odstranil jsem dočasný test support:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Common/TestAuthenticationProviders.cs`
+- Vrátil jsem testové konstrukce controllerů bez auth provider stubů:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Meetings/JednaniControllerBehaviorTests.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Projects/ProjektyControllerBehaviorTests.cs`
+
+### Ověření
+
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - celý solution matrix zelený
+  - `PmTracker.Web.Tests` = `6/6`
+  - `PmTracker.Tests.Unit` = `111/111`
+  - `PmTracker.Tests.Api` = `252/252`
+  - `PmTracker.Tests.E2E` = `28/28`
+  - `PmTracker.Tests.Integration` = `62/62`
