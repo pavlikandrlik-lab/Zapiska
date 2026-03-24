@@ -4569,6 +4569,112 @@ Datum: 2026-03-23
   - `PmTracker.Tests.E2E` = `28/28`
   - `PmTracker.Tests.Integration` = `62/62`
 
+## 2026-03-24 - Auth diagnostika přes structured logy
+
+### Cíl
+
+- Umožnit čitelný konzolový trace auth flow bez `Console.WriteLine`, bez debug prasáren a bez rozbití struktury aplikace
+- Získat odpověď na otázky:
+  - jestli request vůbec nese použitelný principal z IIS
+  - jestli je principal označený jako autentizovaný
+  - kolik login kandidátů resolver sestavil
+  - jestli se zkoušel `GuidAd` nebo `AdLogin`
+  - jestli dohledání osoby skončilo matchí nebo ne
+
+### Změny
+
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Security/UserContextResolver.cs`
+  - doplnil jsem `Information`/`Warning` structured logy do klíčových bodů auth flow:
+    - start `ResolveAsync(...)`
+    - authenticated vs unauthenticated větev
+    - pokus o `GuidAd` lookup
+    - pokus o `AdLogin` lookup
+    - finální failure `401/403`
+    - finální success
+  - diagnostika loguje pouze technické stavy a počty:
+    - `IsAuthenticated`
+    - `AuthenticationType`
+    - přítomné claim typy
+    - počet login kandidátů
+    - jestli kandidáti obsahují domain-qualified / short / UPN variantu
+    - kolik osob s `ad_login` se prohledávalo
+    - `MatchedOsobaId`
+  - nezavedl jsem `Console.WriteLine`, `Debug.WriteLine` ani změnu veřejného kontraktu
+
+### Ověřený konzolový trace
+
+- Cílený běh:
+  - `env Logging__LogLevel__Default=Information 'Logging__LogLevel__PmTracker.Web.Services.Security.UserContextResolver=Information' dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/PmTracker.Tests.Api.csproj --filter IisLoginFallbackAuthTests --logger 'console;verbosity=detailed'`
+- Z relevantního výstupu:
+  - `Resolving user context. Path=/Projekty IsDevelopment=False IsAuthenticated=False AuthenticationType=(null) IdentityNamePresent=True LoginCandidateCount=2 ...`
+  - `Attempting user resolution from IIS login candidates without authenticated principal. Path=/Projekty LoginCandidateCount=2`
+  - `AdLogin lookup completed. CandidateCount=2 HasDomainQualifiedCandidate=True HasUpnCandidate=False HasShortCandidate=True PeopleWithAdLoginCount=1 MatchedOsobaId=1`
+  - `User context resolved successfully. OsobaId=1 IsSuperAdmin=True RoleCount=1 VisibleProjectCount=0 PermissionGrantCount=12`
+
+### Ověření
+
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/PmTracker.Tests.Api.csproj --filter IisLoginFallbackAuthTests --logger 'console;verbosity=detailed'`
+  - auth trace v konzoli potvrzen
+  - `2/2` zelené
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - `PmTracker.Web.Tests` = `6/6`
+  - `PmTracker.Tests.Unit` = `110/110`
+  - `PmTracker.Tests.Api` = `254/254`
+  - `PmTracker.Tests.E2E` = `28/28`
+  - `PmTracker.Tests.Integration` = `62/62`
+
+## 2026-03-24 - Oprava IIS login párování pro 401 scénáře
+
+### Problém
+
+- V produkčním auth flow se osoba párovala proti `Osoby.AdLogin` asymetricky:
+  - login kandidáti z IIS/claims se normalizovali na varianty `acr\\user`, `user`, `user@domena`
+  - login uložený v DB se při `LoginEquals(...)` jen lowercasoval, ale neštěpil na stejné varianty
+- Dopad:
+  - pokud DB obsahovala `acr\\user` a IIS principal nesl jen `user`, lokální párování nevyšlo a aplikace vracela `401/403`
+- Druhá slabina byla v tom, že resolver v produkci vracel `401` okamžitě při `Identity.IsAuthenticated != true`, i když `HttpContext.User` už nesl použitelný IIS login pro párování přes `AdLogin`
+
+### Změny
+
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Security/UserContextResolver.cs`
+  - doplnil jsem společnou metodu `ResolveOsobaIdFromLoginCandidatesAsync(...)` pro dohledání osoby podle login kandidátů
+  - tuto login větev jsem zapojil:
+    - v klasickém authenticated flow po neúspěšném `GuidAd` match
+    - i v produkční větvi, kde principal nenese `IsAuthenticated == true`, ale už obsahuje použitelný IIS login
+  - odstranil jsem rozpracovaný `goto` a vrátil flow do čisté lineární podoby
+  - upravil jsem `LoginEquals(...)`, aby porovnání bylo symetrické:
+    - `acr\\user` v DB odpovídá `user` z IIS
+    - `user@domena` v DB odpovídá `user` z IIS
+
+### Testy
+
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/Controllers/IisLoginFallbackAuthTests.cs`
+  - přidal jsem integrační HTTP test pro scénář:
+    - principal má IIS login, ale `Identity.IsAuthenticated == false`
+    - aplikace má i tak uživatele napárovat přes `AdLogin`
+  - přidal jsem integrační HTTP test pro scénář:
+    - v DB je `acr\\user`
+    - IIS přinese jen `user`
+    - aplikace má uživatele správně napárovat
+  - testy po sobě obnovují původní `AdLogin` admin osoby, aby nevnášely sdílený stav do kolekce API testů
+
+### Ověření
+
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/PmTracker.Tests.Api.csproj --filter IisLoginFallbackAuthTests --no-restore`
+  - `2/2` zelené
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - `PmTracker.Web.Tests` = `6/6`
+  - `PmTracker.Tests.Unit` = `110/110`
+  - `PmTracker.Tests.Api` = `254/254`
+  - `PmTracker.Tests.E2E` = `28/28`
+  - `PmTracker.Tests.Integration` = `62/62`
+
 ## 2026-03-24 - Návrat auth flow na logiku odpovídající main
 
 ### Kontext

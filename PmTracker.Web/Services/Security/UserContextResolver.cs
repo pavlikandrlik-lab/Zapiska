@@ -65,64 +65,115 @@ public sealed class UserContextResolver : IUserContextResolver
         if (!osobaId.HasValue)
         {
             var principal = httpContext.User;
-            if (principal?.Identity?.IsAuthenticated != true)
-            {
-                if (_environment.IsDevelopment())
-                {
-                    osobaId = await _dbContext.Osoby
-                        .AsNoTracking()
-                        .OrderBy(x => x.Id)
-                        .Select(x => (int?)x.Id)
-                        .FirstOrDefaultAsync(ct);
+            var loginCandidates = BuildNormalizedLoginCandidates(principal);
+            var isAuthenticated = principal?.Identity?.IsAuthenticated == true;
 
-                    if (!osobaId.HasValue)
-                    {
-                        return UserContextResolutionResult.Forbidden("V databázi nejsou žádné osoby.");
-                    }
-                }
-                else
+            _logger.LogInformation(
+                "Resolving user context. Path={Path} IsDevelopment={IsDevelopment} IsAuthenticated={IsAuthenticated} AuthenticationType={AuthenticationType} IdentityNamePresent={IdentityNamePresent} LoginCandidateCount={LoginCandidateCount} LoginClaimTypesPresent={LoginClaimTypesPresent} GuidClaimTypesPresent={GuidClaimTypesPresent}",
+                httpContext.Request.Path.Value ?? string.Empty,
+                _environment.IsDevelopment(),
+                isAuthenticated,
+                principal?.Identity?.AuthenticationType ?? "(null)",
+                !string.IsNullOrWhiteSpace(principal?.Identity?.Name),
+                loginCandidates.Count,
+                DescribePresentClaimTypes(principal, LoginClaimTypes),
+                DescribePresentClaimTypes(principal, GuidClaimTypes));
+
+            if (!isAuthenticated)
+            {
+                if (loginCandidates.Count > 0)
                 {
-                    return UserContextResolutionResult.Unauthorized("Uživatel není autentizován.");
+                    _logger.LogInformation(
+                        "Attempting user resolution from IIS login candidates without authenticated principal. Path={Path} LoginCandidateCount={LoginCandidateCount}",
+                        httpContext.Request.Path.Value ?? string.Empty,
+                        loginCandidates.Count);
+
+                    osobaId = await ResolveOsobaIdFromLoginCandidatesAsync(loginCandidates, ct);
+                }
+
+                if (!osobaId.HasValue)
+                {
+                    if (_environment.IsDevelopment())
+                    {
+                        _logger.LogInformation(
+                            "Falling back to development first-person resolution. Path={Path}",
+                            httpContext.Request.Path.Value ?? string.Empty);
+
+                        osobaId = await _dbContext.Osoby
+                            .AsNoTracking()
+                            .OrderBy(x => x.Id)
+                            .Select(x => (int?)x.Id)
+                            .FirstOrDefaultAsync(ct);
+
+                        if (!osobaId.HasValue)
+                        {
+                            _logger.LogWarning(
+                                "User context resolution failed. Path={Path} Reason=NoPeopleInDevelopmentDatabase",
+                                httpContext.Request.Path.Value ?? string.Empty);
+
+                            return UserContextResolutionResult.Forbidden("V databázi nejsou žádné osoby.");
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "User context resolution failed. Path={Path} Reason=PrincipalNotAuthenticated LoginCandidateCount={LoginCandidateCount}",
+                            httpContext.Request.Path.Value ?? string.Empty,
+                            loginCandidates.Count);
+
+                        return UserContextResolutionResult.Unauthorized("Uživatel není autentizován.");
+                    }
                 }
             }
             else
             {
+                var authenticatedPrincipal = principal!;
                 var claimValue = GuidClaimTypes
-                    .Select(type => principal.FindFirst(type)?.Value)
+                    .Select(type => authenticatedPrincipal.FindFirst(type)?.Value)
                     .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
-                if (Guid.TryParse(claimValue, out var objectGuid))
+                var guidParsed = Guid.TryParse(claimValue, out var objectGuid);
+                _logger.LogInformation(
+                    "Authenticated principal detected. Path={Path} GuidClaimPresent={GuidClaimPresent} GuidParsed={GuidParsed} LoginCandidateCount={LoginCandidateCount}",
+                    httpContext.Request.Path.Value ?? string.Empty,
+                    !string.IsNullOrWhiteSpace(claimValue),
+                    guidParsed,
+                    loginCandidates.Count);
+
+                if (guidParsed)
                 {
                     osobaId = await _dbContext.Osoby
                         .AsNoTracking()
                         .Where(x => x.GuidAd == objectGuid)
                         .Select(x => (int?)x.Id)
                         .FirstOrDefaultAsync(ct);
+
+                    _logger.LogInformation(
+                        "Guid-based person lookup completed. Path={Path} MatchedOsobaId={MatchedOsobaId}",
+                        httpContext.Request.Path.Value ?? string.Empty,
+                        osobaId);
                 }
 
                 if (!osobaId.HasValue)
                 {
-                    var loginCandidates = BuildNormalizedLoginCandidates(principal);
                     if (loginCandidates.Count > 0)
                     {
-                        var people = await _dbContext.Osoby
-                            .AsNoTracking()
-                            .Where(x => x.AdLogin != null)
-                            .Select(x => new
-                            {
-                                x.Id,
-                                x.AdLogin
-                            })
-                            .ToListAsync(ct);
+                        _logger.LogInformation(
+                            "Attempting authenticated login-candidate resolution after Guid lookup miss. Path={Path} LoginCandidateCount={LoginCandidateCount}",
+                            httpContext.Request.Path.Value ?? string.Empty,
+                            loginCandidates.Count);
 
-                        osobaId = people
-                            .FirstOrDefault(person => LoginEquals(person.AdLogin, loginCandidates))
-                            ?.Id;
+                        osobaId = await ResolveOsobaIdFromLoginCandidatesAsync(loginCandidates, ct);
                     }
                 }
 
                 if (!osobaId.HasValue)
                 {
+                    _logger.LogWarning(
+                        "User context resolution failed. Path={Path} Reason=NoGuidOrAdLoginMatch LoginCandidateCount={LoginCandidateCount}",
+                        httpContext.Request.Path.Value ?? string.Empty,
+                        loginCandidates.Count);
+
                     return UserContextResolutionResult.Forbidden("Nemáte přístup do aplikace. Chybí párování osoby.guid_ad nebo osoby.ad_login.");
                 }
             }
@@ -146,6 +197,10 @@ public sealed class UserContextResolver : IUserContextResolver
 
         if (osoba is null)
         {
+            _logger.LogWarning(
+                "User context resolution failed. Reason=ResolvedPersonMissingInDatabase OsobaId={OsobaId}",
+                osobaId);
+
             return UserContextResolutionResult.Forbidden("Přihlášená osoba v databázi neexistuje.");
         }
 
@@ -308,6 +363,14 @@ public sealed class UserContextResolver : IUserContextResolver
             PermissionGrants = grants
         };
 
+        _logger.LogInformation(
+            "User context resolved successfully. OsobaId={OsobaId} IsSuperAdmin={IsSuperAdmin} RoleCount={RoleCount} VisibleProjectCount={VisibleProjectCount} PermissionGrantCount={PermissionGrantCount}",
+            context.OsobaId,
+            context.IsSuperAdmin,
+            context.RoleKody.Count,
+            context.VisibleProjectIds.Count,
+            context.PermissionGrants.Count);
+
         return UserContextResolutionResult.Success(context);
     }
 
@@ -367,6 +430,55 @@ public sealed class UserContextResolver : IUserContextResolver
 
         _logger.LogWarning("asUser '{AsUser}' nebyl nalezen mezi osobami.", asUser);
         return null;
+    }
+
+    private async Task<int?> ResolveOsobaIdFromLoginCandidatesAsync(IReadOnlySet<string> loginCandidates, CancellationToken ct)
+    {
+        if (loginCandidates.Count == 0)
+        {
+            _logger.LogInformation("Skipping AdLogin lookup because there are no login candidates.");
+            return null;
+        }
+
+        var people = await _dbContext.Osoby
+            .AsNoTracking()
+            .Where(x => x.AdLogin != null)
+            .Select(x => new
+            {
+                x.Id,
+                x.AdLogin
+            })
+            .ToListAsync(ct);
+
+        var matchedPerson = people
+            .FirstOrDefault(person => LoginEquals(person.AdLogin, loginCandidates))
+            ?.Id;
+
+        _logger.LogInformation(
+            "AdLogin lookup completed. CandidateCount={CandidateCount} HasDomainQualifiedCandidate={HasDomainQualifiedCandidate} HasUpnCandidate={HasUpnCandidate} HasShortCandidate={HasShortCandidate} PeopleWithAdLoginCount={PeopleWithAdLoginCount} MatchedOsobaId={MatchedOsobaId}",
+            loginCandidates.Count,
+            loginCandidates.Any(candidate => candidate.Contains('\\')),
+            loginCandidates.Any(candidate => candidate.Contains('@')),
+            loginCandidates.Any(candidate => !candidate.Contains('\\') && !candidate.Contains('@')),
+            people.Count,
+            matchedPerson);
+
+        return matchedPerson;
+    }
+
+    private static string DescribePresentClaimTypes(ClaimsPrincipal? principal, IEnumerable<string> claimTypes)
+    {
+        if (principal is null)
+        {
+            return "(none)";
+        }
+
+        var present = claimTypes
+            .Where(type => !string.IsNullOrWhiteSpace(principal.FindFirst(type)?.Value))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        return present.Length == 0 ? "(none)" : string.Join(",", present);
     }
 
     private static HashSet<string> BuildNormalizedLoginCandidates(ClaimsPrincipal principal)
@@ -452,7 +564,8 @@ public sealed class UserContextResolver : IUserContextResolver
             return false;
         }
 
-        return candidates.Contains(storedLogin.Trim().ToLowerInvariant());
+        var storedCandidates = BuildNormalizedLoginCandidates(storedLogin);
+        return storedCandidates.Overlaps(candidates);
     }
 
     private static bool LoginContains(string? storedLogin, IReadOnlySet<string> candidates)
