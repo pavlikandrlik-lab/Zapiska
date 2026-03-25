@@ -39,6 +39,18 @@ public sealed partial class RecordService : IRecordService
     public Task<ProjektDetailViewModel> BuildProjektDetailAsync(int id, CancellationToken ct = default)
         => projectService.BuildProjektDetailAsync(id, ct);
 
+    public Task<ProjektZaznamCardShellViewModel?> BuildRecordCardShellAsync(int projectId, int recordId, CancellationToken ct = default)
+        => projectService.BuildRecordCardShellAsync(projectId, recordId, ct);
+
+    public Task<ZaznamCardDetailViewModel?> BuildRecordCardDetailAsync(int projectId, int recordId, CancellationToken ct = default)
+        => projectService.BuildRecordCardDetailAsync(projectId, recordId, ct);
+
+    public Task<ZaznamCommentsPanelViewModel?> BuildRecordCommentsPanelAsync(int projectId, int recordId, CancellationToken ct = default)
+        => projectService.BuildRecordCommentsPanelAsync(projectId, recordId, ct);
+
+    public Task<ZaznamCommentsPanelViewModel?> BuildRecordCommentsPanelAsync(int projectId, int recordId, int? limit, bool loadAll, CancellationToken ct = default)
+        => projectService.BuildRecordCommentsPanelAsync(projectId, recordId, limit, loadAll, ct);
+
     public Task<ZaznamEditViewModel> BuildZaznamEditAsync(int id, CancellationToken ct = default)
         => BuildZaznamEditAsync(id, recordEditorQueriesComposition, ct);
 

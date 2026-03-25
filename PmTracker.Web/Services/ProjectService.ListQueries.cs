@@ -28,4 +28,40 @@ public sealed partial class ProjectService
             })
             .ToList();
     }
+
+    public async Task<ProjektListItemViewModel?> GetProjectListItemAsync(int id, CancellationToken ct = default)
+    {
+        var project = await dbContext.Projekty.AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                x.Id,
+                x.Zkratka,
+                Nazev = x.CelyNazev,
+                x.StavId,
+                x.PouzivatIdentJednani
+            })
+            .FirstOrDefaultAsync(ct);
+        if (project is null)
+        {
+            return null;
+        }
+
+        var status = await dbContext.CiselnikStavuProjektu.AsNoTracking()
+            .Where(x => x.Id == project.StavId)
+            .Select(x => new { x.Kod, x.Nazev })
+            .FirstOrDefaultAsync(ct);
+
+        return new ProjektListItemViewModel
+        {
+            Id = project.Id,
+            Zkratka = project.Zkratka,
+            Nazev = project.Nazev,
+            StavKod = status?.Kod,
+            Stav = status?.Nazev ?? "-",
+            PouzivatIdentJednani = project.PouzivatIdentJednani,
+            CanEdit = true,
+            CanDelete = true
+        };
+    }
 }

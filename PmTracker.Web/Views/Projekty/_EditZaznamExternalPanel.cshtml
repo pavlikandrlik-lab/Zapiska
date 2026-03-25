@@ -1,0 +1,233 @@
+@using System.Globalization
+@model ZaznamEditViewModel
+@{
+    var isActive = ViewData["IsActive"] as bool? ?? false;
+}
+
+<div class="record-modal-panel"
+     data-record-modal-panel="external"
+     @(isActive ? null : "hidden=\"hidden\"")>
+    <div class="section-divider">Externí vazby</div>
+    <div data-external-links-editor>
+        <div class="external-links" data-external-links>
+            @for (var i = 0; i < Model.ExterniVazby.Count; i++)
+            {
+                var vazba = Model.ExterniVazby[i];
+                var showEstimatedPrice = string.Equals(vazba.Typ, "PMP", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(vazba.Typ, "PNF", StringComparison.OrdinalIgnoreCase);
+                var estimatedPriceValue = vazba.PredpokladanaCena?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty;
+                var datumObjednaniIso = vazba.DatumObjednani?.ToString("yyyy-MM-dd") ?? string.Empty;
+                var datumObjednaniDisplay = vazba.DatumObjednani?.ToString("dd.MM.yyyy") ?? string.Empty;
+                var planDodaniIso = vazba.PlanDodani?.ToString("yyyy-MM-dd") ?? string.Empty;
+                var planDodaniDisplay = vazba.PlanDodani?.ToString("dd.MM.yyyy") ?? string.Empty;
+                var datumDodaniIso = vazba.DatumDodani?.ToString("yyyy-MM-dd") ?? string.Empty;
+                var datumDodaniDisplay = vazba.DatumDodani?.ToString("dd.MM.yyyy") ?? string.Empty;
+                var datumPrevzetiIso = vazba.DatumPrevzeti?.ToString("yyyy-MM-dd") ?? string.Empty;
+                var datumPrevzetiDisplay = vazba.DatumPrevzeti?.ToString("dd.MM.yyyy") ?? string.Empty;
+                <div class="external-row" data-external-row>
+                    <input type="hidden" name="ExterniVazby[@i].Id" value="@vazba.Id" />
+                    <label>
+                        Typ odkazu
+                        <select name="ExterniVazby[@i].Typ" data-external-type-select>
+                            @foreach (var typ in Model.TypyExternichOdkazu)
+                            {
+                                if (typ == vazba.Typ)
+                                {
+                                    <option selected="selected">@typ</option>
+                                }
+                                else
+                                {
+                                    <option>@typ</option>
+                                }
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        Číslo
+                        <input type="text" name="ExterniVazby[@i].Cislo" value="@vazba.Cislo" />
+                    </label>
+                    <label data-external-price-field hidden="@(showEstimatedPrice ? null : "hidden")">
+                        Předpokládaná cena
+                        <input type="number"
+                               name="ExterniVazby[@i].PredpokladanaCena"
+                               value="@estimatedPriceValue"
+                               step="0.01"
+                               min="0"
+                               inputmode="decimal"
+                               data-external-price-input
+                               disabled="@(showEstimatedPrice ? null : "disabled")" />
+                    </label>
+                    <label>
+                        Výzva
+                        <select name="ExterniVazby[@i].Vyzva">
+                            <option value="">—</option>
+                            @foreach (var vyzva in Model.Vyzvy)
+                            {
+                                if (vyzva == vazba.Vyzva)
+                                {
+                                    <option selected="selected">@vyzva</option>
+                                }
+                                else
+                                {
+                                    <option>@vyzva</option>
+                                }
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        Datum objednání
+                        @await Html.PartialAsync(
+                            "_AppDateField",
+                            new AppDateFieldViewModel
+                            {
+                                Name = $"ExterniVazby[{i}].DatumObjednani",
+                                IsoValue = datumObjednaniIso,
+                                DisplayValue = datumObjednaniDisplay,
+                                Locked = false,
+                                AriaLabel = "Otevřít kalendář"
+                            })
+                    </label>
+                    <label>
+                        Plán dodání
+                        @await Html.PartialAsync(
+                            "_AppDateField",
+                            new AppDateFieldViewModel
+                            {
+                                Name = $"ExterniVazby[{i}].PlanDodani",
+                                IsoValue = planDodaniIso,
+                                DisplayValue = planDodaniDisplay,
+                                Locked = false,
+                                AriaLabel = "Otevřít kalendář"
+                            })
+                    </label>
+                    <label>
+                        Datum dodání
+                        @await Html.PartialAsync(
+                            "_AppDateField",
+                            new AppDateFieldViewModel
+                            {
+                                Name = $"ExterniVazby[{i}].DatumDodani",
+                                IsoValue = datumDodaniIso,
+                                DisplayValue = datumDodaniDisplay,
+                                Locked = false,
+                                AriaLabel = "Otevřít kalendář"
+                            })
+                    </label>
+                    <label>
+                        Datum převzetí
+                        @await Html.PartialAsync(
+                            "_AppDateField",
+                            new AppDateFieldViewModel
+                            {
+                                Name = $"ExterniVazby[{i}].DatumPrevzeti",
+                                IsoValue = datumPrevzetiIso,
+                                DisplayValue = datumPrevzetiDisplay,
+                                Locked = false,
+                                AriaLabel = "Otevřít kalendář"
+                            })
+                    </label>
+                    <div class="external-actions">
+                        <button class="btn small ghost" type="button" data-external-remove>Odebrat vazbu</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <template data-external-template>
+            <div class="external-row" data-external-row>
+                <input type="hidden" name="ExterniVazby[__index__].Id" value="0" />
+                <label>
+                    Typ odkazu
+                    <select name="ExterniVazby[__index__].Typ" data-external-type-select>
+                        @foreach (var typ in Model.TypyExternichOdkazu)
+                        {
+                            <option>@typ</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    Číslo
+                    <input type="text" name="ExterniVazby[__index__].Cislo" value="" />
+                </label>
+                <label data-external-price-field hidden="hidden">
+                    Předpokládaná cena
+                    <input type="number"
+                           name="ExterniVazby[__index__].PredpokladanaCena"
+                           value=""
+                           step="0.01"
+                           min="0"
+                           inputmode="decimal"
+                           data-external-price-input
+                           disabled="disabled" />
+                </label>
+                <label>
+                    Výzva
+                    <select name="ExterniVazby[__index__].Vyzva">
+                        <option value="">—</option>
+                        @foreach (var vyzva in Model.Vyzvy)
+                        {
+                            <option>@vyzva</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    Datum objednání
+                    @await Html.PartialAsync(
+                        "_AppDateField",
+                        new AppDateFieldViewModel
+                        {
+                            Name = "ExterniVazby[__index__].DatumObjednani",
+                            IsoValue = string.Empty,
+                            DisplayValue = string.Empty,
+                            Locked = false,
+                            AriaLabel = "Otevřít kalendář"
+                        })
+                </label>
+                <label>
+                    Plán dodání
+                    @await Html.PartialAsync(
+                        "_AppDateField",
+                        new AppDateFieldViewModel
+                        {
+                            Name = "ExterniVazby[__index__].PlanDodani",
+                            IsoValue = string.Empty,
+                            DisplayValue = string.Empty,
+                            Locked = false,
+                            AriaLabel = "Otevřít kalendář"
+                        })
+                </label>
+                <label>
+                    Datum dodání
+                    @await Html.PartialAsync(
+                        "_AppDateField",
+                        new AppDateFieldViewModel
+                        {
+                            Name = "ExterniVazby[__index__].DatumDodani",
+                            IsoValue = string.Empty,
+                            DisplayValue = string.Empty,
+                            Locked = false,
+                            AriaLabel = "Otevřít kalendář"
+                        })
+                </label>
+                <label>
+                    Datum převzetí
+                    @await Html.PartialAsync(
+                        "_AppDateField",
+                        new AppDateFieldViewModel
+                        {
+                            Name = "ExterniVazby[__index__].DatumPrevzeti",
+                            IsoValue = string.Empty,
+                            DisplayValue = string.Empty,
+                            Locked = false,
+                            AriaLabel = "Otevřít kalendář"
+                        })
+                </label>
+                <div class="external-actions">
+                    <button class="btn small ghost" type="button" data-external-remove>Odebrat vazbu</button>
+                </div>
+            </div>
+        </template>
+
+        <button class="btn" type="button" data-external-add>Přidat externí vazbu</button>
+    </div>
+</div>

@@ -3,11 +3,15 @@ using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
+using System.Globalization;
 
 namespace PmTracker.Web.Controllers;
 
 public sealed class ProjektyController : BaseController
 {
+    private const string RecordsTab = "zaznamy";
+    private const string ScheduleTab = "harmonogram";
+    private const string MeetingsTab = "jednani";
     private const string TeamTab = "tym";
     private const string TeamRefreshScope = "projekty-detail-tym";
 
@@ -56,7 +60,7 @@ public sealed class ProjektyController : BaseController
         return View(model);
     }
 
-    public async Task<IActionResult> Detail(int id, CancellationToken ct = default)
+    public async Task<IActionResult> Detail(int id, string? tab, CancellationToken ct = default)
     {
         if (!await _projectService.ProjektExistsAsync(id, ct))
         {
@@ -68,9 +72,101 @@ public sealed class ProjektyController : BaseController
             return NotFound();
         }
 
+        var requestedTab = NormalizeProjectTab(tab);
         var model = await _projectService.BuildProjektDetailAsync(id, ct);
+        model.ActiveTab = requestedTab;
         PrepareProjectDetailPresentation(model);
+        await PrepareActiveProjectTabAsync(model, requestedTab, ct);
         return View(model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> RecordsTabPartial(int id, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(id))
+        {
+            return NotFound();
+        }
+
+        var model = await _projectService.BuildProjectRecordsTabAsync(id, ct);
+        PrepareProjectRecordsTabPresentation(model);
+        return PartialView("~/Views/Projekty/_ProjectRecordsTab.cshtml", model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> RecordMeetingCommentStates(int id, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(id))
+        {
+            return NotFound();
+        }
+
+        var statesByRecordId = await _projectService.BuildRecordMeetingCommentStatesAsync(id, ct);
+        return Json(new ProjektMeetingCommentStatesResponseViewModel
+        {
+            StatesByRecordId = statesByRecordId.ToDictionary(
+                item => item.Key.ToString(CultureInfo.InvariantCulture),
+                item => item.Value)
+        });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> SearchProjectMemberCandidates(int id, [FromQuery(Name = "q")] string? query, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(id))
+        {
+            return NotFound();
+        }
+
+        if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, id))
+        {
+            return Forbid();
+        }
+
+        var results = await _projectService.SearchProjectMemberCandidatesAsync(query ?? string.Empty, ct);
+        return Json(new PersonPickerSearchResponseViewModel
+        {
+            Results = results
+        });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> HarmonogramTabPartial(int id, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(id))
+        {
+            return NotFound();
+        }
+
+        var model = await _projectService.BuildProjectScheduleTabAsync(id, ct);
+        PrepareProjectScheduleTabPresentation(model);
+        return PartialView("~/Views/Projekty/_ProjectScheduleTab.cshtml", model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> JednaniTabPartial(int id, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(id))
+        {
+            return NotFound();
+        }
+
+        var model = await _projectService.BuildProjectMeetingsTabAsync(id, ct);
+        PrepareProjectMeetingsTabPresentation(model);
+        return PartialView("~/Views/Projekty/_ProjectMeetingsTab.cshtml", model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> TymTabPartial(int id, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(id))
+        {
+            return NotFound();
+        }
+
+        var model = await _projectService.BuildProjectTeamTabAsync(id, ct);
+        PrepareProjectTeamTabPresentation(model);
+        return PartialView("~/Views/Projekty/_ProjectTeamTab.cshtml", model);
     }
 
     [HttpGet]
@@ -110,7 +206,7 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        var project = (await _projectService.BuildProjektyListAsync(ct)).FirstOrDefault(item => item.Id == id);
+        var project = await _projectService.GetProjectListItemAsync(id, ct);
         if (project is null)
         {
             return NotFound();
@@ -147,7 +243,7 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        var project = (await _projectService.BuildProjektyListAsync(ct)).FirstOrDefault(item => item.Id == id);
+        var project = await _projectService.GetProjectListItemAsync(id, ct);
         if (project is null)
         {
             return NotFound();
@@ -181,27 +277,8 @@ public sealed class ProjektyController : BaseController
             return NotFound();
         }
 
-        var detail = await _projectService.BuildProjektDetailAsync(projektId, ct);
-        var nextMeetingNumber = detail.Jednani.Any() ? detail.Jednani.Max(item => item.CisloJednani) + 1 : 1;
-        var defaultStatus = detail.StavyJednani.FirstOrDefault()?.Value ?? string.Empty;
-        var localNow = GetLocalNow();
-
-        var model = new MeetingModalViewModel
-        {
-            Title = "Nová porada",
-            Command = new SaveMeetingCommand
-            {
-                ProjektId = projektId,
-                CisloJednani = nextMeetingNumber,
-                DatumPlanovane = localNow.Date,
-                CasZacatek = TimeOnly.FromDateTime(localNow),
-                StavJednani = defaultStatus
-            },
-            ExistingMeetingNumbersCsv = string.Join(",", detail.Jednani.Select(item => item.CisloJednani).Distinct().OrderBy(item => item)),
-            StavyJednani = detail.StavyJednani
-        };
-
-        return View(model);
+        var model = await _meetingService.BuildNewMeetingModalAsync(projektId, GetLocalNow(), ct);
+        return View("NewMeetingModal", model);
     }
 
     [HttpGet]
@@ -212,39 +289,22 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        if (!await _projectService.ProjektExistsAsync(projektId, ct))
+        var isEditable = await _meetingService.IsMeetingEditableAsync(projektId, meetingId, ct);
+        if (!isEditable.HasValue)
         {
             return NotFound();
         }
 
-        var projectDetail = await _projectService.BuildProjektDetailAsync(projektId, ct);
-        var meeting = projectDetail.Jednani.FirstOrDefault(item => item.Id == meetingId);
-        if (meeting is null)
-        {
-            return NotFound();
-        }
-
-        if (IsMeetingClosed(projectDetail.StavyJednani, meeting))
+        if (!isEditable.Value)
         {
             return StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var model = new MeetingModalViewModel
+        var model = await _meetingService.BuildEditMeetingModalAsync(projektId, meetingId, ct);
+        if (model is null)
         {
-            Title = "Upravit poradu",
-            Command = new SaveMeetingCommand
-            {
-                Id = meeting.Id,
-                ProjektId = projektId,
-                CisloJednani = meeting.CisloJednani,
-                DatumPlanovane = meeting.Datum,
-                CasZacatek = meeting.CasZacatek,
-                Misto = meeting.Misto,
-                StavJednani = meeting.StavKod ?? projectDetail.StavyJednani.FirstOrDefault()?.Value ?? string.Empty
-            },
-            ExistingMeetingNumbersCsv = string.Join(",", projectDetail.Jednani.Select(item => item.CisloJednani).Distinct().OrderBy(item => item)),
-            StavyJednani = projectDetail.StavyJednani
-        };
+            return NotFound();
+        }
 
         return View("NewMeetingModal", model);
     }
@@ -262,8 +322,8 @@ public sealed class ProjektyController : BaseController
             return NotFound();
         }
 
-        var detail = await _projectService.BuildProjektDetailAsync(projektId, ct);
-        var defaultRole = detail.RoleProjektu.FirstOrDefault()?.Value ?? string.Empty;
+        var modalOptions = await _projectService.BuildProjectTeamModalOptionsAsync(projektId, ct);
+        var defaultRole = modalOptions.RoleProjektu.FirstOrDefault()?.Value ?? string.Empty;
         var model = new TeamMemberModalViewModel
         {
             Title = "Přidat člena týmu",
@@ -272,17 +332,9 @@ public sealed class ProjektyController : BaseController
                 ProjektId = projektId,
                 Role = defaultRole
             },
-            DostupniClenoveTymu = detail.DostupneOsobyProRole
-                .Select(person => new TeamCandidateViewModel
-                {
-                    Id = person.OsobaId,
-                    Osoba = person.Osoba,
-                    Email = person.Email,
-                    Organizace = person.Organizace,
-                    OrganizacniCelek = person.OrganizacniCelek
-                })
-                .ToList(),
-            RoleProjektu = detail.RoleProjektu
+            SearchUrl = Url.Action(nameof(SearchProjectMemberCandidates), new { id = projektId }),
+            DostupniClenoveTymu = [],
+            RoleProjektu = modalOptions.RoleProjektu
         };
 
         return View(model);
@@ -296,13 +348,14 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        var detail = await _projectService.BuildProjektDetailAsync(projektId, ct);
+        var modalOptions = await _projectService.BuildProjectTeamModalOptionsAsync(projektId, ct);
         return View("AssignProjectRoleModal", new AssignProjectRoleModalViewModel
         {
             Title = "Přidat projektovou roli",
             Command = new AssignProjectRoleCommand { ProjektId = projektId },
-            DostupneOsoby = detail.DostupneOsobyProRole,
-            RoleProjektu = detail.RoleProjektu
+            SearchUrl = Url.Action(nameof(SearchProjectMemberCandidates), new { id = projektId }),
+            DostupneOsoby = [],
+            RoleProjektu = modalOptions.RoleProjektu
         });
     }
 
@@ -314,12 +367,12 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        var detail = await _projectService.BuildProjektDetailAsync(projektId, ct);
+        var modalOptions = await _projectService.BuildProjectTeamModalOptionsAsync(projektId, ct);
         return View("AssignProjectSubsystemModal", new AssignProjectSubsystemModalViewModel
         {
             Title = "Přiřadit subsystém projektu",
             Command = new AssignProjectSubsystemCommand { ProjektId = projektId },
-            Subsystemy = detail.DostupneSubsystemy
+            Subsystemy = modalOptions.DostupneSubsystemy
         });
     }
 
@@ -331,14 +384,15 @@ public sealed class ProjektyController : BaseController
             return Forbid();
         }
 
-        var detail = await _projectService.BuildProjektDetailAsync(projektId, ct);
+        var modalOptions = await _projectService.BuildProjectTeamModalOptionsAsync(projektId, ct);
         return View("AssignProjectSubsystemRoleModal", new AssignProjectSubsystemRoleModalViewModel
         {
             Title = "Přidat roli v subsystému",
             Command = new AssignProjectSubsystemRoleCommand { ProjektId = projektId },
-            ProjektSubsystemy = detail.DostupneProjektoveSubsystemy,
-            DostupneOsoby = detail.DostupneOsobyProRole,
-            RoleSubsystemu = detail.RoleSubsystemu
+            ProjektSubsystemy = modalOptions.DostupneProjektoveSubsystemy,
+            SearchUrl = Url.Action(nameof(SearchProjectMemberCandidates), new { id = projektId }),
+            DostupneOsoby = [],
+            RoleSubsystemu = modalOptions.RoleSubsystemu
         });
     }
 
@@ -398,14 +452,13 @@ public sealed class ProjektyController : BaseController
                 return Forbid();
             }
 
-            var projectDetail = await _projectService.BuildProjektDetailAsync(command.ProjektId, ct);
-            var existingMeeting = projectDetail.Jednani.FirstOrDefault(item => item.Id == command.Id.Value);
-            if (existingMeeting is null)
+            var isEditable = await _meetingService.IsMeetingEditableAsync(command.ProjektId, command.Id.Value, ct);
+            if (!isEditable.HasValue)
             {
                 return NotFound();
             }
 
-            if (IsMeetingClosed(projectDetail.StavyJednani, existingMeeting))
+            if (!isEditable.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden);
             }
@@ -421,7 +474,7 @@ public sealed class ProjektyController : BaseController
             onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" })!),
             onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "projekty-detail-jednani",
-                refreshUrl: Url.Action(nameof(Detail), "Projekty", new { id = command.ProjektId, tab = "jednani" }),
+                refreshUrl: Url.Action(nameof(JednaniTabPartial), "Projekty", new { id = command.ProjektId }),
                 projectId: command.ProjektId,
                 tab: "jednani",
                 message: "Porada byla uložena.")),
@@ -447,7 +500,7 @@ public sealed class ProjektyController : BaseController
             onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectAfterDelete()),
             onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "projekty-detail-jednani",
-                refreshUrl: Url.Action(nameof(Detail), "Projekty", new { id = command.ProjektId, tab = "jednani" }),
+                refreshUrl: Url.Action(nameof(JednaniTabPartial), "Projekty", new { id = command.ProjektId }),
                 projectId: command.ProjektId,
                 tab: "jednani",
                 message: "Porada byla smazána.")),
@@ -568,22 +621,6 @@ public sealed class ProjektyController : BaseController
         }
     }
 
-    private static bool IsMeetingClosed(IReadOnlyList<LookupOptionViewModel> statuses, JednaniListItemViewModel meeting)
-    {
-        var closedStatusCode = statuses
-            .Where(item => string.Equals(item.Value, "CLOSED", StringComparison.OrdinalIgnoreCase)
-                || item.Label.Contains("uzav", StringComparison.OrdinalIgnoreCase))
-            .Select(item => item.Value)
-            .FirstOrDefault();
-
-        if (!string.IsNullOrWhiteSpace(closedStatusCode))
-        {
-            return string.Equals(meeting.StavKod, closedStatusCode, StringComparison.OrdinalIgnoreCase);
-        }
-
-        return !string.IsNullOrWhiteSpace(meeting.UzamklOsoba);
-    }
-
     private Task<IReadOnlyList<LookupOptionViewModel>> BuildProjectStatusOptionsAsync(CancellationToken ct = default)
         => _projectService.BuildProjectStatusOptionsAsync(CurrentUserContext, ct);
 
@@ -610,25 +647,124 @@ public sealed class ProjektyController : BaseController
         model.ReturnToProjectUrl = Url.Action("Detail", "Projekty", new { id = projectId, tab = "jednani" }) ?? $"/Projekty/Detail/{projectId}?tab=jednani";
         model.ProjectPrintUrl = Url.Action("ProjektTisk", "Export", new { projektId = projectId, autoPrint = true }) ?? $"/Export/Projekt/{projectId}/Tisk?autoPrint=true";
         model.ProjectWordUrl = Url.Action("ProjektWord", "Export", new { projektId = projectId }) ?? $"/Export/Projekt/{projectId}/Word";
+        model.HarmonogramTab.LoadUrl = Url.Action(nameof(HarmonogramTabPartial), new { id = projectId }) ?? $"/Projekty/HarmonogramTabPartial/{projectId}";
+        model.JednaniTab.LoadUrl = Url.Action(nameof(JednaniTabPartial), new { id = projectId }) ?? $"/Projekty/JednaniTabPartial/{projectId}";
+        model.TymTab.LoadUrl = Url.Action(nameof(TymTabPartial), new { id = projectId }) ?? $"/Projekty/TymTabPartial/{projectId}";
+
+        PrepareProjectRecordsTabPresentation(model.ZaznamyTab);
+    }
+
+    private async Task PrepareActiveProjectTabAsync(ProjektDetailViewModel model, string requestedTab, CancellationToken ct)
+    {
+        if (string.Equals(requestedTab, ScheduleTab, StringComparison.OrdinalIgnoreCase))
+        {
+            var scheduleTab = await _projectService.BuildProjectScheduleTabAsync(model.Projekt.Id, ct);
+            PrepareProjectScheduleTabPresentation(scheduleTab);
+            model.LoadedHarmonogramTab = scheduleTab;
+            return;
+        }
+
+        if (string.Equals(requestedTab, MeetingsTab, StringComparison.OrdinalIgnoreCase))
+        {
+            var meetingsTab = await _projectService.BuildProjectMeetingsTabAsync(model.Projekt.Id, ct);
+            PrepareProjectMeetingsTabPresentation(meetingsTab);
+            model.LoadedJednaniTab = meetingsTab;
+            return;
+        }
+
+        if (string.Equals(requestedTab, TeamTab, StringComparison.OrdinalIgnoreCase))
+        {
+            var teamTab = await _projectService.BuildProjectTeamTabAsync(model.Projekt.Id, ct);
+            PrepareProjectTeamTabPresentation(teamTab);
+            model.LoadedTymTab = teamTab;
+        }
+    }
+
+    private static string NormalizeProjectTab(string? tab)
+    {
+        if (string.Equals(tab, "gant", StringComparison.OrdinalIgnoreCase))
+        {
+            return ScheduleTab;
+        }
+
+        if (string.Equals(tab, ScheduleTab, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tab, MeetingsTab, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tab, TeamTab, StringComparison.OrdinalIgnoreCase))
+        {
+            return tab!.ToLowerInvariant();
+        }
+
+        return RecordsTab;
+    }
+
+    private void PrepareProjectRecordsTabPresentation(ProjektZaznamyTabViewModel model)
+    {
+        var projectId = model.ProjektId;
+        var canManageRecords = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projectId);
+
+        model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+        model.CanManageRecords = canManageRecords;
+        model.CreateRecordEditorUrl = Url.Action("Create", "Zaznamy", new { projektId = projectId }) ?? $"/Zaznamy/Create?projektId={projectId}";
+        model.RefreshUrl = Url.Action(nameof(RecordsTabPartial), new { id = projectId }) ?? $"/Projekty/RecordsTabPartial/{projectId}";
+        model.MeetingCommentStatesUrl = Url.Action(nameof(RecordMeetingCommentStates), new { id = projectId }) ?? $"/Projekty/RecordMeetingCommentStates/{projectId}";
+        model.ProjectPrintUrl = Url.Action("ProjektTisk", "Export", new { projektId = projectId, autoPrint = true }) ?? $"/Export/Projekt/{projectId}/Tisk?autoPrint=true";
+        model.ProjectWordUrl = Url.Action("ProjektWord", "Export", new { projektId = projectId }) ?? $"/Export/Projekt/{projectId}/Word";
 
         foreach (var record in model.Zaznamy)
         {
-            record.CanEditRecord = canManageRecords;
-            record.CanEditSchedule = record.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projectId);
-            record.CanAddSchedule = record.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projectId);
-            record.CanManageSchedule = record.CanEditSchedule || record.CanAddSchedule;
-            record.CanCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId)
-                && record.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
-            record.CanAddComment = record.CanEditRecord || record.CanCommentAsSubsystemLeader;
-            record.EditButtonLabel = record.CanEditRecord ? "Upravit" : "GANTT";
-            record.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+            PrepareRecordCardShellPresentation(record, projectId);
         }
+
+        foreach (var group in model.SkupinyZaznamu)
+        {
+            foreach (var record in group.Zaznamy)
+            {
+                PrepareRecordCardShellPresentation(record, projectId);
+            }
+        }
+    }
+
+    private void PrepareRecordCardShellPresentation(ProjektZaznamCardShellViewModel record, int projectId)
+    {
+        var summary = record.Summary;
+        summary.CanEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projectId);
+        summary.CanEditSchedule = summary.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projectId);
+        summary.CanAddSchedule = summary.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projectId);
+        summary.CanManageSchedule = summary.CanEditSchedule || summary.CanAddSchedule;
+        summary.CanCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId)
+            && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
+        summary.CanAddComment = summary.CanEditRecord || summary.CanCommentAsSubsystemLeader;
+        summary.EditButtonLabel = summary.CanEditRecord ? "Upravit" : "GANTT";
+        summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+        record.DetailUrl = Url.Action("RecordDetailPartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordDetailPartial?projektId={projectId}&zaznamId={summary.Id}";
+        record.CommentsUrl = Url.Action("RecordCommentsPartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={summary.Id}";
+    }
+
+    private void PrepareProjectScheduleTabPresentation(ProjektHarmonogramTabViewModel model)
+    {
+        model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+
+        var canManageSchedules = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId)
+            || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, model.ProjektId)
+            || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, model.ProjektId);
 
         foreach (var item in model.HarmonogramUkoly)
         {
             item.CanManageSchedule = canManageSchedules;
-            item.ScheduleEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = projectId }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
+            item.ScheduleEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = model.ProjektId }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
         }
+    }
+
+    private void PrepareProjectMeetingsTabPresentation(ProjektJednaniTabViewModel model)
+    {
+        model.CanCreateMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, model.ProjektId);
+        model.CanEditMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, model.ProjektId);
+        model.ReturnToProjectUrl = Url.Action(nameof(Detail), new { id = model.ProjektId, tab = "jednani" }) ?? $"/Projekty/Detail/{model.ProjektId}?tab=jednani";
+    }
+
+    private void PrepareProjectTeamTabPresentation(ProjektTymTabViewModel model)
+    {
+        model.CanManageTeam = CurrentUserContext.HasPermission(PermissionKeys.TeamManage, model.ProjektId);
     }
 
     private Task<IActionResult> ExecuteTeamValidatedActionAsync(
@@ -661,7 +797,7 @@ public sealed class ProjektyController : BaseController
     {
         return AjaxSuccessResult(
             refreshScope: TeamRefreshScope,
-            refreshUrl: Url.Action(nameof(Detail), new { id = projektId, tab = TeamTab }),
+            refreshUrl: Url.Action(nameof(TymTabPartial), new { id = projektId }),
             projectId: projektId,
             tab: TeamTab,
             message: successMessage);

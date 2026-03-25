@@ -2,6 +2,7 @@ using System.Reflection;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -94,31 +95,33 @@ public sealed class ProjektyControllerBehaviorTests
 
         var projectService = new FakeProjectService
         {
-            ProjektDetail = CreateEmptyProjektDetail(
-                projectId,
-                meetings:
-                [
-                    new JednaniListItemViewModel
-                    {
-                        Id = 1,
-                        CisloJednani = 7,
-                        Datum = new DateTime(2026, 1, 1),
-                        CasZacatek = new TimeOnly(8, 0),
-                        Misto = "Zasedacka",
-                        StavKod = "OPEN",
-                        Stav = "Otevreno"
-                    }
-                ],
-                meetingStatuses:
+            ProjektDetail = CreateEmptyProjektDetail(projectId)
+        };
+        var meetingService = new FakeMeetingService
+        {
+            NewMeetingModalResult = new MeetingModalViewModel
+            {
+                Title = "Nová porada",
+                Command = new SaveMeetingCommand
+                {
+                    ProjektId = projectId,
+                    CisloJednani = 8,
+                    DatumPlanovane = expectedLocalNow.Date,
+                    CasZacatek = TimeOnly.FromDateTime(expectedLocalNow),
+                    StavJednani = "OPEN"
+                },
+                ExistingMeetingNumbersCsv = "7",
+                StavyJednani =
                 [
                     new LookupOptionViewModel
                     {
                         Value = "OPEN",
                         Label = "Otevreno"
                     }
-                ])
+                ]
+            }
         };
-        var controller = CreateController(projectService, timeProvider);
+        var controller = CreateController(projectService, timeProvider, meetingService);
 
         var result = await controller.NewMeetingModal(projectId);
 
@@ -130,9 +133,66 @@ public sealed class ProjektyControllerBehaviorTests
         model.Command.StavJednani.Should().Be("OPEN");
     }
 
+    [Fact]
+    public async Task RecordMeetingCommentStates_ShouldReturnJsonPayload_FromProjectService()
+    {
+        const int projectId = 77;
+        var projectService = new FakeProjectService
+        {
+            ProjektDetail = CreateEmptyProjektDetail(projectId),
+            RecordMeetingCommentStates =
+                new Dictionary<int, IReadOnlyList<string>>
+                {
+                    [12] = ["1", "4"],
+                    [19] = ["2"]
+                }
+        };
+        var controller = CreateController(projectService);
+
+        var result = await controller.RecordMeetingCommentStates(projectId);
+
+        var json = result.Should().BeOfType<JsonResult>().Subject;
+        var payload = json.Value.Should().BeOfType<ProjektMeetingCommentStatesResponseViewModel>().Subject;
+        payload.StatesByRecordId.Should().ContainKey("12");
+        payload.StatesByRecordId["12"].Should().BeEquivalentTo(["1", "4"]);
+        payload.StatesByRecordId.Should().ContainKey("19");
+        payload.StatesByRecordId["19"].Should().BeEquivalentTo(["2"]);
+    }
+
+    [Fact]
+    public async Task SearchProjectMemberCandidates_ShouldReturnJsonPayload_FromProjectService()
+    {
+        const int projectId = 91;
+        var projectService = new FakeProjectService
+        {
+            ProjektDetail = CreateEmptyProjektDetail(projectId),
+            ProjectMemberSearchResults =
+            [
+                new PersonPickerEntryViewModel
+                {
+                    Id = 5,
+                    Label = "Jan Novak",
+                    Email = "jan.novak@test.local",
+                    Organizace = "FIS",
+                    OrganizacniCelek = "IT"
+                }
+            ]
+        };
+        var controller = CreateController(projectService);
+
+        var result = await controller.SearchProjectMemberCandidates(projectId, "jan");
+
+        var json = result.Should().BeOfType<JsonResult>().Subject;
+        var payload = json.Value.Should().BeOfType<PersonPickerSearchResponseViewModel>().Subject;
+        payload.Results.Should().HaveCount(1);
+        payload.Results[0].Id.Should().Be(5);
+        payload.Results[0].Label.Should().Be("Jan Novak");
+    }
+
     private static ProjektyController CreateController(
         FakeProjectService projectService,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        FakeMeetingService? meetingService = null)
     {
         var services = new ServiceCollection();
         if (timeProvider is not null)
@@ -150,7 +210,7 @@ public sealed class ProjektyControllerBehaviorTests
             timeProvider: timeProvider ?? TimeProvider.System,
             loggerFactory: NullLoggerFactory.Instance,
             projectService: projectService,
-            meetingService: new FakeMeetingService())
+            meetingService: meetingService ?? new FakeMeetingService())
         {
             ControllerContext = new ControllerContext
             {
@@ -158,6 +218,7 @@ public sealed class ProjektyControllerBehaviorTests
             }
         };
 
+        controller.Url = new StubUrlHelper();
         controller.TempData = new TempDataDictionary(httpContext, new StubTempDataProvider());
         SetCurrentUserContext(controller, BuildSuperAdminContext());
         return controller;
@@ -190,9 +251,7 @@ public sealed class ProjektyControllerBehaviorTests
     }
 
     private static ProjektDetailViewModel CreateEmptyProjektDetail(
-        int projectId,
-        IReadOnlyList<JednaniListItemViewModel>? meetings = null,
-        IReadOnlyList<LookupOptionViewModel>? meetingStatuses = null)
+        int projectId)
     {
         return new ProjektDetailViewModel
         {
@@ -203,35 +262,30 @@ public sealed class ProjektyControllerBehaviorTests
                 Zkratka = "PRJ",
                 Stav = "Bezi"
             },
-            DleSubsystemu = true,
-            SkupinySubsystemu = [],
-            Zaznamy = [],
-            Jednani = meetings ?? [],
-            AktivniRole = [],
-            HistorieRoli = [],
-            AktivniSubsystemyProjektu = [],
-            DostupneOsobyProRole = [],
-            DostupneProjektoveSubsystemy = [],
-            HarmonogramUkoly = [],
-            RoleProjektu = [],
-            RoleSubsystemu = [],
-            DostupneSubsystemy = [],
-            OtevrenaJednani = [],
-            StavyJednani = meetingStatuses ?? [],
-            Filtry = new ProjektFiltryViewModel
+            ZaznamyTab = new ProjektZaznamyTabViewModel
             {
-                Subsystemy = [],
-                SubsystemyMoznosti = [],
-                Kategorie = [],
-                KategorieMoznosti = [],
-                StavyUkolu = [],
-                StavyUkoluMoznosti = [],
-                TypyUkolu = [],
-                TypyUkoluMoznosti = [],
-                Vlastnici = [],
-                VlastniciMoznosti = [],
-                StavyJednaniVyjadreni = []
-            }
+                ProjektId = projectId,
+                DleSubsystemu = true,
+                Zaznamy = [],
+                SkupinyZaznamu = [],
+                Filtry = new ProjektFiltryViewModel
+                {
+                    Subsystemy = [],
+                    SubsystemyMoznosti = [],
+                    Kategorie = [],
+                    KategorieMoznosti = [],
+                    StavyUkolu = [],
+                    StavyUkoluMoznosti = [],
+                    TypyUkolu = [],
+                    TypyUkoluMoznosti = [],
+                    Vlastnici = [],
+                    VlastniciMoznosti = [],
+                    StavyJednaniVyjadreni = []
+                }
+            },
+            HarmonogramTab = new ProjektLazyTabShellViewModel { TabKey = "harmonogram", LoadingText = "Načítání harmonogramu..." },
+            JednaniTab = new ProjektLazyTabShellViewModel { TabKey = "jednani", LoadingText = "Načítání jednání..." },
+            TymTab = new ProjektLazyTabShellViewModel { TabKey = "tym", LoadingText = "Načítání týmu..." }
         };
     }
 
@@ -240,6 +294,13 @@ public sealed class ProjektyControllerBehaviorTests
         public IReadOnlyList<ProjektListItemViewModel> ProjektyList { get; init; } = [];
         public IReadOnlyList<LookupOptionViewModel> ProjectStatusOptions { get; init; } = [];
         public ProjektDetailViewModel ProjektDetail { get; init; } = CreateEmptyProjektDetail(0);
+        public ProjektZaznamyTabViewModel RecordsTab { get; init; } = new();
+        public ProjektHarmonogramTabViewModel ScheduleTab { get; init; } = new();
+        public ProjektJednaniTabViewModel MeetingsTab { get; init; } = new();
+        public ProjektTymTabViewModel TeamTab { get; init; } = new();
+        public ProjectTeamModalOptionsViewModel TeamModalOptions { get; init; } = new();
+        public IReadOnlyDictionary<int, IReadOnlyList<string>> RecordMeetingCommentStates { get; init; } = new Dictionary<int, IReadOnlyList<string>>();
+        public IReadOnlyList<PersonPickerEntryViewModel> ProjectMemberSearchResults { get; init; } = [];
 
         public Task<bool> ProjektExistsAsync(int id, CancellationToken ct = default)
             => Task.FromResult(ProjektyList.Any(item => item.Id == id) || ProjektDetail.Projekt.Id == id);
@@ -247,8 +308,85 @@ public sealed class ProjektyControllerBehaviorTests
         public Task<IReadOnlyList<ProjektListItemViewModel>> BuildProjektyListAsync(CancellationToken ct = default)
             => Task.FromResult(ProjektyList);
 
+        public Task<ProjektListItemViewModel?> GetProjectListItemAsync(int id, CancellationToken ct = default)
+            => Task.FromResult(ProjektyList.FirstOrDefault(item => item.Id == id));
+
         public Task<ProjektDetailViewModel> BuildProjektDetailAsync(int id, CancellationToken ct = default)
             => Task.FromResult(ProjektDetail);
+
+        public Task<ProjektZaznamyTabViewModel> BuildProjectRecordsTabAsync(int id, CancellationToken ct = default)
+            => Task.FromResult(new ProjektZaznamyTabViewModel
+            {
+                ProjektId = id,
+                DleSubsystemu = RecordsTab.DleSubsystemu,
+                Zaznamy = RecordsTab.Zaznamy,
+                SkupinyZaznamu = RecordsTab.SkupinyZaznamu,
+                Filtry = RecordsTab.Filtry,
+                CurrentUserOsobaId = RecordsTab.CurrentUserOsobaId,
+                CanManageRecords = RecordsTab.CanManageRecords,
+                CreateRecordEditorUrl = RecordsTab.CreateRecordEditorUrl,
+                RefreshUrl = RecordsTab.RefreshUrl,
+                MeetingCommentStatesUrl = RecordsTab.MeetingCommentStatesUrl,
+                ProjectPrintUrl = RecordsTab.ProjectPrintUrl,
+                ProjectWordUrl = RecordsTab.ProjectWordUrl
+            });
+
+        public Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> BuildRecordMeetingCommentStatesAsync(int projectId, CancellationToken ct = default)
+            => Task.FromResult(RecordMeetingCommentStates);
+
+        public Task<ProjektHarmonogramTabViewModel> BuildProjectScheduleTabAsync(int id, CancellationToken ct = default)
+            => Task.FromResult(new ProjektHarmonogramTabViewModel
+            {
+                ProjektId = id,
+                HarmonogramUkoly = ScheduleTab.HarmonogramUkoly,
+                SubsystemyMoznosti = ScheduleTab.SubsystemyMoznosti
+            });
+
+        public Task<ProjektJednaniTabViewModel> BuildProjectMeetingsTabAsync(int id, CancellationToken ct = default)
+            => Task.FromResult(new ProjektJednaniTabViewModel
+            {
+                ProjektId = id,
+                Jednani = MeetingsTab.Jednani,
+                StavyJednani = MeetingsTab.StavyJednani
+            });
+
+        public Task<ProjektTymTabViewModel> BuildProjectTeamTabAsync(int id, CancellationToken ct = default)
+            => Task.FromResult(new ProjektTymTabViewModel
+            {
+                ProjektId = id,
+                AktivniRole = TeamTab.AktivniRole,
+                HistorieRoli = TeamTab.HistorieRoli,
+                AktivniSubsystemyProjektu = TeamTab.AktivniSubsystemyProjektu,
+                DostupneOsobyProRole = TeamTab.DostupneOsobyProRole,
+                DostupneProjektoveSubsystemy = TeamTab.DostupneProjektoveSubsystemy,
+                RoleProjektu = TeamTab.RoleProjektu,
+                RoleSubsystemu = TeamTab.RoleSubsystemu,
+                DostupneSubsystemy = TeamTab.DostupneSubsystemy
+            });
+
+        public Task<ProjectTeamModalOptionsViewModel> BuildProjectTeamModalOptionsAsync(int id, CancellationToken ct = default)
+            => Task.FromResult(new ProjectTeamModalOptionsViewModel
+            {
+                RoleProjektu = TeamModalOptions.RoleProjektu.Count == 0 ? TeamTab.RoleProjektu : TeamModalOptions.RoleProjektu,
+                RoleSubsystemu = TeamModalOptions.RoleSubsystemu.Count == 0 ? TeamTab.RoleSubsystemu : TeamModalOptions.RoleSubsystemu,
+                DostupneProjektoveSubsystemy = TeamModalOptions.DostupneProjektoveSubsystemy.Count == 0 ? TeamTab.DostupneProjektoveSubsystemy : TeamModalOptions.DostupneProjektoveSubsystemy,
+                DostupneSubsystemy = TeamModalOptions.DostupneSubsystemy.Count == 0 ? TeamTab.DostupneSubsystemy : TeamModalOptions.DostupneSubsystemy
+            });
+
+        public Task<IReadOnlyList<PersonPickerEntryViewModel>> SearchProjectMemberCandidatesAsync(string query, CancellationToken ct = default)
+            => Task.FromResult(ProjectMemberSearchResults);
+
+        public Task<ProjektZaznamCardShellViewModel?> BuildRecordCardShellAsync(int projectId, int recordId, CancellationToken ct = default)
+            => Task.FromResult<ProjektZaznamCardShellViewModel?>(null);
+
+        public Task<ZaznamCardDetailViewModel?> BuildRecordCardDetailAsync(int projectId, int recordId, CancellationToken ct = default)
+            => Task.FromResult<ZaznamCardDetailViewModel?>(null);
+
+        public Task<ZaznamCommentsPanelViewModel?> BuildRecordCommentsPanelAsync(int projectId, int recordId, CancellationToken ct = default)
+            => Task.FromResult<ZaznamCommentsPanelViewModel?>(null);
+
+        public Task<ZaznamCommentsPanelViewModel?> BuildRecordCommentsPanelAsync(int projectId, int recordId, int? limit, bool loadAll, CancellationToken ct = default)
+            => Task.FromResult<ZaznamCommentsPanelViewModel?>(null);
 
         public Task<IReadOnlyList<LookupOptionViewModel>> BuildProjectStatusOptionsAsync(CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => Task.FromResult(ProjectStatusOptions);
@@ -267,8 +405,19 @@ public sealed class ProjektyControllerBehaviorTests
 
     private sealed class FakeMeetingService : IMeetingService
     {
+        public MeetingModalViewModel? NewMeetingModalResult { get; init; }
+        public MeetingModalViewModel? EditMeetingModalResult { get; init; }
+        public bool? EditableMeetingState { get; init; }
+
         public Task<IReadOnlyList<JednaniProjektListItemViewModel>> BuildJednaniOverviewAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<JednaniProjektListItemViewModel>> BuildJednaniOverviewAsync(IReadOnlyCollection<int>? projectIds, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<JednaniListItemViewModel>> BuildJednaniListAsync(int projektId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<MeetingModalViewModel> BuildNewMeetingModalAsync(int projectId, DateTime localNow, CancellationToken ct = default)
+            => Task.FromResult(NewMeetingModalResult ?? throw new NotSupportedException());
+        public Task<MeetingModalViewModel?> BuildEditMeetingModalAsync(int projectId, int meetingId, CancellationToken ct = default)
+            => Task.FromResult(EditMeetingModalResult);
+        public Task<bool?> IsMeetingEditableAsync(int projectId, int meetingId, CancellationToken ct = default)
+            => Task.FromResult(EditableMeetingState);
         public Task<JednaniDetailViewModel> BuildJednaniDetailAsync(int id, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int?> GetMeetingProjectIdAsync(int meetingId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<JednaniUkolViewModel?> GetSingleTaskAsync(int meetingId, int zaznamId, CancellationToken ct = default) => throw new NotSupportedException();
@@ -291,5 +440,20 @@ public sealed class ProjektyControllerBehaviorTests
         public IDictionary<string, object> LoadTempData(HttpContext context) => new Dictionary<string, object>();
 
         public void SaveTempData(HttpContext context, IDictionary<string, object> values) { }
+    }
+
+    private sealed class StubUrlHelper : IUrlHelper
+    {
+        public ActionContext ActionContext { get; } = new();
+
+        public string? Action(UrlActionContext actionContext) => "/stub";
+
+        public string? Content(string? contentPath) => contentPath;
+
+        public bool IsLocalUrl(string? url) => true;
+
+        public string? Link(string? routeName, object? values) => "/stub";
+
+        public string? RouteUrl(UrlRouteContext routeContext) => "/stub";
     }
 }

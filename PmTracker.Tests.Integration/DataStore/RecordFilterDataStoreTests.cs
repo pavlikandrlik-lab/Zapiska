@@ -52,24 +52,23 @@ public sealed class RecordFilterDataStoreTests
 
         await dbContext.SaveChangesAsync();
 
-        var detail = store.BuildProjektDetail(projectId);
+        var recordsTab = store.BuildProjectRecordsTab(projectId);
 
-        detail.Zaznamy.Should().Contain(x => x.Id == infoRecordId && x.KategorieKod == "INFO");
-        detail.Zaznamy.Should().Contain(x => x.Id == decisionRecordId && x.KategorieKod == "ROZHODNUTI");
+        recordsTab.Zaznamy.Select(x => x.Summary).Should().Contain(x => x.Id == infoRecordId && x.KategorieKod == "INFO");
+        recordsTab.Zaznamy.Select(x => x.Summary).Should().Contain(x => x.Id == decisionRecordId && x.KategorieKod == "ROZHODNUTI");
 
         var draftStateId = (await dbContext.CiselnikStavuJednani.Where(x => x.Kod == "DRAFT").Select(x => x.Id).FirstAsync()).ToString();
         var openStateId = (await dbContext.CiselnikStavuJednani.Where(x => x.Kod == "OPEN").Select(x => x.Id).FirstAsync()).ToString();
 
-        var infoRecord = detail.Zaznamy.First(x => x.Id == infoRecordId);
-        var decisionRecord = detail.Zaznamy.First(x => x.Id == decisionRecordId);
+        var meetingCommentStates = store.BuildRecordMeetingCommentStates(projectId);
 
-        infoRecord.VyjadreniJednaniStavyKody.Should().Contain(openStateId);
-        infoRecord.VyjadreniJednaniStavyKody.Should().NotContain(draftStateId);
+        meetingCommentStates[infoRecordId].Should().Contain(openStateId);
+        meetingCommentStates[infoRecordId].Should().NotContain(draftStateId);
 
-        decisionRecord.VyjadreniJednaniStavyKody.Should().Contain(draftStateId);
-        decisionRecord.VyjadreniJednaniStavyKody.Should().NotContain(openStateId);
+        meetingCommentStates[decisionRecordId].Should().Contain(draftStateId);
+        meetingCommentStates[decisionRecordId].Should().NotContain(openStateId);
 
-        detail.Filtry.StavyJednaniVyjadreni.Select(x => x.Value)
+        recordsTab.Filtry.StavyJednaniVyjadreni.Select(x => x.Value)
             .Should()
             .Contain([draftStateId, openStateId]);
     }

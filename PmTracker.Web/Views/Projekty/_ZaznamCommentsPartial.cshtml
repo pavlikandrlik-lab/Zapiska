@@ -1,0 +1,143 @@
+@model ZaznamCommentsPanelViewModel
+@inject PmTracker.Web.Services.Common.IRichTextContentService RichTextContentService
+
+<div class="record-comments"
+     data-record-comments-panel
+     data-record-comments-scope="@Model.ZaznamId"
+     data-record-comments-loaded-count="@Model.LoadedCount"
+     data-record-comments-total-count="@Model.TotalCount"
+     data-record-comments-load-step="@Model.LoadStep"
+     data-record-comments-is-fully-loaded="@Model.IsFullyLoaded.ToString().ToLowerInvariant()"
+     data-comment-sort-section
+     data-comment-sort-direction="asc">
+    <div class="record-comments-header">
+        <h4>Vyjádření</h4>
+        @if (Model.Vyjadreni.Count > 1)
+        {
+            <button type="button" class="btn small ghost comment-sort-toggle" data-comment-sort-toggle>
+                Řazení: jednání vzestupně
+            </button>
+        }
+    </div>
+    @if (Model.Vyjadreni.Count == 0)
+    {
+        <p class="muted">Zatím bez vyjádření.</p>
+    }
+    else
+    {
+        <div class="comment-list" data-comment-list>
+            @foreach (var vyjadreni in Model.Vyjadreni)
+            {
+                <div class="comment"
+                     data-comment-item
+                     data-comment-meeting="@(vyjadreni.JednaniCislo ?? 0)"
+                     data-comment-date="@vyjadreni.Datum.ToString("O")"
+                     data-comment-id="@vyjadreni.Id">
+                    <div class="comment-header">
+                        <strong>@vyjadreni.Autor</strong>
+                        <span class="muted">@vyjadreni.Datum.ToString("dd.MM.yyyy")</span>
+                    </div>
+                    <div class="comment-text richtext-render">@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
+                    @if (Model.CanAddComment)
+                    {
+                        <div class="comment-toolbar">
+                            @{
+                                var canEditThisComment = vyjadreni.LzeUpravit
+                                    && (Model.CanEditRecord
+                                        || (Model.CanCommentAsSubsystemLeader && vyjadreni.AutorOsobaId == Model.CurrentUserOsobaId));
+                            }
+                            @if (canEditThisComment)
+                            {
+                                <div class="comment-toolbar-actions">
+                                    <details class="comment-edit-details">
+                                        <summary class="btn small ghost comment-action-chip">Upravit</summary>
+                                        <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true">
+                                            <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                            <input type="hidden" name="uiContext" value="project" />
+                                            <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
+                                            <input type="hidden" name="Id" value="@vyjadreni.Id" />
+                                            <textarea rows="3"
+                                                      name="Text"
+                                                      required
+                                                      data-rich-text="true"
+                                                      data-rich-text-min-height="92">@RichTextContentService.ToSafeHtml(vyjadreni.Text)</textarea>
+                                            <button class="btn small" type="submit">Uložit změnu</button>
+                                        </form>
+                                    </details>
+                                    <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
+                                        <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                        <input type="hidden" name="uiContext" value="project" />
+                                        <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
+                                        <input type="hidden" name="Id" value="@vyjadreni.Id" />
+                                        <button class="btn small ghost" type="submit">Smazat</button>
+                                    </form>
+                                </div>
+                            }
+                            else if (!vyjadreni.LzeUpravit)
+                            {
+                                <span class="muted">Jednání je uzavřené, vyjádření je jen pro čtení.</span>
+                            }
+                        </div>
+                    }
+                    @if (vyjadreni.JednaniDatum.HasValue)
+                    {
+                        @if (vyjadreni.JednaniCislo.HasValue)
+                        {
+                            <span class="tag">Zapsáno na jednání č. @vyjadreni.JednaniCislo (@vyjadreni.JednaniDatum.Value.ToString("dd.MM.yyyy"))</span>
+                        }
+                        else
+                        {
+                            <span class="tag">Zapsáno na jednání @vyjadreni.JednaniDatum.Value.ToString("dd.MM.yyyy")</span>
+                        }
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (Model.CanLoadMore || Model.CanLoadAll)
+    {
+        <div class="comment-pagination-actions">
+            @if (Model.CanLoadMore)
+            {
+                <button type="button"
+                        class="btn small ghost"
+                        data-record-comments-load-more>
+                    Zobrazit dalších @Model.LoadStep
+                </button>
+            }
+            @if (Model.CanLoadAll)
+            {
+                <button type="button"
+                        class="btn small ghost"
+                        data-record-comments-load-all>
+                    Zobrazit vše
+                </button>
+            }
+        </div>
+    }
+
+    @if (Model.CanAddComment)
+    {
+        <form class="comment-form" asp-controller="Zaznamy" asp-action="AddComment" method="post" data-ajax-submit="true">
+            <input type="hidden" name="projektId" value="@Model.ProjektId" />
+            <input type="hidden" name="uiContext" value="project" />
+            <input type="hidden" name="ZaznamId" value="@Model.ZaznamId" />
+            <textarea rows="4"
+                      name="Text"
+                      placeholder="Přidat vyjádření..."
+                      data-rich-text="true"
+                      data-rich-text-min-height="132"></textarea>
+            <div class="comment-actions">
+                <select class="wide-select" name="JednaniId" required>
+                    <option value="">Vazba na jednání</option>
+                    @foreach (var jednani in Model.OtevrenaJednani)
+                    {
+                        <option value="@jednani.Id">@jednani.Label</option>
+                    }
+                </select>
+                <button class="btn small primary" type="submit">Uložit</button>
+            </div>
+        </form>
+    }
+</div>

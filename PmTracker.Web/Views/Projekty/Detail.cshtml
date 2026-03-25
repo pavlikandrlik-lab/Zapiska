@@ -1,551 +1,118 @@
 @model ProjektDetailViewModel
 @{
     ViewData["Title"] = $"Projekt {Model.Projekt.Zkratka}";
-    ViewData["OtevrenaJednani"] = Model.OtevrenaJednani;
-    ViewData["ProjektId"] = Model.Projekt.Id;
-    var harmonogramUkoly = Model.HarmonogramUkoly;
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = Model.PageTitle,
-    Subtitle = $"Zkratka: {Model.Projekt.Zkratka}",
-    BackUrl = Model.BackUrl,
-    BackLabel = Model.BackLabel,
-    Badge = Model.Projekt.Stav
-})
+<section class="page-header page-header-compact">
+    <div class="project-header-row">
+        @if (!string.IsNullOrWhiteSpace(Model.BackUrl))
+        {
+            <a class="btn small ghost" href="@Model.BackUrl">@(Model.BackLabel ?? "Zpět")</a>
+            <span class="project-header-divider">|</span>
+        }
+        <h1 class="project-title-inline">@Model.PageTitle</h1>
+        <span class="pill">Zkratka: @Model.Projekt.Zkratka</span>
+        @if (!string.IsNullOrWhiteSpace(Model.Projekt.Stav))
+        {
+            <span class="badge project-status-inline">@Model.Projekt.Stav</span>
+        }
+    </div>
+</section>
 
 <div class="tabs" role="tablist">
-    <button class="tab active" type="button" data-tab="zaznamy">Záznamy</button>
-    <button class="tab" type="button" data-tab="harmonogram">Harmonogram</button>
-    <button class="tab" type="button" data-tab="jednani">Jednání</button>
-    <button class="tab" type="button" data-tab="tym">Osoby (tým)</button>
+    <button class="tab @(Model.ActiveTab == "zaznamy" ? "active" : null)" type="button" data-tab="zaznamy">Záznamy</button>
+    <button class="tab @(Model.ActiveTab == "harmonogram" ? "active" : null)" type="button" data-tab="harmonogram">Harmonogram</button>
+    <button class="tab @(Model.ActiveTab == "jednani" ? "active" : null)" type="button" data-tab="jednani">Jednání</button>
+    <button class="tab @(Model.ActiveTab == "tym" ? "active" : null)" type="button" data-tab="tym">Osoby (tým)</button>
 </div>
 
-<section class="tab-panel active" data-tab-panel="zaznamy" data-project-detail-root data-project-id="@Model.Projekt.Id">
-    <div class="panel-header">
-        <div class="panel-header-actions">
-            <a class="btn ghost"
-               href="@Model.ProjectPrintUrl"
-               target="_blank"
-               rel="noopener"
-               data-print-trigger="true"
-               data-print-pdf-url="@Model.ProjectPrintUrl"
-               data-print-word-url="@Model.ProjectWordUrl"
-               data-print-label="Tisk projektu">
-                Tisk projektu
-            </a>
-            @if (Model.CanManageRecords)
-            {
-                <button class="btn primary"
-                        type="button"
-                        data-record-editor-url="@Model.CreateRecordEditorUrl"
-                        data-record-editor-project-id="@Model.Projekt.Id"
-                        data-record-editor-label="Nový záznam">
-                    Nový záznam
-                </button>
-            }
-        </div>
-    </div>
-
-    <div class="filter-shell"
-         data-project-filter-scope="records"
-         data-project-id="@Model.Projekt.Id"
-         data-current-user-id="@Model.CurrentUserOsobaId">
-        <button class="filter-toggle" type="button" data-filter-toggle>
-            Filtry
-            <span class="filter-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>
-                </svg>
-            </span>
-        </button>
-        <div class="active-filter-row" data-filter-chip-row="records" hidden="hidden"></div>
-        <div class="filter-panel collapsed" data-filter-panel>
-            <div class="filter-grid">
-                <label class="gov-switch filter-inline-wide">
-                    <input type="checkbox" checked="checked" data-filter-key="groupBySubsystem" />
-                    <span class="gov-switch-track" aria-hidden="true">
-                        <span class="gov-switch-thumb"></span>
-                    </span>
-                    <span class="gov-switch-label">Seskupit dle subsystému</span>
-                </label>
-                <label>
-                    Subsystém
-                    <select data-filter-key="subsystem">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.SubsystemyMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Kategorie
-                    <select data-filter-key="kategorie">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.KategorieMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Stav úkolu
-                    <select data-filter-key="stav">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.StavyUkoluMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Typ úkolu
-                    <select data-filter-key="typ">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.TypyUkoluMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Vlastník
-                    <select data-filter-key="vlastnik">
-                        <option value="">Všichni</option>
-                        @foreach (var item in Model.Filtry.VlastniciMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label class="gov-switch">
-                    <input type="checkbox" data-filter-key="aktivni" />
-                    <span class="gov-switch-track" aria-hidden="true">
-                        <span class="gov-switch-thumb"></span>
-                    </span>
-                    <span class="gov-switch-label">Pouze aktivní úkoly</span>
-                </label>
-                <label class="gov-switch">
-                    <input type="checkbox" data-filter-key="mine" />
-                    <span class="gov-switch-track" aria-hidden="true">
-                        <span class="gov-switch-thumb"></span>
-                    </span>
-                    <span class="gov-switch-label">Jen mé záznamy</span>
-                </label>
-                <label>
-                    Jednání-vyjádření
-                    <select data-filter-key="jednani-vyjadreni-stav">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.StavyJednaniVyjadreni)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-            </div>
-            <div class="filter-actions">
-                <button class="btn small ghost" type="button" data-filter-save-defaults="records">Uložit jako výchozí</button>
-                <span class="filter-save-status" data-filter-save-status="records" aria-live="polite"></span>
-            </div>
-        </div>
-    </div>
-
-    <div class="records-shell" data-records-view="subsystem" data-subsystem-grouped-shell>
-        <aside class="subsystem-scroll-indicator" data-subsystem-scroll-indicator hidden aria-live="polite">
-            <span class="subsystem-scroll-indicator-rail" data-subsystem-scroll-indicator-rail aria-hidden="true"></span>
-            <span class="subsystem-scroll-indicator-bubble" data-subsystem-scroll-indicator-bubble>
-                <strong class="subsystem-scroll-indicator-label" data-subsystem-scroll-indicator-label></strong>
-            </span>
-        </aside>
-        @foreach (var skupina in Model.SkupinySubsystemu)
-        {
-            <div class="subsystem-group" data-subsystem-group data-subsystem-name="@skupina.Nazev">
-                <h3>@skupina.Nazev</h3>
-                <div class="card-list">
-                    @foreach (var zaznam in skupina.Zaznamy)
-                    {
-                        @await Html.PartialAsync("_ZaznamPartial", zaznam)
-                    }
-                </div>
-            </div>
-        }
-    </div>
-
-    <div class="records-shell" data-records-view="flat" hidden>
-        <div class="card-list">
-            @foreach (var zaznam in Model.Zaznamy)
-            {
-                @await Html.PartialAsync("_ZaznamPartial", zaznam)
-            }
-        </div>
-    </div>
-</section>
-
-<section class="tab-panel" data-tab-panel="harmonogram">
-    <div class="filter-shell"
-         data-project-filter-scope="schedule"
-         data-project-id="@Model.Projekt.Id"
-         data-current-user-id="@Model.CurrentUserOsobaId">
-        <button class="filter-toggle" type="button" data-schedule-filter-toggle>
-            Filtry
-            <span class="filter-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>
-                </svg>
-            </span>
-        </button>
-        <div class="active-filter-row" data-filter-chip-row="schedule" hidden="hidden"></div>
-        <div class="filter-panel collapsed" data-schedule-filter-panel>
-            <div class="filter-grid">
-                <label>
-                    Subsystém
-                    <select data-schedule-filter-key="subsystem">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.SubsystemyMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-            </div>
-            <div class="filter-actions">
-                <button class="btn small ghost" type="button" data-filter-save-defaults="schedule">Uložit jako výchozí</button>
-                <span class="filter-save-status" data-filter-save-status="schedule" aria-live="polite"></span>
-            </div>
-        </div>
-    </div>
-
-    <div class="schedule-project-list" data-project-schedule-list data-subsystem-grouped-shell>
-        @if (harmonogramUkoly.Count == 0)
-        {
-            <p class="muted">V projektu zatím nejsou úkoly s harmonogramem.</p>
-        }
-        else
-        {
-            @foreach (var skupina in harmonogramUkoly
-                .GroupBy(item => new { item.SubsystemKod, item.Subsystem })
-                .OrderBy(group => group.Key.Subsystem))
-            {
-                <section class="schedule-subsystem-group" data-subsystem-group data-subsystem-name="@skupina.Key.Subsystem">
-                    <h3 class="schedule-subsystem-heading">@skupina.Key.Subsystem</h3>
-                    <div class="schedule-group-list">
-                        @foreach (var item in skupina)
-                        {
-                            <article class="schedule-card"
-                                     data-schedule-item
-                                     data-schedule-filter-subsystem="@item.Subsystem"
-                                     data-schedule-filter-subsystem-kod="@item.SubsystemKod">
-                                <div class="schedule-card-header">
-                                    <div>
-                                        <div class="record-title">#@item.CisloViditelne - @item.Nazev</div>
-                                        <div class="record-summary-meta">
-                                            <span><span class="label">Stav úkolu:</span> @item.Stav</span>
-                                            <span><span class="label">Typ:</span> @(string.IsNullOrWhiteSpace(item.TypUkolu) ? "-" : item.TypUkolu)</span>
-                                            <span><span class="label">Subsystém:</span> @item.Subsystem</span>
-                                            <span><span class="label">Vlastník:</span> @item.Vlastnik</span>
-                                        </div>
-                                    </div>
-                                    <div class="schedule-card-actions">
-                                        <span class="badge @(item.Stihame ? "schedule-badge-ok" : "schedule-badge-late")">@(item.Stihame ? "Stíháme" : "Nestíháme")</span>
-                                        <button class="btn small ghost" type="button" data-schedule-expand-toggle data-schedule-record-id="@item.ZaznamId">Rozpad</button>
-                                        @if (item.CanManageSchedule)
-                                        {
-                                            <button class="btn small"
-                                                    type="button"
-                                                    data-record-editor-url="@item.ScheduleEditUrl"
-                                                    data-record-editor-project-id="@Model.Projekt.Id"
-                                                    data-record-editor-label="@($"Upravit záznam #{item.CisloViditelne}")">
-                                                Upravit
-                                            </button>
-                                        }
-                                    </div>
-                                </div>
-
-                                <div class="schedule-card-timeline">
-                                    <div class="schedule-overview-timeline">
-                                        <div class="schedule-overview-row">
-                                            <span class="schedule-overview-label">Plán</span>
-                                            <div class="schedule-overview-track">
-                                                <div class="schedule-overview-marker today"
-                                                     style="left:@item.FormatCompactTodayPercent%;"
-                                                     title="@item.CompactTodayTitle"></div>
-                                                <div class="schedule-overview-marker deadline"
-                                                     style="left:@item.FormatCompactDeadlinePercent%;"
-                                                     title="@($"Termín úkolu: {item.TerminUkonceni:dd.MM.yyyy}")"></div>
-                                                @foreach (var krok in item.Kroky)
-                                                {
-                                                    <span class="schedule-overview-segment"
-                                                          data-rainbow-segment-label-full="@krok.Nazev"
-                                                          data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                          style="left:@krok.CompactPlanLeftPercent%; width:@krok.CompactPlanWidthStyle; background:@krok.BarvaHex;"
-                                                          title="@krok.CompactPlanTitle"></span>
-                                                }
-                                            </div>
-                                        </div>
-                                        <div class="schedule-overview-row">
-                                            <span class="schedule-overview-label">Skutečnost</span>
-                                            <div class="schedule-overview-track">
-                                                <div class="schedule-overview-marker today"
-                                                     style="left:@item.FormatCompactTodayPercent%;"
-                                                     title="@item.CompactTodayTitle"></div>
-                                                <div class="schedule-overview-marker deadline"
-                                                     style="left:@item.FormatCompactDeadlinePercent%;"
-                                                     title="@($"Termín úkolu: {item.TerminUkonceni:dd.MM.yyyy}")"></div>
-                                                @foreach (var krok in item.Kroky)
-                                                {
-                                                    <span class="schedule-overview-segment"
-                                                          data-rainbow-segment-label-full="@krok.Nazev"
-                                                          data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                          style="left:@krok.CompactActualLeftPercent%; width:@krok.CompactActualWidthStyle; background:@krok.BarvaHex;"
-                                                          title="@krok.CompactActualTitle"></span>
-                                                }
-                                            </div>
-                                        </div>
-                                        <div class="schedule-overview-axis-row">
-                                            <span class="schedule-overview-axis-spacer" aria-hidden="true"></span>
-                                            <div class="timeline-axis schedule-overview-axis"
-                                                 data-timeline-axis
-                                                 data-axis-start="@item.CompactAxisStart.ToString("yyyy-MM-dd")"
-                                                 data-axis-end="@item.CompactAxisEnd.ToString("yyyy-MM-dd")"></div>
-                                        </div>
-                                    </div>
-                                    <div class="schedule-layered-summary">
-                                        <span>Plán: @item.BaselineDokonceni.ToString("dd.MM.yyyy")</span>
-                                        <span>Skutečnost: @item.SkutecneDokonceni.ToString("dd.MM.yyyy")</span>
-                                        <span>Termín úkolu: @item.TerminUkonceni.ToString("dd.MM.yyyy")</span>
-                                        <span>Překročení: @(item.PrekroceniDni > 0 ? $"{item.PrekroceniDni} dnů" : "0 dnů")</span>
-                                    </div>
-                                </div>
-
-                                <div class="gantt-steps schedule-steps" data-schedule-steps data-schedule-record-id="@item.ZaznamId" hidden="hidden">
-                                    <div class="schedule-layered-legend schedule-layered-legend--steps">
-                                        <span><span class="schedule-layered-legend-swatch planned"></span>Plán</span>
-                                        <span><span class="schedule-layered-legend-swatch actual"></span>Skutečnost</span>
-                                        <span><span class="schedule-layered-legend-swatch today"></span>Dnes</span>
-                                    </div>
-                                    <div class="schedule-layered-axis-row">
-                                        <span class="schedule-layered-axis-spacer" aria-hidden="true"></span>
-                                        <div class="timeline-axis schedule-layered-axis"
-                                             data-timeline-axis
-                                             data-axis-start="@item.BreakdownAxisStart.ToString("yyyy-MM-dd")"
-                                             data-axis-end="@item.BreakdownAxisEnd.ToString("yyyy-MM-dd")"></div>
-                                    </div>
-                                    @foreach (var krok in item.Kroky)
-                                    {
-                                        <div class="gantt-step-row">
-                                            <div class="gantt-step-name">
-                                                <span>@krok.Nazev</span>
-                                                <span class="gantt-step-offset @krok.OffsetCssClass">@krok.OffsetLabel</span>
-                                            </div>
-                                            <div class="schedule-layered-track schedule-layered-track--step">
-                                                @if (krok.HasBreakdownVisualDuration)
-                                                {
-                                                    <div class="schedule-layered-marker today"
-                                                         style="left:@item.FormatBreakdownTodayPercent%;"
-                                                         title="@item.CompactTodayTitle"></div>
-                                                    <span class="schedule-layered-segment planned"
-                                                          style="left:@krok.BreakdownPlanLeftPercent%; width:@krok.BreakdownPlanWidthPercent%; background:@krok.BarvaHex;"></span>
-                                                    <span class="schedule-layered-segment actual"
-                                                          style="left:@krok.BreakdownActualLeftPercent%; width:@krok.BreakdownActualWidthPercent%; --schedule-actual-color:@item.DelayBarvaHex;"></span>
-                                                }
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
-                            </article>
-                        }
-                    </div>
-                </section>
-            }
-        }
-    </div>
-</section>
-
-<section class="tab-panel" data-tab-panel="jednani">
-    @if (Model.CanCreateMeetings)
+@await Html.PartialAsync(
+    "_ProjectRecordsTab",
+    Model.ZaznamyTab,
+    new ViewDataDictionary(ViewData)
     {
-        <div class="panel-header">
-            <button class="btn primary" type="button" data-modal-url="@Url.Action("NewMeetingModal", "Projekty", new { projektId = Model.Projekt.Id })">Nová porada</button>
-        </div>
-    }
+        ["IsActive"] = Model.ActiveTab == "zaznamy"
+    })
 
-    <div class="meeting-grid">
-        @foreach (var jednani in Model.Jednani)
+@if (Model.LoadedHarmonogramTab is not null)
+{
+    @await Html.PartialAsync(
+        "_ProjectScheduleTab",
+        Model.LoadedHarmonogramTab,
+        new ViewDataDictionary(ViewData)
         {
-            var detailUrl = Url.Action("Detail", "Jednani", new { id = jednani.Id, returnUrl = Model.ReturnToProjectUrl }) ?? $"/Jednani/Detail/{jednani.Id}";
-            var meetingPdfUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{jednani.Id}/Tisk?autoPrint=true";
-            var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = jednani.Id }) ?? $"/Export/Jednani/{jednani.Id}/Word";
-            @await Html.PartialAsync("_MeetingCard", new MeetingCardViewModel
-            {
-                ProjektId = Model.Projekt.Id,
-                CanDelete = Model.CanEditMeetings,
-                UseAjaxDelete = true,
-                DetailUrl = detailUrl,
-                PrintPdfUrl = meetingPdfUrl,
-                PrintWordUrl = meetingWordUrl,
-                Jednani = jednani
-            })
-        }
-    </div>
-</section>
-
-<section class="tab-panel" data-tab-panel="tym">
-    <div class="stack-lg">
-        <section class="card">
-            <div class="panel-header">
-                <h3>Projektové role</h3>
-                @if (Model.CanManageTeam)
-                {
-                    <div class="header-actions">
-                        <button class="btn primary" type="button" data-modal-url="@Url.Action("AssignProjectRoleModal", "Projekty", new { projektId = Model.Projekt.Id })">Přidat projektovou roli</button>
-                        <button class="btn" type="button" data-modal-url="@Url.Action("AssignProjectSubsystemRoleModal", "Projekty", new { projektId = Model.Projekt.Id })">Přidat roli v subsystému</button>
-                    </div>
-                }
+            ["IsActive"] = Model.ActiveTab == "harmonogram"
+        })
+}
+else
+{
+    <section class="tab-panel @(Model.ActiveTab == "harmonogram" ? "active" : null)"
+             data-tab-panel="harmonogram"
+             data-project-tab-lazy-url="@Model.HarmonogramTab.LoadUrl"
+             data-project-tab-loaded="false">
+        <div class="lazy-tab-placeholder" data-project-tab-placeholder>
+            <div class="record-loading-placeholder">
+                <div class="record-loading-line"></div>
+                <div class="record-loading-line short"></div>
+                <div class="record-loading-line"></div>
             </div>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Osoba</th>
-                        <th>Email</th>
-                        <th>Typ role</th>
-                        <th>Role</th>
-                        <th>Subsystém</th>
-                        <th>Organizace</th>
-                        <th>Organizační celek</th>
-                        <th>Přiřazeno</th>
-                        <th class="table-actions">Akce</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var role in Model.AktivniRole)
-                {
-                    <tr>
-                        <td>@role.Osoba</td>
-                        <td>@(string.IsNullOrWhiteSpace(role.Email) ? "-" : role.Email)</td>
-                        <td>@role.RoleTypeLabel</td>
-                        <td>@role.RoleNazev</td>
-                        <td>@(string.IsNullOrWhiteSpace(role.SubsystemNazev) ? "-" : role.SubsystemNazev)</td>
-                        <td>@(role.Organizace ?? "-")</td>
-                        <td>@(role.OrganizacniCelek ?? "-")</td>
-                        <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
-                        <td class="table-actions">
-                            @if (Model.CanManageTeam)
-                            {
-                                @if (string.Equals(role.AssignmentKind, "PROJECT", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    <form asp-controller="Projekty"
-                                          asp-action="DeactivateProjectRole"
-                                          method="post"
-                                          data-ajax-submit="true"
-                                          onsubmit="return confirm('Opravdu deaktivovat projektovou roli?');">
-                                        <input type="hidden" name="projektId" value="@Model.Projekt.Id" />
-                                        <input type="hidden" name="ProjektRoleId" value="@role.AssignmentId" />
-                                        <button class="btn small ghost" type="submit">Deaktivovat</button>
-                                    </form>
-                                }
-                                else
-                                {
-                                    <form asp-controller="Projekty"
-                                          asp-action="DeactivateProjectSubsystemRole"
-                                          method="post"
-                                          data-ajax-submit="true"
-                                          onsubmit="return confirm('Opravdu deaktivovat roli v subsystému?');">
-                                        <input type="hidden" name="projektId" value="@Model.Projekt.Id" />
-                                        <input type="hidden" name="ProjektSubsystemRoleId" value="@role.AssignmentId" />
-                                        <button class="btn small ghost" type="submit">Deaktivovat</button>
-                                    </form>
-                                }
-                            }
-                            else
-                            {
-                                <span class="muted">Pouze čtení</span>
-                            }
-                        </td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </section>
+            <p class="muted">@Model.HarmonogramTab.LoadingText</p>
+        </div>
+        <div class="record-loading-error" data-project-tab-error hidden></div>
+    </section>
+}
 
-        <section class="card">
-            <div class="panel-header">
-                <h3>Subsystémy projektu</h3>
-                @if (Model.CanManageTeam)
-                {
-                    <button class="btn primary" type="button" data-modal-url="@Url.Action("AssignProjectSubsystemModal", "Projekty", new { projektId = Model.Projekt.Id })">Přiřadit subsystém</button>
-                }
+@if (Model.LoadedJednaniTab is not null)
+{
+    @await Html.PartialAsync(
+        "_ProjectMeetingsTab",
+        Model.LoadedJednaniTab,
+        new ViewDataDictionary(ViewData)
+        {
+            ["IsActive"] = Model.ActiveTab == "jednani"
+        })
+}
+else
+{
+    <section class="tab-panel @(Model.ActiveTab == "jednani" ? "active" : null)"
+             data-tab-panel="jednani"
+             data-project-tab-lazy-url="@Model.JednaniTab.LoadUrl"
+             data-project-tab-loaded="false">
+        <div class="lazy-tab-placeholder" data-project-tab-placeholder>
+            <div class="record-loading-placeholder">
+                <div class="record-loading-line"></div>
+                <div class="record-loading-line short"></div>
             </div>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Kód</th>
-                        <th>Subsystém</th>
-                        <th>Přiřazeno</th>
-                        <th class="table-actions">Akce</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var subsystem in Model.AktivniSubsystemyProjektu)
-                {
-                    <tr>
-                        <td>@subsystem.Kod</td>
-                        <td>@subsystem.Nazev</td>
-                        <td>@subsystem.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
-                        <td class="table-actions">
-                            @if (Model.CanManageTeam)
-                            {
-                                <form asp-controller="Projekty"
-                                      asp-action="DeactivateProjectSubsystem"
-                                      method="post"
-                                      data-ajax-submit="true"
-                                      onsubmit="return confirm('Opravdu deaktivovat subsystém projektu?');">
-                                    <input type="hidden" name="projektId" value="@Model.Projekt.Id" />
-                                    <input type="hidden" name="ProjektSubsystemId" value="@subsystem.ProjektSubsystemId" />
-                                    <button class="btn small ghost" type="submit">Deaktivovat</button>
-                                </form>
-                            }
-                            else
-                            {
-                                <span class="muted">Pouze čtení</span>
-                            }
-                        </td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </section>
+            <p class="muted">@Model.JednaniTab.LoadingText</p>
+        </div>
+        <div class="record-loading-error" data-project-tab-error hidden></div>
+    </section>
+}
 
-        <section class="card">
-            <div class="panel-header">
-                <h3>Historie rolí</h3>
+@if (Model.LoadedTymTab is not null)
+{
+    @await Html.PartialAsync(
+        "_ProjectTeamTab",
+        Model.LoadedTymTab,
+        new ViewDataDictionary(ViewData)
+        {
+            ["IsActive"] = Model.ActiveTab == "tym"
+        })
+}
+else
+{
+    <section class="tab-panel @(Model.ActiveTab == "tym" ? "active" : null)"
+             data-tab-panel="tym"
+             data-project-tab-lazy-url="@Model.TymTab.LoadUrl"
+             data-project-tab-loaded="false">
+        <div class="lazy-tab-placeholder" data-project-tab-placeholder>
+            <div class="record-loading-placeholder">
+                <div class="record-loading-line"></div>
+                <div class="record-loading-line short"></div>
+                <div class="record-loading-line"></div>
             </div>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Osoba</th>
-                        <th>Typ role</th>
-                        <th>Role</th>
-                        <th>Subsystém</th>
-                        <th>Přiřazeno</th>
-                        <th>Odebráno</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var role in Model.HistorieRoli)
-                {
-                    <tr>
-                        <td>@role.Osoba</td>
-                        <td>@role.RoleTypeLabel</td>
-                        <td>@role.RoleNazev</td>
-                        <td>@(string.IsNullOrWhiteSpace(role.SubsystemNazev) ? "-" : role.SubsystemNazev)</td>
-                        <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
-                        <td>@(role.DatumOdebrani?.ToString("dd.MM.yyyy HH:mm") ?? "-")</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </section>
-    </div>
-</section>
+            <p class="muted">@Model.TymTab.LoadingText</p>
+        </div>
+        <div class="record-loading-error" data-project-tab-error hidden></div>
+    </section>
+}

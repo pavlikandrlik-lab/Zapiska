@@ -49,7 +49,9 @@ Tento dokument popisuje runtime konfiguraci aplikace včetně všech povinných 
 
 ### 5.2 Environment-specific pravidla
 - `Development`:
-  - může používat SQL login pro lokální kontejner.
+  - connection string neukládej do `appsettings.Development.json`,
+  - dodej ho přes environment variable `ConnectionStrings__PmTrackerDb`,
+  - lokální SQL login pro kontejner je přípustný jen mimo repozitář.
 - `Production`:
   - preferuj `Trusted_Connection=True` se servisní identitou app poolu,
   - citlivé hodnoty neukládej do repozitáře.

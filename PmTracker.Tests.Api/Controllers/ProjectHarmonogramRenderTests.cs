@@ -18,6 +18,26 @@ public sealed class ProjectHarmonogramRenderTests
     }
 
     [Fact]
+    public async Task Detail_ShouldRenderInlineProjectHeader_LikeMainLayout()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiProjectHeaderOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIHARMHDR");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIHARMSUBHDR", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+        await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API project header record");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Projekty/Detail/{projectId}?asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("project-header-row");
+        html.Should().Contain("project-title-inline");
+        html.Should().Contain("project-status-inline");
+        html.Should().Contain("Zkratka: APIHARMHDR");
+    }
+
+    [Fact]
     public async Task Detail_ShouldRenderCompactOverview_WithSeparateRows_AndAxisBelow()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiHarmonogramOwner");

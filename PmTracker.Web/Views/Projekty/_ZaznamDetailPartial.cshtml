@@ -1,0 +1,157 @@
+@using System.Globalization
+@model ZaznamCardDetailViewModel
+@inject PmTracker.Web.Services.Common.IRichTextContentService RichTextContentService
+@{
+    var safeDescriptionHtml = RichTextContentService.ToSafeHtml(Model.Popis);
+}
+
+<div class="record-history">
+    <div>
+        <span class="label">Vlastník:</span>
+        @foreach (var jmeno in Model.HistorieVlastniku)
+        {
+            <span class="history"><s>@jmeno</s></span>
+        }
+        <strong>@Model.AktualniVlastnik</strong>
+    </div>
+    <div>
+        <span class="label">Termín:</span>
+        @foreach (var termin in Model.HistorieTerminu)
+        {
+            <span class="history"><s>@termin.ToString("dd.MM.yyyy")</s></span>
+        }
+        <strong>@(Model.AktualniTermin?.ToString("dd.MM.yyyy") ?? "-")</strong>
+    </div>
+    <div>
+        <span class="label">Subsystém:</span>
+        @foreach (var subsystem in Model.HistorieSubsystemu)
+        {
+            <span class="history"><s>@subsystem</s></span>
+        }
+        <strong>@Model.AktualniSubsystem</strong>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Model.TypUkolu))
+    {
+        <div>
+            <span class="label">Typ úkolu:</span>
+            @foreach (var typ in Model.HistorieTypuUkolu)
+            {
+                <span class="history"><s>@typ</s></span>
+            }
+            <strong>@Model.TypUkolu</strong>
+        </div>
+    }
+</div>
+
+@if (!string.IsNullOrWhiteSpace(safeDescriptionHtml))
+{
+    <div class="record-description">
+        <span class="label">Popis:</span>
+        <div class="richtext-render">@Html.Raw(safeDescriptionHtml)</div>
+    </div>
+}
+
+@if (Model.ExterniOdkazy.Count > 0)
+{
+    <div class="record-chips">
+        @for (var i = 0; i < Model.ExterniOdkazy.Count; i++)
+        {
+            var odkaz = Model.ExterniOdkazy[i];
+            var tooltipId = $"chip-tooltip-{Guid.NewGuid():N}-{i}";
+            var estimatedPriceLabel = odkaz.PredpokladanaCena.HasValue
+                ? $"{odkaz.PredpokladanaCena.Value.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ"))} Kč"
+                : null;
+            <span class="chip-wrap">
+                @if (!string.IsNullOrWhiteSpace(odkaz.ServiceDeskUrl))
+                {
+                    <a class="chip chip-interactive chip-link"
+                       href="@odkaz.ServiceDeskUrl"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       aria-describedby="@tooltipId"
+                       title="Otevřít detail v ServiceDesk">
+                        <span class="chip-label">@odkaz.Typ</span>
+                        <span class="chip-value">@odkaz.Cislo</span>
+                        @if (!string.IsNullOrWhiteSpace(odkaz.Vyzva))
+                        {
+                            <span class="chip-sub">@odkaz.Vyzva</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(estimatedPriceLabel))
+                        {
+                            <span class="chip-sub">@estimatedPriceLabel</span>
+                        }
+                    </a>
+                }
+                else
+                {
+                    <span class="chip chip-interactive" tabindex="0" aria-describedby="@tooltipId">
+                        <span class="chip-label">@odkaz.Typ</span>
+                        <span class="chip-value">@odkaz.Cislo</span>
+                        @if (!string.IsNullOrWhiteSpace(odkaz.Vyzva))
+                        {
+                            <span class="chip-sub">@odkaz.Vyzva</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(estimatedPriceLabel))
+                        {
+                            <span class="chip-sub">@estimatedPriceLabel</span>
+                        }
+                    </span>
+                }
+                <span id="@tooltipId" class="chip-tooltip" role="tooltip">
+                    <span class="chip-tooltip-title">@odkaz.Typ @odkaz.Cislo</span>
+                    <span class="chip-tooltip-row">
+                        <span>Typ:</span>
+                        <strong>@(odkaz.TypNazev ?? "-")</strong>
+                    </span>
+                    <span class="chip-tooltip-row">
+                        <span>Výzva:</span>
+                        <strong>@(string.IsNullOrWhiteSpace(odkaz.Vyzva) ? "-" : odkaz.Vyzva)</strong>
+                    </span>
+                    <span class="chip-tooltip-row">
+                        <span>Předpokl. cena:</span>
+                        <strong>@(string.IsNullOrWhiteSpace(estimatedPriceLabel) ? "-" : estimatedPriceLabel)</strong>
+                    </span>
+                    <span class="chip-tooltip-row">
+                        <span>Objednáno:</span>
+                        <strong>@FormatDate(odkaz.DatumObjednani)</strong>
+                    </span>
+                    <span class="chip-tooltip-row">
+                        <span>Plán dodání:</span>
+                        <strong>@FormatDate(odkaz.DatumPlanDodani)</strong>
+                    </span>
+                    <span class="chip-tooltip-row">
+                        <span>Datum dodání:</span>
+                        <strong>@FormatDate(odkaz.DatumDodani)</strong>
+                    </span>
+                    <span class="chip-tooltip-row">
+                        <span>Datum převzetí:</span>
+                        <strong>@FormatDate(odkaz.DatumPrevzeti)</strong>
+                    </span>
+                </span>
+            </span>
+        }
+    </div>
+}
+
+@if (Model.Spoluprace.Count > 0)
+{
+    <div class="record-collab-block">
+        <span class="label">Spolupráce:</span>
+        <div class="record-collab-chips">
+            @foreach (var spolupracovnik in Model.Spoluprace)
+            {
+                <span class="chip chip-collab"
+                      title="@(string.IsNullOrWhiteSpace(spolupracovnik.Email) ? "-" : spolupracovnik.Email) | @(spolupracovnik.Organizace ?? "-") / @(spolupracovnik.OrganizacniCelek ?? "-")">
+                    @spolupracovnik.Osoba
+                </span>
+            }
+        </div>
+    </div>
+}
+
+@functions {
+    private static string FormatDate(DateTime? value)
+    {
+        return value?.ToString("dd.MM.yyyy") ?? "-";
+    }
+}

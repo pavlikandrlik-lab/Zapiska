@@ -4,6 +4,8 @@ import {
     handleNavigationCardClick,
     handleNavigationCardKeydown,
     initCiselnikAjaxSwitch,
+    loadProjectTabPanel,
+    loadRecordComments,
     initProfileRightsFilter,
     initProjectIndexStatusFilters,
     initProjectRecordPageshowSync,
@@ -11,6 +13,8 @@ import {
     initProjectTabs,
     initSettingsAjaxSwitch,
     initUserMenu,
+    loadRecordDetail,
+    toggleRecordCard,
     toggleMeetingAttendancePanel
 } from "./navigation.js";
 import {
@@ -244,6 +248,46 @@ function handleDocumentClick(event) {
         return;
     }
 
+    const projectTabRetry = target.closest("[data-project-tab-retry]");
+    if (projectTabRetry instanceof HTMLButtonElement) {
+        event.preventDefault();
+        const panel = projectTabRetry.closest("[data-tab-panel]");
+        if (panel instanceof HTMLElement) {
+            void loadProjectTabPanel(panel, { force: true });
+        }
+        return;
+    }
+
+    const recordCommentsToggle = target.closest("[data-record-comments-toggle]");
+    if (recordCommentsToggle instanceof HTMLButtonElement) {
+        event.preventDefault();
+        const card = recordCommentsToggle.closest(".record-card");
+        if (card instanceof HTMLElement) {
+            void loadRecordComments(card);
+        }
+        return;
+    }
+
+    const recordCommentsRetry = target.closest("[data-record-comments-retry]");
+    if (recordCommentsRetry instanceof HTMLButtonElement) {
+        event.preventDefault();
+        const card = recordCommentsRetry.closest(".record-card");
+        if (card instanceof HTMLElement) {
+            void loadRecordComments(card, { force: true });
+        }
+        return;
+    }
+
+    const recordDetailRetry = target.closest("[data-record-detail-retry]");
+    if (recordDetailRetry instanceof HTMLButtonElement) {
+        event.preventDefault();
+        const card = recordDetailRetry.closest(".record-card");
+        if (card instanceof HTMLElement) {
+            void loadRecordDetail(card, { force: true });
+        }
+        return;
+    }
+
     const recordToggle = target.closest("[data-record-toggle]");
     if (recordToggle) {
         if (target.closest("[data-stop-propagation]")) {
@@ -251,8 +295,7 @@ function handleDocumentClick(event) {
         }
         const card = recordToggle.closest(".record-card");
         if (card) {
-            card.classList.toggle("collapsed", !card.classList.contains("collapsed"));
-            recordToggle.setAttribute("aria-expanded", String(!card.classList.contains("collapsed")));
+            void toggleRecordCard(card);
         }
         return;
     }

@@ -20,6 +20,7 @@ public sealed class TeamMemberModalViewModel
 {
     public required string Title { get; init; }
     public required SaveTeamMemberCommand Command { get; init; }
+    public string? SearchUrl { get; init; }
     public IReadOnlyList<TeamCandidateViewModel> DostupniClenoveTymu { get; init; } = Array.Empty<TeamCandidateViewModel>();
     public IReadOnlyList<LookupOptionViewModel> RoleProjektu { get; init; } = Array.Empty<LookupOptionViewModel>();
 }
@@ -28,6 +29,7 @@ public sealed class AssignProjectRoleModalViewModel
 {
     public required string Title { get; init; }
     public required AssignProjectRoleCommand Command { get; init; }
+    public string? SearchUrl { get; init; }
     public IReadOnlyList<ProjectMemberCandidateViewModel> DostupneOsoby { get; init; } = Array.Empty<ProjectMemberCandidateViewModel>();
     public IReadOnlyList<LookupOptionViewModel> RoleProjektu { get; init; } = Array.Empty<LookupOptionViewModel>();
 }
@@ -43,9 +45,32 @@ public sealed class AssignProjectSubsystemRoleModalViewModel
 {
     public required string Title { get; init; }
     public required AssignProjectSubsystemRoleCommand Command { get; init; }
+    public string? SearchUrl { get; init; }
     public IReadOnlyList<ProjectSubsystemOptionViewModel> ProjektSubsystemy { get; init; } = Array.Empty<ProjectSubsystemOptionViewModel>();
     public IReadOnlyList<ProjectMemberCandidateViewModel> DostupneOsoby { get; init; } = Array.Empty<ProjectMemberCandidateViewModel>();
     public IReadOnlyList<LookupOptionViewModel> RoleSubsystemu { get; init; } = Array.Empty<LookupOptionViewModel>();
+}
+
+public sealed class ProjectTeamModalOptionsViewModel
+{
+    public IReadOnlyList<LookupOptionViewModel> RoleProjektu { get; init; } = Array.Empty<LookupOptionViewModel>();
+    public IReadOnlyList<LookupOptionViewModel> RoleSubsystemu { get; init; } = Array.Empty<LookupOptionViewModel>();
+    public IReadOnlyList<ProjectSubsystemOptionViewModel> DostupneProjektoveSubsystemy { get; init; } = Array.Empty<ProjectSubsystemOptionViewModel>();
+    public IReadOnlyList<LookupOptionViewModel> DostupneSubsystemy { get; init; } = Array.Empty<LookupOptionViewModel>();
+}
+
+public sealed class PersonPickerEntryViewModel
+{
+    public int Id { get; init; }
+    public required string Label { get; init; }
+    public string? Email { get; init; }
+    public string? Organizace { get; init; }
+    public string? OrganizacniCelek { get; init; }
+}
+
+public sealed class PersonPickerSearchResponseViewModel
+{
+    public IReadOnlyList<PersonPickerEntryViewModel> Results { get; init; } = Array.Empty<PersonPickerEntryViewModel>();
 }
 
 public sealed class AddMeetingParticipantModalViewModel

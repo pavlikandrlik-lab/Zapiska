@@ -122,7 +122,8 @@ public sealed partial class MeetingService
 
         var commentsForRecord = await dbContext.Vyjadreni.AsNoTracking()
             .Where(x => x.JednaniId == meetingId && x.ZaznamId == zaznamId)
-            .OrderBy(x => x.Id)
+            .OrderBy(x => x.DatumVyjadreni)
+            .ThenBy(x => x.Id)
             .ToListAsync(ct);
         var requiredPersonIds = commentsForRecord
             .Select(x => x.AutorOsobaId)

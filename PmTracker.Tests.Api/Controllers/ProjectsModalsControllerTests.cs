@@ -207,7 +207,7 @@ public sealed class ProjectsModalsControllerTests
         html.Should().Contain($"name=\"ProjektId\" value=\"{projectId}\"");
         html.Should().Contain("name=\"OsobaId\"");
         html.Should().Contain("name=\"Role\"");
-        html.Should().Contain(candidateId.ToString(), "kandidáti osob mají být dostupní ve zdroji pickeru");
+        html.Should().Contain($"data-person-picker-search-url=\"/Projekty/SearchProjectMemberCandidates/{projectId}\"");
     }
 
     [Fact]
@@ -249,7 +249,7 @@ public sealed class ProjectsModalsControllerTests
         html.Should().Contain($"name=\"ProjektId\" value=\"{projectId}\"");
         html.Should().Contain("name=\"OsobaId\"");
         html.Should().Contain("name=\"RoleKod\"");
-        html.Should().Contain(candidateId.ToString());
+        html.Should().Contain($"data-person-picker-search-url=\"/Projekty/SearchProjectMemberCandidates/{projectId}\"");
     }
 
     [Fact]
@@ -322,7 +322,7 @@ public sealed class ProjectsModalsControllerTests
         html.Should().Contain("name=\"OsobaId\"");
         html.Should().Contain("name=\"RoleKod\"");
         html.Should().Contain(projectSubsystemId.ToString());
-        html.Should().Contain(candidateId.ToString());
+        html.Should().Contain($"data-person-picker-search-url=\"/Projekty/SearchProjectMemberCandidates/{projectId}\"");
     }
 
     [Fact]

@@ -24,7 +24,11 @@
         <div class="comment-list" data-comment-list>
             @foreach (var vyjadreni in ukol.Vyjadreni)
             {
-                <div class="comment" data-comment-item data-comment-meeting="@Model.JednaniCislo" data-comment-id="@vyjadreni.Id">
+                <div class="comment"
+                     data-comment-item
+                     data-comment-meeting="@Model.JednaniCislo"
+                     data-comment-date="@vyjadreni.Datum.ToString("O")"
+                     data-comment-id="@vyjadreni.Id">
                     <div class="comment-header">
                         <strong>@vyjadreni.Autor</strong>
                         <span class="muted">@vyjadreni.Datum.ToString("dd.MM.yyyy HH:mm")</span>

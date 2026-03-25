@@ -24,6 +24,10 @@ public sealed partial class RecordService
         int Id,
         int CisloJednani);
 
+    private sealed record OpenMeetingRow(
+        int Id,
+        int CisloJednani);
+
     private sealed record SaveRecordValidationContext(
         int OwnerId,
         int KategorieId,
@@ -90,6 +94,7 @@ public sealed partial class RecordService
             var normalizedDescription = richTextContentService.NormalizeForStorage(command.Popis?.Trim());
             entity.Popis = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription;
             entity.VlastnikId = ownerId;
+            entity.DatumZalozeni = command.DatumZalozeni.Date;
             entity.DatumUkonceni = command.TerminUkonceni.Date;
             entity.SubsystemId = subsystemId;
             if (string.IsNullOrWhiteSpace(entity.CisloViditelne))
@@ -396,26 +401,15 @@ public sealed partial class RecordService
             throw new InvalidOperationException("Záznam už má identifikátor podle jednání.");
         }
 
-        var meetingRows = await dbContext.Jednani.AsNoTracking()
-            .Where(x => x.ProjektId == command.ProjektId)
-            .ToListAsync(ct);
-        var meetingStateById = (await dbContext.CiselnikStavuJednani.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
-        var openMeetingIds = meetingRows
-            .Where(x => !IsMeetingReadOnly(x, meetingStateById.GetValueOrDefault(x.StavJednaniId)))
-            .Select(x => x.Id)
-            .ToHashSet();
-        if (openMeetingIds.Count == 0)
+        var openMeetings = await LoadOpenProjectMeetingsAsync(command.ProjektId, ct);
+        if (openMeetings.Count == 0)
         {
             throw new InvalidOperationException("Není dostupné žádné neuzavřené jednání.");
         }
 
-        var meeting = meetingRows
+        var meeting = openMeetings
             .FirstOrDefault(x => x.Id == command.JednaniId)
             ?? throw new InvalidOperationException("Vybrané jednání neexistuje.");
-        if (!openMeetingIds.Contains(meeting.Id))
-        {
-            throw new InvalidOperationException("Vybrané jednání je uzavřené. Vyberte neuzavřené jednání.");
-        }
 
         var nextOrder = await composition.AllocateMeetingOrderTransactionalAsync(command.ProjektId, meeting.CisloJednani, ct);
         var old = JsonSerializer.Serialize(record);
@@ -560,13 +554,7 @@ public sealed partial class RecordService
         SaveRecordMeetingContext? meetingForNumbering = null;
         if (project?.PouzivatIdentJednani == true && !command.Id.HasValue)
         {
-            var meetingRows = await dbContext.Jednani.AsNoTracking()
-                .Where(x => x.ProjektId == command.ProjektId)
-                .ToListAsync(ct);
-            var meetingStateById = (await dbContext.CiselnikStavuJednani.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
-            var openMeetings = meetingRows
-                .Where(row => !IsMeetingReadOnly(row, meetingStateById.GetValueOrDefault(row.StavJednaniId)))
-                .ToList();
+            var openMeetings = await LoadOpenProjectMeetingsAsync(command.ProjektId, ct);
 
             if (openMeetings.Count == 0)
             {
@@ -590,25 +578,15 @@ public sealed partial class RecordService
             }
             else
             {
-                var selectedMeeting = meetingRows.FirstOrDefault(x => x.Id == command.JednaniIdProCislo.Value);
+                var selectedMeeting = openMeetings.FirstOrDefault(x => x.Id == command.JednaniIdProCislo.Value);
                 if (selectedMeeting is null)
                 {
                     AddRecordValidationIssue(
                         issues,
                         "JednaniIdProCislo",
-                        "Vybrané jednání neexistuje.",
+                        "Vybrané jednání neexistuje nebo je uzavřené. Vyberte neuzavřené jednání.",
                         "basic",
-                        "meeting_not_found",
-                        command.JednaniIdProCislo.Value.ToString(CultureInfo.InvariantCulture));
-                }
-                else if (openMeetings.All(x => x.Id != selectedMeeting.Id))
-                {
-                    AddRecordValidationIssue(
-                        issues,
-                        "JednaniIdProCislo",
-                        "Vybrané jednání je uzavřené. Vyberte neuzavřené jednání.",
-                        "basic",
-                        "meeting_closed",
+                        "meeting_closed_or_missing",
                         command.JednaniIdProCislo.Value.ToString(CultureInfo.InvariantCulture));
                 }
                 else
@@ -1454,6 +1432,19 @@ public sealed partial class RecordService
 
     private static bool IsMeetingReadOnly(JednaniEntity? meeting, CiselnikStavuJednaniEntity? status)
         => MeetingStatePolicy.IsReadOnly(meeting, status);
+
+    private Task<List<OpenMeetingRow>> LoadOpenProjectMeetingsAsync(int projectId, CancellationToken ct)
+        => (
+                from meeting in dbContext.Jednani.AsNoTracking()
+                join state in dbContext.CiselnikStavuJednani.AsNoTracking() on meeting.StavJednaniId equals state.Id
+                where meeting.ProjektId == projectId
+                    && !meeting.UzamklOsobaId.HasValue
+                    && state.Kod != "CLOSED"
+                    && !EF.Functions.Like(state.Nazev, "%uzav%")
+                select new OpenMeetingRow(
+                    meeting.Id,
+                    meeting.CisloJednani))
+            .ToListAsync(ct);
 
     private DateTime GetLocalNow()
         => timeProvider.GetLocalNow().LocalDateTime;

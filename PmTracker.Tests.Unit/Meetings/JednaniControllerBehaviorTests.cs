@@ -59,6 +59,46 @@ public sealed class JednaniControllerBehaviorTests
         meetingService.BuildJednaniListAsyncCalls.Should().Be(1);
     }
 
+    [Fact]
+    public async Task Index_ShouldPassAccessibleProjectFilterToMeetingOverviewAsync()
+    {
+        var meetingService = new FakeMeetingService
+        {
+            Overview =
+            [
+                new JednaniProjektListItemViewModel
+                {
+                    ProjektId = 42,
+                    ProjektNazev = "Projekt 42",
+                    Jednani = []
+                }
+            ]
+        };
+        var controller = CreateController(meetingService);
+        SetCurrentUserContext(controller, new CurrentUserContextViewModel
+        {
+            OsobaId = 1,
+            Jmeno = "Unit",
+            Prijmeni = "Tester",
+            DisplayName = "Unit Tester",
+            Email = "unit@test.local",
+            OrganizacniCelek = "Test",
+            OrganizacniCelekKod = "TEST",
+            IsSuperAdmin = false,
+            RoleKody = [],
+            VisibleProjectIds = [42],
+            DeletedProjectIds = [],
+            PermissionGrants = []
+        });
+
+        var result = await controller.Index(null);
+
+        var view = result.Should().BeOfType<ViewResult>().Subject;
+        var model = view.Model.Should().BeOfType<JednaniIndexViewModel>().Subject;
+        model.Projekty.Should().ContainSingle(x => x.ProjektId == 42);
+        meetingService.OverviewProjectIds.Should().Equal(42);
+    }
+
     private static JednaniController CreateController(FakeMeetingService meetingService)
     {
         var httpContext = new DefaultHttpContext();
@@ -105,19 +145,32 @@ public sealed class JednaniControllerBehaviorTests
         public int? MeetingProjectId { get; set; }
         public JednaniUkolViewModel? SingleTask { get; set; }
         public IReadOnlyList<JednaniListItemViewModel> Meetings { get; set; } = [];
+        public IReadOnlyList<JednaniProjektListItemViewModel> Overview { get; set; } = [];
+        public IReadOnlyList<int>? OverviewProjectIds { get; private set; }
         public IReadOnlyList<MeetingParticipantCandidateViewModel> ParticipantCandidates { get; set; } = [];
         public int BuildJednaniDetailCalls { get; private set; }
         public int GetMeetingProjectIdCalls { get; private set; }
         public int GetSingleTaskCalls { get; private set; }
         public int BuildJednaniListAsyncCalls { get; private set; }
 
-        public Task<IReadOnlyList<JednaniProjektListItemViewModel>> BuildJednaniOverviewAsync(CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<JednaniProjektListItemViewModel>> BuildJednaniOverviewAsync(CancellationToken ct = default)
+            => Task.FromResult(Overview);
+
+        public Task<IReadOnlyList<JednaniProjektListItemViewModel>> BuildJednaniOverviewAsync(IReadOnlyCollection<int>? projectIds, CancellationToken ct = default)
+        {
+            OverviewProjectIds = projectIds?.ToArray();
+            return Task.FromResult(Overview);
+        }
 
         public Task<IReadOnlyList<JednaniListItemViewModel>> BuildJednaniListAsync(int projektId, CancellationToken ct = default)
         {
             BuildJednaniListAsyncCalls += 1;
             return Task.FromResult(Meetings);
         }
+
+        public Task<MeetingModalViewModel> BuildNewMeetingModalAsync(int projectId, DateTime localNow, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<MeetingModalViewModel?> BuildEditMeetingModalAsync(int projectId, int meetingId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool?> IsMeetingEditableAsync(int projectId, int meetingId, CancellationToken ct = default) => throw new NotSupportedException();
 
         public Task<JednaniDetailViewModel> BuildJednaniDetailAsync(int id, CancellationToken ct = default)
         {

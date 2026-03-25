@@ -8,17 +8,47 @@ namespace PmTracker.Web.Services;
 public sealed partial class MeetingService
 {
     public async Task<IReadOnlyList<JednaniProjektListItemViewModel>> BuildJednaniOverviewAsync(CancellationToken ct = default)
+        => await BuildJednaniOverviewAsync(projectIds: null, ct);
+
+    public async Task<IReadOnlyList<JednaniProjektListItemViewModel>> BuildJednaniOverviewAsync(IReadOnlyCollection<int>? projectIds, CancellationToken ct = default)
     {
-        var projects = await dbContext.Projekty.AsNoTracking()
-            .OrderBy(x => x.Zkratka)
-            .Select(x => new { x.Id, x.CelyNazev })
+        if (projectIds is { Count: 0 })
+        {
+            return [];
+        }
+
+        var meetingRowsQuery =
+            from meeting in dbContext.Jednani.AsNoTracking()
+            join project in dbContext.Projekty.AsNoTracking() on meeting.ProjektId equals project.Id
+            join status in dbContext.CiselnikStavuJednani.AsNoTracking() on meeting.StavJednaniId equals status.Id
+            select new
+            {
+                ProjektId = project.Id,
+                ProjektNazev = project.CelyNazev,
+                ProjectSortKey = project.Zkratka,
+                meeting.Id,
+                meeting.CisloJednani,
+                Datum = meeting.DatumPlanovane,
+                meeting.CasZacatek,
+                meeting.Misto,
+                StavKod = status.Kod,
+                Stav = status.Nazev,
+                meeting.UzamklOsobaId
+            };
+
+        if (projectIds is { Count: > 0 })
+        {
+            meetingRowsQuery = meetingRowsQuery.Where(x => projectIds.Contains(x.ProjektId));
+        }
+
+        var rows = await meetingRowsQuery
+            .OrderBy(x => x.ProjectSortKey)
+            .ThenByDescending(x => x.CisloJednani)
+            .ThenByDescending(x => x.Datum)
+            .ThenByDescending(x => x.CasZacatek)
             .ToListAsync(ct);
 
-        var allMeetings = await dbContext.Jednani.AsNoTracking()
-            .ToListAsync(ct);
-        var statusRows = await dbContext.CiselnikStavuJednani.AsNoTracking()
-            .ToListAsync(ct);
-        var lockedPersonIds = allMeetings
+        var lockedPersonIds = rows
             .Where(x => x.UzamklOsobaId.HasValue)
             .Select(x => x.UzamklOsobaId!.Value)
             .Distinct()
@@ -28,20 +58,29 @@ public sealed partial class MeetingService
             : await dbContext.Osoby.AsNoTracking()
                 .Where(x => lockedPersonIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
-
-        var statusById = statusRows.ToDictionary(x => x.Id);
-        var meetingsByProjectId = allMeetings
-            .GroupBy(x => x.ProjektId)
-            .ToDictionary(group => group.Key, group => (IReadOnlyList<JednaniListItemViewModel>)MapJednaniList(group, statusById, lockedPersons));
-
-        return projects
-            .Select(project => new JednaniProjektListItemViewModel
+        return rows
+            .GroupBy(x => new { x.ProjektId, x.ProjektNazev })
+            .Select(group => new JednaniProjektListItemViewModel
             {
-                ProjektId = project.Id,
-                ProjektNazev = project.CelyNazev,
-                Jednani = meetingsByProjectId.GetValueOrDefault(project.Id, [])
+                ProjektId = group.Key.ProjektId,
+                ProjektNazev = group.Key.ProjektNazev,
+                Jednani = group
+                    .Select(x => new JednaniListItemViewModel
+                    {
+                        Id = x.Id,
+                        CisloJednani = x.CisloJednani,
+                        Datum = x.Datum,
+                        CasZacatek = x.CasZacatek,
+                        Misto = string.IsNullOrWhiteSpace(x.Misto) ? "-" : x.Misto,
+                        StavKod = x.StavKod,
+                        Stav = x.Stav,
+                        UzamklOsoba = x.UzamklOsobaId.HasValue
+                            ? BuildInlinePersonLabelFromOsoba(lockedPersons.GetValueOrDefault(x.UzamklOsobaId.Value))
+                            : null
+                    })
+                    .ToList()
             })
-            .Where(x => x.Jednani.Count > 0)
+            .OrderBy(x => x.ProjektNazev, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
     }
 

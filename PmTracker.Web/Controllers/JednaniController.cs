@@ -22,20 +22,14 @@ public sealed class JednaniController : BaseController
 
     public async Task<IActionResult> Index(int? projektId, CancellationToken ct = default)
     {
-        var projekty = await _meetingService.BuildJednaniOverviewAsync(ct);
-        var filteredProjects = projekty
-            .Where(project => CurrentUserContext.CanAccessProject(project.ProjektId));
-
-        if (projektId.HasValue)
-        {
-            filteredProjects = filteredProjects.Where(project => project.ProjektId == projektId.Value);
-        }
+        var projectFilter = BuildMeetingOverviewProjectFilter(projektId);
+        var projekty = await _meetingService.BuildJednaniOverviewAsync(projectFilter, ct);
 
         return View(new JednaniIndexViewModel
         {
             CurrentUserContext = CurrentUserContext,
             PageTitle = "Jednání",
-            Projekty = filteredProjects.ToList()
+            Projekty = projekty
                 .Select(project => new JednaniProjektListItemViewModel
                 {
                     ProjektId = project.ProjektId,
@@ -68,6 +62,41 @@ public sealed class JednaniController : BaseController
         model.BackLabel = isValidReturnUrl ? "Zpět na projekt" : "Zpět na jednání";
 
         return View(model);
+    }
+
+    private IReadOnlyCollection<int>? BuildMeetingOverviewProjectFilter(int? projektId)
+    {
+        if (projektId.HasValue)
+        {
+            return CurrentUserContext.CanAccessProject(projektId.Value)
+                ? [projektId.Value]
+                : Array.Empty<int>();
+        }
+
+        if (CurrentUserContext.IsSuperAdmin || HasGlobalMeetingOverviewAccess())
+        {
+            return null;
+        }
+
+        return CurrentUserContext.VisibleProjectIds
+            .Concat(CurrentUserContext.PermissionGrants
+                .Where(grant =>
+                    grant.IsAllowed
+                    && PermissionKeys.GrantsProjectRead(grant.PermissionKey)
+                    && string.Equals(grant.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(grant => grant.ProjectIds))
+            .Distinct()
+            .OrderBy(id => id)
+            .ToArray();
+    }
+
+    private bool HasGlobalMeetingOverviewAccess()
+    {
+        return CurrentUserContext.PermissionGrants.Any(grant =>
+            grant.IsAllowed
+            && PermissionKeys.GrantsProjectRead(grant.PermissionKey)
+            && (string.Equals(grant.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(grant.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase)));
     }
 
     [HttpGet]

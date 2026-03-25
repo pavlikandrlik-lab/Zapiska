@@ -96,6 +96,7 @@ public sealed class HarmonogramUnifiedScenariosTests
 
         var labels = axes.First.Locator(".timeline-axis-label:not([hidden])");
         await Expect(labels.First).ToBeVisibleAsync();
+        await Expect(form.Locator(".schedule-mini-gantt-marker.today")).ToHaveCountAsync(2);
 
         (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
         ((await labels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
@@ -135,6 +136,7 @@ public sealed class HarmonogramUnifiedScenariosTests
         var secondRowTrack = rows.Nth(1).Locator(".schedule-mini-gantt-track");
         await Expect(firstRowTrack).ToBeVisibleAsync();
         await Expect(secondRowTrack).ToBeVisibleAsync();
+        await Expect(form.Locator(".schedule-mini-gantt-marker.today")).ToHaveCountAsync(2);
 
         var firstRowBox = await rows.Nth(0).BoundingBoxAsync();
         var secondRowBox = await rows.Nth(1).BoundingBoxAsync();
@@ -192,11 +194,16 @@ public sealed class HarmonogramUnifiedScenariosTests
         var expandToggle = firstCard.Locator("[data-schedule-expand-toggle]");
         if (await expandToggle.CountAsync() > 0)
         {
+            var breakdown = firstCard.Locator("[data-schedule-steps]");
+            await Expect(breakdown).ToBeHiddenAsync();
             var expanded = await expandToggle.First.GetAttributeAsync("aria-expanded");
             if (expanded is null || !expanded.Equals("true", StringComparison.OrdinalIgnoreCase))
             {
                 await expandToggle.First.ClickAsync();
             }
+
+            await Expect(breakdown).ToBeVisibleAsync();
+            (await expandToggle.First.GetAttributeAsync("aria-expanded")).Should().Be("true");
         }
 
         await page.WaitForTimeoutAsync(120);

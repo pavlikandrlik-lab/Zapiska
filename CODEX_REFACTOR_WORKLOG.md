@@ -4489,6 +4489,109 @@ Datum: 2026-03-23
   - `PmTracker.Tests.E2E` = `28/28`
   - `PmTracker.Tests.Integration` = `62/62`
 
+## 2026-03-25 - Lazy load stavů jednání z vyjádření pro records filtr
+
+### Cíl
+
+- Odstranit dotaz do `Vyjadreni` z prvního loadu projektového přehledu záznamů.
+- Zachovat existující filtr `Jednání-vyjádření`.
+- Načíst mapu `recordId -> stavy jednání z vyjádření` až při prvním použití tohoto filtru.
+
+### Backend
+
+- Do `IProjectService` jsem doplnil novou aditivní query metodu:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/IProjectService.cs`
+  - `BuildRecordMeetingCommentStatesAsync(int projectId, CancellationToken ct = default)`
+- Do `ProjectService` jsem doplnil lehký query flow pro načtení stavů jednání z vyjádření:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.LazyQueries.cs`
+- Z `BuildRecordCardSummariesCoreAsync(...)` jsem odstranil eager query do `Vyjadreni` a `Jednani` pro summary load.
+- První load records tabu teď summary kartám nastavuje:
+  - `VyjadreniJednaniStavyKody = Array.Empty<string>()`
+- Přidal jsem nový MVC endpoint:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ProjektyController.cs`
+  - `RecordMeetingCommentStates(int id, CancellationToken ct = default)`
+- Endpoint vrací JSON payload:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Models/ViewModels/ProjektyViewModels.cs`
+  - `ProjektMeetingCommentStatesResponseViewModel`
+
+### ViewModel + Razor
+
+- Do records tabu jsem doplnil URL pro lazy načtení mapy stavů:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Models/ViewModels/ProjektyViewModels.cs`
+  - `ProjektZaznamyTabViewModel.MeetingCommentStatesUrl`
+- Do root sekce records tabu jsem propsal `data-record-meeting-comment-states-url`:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectRecordsTab.cshtml`
+
+### Frontend
+
+- Do records filtrů jsem doplnil klientskou cache mapy stavů jednání z vyjádření:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/filters.js`
+- Chování po změně:
+  - bez aktivního filtru `Jednání-vyjádření` se nic nenačítá
+  - při prvním použití filtru se přes AJAX stáhne jen JSON mapa stavů
+  - mapa se uloží v JS cache pro daný projekt
+  - po načtení se filtr automaticky přepočítá
+- Po refreshi comment/card flow se cache invaliduje:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/recordRefresh.js`
+
+### Testy
+
+- Dopsal jsem unit test na nový endpoint:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Projects/ProjektyControllerBehaviorTests.cs`
+  - `RecordMeetingCommentStates_ShouldReturnJsonPayload_FromProjectService`
+- Aktualizoval jsem fake implementaci `IProjectService` ve stejném test souboru.
+
+### Ověření
+
+- `bun build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/site.js --target browser --outfile /tmp/pmtracker-site.bundle.js`
+  - zelené
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj --no-build`
+  - `111/111`
+
+## 2026-03-25 - Zúžení meeting options v comments flow
+
+### Cíl
+
+- Odstranit z comments panelu zbytečný full load meeting listu projektu.
+- Zachovat stejné chování selectu `Vazba na jednání` ve vyjádřeních.
+
+### Změna
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.LazyQueries.cs`
+  - jsem v `BuildRecordCommentsPanelAsync(...)` nahradil volání:
+    - `BuildOpenMeetingOptionsAsync(await BuildJednaniListAsync(projectId, ct), ct)`
+  - za nový přímý lehký query helper:
+    - `BuildOpenMeetingOptionsForProjectAsync(projectId, ct)`
+- Nový helper načítá pouze:
+  - `Jednani.Id`
+  - `Jednani.CisloJednani`
+  - `Jednani.DatumPlanovane`
+  - stav jednání (`Kod`, `Nazev`)
+  - informaci, zda je jednání uzamčené
+- Pak teprve lokálně aplikuje stejnou open/closed logiku pro option list.
+
+### Dopad
+
+- Otevření sekce vyjádření pro jeden záznam už nepotřebuje:
+  - skládat celý `JednaniListItemViewModel` seznam projektu
+  - načítat uzamykající osoby pro list query
+  - procházet plný meeting list service flow
+- Comments panel teď sahá jen na:
+  - komentáře daného záznamu
+  - jejich navázaná jednání
+  - lehký option seznam otevřených jednání projektu
+
+### Ověření
+
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj --no-build`
+  - `111/111`
+
 ### Poznámka
 
 - Tato oprava řeší aplikační regresi v auth flow pro HTML requesty.
@@ -4568,6 +4671,375 @@ Datum: 2026-03-23
   - `PmTracker.Tests.Api` = `252/252`
   - `PmTracker.Tests.E2E` = `28/28`
   - `PmTracker.Tests.Integration` = `62/62`
+
+## 2026-03-25 - Team picker lazy search místo full katalogu osob
+
+### Cíl
+
+- Odstranit broad fetch celého katalogu osob z team tabu a team modalů.
+- Zachovat současný UX modalů, ale osoby dohledávat až podle dotazu uživatele.
+
+### Hotové změny
+
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.LazyQueries.cs`
+  - v `BuildProjectTeamTabAsync(...)` už neplním `DostupneOsobyProRole` přes `BuildProjectMemberCandidatesAsync(...)`
+  - team tab už nenačítá celý katalog osob při prvním otevření
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.TeamComposition.cs`
+  - přidal jsem `SearchProjectMemberCandidatesAsync(...)`
+  - search používá DB prefilter nad `Osoby` podle jména, příjmení, emailu a `AdLogin`
+  - organizace a organizační celky se načítají až pro úzkou sadu kandidátů
+  - výsledky se in-memory dořazují přes existující `ITextNormalizer` a `IPersonIdentityMatcher`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/IProjectService.cs`
+  - doplněný additivní kontrakt `SearchProjectMemberCandidatesAsync(...)`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ProjektyController.cs`
+  - přidaný nový JSON endpoint `SearchProjectMemberCandidates(...)`
+  - endpoint je chráněný `PermissionKeys.TeamManage`
+  - modal akce `AddTeamMemberModal`, `AssignProjectRoleModal` a `AssignProjectSubsystemRoleModal` teď předávají `SearchUrl` místo přednačteného katalogu osob
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Models/ViewModels/ModalViewModels.cs`
+  - doplněné `SearchUrl` do team modal viewmodelů
+  - přidané `PersonPickerEntryViewModel` a `PersonPickerSearchResponseViewModel`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/AddTeamMemberModal.cshtml`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/AssignProjectRoleModal.cshtml`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/AssignProjectSubsystemRoleModal.cshtml`
+  - odstraněný skrytý HTML katalog osob
+  - přidaný `data-person-picker-search-url`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/pickers.js`
+  - `initSinglePersonPickers(...)` nově podporuje remote režim
+  - starý lokální režim přes `data-person-picker-source` zůstal zachovaný
+  - remote search má debounce, request cancellation, loader/status row a chybový stav
+  - picker validaci dál vynucuje výběr osoby ze seznamu výsledků
+
+### Testy
+
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Projects/ProjektyControllerBehaviorTests.cs`
+  - doplněný fake `IProjectService` o `SearchProjectMemberCandidatesAsync(...)`
+  - přidaný test na JSON payload nového search endpointu
+
+### Ověření
+
+- `bun build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/site.js --target browser --outfile /tmp/pmtracker-site.bundle.js`
+  - prošel
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj --no-build`
+  - `111/111`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - padá mimo scope změny na nedostupném Docker/Testcontainers (`/var/run/docker.sock`, `~/.colima/default/docker.sock`)
+
+## 2026-03-25 - Rozpad přerostlých modulů a partialů
+
+### JavaScript moduly
+
+- Rozdělil jsem `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/navigation.js` na menší moduly podle zodpovědnosti:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/navigationRuntime.js`
+    - sdílený runtime bridge pro `initRecordFormEnhancements` a `prepareRecordEditorFormNavigation`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/navigationShared.js`
+    - sdílené fetch/DOM helpery pro lazy loading
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/projectTabs.js`
+    - project tab controller, lazy load tabů, records tab init
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/recordLazyLoading.js`
+    - lazy load detailu záznamu, lazy load vyjádření, toggle karty, klik/keydown navigačních karet
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/recordRefresh.js`
+    - restore UI state, refresh record card/comments/task item, refresh scope stránky, `pageshow` sync
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/pageSwitchers.js`
+    - číselníky, nastavení, profilová práva, project index status filtry, user menu, attendance toggle
+- Z původního `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/navigation.js` jsem udělal tenký facade modul, který už jen re-exportuje rozdělené části.
+- Výsledek velikostí:
+  - `navigation.js` = `36` řádků
+  - `projectTabs.js` = `231` řádků
+  - `recordLazyLoading.js` = `209` řádků
+  - `recordRefresh.js` = `523` řádků
+  - `pageSwitchers.js` = `515` řádků
+
+### ProjectService partial rozpad
+
+- Rozdělil jsem `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.RecordComposition.cs` na menší partial soubory podle use-case:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.RecordCards.cs`
+    - skládání karet záznamů, načítání osob/organizací pro record flow, lead-equivalent mapy
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.ScheduleComposition.cs`
+    - řádky harmonogramu a jejich vizuální výpočty
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.TeamComposition.cs`
+    - tým, role, subsystémové role, kandidáti osob, save/remove team member
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.RecordEditorComposition.cs`
+    - data pro editor záznamu, open meeting options, record editor subsystemy
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.RecordComposition.cs` zůstaly jen sdílené kontraktní bridge metody, základní helpery a společné utility.
+- Výsledek velikostí:
+  - `ProjectService.RecordComposition.cs` = `280` řádků
+  - `ProjectService.RecordCards.cs` = `333` řádků
+  - `ProjectService.ScheduleComposition.cs` = `230` řádků
+  - `ProjectService.TeamComposition.cs` = `513` řádků
+  - `ProjectService.RecordEditorComposition.cs` = `238` řádků
+
+### Razor partial rozpad
+
+- Rozdělil jsem `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_EditZaznamForm.cshtml` na panel partialy:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_EditZaznamBasicPanel.cshtml`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_EditZaznamExternalPanel.cshtml`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_EditZaznamCollaborationPanel.cshtml`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_EditZaznamSchedulePanel.cshtml`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_EditZaznamForm.cshtml` teď funguje jako kompozice formuláře a jednotlivých panelů, ne jako jeden velký markup blok.
+- Výsledek velikostí:
+  - `_EditZaznamForm.cshtml` = `152` řádků
+  - `_EditZaznamBasicPanel.cshtml` = `232` řádků
+  - `_EditZaznamExternalPanel.cshtml` = `233` řádků
+  - `_EditZaznamCollaborationPanel.cshtml` = `36` řádků
+  - `_EditZaznamSchedulePanel.cshtml` = `208` řádků
+
+### Ověření
+
+- `bun build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/site.js --target browser --outfile /tmp/pmtracker-site.bundle.js`
+  - prošel
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj --no-build`
+  - `110/110`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web.Tests/PmTracker.Web.Tests.csproj --no-build`
+  - testy dál blokuje nedostupný Docker/Testcontainers na tomto stroji
+
+## 2026-03-25 - Lazy MVC načítání detailu projektu a záznamů
+
+### Cíl kroku
+
+- Zachovat MVC i současný UX sbalené karty záznamu.
+- První load detailu projektu zúžit na shell projektu + lehký records tab.
+- Přesunout těžký detail záznamu, vyjádření a další projektové taby na lazy partial flow.
+- Odstranit broad fetch call sites v controllerech, které kvůli úzkému účelu skládaly celý projektový detail.
+
+### Backend split projektu
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Models/ViewModels/ProjektyViewModels.cs`
+  - jsem doplnil nové viewmodely pro rozpad summary/detail/comments/tab shell flow:
+    - `ProjektLazyTabShellViewModel`
+    - `ProjektZaznamyTabViewModel`
+    - `ProjektZaznamGroupViewModel`
+    - `ProjektZaznamCardShellViewModel`
+    - `ZaznamCardSummaryViewModel`
+    - `ZaznamCardDetailViewModel`
+    - `ZaznamCommentsPanelViewModel`
+    - `ProjektHarmonogramTabViewModel`
+    - `ProjektJednaniTabViewModel`
+    - `ProjektTymTabViewModel`
+- `ProjektDetailViewModel` už nově nese:
+  - lehký `ZaznamyTab`
+  - lazy shell pro `HarmonogramTab`
+  - lazy shell pro `JednaniTab`
+  - lazy shell pro `TymTab`
+- `ProjektZaznamyTabViewModel` jsem doplnil o `RefreshUrl`, aby records tab šel obnovovat partial refresh cestou i při `pageshow` synchronizaci.
+
+### Services - nové cílené query flow
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/IProjectService.cs`
+  - jsem přidal nové cílené read kontrakty:
+    - `GetProjectListItemAsync(...)`
+    - `BuildProjectRecordsTabAsync(...)`
+    - `BuildProjectScheduleTabAsync(...)`
+    - `BuildProjectMeetingsTabAsync(...)`
+    - `BuildProjectTeamTabAsync(...)`
+    - `BuildRecordCardShellAsync(...)`
+    - `BuildRecordCardDetailAsync(...)`
+    - `BuildRecordCommentsPanelAsync(...)`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/IRecordService.cs`
+  - jsem doplnil delegační record detail/comment kontrakty nad `ProjectService`.
+- V novém souboru `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.LazyQueries.cs`
+  - jsem implementoval cílené lazy queries:
+    - lehký summary list záznamů bez `Popis`, historií, externích vazeb, spolupráce a vyjádření
+    - samostatný detail záznamu
+    - samostatný comments panel pro jeden záznam
+    - lazy tab queries pro harmonogram, jednání a tým
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.DetailQueries.cs`
+  - `BuildProjektDetailAsync(...)` už neskládá celý eager aggregate přes všechny taby
+  - vrací jen shell projektu a summary `ZaznamyTab`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.ListQueries.cs`
+  - jsem přidal `GetProjectListItemAsync(...)` pro úzké modal use-cases.
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/RecordService.cs`
+  - jsem přesměroval record shell/detail/comments flow na nové projektové query metody.
+
+### Controllers - odstranění broad fetch call sites
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ProjektyController.cs`
+  - jsem přidal nové partial akce:
+    - `RecordsTabPartial`
+    - `HarmonogramTabPartial`
+    - `JednaniTabPartial`
+    - `TymTabPartial`
+  - `EditProjectModal` a `DeleteProjectModal` už neberou celý `BuildProjektyListAsync()`, ale `GetProjectListItemAsync(...)`
+  - meeting/team modaly a save/delete refresh flow už nečtou celý `BuildProjektDetailAsync(...)`
+  - připravuji pro prezentaci i lazy URLs:
+    - records refresh URL
+    - tab partial URLs
+    - record detail/comments partial URLs
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ZaznamyController.cs`
+  - `RecordCardPartial(...)` už nevolá full `BuildProjektDetailAsync(...)`
+  - přidal jsem:
+    - `RecordDetailPartial`
+    - `RecordCommentsPartial`
+  - create/delete/update record flow v projektovém kontextu už refreshuje records tab partial nebo comments partial místo full detailu projektu
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Records/RecordUiFlowResolver.cs`
+  - project-context comment refresh jsem přepnul z `record-card` na `record-comments`
+  - meeting-context flow zůstává na `meeting-task-item`
+
+### Razor views - summary/detail/comments split
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/Detail.cshtml`
+  - jsem odstranil eager render všech čtyř tabů
+  - zůstal pouze records tab a tři lazy shell sekce s placeholdery
+- V nových partialech:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectRecordsTab.cshtml`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectScheduleTab.cshtml`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectMeetingsTab.cshtml`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectTeamTab.cshtml`
+  - jsem rozdělil tab content na samostatné partial response jednotky
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ZaznamPartial.cshtml`
+  - jsem ponechal summary sbalené karty beze změny obsahu:
+    - chips
+    - název
+    - cíl
+    - datum založení
+    - termín
+    - stav badge
+    - akce
+  - a vyvedl lazy shell pro:
+    - detail záznamu
+    - vyjádření
+- Do nových partialů jsem přesunul těžký obsah:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ZaznamDetailPartial.cshtml`
+    - `Popis`
+    - historie
+    - externí odkazy
+    - spolupráci
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml`
+    - vyjádření
+    - řazení komentářů
+    - add/edit/delete comment formuláře
+- Tím jsem odstranil dvojí eager render `_ZaznamPartial` pro grouped i flat variantu:
+  - full HTML karty teď existuje jen jednou
+  - grouped/flat přepínání přesouvá stejný DOM uzel
+
+### Frontend runtime - lazy load a refresh orchestrace
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/navigation.js`
+  - jsem přidal runtime pro:
+    - `loadProjectTabPanel(...)`
+    - `ensureProjectTabLoaded(...)`
+    - `loadRecordDetail(...)`
+    - `loadRecordComments(...)`
+    - `refreshRecordComments(...)`
+  - project tabs se při prvním otevření dotahují z vlastních partial endpointů
+  - detail záznamu se načítá až při rozkliknutí karty
+  - vyjádření se načítají až při kliknutí na `Zobrazit vyjádření`
+  - v `refreshPageScope(...)` jsem přesměroval projektové tab refresh flow na partial fragmenty místo full detail page fetch
+  - `buildRecordUiState(...)` a `restoreRecordUiState(...)` nově zachovávají i stav lazy načtených vyjádření a po refreshi je znovu dohrají
+  - `refreshRecordCard(...)` po výměně shellu znovu dotáhne detail a comments, pokud byly před refreshí otevřené
+  - `refreshProjectSchedulePanels()` už neobnovuje harmonogram přes full project detail, ale přes harmonogram tab partial
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/bootstrap.js`
+  - jsem napojil click handlery pro:
+    - record detail retry
+    - comments load
+    - comments retry
+    - tab retry
+    - lazy expand karty přes `toggleRecordCard(...)`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/filters.js`
+  - zůstal zachovaný one-source DOM přístup:
+    - grouped/flat view přesouvá stejnou kartu mezi grouped a flat listem
+    - neduplikuje už plný HTML payload karty
+
+### CSS placeholdery a lazy stavy
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/css/site.css`
+  - jsem doplnil styly pro:
+    - `record-detail-shell`
+    - `record-comments-lazy`
+    - `record-loading-placeholder`
+    - `record-loading-line`
+    - `record-loading-error`
+    - `lazy-tab-placeholder`
+    - `record-collab-block`
+  - včetně skeleton shimmer animace pro lazy load placeholdery
+
+### Testy a test support
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Projects/ProjektyControllerBehaviorTests.cs`
+  - jsem doplnil fake implementaci nových `IProjectService` metod
+  - `CreateController(...)` dostal `StubUrlHelper`, protože controller nově generuje partial refresh URL přes `Url.Action(...)`
+  - `CreateEmptyProjektDetail(...)` teď inicializuje i nové tab shell viewmodely
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Records/RecordUiFlowResolverTests.cs`
+  - jsem přepnul expectations project comment flow na:
+    - `record-comments`
+    - `RecordCommentsPartial`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/Controllers/AjaxControllersTests.cs`
+  - jsem srovnal expectation pro project-context add comment AJAX success na `record-comments`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/Controllers/RecordEditorControllerTests.cs`
+  - jsem upravil smoke očekávání:
+    - `RecordCardPartial` už neobsahuje eager popis
+    - `RecordDetailPartial` je nový zdroj renderu pro rich-text popis
+
+### UserContextResolver - secondary cleanup
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Security/UserContextResolver.cs`
+  - jsem zúžil `DeletedProjectIds` resolution:
+    - už nenačítá všechny projekty joinem se stavy
+    - nejdřív vybere jen deleted-like statusy
+    - teprve potom načte jen projekty v těchto stavech
+  - jsem zúžil `AdLogin` lookup:
+    - už netahá všechny osoby s `AdLogin`
+    - používá DB prefilter nad kandidátními login variantami
+    - finální match logika `LoginEquals(...)` zůstává zachovaná, takže se nemění auth chování, jen se zmenšuje objem načtených řádků
+
+### Ověření
+
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `bun build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/site.js --target browser --outfile /tmp/pmtracker-site.bundle.js`
+  - bundling prošel
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj`
+  - `110/110` zelené
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web.Tests/PmTracker.Web.Tests.csproj --no-build`
+  - v tomto běhu neověřeno kvůli nedostupnému Docker/Testcontainers
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/PmTracker.Tests.Api.csproj --no-build`
+  - v tomto běhu neověřeno kvůli nedostupnému Docker/Testcontainers
+
+### Stav po kroku
+
+- Projektový detail už není eager aggregate přes všechny taby.
+- Records tab už načítá summary a neplní do prvního requestu `Popis` ani `Vyjadreni`.
+- `RecordCardPartial` už není závislý na full project detail query.
+- Lazy partial flow je zavedený bez změny collapsed UX karty.
+- `UserContextResolver` už nemá broad fetch přes všechny projekty pro `DeletedProjectIds` a login fallback už používá zúžený DB prefilter.
+
+## 2026-03-25 09:32 CET - Cleanup auth debug trace + odstraneni dev credentials z repa
+
+### Změny
+
+- Odstranil jsem dočasný konzolový auth trace z:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Security/UserContextResolver.cs`
+- Zachoval jsem structured `ILogger` diagnostiku v auth resolveru a vyčistil pouze dočasné `Console.WriteLine` / `WriteAuthTrace(...)` výpisy.
+- Odstranil jsem development connection string s lokálním SQL loginem z:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/appsettings.Development.json`
+- Doplnil jsem dokumentaci runtime konfigurace, že development connection string se má dodávat přes environment variable:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/03-runtime-configuration.md`
+
+### Výsledný stav
+
+- V repozitáři už není dočasný produkční konzolový debug pro auth flow.
+- V repozitáři už není dev SQL credential pro lokální `localhost,1433` databázi.
+- Development runtime teď očekává `ConnectionStrings__PmTrackerDb` mimo repo konfiguraci, pokud se nemá použít základní connection string z `appsettings.json`.
+
+### Ověření
+
+- `rg -n "Console\\.WriteLine|WriteAuthTrace\\(" PmTracker.Web -S`
+  - bez nálezu
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj --no-build`
+  - green (`110/110`)
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - v tomto běhu negreen kvůli nedostupnému Docker/Testcontainers (`/var/run/docker.sock`, `~/.colima/default/docker.sock`)
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web.Tests/PmTracker.Web.Tests.csproj --no-build`
+  - v tomto běhu negreen ze stejného důvodu (`ApiSqlFixture` / Testcontainers)
 
 ## 2026-03-24 - Auth diagnostika přes structured logy
 
@@ -4738,3 +5210,391 @@ Datum: 2026-03-23
   - `PmTracker.Tests.Api` = `252/252`
   - `PmTracker.Tests.E2E` = `28/28`
   - `PmTracker.Tests.Integration` = `62/62`
+
+## 2026-03-25 - Dočištění výkonu a struktury + editace DatumZalozeni
+
+### UserContextResolver
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Security/UserContextResolver.cs`
+  - jsem odstranil full materializaci osob v `ResolveOsobaIdFromAsUserAsync(...)`
+  - `asUser` flow teď:
+    - generuje login/name kandidáty
+    - udělá úzký DB prefilter
+    - teprve nad omezeným datasetem dělá finální matching
+  - `DeletedProjectIds` už se neskládají lokální broad query větví, ale přes sdílený helper
+- Přidal jsem `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Security/ProjectAuthorizationQueryHelper.cs`
+  - centralizuje query pro `DeletedProjectIds`
+- Stejný helper používá i `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Settings/UserAuthorizationSnapshotBuilder.cs`
+  - tím už nevznikají dvě různé varianty authz projekční logiky
+
+### Meeting modaly a meeting overview
+
+- Přidal jsem úzké modal query flow do `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/MeetingService.ModalQueries.cs`
+  - `BuildNewMeetingModalAsync(...)`
+  - `BuildEditMeetingModalAsync(...)`
+  - `IsMeetingEditableAsync(...)`
+- Rozhraní `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/IMeetingService.cs` jsem rozšířil o tyto interně potřebné query metody
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ProjektyController.cs`
+  - `NewMeetingModal`
+  - `EditMeetingModal`
+  - edit větev `SaveMeeting`
+  už nepoužívají full meetings tab model
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/MeetingService.ListQueries.cs`
+  - `BuildJednaniOverviewAsync(...)` už nestaví overview z `all projects + all meetings + all statuses`
+  - nově běží přes úzkou SQL projekci nad `Jednani`, `Projekty` a stavem jednání
+
+### BaseController
+
+- Rozdělil jsem `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/BaseController.cs` do partial souborů:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/BaseController.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/BaseController.Validation.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/BaseController.Commands.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/BaseController.Ajax.cs`
+- Chování controllerů se nezměnilo
+- Rozseknuté odpovědnosti:
+  - action filter + auth attach
+  - validation/model-state mapping
+  - command orchestrace
+  - AJAX contract + diagnostika
+
+### Projekt detail a record detail query
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Models/ViewModels/ProjektyViewModels.cs`
+  - jsem zúžil `ProjektDetailViewModel` na skutečný lazy shell
+  - odstraněny staré eager payload properties pro záznamy, meetingy, role a harmonogram
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.LazyQueries.cs`
+  - detail jedné record karty už netahá celé lookup tabulky
+  - nejdřív zjistí relevantní `Id`
+  - až potom dotahuje jen potřebné lookup rows
+
+### DatumZalozeni v editaci záznamu
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_EditZaznamBasicPanel.cshtml`
+  - `DatumZalozeni` už není v edit režimu zamčené
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/RecordService.WriteCommands.cs`
+  - update flow nově persistuje změněné `DatumZalozeni`
+- Validace `TerminUkonceni >= DatumZalozeni` zůstala beze změny
+- `TerminUkonceni` se automaticky neposouvá
+
+### Testy
+
+- Upravil jsem dotčené fake/test helpery a testy:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Projects/ProjektyControllerBehaviorTests.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Meetings/JednaniControllerBehaviorTests.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Integration/TestInfrastructure/IntegrationTestDataStore.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Integration/DataStore/ProjectMembershipDataStoreTests.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Integration/DataStore/RecordFilterDataStoreTests.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Integration/DataStore/RecordSaveDataStoreTests.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/Controllers/RecordEditorControllerTests.cs`
+- Přidané pokrytí:
+  - editace `DatumZalozeni` v save flow
+  - editor záznamu zobrazuje `DatumZalozeni` jako editovatelné pole
+
+### Ověření
+
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj --no-build`
+  - `112/112` zelené
+- `bun build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/site.js --target browser --outfile /tmp/pmtracker-site.bundle.js`
+  - zelené
+- `colima start`
+  - Docker/Testcontainers prostředí znovu dostupné
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - `PmTracker.Web.Tests` = `6/6`
+  - `PmTracker.Tests.Unit` = `112/112`
+  - `PmTracker.Tests.Api` = `256/256`
+  - `PmTracker.Tests.E2E` = `28/28`
+  - `PmTracker.Tests.Integration` = `63/63`
+
+### Finální doladění po plném test matrixu
+
+- Při reálném full test běhu se ukázaly ještě 4 regresní oblasti:
+  - `_EditZaznamForm.cshtml` používal relativní cesty na nové partialy a v běhu přes `ZaznamyController` padal na hledání v `/Views/Zaznamy`
+  - detail projektu neuměl server-side bootstrap aktivní lazy tab podle query `?tab=...`
+  - JS lazy replace projektových tabů neudržel `active` class po výměně placeholderu za načtený partial
+  - API testy team modalů a E2E rich-text scénář ještě ověřovaly staré eager chování
+- Oprava:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_EditZaznamForm.cshtml`
+    - partialy přepnuté na explicitní `~/Views/Projekty/...`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ProjektyController.cs`
+    - detail umí načíst a připravit aktivní tab server-side
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Models/ViewModels/ProjektyViewModels.cs`
+    - `ProjektDetailViewModel` doplněn o `ActiveTab` a volitelné loaded tab modely
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/Detail.cshtml`
+    - aktivní tab se renderuje server-side už v prvním response
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectRecordsTab.cshtml`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectScheduleTab.cshtml`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectMeetingsTab.cshtml`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectTeamTab.cshtml`
+    - partialy respektují `IsActive`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/projectTabs.js`
+    - lazy replace zachovává `active` class
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/Index.cshtml`
+    - doplněny datové atributy pro funkční status filtry projektů
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/Controllers/ProjectsModalsControllerTests.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.E2E/Scenarios/RecordRichTextScenariosTests.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Integration/DataStore/RecordFilterDataStoreTests.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Integration/DataStore/RecordSaveDataStoreTests.cs`
+    - testy srovnané na nový lazy/remote-search kontrakt a na validní kombinaci `DatumZalozeni` vs `TerminUkonceni`
+
+## 2026-03-25 - Dočištění zbývajícího výkonového dluhu
+
+### Team modaly a team flow
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/IProjectService.cs`
+  - jsem doplnil aditivní lehkou query metodu `BuildProjectTeamModalOptionsAsync(...)`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Models/ViewModels/ModalViewModels.cs`
+  - přidán `ProjectTeamModalOptionsViewModel`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/ProjektyController.cs`
+  - `AddTeamMemberModal`
+  - `AssignProjectRoleModal`
+  - `AssignProjectSubsystemModal`
+  - `AssignProjectSubsystemRoleModal`
+  - už nevolají celý `BuildProjectTeamTabAsync(...)`
+  - berou jen lehký modal options model
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.TeamComposition.cs`
+  - jsem zúžil interní team query flow:
+    - `BuildActiveProjectMembershipRowsAsync(...)` už netahá celé organizace a organizační celky
+    - `BuildActiveProjectRoleAssignmentsAsync(...)` a `BuildProjectRoleHistoryAsync(...)` už nenačítají celý katalog rolí projektu
+    - `BuildActiveProjectSubsystemsAsync(...)` jede přes přímý join místo full fetch všech subsystemů
+    - `BuildActiveProjectSubsystemRoleAssignmentsAsync(...)` a `BuildProjectSubsystemRoleHistoryAsync(...)` načítají jen relevantní subsystemy a subsystem role
+    - fallback pro vybraného vlastníka v `BuildRecordOwnerCandidatesAsync(...)` už netahá celé org katalogy
+
+### Record a schedule summary lookupy
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.LazyQueries.cs`
+  - `BuildRecordCardSummariesCoreAsync(...)` už nenačítá celé lookup tabulky do dictionary
+  - nejdřív zjistí relevantní `KategorieId`, `TypUkoluId`, `StavUkoluId`, `SubsystemId`
+  - teprve potom tahá jen potřebné lookup rows
+  - stejný princip jsem aplikoval i v `BuildScheduleRecordCardsForProjectAsync(...)`
+  - `BuildRecordCommentsPanelAsync(...)` už nečte celý `CiselnikStavuJednani`, jen stavy skutečně referencovaných meetingů
+  - `BuildOpenMeetingOptionsForProjectAsync(...)` filtruje otevřená jednání už v SQL místo až v paměti
+
+### Auth resolver
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Security/UserContextResolver.cs`
+  - jsem sloučil opakované authz query do menšího počtu dotazů
+  - aktivní role už se čtou jednou a z nich se skládají `RoleKody` i `RoleId` pro permission granty
+  - implicitní projektové a subsystem role assignmenty se čtou jednou a z těch samých výsledků se skládají i `VisibleProjectIds`
+  - `OrganizacniCelek` se dohledává jen když má osoba skutečně `OrganizacniCelekId`
+
+### Write flow navázaný na jednání
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/RecordService.WriteCommands.cs`
+  - `AssignMeetingIdentifierAsync(...)` už netahá všechny meetingy projektu + celý meeting-state katalog
+  - `ValidateRecordSaveCommandAsync(...)` v numbering větvi používá stejný lehký open-meetings query helper
+  - otevřená jednání se filtrují už v SQL
+
+### Testy
+
+- Upravené fake/test helper implementace:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Projects/ProjektyControllerBehaviorTests.cs`
+- Ověření:
+  - `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+    - `0 warnings`
+    - `0 errors`
+  - `bun build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/site.js --target browser --outfile /tmp/pmtracker-site.bundle.js`
+    - zelené
+  - `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj --no-build`
+    - `112/112`
+  - `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+    - `PmTracker.Web.Tests` = `6/6`
+    - `PmTracker.Tests.Unit` = `112/112`
+    - `PmTracker.Tests.Api` = `256/256`
+    - `PmTracker.Tests.E2E` = `28/28`
+    - `PmTracker.Tests.Integration` = `63/63`
+
+## 2026-03-25 — Finální cleanup zbývajících výkonových hotspotů
+
+### Týmový tab
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.TeamComposition.cs`
+  - `BuildUnifiedActiveProjectRoleRowsAsync(...)` už znovu nevolá `BuildActiveProjectMembershipRowsAsync(...)`
+  - projektové a subsystem role assignmenty se načtou jen jednou a grid se skládá přímo z nich
+  - subsystem role assignmenty teď nesou i `Organizace` a `OrganizacniCelek`, takže už kvůli nim není potřeba mezikrok membership snapshotu
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.LazyQueries.cs`
+  - `BuildProjectTeamTabAsync(...)` už v team tabu nenačítá modal options payload, který tab sám nepoužívá
+
+### UserContextResolver
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Security/UserContextResolver.cs`
+  - lookup osoby, organizačního celku a `IsSuperAdmin` je nově jeden dotaz místo tří
+  - permission granty a INCLUDE project ids se skládají z jedné query projekce místo `grantsRaw + includeProjectMap`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Security/ProjectAuthorizationQueryHelper.cs`
+  - `DeletedProjectIds` už nejoinují projekty se stavy dvakrát
+  - helper nejdřív vyhodnotí malé status katalogy a teprve potom sáhne na projekty přes relevantní `StavId`
+
+### Přehled jednání
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/IMeetingService.cs`
+  - přidané additivní overload API pro přehled jednání s prefiltered `projectIds`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/MeetingService.ListQueries.cs`
+  - `BuildJednaniOverviewAsync(...)` umí filtrovat projekty už před materializací meeting rows
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Controllers/JednaniController.cs`
+  - `Index(...)` skládá SQL project filter z `CurrentUserContext` a neposílá do service zbytečně všechny projekty, když uživatel nemá globální read
+
+### Testy
+
+- Přidaný unit test:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Meetings/JednaniControllerBehaviorTests.cs`
+    - ověřuje, že `JednaniController.Index(...)` posílá do service jen přístupné projekty
+- Upravené fake implementace:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Projects/ProjektyControllerBehaviorTests.cs`
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/Meetings/JednaniControllerBehaviorTests.cs`
+
+### Ověření
+
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Unit/PmTracker.Tests.Unit.csproj --no-build`
+  - `113/113`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - `PmTracker.Web.Tests` = `6/6`
+  - `PmTracker.Tests.Unit` = `113/113`
+  - `PmTracker.Tests.Api` = `256/256`
+  - `PmTracker.Tests.E2E` = `28/28`
+  - `PmTracker.Tests.Integration` = `63/63`
+
+## 2026-03-25 - Komentáře a harmonogram regression fix
+
+### Řazení vyjádření
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/ProjectService.LazyQueries.cs`
+  - `BuildRecordCommentsPanelAsync(...)` nově vrací vyjádření řazená podle `JednaniCislo`, `Datum` a `Id`, ne jen podle insert pořadí
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/MeetingService.DetailQueries.cs`
+  - meeting task comments se načítají podle `DatumVyjadreni` a `Id`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml`
+  - každý comment item má `data-comment-date`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Jednani/_TaskItemPartial.cshtml`
+  - každý comment item má `data-comment-date`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/comments.js`
+  - client-side sort používá `meeting -> date -> id`
+  - inicializace respektuje uložený sort direction z `localStorage`
+
+### Harmonogram - tlačítko Rozpad
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/schedule.js`
+  - expand toggle hledá detail vůči vlastní schedule kartě, ne globálně
+  - `aria-expanded` se inicializuje ze skutečného hidden stavu
+  - po rozbalení se znovu vyrenderují osy i rainbow segmenty
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectScheduleTab.cshtml`
+  - tlačítko `Rozpad` má explicitní `aria-expanded="false"`
+
+### Testy
+
+- Přidaný API regresní test:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/Controllers/RecordEditorControllerTests.cs`
+    - `RecordCommentsPartial_ShouldRenderCommentsOrderedByMeetingAndDate`
+- Zpřísněný E2E test:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.E2E/Scenarios/HarmonogramUnifiedScenariosTests.cs`
+    - ověřuje, že `[data-schedule-steps]` je před klikem skryté a po kliknutí skutečně viditelné
+
+### Ověření
+
+- `bun build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/site.js --target browser --outfile /tmp/pmtracker-site.bundle.js`
+  - bundle prošel
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - `PmTracker.Web.Tests` = `6/6`
+  - `PmTracker.Tests.Unit` = `113/113`
+  - `PmTracker.Tests.Api` = `257/257`
+  - `PmTracker.Tests.E2E` = `28/28`
+  - `PmTracker.Tests.Integration` = `63/63`
+
+## 2026-03-25 - Harmonogram editor today marker + numerická osa
+
+### Aktuální stav před opravou
+
+- Projektová záložka harmonogramu už marker `Dnes` ve sbaleném overview měla:
+  - serverový render v `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_ProjectScheduleTab.cshtml`
+  - potvrzené API/E2E testy v `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/Controllers/ProjectHarmonogramRenderTests.cs`
+    a `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.E2E/Scenarios/HarmonogramUnifiedScenariosTests.cs`
+- Chyba byla v editoru záznamu:
+  - mini-gantt v `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_EditZaznamSchedulePanel.cshtml`
+    renderoval jen deadline marker a chyběl mu marker `Dnes`
+
+### Oprava
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/_EditZaznamSchedulePanel.cshtml`
+  - do obou řádků mini-ganttu (`Plán`, `Skutečnost`) přidaný marker `data-schedule-gantt-today`
+  - legenda rozšířená na `Plán / Skutečnost / Dnes / Termín`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/schedule.js`
+  - `RecordSchedulePlanner` nově pozicuje marker `Dnes`
+  - editorová osa se škáluje i vůči dnešnímu dni, aby marker nezmizel mimo rozsah
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/modules/utils.js`
+  - month/year labels změněné z textového měsíce na `MM/YYYY`
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/css/site.css`
+  - přidaný styl pro `.schedule-mini-gantt-marker.today`
+
+### Testy
+
+- Upravený API test:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/Controllers/RecordEditorControllerTests.cs`
+    - editorový mini-gantt musí obsahovat 2 markery `data-schedule-gantt-today`
+- Upravené E2E testy:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.E2E/Scenarios/HarmonogramUnifiedScenariosTests.cs`
+    - editorový harmonogram ověřuje přítomnost 2 markerů `Dnes`
+
+### Ověření
+
+- `bun build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/site.js --target browser --outfile /tmp/pmtracker-site.bundle.js`
+  - bundle prošel
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - `PmTracker.Web.Tests` = `6/6`
+  - `PmTracker.Tests.Unit` = `113/113`
+  - `PmTracker.Tests.Api` = `257/257`
+  - `PmTracker.Tests.E2E` = `28/28`
+  - `PmTracker.Tests.Integration` = `63/63`
+
+## 2026-03-25 - Projekt detail header layout regression
+
+### Problém
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/Detail.cshtml`
+  - projektový detail po refaktoru přešel na sdílený `_PageHeader`
+  - tím se oproti `main` rozbil inline header layout a obsah projektu utekl doprava místo řádku vedle tlačítka `Zpět`
+
+### Oprava
+
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Views/Projekty/Detail.cshtml`
+  - vrácený speciální inline header projektu:
+    - back button
+    - divider
+    - název projektu
+    - pill `Zkratka`
+    - status badge vpravo
+- V `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/css/site.css`
+  - vrácené styly:
+    - `.page-header-compact`
+    - `.project-header-row`
+    - `.project-title-inline`
+    - `.project-header-divider`
+    - `.project-status-inline`
+
+### Testy
+
+- Přidaný API render test:
+  - `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Tests.Api/Controllers/ProjectHarmonogramRenderTests.cs`
+    - `Detail_ShouldRenderInlineProjectHeader_LikeMainLayout`
+
+### Ověření
+
+- `bun build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/wwwroot/js/site.js --target browser --outfile /tmp/pmtracker-site.bundle.js`
+  - bundle prošel
+- `dotnet build /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln /nodeReuse:false`
+  - `0 warnings`
+  - `0 errors`
+- `dotnet test /Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.sln --no-build`
+  - `PmTracker.Web.Tests` = `6/6`
+  - `PmTracker.Tests.Unit` = `113/113`
+  - `PmTracker.Tests.Api` = `258/258`
+  - `PmTracker.Tests.E2E` = `28/28`
+  - `PmTracker.Tests.Integration` = `63/63`

@@ -62,7 +62,9 @@
         @foreach (var projekt in Model.Projekty)
         {
             <article class="project-card"
+                     data-project-list-row
                      data-href="@Url.Action("Detail", new { id = projekt.Id })"
+                     data-project-status="@projekt.StavKod"
                      data-project-status-code="@projekt.StavKod"
                      role="link"
                      tabindex="0">

@@ -17,6 +17,7 @@
 
     <div class="office-picker"
          data-person-picker="single"
+         data-person-picker-search-url="@Model.SearchUrl"
          data-person-picker-placeholder="Vyhledejte osobu podle jména nebo emailu..."
          data-person-picker-empty="Nenalezeny žádné odpovídající osoby.">
         <input type="hidden" name="OsobaId" value="" data-person-picker-hidden required />
@@ -26,16 +27,6 @@
             <div class="office-search-panel" data-person-picker-panel data-floating-panel data-floating-kind="person-search" data-floating-match-width="true" hidden>
                 <div class="office-search-results" data-person-picker-results role="listbox" aria-label="Výsledky osob"></div>
             </div>
-        </div>
-        <div class="person-picker-source" data-person-picker-source hidden>
-            @foreach (var osoba in Model.DostupneOsoby)
-            {
-                <div data-id="@osoba.OsobaId"
-                     data-label="@osoba.Osoba"
-                     data-email="@(osoba.Email ?? string.Empty)"
-                     data-org="@(osoba.Organizace ?? string.Empty)"
-                     data-unit="@(osoba.OrganizacniCelek ?? string.Empty)"></div>
-            }
         </div>
     </div>
 

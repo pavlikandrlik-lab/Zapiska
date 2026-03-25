@@ -1,6 +1,8 @@
+using System.Linq.Expressions;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Data;
+using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
 
@@ -24,6 +26,19 @@ public sealed class UserContextResolver : IUserContextResolver
         "upn",
         "unique_name"
     };
+
+    private sealed record ActiveRoleRow(int RoleId, string RoleCode);
+    private sealed record PermissionGrantRaw(string Klic, string ScopeLevel, string ScopeMode, bool IsAllowed, int RolePermissionId);
+    private sealed record PermissionGrantProjectRow(string Klic, string ScopeLevel, string ScopeMode, bool IsAllowed, int RolePermissionId, int? ProjectId);
+    private sealed record ResolvedPersonRow(
+        int Id,
+        string? Titul,
+        string Jmeno,
+        string Prijmeni,
+        string? Email,
+        string? OrganizacniCelekKod,
+        string? OrganizacniCelekNazev,
+        bool IsSuperAdmin);
 
     private readonly PmTrackerDbContext _dbContext;
     private readonly IWebHostEnvironment _environment;
@@ -68,9 +83,6 @@ public sealed class UserContextResolver : IUserContextResolver
             var loginCandidates = BuildNormalizedLoginCandidates(principal);
             var isAuthenticated = principal?.Identity?.IsAuthenticated == true;
 
-            WriteAuthTrace(
-                $"ResolveAsync start | Path={httpContext.Request.Path.Value ?? string.Empty} | IsDevelopment={_environment.IsDevelopment()} | IsAuthenticated={isAuthenticated} | AuthenticationType={principal?.Identity?.AuthenticationType ?? "(null)"} | IdentityName={principal?.Identity?.Name ?? "(null)"} | LoginCandidates=[{string.Join(", ", loginCandidates.OrderBy(x => x, StringComparer.Ordinal))}] | LoginClaimTypesPresent={DescribePresentClaimTypes(principal, LoginClaimTypes)} | GuidClaimTypesPresent={DescribePresentClaimTypes(principal, GuidClaimTypes)}");
-
             _logger.LogInformation(
                 "Resolving user context. Path={Path} IsDevelopment={IsDevelopment} IsAuthenticated={IsAuthenticated} AuthenticationType={AuthenticationType} IdentityNamePresent={IdentityNamePresent} LoginCandidateCount={LoginCandidateCount} LoginClaimTypesPresent={LoginClaimTypesPresent} GuidClaimTypesPresent={GuidClaimTypesPresent}",
                 httpContext.Request.Path.Value ?? string.Empty,
@@ -86,9 +98,6 @@ public sealed class UserContextResolver : IUserContextResolver
             {
                 if (loginCandidates.Count > 0)
                 {
-                    WriteAuthTrace(
-                        $"Unauthenticated principal branch | attempting AdLogin lookup from IIS login candidates | CandidateCount={loginCandidates.Count}");
-
                     _logger.LogInformation(
                         "Attempting user resolution from IIS login candidates without authenticated principal. Path={Path} LoginCandidateCount={LoginCandidateCount}",
                         httpContext.Request.Path.Value ?? string.Empty,
@@ -101,8 +110,6 @@ public sealed class UserContextResolver : IUserContextResolver
                 {
                     if (_environment.IsDevelopment())
                     {
-                        WriteAuthTrace("Unauthenticated principal branch | development fallback to first person in DB");
-
                         _logger.LogInformation(
                             "Falling back to development first-person resolution. Path={Path}",
                             httpContext.Request.Path.Value ?? string.Empty);
@@ -115,8 +122,6 @@ public sealed class UserContextResolver : IUserContextResolver
 
                         if (!osobaId.HasValue)
                         {
-                            WriteAuthTrace("ResolveAsync failed | no people in DB for development fallback");
-
                             _logger.LogWarning(
                                 "User context resolution failed. Path={Path} Reason=NoPeopleInDevelopmentDatabase",
                                 httpContext.Request.Path.Value ?? string.Empty);
@@ -126,9 +131,6 @@ public sealed class UserContextResolver : IUserContextResolver
                     }
                     else
                     {
-                        WriteAuthTrace(
-                            $"ResolveAsync failed | principal not authenticated | CandidateCount={loginCandidates.Count}");
-
                         _logger.LogWarning(
                             "User context resolution failed. Path={Path} Reason=PrincipalNotAuthenticated LoginCandidateCount={LoginCandidateCount}",
                             httpContext.Request.Path.Value ?? string.Empty,
@@ -146,9 +148,6 @@ public sealed class UserContextResolver : IUserContextResolver
                     .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
                 var guidParsed = Guid.TryParse(claimValue, out var objectGuid);
-                WriteAuthTrace(
-                    $"Authenticated principal branch | GuidClaimValue={(string.IsNullOrWhiteSpace(claimValue) ? "(none)" : claimValue)} | GuidParsed={guidParsed} | CandidateCount={loginCandidates.Count}");
-
                 _logger.LogInformation(
                     "Authenticated principal detected. Path={Path} GuidClaimPresent={GuidClaimPresent} GuidParsed={GuidParsed} LoginCandidateCount={LoginCandidateCount}",
                     httpContext.Request.Path.Value ?? string.Empty,
@@ -164,8 +163,6 @@ public sealed class UserContextResolver : IUserContextResolver
                         .Select(x => (int?)x.Id)
                         .FirstOrDefaultAsync(ct);
 
-                    WriteAuthTrace($"Guid lookup finished | MatchedOsobaId={osobaId?.ToString() ?? "(null)"}");
-
                     _logger.LogInformation(
                         "Guid-based person lookup completed. Path={Path} MatchedOsobaId={MatchedOsobaId}",
                         httpContext.Request.Path.Value ?? string.Empty,
@@ -176,9 +173,6 @@ public sealed class UserContextResolver : IUserContextResolver
                 {
                     if (loginCandidates.Count > 0)
                     {
-                        WriteAuthTrace(
-                            $"Authenticated principal branch | Guid miss -> attempting AdLogin lookup | CandidateCount={loginCandidates.Count}");
-
                         _logger.LogInformation(
                             "Attempting authenticated login-candidate resolution after Guid lookup miss. Path={Path} LoginCandidateCount={LoginCandidateCount}",
                             httpContext.Request.Path.Value ?? string.Empty,
@@ -190,9 +184,6 @@ public sealed class UserContextResolver : IUserContextResolver
 
                 if (!osobaId.HasValue)
                 {
-                    WriteAuthTrace(
-                        $"ResolveAsync failed | no Guid/AdLogin match | CandidateCount={loginCandidates.Count}");
-
                     _logger.LogWarning(
                         "User context resolution failed. Path={Path} Reason=NoGuidOrAdLoginMatch LoginCandidateCount={LoginCandidateCount}",
                         httpContext.Request.Path.Value ?? string.Empty,
@@ -203,26 +194,25 @@ public sealed class UserContextResolver : IUserContextResolver
             }
         }
 
-        var osoba = await _dbContext.Osoby
-            .AsNoTracking()
-            .Where(x => x.Id == osobaId.Value)
-            .Select(x => new
-            {
-                x.Id,
-                x.Titul,
-                x.Jmeno,
-                x.Prijmeni,
-                x.Email,
-                x.GuidAd,
-                x.AdLogin,
-                x.OrganizacniCelekId
-            })
+        var osoba = await (
+                from person in _dbContext.Osoby.AsNoTracking()
+                join organizationalUnit in _dbContext.CiselnikOrganizacniCelky.AsNoTracking()
+                    on person.OrganizacniCelekId equals organizationalUnit.Id into organizationalUnitGroup
+                from organizationalUnit in organizationalUnitGroup.DefaultIfEmpty()
+                where person.Id == osobaId.Value
+                select new ResolvedPersonRow(
+                    person.Id,
+                    person.Titul,
+                    person.Jmeno,
+                    person.Prijmeni,
+                    person.Email,
+                    organizationalUnit != null ? organizationalUnit.Kod : null,
+                    organizationalUnit != null ? organizationalUnit.Nazev : null,
+                    _dbContext.AuthzSuperadmins.AsNoTracking().Any(superadmin => superadmin.OsobaId == person.Id)))
             .FirstOrDefaultAsync(ct);
 
         if (osoba is null)
         {
-            WriteAuthTrace($"ResolveAsync failed | resolved OsobaId {osobaId} not found in DB");
-
             _logger.LogWarning(
                 "User context resolution failed. Reason=ResolvedPersonMissingInDatabase OsobaId={OsobaId}",
                 osobaId);
@@ -230,75 +220,78 @@ public sealed class UserContextResolver : IUserContextResolver
             return UserContextResolutionResult.Forbidden("Přihlášená osoba v databázi neexistuje.");
         }
 
-        var organizationalUnit = await _dbContext.CiselnikOrganizacniCelky
-            .AsNoTracking()
-            .Where(x => x.Id == osoba.OrganizacniCelekId)
-            .Select(x => new { x.Kod, x.Nazev })
-            .FirstOrDefaultAsync(ct);
-
-        var roleCodes = await (
+        var activeRoleRows = await (
                 from ur in _dbContext.AuthzUserRoles.AsNoTracking()
                 join role in _dbContext.AuthzRoles.AsNoTracking() on ur.RoleId equals role.Id
                 where ur.OsobaId == osoba.Id && ur.IsActive && role.IsActive
-                orderby role.Kod
-                select role.Kod)
-            .Distinct()
+                select new ActiveRoleRow(ur.RoleId, role.Kod))
             .ToListAsync(ct);
+        var roleCodes = activeRoleRows
+            .Select(x => x.RoleCode)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+        var activeRoleIds = activeRoleRows
+            .Select(x => x.RoleId)
+            .Distinct()
+            .ToList();
 
-        var isSuperAdmin = await _dbContext.AuthzSuperadmins
-            .AsNoTracking()
-            .AnyAsync(x => x.OsobaId == osoba.Id, ct);
-
+        var isSuperAdmin = osoba.IsSuperAdmin;
         if (!isSuperAdmin)
         {
             isSuperAdmin = roleCodes.Any(code => string.Equals(code, "SUPERADMIN", StringComparison.OrdinalIgnoreCase));
         }
 
-        var grantsRaw = await (
-                from ur in _dbContext.AuthzUserRoles.AsNoTracking()
-                join rp in _dbContext.AuthzRolePermissions.AsNoTracking() on ur.RoleId equals rp.RoleId
-                join p in _dbContext.AuthzPermissions.AsNoTracking() on rp.PermissionId equals p.Id
-                where ur.OsobaId == osoba.Id && ur.IsActive && p.IsActive
-                select new
-                {
-                    p.Klic,
-                    p.ScopeLevel,
-                    rp.ScopeMode,
-                    rp.IsAllowed,
-                    RolePermissionId = rp.Id
-                })
-            .ToListAsync(ct);
+        var grantProjectRows = activeRoleIds.Count == 0
+            ? new List<PermissionGrantProjectRow>()
+            : await (
+                    from rp in _dbContext.AuthzRolePermissions.AsNoTracking()
+                    join p in _dbContext.AuthzPermissions.AsNoTracking() on rp.PermissionId equals p.Id
+                    join includeProject in _dbContext.AuthzRolePermissionProjects.AsNoTracking()
+                        on rp.Id equals includeProject.RolePermissionId into includeProjectGroup
+                    from includeProject in includeProjectGroup.DefaultIfEmpty()
+                    where activeRoleIds.Contains(rp.RoleId) && p.IsActive
+                    select new PermissionGrantProjectRow(
+                        p.Klic,
+                        p.ScopeLevel,
+                        rp.ScopeMode,
+                        rp.IsAllowed,
+                        rp.Id,
+                        includeProject != null ? includeProject.ProjektId : null))
+                .ToListAsync(ct);
 
-        var rolePermissionIds = grantsRaw
-            .Where(x => string.Equals(x.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase))
-            .Select(x => x.RolePermissionId)
-            .Distinct()
+        var grantsRaw = grantProjectRows
+            .GroupBy(row => new PermissionGrantRaw(
+                row.Klic,
+                row.ScopeLevel,
+                row.ScopeMode,
+                row.IsAllowed,
+                row.RolePermissionId))
+            .Select(group => new
+            {
+                Raw = group.Key,
+                ProjectIds = group
+                    .Where(item => item.ProjectId.HasValue)
+                    .Select(item => item.ProjectId!.Value)
+                    .Distinct()
+                    .ToList()
+            })
             .ToList();
 
-        var includeProjectMap = await _dbContext.AuthzRolePermissionProjects
-            .AsNoTracking()
-            .Where(x => rolePermissionIds.Contains(x.RolePermissionId))
-            .GroupBy(x => x.RolePermissionId)
-            .ToDictionaryAsync(
-                group => group.Key,
-                group => (IReadOnlyList<int>)group.Select(item => item.ProjektId).Distinct().ToList(),
-                ct);
-
         var grants = grantsRaw
-            .Select(raw => new PermissionGrantViewModel
+            .Select(item => new PermissionGrantViewModel
             {
-                PermissionKey = raw.Klic,
-                ScopeLevel = raw.ScopeLevel,
-                ScopeMode = raw.ScopeMode,
-                IsAllowed = raw.IsAllowed,
-                ProjectIds = raw.ScopeMode.Equals("INCLUDE", StringComparison.OrdinalIgnoreCase)
-                    ? includeProjectMap.GetValueOrDefault(raw.RolePermissionId, Array.Empty<int>())
+                PermissionKey = item.Raw.Klic,
+                ScopeLevel = item.Raw.ScopeLevel,
+                ScopeMode = item.Raw.ScopeMode,
+                IsAllowed = item.Raw.IsAllowed,
+                ProjectIds = item.Raw.ScopeMode.Equals("INCLUDE", StringComparison.OrdinalIgnoreCase)
+                    ? item.ProjectIds
                     : Array.Empty<int>()
             })
             .ToList();
 
-        var implicitProjectRoleGrants = ProjectRolePermissionGrantBuilder.BuildImplicitProjectRoleGrants(
-            await (
+        var activeProjectRoleAssignments = await (
                 from assignment in _dbContext.ObsazeniProjektu.AsNoTracking()
                 join role in _dbContext.CiselnikRoliProjektu.AsNoTracking() on assignment.RoleId equals role.Id
                 where assignment.OsobaId == osoba.Id
@@ -308,11 +301,11 @@ public sealed class UserContextResolver : IUserContextResolver
                     RoleCode = role.Kod,
                     ProjectId = assignment.ProjektId
                 })
-            .ToListAsync(ct));
+            .ToListAsync(ct);
+        var implicitProjectRoleGrants = ProjectRolePermissionGrantBuilder.BuildImplicitProjectRoleGrants(activeProjectRoleAssignments);
         grants.AddRange(implicitProjectRoleGrants);
 
-        var implicitSubsystemRoleGrants = SubsystemRolePermissionGrantBuilder.BuildImplicitSubsystemRoleGrants(
-            await (
+        var activeSubsystemRoleAssignments = await (
                 from assignment in _dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
                 join role in _dbContext.CiselnikRoliSubsystemu.AsNoTracking() on assignment.RoleSubsystemuId equals role.Id
                 join projectSubsystem in _dbContext.ProjektSubsystemy.AsNoTracking() on assignment.ProjektSubsystemId equals projectSubsystem.Id
@@ -324,23 +317,19 @@ public sealed class UserContextResolver : IUserContextResolver
                     RoleCode = role.Kod,
                     ProjectId = projectSubsystem.ProjektId
                 })
-            .ToListAsync(ct));
+            .ToListAsync(ct);
+        var implicitSubsystemRoleGrants = SubsystemRolePermissionGrantBuilder.BuildImplicitSubsystemRoleGrants(activeSubsystemRoleAssignments);
         grants.AddRange(implicitSubsystemRoleGrants);
 
-        var projectRoleProjectIds = await _dbContext.ObsazeniProjektu
-            .AsNoTracking()
-            .Where(x => x.OsobaId == osoba.Id && !x.DatumOdebrani.HasValue)
-            .Select(x => x.ProjektId)
-            .ToListAsync(ct);
+        var projectRoleProjectIds = activeProjectRoleAssignments
+            .Select(x => x.ProjectId)
+            .Distinct()
+            .ToList();
 
-        var subsystemRoleProjectIds = await (
-                from role in _dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
-                join projectSubsystem in _dbContext.ProjektSubsystemy.AsNoTracking() on role.ProjektSubsystemId equals projectSubsystem.Id
-                where role.OsobaId == osoba.Id
-                    && !role.DatumOdebrani.HasValue
-                    && !projectSubsystem.DatumOdebrani.HasValue
-                select projectSubsystem.ProjektId)
-            .ToListAsync(ct);
+        var subsystemRoleProjectIds = activeSubsystemRoleAssignments
+            .Select(x => x.ProjectId)
+            .Distinct()
+            .ToList();
 
         var visibleProjectIds = projectRoleProjectIds
             .Concat(subsystemRoleProjectIds)
@@ -348,28 +337,10 @@ public sealed class UserContextResolver : IUserContextResolver
             .OrderBy(x => x)
             .ToList();
 
-        var deletedProjectIds = await _dbContext.Projekty
-            .AsNoTracking()
-            .Join(
-                _dbContext.CiselnikStavuProjektu.AsNoTracking(),
-                project => project.StavId,
-                status => status.Id,
-                (project, status) => new
-                {
-                    project.Id,
-                    status.Kod,
-                    status.Nazev
-                })
-            .ToListAsync(ct);
-
-        var resolvedDeletedProjectIds = deletedProjectIds
-            .Where(x =>
-                string.Equals(x.Kod, "DELETED", StringComparison.OrdinalIgnoreCase) ||
-                _textNormalizer.Normalize(x.Nazev).Contains("smaz"))
-            .Select(x => x.Id)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToList();
+        var resolvedDeletedProjectIds = await ProjectAuthorizationQueryHelper.BuildDeletedProjectIdsAsync(
+            _dbContext,
+            _textNormalizer,
+            ct);
 
         var displayName = BuildDisplayName(osoba.Titul, osoba.Jmeno, osoba.Prijmeni, osoba.Id);
 
@@ -380,8 +351,8 @@ public sealed class UserContextResolver : IUserContextResolver
             Prijmeni = osoba.Prijmeni,
             DisplayName = displayName,
             Email = osoba.Email?.Trim() ?? string.Empty,
-            OrganizacniCelekKod = string.IsNullOrWhiteSpace(organizationalUnit?.Kod) ? null : organizationalUnit.Kod.Trim(),
-            OrganizacniCelek = organizationalUnit?.Nazev ?? "-",
+            OrganizacniCelekKod = string.IsNullOrWhiteSpace(osoba.OrganizacniCelekKod) ? null : osoba.OrganizacniCelekKod.Trim(),
+            OrganizacniCelek = osoba.OrganizacniCelekNazev ?? "-",
             IsSuperAdmin = isSuperAdmin,
             RoleKody = roleCodes,
             VisibleProjectIds = visibleProjectIds,
@@ -396,9 +367,6 @@ public sealed class UserContextResolver : IUserContextResolver
             context.RoleKody.Count,
             context.VisibleProjectIds.Count,
             context.PermissionGrants.Count);
-
-        WriteAuthTrace(
-            $"ResolveAsync success | OsobaId={context.OsobaId} | IsSuperAdmin={context.IsSuperAdmin} | RoleCount={context.RoleKody.Count} | VisibleProjectCount={context.VisibleProjectIds.Count} | PermissionGrantCount={context.PermissionGrants.Count}");
 
         return UserContextResolutionResult.Success(context);
     }
@@ -422,9 +390,16 @@ public sealed class UserContextResolver : IUserContextResolver
         }
 
         var normalized = _textNormalizer.Normalize(asUser);
+        var loginCandidates = BuildNormalizedLoginCandidates(asUser);
+        var queryTokens = normalized
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(token => token.Length >= 2)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         var candidates = await _dbContext.Osoby
             .AsNoTracking()
+            .Where(BuildAsUserPrefilterPredicate(loginCandidates, normalized, queryTokens))
             .Select(x => new
             {
                 x.Id,
@@ -434,9 +409,8 @@ public sealed class UserContextResolver : IUserContextResolver
                 x.Email,
                 x.AdLogin
             })
+            .Take(200)
             .ToListAsync(ct);
-
-        var loginCandidates = BuildNormalizedLoginCandidates(asUser);
         var exact = candidates.FirstOrDefault(x =>
             _personIdentityMatcher.NameEquals(x.Titul, x.Jmeno, x.Prijmeni, normalized) ||
             _personIdentityMatcher.EmailEquals(x.Email, normalized) ||
@@ -465,14 +439,13 @@ public sealed class UserContextResolver : IUserContextResolver
     {
         if (loginCandidates.Count == 0)
         {
-            WriteAuthTrace("AdLogin lookup skipped | no login candidates");
             _logger.LogInformation("Skipping AdLogin lookup because there are no login candidates.");
             return null;
         }
 
         var people = await _dbContext.Osoby
             .AsNoTracking()
-            .Where(x => x.AdLogin != null)
+            .Where(BuildAdLoginPrefilterPredicate(loginCandidates))
             .Select(x => new
             {
                 x.Id,
@@ -484,9 +457,6 @@ public sealed class UserContextResolver : IUserContextResolver
             .FirstOrDefault(person => LoginEquals(person.AdLogin, loginCandidates))
             ?.Id;
 
-        WriteAuthTrace(
-            $"AdLogin lookup finished | CandidateCount={loginCandidates.Count} | Candidates=[{string.Join(", ", loginCandidates.OrderBy(x => x, StringComparer.Ordinal))}] | PeopleWithAdLoginCount={people.Count} | MatchedOsobaId={matchedPerson?.ToString() ?? "(null)"}");
-
         _logger.LogInformation(
             "AdLogin lookup completed. CandidateCount={CandidateCount} HasDomainQualifiedCandidate={HasDomainQualifiedCandidate} HasUpnCandidate={HasUpnCandidate} HasShortCandidate={HasShortCandidate} PeopleWithAdLoginCount={PeopleWithAdLoginCount} MatchedOsobaId={MatchedOsobaId}",
             loginCandidates.Count,
@@ -497,11 +467,6 @@ public sealed class UserContextResolver : IUserContextResolver
             matchedPerson);
 
         return matchedPerson;
-    }
-
-    private static void WriteAuthTrace(string message)
-    {
-        Console.WriteLine($"[AUTH TRACE] {message}");
     }
 
     private static string DescribePresentClaimTypes(ClaimsPrincipal? principal, IEnumerable<string> claimTypes)
@@ -615,6 +580,122 @@ public sealed class UserContextResolver : IUserContextResolver
 
         var normalized = storedLogin.Trim().ToLowerInvariant();
         return candidates.Any(candidate => normalized.Contains(candidate, StringComparison.Ordinal));
+    }
+
+    private static Expression<Func<OsobaEntity, bool>> BuildAdLoginPrefilterPredicate(IReadOnlySet<string> loginCandidates)
+    {
+        var normalizedCandidates = loginCandidates
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+            .Select(candidate => candidate.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (normalizedCandidates.Length == 0)
+        {
+            return _ => false;
+        }
+
+        var shortCandidates = normalizedCandidates
+            .Where(candidate => !candidate.Contains('\\') && !candidate.Contains('@'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var parameter = Expression.Parameter(typeof(OsobaEntity), "osoba");
+        var adLoginProperty = Expression.Property(parameter, nameof(OsobaEntity.AdLogin));
+        var notNull = Expression.NotEqual(adLoginProperty, Expression.Constant(null, typeof(string)));
+        var lowerAdLogin = Expression.Call(adLoginProperty, typeof(string).GetMethod(nameof(string.ToLower), Type.EmptyTypes)!);
+
+        Expression body = Expression.Constant(false);
+        foreach (var candidate in normalizedCandidates)
+        {
+            body = Expression.OrElse(
+                body,
+                Expression.Equal(lowerAdLogin, Expression.Constant(candidate)));
+        }
+
+        foreach (var candidate in shortCandidates)
+        {
+            body = Expression.OrElse(
+                body,
+                Expression.Call(lowerAdLogin, typeof(string).GetMethod(nameof(string.EndsWith), [typeof(string)])!, Expression.Constant("\\" + candidate)));
+            body = Expression.OrElse(
+                body,
+                Expression.Call(lowerAdLogin, typeof(string).GetMethod(nameof(string.StartsWith), [typeof(string)])!, Expression.Constant(candidate + "@")));
+        }
+
+        return Expression.Lambda<Func<OsobaEntity, bool>>(
+            Expression.AndAlso(notNull, body),
+            parameter);
+    }
+
+    private static Expression<Func<OsobaEntity, bool>> BuildAsUserPrefilterPredicate(
+        IReadOnlySet<string> loginCandidates,
+        string normalizedSearch,
+        IReadOnlyCollection<string> queryTokens)
+    {
+        var loginPredicate = BuildAdLoginPrefilterPredicate(loginCandidates);
+        var searchPredicate = BuildNameAndEmailPrefilterPredicate(normalizedSearch, queryTokens);
+
+        return OrElse(loginPredicate, searchPredicate);
+    }
+
+    private static Expression<Func<OsobaEntity, bool>> BuildNameAndEmailPrefilterPredicate(
+        string normalizedSearch,
+        IReadOnlyCollection<string> queryTokens)
+    {
+        var normalized = normalizedSearch.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(normalized) && queryTokens.Count == 0)
+        {
+            return _ => false;
+        }
+
+        var parameter = Expression.Parameter(typeof(OsobaEntity), "osoba");
+        Expression body = Expression.Constant(false);
+
+        if (!string.IsNullOrWhiteSpace(normalized))
+        {
+            body = Expression.OrElse(body, BuildContainsCondition(parameter, nameof(OsobaEntity.Email), normalized));
+        }
+
+        foreach (var token in queryTokens)
+        {
+            body = Expression.OrElse(body, BuildContainsCondition(parameter, nameof(OsobaEntity.Jmeno), token));
+            body = Expression.OrElse(body, BuildContainsCondition(parameter, nameof(OsobaEntity.Prijmeni), token));
+            body = Expression.OrElse(body, BuildContainsCondition(parameter, nameof(OsobaEntity.Titul), token));
+        }
+
+        return Expression.Lambda<Func<OsobaEntity, bool>>(body, parameter);
+    }
+
+    private static Expression<Func<OsobaEntity, bool>> OrElse(
+        Expression<Func<OsobaEntity, bool>> left,
+        Expression<Func<OsobaEntity, bool>> right)
+    {
+        var parameter = Expression.Parameter(typeof(OsobaEntity), "osoba");
+        var leftBody = ReplaceParameter(left.Body, left.Parameters[0], parameter);
+        var rightBody = ReplaceParameter(right.Body, right.Parameters[0], parameter);
+        return Expression.Lambda<Func<OsobaEntity, bool>>(Expression.OrElse(leftBody, rightBody), parameter);
+    }
+
+    private static Expression ReplaceParameter(Expression body, ParameterExpression source, ParameterExpression target)
+        => new ParameterReplaceVisitor(source, target).Visit(body)!;
+
+    private static Expression BuildContainsCondition(ParameterExpression parameter, string propertyName, string value)
+    {
+        var property = Expression.Property(parameter, propertyName);
+        var notNull = Expression.NotEqual(property, Expression.Constant(null, typeof(string)));
+        var lowerProperty = Expression.Call(property, typeof(string).GetMethod(nameof(string.ToLower), Type.EmptyTypes)!);
+        var contains = Expression.Call(
+            lowerProperty,
+            typeof(string).GetMethod(nameof(string.Contains), [typeof(string)])!,
+            Expression.Constant(value));
+
+        return Expression.AndAlso(notNull, contains);
+    }
+
+    private sealed class ParameterReplaceVisitor(ParameterExpression source, ParameterExpression target) : ExpressionVisitor
+    {
+        protected override Expression VisitParameter(ParameterExpression node)
+            => node == source ? target : base.VisitParameter(node);
     }
 
     private string BuildDisplayName(string? titul, string jmeno, string prijmeni, int id)

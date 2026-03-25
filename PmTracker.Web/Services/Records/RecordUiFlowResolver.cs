@@ -25,9 +25,9 @@ public sealed class RecordUiFlowResolver : IRecordUiFlowResolver
 
         return new RecordCommentAjaxFlow
         {
-            RefreshScope = "record-card",
+            RefreshScope = "record-comments",
             ControllerName = "Zaznamy",
-            ActionName = "RecordCardPartial",
+            ActionName = "RecordCommentsPartial",
             RouteValues = new RouteValueDictionary(new { projektId, zaznamId }),
             UiContext = UiContextProject,
             Tab = RecordsTab

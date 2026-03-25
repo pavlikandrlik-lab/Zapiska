@@ -1,0 +1,163 @@
+@model ProjektTymTabViewModel
+@{
+    var isActive = ViewData["IsActive"] as bool? ?? false;
+}
+
+<section class="tab-panel @(isActive ? "active" : null)" data-tab-panel="tym">
+    <div class="stack-lg">
+        <section class="card">
+            <div class="panel-header">
+                <h3>Projektové role</h3>
+                @if (Model.CanManageTeam)
+                {
+                    <div class="header-actions">
+                        <button class="btn primary" type="button" data-modal-url="@Url.Action("AssignProjectRoleModal", "Projekty", new { projektId = Model.ProjektId })">Přidat projektovou roli</button>
+                        <button class="btn" type="button" data-modal-url="@Url.Action("AssignProjectSubsystemRoleModal", "Projekty", new { projektId = Model.ProjektId })">Přidat roli v subsystému</button>
+                    </div>
+                }
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Osoba</th>
+                        <th>Email</th>
+                        <th>Typ role</th>
+                        <th>Role</th>
+                        <th>Subsystém</th>
+                        <th>Organizace</th>
+                        <th>Organizační celek</th>
+                        <th>Přiřazeno</th>
+                        <th class="table-actions">Akce</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var role in Model.AktivniRole)
+                {
+                    <tr>
+                        <td>@role.Osoba</td>
+                        <td>@(string.IsNullOrWhiteSpace(role.Email) ? "-" : role.Email)</td>
+                        <td>@role.RoleTypeLabel</td>
+                        <td>@role.RoleNazev</td>
+                        <td>@(string.IsNullOrWhiteSpace(role.SubsystemNazev) ? "-" : role.SubsystemNazev)</td>
+                        <td>@(role.Organizace ?? "-")</td>
+                        <td>@(role.OrganizacniCelek ?? "-")</td>
+                        <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td class="table-actions">
+                            @if (Model.CanManageTeam)
+                            {
+                                @if (string.Equals(role.AssignmentKind, "PROJECT", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <form asp-controller="Projekty"
+                                          asp-action="DeactivateProjectRole"
+                                          method="post"
+                                          data-ajax-submit="true"
+                                          onsubmit="return confirm('Opravdu deaktivovat projektovou roli?');">
+                                        <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                        <input type="hidden" name="ProjektRoleId" value="@role.AssignmentId" />
+                                        <button class="btn small ghost" type="submit">Deaktivovat</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form asp-controller="Projekty"
+                                          asp-action="DeactivateProjectSubsystemRole"
+                                          method="post"
+                                          data-ajax-submit="true"
+                                          onsubmit="return confirm('Opravdu deaktivovat roli v subsystému?');">
+                                        <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                        <input type="hidden" name="ProjektSubsystemRoleId" value="@role.AssignmentId" />
+                                        <button class="btn small ghost" type="submit">Deaktivovat</button>
+                                    </form>
+                                }
+                            }
+                            else
+                            {
+                                <span class="muted">Pouze čtení</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <div class="panel-header">
+                <h3>Subsystémy projektu</h3>
+                @if (Model.CanManageTeam)
+                {
+                    <button class="btn primary" type="button" data-modal-url="@Url.Action("AssignProjectSubsystemModal", "Projekty", new { projektId = Model.ProjektId })">Přiřadit subsystém</button>
+                }
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Kód</th>
+                        <th>Subsystém</th>
+                        <th>Přiřazeno</th>
+                        <th class="table-actions">Akce</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var subsystem in Model.AktivniSubsystemyProjektu)
+                {
+                    <tr>
+                        <td>@subsystem.Kod</td>
+                        <td>@subsystem.Nazev</td>
+                        <td>@subsystem.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td class="table-actions">
+                            @if (Model.CanManageTeam)
+                            {
+                                <form asp-controller="Projekty"
+                                      asp-action="DeactivateProjectSubsystem"
+                                      method="post"
+                                      data-ajax-submit="true"
+                                      onsubmit="return confirm('Opravdu deaktivovat subsystém projektu?');">
+                                    <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                    <input type="hidden" name="ProjektSubsystemId" value="@subsystem.ProjektSubsystemId" />
+                                    <button class="btn small ghost" type="submit">Deaktivovat</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <span class="muted">Pouze čtení</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <div class="panel-header">
+                <h3>Historie rolí</h3>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Osoba</th>
+                        <th>Typ role</th>
+                        <th>Role</th>
+                        <th>Subsystém</th>
+                        <th>Přiřazeno</th>
+                        <th>Odebráno</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var role in Model.HistorieRoli)
+                {
+                    <tr>
+                        <td>@role.Osoba</td>
+                        <td>@role.RoleTypeLabel</td>
+                        <td>@role.RoleNazev</td>
+                        <td>@(string.IsNullOrWhiteSpace(role.SubsystemNazev) ? "-" : role.SubsystemNazev)</td>
+                        <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@(role.DatumOdebrani?.ToString("dd.MM.yyyy HH:mm") ?? "-")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </section>
+    </div>
+</section>

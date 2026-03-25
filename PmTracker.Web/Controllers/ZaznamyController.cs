@@ -205,35 +205,55 @@ public sealed class ZaznamyController : BaseController
             return NotFound();
         }
 
-        var model = await _recordService.BuildProjektDetailAsync(projektId, ct);
-        var record = model.Zaznamy.FirstOrDefault(x => x.Id == zaznamId);
+        var record = await _recordService.BuildRecordCardShellAsync(projektId, zaznamId, ct);
         if (record is null)
         {
             return NotFound();
         }
 
-        var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId);
-        var canEditSchedule = record.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projektId);
-        var canAddSchedule = record.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projektId);
-        var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId)
-            && record.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
-        if (!canEditRecord && !canCommentAsSubsystemLead && !canEditSchedule && !canAddSchedule)
+        PrepareRecordCardShellPresentation(record, projektId);
+        return PartialView("~/Views/Projekty/_ZaznamPartial.cshtml", record);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> RecordDetailPartial(int projektId, int zaznamId, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(projektId))
         {
-            return Forbid();
+            return NotFound();
         }
 
-        record.CanEditRecord = canEditRecord;
-        record.CanEditSchedule = canEditSchedule;
-        record.CanAddSchedule = canAddSchedule;
-        record.CanManageSchedule = canEditSchedule || canAddSchedule;
-        record.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
-        record.CanAddComment = canEditRecord || canCommentAsSubsystemLead;
-        record.EditButtonLabel = canEditRecord ? "Upravit" : "GANTT";
-        record.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+        var model = await _recordService.BuildRecordCardDetailAsync(projektId, zaznamId, ct);
+        if (model is null)
+        {
+            return NotFound();
+        }
 
-        ViewData["OtevrenaJednani"] = model.OtevrenaJednani;
-        ViewData["ProjektId"] = projektId;
-        return PartialView("~/Views/Projekty/_ZaznamPartial.cshtml", record);
+        return PartialView("~/Views/Projekty/_ZaznamDetailPartial.cshtml", model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> RecordCommentsPartial(int projektId, int zaznamId, int? limit, bool loadAll = false, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(projektId))
+        {
+            return NotFound();
+        }
+
+        var record = await _recordService.BuildRecordCardShellAsync(projektId, zaznamId, ct);
+        if (record is null)
+        {
+            return NotFound();
+        }
+
+        var model = await _recordService.BuildRecordCommentsPanelAsync(projektId, zaznamId, limit, loadAll, ct);
+        if (model is null)
+        {
+            return NotFound();
+        }
+
+        PrepareRecordCommentsPresentation(model, record.Summary);
+        return PartialView("~/Views/Projekty/_ZaznamCommentsPartial.cshtml", model);
     }
 
     [HttpPost]
@@ -355,7 +375,7 @@ public sealed class ZaznamyController : BaseController
 
         return AjaxSuccessResult(
             refreshScope: "projekty-detail-zaznamy-preserve",
-            refreshUrl: Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = projectTab }),
+            refreshUrl: Url.Action("RecordsTabPartial", "Projekty", new { id = command.ProjektId }),
             projectId: command.ProjektId,
             uiContext: UiContextProject,
             tab: projectTab,
@@ -377,8 +397,7 @@ public sealed class ZaznamyController : BaseController
 
         return AjaxSuccessResult(
             refreshScope: "projekty-detail-zaznamy-preserve",
-            refreshUrl: NormalizeLocalReturnUrl(returnUrl)
-                ?? (Url.Action("Detail", "Projekty", new { id = projektId, tab = normalizedTab }) ?? $"/Projekty/Detail/{projektId}?tab={normalizedTab}"),
+            refreshUrl: Url.Action("RecordsTabPartial", "Projekty", new { id = projektId }) ?? $"/Projekty/RecordsTabPartial/{projektId}",
             projectId: projektId,
             uiContext: UiContextProject,
             tab: normalizedTab,
@@ -552,5 +571,38 @@ public sealed class ZaznamyController : BaseController
         }
 
         return Url.IsLocalUrl(returnUrl) ? returnUrl : null;
+    }
+
+    private void PrepareRecordCardShellPresentation(ProjektZaznamCardShellViewModel record, int projektId)
+    {
+        var summary = record.Summary;
+        var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId);
+        var canEditSchedule = summary.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projektId);
+        var canAddSchedule = summary.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projektId);
+        var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId)
+            && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
+
+        summary.CanEditRecord = canEditRecord;
+        summary.CanEditSchedule = canEditSchedule;
+        summary.CanAddSchedule = canAddSchedule;
+        summary.CanManageSchedule = canEditSchedule || canAddSchedule;
+        summary.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
+        summary.CanAddComment = canEditRecord || canCommentAsSubsystemLead;
+        summary.EditButtonLabel = canEditRecord ? "Upravit" : "GANTT";
+        summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+        record.DetailUrl ??= Url.Action(nameof(RecordDetailPartial), new { projektId, zaznamId = summary.Id });
+        record.CommentsUrl ??= Url.Action(nameof(RecordCommentsPartial), new { projektId, zaznamId = summary.Id });
+    }
+
+    private void PrepareRecordCommentsPresentation(ZaznamCommentsPanelViewModel model, ZaznamCardSummaryViewModel summary)
+    {
+        var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId);
+        var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, model.ProjektId)
+            && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
+
+        model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+        model.CanEditRecord = canEditRecord;
+        model.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
+        model.CanAddComment = canEditRecord || canCommentAsSubsystemLead;
     }
 }

@@ -1,94 +1,81 @@
-@using System.Globalization
-@model ZaznamCardViewModel
-@inject PmTracker.Web.Services.Common.IRichTextContentService RichTextContentService
+@model ProjektZaznamCardShellViewModel
 @{
-    var otevrenaJednani = ViewData["OtevrenaJednani"] as IReadOnlyList<JednaniOptionViewModel> ?? Array.Empty<JednaniOptionViewModel>();
-    var colorClass = "category-" + Model.KategorieKod.ToLowerInvariant();
-    var projektId = ViewData["ProjektId"] as int? ?? 0;
-    var taskPrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = Model.Id, projektId, autoPrint = true }) ?? $"/Export/Ukol/{Model.Id}/Tisk?projektId={projektId}&autoPrint=true";
-    var taskPrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = Model.Id, projektId }) ?? $"/Export/Ukol/{Model.Id}/Word?projektId={projektId}";
-    var editRecordUrl = Url.Action("Edit", "Zaznamy", new { id = Model.Id, projektId }) ?? $"/Zaznamy/Edit/{Model.Id}";
-    var safeDescriptionHtml = RichTextContentService.ToSafeHtml(Model.Popis);
+    var summary = Model.Summary;
+    var colorClass = "category-" + summary.KategorieKod.ToLowerInvariant();
+    var projektId = summary.ProjektId;
+    var taskPrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = summary.Id, projektId, autoPrint = true }) ?? $"/Export/Ukol/{summary.Id}/Tisk?projektId={projektId}&autoPrint=true";
+    var taskPrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = summary.Id, projektId }) ?? $"/Export/Ukol/{summary.Id}/Word?projektId={projektId}";
+    var editRecordUrl = Url.Action("Edit", "Zaznamy", new { id = summary.Id, projektId }) ?? $"/Zaznamy/Edit/{summary.Id}";
 }
 
 <article class="record-card collapsed @colorClass"
-         data-record-id="@Model.Id"
-         data-filter-subsystem="@Model.AktualniSubsystem"
-         data-filter-subsystem-kod="@Model.AktualniSubsystemKod"
-         data-filter-kategorie="@Model.KategorieNazev"
-         data-filter-kategorie-kod="@Model.KategorieKod"
-         data-filter-stav="@Model.Stav"
-         data-filter-stav-kod="@Model.StavKod"
-         data-filter-typ="@(Model.TypUkolu ?? string.Empty)"
-         data-filter-typ-kod="@(Model.TypUkoluKod ?? string.Empty)"
-         data-filter-vlastnik="@Model.AktualniVlastnik"
-         data-filter-vlastnik-id="@Model.AktualniVlastnikId"
-         data-filter-aktivni="@Model.IsAktivniStav.ToString().ToLowerInvariant()"
-         data-filter-je-ukol="@Model.JeUkol.ToString().ToLowerInvariant()"
-         data-filter-vyjadreni-jednani-stavy="@(string.Join("|", Model.VyjadreniJednaniStavyKody))">
+         data-record-id="@summary.Id"
+         data-record-detail-url="@Model.DetailUrl"
+         data-record-comments-url="@Model.CommentsUrl"
+         data-record-comments-base-url="@Model.CommentsUrl"
+         data-record-detail-loaded="@(Model.DetailLoaded ? "true" : "false")"
+         data-record-comments-loaded="@(Model.CommentsLoaded ? "true" : "false")"
+         data-filter-subsystem="@summary.AktualniSubsystem"
+         data-filter-subsystem-kod="@summary.AktualniSubsystemKod"
+         data-filter-kategorie="@summary.KategorieNazev"
+         data-filter-kategorie-kod="@summary.KategorieKod"
+         data-filter-stav="@summary.Stav"
+         data-filter-stav-kod="@summary.StavKod"
+         data-filter-typ="@(summary.TypUkolu ?? string.Empty)"
+         data-filter-typ-kod="@(summary.TypUkoluKod ?? string.Empty)"
+         data-filter-vlastnik="@summary.AktualniVlastnik"
+         data-filter-vlastnik-id="@summary.AktualniVlastnikId"
+         data-filter-aktivni="@summary.IsAktivniStav.ToString().ToLowerInvariant()"
+         data-filter-je-ukol="@summary.JeUkol.ToString().ToLowerInvariant()"
+         data-filter-vyjadreni-jednani-stavy="@(string.Join("|", summary.VyjadreniJednaniStavyKody))">
     <div class="record-bar" aria-hidden="true"></div>
     <div class="record-content">
         <header class="record-header" data-record-toggle aria-expanded="false">
             <div class="record-title-wrap">
                 <div class="record-meta">
-                    <span class="pill">@Model.KategorieNazev</span>
-                    @if (!string.IsNullOrWhiteSpace(Model.TypUkolu))
+                    <span class="pill">@summary.KategorieNazev</span>
+                    @if (!string.IsNullOrWhiteSpace(summary.TypUkolu))
                     {
-                        <span class="pill ghost">@Model.TypUkolu</span>
+                        <span class="pill ghost">@summary.TypUkolu</span>
                     }
                 </div>
-                <div class="record-title">#@Model.CisloViditelne - @Model.Nazev</div>
-                @if (!string.IsNullOrWhiteSpace(Model.Cil))
+                <div class="record-title">#@summary.CisloViditelne - @summary.Nazev</div>
+                @if (!string.IsNullOrWhiteSpace(summary.Cil))
                 {
-                    <div class="record-subtitle record-goal-subtitle">@Model.Cil</div>
+                    <div class="record-subtitle record-goal-subtitle">@summary.Cil</div>
                 }
                 <div class="record-summary-meta">
-                    <span><span class="label">Termín:</span> @(Model.AktualniTermin?.ToString("dd.MM.yyyy") ?? "-")</span>
-                    <span><span class="label">Založeno:</span> @Model.DatumZalozeni.ToString("dd.MM.yyyy")</span>
+                    <span><span class="label">Termín:</span> @(summary.AktualniTermin?.ToString("dd.MM.yyyy") ?? "-")</span>
+                    <span><span class="label">Založeno:</span> @summary.DatumZalozeni.ToString("dd.MM.yyyy")</span>
                 </div>
-                @if (Model.Spoluprace.Count > 0)
-                {
-                    <div class="record-collab-inline">
-                        <span class="label">Spolupráce:</span>
-                        <div class="record-collab-chips">
-                            @foreach (var spolupracovnik in Model.Spoluprace)
-                            {
-                                <span class="chip chip-collab"
-                                      title="@(string.IsNullOrWhiteSpace(spolupracovnik.Email) ? "-" : spolupracovnik.Email) | @(spolupracovnik.Organizace ?? "-") / @(spolupracovnik.OrganizacniCelek ?? "-")">
-                                    @spolupracovnik.Osoba
-                                </span>
-                            }
-                        </div>
-                    </div>
-                }
             </div>
             <div class="record-actions">
-                <span class="badge">@Model.Stav</span>
+                <span class="badge">@summary.Stav</span>
                 <a class="icon-btn"
                    href="@taskPrintPdfUrl"
                    target="_blank"
                    rel="noopener"
-                   aria-label="Tisk úkolu #@Model.CisloViditelne"
+                   aria-label="Tisk úkolu #@summary.CisloViditelne"
                    data-stop-propagation="true"
                    data-print-trigger="true"
                    data-print-pdf-url="@taskPrintPdfUrl"
                    data-print-word-url="@taskPrintWordUrl"
-                   data-print-label="Tisk úkolu #@Model.CisloViditelne">
+                   data-print-label="Tisk úkolu #@summary.CisloViditelne">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <polyline points="6 9 6 2 18 2 18 9"></polyline>
                         <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
                         <rect x="6" y="14" width="12" height="8"></rect>
                     </svg>
                 </a>
-                @if (Model.CanEditRecord || Model.CanManageSchedule)
+                @if (summary.CanEditRecord || summary.CanManageSchedule)
                 {
                     <button class="btn small"
                             type="button"
                             data-record-editor-url="@editRecordUrl"
                             data-record-editor-project-id="@projektId"
-                            data-record-editor-label="@($"{Model.EditButtonLabel} záznam #{Model.CisloViditelne}")"
+                            data-record-editor-label="@($"{summary.EditButtonLabel} záznam #{summary.CisloViditelne}")"
                             data-stop-propagation="true">
-                        @Model.EditButtonLabel
+                        @summary.EditButtonLabel
                     </button>
                 }
                 <span class="record-toggle-indicator" aria-hidden="true">›</span>
@@ -96,247 +83,48 @@
         </header>
 
         <div class="record-body">
-            <div class="record-history">
-                <div>
-                    <span class="label">Vlastník:</span>
-                    @foreach (var jmeno in Model.HistorieVlastniku)
-                    {
-                        <span class="history"><s>@jmeno</s></span>
-                    }
-                    <strong>@Model.AktualniVlastnik</strong>
-                </div>
-                <div>
-                    <span class="label">Termín:</span>
-                    @foreach (var termin in Model.HistorieTerminu)
-                    {
-                        <span class="history"><s>@termin.ToString("dd.MM.yyyy")</s></span>
-                    }
-                    <strong>@(Model.AktualniTermin?.ToString("dd.MM.yyyy") ?? "-")</strong>
-                </div>
-                <div>
-                    <span class="label">Subsystém:</span>
-                    @foreach (var subsystem in Model.HistorieSubsystemu)
-                    {
-                        <span class="history"><s>@subsystem</s></span>
-                    }
-                    <strong>@Model.AktualniSubsystem</strong>
-                </div>
-                @if (!string.IsNullOrWhiteSpace(Model.TypUkolu))
+            <div class="record-detail-shell" data-record-detail-shell>
+                @if (Model.DetailLoaded && Model.Detail is not null)
                 {
-                    <div>
-                        <span class="label">Typ úkolu:</span>
-                        @foreach (var typ in Model.HistorieTypuUkolu)
-                        {
-                            <span class="history"><s>@typ</s></span>
-                        }
-                        <strong>@Model.TypUkolu</strong>
-                    </div>
-                }
-            </div>
-
-            @if (!string.IsNullOrWhiteSpace(safeDescriptionHtml))
-            {
-                <div class="record-description">
-                    <span class="label">Popis:</span>
-                    <div class="richtext-render">@Html.Raw(safeDescriptionHtml)</div>
-                </div>
-            }
-
-            @if (Model.ExterniOdkazy.Count > 0)
-            {
-                <div class="record-chips">
-                    @for (var i = 0; i < Model.ExterniOdkazy.Count; i++)
-                    {
-                        var odkaz = Model.ExterniOdkazy[i];
-                        var tooltipId = $"chip-tooltip-{Model.Id}-{i}";
-                        var estimatedPriceLabel = odkaz.PredpokladanaCena.HasValue
-                            ? $"{odkaz.PredpokladanaCena.Value.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ"))} Kč"
-                            : null;
-                        <span class="chip-wrap">
-                            @if (!string.IsNullOrWhiteSpace(odkaz.ServiceDeskUrl))
-                            {
-                                <a class="chip chip-interactive chip-link"
-                                   href="@odkaz.ServiceDeskUrl"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   aria-describedby="@tooltipId"
-                                   title="Otevřít detail v ServiceDesk">
-                                    <span class="chip-label">@odkaz.Typ</span>
-                                    <span class="chip-value">@odkaz.Cislo</span>
-                                    @if (!string.IsNullOrWhiteSpace(odkaz.Vyzva))
-                                    {
-                                        <span class="chip-sub">@odkaz.Vyzva</span>
-                                    }
-                                    @if (!string.IsNullOrWhiteSpace(estimatedPriceLabel))
-                                    {
-                                        <span class="chip-sub">@estimatedPriceLabel</span>
-                                    }
-                                </a>
-                            }
-                            else
-                            {
-                                <span class="chip chip-interactive" tabindex="0" aria-describedby="@tooltipId">
-                                    <span class="chip-label">@odkaz.Typ</span>
-                                    <span class="chip-value">@odkaz.Cislo</span>
-                                    @if (!string.IsNullOrWhiteSpace(odkaz.Vyzva))
-                                    {
-                                        <span class="chip-sub">@odkaz.Vyzva</span>
-                                    }
-                                    @if (!string.IsNullOrWhiteSpace(estimatedPriceLabel))
-                                    {
-                                        <span class="chip-sub">@estimatedPriceLabel</span>
-                                    }
-                                </span>
-                            }
-                            <span id="@tooltipId" class="chip-tooltip" role="tooltip">
-                                <span class="chip-tooltip-title">@odkaz.Typ @odkaz.Cislo</span>
-                                <span class="chip-tooltip-row">
-                                    <span>Typ:</span>
-                                    <strong>@(odkaz.TypNazev ?? "-")</strong>
-                                </span>
-                                <span class="chip-tooltip-row">
-                                    <span>Výzva:</span>
-                                    <strong>@(string.IsNullOrWhiteSpace(odkaz.Vyzva) ? "-" : odkaz.Vyzva)</strong>
-                                </span>
-                                <span class="chip-tooltip-row">
-                                    <span>Předpokl. cena:</span>
-                                    <strong>@(string.IsNullOrWhiteSpace(estimatedPriceLabel) ? "-" : estimatedPriceLabel)</strong>
-                                </span>
-                                <span class="chip-tooltip-row">
-                                    <span>Objednáno:</span>
-                                    <strong>@FormatDate(odkaz.DatumObjednani)</strong>
-                                </span>
-                                <span class="chip-tooltip-row">
-                                    <span>Plán dodání:</span>
-                                    <strong>@FormatDate(odkaz.DatumPlanDodani)</strong>
-                                </span>
-                                <span class="chip-tooltip-row">
-                                    <span>Datum dodání:</span>
-                                    <strong>@FormatDate(odkaz.DatumDodani)</strong>
-                                </span>
-                                <span class="chip-tooltip-row">
-                                    <span>Datum převzetí:</span>
-                                    <strong>@FormatDate(odkaz.DatumPrevzeti)</strong>
-                                </span>
-                            </span>
-                        </span>
-                    }
-                </div>
-            }
-
-            <div class="record-comments" data-comment-sort-section data-comment-sort-direction="asc">
-                <div class="record-comments-header">
-                    <h4>Vyjádření</h4>
-                    @if (Model.Vyjadreni.Count > 1)
-                    {
-                        <button type="button" class="btn small ghost comment-sort-toggle" data-comment-sort-toggle>
-                            Řazení: jednání vzestupně
-                        </button>
-                    }
-                </div>
-                @if (Model.Vyjadreni.Count == 0)
-                {
-                    <p class="muted">Zatím bez vyjádření.</p>
+                    @await Html.PartialAsync("_ZaznamDetailPartial", Model.Detail)
                 }
                 else
                 {
-                    <div class="comment-list" data-comment-list>
-                        @foreach (var vyjadreni in Model.Vyjadreni)
-                        {
-                            <div class="comment" data-comment-item data-comment-meeting="@(vyjadreni.JednaniCislo ?? 0)" data-comment-id="@vyjadreni.Id">
-                                <div class="comment-header">
-                                    <strong>@vyjadreni.Autor</strong>
-                                    <span class="muted">@vyjadreni.Datum.ToString("dd.MM.yyyy")</span>
-                                </div>
-                                <div class="comment-text richtext-render">@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
-                                @if (Model.CanAddComment)
-                                {
-                                    <div class="comment-toolbar">
-                                        @{
-                                            var canEditThisComment = vyjadreni.LzeUpravit
-                                                && (Model.CanEditRecord
-                                                    || (Model.CanCommentAsSubsystemLeader && vyjadreni.AutorOsobaId == Model.CurrentUserOsobaId));
-                                        }
-                                        @if (canEditThisComment)
-                                        {
-                                            <div class="comment-toolbar-actions">
-                                                <details class="comment-edit-details">
-                                                    <summary class="btn small ghost comment-action-chip">Upravit</summary>
-                                                    <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true">
-                                                        <input type="hidden" name="projektId" value="@projektId" />
-                                                        <input type="hidden" name="uiContext" value="project" />
-                                                        <input type="hidden" name="zaznamId" value="@Model.Id" />
-                                                        <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                                        <textarea rows="3"
-                                                                  name="Text"
-                                                                  required
-                                                                  data-rich-text="true"
-                                                                  data-rich-text-min-height="92">@RichTextContentService.ToSafeHtml(vyjadreni.Text)</textarea>
-                                                        <button class="btn small" type="submit">Uložit změnu</button>
-                                                    </form>
-                                                </details>
-                                                <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
-                                                    <input type="hidden" name="projektId" value="@projektId" />
-                                                    <input type="hidden" name="uiContext" value="project" />
-                                                    <input type="hidden" name="zaznamId" value="@Model.Id" />
-                                                    <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                                    <button class="btn small ghost" type="submit">Smazat</button>
-                                                </form>
-                                            </div>
-                                        }
-                                        else if (!vyjadreni.LzeUpravit)
-                                        {
-                                            <span class="muted">Jednání je uzavřené, vyjádření je jen pro čtení.</span>
-                                        }
-                                    </div>
-                                }
-                                @if (vyjadreni.JednaniDatum.HasValue)
-                                {
-                                    @if (vyjadreni.JednaniCislo.HasValue)
-                                    {
-                                        <span class="tag">Zapsáno na jednání č. @vyjadreni.JednaniCislo (@vyjadreni.JednaniDatum.Value.ToString("dd.MM.yyyy"))</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="tag">Zapsáno na jednání @vyjadreni.JednaniDatum.Value.ToString("dd.MM.yyyy")</span>
-                                    }
-                                }
-                            </div>
-                        }
+                    <div class="record-loading-placeholder" data-record-detail-placeholder hidden>
+                        <div class="record-loading-line"></div>
+                        <div class="record-loading-line short"></div>
+                        <div class="record-loading-line"></div>
                     </div>
+                    <div class="record-loading-error" data-record-detail-error hidden></div>
                 }
+            </div>
 
-                @if (Model.CanAddComment)
+            <div class="record-comments-lazy"
+                 data-record-comments-shell
+                 data-record-comments-scope="@summary.Id"
+                 data-record-comments-url="@Model.CommentsUrl"
+                 data-record-comments-base-url="@Model.CommentsUrl"
+                 data-record-comments-loaded="@(Model.CommentsLoaded ? "true" : "false")">
+                @if (Model.CommentsLoaded && Model.Comments is not null)
                 {
-                    <form class="comment-form" asp-controller="Zaznamy" asp-action="AddComment" method="post" data-ajax-submit="true">
-                        <input type="hidden" name="projektId" value="@projektId" />
-                        <input type="hidden" name="uiContext" value="project" />
-                        <input type="hidden" name="ZaznamId" value="@Model.Id" />
-                        <textarea rows="4"
-                                  name="Text"
-                                  placeholder="Přidat vyjádření..."
-                                  data-rich-text="true"
-                                  data-rich-text-min-height="132"></textarea>
-                        <div class="comment-actions">
-                            <select class="wide-select" name="JednaniId" required>
-                                <option value="">Vazba na jednání</option>
-                                @foreach (var jednani in otevrenaJednani)
-                                {
-                                    <option value="@jednani.Id">@jednani.Label</option>
-                                }
-                            </select>
-                            <button class="btn small primary" type="submit">Uložit</button>
-                        </div>
-                    </form>
+                    @await Html.PartialAsync("_ZaznamCommentsPartial", Model.Comments)
+                }
+                else
+                {
+                    <div class="record-comments-header compact">
+                        <h4>Vyjádření</h4>
+                        <button type="button" class="btn small ghost" data-record-comments-toggle>
+                            Zobrazit vyjádření
+                        </button>
+                    </div>
+                    <div class="record-loading-placeholder" data-record-comments-placeholder hidden>
+                        <div class="record-loading-line"></div>
+                        <div class="record-loading-line short"></div>
+                    </div>
+                    <div class="record-loading-error" data-record-comments-error hidden></div>
+                    <div data-record-comments-content></div>
                 }
             </div>
         </div>
     </div>
 </article>
-
-@functions {
-    private static string FormatDate(DateTime? value)
-    {
-        return value?.ToString("dd.MM.yyyy") ?? "-";
-    }
-}

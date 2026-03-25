@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Services.Settings;
 
@@ -50,34 +51,7 @@ public sealed class UserAuthorizationSnapshotBuilder(
     }
 
     private async Task<List<int>> BuildDeletedProjectIdsAsync(CancellationToken ct)
-    {
-        var directMatches = await (
-            from project in dbContext.Projekty.AsNoTracking()
-            join status in dbContext.CiselnikStavuProjektu.AsNoTracking() on project.StavId equals status.Id
-            where status.Kod == "DELETED"
-            select project.Id)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToListAsync(ct);
-
-        if (directMatches.Count > 0)
-        {
-            return directMatches;
-        }
-
-        var projectStatuses = await (
-            from project in dbContext.Projekty.AsNoTracking()
-            join status in dbContext.CiselnikStavuProjektu.AsNoTracking() on project.StavId equals status.Id
-            select new { project.Id, status.Nazev })
-            .ToListAsync(ct);
-
-        return projectStatuses
-            .Where(x => textNormalizer.Normalize(x.Nazev).Contains("smaz"))
-            .Select(x => x.Id)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToList();
-    }
+        => await ProjectAuthorizationQueryHelper.BuildDeletedProjectIdsAsync(dbContext, textNormalizer, ct);
 
     private Task<List<string>> BuildUserRoleCodesAsync(int osobaId, CancellationToken ct)
     {

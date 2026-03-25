@@ -27,9 +27,9 @@ public sealed class RecordUiFlowResolverTests
     {
         var result = _sut.ResolveCommentAjaxFlow("meeting", 17, 31, null);
 
-        result.RefreshScope.Should().Be("record-card");
+        result.RefreshScope.Should().Be("record-comments");
         result.ControllerName.Should().Be("Zaznamy");
-        result.ActionName.Should().Be("RecordCardPartial");
+        result.ActionName.Should().Be("RecordCommentsPartial");
         result.RouteValues["projektId"].Should().Be(17);
         result.RouteValues["zaznamId"].Should().Be(31);
         result.UiContext.Should().Be("project");

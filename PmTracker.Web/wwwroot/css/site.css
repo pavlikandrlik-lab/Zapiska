@@ -909,6 +909,33 @@
     margin: 5px 0 0;
 }
 
+.page-header-compact {
+    margin-bottom: 12px;
+    padding: 8px 0;
+}
+
+.project-header-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+}
+
+.project-title-inline {
+    margin: 0;
+    font-size: 25px;
+    line-height: 1.15;
+}
+
+.project-header-divider {
+    color: var(--app-muted);
+    font-size: 14px;
+}
+
+.project-status-inline {
+    margin-left: auto;
+}
+
 .page-header + .header-actions,
 .page-header + .projects-header-actions,
 .page-header + .meeting-detail-header {
@@ -1808,6 +1835,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background: #0f172a;
     opacity: 0.7;
     z-index: 5;
+}
+
+.schedule-mini-gantt-marker.today {
+    background: #111111;
+    opacity: 0.95;
+    z-index: 6;
 }
 
 .timeline-axis {
@@ -2727,6 +2760,56 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: none;
 }
 
+.record-detail-shell,
+.record-comments-lazy,
+.lazy-tab-placeholder {
+    position: relative;
+}
+
+.record-loading-placeholder {
+    display: grid;
+    gap: 10px;
+    margin: 12px 0 8px;
+    padding: 14px 16px;
+    border: 1px dashed var(--gov-color-border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--gov-color-surface) 92%, #e2e8f0 8%);
+}
+
+.record-loading-line {
+    height: 12px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%);
+    background-size: 220px 100%;
+    animation: record-loading-shimmer 1.4s linear infinite;
+}
+
+.record-loading-line.short {
+    width: 42%;
+}
+
+.record-loading-error {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0 8px;
+    padding: 12px 14px;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.record-collab-block {
+    display: grid;
+    gap: 8px;
+    margin: 10px 0 8px;
+}
+
+.lazy-tab-placeholder {
+    margin-top: 12px;
+}
+
 .record-history {
     display: grid;
     gap: 6px;
@@ -2903,6 +2986,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin: 0 0 6px;
 }
 
+@keyframes record-loading-shimmer {
+    0% {
+        background-position: 220px 0;
+    }
+
+    100% {
+        background-position: -220px 0;
+    }
+}
+
 .richtext-render p:last-child {
     margin-bottom: 0;
 }
@@ -3002,6 +3095,14 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin-top: 10px;
     display: grid;
     gap: 8px;
+}
+
+.comment-pagination-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 10px;
 }
 
 .comment-form textarea,

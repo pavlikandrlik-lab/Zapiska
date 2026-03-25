@@ -13,6 +13,10 @@ const legacyGanttStoragePrefixes = [
     "pmtracker.gantt.pinned.",
     "pmtracker.gantt.expanded."
 ];
+const recordMeetingCommentStateCache = new Map();
+const recordMeetingCommentStateRequests = new Map();
+const recordMeetingCommentStateLoadingMessage = "Načítání dat pro filtr jednání-vyjádření...";
+const recordMeetingCommentStateErrorMessage = "Nepodařilo se načíst data pro filtr jednání-vyjádření.";
 const projectFilterConfigs = {
     records: {
         rootSelector: '[data-project-filter-scope="records"]',
@@ -79,6 +83,110 @@ function getProjectFilterProjectId(scope) {
     const root = getProjectFilterRoot(scope);
     const projectId = (root?.dataset.projectId || "").trim();
     return projectId || "0";
+}
+
+function getProjectDetailRoot() {
+    const root = document.querySelector("[data-project-detail-root]");
+    return root instanceof HTMLElement ? root : null;
+}
+
+function normalizeRecordMeetingCommentStatesPayload(payload) {
+    if (!payload || typeof payload !== "object") {
+        return {};
+    }
+
+    const rawStates = payload.statesByRecordId && typeof payload.statesByRecordId === "object"
+        ? payload.statesByRecordId
+        : payload;
+    const normalized = {};
+
+    Object.entries(rawStates).forEach(([recordId, values]) => {
+        const normalizedRecordId = String(recordId || "").trim();
+        if (!normalizedRecordId) {
+            return;
+        }
+
+        const normalizedValues = Array.isArray(values)
+            ? values
+                .map((value) => normalizeFilterToken(value))
+                .filter(Boolean)
+            : [];
+
+        normalized[normalizedRecordId] = Array.from(new Set(normalizedValues));
+    });
+
+    return normalized;
+}
+
+function applyCachedRecordMeetingCommentStates(projectId) {
+    const normalizedProjectId = String(projectId || "").trim();
+    if (!normalizedProjectId || !recordMeetingCommentStateCache.has(normalizedProjectId)) {
+        return false;
+    }
+
+    const statesByRecordId = recordMeetingCommentStateCache.get(normalizedProjectId) || {};
+    document.querySelectorAll(".record-card[data-record-id]").forEach((card) => {
+        if (!(card instanceof HTMLElement)) {
+            return;
+        }
+
+        const recordId = (card.dataset.recordId || "").trim();
+        const values = Array.isArray(statesByRecordId[recordId]) ? statesByRecordId[recordId] : [];
+        card.dataset.filterVyjadreniJednaniStavy = values.join("|");
+    });
+
+    return true;
+}
+
+async function ensureRecordMeetingCommentStatesLoaded() {
+    const projectRoot = getProjectDetailRoot();
+    const projectId = getProjectFilterProjectId("records");
+    const loadUrl = (projectRoot?.dataset.recordMeetingCommentStatesUrl || "").trim();
+    if (!projectId || projectId === "0" || !loadUrl) {
+        return false;
+    }
+
+    if (applyCachedRecordMeetingCommentStates(projectId)) {
+        return true;
+    }
+
+    const existingRequest = recordMeetingCommentStateRequests.get(projectId);
+    if (existingRequest instanceof Promise) {
+        return existingRequest;
+    }
+
+    setProjectFilterSaveStatus("records", recordMeetingCommentStateLoadingMessage);
+
+    const request = (async () => {
+        try {
+            const response = await fetch(loadUrl, {
+                headers: {
+                    "Accept": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                credentials: "same-origin"
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const payload = await response.json();
+            recordMeetingCommentStateCache.set(projectId, normalizeRecordMeetingCommentStatesPayload(payload));
+            applyCachedRecordMeetingCommentStates(projectId);
+            setProjectFilterSaveStatus("records", "");
+            applyProjectRecordFilters();
+            return true;
+        } catch (error) {
+            setProjectFilterSaveStatus("records", recordMeetingCommentStateErrorMessage);
+            return false;
+        } finally {
+            recordMeetingCommentStateRequests.delete(projectId);
+        }
+    })();
+
+    recordMeetingCommentStateRequests.set(projectId, request);
+    return request;
 }
 
 function readJsonStorage(storage, key) {
@@ -465,6 +573,11 @@ export function applyProjectRecordFilters() {
         mine: Boolean(state.mine),
         meetingCommentState: normalizeFilterToken(state.jednaniVyjadreniStav)
     };
+    const projectId = getProjectFilterProjectId("records");
+    const hasMeetingCommentStateCache = applyCachedRecordMeetingCommentStates(projectId);
+    if (filters.meetingCommentState && !hasMeetingCommentStateCache) {
+        void ensureRecordMeetingCommentStatesLoaded();
+    }
 
     cards.forEach((item) => {
         if (!(item instanceof HTMLElement)) {
@@ -483,6 +596,7 @@ export function applyProjectRecordFilters() {
             .map((value) => normalizeFilterToken(value))
             .filter(Boolean);
         const matchesMeetingCommentState = !filters.meetingCommentState
+            || !hasMeetingCommentStateCache
             || (isTask && commentMeetingStates.includes(filters.meetingCommentState));
         const matchesMine = !filters.mine || (hasCurrentUser && vlastnik === currentUserId);
 
@@ -644,6 +758,60 @@ export function applyRecordsView(view) {
         return;
     }
 
+    const groupedList = document.querySelector("[data-record-grouped-list]");
+    const flatList = document.querySelector("[data-record-flat-list]");
+    const cards = Array.from(document.querySelectorAll(".record-card[data-record-id]"))
+        .filter((card) => card instanceof HTMLElement);
+
+    if (groupedList instanceof HTMLElement && flatList instanceof HTMLElement && cards.length > 0) {
+        if (view === "subsystem") {
+            const orderedCards = cards
+                .sort((aNode, bNode) => {
+                    const aName = (aNode.getAttribute("data-filter-subsystem") || "").trim();
+                    const bName = (bNode.getAttribute("data-filter-subsystem") || "").trim();
+                    const bySubsystem = aName.localeCompare(bName, "cs");
+                    if (bySubsystem !== 0) {
+                        return bySubsystem;
+                    }
+
+                    const aNumber = Number(aNode.getAttribute("data-record-id") || "0");
+                    const bNumber = Number(bNode.getAttribute("data-record-id") || "0");
+                    return aNumber - bNumber;
+                });
+
+            groupedList.innerHTML = "";
+            let currentGroup = null;
+            let currentGroupCards = null;
+            let currentName = "";
+
+            orderedCards.forEach((card) => {
+                const subsystemName = (card.getAttribute("data-filter-subsystem") || "").trim() || "-";
+                if (currentGroup === null || currentGroupCards === null || subsystemName !== currentName) {
+                    currentName = subsystemName;
+                    currentGroup = document.createElement("div");
+                    currentGroup.className = "subsystem-group";
+                    currentGroup.setAttribute("data-subsystem-group", "");
+                    currentGroup.setAttribute("data-subsystem-name", subsystemName);
+
+                    const heading = document.createElement("h3");
+                    heading.textContent = subsystemName;
+                    currentGroup.appendChild(heading);
+
+                    currentGroupCards = document.createElement("div");
+                    currentGroupCards.className = "card-list";
+                    currentGroup.appendChild(currentGroupCards);
+                    groupedList.appendChild(currentGroup);
+                }
+
+                currentGroupCards.appendChild(card);
+            });
+        }
+        else {
+            cards.forEach((card) => flatList.appendChild(card));
+            groupedList.innerHTML = "";
+        }
+    }
+
     shells.forEach((shell) => {
         const mode = shell.getAttribute("data-records-view");
         shell.toggleAttribute("hidden", mode !== view);
@@ -671,6 +839,16 @@ export function initProjectRecordsUi(options = {}) {
     setStatus("records", "");
     applyRecordsView(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
     initSubsystemScrollIndicator();
+}
+
+export function invalidateRecordMeetingCommentStates(projectId) {
+    const normalizedProjectId = String(projectId || "").trim();
+    if (!normalizedProjectId) {
+        return;
+    }
+
+    recordMeetingCommentStateCache.delete(normalizedProjectId);
+    recordMeetingCommentStateRequests.delete(normalizedProjectId);
 }
 
 export function setActiveTab(tabName) {

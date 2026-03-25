@@ -129,6 +129,74 @@ public sealed class RecordSaveDataStoreTests
     }
 
     [Fact]
+    public async Task SaveRecord_ShouldPersistUpdatedCreatedDate_ForExistingRecord()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_save_update_created_date");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordEditCreatedDateAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordEditCreatedDateOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RDATEEDIT");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RDATEEDIT_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "Editable created date");
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
+
+        var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == recordId)
+            .Select(x => new
+            {
+                x.Id,
+                x.ProjektId,
+                x.KategorieId,
+                x.StavUkoluId,
+                x.CisloZaznamu,
+                x.Nazev,
+                x.Cil,
+                x.Popis,
+                x.VlastnikId,
+                x.DatumUkonceni,
+                x.SubsystemId
+            })
+            .FirstAsync();
+        var categoryCode = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+            .Where(x => x.Id == record.KategorieId)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var statusCode = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+            .Where(x => x.Id == record.StavUkoluId)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var subsystemCode = await dbContext.Subsystemy.AsNoTracking()
+            .Where(x => x.Id == record.SubsystemId)
+            .Select(x => x.Kod)
+            .FirstAsync();
+        var newCreatedDate = record.DatumUkonceni.Date.AddDays(-1);
+
+        store.SaveRecord(new SaveRecordCommand
+        {
+            Id = record.Id,
+            ProjektId = record.ProjektId,
+            Kategorie = categoryCode,
+            Stav = statusCode,
+            Nazev = record.Nazev,
+            Cil = record.Cil,
+            Popis = record.Popis,
+            VlastnikId = record.VlastnikId,
+            DatumZalozeni = newCreatedDate,
+            TerminUkonceni = record.DatumUkonceni,
+            Subsystem = subsystemCode,
+            CisloZaznamu = record.CisloZaznamu
+        }, currentUser);
+
+        var saved = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
+        saved.DatumZalozeni.Date.Should().Be(newCreatedDate.Date);
+    }
+
+    [Fact]
     public async Task BuildZaznamCreate_ShouldBootstrapPersistedScheduleSchema_WhenCatalogIsEmpty()
     {
         var db = await _fixture.CreateDatabaseAsync("record_create_bootstrap_schema");

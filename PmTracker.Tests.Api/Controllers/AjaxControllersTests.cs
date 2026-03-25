@@ -147,7 +147,7 @@ public sealed class AjaxControllersTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
         payload.Ok.Should().BeTrue();
-        payload.RefreshScope.Should().Be("record-card");
+        payload.RefreshScope.Should().Be("record-comments");
         payload.RecordId.Should().Be(recordId);
 
         await using var dbContext = _fixture.CreateDbContext();

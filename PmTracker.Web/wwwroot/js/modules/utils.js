@@ -262,7 +262,8 @@ export function formatAxisDayMonth(date) {
 }
 
 export function formatAxisMonthYear(date) {
-    return new Intl.DateTimeFormat("cs-CZ", { month: "short", year: "numeric" }).format(date);
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${month}/${date.getFullYear()}`;
 }
 
 export function parseIsoDateTime(value) {

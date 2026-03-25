@@ -1,0 +1,754 @@
+using System.Globalization;
+using Microsoft.EntityFrameworkCore;
+using PmTracker.Web.Models.Entities;
+using PmTracker.Web.Models.ViewModels;
+
+namespace PmTracker.Web.Services;
+
+public sealed partial class ProjectService
+{
+    private const int RecordCommentsLoadStep = 5;
+
+    private sealed record RecordSummaryRow(
+        int Id,
+        int ProjektId,
+        int HarmonogramSablonaVerze,
+        int CisloZaznamu,
+        string? CisloViditelne,
+        int CisloViditelneA,
+        int CisloViditelneB,
+        byte CisloViditelneTyp,
+        string Nazev,
+        int KategorieId,
+        int? AktualniTypUkoluId,
+        int? StavUkoluId,
+        string? Cil,
+        DateTime DatumZalozeni,
+        DateTime? DatumUkonceni,
+        int SubsystemId,
+        int VlastnikId);
+
+    public async Task<ProjektZaznamyTabViewModel> BuildProjectRecordsTabAsync(int id, CancellationToken ct = default)
+    {
+        var summaries = await BuildRecordCardSummariesForProjectAsync(id, ct);
+        var activeProjectSubsystems = await BuildActiveProjectSubsystemsAsync(id, ct);
+        var subsystemFilterOptions = activeProjectSubsystems
+            .OrderBy(x => x.Kod)
+            .ThenBy(x => x.Nazev)
+            .Select(x => new LookupOptionViewModel
+            {
+                Value = string.IsNullOrWhiteSpace(x.Kod) ? x.Nazev : x.Kod,
+                Label = string.IsNullOrWhiteSpace(x.Kod) ? x.Nazev : $"{x.Kod} - {x.Nazev}"
+            })
+            .ToList();
+        var categoryFilterOptions = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+            .OrderBy(x => x.Id)
+            .Select(x => new LookupOptionViewModel
+            {
+                Value = x.Kod,
+                Label = x.Nazev
+            })
+            .ToListAsync(ct);
+        var taskStateFilterOptions = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+            .OrderBy(x => x.Id)
+            .Select(x => new LookupOptionViewModel
+            {
+                Value = x.Kod,
+                Label = x.Nazev
+            })
+            .ToListAsync(ct);
+        var taskTypeFilterOptions = await dbContext.CiselnikTypuUkolu.AsNoTracking()
+            .OrderBy(x => x.Id)
+            .Select(x => new LookupOptionViewModel
+            {
+                Value = x.Kod,
+                Label = x.Nazev
+            })
+            .ToListAsync(ct);
+        var meetingStatusFilterOptions = await dbContext.CiselnikStavuJednani.AsNoTracking()
+            .OrderBy(x => x.Id)
+            .Select(x => new LookupOptionViewModel
+            {
+                Value = x.Id.ToString(CultureInfo.InvariantCulture),
+                Label = x.Nazev
+            })
+            .ToListAsync(ct);
+        var ownerFilterOptions = summaries
+            .Where(x => x.Summary.AktualniVlastnikId > 0)
+            .GroupBy(x => x.Summary.AktualniVlastnikId)
+            .Select(group => new LookupOptionViewModel
+            {
+                Value = group.Key.ToString(CultureInfo.InvariantCulture),
+                Label = group.First().Summary.AktualniVlastnik
+            })
+            .OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        return new ProjektZaznamyTabViewModel
+        {
+            ProjektId = id,
+            DleSubsystemu = true,
+            SkupinyZaznamu = summaries
+                .GroupBy(x => x.Summary.AktualniSubsystem)
+                .OrderBy(x => x.Key, StringComparer.CurrentCultureIgnoreCase)
+                .Select(group => new ProjektZaznamGroupViewModel
+                {
+                    Nazev = group.Key,
+                    Zaznamy = group.ToList()
+                })
+                .ToList(),
+            Zaznamy = summaries,
+            Filtry = new ProjektFiltryViewModel
+            {
+                Subsystemy = summaries.Select(x => x.Summary.AktualniSubsystem).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList(),
+                SubsystemyMoznosti = subsystemFilterOptions,
+                Kategorie = summaries.Select(x => x.Summary.KategorieNazev).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList(),
+                KategorieMoznosti = categoryFilterOptions,
+                StavyUkolu = summaries.Select(x => x.Summary.Stav).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList(),
+                StavyUkoluMoznosti = taskStateFilterOptions,
+                TypyUkolu = summaries.Where(x => !string.IsNullOrWhiteSpace(x.Summary.TypUkolu)).Select(x => x.Summary.TypUkolu!).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList(),
+                TypyUkoluMoznosti = taskTypeFilterOptions,
+                Vlastnici = summaries.Select(x => x.Summary.AktualniVlastnik).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList(),
+                VlastniciMoznosti = ownerFilterOptions,
+                StavyJednaniVyjadreni = meetingStatusFilterOptions
+            }
+        };
+    }
+
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> BuildRecordMeetingCommentStatesAsync(int projectId, CancellationToken ct = default)
+    {
+        var recordIds = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.ProjektId == projectId)
+            .Select(x => x.Id)
+            .ToArrayAsync(ct);
+
+        return await BuildRecordMeetingCommentStateMapAsync(recordIds, ct);
+    }
+
+    public async Task<ProjektHarmonogramTabViewModel> BuildProjectScheduleTabAsync(int id, CancellationToken ct = default)
+    {
+        var scheduleRecords = await BuildScheduleRecordCardsForProjectAsync(id, ct);
+        var harmonogramUkoly = await BuildProjectScheduleRowsAsync(scheduleRecords, ct);
+        var activeProjectSubsystems = await BuildActiveProjectSubsystemsAsync(id, ct);
+        var subsystemOptions = activeProjectSubsystems
+            .OrderBy(x => x.Kod)
+            .ThenBy(x => x.Nazev)
+            .Select(x => new LookupOptionViewModel
+            {
+                Value = string.IsNullOrWhiteSpace(x.Kod) ? x.Nazev : x.Kod,
+                Label = string.IsNullOrWhiteSpace(x.Kod) ? x.Nazev : $"{x.Kod} - {x.Nazev}"
+            })
+            .ToList();
+
+        return new ProjektHarmonogramTabViewModel
+        {
+            ProjektId = id,
+            SubsystemyMoznosti = subsystemOptions,
+            HarmonogramUkoly = harmonogramUkoly
+        };
+    }
+
+    public async Task<ProjektJednaniTabViewModel> BuildProjectMeetingsTabAsync(int id, CancellationToken ct = default)
+    {
+        var meetings = await BuildJednaniListAsync(id, ct);
+        var meetingStatusOptions = await dbContext.CiselnikStavuJednani.AsNoTracking()
+            .OrderBy(x => x.Id)
+            .Select(x => new LookupOptionViewModel
+            {
+                Value = x.Kod,
+                Label = x.Nazev
+            })
+            .ToListAsync(ct);
+
+        return new ProjektJednaniTabViewModel
+        {
+            ProjektId = id,
+            Jednani = meetings,
+            StavyJednani = meetingStatusOptions
+        };
+    }
+
+    public async Task<ProjektTymTabViewModel> BuildProjectTeamTabAsync(int id, CancellationToken ct = default)
+    {
+        return new ProjektTymTabViewModel
+        {
+            ProjektId = id,
+            AktivniRole = await BuildUnifiedActiveProjectRoleRowsAsync(id, ct),
+            HistorieRoli = await BuildUnifiedProjectRoleHistoryRowsAsync(id, ct),
+            AktivniSubsystemyProjektu = await BuildActiveProjectSubsystemsAsync(id, ct),
+            DostupneOsobyProRole = [],
+            DostupneProjektoveSubsystemy = [],
+            RoleProjektu = [],
+            RoleSubsystemu = [],
+            DostupneSubsystemy = []
+        };
+    }
+
+    public async Task<ProjektZaznamCardShellViewModel?> BuildRecordCardShellAsync(int projectId, int recordId, CancellationToken ct = default)
+    {
+        var summary = await BuildRecordCardSummaryAsync(projectId, recordId, ct);
+        if (summary is null)
+        {
+            return null;
+        }
+
+        return new ProjektZaznamCardShellViewModel
+        {
+            Summary = summary,
+            DetailLoaded = false,
+            CommentsLoaded = false
+        };
+    }
+
+    public async Task<ZaznamCardDetailViewModel?> BuildRecordCardDetailAsync(int projectId, int recordId, CancellationToken ct = default)
+    {
+        var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.ProjektId == projectId && x.Id == recordId)
+            .Select(x => new
+            {
+                x.Id,
+                x.Popis,
+                x.VlastnikId,
+                x.DatumUkonceni,
+                x.SubsystemId,
+                x.AktualniTypUkoluId
+            })
+            .FirstOrDefaultAsync(ct);
+        if (record is null)
+        {
+            return null;
+        }
+
+        var ownerHistory = await dbContext.ZaznamHistorieVlastnik.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId)
+            .OrderBy(x => x.DatumZmeny)
+            .ToListAsync(ct);
+        var termHistory = await dbContext.ZaznamHistorieTerminu.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId)
+            .OrderBy(x => x.DatumZmeny)
+            .ToListAsync(ct);
+        var subsystemHistory = await dbContext.ZaznamHistorieSubsystem.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId)
+            .OrderBy(x => x.DatumZmeny)
+            .ToListAsync(ct);
+        var taskTypeHistory = await dbContext.ZaznamHistorieZmenTypu.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId)
+            .OrderBy(x => x.DatumZmeny)
+            .ToListAsync(ct);
+        var externalLinks = await dbContext.ZaznamExterniOdkazy.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId)
+            .OrderBy(x => x.Id)
+            .ToListAsync(ct);
+        var collaborationRows = await dbContext.ZaznamSpoluprace.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId)
+            .ToListAsync(ct);
+
+        var personIds = ownerHistory.Select(x => x.PuvodniVlastnik)
+            .Append(record.VlastnikId)
+            .Concat(collaborationRows.Select(x => x.OsobaId))
+            .Distinct()
+            .ToArray();
+        var people = await LoadPeopleByIdsAsync(personIds, ct);
+        var organizations = await LoadOrganizationsByPeopleAsync(people.Values, ct);
+        var orgUnits = await LoadOrgUnitsByPeopleAsync(people.Values, ct);
+        var subsystemIds = subsystemHistory
+            .SelectMany(x => new[] { x.PuvodniSubsystem, x.NovySubsystem })
+            .Append(record.SubsystemId)
+            .Distinct()
+            .ToArray();
+        var taskTypeIds = taskTypeHistory
+            .SelectMany(x => new[] { x.PuvodniTypId, x.NovyTypId })
+            .Append(record.AktualniTypUkoluId ?? 0)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToArray();
+        var externalTypeIds = externalLinks
+            .Select(x => x.TypOdkazuId)
+            .Distinct()
+            .ToArray();
+        var vyzvaIds = externalLinks
+            .Where(x => x.Vyzva.HasValue)
+            .Select(x => x.Vyzva!.Value)
+            .Distinct()
+            .ToArray();
+
+        var subsystems = subsystemIds.Length == 0
+            ? new Dictionary<int, SubsystemEntity>()
+            : await dbContext.Subsystemy.AsNoTracking()
+                .Where(x => subsystemIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var taskTypes = taskTypeIds.Length == 0
+            ? new Dictionary<int, CiselnikTypuUkoluEntity>()
+            : await dbContext.CiselnikTypuUkolu.AsNoTracking()
+                .Where(x => taskTypeIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var extTypeById = externalTypeIds.Length == 0
+            ? new Dictionary<int, CiselnikTypuExternichOdkazuEntity>()
+            : await dbContext.CiselnikTypuExternichOdkazu.AsNoTracking()
+                .Where(x => externalTypeIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var vyzvaById = vyzvaIds.Length == 0
+            ? new Dictionary<int, CiselnikVyzvaEntity>()
+            : await dbContext.CiselnikVyzvy.AsNoTracking()
+                .Where(x => vyzvaIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+
+        return new ZaznamCardDetailViewModel
+        {
+            Popis = record.Popis ?? string.Empty,
+            HistorieVlastniku = ownerHistory
+                .Select(x => BuildInlinePersonLabelFromOsoba(people.GetValueOrDefault(x.PuvodniVlastnik)))
+                .Distinct(Ci)
+                .ToList(),
+            AktualniVlastnik = BuildInlinePersonLabelFromOsoba(people.GetValueOrDefault(record.VlastnikId)),
+            HistorieTerminu = termHistory.Select(x => x.PuvodniDatum).Distinct().ToList(),
+            AktualniTermin = record.DatumUkonceni,
+            HistorieSubsystemu = subsystemHistory
+                .Select(x => subsystems.GetValueOrDefault(x.PuvodniSubsystem)?.Nazev ?? "-")
+                .Distinct(Ci)
+                .ToList(),
+            AktualniSubsystem = subsystems.GetValueOrDefault(record.SubsystemId)?.Nazev ?? "-",
+            TypUkolu = record.AktualniTypUkoluId.HasValue ? taskTypes.GetValueOrDefault(record.AktualniTypUkoluId.Value)?.Nazev : null,
+            HistorieTypuUkolu = taskTypeHistory
+                .Select(x => taskTypes.GetValueOrDefault(x.PuvodniTypId)?.Nazev ?? "-")
+                .Distinct(Ci)
+                .ToList(),
+            ExterniOdkazy = externalLinks.Select(link =>
+            {
+                var ticketId = ExtractServiceDeskTicketId(link.Cislo);
+                return new ExterniOdkazViewModel
+                {
+                    Typ = extTypeById.GetValueOrDefault(link.TypOdkazuId)?.Kod ?? "-",
+                    TypNazev = extTypeById.GetValueOrDefault(link.TypOdkazuId)?.Nazev,
+                    Cislo = link.Cislo,
+                    PredpokladanaCena = link.PredpokladanaCena,
+                    ServiceDeskTicketId = ticketId,
+                    ServiceDeskUrl = BuildServiceDeskUrl(ticketId),
+                    Vyzva = link.Vyzva.HasValue ? vyzvaById.GetValueOrDefault(link.Vyzva.Value)?.Kod : null,
+                    DatumObjednani = link.DatumObjednani,
+                    DatumPlanDodani = link.PlanDodani,
+                    DatumDodani = link.DatumDodani,
+                    DatumPrevzeti = link.DatumPrevzeti
+                };
+            }).ToList(),
+            Spoluprace = collaborationRows.Select(row =>
+            {
+                var person = people.GetValueOrDefault(row.OsobaId);
+                return new SpolupracovnikViewModel
+                {
+                    OsobaId = row.OsobaId,
+                    Osoba = BuildDisplayNameFromOsoba(person),
+                    Email = person?.Email?.Trim(),
+                    Organizace = person is null ? null : organizations.GetValueOrDefault(person.OrganizaceId)?.Nazev,
+                    OrganizacniCelek = person?.OrganizacniCelekId is int cel ? orgUnits.GetValueOrDefault(cel)?.Nazev : null
+                };
+            }).ToList()
+        };
+    }
+
+    public Task<ZaznamCommentsPanelViewModel?> BuildRecordCommentsPanelAsync(int projectId, int recordId, CancellationToken ct = default)
+        => BuildRecordCommentsPanelAsync(projectId, recordId, limit: null, loadAll: false, ct);
+
+    public async Task<ZaznamCommentsPanelViewModel?> BuildRecordCommentsPanelAsync(int projectId, int recordId, int? limit, bool loadAll, CancellationToken ct = default)
+    {
+        var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.ProjektId == projectId && x.Id == recordId)
+            .Select(x => new
+            {
+                x.Id,
+                x.VlastnikId
+            })
+            .FirstOrDefaultAsync(ct);
+        if (record is null)
+        {
+            return null;
+        }
+
+        var totalCount = await dbContext.Vyjadreni.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId)
+            .CountAsync(ct);
+        var effectiveLimit = ResolveRecordCommentsLimit(limit, loadAll, totalCount);
+        var comments = await dbContext.Vyjadreni.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId)
+            .OrderByDescending(x => x.DatumVyjadreni)
+            .ThenByDescending(x => x.Id)
+            .Take(effectiveLimit)
+            .ToListAsync(ct);
+        var personIds = comments.Select(x => x.AutorOsobaId)
+            .Append(record.VlastnikId)
+            .Distinct()
+            .ToArray();
+        var people = await LoadPeopleByIdsAsync(personIds, ct);
+        var meetingIds = comments.Select(x => x.JednaniId).Distinct().ToArray();
+        var meetings = meetingIds.Length == 0
+            ? new Dictionary<int, JednaniEntity>()
+            : await dbContext.Jednani.AsNoTracking()
+                .Where(x => meetingIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var meetingStateIds = meetings.Values.Select(x => x.StavJednaniId).Distinct().ToArray();
+        var meetingStates = meetingStateIds.Length == 0
+            ? new Dictionary<int, CiselnikStavuJednaniEntity>()
+            : await dbContext.CiselnikStavuJednani.AsNoTracking()
+                .Where(x => meetingStateIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var meetingOptions = await BuildOpenMeetingOptionsForProjectAsync(projectId, ct);
+        var loadedCount = comments.Count;
+        var isFullyLoaded = loadedCount >= totalCount;
+
+        return new ZaznamCommentsPanelViewModel
+        {
+            ProjektId = projectId,
+            ZaznamId = recordId,
+            LoadedCount = loadedCount,
+            TotalCount = totalCount,
+            LoadStep = RecordCommentsLoadStep,
+            CanLoadMore = !isFullyLoaded,
+            CanLoadAll = !isFullyLoaded,
+            IsFullyLoaded = isFullyLoaded,
+            OtevrenaJednani = meetingOptions,
+            Vyjadreni = comments
+                .Select(comment =>
+                {
+                    meetings.TryGetValue(comment.JednaniId, out var meeting);
+                    var meetingState = meeting is null ? null : meetingStates.GetValueOrDefault(meeting.StavJednaniId);
+                    var author = people.GetValueOrDefault(comment.AutorOsobaId) ?? people.GetValueOrDefault(record.VlastnikId);
+                    return new VyjadreniViewModel
+                    {
+                        Id = comment.Id,
+                        AutorOsobaId = comment.AutorOsobaId,
+                        Autor = BuildInlinePersonLabelFromOsoba(author),
+                        Datum = comment.DatumVyjadreni,
+                        Text = comment.TextVyjadreni,
+                        JednaniCislo = meeting?.CisloJednani,
+                        JednaniDatum = meeting?.DatumPlanovane,
+                        LzeUpravit = !IsMeetingReadOnly(meeting, meetingState)
+                    };
+                })
+                .ToList()
+        };
+    }
+
+    private static int ResolveRecordCommentsLimit(int? limit, bool loadAll, int totalCount)
+    {
+        if (totalCount <= 0)
+        {
+            return 0;
+        }
+
+        if (loadAll)
+        {
+            return totalCount;
+        }
+
+        var normalizedLimit = limit.GetValueOrDefault(RecordCommentsLoadStep);
+        if (normalizedLimit <= 0)
+        {
+            normalizedLimit = RecordCommentsLoadStep;
+        }
+
+        return Math.Min(totalCount, normalizedLimit);
+    }
+
+    private async Task<List<JednaniOptionViewModel>> BuildOpenMeetingOptionsForProjectAsync(int projectId, CancellationToken ct)
+    {
+        var rows = await (
+                from meeting in dbContext.Jednani.AsNoTracking()
+                join state in dbContext.CiselnikStavuJednani.AsNoTracking() on meeting.StavJednaniId equals state.Id
+                where meeting.ProjektId == projectId
+                    && !meeting.UzamklOsobaId.HasValue
+                    && state.Kod != "CLOSED"
+                    && !EF.Functions.Like(state.Nazev, "%uzav%")
+                orderby meeting.CisloJednani descending, meeting.DatumPlanovane descending
+                select new
+                {
+                    meeting.Id,
+                    meeting.CisloJednani,
+                    meeting.DatumPlanovane,
+                    StavKod = state.Kod,
+                    Stav = state.Nazev
+                })
+            .ToListAsync(ct);
+
+        return rows
+            .Select(row => new JednaniOptionViewModel
+            {
+                Id = row.Id,
+                Label = $"Jednání č. {row.CisloJednani} ({row.DatumPlanovane:dd.MM.yyyy})",
+                Datum = row.DatumPlanovane.Date
+            })
+            .ToList();
+    }
+
+    private async Task<List<ProjektZaznamCardShellViewModel>> BuildRecordCardSummariesForProjectAsync(int projectId, CancellationToken ct)
+        => (await BuildRecordCardSummariesCoreAsync(projectId, null, ct))
+            .Select(summary => new ProjektZaznamCardShellViewModel
+            {
+                Summary = summary,
+                DetailLoaded = false,
+                CommentsLoaded = false
+            })
+            .ToList();
+
+    private async Task<ZaznamCardSummaryViewModel?> BuildRecordCardSummaryAsync(int projectId, int recordId, CancellationToken ct)
+        => (await BuildRecordCardSummariesCoreAsync(projectId, [recordId], ct)).FirstOrDefault();
+
+    private async Task<List<ZaznamCardSummaryViewModel>> BuildRecordCardSummariesCoreAsync(int projectId, IReadOnlyCollection<int>? recordIdsFilter, CancellationToken ct)
+    {
+        var records = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.ProjektId == projectId && (recordIdsFilter == null || recordIdsFilter.Contains(x.Id)))
+            .Select(x => new RecordSummaryRow(
+                x.Id,
+                x.ProjektId,
+                x.HarmonogramSablonaVerze,
+                x.CisloZaznamu,
+                x.CisloViditelne,
+                x.CisloViditelneA,
+                x.CisloViditelneB,
+                x.CisloViditelneTyp,
+                x.Nazev,
+                x.KategorieId,
+                x.AktualniTypUkoluId,
+                x.StavUkoluId,
+                x.Cil,
+                x.DatumZalozeni,
+                x.DatumUkonceni,
+                x.SubsystemId,
+                x.VlastnikId))
+            .ToListAsync(ct);
+        if (records.Count == 0)
+        {
+            return [];
+        }
+
+        records = records
+            .OrderBy(ResolveVisibleNumberPartA)
+            .ThenBy(ResolveVisibleNumberPartB)
+            .ThenBy(x => x.CisloZaznamu)
+            .ToList();
+        var ownerIds = records.Select(x => x.VlastnikId).Distinct().ToArray();
+        var categoryIds = records.Select(x => x.KategorieId).Distinct().ToArray();
+        var taskTypeIds = records.Where(x => x.AktualniTypUkoluId.HasValue).Select(x => x.AktualniTypUkoluId!.Value).Distinct().ToArray();
+        var taskStateIds = records.Where(x => x.StavUkoluId.HasValue).Select(x => x.StavUkoluId!.Value).Distinct().ToArray();
+        var subsystemIds = records.Select(x => x.SubsystemId).Distinct().ToArray();
+        var categories = categoryIds.Length == 0
+            ? new Dictionary<int, CiselnikKategoriiZaznamuEntity>()
+            : await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+                .Where(x => categoryIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var taskTypes = taskTypeIds.Length == 0
+            ? new Dictionary<int, CiselnikTypuUkoluEntity>()
+            : await dbContext.CiselnikTypuUkolu.AsNoTracking()
+                .Where(x => taskTypeIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var taskStates = taskStateIds.Length == 0
+            ? new Dictionary<int, CiselnikStavuUkoluEntity>()
+            : await dbContext.CiselnikStavuUkolu.AsNoTracking()
+                .Where(x => taskStateIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var subsystems = subsystemIds.Length == 0
+            ? new Dictionary<int, SubsystemEntity>()
+            : await dbContext.Subsystemy.AsNoTracking()
+                .Where(x => subsystemIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var people = await LoadPeopleByIdsAsync(ownerIds, ct);
+        var leadEquivalentOsobaIdsBySubsystem = await BuildLeadEquivalentOsobaIdsByProjectSubsystemAsync(projectId, ct);
+
+        return records.Select(record =>
+        {
+            var category = categories.GetValueOrDefault(record.KategorieId);
+            var currentTaskType = record.AktualniTypUkoluId.HasValue ? taskTypes.GetValueOrDefault(record.AktualniTypUkoluId.Value) : null;
+            var currentState = record.StavUkoluId.HasValue ? taskStates.GetValueOrDefault(record.StavUkoluId.Value) : null;
+            var currentSubsystem = subsystems.GetValueOrDefault(record.SubsystemId);
+            return new ZaznamCardSummaryViewModel
+            {
+                Id = record.Id,
+                ProjektId = record.ProjektId,
+                CisloZaznamu = record.CisloZaznamu,
+                CisloViditelne = ResolveVisibleRecordNumber(record),
+                Nazev = record.Nazev,
+                KategorieKod = category?.Kod ?? "-",
+                KategorieNazev = category?.Nazev ?? "-",
+                TypUkoluKod = currentTaskType?.Kod,
+                TypUkolu = currentTaskType?.Nazev,
+                StavKod = currentState?.Kod,
+                Stav = currentState?.Nazev ?? "-",
+                IsAktivniStav = record.StavUkoluId.HasValue
+                    ? !(currentState?.IsFinal ?? false)
+                    : true,
+                JeUkol = IsTaskCategory(category?.Kod, category?.Nazev),
+                VyjadreniJednaniStavyKody = Array.Empty<string>(),
+                Cil = record.Cil ?? string.Empty,
+                AktualniVlastnik = BuildInlinePersonLabelFromOsoba(people.GetValueOrDefault(record.VlastnikId)),
+                AktualniTermin = record.DatumUkonceni,
+                AktualniSubsystemKod = string.IsNullOrWhiteSpace(currentSubsystem?.Kod) ? (currentSubsystem?.Nazev ?? string.Empty) : currentSubsystem.Kod,
+                AktualniSubsystem = currentSubsystem?.Nazev ?? "-",
+                AktualniSubsystemLeadEquivalentOsobaIds = leadEquivalentOsobaIdsBySubsystem.GetValueOrDefault(record.SubsystemId, []),
+                DatumZalozeni = record.DatumZalozeni,
+                AktualniVlastnikId = record.VlastnikId
+            };
+        }).ToList();
+    }
+
+    private async Task<Dictionary<int, IReadOnlyList<string>>> BuildRecordMeetingCommentStateMapAsync(
+        IReadOnlyCollection<int> recordIds,
+        CancellationToken ct)
+    {
+        if (recordIds.Count == 0)
+        {
+            return [];
+        }
+
+        return (await (
+                from comment in dbContext.Vyjadreni.AsNoTracking()
+                join meeting in dbContext.Jednani.AsNoTracking() on comment.JednaniId equals meeting.Id
+                where recordIds.Contains(comment.ZaznamId)
+                select new
+                {
+                    comment.ZaznamId,
+                    StavJednaniId = meeting.StavJednaniId
+                })
+            .ToListAsync(ct))
+            .GroupBy(x => x.ZaznamId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<string>)group
+                    .Select(x => x.StavJednaniId.ToString(CultureInfo.InvariantCulture))
+                    .Distinct(Ci)
+                    .ToList());
+    }
+
+    private async Task<List<ZaznamCardViewModel>> BuildScheduleRecordCardsForProjectAsync(int projectId, CancellationToken ct)
+    {
+        var records = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.ProjektId == projectId)
+            .Select(x => new RecordSummaryRow(
+                x.Id,
+                x.ProjektId,
+                x.HarmonogramSablonaVerze,
+                x.CisloZaznamu,
+                x.CisloViditelne,
+                x.CisloViditelneA,
+                x.CisloViditelneB,
+                x.CisloViditelneTyp,
+                x.Nazev,
+                x.KategorieId,
+                x.AktualniTypUkoluId,
+                x.StavUkoluId,
+                x.Cil,
+                x.DatumZalozeni,
+                x.DatumUkonceni,
+                x.SubsystemId,
+                x.VlastnikId))
+            .ToListAsync(ct);
+        if (records.Count == 0)
+        {
+            return [];
+        }
+
+        records = records
+            .OrderBy(ResolveVisibleNumberPartA)
+            .ThenBy(ResolveVisibleNumberPartB)
+            .ThenBy(x => x.CisloZaznamu)
+            .ToList();
+        var ownerIds = records.Select(x => x.VlastnikId).Distinct().ToArray();
+        var categoryIds = records.Select(x => x.KategorieId).Distinct().ToArray();
+        var taskTypeIds = records.Where(x => x.AktualniTypUkoluId.HasValue).Select(x => x.AktualniTypUkoluId!.Value).Distinct().ToArray();
+        var taskStateIds = records.Where(x => x.StavUkoluId.HasValue).Select(x => x.StavUkoluId!.Value).Distinct().ToArray();
+        var subsystemIds = records.Select(x => x.SubsystemId).Distinct().ToArray();
+        var categories = categoryIds.Length == 0
+            ? new Dictionary<int, CiselnikKategoriiZaznamuEntity>()
+            : await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+                .Where(x => categoryIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var taskTypes = taskTypeIds.Length == 0
+            ? new Dictionary<int, CiselnikTypuUkoluEntity>()
+            : await dbContext.CiselnikTypuUkolu.AsNoTracking()
+                .Where(x => taskTypeIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var taskStates = taskStateIds.Length == 0
+            ? new Dictionary<int, CiselnikStavuUkoluEntity>()
+            : await dbContext.CiselnikStavuUkolu.AsNoTracking()
+                .Where(x => taskStateIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var subsystems = subsystemIds.Length == 0
+            ? new Dictionary<int, SubsystemEntity>()
+            : await dbContext.Subsystemy.AsNoTracking()
+                .Where(x => subsystemIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+        var people = await LoadPeopleByIdsAsync(ownerIds, ct);
+
+        return records.Select(record =>
+        {
+            var category = categories.GetValueOrDefault(record.KategorieId);
+            var currentTaskType = record.AktualniTypUkoluId.HasValue ? taskTypes.GetValueOrDefault(record.AktualniTypUkoluId.Value) : null;
+            var currentState = record.StavUkoluId.HasValue ? taskStates.GetValueOrDefault(record.StavUkoluId.Value) : null;
+            var currentSubsystem = subsystems.GetValueOrDefault(record.SubsystemId);
+
+            return new ZaznamCardViewModel
+            {
+                Id = record.Id,
+                HarmonogramSablonaVerze = record.HarmonogramSablonaVerze,
+                CisloZaznamu = record.CisloZaznamu,
+                CisloViditelne = ResolveVisibleRecordNumber(record),
+                Nazev = record.Nazev,
+                KategorieKod = category?.Kod ?? "-",
+                KategorieNazev = category?.Nazev ?? "-",
+                TypUkoluKod = currentTaskType?.Kod,
+                TypUkolu = currentTaskType?.Nazev,
+                StavKod = currentState?.Kod,
+                Stav = currentState?.Nazev ?? "-",
+                IsAktivniStav = record.StavUkoluId.HasValue
+                    ? !(currentState?.IsFinal ?? false)
+                    : true,
+                JeUkol = IsTaskCategory(category?.Kod, category?.Nazev),
+                VyjadreniJednaniStavyKody = Array.Empty<string>(),
+                Cil = record.Cil ?? string.Empty,
+                Popis = string.Empty,
+                HistorieVlastniku = Array.Empty<string>(),
+                AktualniVlastnik = BuildInlinePersonLabelFromOsoba(people.GetValueOrDefault(record.VlastnikId)),
+                HistorieTerminu = Array.Empty<DateTime>(),
+                AktualniTermin = record.DatumUkonceni,
+                HistorieSubsystemu = Array.Empty<string>(),
+                HistorieTypuUkolu = Array.Empty<string>(),
+                AktualniSubsystemKod = string.IsNullOrWhiteSpace(currentSubsystem?.Kod) ? (currentSubsystem?.Nazev ?? string.Empty) : currentSubsystem.Kod,
+                AktualniSubsystem = currentSubsystem?.Nazev ?? "-",
+                AktualniSubsystemLeadEquivalentOsobaIds = Array.Empty<int>(),
+                ExterniOdkazy = Array.Empty<ExterniOdkazViewModel>(),
+                Spoluprace = Array.Empty<SpolupracovnikViewModel>(),
+                Vyjadreni = Array.Empty<VyjadreniViewModel>(),
+                DatumZalozeni = record.DatumZalozeni,
+                AktualniVlastnikId = record.VlastnikId
+            };
+        }).ToList();
+    }
+
+    private static string ResolveVisibleRecordNumber(RecordSummaryRow record)
+    {
+        if (!string.IsNullOrWhiteSpace(record.CisloViditelne))
+        {
+            return record.CisloViditelne.Trim();
+        }
+
+        return record.CisloZaznamu.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static int ResolveVisibleNumberPartA(RecordSummaryRow record)
+    {
+        if (record.CisloViditelneA > 0)
+        {
+            return record.CisloViditelneA;
+        }
+
+        return Math.Max(0, record.CisloZaznamu);
+    }
+
+    private static int ResolveVisibleNumberPartB(RecordSummaryRow record)
+    {
+        if (record.CisloViditelneTyp == RecordDisplayNumberTypeMeeting)
+        {
+            return Math.Max(1, record.CisloViditelneB);
+        }
+
+        return 0;
+    }
+}

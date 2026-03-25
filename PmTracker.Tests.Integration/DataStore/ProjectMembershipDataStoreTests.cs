@@ -40,8 +40,8 @@ public sealed class ProjectMembershipDataStoreTests
             RoleKod = SubsystemRoleCodes.DeputyLead
         }, currentUser);
 
-        var detail = store.BuildProjektDetail(projectId);
-        var assignedRow = detail.AktivniRole.Single(row => row.OsobaId == subsystemMemberId);
+        var teamTab = store.BuildProjectTeamTab(projectId);
+        var assignedRow = teamTab.AktivniRole.Single(row => row.OsobaId == subsystemMemberId);
         assignedRow.AssignmentKind.Should().Be("SUBSYSTEM");
         assignedRow.RoleTypeLabel.Should().Be("Subsystémová");
         assignedRow.SubsystemKod.Should().Be("SUBONLY_SYS");

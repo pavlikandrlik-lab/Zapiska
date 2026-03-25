@@ -44,6 +44,18 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
     public ProjektDetailViewModel BuildProjektDetail(int id)
         => services.GetRequiredService<IProjectService>().BuildProjektDetailAsync(id).GetAwaiter().GetResult();
 
+    public ProjektZaznamyTabViewModel BuildProjectRecordsTab(int id)
+        => services.GetRequiredService<IProjectService>().BuildProjectRecordsTabAsync(id).GetAwaiter().GetResult();
+
+    public IReadOnlyDictionary<int, IReadOnlyList<string>> BuildRecordMeetingCommentStates(int id)
+        => services.GetRequiredService<IProjectService>().BuildRecordMeetingCommentStatesAsync(id).GetAwaiter().GetResult();
+
+    public ProjektJednaniTabViewModel BuildProjectMeetingsTab(int id)
+        => services.GetRequiredService<IProjectService>().BuildProjectMeetingsTabAsync(id).GetAwaiter().GetResult();
+
+    public ProjektTymTabViewModel BuildProjectTeamTab(int id)
+        => services.GetRequiredService<IProjectService>().BuildProjectTeamTabAsync(id).GetAwaiter().GetResult();
+
     public CiselnikDetailViewModel BuildCiselnikDetail(string id, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IDictionaryService>().BuildCiselnikDetailAsync(id, currentUser).GetAwaiter().GetResult();
 

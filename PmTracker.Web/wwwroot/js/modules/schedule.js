@@ -29,14 +29,22 @@ export function initScheduleExpandUi(scope) {
             return;
         }
 
+        const card = button.closest("[data-schedule-item]");
+        const details = card instanceof HTMLElement
+            ? card.querySelector("[data-schedule-steps]")
+            : null;
+        if (details instanceof HTMLElement) {
+            button.setAttribute("aria-expanded", String(!details.hidden));
+        }
+
         button.dataset.scheduleExpandReady = "true";
         button.addEventListener("click", () => {
-            const recordId = String(button.dataset.scheduleRecordId || "").trim();
-            if (!recordId) {
+            const owningCard = button.closest("[data-schedule-item]");
+            if (!(owningCard instanceof HTMLElement)) {
                 return;
             }
 
-            const details = root.querySelector(`[data-schedule-steps][data-schedule-record-id="${CSS.escape(recordId)}"]`);
+            const details = owningCard.querySelector("[data-schedule-steps]");
             if (!(details instanceof HTMLElement)) {
                 return;
             }
@@ -48,8 +56,10 @@ export function initScheduleExpandUi(scope) {
 
             if (expanded) {
                 renderStaticTimelineAxes(details);
+                queueRainbowSegmentRender(details);
                 window.requestAnimationFrame(() => {
                     renderStaticTimelineAxes(details);
+                    queueRainbowSegmentRender(details);
                 });
             }
         });
@@ -718,7 +728,8 @@ export class ScheduleTimelineEngine {
         const axisEndStamp = Math.max(
             startStamp,
             toUtcDayStamp(deadlineDate),
-            toUtcDayStamp(actualEndDate));
+            toUtcDayStamp(actualEndDate),
+            toUtcDayStamp(new Date()));
         const totalDays = Math.max(1, Math.round((axisEndStamp - startStamp) / msPerDay));
         return {
             totalDays,
@@ -752,6 +763,8 @@ export class RecordSchedulePlanner {
         this.summaryOverrun = editor.querySelector("[data-schedule-summary-overrun]");
         this.statusLine = editor.querySelector(".schedule-status-line");
         this.timelineAxes = Array.from(editor.querySelectorAll("[data-schedule-axis]"))
+            .filter((node) => node instanceof HTMLElement);
+        this.ganttTodayMarkers = Array.from(editor.querySelectorAll("[data-schedule-gantt-today]"))
             .filter((node) => node instanceof HTMLElement);
         this.ganttDeadlineMarkers = Array.from(editor.querySelectorAll("[data-schedule-gantt-deadline]"))
             .filter((node) => node instanceof HTMLElement);
@@ -967,6 +980,9 @@ export class RecordSchedulePlanner {
     renderMiniGantt(plan, actual, startDate, deadlineDate) {
         const actualEnd = actual.length > 0 ? actual[actual.length - 1].end : startDate;
         const { totalDays, axisEndDate } = ScheduleTimelineEngine.buildScale(startDate, deadlineDate, actualEnd);
+        const today = new Date();
+        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const todayPercent = ScheduleTimelineEngine.toPercent(todayDate, startDate, totalDays);
         const deadlinePercent = ScheduleTimelineEngine.toPercent(deadlineDate, startDate, totalDays);
         const formatPercent = (value) => `${Number.isFinite(value) ? value.toFixed(4) : "0.0000"}%`;
         const formatSegmentWidth = (value) => {
@@ -999,8 +1015,14 @@ export class RecordSchedulePlanner {
             });
         };
 
+        this.ganttTodayMarkers.forEach((marker) => {
+            marker.style.left = formatPercent(todayPercent);
+            marker.title = `Dnes: ${formatDisplayDate(todayDate)}`;
+        });
+
         this.ganttDeadlineMarkers.forEach((marker) => {
             marker.style.left = formatPercent(deadlinePercent);
+            marker.title = `Termín úkolu: ${formatDisplayDate(deadlineDate)}`;
         });
 
         this.timelineAxes.forEach((axis) => {

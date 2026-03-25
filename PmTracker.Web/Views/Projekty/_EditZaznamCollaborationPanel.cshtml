@@ -1,0 +1,36 @@
+@model ZaznamEditViewModel
+@{
+    var isActive = ViewData["IsActive"] as bool? ?? false;
+}
+
+<div class="record-modal-panel"
+     data-record-modal-panel="collaboration"
+     @(isActive ? null : "hidden=\"hidden\"")>
+    <div class="section-divider">Spolupráce</div>
+    <div class="collab-picker">
+        <label>
+            Vyhledat osobu
+            <input type="search" placeholder="Jméno, organizace..." data-collab-search />
+        </label>
+        <div class="collab-options" data-collab-options>
+            @foreach (var osoba in Model.DostupniSpolupracovnici)
+            {
+                var isChecked = Model.VybraniSpolupracovniciIds.Contains(osoba.OsobaId);
+                var searchable = $"{osoba.Osoba} {osoba.Email} {osoba.Organizace} {osoba.OrganizacniCelek}".ToLowerInvariant();
+                <label class="collab-option" data-collab-option data-collab-label="@searchable">
+                    @if (isChecked)
+                    {
+                        <input type="checkbox" name="VybraniSpolupracovniciIds" value="@osoba.OsobaId" checked="checked" />
+                    }
+                    else
+                    {
+                        <input type="checkbox" name="VybraniSpolupracovniciIds" value="@osoba.OsobaId" />
+                    }
+                    <span class="collab-option-name">@osoba.Osoba</span>
+                    <span class="collab-option-email">@(string.IsNullOrWhiteSpace(osoba.Email) ? "-" : osoba.Email)</span>
+                    <span class="collab-option-origin">@(osoba.Organizace ?? "-") / @(osoba.OrganizacniCelek ?? "-")</span>
+                </label>
+            }
+        </div>
+    </div>
+</div>
