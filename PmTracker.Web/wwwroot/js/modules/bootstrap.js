@@ -262,16 +262,6 @@ function handleDocumentClick(event) {
         return;
     }
 
-    const recordCommentsToggle = target.closest("[data-record-comments-toggle]");
-    if (recordCommentsToggle instanceof HTMLButtonElement) {
-        event.preventDefault();
-        const card = recordCommentsToggle.closest(".record-card");
-        if (card instanceof HTMLElement) {
-            void loadRecordComments(card);
-        }
-        return;
-    }
-
     const recordCommentsRetry = target.closest("[data-record-comments-retry]");
     if (recordCommentsRetry instanceof HTMLButtonElement) {
         event.preventDefault();

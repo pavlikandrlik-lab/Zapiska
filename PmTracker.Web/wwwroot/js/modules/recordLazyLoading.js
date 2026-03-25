@@ -116,11 +116,6 @@ export async function loadRecordComments(cardOrChild, options = {}) {
 
     const placeholder = commentsShell.querySelector("[data-record-comments-placeholder]");
     const errorContainer = resolveOrCreateErrorContainer(commentsShell, "data-record-comments-error");
-    const toggle = commentsShell.querySelector("[data-record-comments-toggle]");
-    if (toggle instanceof HTMLButtonElement) {
-        toggle.disabled = true;
-    }
-
     setLazyLoadingState(commentsShell, placeholder, errorContainer, true);
 
     try {
@@ -144,11 +139,6 @@ export async function loadRecordComments(cardOrChild, options = {}) {
         renderLazyLoadError(errorContainer, "Nepodařilo se načíst vyjádření.", "data-record-comments-retry");
         return false;
     }
-    finally {
-        if (toggle instanceof HTMLButtonElement) {
-            toggle.disabled = false;
-        }
-    }
 }
 
 export async function toggleRecordCard(cardOrChild, options = {}) {
@@ -169,7 +159,10 @@ export async function toggleRecordCard(cardOrChild, options = {}) {
     }
 
     if (shouldExpand) {
-        await loadRecordDetail(card, { force: options.force === true });
+        await Promise.all([
+            loadRecordDetail(card, { force: options.force === true }),
+            loadRecordComments(card, { force: options.force === true })
+        ]);
     }
 }
 

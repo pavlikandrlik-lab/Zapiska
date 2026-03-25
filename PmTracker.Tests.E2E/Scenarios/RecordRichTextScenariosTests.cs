@@ -82,7 +82,6 @@ public sealed class RecordRichTextScenariosTests
             var card = page.Locator(".record-card", new() { HasTextString = createdRecordName }).First;
             await Expect(card).ToBeVisibleAsync();
             await card.Locator("[data-record-toggle]").ClickAsync();
-            await card.Locator("[data-record-comments-toggle]").ClickAsync();
 
             var recordId = await card.GetAttributeAsync("data-record-id");
             recordId.Should().NotBeNullOrWhiteSpace();
@@ -170,7 +169,6 @@ public sealed class RecordRichTextScenariosTests
             var card = page.Locator(".record-card", new() { HasTextString = recordName }).First;
             await Expect(card).ToBeVisibleAsync();
             await card.Locator("[data-record-toggle]").ClickAsync();
-            await card.Locator("[data-record-comments-toggle]").ClickAsync();
 
             var comments = card.Locator("[data-comment-item]");
             await Expect(comments).ToHaveCountAsync(5);

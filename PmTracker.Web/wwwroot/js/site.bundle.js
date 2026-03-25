@@ -3304,10 +3304,6 @@ async function loadRecordComments(cardOrChild, options = {}) {
   }
   const placeholder = commentsShell.querySelector("[data-record-comments-placeholder]");
   const errorContainer = resolveOrCreateErrorContainer(commentsShell, "data-record-comments-error");
-  const toggle = commentsShell.querySelector("[data-record-comments-toggle]");
-  if (toggle instanceof HTMLButtonElement) {
-    toggle.disabled = true;
-  }
   setLazyLoadingState(commentsShell, placeholder, errorContainer, true);
   try {
     commentsShell.innerHTML = await fetchHtmlFragment(requestUrl);
@@ -3328,10 +3324,6 @@ async function loadRecordComments(cardOrChild, options = {}) {
     setLazyLoadingState(commentsShell, placeholder, errorContainer, false);
     renderLazyLoadError(errorContainer, "Nepodařilo se načíst vyjádření.", "data-record-comments-retry");
     return false;
-  } finally {
-    if (toggle instanceof HTMLButtonElement) {
-      toggle.disabled = false;
-    }
   }
 }
 async function toggleRecordCard(cardOrChild, options = {}) {
@@ -3346,7 +3338,10 @@ async function toggleRecordCard(cardOrChild, options = {}) {
     header.setAttribute("aria-expanded", String(shouldExpand));
   }
   if (shouldExpand) {
-    await loadRecordDetail(card, { force: options.force === true });
+    await Promise.all([
+      loadRecordDetail(card, { force: options.force === true }),
+      loadRecordComments(card, { force: options.force === true })
+    ]);
   }
 }
 function handleNavigationCardClick(target) {
@@ -8085,15 +8080,6 @@ function handleDocumentClick(event) {
     const panel = projectTabRetry.closest("[data-tab-panel]");
     if (panel instanceof HTMLElement) {
       loadProjectTabPanel(panel, { force: true });
-    }
-    return;
-  }
-  const recordCommentsToggle = target.closest("[data-record-comments-toggle]");
-  if (recordCommentsToggle instanceof HTMLButtonElement) {
-    event.preventDefault();
-    const card = recordCommentsToggle.closest(".record-card");
-    if (card instanceof HTMLElement) {
-      loadRecordComments(card);
     }
     return;
   }
