@@ -68,6 +68,9 @@ public sealed class UserContextResolver : IUserContextResolver
             var loginCandidates = BuildNormalizedLoginCandidates(principal);
             var isAuthenticated = principal?.Identity?.IsAuthenticated == true;
 
+            WriteAuthTrace(
+                $"ResolveAsync start | Path={httpContext.Request.Path.Value ?? string.Empty} | IsDevelopment={_environment.IsDevelopment()} | IsAuthenticated={isAuthenticated} | AuthenticationType={principal?.Identity?.AuthenticationType ?? "(null)"} | IdentityName={principal?.Identity?.Name ?? "(null)"} | LoginCandidates=[{string.Join(", ", loginCandidates.OrderBy(x => x, StringComparer.Ordinal))}] | LoginClaimTypesPresent={DescribePresentClaimTypes(principal, LoginClaimTypes)} | GuidClaimTypesPresent={DescribePresentClaimTypes(principal, GuidClaimTypes)}");
+
             _logger.LogInformation(
                 "Resolving user context. Path={Path} IsDevelopment={IsDevelopment} IsAuthenticated={IsAuthenticated} AuthenticationType={AuthenticationType} IdentityNamePresent={IdentityNamePresent} LoginCandidateCount={LoginCandidateCount} LoginClaimTypesPresent={LoginClaimTypesPresent} GuidClaimTypesPresent={GuidClaimTypesPresent}",
                 httpContext.Request.Path.Value ?? string.Empty,
@@ -83,6 +86,9 @@ public sealed class UserContextResolver : IUserContextResolver
             {
                 if (loginCandidates.Count > 0)
                 {
+                    WriteAuthTrace(
+                        $"Unauthenticated principal branch | attempting AdLogin lookup from IIS login candidates | CandidateCount={loginCandidates.Count}");
+
                     _logger.LogInformation(
                         "Attempting user resolution from IIS login candidates without authenticated principal. Path={Path} LoginCandidateCount={LoginCandidateCount}",
                         httpContext.Request.Path.Value ?? string.Empty,
@@ -95,6 +101,8 @@ public sealed class UserContextResolver : IUserContextResolver
                 {
                     if (_environment.IsDevelopment())
                     {
+                        WriteAuthTrace("Unauthenticated principal branch | development fallback to first person in DB");
+
                         _logger.LogInformation(
                             "Falling back to development first-person resolution. Path={Path}",
                             httpContext.Request.Path.Value ?? string.Empty);
@@ -107,6 +115,8 @@ public sealed class UserContextResolver : IUserContextResolver
 
                         if (!osobaId.HasValue)
                         {
+                            WriteAuthTrace("ResolveAsync failed | no people in DB for development fallback");
+
                             _logger.LogWarning(
                                 "User context resolution failed. Path={Path} Reason=NoPeopleInDevelopmentDatabase",
                                 httpContext.Request.Path.Value ?? string.Empty);
@@ -116,6 +126,9 @@ public sealed class UserContextResolver : IUserContextResolver
                     }
                     else
                     {
+                        WriteAuthTrace(
+                            $"ResolveAsync failed | principal not authenticated | CandidateCount={loginCandidates.Count}");
+
                         _logger.LogWarning(
                             "User context resolution failed. Path={Path} Reason=PrincipalNotAuthenticated LoginCandidateCount={LoginCandidateCount}",
                             httpContext.Request.Path.Value ?? string.Empty,
@@ -133,6 +146,9 @@ public sealed class UserContextResolver : IUserContextResolver
                     .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
                 var guidParsed = Guid.TryParse(claimValue, out var objectGuid);
+                WriteAuthTrace(
+                    $"Authenticated principal branch | GuidClaimValue={(string.IsNullOrWhiteSpace(claimValue) ? "(none)" : claimValue)} | GuidParsed={guidParsed} | CandidateCount={loginCandidates.Count}");
+
                 _logger.LogInformation(
                     "Authenticated principal detected. Path={Path} GuidClaimPresent={GuidClaimPresent} GuidParsed={GuidParsed} LoginCandidateCount={LoginCandidateCount}",
                     httpContext.Request.Path.Value ?? string.Empty,
@@ -148,6 +164,8 @@ public sealed class UserContextResolver : IUserContextResolver
                         .Select(x => (int?)x.Id)
                         .FirstOrDefaultAsync(ct);
 
+                    WriteAuthTrace($"Guid lookup finished | MatchedOsobaId={osobaId?.ToString() ?? "(null)"}");
+
                     _logger.LogInformation(
                         "Guid-based person lookup completed. Path={Path} MatchedOsobaId={MatchedOsobaId}",
                         httpContext.Request.Path.Value ?? string.Empty,
@@ -158,6 +176,9 @@ public sealed class UserContextResolver : IUserContextResolver
                 {
                     if (loginCandidates.Count > 0)
                     {
+                        WriteAuthTrace(
+                            $"Authenticated principal branch | Guid miss -> attempting AdLogin lookup | CandidateCount={loginCandidates.Count}");
+
                         _logger.LogInformation(
                             "Attempting authenticated login-candidate resolution after Guid lookup miss. Path={Path} LoginCandidateCount={LoginCandidateCount}",
                             httpContext.Request.Path.Value ?? string.Empty,
@@ -169,6 +190,9 @@ public sealed class UserContextResolver : IUserContextResolver
 
                 if (!osobaId.HasValue)
                 {
+                    WriteAuthTrace(
+                        $"ResolveAsync failed | no Guid/AdLogin match | CandidateCount={loginCandidates.Count}");
+
                     _logger.LogWarning(
                         "User context resolution failed. Path={Path} Reason=NoGuidOrAdLoginMatch LoginCandidateCount={LoginCandidateCount}",
                         httpContext.Request.Path.Value ?? string.Empty,
@@ -197,6 +221,8 @@ public sealed class UserContextResolver : IUserContextResolver
 
         if (osoba is null)
         {
+            WriteAuthTrace($"ResolveAsync failed | resolved OsobaId {osobaId} not found in DB");
+
             _logger.LogWarning(
                 "User context resolution failed. Reason=ResolvedPersonMissingInDatabase OsobaId={OsobaId}",
                 osobaId);
@@ -371,6 +397,9 @@ public sealed class UserContextResolver : IUserContextResolver
             context.VisibleProjectIds.Count,
             context.PermissionGrants.Count);
 
+        WriteAuthTrace(
+            $"ResolveAsync success | OsobaId={context.OsobaId} | IsSuperAdmin={context.IsSuperAdmin} | RoleCount={context.RoleKody.Count} | VisibleProjectCount={context.VisibleProjectIds.Count} | PermissionGrantCount={context.PermissionGrants.Count}");
+
         return UserContextResolutionResult.Success(context);
     }
 
@@ -436,6 +465,7 @@ public sealed class UserContextResolver : IUserContextResolver
     {
         if (loginCandidates.Count == 0)
         {
+            WriteAuthTrace("AdLogin lookup skipped | no login candidates");
             _logger.LogInformation("Skipping AdLogin lookup because there are no login candidates.");
             return null;
         }
@@ -454,6 +484,9 @@ public sealed class UserContextResolver : IUserContextResolver
             .FirstOrDefault(person => LoginEquals(person.AdLogin, loginCandidates))
             ?.Id;
 
+        WriteAuthTrace(
+            $"AdLogin lookup finished | CandidateCount={loginCandidates.Count} | Candidates=[{string.Join(", ", loginCandidates.OrderBy(x => x, StringComparer.Ordinal))}] | PeopleWithAdLoginCount={people.Count} | MatchedOsobaId={matchedPerson?.ToString() ?? "(null)"}");
+
         _logger.LogInformation(
             "AdLogin lookup completed. CandidateCount={CandidateCount} HasDomainQualifiedCandidate={HasDomainQualifiedCandidate} HasUpnCandidate={HasUpnCandidate} HasShortCandidate={HasShortCandidate} PeopleWithAdLoginCount={PeopleWithAdLoginCount} MatchedOsobaId={MatchedOsobaId}",
             loginCandidates.Count,
@@ -464,6 +497,11 @@ public sealed class UserContextResolver : IUserContextResolver
             matchedPerson);
 
         return matchedPerson;
+    }
+
+    private static void WriteAuthTrace(string message)
+    {
+        Console.WriteLine($"[AUTH TRACE] {message}");
     }
 
     private static string DescribePresentClaimTypes(ClaimsPrincipal? principal, IEnumerable<string> claimTypes)
