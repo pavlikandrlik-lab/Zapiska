@@ -512,10 +512,8 @@ export function renderTimelineAxis(container, startDate, endDate, options) {
     const endStamp = toUtcDayStamp(endDate);
     const axisStart = startStamp <= endStamp ? startDate : endDate;
     const axisEnd = startStamp <= endStamp ? endDate : startDate;
-    const totalDays = Math.max(1, diffCalendarDays(axisEnd, axisStart));
     const edgeInsetPx = Math.max(2, Math.min(4, Math.round(containerWidth * 0.006)));
     const usableAxisWidth = Math.max(1, containerWidth - (edgeInsetPx * 2));
-    const labelGlobalShiftLeftPx = 14;
     const percentToAxisPx = (percentValue) => {
         const normalized = Math.max(0, Math.min(100, Number.isFinite(percentValue) ? percentValue : 0));
         return edgeInsetPx + ((normalized / 100) * usableAxisWidth);
@@ -550,7 +548,6 @@ export function renderTimelineAxis(container, startDate, endDate, options) {
         return;
     }
 
-    let previousLabelRight = -Infinity;
     const minLabelGap = 6;
     const tickNodes = Array.from(container.querySelectorAll(".timeline-axis-tick"))
         .filter((tickNode) => tickNode instanceof HTMLElement);
@@ -576,84 +573,101 @@ export function renderTimelineAxis(container, startDate, endDate, options) {
         const measuredLeft = Number.parseFloat(tickNode.style.left || "0");
         return Number.isFinite(measuredLeft) ? measuredLeft : 0;
     };
-    const placeLabel = (tickNode, labelNode, index, forceVisible) => {
-        const tickLeftPx = resolveTickLeftPx(tickNode);
-        const labelWidthRaw = resolveLabelWidth(labelNode);
-        const labelWidth = Math.max(1, Math.min(containerWidth, labelWidthRaw > 0 ? labelWidthRaw : 1));
-        labelNode.style.maxWidth = `${Math.max(1, containerWidth)}px`;
+    const resolveLabelPlacement = (index) => {
+        if (tickNodes.length === 1 || index === 0) {
+            return "start";
+        }
 
-        const sidePadding = 12;
-        let desiredLeft = tickLeftPx + sidePadding;
         if (index === lastIndex) {
-            desiredLeft = tickLeftPx - labelWidth - sidePadding;
-        } else if (index > 0) {
-            desiredLeft = tickLeftPx - (labelWidth / 2);
+            return "end";
         }
 
-        desiredLeft -= labelGlobalShiftLeftPx;
-
-        const clampedLeft = Math.max(0, Math.min(desiredLeft, Math.max(0, containerWidth - labelWidth)));
-        if (!forceVisible && clampedLeft < previousLabelRight + minLabelGap) {
-            labelNode.hidden = true;
-            return;
-        }
-
-        labelNode.hidden = false;
-        labelNode.style.left = `${Math.round(clampedLeft - tickLeftPx)}px`;
-        previousLabelRight = Math.max(previousLabelRight, clampedLeft + labelWidth);
+        return "center";
     };
-
-    tickNodes.forEach((tickNode, index) => {
-        if (!(tickNode instanceof HTMLElement)) {
-            return;
-        }
-
-        const labelNode = tickNode.querySelector(".timeline-axis-label");
-        if (!(labelNode instanceof HTMLElement)) {
-            return;
-        }
-
-        labelNode.hidden = false;
-        labelNode.style.left = "4px";
-        const forceVisible = index === 0 || index === lastIndex;
-        placeLabel(tickNode, labelNode, index, forceVisible);
-    });
-
-    const resolveTickLabelNode = (tickNode) => tickNode instanceof HTMLElement
-        ? tickNode.querySelector(".timeline-axis-label")
-        : null;
-    const visibleLabelNodes = tickNodes
-        .map(resolveTickLabelNode)
-        .filter((labelNode) => labelNode instanceof HTMLElement && !labelNode.hidden && String(labelNode.textContent || "").trim());
-
-    const forceLabelVisible = (tickNode, alignEnd) => {
-        if (!(tickNode instanceof HTMLElement)) {
-            return;
-        }
-
-        const labelNode = tickNode.querySelector(".timeline-axis-label");
-        if (!(labelNode instanceof HTMLElement)) {
-            return;
-        }
-
+    const clampAbsoluteLeft = (value, width) => Math.max(0, Math.min(value, Math.max(0, containerWidth - width)));
+    const resolveLabelLayout = (tickNode, labelNode, index) => {
+        const placement = resolveLabelPlacement(index);
         const tickLeftPx = resolveTickLeftPx(tickNode);
+        const maxWidthByPlacement = placement === "start"
+            ? Math.max(1, containerWidth - tickLeftPx)
+            : placement === "end"
+                ? Math.max(1, tickLeftPx)
+                : Math.max(1, containerWidth);
+
+        labelNode.style.maxWidth = `${Math.max(1, Math.floor(maxWidthByPlacement))}px`;
         const labelWidthRaw = resolveLabelWidth(labelNode);
-        const labelWidth = Math.max(1, Math.min(containerWidth, labelWidthRaw > 0 ? labelWidthRaw : 1));
-        labelNode.style.maxWidth = `${Math.max(1, containerWidth)}px`;
-        const desiredLeft = alignEnd
-            ? Math.max(0, containerWidth - labelWidth - edgeInsetPx)
-            : edgeInsetPx;
-        const shiftedDesiredLeft = desiredLeft - labelGlobalShiftLeftPx;
-        const clampedLeft = Math.max(0, Math.min(shiftedDesiredLeft, Math.max(0, containerWidth - labelWidth)));
-        labelNode.hidden = false;
-        labelNode.style.left = `${Math.round(clampedLeft - tickLeftPx)}px`;
+        const labelWidth = Math.max(1, Math.min(maxWidthByPlacement, labelWidthRaw > 0 ? labelWidthRaw : 1));
+        const desiredLeft = placement === "start"
+            ? tickLeftPx
+            : placement === "end"
+                ? tickLeftPx - labelWidth
+                : tickLeftPx - (labelWidth / 2);
+        const absoluteLeft = clampAbsoluteLeft(desiredLeft, labelWidth);
+
+        return {
+            tickNode,
+            labelNode,
+            tickLeftPx,
+            labelWidth,
+            absoluteLeft,
+            absoluteRight: absoluteLeft + labelWidth
+        };
+    };
+    const applyLabelLayout = (layout, hidden) => {
+        if (!layout || !(layout.labelNode instanceof HTMLElement)) {
+            return;
+        }
+
+        layout.labelNode.hidden = hidden;
+        if (hidden) {
+            return;
+        }
+
+        layout.labelNode.style.left = `${Math.round(layout.absoluteLeft - layout.tickLeftPx)}px`;
     };
 
-    if (visibleLabelNodes.length < 2 && tickNodes.length >= 2) {
-        forceLabelVisible(tickNodes[0], false);
-        forceLabelVisible(tickNodes[lastIndex], true);
-    } else if (visibleLabelNodes.length === 0 && tickNodes.length === 1) {
-        forceLabelVisible(tickNodes[0], false);
+    const labelLayouts = tickNodes
+        .map((tickNode, index) => {
+            if (!(tickNode instanceof HTMLElement)) {
+                return null;
+            }
+
+            const labelNode = tickNode.querySelector(".timeline-axis-label");
+            if (!(labelNode instanceof HTMLElement)) {
+                return null;
+            }
+
+            labelNode.hidden = false;
+            labelNode.style.left = "0px";
+            return resolveLabelLayout(tickNode, labelNode, index);
+        })
+        .filter((layout) => layout && layout.labelNode instanceof HTMLElement);
+
+    if (labelLayouts.length === 0) {
+        return;
+    }
+
+    if (labelLayouts.length === 1) {
+        applyLabelLayout(labelLayouts[0], false);
+        return;
+    }
+
+    const firstLayout = labelLayouts[0];
+    const lastLayout = labelLayouts[labelLayouts.length - 1];
+    applyLabelLayout(firstLayout, false);
+    applyLabelLayout(lastLayout, false);
+
+    let previousLabelRight = firstLayout.absoluteRight;
+    const reservedLastLeft = lastLayout.absoluteLeft;
+    for (let index = 1; index < labelLayouts.length - 1; index += 1) {
+        const currentLayout = labelLayouts[index];
+        const overlapsPrevious = currentLayout.absoluteLeft < previousLabelRight + minLabelGap;
+        const overlapsLast = currentLayout.absoluteRight > reservedLastLeft - minLabelGap;
+        const shouldHide = overlapsPrevious || overlapsLast;
+        applyLabelLayout(currentLayout, shouldHide);
+        if (!shouldHide) {
+            previousLabelRight = currentLayout.absoluteRight;
+        }
     }
 
 }

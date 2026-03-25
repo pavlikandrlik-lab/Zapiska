@@ -100,6 +100,7 @@ public sealed class HarmonogramUnifiedScenariosTests
 
         (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
         ((await labels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+        await AssertAxisEdgeLabelsAlignedWithinBoundsAsync(axes.First);
 
         await page.Context.CloseAsync();
     }
@@ -190,6 +191,7 @@ public sealed class HarmonogramUnifiedScenariosTests
         overviewLabelCount.Should().BeLessThanOrEqualTo(10);
         ((await overviewLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
         ((await overviewLabels.Last.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+        await AssertAxisEdgeLabelsAlignedWithinBoundsAsync(firstCard.Locator(".schedule-overview-axis").First);
 
         var expandToggle = firstCard.Locator("[data-schedule-expand-toggle]");
         if (await expandToggle.CountAsync() > 0)
@@ -213,6 +215,7 @@ public sealed class HarmonogramUnifiedScenariosTests
         layeredLabelCount.Should().BeLessThanOrEqualTo(10);
         ((await layeredLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
         ((await layeredLabels.Last.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+        await AssertAxisEdgeLabelsAlignedWithinBoundsAsync(firstCard.Locator(".schedule-layered-axis").First);
         var layeredTodayColor = await firstCard.Locator(".schedule-layered-marker.today").First.EvaluateAsync<string>(
             "node => getComputedStyle(node).backgroundColor");
         layeredTodayColor.Should().Be("rgb(17, 17, 17)");
@@ -403,6 +406,62 @@ public sealed class HarmonogramUnifiedScenariosTests
     private static ILocatorAssertions Expect(ILocator locator)
     {
         return Assertions.Expect(locator);
+    }
+
+    private static async Task AssertAxisEdgeLabelsAlignedWithinBoundsAsync(ILocator axis)
+    {
+        var result = await axis.EvaluateAsync<AxisEdgeAlignmentResult>(
+            """
+            axisNode => {
+                if (!(axisNode instanceof HTMLElement)) {
+                    return { hasEnoughLabels: false, firstInside: false, lastInside: false, firstAligned: false, lastAligned: false };
+                }
+
+                const labels = Array.from(axisNode.querySelectorAll('.timeline-axis-label'))
+                    .filter(label => label instanceof HTMLElement && !label.hidden && (label.textContent || '').trim().length > 0);
+                if (labels.length < 2) {
+                    return { hasEnoughLabels: false, firstInside: false, lastInside: false, firstAligned: false, lastAligned: false };
+                }
+
+                const axisRect = axisNode.getBoundingClientRect();
+                const firstLabel = labels[0];
+                const lastLabel = labels[labels.length - 1];
+                const firstTick = firstLabel.closest('.timeline-axis-tick');
+                const lastTick = lastLabel.closest('.timeline-axis-tick');
+                if (!(firstTick instanceof HTMLElement) || !(lastTick instanceof HTMLElement)) {
+                    return { hasEnoughLabels: false, firstInside: false, lastInside: false, firstAligned: false, lastAligned: false };
+                }
+
+                const tolerance = 2.5;
+                const firstRect = firstLabel.getBoundingClientRect();
+                const lastRect = lastLabel.getBoundingClientRect();
+                const firstTickRect = firstTick.getBoundingClientRect();
+                const lastTickRect = lastTick.getBoundingClientRect();
+
+                return {
+                    hasEnoughLabels: true,
+                    firstInside: firstRect.left >= axisRect.left - tolerance && firstRect.right <= axisRect.right + tolerance,
+                    lastInside: lastRect.left >= axisRect.left - tolerance && lastRect.right <= axisRect.right + tolerance,
+                    firstAligned: Math.abs(firstRect.left - firstTickRect.left) <= tolerance,
+                    lastAligned: Math.abs(lastRect.right - lastTickRect.left) <= tolerance
+                };
+            }
+            """);
+
+        result.HasEnoughLabels.Should().BeTrue();
+        result.FirstInside.Should().BeTrue();
+        result.LastInside.Should().BeTrue();
+        result.FirstAligned.Should().BeTrue();
+        result.LastAligned.Should().BeTrue();
+    }
+
+    private sealed class AxisEdgeAlignmentResult
+    {
+        public bool HasEnoughLabels { get; set; }
+        public bool FirstInside { get; set; }
+        public bool LastInside { get; set; }
+        public bool FirstAligned { get; set; }
+        public bool LastAligned { get; set; }
     }
 
     private async Task DeleteRecordByNameAsync(string recordName)
