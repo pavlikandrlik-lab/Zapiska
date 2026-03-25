@@ -2788,6 +2788,22 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: 42%;
 }
 
+.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"]:checked) [data-records-view="subsystem"] {
+    display: block !important;
+}
+
+.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"]:checked) [data-records-view="flat"] {
+    display: none !important;
+}
+
+.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"]:not(:checked)) [data-records-view="subsystem"] {
+    display: none !important;
+}
+
+.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"]:not(:checked)) [data-records-view="flat"] {
+    display: block !important;
+}
+
 .record-loading-error {
     display: flex;
     align-items: center;

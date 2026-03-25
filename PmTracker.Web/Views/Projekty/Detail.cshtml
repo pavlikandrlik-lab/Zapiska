@@ -1,6 +1,11 @@
 @model ProjektDetailViewModel
 @{
     ViewData["Title"] = $"Projekt {Model.Projekt.Zkratka}";
+    var asUser = Context.Request.Query["asUser"].ToString();
+    var recordsTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "zaznamy", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=zaznamy";
+    var scheduleTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "harmonogram", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=harmonogram";
+    var meetingsTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "jednani", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=jednani";
+    var teamTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "tym", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=tym";
 }
 
 <section class="page-header page-header-compact">
@@ -20,10 +25,26 @@
 </section>
 
 <div class="tabs" role="tablist">
-    <button class="tab @(Model.ActiveTab == "zaznamy" ? "active" : null)" type="button" data-tab="zaznamy">Záznamy</button>
-    <button class="tab @(Model.ActiveTab == "harmonogram" ? "active" : null)" type="button" data-tab="harmonogram">Harmonogram</button>
-    <button class="tab @(Model.ActiveTab == "jednani" ? "active" : null)" type="button" data-tab="jednani">Jednání</button>
-    <button class="tab @(Model.ActiveTab == "tym" ? "active" : null)" type="button" data-tab="tym">Osoby (tým)</button>
+    <a class="tab @(Model.ActiveTab == "zaznamy" ? "active" : null)"
+       href="@recordsTabUrl"
+       data-tab="zaznamy">
+        Záznamy
+    </a>
+    <a class="tab @(Model.ActiveTab == "harmonogram" ? "active" : null)"
+       href="@scheduleTabUrl"
+       data-tab="harmonogram">
+        Harmonogram
+    </a>
+    <a class="tab @(Model.ActiveTab == "jednani" ? "active" : null)"
+       href="@meetingsTabUrl"
+       data-tab="jednani">
+        Jednání
+    </a>
+    <a class="tab @(Model.ActiveTab == "tym" ? "active" : null)"
+       href="@teamTabUrl"
+       data-tab="tym">
+        Osoby (tým)
+    </a>
 </div>
 
 @await Html.PartialAsync(

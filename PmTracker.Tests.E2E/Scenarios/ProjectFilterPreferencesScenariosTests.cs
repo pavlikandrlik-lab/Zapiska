@@ -37,6 +37,28 @@ public sealed class ProjectFilterPreferencesScenariosTests
     }
 
     [Fact]
+    public async Task ProjectDetailTabs_ShouldNavigateAndRenderServerSidePanels()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync(ProjectDetailUrl("zaznamy"));
+
+        await page.Locator("[data-tab='harmonogram']").ClickAsync();
+        await page.WaitForURLAsync("**tab=harmonogram**");
+        await Expect(page.Locator("[data-tab-panel='harmonogram']")).ToBeVisibleAsync();
+
+        await page.Locator("[data-tab='jednani']").ClickAsync();
+        await page.WaitForURLAsync("**tab=jednani**");
+        await Expect(page.Locator("[data-tab-panel='jednani']")).ToBeVisibleAsync();
+
+        await page.Locator("[data-tab='tym']").ClickAsync();
+        await page.WaitForURLAsync("**tab=tym**");
+        await Expect(page.Locator("[data-tab-panel='tym']")).ToBeVisibleAsync();
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
     public async Task ProjectFilters_ShouldSaveDefaults_ForAllPanels_AndRestoreAfterReload()
     {
         var page = await _fixture.NewPageAsync();
@@ -49,7 +71,7 @@ public sealed class ProjectFilterPreferencesScenariosTests
         await recordsShell.Locator("[data-filter-save-defaults='records']").ClickAsync();
         await Expect(recordsShell.Locator("[data-filter-save-status='records']")).ToContainTextAsync("Výchozí filtry uloženy");
 
-        await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+        await page.Locator("[data-tab='harmonogram']").ClickAsync();
         var scheduleShell = page.Locator("[data-project-filter-scope='schedule']");
         await OpenFiltersAsync(scheduleShell);
         var selectedSubsystem = await scheduleShell.Locator("[data-schedule-filter-key='subsystem']").InputValueAsync();
@@ -58,11 +80,11 @@ public sealed class ProjectFilterPreferencesScenariosTests
 
         await page.ReloadAsync();
 
-        await page.GetByRole(AriaRole.Button, new() { Name = "Záznamy" }).ClickAsync();
+        await page.Locator("[data-tab='zaznamy']").ClickAsync();
         await OpenFiltersAsync(page.Locator("[data-project-filter-scope='records']"));
         await Expect(page.Locator("[data-project-filter-scope='records'] [data-filter-key='mine']")).ToBeCheckedAsync();
 
-        await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+        await page.Locator("[data-tab='harmonogram']").ClickAsync();
         var restoredScheduleShell = page.Locator("[data-project-filter-scope='schedule']");
         await OpenFiltersAsync(restoredScheduleShell);
         await Expect(restoredScheduleShell.Locator("[data-schedule-filter-key='subsystem']")).ToHaveValueAsync(selectedSubsystem);

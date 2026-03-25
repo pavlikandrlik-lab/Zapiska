@@ -90,6 +90,11 @@ function getProjectDetailRoot() {
     return root instanceof HTMLElement ? root : null;
 }
 
+function getProjectRecordsPanel() {
+    const panel = document.querySelector('[data-tab-panel="zaznamy"]');
+    return panel instanceof HTMLElement ? panel : null;
+}
+
 function normalizeRecordMeetingCommentStatesPayload(payload) {
     if (!payload || typeof payload !== "object") {
         return {};
@@ -125,7 +130,12 @@ function applyCachedRecordMeetingCommentStates(projectId) {
     }
 
     const statesByRecordId = recordMeetingCommentStateCache.get(normalizedProjectId) || {};
-    document.querySelectorAll(".record-card[data-record-id]").forEach((card) => {
+    const recordsPanel = getProjectRecordsPanel();
+    if (!(recordsPanel instanceof HTMLElement)) {
+        return false;
+    }
+
+    recordsPanel.querySelectorAll(".record-card[data-record-id]").forEach((card) => {
         if (!(card instanceof HTMLElement)) {
             return;
         }
@@ -555,7 +565,12 @@ export function setRecordFilterVisibility(element, isVisible) {
 }
 
 export function applyProjectRecordFilters() {
-    const cards = document.querySelectorAll(".record-card[data-record-id]");
+    const recordsPanel = getProjectRecordsPanel();
+    if (!(recordsPanel instanceof HTMLElement)) {
+        return;
+    }
+
+    const cards = recordsPanel.querySelectorAll(".record-card[data-record-id]");
     if (cards.length === 0) {
         return;
     }
@@ -613,7 +628,7 @@ export function applyProjectRecordFilters() {
         setRecordFilterVisibility(item, matches);
     });
 
-    document.querySelectorAll(".subsystem-group").forEach((group) => {
+    recordsPanel.querySelectorAll(".subsystem-group").forEach((group) => {
         if (!(group instanceof HTMLElement)) {
             return;
         }
@@ -753,58 +768,74 @@ export function initSubsystemScrollIndicator() {
 }
 
 export function applyRecordsView(view) {
-    const shells = document.querySelectorAll("[data-records-view]");
+    const recordsPanel = getProjectRecordsPanel();
+    if (!(recordsPanel instanceof HTMLElement)) {
+        return;
+    }
+
+    const groupBySubsystemInput = getProjectFilterInput("records", "groupBySubsystem");
+    const resolvedView = groupBySubsystemInput instanceof HTMLInputElement
+        ? (groupBySubsystemInput.checked ? "subsystem" : "flat")
+        : view;
+
+    const shells = recordsPanel.querySelectorAll("[data-records-view]");
     if (shells.length === 0) {
         return;
     }
 
-    const groupedList = document.querySelector("[data-record-grouped-list]");
-    const flatList = document.querySelector("[data-record-flat-list]");
-    const cards = Array.from(document.querySelectorAll(".record-card[data-record-id]"))
+    const groupedList = recordsPanel.querySelector("[data-record-grouped-list]");
+    const flatList = recordsPanel.querySelector("[data-record-flat-list]");
+    const cards = Array.from(recordsPanel.querySelectorAll(".record-card[data-record-id]"))
         .filter((card) => card instanceof HTMLElement);
+    const hasServerRenderedGroups = groupedList instanceof HTMLElement
+        && groupedList.querySelector("[data-subsystem-group]") instanceof HTMLElement
+        && flatList instanceof HTMLElement
+        && flatList.querySelector(".record-card[data-record-id]") === null;
 
     if (groupedList instanceof HTMLElement && flatList instanceof HTMLElement && cards.length > 0) {
-        if (view === "subsystem") {
-            const orderedCards = cards
-                .sort((aNode, bNode) => {
-                    const aName = (aNode.getAttribute("data-filter-subsystem") || "").trim();
-                    const bName = (bNode.getAttribute("data-filter-subsystem") || "").trim();
-                    const bySubsystem = aName.localeCompare(bName, "cs");
-                    if (bySubsystem !== 0) {
-                        return bySubsystem;
+        if (resolvedView === "subsystem") {
+            if (!hasServerRenderedGroups) {
+                const orderedCards = cards
+                    .sort((aNode, bNode) => {
+                        const aName = (aNode.getAttribute("data-filter-subsystem") || "").trim();
+                        const bName = (bNode.getAttribute("data-filter-subsystem") || "").trim();
+                        const bySubsystem = aName.localeCompare(bName, "cs");
+                        if (bySubsystem !== 0) {
+                            return bySubsystem;
+                        }
+
+                        const aNumber = Number(aNode.getAttribute("data-record-id") || "0");
+                        const bNumber = Number(bNode.getAttribute("data-record-id") || "0");
+                        return aNumber - bNumber;
+                    });
+
+                groupedList.innerHTML = "";
+                let currentGroup = null;
+                let currentGroupCards = null;
+                let currentName = "";
+
+                orderedCards.forEach((card) => {
+                    const subsystemName = (card.getAttribute("data-filter-subsystem") || "").trim() || "-";
+                    if (currentGroup === null || currentGroupCards === null || subsystemName !== currentName) {
+                        currentName = subsystemName;
+                        currentGroup = document.createElement("div");
+                        currentGroup.className = "subsystem-group";
+                        currentGroup.setAttribute("data-subsystem-group", "");
+                        currentGroup.setAttribute("data-subsystem-name", subsystemName);
+
+                        const heading = document.createElement("h3");
+                        heading.textContent = subsystemName;
+                        currentGroup.appendChild(heading);
+
+                        currentGroupCards = document.createElement("div");
+                        currentGroupCards.className = "card-list";
+                        currentGroup.appendChild(currentGroupCards);
+                        groupedList.appendChild(currentGroup);
                     }
 
-                    const aNumber = Number(aNode.getAttribute("data-record-id") || "0");
-                    const bNumber = Number(bNode.getAttribute("data-record-id") || "0");
-                    return aNumber - bNumber;
+                    currentGroupCards.appendChild(card);
                 });
-
-            groupedList.innerHTML = "";
-            let currentGroup = null;
-            let currentGroupCards = null;
-            let currentName = "";
-
-            orderedCards.forEach((card) => {
-                const subsystemName = (card.getAttribute("data-filter-subsystem") || "").trim() || "-";
-                if (currentGroup === null || currentGroupCards === null || subsystemName !== currentName) {
-                    currentName = subsystemName;
-                    currentGroup = document.createElement("div");
-                    currentGroup.className = "subsystem-group";
-                    currentGroup.setAttribute("data-subsystem-group", "");
-                    currentGroup.setAttribute("data-subsystem-name", subsystemName);
-
-                    const heading = document.createElement("h3");
-                    heading.textContent = subsystemName;
-                    currentGroup.appendChild(heading);
-
-                    currentGroupCards = document.createElement("div");
-                    currentGroupCards.className = "card-list";
-                    currentGroup.appendChild(currentGroupCards);
-                    groupedList.appendChild(currentGroup);
-                }
-
-                currentGroupCards.appendChild(card);
-            });
+            }
         }
         else {
             cards.forEach((card) => flatList.appendChild(card));
@@ -814,7 +845,7 @@ export function applyRecordsView(view) {
 
     shells.forEach((shell) => {
         const mode = shell.getAttribute("data-records-view");
-        shell.toggleAttribute("hidden", mode !== view);
+        shell.toggleAttribute("hidden", mode !== resolvedView);
     });
 
     applyProjectRecordFilters();
@@ -832,12 +863,34 @@ export function persistFilterState(input, options = {}) {
 
 export function initProjectRecordsUi(options = {}) {
     setFilterPanelOpen(localStorage.getItem(projectRecordFilterPanelStorageKey) === "true");
-    const state = restoreFilterState();
+    restoreFilterState();
+    const recordsPanel = getProjectRecordsPanel();
+    const groupBySubsystemInput = getProjectFilterInput("records", "groupBySubsystem");
+    const showGroupedView = groupBySubsystemInput instanceof HTMLInputElement
+        ? groupBySubsystemInput.checked
+        : true;
+    const hasServerRenderedGroups = recordsPanel instanceof HTMLElement
+        && recordsPanel.querySelector("[data-record-grouped-list] [data-subsystem-group]") instanceof HTMLElement;
     const setStatus = typeof options.setProjectFilterSaveStatus === "function"
         ? options.setProjectFilterSaveStatus
         : setProjectFilterSaveStatus;
     setStatus("records", "");
-    applyRecordsView(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
+    if (showGroupedView && hasServerRenderedGroups && recordsPanel instanceof HTMLElement) {
+        const groupedShell = recordsPanel.querySelector('[data-records-view="subsystem"]');
+        const flatShell = recordsPanel.querySelector('[data-records-view="flat"]');
+        if (groupedShell instanceof HTMLElement) {
+            groupedShell.hidden = false;
+        }
+
+        if (flatShell instanceof HTMLElement) {
+            flatShell.hidden = true;
+        }
+
+        applyProjectRecordFilters();
+    }
+    else {
+        applyRecordsView(showGroupedView ? "subsystem" : "flat");
+    }
     initSubsystemScrollIndicator();
 }
 

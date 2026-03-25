@@ -38,6 +38,28 @@ public sealed class ProjectHarmonogramRenderTests
     }
 
     [Fact]
+    public async Task Detail_ShouldRenderRecordCardsAndTabFallbackLinks_ServerSide()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiProjectRecordsOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIHARMREC");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIHARMSUBREC", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+        await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API records fallback record");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Projekty/Detail/{projectId}?asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("API records fallback record");
+        html.Should().Contain("data-record-grouped-list");
+        html.Should().Contain($"href=\"/Projekty/Detail/{projectId}?tab=zaznamy&amp;asUser=");
+        html.Should().Contain($"href=\"/Projekty/Detail/{projectId}?tab=harmonogram&amp;asUser=");
+        html.Should().Contain($"href=\"/Projekty/Detail/{projectId}?tab=jednani&amp;asUser=");
+        html.Should().Contain($"href=\"/Projekty/Detail/{projectId}?tab=tym&amp;asUser=");
+    }
+
+    [Fact]
     public async Task Detail_ShouldRenderCompactOverview_WithSeparateRows_AndAxisBelow()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiHarmonogramOwner");

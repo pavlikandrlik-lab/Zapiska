@@ -22,7 +22,7 @@ public sealed class HarmonogramUnifiedScenariosTests
 
         await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
 
-        await Expect(page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" })).ToBeVisibleAsync();
+        await Expect(page.Locator("[data-tab='harmonogram']")).ToBeVisibleAsync();
         await Expect(page.GetByRole(AriaRole.Button, new() { Name = "GANTT" })).ToHaveCountAsync(0);
 
         await page.Context.CloseAsync();
@@ -50,7 +50,7 @@ public sealed class HarmonogramUnifiedScenariosTests
         var page = await _fixture.NewPageAsync();
 
         await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?asUser={_fixture.AdminOsobaId}");
-        await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+        await page.Locator("[data-tab='harmonogram']").ClickAsync();
 
         if (await page.Locator(".schedule-card").CountAsync() == 0)
         {
@@ -229,7 +229,7 @@ public sealed class HarmonogramUnifiedScenariosTests
 
         for (var attempt = 0; attempt < 3; attempt += 1)
         {
-            await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+            await page.Locator("[data-tab='harmonogram']").ClickAsync();
             if (await page.Locator(".schedule-card").CountAsync() > 0)
             {
                 var firstCard = page.Locator(".schedule-card").First;
@@ -238,10 +238,10 @@ public sealed class HarmonogramUnifiedScenariosTests
                 (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
             }
 
-            await page.GetByRole(AriaRole.Button, new() { Name = "Záznamy" }).ClickAsync();
+            await page.Locator("[data-tab='zaznamy']").ClickAsync();
         }
 
-        await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+        await page.Locator("[data-tab='harmonogram']").ClickAsync();
         if (await page.Locator(".schedule-card").CountAsync() == 0)
         {
             await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
@@ -251,7 +251,7 @@ public sealed class HarmonogramUnifiedScenariosTests
 
         await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
         await page.ReloadAsync();
-        await page.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+        await page.Locator("[data-tab='harmonogram']").ClickAsync();
 
         if (await page.Locator(".schedule-card").CountAsync() == 0)
         {

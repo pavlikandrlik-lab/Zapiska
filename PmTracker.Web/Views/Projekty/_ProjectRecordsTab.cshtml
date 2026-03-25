@@ -145,15 +145,25 @@
                 <strong class="subsystem-scroll-indicator-label" data-subsystem-scroll-indicator-label></strong>
             </span>
         </aside>
-        <div class="records-grouped-list" data-record-grouped-list></div>
+        <div class="records-grouped-list" data-record-grouped-list>
+            @foreach (var skupina in Model.SkupinyZaznamu)
+            {
+                <div class="subsystem-group"
+                     data-subsystem-group
+                     data-subsystem-name="@skupina.Nazev">
+                    <h3>@skupina.Nazev</h3>
+                    <div class="card-list">
+                        @foreach (var zaznam in skupina.Zaznamy)
+                        {
+                            @await Html.PartialAsync("_ZaznamPartial", zaznam)
+                        }
+                    </div>
+                </div>
+            }
+        </div>
     </div>
 
     <div class="records-shell" data-records-view="flat" hidden>
-        <div class="card-list" data-record-flat-list>
-            @foreach (var zaznam in Model.Zaznamy)
-            {
-                @await Html.PartialAsync("_ZaznamPartial", zaznam)
-            }
-        </div>
+        <div class="card-list" data-record-flat-list></div>
     </div>
 </section>

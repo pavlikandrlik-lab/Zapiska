@@ -112,7 +112,11 @@ configureModalRuntime({
 });
 
 function handleDocumentClick(event) {
-    const target = event.target;
+    const target = event.target instanceof Element
+        ? event.target
+        : event.target instanceof Node
+            ? event.target.parentElement
+            : null;
     if (!(target instanceof Element)) {
         return;
     }
@@ -473,7 +477,7 @@ export function bootstrapPmTrackerApp() {
 
     runInitializers([
         () => initProjectTabs(),
-        () => initProjectRecordsUi(),
+        () => initProjectRecordsUi({ preserveServerView: true }),
         () => initProjectScheduleUi(),
         () => initProjectRecordPageshowSync(),
         () => initCommentSortUi(document),

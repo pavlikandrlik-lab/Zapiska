@@ -86,42 +86,88 @@ class ProjectNavigationController {
         }
 
         const availableTabs = new Set(Array.from(tabs).map((tab) => tab.getAttribute("data-tab")));
-        const storedTab = this.normalizeTabName(localStorage.getItem(projectTabStorageKey));
         const urlTab = this.normalizeTabName(new URL(window.location.href).searchParams.get("tab"));
         const defaultTab = tabs[0].getAttribute("data-tab");
         const tabToActivate = urlTab && availableTabs.has(urlTab)
             ? urlTab
-            : storedTab && availableTabs.has(storedTab)
-                ? storedTab
-                : defaultTab;
+            : defaultTab;
 
         this.setActiveTab(tabToActivate);
-        void this.ensureTabLoaded(tabToActivate);
 
         tabs.forEach((tab) => {
-            if (!(tab instanceof HTMLElement) || tab.dataset.tabReady === "true") {
+            if (!(tab instanceof HTMLElement)
+                || tab instanceof HTMLAnchorElement
+                || tab.dataset.tabReady === "true") {
                 return;
             }
 
             tab.dataset.tabReady = "true";
-            tab.addEventListener("click", () => {
+            tab.addEventListener("click", async (event) => {
+                event.preventDefault();
                 const requestedTab = tab.getAttribute("data-tab");
                 this.setActiveTab(requestedTab);
                 this.syncTabQuery(requestedTab);
-                void this.ensureTabLoaded(requestedTab);
+                try {
+                    const loaded = await this.ensureTabLoaded(requestedTab);
+                    if (!loaded && tab instanceof HTMLAnchorElement && tab.href) {
+                        window.location.assign(tab.href);
+                    }
+                }
+                catch {
+                    if (tab instanceof HTMLAnchorElement && tab.href) {
+                        window.location.assign(tab.href);
+                    }
+                }
             });
         });
     }
 
-    initRecordsUi() {
+    initRecordsUi(options = {}) {
         const filterPanel = document.querySelector("[data-filter-panel]");
         if (filterPanel instanceof HTMLElement) {
             this.options.setFilterPanelOpen?.(localStorage.getItem(projectRecordFilterPanelStorageKey) === "true");
         }
 
-        const state = this.options.restoreFilterState?.() || {};
+        const preserveServerView = options && options.preserveServerView === true;
+        this.options.restoreFilterState?.();
+        const recordsPanel = document.querySelector('[data-tab-panel="zaznamy"]');
+        const groupBySubsystemInput = document.querySelector('[data-project-filter-scope="records"] [data-filter-key="groupBySubsystem"]');
+        const showGroupedView = groupBySubsystemInput instanceof HTMLInputElement
+            ? groupBySubsystemInput.checked
+            : true;
+        const hasServerRenderedGroups = recordsPanel instanceof HTMLElement
+            && recordsPanel.querySelector("[data-record-grouped-list] [data-subsystem-group]") instanceof HTMLElement;
         this.options.setProjectFilterSaveStatus?.("records", "");
-        this.options.applyRecordsView?.(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
+        if (preserveServerView && recordsPanel instanceof HTMLElement) {
+            const groupedShell = recordsPanel.querySelector('[data-records-view="subsystem"]');
+            const flatShell = recordsPanel.querySelector('[data-records-view="flat"]');
+            const syncServerView = () => {
+                if (groupedShell instanceof HTMLElement) {
+                    groupedShell.hidden = false;
+                }
+
+                if (flatShell instanceof HTMLElement) {
+                    flatShell.hidden = true;
+                }
+            };
+
+            syncServerView();
+            window.requestAnimationFrame(syncServerView);
+        }
+        else if (showGroupedView && hasServerRenderedGroups && recordsPanel instanceof HTMLElement) {
+            const groupedShell = recordsPanel.querySelector('[data-records-view="subsystem"]');
+            const flatShell = recordsPanel.querySelector('[data-records-view="flat"]');
+            if (groupedShell instanceof HTMLElement) {
+                groupedShell.hidden = false;
+            }
+
+            if (flatShell instanceof HTMLElement) {
+                flatShell.hidden = true;
+            }
+        }
+        else {
+            this.options.applyRecordsView?.(showGroupedView ? "subsystem" : "flat");
+        }
         this.options.initSubsystemScrollIndicator?.();
     }
 }
@@ -170,8 +216,8 @@ export function initProjectTabs() {
     projectNavigationController.initTabs();
 }
 
-export function initProjectRecordsUi() {
-    projectNavigationController.initRecordsUi();
+export function initProjectRecordsUi(options = {}) {
+    projectNavigationController.initRecordsUi(options);
 }
 
 export async function loadProjectTabPanel(tabNameOrPanel, options = {}) {
