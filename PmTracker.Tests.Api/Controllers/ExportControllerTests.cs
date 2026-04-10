@@ -148,10 +148,206 @@ public sealed class ExportControllerTests
         html.Should().NotContain("class=\"project-roles\"");
         html.Should().Contain("<th>Záznamy a vyjádření</th>");
         html.Should().Contain("551 (17.02.2026) | Ing. ApiExportOwner Api | 18.02.2026");
-        html.Should().Contain("class=\"comment-item\" style=\"color:#0F4D8A;\"");
+        html.Should().Contain("class=\"comment-item\" style=\"color:#2563EB;\"");
         html.Should().Contain("content: '\\2022';");
         html.Should().NotContain("comment-item highlight");
         html.Should().NotContain("style=\"background:");
+    }
+
+    [Fact]
+    public async Task JednaniTisk_ShouldRenderPreparationComments_WithLighterRedMeaningColor()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiExportDraftOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIEXP2");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIEXPSUB2", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API export draft record");
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "DRAFT", 552);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var meeting = await dbContext.Jednani.FirstAsync(x => x.Id == meetingId);
+            meeting.DatumPlanovane = new DateTime(2026, 2, 19);
+            var record = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == recordId);
+            record.DatumZalozeni = new DateTime(2026, 2, 2);
+            record.DatumUkonceni = new DateTime(2026, 3, 3);
+            record.StavUkoluId = await dbContext.CiselnikStavuUkolu
+                .Where(x => !x.IsFinal)
+                .OrderBy(x => x.Id)
+                .Select(x => x.Id)
+                .FirstAsync();
+
+            dbContext.Vyjadreni.Add(new VyjadreniEntity
+            {
+                ZaznamId = recordId,
+                JednaniId = meetingId,
+                AutorOsobaId = ownerId,
+                TextVyjadreni = "<p>Draft export comment</p>",
+                DatumVyjadreni = new DateTime(2026, 2, 19, 9, 0, 0)
+            });
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Export/Jednani/{meetingId}/Tisk?asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("class=\"comment-item\" style=\"color:#DC2626;\"");
+        html.Should().Contain("552 (19.02.2026) | Ing. ApiExportDraftOwner Api | 19.02.2026");
+    }
+
+    [Fact]
+    public async Task ProjektTisk_ShouldRenderPausedRecord_WithWholeBlockBackground()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiExportPausedOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIEXP3");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIEXPSUB3", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API export paused record");
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var pausedStateId = await dbContext.CiselnikStavuUkolu
+                .Where(x => x.Nazev.Contains("pozastav"))
+                .OrderBy(x => x.Id)
+                .Select(x => (int?)x.Id)
+                .FirstOrDefaultAsync();
+
+            if (!pausedStateId.HasValue)
+            {
+                var pausedState = new CiselnikStavuUkoluEntity
+                {
+                    Kod = "PAUSED_EXPORT_TEST",
+                    Nazev = "Pozastaveno",
+                    IsFinal = false,
+                    IsLocked = false
+                };
+
+                dbContext.CiselnikStavuUkolu.Add(pausedState);
+                await dbContext.SaveChangesAsync();
+                pausedStateId = pausedState.Id;
+            }
+
+            var record = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == recordId);
+            record.StavUkoluId = pausedStateId.Value;
+            record.DatumZalozeni = new DateTime(2026, 2, 5);
+            record.DatumUkonceni = new DateTime(2026, 3, 5);
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Export/Projekt/{projectId}/Tisk?asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain(".task-row.paused td");
+        html.Should().Contain("background: #fdf4e8;");
+        html.Should().Contain("class=\"task-row paused\"");
+        html.Should().NotContain("record-title paused");
+        html.Should().NotContain("record-code-badge paused");
+    }
+
+    [Fact]
+    public async Task ProjektTisk_ShouldApplyCurrentRecordFilters_WhenRequested()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        var ownerId = await _fixture.EnsurePersonAsync($"ApiExportFilterOwner{suffix}");
+        var otherOwnerId = await _fixture.EnsurePersonAsync($"ApiExportFilterOther{suffix}");
+        var projectId = await _fixture.EnsureProjectAsync($"AFL{suffix}");
+        var subsystemId = await _fixture.EnsureSubsystemAsync($"SFL{suffix}", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, otherOwnerId);
+
+        var matchingRecordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", $"Export filtered match {suffix}");
+        var finalRecordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", $"Export filtered final {suffix}");
+        var otherOwnerRecordId = await _fixture.EnsureRecordAsync(projectId, otherOwnerId, subsystemId, "U", $"Export filtered other owner {suffix}");
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var activeStateId = await dbContext.CiselnikStavuUkolu
+                .Where(x => !x.IsFinal)
+                .OrderBy(x => x.Id)
+                .Select(x => x.Id)
+                .FirstAsync();
+            var finalStateId = await dbContext.CiselnikStavuUkolu
+                .Where(x => x.IsFinal)
+                .OrderBy(x => x.Id)
+                .Select(x => x.Id)
+                .FirstAsync();
+
+            var matchingRecord = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == matchingRecordId);
+            matchingRecord.StavUkoluId = activeStateId;
+
+            var finalRecord = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == finalRecordId);
+            finalRecord.StavUkoluId = finalStateId;
+
+            var otherOwnerRecord = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == otherOwnerRecordId);
+            otherOwnerRecord.StavUkoluId = activeStateId;
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Export/Projekt/{projectId}/Tisk?useCurrentFilters=true&aktivni=true&vlastnik={ownerId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+        var decodedHtml = WebUtility.HtmlDecode(html);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        decodedHtml.Should().Contain("Tisk projektu s použitím aktivních filtrů.");
+        decodedHtml.Should().Contain("Pouze aktivní úkoly");
+        decodedHtml.Should().Contain("Vlastník:");
+        decodedHtml.Should().Contain($"Export filtered match {suffix}");
+        decodedHtml.Should().NotContain($"Export filtered final {suffix}");
+        decodedHtml.Should().NotContain($"Export filtered other owner {suffix}");
+    }
+
+    [Fact]
+    public async Task ProjektTisk_ShouldIgnoreFilterParameters_WhenUseCurrentFiltersIsFalse()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        var ownerId = await _fixture.EnsurePersonAsync($"ApiExportNoFilterOwner{suffix}");
+        var projectId = await _fixture.EnsureProjectAsync($"ANF{suffix}");
+        var subsystemId = await _fixture.EnsureSubsystemAsync($"SNF{suffix}", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+
+        var activeRecordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", $"Export no-filter active {suffix}");
+        var finalRecordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", $"Export no-filter final {suffix}");
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var activeStateId = await dbContext.CiselnikStavuUkolu
+                .Where(x => !x.IsFinal)
+                .OrderBy(x => x.Id)
+                .Select(x => x.Id)
+                .FirstAsync();
+            var finalStateId = await dbContext.CiselnikStavuUkolu
+                .Where(x => x.IsFinal)
+                .OrderBy(x => x.Id)
+                .Select(x => x.Id)
+                .FirstAsync();
+
+            var activeRecord = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == activeRecordId);
+            activeRecord.StavUkoluId = activeStateId;
+
+            var finalRecord = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == finalRecordId);
+            finalRecord.StavUkoluId = finalStateId;
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Export/Projekt/{projectId}/Tisk?useCurrentFilters=false&aktivni=true&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+        var decodedHtml = WebUtility.HtmlDecode(html);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        decodedHtml.Should().Contain("Tisk kompletního projektu bez filtru.");
+        decodedHtml.Should().Contain("Bez omezení");
+        decodedHtml.Should().Contain($"Export no-filter active {suffix}");
+        decodedHtml.Should().Contain($"Export no-filter final {suffix}");
     }
 
     [Fact]

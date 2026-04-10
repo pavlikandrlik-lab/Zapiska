@@ -37,7 +37,14 @@ public sealed class CommentService(
         await EnsureMeetingAllowsCommentChangesAsync(meeting, ct);
 
         var subsystemLeadEquivalentOsobaIds = await ResolveLeadEquivalentOsobaIdsAsync(record.ProjektId, record.SubsystemId, ct);
-        var canAdd = commentAuthorizationPolicy.CanAddComment(currentUser, record.ProjektId, subsystemLeadEquivalentOsobaIds);
+        var meetingState = await dbContext.CiselnikStavuJednani
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
+        var canAdd = commentAuthorizationPolicy.CanAddComment(
+            currentUser,
+            record.ProjektId,
+            subsystemLeadEquivalentOsobaIds,
+            IsDraftMeeting(meetingState));
         if (!canAdd)
         {
             throw new InvalidOperationException("Nemáte oprávnění přidat vyjádření k tomuto záznamu.");
@@ -87,7 +94,10 @@ public sealed class CommentService(
 
         await EnsureMeetingAllowsCommentChangesAsync(meeting, ct);
 
-        if (!await CanModifyCommentAsync(comment, record, currentUser, ct))
+        var meetingState = await dbContext.CiselnikStavuJednani
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
+        if (!await CanModifyCommentAsync(comment, record, meetingState, currentUser, ct))
         {
             throw new InvalidOperationException("Nemáte oprávnění upravit toto vyjádření.");
         }
@@ -128,7 +138,10 @@ public sealed class CommentService(
 
         await EnsureMeetingAllowsCommentChangesAsync(meeting, ct);
 
-        if (!await CanModifyCommentAsync(comment, record, currentUser, ct))
+        var meetingState = await dbContext.CiselnikStavuJednani
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
+        if (!await CanModifyCommentAsync(comment, record, meetingState, currentUser, ct))
         {
             throw new InvalidOperationException("Nemáte oprávnění smazat toto vyjádření.");
         }
@@ -168,6 +181,10 @@ public sealed class CommentService(
             .FirstOrDefaultAsync(x => x.Id == meetingId, ct)
             ?? throw new InvalidOperationException($"Jednání {meetingId} neexistuje.");
         await EnsureMeetingAllowsCommentChangesAsync(meeting, ct);
+        var meetingState = await dbContext.CiselnikStavuJednani
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
+        var isDraftMeeting = IsDraftMeeting(meetingState);
 
         var recordIds = normalizedRows.Select(x => x.ZaznamId).Distinct().ToList();
         var recordsById = await dbContext.ProjektoveZaznamy.AsNoTracking()
@@ -186,7 +203,7 @@ public sealed class CommentService(
 
             var normalizedText = NormalizeCommentText(row.Text);
             var subsystemLeadEquivalentOsobaIds = leadEquivalentOsobaIdsBySubsystem.GetValueOrDefault(record.SubsystemId, []);
-            if (!commentAuthorizationPolicy.CanAddComment(currentUser, record.ProjektId, subsystemLeadEquivalentOsobaIds))
+            if (!commentAuthorizationPolicy.CanAddComment(currentUser, record.ProjektId, subsystemLeadEquivalentOsobaIds, isDraftMeeting))
             {
                 throw new InvalidOperationException("Nemáte oprávnění přidat vyjádření k tomuto záznamu.");
             }
@@ -238,6 +255,7 @@ public sealed class CommentService(
     private async Task<bool> CanModifyCommentAsync(
         VyjadreniEntity comment,
         ProjektovyZaznamEntity record,
+        CiselnikStavuJednaniEntity? meetingState,
         CurrentUserContextViewModel currentUser,
         CancellationToken ct)
     {
@@ -246,7 +264,8 @@ public sealed class CommentService(
             currentUser,
             record.ProjektId,
             subsystemLeadEquivalentOsobaIds,
-            comment.AutorOsobaId);
+            comment.AutorOsobaId,
+            IsDraftMeeting(meetingState));
     }
 
     private async Task EnsureMeetingAllowsCommentChangesAsync(JednaniEntity meeting, CancellationToken ct)
@@ -260,6 +279,9 @@ public sealed class CommentService(
             throw new InvalidOperationException("Vyjádření u uzavřeného jednání nelze upravovat ani mazat. Nejprve jednání otevřete.");
         }
     }
+
+    private static bool IsDraftMeeting(CiselnikStavuJednaniEntity? status)
+        => string.Equals(status?.Kod, "DRAFT", StringComparison.OrdinalIgnoreCase);
 
     private async Task<List<int>> ResolveLeadEquivalentOsobaIdsAsync(int projectId, int subsystemId, CancellationToken ct)
     {

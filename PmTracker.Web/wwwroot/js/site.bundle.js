@@ -458,11 +458,78 @@ var projectFilterConfigs = {
     ]
   }
 };
+var projectPrintRelevantRecordStateKeys = [
+  "subsystem",
+  "kategorie",
+  "stav",
+  "typ",
+  "vlastnik",
+  "aktivni",
+  "mine",
+  "jednaniVyjadreniStav"
+];
+function normalizeFilterText(value) {
+  if (!value) {
+    return "";
+  }
+  return value.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
 function normalizeFilterToken(value) {
   if (value === null || value === undefined) {
     return "";
   }
   return String(value).trim().toUpperCase();
+}
+function buildProjectPrintFilterSnapshot() {
+  const state = buildProjectFilterStateFromInputs2("records");
+  const snapshot = {
+    subsystem: typeof state.subsystem === "string" ? state.subsystem.trim() : "",
+    kategorie: typeof state.kategorie === "string" ? state.kategorie.trim() : "",
+    stav: typeof state.stav === "string" ? state.stav.trim() : "",
+    typ: typeof state.typ === "string" ? state.typ.trim() : "",
+    vlastnik: typeof state.vlastnik === "string" ? state.vlastnik.trim() : "",
+    aktivni: Boolean(state.aktivni),
+    mine: Boolean(state.mine),
+    jednaniVyjadreniStav: typeof state.jednaniVyjadreniStav === "string" ? state.jednaniVyjadreniStav.trim() : ""
+  };
+  return {
+    ...snapshot,
+    hasRelevantFilters: projectPrintRelevantRecordStateKeys.some((key) => Boolean(snapshot[key]))
+  };
+}
+function buildProjectPrintFilterQueryParams(useCurrentFilters) {
+  const snapshot = buildProjectPrintFilterSnapshot();
+  const params = new URLSearchParams;
+  if (!useCurrentFilters) {
+    params.set("useCurrentFilters", "false");
+    return { snapshot, params };
+  }
+  params.set("useCurrentFilters", "true");
+  if (snapshot.subsystem) {
+    params.set("subsystem", snapshot.subsystem);
+  }
+  if (snapshot.kategorie) {
+    params.set("kategorie", snapshot.kategorie);
+  }
+  if (snapshot.stav) {
+    params.set("stav", snapshot.stav);
+  }
+  if (snapshot.typ) {
+    params.set("typ", snapshot.typ);
+  }
+  if (snapshot.vlastnik) {
+    params.set("vlastnik", snapshot.vlastnik);
+  }
+  if (snapshot.aktivni) {
+    params.set("aktivni", "true");
+  }
+  if (snapshot.mine) {
+    params.set("mine", "true");
+  }
+  if (snapshot.jednaniVyjadreniStav) {
+    params.set("jednaniVyjadreniStav", snapshot.jednaniVyjadreniStav);
+  }
+  return { snapshot, params };
 }
 function getProjectFilterRoot(scope) {
   const config = getProjectFilterConfig(scope);
@@ -1077,6 +1144,111 @@ function invalidateRecordMeetingCommentStates(projectId) {
   recordMeetingCommentStateRequests.delete(normalizedProjectId);
 }
 
+// PmTracker.Web/wwwroot/js/modules/meetingOverview.js
+var FIRST_ROW_TOLERANCE_PX = 2;
+function getMeetingYearGroups(scope) {
+  return Array.from(scope.querySelectorAll("[data-meeting-year-group]")).filter((group) => group instanceof HTMLElement);
+}
+function getMeetingCardSlots(scope) {
+  return Array.from(scope.querySelectorAll("[data-meeting-card-wrap]")).filter((slot) => slot instanceof HTMLElement);
+}
+function getMeetingId(slot) {
+  if (!(slot instanceof HTMLElement)) {
+    return "";
+  }
+  return slot.dataset.meetingId || "";
+}
+function getFirstVisualRowSlots(grid) {
+  const slots = getMeetingCardSlots(grid).filter((slot) => !slot.hidden);
+  if (slots.length === 0) {
+    return [];
+  }
+  const firstTop = Math.min(...slots.map((slot) => slot.offsetTop));
+  return slots.filter((slot) => Math.abs(slot.offsetTop - firstTop) <= FIRST_ROW_TOLERANCE_PX);
+}
+function formatMeetingCount(count) {
+  return `${count} jednání`;
+}
+function updateMeetingYearCount(group, visibleCount) {
+  const count = group.querySelector("[data-meeting-year-count]");
+  if (!(count instanceof HTMLElement)) {
+    return;
+  }
+  count.textContent = formatMeetingCount(visibleCount);
+}
+function clearPreviewHiddenSlots(scope) {
+  getMeetingCardSlots(scope).forEach((slot) => {
+    if (slot.dataset.meetingPreviewHidden !== "true") {
+      return;
+    }
+    slot.hidden = false;
+    delete slot.dataset.meetingPreviewHidden;
+  });
+}
+function countMeetingSlots(group) {
+  return getMeetingCardSlots(group).length;
+}
+function applyMeetingYearState(group) {
+  if (!(group instanceof HTMLElement)) {
+    return;
+  }
+  const body = group.querySelector("[data-meeting-year-body]");
+  const grid = group.querySelector("[data-meeting-year-grid]");
+  const toggle = group.querySelector("[data-meeting-year-toggle]");
+  if (!(body instanceof HTMLElement) || !(grid instanceof HTMLElement) || !(toggle instanceof HTMLElement)) {
+    return;
+  }
+  const state = group.dataset.meetingYearState || "collapsed";
+  clearPreviewHiddenSlots(group);
+  if (state === "collapsed") {
+    body.hidden = true;
+    body.classList.remove("is-preview");
+    body.style.removeProperty("max-height");
+    toggle.setAttribute("aria-expanded", "false");
+    return;
+  }
+  body.hidden = false;
+  toggle.setAttribute("aria-expanded", "true");
+  if (state !== "preview") {
+    body.classList.remove("is-preview");
+    body.style.removeProperty("max-height");
+    return;
+  }
+  body.classList.add("is-preview");
+  body.style.removeProperty("max-height");
+  const firstRowSlots = getFirstVisualRowSlots(grid);
+  const firstRowIds = new Set(firstRowSlots.map(getMeetingId).filter(Boolean));
+  getMeetingCardSlots(grid).forEach((slot) => {
+    const meetingId = getMeetingId(slot);
+    if (!meetingId || firstRowIds.has(meetingId)) {
+      return;
+    }
+    slot.hidden = true;
+    slot.dataset.meetingPreviewHidden = "true";
+  });
+}
+function syncYearGroupedMeetingOverview(root) {
+  getMeetingYearGroups(root).forEach((group) => {
+    updateMeetingYearCount(group, countMeetingSlots(group));
+    applyMeetingYearState(group);
+  });
+}
+function initMeetingOverview(scope = document) {
+  const roots = Array.from(scope.querySelectorAll("[data-meeting-overview]")).filter((root) => root instanceof HTMLElement);
+  roots.forEach((root) => {
+    syncYearGroupedMeetingOverview(root);
+  });
+}
+function toggleMeetingYearGroup(toggle) {
+  const group = toggle instanceof HTMLElement ? toggle.closest("[data-meeting-year-group]") : null;
+  if (!(group instanceof HTMLElement)) {
+    return;
+  }
+  const currentState = group.dataset.meetingYearState || "collapsed";
+  group.dataset.meetingYearState = currentState === "preview" ? "open" : currentState === "open" ? "collapsed" : "open";
+  applyMeetingYearState(group);
+}
+
 // PmTracker.Web/wwwroot/js/modules/utils.js
 var msPerDay = 24 * 60 * 60 * 1000;
 var dateMonths = [
@@ -1093,7 +1265,7 @@ var dateMonths = [
   "Listopad",
   "Prosinec"
 ];
-function normalizeFilterText(value) {
+function normalizeFilterText2(value) {
   if (!value) {
     return "";
   }
@@ -1106,7 +1278,7 @@ function normalizeFilterToken2(value) {
   return String(value).trim().toUpperCase();
 }
 function normalizeSearchText2(value) {
-  return normalizeFilterText(value);
+  return normalizeFilterText2(value);
 }
 function containsWordPrefix(text, token) {
   if (!text || !token) {
@@ -1513,14 +1685,39 @@ function closePrintChooser(options) {
     trigger.focus({ preventScroll: true });
   }
 }
-function resolvePrintUrl(trigger, format) {
+function resolvePrintUrl(trigger, format, options) {
+  const settings = options || {};
   if (!(trigger instanceof Element)) {
     return "";
   }
   if (format === "word") {
+    if (typeof settings.wordUrlOverride === "string" && settings.wordUrlOverride) {
+      return settings.wordUrlOverride;
+    }
     return trigger.getAttribute("data-print-word-url") || "";
   }
+  if (typeof settings.pdfUrlOverride === "string" && settings.pdfUrlOverride) {
+    return settings.pdfUrlOverride;
+  }
   return trigger.getAttribute("data-print-pdf-url") || trigger.getAttribute("href") || "";
+}
+function isProjectPrintTrigger(trigger) {
+  return trigger instanceof HTMLElement && trigger.dataset.projectPrintTrigger === "true";
+}
+function shouldPromptForProjectPrintFilters(trigger) {
+  return isProjectPrintTrigger(trigger) && buildProjectPrintFilterSnapshot().hasRelevantFilters;
+}
+function buildProjectPrintUrl(trigger, format, useCurrentFilters) {
+  const baseUrl = resolvePrintUrl(trigger, format);
+  if (!baseUrl) {
+    return "";
+  }
+  const url = new URL(baseUrl, window.location.origin);
+  const { params } = buildProjectPrintFilterQueryParams(useCurrentFilters);
+  params.forEach((value, key) => {
+    url.searchParams.set(key, value);
+  });
+  return url.toString();
 }
 function openPrintUrl(url) {
   if (!url) {
@@ -1560,8 +1757,8 @@ function positionPrintChooser(popover, trigger) {
   popover.style.left = `${Math.round(left)}px`;
   popover.style.top = `${Math.round(top)}px`;
 }
-function handlePrintChoice(trigger, format, shouldRemember) {
-  const url = resolvePrintUrl(trigger, format);
+function handlePrintChoice(trigger, format, shouldRemember, options) {
+  const url = resolvePrintUrl(trigger, format, options);
   if (!url) {
     return;
   }
@@ -1569,6 +1766,83 @@ function handlePrintChoice(trigger, format, shouldRemember) {
     setStoredPrintFormat(format);
   }
   openPrintUrl(url);
+}
+function handleProjectPrintScopeChoice(trigger, useCurrentFilters) {
+  const preferredFormat = getStoredPrintFormat();
+  if (preferredFormat) {
+    const preferredUrl = buildProjectPrintUrl(trigger, preferredFormat, useCurrentFilters);
+    if (preferredUrl) {
+      closePrintChooser({ restoreFocus: false });
+      openPrintUrl(preferredUrl);
+      return;
+    }
+  }
+  showPrintChooser(trigger, {
+    quickMode: false,
+    pdfUrlOverride: buildProjectPrintUrl(trigger, "pdf", useCurrentFilters),
+    wordUrlOverride: buildProjectPrintUrl(trigger, "word", useCurrentFilters)
+  });
+}
+function createProjectPrintScopeChooser(trigger) {
+  const label = trigger.getAttribute("data-print-label") || "Tisk projektu";
+  const popover = document.createElement("div");
+  popover.className = "print-format-popover";
+  popover.setAttribute("role", "dialog");
+  popover.setAttribute("aria-modal", "false");
+  popover.setAttribute("data-print-popover", "true");
+  popover.setAttribute("tabindex", "-1");
+  const title = document.createElement("h3");
+  title.className = "print-format-title";
+  title.textContent = "Použít aktuální filtry?";
+  popover.appendChild(title);
+  const subtitle = document.createElement("p");
+  subtitle.className = "print-format-subtitle";
+  subtitle.textContent = label;
+  popover.appendChild(subtitle);
+  const actions = document.createElement("div");
+  actions.className = "print-format-actions";
+  const filteredButton = document.createElement("button");
+  filteredButton.type = "button";
+  filteredButton.className = "btn small";
+  filteredButton.textContent = "Použít aktuální filtry";
+  filteredButton.setAttribute("data-print-filter-scope", "current");
+  actions.appendChild(filteredButton);
+  const fullProjectButton = document.createElement("button");
+  fullProjectButton.type = "button";
+  fullProjectButton.className = "btn small ghost";
+  fullProjectButton.textContent = "Tisknout celý projekt";
+  fullProjectButton.setAttribute("data-print-filter-scope", "all");
+  actions.appendChild(fullProjectButton);
+  popover.appendChild(actions);
+  const note = document.createElement("p");
+  note.className = "print-format-note";
+  note.textContent = "Volba se použije jen pro tento tisk a neukládá se.";
+  popover.appendChild(note);
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "print-format-close";
+  closeButton.setAttribute("aria-label", "Zavřít výběr filtru pro tisk projektu");
+  closeButton.textContent = "×";
+  popover.appendChild(closeButton);
+  popover.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    if (target.closest(".print-format-close")) {
+      event.preventDefault();
+      closePrintChooser({ restoreFocus: true });
+      return;
+    }
+    const choice = target.closest("[data-print-filter-scope]");
+    if (!choice) {
+      return;
+    }
+    event.preventDefault();
+    const scope = choice.getAttribute("data-print-filter-scope");
+    handleProjectPrintScopeChoice(trigger, scope === "current");
+  });
+  return popover;
 }
 function createPrintChooser(trigger, options) {
   const settings = options || {};
@@ -1642,7 +1916,7 @@ function createPrintChooser(trigger, options) {
     }
     const remember = rememberCheckbox.checked;
     closePrintChooser({ restoreFocus: false });
-    handlePrintChoice(trigger, format, remember);
+    handlePrintChoice(trigger, format, remember, settings);
   });
   return popover;
 }
@@ -1656,7 +1930,24 @@ function showPrintChooser(trigger, options) {
   positionPrintChooser(popover, trigger);
   printState.popover = popover;
   printState.trigger = trigger;
-  const firstAction = popover.querySelector("[data-print-choice]");
+  const firstAction = popover.querySelector("[data-print-choice], [data-print-filter-scope]");
+  if (firstAction instanceof HTMLElement) {
+    firstAction.focus({ preventScroll: true });
+  } else {
+    popover.focus({ preventScroll: true });
+  }
+}
+function showProjectPrintScopeChooser(trigger) {
+  if (!(trigger instanceof HTMLElement)) {
+    return;
+  }
+  closePrintChooser({ restoreFocus: false });
+  const popover = createProjectPrintScopeChooser(trigger);
+  document.body.appendChild(popover);
+  positionPrintChooser(popover, trigger);
+  printState.popover = popover;
+  printState.trigger = trigger;
+  const firstAction = popover.querySelector("[data-print-filter-scope]");
   if (firstAction instanceof HTMLElement) {
     firstAction.focus({ preventScroll: true });
   } else {
@@ -1668,6 +1959,10 @@ function handlePrintTriggerClick(trigger) {
     return;
   }
   clearPrintHoverTimer();
+  if (shouldPromptForProjectPrintFilters(trigger)) {
+    showProjectPrintScopeChooser(trigger);
+    return;
+  }
   const preferredFormat = getStoredPrintFormat();
   if (preferredFormat) {
     const preferredUrl = resolvePrintUrl(trigger, preferredFormat);
@@ -1694,6 +1989,9 @@ function initPrintFormatChooser() {
       return;
     }
     if (event instanceof PointerEvent && event.pointerType !== "mouse") {
+      return;
+    }
+    if (shouldPromptForProjectPrintFilters(trigger)) {
       return;
     }
     if (!getStoredPrintFormat()) {
@@ -2046,40 +2344,51 @@ function isInteractionInsideFloatingControl(target, anchor, panel) {
 }
 
 // PmTracker.Web/wwwroot/js/modules/schedule.js
+function syncScheduleExpandButton(button, details) {
+  if (!(button instanceof HTMLButtonElement) || !(details instanceof HTMLElement)) {
+    return;
+  }
+  const expanded = !details.hidden;
+  button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
+  button.setAttribute("aria-expanded", String(expanded));
+}
+function toggleScheduleBreakdown(toggleOrTarget) {
+  const button = toggleOrTarget instanceof HTMLButtonElement ? toggleOrTarget : toggleOrTarget instanceof Element ? toggleOrTarget.closest("[data-schedule-expand-toggle]") : null;
+  if (!(button instanceof HTMLButtonElement)) {
+    return false;
+  }
+  const owningCard = button.closest("[data-schedule-item]");
+  if (!(owningCard instanceof HTMLElement)) {
+    return false;
+  }
+  const details = owningCard.querySelector("[data-schedule-steps]");
+  if (!(details instanceof HTMLElement)) {
+    return false;
+  }
+  const expanded = details.hidden;
+  details.hidden = !expanded;
+  syncScheduleExpandButton(button, details);
+  if (expanded) {
+    renderStaticTimelineAxes(details);
+    queueRainbowSegmentRender(details);
+    window.requestAnimationFrame(() => {
+      renderStaticTimelineAxes(details);
+      queueRainbowSegmentRender(details);
+    });
+  }
+  return true;
+}
 function initScheduleExpandUi(scope) {
   const root = scope instanceof Element ? scope : document;
   root.querySelectorAll("[data-schedule-expand-toggle]").forEach((button) => {
-    if (!(button instanceof HTMLButtonElement) || button.dataset.scheduleExpandReady === "true") {
+    if (!(button instanceof HTMLButtonElement)) {
       return;
     }
     const card = button.closest("[data-schedule-item]");
     const details = card instanceof HTMLElement ? card.querySelector("[data-schedule-steps]") : null;
     if (details instanceof HTMLElement) {
-      button.setAttribute("aria-expanded", String(!details.hidden));
+      syncScheduleExpandButton(button, details);
     }
-    button.dataset.scheduleExpandReady = "true";
-    button.addEventListener("click", () => {
-      const owningCard = button.closest("[data-schedule-item]");
-      if (!(owningCard instanceof HTMLElement)) {
-        return;
-      }
-      const details2 = owningCard.querySelector("[data-schedule-steps]");
-      if (!(details2 instanceof HTMLElement)) {
-        return;
-      }
-      const expanded = details2.hidden;
-      details2.hidden = !expanded;
-      button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
-      button.setAttribute("aria-expanded", String(expanded));
-      if (expanded) {
-        renderStaticTimelineAxes(details2);
-        queueRainbowSegmentRender(details2);
-        window.requestAnimationFrame(() => {
-          renderStaticTimelineAxes(details2);
-          queueRainbowSegmentRender(details2);
-        });
-      }
-    });
   });
 }
 function setScheduleFilterPanelOpen(open) {
@@ -3025,6 +3334,233 @@ function initProjectScheduleUi() {
   initScheduleExpandUi(schedulePanel);
 }
 
+// PmTracker.Web/wwwroot/js/modules/tableTools.js
+function parseCzechDateTime(value) {
+  const text = (value || "").trim();
+  if (!text || text === "-") {
+    return null;
+  }
+  const match = text.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}))?$/);
+  if (!match) {
+    return null;
+  }
+  const [, dayText, monthText, yearText, hourText, minuteText] = match;
+  const day = Number.parseInt(dayText, 10);
+  const month = Number.parseInt(monthText, 10) - 1;
+  const year = Number.parseInt(yearText, 10);
+  const hour = Number.parseInt(hourText || "0", 10);
+  const minute = Number.parseInt(minuteText || "0", 10);
+  const valueDate = new Date(year, month, day, hour, minute, 0, 0);
+  return Number.isNaN(valueDate.getTime()) ? null : valueDate.getTime();
+}
+function parseBooleanValue(value) {
+  const normalized = normalizeFilterText(value);
+  if (!normalized || normalized === "-") {
+    return null;
+  }
+  if (["ano", "true", "1", "yes"].includes(normalized)) {
+    return 1;
+  }
+  if (["ne", "false", "0", "no"].includes(normalized)) {
+    return 0;
+  }
+  return null;
+}
+function parseComparableValue(rawValue, type) {
+  if (type === "datetime") {
+    return parseCzechDateTime(rawValue);
+  }
+  if (type === "boolean") {
+    return parseBooleanValue(rawValue);
+  }
+  if (type === "number") {
+    const normalized = (rawValue || "").trim().replace(/\s+/g, "").replace(",", ".");
+    if (!normalized || normalized === "-") {
+      return null;
+    }
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return normalizeFilterText(rawValue);
+}
+function resolveCellValue(row, columnIndex) {
+  const cells = Array.from(row.children).filter((cell2) => cell2 instanceof HTMLTableCellElement);
+  const cell = cells[columnIndex];
+  if (!(cell instanceof HTMLTableCellElement)) {
+    return "";
+  }
+  return (cell.dataset.tableSortValue || cell.textContent || "").trim();
+}
+function buildSearchText(row) {
+  const explicit = (row.dataset.tableSearchText || "").trim();
+  if (explicit) {
+    return normalizeFilterText(explicit);
+  }
+  const text = Array.from(row.children).filter((cell) => cell instanceof HTMLTableCellElement && !cell.classList.contains("table-actions")).map((cell) => cell.textContent || "").join(" ");
+  return normalizeFilterText(text);
+}
+function ensureEmptyRow(table) {
+  const tbody = table.tBodies[0];
+  if (!(tbody instanceof HTMLTableSectionElement)) {
+    return null;
+  }
+  const existing = tbody.querySelector("[data-table-empty-row]");
+  if (existing instanceof HTMLTableRowElement) {
+    return existing;
+  }
+  const headerCells = table.tHead?.rows[0]?.cells;
+  const colspan = headerCells?.length || 1;
+  const message = (table.dataset.tableEmptyMessage || "Žádné výsledky.").trim();
+  const row = document.createElement("tr");
+  row.setAttribute("data-table-empty-row", "");
+  row.hidden = true;
+  const cell = document.createElement("td");
+  cell.colSpan = colspan;
+  cell.className = "table-empty-row";
+  cell.textContent = message;
+  row.appendChild(cell);
+  tbody.appendChild(row);
+  return row;
+}
+function getDataRows(table) {
+  return Array.from(table.tBodies[0]?.querySelectorAll("tr[data-table-row]") || []).filter((row) => row instanceof HTMLTableRowElement);
+}
+function updateSortIndicators(table) {
+  const activeIndex = table.dataset.tableSortIndex || "";
+  const direction = table.dataset.tableSortDirection === "desc" ? "desc" : "asc";
+  table.querySelectorAll("[data-table-sort-button]").forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    const sortIndex = button.dataset.tableSortIndex || "";
+    const isActive = sortIndex === activeIndex;
+    button.dataset.tableSortDirection = isActive ? direction : "";
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-sort", isActive ? direction === "desc" ? "descending" : "ascending" : "none");
+  });
+}
+function compareRows(left, right, columnIndex, type, direction) {
+  const leftValue = parseComparableValue(resolveCellValue(left, columnIndex), type);
+  const rightValue = parseComparableValue(resolveCellValue(right, columnIndex), type);
+  if (leftValue === null && rightValue === null) {
+    return 0;
+  }
+  if (leftValue === null) {
+    return 1;
+  }
+  if (rightValue === null) {
+    return -1;
+  }
+  if (leftValue < rightValue) {
+    return direction === "desc" ? 1 : -1;
+  }
+  if (leftValue > rightValue) {
+    return direction === "desc" ? -1 : 1;
+  }
+  return 0;
+}
+function sortTableRows(table) {
+  const sortIndexText = table.dataset.tableSortIndex || "";
+  if (!sortIndexText) {
+    return;
+  }
+  const sortIndex = Number.parseInt(sortIndexText, 10);
+  if (!Number.isInteger(sortIndex) || sortIndex < 0) {
+    return;
+  }
+  const button = table.querySelector(`[data-table-sort-button][data-table-sort-index="${sortIndex}"]`);
+  const sortType = button instanceof HTMLButtonElement ? button.dataset.tableSortType || "text" : "text";
+  const direction = table.dataset.tableSortDirection === "desc" ? "desc" : "asc";
+  const rows = getDataRows(table);
+  const sorted = rows.map((row, index) => ({ row, index })).sort((left, right) => {
+    const result = compareRows(left.row, right.row, sortIndex, sortType, direction);
+    return result !== 0 ? result : left.index - right.index;
+  });
+  const tbody = table.tBodies[0];
+  if (!(tbody instanceof HTMLTableSectionElement)) {
+    return;
+  }
+  const emptyRow = ensureEmptyRow(table);
+  sorted.forEach((entry) => tbody.appendChild(entry.row));
+  if (emptyRow instanceof HTMLTableRowElement) {
+    tbody.appendChild(emptyRow);
+  }
+}
+function filterTableRows(root, table) {
+  const query = normalizeFilterText(root.querySelector("[data-table-tools-search-input]") instanceof HTMLInputElement ? root.querySelector("[data-table-tools-search-input]").value : "");
+  const rows = getDataRows(table);
+  let visibleCount = 0;
+  rows.forEach((row) => {
+    const matches = !query || buildSearchText(row).includes(query);
+    row.hidden = !matches;
+    if (matches) {
+      visibleCount += 1;
+    }
+  });
+  const emptyRow = ensureEmptyRow(table);
+  if (emptyRow instanceof HTMLTableRowElement) {
+    emptyRow.hidden = visibleCount > 0;
+  }
+}
+function applyTableState(root, table) {
+  sortTableRows(table);
+  filterTableRows(root, table);
+  updateSortIndicators(table);
+}
+function handleSortButtonClick(root, button) {
+  const table = button.closest("[data-table-tools-table]");
+  if (!(table instanceof HTMLTableElement)) {
+    return;
+  }
+  const requestedIndex = button.dataset.tableSortIndex || "";
+  const currentIndex = table.dataset.tableSortIndex || "";
+  const currentDirection = table.dataset.tableSortDirection === "desc" ? "desc" : "asc";
+  const nextDirection = currentIndex === requestedIndex && currentDirection === "asc" ? "desc" : "asc";
+  table.dataset.tableSortIndex = requestedIndex;
+  table.dataset.tableSortDirection = nextDirection;
+  applyTableState(root, table);
+}
+function initTable(root) {
+  if (!(root instanceof HTMLElement) || root.dataset.tableToolsReady === "true") {
+    return;
+  }
+  root.dataset.tableToolsReady = "true";
+  const tables = Array.from(root.querySelectorAll("[data-table-tools-table]")).filter((table) => table instanceof HTMLTableElement);
+  if (tables.length === 0) {
+    return;
+  }
+  const searchInput = root.querySelector("[data-table-tools-search-input]");
+  if (searchInput instanceof HTMLInputElement) {
+    searchInput.addEventListener("input", () => {
+      tables.forEach((table) => applyTableState(root, table));
+    });
+  }
+  root.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target.closest("[data-table-sort-button]") : null;
+    if (!(target instanceof HTMLButtonElement)) {
+      return;
+    }
+    event.preventDefault();
+    handleSortButtonClick(root, target);
+  });
+  tables.forEach((table) => {
+    const defaultButton = table.querySelector("[data-table-sort-button][data-table-sort-default='true']");
+    if (defaultButton instanceof HTMLButtonElement) {
+      table.dataset.tableSortIndex = defaultButton.dataset.tableSortIndex || "";
+      table.dataset.tableSortDirection = defaultButton.dataset.tableSortDefaultDirection === "desc" ? "desc" : "asc";
+    }
+    applyTableState(root, table);
+  });
+}
+function initTableTools(scope = document) {
+  const roots = scope instanceof HTMLElement ? scope.matches("[data-table-tools-root]") ? [scope] : Array.from(scope.querySelectorAll("[data-table-tools-root]")) : Array.from(document.querySelectorAll("[data-table-tools-root]"));
+  roots.forEach((root) => {
+    if (root instanceof HTMLElement) {
+      initTable(root);
+    }
+  });
+}
+
 // PmTracker.Web/wwwroot/js/modules/projectTabs.js
 var projectTabStorageKey = "pmtracker.tab.active";
 var projectRecordFilterPanelStorageKey2 = "pmtracker.filters.open";
@@ -3058,6 +3594,8 @@ class ProjectNavigationController {
     if (activePanel instanceof HTMLElement) {
       if (normalizedTabName === "harmonogram") {
         this.options.renderStaticTimelineAxes?.(activePanel);
+      } else if (normalizedTabName === "jednani") {
+        initMeetingOverview(activePanel);
       }
       this.options.queueRainbowSegmentRender?.(activePanel);
     }
@@ -3216,6 +3754,8 @@ async function loadProjectTabPanel(tabNameOrPanel, options = {}) {
         initProjectScheduleUi();
         renderStaticTimelineAxes(currentPanel);
       }
+      initTableTools(currentPanel);
+      initMeetingOverview(currentPanel);
       queueRainbowSegmentRender(currentPanel);
       scheduleSubsystemIndicatorSync();
     }
@@ -3791,6 +4331,7 @@ async function refreshPageScope(payload) {
       initProjectTabs();
       initProjectRecordsUi();
       initProjectScheduleUi();
+      initMeetingOverview(document);
       initCommentSortUi(document);
       if (preserveRecordUi) {
         await restoreRecordUiState(recordUiState);
@@ -7886,9 +8427,41 @@ function initModalAjaxSubmit() {
 
 // PmTracker.Web/wwwroot/js/modules/theme.js
 var themeStorageKey = "pmtracker.theme.mode";
+var themeSwitchSelector = "gov-theme-switch";
 var mediaDark = window.matchMedia("(prefers-color-scheme: dark)");
+var themeCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
+function isThemeMode(value) {
+  return value === "dark" || value === "light" || value === "auto";
+}
 function getStoredThemeMode() {
-  return localStorage.getItem(themeStorageKey);
+  const cookieValue = getThemeCookieMode();
+  if (isThemeMode(cookieValue)) {
+    return cookieValue;
+  }
+  try {
+    const storedValue = localStorage.getItem(themeStorageKey);
+    return isThemeMode(storedValue) ? storedValue : null;
+  } catch {
+    return null;
+  }
+}
+function getThemeCookieMode() {
+  const cookies = document.cookie.split(";");
+  for (const entry of cookies) {
+    const [rawName, rawValue = ""] = entry.split("=");
+    if (rawName.trim() !== themeStorageKey) {
+      continue;
+    }
+    const value = decodeURIComponent(rawValue.trim());
+    return isThemeMode(value) ? value : null;
+  }
+  return null;
+}
+function persistThemeMode(mode) {
+  try {
+    localStorage.setItem(themeStorageKey, mode);
+  } catch {}
+  document.cookie = `${themeStorageKey}=${encodeURIComponent(mode)}; Path=/; Max-Age=${themeCookieMaxAgeSeconds}; SameSite=Lax`;
 }
 function resolveEffectiveTheme(mode) {
   if (mode === "dark" || mode === "light") {
@@ -7897,21 +8470,93 @@ function resolveEffectiveTheme(mode) {
   return mediaDark.matches ? "dark" : "light";
 }
 function setTheme(mode, persist) {
-  const normalized = mode === "dark" || mode === "light" || mode === "auto" ? mode : "auto";
+  const normalized = isThemeMode(mode) ? mode : "auto";
   const effective = resolveEffectiveTheme(normalized);
   document.documentElement.setAttribute("data-theme", effective);
   document.documentElement.setAttribute("data-theme-mode", normalized);
   if (persist) {
-    localStorage.setItem(themeStorageKey, normalized);
+    persistThemeMode(normalized);
   }
-  document.querySelectorAll("[data-theme-switch]").forEach((element) => {
-    if (element instanceof HTMLInputElement) {
-      element.checked = effective === "dark";
+  syncThemeSwitches(effective);
+}
+function syncThemeSwitches(effectiveTheme) {
+  document.querySelectorAll(themeSwitchSelector).forEach((element) => {
+    if (!(element instanceof HTMLElement)) {
+      return;
     }
+    upgradeThemeSwitch(element);
+    syncThemeSwitchElement(element, effectiveTheme);
   });
+}
+function upgradeThemeSwitch(element) {
+  if (element.dataset.themeSwitchInitialized === "true") {
+    return;
+  }
+  element.innerHTML = [
+    '<button type="button" class="gov-theme-switch-button" role="switch" aria-checked="false" data-theme-switch-button>',
+    '  <span class="gov-theme-switch-track" aria-hidden="true">',
+    '    <span class="gov-theme-switch-icon gov-theme-switch-icon-sun">',
+    '      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">',
+    '        <path d="M12 4.75a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V5.5a.75.75 0 0 1 .75-.75Zm0 11a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Zm7.25-4.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1 0-1.5h1.5Zm-13 0a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1 0-1.5h1.5Zm9.046-4.296a.75.75 0 0 1 1.061 0l1.061 1.061a.75.75 0 0 1-1.06 1.06l-1.062-1.06a.75.75 0 0 1 0-1.061Zm-8.652 8.652a.75.75 0 0 1 1.06 0l1.061 1.061a.75.75 0 1 1-1.06 1.06l-1.061-1.06a.75.75 0 0 1 0-1.061Zm9.713 1.06a.75.75 0 0 1 1.061 1.061l-1.061 1.061a.75.75 0 0 1-1.06-1.06l1.06-1.062Zm-8.652-8.651a.75.75 0 0 1 0 1.06L6.984 10.14a.75.75 0 0 1-1.06-1.06l1.06-1.062a.75.75 0 0 1 1.061 0ZM12 17a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 12 17Z" />',
+    "      </svg>",
+    "    </span>",
+    '    <span class="gov-theme-switch-icon gov-theme-switch-icon-moon">',
+    '      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">',
+    '        <path d="M14.72 3.78a.75.75 0 0 1 .86.86 7.25 7.25 0 0 0 8.78 8.78.75.75 0 0 1 .86.86A9.25 9.25 0 1 1 14.72 3.78Zm-.91 1.77a7.75 7.75 0 1 0 7.64 7.64 8.75 8.75 0 0 1-7.64-7.64Z" transform="translate(-1.5 -1.5) scale(0.95)" />',
+    "      </svg>",
+    "    </span>",
+    '    <span class="gov-theme-switch-thumb"></span>',
+    "  </span>",
+    '  <span class="gov-theme-switch-label" data-theme-switch-label hidden></span>',
+    "</button>"
+  ].join("");
+  const button = element.querySelector("[data-theme-switch-button]");
+  if (button instanceof HTMLButtonElement) {
+    button.addEventListener("click", () => {
+      const currentState = element.getAttribute("data-theme-switch-state") === "dark" ? "dark" : "light";
+      const nextMode = currentState === "dark" ? "light" : "dark";
+      element.dispatchEvent(new CustomEvent("gov-change", {
+        bubbles: true,
+        detail: { mode: nextMode }
+      }));
+    });
+  }
+  element.dataset.themeSwitchInitialized = "true";
+}
+function syncThemeSwitchElement(element, effectiveTheme) {
+  const button = element.querySelector("[data-theme-switch-button]");
+  const label = element.querySelector("[data-theme-switch-label]");
+  if (!(button instanceof HTMLButtonElement) || !(label instanceof HTMLElement)) {
+    return;
+  }
+  const isDark = effectiveTheme === "dark";
+  const displayLabel = shouldDisplayThemeLabel(element);
+  const labelLight = getThemeSwitchAttribute(element, "label-light", "Světlý mód");
+  const labelDark = getThemeSwitchAttribute(element, "label-dark", "Tmavý mód");
+  const ariaLabelLight = getThemeSwitchAttribute(element, "aria-label-light", "Přepnout na tmavý mód");
+  const ariaLabelDark = getThemeSwitchAttribute(element, "aria-label-dark", "Přepnout na světlý mód");
+  element.setAttribute("data-theme-switch-state", effectiveTheme);
+  label.hidden = !displayLabel;
+  label.textContent = isDark ? labelDark : labelLight;
+  button.setAttribute("aria-checked", String(isDark));
+  button.setAttribute("aria-label", isDark ? ariaLabelDark : ariaLabelLight);
+}
+function shouldDisplayThemeLabel(element) {
+  if (!element.hasAttribute("display-label")) {
+    return false;
+  }
+  const value = element.getAttribute("display-label");
+  return value === "" || value === "true";
+}
+function getThemeSwitchAttribute(element, attributeName, fallback) {
+  const value = element.getAttribute(attributeName);
+  return value && value.trim().length > 0 ? value.trim() : fallback;
 }
 function initTheme() {
   const stored = getStoredThemeMode();
+  if (stored && !getThemeCookieMode()) {
+    persistThemeMode(stored);
+  }
   setTheme(stored || "auto", false);
   const handleMediaChange = () => {
     const mode = getStoredThemeMode() || "auto";
@@ -7924,13 +8569,19 @@ function initTheme() {
   } else if (typeof mediaDark.addListener === "function") {
     mediaDark.addListener(handleMediaChange);
   }
-  document.querySelectorAll("[data-theme-switch]").forEach((element) => {
-    if (!(element instanceof HTMLInputElement)) {
+  document.querySelectorAll(themeSwitchSelector).forEach((element) => {
+    if (!(element instanceof HTMLElement)) {
       return;
     }
-    element.addEventListener("change", () => {
-      setTheme(element.checked ? "dark" : "light", true);
+    upgradeThemeSwitch(element);
+    if (element.dataset.themeSwitchBound === "true") {
+      return;
+    }
+    element.addEventListener("gov-change", (event) => {
+      const nextMode = event instanceof CustomEvent && isThemeMode(event.detail?.mode) ? event.detail.mode : "auto";
+      setTheme(nextMode, true);
     });
+    element.dataset.themeSwitchBound = "true";
   });
 }
 
@@ -8028,6 +8679,18 @@ function handleDocumentClick(event) {
   if (attendanceToggle instanceof HTMLButtonElement) {
     event.preventDefault();
     toggleMeetingAttendancePanel(attendanceToggle);
+    return;
+  }
+  const meetingYearToggle = target.closest("[data-meeting-year-toggle]");
+  if (meetingYearToggle instanceof HTMLButtonElement) {
+    event.preventDefault();
+    toggleMeetingYearGroup(meetingYearToggle);
+    return;
+  }
+  const scheduleExpandToggle = target.closest("[data-schedule-expand-toggle]");
+  if (scheduleExpandToggle instanceof HTMLButtonElement) {
+    event.preventDefault();
+    toggleScheduleBreakdown(scheduleExpandToggle);
     return;
   }
   if (printState.popover instanceof HTMLElement && !target.closest("[data-print-popover]") && !target.closest("[data-print-trigger]")) {
@@ -8230,6 +8893,9 @@ var rerenderTimelineAxesOnResize = debounce(() => {
     }
   });
 }, 140);
+var reflowMeetingOverviewsOnResize = debounce(() => {
+  initMeetingOverview(document);
+}, 120);
 function normalizeEventBindings(bindings) {
   return Array.isArray(bindings) ? bindings : [];
 }
@@ -8261,7 +8927,8 @@ function bootstrapPmTrackerApp() {
     { type: "scroll", handler: queueFloatingPanelReposition, options: true },
     { type: "resize", handler: queueFloatingPanelReposition },
     { type: "resize", handler: rerenderRainbowLabelsOnResize },
-    { type: "resize", handler: rerenderTimelineAxesOnResize }
+    { type: "resize", handler: rerenderTimelineAxesOnResize },
+    { type: "resize", handler: reflowMeetingOverviewsOnResize }
   ]);
   runInitializers([
     () => initProjectTabs(),
@@ -8277,6 +8944,8 @@ function bootstrapPmTrackerApp() {
     () => initPageSwitchers(),
     () => initRecordFormEnhancements(document),
     () => initPermissionMetadataBindings(document),
+    () => initTableTools(document),
+    () => initMeetingOverview(document),
     () => initProjectIndexUi(),
     () => initSessionCoordinator(),
     () => initModalAjaxSubmit()

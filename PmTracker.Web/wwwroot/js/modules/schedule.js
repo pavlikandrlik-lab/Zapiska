@@ -22,10 +22,56 @@ import {
 } from "./filters.js";
 import { queueRainbowSegmentRender } from "./ui.js";
 
+function syncScheduleExpandButton(button, details) {
+    if (!(button instanceof HTMLButtonElement) || !(details instanceof HTMLElement)) {
+        return;
+    }
+
+    const expanded = !details.hidden;
+    button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
+    button.setAttribute("aria-expanded", String(expanded));
+}
+
+export function toggleScheduleBreakdown(toggleOrTarget) {
+    const button = toggleOrTarget instanceof HTMLButtonElement
+        ? toggleOrTarget
+        : toggleOrTarget instanceof Element
+            ? toggleOrTarget.closest("[data-schedule-expand-toggle]")
+            : null;
+    if (!(button instanceof HTMLButtonElement)) {
+        return false;
+    }
+
+    const owningCard = button.closest("[data-schedule-item]");
+    if (!(owningCard instanceof HTMLElement)) {
+        return false;
+    }
+
+    const details = owningCard.querySelector("[data-schedule-steps]");
+    if (!(details instanceof HTMLElement)) {
+        return false;
+    }
+
+    const expanded = details.hidden;
+    details.hidden = !expanded;
+    syncScheduleExpandButton(button, details);
+
+    if (expanded) {
+        renderStaticTimelineAxes(details);
+        queueRainbowSegmentRender(details);
+        window.requestAnimationFrame(() => {
+            renderStaticTimelineAxes(details);
+            queueRainbowSegmentRender(details);
+        });
+    }
+
+    return true;
+}
+
 export function initScheduleExpandUi(scope) {
     const root = scope instanceof Element ? scope : document;
     root.querySelectorAll("[data-schedule-expand-toggle]").forEach((button) => {
-        if (!(button instanceof HTMLButtonElement) || button.dataset.scheduleExpandReady === "true") {
+        if (!(button instanceof HTMLButtonElement)) {
             return;
         }
 
@@ -34,35 +80,8 @@ export function initScheduleExpandUi(scope) {
             ? card.querySelector("[data-schedule-steps]")
             : null;
         if (details instanceof HTMLElement) {
-            button.setAttribute("aria-expanded", String(!details.hidden));
+            syncScheduleExpandButton(button, details);
         }
-
-        button.dataset.scheduleExpandReady = "true";
-        button.addEventListener("click", () => {
-            const owningCard = button.closest("[data-schedule-item]");
-            if (!(owningCard instanceof HTMLElement)) {
-                return;
-            }
-
-            const details = owningCard.querySelector("[data-schedule-steps]");
-            if (!(details instanceof HTMLElement)) {
-                return;
-            }
-
-            const expanded = details.hidden;
-            details.hidden = !expanded;
-            button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
-            button.setAttribute("aria-expanded", String(expanded));
-
-            if (expanded) {
-                renderStaticTimelineAxes(details);
-                queueRainbowSegmentRender(details);
-                window.requestAnimationFrame(() => {
-                    renderStaticTimelineAxes(details);
-                    queueRainbowSegmentRender(details);
-                });
-            }
-        });
     });
 }
 

@@ -34,6 +34,33 @@ public sealed class ProjectRolePermissionGrantBuilderTests
     }
 
     [Fact]
+    public void BuildImplicitProjectRoleGrants_ShouldReturnProjectScopedAdminGrants_ForProjMan()
+    {
+        var grants = ProjectRolePermissionGrantBuilder.BuildImplicitProjectRoleGrants(
+        [
+            new ProjectRoleAssignmentGrantSource
+            {
+                RoleCode = ProjectRoleCodes.ProjectManager,
+                ProjectId = 17
+            }
+        ]);
+
+        grants.Should().HaveCount(4);
+        grants.Select(x => x.PermissionKey).Should().BeEquivalentTo(
+        [
+            PermissionKeys.TeamManage,
+            PermissionKeys.RecordsEdit,
+            PermissionKeys.MeetingsCreate,
+            PermissionKeys.MeetingsEdit
+        ]);
+        grants.Should().OnlyContain(x =>
+            x.ScopeLevel == "PROJECT" &&
+            x.ScopeMode == "INCLUDE" &&
+            x.IsAllowed &&
+            x.ProjectIds.SequenceEqual(new[] { 17 }));
+    }
+
+    [Fact]
     public void BuildImplicitProjectRoleGrants_ShouldReturnEmpty_ForUnknownRole()
     {
         var grants = ProjectRolePermissionGrantBuilder.BuildImplicitProjectRoleGrants(

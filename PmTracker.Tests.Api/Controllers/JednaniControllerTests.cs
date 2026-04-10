@@ -57,9 +57,9 @@ public sealed class JednaniControllerTests
     }
 
     [Fact]
-    public async Task TaskItemPartial_ShouldRenderTaskItem_WhenUserIsSubsystemLeadWithoutRecordsEdit()
+    public async Task TaskItemPartial_ShouldRenderTaskItem_WhenUserIsSubsystemLeadWithoutRecordsEdit_InDraft()
     {
-        var context = await CreateMeetingTaskContextAsync("APIMTG_TASK_LEAD");
+        var context = await CreateMeetingTaskContextAsync("APIMTG_TASK_LEAD", "DRAFT");
         var leadUserId = await _fixture.EnsurePersonAsync("ApiMeetingTaskSubsystemLead");
         var subsystemId = await GetRecordSubsystemIdAsync(context.RecordId);
         await AssignSubsystemRoleAsync(context.ProjectId, subsystemId, leadUserId, SubsystemRoleCodes.Lead);
@@ -72,6 +72,67 @@ public sealed class JednaniControllerTests
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain($"data-task-record-id=\"{context.RecordId}\"");
         html.Should().Contain("meeting-note-add-form");
+    }
+
+    [Fact]
+    public async Task TaskItemPartial_ShouldRenderWithoutAddOrEdit_WhenSubsystemLeadWithoutRecordsEdit_OpensOpenMeeting()
+    {
+        var context = await CreateMeetingTaskContextAsync("APIMTG_TASK_LEAD_OPEN", "OPEN");
+        var leadUserId = await _fixture.EnsurePersonAsync("ApiMeetingTaskSubsystemLeadOpen");
+        var subsystemId = await GetRecordSubsystemIdAsync(context.RecordId);
+        await AssignSubsystemRoleAsync(context.ProjectId, subsystemId, leadUserId, SubsystemRoleCodes.Lead);
+        await GrantProjectPermissionAsync(context.ProjectId, leadUserId, PermissionKeys.RecordsCommentSubsystemLead, "ApiTaskLeadOpen");
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            dbContext.Vyjadreni.Add(new VyjadreniEntity
+            {
+                ZaznamId = context.RecordId,
+                JednaniId = context.MeetingId,
+                AutorOsobaId = leadUserId,
+                TextVyjadreni = "Subsystem lead open comment",
+                DatumVyjadreni = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Jednani/TaskItemPartial?jednaniId={context.MeetingId}&zaznamId={context.RecordId}&asUser={leadUserId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain($"data-task-record-id=\"{context.RecordId}\"");
+        html.Should().NotContain("meeting-note-add-form");
+        html.Should().NotContain("comment-edit-form");
+        html.Should().NotContain("comment-delete-form");
+    }
+
+    [Fact]
+    public async Task TaskItemPartial_ShouldKeepCommentEditDeleteVisible_ForRecordsEditUserInOpenMeeting()
+    {
+        var context = await CreateMeetingTaskContextAsync("APIMTG_TASK_EDIT_OPEN", "OPEN");
+        var commenterId = await _fixture.EnsurePersonAsync("ApiMeetingTaskCommentAuthor");
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            dbContext.Vyjadreni.Add(new VyjadreniEntity
+            {
+                ZaznamId = context.RecordId,
+                JednaniId = context.MeetingId,
+                AutorOsobaId = commenterId,
+                TextVyjadreni = "Existing editable comment",
+                DatumVyjadreni = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Jednani/TaskItemPartial?jednaniId={context.MeetingId}&zaznamId={context.RecordId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("comment-edit-form");
+        html.Should().Contain("comment-delete-form");
     }
 
     [Fact]
@@ -634,13 +695,13 @@ public sealed class JednaniControllerTests
         attendanceCount.Should().Be(1);
     }
 
-    private async Task<MeetingTaskContext> CreateMeetingTaskContextAsync(string marker)
+    private async Task<MeetingTaskContext> CreateMeetingTaskContextAsync(string marker, string stateCode = "OPEN")
     {
         var ownerId = await _fixture.EnsurePersonAsync($"{marker}_OWNER");
         var projectId = await _fixture.EnsureProjectAsync($"{marker}_PROJ");
         var subsystemId = await _fixture.EnsureSubsystemAsync($"{marker}_SUB", ownerId);
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", $"{marker} record");
-        var meetingId = await CreateMeetingWithNextNumberAsync(projectId, "OPEN");
+        var meetingId = await CreateMeetingWithNextNumberAsync(projectId, stateCode);
 
         return new MeetingTaskContext(projectId, meetingId, recordId);
     }

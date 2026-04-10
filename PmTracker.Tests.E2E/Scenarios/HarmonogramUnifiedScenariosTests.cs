@@ -206,6 +206,14 @@ public sealed class HarmonogramUnifiedScenariosTests
 
             await Expect(breakdown).ToBeVisibleAsync();
             (await expandToggle.First.GetAttributeAsync("aria-expanded")).Should().Be("true");
+
+            await expandToggle.First.ClickAsync();
+            await Expect(breakdown).ToBeHiddenAsync();
+            (await expandToggle.First.GetAttributeAsync("aria-expanded")).Should().Be("false");
+
+            await expandToggle.First.ClickAsync();
+            await Expect(breakdown).ToBeVisibleAsync();
+            (await expandToggle.First.GetAttributeAsync("aria-expanded")).Should().Be("true");
         }
 
         await page.WaitForTimeoutAsync(120);
@@ -414,13 +422,13 @@ public sealed class HarmonogramUnifiedScenariosTests
             """
             axisNode => {
                 if (!(axisNode instanceof HTMLElement)) {
-                    return { hasEnoughLabels: false, firstInside: false, lastInside: false, firstAligned: false, lastAligned: false };
+                    return { hasEnoughLabels: false, firstInside: false, lastInside: false, firstAligned: false, lastAligned: false, firstFullyVisible: false, lastFullyVisible: false };
                 }
 
                 const labels = Array.from(axisNode.querySelectorAll('.timeline-axis-label'))
                     .filter(label => label instanceof HTMLElement && !label.hidden && (label.textContent || '').trim().length > 0);
                 if (labels.length < 2) {
-                    return { hasEnoughLabels: false, firstInside: false, lastInside: false, firstAligned: false, lastAligned: false };
+                    return { hasEnoughLabels: false, firstInside: false, lastInside: false, firstAligned: false, lastAligned: false, firstFullyVisible: false, lastFullyVisible: false };
                 }
 
                 const axisRect = axisNode.getBoundingClientRect();
@@ -429,7 +437,7 @@ public sealed class HarmonogramUnifiedScenariosTests
                 const firstTick = firstLabel.closest('.timeline-axis-tick');
                 const lastTick = lastLabel.closest('.timeline-axis-tick');
                 if (!(firstTick instanceof HTMLElement) || !(lastTick instanceof HTMLElement)) {
-                    return { hasEnoughLabels: false, firstInside: false, lastInside: false, firstAligned: false, lastAligned: false };
+                    return { hasEnoughLabels: false, firstInside: false, lastInside: false, firstAligned: false, lastAligned: false, firstFullyVisible: false, lastFullyVisible: false };
                 }
 
                 const tolerance = 2.5;
@@ -437,13 +445,16 @@ public sealed class HarmonogramUnifiedScenariosTests
                 const lastRect = lastLabel.getBoundingClientRect();
                 const firstTickRect = firstTick.getBoundingClientRect();
                 const lastTickRect = lastTick.getBoundingClientRect();
+                const widthTolerance = 1;
 
                 return {
                     hasEnoughLabels: true,
                     firstInside: firstRect.left >= axisRect.left - tolerance && firstRect.right <= axisRect.right + tolerance,
                     lastInside: lastRect.left >= axisRect.left - tolerance && lastRect.right <= axisRect.right + tolerance,
                     firstAligned: Math.abs(firstRect.left - firstTickRect.left) <= tolerance,
-                    lastAligned: Math.abs(lastRect.right - lastTickRect.left) <= tolerance
+                    lastAligned: Math.abs(lastRect.right - lastTickRect.left) <= tolerance,
+                    firstFullyVisible: firstLabel.scrollWidth <= firstLabel.clientWidth + widthTolerance,
+                    lastFullyVisible: lastLabel.scrollWidth <= lastLabel.clientWidth + widthTolerance
                 };
             }
             """);
@@ -453,6 +464,8 @@ public sealed class HarmonogramUnifiedScenariosTests
         result.LastInside.Should().BeTrue();
         result.FirstAligned.Should().BeTrue();
         result.LastAligned.Should().BeTrue();
+        result.FirstFullyVisible.Should().BeTrue();
+        result.LastFullyVisible.Should().BeTrue();
     }
 
     private sealed class AxisEdgeAlignmentResult
@@ -462,6 +475,8 @@ public sealed class HarmonogramUnifiedScenariosTests
         public bool LastInside { get; set; }
         public bool FirstAligned { get; set; }
         public bool LastAligned { get; set; }
+        public bool FirstFullyVisible { get; set; }
+        public bool LastFullyVisible { get; set; }
     }
 
     private async Task DeleteRecordByNameAsync(string recordName)

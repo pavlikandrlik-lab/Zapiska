@@ -138,6 +138,7 @@ public sealed partial class MeetingService
         var meetingState = await dbContext.CiselnikStavuJednani.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
         var canModify = !IsMeetingReadOnly(meeting, meetingState);
+        var isDraftMeeting = string.Equals(meetingState?.Kod, "DRAFT", StringComparison.OrdinalIgnoreCase);
 
         return new JednaniUkolViewModel
         {
@@ -156,7 +157,8 @@ public sealed partial class MeetingService
                     Autor = BuildInlinePersonLabelFromOsoba(people.GetValueOrDefault(comment.AutorOsobaId)),
                     Datum = comment.DatumVyjadreni,
                     Text = comment.TextVyjadreni,
-                    LzeUpravit = canModify
+                    LzeUpravit = canModify,
+                    CanEditOwnAsSubsystemLeader = canModify && isDraftMeeting
                 })
                 .ToList()
         };
@@ -275,6 +277,7 @@ public sealed partial class MeetingService
             : await dbContext.CiselnikStavuJednani.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
         var canModify = !IsMeetingReadOnly(meeting, meetingState);
+        var isDraftMeeting = string.Equals(meetingState?.Kod, "DRAFT", StringComparison.OrdinalIgnoreCase);
 
         return projectRecords.Select(record => new JednaniUkolViewModel
         {
@@ -295,7 +298,8 @@ public sealed partial class MeetingService
                     Autor = BuildInlinePersonLabelFromOsoba(people.GetValueOrDefault(comment.AutorOsobaId)),
                     Datum = comment.DatumVyjadreni,
                     Text = comment.TextVyjadreni,
-                    LzeUpravit = canModify
+                    LzeUpravit = canModify,
+                    CanEditOwnAsSubsystemLeader = canModify && isDraftMeeting
                 })
                 .ToList()
         }).ToList();

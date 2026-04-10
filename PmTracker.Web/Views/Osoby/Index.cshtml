@@ -23,17 +23,39 @@
     }
 </div>
 
-<section class="card" data-osoby-table-card>
-    <table class="table">
+<section class="card" data-osoby-table-card data-table-tools-root>
+    <div class="table-tools-toolbar">
+        <label class="table-tools-search">
+            <span>Hledat v osobách</span>
+            <input type="search"
+                   placeholder="Jméno, email, organizace, AD..."
+                   data-table-tools-search-input />
+        </label>
+    </div>
+    <table class="table" data-table-tools-table data-table-empty-message="Žádná osoba neodpovídá zadanému filtru.">
         <thead>
             <tr>
-                <th>Jméno</th>
-                <th>Příjmení</th>
-                <th>Titul</th>
-                <th>Email</th>
-                <th>Organizace</th>
-                <th>Organizační celek</th>
-                <th>AD</th>
+                <th>
+                    <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="0" data-table-sort-type="text">Jméno</button>
+                </th>
+                <th>
+                    <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="1" data-table-sort-type="text" data-table-sort-default="true">Příjmení</button>
+                </th>
+                <th>
+                    <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="2" data-table-sort-type="text">Titul</button>
+                </th>
+                <th>
+                    <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="3" data-table-sort-type="text">Email</button>
+                </th>
+                <th>
+                    <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="4" data-table-sort-type="text">Organizace</button>
+                </th>
+                <th>
+                    <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="5" data-table-sort-type="text">Organizační celek</button>
+                </th>
+                <th>
+                    <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="6" data-table-sort-type="boolean">AD</button>
+                </th>
                 @if (Model.CanManagePeople)
                 {
                     <th class="table-actions">Akce</th>
@@ -43,14 +65,14 @@
         <tbody>
         @foreach (var osoba in Model.Osoby)
         {
-            <tr>
+            <tr data-table-row>
                 <td>@osoba.Jmeno</td>
                 <td>@osoba.Prijmeni</td>
                 <td>@(string.IsNullOrWhiteSpace(osoba.Titul) ? "-" : osoba.Titul)</td>
                 <td>@(string.IsNullOrWhiteSpace(osoba.Email) ? "-" : osoba.Email)</td>
                 <td>@(osoba.Organizace ?? "-")</td>
                 <td>@(osoba.OrganizacniCelek ?? "-")</td>
-                <td>@(osoba.JeAdUcet ? "Ano" : "Ne")</td>
+                <td data-table-sort-value="@(osoba.JeAdUcet ? "1" : "0")">@(osoba.JeAdUcet ? "Ano" : "Ne")</td>
                 @if (Model.CanManagePeople)
                 {
                     <td class="table-actions">

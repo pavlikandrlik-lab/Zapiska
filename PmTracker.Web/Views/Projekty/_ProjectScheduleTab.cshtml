@@ -100,11 +100,14 @@
                                                      title="@($"Termín úkolu: {item.TerminUkonceni:dd.MM.yyyy}")"></div>
                                                 @foreach (var krok in item.Kroky)
                                                 {
-                                                    <span class="schedule-overview-segment"
-                                                          data-rainbow-segment-label-full="@krok.Nazev"
-                                                          data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                          style="left:@krok.CompactPlanLeftPercent%; width:@krok.CompactPlanWidthStyle; background:@krok.BarvaHex;"
-                                                          title="@krok.CompactPlanTitle"></span>
+                                                    @if (krok.HasCompactVisualDuration)
+                                                    {
+                                                        <span class="schedule-overview-segment"
+                                                              data-rainbow-segment-label-full="@krok.Nazev"
+                                                              data-rainbow-segment-label-short="@krok.KrokIndex"
+                                                              style="left:@krok.CompactPlanLeftPercent%; width:@krok.CompactPlanWidthStyle; background:@krok.BarvaHex;"
+                                                              title="@krok.CompactPlanTitle"></span>
+                                                    }
                                                 }
                                             </div>
                                         </div>
@@ -119,11 +122,14 @@
                                                      title="@($"Termín úkolu: {item.TerminUkonceni:dd.MM.yyyy}")"></div>
                                                 @foreach (var krok in item.Kroky)
                                                 {
-                                                    <span class="schedule-overview-segment"
-                                                          data-rainbow-segment-label-full="@krok.Nazev"
-                                                          data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                          style="left:@krok.CompactActualLeftPercent%; width:@krok.CompactActualWidthStyle; background:@krok.BarvaHex;"
-                                                          title="@krok.CompactActualTitle"></span>
+                                                    @if (krok.HasCompactVisualDuration)
+                                                    {
+                                                        <span class="schedule-overview-segment"
+                                                              data-rainbow-segment-label-full="@krok.Nazev"
+                                                              data-rainbow-segment-label-short="@krok.KrokIndex"
+                                                              style="left:@krok.CompactActualLeftPercent%; width:@krok.CompactActualWidthStyle; background:@krok.BarvaHex;"
+                                                              title="@krok.CompactActualTitle"></span>
+                                                    }
                                                 }
                                             </div>
                                         </div>

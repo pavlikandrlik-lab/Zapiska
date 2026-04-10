@@ -69,7 +69,7 @@ public sealed class MeetingAndCommentDataStoreTests
     }
 
     [Fact]
-    public async Task SubsystemLeaderPermission_ShouldAllowOwnCommentCrud_AndBlockOthers()
+    public async Task SubsystemLeaderPermission_ShouldAllowOwnCommentCrudOnlyInDraft_AndBlockOthersInOpen()
     {
         var db = await _fixture.CreateDatabaseAsync("comment_permissions");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
@@ -140,7 +140,68 @@ public sealed class MeetingAndCommentDataStoreTests
         meeting.StavJednaniId = await dbContext.CiselnikStavuJednani.Where(x => x.Kod == "OPEN").Select(x => x.Id).FirstAsync();
         await dbContext.SaveChangesAsync();
 
-        store.DeleteComment(new DeleteCommentCommand { Id = comment.Id }, leaderContext);
+        var deleteInOpen = () => store.DeleteComment(new DeleteCommentCommand { Id = comment.Id }, leaderContext);
+        deleteInOpen.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Nemáte oprávnění*");
+
+        (await dbContext.Vyjadreni.AnyAsync(x => x.Id == comment.Id)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ProjectManager_ShouldModifyAndDeleteForeignSubsystemLeaderComment_WhenMeetingIsEditable()
+    {
+        var db = await _fixture.CreateDatabaseAsync("comment_proj_manager_crud");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var leaderId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ProjManLead");
+        var managerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ProjManEditor");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "PRJMANCOM");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "PRJMAN_SUB", leaderId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, leaderId, SubsystemRoleCodes.Lead);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, managerId, ProjectRoleCodes.ProjectManager);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, leaderId, subsystemId, "U", "Proj manager comment record");
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "DRAFT", meetingNumber: 9301);
+
+        var leaderContext = IntegrationTestHelper.BuildUser(
+            leaderId,
+            isSuperAdmin: false,
+            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId) });
+
+        store.AddComment(new AddCommentCommand
+        {
+            ZaznamId = recordId,
+            JednaniId = meetingId,
+            Text = "Subsystem lead draft comment"
+        }, leaderContext);
+
+        var comment = await dbContext.Vyjadreni
+            .AsNoTracking()
+            .OrderByDescending(x => x.Id)
+            .FirstAsync(x => x.ZaznamId == recordId && x.JednaniId == meetingId);
+
+        var meeting = await dbContext.Jednani.FirstAsync(x => x.Id == meetingId);
+        meeting.StavJednaniId = await dbContext.CiselnikStavuJednani
+            .Where(x => x.Kod == "OPEN")
+            .Select(x => x.Id)
+            .FirstAsync();
+        await dbContext.SaveChangesAsync();
+
+        var managerContext = store.BuildCurrentUserContext(managerId.ToString());
+        managerContext.HasPermission(PermissionKeys.RecordsEdit, projectId).Should().BeTrue();
+
+        store.UpdateComment(new UpdateCommentCommand
+        {
+            Id = comment.Id,
+            Text = "Project manager rewrite"
+        }, managerContext);
+
+        (await dbContext.Vyjadreni.AsNoTracking().FirstAsync(x => x.Id == comment.Id)).TextVyjadreni
+            .Should()
+            .Be("Project manager rewrite");
+
+        store.DeleteComment(new DeleteCommentCommand { Id = comment.Id }, managerContext);
         (await dbContext.Vyjadreni.AnyAsync(x => x.Id == comment.Id)).Should().BeFalse();
     }
 

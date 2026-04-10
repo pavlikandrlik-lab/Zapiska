@@ -162,7 +162,7 @@ public sealed class ZaznamCommentsPanelViewModel
     public bool CanAddComment { get; set; }
     public int CurrentUserOsobaId { get; set; }
     public IReadOnlyList<VyjadreniViewModel> Vyjadreni { get; init; } = Array.Empty<VyjadreniViewModel>();
-    public IReadOnlyList<JednaniOptionViewModel> OtevrenaJednani { get; init; } = Array.Empty<JednaniOptionViewModel>();
+    public IReadOnlyList<JednaniOptionViewModel> OtevrenaJednani { get; set; } = Array.Empty<JednaniOptionViewModel>();
 }
 
 public sealed class ProjektHarmonogramTabViewModel
@@ -177,6 +177,8 @@ public sealed class ProjektJednaniTabViewModel
 {
     public int ProjektId { get; init; }
     public IReadOnlyList<JednaniListItemViewModel> Jednani { get; init; } = Array.Empty<JednaniListItemViewModel>();
+    public IReadOnlyList<JednaniYearGroupViewModel> RocniSkupiny { get; init; } = Array.Empty<JednaniYearGroupViewModel>();
+    public int? PreviewRok { get; set; }
     public IReadOnlyList<LookupOptionViewModel> StavyJednani { get; init; } = Array.Empty<LookupOptionViewModel>();
     public bool CanCreateMeetings { get; set; }
     public bool CanEditMeetings { get; set; }
@@ -305,6 +307,7 @@ public sealed class ProjektHarmonogramKrokViewModel
     public DateTime PlanEnd { get; init; }
     public DateTime RealStart { get; init; }
     public DateTime RealEnd { get; init; }
+    public bool HasCompactVisualDuration { get; set; }
     public bool HasBreakdownVisualDuration { get; set; }
     public string OffsetLabel { get; set; } = string.Empty;
     public string? OffsetCssClass { get; set; }
@@ -345,6 +348,7 @@ public sealed class VyjadreniViewModel
     public int? JednaniCislo { get; init; }
     public DateTime? JednaniDatum { get; init; }
     public bool LzeUpravit { get; init; }
+    public bool CanEditOwnAsSubsystemLeader { get; init; }
 }
 
 public sealed class ProjectMemberCandidateViewModel
@@ -495,6 +499,9 @@ public sealed class JednaniOptionViewModel
     public int Id { get; init; }
     public required string Label { get; init; }
     public DateTime Datum { get; init; }
+    public string? StavKod { get; init; }
+
+    public bool IsDraft => string.Equals(StavKod, "DRAFT", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed class ZaznamEditViewModel

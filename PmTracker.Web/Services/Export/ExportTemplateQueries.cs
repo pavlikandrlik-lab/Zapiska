@@ -11,7 +11,7 @@ namespace PmTracker.Web.Services.Export
 
     public interface IExportTemplateQueries
     {
-        Task<ExportTemplateQueryResult> GetProjectTemplateAsync(int projektId, CancellationToken ct = default);
+        Task<ExportTemplateQueryResult> GetProjectTemplateAsync(int projektId, CurrentUserContextViewModel currentUser, ProjectExportRecordFilters? filters = null, CancellationToken ct = default);
         Task<ExportTemplateQueryResult> GetMeetingTemplateAsync(int jednaniId, CancellationToken ct = default);
         Task<ExportTemplateQueryResult> GetTaskTemplateAsync(int projektId, int zaznamId, CancellationToken ct = default);
     }
@@ -58,15 +58,21 @@ namespace PmTracker.Web.Services.Export
             this.exportTemplateSummaryBuilder = exportTemplateSummaryBuilder;
         }
 
-        public async Task<ExportTemplateQueryResult> GetProjectTemplateAsync(int projektId, CancellationToken ct = default)
+        public async Task<ExportTemplateQueryResult> GetProjectTemplateAsync(int projektId, CurrentUserContextViewModel currentUser, ProjectExportRecordFilters? filters = null, CancellationToken ct = default)
         {
             var project = await dbContext.Projekty.AsNoTracking().FirstOrDefaultAsync(x => x.Id == projektId, ct)
                 ?? throw new InvalidOperationException($"Projekt {projektId} nebyl nalezen.");
-            var summary = exportTemplateSummaryBuilder.BuildProjectSummary();
+            var normalizedFilters = NormalizeProjectExportFilters(filters);
+            var appliedRuleSummary = normalizedFilters is { UseCurrentFilters: true, HasRelevantFilters: true }
+                ? await BuildProjectFilterSummaryAsync(normalizedFilters, currentUser.OsobaId, ct)
+                : Array.Empty<string>();
+            var summary = normalizedFilters is { UseCurrentFilters: true, HasRelevantFilters: true }
+                ? exportTemplateSummaryBuilder.BuildFilteredProjectSummary(appliedRuleSummary)
+                : exportTemplateSummaryBuilder.BuildProjectSummary();
 
             return new ExportTemplateQueryResult
             {
-                ExportVariant = "project_all",
+                ExportVariant = normalizedFilters is { UseCurrentFilters: true, HasRelevantFilters: true } ? "project_filtered" : "project_all",
                 ProjektId = project.Id,
                 ProjektZkratka = project.Zkratka,
                 ProjektNazev = project.CelyNazev,
@@ -80,7 +86,7 @@ namespace PmTracker.Web.Services.Export
                 ProjektoveRole = await exportRoleProjectionBuilder.BuildProjectRoleRowsAsync(project.Id, ct),
                 AppliedRuleSummary = summary.AppliedRuleSummary,
                 Legenda = summary.Legenda,
-                Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(projektId, null, null, limitComments: false, applyMeetingSnapshotRules: false, ct),
+                Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(projektId, null, null, limitComments: false, applyMeetingSnapshotRules: false, normalizedFilters, currentUser.OsobaId, ct),
                 Dochazka = []
             };
         }
@@ -111,7 +117,7 @@ namespace PmTracker.Web.Services.Export
                 ProjektoveRole = await exportRoleProjectionBuilder.BuildProjectRoleRowsAsync(project.Id, ct),
                 AppliedRuleSummary = summary.AppliedRuleSummary,
                 Legenda = summary.Legenda,
-                Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(project.Id, meeting.Id, null, limitComments: true, applyMeetingSnapshotRules: true, ct),
+                Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(project.Id, meeting.Id, null, limitComments: true, applyMeetingSnapshotRules: true, null, null, ct),
                 Dochazka = await exportAttendanceProjectionBuilder.BuildAttendanceGroupsAsync(meeting.Id, project.Id, ct)
             };
         }
@@ -143,9 +149,109 @@ namespace PmTracker.Web.Services.Export
                 ProjektoveRole = [],
                 AppliedRuleSummary = summary.AppliedRuleSummary,
                 Legenda = summary.Legenda,
-                Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(projektId, lastMeeting?.Id, zaznamId, limitComments: true, applyMeetingSnapshotRules: false, ct),
+                Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(projektId, lastMeeting?.Id, zaznamId, limitComments: true, applyMeetingSnapshotRules: false, null, null, ct),
                 Dochazka = []
             };
+        }
+
+        private static ProjectExportRecordFilters? NormalizeProjectExportFilters(ProjectExportRecordFilters? filters)
+        {
+            if (filters is null)
+            {
+                return null;
+            }
+
+            return filters with
+            {
+                Subsystem = string.IsNullOrWhiteSpace(filters.Subsystem) ? null : filters.Subsystem.Trim(),
+                Kategorie = string.IsNullOrWhiteSpace(filters.Kategorie) ? null : filters.Kategorie.Trim(),
+                Stav = string.IsNullOrWhiteSpace(filters.Stav) ? null : filters.Stav.Trim(),
+                Typ = string.IsNullOrWhiteSpace(filters.Typ) ? null : filters.Typ.Trim(),
+                VlastnikId = filters.VlastnikId > 0 ? filters.VlastnikId : null,
+                JednaniVyjadreniStavId = filters.JednaniVyjadreniStavId > 0 ? filters.JednaniVyjadreniStavId : null
+            };
+        }
+
+        private async Task<IReadOnlyList<string>> BuildProjectFilterSummaryAsync(ProjectExportRecordFilters filters, int currentUserOsobaId, CancellationToken ct)
+        {
+            var appliedRules = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(filters.Subsystem))
+            {
+                var subsystemRow = await dbContext.Subsystemy.AsNoTracking()
+                    .Where(x => x.Kod == filters.Subsystem || (string.IsNullOrEmpty(x.Kod) && x.Nazev == filters.Subsystem))
+                    .Select(x => new { x.Kod, x.Nazev })
+                    .FirstOrDefaultAsync(ct);
+                var subsystemLabel = subsystemRow is null
+                    ? null
+                    : string.IsNullOrWhiteSpace(subsystemRow.Kod)
+                        ? subsystemRow.Nazev
+                        : $"{subsystemRow.Kod} - {subsystemRow.Nazev}";
+                appliedRules.Add($"Subsystém: {(string.IsNullOrWhiteSpace(subsystemLabel) ? filters.Subsystem : subsystemLabel)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(filters.Kategorie))
+            {
+                var categoryLabel = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+                    .Where(x => x.Kod == filters.Kategorie)
+                    .Select(x => x.Nazev)
+                    .FirstOrDefaultAsync(ct);
+                appliedRules.Add($"Kategorie: {(string.IsNullOrWhiteSpace(categoryLabel) ? filters.Kategorie : categoryLabel)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(filters.Stav))
+            {
+                var taskStateLabel = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+                    .Where(x => x.Kod == filters.Stav)
+                    .Select(x => x.Nazev)
+                    .FirstOrDefaultAsync(ct);
+                appliedRules.Add($"Stav úkolu: {(string.IsNullOrWhiteSpace(taskStateLabel) ? filters.Stav : taskStateLabel)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(filters.Typ))
+            {
+                var taskTypeLabel = await dbContext.CiselnikTypuUkolu.AsNoTracking()
+                    .Where(x => x.Kod == filters.Typ)
+                    .Select(x => x.Nazev)
+                    .FirstOrDefaultAsync(ct);
+                appliedRules.Add($"Typ úkolu: {(string.IsNullOrWhiteSpace(taskTypeLabel) ? filters.Typ : taskTypeLabel)}");
+            }
+
+            if (filters.VlastnikId.HasValue)
+            {
+                var ownerRow = await dbContext.Osoby.AsNoTracking()
+                    .Where(x => x.Id == filters.VlastnikId.Value)
+                    .Select(x => new { x.Titul, x.Jmeno, x.Prijmeni })
+                    .FirstOrDefaultAsync(ct);
+                var ownerLabel = ownerRow is null
+                    ? null
+                    : string.Join(" ", new[] { ownerRow.Titul, ownerRow.Jmeno, ownerRow.Prijmeni }.Where(value => !string.IsNullOrWhiteSpace(value)));
+                appliedRules.Add($"Vlastník: {(string.IsNullOrWhiteSpace(ownerLabel) ? $"Osoba #{filters.VlastnikId.Value}" : ownerLabel)}");
+            }
+
+            if (filters.Aktivni)
+            {
+                appliedRules.Add("Pouze aktivní úkoly");
+            }
+
+            if (filters.Mine)
+            {
+                var mineLabel = currentUserOsobaId > 0
+                    ? "Jen mé záznamy"
+                    : "Jen mé záznamy (bez identifikované osoby)";
+                appliedRules.Add(mineLabel);
+            }
+
+            if (filters.JednaniVyjadreniStavId.HasValue)
+            {
+                var meetingStateLabel = await dbContext.CiselnikStavuJednani.AsNoTracking()
+                    .Where(x => x.Id == filters.JednaniVyjadreniStavId.Value)
+                    .Select(x => x.Nazev)
+                    .FirstOrDefaultAsync(ct);
+                appliedRules.Add($"Jednání-vyjádření: {(string.IsNullOrWhiteSpace(meetingStateLabel) ? filters.JednaniVyjadreniStavId.Value.ToString(CultureInfo.InvariantCulture) : meetingStateLabel)}");
+            }
+
+            return appliedRules;
         }
     }
 }
@@ -171,6 +277,8 @@ namespace PmTracker.Web.Services.Export.Queries
             int? specificRecordId,
             bool limitComments,
             bool applyMeetingSnapshotRules,
+            ProjectExportRecordFilters? projectFilters,
+            int? currentUserOsobaId,
             CancellationToken ct = default);
     }
 
@@ -192,6 +300,7 @@ namespace PmTracker.Web.Services.Export.Queries
     public interface IExportTemplateSummaryBuilder
     {
         ExportTemplateSummaryProjection BuildProjectSummary();
+        ExportTemplateSummaryProjection BuildFilteredProjectSummary(IReadOnlyList<string> appliedRuleSummary);
         ExportTemplateSummaryProjection BuildMeetingSummary(string? meetingStatusName);
         ExportTemplateSummaryProjection BuildTaskSummary();
     }
@@ -215,6 +324,18 @@ namespace PmTracker.Web.Services.Export.Queries
                 SnapshotSummary = "Tisk kompletního projektu bez filtru.",
                 PreparationSummary = null,
                 AppliedRuleSummary = ["Bez omezení"],
+                Legenda = []
+            };
+        }
+
+        public ExportTemplateSummaryProjection BuildFilteredProjectSummary(IReadOnlyList<string> appliedRuleSummary)
+        {
+            return new ExportTemplateSummaryProjection
+            {
+                JednaniStav = "Projekt",
+                SnapshotSummary = "Tisk projektu s použitím aktivních filtrů.",
+                PreparationSummary = null,
+                AppliedRuleSummary = appliedRuleSummary.Count > 0 ? appliedRuleSummary : ["Aktivní projektové filtry"],
                 Legenda = []
             };
         }
@@ -716,6 +837,8 @@ namespace PmTracker.Web.Services.Export.Queries
         IExportCommentProjectionBuilder exportCommentProjectionBuilder,
         IExportRecordVisibilityEvaluator exportRecordVisibilityEvaluator) : IExportRecordProjectionBuilder
     {
+        private const string NewInformationHighlightColor = "#2563EB";
+        private const string PreparationHighlightColor = "#DC2626";
         private static readonly StringComparer Ci = StringComparer.OrdinalIgnoreCase;
 
         public async Task<IReadOnlyList<PdfExportRecordViewModel>> BuildExportRecordsAsync(
@@ -724,12 +847,124 @@ namespace PmTracker.Web.Services.Export.Queries
             int? specificRecordId,
             bool limitComments,
             bool applyMeetingSnapshotRules,
+            ProjectExportRecordFilters? projectFilters,
+            int? currentUserOsobaId,
             CancellationToken ct = default)
         {
-            var records = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            var recordsQuery = dbContext.ProjektoveZaznamy.AsNoTracking()
                 .Where(x => x.ProjektId == projectId)
-                .Where(x => !specificRecordId.HasValue || x.Id == specificRecordId.Value)
-                .ToListAsync(ct);
+                .Where(x => !specificRecordId.HasValue || x.Id == specificRecordId.Value);
+
+            if (projectFilters is { UseCurrentFilters: true, HasRelevantFilters: true })
+            {
+                if (!string.IsNullOrWhiteSpace(projectFilters.Subsystem))
+                {
+                    var matchingSubsystemIds = await dbContext.Subsystemy.AsNoTracking()
+                        .Where(x => x.Kod == projectFilters.Subsystem || (string.IsNullOrEmpty(x.Kod) && x.Nazev == projectFilters.Subsystem))
+                        .Select(x => x.Id)
+                        .ToArrayAsync(ct);
+                    if (matchingSubsystemIds.Length == 0)
+                    {
+                        return [];
+                    }
+
+                    recordsQuery = recordsQuery.Where(x => matchingSubsystemIds.Contains(x.SubsystemId));
+                }
+
+                if (!string.IsNullOrWhiteSpace(projectFilters.Kategorie))
+                {
+                    var categoryIds = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+                        .Where(x => x.Kod == projectFilters.Kategorie)
+                        .Select(x => x.Id)
+                        .ToArrayAsync(ct);
+                    if (categoryIds.Length == 0)
+                    {
+                        return [];
+                    }
+
+                    recordsQuery = recordsQuery.Where(x => categoryIds.Contains(x.KategorieId));
+                }
+
+                if (!string.IsNullOrWhiteSpace(projectFilters.Stav))
+                {
+                    var taskStateIds = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+                        .Where(x => x.Kod == projectFilters.Stav)
+                        .Select(x => x.Id)
+                        .ToArrayAsync(ct);
+                    if (taskStateIds.Length == 0)
+                    {
+                        return [];
+                    }
+
+                    recordsQuery = recordsQuery.Where(x => x.StavUkoluId.HasValue && taskStateIds.Contains(x.StavUkoluId.Value));
+                }
+
+                if (!string.IsNullOrWhiteSpace(projectFilters.Typ))
+                {
+                    var taskTypeIds = await dbContext.CiselnikTypuUkolu.AsNoTracking()
+                        .Where(x => x.Kod == projectFilters.Typ)
+                        .Select(x => x.Id)
+                        .ToArrayAsync(ct);
+                    if (taskTypeIds.Length == 0)
+                    {
+                        return [];
+                    }
+
+                    recordsQuery = recordsQuery.Where(x => x.AktualniTypUkoluId.HasValue && taskTypeIds.Contains(x.AktualniTypUkoluId.Value));
+                }
+
+                if (projectFilters.VlastnikId.HasValue)
+                {
+                    recordsQuery = recordsQuery.Where(x => x.VlastnikId == projectFilters.VlastnikId.Value);
+                }
+
+                if (projectFilters.Aktivni)
+                {
+                    var activeTaskStateIds = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+                        .Where(x => !x.IsFinal)
+                        .Select(x => x.Id)
+                        .ToArrayAsync(ct);
+                    recordsQuery = recordsQuery.Where(x => !x.StavUkoluId.HasValue || activeTaskStateIds.Contains(x.StavUkoluId.Value));
+                }
+
+                if (projectFilters.Mine)
+                {
+                    if (!currentUserOsobaId.HasValue || currentUserOsobaId.Value <= 0)
+                    {
+                        return [];
+                    }
+
+                    recordsQuery = recordsQuery.Where(x => x.VlastnikId == currentUserOsobaId.Value);
+                }
+
+                if (projectFilters.JednaniVyjadreniStavId.HasValue)
+                {
+                    var taskCategoryIds = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+                        .Where(x => x.Kod == "U" || x.Kod == "UKOL" || x.Nazev.Contains("úkol") || x.Nazev.Contains("ukol"))
+                        .Select(x => x.Id)
+                        .ToArrayAsync(ct);
+                    if (taskCategoryIds.Length == 0)
+                    {
+                        return [];
+                    }
+
+                    var matchingRecordIds = await (
+                            from comment in dbContext.Vyjadreni.AsNoTracking()
+                            join meeting in dbContext.Jednani.AsNoTracking() on comment.JednaniId equals meeting.Id
+                            where meeting.StavJednaniId == projectFilters.JednaniVyjadreniStavId.Value
+                            select comment.ZaznamId)
+                        .Distinct()
+                        .ToArrayAsync(ct);
+                    if (matchingRecordIds.Length == 0)
+                    {
+                        return [];
+                    }
+
+                    recordsQuery = recordsQuery.Where(x => taskCategoryIds.Contains(x.KategorieId) && matchingRecordIds.Contains(x.Id));
+                }
+            }
+
+            var records = await recordsQuery.ToListAsync(ct);
             records = [.. OrderRecordsByVisibleNumber(records)];
             var recordIds = records.Select(record => record.Id).ToArray();
 
@@ -914,6 +1149,9 @@ namespace PmTracker.Web.Services.Export.Queries
                     TypUkoluKod = taskType?.Kod,
                     TypUkolu = taskType?.Nazev,
                     Stav = record.StavUkoluId.HasValue ? taskStates.GetValueOrDefault(record.StavUkoluId.Value)?.Nazev ?? "-" : "-",
+                    IsPaused = record.StavUkoluId.HasValue
+                        && (taskStates.GetValueOrDefault(record.StavUkoluId.Value)?.Nazev ?? string.Empty)
+                            .Contains("pozastav", StringComparison.CurrentCultureIgnoreCase),
                     Vlastnik = BuildDisplayNameFromOsoba(people.GetValueOrDefault(record.VlastnikId)),
                     SubsystemKod = subsystem?.Kod ?? "-",
                     Subsystem = subsystem?.Nazev ?? "-",
@@ -943,17 +1181,17 @@ namespace PmTracker.Web.Services.Export.Queries
 
             if (!anchorIsPreparation)
             {
-                return commentMeeting.Id == anchorMeeting.Id ? "#0F4D8A" : null;
+                return commentMeeting.Id == anchorMeeting.Id ? NewInformationHighlightColor : null;
             }
 
             if (commentMeeting.Id == anchorMeeting.Id)
             {
-                return "#A63A2B";
+                return PreparationHighlightColor;
             }
 
             if (previousMeetingNumber.HasValue && commentMeeting.CisloJednani == previousMeetingNumber.Value)
             {
-                return "#0F4D8A";
+                return NewInformationHighlightColor;
             }
 
             return null;

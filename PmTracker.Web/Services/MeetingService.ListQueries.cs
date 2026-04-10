@@ -60,11 +60,9 @@ public sealed partial class MeetingService
                 .ToDictionaryAsync(x => x.Id, ct);
         return rows
             .GroupBy(x => new { x.ProjektId, x.ProjektNazev })
-            .Select(group => new JednaniProjektListItemViewModel
+            .Select(group =>
             {
-                ProjektId = group.Key.ProjektId,
-                ProjektNazev = group.Key.ProjektNazev,
-                Jednani = group
+                var meetings = group
                     .Select(x => new JednaniListItemViewModel
                     {
                         Id = x.Id,
@@ -78,7 +76,15 @@ public sealed partial class MeetingService
                             ? BuildInlinePersonLabelFromOsoba(lockedPersons.GetValueOrDefault(x.UzamklOsobaId.Value))
                             : null
                     })
-                    .ToList()
+                    .ToList();
+
+                return new JednaniProjektListItemViewModel
+                {
+                    ProjektId = group.Key.ProjektId,
+                    ProjektNazev = group.Key.ProjektNazev,
+                    Jednani = meetings,
+                    RocniSkupiny = MeetingYearGroupBuilder.BuildYearGroups(meetings)
+                };
             })
             .OrderBy(x => x.ProjektNazev, StringComparer.CurrentCultureIgnoreCase)
             .ToList();

@@ -146,7 +146,9 @@ public sealed partial class ProjectService
                         Text = comment.TextVyjadreni,
                         JednaniCislo = meeting?.CisloJednani,
                         JednaniDatum = meeting?.DatumPlanovane,
-                        LzeUpravit = !IsMeetingReadOnly(meeting, meetingState)
+                        LzeUpravit = !IsMeetingReadOnly(meeting, meetingState),
+                        CanEditOwnAsSubsystemLeader = !IsMeetingReadOnly(meeting, meetingState)
+                            && string.Equals(meetingState?.Kod, "DRAFT", StringComparison.OrdinalIgnoreCase)
                     };
                 })
                 .OrderBy(x => x.JednaniCislo ?? int.MaxValue)

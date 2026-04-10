@@ -5,6 +5,7 @@
     var otevrenyStav = Model.StavyJednani.FirstOrDefault(x => string.Equals(x.Value, Model.OtevrenyStavKod, StringComparison.OrdinalIgnoreCase));
     var isLocked = !string.IsNullOrWhiteSpace(Model.UzavrenyStavKod)
         && string.Equals(Model.Jednani.StavKod, Model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase);
+    var isDraftMeeting = string.Equals(Model.Jednani.StavKod, "DRAFT", StringComparison.OrdinalIgnoreCase);
     var canEditMeetingFields = Model.CanEditMeeting && !isLocked;
     var canEditRecordNotes = Model.CanEditRecords && !isLocked;
     var meetingPrintUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = Model.Jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Tisk?autoPrint=true";
@@ -241,6 +242,7 @@
                     var canCommentTask = canEditRecordNotes
                         || (Model.HasSubsystemLeadPermission
                             && !isLocked
+                            && isDraftMeeting
                             && Model.CurrentUserOsobaId > 0
                             && ukol.SubsystemLeadEquivalentOsobaIds.Contains(Model.CurrentUserOsobaId));
                     @await Html.PartialAsync("_TaskItemPartial", new JednaniTaskItemPartialViewModel

@@ -33,7 +33,7 @@ public sealed class CommentCreateAuthorizationDataStoreTests
         await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, allowedSubsystemId, deputyId, SubsystemRoleCodes.DeputyLead);
         var allowedRecordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, allowedSubsystemId, "U", "DeputyAllowed");
         var deniedRecordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, deniedSubsystemId, "U", "DeputyDenied");
-        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9501);
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "DRAFT", meetingNumber: 9501);
 
         var deputyContext = store.BuildCurrentUserContext(deputyId.ToString(CultureInfo.InvariantCulture));
         deputyContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId).Should().BeTrue();
@@ -80,7 +80,7 @@ public sealed class CommentCreateAuthorizationDataStoreTests
         await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, allowedSubsystemId, leadId, SubsystemRoleCodes.Lead);
         var allowedRecordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, allowedSubsystemId, "U", "LeadAllowed");
         var deniedRecordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, deniedSubsystemId, "U", "LeadDenied");
-        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9502);
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "DRAFT", meetingNumber: 9502);
 
         var leadContext = store.BuildCurrentUserContext(leadId.ToString(CultureInfo.InvariantCulture));
         leadContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId).Should().BeTrue();
@@ -141,5 +141,36 @@ public sealed class CommentCreateAuthorizationDataStoreTests
             x.AutorOsobaId == ownerId))
             .Should()
             .BeTrue();
+    }
+
+    [Fact]
+    public async Task AddComment_ShouldDenySubsystemLeadSpecialPermission_InOpenMeeting()
+    {
+        var db = await _fixture.CreateDatabaseAsync("comment_add_lead_open_denied");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var leadId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "LeadOpenDenied");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "LeadOpenDeniedOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "COPENLEAD");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "COPENLEADSUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, leadId, SubsystemRoleCodes.Lead);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "LeadOpenDeniedRecord");
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9504);
+
+        var leadContext = store.BuildCurrentUserContext(leadId.ToString(CultureInfo.InvariantCulture));
+        leadContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId).Should().BeTrue();
+        leadContext.HasPermission(PermissionKeys.RecordsEdit, projectId).Should().BeFalse();
+
+        var action = () => store.AddComment(new AddCommentCommand
+        {
+            ZaznamId = recordId,
+            JednaniId = meetingId,
+            Text = "Subsystem lead cannot comment in OPEN without records.edit."
+        }, leadContext);
+
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Nemáte oprávnění přidat vyjádření*");
     }
 }

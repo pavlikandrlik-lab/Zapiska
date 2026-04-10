@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
+using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Security;
 using System.Globalization;
 
@@ -760,6 +761,7 @@ public sealed class ProjektyController : BaseController
         model.CanCreateMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, model.ProjektId);
         model.CanEditMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, model.ProjektId);
         model.ReturnToProjectUrl = Url.Action(nameof(Detail), new { id = model.ProjektId, tab = "jednani" }) ?? $"/Projekty/Detail/{model.ProjektId}?tab=jednani";
+        model.PreviewRok = MeetingYearGroupBuilder.ResolvePreviewYear(model.RocniSkupiny, GetLocalNow().Year);
     }
 
     private void PrepareProjectTeamTabPresentation(ProjektTymTabViewModel model)

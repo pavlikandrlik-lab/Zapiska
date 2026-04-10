@@ -3,6 +3,8 @@ using System.Text.RegularExpressions;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
+using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Data;
 using PmTracker.Tests.Api.TestInfrastructure;
 
 namespace PmTracker.Tests.Api.Controllers;
@@ -234,6 +236,72 @@ public sealed class RecordEditorControllerTests
         html.Should().Contain("data-record-comments-is-fully-loaded=\"true\"");
         html.Should().NotContain("Zobrazit dalších 5");
         html.Should().NotContain("Zobrazit vše");
+    }
+
+    [Fact]
+    public async Task RecordCommentsPartial_ShouldOfferOnlyDraftMeetings_ForSubsystemLeadWithoutRecordsEdit()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiCommentsDraftOnlyOwner");
+        var leadUserId = await _fixture.EnsurePersonAsync("ApiCommentsDraftOnlyLead");
+        var projectId = await _fixture.EnsureProjectAsync("APIREDCOMMDRAFT");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDCOMMDRAFTSUB", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API comments draft-only record");
+        var draftMeetingId = await _fixture.CreateMeetingAsync(projectId, "DRAFT", 4204);
+        var openMeetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 4205);
+
+        await AssignSubsystemRoleAsync(projectId, subsystemId, leadUserId, SubsystemRoleCodes.Lead);
+        await GrantProjectPermissionAsync(projectId, leadUserId, PermissionKeys.RecordsCommentSubsystemLead, "ApiCommentsDraftOnly");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={recordId}&asUser={leadUserId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("comment-form");
+        html.Should().Contain($"<option value=\"{draftMeetingId}\">");
+        html.Should().NotContain($"<option value=\"{openMeetingId}\">");
+    }
+
+    [Fact]
+    public async Task RecordCommentsPartial_ShouldHideAddForm_WhenSubsystemLeadHasOnlyOpenMeetings()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiCommentsOpenOnlyOwner");
+        var leadUserId = await _fixture.EnsurePersonAsync("ApiCommentsOpenOnlyLead");
+        var projectId = await _fixture.EnsureProjectAsync("APIREDCOMMOPEN");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDCOMMOPENSUB", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API comments open-only record");
+        var openMeetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 4206);
+
+        await AssignSubsystemRoleAsync(projectId, subsystemId, leadUserId, SubsystemRoleCodes.Lead);
+        await GrantProjectPermissionAsync(projectId, leadUserId, PermissionKeys.RecordsCommentSubsystemLead, "ApiCommentsOpenOnly");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={recordId}&asUser={leadUserId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().NotContain("comment-form");
+        html.Should().NotContain($"<option value=\"{openMeetingId}\">");
+    }
+
+    [Fact]
+    public async Task RecordCommentsPartial_ShouldKeepOpenMeetingsVisible_ForRecordsEditUser()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiCommentsEditorOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIREDCOMMEDITOR");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDCOMMEDITORSUB", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API comments editor record");
+        var draftMeetingId = await _fixture.CreateMeetingAsync(projectId, "DRAFT", 4207);
+        var openMeetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 4208);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={recordId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("comment-form");
+        html.Should().Contain($"<option value=\"{draftMeetingId}\">");
+        html.Should().Contain($"<option value=\"{openMeetingId}\">");
     }
 
     [Fact]
@@ -1019,6 +1087,93 @@ public sealed class RecordEditorControllerTests
                 DatumVyjadreni = datum
             });
         }
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task AssignSubsystemRoleAsync(int projectId, int subsystemId, int osobaId, string roleCode)
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+        var roleId = await dbContext.CiselnikRoliSubsystemu.AsNoTracking()
+            .Where(x => x.Kod == roleCode)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync();
+        roleId.Should().NotBeNull();
+
+        var projectSubsystemId = await dbContext.ProjektSubsystemy.AsNoTracking()
+            .Where(x => x.ProjektId == projectId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync();
+        projectSubsystemId.Should().NotBeNull();
+
+        var existing = await dbContext.ObsazeniSubsystemuProjektu
+            .FirstOrDefaultAsync(x =>
+                x.ProjektSubsystemId == projectSubsystemId!.Value &&
+                x.OsobaId == osobaId &&
+                x.RoleSubsystemuId == roleId!.Value &&
+                !x.DatumOdebrani.HasValue);
+        if (existing is not null)
+        {
+            return;
+        }
+
+        dbContext.ObsazeniSubsystemuProjektu.Add(new ObsazeniSubsystemuProjektuEntity
+        {
+            ProjektSubsystemId = projectSubsystemId.Value,
+            OsobaId = osobaId,
+            RoleSubsystemuId = roleId.Value,
+            DatumPrirazeni = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task GrantProjectPermissionAsync(int projectId, int osobaId, string permissionKey, string roleMarker)
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+
+        var permissionId = await dbContext.AuthzPermissions.AsNoTracking()
+            .Where(x => x.IsActive && x.Klic == permissionKey)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync();
+        permissionId.Should().NotBeNull();
+
+        var roleCode = $"API_{roleMarker}_{Guid.NewGuid():N}".ToUpperInvariant();
+        roleCode = roleCode.Length <= 40 ? roleCode : roleCode[..40];
+
+        var role = new AuthzRoleEntity
+        {
+            Kod = roleCode,
+            Nazev = roleMarker,
+            Popis = roleMarker,
+            IsSystem = false,
+            IsActive = true
+        };
+        dbContext.AuthzRoles.Add(role);
+        await dbContext.SaveChangesAsync();
+
+        var rolePermission = new AuthzRolePermissionEntity
+        {
+            RoleId = role.Id,
+            PermissionId = permissionId.Value,
+            ScopeMode = "INCLUDE",
+            IsAllowed = true
+        };
+        dbContext.AuthzRolePermissions.Add(rolePermission);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.AuthzRolePermissionProjects.Add(new AuthzRolePermissionProjectEntity
+        {
+            RolePermissionId = rolePermission.Id,
+            ProjektId = projectId
+        });
+
+        dbContext.AuthzUserRoles.Add(new AuthzUserRoleEntity
+        {
+            OsobaId = osobaId,
+            RoleId = role.Id,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
 
         await dbContext.SaveChangesAsync();
     }

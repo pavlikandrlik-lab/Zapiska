@@ -1,4 +1,5 @@
 import { debounce, measureTextWidth, parseColorChannels, getContrastTextColor, pickSegmentLabel } from "./utils.js";
+import { buildProjectPrintFilterQueryParams, buildProjectPrintFilterSnapshot } from "./filters.js";
 
 const printFormatStorageKey = "pmtracker.print.preferredFormat";
 
@@ -84,16 +85,47 @@ export function closePrintChooser(options) {
     }
 }
 
-export function resolvePrintUrl(trigger, format) {
+export function resolvePrintUrl(trigger, format, options) {
+    const settings = options || {};
     if (!(trigger instanceof Element)) {
         return "";
     }
 
     if (format === "word") {
+        if (typeof settings.wordUrlOverride === "string" && settings.wordUrlOverride) {
+            return settings.wordUrlOverride;
+        }
         return trigger.getAttribute("data-print-word-url") || "";
     }
 
+    if (typeof settings.pdfUrlOverride === "string" && settings.pdfUrlOverride) {
+        return settings.pdfUrlOverride;
+    }
+
     return trigger.getAttribute("data-print-pdf-url") || trigger.getAttribute("href") || "";
+}
+
+function isProjectPrintTrigger(trigger) {
+    return trigger instanceof HTMLElement && trigger.dataset.projectPrintTrigger === "true";
+}
+
+function shouldPromptForProjectPrintFilters(trigger) {
+    return isProjectPrintTrigger(trigger) && buildProjectPrintFilterSnapshot().hasRelevantFilters;
+}
+
+function buildProjectPrintUrl(trigger, format, useCurrentFilters) {
+    const baseUrl = resolvePrintUrl(trigger, format);
+    if (!baseUrl) {
+        return "";
+    }
+
+    const url = new URL(baseUrl, window.location.origin);
+    const { params } = buildProjectPrintFilterQueryParams(useCurrentFilters);
+    params.forEach((value, key) => {
+        url.searchParams.set(key, value);
+    });
+
+    return url.toString();
 }
 
 export function openPrintUrl(url) {
@@ -141,8 +173,8 @@ export function positionPrintChooser(popover, trigger) {
     popover.style.top = `${Math.round(top)}px`;
 }
 
-export function handlePrintChoice(trigger, format, shouldRemember) {
-    const url = resolvePrintUrl(trigger, format);
+export function handlePrintChoice(trigger, format, shouldRemember, options) {
+    const url = resolvePrintUrl(trigger, format, options);
     if (!url) {
         return;
     }
@@ -152,6 +184,100 @@ export function handlePrintChoice(trigger, format, shouldRemember) {
     }
 
     openPrintUrl(url);
+}
+
+function handleProjectPrintScopeChoice(trigger, useCurrentFilters) {
+    const preferredFormat = getStoredPrintFormat();
+    if (preferredFormat) {
+        const preferredUrl = buildProjectPrintUrl(trigger, preferredFormat, useCurrentFilters);
+        if (preferredUrl) {
+            closePrintChooser({ restoreFocus: false });
+            openPrintUrl(preferredUrl);
+            return;
+        }
+    }
+
+    showPrintChooser(trigger, {
+        quickMode: false,
+        pdfUrlOverride: buildProjectPrintUrl(trigger, "pdf", useCurrentFilters),
+        wordUrlOverride: buildProjectPrintUrl(trigger, "word", useCurrentFilters)
+    });
+}
+
+function createProjectPrintScopeChooser(trigger) {
+    const label = trigger.getAttribute("data-print-label") || "Tisk projektu";
+
+    const popover = document.createElement("div");
+    popover.className = "print-format-popover";
+    popover.setAttribute("role", "dialog");
+    popover.setAttribute("aria-modal", "false");
+    popover.setAttribute("data-print-popover", "true");
+    popover.setAttribute("tabindex", "-1");
+
+    const title = document.createElement("h3");
+    title.className = "print-format-title";
+    title.textContent = "Použít aktuální filtry?";
+    popover.appendChild(title);
+
+    const subtitle = document.createElement("p");
+    subtitle.className = "print-format-subtitle";
+    subtitle.textContent = label;
+    popover.appendChild(subtitle);
+
+    const actions = document.createElement("div");
+    actions.className = "print-format-actions";
+
+    const filteredButton = document.createElement("button");
+    filteredButton.type = "button";
+    filteredButton.className = "btn small";
+    filteredButton.textContent = "Použít aktuální filtry";
+    filteredButton.setAttribute("data-print-filter-scope", "current");
+    actions.appendChild(filteredButton);
+
+    const fullProjectButton = document.createElement("button");
+    fullProjectButton.type = "button";
+    fullProjectButton.className = "btn small ghost";
+    fullProjectButton.textContent = "Tisknout celý projekt";
+    fullProjectButton.setAttribute("data-print-filter-scope", "all");
+    actions.appendChild(fullProjectButton);
+
+    popover.appendChild(actions);
+
+    const note = document.createElement("p");
+    note.className = "print-format-note";
+    note.textContent = "Volba se použije jen pro tento tisk a neukládá se.";
+    popover.appendChild(note);
+
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "print-format-close";
+    closeButton.setAttribute("aria-label", "Zavřít výběr filtru pro tisk projektu");
+    closeButton.textContent = "×";
+    popover.appendChild(closeButton);
+
+    popover.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+            return;
+        }
+
+        if (target.closest(".print-format-close")) {
+            event.preventDefault();
+            closePrintChooser({ restoreFocus: true });
+            return;
+        }
+
+        const choice = target.closest("[data-print-filter-scope]");
+        if (!choice) {
+            return;
+        }
+
+        event.preventDefault();
+        const scope = choice.getAttribute("data-print-filter-scope");
+        handleProjectPrintScopeChoice(trigger, scope === "current");
+    });
+
+    return popover;
 }
 
 export function createPrintChooser(trigger, options) {
@@ -245,7 +371,7 @@ export function createPrintChooser(trigger, options) {
 
         const remember = rememberCheckbox.checked;
         closePrintChooser({ restoreFocus: false });
-        handlePrintChoice(trigger, format, remember);
+        handlePrintChoice(trigger, format, remember, settings);
     });
 
     return popover;
@@ -264,7 +390,28 @@ export function showPrintChooser(trigger, options) {
     printState.popover = popover;
     printState.trigger = trigger;
 
-    const firstAction = popover.querySelector("[data-print-choice]");
+    const firstAction = popover.querySelector("[data-print-choice], [data-print-filter-scope]");
+    if (firstAction instanceof HTMLElement) {
+        firstAction.focus({ preventScroll: true });
+    } else {
+        popover.focus({ preventScroll: true });
+    }
+}
+
+function showProjectPrintScopeChooser(trigger) {
+    if (!(trigger instanceof HTMLElement)) {
+        return;
+    }
+
+    closePrintChooser({ restoreFocus: false });
+
+    const popover = createProjectPrintScopeChooser(trigger);
+    document.body.appendChild(popover);
+    positionPrintChooser(popover, trigger);
+    printState.popover = popover;
+    printState.trigger = trigger;
+
+    const firstAction = popover.querySelector("[data-print-filter-scope]");
     if (firstAction instanceof HTMLElement) {
         firstAction.focus({ preventScroll: true });
     } else {
@@ -278,6 +425,11 @@ export function handlePrintTriggerClick(trigger) {
     }
 
     clearPrintHoverTimer();
+    if (shouldPromptForProjectPrintFilters(trigger)) {
+        showProjectPrintScopeChooser(trigger);
+        return;
+    }
+
     const preferredFormat = getStoredPrintFormat();
     if (preferredFormat) {
         const preferredUrl = resolvePrintUrl(trigger, preferredFormat);
@@ -310,6 +462,10 @@ export function initPrintFormatChooser() {
         }
 
         if (event instanceof PointerEvent && event.pointerType !== "mouse") {
+            return;
+        }
+
+        if (shouldPromptForProjectPrintFilters(trigger)) {
             return;
         }
 

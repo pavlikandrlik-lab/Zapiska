@@ -31,6 +31,23 @@ public sealed class PeopleControllerTests
     }
 
     [Fact]
+    public async Task Index_ShouldRenderSearch_AndSortablePeopleTable()
+    {
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync($"/Osoby?asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("data-osoby-table-card");
+        html.Should().Contain("data-table-tools-root");
+        html.Should().Contain("data-table-tools-search-input");
+        html.Should().Contain("data-table-tools-table");
+        html.Should().Contain("data-table-sort-button");
+        html.Should().Contain("Žádná osoba neodpovídá zadanému filtru.");
+    }
+
+    [Fact]
     public async Task AdPersonModal_ShouldReturnForbidden_WhenUserContextCannotBeResolved()
     {
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });

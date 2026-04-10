@@ -23,7 +23,7 @@ public sealed class CommentAuthorizationPolicyTests
                 ProjectIds = Array.Empty<int>()
             });
 
-        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [999]).Should().BeTrue();
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [999], isDraftMeeting: false).Should().BeTrue();
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public sealed class CommentAuthorizationPolicyTests
     }
 
     [Fact]
-    public void CanModifyComment_ShouldAllowOnlyOwnComment_InSubsystemLeadMode()
+    public void CanModifyComment_ShouldAllowOnlyOwnComment_InSubsystemLeadModeForDraft()
     {
         var user = BuildUser(
             osobaId: 20,
@@ -61,8 +61,62 @@ public sealed class CommentAuthorizationPolicyTests
                 ProjectIds = Array.Empty<int>()
             });
 
-        _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 20).Should().BeTrue();
-        _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 30).Should().BeFalse();
+        _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 20, isDraftMeeting: true).Should().BeTrue();
+        _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 30, isDraftMeeting: true).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanAddComment_ShouldDenySubsystemLeaderSpecialRight_InOpen()
+    {
+        var user = BuildUser(
+            osobaId: 12,
+            visibleProjectIds: [2],
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
+                ScopeLevel = "PROJECT",
+                ScopeMode = "INCLUDE",
+                IsAllowed = true,
+                ProjectIds = new[] { 2 }
+            });
+
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12], isDraftMeeting: false).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanModifyComment_ShouldDenySubsystemLeaderSpecialRight_InOpen()
+    {
+        var user = BuildUser(
+            osobaId: 20,
+            visibleProjectIds: [9],
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
+                ScopeLevel = "PROJECT",
+                ScopeMode = "ALL",
+                IsAllowed = true,
+                ProjectIds = Array.Empty<int>()
+            });
+
+        _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 20, isDraftMeeting: false).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanModifyComment_ShouldAllowForeignComment_WhenUserHasRecordsEdit()
+    {
+        var user = BuildUser(
+            osobaId: 20,
+            visibleProjectIds: [9],
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.RecordsEdit,
+                ScopeLevel = "PROJECT",
+                ScopeMode = "ALL",
+                IsAllowed = true,
+                ProjectIds = Array.Empty<int>()
+            });
+
+        _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [21], commentAuthorOsobaId: 30, isDraftMeeting: false).Should().BeTrue();
     }
 
     [Fact]
@@ -82,7 +136,7 @@ public sealed class CommentAuthorizationPolicyTests
             });
 
         _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12]).Should().BeFalse();
-        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12]).Should().BeFalse();
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12], isDraftMeeting: true).Should().BeFalse();
     }
 
     private static CurrentUserContextViewModel BuildUser(

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
+using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
@@ -35,6 +36,8 @@ public sealed class JednaniController : BaseController
                     ProjektId = project.ProjektId,
                     ProjektNazev = project.ProjektNazev,
                     Jednani = project.Jednani,
+                    RocniSkupiny = project.RocniSkupiny,
+                    PreviewRok = MeetingYearGroupBuilder.ResolvePreviewYear(project.RocniSkupiny, GetLocalNow().Year),
                     CanDeleteMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, project.ProjektId)
                 })
                 .ToList()
@@ -126,12 +129,15 @@ public sealed class JednaniController : BaseController
             return NotFound();
         }
 
+        var isRelevantSubsystemLeader = ukol.SubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
         var canEditRecordNotes = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId.Value)
             && ukol.LzeUpravovatVyjadreni;
+        var isDraftMeeting = string.Equals(meeting.StavKod, "DRAFT", StringComparison.OrdinalIgnoreCase);
         var canCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId.Value)
-            && ukol.SubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId)
+            && isRelevantSubsystemLeader
+            && isDraftMeeting
             && ukol.LzeUpravovatVyjadreni;
-        if (!canEditRecordNotes && !canCommentAsSubsystemLeader)
+        if (!canEditRecordNotes && !canCommentAsSubsystemLeader && !isRelevantSubsystemLeader)
         {
             return Forbid();
         }

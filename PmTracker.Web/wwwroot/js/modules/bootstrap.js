@@ -17,6 +17,7 @@ import {
     toggleRecordCard,
     toggleMeetingAttendancePanel
 } from "./navigation.js";
+import { initMeetingOverview, toggleMeetingYearGroup } from "./meetingOverview.js";
 import {
     clearProjectFilterInput,
     clearProjectFilterPreferenceStorage,
@@ -56,7 +57,8 @@ import {
     persistScheduleFilterState,
     queueRecordSchedulePlannerRecalc,
     renderStaticTimelineAxes,
-    setScheduleFilterPanelOpen
+    setScheduleFilterPanelOpen,
+    toggleScheduleBreakdown
 } from "./schedule.js";
 import {
     clearStoredPrintFormat,
@@ -71,6 +73,7 @@ import {
 import { debounce } from "./utils.js";
 import { initSessionCoordinator } from "./session.js";
 import { initTheme } from "./theme.js";
+import { initTableTools } from "./tableTools.js";
 
 const projectIndexFilterOptions = {
     hideDoneStorageKey: "pmtracker.projects.hideDone",
@@ -183,6 +186,20 @@ function handleDocumentClick(event) {
     if (attendanceToggle instanceof HTMLButtonElement) {
         event.preventDefault();
         toggleMeetingAttendancePanel(attendanceToggle);
+        return;
+    }
+
+    const meetingYearToggle = target.closest("[data-meeting-year-toggle]");
+    if (meetingYearToggle instanceof HTMLButtonElement) {
+        event.preventDefault();
+        toggleMeetingYearGroup(meetingYearToggle);
+        return;
+    }
+
+    const scheduleExpandToggle = target.closest("[data-schedule-expand-toggle]");
+    if (scheduleExpandToggle instanceof HTMLButtonElement) {
+        event.preventDefault();
+        toggleScheduleBreakdown(scheduleExpandToggle);
         return;
     }
 
@@ -426,6 +443,10 @@ const rerenderTimelineAxesOnResize = debounce(() => {
     });
 }, 140);
 
+const reflowMeetingOverviewsOnResize = debounce(() => {
+    initMeetingOverview(document);
+}, 120);
+
 function normalizeEventBindings(bindings) {
     return Array.isArray(bindings) ? bindings : [];
 }
@@ -462,7 +483,8 @@ export function bootstrapPmTrackerApp() {
         { type: "scroll", handler: queueFloatingPanelReposition, options: true },
         { type: "resize", handler: queueFloatingPanelReposition },
         { type: "resize", handler: rerenderRainbowLabelsOnResize },
-        { type: "resize", handler: rerenderTimelineAxesOnResize }
+        { type: "resize", handler: rerenderTimelineAxesOnResize },
+        { type: "resize", handler: reflowMeetingOverviewsOnResize }
     ]);
 
     runInitializers([
@@ -479,6 +501,8 @@ export function bootstrapPmTrackerApp() {
         () => initPageSwitchers(),
         () => initRecordFormEnhancements(document),
         () => initPermissionMetadataBindings(document),
+        () => initTableTools(document),
+        () => initMeetingOverview(document),
         () => initProjectIndexUi(),
         () => initSessionCoordinator(),
         () => initModalAjaxSubmit()

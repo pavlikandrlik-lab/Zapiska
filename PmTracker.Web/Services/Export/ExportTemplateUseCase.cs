@@ -4,15 +4,15 @@ namespace PmTracker.Web.Services.Export;
 
 public interface IExportTemplateUseCase
 {
-    Task<PdfExportTemplateViewModel> BuildProjectTemplateAsync(int projektId, CurrentUserContextViewModel currentUser, bool autoPrint, CancellationToken ct = default);
+    Task<PdfExportTemplateViewModel> BuildProjectTemplateAsync(int projektId, CurrentUserContextViewModel currentUser, bool autoPrint, ProjectExportRecordFilters? filters = null, CancellationToken ct = default);
     Task<PdfExportTemplateViewModel> BuildMeetingTemplateAsync(int jednaniId, CurrentUserContextViewModel currentUser, bool autoPrint, CancellationToken ct = default);
     Task<PdfExportTemplateViewModel> BuildTaskTemplateAsync(int projektId, int zaznamId, CurrentUserContextViewModel currentUser, bool autoPrint, CancellationToken ct = default);
 }
 
 public sealed class ExportTemplateUseCase(IExportTemplateQueries queries, TimeProvider timeProvider) : IExportTemplateUseCase
 {
-    public async Task<PdfExportTemplateViewModel> BuildProjectTemplateAsync(int projektId, CurrentUserContextViewModel currentUser, bool autoPrint, CancellationToken ct = default)
-        => BuildTemplate(await queries.GetProjectTemplateAsync(projektId, ct), currentUser, autoPrint);
+    public async Task<PdfExportTemplateViewModel> BuildProjectTemplateAsync(int projektId, CurrentUserContextViewModel currentUser, bool autoPrint, ProjectExportRecordFilters? filters = null, CancellationToken ct = default)
+        => BuildTemplate(await queries.GetProjectTemplateAsync(projektId, currentUser, filters, ct), currentUser, autoPrint);
 
     public async Task<PdfExportTemplateViewModel> BuildMeetingTemplateAsync(int jednaniId, CurrentUserContextViewModel currentUser, bool autoPrint, CancellationToken ct = default)
         => BuildTemplate(await queries.GetMeetingTemplateAsync(jednaniId, ct), currentUser, autoPrint);
@@ -50,7 +50,7 @@ public sealed class ExportTemplateUseCase(IExportTemplateQueries queries, TimePr
             Zaznamy = queryResult.Zaznamy,
             NormalizedVariant = normalizedVariant,
             IsMeeting = string.Equals(normalizedVariant, "meeting", StringComparison.Ordinal),
-            IsProjectSummary = string.Equals(normalizedVariant, "project_all", StringComparison.Ordinal),
+            IsProjectSummary = normalizedVariant.StartsWith("project_", StringComparison.Ordinal),
             DocumentTitle = BuildDocumentTitle(normalizedVariant, queryResult.ProjektNazev, queryResult.JednaniCislo),
             ExportTypeLabel = string.Equals(normalizedVariant, "task_single", StringComparison.Ordinal)
                 ? "Jeden úkol"

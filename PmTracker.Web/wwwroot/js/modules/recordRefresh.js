@@ -23,6 +23,7 @@ import {
     setActiveTab,
     syncTabQuery
 } from "./projectTabs.js";
+import { initMeetingOverview } from "./meetingOverview.js";
 import { initProjectScheduleUi } from "./schedule.js";
 import { closeAllFloatingPanels } from "./ui.js";
 
@@ -530,6 +531,7 @@ export async function refreshPageScope(payload) {
             initProjectTabs();
             initProjectRecordsUi();
             initProjectScheduleUi();
+            initMeetingOverview(document);
             initCommentSortUi(document);
             if (preserveRecordUi) {
                 await restoreRecordUiState(recordUiState);

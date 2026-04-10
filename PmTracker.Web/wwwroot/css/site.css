@@ -224,6 +224,48 @@
     font-weight: 600;
 }
 
+gov-theme-switch {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+gov-theme-switch .gov-theme-switch-button {
+    border: none;
+    background: transparent;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+}
+
+gov-theme-switch .gov-theme-switch-button:focus-visible {
+    outline: 2px solid var(--gov-color-primary);
+    outline-offset: 2px;
+    border-radius: 999px;
+}
+
+gov-theme-switch[data-theme-switch-state="dark"] .gov-theme-switch-track {
+    background: var(--gov-color-primary);
+    border-color: var(--gov-color-primary);
+    box-shadow: inset 0 1px 1px rgba(5, 51, 117, 0.24);
+}
+
+gov-theme-switch[data-theme-switch-state="dark"] .gov-theme-switch-thumb {
+    transform: translateX(24px);
+}
+
+gov-theme-switch[data-theme-switch-state="dark"] .gov-theme-switch-icon-sun {
+    opacity: 0.45;
+}
+
+gov-theme-switch[data-theme-switch-state="dark"] .gov-theme-switch-icon-moon {
+    color: #eef4ff;
+}
+
 .user-menu {
     position: relative;
 }
@@ -1120,6 +1162,62 @@
     flex-wrap: nowrap;
 }
 
+.table-tools-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.table-tools-search {
+    display: grid;
+    gap: 6px;
+    min-width: min(360px, 100%);
+    font-size: 14px;
+    color: var(--app-text-primary);
+}
+
+.table-tools-search input[type="search"] {
+    width: min(360px, 100%);
+}
+
+.table-sort-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    padding: 0;
+    cursor: pointer;
+}
+
+.table-sort-button::after {
+    content: "↕";
+    font-size: 11px;
+    color: var(--gov-color-muted);
+}
+
+.table-sort-button.is-active::after,
+.table-sort-button[data-table-sort-direction="asc"]::after {
+    content: "↑";
+    color: var(--gov-color-primary);
+}
+
+.table-sort-button[data-table-sort-direction="desc"]::after {
+    content: "↓";
+    color: var(--gov-color-primary);
+}
+
+.table-empty-row {
+    color: var(--app-muted);
+    font-style: italic;
+}
+
 .btn {
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
@@ -1868,6 +1966,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     top: 0;
     left: 4px;
     display: inline-block;
+    box-sizing: border-box;
     max-width: calc(100% - 4px);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3859,6 +3958,94 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
+.meeting-card-slot {
+    min-width: 0;
+}
+
+.meeting-card-slot > .meeting-card {
+    height: 100%;
+}
+
+.meeting-project-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.meeting-year-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.meeting-year-group {
+    border: 1px solid var(--gov-color-border);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--gov-color-primary) 4%, var(--gov-color-surface));
+    overflow: hidden;
+}
+
+.meeting-year-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 16px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.meeting-year-toggle:hover {
+    background: color-mix(in srgb, var(--gov-color-primary) 8%, var(--gov-color-surface));
+}
+
+.meeting-year-toggle-main {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.meeting-year-title {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.meeting-year-count {
+    font-size: 14px;
+    color: var(--gov-color-muted);
+}
+
+.meeting-year-chevron {
+    width: 12px;
+    height: 12px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.18s ease;
+    flex: 0 0 auto;
+    margin-top: -4px;
+}
+
+.meeting-year-group[data-meeting-year-state="open"] .meeting-year-chevron,
+.meeting-year-group[data-meeting-year-state="preview"] .meeting-year-chevron {
+    transform: rotate(-135deg);
+    margin-top: 4px;
+}
+
+.meeting-year-body {
+    padding: 0 16px 16px;
+}
+
+.meeting-year-body.is-preview {
+    overflow: hidden;
+}
+
 .meeting-card {
     border: 1px solid var(--gov-color-border);
     border-radius: 14px;
@@ -4423,6 +4610,32 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 :root[data-theme="dark"] .user-menu-toggle:hover {
     background: #16233a;
+}
+
+:root[data-theme="dark"] gov-theme-switch .gov-theme-switch-track {
+    background: #2d3a53;
+    border-color: #405273;
+}
+
+:root[data-theme="dark"] gov-theme-switch .gov-theme-switch-thumb {
+    background: #dce5ff;
+}
+
+:root[data-theme="dark"] gov-theme-switch .gov-theme-switch-icon-sun {
+    color: #f3c96b;
+}
+
+:root[data-theme="dark"] gov-theme-switch .gov-theme-switch-icon-moon {
+    color: #b7c8ea;
+}
+
+:root[data-theme="dark"] gov-theme-switch[data-theme-switch-state="dark"] .gov-theme-switch-track {
+    background: var(--gov-color-primary);
+    border-color: var(--gov-color-primary);
+}
+
+:root[data-theme="dark"] gov-theme-switch[data-theme-switch-state="dark"] .gov-theme-switch-icon-moon {
+    color: #f8fbff;
 }
 
 :root[data-theme="dark"] .gov-theme-switch-track,

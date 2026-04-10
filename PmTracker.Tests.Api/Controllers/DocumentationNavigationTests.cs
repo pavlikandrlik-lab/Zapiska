@@ -64,5 +64,22 @@ public sealed class DocumentationNavigationTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().NotContain("Vzhled: přepnout");
+        html.Should().Contain("<gov-theme-switch", "layout má používat oficiální template kontrakt komponenty");
+        html.Should().Contain("aria-label=\"Přepínač barevného schématu stránky\"");
+        html.Should().NotContain("theme-switch-main", "layout už nemá renderovat vlastní checkbox markup");
+    }
+
+    [Fact]
+    public async Task Layout_ShouldRenderServerThemeAttributesFromCookie()
+    {
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add("Cookie", "pmtracker.theme.mode=dark");
+
+        var response = await client.GetAsync($"/Projekty?asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("data-theme=\"dark\"");
+        html.Should().Contain("data-theme-mode=\"dark\"");
     }
 }

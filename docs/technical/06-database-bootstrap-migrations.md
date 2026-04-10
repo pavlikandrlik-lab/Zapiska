@@ -47,7 +47,7 @@ sqlcmd -S $SQL_INSTANCE -E -d $DB_NAME -b -i "$SQL_DIR\db_upgrade_1_1_1_external
 ### 5.4 Povinné baseline kontroly
 ```sql
 SELECT kod FROM dbo.ciselnik_stavu_projektu WHERE kod IN ('PLAN','RUN','DONE','DELETED');
-SELECT kod FROM dbo.ciselnik_roli_projektu WHERE kod IN ('VLASTNIK_PROJEKTU','HOST','ADM_PROJ');
+SELECT kod FROM dbo.ciselnik_roli_projektu WHERE kod IN ('VLASTNIK_PROJEKTU','HOST','ADM_PROJ','PROJ_MAN');
 SELECT kod FROM dbo.ciselnik_roli_subsystemu WHERE kod IN ('VEDOUCI_SUBSYSTEMU','ZASTUPCE_VEDOUCIHO_SUBSYSTEMU','METODIK_SUBSYSTEMU');
 SELECT id, kod FROM dbo.ciselnik_organizace WHERE kod='MO';
 SELECT COUNT(*) AS osoby_count FROM dbo.osoby;

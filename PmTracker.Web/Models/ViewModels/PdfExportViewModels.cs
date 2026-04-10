@@ -76,6 +76,7 @@ public sealed class PdfExportRecordViewModel
     public string? TypUkoluKod { get; init; }
     public string? TypUkolu { get; init; }
     public required string Stav { get; init; }
+    public bool IsPaused { get; init; }
     public required string Vlastnik { get; init; }
     public required string SubsystemKod { get; init; }
     public required string Subsystem { get; init; }

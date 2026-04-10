@@ -26,17 +26,17 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
         return _permissionEvaluationService.HasPermission(currentUser, PermissionKeys.RecordsCommentSubsystemLead, projektId);
     }
 
-    public bool CanAddComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds)
+    public bool CanAddComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, bool isDraftMeeting)
     {
         if (_permissionEvaluationService.HasPermission(currentUser, PermissionKeys.RecordsEdit, projektId))
         {
             return true;
         }
 
-        return CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
+        return isDraftMeeting && CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
     }
 
-    public bool CanModifyComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, int commentAuthorOsobaId)
+    public bool CanModifyComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, int commentAuthorOsobaId, bool isDraftMeeting)
     {
         if (_permissionEvaluationService.HasPermission(currentUser, PermissionKeys.RecordsEdit, projektId))
         {
@@ -45,6 +45,7 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
 
         return commentAuthorOsobaId > 0
             && currentUser.OsobaId == commentAuthorOsobaId
+            && isDraftMeeting
             && CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
     }
 }

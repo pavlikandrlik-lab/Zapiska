@@ -189,6 +189,61 @@ public sealed class ProjektyControllerBehaviorTests
         payload.Results[0].Label.Should().Be("Jan Novak");
     }
 
+    [Fact]
+    public async Task JednaniTabPartial_ShouldUseCurrentYear_AsPreviewYear_WhenAvailable()
+    {
+        const int projectId = 118;
+        var fixedUtcNow = new DateTimeOffset(2026, 4, 9, 10, 0, 0, TimeSpan.Zero);
+        var currentYear = TimeZoneInfo.ConvertTime(fixedUtcNow, TimeZoneInfo.Local).Year;
+        var projectService = new FakeProjectService
+        {
+            ProjektDetail = CreateEmptyProjektDetail(projectId),
+            MeetingsTab = new ProjektJednaniTabViewModel
+            {
+                ProjektId = projectId,
+                RocniSkupiny =
+                [
+                    new JednaniYearGroupViewModel { Rok = currentYear - 1, Jednani = [] },
+                    new JednaniYearGroupViewModel { Rok = currentYear, Jednani = [] }
+                ]
+            }
+        };
+        var controller = CreateController(projectService, new FixedTimeProvider(fixedUtcNow));
+
+        var result = await controller.JednaniTabPartial(projectId);
+
+        var partial = result.Should().BeOfType<PartialViewResult>().Subject;
+        var model = partial.Model.Should().BeOfType<ProjektJednaniTabViewModel>().Subject;
+        model.PreviewRok.Should().Be(currentYear);
+    }
+
+    [Fact]
+    public async Task JednaniTabPartial_ShouldFallbackPreviewYear_ToNewestAvailableYear_WhenCurrentYearMissing()
+    {
+        const int projectId = 119;
+        var fixedUtcNow = new DateTimeOffset(2026, 4, 9, 10, 0, 0, TimeSpan.Zero);
+        var projectService = new FakeProjectService
+        {
+            ProjektDetail = CreateEmptyProjektDetail(projectId),
+            MeetingsTab = new ProjektJednaniTabViewModel
+            {
+                ProjektId = projectId,
+                RocniSkupiny =
+                [
+                    new JednaniYearGroupViewModel { Rok = 2024, Jednani = [] },
+                    new JednaniYearGroupViewModel { Rok = 2025, Jednani = [] }
+                ]
+            }
+        };
+        var controller = CreateController(projectService, new FixedTimeProvider(fixedUtcNow));
+
+        var result = await controller.JednaniTabPartial(projectId);
+
+        var partial = result.Should().BeOfType<PartialViewResult>().Subject;
+        var model = partial.Model.Should().BeOfType<ProjektJednaniTabViewModel>().Subject;
+        model.PreviewRok.Should().Be(2025);
+    }
+
     private static ProjektyController CreateController(
         FakeProjectService projectService,
         TimeProvider? timeProvider = null,
@@ -347,6 +402,7 @@ public sealed class ProjektyControllerBehaviorTests
             {
                 ProjektId = id,
                 Jednani = MeetingsTab.Jednani,
+                RocniSkupiny = MeetingsTab.RocniSkupiny,
                 StavyJednani = MeetingsTab.StavyJednani
             });
 

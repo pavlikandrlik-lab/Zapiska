@@ -13,7 +13,16 @@ public sealed class JednaniProjektListItemViewModel
     public int ProjektId { get; init; }
     public required string ProjektNazev { get; init; }
     public required IReadOnlyList<JednaniListItemViewModel> Jednani { get; init; }
+    public IReadOnlyList<JednaniYearGroupViewModel> RocniSkupiny { get; init; } = Array.Empty<JednaniYearGroupViewModel>();
+    public int? PreviewRok { get; set; }
     public bool CanDeleteMeetings { get; set; }
+}
+
+public sealed class JednaniYearGroupViewModel
+{
+    public int Rok { get; init; }
+    public IReadOnlyList<JednaniListItemViewModel> Jednani { get; init; } = Array.Empty<JednaniListItemViewModel>();
+    public int PocetJednani => Jednani.Count;
 }
 
 public sealed class JednaniDetailViewModel : BaseViewModel
@@ -74,6 +83,7 @@ public sealed class JednaniVyjadreniViewModel
     public DateTime Datum { get; init; }
     public required string Text { get; init; }
     public bool LzeUpravit { get; init; }
+    public bool CanEditOwnAsSubsystemLeader { get; init; }
 }
 
 public sealed class JednaniTaskItemPartialViewModel

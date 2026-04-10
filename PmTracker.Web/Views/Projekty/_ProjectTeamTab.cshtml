@@ -3,7 +3,15 @@
     var isActive = ViewData["IsActive"] as bool? ?? false;
 }
 
-<section class="tab-panel @(isActive ? "active" : null)" data-tab-panel="tym">
+<section class="tab-panel @(isActive ? "active" : null)" data-tab-panel="tym" data-table-tools-root>
+    <div class="table-tools-toolbar">
+        <label class="table-tools-search">
+            <span>Hledat v týmu</span>
+            <input type="search"
+                   placeholder="Osoba, role, subsystém, organizace..."
+                   data-table-tools-search-input />
+        </label>
+    </div>
     <div class="stack-lg">
         <section class="card">
             <div class="panel-header">
@@ -16,24 +24,40 @@
                     </div>
                 }
             </div>
-            <table class="table">
+            <table class="table" data-table-tools-table data-table-empty-message="Žádná projektová role neodpovídá zadanému filtru.">
                 <thead>
                     <tr>
-                        <th>Osoba</th>
-                        <th>Email</th>
-                        <th>Typ role</th>
-                        <th>Role</th>
-                        <th>Subsystém</th>
-                        <th>Organizace</th>
-                        <th>Organizační celek</th>
-                        <th>Přiřazeno</th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="0" data-table-sort-type="text" data-table-sort-default="true">Osoba</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="1" data-table-sort-type="text">Email</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="2" data-table-sort-type="text">Typ role</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="3" data-table-sort-type="text">Role</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="4" data-table-sort-type="text">Subsystém</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="5" data-table-sort-type="text">Organizace</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="6" data-table-sort-type="text">Organizační celek</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="7" data-table-sort-type="datetime">Přiřazeno</button>
+                        </th>
                         <th class="table-actions">Akce</th>
                     </tr>
                 </thead>
                 <tbody>
                 @foreach (var role in Model.AktivniRole)
                 {
-                    <tr>
+                    <tr data-table-row>
                         <td>@role.Osoba</td>
                         <td>@(string.IsNullOrWhiteSpace(role.Email) ? "-" : role.Email)</td>
                         <td>@role.RoleTypeLabel</td>
@@ -41,7 +65,7 @@
                         <td>@(string.IsNullOrWhiteSpace(role.SubsystemNazev) ? "-" : role.SubsystemNazev)</td>
                         <td>@(role.Organizace ?? "-")</td>
                         <td>@(role.OrganizacniCelek ?? "-")</td>
-                        <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td data-table-sort-value="@role.DatumPrirazeni.ToString("O")">@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
                         <td class="table-actions">
                             @if (Model.CanManageTeam)
                             {
@@ -89,22 +113,28 @@
                     <button class="btn primary" type="button" data-modal-url="@Url.Action("AssignProjectSubsystemModal", "Projekty", new { projektId = Model.ProjektId })">Přiřadit subsystém</button>
                 }
             </div>
-            <table class="table">
+            <table class="table" data-table-tools-table data-table-empty-message="Žádný subsystém neodpovídá zadanému filtru.">
                 <thead>
                     <tr>
-                        <th>Kód</th>
-                        <th>Subsystém</th>
-                        <th>Přiřazeno</th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="0" data-table-sort-type="text" data-table-sort-default="true">Kód</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="1" data-table-sort-type="text">Subsystém</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="2" data-table-sort-type="datetime">Přiřazeno</button>
+                        </th>
                         <th class="table-actions">Akce</th>
                     </tr>
                 </thead>
                 <tbody>
                 @foreach (var subsystem in Model.AktivniSubsystemyProjektu)
                 {
-                    <tr>
+                    <tr data-table-row>
                         <td>@subsystem.Kod</td>
                         <td>@subsystem.Nazev</td>
-                        <td>@subsystem.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td data-table-sort-value="@subsystem.DatumPrirazeni.ToString("O")">@subsystem.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
                         <td class="table-actions">
                             @if (Model.CanManageTeam)
                             {
@@ -133,27 +163,39 @@
             <div class="panel-header">
                 <h3>Historie rolí</h3>
             </div>
-            <table class="table">
+            <table class="table" data-table-tools-table data-table-empty-message="Žádná historická role neodpovídá zadanému filtru.">
                 <thead>
                     <tr>
-                        <th>Osoba</th>
-                        <th>Typ role</th>
-                        <th>Role</th>
-                        <th>Subsystém</th>
-                        <th>Přiřazeno</th>
-                        <th>Odebráno</th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="0" data-table-sort-type="text" data-table-sort-default="true">Osoba</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="1" data-table-sort-type="text">Typ role</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="2" data-table-sort-type="text">Role</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="3" data-table-sort-type="text">Subsystém</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="4" data-table-sort-type="datetime">Přiřazeno</button>
+                        </th>
+                        <th>
+                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="5" data-table-sort-type="datetime">Odebráno</button>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
                 @foreach (var role in Model.HistorieRoli)
                 {
-                    <tr>
+                    <tr data-table-row>
                         <td>@role.Osoba</td>
                         <td>@role.RoleTypeLabel</td>
                         <td>@role.RoleNazev</td>
                         <td>@(string.IsNullOrWhiteSpace(role.SubsystemNazev) ? "-" : role.SubsystemNazev)</td>
-                        <td>@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
-                        <td>@(role.DatumOdebrani?.ToString("dd.MM.yyyy HH:mm") ?? "-")</td>
+                        <td data-table-sort-value="@role.DatumPrirazeni.ToString("O")">@role.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td data-table-sort-value="@(role.DatumOdebrani?.ToString("O") ?? string.Empty)">@(role.DatumOdebrani?.ToString("dd.MM.yyyy HH:mm") ?? "-")</td>
                     </tr>
                 }
                 </tbody>

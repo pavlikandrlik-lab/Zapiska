@@ -599,10 +599,16 @@ public sealed class ZaznamyController : BaseController
         var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId);
         var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, model.ProjektId)
             && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
+        if (!canEditRecord && canCommentAsSubsystemLead)
+        {
+            model.OtevrenaJednani = model.OtevrenaJednani
+                .Where(item => item.IsDraft)
+                .ToList();
+        }
 
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.CanEditRecord = canEditRecord;
         model.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
-        model.CanAddComment = canEditRecord || canCommentAsSubsystemLead;
+        model.CanAddComment = model.OtevrenaJednani.Count > 0 && (canEditRecord || canCommentAsSubsystemLead);
     }
 }

@@ -51,6 +51,7 @@ public sealed class SeedBaselineDocumentationTests
         script.Should().Contain("VLASTNIK_PROJEKTU");
         script.Should().Contain("HOST");
         script.Should().Contain("ADM_PROJ");
+        script.Should().Contain("PROJ_MAN");
         script.Should().NotContain("VED_SUB");
         script.Should().NotContain("ANALYTIK");
         script.Should().NotContain("DEV");

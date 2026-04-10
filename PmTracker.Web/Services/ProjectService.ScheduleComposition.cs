@@ -175,32 +175,50 @@ public sealed partial class ProjectService
     {
         var previousPlanRight = 0d;
         var previousActualRight = 0d;
+        var skippedCompactActualWidth = 0d;
 
         foreach (var krok in kroky)
         {
             var rawPlanLeft = ToAxisPercent(krok.PlanStart, compactAxisStart, compactAxisDays);
             var rawPlanRight = ToAxisPercent(krok.PlanEnd, compactAxisStart, compactAxisDays);
-            var planLeft = Math.Max(previousPlanRight, rawPlanLeft);
-            var planRight = Math.Max(planLeft, rawPlanRight);
-            var planWidth = Math.Max(0d, planRight - planLeft);
-            krok.CompactPlanLeftPercent = FormatPercent(planLeft);
-            krok.CompactPlanWidthStyle = planWidth > 0d
-                ? $"calc({FormatPercent(planWidth)}% + 1px)"
-                : "0%";
-            krok.CompactPlanTitle = $"{krok.Nazev}: plán {krok.PlanStart:dd.MM.yyyy} - {krok.PlanEnd:dd.MM.yyyy}";
-            previousPlanRight = planRight;
-
             var rawActualLeft = ToAxisPercent(krok.RealStart, compactAxisStart, compactAxisDays);
             var rawActualRight = ToAxisPercent(krok.RealEnd, compactAxisStart, compactAxisDays);
-            var actualLeft = Math.Max(previousActualRight, rawActualLeft);
-            var actualRight = Math.Max(actualLeft, rawActualRight);
-            var actualWidth = Math.Max(0d, actualRight - actualLeft);
-            krok.CompactActualLeftPercent = FormatPercent(actualLeft);
-            krok.CompactActualWidthStyle = actualWidth > 0d
-                ? $"calc({FormatPercent(actualWidth)}% + 1px)"
-                : "0%";
-            krok.CompactActualTitle = $"{krok.Nazev}: skutečnost {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}";
-            previousActualRight = actualRight;
+            krok.HasCompactVisualDuration = krok.TrvaniDni > 0;
+
+            if (krok.HasCompactVisualDuration)
+            {
+                var planLeft = Math.Max(previousPlanRight, rawPlanLeft);
+                var planRight = Math.Max(planLeft, rawPlanRight);
+                var planWidth = Math.Max(0d, planRight - planLeft);
+                krok.CompactPlanLeftPercent = FormatPercent(planLeft);
+                krok.CompactPlanWidthStyle = planWidth > 0d
+                    ? $"calc({FormatPercent(planWidth)}% + 1px)"
+                    : "0%";
+                krok.CompactPlanTitle = $"{krok.Nazev}: plán {krok.PlanStart:dd.MM.yyyy} - {krok.PlanEnd:dd.MM.yyyy}";
+                previousPlanRight = planRight;
+
+                var adjustedActualLeft = Math.Max(0d, rawActualLeft - skippedCompactActualWidth);
+                var adjustedActualRight = Math.Max(adjustedActualLeft, rawActualRight - skippedCompactActualWidth);
+                var actualLeft = Math.Max(previousActualRight, adjustedActualLeft);
+                var actualRight = Math.Max(actualLeft, adjustedActualRight);
+                var actualWidth = Math.Max(0d, actualRight - actualLeft);
+                krok.CompactActualLeftPercent = FormatPercent(actualLeft);
+                krok.CompactActualWidthStyle = actualWidth > 0d
+                    ? $"calc({FormatPercent(actualWidth)}% + 1px)"
+                    : "0%";
+                krok.CompactActualTitle = $"{krok.Nazev}: skutečnost {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}";
+                previousActualRight = actualRight;
+            }
+            else
+            {
+                krok.CompactPlanLeftPercent = FormatPercent(rawPlanLeft);
+                krok.CompactPlanWidthStyle = "0%";
+                krok.CompactPlanTitle = $"{krok.Nazev}: plán {krok.PlanStart:dd.MM.yyyy} - {krok.PlanEnd:dd.MM.yyyy}";
+                krok.CompactActualLeftPercent = FormatPercent(Math.Max(0d, rawActualLeft - skippedCompactActualWidth));
+                krok.CompactActualWidthStyle = "0%";
+                krok.CompactActualTitle = $"{krok.Nazev}: skutečnost {krok.RealStart:dd.MM.yyyy} - {krok.RealEnd:dd.MM.yyyy}";
+                skippedCompactActualWidth += Math.Max(0d, rawActualRight - rawActualLeft);
+            }
 
             var breakdownPlanLeft = ToAxisPercent(krok.PlanStart, breakdownAxisStart, breakdownAxisDays);
             var breakdownPlanRight = ToAxisPercent(krok.PlanEnd, breakdownAxisStart, breakdownAxisDays);

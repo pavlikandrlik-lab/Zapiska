@@ -33,7 +33,19 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Projekt/{projektId:int}/Tisk")]
-    public async Task<IActionResult> ProjektTisk(int projektId, bool autoPrint = true, CancellationToken ct = default)
+    public async Task<IActionResult> ProjektTisk(
+        int projektId,
+        bool autoPrint = true,
+        bool useCurrentFilters = false,
+        string? subsystem = null,
+        string? kategorie = null,
+        string? stav = null,
+        string? typ = null,
+        int? vlastnik = null,
+        bool aktivni = false,
+        bool mine = false,
+        int? jednaniVyjadreniStav = null,
+        CancellationToken ct = default)
     {
         var accessCheck = await EnsureProjectReadableAsync(projektId, ct);
         if (accessCheck is not null)
@@ -41,12 +53,34 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        var model = await _exportTemplateUseCase.BuildProjectTemplateAsync(projektId, CurrentUserContext, autoPrint, ct);
+        var filters = BuildProjectExportFilters(
+            useCurrentFilters,
+            subsystem,
+            kategorie,
+            stav,
+            typ,
+            vlastnik,
+            aktivni,
+            mine,
+            jednaniVyjadreniStav);
+
+        var model = await _exportTemplateUseCase.BuildProjectTemplateAsync(projektId, CurrentUserContext, autoPrint, filters, ct);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
     [HttpGet("Projekt/{projektId:int}/Word")]
-    public async Task<IActionResult> ProjektWord(int projektId, CancellationToken ct = default)
+    public async Task<IActionResult> ProjektWord(
+        int projektId,
+        bool useCurrentFilters = false,
+        string? subsystem = null,
+        string? kategorie = null,
+        string? stav = null,
+        string? typ = null,
+        int? vlastnik = null,
+        bool aktivni = false,
+        bool mine = false,
+        int? jednaniVyjadreniStav = null,
+        CancellationToken ct = default)
     {
         var accessCheck = await EnsureProjectReadableAsync(projektId, ct);
         if (accessCheck is not null)
@@ -54,7 +88,18 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        var model = await _exportTemplateUseCase.BuildProjectTemplateAsync(projektId, CurrentUserContext, autoPrint: false, ct);
+        var filters = BuildProjectExportFilters(
+            useCurrentFilters,
+            subsystem,
+            kategorie,
+            stav,
+            typ,
+            vlastnik,
+            aktivni,
+            mine,
+            jednaniVyjadreniStav);
+
+        var model = await _exportTemplateUseCase.BuildProjectTemplateAsync(projektId, CurrentUserContext, autoPrint: false, filters, ct);
         return BuildWordResult(model);
     }
 
@@ -154,6 +199,31 @@ public sealed class ExportController : BaseController
     {
         var payload = _wordExportService.BuildDocument(model);
         return File(payload, WordContentType, BuildWordFileName(model, GetLocalNow()));
+    }
+
+    private static ProjectExportRecordFilters BuildProjectExportFilters(
+        bool useCurrentFilters,
+        string? subsystem,
+        string? kategorie,
+        string? stav,
+        string? typ,
+        int? vlastnik,
+        bool aktivni,
+        bool mine,
+        int? jednaniVyjadreniStav)
+    {
+        return new ProjectExportRecordFilters
+        {
+            UseCurrentFilters = useCurrentFilters,
+            Subsystem = string.IsNullOrWhiteSpace(subsystem) ? null : subsystem.Trim(),
+            Kategorie = string.IsNullOrWhiteSpace(kategorie) ? null : kategorie.Trim(),
+            Stav = string.IsNullOrWhiteSpace(stav) ? null : stav.Trim(),
+            Typ = string.IsNullOrWhiteSpace(typ) ? null : typ.Trim(),
+            VlastnikId = vlastnik > 0 ? vlastnik : null,
+            Aktivni = aktivni,
+            Mine = mine,
+            JednaniVyjadreniStavId = jednaniVyjadreniStav > 0 ? jednaniVyjadreniStav : null
+        };
     }
 
     private async Task<IActionResult?> EnsureProjectReadableAsync(int projektId, CancellationToken ct)

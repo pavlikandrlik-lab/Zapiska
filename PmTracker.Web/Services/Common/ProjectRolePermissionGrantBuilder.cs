@@ -10,6 +10,12 @@ public sealed record ProjectRoleAssignmentGrantSource
 
 public static class ProjectRolePermissionGrantBuilder
 {
+    private static readonly HashSet<string> ProjectAdminLikeRoleCodes =
+    [
+        ProjectRoleCodes.ProjectAdmin,
+        ProjectRoleCodes.ProjectManager
+    ];
+
     private static readonly IReadOnlyList<string> ProjectAdminPermissionKeys =
     [
         PermissionKeys.TeamManage,
@@ -32,7 +38,7 @@ public static class ProjectRolePermissionGrantBuilder
                 continue;
             }
 
-            if (!string.Equals(assignment.RoleCode, ProjectRoleCodes.ProjectAdmin, StringComparison.OrdinalIgnoreCase))
+            if (!ProjectAdminLikeRoleCodes.Contains(assignment.RoleCode))
             {
                 continue;
             }

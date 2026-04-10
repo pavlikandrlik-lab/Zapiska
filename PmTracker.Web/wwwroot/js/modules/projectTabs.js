@@ -16,7 +16,9 @@ import {
     resolveProjectTabPanel,
     setLazyLoadingState
 } from "./navigationShared.js";
+import { initMeetingOverview } from "./meetingOverview.js";
 import { initProjectScheduleUi, renderStaticTimelineAxes } from "./schedule.js";
+import { initTableTools } from "./tableTools.js";
 import { queueRainbowSegmentRender } from "./ui.js";
 
 const projectTabStorageKey = "pmtracker.tab.active";
@@ -56,6 +58,9 @@ class ProjectNavigationController {
         if (activePanel instanceof HTMLElement) {
             if (normalizedTabName === "harmonogram") {
                 this.options.renderStaticTimelineAxes?.(activePanel);
+            }
+            else if (normalizedTabName === "jednani") {
+                initMeetingOverview(activePanel);
             }
 
             this.options.queueRainbowSegmentRender?.(activePanel);
@@ -257,6 +262,9 @@ export async function loadProjectTabPanel(tabNameOrPanel, options = {}) {
                 initProjectScheduleUi();
                 renderStaticTimelineAxes(currentPanel);
             }
+
+            initTableTools(currentPanel);
+            initMeetingOverview(currentPanel);
 
             queueRainbowSegmentRender(currentPanel);
             scheduleSubsystemIndicatorSync();

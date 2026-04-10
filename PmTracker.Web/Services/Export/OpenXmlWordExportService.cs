@@ -17,6 +17,8 @@ public interface IWordExportService
 
 public sealed partial class OpenXmlWordExportService(IRichTextContentService richTextContentService) : IWordExportService
 {
+    private const string PausedRecordFillHex = "FDF4E8";
+
     public byte[] BuildDocument(PdfExportTemplateViewModel model)
     {
         using var stream = new MemoryStream();
@@ -50,6 +52,7 @@ public sealed partial class OpenXmlWordExportService(IRichTextContentService ric
     {
         var variant = (model.ExportVariant ?? "project_all").Trim().ToLowerInvariant();
         var isMeeting = string.Equals(variant, "meeting", StringComparison.OrdinalIgnoreCase);
+        var isProjectSummary = variant.StartsWith("project_", StringComparison.OrdinalIgnoreCase);
         var table = CreateHeaderTableSkeleton();
         table.Append(CreateHeaderTitleRow(documentTitle));
         table.Append(CreateHeaderKeyValueRow("Projekt", $"{model.ProjektNazev} ({model.ProjektZkratka})"));
@@ -68,6 +71,12 @@ public sealed partial class OpenXmlWordExportService(IRichTextContentService ric
 
         table.Append(CreateHeaderKeyValueRow("Generoval", model.Vytvoril));
         table.Append(CreateHeaderKeyValueRow("Vytvořeno", model.VytvorenoDne.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)));
+
+        if (isProjectSummary)
+        {
+            table.Append(CreateHeaderKeyValueRow("Souhrn", model.SnapshotSummary));
+            table.Append(CreateHeaderMultilineRow("Použitá pravidla", model.AppliedRuleSummary));
+        }
 
         if (!isMeeting && model.ProjektoveRole.Count > 0)
         {
@@ -250,15 +259,27 @@ public sealed partial class OpenXmlWordExportService(IRichTextContentService ric
 
     private TableRow CreateRecordRow(MainDocumentPart mainPart, PdfExportRecordViewModel record)
     {
-        var commentsCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "8100" }));
-        var peopleCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "2100" }));
-        var deadlinesCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "1600" }));
+        var recordFillColor = record.IsPaused ? PausedRecordFillHex : null;
+        var commentsCell = CreateRecordCell("8100", recordFillColor);
+        var peopleCell = CreateRecordCell("2100", recordFillColor);
+        var deadlinesCell = CreateRecordCell("1600", recordFillColor);
 
         AppendComments(commentsCell, mainPart, record);
         AppendPeople(peopleCell, record);
         AppendDeadlines(deadlinesCell, record);
 
         return new TableRow(commentsCell, peopleCell, deadlinesCell);
+    }
+
+    private static TableCell CreateRecordCell(string width, string? fillColor)
+    {
+        var properties = new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = width });
+        if (!string.IsNullOrWhiteSpace(fillColor))
+        {
+            properties.Append(new Shading { Val = ShadingPatternValues.Clear, Fill = fillColor, Color = "auto" });
+        }
+
+        return new TableCell(properties);
     }
 
     private void AppendComments(TableCell cell, MainDocumentPart mainPart, PdfExportRecordViewModel record)
@@ -300,16 +321,13 @@ public sealed partial class OpenXmlWordExportService(IRichTextContentService ric
         var code = string.IsNullOrWhiteSpace(record.TypUkoluKod)
             ? (string.IsNullOrWhiteSpace(record.KategorieKod) ? "-" : record.KategorieKod)
             : record.TypUkoluKod;
-        var isPaused = (record.Stav ?? string.Empty).Contains("pozastav", StringComparison.CurrentCultureIgnoreCase);
-        var pausedFill = isPaused ? "FDF4E8" : null;
 
         cell.Append(OpenXmlWordElements.CreateParagraph(
             $"{code}{record.CisloViditelne} - {record.Nazev}",
             bold: true,
             sizeHalfPoints: OpenXmlWordElements.RecordTitleHalfPoints,
             before: 40,
-            after: 40,
-            shadingHex: pausedFill));
+            after: 40));
 
         cell.Append(OpenXmlWordElements.CreateRichParagraph(
             new[]

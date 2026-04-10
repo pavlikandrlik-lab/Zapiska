@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Common;
 
 namespace PmTracker.Web.Services;
 
@@ -164,6 +165,7 @@ public sealed partial class ProjectService
         {
             ProjektId = id,
             Jednani = meetings,
+            RocniSkupiny = MeetingYearGroupBuilder.BuildYearGroups(meetings),
             StavyJednani = meetingStatusOptions
         };
     }
@@ -421,7 +423,9 @@ public sealed partial class ProjectService
                         Text = comment.TextVyjadreni,
                         JednaniCislo = meeting?.CisloJednani,
                         JednaniDatum = meeting?.DatumPlanovane,
-                        LzeUpravit = !IsMeetingReadOnly(meeting, meetingState)
+                        LzeUpravit = !IsMeetingReadOnly(meeting, meetingState),
+                        CanEditOwnAsSubsystemLeader = !IsMeetingReadOnly(meeting, meetingState)
+                            && string.Equals(meetingState?.Kod, "DRAFT", StringComparison.OrdinalIgnoreCase)
                     };
                 })
                 .ToList()
@@ -474,7 +478,8 @@ public sealed partial class ProjectService
             {
                 Id = row.Id,
                 Label = $"Jednání č. {row.CisloJednani} ({row.DatumPlanovane:dd.MM.yyyy})",
-                Datum = row.DatumPlanovane.Date
+                Datum = row.DatumPlanovane.Date,
+                StavKod = row.StavKod
             })
             .ToList();
     }

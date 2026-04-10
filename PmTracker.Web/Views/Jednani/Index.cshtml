@@ -13,28 +13,64 @@
 
 @foreach (var projekt in Model.Projekty)
 {
-    <section class="card">
+    <section class="card meeting-project-overview">
         <div class="meeting-header">
             <h2>@projekt.ProjektNazev</h2>
         </div>
-        <div class="meeting-grid">
-            @foreach (var jednani in projekt.Jednani)
-            {
-                var detailUrl = Url.Action("Detail", new { id = jednani.Id }) ?? $"/Jednani/Detail/{jednani.Id}";
-                var meetingPdfUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{jednani.Id}/Tisk?autoPrint=true";
-                var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = jednani.Id }) ?? $"/Export/Jednani/{jednani.Id}/Word";
-                @await Html.PartialAsync("_MeetingCard", new MeetingCardViewModel
+        @if (projekt.Jednani.Count == 0)
+        {
+            <p class="muted">Projekt zatím nemá evidovaná jednání.</p>
+        }
+        else
+        {
+            <div class="meeting-year-stack"
+                 data-meeting-overview="year-grouped"
+                 data-meeting-preview-year="@(projekt.PreviewRok?.ToString() ?? string.Empty)">
+                @foreach (var rok in projekt.RocniSkupiny)
                 {
-                    ProjektId = projekt.ProjektId,
-                    CanDelete = projekt.CanDeleteMeetings,
-                    UseAjaxDelete = false,
-                    ReturnUrl = $"{Context.Request.Path}{Context.Request.QueryString}",
-                    DetailUrl = detailUrl,
-                    PrintPdfUrl = meetingPdfUrl,
-                    PrintWordUrl = meetingWordUrl,
-                    Jednani = jednani
-                })
-            }
-        </div>
+                    var isPreviewYear = projekt.PreviewRok.HasValue && rok.Rok == projekt.PreviewRok.Value;
+                    <section class="meeting-year-group"
+                             data-meeting-year-group
+                             data-meeting-year="@rok.Rok"
+                             data-meeting-year-state="@(isPreviewYear ? "preview" : "collapsed")">
+                        <button class="meeting-year-toggle"
+                                type="button"
+                                data-meeting-year-toggle
+                                aria-expanded="@(isPreviewYear ? "true" : "false")">
+                            <span class="meeting-year-toggle-main">
+                                <span class="meeting-year-title">@rok.Rok</span>
+                                <span class="meeting-year-count" data-meeting-year-count>@rok.PocetJednani jednání</span>
+                            </span>
+                            <span class="meeting-year-chevron" aria-hidden="true"></span>
+                        </button>
+                        <div class="meeting-year-body@(isPreviewYear ? " is-preview" : null)"
+                             data-meeting-year-body
+                             @(isPreviewYear ? null : "hidden")>
+                            <div class="meeting-grid" data-meeting-year-grid>
+                                @foreach (var jednani in rok.Jednani)
+                                {
+                                    var detailUrl = Url.Action("Detail", new { id = jednani.Id }) ?? $"/Jednani/Detail/{jednani.Id}";
+                                    var meetingPdfUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{jednani.Id}/Tisk?autoPrint=true";
+                                    var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = jednani.Id }) ?? $"/Export/Jednani/{jednani.Id}/Word";
+                                    <div class="meeting-card-slot" data-meeting-card-wrap data-meeting-id="@jednani.Id">
+                                        @await Html.PartialAsync("_MeetingCard", new MeetingCardViewModel
+                                        {
+                                            ProjektId = projekt.ProjektId,
+                                            CanDelete = projekt.CanDeleteMeetings,
+                                            UseAjaxDelete = false,
+                                            ReturnUrl = $"{Context.Request.Path}{Context.Request.QueryString}",
+                                            DetailUrl = detailUrl,
+                                            PrintPdfUrl = meetingPdfUrl,
+                                            PrintWordUrl = meetingWordUrl,
+                                            Jednani = jednani
+                                        })
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </section>
+                }
+            </div>
+        }
     </section>
 }

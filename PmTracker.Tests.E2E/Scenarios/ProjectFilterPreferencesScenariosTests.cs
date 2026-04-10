@@ -1,3 +1,4 @@
+using FluentAssertions;
 using Microsoft.Playwright;
 using PmTracker.Tests.E2E.TestInfrastructure;
 
@@ -22,8 +23,7 @@ public sealed class ProjectFilterPreferencesScenariosTests
 
         var recordsShell = page.Locator("[data-project-filter-scope='records']");
         await OpenFiltersAsync(recordsShell);
-
-        await recordsShell.GetByLabel("Pouze aktivní úkoly").CheckAsync();
+        await Expect(recordsShell.Locator("[data-filter-key='aktivni']")).ToBeCheckedAsync();
 
         var chipRow = page.Locator("[data-filter-chip-row='records']");
         await Expect(chipRow).ToContainTextAsync("Pouze aktivní");
@@ -43,16 +43,13 @@ public sealed class ProjectFilterPreferencesScenariosTests
 
         await page.GotoAsync(ProjectDetailUrl("zaznamy"));
 
-        await page.Locator("[data-tab='harmonogram']").ClickAsync();
-        await page.WaitForURLAsync("**tab=harmonogram**");
+        await page.GotoAsync(ProjectDetailUrl("harmonogram"));
         await Expect(page.Locator("[data-tab-panel='harmonogram']")).ToBeVisibleAsync();
 
-        await page.Locator("[data-tab='jednani']").ClickAsync();
-        await page.WaitForURLAsync("**tab=jednani**");
+        await page.GotoAsync(ProjectDetailUrl("jednani"));
         await Expect(page.Locator("[data-tab-panel='jednani']")).ToBeVisibleAsync();
 
-        await page.Locator("[data-tab='tym']").ClickAsync();
-        await page.WaitForURLAsync("**tab=tym**");
+        await page.GotoAsync(ProjectDetailUrl("tym"));
         await Expect(page.Locator("[data-tab-panel='tym']")).ToBeVisibleAsync();
 
         await page.Context.CloseAsync();
@@ -113,7 +110,89 @@ public sealed class ProjectFilterPreferencesScenariosTests
         await OpenFiltersAsync(recordsShell);
 
         await Expect(recordsShell.Locator("[data-filter-key='mine']")).Not.ToBeCheckedAsync();
+        await Expect(recordsShell.Locator("[data-filter-key='aktivni']")).ToBeCheckedAsync();
         await Expect(recordsShell.Locator("[data-filter-key='groupBySubsystem']")).ToBeCheckedAsync();
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
+    public async Task ProjectTeamTab_ShouldApplySharedSearch_AfterLazyLoad()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync(ProjectDetailUrl("zaznamy"));
+        await page.Locator("[data-tab='tym']").ClickAsync();
+
+        var teamPanel = page.Locator("[data-tab-panel='tym']");
+        await Expect(teamPanel.Locator("[data-table-tools-search-input]")).ToBeVisibleAsync();
+
+        await teamPanel.Locator("[data-table-tools-search-input]").FillAsync("__no_match__");
+        await Expect(teamPanel.Locator("[data-table-empty-row]").First).ToBeVisibleAsync();
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
+    public async Task ProjectPrint_ShouldPromptForFilterChoice_WhenRelevantFiltersAreActive_AndUsePreferredFormat()
+    {
+        var page = await _fixture.NewPageAsync();
+        await page.GotoAsync(ProjectDetailUrl("zaznamy"));
+
+        await page.EvaluateAsync("window.localStorage.setItem('pmtracker.print.preferredFormat', 'pdf');");
+
+        var popup = await page.RunAndWaitForPopupAsync(async () =>
+        {
+            await page.GetByRole(AriaRole.Link, new() { Name = "Tisk projektu" }).ClickAsync();
+            await Expect(page.Locator("[data-print-filter-scope='current']")).ToBeVisibleAsync();
+            await page.GetByRole(AriaRole.Button, new() { Name = "Použít aktuální filtry" }).ClickAsync();
+        });
+
+        popup.Url.Should().Contain($"/Export/Projekt/{_fixture.ProjectId}/Tisk");
+        popup.Url.Should().Contain("useCurrentFilters=true");
+        popup.Url.Should().Contain("aktivni=true");
+        popup.Url.Should().NotContain("groupBySubsystem");
+
+        await popup.CloseAsync();
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
+    public async Task ProjectPrint_ShouldShowFormatChooserAfterFilterChoice_WhenNoPreferredFormatExists()
+    {
+        var page = await _fixture.NewPageAsync();
+        await page.GotoAsync(ProjectDetailUrl("zaznamy"));
+
+        await page.EvaluateAsync("window.localStorage.removeItem('pmtracker.print.preferredFormat');");
+
+        await page.GetByRole(AriaRole.Link, new() { Name = "Tisk projektu" }).ClickAsync();
+        await Expect(page.Locator("[data-print-filter-scope='current']")).ToBeVisibleAsync();
+
+        await page.GetByRole(AriaRole.Button, new() { Name = "Použít aktuální filtry" }).ClickAsync();
+
+        await Expect(page.Locator("[data-print-choice='pdf']")).ToBeVisibleAsync();
+        await Expect(page.Locator("[data-print-choice='word']")).ToBeVisibleAsync();
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
+    public async Task ProjectPrint_ShouldSkipFilterPrompt_WhenNoRelevantFiltersAreActive()
+    {
+        var page = await _fixture.NewPageAsync();
+        await page.GotoAsync(ProjectDetailUrl("zaznamy"));
+
+        await page.EvaluateAsync("window.localStorage.removeItem('pmtracker.print.preferredFormat');");
+
+        var recordsShell = page.Locator("[data-project-filter-scope='records']");
+        await OpenFiltersAsync(recordsShell);
+        await recordsShell.Locator("[data-filter-key='aktivni']").UncheckAsync();
+
+        await page.GetByRole(AriaRole.Link, new() { Name = "Tisk projektu" }).ClickAsync();
+
+        await Expect(page.Locator("[data-print-filter-scope='current']")).ToHaveCountAsync(0);
+        await Expect(page.Locator("[data-print-choice='pdf']")).ToBeVisibleAsync();
+        await Expect(page.Locator("[data-print-choice='word']")).ToBeVisibleAsync();
 
         await page.Context.CloseAsync();
     }
