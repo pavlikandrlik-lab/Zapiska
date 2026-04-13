@@ -711,6 +711,9 @@ export function initModalAjaxSubmit() {
         event.preventDefault();
         clearModalFormErrors(target);
         const isRecordEditorForm = target.matches('[data-record-editor-form="true"]');
+        const submitter = event instanceof SubmitEvent
+            ? event.submitter
+            : null;
 
         if (!validateRequiredPersonPickers(target)) {
             return;
@@ -721,9 +724,15 @@ export function initModalAjaxSubmit() {
             return;
         }
 
-        const action = target.getAttribute("action") || window.location.href;
-        const method = (target.getAttribute("method") || "post").toUpperCase();
-        const blockedSnapshot = buildFormDataSnapshot(new FormData(target), 120);
+        const submitterAction = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
+            ? (submitter.getAttribute("formaction") || submitter.formAction || "")
+            : "";
+        const submitterMethod = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
+            ? (submitter.getAttribute("formmethod") || submitter.formMethod || "")
+            : "";
+        const action = submitterAction || target.getAttribute("action") || window.location.href;
+        const method = (submitterMethod || target.getAttribute("method") || "post").toUpperCase();
+        const blockedSnapshot = buildFormDataSnapshot(new FormData(target, submitter instanceof HTMLElement ? submitter : undefined), 120);
         if (sessionState.stale) {
             target.dataset.recordEditorNavigating = "false";
             renderModalFormErrors(
@@ -741,7 +750,7 @@ export function initModalAjaxSubmit() {
 
         try {
             const executeSubmitAttempt = async () => {
-                const formData = new FormData(target);
+                const formData = new FormData(target, submitter instanceof HTMLElement ? submitter : undefined);
                 const requestFormSnapshot = buildFormDataSnapshot(formData, 120);
                 const response = await fetch(action, {
                     method,
@@ -811,7 +820,7 @@ export function initModalAjaxSubmit() {
             await refreshPageScope(result.payload);
         } catch (error) {
             target.dataset.recordEditorNavigating = "false";
-            const fallbackSnapshot = buildFormDataSnapshot(new FormData(target), 120);
+            const fallbackSnapshot = buildFormDataSnapshot(new FormData(target, submitter instanceof HTMLElement ? submitter : undefined), 120);
             renderModalFormErrors(target, buildAjaxExceptionPayload(error, action, method, fallbackSnapshot));
         } finally {
             setFormSubmitting(target, false);

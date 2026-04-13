@@ -1,5 +1,19 @@
+@model DashboardPageViewModel
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = Model.PageTitle;
 }
 
-<p>Přesměrování...</p>
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = Model.Subtitle
+})
+
+<div class="dashboard-layout">
+    @await Html.PartialAsync("_DashboardHero", Model.Hero)
+
+    @foreach (var section in Model.Sections)
+    {
+        @await Html.PartialAsync("_DashboardSection", section)
+    }
+</div>

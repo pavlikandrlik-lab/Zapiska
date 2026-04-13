@@ -16,7 +16,8 @@ public sealed partial class ProjectService
         bool editorCanEditScheduleFull = false,
         bool editorCanEditScheduleAddOnly = false,
         bool editorCanEditPlanOnly = false,
-        bool editorPlanFieldsLocked = false)
+        bool editorPlanFieldsLocked = false,
+        bool editorScheduleFieldsLocked = false)
     {
         return new HarmonogramBlockViewModel
         {
@@ -31,7 +32,9 @@ public sealed partial class ProjectService
             EditorCanEditScheduleFull = editorCanEditScheduleFull,
             EditorCanEditScheduleAddOnly = editorCanEditScheduleAddOnly,
             EditorCanEditPlanOnly = editorCanEditPlanOnly,
-            EditorPlanFieldsLocked = editorPlanFieldsLocked
+            EditorPlanFieldsLocked = editorPlanFieldsLocked,
+            EditorScheduleFieldsLocked = editorScheduleFieldsLocked,
+            EditorChangedTypeTooltips = new Dictionary<int, string>()
         };
     }
 }

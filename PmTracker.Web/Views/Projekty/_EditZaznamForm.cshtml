@@ -4,7 +4,7 @@
     var schedulePermissionMode = Model.CanEditScheduleFull
         ? "full"
         : (Model.CanEditScheduleAddOnly ? "add" : "none");
-    var canUseBasicTabs = Model.CanEditRecord;
+    var canUseBasicTabs = Model.CanEditRecord || Model.IsProposalEditor || Model.IsProposalDecisionDetail;
     var defaultEditorTab = string.Equals(Model.ActiveEditorTab, "schedule", StringComparison.OrdinalIgnoreCase) && Model.JeUkolKategorie
         ? "schedule"
         : "basic";
@@ -14,6 +14,7 @@
     var deleteFallbackTab = string.Equals(defaultEditorTab, "schedule", StringComparison.OrdinalIgnoreCase)
         ? "harmonogram"
         : "zaznamy";
+    var isProposalDetail = Model.IsProposalDecisionDetail;
     var deleteRecordModalUrl = !Model.IsCreate && Model.CanEditRecord
         ? Url.Action("DeleteRecordModal", "Zaznamy", new
         {
@@ -31,7 +32,7 @@
     <h2 id="record-modal-title">@(!string.IsNullOrWhiteSpace(Model.ModalTitle) ? Model.ModalTitle : (Model.IsCreate ? "Nový projektový záznam" : "Upravit záznam"))</h2>
 }
 
-<form class="form-grid record-editor-form"
+<form class="form-grid record-editor-form @(isProposalDetail ? "proposal-detail-form" : null)"
       asp-controller="@Model.FormController"
       asp-action="@Model.FormAction"
       method="post"
@@ -53,6 +54,10 @@
     <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
     <input type="hidden" name="UiContext" value="@Model.UiContext" />
     <input type="hidden" name="MeetingId" value="@(Model.MeetingId?.ToString(CultureInfo.InvariantCulture))" />
+    @if (Model.ProposalId.HasValue)
+    {
+        <input type="hidden" name="ProposalId" value="@Model.ProposalId.Value" />
+    }
 
     <div class="record-modal-tabs" data-record-modal-tabs>
         <button class="record-modal-tab @(defaultEditorTab == "basic" ? "active" : null)"
@@ -115,7 +120,7 @@
         })
 
     <div class="record-editor-actions @(isPagePresentation ? "record-editor-actions-page" : "record-editor-actions-modal")">
-        @if (!Model.IsProposalEditor && !Model.IsCreate && !string.IsNullOrWhiteSpace(deleteRecordModalUrl))
+        @if (!Model.IsProposalEditor && !Model.IsProposalDecisionDetail && !Model.IsCreate && !string.IsNullOrWhiteSpace(deleteRecordModalUrl))
         {
             <button class="btn ghost danger"
                     type="button"
@@ -145,14 +150,61 @@
         {
             <p class="muted record-editor-secondary-note">@Model.SecondaryNote</p>
         }
-        <button class="btn primary"
-                type="submit"
-                disabled="@(createBlockedByMissingMeeting ? "disabled" : null)">
-            @(!string.IsNullOrWhiteSpace(Model.PrimaryActionLabel)
-                ? Model.PrimaryActionLabel
-                : (isPagePresentation
-                    ? (Model.IsCreate ? "Založit a vrátit se do projektu" : "Uložit a vrátit se do projektu")
-                    : (Model.IsCreate ? "Založit záznam" : "Uložit")))
-        </button>
+        @if (Model.IsProposalDecisionDetail)
+        {
+            @if (!string.IsNullOrWhiteSpace(Model.ProposalSummaryNote))
+            {
+                <p class="muted record-editor-secondary-note">@Model.ProposalSummaryNote</p>
+            }
+            @if (Model.CanApproveProposal)
+            {
+                <button class="btn primary"
+                        type="submit"
+                        formaction="@Url.Action("ApproveProposal", "Navrhy")"
+                        formmethod="post">
+                    Schválit
+                </button>
+            }
+            @if (Model.CanRejectProposal)
+            {
+                <button class="btn ghost"
+                        type="submit"
+                        formaction="@Url.Action("RejectProposal", "Navrhy")"
+                        formmethod="post">
+                    Zamítnout
+                </button>
+            }
+            @if (Model.CanRejectAndEditProposal)
+            {
+                <button class="btn"
+                        type="submit"
+                        formaction="@Url.Action("RejectAndEditProposal", "Navrhy")"
+                        formmethod="post">
+                    Zamítnout a upravit
+                </button>
+            }
+            @if (Model.CanPrefillProposalForm)
+            {
+                <button class="btn"
+                        type="button"
+                        data-record-editor-url="@Url.Action("EditFromProposal", "Navrhy", new { projektId = Model.ProjektId, proposalId = Model.ProposalId })"
+                        data-record-editor-project-id="@Model.ProjektId"
+                        data-record-editor-label="@($"Předvyplnit formulář z návrhu #{Model.ProposalId}")">
+                    Předvyplnit formulář
+                </button>
+            }
+        }
+        else
+        {
+            <button class="btn primary"
+                    type="submit"
+                    disabled="@(createBlockedByMissingMeeting ? "disabled" : null)">
+                @(!string.IsNullOrWhiteSpace(Model.PrimaryActionLabel)
+                    ? Model.PrimaryActionLabel
+                    : (isPagePresentation
+                        ? (Model.IsCreate ? "Založit a vrátit se do projektu" : "Uložit a vrátit se do projektu")
+                        : (Model.IsCreate ? "Založit záznam" : "Uložit")))
+            </button>
+        }
     </div>
 </form>

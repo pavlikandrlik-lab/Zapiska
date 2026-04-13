@@ -8604,6 +8604,7 @@ function initModalAjaxSubmit() {
     event.preventDefault();
     clearModalFormErrors(target);
     const isRecordEditorForm = target.matches('[data-record-editor-form="true"]');
+    const submitter = event instanceof SubmitEvent ? event.submitter : null;
     if (!validateRequiredPersonPickers(target)) {
       return;
     }
@@ -8611,9 +8612,11 @@ function initModalAjaxSubmit() {
       target.reportValidity();
       return;
     }
-    const action = target.getAttribute("action") || window.location.href;
-    const method = (target.getAttribute("method") || "post").toUpperCase();
-    const blockedSnapshot = buildFormDataSnapshot(new FormData(target), 120);
+    const submitterAction = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter.getAttribute("formaction") || submitter.formAction || "" : "";
+    const submitterMethod = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter.getAttribute("formmethod") || submitter.formMethod || "" : "";
+    const action = submitterAction || target.getAttribute("action") || window.location.href;
+    const method = (submitterMethod || target.getAttribute("method") || "post").toUpperCase();
+    const blockedSnapshot = buildFormDataSnapshot(new FormData(target, submitter instanceof HTMLElement ? submitter : undefined), 120);
     if (sessionState.stale) {
       target.dataset.recordEditorNavigating = "false";
       renderModalFormErrors(target, buildSessionStalePayload(action, method, blockedSnapshot, "Submit blocked because session is stale.", isRecordEditorForm));
@@ -8622,7 +8625,7 @@ function initModalAjaxSubmit() {
     setFormSubmitting(target, true);
     try {
       const executeSubmitAttempt = async () => {
-        const formData = new FormData(target);
+        const formData = new FormData(target, submitter instanceof HTMLElement ? submitter : undefined);
         const requestFormSnapshot = buildFormDataSnapshot(formData, 120);
         const response = await fetch(action, {
           method,
@@ -8671,7 +8674,7 @@ function initModalAjaxSubmit() {
       await refreshPageScope(result.payload);
     } catch (error) {
       target.dataset.recordEditorNavigating = "false";
-      const fallbackSnapshot = buildFormDataSnapshot(new FormData(target), 120);
+      const fallbackSnapshot = buildFormDataSnapshot(new FormData(target, submitter instanceof HTMLElement ? submitter : undefined), 120);
       renderModalFormErrors(target, buildAjaxExceptionPayload(error, action, method, fallbackSnapshot));
     } finally {
       setFormSubmitting(target, false);
@@ -8681,7 +8684,7 @@ function initModalAjaxSubmit() {
 
 // PmTracker.Web/wwwroot/js/modules/theme.js
 var themeStorageKey = "pmtracker.theme.mode";
-var themeSwitchSelector = "gov-theme-switch";
+var themeSwitchSelector = "[data-theme-switch]";
 var mediaDark = window.matchMedia("(prefers-color-scheme: dark)");
 var themeCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 function isThemeMode(value) {
@@ -8738,62 +8741,26 @@ function syncThemeSwitches(effectiveTheme) {
     if (!(element instanceof HTMLElement)) {
       return;
     }
-    upgradeThemeSwitch(element);
     syncThemeSwitchElement(element, effectiveTheme);
   });
 }
-function upgradeThemeSwitch(element) {
-  if (element.dataset.themeSwitchInitialized === "true") {
-    return;
-  }
-  element.innerHTML = [
-    '<button type="button" class="gov-theme-switch-button" role="switch" aria-checked="false" data-theme-switch-button>',
-    '  <span class="gov-theme-switch-track" aria-hidden="true">',
-    '    <span class="gov-theme-switch-icon gov-theme-switch-icon-sun">',
-    '      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">',
-    '        <path d="M12 4.75a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V5.5a.75.75 0 0 1 .75-.75Zm0 11a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Zm7.25-4.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1 0-1.5h1.5Zm-13 0a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1 0-1.5h1.5Zm9.046-4.296a.75.75 0 0 1 1.061 0l1.061 1.061a.75.75 0 0 1-1.06 1.06l-1.062-1.06a.75.75 0 0 1 0-1.061Zm-8.652 8.652a.75.75 0 0 1 1.06 0l1.061 1.061a.75.75 0 1 1-1.06 1.06l-1.061-1.06a.75.75 0 0 1 0-1.061Zm9.713 1.06a.75.75 0 0 1 1.061 1.061l-1.061 1.061a.75.75 0 0 1-1.06-1.06l1.06-1.062Zm-8.652-8.651a.75.75 0 0 1 0 1.06L6.984 10.14a.75.75 0 0 1-1.06-1.06l1.06-1.062a.75.75 0 0 1 1.061 0ZM12 17a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 12 17Z" />',
-    "      </svg>",
-    "    </span>",
-    '    <span class="gov-theme-switch-icon gov-theme-switch-icon-moon">',
-    '      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">',
-    '        <path d="M14.72 3.78a.75.75 0 0 1 .86.86 7.25 7.25 0 0 0 8.78 8.78.75.75 0 0 1 .86.86A9.25 9.25 0 1 1 14.72 3.78Zm-.91 1.77a7.75 7.75 0 1 0 7.64 7.64 8.75 8.75 0 0 1-7.64-7.64Z" transform="translate(-1.5 -1.5) scale(0.95)" />',
-    "      </svg>",
-    "    </span>",
-    '    <span class="gov-theme-switch-thumb"></span>',
-    "  </span>",
-    '  <span class="gov-theme-switch-label" data-theme-switch-label hidden></span>',
-    "</button>"
-  ].join("");
-  const button = element.querySelector("[data-theme-switch-button]");
-  if (button instanceof HTMLButtonElement) {
-    button.addEventListener("click", () => {
-      const currentState = element.getAttribute("data-theme-switch-state") === "dark" ? "dark" : "light";
-      const nextMode = currentState === "dark" ? "light" : "dark";
-      element.dispatchEvent(new CustomEvent("gov-change", {
-        bubbles: true,
-        detail: { mode: nextMode }
-      }));
-    });
-  }
-  element.dataset.themeSwitchInitialized = "true";
-}
 function syncThemeSwitchElement(element, effectiveTheme) {
-  const button = element.querySelector("[data-theme-switch-button]");
+  const input = element.querySelector("[data-theme-switch-input]");
   const label = element.querySelector("[data-theme-switch-label]");
-  if (!(button instanceof HTMLButtonElement) || !(label instanceof HTMLElement)) {
+  if (!(input instanceof HTMLInputElement) || !(label instanceof HTMLElement)) {
     return;
   }
   const isDark = effectiveTheme === "dark";
   const displayLabel = shouldDisplayThemeLabel(element);
-  const labelLight = getThemeSwitchAttribute(element, "label-light", "Světlý mód");
-  const labelDark = getThemeSwitchAttribute(element, "label-dark", "Tmavý mód");
-  const ariaLabelLight = getThemeSwitchAttribute(element, "aria-label-light", "Přepnout na tmavý mód");
-  const ariaLabelDark = getThemeSwitchAttribute(element, "aria-label-dark", "Přepnout na světlý mód");
+  const labelLight = getThemeSwitchAttribute(input, "data-label-light", "Světlý mód");
+  const labelDark = getThemeSwitchAttribute(input, "data-label-dark", "Tmavý mód");
+  const ariaLabelLight = getThemeSwitchAttribute(input, "data-aria-label-light", "Přepnout na tmavý mód");
+  const ariaLabelDark = getThemeSwitchAttribute(input, "data-aria-label-dark", "Přepnout na světlý mód");
   element.setAttribute("data-theme-switch-state", effectiveTheme);
+  input.checked = isDark;
   label.hidden = !displayLabel;
   label.textContent = isDark ? labelDark : labelLight;
-  button.setAttribute("aria-checked", String(isDark));
-  button.setAttribute("aria-label", isDark ? ariaLabelDark : ariaLabelLight);
+  input.setAttribute("aria-label", isDark ? ariaLabelDark : ariaLabelLight);
 }
 function shouldDisplayThemeLabel(element) {
   if (!element.hasAttribute("display-label")) {
@@ -8827,14 +8794,15 @@ function initTheme() {
     if (!(element instanceof HTMLElement)) {
       return;
     }
-    upgradeThemeSwitch(element);
     if (element.dataset.themeSwitchBound === "true") {
       return;
     }
-    element.addEventListener("gov-change", (event) => {
-      const nextMode = event instanceof CustomEvent && isThemeMode(event.detail?.mode) ? event.detail.mode : "auto";
-      setTheme(nextMode, true);
-    });
+    const input = element.querySelector("[data-theme-switch-input]");
+    if (input instanceof HTMLInputElement) {
+      input.addEventListener("change", () => {
+        setTheme(input.checked ? "dark" : "light", true);
+      });
+    }
     element.dataset.themeSwitchBound = "true";
   });
 }

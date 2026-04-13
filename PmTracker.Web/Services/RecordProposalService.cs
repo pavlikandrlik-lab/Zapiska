@@ -166,7 +166,7 @@ public sealed class RecordProposalService : IRecordProposalService
         var access = await _authorizationPolicy.EvaluateRecordAccessAsync(projectId, recordId, currentUser, ct);
         if (!access.CanCreateScheduleProposal)
         {
-            throw new InvalidOperationException("Návrh změny termínu a plánu může vytvořit jen vedoucí relevantního subsystému nebo jeho zástupce.");
+            throw new InvalidOperationException("Návrh změny termínu a harmonogramu může vytvořit jen vedoucí relevantního subsystému nebo jeho zástupce.");
         }
 
         var pendingLock = await _pendingScheduleProposalLockEvaluator.EvaluateAsync(recordId, ct);
@@ -182,6 +182,83 @@ public sealed class RecordProposalService : IRecordProposalService
         }
 
         ConfigureScheduleProposalEditor(model);
+        return model;
+    }
+
+    public async Task<ZaznamEditViewModel> BuildProposalDetailAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+    {
+        var proposal = await LoadProposalAsync(projectId, proposalId, ct);
+        await EnsureCanViewProposalAsync(proposal, currentUser, ct);
+
+        if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase))
+        {
+            var payload = DeserializePayload(proposal.PayloadJson);
+            var createPayload = payload.CreateRecord
+                ?? throw new InvalidOperationException("Payload návrhu založení záznamu je neplatný.");
+            var model = await _recordService.BuildZaznamCreateAsync(projectId, createPayload.JednaniIdProCislo, ct);
+            _payloadMapper.ApplyCreatePayload(model, createPayload);
+            var canDecide = await _authorizationPolicy.CanDecideProjectProposalAsync(projectId, currentUser, ct);
+            ConfigureProposalDetailEditor(model, proposal, canDecide, proposalSummaryNote: "Detail návrhu je jen pro posouzení. Změny návrhu zde neupravujete přímo.");
+            return model;
+        }
+
+        if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!proposal.ZaznamId.HasValue)
+            {
+                throw new InvalidOperationException("Návrh změny termínu a harmonogramu není navázán na záznam.");
+            }
+
+            var model = await _recordService.BuildZaznamEditAsync(proposal.ZaznamId.Value, ct);
+            var payload = DeserializePayload(proposal.PayloadJson);
+            var schedulePayload = payload.SchedulePlan
+                ?? throw new InvalidOperationException("Payload návrhu harmonogramu je neplatný.");
+            var fieldTooltips = BuildScheduleProposalFieldDiffTooltips(model, schedulePayload);
+            var scheduleTypeTooltips = BuildScheduleProposalScheduleDiffTooltips(model, schedulePayload);
+            ApplySchedulePayloadToModel(model, schedulePayload);
+            var canDecide = await _authorizationPolicy.CanDecideProjectProposalAsync(projectId, currentUser, ct);
+            ConfigureProposalDetailEditor(
+                model,
+                proposal,
+                canDecide,
+                fieldTooltips,
+                scheduleTypeTooltips,
+                "Zvýrazněná pole ukazují hodnoty navržené ke schválení. Po najetí se zobrazí původní a navržená hodnota.");
+            return model;
+        }
+
+        throw new InvalidOperationException("Neznámý typ návrhu.");
+    }
+
+    public async Task<ZaznamEditViewModel> BuildEditableRecordEditorFromProposalAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+    {
+        var proposal = await LoadProposalAsync(projectId, proposalId, ct);
+        if (!await _authorizationPolicy.CanDecideProjectProposalAsync(projectId, currentUser, ct))
+        {
+            throw new InvalidOperationException("Převzetí návrhu do formuláře je dostupné jen projektovému manažerovi nebo administrátorovi projektu.");
+        }
+
+        if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase))
+        {
+            return await BuildPrefilledCreateRecordEditorFromProposalAsync(projectId, proposalId, currentUser, ct);
+        }
+
+        if (!string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Převzetí návrhu do formuláře je dostupné jen pro podporované typy návrhů.");
+        }
+
+        if (!proposal.ZaznamId.HasValue)
+        {
+            throw new InvalidOperationException("Návrh změny harmonogramu není navázán na záznam.");
+        }
+
+        var payload = DeserializePayload(proposal.PayloadJson);
+        var schedulePayload = payload.SchedulePlan
+            ?? throw new InvalidOperationException("Payload návrhu harmonogramu je neplatný.");
+        var model = await _recordService.BuildZaznamEditAsync(proposal.ZaznamId.Value, ct);
+        ApplySchedulePayloadToModel(model, schedulePayload);
+        ConfigureStandardTakenOverScheduleEditor(model);
         return model;
     }
 
@@ -265,7 +342,7 @@ public sealed class RecordProposalService : IRecordProposalService
         var access = await _authorizationPolicy.EvaluateRecordAccessAsync(command.ProjektId, command.Id.Value, currentUser, ct);
         if (!access.CanCreateScheduleProposal)
         {
-            throw new InvalidOperationException("Návrh změny termínu a plánu může vytvořit jen vedoucí relevantního subsystému nebo jeho zástupce.");
+            throw new InvalidOperationException("Návrh změny termínu a harmonogramu může vytvořit jen vedoucí relevantního subsystému nebo jeho zástupce.");
         }
 
         ValidateScheduleProposalInput(command, record);
@@ -276,8 +353,32 @@ public sealed class RecordProposalService : IRecordProposalService
             throw new InvalidOperationException(pendingLock.Message ?? "Pro tento záznam už existuje čekající návrh změny harmonogramu.");
         }
 
-        var plannedTypeIds = await ResolvePlannedTypeIdsAsync(record, ct);
-        var payload = _payloadMapper.BuildSchedulePayload(command, plannedTypeIds);
+        var scheduleTypeDefinitions = await ResolveScheduleTypeDefinitionsAsync(record, ct);
+        var existingScheduleValues = await LoadExistingScheduleValuesAsync(record.Id, scheduleTypeDefinitions, ct);
+        var plannedTypeIds = scheduleTypeDefinitions
+            .Select(x => x.DurationTypeId)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToList();
+        var actualTypeIds = scheduleTypeDefinitions
+            .Select(x => x.DelayTypeId)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToList();
+        var payload = _payloadMapper.BuildSchedulePayload(
+            command,
+            plannedTypeIds,
+            actualTypeIds,
+            record.DatumUkonceni,
+            existingScheduleValues);
+        var schedulePayload = payload.SchedulePlan;
+        if (schedulePayload is null
+            || (!schedulePayload.ChangesTermDeadline
+                && !schedulePayload.ChangesSchedulePlan
+                && !schedulePayload.ChangesScheduleActual))
+        {
+            throw new InvalidOperationException("Návrh neobsahuje žádnou změnu termínu ani harmonogramu.");
+        }
 
         await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         _dbContext.ZaznamNavrhy.Add(new ZaznamNavrhEntity
@@ -361,6 +462,19 @@ public sealed class RecordProposalService : IRecordProposalService
         await tx.CommitAsync(ct);
     }
 
+    public async Task RejectAndEditProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+    {
+        var proposal = await LoadPendingProposalForDecisionAsync(command, currentUser, ct);
+
+        await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        proposal.Stav = RecordProposalStateCodes.Rejected;
+        proposal.DecidedByOsobaId = currentUser.OsobaId;
+        proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
+        await _dbContext.SaveChangesAsync(ct);
+        await AppendAuditAsync(currentUser.OsobaId, "zaznam_navrhy", "proposal_rejected_edit", ct);
+        await tx.CommitAsync(ct);
+    }
+
     private async Task FilterCreateProposalSubsystemsAsync(ZaznamEditViewModel model, IReadOnlySet<int> allowedSubsystemIds, CancellationToken ct)
     {
         var allowedSubsystemRows = await _dbContext.ProjektSubsystemy.AsNoTracking()
@@ -414,8 +528,8 @@ public sealed class RecordProposalService : IRecordProposalService
 
     private void ConfigureScheduleProposalEditor(ZaznamEditViewModel model)
     {
-        model.PageTitle = $"Navrhnout změnu plánu záznamu {model.CisloViditelne}";
-        model.ModalTitle = $"Navrhnout změnu termínu a plánu #{model.CisloViditelne}";
+        model.PageTitle = $"Navrhnout změnu termínu a harmonogramu záznamu {model.CisloViditelne}";
+        model.ModalTitle = $"Navrhnout změnu termínu a harmonogramu #{model.CisloViditelne}";
         model.PrimaryActionLabel = model.Presentation.Equals("page", StringComparison.OrdinalIgnoreCase)
             ? "Odeslat návrh a vrátit se do projektu"
             : "Odeslat návrh";
@@ -425,25 +539,16 @@ public sealed class RecordProposalService : IRecordProposalService
         model.AllowBasicMetadataEdit = false;
         model.AllowTermDeadlineEdit = true;
         model.CanEditRecord = false;
-        model.CanEditScheduleFull = false;
+        model.CanEditScheduleFull = true;
         model.CanEditScheduleAddOnly = false;
-        model.HarmonogramBlok = new HarmonogramBlockViewModel
-        {
-            RecordId = model.HarmonogramBlok.RecordId,
-            Mode = model.HarmonogramBlok.Mode,
-            DatumZalozeni = model.HarmonogramBlok.DatumZalozeni,
-            TerminUkonceni = model.HarmonogramBlok.TerminUkonceni,
-            DelayBarvaHex = model.HarmonogramBlok.DelayBarvaHex,
-            Souhrn = model.HarmonogramBlok.Souhrn,
-            Kroky = model.HarmonogramBlok.Kroky,
-            EditorJeUkolKategorie = model.HarmonogramBlok.EditorJeUkolKategorie,
-            EditorCanEditScheduleFull = false,
-            EditorCanEditScheduleAddOnly = false,
-            EditorCanEditPlanOnly = true,
-            EditorPlanFieldsLocked = false
-        };
+        model.HarmonogramBlok = CloneScheduleBlock(
+            model.HarmonogramBlok,
+            editorCanEditScheduleFull: true,
+            editorCanEditScheduleAddOnly: false,
+            editorCanEditPlanOnly: false,
+            editorPlanFieldsLocked: false);
         model.ActiveEditorTab = "schedule";
-        model.SecondaryNote = "V návrhu lze měnit jen termín ukončení a plánovou část harmonogramu. Skutečnost harmonogramu zůstává jen pro čtení.";
+        model.SecondaryNote = "V návrhu lze měnit termín ukončení a celý harmonogram. Ostatní metadata záznamu zůstávají jen pro čtení.";
     }
 
     private void ConfigureStandardPrefilledCreateEditor(ZaznamEditViewModel model)
@@ -457,6 +562,30 @@ public sealed class RecordProposalService : IRecordProposalService
         model.FormAction = "Save";
         model.ProposalEditorMode = RecordProposalEditorModes.None;
         model.SecondaryNote = "Formulář je předvyplněný daty z vybraného návrhu. Po uložení vznikne běžný provozní záznam.";
+    }
+
+    private void ConfigureStandardTakenOverScheduleEditor(ZaznamEditViewModel model)
+    {
+        model.PageTitle = $"Upravit záznam {model.CisloViditelne}";
+        model.ModalTitle = $"Upravit záznam #{model.CisloViditelne}";
+        model.PrimaryActionLabel = model.Presentation.Equals("page", StringComparison.OrdinalIgnoreCase)
+            ? "Uložit a vrátit se do projektu"
+            : "Uložit";
+        model.FormController = "Zaznamy";
+        model.FormAction = "Save";
+        model.ProposalEditorMode = RecordProposalEditorModes.None;
+        model.SecondaryNote = "Formulář je předvyplněný daty zamítnutého návrhu. Po uložení se promítne běžná úprava záznamu.";
+        model.CanEditRecord = true;
+        model.CanEditScheduleFull = true;
+        model.AllowBasicMetadataEdit = true;
+        model.AllowTermDeadlineEdit = true;
+        model.ActiveEditorTab = "basic";
+        model.HarmonogramBlok = CloneScheduleBlock(
+            model.HarmonogramBlok,
+            editorCanEditScheduleFull: true,
+            editorCanEditScheduleAddOnly: false,
+            editorCanEditPlanOnly: false,
+            editorPlanFieldsLocked: false);
     }
 
     private static void ValidateCommonProposalInput(SaveRecordCommand command)
@@ -559,6 +688,207 @@ public sealed class RecordProposalService : IRecordProposalService
             .ToHashSet();
     }
 
+    private async Task<IReadOnlyList<RecordScheduleTypeDefinition>> ResolveScheduleTypeDefinitionsAsync(ProjektovyZaznamEntity record, CancellationToken ct)
+    {
+        var schema = await _harmonogramService.GetSchemaForRecordAsync(record, ct);
+        return _harmonogramService.BuildRecordScheduleTypeDefinitions(schema);
+    }
+
+    private async Task<Dictionary<int, int>> LoadExistingScheduleValuesAsync(
+        int recordId,
+        IReadOnlyList<RecordScheduleTypeDefinition> scheduleTypeDefinitions,
+        CancellationToken ct)
+    {
+        var allowedTypeIds = scheduleTypeDefinitions
+            .SelectMany(definition => new[] { definition.DurationTypeId, definition.DelayTypeId })
+            .Where(typeId => typeId > 0)
+            .Distinct()
+            .ToList();
+        if (allowedTypeIds.Count == 0)
+        {
+            return [];
+        }
+
+        return (await _dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
+                .Where(x => x.ZaznamId == recordId && allowedTypeIds.Contains(x.TypId))
+                .ToListAsync(ct))
+            .ToDictionary(x => x.TypId, x => x.HodnotaInt);
+    }
+
+    private async Task EnsureCanViewProposalAsync(ZaznamNavrhEntity proposal, CurrentUserContextViewModel currentUser, CancellationToken ct)
+    {
+        var access = await _authorizationPolicy.EvaluateProjectAccessAsync(proposal.ProjektId, currentUser, ct);
+        if (!access.CanViewTab)
+        {
+            throw new InvalidOperationException("Nemáte přístup k návrhům v tomto projektu.");
+        }
+
+        if (!access.CanDecide && proposal.CreatedByOsobaId != currentUser.OsobaId)
+        {
+            throw new InvalidOperationException("Nemáte oprávnění zobrazit detail tohoto návrhu.");
+        }
+    }
+
+    private void ApplySchedulePayloadToModel(ZaznamEditViewModel model, SchedulePlanProposalPayload payload)
+    {
+        var valueByType = payload.PlannedHarmonogramHodnoty
+            .Concat(payload.ActualHarmonogramHodnoty)
+            .GroupBy(value => value.TypId)
+            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
+        var schema = model.HarmonogramBlok.Kroky
+            .OrderBy(step => step.KrokIndex)
+            .Select(step => new HarmonogramTypPar(
+                step.KrokIndex,
+                $"STEP_{step.KrokIndex}_DURATION",
+                step.Nazev,
+                step.BarvaHex,
+                step.TrvaniTypId,
+                step.ZpozdeniTypId))
+            .ToList();
+        var vypocet = _harmonogramService.BuildHarmonogramVypocetPublic(model.DatumZalozeni, schema, valueByType);
+        var souhrn = _harmonogramService.BuildHarmonogramSouhrn(vypocet, payload.TerminUkonceni);
+        var kroky = vypocet.Select(krok => new HarmonogramKrokEditViewModel
+        {
+            KrokIndex = krok.KrokIndex,
+            Nazev = krok.Nazev,
+            BarvaHex = krok.BarvaHex,
+            TrvaniTypId = krok.TrvaniTypId,
+            ZpozdeniTypId = krok.ZpozdeniTypId,
+            TrvaniDni = krok.TrvaniDni,
+            OdchylkaDni = krok.ZpozdeniDni,
+            BaselineDatum = krok.BaselineDatum,
+            SkutecneDatum = krok.PosunuteDatum
+        }).ToList();
+
+        model.TerminUkonceni = payload.TerminUkonceni;
+        model.HarmonogramBlok = CloneScheduleBlock(
+            model.HarmonogramBlok,
+            souhrn: souhrn,
+            kroky: kroky,
+            terminUkonceni: payload.TerminUkonceni);
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildScheduleProposalFieldDiffTooltips(
+        ZaznamEditViewModel originalModel,
+        SchedulePlanProposalPayload payload)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (payload.ChangesTermDeadline && originalModel.TerminUkonceni.HasValue)
+        {
+            result["TerminUkonceni"] =
+                $"Původní hodnota: {originalModel.TerminUkonceni.Value:dd.MM.yyyy} | Navržená hodnota: {payload.TerminUkonceni:dd.MM.yyyy}";
+        }
+
+        return result;
+    }
+
+    private static IReadOnlyDictionary<int, string> BuildScheduleProposalScheduleDiffTooltips(
+        ZaznamEditViewModel originalModel,
+        SchedulePlanProposalPayload payload)
+    {
+        var result = new Dictionary<int, string>();
+        var originalByDurationType = originalModel.HarmonogramBlok.Kroky.ToDictionary(step => step.TrvaniTypId, step => step.TrvaniDni);
+        var originalByDelayType = originalModel.HarmonogramBlok.Kroky.ToDictionary(step => step.ZpozdeniTypId, step => step.OdchylkaDni);
+
+        foreach (var planned in payload.PlannedHarmonogramHodnoty)
+        {
+            var originalValue = originalByDurationType.GetValueOrDefault(planned.TypId);
+            if (originalValue != planned.Hodnota)
+            {
+                result[planned.TypId] = $"Původní hodnota: {originalValue} dnů | Navržená hodnota: {planned.Hodnota} dnů";
+            }
+        }
+
+        foreach (var actual in payload.ActualHarmonogramHodnoty)
+        {
+            var originalValue = originalByDelayType.GetValueOrDefault(actual.TypId);
+            if (originalValue != actual.Hodnota)
+            {
+                result[actual.TypId] = $"Původní hodnota: {originalValue} dnů | Navržená hodnota: {actual.Hodnota} dnů";
+            }
+        }
+
+        return result;
+    }
+
+    private void ConfigureProposalDetailEditor(
+        ZaznamEditViewModel model,
+        ZaznamNavrhEntity proposal,
+        bool canDecide,
+        IReadOnlyDictionary<string, string>? changedFieldTooltips = null,
+        IReadOnlyDictionary<int, string>? changedScheduleTypeTooltips = null,
+        string? proposalSummaryNote = null)
+    {
+        var isCreateProposal = string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase);
+        var isPending = string.Equals(proposal.Stav, RecordProposalStateCodes.Pending, StringComparison.OrdinalIgnoreCase);
+
+        model.PageTitle = isCreateProposal
+            ? $"Detail návrhu založení záznamu #{proposal.Id}"
+            : $"Detail návrhu změny termínu a harmonogramu #{proposal.Id}";
+        model.ModalTitle = model.PageTitle;
+        model.IsProposalDecisionDetail = true;
+        model.ProposalId = proposal.Id;
+        model.ProposalType = proposal.TypNavrhu;
+        model.ProposalState = proposal.Stav;
+        model.ProposalSummaryNote = proposalSummaryNote;
+        model.AllowBasicMetadataEdit = false;
+        model.AllowTermDeadlineEdit = false;
+        model.CanEditRecord = false;
+        model.CanEditScheduleFull = false;
+        model.CanEditScheduleAddOnly = false;
+        model.PrimaryActionLabel = string.Empty;
+        model.FormAction = string.Empty;
+        model.FormController = string.Empty;
+        model.ActiveEditorTab = "basic";
+        model.HarmonogramBlok = CloneScheduleBlock(
+            model.HarmonogramBlok,
+            editorCanEditScheduleFull: false,
+            editorCanEditScheduleAddOnly: false,
+            editorCanEditPlanOnly: false,
+            editorPlanFieldsLocked: false,
+            editorScheduleFieldsLocked: false,
+            editorChangedTypeTooltips: changedScheduleTypeTooltips);
+        model.CanApproveProposal = canDecide && isPending;
+        model.CanRejectProposal = canDecide && isPending;
+        model.CanRejectAndEditProposal = canDecide && isPending;
+        model.CanPrefillProposalForm = canDecide
+            && !isPending
+            && isCreateProposal;
+        model.ProposalChangedFieldTooltips = changedFieldTooltips ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        model.ProposalChangedScheduleTypeTooltips = changedScheduleTypeTooltips ?? new Dictionary<int, string>();
+    }
+
+    private static HarmonogramBlockViewModel CloneScheduleBlock(
+        HarmonogramBlockViewModel source,
+        HarmonogramSouhrnViewModel? souhrn = null,
+        IReadOnlyList<HarmonogramKrokEditViewModel>? kroky = null,
+        DateTime? terminUkonceni = null,
+        bool? editorCanEditScheduleFull = null,
+        bool? editorCanEditScheduleAddOnly = null,
+        bool? editorCanEditPlanOnly = null,
+        bool? editorPlanFieldsLocked = null,
+        bool? editorScheduleFieldsLocked = null,
+        IReadOnlyDictionary<int, string>? editorChangedTypeTooltips = null)
+    {
+        return new HarmonogramBlockViewModel
+        {
+            RecordId = source.RecordId,
+            Mode = source.Mode,
+            DatumZalozeni = source.DatumZalozeni,
+            TerminUkonceni = terminUkonceni ?? source.TerminUkonceni,
+            DelayBarvaHex = source.DelayBarvaHex,
+            Souhrn = souhrn ?? source.Souhrn,
+            Kroky = kroky ?? source.Kroky,
+            EditorJeUkolKategorie = source.EditorJeUkolKategorie,
+            EditorCanEditScheduleFull = editorCanEditScheduleFull ?? source.EditorCanEditScheduleFull,
+            EditorCanEditScheduleAddOnly = editorCanEditScheduleAddOnly ?? source.EditorCanEditScheduleAddOnly,
+            EditorCanEditPlanOnly = editorCanEditPlanOnly ?? source.EditorCanEditPlanOnly,
+            EditorPlanFieldsLocked = editorPlanFieldsLocked ?? source.EditorPlanFieldsLocked,
+            EditorScheduleFieldsLocked = editorScheduleFieldsLocked ?? source.EditorScheduleFieldsLocked,
+            EditorChangedTypeTooltips = editorChangedTypeTooltips ?? source.EditorChangedTypeTooltips
+        };
+    }
+
     private async Task ApplyApprovedScheduleProposalAsync(ZaznamNavrhEntity proposal, CurrentUserContextViewModel currentUser, CancellationToken ct)
     {
         if (!proposal.ZaznamId.HasValue)
@@ -573,40 +903,62 @@ public sealed class RecordProposalService : IRecordProposalService
             .FirstOrDefaultAsync(x => x.Id == proposal.ZaznamId.Value && x.ProjektId == proposal.ProjektId, ct)
             ?? throw new InvalidOperationException($"Záznam {proposal.ZaznamId.Value} nebyl nalezen.");
 
-        var plannedTypeIds = await ResolvePlannedTypeIdsAsync(record, ct);
-        var plannedValues = schedulePayload.PlannedHarmonogramHodnoty
-            .Where(value => plannedTypeIds.Contains(value.TypId))
+        var scheduleTypeDefinitions = await ResolveScheduleTypeDefinitionsAsync(record, ct);
+        var plannedTypeIds = scheduleTypeDefinitions
+            .Select(x => x.DurationTypeId)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToHashSet();
+        var actualTypeIds = scheduleTypeDefinitions
+            .Select(x => x.DelayTypeId)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToHashSet();
+        var allowedTypeIds = plannedTypeIds.Concat(actualTypeIds).ToHashSet();
+        var submittedValues = (schedulePayload.ChangesSchedulePlan
+                ? schedulePayload.PlannedHarmonogramHodnoty.Where(value => plannedTypeIds.Contains(value.TypId))
+                : Enumerable.Empty<SaveRecordHarmonogramValueCommand>())
+            .Concat(
+                schedulePayload.ChangesScheduleActual
+                    ? schedulePayload.ActualHarmonogramHodnoty.Where(value => actualTypeIds.Contains(value.TypId))
+                    : Enumerable.Empty<SaveRecordHarmonogramValueCommand>())
             .GroupBy(value => value.TypId)
             .Select(group => new SaveRecordHarmonogramValueCommand
             {
                 TypId = group.Key,
-                Hodnota = Math.Max(0, group.Last().Hodnota)
+                Hodnota = plannedTypeIds.Contains(group.Key)
+                    ? Math.Max(0, group.Last().Hodnota)
+                    : group.Last().Hodnota
             })
             .ToList();
         var existingRows = await _dbContext.ZaznamHarmonogramHodnoty
-            .Where(x => x.ZaznamId == record.Id && plannedTypeIds.Contains(x.TypId))
+            .Where(x => x.ZaznamId == record.Id && allowedTypeIds.Contains(x.TypId))
             .ToListAsync(ct);
-        var normalizedPlannedValues = plannedValues
-            .Where(x => x.Hodnota > 0)
+        var normalizedValues = submittedValues
+            .Where(x => x.Hodnota > 0 || actualTypeIds.Contains(x.TypId))
             .ToDictionary(x => x.TypId, x => x.Hodnota);
 
-        record.DatumUkonceni = schedulePayload.TerminUkonceni.Date;
+        if (schedulePayload.ChangesTermDeadline)
+        {
+            record.DatumUkonceni = schedulePayload.TerminUkonceni.Date;
+        }
 
         foreach (var row in existingRows)
         {
-            if (normalizedPlannedValues.TryGetValue(row.TypId, out var updatedValue))
+            if (normalizedValues.TryGetValue(row.TypId, out var updatedValue))
             {
                 row.HodnotaInt = updatedValue;
                 row.UpdatedAt = _timeProvider.GetUtcNow().UtcDateTime;
-                normalizedPlannedValues.Remove(row.TypId);
+                normalizedValues.Remove(row.TypId);
             }
-            else
+            else if ((plannedTypeIds.Contains(row.TypId) && schedulePayload.ChangesSchedulePlan)
+                || (actualTypeIds.Contains(row.TypId) && schedulePayload.ChangesScheduleActual))
             {
                 _dbContext.ZaznamHarmonogramHodnoty.Remove(row);
             }
         }
 
-        foreach (var plannedValue in normalizedPlannedValues)
+        foreach (var plannedValue in normalizedValues)
         {
             _dbContext.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
             {
@@ -657,12 +1009,15 @@ public sealed class RecordProposalService : IRecordProposalService
             DatumZalozeni = createPayload?.DatumZalozeni ?? recordRow?.DatumZalozeni,
             TerminUkonceni = createPayload?.TerminUkonceni ?? schedulePayload?.TerminUkonceni ?? recordRow?.TerminUkonceni,
             PlannedStepCount = schedulePayload?.PlannedHarmonogramHodnoty.Count ?? 0,
+            ActualStepCount = schedulePayload?.ActualHarmonogramHodnoty.Count ?? 0,
             CanApprove = canDecide && string.Equals(proposal.Stav, RecordProposalStateCodes.Pending, StringComparison.OrdinalIgnoreCase),
             CanReject = canDecide && string.Equals(proposal.Stav, RecordProposalStateCodes.Pending, StringComparison.OrdinalIgnoreCase),
             CanRejectAndTakeOver = canDecide
                 && string.Equals(proposal.Stav, RecordProposalStateCodes.Pending, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase),
+            CanRejectAndEdit = canDecide && string.Equals(proposal.Stav, RecordProposalStateCodes.Pending, StringComparison.OrdinalIgnoreCase),
             CanPrefillCreateForm = canDecide && string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase),
+            DetailUrl = null,
             ScheduleProposalEditorUrl = null,
             PrefillCreateFormUrl = null
         };
@@ -670,7 +1025,7 @@ public sealed class RecordProposalService : IRecordProposalService
 
     private static string GetProposalTypeLabel(string typeCode)
         => string.Equals(typeCode, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase)
-            ? "Návrh změny termínu a plánu"
+            ? "Návrh změny termínu a harmonogramu"
             : "Návrh založení záznamu";
 
     private static string GetProposalStateLabel(string stateCode)

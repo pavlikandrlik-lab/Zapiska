@@ -49,9 +49,23 @@ public sealed class RecordProposalPayloadMapper
         };
     }
 
-    public RecordProposalPayload BuildSchedulePayload(SaveRecordCommand command, IReadOnlyCollection<int> plannedTypeIds)
+    public RecordProposalPayload BuildSchedulePayload(
+        SaveRecordCommand command,
+        IReadOnlyCollection<int> plannedTypeIds,
+        IReadOnlyCollection<int> actualTypeIds,
+        DateTime originalDeadline,
+        IReadOnlyDictionary<int, int> existingValues)
     {
         var plannedTypeIdSet = plannedTypeIds.ToHashSet();
+        var actualTypeIdSet = actualTypeIds.ToHashSet();
+        var submittedByType = command.HarmonogramHodnoty
+            .GroupBy(value => value.TypId)
+            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
+        var changesTermDeadline = command.TerminUkonceni.Date != originalDeadline.Date;
+        var changesSchedulePlan = plannedTypeIdSet.Any(typeId =>
+            NormalizeScheduleValue(submittedByType.GetValueOrDefault(typeId)) != NormalizeScheduleValue(existingValues.GetValueOrDefault(typeId)));
+        var changesScheduleActual = actualTypeIdSet.Any(typeId =>
+            NormalizeScheduleValue(submittedByType.GetValueOrDefault(typeId)) != NormalizeScheduleValue(existingValues.GetValueOrDefault(typeId)));
 
         return new RecordProposalPayload
         {
@@ -68,7 +82,18 @@ public sealed class RecordProposalPayloadMapper
                         TypId = value.TypId,
                         Hodnota = value.Hodnota
                     })
-                    .ToList()
+                    .ToList(),
+                ActualHarmonogramHodnoty = command.HarmonogramHodnoty
+                    .Where(value => actualTypeIdSet.Contains(value.TypId))
+                    .Select(value => new SaveRecordHarmonogramValueCommand
+                    {
+                        TypId = value.TypId,
+                        Hodnota = value.Hodnota
+                    })
+                    .ToList(),
+                ChangesTermDeadline = changesTermDeadline,
+                ChangesSchedulePlan = changesSchedulePlan,
+                ChangesScheduleActual = changesScheduleActual
             }
         };
     }
@@ -143,4 +168,47 @@ public sealed class RecordProposalPayloadMapper
             .ToList();
         model.JednaniIdProCislo = payload.JednaniIdProCislo;
     }
+
+    public void ApplySchedulePayload(ZaznamEditViewModel model, SchedulePlanProposalPayload payload)
+    {
+        model.TerminUkonceni = payload.TerminUkonceni;
+
+        var scheduleValuesByType = payload.PlannedHarmonogramHodnoty
+            .Concat(payload.ActualHarmonogramHodnoty)
+            .GroupBy(value => value.TypId)
+            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
+
+        var rebuiltSteps = model.HarmonogramBlok.Kroky
+            .Select(step => new HarmonogramKrokEditViewModel
+            {
+                KrokIndex = step.KrokIndex,
+                Nazev = step.Nazev,
+                BarvaHex = step.BarvaHex,
+                TrvaniTypId = step.TrvaniTypId,
+                ZpozdeniTypId = step.ZpozdeniTypId,
+                TrvaniDni = scheduleValuesByType.TryGetValue(step.TrvaniTypId, out var duration) ? Math.Max(0, duration) : step.TrvaniDni,
+                OdchylkaDni = scheduleValuesByType.TryGetValue(step.ZpozdeniTypId, out var delay) ? delay : step.OdchylkaDni,
+                BaselineDatum = step.BaselineDatum,
+                SkutecneDatum = step.SkutecneDatum
+            })
+            .ToList();
+
+        model.HarmonogramBlok = new HarmonogramBlockViewModel
+        {
+            RecordId = model.HarmonogramBlok.RecordId,
+            Mode = model.HarmonogramBlok.Mode,
+            DatumZalozeni = model.HarmonogramBlok.DatumZalozeni,
+            TerminUkonceni = payload.TerminUkonceni,
+            DelayBarvaHex = model.HarmonogramBlok.DelayBarvaHex,
+            Souhrn = model.HarmonogramBlok.Souhrn,
+            Kroky = rebuiltSteps,
+            EditorJeUkolKategorie = model.HarmonogramBlok.EditorJeUkolKategorie,
+            EditorCanEditScheduleFull = model.HarmonogramBlok.EditorCanEditScheduleFull,
+            EditorCanEditScheduleAddOnly = model.HarmonogramBlok.EditorCanEditScheduleAddOnly,
+            EditorCanEditPlanOnly = model.HarmonogramBlok.EditorCanEditPlanOnly,
+            EditorPlanFieldsLocked = model.HarmonogramBlok.EditorPlanFieldsLocked
+        };
+    }
+
+    private static int NormalizeScheduleValue(int value) => value;
 }

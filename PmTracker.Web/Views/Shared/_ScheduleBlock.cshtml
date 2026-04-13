@@ -27,7 +27,13 @@
      style="--record-schedule-delay-color:@Model.DelayBarvaHex;">
     @if (isEditor)
     {
-        @if (Model.EditorPlanFieldsLocked)
+        @if (Model.EditorScheduleFieldsLocked)
+        {
+            <div class="alert warning">
+                Harmonogram je do vyřízení aktivního návrhu uzamčený.
+            </div>
+        }
+        else if (Model.EditorPlanFieldsLocked)
         {
             <div class="alert warning">
                 Plánová část harmonogramu je do vyřízení aktivního návrhu uzamčená.
@@ -191,11 +197,17 @@
                         var durationStaticDisabled = krok.TrvaniTypId <= 0;
                         var delayStaticDisabled = krok.ZpozdeniTypId <= 0;
                         var stepStaticDisabled = durationStaticDisabled || delayStaticDisabled;
+                        var durationChanged = krok.TrvaniTypId > 0 && Model.EditorChangedTypeTooltips.ContainsKey(krok.TrvaniTypId);
+                        var delayChanged = krok.ZpozdeniTypId > 0 && Model.EditorChangedTypeTooltips.ContainsKey(krok.ZpozdeniTypId);
+                        var durationTooltip = durationChanged ? Model.EditorChangedTypeTooltips[krok.TrvaniTypId] : null;
+                        var delayTooltip = delayChanged ? Model.EditorChangedTypeTooltips[krok.ZpozdeniTypId] : null;
                         var canEditDuration = !Model.EditorPlanFieldsLocked
+                            && !Model.EditorScheduleFieldsLocked
                             && (Model.EditorCanEditScheduleFull
                                 || Model.EditorCanEditPlanOnly
                                 || (Model.EditorCanEditScheduleAddOnly && krok.TrvaniDni <= 0));
                         var canEditDelay = !Model.EditorCanEditPlanOnly
+                            && !Model.EditorScheduleFieldsLocked
                             && (Model.EditorCanEditScheduleFull || Model.EditorCanEditScheduleAddOnly);
                         var durationDisabled = !Model.EditorJeUkolKategorie || durationStaticDisabled || !canEditDuration;
                         var delayDisabled = !Model.EditorJeUkolKategorie || delayStaticDisabled || !canEditDelay;
@@ -209,7 +221,8 @@
                             data-step-delay="@krok.OdchylkaDni">
                             <td>@krok.Nazev</td>
                             <td>
-                                <div class="schedule-stacked-input">
+                                <div class="schedule-stacked-input @(durationChanged ? "proposal-field-changed" : null)"
+                                     title="@durationTooltip">
                                     <input type="hidden" name="HarmonogramHodnoty[@durationInputIndex].TypId" value="@krok.TrvaniTypId" />
                                     <div class="schedule-stacked-main">
                                         <div class="schedule-stacked-part schedule-stacked-part-top">
@@ -233,12 +246,13 @@
                                                     DisplayValue = krok.BaselineDatum.ToString("dd.MM.yyyy"),
                                                     Locked = dateDisabled,
                                                     AriaLabel = "Otevřít kalendář kroku harmonogramu",
-                                                    ContainerCssClass = "schedule-date-field schedule-date-field-stacked",
+                                                    ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(durationChanged ? " proposal-field-changed" : string.Empty)}",
                                                     ExtraDataAttributes = new Dictionary<string, object?>
                                                     {
                                                         ["data-schedule-date"] = "true",
                                                         ["data-schedule-static-disabled"] = stepStaticDisabled ? "true" : "false",
-                                                        ["data-schedule-original-duration"] = krok.TrvaniDni.ToString()
+                                                        ["data-schedule-original-duration"] = krok.TrvaniDni.ToString(),
+                                                        ["title"] = durationTooltip
                                                     }
                                                 })
                                         </div>
@@ -267,7 +281,8 @@
                                 </div>
                             </td>
                             <td>
-                                <div class="schedule-stacked-input">
+                                <div class="schedule-stacked-input @(delayChanged ? "proposal-field-changed" : null)"
+                                     title="@delayTooltip">
                                     <input type="hidden" name="HarmonogramHodnoty[@delayInputIndex].TypId" value="@krok.ZpozdeniTypId" />
                                     <div class="schedule-stacked-main">
                                         <div class="schedule-stacked-part schedule-stacked-part-top">
@@ -289,11 +304,12 @@
                                                     DisplayValue = krok.SkutecneDatum.ToString("dd.MM.yyyy"),
                                                     Locked = delayDateDisabled,
                                                     AriaLabel = "Otevřít kalendář skutečnosti kroku harmonogramu",
-                                                    ContainerCssClass = "schedule-date-field schedule-date-field-stacked",
+                                                    ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(delayChanged ? " proposal-field-changed" : string.Empty)}",
                                                     ExtraDataAttributes = new Dictionary<string, object?>
                                                     {
                                                         ["data-schedule-delay-date"] = "true",
-                                                        ["data-schedule-static-disabled"] = delayStaticDisabled ? "true" : "false"
+                                                        ["data-schedule-static-disabled"] = delayStaticDisabled ? "true" : "false",
+                                                        ["title"] = delayTooltip
                                                     }
                                                 })
                                         </div>

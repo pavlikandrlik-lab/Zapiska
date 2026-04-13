@@ -12,6 +12,7 @@ using PmTracker.Web.Services.Profile;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Documentation;
+using PmTracker.Web.Services.Home;
 using PmTracker.Web.Services.Settings;
 using PmTracker.Web.Services.Records;
 
@@ -56,6 +57,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<ProjectService>();
         services.AddScoped<RecordService>();
         services.AddScoped<RecordProposalService>();
+        services.AddScoped<HomeDashboardService>();
         services.AddScoped<PeopleService>();
         services.AddScoped<ProfileService>();
         services.AddScoped<DictionaryService>();
@@ -65,6 +67,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IProjectService>(sp => sp.GetRequiredService<ProjectService>());
         services.AddScoped<IRecordService>(sp => sp.GetRequiredService<RecordService>());
         services.AddScoped<IRecordProposalService>(sp => sp.GetRequiredService<RecordProposalService>());
+        services.AddScoped<IHomeDashboardService>(sp => sp.GetRequiredService<HomeDashboardService>());
         services.AddScoped<IPeopleService>(sp => sp.GetRequiredService<PeopleService>());
         services.AddScoped<IProfileService>(sp => sp.GetRequiredService<ProfileService>());
         services.AddScoped<IDictionaryService>(sp => sp.GetRequiredService<DictionaryService>());

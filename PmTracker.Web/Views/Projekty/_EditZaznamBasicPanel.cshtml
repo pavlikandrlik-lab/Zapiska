@@ -9,7 +9,9 @@
     var datumZalozeniLocked = metadataLocked || Model.IsSchedulePlanProposalEditor;
     var terminUkonceniIso = Model.TerminUkonceni?.ToString("yyyy-MM-dd") ?? string.Empty;
     var terminUkonceniDisplay = Model.TerminUkonceni?.ToString("dd.MM.yyyy") ?? string.Empty;
-    var terminUkonceniLocked = !Model.AllowTermDeadlineEdit || Model.HasPendingScheduleProposalLock;
+    var terminUkonceniLocked = !Model.AllowTermDeadlineEdit || (Model.HasPendingScheduleProposalLock && Model.PendingScheduleProposalLocksTermDeadline);
+    var terminUkonceniChanged = Model.IsProposalFieldChanged("TerminUkonceni");
+    var terminUkonceniTooltip = Model.GetProposalFieldTooltip("TerminUkonceni");
     var showTaskType = !string.IsNullOrWhiteSpace(Model.Kategorie)
         && (Model.Kategorie.Contains("úkol", StringComparison.OrdinalIgnoreCase)
             || Model.Kategorie.Contains("ukol", StringComparison.OrdinalIgnoreCase));
@@ -170,7 +172,8 @@
                     AriaLabel = "Otevřít kalendář"
                 })
         </label>
-        <label>
+        <label class="@(terminUkonceniChanged ? "proposal-field-changed" : null)"
+               title="@terminUkonceniTooltip">
             Termín ukončení
             @await Html.PartialAsync(
                 "_AppDateField",
@@ -180,7 +183,8 @@
                     IsoValue = terminUkonceniIso,
                     DisplayValue = terminUkonceniDisplay,
                     Locked = terminUkonceniLocked,
-                    AriaLabel = "Otevřít kalendář"
+                    AriaLabel = "Otevřít kalendář",
+                    ContainerCssClass = terminUkonceniChanged ? "proposal-field-changed" : null
                 })
         </label>
     </div>

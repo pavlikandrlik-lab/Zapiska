@@ -52,6 +52,10 @@ public sealed class SchedulePlanProposalPayload
     public int ZaznamId { get; set; }
     public DateTime TerminUkonceni { get; set; }
     public List<SaveRecordHarmonogramValueCommand> PlannedHarmonogramHodnoty { get; set; } = [];
+    public List<SaveRecordHarmonogramValueCommand> ActualHarmonogramHodnoty { get; set; } = [];
+    public bool ChangesTermDeadline { get; set; }
+    public bool ChangesSchedulePlan { get; set; }
+    public bool ChangesScheduleActual { get; set; }
 }
 
 public sealed class ProjektNavrhyTabViewModel
@@ -85,10 +89,13 @@ public sealed class RecordProposalListItemViewModel
     public DateTime? DatumZalozeni { get; init; }
     public DateTime? TerminUkonceni { get; init; }
     public int PlannedStepCount { get; init; }
+    public int ActualStepCount { get; init; }
     public bool CanApprove { get; set; }
     public bool CanReject { get; set; }
     public bool CanRejectAndTakeOver { get; set; }
+    public bool CanRejectAndEdit { get; set; }
     public bool CanPrefillCreateForm { get; set; }
+    public string? DetailUrl { get; set; }
     public string? ScheduleProposalEditorUrl { get; set; }
     public string? PrefillCreateFormUrl { get; set; }
 }

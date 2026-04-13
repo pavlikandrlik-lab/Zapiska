@@ -62,6 +62,42 @@ public sealed class NavrhyController : BaseController
     }
 
     [HttpGet]
+    public async Task<IActionResult> ProposalDetail(int projektId, int proposalId, string? presentation, string? returnUrl, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(projektId))
+        {
+            return NotFound();
+        }
+
+        if (!await _recordProposalService.CanViewProposalTabAsync(projektId, CurrentUserContext, ct))
+        {
+            return Forbid();
+        }
+
+        var model = await _recordProposalService.BuildProposalDetailAsync(projektId, proposalId, CurrentUserContext, ct);
+        PrepareProposalEditorModel(model, presentation, returnUrl);
+        return View(GetEditorViewPath(model.Presentation), model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> EditFromProposal(int projektId, int proposalId, string? presentation, string? returnUrl, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(projektId))
+        {
+            return NotFound();
+        }
+
+        if (!await _recordProposalService.CanViewProposalTabAsync(projektId, CurrentUserContext, ct))
+        {
+            return Forbid();
+        }
+
+        var model = await _recordProposalService.BuildEditableRecordEditorFromProposalAsync(projektId, proposalId, CurrentUserContext, ct);
+        PrepareProposalEditorModel(model, presentation, returnUrl);
+        return View(GetEditorViewPath(model.Presentation), model);
+    }
+
+    [HttpGet]
     public async Task<IActionResult> PrefillCreateProposal(int projektId, int proposalId, string? presentation, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
@@ -99,11 +135,11 @@ public sealed class NavrhyController : BaseController
     {
         return ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, command.ProjektId),
-            invalidAjaxMessage: "Návrh změny termínu a plánu nelze odeslat.",
+            invalidAjaxMessage: "Návrh změny termínu a harmonogramu nelze odeslat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToProposalTab(command.ProjektId),
             onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToProposalTab(command.ProjektId)),
-            onAjaxSuccess: () => Task.FromResult<IActionResult>(BuildProposalSubmitAjaxSuccess(command, "Návrh změny termínu a plánu byl odeslán.")),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(BuildProposalSubmitAjaxSuccess(command, "Návrh změny termínu a harmonogramu byl odeslán.")),
             operation: () => _recordProposalService.SubmitScheduleProposalAsync(command, CurrentUserContext, ct));
     }
 
@@ -155,6 +191,28 @@ public sealed class NavrhyController : BaseController
                 tab: ProposalsTab,
                 message: "Návrh byl zamítnut a data byla převzata do nového formuláře.")),
             operation: () => _recordProposalService.RejectAndTakeOverCreateProposalAsync(command, CurrentUserContext, ct));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> RejectAndEditProposal(ProposalDecisionCommand command, CancellationToken ct = default)
+    {
+        var editUrl = Url.Action(nameof(EditFromProposal), new { projektId = command.ProjektId, proposalId = command.ProposalId, presentation = PresentationPage })
+            ?? $"/Navrhy/EditFromProposal?projektId={command.ProjektId}&proposalId={command.ProposalId}&presentation=page";
+
+        return ExecuteValidatedCommandAsync(
+            hasPermission: () => CurrentUserContext.CanAccessProject(command.ProjektId),
+            invalidAjaxMessage: "Návrh nelze zamítnout a převzít do formuláře.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
+            onInvalidRedirect: () => RedirectToProposalTab(command.ProjektId),
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(Redirect(editUrl)),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
+                refreshScope: "page",
+                refreshUrl: editUrl,
+                projectId: command.ProjektId,
+                tab: ProposalsTab,
+                message: "Návrh byl zamítnut a data byla převzata do běžného formuláře.")),
+            operation: () => _recordProposalService.RejectAndEditProposalAsync(command, CurrentUserContext, ct));
     }
 
     private void PrepareProposalEditorModel(ZaznamEditViewModel model, string? requestedPresentation, string? requestedReturnUrl)

@@ -74,7 +74,7 @@ public sealed partial class RecordService
         var normalizedCollaborationIds = validation.NormalizedCollaborationIds;
         var pendingScheduleProposalLock = validation.ExistingRecord is not null
             ? await pendingScheduleProposalLockEvaluator.EvaluateAsync(validation.ExistingRecord.Id, ct)
-            : new PendingScheduleProposalLockState(false, null, null);
+            : new PendingScheduleProposalLockState(false, null, null, false, false);
 
         var (tx, ownsTransaction) = await BeginSerializableTransactionIfNeededAsync(ct);
         await using var _ = tx;
@@ -101,7 +101,7 @@ public sealed partial class RecordService
             entity.Popis = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription;
             entity.VlastnikId = ownerId;
             entity.DatumZalozeni = command.DatumZalozeni.Date;
-            entity.DatumUkonceni = pendingScheduleProposalLock.HasPendingProposal
+            entity.DatumUkonceni = pendingScheduleProposalLock.LocksTermDeadline
                 ? entity.DatumUkonceni.Date
                 : command.TerminUkonceni.Date;
             entity.SubsystemId = subsystemId;
@@ -239,8 +239,8 @@ public sealed partial class RecordService
         if (isTaskCategory && command.HarmonogramHodnoty.Count > 0)
         {
             var scheduleTypeDefinitions = await composition.ResolveScheduleTypeDefinitionsForRecordAsync(entity, ct);
-            var valuesToPersist = pendingScheduleProposalLock.HasPendingProposal
-                ? await BuildScheduleValuesPreservingPlanAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, ct)
+            var valuesToPersist = pendingScheduleProposalLock.LocksSchedule
+                ? await BuildScheduleValuesPreservingLockedScopeAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, pendingScheduleProposalLock, ct)
                 : command.HarmonogramHodnoty;
             normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, ct);
         }
@@ -1239,9 +1239,9 @@ public sealed partial class RecordService
             : await BuildScheduleValuesForAddOnlyAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, ct);
 
         var pendingScheduleProposalLock = await pendingScheduleProposalLockEvaluator.EvaluateAsync(entity.Id, ct);
-        if (pendingScheduleProposalLock.HasPendingProposal)
+        if (pendingScheduleProposalLock.LocksSchedule)
         {
-            valuesToPersist = await BuildScheduleValuesPreservingPlanAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, ct);
+            valuesToPersist = await BuildScheduleValuesPreservingLockedScopeAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, pendingScheduleProposalLock, ct);
         }
 
         var (tx, ownsTransaction) = await BeginSerializableTransactionIfNeededAsync(ct);
@@ -1378,10 +1378,11 @@ public sealed partial class RecordService
             .ToList();
     }
 
-    private async Task<List<SaveRecordHarmonogramValueCommand>> BuildScheduleValuesPreservingPlanAsync(
+    private async Task<List<SaveRecordHarmonogramValueCommand>> BuildScheduleValuesPreservingLockedScopeAsync(
         int zaznamId,
         IReadOnlyList<SaveRecordHarmonogramValueCommand> submittedValues,
         IReadOnlyList<RecordScheduleTypeDefinition> scheduleTypeDefinitions,
+        PendingScheduleProposalLockState lockState,
         CancellationToken ct)
     {
         if (scheduleTypeDefinitions.Count == 0)
@@ -1407,10 +1408,19 @@ public sealed partial class RecordService
             return [];
         }
 
-        var submittedByType = submittedValues
-            .Where(x => allowedTypeIds.Contains(x.TypId))
-            .GroupBy(x => x.TypId)
-            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
+        if (!lockState.LocksSchedule)
+        {
+            return submittedValues
+                .Where(x => allowedTypeIds.Contains(x.TypId))
+                .GroupBy(x => x.TypId)
+                .Select(group => new SaveRecordHarmonogramValueCommand
+                {
+                    TypId = group.Key,
+                    Hodnota = group.Last().Hodnota
+                })
+                .OrderBy(x => x.TypId)
+                .ToList();
+        }
 
         var existingByType = (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
                 .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId))
@@ -1429,11 +1439,7 @@ public sealed partial class RecordService
 
         foreach (var typeId in delayTypeIds)
         {
-            if (submittedByType.TryGetValue(typeId, out var submittedDelay))
-            {
-                desired[typeId] = submittedDelay;
-            }
-            else if (existingByType.TryGetValue(typeId, out var existingDelay))
+            if (existingByType.TryGetValue(typeId, out var existingDelay))
             {
                 desired[typeId] = existingDelay;
             }

@@ -828,6 +828,7 @@ public sealed class ProjektyController : BaseController
 
         foreach (var item in model.NavrhyZalozeni.Concat(model.NavrhyHarmonogramu))
         {
+            item.DetailUrl = Url.Action("ProposalDetail", "Navrhy", new { projektId = model.ProjektId, proposalId = item.Id }) ?? $"/Navrhy/ProposalDetail?projektId={model.ProjektId}&proposalId={item.Id}";
             item.PrefillCreateFormUrl = Url.Action("PrefillCreateProposal", "Navrhy", new { projektId = model.ProjektId, proposalId = item.Id }) ?? $"/Navrhy/PrefillCreateProposal?projektId={model.ProjektId}&proposalId={item.Id}";
         }
     }

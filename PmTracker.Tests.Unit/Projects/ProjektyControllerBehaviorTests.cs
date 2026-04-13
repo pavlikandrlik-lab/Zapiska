@@ -623,6 +623,12 @@ public sealed class ProjektyControllerBehaviorTests
         public Task<ZaznamEditViewModel> BuildScheduleProposalEditorAsync(int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => throw new NotSupportedException();
 
+        public Task<ZaznamEditViewModel> BuildProposalDetailAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<ZaznamEditViewModel> BuildEditableRecordEditorFromProposalAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task<ZaznamEditViewModel> BuildPrefilledCreateRecordEditorFromProposalAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => throw new NotSupportedException();
 
@@ -639,6 +645,9 @@ public sealed class ProjektyControllerBehaviorTests
             => throw new NotSupportedException();
 
         public Task RejectAndTakeOverCreateProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task RejectAndEditProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => throw new NotSupportedException();
     }
 }

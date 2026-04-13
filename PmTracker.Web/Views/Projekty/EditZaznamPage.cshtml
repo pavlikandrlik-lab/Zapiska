@@ -8,7 +8,9 @@
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
 {
     Title = Model.PageTitle,
-    Subtitle = "Po uložení se vrátíte zpět do projektu do stejného pracovního kontextu.",
+    Subtitle = Model.IsProposalDecisionDetail
+        ? (Model.ProposalSummaryNote ?? "Detail návrhu je určen jen k posouzení.")
+        : "Po uložení se vrátíte zpět do projektu do stejného pracovního kontextu.",
     BackUrl = Model.BackUrl,
     BackLabel = Model.BackLabel,
     UseRecordEditorBackNavigation = true

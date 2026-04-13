@@ -1,0 +1,19 @@
+@model DashboardHeroViewModel
+
+<section class="dashboard-hero card">
+    <div class="dashboard-hero-copy">
+        <div class="dashboard-hero-eyebrow">@Model.Eyebrow</div>
+        <h2 class="dashboard-hero-title">@Model.Title</h2>
+        <p class="dashboard-hero-description">@Model.Description</p>
+    </div>
+
+    <div class="dashboard-hero-stats" aria-label="Souhrn dashboardu">
+        @foreach (var stat in Model.Stats)
+        {
+            <div class="dashboard-stat">
+                <span class="dashboard-stat-value">@stat.Value</span>
+                <span class="dashboard-stat-label">@stat.Label</span>
+            </div>
+        }
+    </div>
+</section>

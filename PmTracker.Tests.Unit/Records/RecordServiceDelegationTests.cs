@@ -48,7 +48,7 @@ public sealed class RecordServiceDelegationTests
     private sealed class FakePendingScheduleProposalLockEvaluator : IPendingScheduleProposalLockEvaluator
     {
         public Task<PendingScheduleProposalLockState> EvaluateAsync(int recordId, CancellationToken ct = default)
-            => Task.FromResult(new PendingScheduleProposalLockState(false, null, null));
+            => Task.FromResult(new PendingScheduleProposalLockState(false, null, null, false, false));
     }
 
     private sealed class FakeCommentService : ICommentService

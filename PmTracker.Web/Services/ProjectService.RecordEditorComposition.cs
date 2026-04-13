@@ -153,7 +153,7 @@ public sealed partial class ProjectService
         }).ToList();
         var pendingScheduleProposalLock = !isCreate
             ? await pendingScheduleProposalLockEvaluator.EvaluateAsync(record.Id, ct)
-            : new PendingScheduleProposalLockState(false, null, null);
+            : new PendingScheduleProposalLockState(false, null, null, false, false);
 
         return new ZaznamEditViewModel
         {
@@ -203,7 +203,8 @@ public sealed partial class ProjectService
                 harmonogramSouhrn,
                 harmonogramBlokKroky,
                 editorJeUkolKategorie: isTaskCategory,
-                editorPlanFieldsLocked: pendingScheduleProposalLock.HasPendingProposal),
+                editorPlanFieldsLocked: pendingScheduleProposalLock.LocksSchedule,
+                editorScheduleFieldsLocked: pendingScheduleProposalLock.LocksSchedule),
             DostupniVlastnici = ownerCandidates,
             DostupniSpolupracovnici = collaborationCandidates,
             VybraniSpolupracovniciIds = selectedCollaborationIds,
@@ -214,7 +215,9 @@ public sealed partial class ProjectService
             PrimaryActionLabel = isCreate ? "Založit záznam" : "Uložit",
             HasPendingScheduleProposalLock = pendingScheduleProposalLock.HasPendingProposal,
             PendingScheduleProposalId = pendingScheduleProposalLock.ProposalId,
-            PendingScheduleProposalMessage = pendingScheduleProposalLock.Message
+            PendingScheduleProposalMessage = pendingScheduleProposalLock.Message,
+            PendingScheduleProposalLocksTermDeadline = pendingScheduleProposalLock.LocksTermDeadline,
+            PendingScheduleProposalLocksSchedule = pendingScheduleProposalLock.LocksSchedule
         };
     }
 

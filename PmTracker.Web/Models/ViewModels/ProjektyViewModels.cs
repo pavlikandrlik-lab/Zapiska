@@ -191,6 +191,8 @@ public sealed class HarmonogramBlockViewModel
     public bool EditorCanEditScheduleAddOnly { get; set; }
     public bool EditorCanEditPlanOnly { get; set; }
     public bool EditorPlanFieldsLocked { get; set; }
+    public bool EditorScheduleFieldsLocked { get; set; }
+    public IReadOnlyDictionary<int, string> EditorChangedTypeTooltips { get; set; } = new Dictionary<int, string>();
 }
 
 public sealed class ProjektHarmonogramTabViewModel
@@ -544,16 +546,45 @@ public sealed class ZaznamEditViewModel
     public string ProposalEditorMode { get; set; } = RecordProposalEditorModes.None;
     public bool IsProposalEditor => !string.Equals(ProposalEditorMode, RecordProposalEditorModes.None, StringComparison.OrdinalIgnoreCase);
     public bool IsSchedulePlanProposalEditor => string.Equals(ProposalEditorMode, RecordProposalEditorModes.SchedulePlanProposal, StringComparison.OrdinalIgnoreCase);
+    public bool IsProposalDecisionDetail { get; set; }
+    public int? ProposalId { get; set; }
+    public string? ProposalType { get; set; }
+    public string? ProposalState { get; set; }
+    public bool CanApproveProposal { get; set; }
+    public bool CanRejectProposal { get; set; }
+    public bool CanRejectAndEditProposal { get; set; }
+    public bool CanPrefillProposalForm { get; set; }
+    public string? ProposalSummaryNote { get; set; }
+    public IReadOnlyDictionary<string, string> ProposalChangedFieldTooltips { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<int, string> ProposalChangedScheduleTypeTooltips { get; set; } = new Dictionary<int, string>();
     public bool AllowBasicMetadataEdit { get; set; } = true;
     public bool AllowTermDeadlineEdit { get; set; } = true;
     public bool HasPendingScheduleProposalLock { get; set; }
     public int? PendingScheduleProposalId { get; set; }
     public string? PendingScheduleProposalMessage { get; set; }
+    public bool PendingScheduleProposalLocksTermDeadline { get; set; }
+    public bool PendingScheduleProposalLocksSchedule { get; set; }
     public bool CanCreateScheduleProposal { get; set; }
     public string? CreateScheduleProposalUrl { get; set; }
     public bool CanEditRecord { get; set; }
     public bool CanEditScheduleFull { get; set; }
     public bool CanEditScheduleAddOnly { get; set; }
+
+    public bool IsProposalFieldChanged(string fieldKey)
+        => !string.IsNullOrWhiteSpace(fieldKey) && ProposalChangedFieldTooltips.ContainsKey(fieldKey);
+
+    public string? GetProposalFieldTooltip(string fieldKey)
+        => string.IsNullOrWhiteSpace(fieldKey)
+            ? null
+            : ProposalChangedFieldTooltips.GetValueOrDefault(fieldKey);
+
+    public bool IsProposalScheduleTypeChanged(int typeId)
+        => typeId > 0 && ProposalChangedScheduleTypeTooltips.ContainsKey(typeId);
+
+    public string? GetProposalScheduleTypeTooltip(int typeId)
+        => typeId > 0
+            ? ProposalChangedScheduleTypeTooltips.GetValueOrDefault(typeId)
+            : null;
 }
 
 public sealed class HarmonogramKrokEditViewModel

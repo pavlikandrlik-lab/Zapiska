@@ -38,6 +38,7 @@ H - V zápisu jednání se ruční volba řazení nabízet nemá; tam se má vž
 H - Přehledy jednání mají nově seskupovat kartičky do rozbalovacích lišt po kalendářních rocích; vizuál kartiček se nemá měnit, mění se pouze rozložení.
 H - V globální záložce `Jednání` mají být pod sebou projekty, každý projekt má mít řádek s posledními jednáními a možnost rozbalit historická jednání po rocích; roční lišty mají být výchozím stavem zabalené.
 H - V projektové záložce `Jednání` se má začínat přímo ročními lištami pro vybraný projekt; aktuální rok má být výchozím stavem částečně rozbalený tak, aby byl vidět první řádek jednání v daném roce.
+### 3.1 Projektový dashboard
 - Přidat pro každý projekt samostatný `projektový dashboard` pro rychlou analytiku přímo v aplikaci bez potřeby SQL nebo Power BI; konkrétní grafy, statistiky a KPI budou doplněny později.
 
 ## 4. Tisk, historické zobrazení a pravidla pro snapshoty
@@ -63,27 +64,27 @@ H - Cílový scénář je možnost přeformulovat nebo smazat vyjádření, kter
 
 ### Návrh založení záznamu
 
-- Přidat samostatný workflow pro `návrh založení záznamu`; návrh se před schválením nesmí ukládat do provozní tabulky `projektove_zaznamy` ani do navázaných provozních dat.
-- Návrh mohou vytvářet pouze uživatelé s rolí `Vedoucí subsystému` nebo `Zástupce vedoucího subsystému` pro relevantní subsystem.
-- O návrhu mohou rozhodovat pouze uživatelé s projektovou rolí `Projektový manažer` nebo `Administrátor projektu`.
-- Workflow má být jednoduchý: návrh lze pouze `schválit` nebo `zamítnout`, bez vyjádření k návrhu, bez vrácení k doplnění a bez dalších mezikroků.
-- Pro navrhovatele se má použít stejné UI jako pro běžné založení záznamu; pouze primární akce se změní z `Založit záznam` na `Odeslat návrh`.
-- Návrhy se mají ukládat do nové samostatné tabulky oddělené od provozních dat.
-- Vlastní data návrhu se mají ukládat jako serializovaný `JSON` payload odpovídající datům editoru záznamu.
-- Nová tabulka má evidovat minimálně stav návrhu, datum a autora podání návrhu, datum a uživatele rozhodnutí a serializovaná data návrhu.
-- Stav návrhu má pokrývat minimálně hodnoty `PENDING`, `APPROVED` a `REJECTED`.
-- Před rozhodnutím musí být možné načíst data návrhu do stejného formuláře jako při založení záznamu, upravit je podle potřeby schvalovatele a teprve poté schválit nebo zamítnout.
-- Při schválení návrhu se má skutečný záznam vytvořit až z finálně upravených dat; při zamítnutí se žádný provozní záznam nevytvoří.
+H - Přidat samostatný workflow pro `návrh založení záznamu`; návrh se před schválením nesmí ukládat do provozní tabulky `projektove_zaznamy` ani do navázaných provozních dat.
+H - Návrh mohou vytvářet pouze uživatelé s rolí `Vedoucí subsystému` nebo `Zástupce vedoucího subsystému` pro relevantní subsystem.
+H - O návrhu mohou rozhodovat pouze uživatelé s projektovou rolí `Projektový manažer` nebo `Administrátor projektu`.
+H - Workflow má být jednoduchý: návrh lze pouze `schválit` nebo `zamítnout`, bez vyjádření k návrhu, bez vrácení k doplnění a bez dalších mezikroků.
+H - Pro navrhovatele se má použít stejné UI jako pro běžné založení záznamu; pouze primární akce se změní z `Založit záznam` na `Odeslat návrh`.
+H - Návrhy se mají ukládat do nové samostatné tabulky oddělené od provozních dat.
+H - Vlastní data návrhu se mají ukládat jako serializovaný `JSON` payload odpovídající datům editoru záznamu.
+H - Nová tabulka má evidovat minimálně stav návrhu, datum a autora podání návrhu, datum a uživatele rozhodnutí a serializovaná data návrhu.
+H - Stav návrhu má pokrývat minimálně hodnoty `PENDING`, `APPROVED` a `REJECTED`.
+H - Před rozhodnutím musí být možné načíst data návrhu do stejného formuláře jako při založení záznamu, upravit je podle potřeby schvalovatele a teprve poté schválit nebo zamítnout.
+H - Při schválení návrhu se má skutečný záznam vytvořit až z finálně upravených dat; při zamítnutí se žádný provozní záznam nevytvoří.
 
 ### Návrh změny termínu ukončení a plánové části harmonogramu
 
-- Přidat samostatný workflow pro `návrh změny termínu ukončení záznamu` a `návrh změny plánové části harmonogramu`.
-- Workflow se má vztahovat pouze na `Termín ukončení` a plánovou část harmonogramu; skutečnost harmonogramu se do návrhu nesmí zahrnovat ani jím měnit.
-- Pokud pro záznam existuje nevyřízený návrh změny termínu nebo plánové části harmonogramu, musí být odpovídající pole v běžném editoru uzamčená až do vyřízení návrhu.
-- Navrhovat mohou stejné role jako u návrhu založení záznamu, tedy `Vedoucí subsystému` a `Zástupce vedoucího subsystému`.
-- Schvalovat nebo zamítat mohou stejné role jako u návrhu založení záznamu, tedy `Projektový manažer` a `Administrátor projektu`.
-- Workflow má být stejně jednoduchý: pouze `schválit` nebo `zamítnout`, bez vracení k doplnění a bez dalších mezikroků.
-- Při schválení se mají do provozních dat propsat pouze schválené změny `Termínu ukončení` a plánové části harmonogramu; skutečnost harmonogramu musí zůstat beze změny.
+H - Přidat samostatný workflow pro `návrh změny termínu ukončení záznamu` a `návrh změny plánové části harmonogramu`.
+H - Workflow se má vztahovat pouze na `Termín ukončení` a plánovou část harmonogramu; skutečnost harmonogramu se do návrhu nesmí zahrnovat ani jím měnit.
+H - Pokud pro záznam existuje nevyřízený návrh změny termínu nebo plánové části harmonogramu, musí být odpovídající pole v běžném editoru uzamčená až do vyřízení návrhu.
+H - Navrhovat mohou stejné role jako u návrhu založení záznamu, tedy `Vedoucí subsystému` a `Zástupce vedoucího subsystému`.
+H - Schvalovat nebo zamítat mohou stejné role jako u návrhu založení záznamu, tedy `Projektový manažer` a `Administrátor projektu`.
+H - Workflow má být stejně jednoduchý: pouze `schválit` nebo `zamítnout`, bez vracení k doplnění a bez dalších mezikroků.
+H - Při schválení se mají do provozních dat propsat pouze schválené změny `Termínu ukončení` a plánové části harmonogramu; skutečnost harmonogramu musí zůstat beze změny.
 
 ## 7. Vyhledávání, audit a systémové chování aplikace
 
@@ -103,3 +104,5 @@ H - Cílový scénář je možnost přeformulovat nebo smazat vyjádření, kter
 - Pro návrh pravidel integrace a parsování budou později dodány ukázkové tickety a ukázky komunikace z ticketovacího systému.
 - Na základě dodaných ukázek a explicitně zadaných pravidel implementovat parser, který bude z textu ticketů a související komunikace rozpoznávat relevantní termíny pro promítnutí do `skutečnosti harmonogramu`.
 - Detailní mapování zdrojových textů, pravidel parsování a převodu do harmonogramu bude doplněno až ve chvíli, kdy budou k dispozici konkrétní příklady a rozhodovací pravidla.
+
+## 9. Uživatelský dashboard

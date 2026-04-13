@@ -32,24 +32,39 @@
 
     <header class="app-header">
         <div class="app-topbar">
-            <div class="app-brand">
+            <a class="app-brand" asp-controller="Home" asp-action="Index" aria-label="Přejít na hlavní přehled">
                 <div class="app-logo" aria-hidden="true">
                     <img class="app-logo-image" src="~/images/zapiska-logo.svg" alt="" />
                 </div>
                 <div>
                     <div class="app-title">Zápiska</div>
                 </div>
-            </div>
+            </a>
 
             <div class="app-user-tools">
-                <gov-theme-switch
-                    class="app-theme-switch"
-                    size="m"
-                    aria-label="Přepínač barevného schématu stránky"
-                    aria-label-light="Přepnout na tmavý mód"
-                    aria-label-dark="Přepnout na světlý mód"
-                    label-light="Světlý mód"
-                    label-dark="Tmavý mód"></gov-theme-switch>
+                <label class="gov-switch gov-theme-switch app-theme-switch" data-theme-switch>
+                    <input type="checkbox"
+                           data-theme-switch-input
+                           aria-label="Přepínač barevného schématu stránky"
+                           data-aria-label-light="Přepnout na tmavý mód"
+                           data-aria-label-dark="Přepnout na světlý mód"
+                           data-label-light="Světlý mód"
+                           data-label-dark="Tmavý mód" />
+                    <span class="gov-switch-track gov-theme-switch-track" aria-hidden="true">
+                        <span class="gov-theme-switch-icon gov-theme-switch-icon-sun">
+                            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                <path d="M12 4.75a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V5.5a.75.75 0 0 1 .75-.75Zm0 11a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Zm7.25-4.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1 0-1.5h1.5Zm-13 0a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1 0-1.5h1.5Zm9.046-4.296a.75.75 0 0 1 1.061 0l1.061 1.061a.75.75 0 0 1-1.06 1.06l-1.062-1.06a.75.75 0 0 1 0-1.061Zm-8.652 8.652a.75.75 0 0 1 1.06 0l1.061 1.061a.75.75 0 1 1-1.06 1.06l-1.061-1.06a.75.75 0 0 1 0-1.061Zm9.713 1.06a.75.75 0 0 1 1.061 1.061l-1.061 1.061a.75.75 0 0 1-1.06-1.06l1.06-1.062Zm-8.652-8.651a.75.75 0 0 1 0 1.06L6.984 10.14a.75.75 0 0 1-1.06-1.06l1.06-1.062a.75.75 0 0 1 1.061 0ZM12 17a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 12 17Z" />
+                            </svg>
+                        </span>
+                        <span class="gov-theme-switch-icon gov-theme-switch-icon-moon">
+                            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                <path d="M14.72 3.78a.75.75 0 0 1 .86.86 7.25 7.25 0 0 0 8.78 8.78.75.75 0 0 1 .86.86A9.25 9.25 0 1 1 14.72 3.78Zm-.91 1.77a7.75 7.75 0 1 0 7.64 7.64 8.75 8.75 0 0 1-7.64-7.64Z" transform="translate(-1.5 -1.5) scale(0.95)" />
+                            </svg>
+                        </span>
+                        <span class="gov-switch-thumb gov-theme-switch-thumb"></span>
+                    </span>
+                    <span class="gov-switch-label gov-theme-switch-label" data-theme-switch-label hidden></span>
+                </label>
 
                 <div class="user-menu" data-user-menu>
                     <button class="user-menu-toggle" type="button" data-user-menu-toggle aria-expanded="false" aria-haspopup="menu">
@@ -71,6 +86,7 @@
         </div>
 
         <nav class="app-nav" aria-label="Hlavní menu">
+            <a class="@NavClass("home")" asp-controller="Home" asp-action="Index">Přehled</a>
             <a class="@NavClass("projekty")" asp-controller="Projekty" asp-action="Index">Projekty</a>
             @if (nav?.CanViewPeople == true)
             {

@@ -9,7 +9,7 @@ public sealed class RecordProposalPayloadMapperTests
     private readonly RecordProposalPayloadMapper _sut = new();
 
     [Fact]
-    public void BuildSchedulePayload_ShouldKeepOnlyPlannedTypeIds()
+    public void BuildSchedulePayload_ShouldSplitPlannedAndActualValues_AndSetChangedFlags()
     {
         var command = new SaveRecordCommand
         {
@@ -24,7 +24,17 @@ public sealed class RecordProposalPayloadMapperTests
             ]
         };
 
-        var payload = _sut.BuildSchedulePayload(command, [101, 103]);
+        var payload = _sut.BuildSchedulePayload(
+            command,
+            plannedTypeIds: [101, 103],
+            actualTypeIds: [102],
+            originalDeadline: new DateTime(2026, 4, 25),
+            existingValues: new Dictionary<int, int>
+            {
+                [101] = 4,
+                [102] = 1,
+                [103] = 9
+            });
 
         payload.ProposalType.Should().Be(RecordProposalTypeCodes.SchedulePlanChange);
         payload.SchedulePlan.Should().NotBeNull();
@@ -35,6 +45,13 @@ public sealed class RecordProposalPayloadMapperTests
             new { TypId = 101, Hodnota = 5 },
             new { TypId = 103, Hodnota = 9 }
         ]);
+        payload.SchedulePlan.ActualHarmonogramHodnoty.Should().BeEquivalentTo(
+        [
+            new { TypId = 102, Hodnota = 2 }
+        ]);
+        payload.SchedulePlan.ChangesTermDeadline.Should().BeTrue();
+        payload.SchedulePlan.ChangesSchedulePlan.Should().BeTrue();
+        payload.SchedulePlan.ChangesScheduleActual.Should().BeTrue();
     }
 
     [Fact]

@@ -58,6 +58,16 @@
                                 </div>
                             }
                             <div class="proposal-card-actions">
+                                @if (!string.IsNullOrWhiteSpace(item.DetailUrl))
+                                {
+                                    <button class="btn small"
+                                            type="button"
+                                            data-record-editor-url="@item.DetailUrl"
+                                            data-record-editor-project-id="@item.ProjektId"
+                                            data-record-editor-label="@($"Detail návrhu #{item.Id}")">
+                                        Detail návrhu
+                                    </button>
+                                }
                                 @if (item.CanApprove)
                                 {
                                     <form asp-controller="Navrhy"
@@ -94,7 +104,9 @@
                                         <button class="btn small" type="submit">Zamítnout a převzít data</button>
                                     </form>
                                 }
-                                @if (item.CanPrefillCreateForm && !string.IsNullOrWhiteSpace(item.PrefillCreateFormUrl))
+                                @if (item.CanPrefillCreateForm
+                                     && !string.Equals(item.Stav, RecordProposalStateCodes.Pending, StringComparison.OrdinalIgnoreCase)
+                                     && !string.IsNullOrWhiteSpace(item.PrefillCreateFormUrl))
                                 {
                                     <button class="btn small"
                                             type="button"
@@ -112,7 +124,7 @@
         </section>
 
         <section class="card">
-            <h3>Návrhy změny termínu a plánu</h3>
+            <h3>Návrhy změny termínu a harmonogramu</h3>
             @if (Model.NavrhyHarmonogramu.Count == 0)
             {
                 <p class="muted">V této části zatím nejsou žádné návrhy.</p>
@@ -141,6 +153,7 @@
                                 <span><span class="label">Podáno:</span> @item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)</span>
                                 <span><span class="label">Nový termín:</span> @(item.TerminUkonceni?.ToString("dd.MM.yyyy") ?? "-")</span>
                                 <span><span class="label">Plánované kroky:</span> @item.PlannedStepCount</span>
+                                <span><span class="label">Skutečnost:</span> @item.ActualStepCount</span>
                             </div>
                             @if (!string.IsNullOrWhiteSpace(item.RozhodlUzivatel) || item.DecidedAt.HasValue)
                             {
@@ -150,6 +163,16 @@
                                 </div>
                             }
                             <div class="proposal-card-actions">
+                                @if (!string.IsNullOrWhiteSpace(item.DetailUrl))
+                                {
+                                    <button class="btn small"
+                                            type="button"
+                                            data-record-editor-url="@item.DetailUrl"
+                                            data-record-editor-project-id="@item.ProjektId"
+                                            data-record-editor-label="@($"Detail návrhu #{item.Id}")">
+                                        Detail návrhu
+                                    </button>
+                                }
                                 @if (item.CanApprove)
                                 {
                                     <form asp-controller="Navrhy"
@@ -172,6 +195,18 @@
                                         <input type="hidden" name="ProjektId" value="@item.ProjektId" />
                                         <input type="hidden" name="ProposalId" value="@item.Id" />
                                         <button class="btn small ghost" type="submit">Zamítnout</button>
+                                    </form>
+                                }
+                                @if (item.CanRejectAndEdit)
+                                {
+                                    <form asp-controller="Navrhy"
+                                          asp-action="RejectAndEditProposal"
+                                          method="post"
+                                          data-ajax-submit="true">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
+                                        <input type="hidden" name="ProposalId" value="@item.Id" />
+                                        <button class="btn small" type="submit">Zamítnout a upravit</button>
                                     </form>
                                 }
                             </div>
