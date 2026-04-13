@@ -50,6 +50,9 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
     public IReadOnlyDictionary<int, IReadOnlyList<string>> BuildRecordMeetingCommentStates(int id)
         => services.GetRequiredService<IProjectService>().BuildRecordMeetingCommentStatesAsync(id).GetAwaiter().GetResult();
 
+    public ProjektHarmonogramTabViewModel BuildProjectScheduleTab(int id)
+        => services.GetRequiredService<IProjectService>().BuildProjectScheduleTabAsync(id).GetAwaiter().GetResult();
+
     public ProjektJednaniTabViewModel BuildProjectMeetingsTab(int id)
         => services.GetRequiredService<IProjectService>().BuildProjectMeetingsTabAsync(id).GetAwaiter().GetResult();
 
@@ -115,6 +118,12 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
 
     public void AssignProjectRole(AssignProjectRoleCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IProjectService>().AssignProjectRoleAsync(command, currentUser).GetAwaiter().GetResult();
+
+    public void AssignProjectSubsystem(AssignProjectSubsystemCommand command, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IProjectService>().AssignProjectSubsystemAsync(command, currentUser).GetAwaiter().GetResult();
+
+    public void ReorderProjectSubsystem(ReorderProjectSubsystemCommand command, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IProjectService>().ReorderProjectSubsystemAsync(command, currentUser).GetAwaiter().GetResult();
 
     public void AssignProjectSubsystemRole(AssignProjectSubsystemRoleCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IProjectService>().AssignProjectSubsystemRoleAsync(command, currentUser).GetAwaiter().GetResult();

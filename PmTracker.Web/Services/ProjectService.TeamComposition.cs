@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Common;
 
 namespace PmTracker.Web.Services;
 
@@ -299,20 +300,39 @@ public sealed partial class ProjectService
     }
 
     private async Task<List<ProjectSubsystemViewModel>> BuildActiveProjectSubsystemsAsync(int projectId, CancellationToken ct)
-        => await (
-                from mapping in dbContext.ProjektSubsystemy.AsNoTracking()
-                join subsystem in dbContext.Subsystemy.AsNoTracking() on mapping.SubsystemId equals subsystem.Id
-                where mapping.ProjektId == projectId && !mapping.DatumOdebrani.HasValue
-                orderby subsystem.Kod, subsystem.Nazev
-                select new ProjectSubsystemViewModel
-                {
-                    ProjektSubsystemId = mapping.Id,
-                    SubsystemId = mapping.SubsystemId,
-                    Kod = subsystem.Kod ?? "-",
-                    Nazev = subsystem.Nazev ?? "-",
-                    DatumPrirazeni = mapping.DatumPrirazeni
-                })
-            .ToListAsync(ct);
+    {
+        var items = await ProjectSubsystemOrderingQuery.LoadActiveRowsAsync(dbContext, projectId, ct: ct);
+
+        return items
+            .Select(item => new ProjectSubsystemViewModel
+            {
+                ProjektSubsystemId = item.ProjektSubsystemId,
+                SubsystemId = item.SubsystemId,
+                Poradi = item.Poradi,
+                Kod = item.Kod,
+                Nazev = item.Nazev,
+                DatumPrirazeni = item.DatumPrirazeni
+            })
+            .ToList();
+    }
+
+    private async Task<List<ProjectTeamSubsystemRowViewModel>> BuildProjectTeamSubsystemRowsAsync(int projectId, CancellationToken ct)
+    {
+        var subsystems = await BuildActiveProjectSubsystemsAsync(projectId, ct);
+        return subsystems
+            .Select((item, index) => new ProjectTeamSubsystemRowViewModel
+            {
+                ProjektSubsystemId = item.ProjektSubsystemId,
+                SubsystemId = item.SubsystemId,
+                Poradi = item.Poradi,
+                Kod = item.Kod,
+                Nazev = item.Nazev,
+                DatumPrirazeni = item.DatumPrirazeni,
+                CanMoveUp = index > 0,
+                CanMoveDown = index < subsystems.Count - 1
+            })
+            .ToList();
+    }
 
     private async Task<List<ProjectSubsystemRoleAssignmentViewModel>> BuildActiveProjectSubsystemRoleAssignmentsAsync(int projectId, CancellationToken ct)
     {
@@ -673,6 +693,8 @@ public sealed partial class ProjectService
     private async Task<List<ProjectSubsystemOptionViewModel>> BuildProjectSubsystemOptionsAsync(int projectId, CancellationToken ct)
     {
         return (await BuildActiveProjectSubsystemsAsync(projectId, ct))
+            .OrderBy(item => item.Kod, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(item => item.Nazev, StringComparer.CurrentCultureIgnoreCase)
             .Select(item => new ProjectSubsystemOptionViewModel
             {
                 ProjektSubsystemId = item.ProjektSubsystemId,

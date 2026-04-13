@@ -267,8 +267,17 @@ public sealed class E2ETestFixture : IAsyncLifetime
 
             await using var insertMappingCommand = connection.CreateCommand();
             insertMappingCommand.CommandText = """
-                INSERT INTO dbo.projekt_subsystemy (projekt_id, subsystem_id)
-                VALUES (@projectId, @subsystemId);
+                INSERT INTO dbo.projekt_subsystemy (projekt_id, subsystem_id, poradi)
+                VALUES (
+                    @projectId,
+                    @subsystemId,
+                    ISNULL((
+                        SELECT MAX(poradi)
+                        FROM dbo.projekt_subsystemy
+                        WHERE projekt_id = @projectId
+                          AND datum_odebrani IS NULL
+                    ), 0) + 1
+                );
                 """;
             insertMappingCommand.Parameters.AddWithValue("@projectId", projectId);
             insertMappingCommand.Parameters.AddWithValue("@subsystemId", subsystemId);

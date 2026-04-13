@@ -90,11 +90,22 @@ public sealed partial class ProjectService
             ProjektId = id,
             DleSubsystemu = true,
             SkupinyZaznamu = summaries
-                .GroupBy(x => x.Summary.AktualniSubsystem)
-                .OrderBy(x => x.Key, StringComparer.CurrentCultureIgnoreCase)
+                .GroupBy(x => new
+                {
+                    x.Summary.AktualniSubsystem,
+                    x.Summary.AktualniSubsystemKod,
+                    x.Summary.AktualniSubsystemPoradi,
+                    x.Summary.AktualniSubsystemHasProjectOrder
+                })
+                .OrderByDescending(x => x.Key.AktualniSubsystemHasProjectOrder)
+                .ThenBy(x => x.Key.AktualniSubsystemPoradi)
+                .ThenBy(x => x.Key.AktualniSubsystem, StringComparer.CurrentCultureIgnoreCase)
                 .Select(group => new ProjektZaznamGroupViewModel
                 {
-                    Nazev = group.Key,
+                    Nazev = group.Key.AktualniSubsystem,
+                    Kod = group.Key.AktualniSubsystemKod,
+                    Poradi = group.Key.AktualniSubsystemPoradi,
+                    HasProjectOrder = group.Key.AktualniSubsystemHasProjectOrder,
                     Zaznamy = group.ToList()
                 })
                 .ToList(),
@@ -177,7 +188,7 @@ public sealed partial class ProjectService
             ProjektId = id,
             AktivniRole = await BuildUnifiedActiveProjectRoleRowsAsync(id, ct),
             HistorieRoli = await BuildUnifiedProjectRoleHistoryRowsAsync(id, ct),
-            AktivniSubsystemyProjektu = await BuildActiveProjectSubsystemsAsync(id, ct),
+            AktivniSubsystemyProjektu = await BuildProjectTeamSubsystemRowsAsync(id, ct),
             DostupneOsobyProRole = [],
             DostupneProjektoveSubsystemy = [],
             RoleProjektu = [],
@@ -555,6 +566,7 @@ public sealed partial class ProjectService
             : await dbContext.Subsystemy.AsNoTracking()
                 .Where(x => subsystemIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
+        var subsystemOrderById = await BuildActiveProjectSubsystemOrderBySubsystemIdAsync(projectId, subsystemIds, ct);
         var people = await LoadPeopleByIdsAsync(ownerIds, ct);
         var leadEquivalentOsobaIdsBySubsystem = await BuildLeadEquivalentOsobaIdsByProjectSubsystemAsync(projectId, ct);
 
@@ -564,6 +576,7 @@ public sealed partial class ProjectService
             var currentTaskType = record.AktualniTypUkoluId.HasValue ? taskTypes.GetValueOrDefault(record.AktualniTypUkoluId.Value) : null;
             var currentState = record.StavUkoluId.HasValue ? taskStates.GetValueOrDefault(record.StavUkoluId.Value) : null;
             var currentSubsystem = subsystems.GetValueOrDefault(record.SubsystemId);
+            var hasProjectOrder = subsystemOrderById.TryGetValue(record.SubsystemId, out var subsystemOrder);
             return new ZaznamCardSummaryViewModel
             {
                 Id = record.Id,
@@ -587,6 +600,8 @@ public sealed partial class ProjectService
                 AktualniTermin = record.DatumUkonceni,
                 AktualniSubsystemKod = string.IsNullOrWhiteSpace(currentSubsystem?.Kod) ? (currentSubsystem?.Nazev ?? string.Empty) : currentSubsystem.Kod,
                 AktualniSubsystem = currentSubsystem?.Nazev ?? "-",
+                AktualniSubsystemPoradi = hasProjectOrder ? subsystemOrder : 0,
+                AktualniSubsystemHasProjectOrder = hasProjectOrder,
                 AktualniSubsystemLeadEquivalentOsobaIds = leadEquivalentOsobaIdsBySubsystem.GetValueOrDefault(record.SubsystemId, []),
                 DatumZalozeni = record.DatumZalozeni,
                 AktualniVlastnikId = record.VlastnikId
@@ -680,6 +695,7 @@ public sealed partial class ProjectService
             : await dbContext.Subsystemy.AsNoTracking()
                 .Where(x => subsystemIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
+        var subsystemOrderById = await BuildActiveProjectSubsystemOrderBySubsystemIdAsync(projectId, subsystemIds, ct);
         var people = await LoadPeopleByIdsAsync(ownerIds, ct);
 
         return records.Select(record =>
@@ -688,6 +704,7 @@ public sealed partial class ProjectService
             var currentTaskType = record.AktualniTypUkoluId.HasValue ? taskTypes.GetValueOrDefault(record.AktualniTypUkoluId.Value) : null;
             var currentState = record.StavUkoluId.HasValue ? taskStates.GetValueOrDefault(record.StavUkoluId.Value) : null;
             var currentSubsystem = subsystems.GetValueOrDefault(record.SubsystemId);
+            var hasProjectOrder = subsystemOrderById.TryGetValue(record.SubsystemId, out var subsystemOrder);
 
             return new ZaznamCardViewModel
             {
@@ -717,6 +734,8 @@ public sealed partial class ProjectService
                 HistorieTypuUkolu = Array.Empty<string>(),
                 AktualniSubsystemKod = string.IsNullOrWhiteSpace(currentSubsystem?.Kod) ? (currentSubsystem?.Nazev ?? string.Empty) : currentSubsystem.Kod,
                 AktualniSubsystem = currentSubsystem?.Nazev ?? "-",
+                AktualniSubsystemPoradi = hasProjectOrder ? subsystemOrder : 0,
+                AktualniSubsystemHasProjectOrder = hasProjectOrder,
                 AktualniSubsystemLeadEquivalentOsobaIds = Array.Empty<int>(),
                 ExterniOdkazy = Array.Empty<ExterniOdkazViewModel>(),
                 Spoluprace = Array.Empty<SpolupracovnikViewModel>(),

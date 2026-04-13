@@ -1,0 +1,313 @@
+@model HarmonogramBlockViewModel
+@{
+    var isEditor = string.Equals(Model.Mode, "record-editor", StringComparison.OrdinalIgnoreCase);
+    var rootCssClass = isEditor ? "schedule-editor" : "schedule-card-timeline";
+    var overviewShellCssClass = isEditor ? "schedule-mini-gantt schedule-mini-gantt-grid" : "schedule-overview-timeline";
+    var overviewRowCssClass = isEditor ? "schedule-mini-gantt-row" : "schedule-overview-row";
+    var overviewLabelCssClass = isEditor ? "schedule-mini-gantt-row-label" : "schedule-overview-label";
+    var overviewTrackCssClass = isEditor ? "schedule-mini-gantt-track schedule-mini-gantt-row-track" : "schedule-overview-track";
+    var overviewAxisSpacerCssClass = isEditor ? "schedule-mini-gantt-axis-spacer" : "schedule-overview-axis-spacer";
+    var overviewAxisCssClass = isEditor ? "timeline-axis schedule-mini-gantt-axis-track" : "timeline-axis schedule-overview-axis";
+    var overviewSegmentCssClass = isEditor ? "schedule-mini-gantt-segment" : "schedule-overview-segment";
+    var overviewMarkerCssClass = isEditor ? "schedule-mini-gantt-marker" : "schedule-overview-marker";
+    var visibleCompactSteps = Model.Kroky
+        .Where(krok => krok.TrvaniDni > 0)
+        .OrderBy(krok => krok.KrokIndex)
+        .ToList();
+    var editorInputIndex = 0;
+}
+
+<div class="@rootCssClass schedule-block"
+     data-schedule-block
+     data-schedule-mode="@Model.Mode"
+     data-schedule-record-id="@Model.RecordId"
+     data-schedule-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
+     data-schedule-deadline="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"
+     @(isEditor ? "data-record-schedule-editor" : null)
+     style="--record-schedule-delay-color:@Model.DelayBarvaHex;">
+    @if (isEditor)
+    {
+        <div class="schedule-summary-grid">
+            <div><span class="label">Termín úkolu:</span> <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></div>
+            <div><span class="label">Plán dokončení:</span> <strong data-schedule-summary-baseline>@Model.Souhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></div>
+            <div><span class="label">Skutečné dokončení:</span> <strong data-schedule-summary-shifted>@Model.Souhrn.SkutecneDokonceni.ToString("dd.MM.yyyy")</strong></div>
+            <div><span class="label">Trvání:</span> <strong data-schedule-summary-duration>@Model.Souhrn.CelkoveTrvaniDni</strong> dnů</div>
+            <div><span class="label">Celková odchylka:</span> <strong data-schedule-summary-delay>@Model.Souhrn.CelkovaOdchylkaDni</strong> dnů</div>
+            <div class="schedule-status-line @(Model.Souhrn.Stihame ? "ok" : "late")">
+                <span class="label">Stav:</span>
+                <strong data-schedule-summary-state>@(Model.Souhrn.Stihame ? "Stíháme" : "Nestíháme")</strong>
+                <span data-schedule-summary-overrun>@(Model.Souhrn.Stihame ? string.Empty : $"(+{Model.Souhrn.PrekroceniDni} dnů)")</span>
+            </div>
+        </div>
+    }
+
+    <div class="@overviewShellCssClass" @(isEditor ? "data-record-mini-gantt" : null)>
+        @if (isEditor)
+        {
+            <div class="@overviewAxisSpacerCssClass" aria-hidden="true"></div>
+            <div class="@overviewAxisCssClass"
+                 data-schedule-axis="overview"
+                 data-timeline-axis
+                 data-axis-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
+                 data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"></div>
+        }
+
+        @foreach (var row in new[] { ("planned", "Plán"), ("actual", "Skutečnost") })
+        {
+            <div class="@overviewRowCssClass" data-schedule-overview-row="@row.Item1">
+                <span class="@overviewLabelCssClass">@row.Item2</span>
+                <div class="@overviewTrackCssClass" data-schedule-overview-track="@row.Item1">
+                    <div class="@overviewMarkerCssClass today"
+                         data-schedule-marker="today"
+                         @(isEditor ? "data-schedule-gantt-today" : null)
+                         title="Dnes"></div>
+                    <div class="@overviewMarkerCssClass @(isEditor ? null : "deadline")"
+                         data-schedule-marker="deadline"
+                         @(isEditor ? "data-schedule-gantt-deadline" : null)></div>
+                    @foreach (var krok in visibleCompactSteps)
+                    {
+                        var segmentTitle = row.Item1 == "planned"
+                            ? $"{krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
+                            : $"{krok.Nazev}: skutečnost {krok.SkutecneDatum:dd.MM.yyyy}";
+                        <span class="@overviewSegmentCssClass"
+                              data-rainbow-segment-label-full="@krok.Nazev"
+                              data-rainbow-segment-label-short="@krok.KrokIndex"
+                              data-schedule-segment-kind="@row.Item1"
+                              data-step-index="@krok.KrokIndex"
+                              style="background:@krok.BarvaHex;"
+                              title="@segmentTitle"></span>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (!isEditor)
+        {
+            <div class="schedule-overview-axis-row">
+                <span class="@overviewAxisSpacerCssClass" aria-hidden="true"></span>
+                <div class="@overviewAxisCssClass"
+                     data-schedule-axis="overview"
+                     data-timeline-axis
+                     data-axis-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
+                     data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"></div>
+            </div>
+        }
+    </div>
+
+    @if (isEditor)
+    {
+        <div class="schedule-mini-legend">Plán / Skutečnost / Dnes / Termín</div>
+    }
+    else
+    {
+        <div class="schedule-layered-summary">
+            <span>Plán: <strong data-schedule-summary-baseline>@Model.Souhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></span>
+            <span>Skutečnost: <strong data-schedule-summary-shifted>@Model.Souhrn.SkutecneDokonceni.ToString("dd.MM.yyyy")</strong></span>
+            <span>Termín úkolu: <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></span>
+            <span>Překročení: <strong data-schedule-summary-overrun>@(Model.Souhrn.PrekroceniDni > 0 ? $"{Model.Souhrn.PrekroceniDni} dnů" : "0 dnů")</strong></span>
+        </div>
+
+        <div class="gantt-steps schedule-steps" data-schedule-steps data-schedule-record-id="@Model.RecordId" hidden="hidden">
+            <div class="schedule-layered-legend schedule-layered-legend--steps">
+                <span><span class="schedule-layered-legend-swatch planned"></span>Plán</span>
+                <span><span class="schedule-layered-legend-swatch actual"></span>Skutečnost</span>
+                <span><span class="schedule-layered-legend-swatch today"></span>Dnes</span>
+            </div>
+            <div class="schedule-layered-axis-row">
+                <span class="schedule-layered-axis-spacer" aria-hidden="true"></span>
+                <div class="timeline-axis schedule-layered-axis"
+                     data-schedule-axis="breakdown"
+                     data-timeline-axis
+                     data-axis-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
+                     data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"></div>
+            </div>
+            @foreach (var krok in Model.Kroky.OrderBy(k => k.KrokIndex))
+            {
+                var offsetLabel = krok.OdchylkaDni > 0 ? $"+{krok.OdchylkaDni} dnů" : $"{krok.OdchylkaDni} dnů";
+                var offsetCssClass = krok.OdchylkaDni > 0 ? "late" : krok.OdchylkaDni < 0 ? "ahead" : null;
+                <div class="gantt-step-row"
+                     data-schedule-step-row
+                     data-step-index="@krok.KrokIndex"
+                     data-step-name="@krok.Nazev"
+                     data-step-color="@krok.BarvaHex"
+                     data-step-duration="@krok.TrvaniDni"
+                     data-step-delay="@krok.OdchylkaDni">
+                    <div class="gantt-step-name">
+                        <span>@krok.Nazev</span>
+                        <span class="gantt-step-offset @offsetCssClass" data-schedule-offset>@offsetLabel</span>
+                    </div>
+                    <div class="schedule-layered-track schedule-layered-track--step" data-schedule-breakdown-track>
+                        @if (krok.TrvaniDni > 0)
+                        {
+                            <div class="schedule-layered-marker today"
+                                 data-schedule-breakdown-today
+                                 title="Dnes"></div>
+                            <span class="schedule-layered-segment planned"
+                                  data-rainbow-segment-label-full="@krok.Nazev"
+                                  data-rainbow-segment-label-short="@krok.KrokIndex"
+                                  data-schedule-breakdown-segment="planned"
+                                  data-step-index="@krok.KrokIndex"
+                                  style="background:@krok.BarvaHex;"></span>
+                            <span class="schedule-layered-segment actual"
+                                  data-schedule-breakdown-segment="actual"
+                                  data-step-index="@krok.KrokIndex"></span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (isEditor)
+    {
+        <div class="schedule-table-wrap">
+            <table class="table schedule-table">
+                <thead>
+                    <tr>
+                        <th>Krok</th>
+                        <th>Trvání / datum</th>
+                        <th>Skutečnost / datum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < Model.Kroky.Count; i++)
+                    {
+                        var krok = Model.Kroky[i];
+                        var durationInputIndex = editorInputIndex++;
+                        var delayInputIndex = editorInputIndex++;
+                        var durationStaticDisabled = krok.TrvaniTypId <= 0;
+                        var delayStaticDisabled = krok.ZpozdeniTypId <= 0;
+                        var stepStaticDisabled = durationStaticDisabled || delayStaticDisabled;
+                        var canEditDuration = Model.EditorCanEditScheduleFull || (Model.EditorCanEditScheduleAddOnly && krok.TrvaniDni <= 0);
+                        var canEditDelay = Model.EditorCanEditScheduleFull || Model.EditorCanEditScheduleAddOnly;
+                        var durationDisabled = !Model.EditorJeUkolKategorie || durationStaticDisabled || !canEditDuration;
+                        var delayDisabled = !Model.EditorJeUkolKategorie || delayStaticDisabled || !canEditDelay;
+                        var dateDisabled = !Model.EditorJeUkolKategorie || stepStaticDisabled || !canEditDuration;
+                        var delayDateDisabled = !Model.EditorJeUkolKategorie || delayStaticDisabled || !canEditDelay;
+                        <tr data-schedule-step-row
+                            data-step-index="@krok.KrokIndex"
+                            data-step-name="@krok.Nazev"
+                            data-step-color="@krok.BarvaHex"
+                            data-step-duration="@krok.TrvaniDni"
+                            data-step-delay="@krok.OdchylkaDni">
+                            <td>@krok.Nazev</td>
+                            <td>
+                                <div class="schedule-stacked-input">
+                                    <input type="hidden" name="HarmonogramHodnoty[@durationInputIndex].TypId" value="@krok.TrvaniTypId" />
+                                    <div class="schedule-stacked-main">
+                                        <div class="schedule-stacked-part schedule-stacked-part-top">
+                                            <input class="schedule-days-input schedule-days-input-stacked"
+                                                   type="number"
+                                                   min="0"
+                                                   name="HarmonogramHodnoty[@durationInputIndex].Hodnota"
+                                                   value="@krok.TrvaniDni"
+                                                   data-schedule-duration
+                                                   data-schedule-static-disabled="@(durationStaticDisabled ? "true" : "false")"
+                                                   data-schedule-original-duration="@krok.TrvaniDni"
+                                                   @((durationDisabled) ? "disabled=\"disabled\"" : null) />
+                                        </div>
+                                        <div class="schedule-stacked-part schedule-stacked-part-bottom">
+                                            @await Html.PartialAsync(
+                                                "_AppDateField",
+                                                new AppDateFieldViewModel
+                                                {
+                                                    Name = $"UiHarmonogramDatumy[{i}]",
+                                                    IsoValue = krok.BaselineDatum.ToString("yyyy-MM-dd"),
+                                                    DisplayValue = krok.BaselineDatum.ToString("dd.MM.yyyy"),
+                                                    Locked = dateDisabled,
+                                                    AriaLabel = "Otevřít kalendář kroku harmonogramu",
+                                                    ContainerCssClass = "schedule-date-field schedule-date-field-stacked",
+                                                    ExtraDataAttributes = new Dictionary<string, object?>
+                                                    {
+                                                        ["data-schedule-date"] = "true",
+                                                        ["data-schedule-static-disabled"] = stepStaticDisabled ? "true" : "false",
+                                                        ["data-schedule-original-duration"] = krok.TrvaniDni.ToString()
+                                                    }
+                                                })
+                                        </div>
+                                    </div>
+                                    <div class="schedule-stacked-stepper">
+                                        <button class="icon-btn schedule-step-btn"
+                                                type="button"
+                                                data-schedule-duration-inc
+                                                aria-label="Přidat 1 den"
+                                                @((durationDisabled) ? "disabled=\"disabled\"" : null)>
+                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                        </button>
+                                        <button class="icon-btn schedule-step-btn"
+                                                type="button"
+                                                data-schedule-duration-dec
+                                                aria-label="Odebrat 1 den"
+                                                @((durationDisabled) ? "disabled=\"disabled\"" : null)>
+                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="schedule-stacked-input">
+                                    <input type="hidden" name="HarmonogramHodnoty[@delayInputIndex].TypId" value="@krok.ZpozdeniTypId" />
+                                    <div class="schedule-stacked-main">
+                                        <div class="schedule-stacked-part schedule-stacked-part-top">
+                                            <input class="schedule-days-input schedule-days-input-stacked"
+                                                   type="number"
+                                                   name="HarmonogramHodnoty[@delayInputIndex].Hodnota"
+                                                   value="@krok.OdchylkaDni"
+                                                   data-schedule-delay
+                                                   data-schedule-static-disabled="@(delayStaticDisabled ? "true" : "false")"
+                                                   @((delayDisabled) ? "disabled=\"disabled\"" : null) />
+                                        </div>
+                                        <div class="schedule-stacked-part schedule-stacked-part-bottom">
+                                            @await Html.PartialAsync(
+                                                "_AppDateField",
+                                                new AppDateFieldViewModel
+                                                {
+                                                    Name = $"UiHarmonogramPosunuteDatumy[{i}]",
+                                                    IsoValue = krok.SkutecneDatum.ToString("yyyy-MM-dd"),
+                                                    DisplayValue = krok.SkutecneDatum.ToString("dd.MM.yyyy"),
+                                                    Locked = delayDateDisabled,
+                                                    AriaLabel = "Otevřít kalendář skutečnosti kroku harmonogramu",
+                                                    ContainerCssClass = "schedule-date-field schedule-date-field-stacked",
+                                                    ExtraDataAttributes = new Dictionary<string, object?>
+                                                    {
+                                                        ["data-schedule-delay-date"] = "true",
+                                                        ["data-schedule-static-disabled"] = delayStaticDisabled ? "true" : "false"
+                                                    }
+                                                })
+                                        </div>
+                                    </div>
+                                    <div class="schedule-stacked-stepper">
+                                        <button class="icon-btn schedule-step-btn"
+                                                type="button"
+                                                data-schedule-delay-inc
+                                                aria-label="Přidat 1 den odchylky"
+                                                @((delayDisabled) ? "disabled=\"disabled\"" : null)>
+                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                        </button>
+                                        <button class="icon-btn schedule-step-btn"
+                                                type="button"
+                                                data-schedule-delay-dec
+                                                aria-label="Odebrat 1 den odchylky"
+                                                @((delayDisabled) ? "disabled=\"disabled\"" : null)>
+                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

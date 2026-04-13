@@ -84,6 +84,9 @@ public sealed class ProjektZaznamyTabViewModel
 public sealed class ProjektZaznamGroupViewModel
 {
     public required string Nazev { get; init; }
+    public string? Kod { get; init; }
+    public int Poradi { get; init; }
+    public bool HasProjectOrder { get; init; }
     public IReadOnlyList<ProjektZaznamCardShellViewModel> Zaznamy { get; init; } = Array.Empty<ProjektZaznamCardShellViewModel>();
 }
 
@@ -117,6 +120,8 @@ public sealed class ZaznamCardSummaryViewModel
     public DateTime? AktualniTermin { get; init; }
     public required string AktualniSubsystemKod { get; init; }
     public required string AktualniSubsystem { get; init; }
+    public int AktualniSubsystemPoradi { get; init; }
+    public bool AktualniSubsystemHasProjectOrder { get; init; }
     public IReadOnlyList<int> AktualniSubsystemLeadEquivalentOsobaIds { get; init; } = Array.Empty<int>();
     public bool IsAktivniStav { get; init; } = true;
     public bool JeUkol { get; init; }
@@ -165,6 +170,20 @@ public sealed class ZaznamCommentsPanelViewModel
     public IReadOnlyList<JednaniOptionViewModel> OtevrenaJednani { get; set; } = Array.Empty<JednaniOptionViewModel>();
 }
 
+public sealed class HarmonogramBlockViewModel
+{
+    public int RecordId { get; init; }
+    public string Mode { get; init; } = "project-readonly";
+    public DateTime DatumZalozeni { get; init; }
+    public DateTime TerminUkonceni { get; init; }
+    public string DelayBarvaHex { get; init; } = "#dc2626";
+    public HarmonogramSouhrnViewModel Souhrn { get; init; } = new();
+    public IReadOnlyList<HarmonogramKrokEditViewModel> Kroky { get; init; } = Array.Empty<HarmonogramKrokEditViewModel>();
+    public bool EditorJeUkolKategorie { get; set; }
+    public bool EditorCanEditScheduleFull { get; set; }
+    public bool EditorCanEditScheduleAddOnly { get; set; }
+}
+
 public sealed class ProjektHarmonogramTabViewModel
 {
     public int ProjektId { get; init; }
@@ -190,7 +209,7 @@ public sealed class ProjektTymTabViewModel
     public int ProjektId { get; init; }
     public IReadOnlyList<ProjectRoleGridRowViewModel> AktivniRole { get; init; } = Array.Empty<ProjectRoleGridRowViewModel>();
     public IReadOnlyList<ProjectRoleHistoryGridRowViewModel> HistorieRoli { get; init; } = Array.Empty<ProjectRoleHistoryGridRowViewModel>();
-    public IReadOnlyList<ProjectSubsystemViewModel> AktivniSubsystemyProjektu { get; init; } = Array.Empty<ProjectSubsystemViewModel>();
+    public IReadOnlyList<ProjectTeamSubsystemRowViewModel> AktivniSubsystemyProjektu { get; init; } = Array.Empty<ProjectTeamSubsystemRowViewModel>();
     public IReadOnlyList<ProjectMemberCandidateViewModel> DostupneOsobyProRole { get; init; } = Array.Empty<ProjectMemberCandidateViewModel>();
     public IReadOnlyList<ProjectSubsystemOptionViewModel> DostupneProjektoveSubsystemy { get; init; } = Array.Empty<ProjectSubsystemOptionViewModel>();
     public IReadOnlyList<LookupOptionViewModel> RoleProjektu { get; init; } = Array.Empty<LookupOptionViewModel>();
@@ -228,6 +247,8 @@ public sealed class ZaznamCardViewModel
     public required IReadOnlyList<string> HistorieTypuUkolu { get; init; }
     public required string AktualniSubsystemKod { get; init; }
     public required string AktualniSubsystem { get; init; }
+    public int AktualniSubsystemPoradi { get; init; }
+    public bool AktualniSubsystemHasProjectOrder { get; init; }
     public required IReadOnlyList<int> AktualniSubsystemLeadEquivalentOsobaIds { get; init; }
     public required IReadOnlyList<ExterniOdkazViewModel> ExterniOdkazy { get; init; }
     public required IReadOnlyList<SpolupracovnikViewModel> Spoluprace { get; init; }
@@ -251,76 +272,19 @@ public sealed class ZaznamCardViewModel
 public sealed class ProjektHarmonogramUkolViewModel
 {
     public int ZaznamId { get; init; }
-    public int CisloZaznamu { get; init; }
     public required string CisloViditelne { get; init; }
     public required string Nazev { get; init; }
-    public required string KategorieKod { get; init; }
-    public required string KategorieNazev { get; init; }
-    public string? TypUkoluKod { get; init; }
     public string? TypUkolu { get; init; }
     public required string Stav { get; init; }
-    public string? StavKod { get; init; }
     public required string SubsystemKod { get; init; }
     public required string Subsystem { get; init; }
+    public int SubsystemPoradi { get; init; }
+    public bool SubsystemHasProjectOrder { get; init; }
     public required string Vlastnik { get; init; }
-    public string? VlastnikOrgKod { get; init; }
-    public int VlastnikId { get; init; }
-    public bool IsAktivniStav { get; init; }
-    public DateTime DatumZalozeni { get; init; }
-    public DateTime TerminUkonceni { get; init; }
-    public DateTime BaselineDokonceni { get; init; }
-    public DateTime SkutecneDokonceni { get; init; }
-    public DateTime PosunuteDokonceni => SkutecneDokonceni;
-    public int CelkoveTrvaniDni { get; init; }
-    public int CelkovaOdchylkaDni { get; init; }
-    public int CelkoveZpozdeniDni => CelkovaOdchylkaDni;
-    public int DelkaDoTerminuDni { get; init; }
     public bool Stihame { get; init; }
-    public int PrekroceniDni { get; init; }
-    public required string DelayBarvaHex { get; init; }
-    public bool MaVizualniTrvani { get; init; }
-    public required IReadOnlyList<ProjektHarmonogramKrokViewModel> Kroky { get; init; }
-    public DateTime CompactAxisStart { get; set; }
-    public DateTime CompactAxisEnd { get; set; }
-    public DateTime BreakdownAxisStart { get; set; }
-    public DateTime BreakdownAxisEnd { get; set; }
-    public double CompactDeadlinePercent { get; set; }
-    public double CompactTodayPercent { get; set; }
-    public double BreakdownTodayPercent { get; set; }
-    public string FormatCompactDeadlinePercent { get; set; } = string.Empty;
-    public string FormatCompactTodayPercent { get; set; } = string.Empty;
-    public string FormatBreakdownTodayPercent { get; set; } = string.Empty;
-    public string CompactTodayTitle { get; set; } = string.Empty;
+    public HarmonogramBlockViewModel HarmonogramBlok { get; init; } = new();
     public bool CanManageSchedule { get; set; }
     public string? ScheduleEditUrl { get; set; }
-}
-
-public sealed class ProjektHarmonogramKrokViewModel
-{
-    public int KrokIndex { get; init; }
-    public required string Nazev { get; init; }
-    public int TrvaniDni { get; init; }
-    public int OdchylkaDni { get; init; }
-    public int ZpozdeniDni => OdchylkaDni;
-    public required string BarvaHex { get; init; }
-    public DateTime PlanStart { get; init; }
-    public DateTime PlanEnd { get; init; }
-    public DateTime RealStart { get; init; }
-    public DateTime RealEnd { get; init; }
-    public bool HasCompactVisualDuration { get; set; }
-    public bool HasBreakdownVisualDuration { get; set; }
-    public string OffsetLabel { get; set; } = string.Empty;
-    public string? OffsetCssClass { get; set; }
-    public string CompactPlanLeftPercent { get; set; } = string.Empty;
-    public string CompactPlanWidthStyle { get; set; } = string.Empty;
-    public string CompactPlanTitle { get; set; } = string.Empty;
-    public string CompactActualLeftPercent { get; set; } = string.Empty;
-    public string CompactActualWidthStyle { get; set; } = string.Empty;
-    public string CompactActualTitle { get; set; } = string.Empty;
-    public string BreakdownPlanLeftPercent { get; set; } = string.Empty;
-    public string BreakdownPlanWidthPercent { get; set; } = string.Empty;
-    public string BreakdownActualLeftPercent { get; set; } = string.Empty;
-    public string BreakdownActualWidthPercent { get; set; } = string.Empty;
 }
 
 public sealed class ExterniOdkazViewModel
@@ -420,9 +384,22 @@ public sealed class ProjectSubsystemViewModel
 {
     public int ProjektSubsystemId { get; init; }
     public int SubsystemId { get; init; }
+    public int Poradi { get; init; }
     public required string Kod { get; init; }
     public required string Nazev { get; init; }
     public DateTime DatumPrirazeni { get; init; }
+}
+
+public sealed class ProjectTeamSubsystemRowViewModel
+{
+    public int ProjektSubsystemId { get; init; }
+    public int SubsystemId { get; init; }
+    public int Poradi { get; init; }
+    public required string Kod { get; init; }
+    public required string Nazev { get; init; }
+    public DateTime DatumPrirazeni { get; init; }
+    public bool CanMoveUp { get; init; }
+    public bool CanMoveDown { get; init; }
 }
 
 public sealed class ProjectSubsystemOptionViewModel
@@ -534,9 +511,7 @@ public sealed class ZaznamEditViewModel
     public required IReadOnlyList<LookupOptionViewModel> Vlastnici { get; init; }
     public int VlastnikId { get; init; }
     public bool JeUkolKategorie { get; init; }
-    public required string HarmonogramDelayBarvaHex { get; init; }
-    public required IReadOnlyList<HarmonogramKrokEditViewModel> HarmonogramKroky { get; init; }
-    public required HarmonogramSouhrnViewModel HarmonogramSouhrn { get; init; }
+    public HarmonogramBlockViewModel HarmonogramBlok { get; init; } = new();
     public required IReadOnlyList<SpolupracovnikOptionViewModel> DostupniVlastnici { get; init; }
     public required IReadOnlyList<SpolupracovnikOptionViewModel> DostupniSpolupracovnici { get; init; }
     public required IReadOnlyList<int> VybraniSpolupracovniciIds { get; init; }

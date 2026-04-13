@@ -116,15 +116,10 @@
             <table class="table" data-table-tools-table data-table-empty-message="Žádný subsystém neodpovídá zadanému filtru.">
                 <thead>
                     <tr>
-                        <th>
-                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="0" data-table-sort-type="text" data-table-sort-default="true">Kód</button>
-                        </th>
-                        <th>
-                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="1" data-table-sort-type="text">Subsystém</button>
-                        </th>
-                        <th>
-                            <button class="table-sort-button" type="button" data-table-sort-button data-table-sort-index="2" data-table-sort-type="datetime">Přiřazeno</button>
-                        </th>
+                        <th>Pořadí</th>
+                        <th>Kód</th>
+                        <th>Subsystém</th>
+                        <th>Přiřazeno</th>
                         <th class="table-actions">Akce</th>
                     </tr>
                 </thead>
@@ -132,21 +127,43 @@
                 @foreach (var subsystem in Model.AktivniSubsystemyProjektu)
                 {
                     <tr data-table-row>
+                        <td data-table-sort-value="@subsystem.Poradi">@subsystem.Poradi</td>
                         <td>@subsystem.Kod</td>
                         <td>@subsystem.Nazev</td>
                         <td data-table-sort-value="@subsystem.DatumPrirazeni.ToString("O")">@subsystem.DatumPrirazeni.ToString("dd.MM.yyyy HH:mm")</td>
                         <td class="table-actions">
                             @if (Model.CanManageTeam)
                             {
-                                <form asp-controller="Projekty"
-                                      asp-action="DeactivateProjectSubsystem"
-                                      method="post"
-                                      data-ajax-submit="true"
-                                      onsubmit="return confirm('Opravdu deaktivovat subsystém projektu?');">
-                                    <input type="hidden" name="projektId" value="@Model.ProjektId" />
-                                    <input type="hidden" name="ProjektSubsystemId" value="@subsystem.ProjektSubsystemId" />
-                                    <button class="btn small ghost" type="submit">Deaktivovat</button>
-                                </form>
+                                <div class="table-actions-inline">
+                                    <form class="table-action-inline-form"
+                                          asp-controller="Projekty"
+                                          asp-action="ReorderProjectSubsystem"
+                                          method="post"
+                                          data-ajax-submit="true">
+                                        <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
+                                        <input type="hidden" name="ProjektSubsystemId" value="@subsystem.ProjektSubsystemId" />
+                                        <button class="btn small ghost" type="submit" name="Direction" value="up" disabled="@(!subsystem.CanMoveUp)">Nahoru</button>
+                                    </form>
+                                    <form class="table-action-inline-form"
+                                          asp-controller="Projekty"
+                                          asp-action="ReorderProjectSubsystem"
+                                          method="post"
+                                          data-ajax-submit="true">
+                                        <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
+                                        <input type="hidden" name="ProjektSubsystemId" value="@subsystem.ProjektSubsystemId" />
+                                        <button class="btn small ghost" type="submit" name="Direction" value="down" disabled="@(!subsystem.CanMoveDown)">Dolů</button>
+                                    </form>
+                                    <form class="table-action-inline-form"
+                                          asp-controller="Projekty"
+                                          asp-action="DeactivateProjectSubsystem"
+                                          method="post"
+                                          data-ajax-submit="true"
+                                          onsubmit="return confirm('Opravdu deaktivovat subsystém projektu?');">
+                                        <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                        <input type="hidden" name="ProjektSubsystemId" value="@subsystem.ProjektSubsystemId" />
+                                        <button class="btn small ghost" type="submit">Deaktivovat</button>
+                                    </form>
+                                </div>
                             }
                             else
                             {

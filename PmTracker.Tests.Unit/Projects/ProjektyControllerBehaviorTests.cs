@@ -244,6 +244,62 @@ public sealed class ProjektyControllerBehaviorTests
         model.PreviewRok.Should().Be(2025);
     }
 
+    [Fact]
+    public async Task ReorderProjectSubsystem_ShouldReturnForbid_WhenUserLacksTeamManagePermission()
+    {
+        const int projectId = 131;
+        var projectService = new FakeProjectService
+        {
+            ProjektDetail = CreateEmptyProjektDetail(projectId)
+        };
+        var controller = CreateController(projectService);
+        SetCurrentUserContext(controller, BuildProjectUserContext(projectId));
+
+        var result = await controller.ReorderProjectSubsystem(new ReorderProjectSubsystemCommand
+        {
+            ProjektId = projectId,
+            ProjektSubsystemId = 9,
+            Direction = ProjectSubsystemReorderDirections.Up
+        });
+
+        result.Should().BeOfType<ForbidResult>();
+        projectService.ReorderProjectSubsystemCallCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ReorderProjectSubsystem_ShouldReturnAjaxSuccess_AndInvokeService_WhenUserHasTeamManagePermission()
+    {
+        const int projectId = 132;
+        var projectService = new FakeProjectService
+        {
+            ProjektDetail = CreateEmptyProjektDetail(projectId)
+        };
+        var controller = CreateController(projectService);
+        SetCurrentUserContext(controller, BuildProjectUserContext(projectId, PermissionKeys.TeamManage));
+        controller.ControllerContext.HttpContext.Request.Headers["X-Requested-With"] = "XMLHttpRequest";
+
+        var command = new ReorderProjectSubsystemCommand
+        {
+            ProjektId = projectId,
+            ProjektSubsystemId = 17,
+            Direction = ProjectSubsystemReorderDirections.Down
+        };
+
+        var result = await controller.ReorderProjectSubsystem(command);
+
+        var json = result.Should().BeOfType<JsonResult>().Subject;
+        var payload = json.Value.Should().BeOfType<ModalSubmitResultViewModel>().Subject;
+        payload.Ok.Should().BeTrue();
+        payload.ProjectId.Should().Be(projectId);
+        payload.Tab.Should().Be("tym");
+        payload.RefreshScope.Should().Be("projekty-detail-tym");
+        projectService.ReorderProjectSubsystemCallCount.Should().Be(1);
+        projectService.LastReorderProjectSubsystemCommand.Should().NotBeNull();
+        projectService.LastReorderProjectSubsystemCommand!.ProjektId.Should().Be(projectId);
+        projectService.LastReorderProjectSubsystemCommand.ProjektSubsystemId.Should().Be(17);
+        projectService.LastReorderProjectSubsystemCommand.Direction.Should().Be(ProjectSubsystemReorderDirections.Down);
+    }
+
     private static ProjektyController CreateController(
         FakeProjectService projectService,
         TimeProvider? timeProvider = null,
@@ -295,6 +351,35 @@ public sealed class ProjektyControllerBehaviorTests
             VisibleProjectIds = [],
             DeletedProjectIds = [],
             PermissionGrants = []
+        };
+    }
+
+    private static CurrentUserContextViewModel BuildProjectUserContext(int projectId, params string[] permissionKeys)
+    {
+        return new CurrentUserContextViewModel
+        {
+            OsobaId = 2,
+            Jmeno = "Project",
+            Prijmeni = "Tester",
+            DisplayName = "Project Tester",
+            Email = "project@test.local",
+            OrganizacniCelek = "Test",
+            OrganizacniCelekKod = "TEST",
+            IsSuperAdmin = false,
+            RoleKody = [],
+            VisibleProjectIds = [projectId],
+            DeletedProjectIds = [],
+            PermissionGrants = permissionKeys
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(permissionKey => new PermissionGrantViewModel
+                {
+                    PermissionKey = permissionKey,
+                    ScopeLevel = "PROJECT",
+                    ScopeMode = "INCLUDE",
+                    IsAllowed = true,
+                    ProjectIds = [projectId]
+                })
+                .ToList()
         };
     }
 
@@ -356,6 +441,8 @@ public sealed class ProjektyControllerBehaviorTests
         public ProjectTeamModalOptionsViewModel TeamModalOptions { get; init; } = new();
         public IReadOnlyDictionary<int, IReadOnlyList<string>> RecordMeetingCommentStates { get; init; } = new Dictionary<int, IReadOnlyList<string>>();
         public IReadOnlyList<PersonPickerEntryViewModel> ProjectMemberSearchResults { get; init; } = [];
+        public int ReorderProjectSubsystemCallCount { get; private set; }
+        public ReorderProjectSubsystemCommand? LastReorderProjectSubsystemCommand { get; private set; }
 
         public Task<bool> ProjektExistsAsync(int id, CancellationToken ct = default)
             => Task.FromResult(ProjektyList.Any(item => item.Id == id) || ProjektDetail.Projekt.Id == id);
@@ -428,6 +515,13 @@ public sealed class ProjektyControllerBehaviorTests
                 DostupneProjektoveSubsystemy = TeamModalOptions.DostupneProjektoveSubsystemy.Count == 0 ? TeamTab.DostupneProjektoveSubsystemy : TeamModalOptions.DostupneProjektoveSubsystemy,
                 DostupneSubsystemy = TeamModalOptions.DostupneSubsystemy.Count == 0 ? TeamTab.DostupneSubsystemy : TeamModalOptions.DostupneSubsystemy
             });
+
+        public Task ReorderProjectSubsystemAsync(ReorderProjectSubsystemCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+        {
+            ReorderProjectSubsystemCallCount++;
+            LastReorderProjectSubsystemCommand = command;
+            return Task.CompletedTask;
+        }
 
         public Task<IReadOnlyList<PersonPickerEntryViewModel>> SearchProjectMemberCandidatesAsync(string query, CancellationToken ct = default)
             => Task.FromResult(ProjectMemberSearchResults);

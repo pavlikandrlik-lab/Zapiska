@@ -29,6 +29,15 @@
                         }
                     </select>
                 </label>
+                <label>
+                    Řadit podle
+                    <select data-schedule-filter-key="sortBy">
+                        <option value="project-asc" selected="selected">podle pořadí projektu vzestupně</option>
+                        <option value="project-desc">podle pořadí projektu sestupně</option>
+                        <option value="alpha-asc">abecedně vzestupně (A-Z)</option>
+                        <option value="alpha-desc">abecedně sestupně (Z-A)</option>
+                    </select>
+                </label>
             </div>
             <div class="filter-actions">
                 <button class="btn small ghost" type="button" data-filter-save-defaults="schedule">Uložit jako výchozí</button>
@@ -46,9 +55,17 @@
         {
             @foreach (var skupina in Model.HarmonogramUkoly
                 .GroupBy(item => new { item.SubsystemKod, item.Subsystem })
-                .OrderBy(group => group.Key.Subsystem))
+                .OrderByDescending(group => group.First().SubsystemHasProjectOrder)
+                .ThenBy(group => group.First().SubsystemPoradi)
+                .ThenBy(group => group.Key.Subsystem))
             {
-                <section class="schedule-subsystem-group" data-subsystem-group data-subsystem-name="@skupina.Key.Subsystem">
+                var firstItem = skupina.First();
+                <section class="schedule-subsystem-group"
+                         data-subsystem-group
+                         data-subsystem-name="@skupina.Key.Subsystem"
+                         data-subsystem-kod="@skupina.Key.SubsystemKod"
+                         data-subsystem-order="@firstItem.SubsystemPoradi"
+                         data-subsystem-order-active="@firstItem.SubsystemHasProjectOrder.ToString().ToLowerInvariant()">
                     <h3 class="schedule-subsystem-heading">@skupina.Key.Subsystem</h3>
                     <div class="schedule-group-list">
                         @foreach (var item in skupina)
@@ -56,7 +73,9 @@
                             <article class="schedule-card"
                                      data-schedule-item
                                      data-schedule-filter-subsystem="@item.Subsystem"
-                                     data-schedule-filter-subsystem-kod="@item.SubsystemKod">
+                                     data-schedule-filter-subsystem-kod="@item.SubsystemKod"
+                                     data-schedule-subsystem-order="@item.SubsystemPoradi"
+                                     data-schedule-subsystem-order-active="@item.SubsystemHasProjectOrder.ToString().ToLowerInvariant()">
                                 <div class="schedule-card-header">
                                     <div>
                                         <div class="record-title">#@item.CisloViditelne - @item.Nazev</div>
@@ -87,103 +106,7 @@
                                     </div>
                                 </div>
 
-                                <div class="schedule-card-timeline">
-                                    <div class="schedule-overview-timeline">
-                                        <div class="schedule-overview-row">
-                                            <span class="schedule-overview-label">Plán</span>
-                                            <div class="schedule-overview-track">
-                                                <div class="schedule-overview-marker today"
-                                                     style="left:@item.FormatCompactTodayPercent%;"
-                                                     title="@item.CompactTodayTitle"></div>
-                                                <div class="schedule-overview-marker deadline"
-                                                     style="left:@item.FormatCompactDeadlinePercent%;"
-                                                     title="@($"Termín úkolu: {item.TerminUkonceni:dd.MM.yyyy}")"></div>
-                                                @foreach (var krok in item.Kroky)
-                                                {
-                                                    @if (krok.HasCompactVisualDuration)
-                                                    {
-                                                        <span class="schedule-overview-segment"
-                                                              data-rainbow-segment-label-full="@krok.Nazev"
-                                                              data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                              style="left:@krok.CompactPlanLeftPercent%; width:@krok.CompactPlanWidthStyle; background:@krok.BarvaHex;"
-                                                              title="@krok.CompactPlanTitle"></span>
-                                                    }
-                                                }
-                                            </div>
-                                        </div>
-                                        <div class="schedule-overview-row">
-                                            <span class="schedule-overview-label">Skutečnost</span>
-                                            <div class="schedule-overview-track">
-                                                <div class="schedule-overview-marker today"
-                                                     style="left:@item.FormatCompactTodayPercent%;"
-                                                     title="@item.CompactTodayTitle"></div>
-                                                <div class="schedule-overview-marker deadline"
-                                                     style="left:@item.FormatCompactDeadlinePercent%;"
-                                                     title="@($"Termín úkolu: {item.TerminUkonceni:dd.MM.yyyy}")"></div>
-                                                @foreach (var krok in item.Kroky)
-                                                {
-                                                    @if (krok.HasCompactVisualDuration)
-                                                    {
-                                                        <span class="schedule-overview-segment"
-                                                              data-rainbow-segment-label-full="@krok.Nazev"
-                                                              data-rainbow-segment-label-short="@krok.KrokIndex"
-                                                              style="left:@krok.CompactActualLeftPercent%; width:@krok.CompactActualWidthStyle; background:@krok.BarvaHex;"
-                                                              title="@krok.CompactActualTitle"></span>
-                                                    }
-                                                }
-                                            </div>
-                                        </div>
-                                        <div class="schedule-overview-axis-row">
-                                            <span class="schedule-overview-axis-spacer" aria-hidden="true"></span>
-                                            <div class="timeline-axis schedule-overview-axis"
-                                                 data-timeline-axis
-                                                 data-axis-start="@item.CompactAxisStart.ToString("yyyy-MM-dd")"
-                                                 data-axis-end="@item.CompactAxisEnd.ToString("yyyy-MM-dd")"></div>
-                                        </div>
-                                    </div>
-                                    <div class="schedule-layered-summary">
-                                        <span>Plán: @item.BaselineDokonceni.ToString("dd.MM.yyyy")</span>
-                                        <span>Skutečnost: @item.SkutecneDokonceni.ToString("dd.MM.yyyy")</span>
-                                        <span>Termín úkolu: @item.TerminUkonceni.ToString("dd.MM.yyyy")</span>
-                                        <span>Překročení: @(item.PrekroceniDni > 0 ? $"{item.PrekroceniDni} dnů" : "0 dnů")</span>
-                                    </div>
-                                </div>
-
-                                <div class="gantt-steps schedule-steps" data-schedule-steps data-schedule-record-id="@item.ZaznamId" hidden="hidden">
-                                    <div class="schedule-layered-legend schedule-layered-legend--steps">
-                                        <span><span class="schedule-layered-legend-swatch planned"></span>Plán</span>
-                                        <span><span class="schedule-layered-legend-swatch actual"></span>Skutečnost</span>
-                                        <span><span class="schedule-layered-legend-swatch today"></span>Dnes</span>
-                                    </div>
-                                    <div class="schedule-layered-axis-row">
-                                        <span class="schedule-layered-axis-spacer" aria-hidden="true"></span>
-                                        <div class="timeline-axis schedule-layered-axis"
-                                             data-timeline-axis
-                                             data-axis-start="@item.BreakdownAxisStart.ToString("yyyy-MM-dd")"
-                                             data-axis-end="@item.BreakdownAxisEnd.ToString("yyyy-MM-dd")"></div>
-                                    </div>
-                                    @foreach (var krok in item.Kroky)
-                                    {
-                                        <div class="gantt-step-row">
-                                            <div class="gantt-step-name">
-                                                <span>@krok.Nazev</span>
-                                                <span class="gantt-step-offset @krok.OffsetCssClass">@krok.OffsetLabel</span>
-                                            </div>
-                                            <div class="schedule-layered-track schedule-layered-track--step">
-                                                @if (krok.HasBreakdownVisualDuration)
-                                                {
-                                                    <div class="schedule-layered-marker today"
-                                                         style="left:@item.FormatBreakdownTodayPercent%;"
-                                                         title="@item.CompactTodayTitle"></div>
-                                                    <span class="schedule-layered-segment planned"
-                                                          style="left:@krok.BreakdownPlanLeftPercent%; width:@krok.BreakdownPlanWidthPercent%; background:@krok.BarvaHex;"></span>
-                                                    <span class="schedule-layered-segment actual"
-                                                          style="left:@krok.BreakdownActualLeftPercent%; width:@krok.BreakdownActualWidthPercent%; --schedule-actual-color:@item.DelayBarvaHex;"></span>
-                                                }
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
+                                @await Html.PartialAsync("_ScheduleBlock", item.HarmonogramBlok)
                             </article>
                         }
                     </div>

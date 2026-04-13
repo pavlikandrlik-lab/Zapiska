@@ -80,6 +80,8 @@ public sealed class PdfExportRecordViewModel
     public required string Vlastnik { get; init; }
     public required string SubsystemKod { get; init; }
     public required string Subsystem { get; init; }
+    public int SubsystemPoradi { get; init; }
+    public bool SubsystemHasProjectOrder { get; init; }
     public DateTime DatumZalozeni { get; init; }
     public IReadOnlyList<DateTime> HistorieTerminu { get; init; } = Array.Empty<DateTime>();
     public DateTime? Termin { get; init; }

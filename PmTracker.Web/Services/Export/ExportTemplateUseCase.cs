@@ -55,7 +55,7 @@ public sealed class ExportTemplateUseCase(IExportTemplateQueries queries, TimePr
             ExportTypeLabel = string.Equals(normalizedVariant, "task_single", StringComparison.Ordinal)
                 ? "Jeden úkol"
                 : "Kompletní projekt",
-            SubsystemGroups = BuildSubsystemGroups(queryResult.Zaznamy)
+            SubsystemGroups = BuildSubsystemGroups(queryResult.Zaznamy, string.Equals(normalizedVariant, "meeting", StringComparison.Ordinal))
         };
     }
 
@@ -72,14 +72,22 @@ public sealed class ExportTemplateUseCase(IExportTemplateQueries queries, TimePr
             _ => $"Souhrnný zápis projektu {projectName}"
         };
 
-    private static IReadOnlyList<PdfExportSubsystemGroupViewModel> BuildSubsystemGroups(IReadOnlyList<PdfExportRecordViewModel> records)
+    private static IReadOnlyList<PdfExportSubsystemGroupViewModel> BuildSubsystemGroups(IReadOnlyList<PdfExportRecordViewModel> records, bool useProjectOrder)
     {
         return records
-            .GroupBy(record => string.IsNullOrWhiteSpace(record.Subsystem) ? "-" : record.Subsystem)
-            .OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase)
+            .GroupBy(record => new
+            {
+                record.SubsystemKod,
+                Subsystem = string.IsNullOrWhiteSpace(record.Subsystem) ? "-" : record.Subsystem,
+                record.SubsystemPoradi,
+                record.SubsystemHasProjectOrder
+            })
+            .OrderBy(group => useProjectOrder ? (group.Key.SubsystemHasProjectOrder ? 0 : 1) : 0)
+            .ThenBy(group => useProjectOrder && group.Key.SubsystemHasProjectOrder ? group.Key.SubsystemPoradi : int.MaxValue)
+            .ThenBy(group => group.Key.Subsystem, StringComparer.CurrentCultureIgnoreCase)
             .Select(group => new PdfExportSubsystemGroupViewModel
             {
-                Subsystem = group.Key,
+                Subsystem = group.Key.Subsystem,
                 Records = group
                     .OrderBy(record => CategoryOrder(record.Kategorie))
                     .ThenBy(record => record.Kategorie, StringComparer.CurrentCultureIgnoreCase)

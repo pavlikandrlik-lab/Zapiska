@@ -168,6 +168,7 @@ CREATE TABLE dbo.projekt_subsystemy (
     id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_projekt_subsystemy PRIMARY KEY,
     projekt_id int NOT NULL,
     subsystem_id int NOT NULL,
+    poradi int NOT NULL,
     datum_prirazeni datetime2 NOT NULL CONSTRAINT DF_projekt_subsystemy_datum_prirazeni DEFAULT (SYSUTCDATETIME()),
     datum_odebrani datetime2 NULL
 );
@@ -538,6 +539,7 @@ CREATE INDEX IX_osoby_ad_login ON dbo.osoby(ad_login) WHERE ad_login IS NOT NULL
 
 CREATE UNIQUE INDEX UX_obsazeni_projektu_projekt_osoba_role_aktivni ON dbo.obsazeni_projektu(projekt_id, osoba_id, role_id) WHERE datum_odebrani IS NULL;
 CREATE UNIQUE INDEX UX_projekt_subsystemy_projekt_subsystem_aktivni ON dbo.projekt_subsystemy(projekt_id, subsystem_id) WHERE datum_odebrani IS NULL;
+CREATE UNIQUE INDEX UX_projekt_subsystemy_projekt_poradi_aktivni ON dbo.projekt_subsystemy(projekt_id, poradi) WHERE datum_odebrani IS NULL;
 CREATE UNIQUE INDEX UX_obsazeni_subsystemu_projektu_aktivni ON dbo.obsazeni_subsystemu_projektu(projekt_subsystem_id, osoba_id, role_subsystemu_id) WHERE datum_odebrani IS NULL;
 CREATE UNIQUE INDEX UX_jednani_projekt_cislo ON dbo.jednani(projekt_id, cislo_jednani);
 

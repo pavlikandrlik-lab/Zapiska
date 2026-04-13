@@ -127,6 +127,11 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             }
         }
 
+        if (!await HasColumnAsync(dbContext, "dbo.projekt_subsystemy", "poradi", ct))
+        {
+            throw new InvalidOperationException("V DB chybí sloupec dbo.projekt_subsystemy.poradi. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_2_project_subsystem_order.sql.");
+        }
+
         _logger.LogInformation("SQL startup validace proběhla úspěšně.");
     }
 

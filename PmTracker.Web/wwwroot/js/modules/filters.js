@@ -26,6 +26,7 @@ const projectFilterConfigs = {
         statusSelector: '[data-filter-save-status="records"]',
         fields: [
             { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+            { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true },
             { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
             { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
             { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
@@ -43,7 +44,8 @@ const projectFilterConfigs = {
         chipRowSelector: '[data-filter-chip-row="schedule"]',
         statusSelector: '[data-filter-save-status="schedule"]',
         fields: [
-            { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" }
+            { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+            { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true }
         ]
     }
 };
@@ -77,6 +79,95 @@ function normalizeFilterToken(value) {
     }
 
     return String(value).trim().toUpperCase();
+}
+
+function normalizeSubsystemSortMode(value) {
+    const candidate = String(value || "").trim().toLowerCase();
+    if (candidate === "alpha-asc" || candidate === "alpha-desc" || candidate === "project-desc") {
+        return candidate;
+    }
+
+    return "project-asc";
+}
+
+function buildSubsystemSortMeta(source = {}) {
+    return {
+        name: String(source.name || "").trim() || "-",
+        code: String(source.code || "").trim(),
+        order: Number.isInteger(source.order) ? source.order : Number.parseInt(source.order || "0", 10) || 0,
+        hasProjectOrder: source.hasProjectOrder === true || source.hasProjectOrder === "true"
+    };
+}
+
+function readSubsystemGroupSortMeta(element) {
+    if (!(element instanceof Element)) {
+        return buildSubsystemSortMeta();
+    }
+
+    return buildSubsystemSortMeta({
+        name: element.getAttribute("data-subsystem-name") || "",
+        code: element.getAttribute("data-subsystem-kod") || "",
+        order: element.getAttribute("data-subsystem-order") || "0",
+        hasProjectOrder: element.getAttribute("data-subsystem-order-active") === "true"
+    });
+}
+
+function compareSubsystemAlpha(left, right) {
+    const byName = left.name.localeCompare(right.name, "cs");
+    if (byName !== 0) {
+        return byName;
+    }
+
+    return left.code.localeCompare(right.code, "cs");
+}
+
+function compareSubsystemSortMeta(leftSource, rightSource, sortMode) {
+    const left = buildSubsystemSortMeta(leftSource);
+    const right = buildSubsystemSortMeta(rightSource);
+    const resolvedMode = normalizeSubsystemSortMode(sortMode);
+    const alpha = compareSubsystemAlpha(left, right);
+
+    if (resolvedMode === "alpha-asc") {
+        return alpha;
+    }
+
+    if (resolvedMode === "alpha-desc") {
+        return alpha * -1;
+    }
+
+    if (left.hasProjectOrder && right.hasProjectOrder) {
+        if (left.order !== right.order) {
+            return resolvedMode === "project-desc"
+                ? right.order - left.order
+                : left.order - right.order;
+        }
+
+        return alpha;
+    }
+
+    if (left.hasProjectOrder !== right.hasProjectOrder) {
+        return left.hasProjectOrder ? -1 : 1;
+    }
+
+    return resolvedMode === "project-desc" ? alpha * -1 : alpha;
+}
+
+function sortSubsystemGroupsInContainer(container, sortMode) {
+    if (!(container instanceof Element)) {
+        return [];
+    }
+
+    const groups = Array.from(container.querySelectorAll("[data-subsystem-group]"))
+        .filter((group) => group instanceof HTMLElement);
+
+    groups
+        .sort((left, right) => compareSubsystemSortMeta(
+            readSubsystemGroupSortMeta(left),
+            readSubsystemGroupSortMeta(right),
+            sortMode))
+        .forEach((group) => container.appendChild(group));
+
+    return groups;
 }
 
 export function buildProjectPrintFilterSnapshot() {
@@ -862,58 +953,66 @@ export function applyRecordsView(view) {
     const flatList = recordsPanel.querySelector("[data-record-flat-list]");
     const cards = Array.from(recordsPanel.querySelectorAll(".record-card[data-record-id]"))
         .filter((card) => card instanceof HTMLElement);
-    const hasServerRenderedGroups = groupedList instanceof HTMLElement
-        && groupedList.querySelector("[data-subsystem-group]") instanceof HTMLElement
-        && flatList instanceof HTMLElement
-        && flatList.querySelector(".record-card[data-record-id]") === null;
+    const sortMode = normalizeSubsystemSortMode(buildProjectFilterStateFromInputs("records").sortBy);
 
     if (groupedList instanceof HTMLElement && flatList instanceof HTMLElement && cards.length > 0) {
-        if (resolvedView === "subsystem") {
-            if (!hasServerRenderedGroups) {
-                const orderedCards = cards
-                    .sort((aNode, bNode) => {
-                        const aName = (aNode.getAttribute("data-filter-subsystem") || "").trim();
-                        const bName = (bNode.getAttribute("data-filter-subsystem") || "").trim();
-                        const bySubsystem = aName.localeCompare(bName, "cs");
-                        if (bySubsystem !== 0) {
-                            return bySubsystem;
-                        }
+        const groupsByKey = new Map();
+        const orderedGroups = [];
 
-                        const aNumber = Number(aNode.getAttribute("data-record-id") || "0");
-                        const bNumber = Number(bNode.getAttribute("data-record-id") || "0");
-                        return aNumber - bNumber;
-                    });
+        cards.forEach((card) => {
+            const subsystemName = (card.getAttribute("data-filter-subsystem") || "").trim() || "-";
+            const subsystemCode = (card.getAttribute("data-filter-subsystem-kod") || "").trim();
+            const subsystemOrder = Number.parseInt(card.getAttribute("data-filter-subsystem-order") || "0", 10) || 0;
+            const subsystemHasProjectOrder = card.getAttribute("data-filter-subsystem-order-active") === "true";
+            const groupKey = `${subsystemCode}\u0000${subsystemName}`;
+            let group = groupsByKey.get(groupKey);
 
-                groupedList.innerHTML = "";
-                let currentGroup = null;
-                let currentGroupCards = null;
-                let currentName = "";
-
-                orderedCards.forEach((card) => {
-                    const subsystemName = (card.getAttribute("data-filter-subsystem") || "").trim() || "-";
-                    if (currentGroup === null || currentGroupCards === null || subsystemName !== currentName) {
-                        currentName = subsystemName;
-                        currentGroup = document.createElement("div");
-                        currentGroup.className = "subsystem-group";
-                        currentGroup.setAttribute("data-subsystem-group", "");
-                        currentGroup.setAttribute("data-subsystem-name", subsystemName);
-
-                        const heading = document.createElement("h3");
-                        heading.textContent = subsystemName;
-                        currentGroup.appendChild(heading);
-
-                        currentGroupCards = document.createElement("div");
-                        currentGroupCards.className = "card-list";
-                        currentGroup.appendChild(currentGroupCards);
-                        groupedList.appendChild(currentGroup);
-                    }
-
-                    currentGroupCards.appendChild(card);
-                });
+            if (!group) {
+                group = {
+                    meta: {
+                        name: subsystemName,
+                        code: subsystemCode,
+                        order: subsystemOrder,
+                        hasProjectOrder: subsystemHasProjectOrder
+                    },
+                    cards: []
+                };
+                groupsByKey.set(groupKey, group);
+                orderedGroups.push(group);
             }
+
+            group.cards.push(card);
+        });
+
+        orderedGroups.sort((left, right) => compareSubsystemSortMeta(left.meta, right.meta, sortMode));
+
+        if (resolvedView === "subsystem") {
+            groupedList.innerHTML = "";
+
+            orderedGroups.forEach((group) => {
+                const currentGroup = document.createElement("div");
+                currentGroup.className = "subsystem-group";
+                currentGroup.setAttribute("data-subsystem-group", "");
+                currentGroup.setAttribute("data-subsystem-name", group.meta.name);
+                currentGroup.setAttribute("data-subsystem-kod", group.meta.code);
+                currentGroup.setAttribute("data-subsystem-order", String(group.meta.order));
+                currentGroup.setAttribute("data-subsystem-order-active", String(group.meta.hasProjectOrder));
+
+                const heading = document.createElement("h3");
+                heading.textContent = group.meta.name;
+                currentGroup.appendChild(heading);
+
+                const currentGroupCards = document.createElement("div");
+                currentGroupCards.className = "card-list";
+                group.cards.forEach((card) => currentGroupCards.appendChild(card));
+                currentGroup.appendChild(currentGroupCards);
+                groupedList.appendChild(currentGroup);
+            });
         }
         else {
-            cards.forEach((card) => flatList.appendChild(card));
+            orderedGroups.forEach((group) => {
+                group.cards.forEach((card) => flatList.appendChild(card));
+            });
             groupedList.innerHTML = "";
         }
     }
@@ -997,4 +1096,10 @@ export function syncTabQuery(tabName) {
     window.history.replaceState({}, "", url);
 }
 
-export { normalizeFilterText };
+export {
+    compareSubsystemSortMeta,
+    normalizeFilterText,
+    normalizeSubsystemSortMode,
+    readSubsystemGroupSortMeta,
+    sortSubsystemGroupsInContainer
+};

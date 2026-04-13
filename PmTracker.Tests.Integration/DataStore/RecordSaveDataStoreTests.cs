@@ -215,8 +215,8 @@ public sealed class RecordSaveDataStoreTests
 
         var model = store.BuildZaznamCreate(projectId);
 
-        model.HarmonogramKroky.Should().NotBeEmpty();
-        model.HarmonogramKroky.All(x => x.TrvaniTypId > 0).Should().BeTrue();
+        model.HarmonogramBlok.Kroky.Should().NotBeEmpty();
+        model.HarmonogramBlok.Kroky.All(x => x.TrvaniTypId > 0).Should().BeTrue();
 
         (await dbContext.HarmonogramSablony.AsNoTracking().AnyAsync(x => x.IsAktivni)).Should().BeTrue();
         (await dbContext.CiselnikHarmonogramTypu.AsNoTracking().AnyAsync()).Should().BeTrue();
@@ -386,7 +386,7 @@ public sealed class RecordSaveDataStoreTests
             .SingleAsync();
 
         var createModel = store.BuildZaznamCreate(projectId);
-        var durationTypeId = createModel.HarmonogramKroky
+        var durationTypeId = createModel.HarmonogramBlok.Kroky
             .Select(x => x.TrvaniTypId)
             .First(x => x > 0);
         var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
@@ -525,7 +525,7 @@ public sealed class RecordSaveDataStoreTests
             .SingleAsync();
 
         var createModel = store.BuildZaznamCreate(projectId);
-        var durationTypeId = createModel.HarmonogramKroky
+        var durationTypeId = createModel.HarmonogramBlok.Kroky
             .Select(x => x.TrvaniTypId)
             .First(x => x > 0);
         var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);

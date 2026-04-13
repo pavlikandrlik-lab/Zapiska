@@ -202,6 +202,10 @@ internal static class IntegrationTestHelper
         {
             ProjektId = projectId,
             SubsystemId = subsystemId,
+            Poradi = ((await dbContext.ProjektSubsystemy
+                .Where(x => x.ProjektId == projectId && x.DatumOdebrani == null)
+                .Select(x => (int?)x.Poradi)
+                .MaxAsync()) ?? 0) + 1,
             DatumPrirazeni = DateTime.UtcNow
         };
 

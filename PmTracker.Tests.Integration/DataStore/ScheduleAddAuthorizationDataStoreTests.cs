@@ -36,7 +36,7 @@ public sealed class ScheduleAddAuthorizationDataStoreTests
         var subsystemTaskA2Id = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerBId, subsystemAId, "U", "SchedLeadA2");
         var otherSubsystemTaskId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerBId, subsystemBId, "U", "SchedLeadB1");
 
-        var durationTypeId = store.BuildZaznamEdit(subsystemTaskA1Id).HarmonogramKroky
+        var durationTypeId = store.BuildZaznamEdit(subsystemTaskA1Id).HarmonogramBlok.Kroky
             .Select(x => x.TrvaniTypId)
             .First(x => x > 0);
 
@@ -74,7 +74,7 @@ public sealed class ScheduleAddAuthorizationDataStoreTests
         var subsystemTaskA2Id = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerBId, subsystemAId, "U", "SchedDeputyA2");
         var otherSubsystemTaskId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerBId, subsystemBId, "U", "SchedDeputyB1");
 
-        var durationTypeId = store.BuildZaznamEdit(subsystemTaskA1Id).HarmonogramKroky
+        var durationTypeId = store.BuildZaznamEdit(subsystemTaskA1Id).HarmonogramBlok.Kroky
             .Select(x => x.TrvaniTypId)
             .First(x => x > 0);
 
@@ -107,7 +107,7 @@ public sealed class ScheduleAddAuthorizationDataStoreTests
         var ownTaskId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "SchedOwnerOwn");
         var foreignTaskId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, otherOwnerId, subsystemId, "U", "SchedOwnerForeign");
 
-        var durationTypeId = store.BuildZaznamEdit(ownTaskId).HarmonogramKroky
+        var durationTypeId = store.BuildZaznamEdit(ownTaskId).HarmonogramBlok.Kroky
             .Select(x => x.TrvaniTypId)
             .First(x => x > 0);
 

@@ -447,6 +447,9 @@ public sealed class ZaznamyController : BaseController
         model.CanEditScheduleFull = canEditRecord || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, model.ProjektId);
         model.CanEditScheduleAddOnly = !model.CanEditScheduleFull
             && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, model.ProjektId);
+        model.HarmonogramBlok.EditorJeUkolKategorie = model.JeUkolKategorie;
+        model.HarmonogramBlok.EditorCanEditScheduleFull = model.CanEditScheduleFull;
+        model.HarmonogramBlok.EditorCanEditScheduleAddOnly = model.CanEditScheduleAddOnly;
         model.ActiveEditorTab = !canEditRecord && canManageSchedule && model.JeUkolKategorie
             ? EditorTabSchedule
             : EditorTabBasic;

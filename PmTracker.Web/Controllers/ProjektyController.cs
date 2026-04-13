@@ -567,6 +567,18 @@ public sealed class ProjektyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public Task<IActionResult> ReorderProjectSubsystem(ReorderProjectSubsystemCommand command, CancellationToken ct = default)
+    {
+        return ExecuteTeamValidatedActionAsync(
+            projektId: command.ProjektId,
+            invalidAjaxMessage: "Pořadí subsystému projektu nelze změnit.",
+            invalidFallbackMessage: InvalidFormFallbackMessage,
+            successMessage: "Pořadí subsystémů bylo upraveno.",
+            operation: () => _projectService.ReorderProjectSubsystemAsync(command, CurrentUserContext, ct));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public Task<IActionResult> DeactivateProjectSubsystem(DeactivateProjectSubsystemCommand command, int projektId, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(

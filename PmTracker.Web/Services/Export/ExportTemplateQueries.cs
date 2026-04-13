@@ -977,6 +977,9 @@ namespace PmTracker.Web.Services.Export.Queries
                 : await dbContext.Subsystemy.AsNoTracking()
                     .Where(x => subsystemIds.Contains(x.Id))
                     .ToDictionaryAsync(x => x.Id, ct);
+            var subsystemOrderById = subsystemIds.Length == 0
+                ? new Dictionary<int, int>()
+                : await ProjectSubsystemOrderingQuery.LoadActiveOrderBySubsystemIdAsync(dbContext, projectId, subsystemIds, ct);
 
             var comments = await dbContext.Vyjadreni.AsNoTracking()
                 .Where(x => recordIds.Contains(x.ZaznamId))
@@ -1133,6 +1136,7 @@ namespace PmTracker.Web.Services.Export.Queries
                     ? taskTypes.GetValueOrDefault(record.AktualniTypUkoluId.Value)
                     : null;
                 var subsystem = subsystems.GetValueOrDefault(record.SubsystemId);
+                var hasProjectOrder = subsystemOrderById.TryGetValue(record.SubsystemId, out var subsystemOrder);
 
                 return new PdfExportRecordViewModel
                 {
@@ -1155,6 +1159,8 @@ namespace PmTracker.Web.Services.Export.Queries
                     Vlastnik = BuildDisplayNameFromOsoba(people.GetValueOrDefault(record.VlastnikId)),
                     SubsystemKod = subsystem?.Kod ?? "-",
                     Subsystem = subsystem?.Nazev ?? "-",
+                    SubsystemPoradi = hasProjectOrder ? subsystemOrder : 0,
+                    SubsystemHasProjectOrder = hasProjectOrder,
                     DatumZalozeni = record.DatumZalozeni,
                     HistorieTerminu = historyDates,
                     Termin = record.DatumUkonceni,

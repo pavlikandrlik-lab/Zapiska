@@ -14,7 +14,8 @@ public sealed partial class ProjectService
             .Select(x => new
             {
                 x.Id,
-                x.SubsystemId
+                x.SubsystemId,
+                x.Poradi
             })
             .ToListAsync(ct);
 
@@ -46,6 +47,7 @@ public sealed partial class ProjectService
                 {
                     ProjektSubsystemId = mapping?.Id ?? 0,
                     SubsystemId = subsystemId,
+                    Poradi = mapping?.Poradi ?? 0,
                     Kod = subsystem?.Kod ?? "-",
                     Nazev = subsystem?.Nazev ?? "-",
                     DatumPrirazeni = DateTime.MinValue
@@ -136,6 +138,18 @@ public sealed partial class ProjectService
             : new Dictionary<int, int>();
         var harmonogramKroky = harmonogramService.BuildHarmonogramVypocetPublic(record.DatumZalozeni, harmonogramTypy, harmonogramValues);
         var harmonogramSouhrn = harmonogramService.BuildHarmonogramSouhrn(harmonogramKroky, record.DatumUkonceni);
+        var harmonogramBlokKroky = harmonogramKroky.Select(krok => new HarmonogramKrokEditViewModel
+        {
+            KrokIndex = krok.KrokIndex,
+            Nazev = krok.Nazev,
+            BarvaHex = krok.BarvaHex,
+            TrvaniTypId = krok.TrvaniTypId,
+            ZpozdeniTypId = krok.ZpozdeniTypId,
+            TrvaniDni = krok.TrvaniDni,
+            OdchylkaDni = krok.ZpozdeniDni,
+            BaselineDatum = krok.BaselineDatum,
+            SkutecneDatum = krok.PosunuteDatum
+        }).ToList();
 
         return new ZaznamEditViewModel
         {
@@ -176,20 +190,15 @@ public sealed partial class ProjectService
             }).ToList(),
             VlastnikId = record.VlastnikId,
             JeUkolKategorie = isTaskCategory,
-            HarmonogramDelayBarvaHex = harmonogramSchema.DelayBarvaHex,
-            HarmonogramKroky = harmonogramKroky.Select(krok => new HarmonogramKrokEditViewModel
-            {
-                KrokIndex = krok.KrokIndex,
-                Nazev = krok.Nazev,
-                BarvaHex = krok.BarvaHex,
-                TrvaniTypId = krok.TrvaniTypId,
-                ZpozdeniTypId = krok.ZpozdeniTypId,
-                TrvaniDni = krok.TrvaniDni,
-                OdchylkaDni = krok.ZpozdeniDni,
-                BaselineDatum = krok.BaselineDatum,
-                SkutecneDatum = krok.PosunuteDatum
-            }).ToList(),
-            HarmonogramSouhrn = harmonogramSouhrn,
+            HarmonogramBlok = BuildScheduleBlockViewModel(
+                record.Id,
+                "record-editor",
+                record.DatumZalozeni,
+                record.DatumUkonceni,
+                harmonogramSchema.DelayBarvaHex,
+                harmonogramSouhrn,
+                harmonogramBlokKroky,
+                editorJeUkolKategorie: isTaskCategory),
             DostupniVlastnici = ownerCandidates,
             DostupniSpolupracovnici = collaborationCandidates,
             VybraniSpolupracovniciIds = selectedCollaborationIds,

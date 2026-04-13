@@ -242,6 +242,25 @@ public sealed class DeactivateProjectSubsystemCommand
     public int ProjektSubsystemId { get; set; }
 }
 
+public static class ProjectSubsystemReorderDirections
+{
+    public const string Up = "up";
+    public const string Down = "down";
+}
+
+public sealed class ReorderProjectSubsystemCommand
+{
+    [Required]
+    public int ProjektId { get; set; }
+
+    [Required]
+    public int ProjektSubsystemId { get; set; }
+
+    [Required]
+    [RegularExpression("^(up|down)$", ErrorMessage = "Neplatný směr přesunu subsystému.")]
+    public string Direction { get; set; } = ProjectSubsystemReorderDirections.Up;
+}
+
 public sealed class AssignProjectSubsystemRoleCommand
 {
     [Required]

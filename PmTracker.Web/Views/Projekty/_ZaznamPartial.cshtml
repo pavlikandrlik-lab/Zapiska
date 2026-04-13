@@ -17,6 +17,8 @@
          data-record-comments-loaded="@(Model.CommentsLoaded ? "true" : "false")"
          data-filter-subsystem="@summary.AktualniSubsystem"
          data-filter-subsystem-kod="@summary.AktualniSubsystemKod"
+         data-filter-subsystem-order="@summary.AktualniSubsystemPoradi"
+         data-filter-subsystem-order-active="@summary.AktualniSubsystemHasProjectOrder.ToString().ToLowerInvariant()"
          data-filter-kategorie="@summary.KategorieNazev"
          data-filter-kategorie-kod="@summary.KategorieKod"
          data-filter-stav="@summary.Stav"

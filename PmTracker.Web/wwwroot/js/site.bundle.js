@@ -437,6 +437,7 @@ var projectFilterConfigs = {
     statusSelector: '[data-filter-save-status="records"]',
     fields: [
       { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+      { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true },
       { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
       { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
       { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
@@ -454,7 +455,8 @@ var projectFilterConfigs = {
     chipRowSelector: '[data-filter-chip-row="schedule"]',
     statusSelector: '[data-filter-save-status="schedule"]',
     fields: [
-      { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" }
+      { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+      { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true }
     ]
   }
 };
@@ -480,8 +482,71 @@ function normalizeFilterToken(value) {
   }
   return String(value).trim().toUpperCase();
 }
+function normalizeSubsystemSortMode(value) {
+  const candidate = String(value || "").trim().toLowerCase();
+  if (candidate === "alpha-asc" || candidate === "alpha-desc" || candidate === "project-desc") {
+    return candidate;
+  }
+  return "project-asc";
+}
+function buildSubsystemSortMeta(source = {}) {
+  return {
+    name: String(source.name || "").trim() || "-",
+    code: String(source.code || "").trim(),
+    order: Number.isInteger(source.order) ? source.order : Number.parseInt(source.order || "0", 10) || 0,
+    hasProjectOrder: source.hasProjectOrder === true || source.hasProjectOrder === "true"
+  };
+}
+function readSubsystemGroupSortMeta(element) {
+  if (!(element instanceof Element)) {
+    return buildSubsystemSortMeta();
+  }
+  return buildSubsystemSortMeta({
+    name: element.getAttribute("data-subsystem-name") || "",
+    code: element.getAttribute("data-subsystem-kod") || "",
+    order: element.getAttribute("data-subsystem-order") || "0",
+    hasProjectOrder: element.getAttribute("data-subsystem-order-active") === "true"
+  });
+}
+function compareSubsystemAlpha(left, right) {
+  const byName = left.name.localeCompare(right.name, "cs");
+  if (byName !== 0) {
+    return byName;
+  }
+  return left.code.localeCompare(right.code, "cs");
+}
+function compareSubsystemSortMeta(leftSource, rightSource, sortMode) {
+  const left = buildSubsystemSortMeta(leftSource);
+  const right = buildSubsystemSortMeta(rightSource);
+  const resolvedMode = normalizeSubsystemSortMode(sortMode);
+  const alpha = compareSubsystemAlpha(left, right);
+  if (resolvedMode === "alpha-asc") {
+    return alpha;
+  }
+  if (resolvedMode === "alpha-desc") {
+    return alpha * -1;
+  }
+  if (left.hasProjectOrder && right.hasProjectOrder) {
+    if (left.order !== right.order) {
+      return resolvedMode === "project-desc" ? right.order - left.order : left.order - right.order;
+    }
+    return alpha;
+  }
+  if (left.hasProjectOrder !== right.hasProjectOrder) {
+    return left.hasProjectOrder ? -1 : 1;
+  }
+  return resolvedMode === "project-desc" ? alpha * -1 : alpha;
+}
+function sortSubsystemGroupsInContainer(container, sortMode) {
+  if (!(container instanceof Element)) {
+    return [];
+  }
+  const groups = Array.from(container.querySelectorAll("[data-subsystem-group]")).filter((group) => group instanceof HTMLElement);
+  groups.sort((left, right) => compareSubsystemSortMeta(readSubsystemGroupSortMeta(left), readSubsystemGroupSortMeta(right), sortMode)).forEach((group) => container.appendChild(group));
+  return groups;
+}
 function buildProjectPrintFilterSnapshot() {
-  const state = buildProjectFilterStateFromInputs2("records");
+  const state = buildProjectFilterStateFromInputs("records");
   const snapshot = {
     subsystem: typeof state.subsystem === "string" ? state.subsystem.trim() : "",
     kategorie: typeof state.kategorie === "string" ? state.kategorie.trim() : "",
@@ -695,7 +760,7 @@ function readStoredProjectFilterState(scope, kind, fallbackState) {
   return normalizeProjectFilterState(scope, rawState, fallbackState);
 }
 function persistProjectFilterSessionState(scope) {
-  const currentState = buildProjectFilterStateFromInputs2(scope);
+  const currentState = buildProjectFilterStateFromInputs(scope);
   const normalizedState = normalizeProjectFilterState(scope, currentState, currentState);
   const key = getProjectFilterStorageKey(scope, "state");
   writeJsonStorage(sessionStorage, key, normalizedState);
@@ -717,12 +782,12 @@ function buildProjectFilterChipLabel(field, input) {
 }
 function applyProjectFilterScope(scope, options = {}) {
   if (scope === "records") {
-    const state = buildProjectFilterStateFromInputs2(scope);
+    const state = buildProjectFilterStateFromInputs(scope);
     applyRecordsView(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
     return;
   }
   if (typeof options.applyScope === "function") {
-    options.applyScope(scope, buildProjectFilterStateFromInputs2(scope));
+    options.applyScope(scope, buildProjectFilterStateFromInputs(scope));
   }
 }
 function removeMatchingStorageKeys(storage, predicate) {
@@ -791,7 +856,7 @@ function normalizeProjectFilterState(scope, rawState, fallbackState) {
   });
   return normalized;
 }
-function buildProjectFilterStateFromInputs2(scope) {
+function buildProjectFilterStateFromInputs(scope) {
   const config = getProjectFilterConfig(scope);
   if (!config) {
     return {};
@@ -825,7 +890,7 @@ function renderProjectFilterChips(scope) {
     return;
   }
   chipRow.innerHTML = "";
-  const state = buildProjectFilterStateFromInputs2(scope);
+  const state = buildProjectFilterStateFromInputs(scope);
   const chips = [];
   config.fields.forEach((field) => {
     if (field.skipChip) {
@@ -866,7 +931,7 @@ function handleProjectFilterInputChange(scope, options = {}) {
   applyProjectFilterScope(scope, options);
 }
 function restoreProjectFilterScope(scope) {
-  const fallbackState = buildProjectFilterStateFromInputs2(scope);
+  const fallbackState = buildProjectFilterStateFromInputs(scope);
   const restoredState = readStoredProjectFilterState(scope, "state", fallbackState) || readStoredProjectFilterState(scope, "defaults", fallbackState) || fallbackState;
   applyProjectFilterStateToInputs(scope, restoredState);
   persistProjectFilterSessionState(scope);
@@ -922,7 +987,7 @@ function applyProjectRecordFilters() {
   if (cards.length === 0) {
     return;
   }
-  const state = buildProjectFilterStateFromInputs2("records");
+  const state = buildProjectFilterStateFromInputs("records");
   const currentUserId = getProjectFilterCurrentUserId("records");
   const hasCurrentUser = currentUserId && currentUserId !== "0";
   const filters = {
@@ -1079,46 +1144,56 @@ function applyRecordsView(view) {
   const groupedList = recordsPanel.querySelector("[data-record-grouped-list]");
   const flatList = recordsPanel.querySelector("[data-record-flat-list]");
   const cards = Array.from(recordsPanel.querySelectorAll(".record-card[data-record-id]")).filter((card) => card instanceof HTMLElement);
-  const hasServerRenderedGroups = groupedList instanceof HTMLElement && groupedList.querySelector("[data-subsystem-group]") instanceof HTMLElement && flatList instanceof HTMLElement && flatList.querySelector(".record-card[data-record-id]") === null;
+  const sortMode = normalizeSubsystemSortMode(buildProjectFilterStateFromInputs("records").sortBy);
   if (groupedList instanceof HTMLElement && flatList instanceof HTMLElement && cards.length > 0) {
-    if (resolvedView === "subsystem") {
-      if (!hasServerRenderedGroups) {
-        const orderedCards = cards.sort((aNode, bNode) => {
-          const aName = (aNode.getAttribute("data-filter-subsystem") || "").trim();
-          const bName = (bNode.getAttribute("data-filter-subsystem") || "").trim();
-          const bySubsystem = aName.localeCompare(bName, "cs");
-          if (bySubsystem !== 0) {
-            return bySubsystem;
-          }
-          const aNumber = Number(aNode.getAttribute("data-record-id") || "0");
-          const bNumber = Number(bNode.getAttribute("data-record-id") || "0");
-          return aNumber - bNumber;
-        });
-        groupedList.innerHTML = "";
-        let currentGroup = null;
-        let currentGroupCards = null;
-        let currentName = "";
-        orderedCards.forEach((card) => {
-          const subsystemName = (card.getAttribute("data-filter-subsystem") || "").trim() || "-";
-          if (currentGroup === null || currentGroupCards === null || subsystemName !== currentName) {
-            currentName = subsystemName;
-            currentGroup = document.createElement("div");
-            currentGroup.className = "subsystem-group";
-            currentGroup.setAttribute("data-subsystem-group", "");
-            currentGroup.setAttribute("data-subsystem-name", subsystemName);
-            const heading = document.createElement("h3");
-            heading.textContent = subsystemName;
-            currentGroup.appendChild(heading);
-            currentGroupCards = document.createElement("div");
-            currentGroupCards.className = "card-list";
-            currentGroup.appendChild(currentGroupCards);
-            groupedList.appendChild(currentGroup);
-          }
-          currentGroupCards.appendChild(card);
-        });
+    const groupsByKey = new Map;
+    const orderedGroups = [];
+    cards.forEach((card) => {
+      const subsystemName = (card.getAttribute("data-filter-subsystem") || "").trim() || "-";
+      const subsystemCode = (card.getAttribute("data-filter-subsystem-kod") || "").trim();
+      const subsystemOrder = Number.parseInt(card.getAttribute("data-filter-subsystem-order") || "0", 10) || 0;
+      const subsystemHasProjectOrder = card.getAttribute("data-filter-subsystem-order-active") === "true";
+      const groupKey = `${subsystemCode}\x00${subsystemName}`;
+      let group = groupsByKey.get(groupKey);
+      if (!group) {
+        group = {
+          meta: {
+            name: subsystemName,
+            code: subsystemCode,
+            order: subsystemOrder,
+            hasProjectOrder: subsystemHasProjectOrder
+          },
+          cards: []
+        };
+        groupsByKey.set(groupKey, group);
+        orderedGroups.push(group);
       }
+      group.cards.push(card);
+    });
+    orderedGroups.sort((left, right) => compareSubsystemSortMeta(left.meta, right.meta, sortMode));
+    if (resolvedView === "subsystem") {
+      groupedList.innerHTML = "";
+      orderedGroups.forEach((group) => {
+        const currentGroup = document.createElement("div");
+        currentGroup.className = "subsystem-group";
+        currentGroup.setAttribute("data-subsystem-group", "");
+        currentGroup.setAttribute("data-subsystem-name", group.meta.name);
+        currentGroup.setAttribute("data-subsystem-kod", group.meta.code);
+        currentGroup.setAttribute("data-subsystem-order", String(group.meta.order));
+        currentGroup.setAttribute("data-subsystem-order-active", String(group.meta.hasProjectOrder));
+        const heading = document.createElement("h3");
+        heading.textContent = group.meta.name;
+        currentGroup.appendChild(heading);
+        const currentGroupCards = document.createElement("div");
+        currentGroupCards.className = "card-list";
+        group.cards.forEach((card) => currentGroupCards.appendChild(card));
+        currentGroup.appendChild(currentGroupCards);
+        groupedList.appendChild(currentGroup);
+      });
     } else {
-      cards.forEach((card) => flatList.appendChild(card));
+      orderedGroups.forEach((group) => {
+        group.cards.forEach((card) => flatList.appendChild(card));
+      });
       groupedList.innerHTML = "";
     }
   }
@@ -2442,6 +2517,11 @@ function applyProjectScheduleFilters() {
     const hasVisibleItems = Array.from(group.querySelectorAll("[data-schedule-item]")).some((item) => item instanceof HTMLElement && !item.hidden);
     group.hidden = !hasVisibleItems;
   });
+  const scheduleList = document.querySelector("[data-project-schedule-list]");
+  if (scheduleList instanceof HTMLElement) {
+    const sortMode = normalizeSubsystemSortMode(state.sortBy);
+    sortSubsystemGroupsInContainer(scheduleList, sortMode);
+  }
   renderStaticTimelineAxes(document.querySelector('[data-tab-panel="harmonogram"]'));
   queueRainbowSegmentRender(document.querySelector('[data-tab-panel="harmonogram"]'));
   scheduleSubsystemIndicatorSync();
@@ -2859,6 +2939,52 @@ function renderStaticTimelineAxes(scope) {
     renderTimelineAxis(container, startDate, endDate);
   });
 }
+function buildSchedulePlanAndActual(state, startDate) {
+  const plan = [];
+  const actual = [];
+  let planCursor = new Date(startDate.getTime());
+  let actualCursor = new Date(startDate.getTime());
+  state.forEach((item) => {
+    const planStart = new Date(planCursor.getTime());
+    const planEnd = addCalendarDays(planStart, item.duration);
+    plan.push({ start: planStart, end: planEnd });
+    planCursor = new Date(planEnd.getTime());
+    const actualStart = new Date(actualCursor.getTime());
+    const actualEnd = addCalendarDays(actualStart, Math.max(0, item.duration + item.delay));
+    actual.push({ start: actualStart, end: actualEnd });
+    actualCursor = new Date(actualEnd.getTime());
+  });
+  return { plan, actual };
+}
+function buildScheduleScale(startDate, deadlineDate, actualEndDate) {
+  const startStamp = toUtcDayStamp(startDate);
+  const axisEndStamp = Math.max(startStamp, toUtcDayStamp(deadlineDate), toUtcDayStamp(actualEndDate), toUtcDayStamp(new Date));
+  const totalDays = Math.max(1, Math.round((axisEndStamp - startStamp) / msPerDay));
+  return {
+    totalDays,
+    axisEndDate: addCalendarDays(startDate, totalDays)
+  };
+}
+function toSchedulePercent(valueDate, axisStart, totalDays) {
+  const days = diffCalendarDays(valueDate, axisStart);
+  return Math.max(0, Math.min(100, days * 100 / totalDays));
+}
+function toScheduleWidthPercent(startDate, endDate, totalDays) {
+  const days = Math.max(0, diffCalendarDays(endDate, startDate));
+  return Math.max(0, Math.min(100, days * 100 / totalDays));
+}
+function formatSchedulePercent(value) {
+  return `${Number.isFinite(value) ? value.toFixed(4) : "0.0000"}%`;
+}
+function formatScheduleSegmentWidth(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0%";
+  }
+  return `calc(${value.toFixed(4)}% + 1px)`;
+}
+function formatScheduleOffsetLabel(delay) {
+  return delay > 0 ? `+${delay} dnů` : `${delay} dnů`;
+}
 function queueRecordSchedulePlannerRecalc(form, attempt) {
   if (!(form instanceof HTMLFormElement) || !form.isConnected) {
     return;
@@ -2881,142 +3007,110 @@ function queueRecordSchedulePlannerRecalc(form, attempt) {
   });
 }
 
-class ScheduleTimelineEngine {
-  static computePlanAndActual(state, startDate) {
-    const plan = [];
-    const actual = [];
-    let planCursor = new Date(startDate.getTime());
-    let actualCursor = new Date(startDate.getTime());
-    state.forEach((item) => {
-      const planStart = new Date(planCursor.getTime());
-      const planEnd = addCalendarDays(planStart, item.duration);
-      plan.push({ start: planStart, end: planEnd });
-      planCursor = new Date(planEnd.getTime());
-      const actualStart = new Date(actualCursor.getTime());
-      const actualEnd = addCalendarDays(actualStart, Math.max(0, item.duration + item.delay));
-      actual.push({ start: actualStart, end: actualEnd });
-      actualCursor = new Date(actualEnd.getTime());
-    });
-    return { plan, actual };
+class ScheduleBlockRenderer {
+  constructor(root, options = {}) {
+    this.root = root;
+    this.mode = String(root.dataset.scheduleMode || "project-readonly").trim() || "project-readonly";
+    this.form = options.form instanceof HTMLFormElement ? options.form : root.closest('form[data-record-editor-form="true"]');
+    this.startInput = this.form instanceof HTMLFormElement ? this.form.querySelector('input[name="DatumZalozeni"]') : null;
+    this.deadlineInput = this.form instanceof HTMLFormElement ? this.form.querySelector('input[name="TerminUkonceni"]') : null;
+    this.summaryDeadline = root.querySelector("[data-schedule-summary-deadline]");
+    this.summaryBaseline = root.querySelector("[data-schedule-summary-baseline]");
+    this.summaryShifted = root.querySelector("[data-schedule-summary-shifted]");
+    this.summaryDuration = root.querySelector("[data-schedule-summary-duration]");
+    this.summaryDelay = root.querySelector("[data-schedule-summary-delay]");
+    this.summaryState = root.querySelector("[data-schedule-summary-state]");
+    this.summaryOverrun = root.querySelector("[data-schedule-summary-overrun]");
+    this.statusLine = root.querySelector(".schedule-status-line");
+    this.overviewAxis = root.querySelector('[data-schedule-axis="overview"]');
+    this.breakdownAxis = root.querySelector('[data-schedule-axis="breakdown"]');
+    this.overviewTodayMarkers = Array.from(root.querySelectorAll('[data-schedule-marker="today"]')).filter((node) => node instanceof HTMLElement);
+    this.overviewDeadlineMarkers = Array.from(root.querySelectorAll('[data-schedule-marker="deadline"]')).filter((node) => node instanceof HTMLElement);
+    this.overviewPlannedSegments = this.collectSegmentMap('[data-schedule-segment-kind="planned"]');
+    this.overviewActualSegments = this.collectSegmentMap('[data-schedule-segment-kind="actual"]');
+    this.breakdownRows = Array.from(root.querySelectorAll("[data-schedule-breakdown-track]")).map((track) => {
+      if (!(track instanceof HTMLElement)) {
+        return null;
+      }
+      const row = track.closest("[data-schedule-step-row]");
+      if (!(row instanceof HTMLElement)) {
+        return null;
+      }
+      const stepIndex = Number.parseInt(row.dataset.stepIndex || "", 10);
+      if (!Number.isInteger(stepIndex)) {
+        return null;
+      }
+      return {
+        row,
+        stepIndex,
+        offset: row.querySelector("[data-schedule-offset]"),
+        track,
+        plannedSegment: track.querySelector('[data-schedule-breakdown-segment="planned"]'),
+        actualSegment: track.querySelector('[data-schedule-breakdown-segment="actual"]'),
+        todayMarker: track.querySelector("[data-schedule-breakdown-today]")
+      };
+    }).filter((entry) => entry && Number.isInteger(entry.stepIndex)).sort((left, right) => left.stepIndex - right.stepIndex);
+    this.editorRows = Array.from(root.querySelectorAll("tr[data-schedule-step-row]")).map((row) => {
+      if (!(row instanceof HTMLTableRowElement)) {
+        return null;
+      }
+      const stepIndex = Number.parseInt(row.dataset.stepIndex || "", 10);
+      if (!Number.isInteger(stepIndex)) {
+        return null;
+      }
+      return {
+        row,
+        stepIndex,
+        durationInput: row.querySelector("[data-schedule-duration]"),
+        delayInput: row.querySelector("[data-schedule-delay]"),
+        dateInput: row.querySelector("[data-schedule-date]"),
+        delayDateInput: row.querySelector("[data-schedule-delay-date]"),
+        durationInc: row.querySelector("[data-schedule-duration-inc]"),
+        durationDec: row.querySelector("[data-schedule-duration-dec]"),
+        delayInc: row.querySelector("[data-schedule-delay-inc]"),
+        delayDec: row.querySelector("[data-schedule-delay-dec]")
+      };
+    }).filter((entry) => entry && Number.isInteger(entry.stepIndex)).sort((left, right) => left.stepIndex - right.stepIndex);
+    const inlineDelayColor = String(root.style.getPropertyValue("--record-schedule-delay-color") || "").trim();
+    const computedDelayColor = window.getComputedStyle(root).getPropertyValue("--record-schedule-delay-color").trim();
+    this.delayColor = inlineDelayColor || computedDelayColor || "var(--schedule-delay)";
   }
-  static buildScale(startDate, deadlineDate, actualEndDate) {
-    const startStamp = toUtcDayStamp(startDate);
-    const axisEndStamp = Math.max(startStamp, toUtcDayStamp(deadlineDate), toUtcDayStamp(actualEndDate), toUtcDayStamp(new Date));
-    const totalDays = Math.max(1, Math.round((axisEndStamp - startStamp) / msPerDay));
-    return {
-      totalDays,
-      axisEndDate: addCalendarDays(startDate, totalDays)
-    };
-  }
-  static toPercent(valueDate, axisStart, totalDays) {
-    const days = diffCalendarDays(valueDate, axisStart);
-    return Math.max(0, Math.min(100, days * 100 / totalDays));
-  }
-  static toWidthPercent(startDate, endDate, totalDays) {
-    const days = Math.max(0, diffCalendarDays(endDate, startDate));
-    return Math.max(0, Math.min(100, days * 100 / totalDays));
-  }
-}
-
-class RecordSchedulePlanner {
-  constructor(form, editor) {
-    this.form = form;
-    this.editor = editor;
-    this.startInput = form.querySelector('input[name="DatumZalozeni"]');
-    this.deadlineInput = form.querySelector('input[name="TerminUkonceni"]');
-    this.summaryDeadline = editor.querySelector("[data-schedule-summary-deadline]");
-    this.summaryBaseline = editor.querySelector("[data-schedule-summary-baseline]");
-    this.summaryShifted = editor.querySelector("[data-schedule-summary-shifted]");
-    this.summaryDuration = editor.querySelector("[data-schedule-summary-duration]");
-    this.summaryDelay = editor.querySelector("[data-schedule-summary-delay]");
-    this.summaryState = editor.querySelector("[data-schedule-summary-state]");
-    this.summaryOverrun = editor.querySelector("[data-schedule-summary-overrun]");
-    this.statusLine = editor.querySelector(".schedule-status-line");
-    this.timelineAxes = Array.from(editor.querySelectorAll("[data-schedule-axis]")).filter((node) => node instanceof HTMLElement);
-    this.ganttTodayMarkers = Array.from(editor.querySelectorAll("[data-schedule-gantt-today]")).filter((node) => node instanceof HTMLElement);
-    this.ganttDeadlineMarkers = Array.from(editor.querySelectorAll("[data-schedule-gantt-deadline]")).filter((node) => node instanceof HTMLElement);
-    this.ganttPlannedSegments = Array.from(editor.querySelectorAll("[data-schedule-gantt-step-planned]")).filter((node) => node instanceof HTMLElement);
-    this.ganttActualSegments = Array.from(editor.querySelectorAll("[data-schedule-gantt-step-actual]")).filter((node) => node instanceof HTMLElement);
-    this.rows = Array.from(editor.querySelectorAll("[data-schedule-step-row]")).filter((row) => row instanceof HTMLTableRowElement).map((row, index) => ({
-      row,
-      index,
-      durationInput: row.querySelector("[data-schedule-duration]"),
-      delayInput: row.querySelector("[data-schedule-delay]"),
-      dateInput: row.querySelector("[data-schedule-date]"),
-      delayDateInput: row.querySelector("[data-schedule-delay-date]"),
-      baselineCell: row.querySelector("[data-schedule-baseline]"),
-      shiftedCell: row.querySelector("[data-schedule-shifted]"),
-      durationInc: row.querySelector("[data-schedule-duration-inc]"),
-      durationDec: row.querySelector("[data-schedule-duration-dec]"),
-      delayInc: row.querySelector("[data-schedule-delay-inc]"),
-      delayDec: row.querySelector("[data-schedule-delay-dec]")
-    }));
-  }
-  isReady() {
-    return this.form instanceof HTMLFormElement && this.editor instanceof HTMLElement && this.startInput instanceof HTMLInputElement && this.rows.length > 0;
-  }
-  readState() {
-    return this.rows.map((entry) => {
-      const duration = this.normalizeInt(entry.durationInput);
-      const delay = this.normalizeSignedInt(entry.delayInput);
-      return { duration, delay };
-    });
-  }
-  writeState(state) {
-    state.forEach((item, index) => {
-      const entry = this.rows[index];
-      if (!entry) {
+  collectSegmentMap(selector) {
+    const segments = new Map;
+    this.root.querySelectorAll(selector).forEach((node) => {
+      if (!(node instanceof HTMLElement)) {
         return;
       }
-      if (entry.durationInput instanceof HTMLInputElement) {
-        entry.durationInput.value = String(item.duration);
+      const stepIndex = Number.parseInt(node.dataset.stepIndex || "", 10);
+      if (!Number.isInteger(stepIndex)) {
+        return;
       }
-      if (entry.delayInput instanceof HTMLInputElement) {
-        entry.delayInput.value = String(item.delay);
-      }
+      segments.set(stepIndex, node);
     });
+    return segments;
   }
-  getStartDate() {
-    if (!(this.startInput instanceof HTMLInputElement)) {
-      return new Date;
-    }
-    return parseIsoDate(this.startInput.value) || new Date;
-  }
-  getDeadlineDate(startDate) {
-    if (!(this.deadlineInput instanceof HTMLInputElement)) {
-      return startDate;
-    }
-    return parseIsoDate(this.deadlineInput.value) || startDate;
+  isReady() {
+    return this.root instanceof HTMLElement && (this.editorRows.length > 0 || this.breakdownRows.length > 0);
   }
   normalizeInt(input) {
-    return this.normalizeIntWithMinimum(input, 0);
+    if (!(input instanceof HTMLInputElement)) {
+      return 0;
+    }
+    const parsed = Number.parseInt((input.value || "").trim(), 10);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
   }
   normalizeSignedInt(input) {
     if (!(input instanceof HTMLInputElement)) {
       return 0;
     }
     const parsed = Number.parseInt((input.value || "").trim(), 10);
-    if (!Number.isFinite(parsed)) {
-      return 0;
-    }
-    return parsed;
-  }
-  normalizeIntWithMinimum(input, minimum) {
-    if (!(input instanceof HTMLInputElement)) {
-      return Math.max(minimum, 0);
-    }
-    const parsed = Number.parseInt((input.value || "").trim(), 10);
-    if (!Number.isFinite(parsed)) {
-      return Math.max(minimum, 0);
-    }
-    return Math.max(minimum, parsed);
+    return Number.isFinite(parsed) ? parsed : 0;
   }
   setDateInputValue(input, value) {
     if (!(input instanceof HTMLInputElement)) {
       return;
     }
-    const isoValue = formatIsoDate(value);
-    input.value = isoValue;
+    input.value = formatIsoDate(value);
     const dateField = input.closest("[data-app-date-field]");
     if (!(dateField instanceof HTMLElement)) {
       return;
@@ -3026,54 +3120,112 @@ class RecordSchedulePlanner {
       display.value = formatDisplayDate(value);
     }
   }
-  computePlanAndActual(state, startDate) {
-    return ScheduleTimelineEngine.computePlanAndActual(state, startDate);
-  }
-  recalcFromDuration(stepIndex) {
-    if (!Number.isInteger(stepIndex) || stepIndex < 0) {
-      this.recalcAll();
-      return;
+  getStartDate() {
+    if (this.startInput instanceof HTMLInputElement) {
+      return parseIsoDate(this.startInput.value) || new Date;
     }
+    return parseIsoDate(this.root.dataset.scheduleStart) || new Date;
+  }
+  getDeadlineDate(startDate) {
+    if (this.deadlineInput instanceof HTMLInputElement) {
+      return parseIsoDate(this.deadlineInput.value) || startDate;
+    }
+    return parseIsoDate(this.root.dataset.scheduleDeadline) || startDate;
+  }
+  readState() {
+    if (this.editorRows.length > 0) {
+      return this.editorRows.map((entry) => ({
+        stepIndex: entry.stepIndex,
+        name: String(entry.row.dataset.stepName || "").trim(),
+        color: String(entry.row.dataset.stepColor || "").trim(),
+        duration: this.normalizeInt(entry.durationInput),
+        delay: this.normalizeSignedInt(entry.delayInput)
+      }));
+    }
+    return this.breakdownRows.map((entry) => ({
+      stepIndex: entry.stepIndex,
+      name: String(entry.row.dataset.stepName || "").trim(),
+      color: String(entry.row.dataset.stepColor || "").trim(),
+      duration: Math.max(0, Number.parseInt(entry.row.dataset.stepDuration || "0", 10) || 0),
+      delay: Number.parseInt(entry.row.dataset.stepDelay || "0", 10) || 0
+    }));
+  }
+  writeState(state) {
+    state.forEach((item, index) => {
+      const entry = this.editorRows[index];
+      if (!entry) {
+        return;
+      }
+      if (entry.durationInput instanceof HTMLInputElement) {
+        entry.durationInput.value = String(item.duration);
+      }
+      if (entry.delayInput instanceof HTMLInputElement) {
+        entry.delayInput.value = String(item.delay);
+      }
+      entry.row.dataset.stepDuration = String(item.duration);
+      entry.row.dataset.stepDelay = String(item.delay);
+    });
+  }
+  recalcFromDuration() {
     this.recalcAll();
   }
-  recalcFromDelay(stepIndex) {
-    if (!Number.isInteger(stepIndex) || stepIndex < 0) {
-      this.recalcAll();
-      return;
-    }
+  recalcFromDelay() {
     this.recalcAll();
   }
   recalcFromDate(stepIndex) {
-    const entry = this.rows[stepIndex];
+    const entry = this.editorRows[stepIndex];
     if (!entry || !(entry.dateInput instanceof HTMLInputElement)) {
       this.recalcAll();
       return;
     }
     const state = this.readState();
     const startDate = this.getStartDate();
-    const { plan } = this.computePlanAndActual(state, startDate);
+    const { plan } = buildSchedulePlanAndActual(state, startDate);
     const previousPlanEnd = stepIndex === 0 ? startDate : plan[stepIndex - 1]?.end || startDate;
     const selectedDate = parseIsoDate(entry.dateInput.value) || previousPlanEnd;
-    const computedDuration = Math.max(0, diffCalendarDays(selectedDate, previousPlanEnd));
-    state[stepIndex] = { ...state[stepIndex], duration: computedDuration };
+    state[stepIndex] = { ...state[stepIndex], duration: Math.max(0, diffCalendarDays(selectedDate, previousPlanEnd)) };
     this.writeState(state);
     this.recalcAll();
   }
   recalcFromDelayDate(stepIndex) {
-    const entry = this.rows[stepIndex];
+    const entry = this.editorRows[stepIndex];
     if (!entry || !(entry.delayDateInput instanceof HTMLInputElement)) {
       this.recalcAll();
       return;
     }
     const state = this.readState();
     const startDate = this.getStartDate();
-    const { plan } = this.computePlanAndActual(state, startDate);
+    const { plan } = buildSchedulePlanAndActual(state, startDate);
     const planEnd = plan[stepIndex]?.end || startDate;
     const selectedDate = parseIsoDate(entry.delayDateInput.value) || planEnd;
-    const computedDelay = diffCalendarDays(selectedDate, planEnd);
-    state[stepIndex] = { ...state[stepIndex], delay: computedDelay };
+    state[stepIndex] = { ...state[stepIndex], delay: diffCalendarDays(selectedDate, planEnd) };
     this.writeState(state);
     this.recalcAll();
+  }
+  setAxisRange(axis, startDate, endDate) {
+    if (!(axis instanceof HTMLElement) || !(startDate instanceof Date) || !(endDate instanceof Date)) {
+      return;
+    }
+    axis.dataset.axisStart = formatIsoDate(startDate);
+    axis.dataset.axisEnd = formatIsoDate(endDate);
+    renderTimelineAxis(axis, startDate, endDate);
+  }
+  applySegmentLayout(segment, leftPercent, widthPercent, title) {
+    if (!(segment instanceof HTMLElement)) {
+      return;
+    }
+    segment.style.left = formatSchedulePercent(leftPercent);
+    segment.style.width = formatScheduleSegmentWidth(widthPercent);
+    if (title) {
+      segment.title = title;
+    }
+  }
+  resetSegmentLayout(segment) {
+    if (!(segment instanceof HTMLElement)) {
+      return;
+    }
+    segment.style.left = "0%";
+    segment.style.width = "0%";
   }
   renderSummary(plan, actual, state, startDate, deadlineDate) {
     const baselineEnd = plan.length > 0 ? plan[plan.length - 1].end : startDate;
@@ -3101,87 +3253,158 @@ class RecordSchedulePlanner {
       this.summaryState.textContent = stihame ? "Stíháme" : "Nestíháme";
     }
     if (this.summaryOverrun instanceof HTMLElement) {
-      this.summaryOverrun.textContent = stihame ? "" : `(+${overrunDays} dnů)`;
+      this.summaryOverrun.textContent = this.mode === "record-editor" ? stihame ? "" : `(+${overrunDays} dnů)` : `${overrunDays} dnů`;
     }
     if (this.statusLine instanceof HTMLElement) {
       this.statusLine.classList.toggle("ok", stihame);
       this.statusLine.classList.toggle("late", !stihame);
     }
-    this.renderMiniGantt(plan, actual, startDate, deadlineDate);
   }
-  renderMiniGantt(plan, actual, startDate, deadlineDate) {
+  renderOverview(plan, actual, state, startDate, deadlineDate) {
     const actualEnd = actual.length > 0 ? actual[actual.length - 1].end : startDate;
-    const { totalDays, axisEndDate } = ScheduleTimelineEngine.buildScale(startDate, deadlineDate, actualEnd);
+    const { totalDays, axisEndDate } = buildScheduleScale(startDate, deadlineDate, actualEnd);
     const today = new Date;
     const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const todayPercent = ScheduleTimelineEngine.toPercent(todayDate, startDate, totalDays);
-    const deadlinePercent = ScheduleTimelineEngine.toPercent(deadlineDate, startDate, totalDays);
-    const formatPercent = (value) => `${Number.isFinite(value) ? value.toFixed(4) : "0.0000"}%`;
-    const formatSegmentWidth = (value) => {
-      if (!Number.isFinite(value) || value <= 0) {
-        return "0%";
-      }
-      return `calc(${value.toFixed(4)}% + 1px)`;
-    };
-    const renderContinuousSegments = (segments, items) => {
-      let previousRight = 0;
-      segments.forEach((segment, index) => {
-        const item = items[index];
-        if (!item) {
-          segment.style.left = "0%";
-          segment.style.width = "0%";
-          return;
-        }
-        const rawLeft = ScheduleTimelineEngine.toPercent(item.start, startDate, totalDays);
-        const rawRight = ScheduleTimelineEngine.toPercent(item.end, startDate, totalDays);
-        const left = index === 0 ? rawLeft : Math.max(previousRight, rawLeft);
-        const right = Math.max(left, rawRight);
-        const width = Math.max(0, right - left);
-        segment.style.left = formatPercent(left);
-        segment.style.width = formatSegmentWidth(width);
-        previousRight = right;
-      });
-    };
-    this.ganttTodayMarkers.forEach((marker) => {
-      marker.style.left = formatPercent(todayPercent);
+    const todayPercent = toSchedulePercent(todayDate, startDate, totalDays);
+    const deadlinePercent = toSchedulePercent(deadlineDate, startDate, totalDays);
+    this.overviewTodayMarkers.forEach((marker) => {
+      marker.style.left = formatSchedulePercent(todayPercent);
       marker.title = `Dnes: ${formatDisplayDate(todayDate)}`;
     });
-    this.ganttDeadlineMarkers.forEach((marker) => {
-      marker.style.left = formatPercent(deadlinePercent);
+    this.overviewDeadlineMarkers.forEach((marker) => {
+      marker.style.left = formatSchedulePercent(deadlinePercent);
       marker.title = `Termín úkolu: ${formatDisplayDate(deadlineDate)}`;
     });
-    this.timelineAxes.forEach((axis) => {
-      renderTimelineAxis(axis, startDate, axisEndDate);
+    this.setAxisRange(this.overviewAxis, startDate, axisEndDate);
+    let previousPlanRight = 0;
+    let previousActualRight = 0;
+    let skippedCompactActualWidth = 0;
+    state.forEach((item, index) => {
+      const planItem = plan[index];
+      const actualItem = actual[index];
+      const plannedSegment = this.overviewPlannedSegments.get(item.stepIndex);
+      const actualSegment = this.overviewActualSegments.get(item.stepIndex);
+      if (!planItem || !actualItem) {
+        this.resetSegmentLayout(plannedSegment);
+        this.resetSegmentLayout(actualSegment);
+        return;
+      }
+      const rawPlanLeft = toSchedulePercent(planItem.start, startDate, totalDays);
+      const rawPlanRight = toSchedulePercent(planItem.end, startDate, totalDays);
+      const rawActualLeft = toSchedulePercent(actualItem.start, startDate, totalDays);
+      const rawActualRight = toSchedulePercent(actualItem.end, startDate, totalDays);
+      if (item.duration > 0) {
+        const planLeft = Math.max(previousPlanRight, rawPlanLeft);
+        const planRight = Math.max(planLeft, rawPlanRight);
+        const planWidth = Math.max(0, planRight - planLeft);
+        this.applySegmentLayout(plannedSegment, planLeft, planWidth, `${item.name}: plán ${formatDisplayDate(planItem.start)} - ${formatDisplayDate(planItem.end)}`);
+        previousPlanRight = planRight;
+        const adjustedActualLeft = Math.max(0, rawActualLeft - skippedCompactActualWidth);
+        const adjustedActualRight = Math.max(adjustedActualLeft, rawActualRight - skippedCompactActualWidth);
+        const actualLeft = Math.max(previousActualRight, adjustedActualLeft);
+        const actualRight = Math.max(actualLeft, adjustedActualRight);
+        const actualWidth = Math.max(0, actualRight - actualLeft);
+        this.applySegmentLayout(actualSegment, actualLeft, actualWidth, `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)} - ${formatDisplayDate(actualItem.end)}`);
+        previousActualRight = actualRight;
+      } else {
+        skippedCompactActualWidth += Math.max(0, rawActualRight - rawActualLeft);
+        this.resetSegmentLayout(plannedSegment);
+        this.resetSegmentLayout(actualSegment);
+      }
     });
-    renderContinuousSegments(this.ganttPlannedSegments, plan);
-    renderContinuousSegments(this.ganttActualSegments, actual);
-    queueRainbowSegmentRender(this.editor);
   }
-  renderStepRows(plan, actual, state) {
-    this.rows.forEach((entry, index) => {
+  resolveBreakdownAxis(plan, actual, startDate, deadlineDate) {
+    const dates = [];
+    plan.forEach((item) => {
+      dates.push(item.start, item.end);
+    });
+    actual.forEach((item) => {
+      dates.push(item.start, item.end);
+    });
+    if (dates.length === 0) {
+      return {
+        axisStart: startDate,
+        axisEnd: deadlineDate
+      };
+    }
+    const sorted = dates.slice().sort((left, right) => left.getTime() - right.getTime());
+    const axisStart = sorted[0];
+    const latest = sorted[sorted.length - 1];
+    const axisEnd = latest.getTime() > deadlineDate.getTime() ? latest : deadlineDate;
+    return {
+      axisStart,
+      axisEnd
+    };
+  }
+  renderBreakdown(plan, actual, state, startDate, deadlineDate) {
+    if (this.breakdownRows.length === 0) {
+      return;
+    }
+    const { axisStart, axisEnd } = this.resolveBreakdownAxis(plan, actual, startDate, deadlineDate);
+    const totalDays = Math.max(1, diffCalendarDays(axisEnd, axisStart));
+    const today = new Date;
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayPercent = toSchedulePercent(todayDate, axisStart, totalDays);
+    this.setAxisRange(this.breakdownAxis, axisStart, axisEnd);
+    this.breakdownRows.forEach((entry, index) => {
+      const item = state[index];
+      const planItem = plan[index];
+      const actualItem = actual[index];
+      if (!item || !planItem || !actualItem) {
+        return;
+      }
+      if (entry.offset instanceof HTMLElement) {
+        entry.offset.textContent = formatScheduleOffsetLabel(item.delay);
+        entry.offset.classList.toggle("late", item.delay > 0);
+        entry.offset.classList.toggle("ahead", item.delay < 0);
+      }
+      if (entry.todayMarker instanceof HTMLElement) {
+        entry.todayMarker.style.left = formatSchedulePercent(todayPercent);
+        entry.todayMarker.title = `Dnes: ${formatDisplayDate(todayDate)}`;
+      }
+      if (item.duration <= 0) {
+        this.resetSegmentLayout(entry.plannedSegment);
+        this.resetSegmentLayout(entry.actualSegment);
+        return;
+      }
+      const plannedLeft = toSchedulePercent(planItem.start, axisStart, totalDays);
+      const plannedWidth = toScheduleWidthPercent(planItem.start, planItem.end, totalDays);
+      this.applySegmentLayout(entry.plannedSegment, plannedLeft, plannedWidth, `${item.name}: plán ${formatDisplayDate(planItem.start)} - ${formatDisplayDate(planItem.end)}`);
+      const actualLeft = toSchedulePercent(actualItem.start, axisStart, totalDays);
+      const actualWidth = toScheduleWidthPercent(actualItem.start, actualItem.end, totalDays);
+      this.applySegmentLayout(entry.actualSegment, actualLeft, actualWidth, `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)} - ${formatDisplayDate(actualItem.end)}`);
+      if (entry.actualSegment instanceof HTMLElement) {
+        entry.actualSegment.style.setProperty("--schedule-actual-color", this.delayColor);
+      }
+    });
+  }
+  renderEditorRows(plan, actual) {
+    this.editorRows.forEach((entry, index) => {
       const planEnd = plan[index]?.end;
       const actualEnd = actual[index]?.end;
-      if (entry.baselineCell instanceof HTMLElement && planEnd instanceof Date) {
-        entry.baselineCell.textContent = formatDisplayDate(planEnd);
-      }
-      if (entry.shiftedCell instanceof HTMLElement && actualEnd instanceof Date) {
-        entry.shiftedCell.textContent = formatDisplayDate(actualEnd);
-      }
       if (entry.dateInput instanceof HTMLInputElement && planEnd instanceof Date) {
         this.setDateInputValue(entry.dateInput, planEnd);
       }
       if (entry.delayDateInput instanceof HTMLInputElement && actualEnd instanceof Date) {
         this.setDateInputValue(entry.delayDateInput, actualEnd);
       }
+      entry.row.dataset.stepDuration = String(this.normalizeInt(entry.durationInput));
+      entry.row.dataset.stepDelay = String(this.normalizeSignedInt(entry.delayInput));
     });
   }
   recalcAll() {
     const state = this.readState();
+    if (state.length === 0) {
+      return;
+    }
     const startDate = this.getStartDate();
     const deadlineDate = this.getDeadlineDate(startDate);
-    const { plan, actual } = this.computePlanAndActual(state, startDate);
-    this.renderStepRows(plan, actual, state);
+    const { plan, actual } = buildSchedulePlanAndActual(state, startDate);
+    this.renderEditorRows(plan, actual);
     this.renderSummary(plan, actual, state, startDate, deadlineDate);
+    this.renderOverview(plan, actual, state, startDate, deadlineDate);
+    this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
+    queueRainbowSegmentRender(this.root);
   }
   bindNumericStepper(button, input, delta, onChange) {
     if (!(button instanceof HTMLButtonElement) || !(input instanceof HTMLInputElement)) {
@@ -3228,7 +3451,7 @@ class RecordSchedulePlanner {
         }, repeatIntervalMs);
       }, repeatDelayMs);
     });
-    button.addEventListener("click", (event) => {
+    button.addEventListener("click", () => {
       if (suppressClickOnce) {
         suppressClickOnce = false;
         return;
@@ -3249,7 +3472,10 @@ class RecordSchedulePlanner {
     });
   }
   bind() {
-    this.rows.forEach((entry, index) => {
+    if (this.mode !== "record-editor") {
+      return;
+    }
+    this.editorRows.forEach((entry, index) => {
       if (entry.durationInput instanceof HTMLInputElement) {
         entry.durationInput.addEventListener("input", () => this.recalcFromDuration(index));
         entry.durationInput.addEventListener("change", () => {
@@ -3283,6 +3509,39 @@ class RecordSchedulePlanner {
     }
   }
 }
+function initScheduleBlockRenderers(scope) {
+  const root = scope instanceof HTMLElement || scope instanceof Document ? scope : document;
+  const blocks = [];
+  if (scope instanceof HTMLElement && scope.matches("[data-schedule-block]")) {
+    blocks.push(scope);
+  }
+  root.querySelectorAll("[data-schedule-block]").forEach((block) => {
+    if (block instanceof HTMLElement) {
+      blocks.push(block);
+    }
+  });
+  blocks.forEach((block) => {
+    if (!(block instanceof HTMLElement)) {
+      return;
+    }
+    if (block._scheduleRenderer instanceof ScheduleBlockRenderer) {
+      block._scheduleRenderer.recalcAll();
+      return;
+    }
+    const form = block.closest('form[data-record-editor-form="true"]');
+    const renderer = new ScheduleBlockRenderer(block, { form });
+    if (!renderer.isReady()) {
+      return;
+    }
+    renderer.bind();
+    renderer.recalcAll();
+    block._scheduleRenderer = renderer;
+    if (form instanceof HTMLFormElement && renderer.mode === "record-editor") {
+      form._recordSchedulePlanner = renderer;
+      form.dataset.recordScheduleReady = "true";
+    }
+  });
+}
 function initRecordSchedulePlanner(scope) {
   if (!(scope instanceof HTMLElement || scope instanceof Document)) {
     return;
@@ -3297,22 +3556,15 @@ function initRecordSchedulePlanner(scope) {
     }
   });
   forms.forEach((form) => {
-    if (!(form instanceof HTMLFormElement) || form.dataset.recordScheduleReady === "true") {
+    if (!(form instanceof HTMLFormElement)) {
       return;
     }
-    const editor = form.querySelector("[data-record-schedule-editor]");
+    const editor = form.querySelector('[data-schedule-block][data-schedule-mode="record-editor"]');
     const schedulePanel = form.querySelector("[data-record-schedule-panel]");
     if (!(editor instanceof HTMLElement) || schedulePanel instanceof HTMLElement && schedulePanel.dataset.scheduleDisabled === "true") {
       return;
     }
-    const planner = new RecordSchedulePlanner(form, editor);
-    if (!planner.isReady()) {
-      return;
-    }
-    planner.bind();
-    planner.recalcAll();
-    form._recordSchedulePlanner = planner;
-    form.dataset.recordScheduleReady = "true";
+    initScheduleBlockRenderers(editor);
     queueRecordSchedulePlannerRecalc(form, 0);
   });
 }
@@ -3328,6 +3580,7 @@ function initProjectScheduleUi() {
   }
   restoreScheduleFilterState();
   setProjectFilterSaveStatus("schedule", "");
+  initScheduleBlockRenderers(schedulePanel);
   applyProjectScheduleFilters();
   renderStaticTimelineAxes(schedulePanel);
   queueRainbowSegmentRender(schedulePanel);

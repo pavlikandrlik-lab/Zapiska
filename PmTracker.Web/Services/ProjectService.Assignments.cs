@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
@@ -94,7 +95,9 @@ public sealed partial class ProjectService
     public async Task AssignProjectSubsystemAsync(AssignProjectSubsystemCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
         var subsystemId = await ResolveSubsystemIdAsync(command.SubsystemKod, ct);
-        var exists = await dbContext.ProjektSubsystemy.AsNoTracking()
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+
+        var exists = await dbContext.ProjektSubsystemy
             .AnyAsync(x => x.ProjektId == command.ProjektId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue, ct);
         if (exists)
         {
@@ -105,11 +108,59 @@ public sealed partial class ProjectService
         {
             ProjektId = command.ProjektId,
             SubsystemId = subsystemId,
+            Poradi = await ResolveNextProjectSubsystemOrderAsync(command.ProjektId, ct),
             DatumPrirazeni = DateTime.UtcNow
         };
         dbContext.ProjektSubsystemy.Add(entity);
         await dbContext.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         await WriteAuditAsync(currentUser.OsobaId, "projekt_subsystemy", entity.Id.ToString(CultureInfo.InvariantCulture), "create", null, JsonSerializer.Serialize(entity), ct);
+    }
+
+    public async Task ReorderProjectSubsystemAsync(ReorderProjectSubsystemCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+    {
+        var direction = NormalizeProjectSubsystemReorderDirection(command.Direction);
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var activeSubsystems = await dbContext.ProjektSubsystemy
+            .Where(x => x.ProjektId == command.ProjektId && !x.DatumOdebrani.HasValue)
+            .OrderBy(x => x.Poradi)
+            .ThenBy(x => x.Id)
+            .ToListAsync(ct);
+
+        var currentIndex = activeSubsystems.FindIndex(x => x.Id == command.ProjektSubsystemId);
+        if (currentIndex < 0)
+        {
+            throw new InvalidOperationException("Projektový subsystém nebyl nalezen.");
+        }
+
+        var targetIndex = string.Equals(direction, ProjectSubsystemReorderDirections.Up, StringComparison.Ordinal)
+            ? currentIndex - 1
+            : currentIndex + 1;
+        if (targetIndex < 0 || targetIndex >= activeSubsystems.Count)
+        {
+            await transaction.CommitAsync(ct);
+            return;
+        }
+
+        var current = activeSubsystems[currentIndex];
+        var target = activeSubsystems[targetIndex];
+        var currentOld = JsonSerializer.Serialize(current);
+        var targetOld = JsonSerializer.Serialize(target);
+        var currentOrder = current.Poradi;
+        var targetOrder = target.Poradi;
+        var temporaryOrder = activeSubsystems.Max(x => x.Poradi) + 1;
+
+        current.Poradi = temporaryOrder;
+        await dbContext.SaveChangesAsync(ct);
+
+        target.Poradi = currentOrder;
+        current.Poradi = targetOrder;
+        await dbContext.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        await WriteAuditAsync(currentUser.OsobaId, "projekt_subsystemy", current.Id.ToString(CultureInfo.InvariantCulture), "reorder", currentOld, JsonSerializer.Serialize(current), ct);
+        await WriteAuditAsync(currentUser.OsobaId, "projekt_subsystemy", target.Id.ToString(CultureInfo.InvariantCulture), "reorder", targetOld, JsonSerializer.Serialize(target), ct);
     }
 
     public async Task DeactivateProjectSubsystemAsync(DeactivateProjectSubsystemCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -263,6 +314,21 @@ public sealed partial class ProjectService
                 && !x.role.DatumOdebrani.HasValue
                 && !x.projectSubsystem.DatumOdebrani.HasValue,
                 ct);
+    }
+
+    private static string NormalizeProjectSubsystemReorderDirection(string? direction)
+    {
+        if (string.Equals(direction, ProjectSubsystemReorderDirections.Up, StringComparison.OrdinalIgnoreCase))
+        {
+            return ProjectSubsystemReorderDirections.Up;
+        }
+
+        if (string.Equals(direction, ProjectSubsystemReorderDirections.Down, StringComparison.OrdinalIgnoreCase))
+        {
+            return ProjectSubsystemReorderDirections.Down;
+        }
+
+        throw new InvalidOperationException("Neplatný směr přesunu subsystému.");
     }
 
 }

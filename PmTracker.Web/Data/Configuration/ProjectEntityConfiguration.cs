@@ -47,9 +47,14 @@ internal sealed class ProjectSubsystemEntityConfiguration : IEntityTypeConfigura
             .IsUnique()
             .HasFilter("[datum_odebrani] IS NULL")
             .HasDatabaseName("UX_projekt_subsystemy_projekt_subsystem_aktivni");
+        builder.HasIndex(x => new { x.ProjektId, x.Poradi })
+            .IsUnique()
+            .HasFilter("[datum_odebrani] IS NULL")
+            .HasDatabaseName("UX_projekt_subsystemy_projekt_poradi_aktivni");
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.ProjektId).HasColumnName("projekt_id");
         builder.Property(x => x.SubsystemId).HasColumnName("subsystem_id");
+        builder.Property(x => x.Poradi).HasColumnName("poradi");
         builder.Property(x => x.DatumPrirazeni).HasColumnName("datum_prirazeni");
         builder.Property(x => x.DatumOdebrani).HasColumnName("datum_odebrani");
     }

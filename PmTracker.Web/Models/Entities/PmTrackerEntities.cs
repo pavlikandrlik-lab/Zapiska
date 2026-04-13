@@ -167,6 +167,7 @@ public sealed class ProjektSubsystemEntity
     public int Id { get; set; }
     public int ProjektId { get; set; }
     public int SubsystemId { get; set; }
+    public int Poradi { get; set; }
     public DateTime DatumPrirazeni { get; set; }
     public DateTime? DatumOdebrani { get; set; }
 }

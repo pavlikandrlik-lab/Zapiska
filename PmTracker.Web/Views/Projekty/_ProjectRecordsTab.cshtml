@@ -68,6 +68,15 @@
                     </select>
                 </label>
                 <label>
+                    Řadit podle
+                    <select data-filter-key="sortBy">
+                        <option value="project-asc" selected="selected">podle pořadí projektu vzestupně</option>
+                        <option value="project-desc">podle pořadí projektu sestupně</option>
+                        <option value="alpha-asc">abecedně vzestupně (A-Z)</option>
+                        <option value="alpha-desc">abecedně sestupně (Z-A)</option>
+                    </select>
+                </label>
+                <label>
                     Kategorie
                     <select data-filter-key="kategorie">
                         <option value="">Vše</option>
@@ -151,7 +160,10 @@
             {
                 <div class="subsystem-group"
                      data-subsystem-group
-                     data-subsystem-name="@skupina.Nazev">
+                     data-subsystem-name="@skupina.Nazev"
+                     data-subsystem-kod="@skupina.Kod"
+                     data-subsystem-order="@skupina.Poradi"
+                     data-subsystem-order-active="@skupina.HasProjectOrder.ToString().ToLowerInvariant()">
                     <h3>@skupina.Nazev</h3>
                     <div class="card-list">
                         @foreach (var zaznam in skupina.Zaznamy)
