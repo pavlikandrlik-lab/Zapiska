@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Web.Services;
 
@@ -150,6 +151,9 @@ public sealed partial class ProjectService
             BaselineDatum = krok.BaselineDatum,
             SkutecneDatum = krok.PosunuteDatum
         }).ToList();
+        var pendingScheduleProposalLock = !isCreate
+            ? await pendingScheduleProposalLockEvaluator.EvaluateAsync(record.Id, ct)
+            : new PendingScheduleProposalLockState(false, null, null);
 
         return new ZaznamEditViewModel
         {
@@ -198,13 +202,19 @@ public sealed partial class ProjectService
                 harmonogramSchema.DelayBarvaHex,
                 harmonogramSouhrn,
                 harmonogramBlokKroky,
-                editorJeUkolKategorie: isTaskCategory),
+                editorJeUkolKategorie: isTaskCategory,
+                editorPlanFieldsLocked: pendingScheduleProposalLock.HasPendingProposal),
             DostupniVlastnici = ownerCandidates,
             DostupniSpolupracovnici = collaborationCandidates,
             VybraniSpolupracovniciIds = selectedCollaborationIds,
             ExterniVazby = externalLinks,
             TypyExternichOdkazu = extTypes.Select(x => x.Kod).ToList(),
-            Vyzvy = vyzvyById.Values.ToList()
+            Vyzvy = vyzvyById.Values.ToList(),
+            ModalTitle = isCreate ? "Nový projektový záznam" : $"Upravit záznam #{ResolveVisibleRecordNumber(record)}",
+            PrimaryActionLabel = isCreate ? "Založit záznam" : "Uložit",
+            HasPendingScheduleProposalLock = pendingScheduleProposalLock.HasPendingProposal,
+            PendingScheduleProposalId = pendingScheduleProposalLock.ProposalId,
+            PendingScheduleProposalMessage = pendingScheduleProposalLock.Message
         };
     }
 

@@ -70,6 +70,42 @@ internal sealed class RecordTypeChangeHistoryEntityConfiguration : IEntityTypeCo
     }
 }
 
+internal sealed class RecordProposalEntityConfiguration : IEntityTypeConfiguration<ZaznamNavrhEntity>
+{
+    public void Configure(EntityTypeBuilder<ZaznamNavrhEntity> builder)
+    {
+        builder.ToTable("zaznam_navrhy", table =>
+        {
+            table.HasCheckConstraint("CK_zaznam_navrhy_typ", "typ_navrhu IN ('CREATE_RECORD', 'SCHEDULE_PLAN_CHANGE')");
+            table.HasCheckConstraint("CK_zaznam_navrhy_stav", "stav IN ('PENDING', 'APPROVED', 'REJECTED')");
+        });
+
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).HasColumnName("id");
+        builder.Property(x => x.ProjektId).HasColumnName("projekt_id");
+        builder.Property(x => x.ZaznamId).HasColumnName("zaznam_id");
+        builder.Property(x => x.SubsystemId).HasColumnName("subsystem_id");
+        builder.Property(x => x.TypNavrhu).HasColumnName("typ_navrhu").HasMaxLength(64);
+        builder.Property(x => x.Stav).HasColumnName("stav").HasMaxLength(32);
+        builder.Property(x => x.PayloadJson).HasColumnName("payload_json");
+        builder.Property(x => x.CreatedByOsobaId).HasColumnName("created_by_osoba_id");
+        builder.Property(x => x.CreatedAt).HasColumnName("created_at");
+        builder.Property(x => x.DecidedByOsobaId).HasColumnName("decided_by_osoba_id");
+        builder.Property(x => x.DecidedAt).HasColumnName("decided_at");
+        builder.Property(x => x.ApprovedRecordId).HasColumnName("approved_record_id");
+        builder.Property(x => x.RowVersion).HasColumnName("row_version").IsRowVersion();
+
+        builder.HasIndex(x => new { x.ProjektId, x.CreatedAt })
+            .HasDatabaseName("IX_zaznam_navrhy_projekt_created_at");
+        builder.HasIndex(x => new { x.ZaznamId, x.TypNavrhu, x.Stav })
+            .HasDatabaseName("IX_zaznam_navrhy_zaznam_typ_stav");
+        builder.HasIndex(x => new { x.ZaznamId, x.TypNavrhu })
+            .HasFilter("[stav] = 'PENDING' AND [typ_navrhu] = 'SCHEDULE_PLAN_CHANGE'")
+            .HasDatabaseName("UX_zaznam_navrhy_pending_schedule_per_record")
+            .IsUnique();
+    }
+}
+
 internal sealed class RecordDeadlineHistoryEntityConfiguration : IEntityTypeConfiguration<ZaznamHistorieTerminuEntity>
 {
     public void Configure(EntityTypeBuilder<ZaznamHistorieTerminuEntity> builder)

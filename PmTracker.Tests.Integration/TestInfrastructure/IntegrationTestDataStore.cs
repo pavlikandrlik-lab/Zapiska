@@ -59,6 +59,9 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
     public ProjektTymTabViewModel BuildProjectTeamTab(int id)
         => services.GetRequiredService<IProjectService>().BuildProjectTeamTabAsync(id).GetAwaiter().GetResult();
 
+    public ProjektNavrhyTabViewModel BuildProjectProposalsTab(int id, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordProposalService>().BuildProjectProposalsTabAsync(id, currentUser).GetAwaiter().GetResult();
+
     public CiselnikDetailViewModel BuildCiselnikDetail(string id, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IDictionaryService>().BuildCiselnikDetailAsync(id, currentUser).GetAwaiter().GetResult();
 
@@ -77,8 +80,26 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
     public ZaznamEditViewModel BuildZaznamEdit(int id)
         => services.GetRequiredService<IRecordService>().BuildZaznamEditAsync(id).GetAwaiter().GetResult();
 
+    public ZaznamEditViewModel BuildCreateRecordProposalEditor(int projektId, CurrentUserContextViewModel currentUser, int? jednaniId = null)
+        => services.GetRequiredService<IRecordProposalService>().BuildCreateRecordProposalEditorAsync(projektId, currentUser, jednaniId).GetAwaiter().GetResult();
+
+    public ZaznamEditViewModel BuildScheduleProposalEditor(int projektId, int zaznamId, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordProposalService>().BuildScheduleProposalEditorAsync(projektId, zaznamId, currentUser).GetAwaiter().GetResult();
+
     public int SaveRecord(SaveRecordCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordService>().SaveRecordAsync(command, currentUser).GetAwaiter().GetResult();
+
+    public void SubmitCreateRecordProposal(SaveRecordCommand command, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordProposalService>().SubmitCreateRecordProposalAsync(command, currentUser).GetAwaiter().GetResult();
+
+    public void SubmitScheduleProposal(SaveRecordCommand command, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordProposalService>().SubmitScheduleProposalAsync(command, currentUser).GetAwaiter().GetResult();
+
+    public int? ApproveProposal(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordProposalService>().ApproveProposalAsync(command, currentUser).GetAwaiter().GetResult();
+
+    public void RejectProposal(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordProposalService>().RejectProposalAsync(command, currentUser).GetAwaiter().GetResult();
 
     public void DeleteRecord(DeleteRecordCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordService>().DeleteRecordAsync(command, currentUser).GetAwaiter().GetResult();

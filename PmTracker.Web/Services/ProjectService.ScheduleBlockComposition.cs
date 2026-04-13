@@ -14,7 +14,9 @@ public sealed partial class ProjectService
         IReadOnlyList<HarmonogramKrokEditViewModel> kroky,
         bool editorJeUkolKategorie = false,
         bool editorCanEditScheduleFull = false,
-        bool editorCanEditScheduleAddOnly = false)
+        bool editorCanEditScheduleAddOnly = false,
+        bool editorCanEditPlanOnly = false,
+        bool editorPlanFieldsLocked = false)
     {
         return new HarmonogramBlockViewModel
         {
@@ -27,7 +29,9 @@ public sealed partial class ProjectService
             Kroky = kroky,
             EditorJeUkolKategorie = editorJeUkolKategorie,
             EditorCanEditScheduleFull = editorCanEditScheduleFull,
-            EditorCanEditScheduleAddOnly = editorCanEditScheduleAddOnly
+            EditorCanEditScheduleAddOnly = editorCanEditScheduleAddOnly,
+            EditorCanEditPlanOnly = editorCanEditPlanOnly,
+            EditorPlanFieldsLocked = editorPlanFieldsLocked
         };
     }
 }

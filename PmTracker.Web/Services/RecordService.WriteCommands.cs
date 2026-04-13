@@ -3,10 +3,12 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Web.Services;
 
@@ -70,8 +72,12 @@ public sealed partial class RecordService
         var isTaskCategory = validation.IsTaskCategory;
         var project = validation.Project;
         var normalizedCollaborationIds = validation.NormalizedCollaborationIds;
+        var pendingScheduleProposalLock = validation.ExistingRecord is not null
+            ? await pendingScheduleProposalLockEvaluator.EvaluateAsync(validation.ExistingRecord.Id, ct)
+            : new PendingScheduleProposalLockState(false, null, null);
 
-        await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var (tx, ownsTransaction) = await BeginSerializableTransactionIfNeededAsync(ct);
+        await using var _ = tx;
 
         ProjektovyZaznamEntity entity;
         if (command.Id.HasValue)
@@ -95,7 +101,9 @@ public sealed partial class RecordService
             entity.Popis = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription;
             entity.VlastnikId = ownerId;
             entity.DatumZalozeni = command.DatumZalozeni.Date;
-            entity.DatumUkonceni = command.TerminUkonceni.Date;
+            entity.DatumUkonceni = pendingScheduleProposalLock.HasPendingProposal
+                ? entity.DatumUkonceni.Date
+                : command.TerminUkonceni.Date;
             entity.SubsystemId = subsystemId;
             if (string.IsNullOrWhiteSpace(entity.CisloViditelne))
             {
@@ -231,7 +239,10 @@ public sealed partial class RecordService
         if (isTaskCategory && command.HarmonogramHodnoty.Count > 0)
         {
             var scheduleTypeDefinitions = await composition.ResolveScheduleTypeDefinitionsForRecordAsync(entity, ct);
-            normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, ct);
+            var valuesToPersist = pendingScheduleProposalLock.HasPendingProposal
+                ? await BuildScheduleValuesPreservingPlanAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, ct)
+                : command.HarmonogramHodnoty;
+            normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, ct);
         }
         else if (!isTaskCategory)
         {
@@ -246,7 +257,10 @@ public sealed partial class RecordService
         }
 
         await dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        if (ownsTransaction && tx is not null)
+        {
+            await tx.CommitAsync(ct);
+        }
 
         await WriteAuditAsync(currentUser.OsobaId, "projektove_zaznamy", entity.Id.ToString(CultureInfo.InvariantCulture), command.Id.HasValue ? "update" : "create", null, JsonSerializer.Serialize(entity), ct);
         if (normalizedScheduleValues is not null)
@@ -1224,10 +1238,20 @@ public sealed partial class RecordService
             ? command.HarmonogramHodnoty
             : await BuildScheduleValuesForAddOnlyAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, ct);
 
-        await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var pendingScheduleProposalLock = await pendingScheduleProposalLockEvaluator.EvaluateAsync(entity.Id, ct);
+        if (pendingScheduleProposalLock.HasPendingProposal)
+        {
+            valuesToPersist = await BuildScheduleValuesPreservingPlanAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, ct);
+        }
+
+        var (tx, ownsTransaction) = await BeginSerializableTransactionIfNeededAsync(ct);
+        await using var _ = tx;
         var normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, ct);
         await dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        if (ownsTransaction && tx is not null)
+        {
+            await tx.CommitAsync(ct);
+        }
 
         await WriteAuditAsync(
             currentUser.OsobaId,
@@ -1354,6 +1378,77 @@ public sealed partial class RecordService
             .ToList();
     }
 
+    private async Task<List<SaveRecordHarmonogramValueCommand>> BuildScheduleValuesPreservingPlanAsync(
+        int zaznamId,
+        IReadOnlyList<SaveRecordHarmonogramValueCommand> submittedValues,
+        IReadOnlyList<RecordScheduleTypeDefinition> scheduleTypeDefinitions,
+        CancellationToken ct)
+    {
+        if (scheduleTypeDefinitions.Count == 0)
+        {
+            return [];
+        }
+
+        var durationTypeIds = scheduleTypeDefinitions
+            .Select(x => x.DurationTypeId)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToList();
+        var delayTypeIds = scheduleTypeDefinitions
+            .Select(x => x.DelayTypeId)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToList();
+        var allowedTypeIds = durationTypeIds
+            .Concat(delayTypeIds)
+            .ToHashSet();
+        if (allowedTypeIds.Count == 0)
+        {
+            return [];
+        }
+
+        var submittedByType = submittedValues
+            .Where(x => allowedTypeIds.Contains(x.TypId))
+            .GroupBy(x => x.TypId)
+            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
+
+        var existingByType = (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
+                .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId))
+                .ToListAsync(ct))
+            .ToDictionary(x => x.TypId, x => x.HodnotaInt);
+
+        var desired = new Dictionary<int, int>();
+
+        foreach (var typeId in durationTypeIds)
+        {
+            if (existingByType.TryGetValue(typeId, out var existingDuration))
+            {
+                desired[typeId] = Math.Max(0, existingDuration);
+            }
+        }
+
+        foreach (var typeId in delayTypeIds)
+        {
+            if (submittedByType.TryGetValue(typeId, out var submittedDelay))
+            {
+                desired[typeId] = submittedDelay;
+            }
+            else if (existingByType.TryGetValue(typeId, out var existingDelay))
+            {
+                desired[typeId] = existingDelay;
+            }
+        }
+
+        return desired
+            .Select(item => new SaveRecordHarmonogramValueCommand
+            {
+                TypId = item.Key,
+                Hodnota = item.Value
+            })
+            .OrderBy(x => x.TypId)
+            .ToList();
+    }
+
     private async Task<List<SaveRecordHarmonogramValueCommand>> ReplaceRecordScheduleValuesAsync(
         int zaznamId,
         IReadOnlyList<SaveRecordHarmonogramValueCommand> harmonogramValues,
@@ -1432,6 +1527,17 @@ public sealed partial class RecordService
 
     private static bool IsMeetingReadOnly(JednaniEntity? meeting, CiselnikStavuJednaniEntity? status)
         => MeetingStatePolicy.IsReadOnly(meeting, status);
+
+    private async Task<(IDbContextTransaction? Transaction, bool OwnsTransaction)> BeginSerializableTransactionIfNeededAsync(CancellationToken ct)
+    {
+        if (dbContext.Database.CurrentTransaction is not null)
+        {
+            return (null, false);
+        }
+
+        var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        return (transaction, true);
+    }
 
     private Task<List<OpenMeetingRow>> LoadOpenProjectMeetingsAsync(int projectId, CancellationToken ct)
         => (

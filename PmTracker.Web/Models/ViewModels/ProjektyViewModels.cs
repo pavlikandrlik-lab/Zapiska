@@ -34,14 +34,17 @@ public sealed class ProjektDetailViewModel : BaseViewModel
     public ProjektLazyTabShellViewModel HarmonogramTab { get; init; } = new() { TabKey = "harmonogram", LoadingText = "Načítání harmonogramu..." };
     public ProjektLazyTabShellViewModel JednaniTab { get; init; } = new() { TabKey = "jednani", LoadingText = "Načítání jednání..." };
     public ProjektLazyTabShellViewModel TymTab { get; init; } = new() { TabKey = "tym", LoadingText = "Načítání týmu..." };
+    public ProjektLazyTabShellViewModel NavrhyTab { get; init; } = new() { TabKey = "navrhy", LoadingText = "Načítání návrhů..." };
     public ProjektHarmonogramTabViewModel? LoadedHarmonogramTab { get; set; }
     public ProjektJednaniTabViewModel? LoadedJednaniTab { get; set; }
     public ProjektTymTabViewModel? LoadedTymTab { get; set; }
+    public ProjektNavrhyTabViewModel? LoadedNavrhyTab { get; set; }
     public bool CanCreateMeetings { get; set; }
     public bool CanEditMeetings { get; set; }
     public bool CanManageTeam { get; set; }
     public bool CanManageRecords { get; set; }
     public bool CanManageSchedules { get; set; }
+    public bool CanViewProposals { get; set; }
     public int CurrentUserOsobaId { get; set; }
     public string? CreateRecordEditorUrl { get; set; }
     public string? ReturnToProjectUrl { get; set; }
@@ -74,7 +77,9 @@ public sealed class ProjektZaznamyTabViewModel
     public ProjektFiltryViewModel Filtry { get; init; } = new();
     public int CurrentUserOsobaId { get; set; }
     public bool CanManageRecords { get; set; }
+    public bool CanCreateRecordProposal { get; set; }
     public string? CreateRecordEditorUrl { get; set; }
+    public string? CreateRecordProposalUrl { get; set; }
     public string? RefreshUrl { get; set; }
     public string? MeetingCommentStatesUrl { get; set; }
     public string? ProjectPrintUrl { get; set; }
@@ -133,7 +138,9 @@ public sealed class ZaznamCardSummaryViewModel
     public bool CanManageSchedule { get; set; }
     public bool CanCommentAsSubsystemLeader { get; set; }
     public bool CanAddComment { get; set; }
+    public bool CanCreateScheduleProposal { get; set; }
     public string EditButtonLabel { get; set; } = "Upravit";
+    public string? ScheduleProposalUrl { get; set; }
     public int CurrentUserOsobaId { get; set; }
 }
 
@@ -182,6 +189,8 @@ public sealed class HarmonogramBlockViewModel
     public bool EditorJeUkolKategorie { get; set; }
     public bool EditorCanEditScheduleFull { get; set; }
     public bool EditorCanEditScheduleAddOnly { get; set; }
+    public bool EditorCanEditPlanOnly { get; set; }
+    public bool EditorPlanFieldsLocked { get; set; }
 }
 
 public sealed class ProjektHarmonogramTabViewModel
@@ -284,7 +293,9 @@ public sealed class ProjektHarmonogramUkolViewModel
     public bool Stihame { get; init; }
     public HarmonogramBlockViewModel HarmonogramBlok { get; init; } = new();
     public bool CanManageSchedule { get; set; }
+    public bool CanCreateScheduleProposal { get; set; }
     public string? ScheduleEditUrl { get; set; }
+    public string? ScheduleProposalUrl { get; set; }
 }
 
 public sealed class ExterniOdkazViewModel
@@ -485,39 +496,39 @@ public sealed class ZaznamEditViewModel
 {
     public string PageTitle { get; set; } = string.Empty;
     public string? BackLabel { get; set; }
-    public int Id { get; init; }
-    public int CisloZaznamu { get; init; }
-    public required string CisloViditelne { get; init; }
-    public int ProjektId { get; init; }
-    public bool IsCreate { get; init; }
-    public bool PouzivatIdentJednani { get; init; }
-    public bool MaDostupneJednaniProCislo { get; init; }
-    public bool MuzeDoplnitIdentifikatorJednani { get; init; }
-    public int? JednaniIdProCislo { get; init; }
-    public required IReadOnlyList<JednaniOptionViewModel> JednaniProCisloOptions { get; init; }
-    public required string Nazev { get; init; }
-    public required string Cil { get; init; }
-    public required string Kategorie { get; init; }
-    public required string Popis { get; init; }
-    public string? TypUkolu { get; init; }
-    public required string Stav { get; init; }
-    public required IReadOnlyList<string> KategorieZaznamu { get; init; }
-    public required IReadOnlyList<string> StavyUkolu { get; init; }
-    public required IReadOnlyList<string> TypyUkolu { get; init; }
-    public DateTime DatumZalozeni { get; init; }
-    public DateTime? TerminUkonceni { get; init; }
-    public required IReadOnlyList<SubsystemOptionViewModel> Subsystemy { get; init; }
-    public required string Subsystem { get; init; }
-    public required IReadOnlyList<LookupOptionViewModel> Vlastnici { get; init; }
-    public int VlastnikId { get; init; }
-    public bool JeUkolKategorie { get; init; }
-    public HarmonogramBlockViewModel HarmonogramBlok { get; init; } = new();
-    public required IReadOnlyList<SpolupracovnikOptionViewModel> DostupniVlastnici { get; init; }
-    public required IReadOnlyList<SpolupracovnikOptionViewModel> DostupniSpolupracovnici { get; init; }
-    public required IReadOnlyList<int> VybraniSpolupracovniciIds { get; init; }
-    public required IReadOnlyList<ExterniOdkazEditViewModel> ExterniVazby { get; init; }
-    public required IReadOnlyList<string> TypyExternichOdkazu { get; init; }
-    public required IReadOnlyList<string> Vyzvy { get; init; }
+    public int Id { get; set; }
+    public int CisloZaznamu { get; set; }
+    public required string CisloViditelne { get; set; }
+    public int ProjektId { get; set; }
+    public bool IsCreate { get; set; }
+    public bool PouzivatIdentJednani { get; set; }
+    public bool MaDostupneJednaniProCislo { get; set; }
+    public bool MuzeDoplnitIdentifikatorJednani { get; set; }
+    public int? JednaniIdProCislo { get; set; }
+    public required IReadOnlyList<JednaniOptionViewModel> JednaniProCisloOptions { get; set; }
+    public required string Nazev { get; set; }
+    public required string Cil { get; set; }
+    public required string Kategorie { get; set; }
+    public required string Popis { get; set; }
+    public string? TypUkolu { get; set; }
+    public required string Stav { get; set; }
+    public required IReadOnlyList<string> KategorieZaznamu { get; set; }
+    public required IReadOnlyList<string> StavyUkolu { get; set; }
+    public required IReadOnlyList<string> TypyUkolu { get; set; }
+    public DateTime DatumZalozeni { get; set; }
+    public DateTime? TerminUkonceni { get; set; }
+    public required IReadOnlyList<SubsystemOptionViewModel> Subsystemy { get; set; }
+    public required string Subsystem { get; set; }
+    public required IReadOnlyList<LookupOptionViewModel> Vlastnici { get; set; }
+    public int VlastnikId { get; set; }
+    public bool JeUkolKategorie { get; set; }
+    public HarmonogramBlockViewModel HarmonogramBlok { get; set; } = new();
+    public required IReadOnlyList<SpolupracovnikOptionViewModel> DostupniVlastnici { get; set; }
+    public required IReadOnlyList<SpolupracovnikOptionViewModel> DostupniSpolupracovnici { get; set; }
+    public required IReadOnlyList<int> VybraniSpolupracovniciIds { get; set; }
+    public required IReadOnlyList<ExterniOdkazEditViewModel> ExterniVazby { get; set; }
+    public required IReadOnlyList<string> TypyExternichOdkazu { get; set; }
+    public required IReadOnlyList<string> Vyzvy { get; set; }
     public string UiContext { get; set; } = "project";
     public int? MeetingId { get; set; }
     public string Presentation { get; set; } = "modal";
@@ -525,6 +536,21 @@ public sealed class ZaznamEditViewModel
     public string BackUrl { get; set; } = string.Empty;
     public string ActiveEditorTab { get; set; } = "basic";
     public bool UseAjaxSubmit { get; set; } = true;
+    public string FormAction { get; set; } = "Save";
+    public string FormController { get; set; } = "Zaznamy";
+    public string ModalTitle { get; set; } = string.Empty;
+    public string PrimaryActionLabel { get; set; } = string.Empty;
+    public string? SecondaryNote { get; set; }
+    public string ProposalEditorMode { get; set; } = RecordProposalEditorModes.None;
+    public bool IsProposalEditor => !string.Equals(ProposalEditorMode, RecordProposalEditorModes.None, StringComparison.OrdinalIgnoreCase);
+    public bool IsSchedulePlanProposalEditor => string.Equals(ProposalEditorMode, RecordProposalEditorModes.SchedulePlanProposal, StringComparison.OrdinalIgnoreCase);
+    public bool AllowBasicMetadataEdit { get; set; } = true;
+    public bool AllowTermDeadlineEdit { get; set; } = true;
+    public bool HasPendingScheduleProposalLock { get; set; }
+    public int? PendingScheduleProposalId { get; set; }
+    public string? PendingScheduleProposalMessage { get; set; }
+    public bool CanCreateScheduleProposal { get; set; }
+    public string? CreateScheduleProposalUrl { get; set; }
     public bool CanEditRecord { get; set; }
     public bool CanEditScheduleFull { get; set; }
     public bool CanEditScheduleAddOnly { get; set; }

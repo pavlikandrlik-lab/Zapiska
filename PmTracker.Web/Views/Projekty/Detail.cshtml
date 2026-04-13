@@ -6,6 +6,7 @@
     var scheduleTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "harmonogram", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=harmonogram";
     var meetingsTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "jednani", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=jednani";
     var teamTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "tym", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=tym";
+    var proposalsTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "navrhy", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=navrhy";
 }
 
 <section class="page-header page-header-compact">
@@ -45,6 +46,14 @@
        data-tab="tym">
         Osoby (tým)
     </a>
+    @if (Model.CanViewProposals)
+    {
+        <a class="tab @(Model.ActiveTab == "navrhy" ? "active" : null)"
+           href="@proposalsTabUrl"
+           data-tab="navrhy">
+            Návrhy
+        </a>
+    }
 </div>
 
 @await Html.PartialAsync(
@@ -81,6 +90,37 @@ else
         </div>
         <div class="record-loading-error" data-project-tab-error hidden></div>
     </section>
+}
+
+@if (Model.CanViewProposals)
+{
+    if (Model.LoadedNavrhyTab is not null)
+    {
+        @await Html.PartialAsync(
+            "_ProjectProposalsTab",
+            Model.LoadedNavrhyTab,
+            new ViewDataDictionary(ViewData)
+            {
+                ["IsActive"] = Model.ActiveTab == "navrhy"
+            })
+    }
+    else
+    {
+        <section class="tab-panel @(Model.ActiveTab == "navrhy" ? "active" : null)"
+                 data-tab-panel="navrhy"
+                 data-project-tab-lazy-url="@Model.NavrhyTab.LoadUrl"
+                 data-project-tab-loaded="false">
+            <div class="lazy-tab-placeholder" data-project-tab-placeholder>
+                <div class="record-loading-placeholder">
+                    <div class="record-loading-line"></div>
+                    <div class="record-loading-line short"></div>
+                    <div class="record-loading-line"></div>
+                </div>
+                <p class="muted">@Model.NavrhyTab.LoadingText</p>
+            </div>
+            <div class="record-loading-error" data-project-tab-error hidden></div>
+        </section>
+    }
 }
 
 @if (Model.LoadedJednaniTab is not null)

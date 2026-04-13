@@ -1,0 +1,184 @@
+@using System.Globalization
+@model ProjektNavrhyTabViewModel
+@{
+    var isActive = ViewData["IsActive"] as bool? ?? false;
+}
+
+<section class="tab-panel @(isActive ? "active" : null)" data-tab-panel="navrhy">
+    <div class="panel-header">
+        <div class="panel-header-actions">
+            @if (Model.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.CreateRecordProposalUrl))
+            {
+                <button class="btn primary"
+                        type="button"
+                        data-record-editor-url="@Model.CreateRecordProposalUrl"
+                        data-record-editor-project-id="@Model.ProjektId"
+                        data-record-editor-label="Nový návrh založení záznamu">
+                    Nový návrh záznamu
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="proposal-section-grid">
+        <section class="card">
+            <h3>Návrhy založení záznamu</h3>
+            @if (Model.NavrhyZalozeni.Count == 0)
+            {
+                <p class="muted">V této části zatím nejsou žádné návrhy.</p>
+            }
+            else
+            {
+                <div class="proposal-list">
+                    @foreach (var item in Model.NavrhyZalozeni)
+                    {
+                        <article class="proposal-card">
+                            <div class="proposal-card-header">
+                                <div>
+                                    <div class="record-title">@(string.IsNullOrWhiteSpace(item.Nazev) ? $"Návrh #{item.Id}" : item.Nazev)</div>
+                                    @if (!string.IsNullOrWhiteSpace(item.Cil))
+                                    {
+                                        <div class="record-subtitle record-goal-subtitle">@item.Cil</div>
+                                    }
+                                </div>
+                                <span class="badge">@item.StavLabel</span>
+                            </div>
+                            <div class="record-summary-meta">
+                                <span><span class="label">Autor:</span> @item.Autor</span>
+                                <span><span class="label">Subsystém:</span> @item.Subsystem</span>
+                                <span><span class="label">Podáno:</span> @item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)</span>
+                                <span><span class="label">Datum založení:</span> @(item.DatumZalozeni?.ToString("dd.MM.yyyy") ?? "-")</span>
+                                <span><span class="label">Termín:</span> @(item.TerminUkonceni?.ToString("dd.MM.yyyy") ?? "-")</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(item.RozhodlUzivatel) || item.DecidedAt.HasValue)
+                            {
+                                <div class="record-summary-meta">
+                                    <span><span class="label">Rozhodl:</span> @(item.RozhodlUzivatel ?? "-")</span>
+                                    <span><span class="label">Kdy:</span> @(item.DecidedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture) ?? "-")</span>
+                                </div>
+                            }
+                            <div class="proposal-card-actions">
+                                @if (item.CanApprove)
+                                {
+                                    <form asp-controller="Navrhy"
+                                          asp-action="ApproveProposal"
+                                          method="post"
+                                          data-ajax-submit="true">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
+                                        <input type="hidden" name="ProposalId" value="@item.Id" />
+                                        <button class="btn small primary" type="submit">Schválit</button>
+                                    </form>
+                                }
+                                @if (item.CanReject)
+                                {
+                                    <form asp-controller="Navrhy"
+                                          asp-action="RejectProposal"
+                                          method="post"
+                                          data-ajax-submit="true">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
+                                        <input type="hidden" name="ProposalId" value="@item.Id" />
+                                        <button class="btn small ghost" type="submit">Zamítnout</button>
+                                    </form>
+                                }
+                                @if (item.CanRejectAndTakeOver)
+                                {
+                                    <form asp-controller="Navrhy"
+                                          asp-action="RejectAndTakeOverCreateProposal"
+                                          method="post"
+                                          data-ajax-submit="true">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
+                                        <input type="hidden" name="ProposalId" value="@item.Id" />
+                                        <button class="btn small" type="submit">Zamítnout a převzít data</button>
+                                    </form>
+                                }
+                                @if (item.CanPrefillCreateForm && !string.IsNullOrWhiteSpace(item.PrefillCreateFormUrl))
+                                {
+                                    <button class="btn small"
+                                            type="button"
+                                            data-record-editor-url="@item.PrefillCreateFormUrl"
+                                            data-record-editor-project-id="@item.ProjektId"
+                                            data-record-editor-label="@($"Předvyplnit formulář z návrhu #{item.Id}")">
+                                        Předvyplnit formulář
+                                    </button>
+                                }
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="card">
+            <h3>Návrhy změny termínu a plánu</h3>
+            @if (Model.NavrhyHarmonogramu.Count == 0)
+            {
+                <p class="muted">V této části zatím nejsou žádné návrhy.</p>
+            }
+            else
+            {
+                <div class="proposal-list">
+                    @foreach (var item in Model.NavrhyHarmonogramu)
+                    {
+                        <article class="proposal-card">
+                            <div class="proposal-card-header">
+                                <div>
+                                    <div class="record-title">
+                                        @if (!string.IsNullOrWhiteSpace(item.CisloViditelne))
+                                        {
+                                            <text>#@item.CisloViditelne - </text>
+                                        }
+                                        @(string.IsNullOrWhiteSpace(item.Nazev) ? $"Záznam #{item.ZaznamId}" : item.Nazev)
+                                    </div>
+                                </div>
+                                <span class="badge">@item.StavLabel</span>
+                            </div>
+                            <div class="record-summary-meta">
+                                <span><span class="label">Autor:</span> @item.Autor</span>
+                                <span><span class="label">Subsystém:</span> @item.Subsystem</span>
+                                <span><span class="label">Podáno:</span> @item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)</span>
+                                <span><span class="label">Nový termín:</span> @(item.TerminUkonceni?.ToString("dd.MM.yyyy") ?? "-")</span>
+                                <span><span class="label">Plánované kroky:</span> @item.PlannedStepCount</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(item.RozhodlUzivatel) || item.DecidedAt.HasValue)
+                            {
+                                <div class="record-summary-meta">
+                                    <span><span class="label">Rozhodl:</span> @(item.RozhodlUzivatel ?? "-")</span>
+                                    <span><span class="label">Kdy:</span> @(item.DecidedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture) ?? "-")</span>
+                                </div>
+                            }
+                            <div class="proposal-card-actions">
+                                @if (item.CanApprove)
+                                {
+                                    <form asp-controller="Navrhy"
+                                          asp-action="ApproveProposal"
+                                          method="post"
+                                          data-ajax-submit="true">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
+                                        <input type="hidden" name="ProposalId" value="@item.Id" />
+                                        <button class="btn small primary" type="submit">Schválit</button>
+                                    </form>
+                                }
+                                @if (item.CanReject)
+                                {
+                                    <form asp-controller="Navrhy"
+                                          asp-action="RejectProposal"
+                                          method="post"
+                                          data-ajax-submit="true">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
+                                        <input type="hidden" name="ProposalId" value="@item.Id" />
+                                        <button class="btn small ghost" type="submit">Zamítnout</button>
+                                    </form>
+                                }
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+</section>

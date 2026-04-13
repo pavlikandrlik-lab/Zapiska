@@ -4555,10 +4555,11 @@ async function refreshPageScope(payload) {
     case "projekty-detail-zaznamy":
     case "projekty-detail-jednani":
     case "projekty-detail-tym":
+    case "projekty-detail-navrhy":
     case "projekty-detail-zaznamy-preserve": {
       const preserveRecordUi = scope === "projekty-detail-zaznamy-preserve";
       const recordUiState = preserveRecordUi ? buildRecordUiState(document) : null;
-      const tab = typeof payload.tab === "string" && payload.tab ? payload.tab : scope === "projekty-detail-zaznamy" ? "zaznamy" : scope === "projekty-detail-jednani" ? "jednani" : "tym";
+      const tab = typeof payload.tab === "string" && payload.tab ? payload.tab : scope === "projekty-detail-zaznamy" ? "zaznamy" : scope === "projekty-detail-jednani" ? "jednani" : scope === "projekty-detail-navrhy" ? "navrhy" : "tym";
       const targetTabPanelKey = tab === "harmonogram" || tab === "gant" ? "harmonogram" : tab;
       const html = await fetchHtmlFragment(refreshUrl);
       const nextDoc = parseHtmlFragment(html);

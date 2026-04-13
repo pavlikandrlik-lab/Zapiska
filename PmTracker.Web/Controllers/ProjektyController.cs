@@ -14,21 +14,26 @@ public sealed class ProjektyController : BaseController
     private const string ScheduleTab = "harmonogram";
     private const string MeetingsTab = "jednani";
     private const string TeamTab = "tym";
+    private const string ProposalsTab = "navrhy";
     private const string TeamRefreshScope = "projekty-detail-tym";
+    private const string ProposalsRefreshScope = "projekty-detail-navrhy";
 
     private readonly IProjectService _projectService;
     private readonly IMeetingService _meetingService;
+    private readonly IRecordProposalService _recordProposalService;
 
     public ProjektyController(
         IUserContextResolver userContextResolver,
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
         IProjectService projectService,
-        IMeetingService meetingService)
+        IMeetingService meetingService,
+        IRecordProposalService recordProposalService)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _projectService = projectService;
         _meetingService = meetingService;
+        _recordProposalService = recordProposalService;
     }
 
     public async Task<IActionResult> Index(CancellationToken ct = default)
@@ -76,7 +81,7 @@ public sealed class ProjektyController : BaseController
         var requestedTab = NormalizeProjectTab(tab);
         var model = await _projectService.BuildProjektDetailAsync(id, ct);
         model.ActiveTab = requestedTab;
-        PrepareProjectDetailPresentation(model);
+        await PrepareProjectDetailPresentationAsync(model, ct);
         await PrepareActiveProjectTabAsync(model, requestedTab, ct);
         return View(model);
     }
@@ -90,7 +95,7 @@ public sealed class ProjektyController : BaseController
         }
 
         var model = await _projectService.BuildProjectRecordsTabAsync(id, ct);
-        PrepareProjectRecordsTabPresentation(model);
+        await PrepareProjectRecordsTabPresentationAsync(model, ct);
         return PartialView("~/Views/Projekty/_ProjectRecordsTab.cshtml", model);
     }
 
@@ -168,6 +173,24 @@ public sealed class ProjektyController : BaseController
         var model = await _projectService.BuildProjectTeamTabAsync(id, ct);
         PrepareProjectTeamTabPresentation(model);
         return PartialView("~/Views/Projekty/_ProjectTeamTab.cshtml", model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> NavrhyTabPartial(int id, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(id))
+        {
+            return NotFound();
+        }
+
+        if (!await _recordProposalService.CanViewProposalTabAsync(id, CurrentUserContext, ct))
+        {
+            return Forbid();
+        }
+
+        var model = await _recordProposalService.BuildProjectProposalsTabAsync(id, CurrentUserContext, ct);
+        PrepareProjectProposalsTabPresentation(model);
+        return PartialView("~/Views/Projekty/_ProjectProposalsTab.cshtml", model);
     }
 
     [HttpGet]
@@ -637,7 +660,7 @@ public sealed class ProjektyController : BaseController
     private Task<IReadOnlyList<LookupOptionViewModel>> BuildProjectStatusOptionsAsync(CancellationToken ct = default)
         => _projectService.BuildProjectStatusOptionsAsync(CurrentUserContext, ct);
 
-    private void PrepareProjectDetailPresentation(ProjektDetailViewModel model)
+    private async Task PrepareProjectDetailPresentationAsync(ProjektDetailViewModel model, CancellationToken ct)
     {
         AttachCurrentUser(model);
 
@@ -652,6 +675,7 @@ public sealed class ProjektyController : BaseController
         model.CanManageTeam = CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projectId);
         model.CanManageRecords = canManageRecords;
         model.CanManageSchedules = canManageSchedules;
+        model.CanViewProposals = await _recordProposalService.CanViewProposalTabAsync(projectId, CurrentUserContext, ct);
         model.PageTitle = model.Projekt.Nazev;
         model.BackUrl = Url.Action("Index", "Projekty") ?? "/Projekty";
         model.BackLabel = "Zpět na přehled";
@@ -663,8 +687,9 @@ public sealed class ProjektyController : BaseController
         model.HarmonogramTab.LoadUrl = Url.Action(nameof(HarmonogramTabPartial), new { id = projectId }) ?? $"/Projekty/HarmonogramTabPartial/{projectId}";
         model.JednaniTab.LoadUrl = Url.Action(nameof(JednaniTabPartial), new { id = projectId }) ?? $"/Projekty/JednaniTabPartial/{projectId}";
         model.TymTab.LoadUrl = Url.Action(nameof(TymTabPartial), new { id = projectId }) ?? $"/Projekty/TymTabPartial/{projectId}";
+        model.NavrhyTab.LoadUrl = Url.Action(nameof(NavrhyTabPartial), new { id = projectId }) ?? $"/Projekty/NavrhyTabPartial/{projectId}";
 
-        PrepareProjectRecordsTabPresentation(model.ZaznamyTab);
+        await PrepareProjectRecordsTabPresentationAsync(model.ZaznamyTab, ct);
     }
 
     private async Task PrepareActiveProjectTabAsync(ProjektDetailViewModel model, string requestedTab, CancellationToken ct)
@@ -690,6 +715,15 @@ public sealed class ProjektyController : BaseController
             var teamTab = await _projectService.BuildProjectTeamTabAsync(model.Projekt.Id, ct);
             PrepareProjectTeamTabPresentation(teamTab);
             model.LoadedTymTab = teamTab;
+            return;
+        }
+
+        if (string.Equals(requestedTab, ProposalsTab, StringComparison.OrdinalIgnoreCase)
+            && await _recordProposalService.CanViewProposalTabAsync(model.Projekt.Id, CurrentUserContext, ct))
+        {
+            var proposalsTab = await _recordProposalService.BuildProjectProposalsTabAsync(model.Projekt.Id, CurrentUserContext, ct);
+            PrepareProjectProposalsTabPresentation(proposalsTab);
+            model.LoadedNavrhyTab = proposalsTab;
         }
     }
 
@@ -702,7 +736,8 @@ public sealed class ProjektyController : BaseController
 
         if (string.Equals(tab, ScheduleTab, StringComparison.OrdinalIgnoreCase)
             || string.Equals(tab, MeetingsTab, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(tab, TeamTab, StringComparison.OrdinalIgnoreCase))
+            || string.Equals(tab, TeamTab, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tab, ProposalsTab, StringComparison.OrdinalIgnoreCase))
         {
             return tab!.ToLowerInvariant();
         }
@@ -710,14 +745,17 @@ public sealed class ProjektyController : BaseController
         return RecordsTab;
     }
 
-    private void PrepareProjectRecordsTabPresentation(ProjektZaznamyTabViewModel model)
+    private async Task PrepareProjectRecordsTabPresentationAsync(ProjektZaznamyTabViewModel model, CancellationToken ct)
     {
         var projectId = model.ProjektId;
         var canManageRecords = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projectId);
+        var canCreateRecordProposal = !canManageRecords && CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId);
 
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.CanManageRecords = canManageRecords;
+        model.CanCreateRecordProposal = canCreateRecordProposal;
         model.CreateRecordEditorUrl = Url.Action("Create", "Zaznamy", new { projektId = projectId }) ?? $"/Zaznamy/Create?projektId={projectId}";
+        model.CreateRecordProposalUrl = Url.Action("CreateRecordProposal", "Navrhy", new { projektId = projectId }) ?? $"/Navrhy/CreateRecordProposal?projektId={projectId}";
         model.RefreshUrl = Url.Action(nameof(RecordsTabPartial), new { id = projectId }) ?? $"/Projekty/RecordsTabPartial/{projectId}";
         model.MeetingCommentStatesUrl = Url.Action(nameof(RecordMeetingCommentStates), new { id = projectId }) ?? $"/Projekty/RecordMeetingCommentStates/{projectId}";
         model.ProjectPrintUrl = Url.Action("ProjektTisk", "Export", new { projektId = projectId, autoPrint = true }) ?? $"/Export/Projekt/{projectId}/Tisk?autoPrint=true";
@@ -747,10 +785,12 @@ public sealed class ProjektyController : BaseController
         summary.CanCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId)
             && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
         summary.CanAddComment = summary.CanEditRecord || summary.CanCommentAsSubsystemLeader;
+        summary.CanCreateScheduleProposal = summary.JeUkol && summary.CanCommentAsSubsystemLeader;
         summary.EditButtonLabel = summary.CanEditRecord ? "Upravit" : "GANTT";
         summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         record.DetailUrl = Url.Action("RecordDetailPartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordDetailPartial?projektId={projectId}&zaznamId={summary.Id}";
         record.CommentsUrl = Url.Action("RecordCommentsPartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={summary.Id}";
+        summary.ScheduleProposalUrl = Url.Action("CreateScheduleProposal", "Navrhy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Navrhy/CreateScheduleProposal?projektId={projectId}&zaznamId={summary.Id}";
     }
 
     private void PrepareProjectScheduleTabPresentation(ProjektHarmonogramTabViewModel model)
@@ -765,6 +805,7 @@ public sealed class ProjektyController : BaseController
         {
             item.CanManageSchedule = canManageSchedules;
             item.ScheduleEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = model.ProjektId }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
+            item.ScheduleProposalUrl = Url.Action("CreateScheduleProposal", "Navrhy", new { projektId = model.ProjektId, zaznamId = item.ZaznamId }) ?? $"/Navrhy/CreateScheduleProposal?projektId={model.ProjektId}&zaznamId={item.ZaznamId}";
         }
     }
 
@@ -779,6 +820,16 @@ public sealed class ProjektyController : BaseController
     private void PrepareProjectTeamTabPresentation(ProjektTymTabViewModel model)
     {
         model.CanManageTeam = CurrentUserContext.HasPermission(PermissionKeys.TeamManage, model.ProjektId);
+    }
+
+    private void PrepareProjectProposalsTabPresentation(ProjektNavrhyTabViewModel model)
+    {
+        model.CreateRecordProposalUrl = Url.Action("CreateRecordProposal", "Navrhy", new { projektId = model.ProjektId }) ?? $"/Navrhy/CreateRecordProposal?projektId={model.ProjektId}";
+
+        foreach (var item in model.NavrhyZalozeni.Concat(model.NavrhyHarmonogramu))
+        {
+            item.PrefillCreateFormUrl = Url.Action("PrefillCreateProposal", "Navrhy", new { projektId = model.ProjektId, proposalId = item.Id }) ?? $"/Navrhy/PrefillCreateProposal?projektId={model.ProjektId}&proposalId={item.Id}";
+        }
     }
 
     private Task<IActionResult> ExecuteTeamValidatedActionAsync(

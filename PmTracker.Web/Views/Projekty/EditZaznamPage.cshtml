@@ -1,6 +1,8 @@
 @model ZaznamEditViewModel
 @{
-    ViewData["Title"] = Model.IsCreate ? "Nový projektový záznam" : $"Upravit záznam {Model.CisloViditelne}";
+    ViewData["Title"] = !string.IsNullOrWhiteSpace(Model.PageTitle)
+        ? Model.PageTitle
+        : (Model.IsCreate ? "Nový projektový záznam" : $"Upravit záznam {Model.CisloViditelne}");
 }
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel

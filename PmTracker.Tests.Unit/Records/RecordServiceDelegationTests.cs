@@ -1,6 +1,7 @@
 using FluentAssertions;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Tests.Unit.Records;
 
@@ -10,7 +11,7 @@ public sealed class RecordServiceDelegationTests
     public async Task AddCommentAsync_ShouldDelegateToCommentService()
     {
         var commentService = new FakeCommentService();
-        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, TimeProvider.System);
+        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, new FakePendingScheduleProposalLockEvaluator(), TimeProvider.System);
         var command = new AddCommentCommand
         {
             ZaznamId = 13,
@@ -42,6 +43,12 @@ public sealed class RecordServiceDelegationTests
             DeletedProjectIds = [],
             PermissionGrants = []
         };
+    }
+
+    private sealed class FakePendingScheduleProposalLockEvaluator : IPendingScheduleProposalLockEvaluator
+    {
+        public Task<PendingScheduleProposalLockState> EvaluateAsync(int recordId, CancellationToken ct = default)
+            => Task.FromResult(new PendingScheduleProposalLockState(false, null, null));
     }
 
     private sealed class FakeCommentService : ICommentService

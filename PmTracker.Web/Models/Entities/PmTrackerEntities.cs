@@ -205,6 +205,23 @@ public sealed class ProjektovyZaznamEntity
     public int HarmonogramSablonaVerze { get; set; }
 }
 
+public sealed class ZaznamNavrhEntity
+{
+    public int Id { get; set; }
+    public int ProjektId { get; set; }
+    public int? ZaznamId { get; set; }
+    public int SubsystemId { get; set; }
+    public string TypNavrhu { get; set; } = string.Empty;
+    public string Stav { get; set; } = string.Empty;
+    public string PayloadJson { get; set; } = string.Empty;
+    public int CreatedByOsobaId { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public int? DecidedByOsobaId { get; set; }
+    public DateTime? DecidedAt { get; set; }
+    public int? ApprovedRecordId { get; set; }
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+}
+
 public sealed class ZaznamHistorieZmenTypuEntity
 {
     public int Id { get; set; }

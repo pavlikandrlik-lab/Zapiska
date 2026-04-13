@@ -32,6 +32,16 @@
                     Nový záznam
                 </button>
             }
+            @if (Model.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.CreateRecordProposalUrl))
+            {
+                <button class="btn"
+                        type="button"
+                        data-record-editor-url="@Model.CreateRecordProposalUrl"
+                        data-record-editor-project-id="@Model.ProjektId"
+                        data-record-editor-label="Nový návrh založení záznamu">
+                    Nový návrh záznamu
+                </button>
+            }
         </div>
     </div>
 

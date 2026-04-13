@@ -491,6 +491,7 @@ export async function refreshPageScope(payload) {
         case "projekty-detail-zaznamy":
         case "projekty-detail-jednani":
         case "projekty-detail-tym":
+        case "projekty-detail-navrhy":
         case "projekty-detail-zaznamy-preserve": {
             const preserveRecordUi = scope === "projekty-detail-zaznamy-preserve";
             const recordUiState = preserveRecordUi ? buildRecordUiState(document) : null;
@@ -500,7 +501,9 @@ export async function refreshPageScope(payload) {
                     ? "zaznamy"
                     : scope === "projekty-detail-jednani"
                         ? "jednani"
-                        : "tym");
+                        : scope === "projekty-detail-navrhy"
+                            ? "navrhy"
+                            : "tym");
             const targetTabPanelKey = tab === "harmonogram" || tab === "gant"
                 ? "harmonogram"
                 : tab;

@@ -5,9 +5,11 @@
     var isActive = ViewData["IsActive"] as bool? ?? false;
     var selectedOwnerLabel = Model.Vlastnici
         .FirstOrDefault(x => string.Equals(x.Value, Model.VlastnikId.ToString(), StringComparison.Ordinal))?.Label ?? string.Empty;
-    var datumZalozeniLocked = false;
+    var metadataLocked = !Model.AllowBasicMetadataEdit;
+    var datumZalozeniLocked = metadataLocked || Model.IsSchedulePlanProposalEditor;
     var terminUkonceniIso = Model.TerminUkonceni?.ToString("yyyy-MM-dd") ?? string.Empty;
     var terminUkonceniDisplay = Model.TerminUkonceni?.ToString("dd.MM.yyyy") ?? string.Empty;
+    var terminUkonceniLocked = !Model.AllowTermDeadlineEdit || Model.HasPendingScheduleProposalLock;
     var showTaskType = !string.IsNullOrWhiteSpace(Model.Kategorie)
         && (Model.Kategorie.Contains("úkol", StringComparison.OrdinalIgnoreCase)
             || Model.Kategorie.Contains("ukol", StringComparison.OrdinalIgnoreCase));
@@ -20,7 +22,7 @@
     <div class="record-form-row record-form-row-top" data-record-row-top data-has-type="@(showTaskType ? "true" : "false")">
         <label>
             Kategorie záznamu
-            <select name="Kategorie" data-kategorie-select>
+            <select name="Kategorie" data-kategorie-select @(metadataLocked ? "disabled=\"disabled\"" : null)>
                 @foreach (var kategorie in Model.KategorieZaznamu)
                 {
                     if (kategorie == Model.Kategorie)
@@ -36,7 +38,7 @@
         </label>
         <label class="record-form-type-row" data-typ-ukolu-row>
             Typ úkolu
-            <select name="TypUkolu">
+            <select name="TypUkolu" @(metadataLocked ? "disabled=\"disabled\"" : null)>
                 <option value="">-</option>
                 @foreach (var typ in Model.TypyUkolu)
                 {
@@ -53,7 +55,7 @@
         </label>
         <label>
             Stav úkolu
-            <select name="Stav">
+            <select name="Stav" @(metadataLocked ? "disabled=\"disabled\"" : null)>
                 @foreach (var stav in Model.StavyUkolu)
                 {
                     if (stav == Model.Stav)
@@ -81,7 +83,7 @@
                 <select name="JednaniIdProCislo"
                         data-record-meeting-number-select="true"
                         required="required"
-                        @(Model.MaDostupneJednaniProCislo ? null : "disabled=\"disabled\"")>
+                        @((Model.MaDostupneJednaniProCislo && !metadataLocked) ? null : "disabled=\"disabled\"")>
                     <option value="">Vyberte jednání</option>
                     @foreach (var meeting in Model.JednaniProCisloOptions)
                     {
@@ -119,7 +121,7 @@
     <div class="record-form-row record-form-row-title">
         <label>
             Název
-            <input type="text" name="Nazev" value="@Model.Nazev" />
+            <input type="text" name="Nazev" value="@Model.Nazev" @(metadataLocked ? "disabled=\"disabled\"" : null) />
         </label>
     </div>
 
@@ -130,7 +132,8 @@
                       rows="1"
                       name="Cil"
                       maxlength="500"
-                      data-record-goal-autogrow="true">@Model.Cil</textarea>
+                      data-record-goal-autogrow="true"
+                      @(metadataLocked ? "disabled=\"disabled\"" : null)>@Model.Cil</textarea>
         </label>
     </div>
 
@@ -141,9 +144,17 @@
                       rows="3"
                       name="Popis"
                       data-rich-text="true"
-                      data-rich-text-min-height="96">@safeDescriptionHtml</textarea>
+                      data-rich-text-min-height="96"
+                      @(metadataLocked ? "disabled=\"disabled\"" : null)>@safeDescriptionHtml</textarea>
         </label>
     </div>
+
+    @if (Model.HasPendingScheduleProposalLock && !string.IsNullOrWhiteSpace(Model.PendingScheduleProposalMessage))
+    {
+        <div class="alert warning">
+            @Model.PendingScheduleProposalMessage
+        </div>
+    }
 
     <div class="record-form-row record-form-row-dates">
         <label>
@@ -168,7 +179,7 @@
                     Name = "TerminUkonceni",
                     IsoValue = terminUkonceniIso,
                     DisplayValue = terminUkonceniDisplay,
-                    Locked = false,
+                    Locked = terminUkonceniLocked,
                     AriaLabel = "Otevřít kalendář"
                 })
         </label>
@@ -177,7 +188,7 @@
     <div class="record-form-row record-form-row-owner">
         <label>
             Subsystém
-            <select name="Subsystem" data-record-subsystem-select>
+            <select name="Subsystem" data-record-subsystem-select @(metadataLocked ? "disabled=\"disabled\"" : null)>
                 @foreach (var subsystem in Model.Subsystemy)
                 {
                     var subsystemValue = string.IsNullOrWhiteSpace(subsystem.Kod)
@@ -208,10 +219,11 @@
                  data-person-picker="single"
                  data-record-owner-picker
                  data-person-picker-placeholder="Vyhledejte vlastníka podle jména nebo emailu..."
+                 data-picker-locked="@(metadataLocked ? "true" : "false")"
                  data-person-picker-empty="Nenalezeny odpovídající osoby.">
                 <input type="hidden" name="VlastnikId" value="@Model.VlastnikId" data-person-picker-hidden required />
                 <div class="office-searchbox" data-floating-anchor>
-                    <input type="search" value="@selectedOwnerLabel" autocomplete="off" data-person-picker-input required />
+                    <input type="search" value="@selectedOwnerLabel" autocomplete="off" data-person-picker-input required @(metadataLocked ? "disabled=\"disabled\"" : null) />
                     <div class="office-search-panel" data-person-picker-panel hidden>
                         <div class="office-search-results" data-person-picker-results role="listbox" aria-label="Výsledky osob"></div>
                     </div>

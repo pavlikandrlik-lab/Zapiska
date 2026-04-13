@@ -3,6 +3,7 @@ using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Web.Services;
 
@@ -19,6 +20,7 @@ public sealed partial class ProjectService :
     private readonly IHarmonogramService harmonogramService;
     private readonly IMeetingService meetingService;
     private readonly ICommentService commentService;
+    private readonly IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator;
     private readonly TimeProvider timeProvider;
 
     public ProjectService(
@@ -29,6 +31,7 @@ public sealed partial class ProjectService :
         IHarmonogramService harmonogramService,
         IMeetingService meetingService,
         ICommentService commentService,
+        IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator,
         TimeProvider timeProvider)
     {
         this.dbContext = dbContext;
@@ -38,6 +41,7 @@ public sealed partial class ProjectService :
         this.harmonogramService = harmonogramService;
         this.meetingService = meetingService;
         this.commentService = commentService;
+        this.pendingScheduleProposalLockEvaluator = pendingScheduleProposalLockEvaluator;
         this.timeProvider = timeProvider;
     }
 }

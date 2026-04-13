@@ -2,6 +2,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Web.Services;
 
@@ -13,6 +14,7 @@ public sealed partial class RecordService : IRecordService
     private readonly IProjectService projectService;
     private readonly IRecordEditorQueriesComposition recordEditorQueriesComposition;
     private readonly IRecordWriteCommandsComposition recordWriteCommandsComposition;
+    private readonly IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator;
     private readonly TimeProvider timeProvider;
 
     public RecordService(
@@ -22,6 +24,7 @@ public sealed partial class RecordService : IRecordService
         IProjectService projectService,
         IRecordEditorQueriesComposition recordEditorQueriesComposition,
         IRecordWriteCommandsComposition recordWriteCommandsComposition,
+        IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator,
         TimeProvider timeProvider)
     {
         this.dbContext = dbContext;
@@ -30,6 +33,7 @@ public sealed partial class RecordService : IRecordService
         this.projectService = projectService;
         this.recordEditorQueriesComposition = recordEditorQueriesComposition;
         this.recordWriteCommandsComposition = recordWriteCommandsComposition;
+        this.pendingScheduleProposalLockEvaluator = pendingScheduleProposalLockEvaluator;
         this.timeProvider = timeProvider;
     }
 

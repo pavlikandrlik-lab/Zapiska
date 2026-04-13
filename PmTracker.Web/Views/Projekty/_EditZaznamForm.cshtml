@@ -28,12 +28,12 @@
 
 @if (!isPagePresentation)
 {
-    <h2 id="record-modal-title">@(Model.IsCreate ? "Nový projektový záznam" : "Upravit záznam")</h2>
+    <h2 id="record-modal-title">@(!string.IsNullOrWhiteSpace(Model.ModalTitle) ? Model.ModalTitle : (Model.IsCreate ? "Nový projektový záznam" : "Upravit záznam"))</h2>
 }
 
 <form class="form-grid record-editor-form"
-      asp-controller="Zaznamy"
-      asp-action="Save"
+      asp-controller="@Model.FormController"
+      asp-action="@Model.FormAction"
       method="post"
       data-ajax-submit="@(Model.UseAjaxSubmit ? "true" : "false")"
       data-record-editor-form="true"
@@ -115,7 +115,7 @@
         })
 
     <div class="record-editor-actions @(isPagePresentation ? "record-editor-actions-page" : "record-editor-actions-modal")">
-        @if (!Model.IsCreate && !string.IsNullOrWhiteSpace(deleteRecordModalUrl))
+        @if (!Model.IsProposalEditor && !Model.IsCreate && !string.IsNullOrWhiteSpace(deleteRecordModalUrl))
         {
             <button class="btn ghost danger"
                     type="button"
@@ -129,7 +129,7 @@
                     type="button"
                     data-record-editor-cancel
                     data-record-editor-back-url="@Model.BackUrl">
-                Zrušit a vrátit se do projektu
+                Zrušit a vrátit se
             </button>
         }
         else
@@ -141,12 +141,18 @@
                 Zrušit
             </button>
         }
+        @if (!string.IsNullOrWhiteSpace(Model.SecondaryNote))
+        {
+            <p class="muted record-editor-secondary-note">@Model.SecondaryNote</p>
+        }
         <button class="btn primary"
                 type="submit"
                 disabled="@(createBlockedByMissingMeeting ? "disabled" : null)">
-            @(isPagePresentation
-                ? (Model.IsCreate ? "Založit a vrátit se do projektu" : "Uložit a vrátit se do projektu")
-                : (Model.IsCreate ? "Založit záznam" : "Uložit"))
+            @(!string.IsNullOrWhiteSpace(Model.PrimaryActionLabel)
+                ? Model.PrimaryActionLabel
+                : (isPagePresentation
+                    ? (Model.IsCreate ? "Založit a vrátit se do projektu" : "Uložit a vrátit se do projektu")
+                    : (Model.IsCreate ? "Založit záznam" : "Uložit")))
         </button>
     </div>
 </form>

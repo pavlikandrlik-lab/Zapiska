@@ -55,6 +55,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<MeetingService>();
         services.AddScoped<ProjectService>();
         services.AddScoped<RecordService>();
+        services.AddScoped<RecordProposalService>();
         services.AddScoped<PeopleService>();
         services.AddScoped<ProfileService>();
         services.AddScoped<DictionaryService>();
@@ -63,6 +64,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IMeetingService>(sp => sp.GetRequiredService<MeetingService>());
         services.AddScoped<IProjectService>(sp => sp.GetRequiredService<ProjectService>());
         services.AddScoped<IRecordService>(sp => sp.GetRequiredService<RecordService>());
+        services.AddScoped<IRecordProposalService>(sp => sp.GetRequiredService<RecordProposalService>());
         services.AddScoped<IPeopleService>(sp => sp.GetRequiredService<PeopleService>());
         services.AddScoped<IProfileService>(sp => sp.GetRequiredService<ProfileService>());
         services.AddScoped<IDictionaryService>(sp => sp.GetRequiredService<DictionaryService>());
@@ -71,6 +73,9 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IRecordWriteCommandsComposition>(sp => sp.GetRequiredService<ProjectService>());
         services.AddScoped<IDocumentationService, MarkdownDocumentationService>();
         services.AddScoped<IRecordUiFlowResolver, RecordUiFlowResolver>();
+        services.AddScoped<IRecordProposalAuthorizationPolicy, RecordProposalAuthorizationPolicy>();
+        services.AddScoped<IPendingScheduleProposalLockEvaluator, PendingScheduleProposalLockEvaluator>();
+        services.AddScoped<RecordProposalPayloadMapper>();
         services.AddScoped<IExportCommentProjectionBuilder, ExportCommentProjectionBuilder>();
         services.AddScoped<IExportRoleProjectionBuilder, ExportRoleProjectionBuilder>();
         services.AddScoped<IExportAttendanceProjectionBuilder, ExportAttendanceProjectionBuilder>();

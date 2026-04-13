@@ -303,7 +303,8 @@ public sealed class ProjektyControllerBehaviorTests
     private static ProjektyController CreateController(
         FakeProjectService projectService,
         TimeProvider? timeProvider = null,
-        FakeMeetingService? meetingService = null)
+        FakeMeetingService? meetingService = null,
+        FakeRecordProposalService? recordProposalService = null)
     {
         var services = new ServiceCollection();
         if (timeProvider is not null)
@@ -321,7 +322,8 @@ public sealed class ProjektyControllerBehaviorTests
             timeProvider: timeProvider ?? TimeProvider.System,
             loggerFactory: NullLoggerFactory.Instance,
             projectService: projectService,
-            meetingService: meetingService ?? new FakeMeetingService())
+            meetingService: meetingService ?? new FakeMeetingService(),
+            recordProposalService: recordProposalService ?? new FakeRecordProposalService())
         {
             ControllerContext = new ControllerContext
             {
@@ -605,5 +607,38 @@ public sealed class ProjektyControllerBehaviorTests
         public string? Link(string? routeName, object? values) => "/stub";
 
         public string? RouteUrl(UrlRouteContext routeContext) => "/stub";
+    }
+
+    private sealed class FakeRecordProposalService : IRecordProposalService
+    {
+        public Task<bool> CanViewProposalTabAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => Task.FromResult(false);
+
+        public Task<ProjektNavrhyTabViewModel> BuildProjectProposalsTabAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => Task.FromResult(new ProjektNavrhyTabViewModel { ProjektId = projectId });
+
+        public Task<ZaznamEditViewModel> BuildCreateRecordProposalEditorAsync(int projectId, CurrentUserContextViewModel currentUser, int? meetingId = null, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<ZaznamEditViewModel> BuildScheduleProposalEditorAsync(int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<ZaznamEditViewModel> BuildPrefilledCreateRecordEditorFromProposalAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task SubmitCreateRecordProposalAsync(SaveRecordCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task SubmitScheduleProposalAsync(SaveRecordCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<int?> ApproveProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task RejectProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task RejectAndTakeOverCreateProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
     }
 }

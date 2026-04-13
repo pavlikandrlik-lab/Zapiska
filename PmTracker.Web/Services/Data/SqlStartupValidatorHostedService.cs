@@ -76,7 +76,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             throw new InvalidOperationException("V DB chybí sloupec dbo.osoby.email. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
         }
 
-        foreach (var requiredTable in new[] { "dbo.projekt_subsystemy", "dbo.ciselnik_roli_subsystemu", "dbo.obsazeni_subsystemu_projektu" })
+        foreach (var requiredTable in new[] { "dbo.projekt_subsystemy", "dbo.ciselnik_roli_subsystemu", "dbo.obsazeni_subsystemu_projektu", "dbo.zaznam_navrhy" })
         {
             if (!await HasTableAsync(dbContext, requiredTable, ct))
             {
@@ -130,6 +130,14 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         if (!await HasColumnAsync(dbContext, "dbo.projekt_subsystemy", "poradi", ct))
         {
             throw new InvalidOperationException("V DB chybí sloupec dbo.projekt_subsystemy.poradi. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_2_project_subsystem_order.sql.");
+        }
+
+        foreach (var requiredColumn in new[] { "typ_navrhu", "stav", "payload_json", "created_by_osoba_id", "created_at", "row_version" })
+        {
+            if (!await HasColumnAsync(dbContext, "dbo.zaznam_navrhy", requiredColumn, ct))
+            {
+                throw new InvalidOperationException($"V DB chybí sloupec dbo.zaznam_navrhy.{requiredColumn}. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_3_record_proposals.sql.");
+            }
         }
 
         _logger.LogInformation("SQL startup validace proběhla úspěšně.");

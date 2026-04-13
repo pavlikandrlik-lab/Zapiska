@@ -255,6 +255,25 @@ CREATE TABLE dbo.projektove_zaznamy (
 );
 GO
 
+CREATE TABLE dbo.zaznam_navrhy (
+    id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_navrhy PRIMARY KEY,
+    projekt_id int NOT NULL,
+    zaznam_id int NULL,
+    subsystem_id int NOT NULL,
+    typ_navrhu nvarchar(64) NOT NULL,
+    stav nvarchar(32) NOT NULL,
+    payload_json nvarchar(max) NOT NULL,
+    created_by_osoba_id int NOT NULL,
+    created_at datetime2 NOT NULL CONSTRAINT DF_zaznam_navrhy_created_at DEFAULT (SYSUTCDATETIME()),
+    decided_by_osoba_id int NULL,
+    decided_at datetime2 NULL,
+    approved_record_id int NULL,
+    row_version rowversion NOT NULL,
+    CONSTRAINT CK_zaznam_navrhy_typ CHECK (typ_navrhu IN (N'CREATE_RECORD', N'SCHEDULE_PLAN_CHANGE')),
+    CONSTRAINT CK_zaznam_navrhy_stav CHECK (stav IN (N'PENDING', N'APPROVED', N'REJECTED'))
+);
+GO
+
 CREATE TABLE dbo.zaznam_harmonogram_hodnoty (
     id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_harmonogram_hodnoty PRIMARY KEY,
     zaznam_id int NOT NULL,
@@ -479,6 +498,12 @@ ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_vlastnik
 ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_subsystem FOREIGN KEY (subsystem_id) REFERENCES dbo.subsystemy(id);
 ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_harmonogram_sablona FOREIGN KEY (harmonogram_sablona_verze) REFERENCES dbo.harmonogram_sablony(verze);
 ALTER TABLE dbo.projektove_zaznamy ADD CONSTRAINT FK_projektove_zaznamy_cislo_jednani_zdroj FOREIGN KEY (cislo_jednani_zdroj_id) REFERENCES dbo.jednani(id);
+ALTER TABLE dbo.zaznam_navrhy ADD CONSTRAINT FK_zaznam_navrhy_projekt FOREIGN KEY (projekt_id) REFERENCES dbo.projekty(id);
+ALTER TABLE dbo.zaznam_navrhy ADD CONSTRAINT FK_zaznam_navrhy_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_navrhy ADD CONSTRAINT FK_zaznam_navrhy_subsystem FOREIGN KEY (subsystem_id) REFERENCES dbo.subsystemy(id);
+ALTER TABLE dbo.zaznam_navrhy ADD CONSTRAINT FK_zaznam_navrhy_created_by FOREIGN KEY (created_by_osoba_id) REFERENCES dbo.osoby(id);
+ALTER TABLE dbo.zaznam_navrhy ADD CONSTRAINT FK_zaznam_navrhy_decided_by FOREIGN KEY (decided_by_osoba_id) REFERENCES dbo.osoby(id);
+ALTER TABLE dbo.zaznam_navrhy ADD CONSTRAINT FK_zaznam_navrhy_approved_record FOREIGN KEY (approved_record_id) REFERENCES dbo.projektove_zaznamy(id);
 
 ALTER TABLE dbo.zaznam_harmonogram_hodnoty ADD CONSTRAINT FK_zaznam_harmonogram_hodnoty_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
 ALTER TABLE dbo.zaznam_harmonogram_hodnoty ADD CONSTRAINT FK_zaznam_harmonogram_hodnoty_typ FOREIGN KEY (typ_id) REFERENCES dbo.ciselnik_harmonogram_typu(id);
@@ -547,6 +572,11 @@ CREATE UNIQUE INDEX UX_projektove_zaznamy_projekt_cislo ON dbo.projektove_zaznam
 CREATE UNIQUE INDEX UX_projektove_zaznamy_projekt_cislo_viditelne ON dbo.projektove_zaznamy(projekt_id, cislo_viditelne) WHERE cislo_viditelne IS NOT NULL;
 CREATE UNIQUE INDEX UX_projektove_zaznamy_projekt_meeting_order ON dbo.projektove_zaznamy(projekt_id, cislo_viditelne_a, cislo_viditelne_b) WHERE cislo_viditelne_typ = 1;
 CREATE INDEX IX_projektove_zaznamy_projekt_sort ON dbo.projektove_zaznamy(projekt_id, cislo_viditelne_a, cislo_viditelne_b, cislo_zaznamu);
+CREATE INDEX IX_zaznam_navrhy_projekt_created_at ON dbo.zaznam_navrhy(projekt_id, created_at);
+CREATE INDEX IX_zaznam_navrhy_zaznam_typ_stav ON dbo.zaznam_navrhy(zaznam_id, typ_navrhu, stav);
+CREATE UNIQUE INDEX UX_zaznam_navrhy_pending_schedule_per_record
+    ON dbo.zaznam_navrhy(zaznam_id, typ_navrhu)
+    WHERE stav = N'PENDING' AND typ_navrhu = N'SCHEDULE_PLAN_CHANGE';
 
 CREATE INDEX IX_vyjadreni_autor_osoba_id ON dbo.vyjadreni(autor_osoba_id);
 

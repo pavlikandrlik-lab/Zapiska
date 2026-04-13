@@ -27,6 +27,19 @@
      style="--record-schedule-delay-color:@Model.DelayBarvaHex;">
     @if (isEditor)
     {
+        @if (Model.EditorPlanFieldsLocked)
+        {
+            <div class="alert warning">
+                Plánová část harmonogramu je do vyřízení aktivního návrhu uzamčená.
+            </div>
+        }
+        else if (Model.EditorCanEditPlanOnly)
+        {
+            <div class="alert info">
+                V tomto režimu lze měnit pouze plánovou část harmonogramu. Skutečnost zůstává jen pro čtení.
+            </div>
+        }
+
         <div class="schedule-summary-grid">
             <div><span class="label">Termín úkolu:</span> <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></div>
             <div><span class="label">Plán dokončení:</span> <strong data-schedule-summary-baseline>@Model.Souhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></div>
@@ -178,8 +191,12 @@
                         var durationStaticDisabled = krok.TrvaniTypId <= 0;
                         var delayStaticDisabled = krok.ZpozdeniTypId <= 0;
                         var stepStaticDisabled = durationStaticDisabled || delayStaticDisabled;
-                        var canEditDuration = Model.EditorCanEditScheduleFull || (Model.EditorCanEditScheduleAddOnly && krok.TrvaniDni <= 0);
-                        var canEditDelay = Model.EditorCanEditScheduleFull || Model.EditorCanEditScheduleAddOnly;
+                        var canEditDuration = !Model.EditorPlanFieldsLocked
+                            && (Model.EditorCanEditScheduleFull
+                                || Model.EditorCanEditPlanOnly
+                                || (Model.EditorCanEditScheduleAddOnly && krok.TrvaniDni <= 0));
+                        var canEditDelay = !Model.EditorCanEditPlanOnly
+                            && (Model.EditorCanEditScheduleFull || Model.EditorCanEditScheduleAddOnly);
                         var durationDisabled = !Model.EditorJeUkolKategorie || durationStaticDisabled || !canEditDuration;
                         var delayDisabled = !Model.EditorJeUkolKategorie || delayStaticDisabled || !canEditDelay;
                         var dateDisabled = !Model.EditorJeUkolKategorie || stepStaticDisabled || !canEditDuration;
