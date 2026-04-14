@@ -1,6 +1,7 @@
 using FluentAssertions;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Dictionaries;
 
@@ -12,7 +13,7 @@ public sealed class DictionaryServiceTests
     public async Task SaveHarmonogramStepRowAsync_ShouldDelegateToHarmonogramService()
     {
         var harmonogramService = new FakeHarmonogramService();
-        var sut = new DictionaryService(null!, harmonogramService);
+        var sut = new DictionaryService(null!, harmonogramService, new FakeAuditWriteService());
         var command = new SaveCiselnikRowCommand
         {
             Key = "harmonogram-kroky",
@@ -29,7 +30,7 @@ public sealed class DictionaryServiceTests
     public async Task DeleteHarmonogramStepRowAsync_ShouldDelegateToHarmonogramService()
     {
         var harmonogramService = new FakeHarmonogramService();
-        var sut = new DictionaryService(null!, harmonogramService);
+        var sut = new DictionaryService(null!, harmonogramService, new FakeAuditWriteService());
         var command = new DeleteCiselnikRowCommand
         {
             Key = "harmonogram-kroky",
@@ -68,5 +69,15 @@ public sealed class DictionaryServiceTests
             LastDeleteCommand = command;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeAuditWriteService : IAuditWriteService
+    {
+        public void Add(int? actorOsobaId, AuditWriteEntry entry)
+        {
+        }
+
+        public Task WriteAsync(int? actorOsobaId, AuditWriteEntry entry, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

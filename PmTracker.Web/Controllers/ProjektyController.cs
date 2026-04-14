@@ -66,7 +66,7 @@ public sealed class ProjektyController : BaseController
         return View(model);
     }
 
-    public async Task<IActionResult> Detail(int id, string? tab, CancellationToken ct = default)
+    public async Task<IActionResult> Detail(int id, string? tab, int? recordId, bool openComments = false, CancellationToken ct = default)
     {
         if (!await _projectService.ProjektExistsAsync(id, ct))
         {
@@ -81,6 +81,8 @@ public sealed class ProjektyController : BaseController
         var requestedTab = NormalizeProjectTab(tab);
         var model = await _projectService.BuildProjektDetailAsync(id, ct);
         model.ActiveTab = requestedTab;
+        model.TargetRecordId = requestedTab == RecordsTab ? recordId : null;
+        model.TargetRecordOpenComments = requestedTab == RecordsTab && openComments;
         await PrepareProjectDetailPresentationAsync(model, ct);
         await PrepareActiveProjectTabAsync(model, requestedTab, ct);
         return View(model);

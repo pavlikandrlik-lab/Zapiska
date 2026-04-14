@@ -1,9 +1,9 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services;
 
@@ -37,22 +37,31 @@ public sealed partial class ProjectService
 
         var existing = await dbContext.ObsazeniProjektu
             .FirstOrDefaultAsync(x => x.ProjektId == command.ProjektId && x.OsobaId == osobaId, ct);
+        ProjectMembershipAuditSnapshot? oldSnapshot = null;
         if (existing is null)
         {
-            dbContext.ObsazeniProjektu.Add(new ObsazeniProjektuEntity
+            existing = new ObsazeniProjektuEntity
             {
                 ProjektId = command.ProjektId,
                 OsobaId = osobaId,
                 RoleId = roleId
-            });
+            };
+            dbContext.ObsazeniProjektu.Add(existing);
         }
         else
         {
+            oldSnapshot = ProjectMembershipAuditSnapshot.FromEntity(existing);
             existing.RoleId = roleId;
         }
 
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "obsazeni_projektu", $"{command.ProjektId}:{osobaId}", "upsert", null, JsonSerializer.Serialize(command), ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            oldSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
+            AuditEntityType.ProjectMembership,
+            existing.Id.ToString(CultureInfo.InvariantCulture),
+            oldSnapshot,
+            ProjectMembershipAuditSnapshot.FromEntity(existing)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task RemoveTeamMemberAsync(RemoveTeamMemberCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -65,9 +74,20 @@ public sealed partial class ProjectService
             return;
         }
 
+        var snapshots = rows.Select(ProjectMembershipAuditSnapshot.FromEntity).ToList();
         dbContext.ObsazeniProjektu.RemoveRange(rows);
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "obsazeni_projektu", $"{command.ProjektId}:{command.OsobaId}", "delete", null, null, ct);
+        foreach (var snapshot in snapshots)
+        {
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Delete,
+                AuditEntityType.ProjectMembership,
+                snapshot.Id.ToString(CultureInfo.InvariantCulture),
+                snapshot,
+                null));
+        }
+
+        await dbContext.SaveChangesAsync(ct);
     }
 
     private async Task<List<ActiveProjectMembershipRow>> BuildActiveProjectMembershipRowsAsync(int projectId, CancellationToken ct)

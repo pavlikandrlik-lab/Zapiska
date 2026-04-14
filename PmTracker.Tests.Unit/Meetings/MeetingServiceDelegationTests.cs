@@ -1,6 +1,7 @@
 using FluentAssertions;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Tests.Unit.Meetings;
 
@@ -10,7 +11,7 @@ public sealed class MeetingServiceDelegationTests
     public async Task SaveMeetingNotesBatchAsync_ShouldDelegateToCommentService()
     {
         var commentService = new FakeCommentService();
-        var sut = new MeetingService(null!, null!, null!, commentService, TimeProvider.System);
+        var sut = new MeetingService(null!, null!, null!, commentService, new FakeAuditWriteService(), TimeProvider.System);
         var currentUser = BuildCurrentUser();
         var rows = new List<(int ZaznamId, string Text)>
         {
@@ -68,5 +69,15 @@ public sealed class MeetingServiceDelegationTests
             LastUser = currentUser;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeAuditWriteService : IAuditWriteService
+    {
+        public void Add(int? actorOsobaId, AuditWriteEntry entry)
+        {
+        }
+
+        public Task WriteAsync(int? actorOsobaId, AuditWriteEntry entry, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

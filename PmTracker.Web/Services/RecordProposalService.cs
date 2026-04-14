@@ -7,6 +7,7 @@ using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services;
 
@@ -40,6 +41,7 @@ public sealed class RecordProposalService : IRecordProposalService
     private readonly IPendingScheduleProposalLockEvaluator _pendingScheduleProposalLockEvaluator;
     private readonly RecordProposalPayloadMapper _payloadMapper;
     private readonly IHarmonogramService _harmonogramService;
+    private readonly IAuditWriteService _auditWriteService;
     private readonly TimeProvider _timeProvider;
 
     public RecordProposalService(
@@ -49,6 +51,7 @@ public sealed class RecordProposalService : IRecordProposalService
         IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator,
         RecordProposalPayloadMapper payloadMapper,
         IHarmonogramService harmonogramService,
+        IAuditWriteService auditWriteService,
         TimeProvider timeProvider)
     {
         _dbContext = dbContext;
@@ -57,6 +60,7 @@ public sealed class RecordProposalService : IRecordProposalService
         _pendingScheduleProposalLockEvaluator = pendingScheduleProposalLockEvaluator;
         _payloadMapper = payloadMapper;
         _harmonogramService = harmonogramService;
+        _auditWriteService = auditWriteService;
         _timeProvider = timeProvider;
     }
 
@@ -320,7 +324,16 @@ public sealed class RecordProposalService : IRecordProposalService
             CreatedAt = _timeProvider.GetUtcNow().UtcDateTime
         });
         await _dbContext.SaveChangesAsync(ct);
-        await AppendAuditAsync(currentUser.OsobaId, "zaznam_navrhy", "create_proposal_submit", ct);
+        var createdProposal = await _dbContext.ZaznamNavrhy
+            .OrderByDescending(x => x.Id)
+            .FirstAsync(x => x.ProjektId == command.ProjektId && x.CreatedByOsobaId == currentUser.OsobaId, ct);
+        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.RecordProposal,
+            createdProposal.Id.ToString(CultureInfo.InvariantCulture),
+            null,
+            ProposalAuditSnapshot.FromEntity(createdProposal)));
+        await _dbContext.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
 
@@ -393,13 +406,23 @@ public sealed class RecordProposalService : IRecordProposalService
             CreatedAt = _timeProvider.GetUtcNow().UtcDateTime
         });
         await _dbContext.SaveChangesAsync(ct);
-        await AppendAuditAsync(currentUser.OsobaId, "zaznam_navrhy", "schedule_proposal_submit", ct);
+        var createdProposal = await _dbContext.ZaznamNavrhy
+            .OrderByDescending(x => x.Id)
+            .FirstAsync(x => x.ZaznamId == record.Id && x.CreatedByOsobaId == currentUser.OsobaId, ct);
+        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.RecordProposal,
+            createdProposal.Id.ToString(CultureInfo.InvariantCulture),
+            null,
+            ProposalAuditSnapshot.FromEntity(createdProposal)));
+        await _dbContext.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
 
     public async Task<int?> ApproveProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
         var proposal = await LoadPendingProposalForDecisionAsync(command, currentUser, ct);
+        var oldProposalSnapshot = ProposalAuditSnapshot.FromEntity(proposal);
 
         await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         int? approvedRecordId = null;
@@ -427,7 +450,13 @@ public sealed class RecordProposalService : IRecordProposalService
         proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
         proposal.ApprovedRecordId = approvedRecordId;
         await _dbContext.SaveChangesAsync(ct);
-        await AppendAuditAsync(currentUser.OsobaId, "zaznam_navrhy", "proposal_approved", ct);
+        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Approve,
+            AuditEntityType.RecordProposal,
+            proposal.Id.ToString(CultureInfo.InvariantCulture),
+            oldProposalSnapshot,
+            ProposalAuditSnapshot.FromEntity(proposal)));
+        await _dbContext.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
         return approvedRecordId;
@@ -436,12 +465,19 @@ public sealed class RecordProposalService : IRecordProposalService
     public async Task RejectProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
         var proposal = await LoadPendingProposalForDecisionAsync(command, currentUser, ct);
+        var oldProposalSnapshot = ProposalAuditSnapshot.FromEntity(proposal);
         await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         proposal.Stav = RecordProposalStateCodes.Rejected;
         proposal.DecidedByOsobaId = currentUser.OsobaId;
         proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
         await _dbContext.SaveChangesAsync(ct);
-        await AppendAuditAsync(currentUser.OsobaId, "zaznam_navrhy", "proposal_rejected", ct);
+        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Reject,
+            AuditEntityType.RecordProposal,
+            proposal.Id.ToString(CultureInfo.InvariantCulture),
+            oldProposalSnapshot,
+            ProposalAuditSnapshot.FromEntity(proposal)));
+        await _dbContext.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
 
@@ -453,25 +489,39 @@ public sealed class RecordProposalService : IRecordProposalService
             throw new InvalidOperationException("Převzetí do formuláře je dostupné jen pro návrh založení záznamu.");
         }
 
+        var oldProposalSnapshot = ProposalAuditSnapshot.FromEntity(proposal);
         await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         proposal.Stav = RecordProposalStateCodes.Rejected;
         proposal.DecidedByOsobaId = currentUser.OsobaId;
         proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
         await _dbContext.SaveChangesAsync(ct);
-        await AppendAuditAsync(currentUser.OsobaId, "zaznam_navrhy", "proposal_rejected_takeover", ct);
+        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Reject,
+            AuditEntityType.RecordProposal,
+            proposal.Id.ToString(CultureInfo.InvariantCulture),
+            oldProposalSnapshot,
+            ProposalAuditSnapshot.FromEntity(proposal, "takeover")));
+        await _dbContext.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
 
     public async Task RejectAndEditProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
         var proposal = await LoadPendingProposalForDecisionAsync(command, currentUser, ct);
+        var oldProposalSnapshot = ProposalAuditSnapshot.FromEntity(proposal);
 
         await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         proposal.Stav = RecordProposalStateCodes.Rejected;
         proposal.DecidedByOsobaId = currentUser.OsobaId;
         proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
         await _dbContext.SaveChangesAsync(ct);
-        await AppendAuditAsync(currentUser.OsobaId, "zaznam_navrhy", "proposal_rejected_edit", ct);
+        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Reject,
+            AuditEntityType.RecordProposal,
+            proposal.Id.ToString(CultureInfo.InvariantCulture),
+            oldProposalSnapshot,
+            ProposalAuditSnapshot.FromEntity(proposal, "edit")));
+        await _dbContext.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
 
@@ -902,6 +952,7 @@ public sealed class RecordProposalService : IRecordProposalService
         var record = await _dbContext.ProjektoveZaznamy
             .FirstOrDefaultAsync(x => x.Id == proposal.ZaznamId.Value && x.ProjektId == proposal.ProjektId, ct)
             ?? throw new InvalidOperationException($"Záznam {proposal.ZaznamId.Value} nebyl nalezen.");
+        var oldRecordSnapshot = RecordAuditSnapshot.FromEntity(record);
 
         var scheduleTypeDefinitions = await ResolveScheduleTypeDefinitionsAsync(record, ct);
         var plannedTypeIds = scheduleTypeDefinitions
@@ -934,6 +985,9 @@ public sealed class RecordProposalService : IRecordProposalService
         var existingRows = await _dbContext.ZaznamHarmonogramHodnoty
             .Where(x => x.ZaznamId == record.Id && allowedTypeIds.Contains(x.TypId))
             .ToListAsync(ct);
+        var oldScheduleSnapshot = existingRows.Count == 0
+            ? null
+            : RecordScheduleAuditSnapshot.FromEntities(record.Id, existingRows);
         var normalizedValues = submittedValues
             .Where(x => x.Hodnota > 0 || actualTypeIds.Contains(x.TypId))
             .ToDictionary(x => x.TypId, x => x.Hodnota);
@@ -970,7 +1024,31 @@ public sealed class RecordProposalService : IRecordProposalService
         }
 
         await _dbContext.SaveChangesAsync(ct);
-        await AppendAuditAsync(currentUser.OsobaId, "projektove_zaznamy", "schedule_proposal_apply", ct);
+        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Update,
+            AuditEntityType.Record,
+            record.Id.ToString(CultureInfo.InvariantCulture),
+            oldRecordSnapshot,
+            RecordAuditSnapshot.FromEntity(record)));
+
+        var newScheduleRows = await _dbContext.ZaznamHarmonogramHodnoty
+            .AsNoTracking()
+            .Where(x => x.ZaznamId == record.Id && allowedTypeIds.Contains(x.TypId))
+            .ToListAsync(ct);
+        var newScheduleSnapshot = newScheduleRows.Count == 0
+            ? null
+            : RecordScheduleAuditSnapshot.FromEntities(record.Id, newScheduleRows);
+        if (oldScheduleSnapshot is not null || newScheduleSnapshot is not null)
+        {
+            _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
+                AuditEntityType.RecordSchedule,
+                record.Id.ToString(CultureInfo.InvariantCulture),
+                oldScheduleSnapshot,
+                newScheduleSnapshot));
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     private RecordProposalListItemViewModel BuildProposalListItem(
@@ -1069,18 +1147,4 @@ public sealed class RecordProposalService : IRecordProposalService
         return proposal;
     }
 
-    private async Task AppendAuditAsync(int? actorOsobaId, string entityType, string action, CancellationToken ct)
-    {
-        _dbContext.AuthzAuditLog.Add(new AuthzAuditLogEntity
-        {
-            ActorOsobaId = actorOsobaId,
-            EntityType = entityType,
-            EntityId = action,
-            Action = action,
-            OldValue = null,
-            NewValue = null,
-            CreatedAt = _timeProvider.GetUtcNow().UtcDateTime
-        });
-        await _dbContext.SaveChangesAsync(ct);
-    }
 }

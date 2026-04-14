@@ -12,9 +12,11 @@ using PmTracker.Web.Services.Profile;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Documentation;
+using PmTracker.Web.Services.Dashboard;
 using PmTracker.Web.Services.Home;
 using PmTracker.Web.Services.Settings;
 using PmTracker.Web.Services.Records;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services.Data;
 
@@ -50,6 +52,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IPersonIdentityMatcher, PersonIdentityMatcher>();
         services.AddScoped<IPermissionEvaluationService, PermissionEvaluationService>();
         services.AddScoped<ICommentAuthorizationPolicy, CommentAuthorizationPolicy>();
+        services.AddScoped<IAuditWriteService, AuditWriteService>();
         services.AddScoped<IRichTextContentService, RichTextContentService>();
         services.AddScoped<HarmonogramService>();
         services.AddScoped<CommentService>();
@@ -57,6 +60,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<ProjectService>();
         services.AddScoped<RecordService>();
         services.AddScoped<RecordProposalService>();
+        services.AddScoped<DashboardService>();
         services.AddScoped<HomeDashboardService>();
         services.AddScoped<PeopleService>();
         services.AddScoped<ProfileService>();
@@ -67,6 +71,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IProjectService>(sp => sp.GetRequiredService<ProjectService>());
         services.AddScoped<IRecordService>(sp => sp.GetRequiredService<RecordService>());
         services.AddScoped<IRecordProposalService>(sp => sp.GetRequiredService<RecordProposalService>());
+        services.AddScoped<IDashboardService>(sp => sp.GetRequiredService<DashboardService>());
         services.AddScoped<IHomeDashboardService>(sp => sp.GetRequiredService<HomeDashboardService>());
         services.AddScoped<IPeopleService>(sp => sp.GetRequiredService<PeopleService>());
         services.AddScoped<IProfileService>(sp => sp.GetRequiredService<ProfileService>());

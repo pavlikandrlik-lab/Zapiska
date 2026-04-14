@@ -166,6 +166,39 @@ export async function toggleRecordCard(cardOrChild, options = {}) {
     }
 }
 
+export function initProjectRecordDeepLink(scope = document) {
+    const panel = scope instanceof HTMLElement && scope.matches('[data-tab-panel="zaznamy"]')
+        ? scope
+        : scope.querySelector?.('[data-tab-panel="zaznamy"][data-project-detail-root]');
+    if (!(panel instanceof HTMLElement)) {
+        return;
+    }
+
+    const targetRecordId = String(panel.dataset.recordTargetId || "").trim();
+    if (!targetRecordId || panel.dataset.recordTargetHandled === "true") {
+        return;
+    }
+
+    const targetCard = panel.querySelector(`.record-card[data-record-id="${CSS.escape(targetRecordId)}"]`);
+    if (!(targetCard instanceof HTMLElement)) {
+        return;
+    }
+
+    panel.dataset.recordTargetHandled = "true";
+    const openComments = panel.dataset.recordTargetOpenComments === "true";
+
+    window.requestAnimationFrame(async () => {
+        await toggleRecordCard(targetCard, { expand: true });
+        targetCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (openComments) {
+            const commentsShell = targetCard.querySelector("[data-record-comments-shell]");
+            if (commentsShell instanceof HTMLElement) {
+                commentsShell.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+        }
+    });
+}
+
 export function handleNavigationCardClick(target) {
     if (!(target instanceof Element)) {
         return false;

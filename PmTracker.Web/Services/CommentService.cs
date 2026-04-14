@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
@@ -7,6 +6,7 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services;
 
@@ -14,6 +14,7 @@ public sealed class CommentService(
     PmTrackerDbContext dbContext,
     IRichTextContentService richTextContentService,
     ICommentAuthorizationPolicy commentAuthorizationPolicy,
+    IAuditWriteService auditWriteService,
     TimeProvider timeProvider) : ICommentService
 {
     public async Task AddCommentAsync(AddCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -61,14 +62,13 @@ public sealed class CommentService(
 
         dbContext.Vyjadreni.Add(note);
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "vyjadreni",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.Comment,
             note.Id.ToString(CultureInfo.InvariantCulture),
-            "create",
             null,
-            JsonSerializer.Serialize(note),
-            ct);
+            CommentAuditSnapshot.FromEntity(note)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task UpdateCommentAsync(UpdateCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -102,18 +102,17 @@ public sealed class CommentService(
             throw new InvalidOperationException("Nemáte oprávnění upravit toto vyjádření.");
         }
 
-        var old = JsonSerializer.Serialize(comment);
+        var old = CommentAuditSnapshot.FromEntity(comment);
         comment.TextVyjadreni = normalizedText;
         comment.DatumVyjadreni = GetLocalNow();
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "vyjadreni",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Update,
+            AuditEntityType.Comment,
             comment.Id.ToString(CultureInfo.InvariantCulture),
-            "update",
             old,
-            JsonSerializer.Serialize(comment),
-            ct);
+            CommentAuditSnapshot.FromEntity(comment)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task DeleteCommentAsync(DeleteCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -146,17 +145,16 @@ public sealed class CommentService(
             throw new InvalidOperationException("Nemáte oprávnění smazat toto vyjádření.");
         }
 
-        var old = JsonSerializer.Serialize(comment);
+        var old = CommentAuditSnapshot.FromEntity(comment);
         dbContext.Vyjadreni.Remove(comment);
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "vyjadreni",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Delete,
+            AuditEntityType.Comment,
             comment.Id.ToString(CultureInfo.InvariantCulture),
-            "delete",
             old,
-            null,
-            ct);
+            null));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public Task SaveMeetingNoteAsync(SaveMeetingNoteCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -223,13 +221,12 @@ public sealed class CommentService(
 
         foreach (var note in notes)
         {
-            AddAuditEntry(
-                currentUser.OsobaId,
-                "vyjadreni",
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Create,
+                AuditEntityType.Comment,
                 note.Id.ToString(CultureInfo.InvariantCulture),
-                "create",
                 null,
-                JsonSerializer.Serialize(note));
+                CommentAuditSnapshot.FromEntity(note)));
         }
 
         await dbContext.SaveChangesAsync(ct);
@@ -344,30 +341,4 @@ public sealed class CommentService(
                 group => group.Select(x => x.OsobaId).Distinct().OrderBy(x => x).ToList());
     }
 
-    private void AddAuditEntry(int? actorOsobaId, string entityType, string entityId, string action, string? oldValue, string? newValue)
-    {
-        dbContext.AuthzAuditLog.Add(new AuthzAuditLogEntity
-        {
-            ActorOsobaId = actorOsobaId,
-            EntityType = entityType,
-            EntityId = entityId,
-            Action = action,
-            OldValue = oldValue,
-            NewValue = newValue,
-            CreatedAt = GetUtcNow()
-        });
-    }
-
-    private async Task WriteAuditAsync(
-        int? actorOsobaId,
-        string entityType,
-        string entityId,
-        string action,
-        string? oldValue,
-        string? newValue,
-        CancellationToken ct)
-    {
-        AddAuditEntry(actorOsobaId, entityType, entityId, action, oldValue, newValue);
-        await dbContext.SaveChangesAsync(ct);
-    }
 }

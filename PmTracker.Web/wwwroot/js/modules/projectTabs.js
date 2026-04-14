@@ -1,4 +1,5 @@
 import { initCommentSortUi } from "./comments.js";
+import { initProjectRecordDeepLink } from "./recordLazyLoading.js";
 import {
     applyRecordsView,
     initSubsystemScrollIndicator,
@@ -223,6 +224,7 @@ export function initProjectTabs() {
 
 export function initProjectRecordsUi(options = {}) {
     projectNavigationController.initRecordsUi(options);
+    initProjectRecordDeepLink(document);
 }
 
 export async function loadProjectTabPanel(tabNameOrPanel, options = {}) {
@@ -257,6 +259,7 @@ export async function loadProjectTabPanel(tabNameOrPanel, options = {}) {
 
             if (tabKey === "zaznamy") {
                 initProjectRecordsUi();
+                initProjectRecordDeepLink(currentPanel);
             }
             else if (tabKey === "harmonogram") {
                 initProjectScheduleUi();

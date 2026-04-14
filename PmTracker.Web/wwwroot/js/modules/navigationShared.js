@@ -1,7 +1,24 @@
+export function appendCurrentAsUser(url) {
+    const currentUrl = new URL(window.location.href);
+    const asUser = currentUrl.searchParams.get("asUser");
+    if (!asUser) {
+        return url;
+    }
+
+    const resolvedUrl = new URL(url, window.location.origin);
+    if (resolvedUrl.origin !== window.location.origin || resolvedUrl.searchParams.has("asUser")) {
+        return url;
+    }
+
+    resolvedUrl.searchParams.set("asUser", asUser);
+    return `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`;
+}
+
 export async function fetchHtmlDocument(url) {
-    const response = await fetch(url, {
+    const response = await fetch(appendCurrentAsUser(url), {
         headers: { "X-Requested-With": "XMLHttpRequest" },
-        credentials: "same-origin"
+        credentials: "same-origin",
+        cache: "no-store"
     });
 
     if (!response.ok) {
@@ -13,9 +30,10 @@ export async function fetchHtmlDocument(url) {
 }
 
 export async function fetchHtmlFragment(url) {
-    const response = await fetch(url, {
+    const response = await fetch(appendCurrentAsUser(url), {
         headers: { "X-Requested-With": "XMLHttpRequest" },
-        credentials: "same-origin"
+        credentials: "same-origin",
+        cache: "no-store"
     });
 
     if (!response.ok) {

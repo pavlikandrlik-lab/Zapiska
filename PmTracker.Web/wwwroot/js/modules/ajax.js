@@ -1,4 +1,5 @@
 import { closeModal } from "./modals.js";
+import { appendCurrentAsUser } from "./navigationShared.js";
 import { ensureSessionKeepAlive, hasAjaxSubmitFormsInDom, sessionState, sessionStaleErrorCode, setSessionStaleState } from "./session.js";
 import {
     buildFormDataSnapshot,
@@ -730,7 +731,7 @@ export function initModalAjaxSubmit() {
         const submitterMethod = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
             ? (submitter.getAttribute("formmethod") || submitter.formMethod || "")
             : "";
-        const action = submitterAction || target.getAttribute("action") || window.location.href;
+        const action = appendCurrentAsUser(submitterAction || target.getAttribute("action") || window.location.href);
         const method = (submitterMethod || target.getAttribute("method") || "post").toUpperCase();
         const blockedSnapshot = buildFormDataSnapshot(new FormData(target, submitter instanceof HTMLElement ? submitter : undefined), 120);
         if (sessionState.stale) {

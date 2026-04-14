@@ -4,6 +4,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Schedules;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services.Data;
 
@@ -42,6 +43,7 @@ public sealed record HarmonogramVypocetKroku(
 
 internal sealed class HarmonogramService(
     PmTrackerDbContext dbContext,
+    IAuditWriteService auditWriteService,
     TimeProvider timeProvider) : IHarmonogramService
 {
     private static readonly StringComparer Ci = StringComparer.OrdinalIgnoreCase;
@@ -102,6 +104,20 @@ internal sealed class HarmonogramService(
             };
             dbContext.HarmonogramSablony.Add(activeSchema);
             await dbContext.SaveChangesAsync(ct);
+            auditWriteService.Add(null, new AuditWriteEntry(
+                AuditActionType.Create,
+                AuditEntityType.Dictionary,
+                $"harmonogram-schema:{activeSchema.Verze}",
+                null,
+                new DictionaryAuditSnapshot(
+                    "harmonogram-schema",
+                    activeSchema.Verze,
+                    $"SCHEMA_V{activeSchema.Verze}",
+                    "Aktivni harmonogramova sablona",
+                    true,
+                    true,
+                    NormalizeHexColor(activeSchema.DelayBarvaHex, DefaultDelayBarvaHex))));
+            await dbContext.SaveChangesAsync(ct);
         }
 
         var hasRows = await dbContext.CiselnikHarmonogramTypu
@@ -112,6 +128,23 @@ internal sealed class HarmonogramService(
             var defaultRows = BuildDefaultHarmonogramTypeRows(activeSchema.Verze);
             dbContext.CiselnikHarmonogramTypu.AddRange(defaultRows);
             await dbContext.SaveChangesAsync(ct);
+            foreach (var row in defaultRows)
+            {
+                auditWriteService.Add(null, new AuditWriteEntry(
+                    AuditActionType.Create,
+                    AuditEntityType.Dictionary,
+                    row.Id.ToString(),
+                    null,
+                    new DictionaryAuditSnapshot(
+                        "harmonogram-kroky",
+                        row.Id,
+                        row.Kod,
+                        row.Nazev,
+                        row.IsLocked,
+                        true,
+                        row.BarvaHex)));
+            }
+
             await NormalizeHarmonogramSchemaRowsAsync(activeSchema.Verze, ct);
             await dbContext.SaveChangesAsync(ct);
         }

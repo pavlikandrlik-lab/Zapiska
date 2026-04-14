@@ -1,14 +1,15 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services.Settings;
 
 public sealed class SettingsAuthzCommands(
     PmTrackerDbContext dbContext,
+    IAuditWriteService auditWriteService,
     TimeProvider timeProvider) : ISettingsAuthzCommands
 {
     private static readonly StringComparer Ci = StringComparer.OrdinalIgnoreCase;
@@ -29,7 +30,7 @@ public sealed class SettingsAuthzCommands(
         var row = await dbContext.AuthzUserRoles.FirstOrDefaultAsync(
             x => x.OsobaId == command.OsobaId && x.RoleId == command.RoleId,
             ct);
-        var oldValue = row is null ? null : JsonSerializer.Serialize(row);
+        var oldSnapshot = row is null ? null : AuthzUserRoleAuditSnapshot.FromEntity(row);
         if (row is null)
         {
             row = new AuthzUserRoleEntity
@@ -47,7 +48,19 @@ public sealed class SettingsAuthzCommands(
         }
 
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "authz.user_roles", row.Id.ToString(CultureInfo.InvariantCulture), "upsert", oldValue, JsonSerializer.Serialize(row), ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            oldSnapshot is null
+                ? AuditActionType.Create
+                : oldSnapshot.IsActive == row.IsActive
+                    ? AuditActionType.Update
+                    : row.IsActive
+                        ? AuditActionType.Activate
+                        : AuditActionType.Deactivate,
+            AuditEntityType.AuthzUserRole,
+            row.Id.ToString(CultureInfo.InvariantCulture),
+            oldSnapshot,
+            AuthzUserRoleAuditSnapshot.FromEntity(row)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task SaveUserRolesForUserAsync(SaveUserRolesForUserCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -116,14 +129,30 @@ public sealed class SettingsAuthzCommands(
             .OrderBy(x => x.RoleId)
             .ToListAsync(ct);
 
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "authz.user_roles",
-            command.OsobaId.ToString(CultureInfo.InvariantCulture),
-            "replace",
-            JsonSerializer.Serialize(oldRows),
-            JsonSerializer.Serialize(newRows),
-            ct);
+        var oldByRoleId = oldRows.ToDictionary(x => x.RoleId);
+        foreach (var newRow in newRows)
+        {
+            oldByRoleId.TryGetValue(newRow.RoleId, out var oldRow);
+            if (oldRow is not null && oldRow.IsActive == newRow.IsActive)
+            {
+                continue;
+            }
+
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                oldRow is null
+                    ? AuditActionType.Create
+                    : oldRow.IsActive == newRow.IsActive
+                        ? AuditActionType.Update
+                        : newRow.IsActive
+                            ? AuditActionType.Activate
+                            : AuditActionType.Deactivate,
+                AuditEntityType.AuthzUserRole,
+                newRow.Id.ToString(CultureInfo.InvariantCulture),
+                oldRow is null ? null : AuthzUserRoleAuditSnapshot.FromEntity(oldRow),
+                AuthzUserRoleAuditSnapshot.FromEntity(newRow)));
+        }
+
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task SaveAuthzRoleAsync(SaveAuthzRoleCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -147,8 +176,8 @@ public sealed class SettingsAuthzCommands(
         }
 
         AuthzRoleEntity role;
-        string action;
-        string? oldValue = null;
+        AuditActionType action;
+        AuthzRoleAuditSnapshot? oldValue = null;
 
         if (command.Id is int roleId)
         {
@@ -160,11 +189,11 @@ public sealed class SettingsAuthzCommands(
                 throw new InvalidOperationException("Systémovou roli nelze upravit.");
             }
 
-            oldValue = JsonSerializer.Serialize(role);
+            oldValue = AuthzRoleAuditSnapshot.FromEntity(role);
             role.Kod = kod;
             role.Nazev = nazev;
             role.Popis = popis;
-            action = "update";
+            action = AuditActionType.Update;
         }
         else
         {
@@ -177,19 +206,18 @@ public sealed class SettingsAuthzCommands(
                 IsActive = true
             };
             dbContext.AuthzRoles.Add(role);
-            action = "create";
+            action = AuditActionType.Create;
         }
 
         await dbContext.SaveChangesAsync(ct);
 
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "authz.roles",
-            role.Id.ToString(CultureInfo.InvariantCulture),
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             action,
+            AuditEntityType.AuthzRole,
+            role.Id.ToString(CultureInfo.InvariantCulture),
             oldValue,
-            JsonSerializer.Serialize(role),
-            ct);
+            AuthzRoleAuditSnapshot.FromEntity(role)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task ToggleAuthzRoleAsync(ToggleAuthzRoleCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -202,18 +230,17 @@ public sealed class SettingsAuthzCommands(
             throw new InvalidOperationException("Systémovou roli nelze deaktivovat.");
         }
 
-        var oldValue = JsonSerializer.Serialize(role);
+        var oldValue = AuthzRoleAuditSnapshot.FromEntity(role);
         role.IsActive = command.IsActive;
         await dbContext.SaveChangesAsync(ct);
 
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "authz.roles",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            command.IsActive ? AuditActionType.Activate : AuditActionType.Deactivate,
+            AuditEntityType.AuthzRole,
             role.Id.ToString(CultureInfo.InvariantCulture),
-            command.IsActive ? "activate" : "deactivate",
             oldValue,
-            JsonSerializer.Serialize(role),
-            ct);
+            AuthzRoleAuditSnapshot.FromEntity(role)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task SaveAuthzPermissionAsync(SaveAuthzPermissionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -271,8 +298,8 @@ public sealed class SettingsAuthzCommands(
         }
 
         AuthzPermissionEntity permission;
-        string action;
-        string? oldValue = null;
+        AuditActionType action;
+        AuthzPermissionAuditSnapshot? oldValue = null;
 
         if (command.Id is int permissionId)
         {
@@ -284,12 +311,12 @@ public sealed class SettingsAuthzCommands(
                 throw new InvalidOperationException("Systémovou akci nelze upravit.");
             }
 
-            oldValue = JsonSerializer.Serialize(permission);
+            oldValue = AuthzPermissionAuditSnapshot.FromEntity(permission);
             permission.Klic = klic;
             permission.Nazev = nazev;
             permission.CategoryId = categoryId;
             permission.ScopeLevel = scopeLevel;
-            action = "update";
+            action = AuditActionType.Update;
         }
         else
         {
@@ -303,19 +330,18 @@ public sealed class SettingsAuthzCommands(
                 IsSystem = false
             };
             dbContext.AuthzPermissions.Add(permission);
-            action = "create";
+            action = AuditActionType.Create;
         }
 
         await dbContext.SaveChangesAsync(ct);
 
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "authz.permissions",
-            permission.Id.ToString(CultureInfo.InvariantCulture),
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             action,
+            AuditEntityType.AuthzPermission,
+            permission.Id.ToString(CultureInfo.InvariantCulture),
             oldValue,
-            JsonSerializer.Serialize(permission),
-            ct);
+            AuthzPermissionAuditSnapshot.FromEntity(permission)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task ToggleAuthzPermissionAsync(ToggleAuthzPermissionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -328,18 +354,17 @@ public sealed class SettingsAuthzCommands(
             throw new InvalidOperationException("Systémovou akci nelze deaktivovat.");
         }
 
-        var oldValue = JsonSerializer.Serialize(permission);
+        var oldValue = AuthzPermissionAuditSnapshot.FromEntity(permission);
         permission.IsActive = command.IsActive;
         await dbContext.SaveChangesAsync(ct);
 
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "authz.permissions",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            command.IsActive ? AuditActionType.Activate : AuditActionType.Deactivate,
+            AuditEntityType.AuthzPermission,
             permission.Id.ToString(CultureInfo.InvariantCulture),
-            command.IsActive ? "activate" : "deactivate",
             oldValue,
-            JsonSerializer.Serialize(permission),
-            ct);
+            AuthzPermissionAuditSnapshot.FromEntity(permission)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task SaveRolePermissionAsync(SaveRolePermissionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -383,7 +408,7 @@ public sealed class SettingsAuthzCommands(
             throw new InvalidOperationException("Pro zvolenou roli a akci už mapování existuje.");
         }
 
-        var oldValue = row is null ? null : JsonSerializer.Serialize(row);
+        var oldValue = row is null ? null : await BuildRolePermissionAuditSnapshotAsync(row, ct);
         if (row is null)
         {
             row = new AuthzRolePermissionEntity
@@ -437,7 +462,13 @@ public sealed class SettingsAuthzCommands(
         }
 
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "authz.role_permissions", row.Id.ToString(CultureInfo.InvariantCulture), "upsert", oldValue, JsonSerializer.Serialize(command), ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            oldValue is null ? AuditActionType.Create : AuditActionType.Update,
+            AuditEntityType.AuthzRolePermission,
+            row.Id.ToString(CultureInfo.InvariantCulture),
+            oldValue,
+            await BuildRolePermissionAuditSnapshotAsync(row, ct)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task DeleteRolePermissionAsync(DeleteRolePermissionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -445,7 +476,7 @@ public sealed class SettingsAuthzCommands(
         var row = await dbContext.AuthzRolePermissions.FirstOrDefaultAsync(x => x.Id == command.Id, ct)
             ?? throw new InvalidOperationException("Mapování role/akce nebylo nalezeno.");
 
-        var oldValue = JsonSerializer.Serialize(row);
+        var oldValue = await BuildRolePermissionAuditSnapshotAsync(row, ct);
         var linkedProjects = await dbContext.AuthzRolePermissionProjects
             .Where(x => x.RolePermissionId == command.Id)
             .ToListAsync(ct);
@@ -458,30 +489,25 @@ public sealed class SettingsAuthzCommands(
         dbContext.AuthzRolePermissions.Remove(row);
         await dbContext.SaveChangesAsync(ct);
 
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "authz.role_permissions",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Delete,
+            AuditEntityType.AuthzRolePermission,
             command.Id.ToString(CultureInfo.InvariantCulture),
-            "delete",
             oldValue,
-            JsonSerializer.Serialize(command),
-            ct);
+            null));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     private DateTime GetUtcNow() => timeProvider.GetUtcNow().UtcDateTime;
 
-    private async Task WriteAuditAsync(int? actorOsobaId, string entityType, string entityId, string action, string? oldValue, string? newValue, CancellationToken ct)
+    private async Task<AuthzRolePermissionAuditSnapshot> BuildRolePermissionAuditSnapshotAsync(AuthzRolePermissionEntity row, CancellationToken ct)
     {
-        dbContext.AuthzAuditLog.Add(new AuthzAuditLogEntity
-        {
-            ActorOsobaId = actorOsobaId,
-            EntityType = entityType,
-            EntityId = entityId,
-            Action = action,
-            OldValue = oldValue,
-            NewValue = newValue,
-            CreatedAt = GetUtcNow()
-        });
-        await dbContext.SaveChangesAsync(ct);
+        var projectIds = await dbContext.AuthzRolePermissionProjects
+            .AsNoTracking()
+            .Where(x => x.RolePermissionId == row.Id)
+            .Select(x => x.ProjektId)
+            .ToListAsync(ct);
+
+        return AuthzRolePermissionAuditSnapshot.Create(row, projectIds);
     }
 }

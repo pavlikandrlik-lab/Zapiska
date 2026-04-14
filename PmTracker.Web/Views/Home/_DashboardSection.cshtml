@@ -1,17 +1,1 @@
-@model DashboardSectionViewModel
-
-<section class="dashboard-section" data-dashboard-section="@Model.Key">
-    <div class="dashboard-section-header">
-        <div>
-            <h2>@Model.Title</h2>
-            <p class="muted">@Model.Description</p>
-        </div>
-    </div>
-
-    <div class="dashboard-card-grid">
-        @foreach (var card in Model.Cards)
-        {
-            @await Html.PartialAsync("_DashboardCard", card)
-        }
-    </div>
-</section>
+@model object

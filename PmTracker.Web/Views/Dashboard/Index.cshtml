@@ -1,0 +1,50 @@
+@model DashboardPageViewModel
+@{
+    ViewData["Title"] = Model.PageTitle;
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = Model.Subtitle
+})
+
+<section class="dashboard-home" data-dashboard-shell>
+    <div class="dashboard-home-grid">
+        <section class="dashboard-panel dashboard-panel-main"
+                 data-dashboard-panel="focus"
+                 data-dashboard-panel-url="@Model.FocusPanelUrl">
+            <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
+                <div class="record-loading-line"></div>
+                <div class="record-loading-line short"></div>
+                <div class="record-loading-line"></div>
+                <div class="record-loading-line short"></div>
+            </div>
+            <div data-dashboard-panel-content></div>
+        </section>
+
+        <div class="dashboard-side-column">
+            <section class="dashboard-panel"
+                     data-dashboard-panel="meetings"
+                     data-dashboard-panel-url="@Model.MeetingsPanelUrl">
+                <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
+                    <div class="record-loading-line"></div>
+                    <div class="record-loading-line short"></div>
+                    <div class="record-loading-line"></div>
+                </div>
+                <div data-dashboard-panel-content></div>
+            </section>
+
+            <section class="dashboard-panel"
+                     data-dashboard-panel="news"
+                     data-dashboard-panel-url="@Model.NewsPanelUrl">
+                <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
+                    <div class="record-loading-line"></div>
+                    <div class="record-loading-line short"></div>
+                    <div class="record-loading-line"></div>
+                </div>
+                <div data-dashboard-panel-content></div>
+            </section>
+        </div>
+    </div>
+</section>

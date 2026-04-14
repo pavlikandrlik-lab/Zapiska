@@ -1,12 +1,16 @@
 @model ProjektZaznamyTabViewModel
 @{
     var isActive = ViewData["IsActive"] as bool? ?? true;
+    var targetRecordId = ViewData["TargetRecordId"] as int?;
+    var targetRecordOpenComments = ViewData["TargetRecordOpenComments"] as bool? ?? false;
 }
 
 <section class="tab-panel @(isActive ? "active" : null)"
          data-tab-panel="zaznamy"
          data-project-detail-root
          data-project-id="@Model.ProjektId"
+         data-record-target-id="@(targetRecordId?.ToString() ?? string.Empty)"
+         data-record-target-open-comments="@targetRecordOpenComments.ToString().ToLowerInvariant()"
          data-project-tab-refresh-url="@Model.RefreshUrl"
          data-record-meeting-comment-states-url="@Model.MeetingCommentStatesUrl">
     <div class="panel-header">

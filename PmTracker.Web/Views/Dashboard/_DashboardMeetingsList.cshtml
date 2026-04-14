@@ -1,0 +1,26 @@
+@model IReadOnlyList<DashboardMeetingItemViewModel>
+
+@if (Model.Count == 0)
+{
+    <p class="muted">Nejsou naplánovaná žádná blízká jednání.</p>
+}
+else
+{
+    <div class="dashboard-meeting-list">
+        @foreach (var item in Model)
+        {
+            <a class="dashboard-meeting-item" href="@item.DetailUrl">
+                <div class="dashboard-meeting-item-top">
+                    <strong>@item.ProjectCode</strong>
+                    <span class="badge">@item.Meeting.Stav</span>
+                </div>
+                <div class="dashboard-meeting-title">Jednání č. @item.Meeting.CisloJednani</div>
+                <div class="dashboard-item-meta">
+                    <span>@item.Meeting.Datum.ToString("dd.MM.yyyy")</span>
+                    <span>@item.Meeting.CasZacatek.ToString("HH\\:mm")</span>
+                    <span>@item.ProjectName</span>
+                </div>
+            </a>
+        }
+    </div>
+}

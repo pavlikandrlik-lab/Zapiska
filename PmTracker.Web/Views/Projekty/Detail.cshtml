@@ -2,7 +2,14 @@
 @{
     ViewData["Title"] = $"Projekt {Model.Projekt.Zkratka}";
     var asUser = Context.Request.Query["asUser"].ToString();
-    var recordsTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "zaznamy", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=zaznamy";
+    var recordsTabUrl = Url.Action("Detail", "Projekty", new
+    {
+        id = Model.Projekt.Id,
+        tab = "zaznamy",
+        asUser,
+        recordId = Model.TargetRecordId,
+        openComments = Model.TargetRecordOpenComments
+    }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=zaznamy";
     var scheduleTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "harmonogram", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=harmonogram";
     var meetingsTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "jednani", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=jednani";
     var teamTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "tym", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=tym";
@@ -61,7 +68,9 @@
     Model.ZaznamyTab,
     new ViewDataDictionary(ViewData)
     {
-        ["IsActive"] = Model.ActiveTab == "zaznamy"
+        ["IsActive"] = Model.ActiveTab == "zaznamy",
+        ["TargetRecordId"] = Model.TargetRecordId,
+        ["TargetRecordOpenComments"] = Model.TargetRecordOpenComments
     })
 
 @if (Model.LoadedHarmonogramTab is not null)

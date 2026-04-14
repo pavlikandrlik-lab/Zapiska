@@ -158,7 +158,7 @@ public sealed class ProjectsCommandEdgeCasesControllerTests
 
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
         response.Headers.Location.Should().NotBeNull();
-        response.Headers.Location!.ToString().Should().Be("/");
+        response.Headers.Location!.ToString().Should().Be("/Projekty");
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public sealed class ProjectsCommandEdgeCasesControllerTests
 
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
         response.Headers.Location.Should().NotBeNull();
-        response.Headers.Location!.ToString().Should().Be("/");
+        response.Headers.Location!.ToString().Should().Be("/Projekty");
     }
 
     [Fact]

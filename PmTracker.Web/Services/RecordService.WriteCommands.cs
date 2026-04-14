@@ -9,6 +9,7 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services;
 
@@ -75,6 +76,9 @@ public sealed partial class RecordService
         var pendingScheduleProposalLock = validation.ExistingRecord is not null
             ? await pendingScheduleProposalLockEvaluator.EvaluateAsync(validation.ExistingRecord.Id, ct)
             : new PendingScheduleProposalLockState(false, null, null, false, false);
+        var oldRecordSnapshot = validation.ExistingRecord is null
+            ? null
+            : RecordAuditSnapshot.FromEntity(validation.ExistingRecord);
 
         var (tx, ownsTransaction) = await BeginSerializableTransactionIfNeededAsync(ct);
         await using var _ = tx;
@@ -236,6 +240,12 @@ public sealed partial class RecordService
         await ReplaceRecordExternalLinksAsync(entity.Id, command.ExterniVazby, ct);
 
         List<SaveRecordHarmonogramValueCommand>? normalizedScheduleValues = null;
+        RecordScheduleAuditSnapshot? oldScheduleSnapshot = null;
+        if (command.Id.HasValue)
+        {
+            oldScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(command.Id.Value, ct);
+        }
+
         if (isTaskCategory && command.HarmonogramHodnoty.Count > 0)
         {
             var scheduleTypeDefinitions = await composition.ResolveScheduleTypeDefinitionsForRecordAsync(entity, ct);
@@ -257,22 +267,27 @@ public sealed partial class RecordService
         }
 
         await dbContext.SaveChangesAsync(ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            command.Id.HasValue ? AuditActionType.Update : AuditActionType.Create,
+            AuditEntityType.Record,
+            entity.Id.ToString(CultureInfo.InvariantCulture),
+            oldRecordSnapshot,
+            RecordAuditSnapshot.FromEntity(entity)));
+        if (normalizedScheduleValues is not null)
+        {
+            var newScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, ct);
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
+                AuditEntityType.RecordSchedule,
+                entity.Id.ToString(CultureInfo.InvariantCulture),
+                oldScheduleSnapshot,
+                newScheduleSnapshot));
+        }
+
+        await dbContext.SaveChangesAsync(ct);
         if (ownsTransaction && tx is not null)
         {
             await tx.CommitAsync(ct);
-        }
-
-        await WriteAuditAsync(currentUser.OsobaId, "projektove_zaznamy", entity.Id.ToString(CultureInfo.InvariantCulture), command.Id.HasValue ? "update" : "create", null, JsonSerializer.Serialize(entity), ct);
-        if (normalizedScheduleValues is not null)
-        {
-            await WriteAuditAsync(
-                currentUser.OsobaId,
-                "zaznam_harmonogram_hodnoty",
-                entity.Id.ToString(CultureInfo.InvariantCulture),
-                "upsert",
-                null,
-                JsonSerializer.Serialize(normalizedScheduleValues),
-                ct);
         }
 
         return entity.Id;
@@ -301,7 +316,9 @@ public sealed partial class RecordService
         var collaborationRows = await dbContext.ZaznamSpoluprace.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
         var scheduleRows = await dbContext.ZaznamHarmonogramHodnoty.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
         var commentRows = await dbContext.Vyjadreni.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var oldRecord = JsonSerializer.Serialize(record);
+        var oldRecord = RecordAuditSnapshot.FromEntity(record);
+        var oldScheduleSnapshot = RecordScheduleAuditSnapshot.FromEntities(command.ZaznamId, scheduleRows);
+        var oldCommentSnapshots = commentRows.Select(CommentAuditSnapshot.FromEntity).ToList();
 
         if (historyTypeRows.Count > 0)
         {
@@ -369,28 +386,34 @@ public sealed partial class RecordService
 
         dbContext.ProjektoveZaznamy.Remove(record);
         await dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "projektove_zaznamy",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Delete,
+            AuditEntityType.Record,
             command.ZaznamId.ToString(CultureInfo.InvariantCulture),
-            "hard_delete",
             oldRecord,
-            JsonSerializer.Serialize(new
-            {
-                DeletedComments = commentRows.Count,
-                DeletedExternalLinks = externalLinkRows.Count,
-                DeletedCollaborationRows = collaborationRows.Count,
-                DeletedScheduleRows = scheduleRows.Count,
-                DeletedTypeHistoryRows = historyTypeRows.Count,
-                DeletedDeadlineHistoryRows = historyDeadlineRows.Count,
-                DeletedOwnerHistoryRows = historyOwnerRows.Count,
-                DeletedSubsystemHistoryRows = historySubsystemRows.Count,
-                DeletedStateHistoryRows = historyStateRows.Count,
-                DeletedProjectStateHistoryRows = historyProjectStateRows.Count
-            }),
-            ct);
+            null));
+        if (scheduleRows.Count > 0)
+        {
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Delete,
+                AuditEntityType.RecordSchedule,
+                command.ZaznamId.ToString(CultureInfo.InvariantCulture),
+                oldScheduleSnapshot,
+                null));
+        }
+
+        foreach (var oldCommentSnapshot in oldCommentSnapshots)
+        {
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Delete,
+                AuditEntityType.Comment,
+                oldCommentSnapshot.Id.ToString(CultureInfo.InvariantCulture),
+                oldCommentSnapshot,
+                null));
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
     }
 
     public async Task AssignMeetingIdentifierAsync(
@@ -426,23 +449,21 @@ public sealed partial class RecordService
             ?? throw new InvalidOperationException("Vybrané jednání neexistuje.");
 
         var nextOrder = await composition.AllocateMeetingOrderTransactionalAsync(command.ProjektId, meeting.CisloJednani, ct);
-        var old = JsonSerializer.Serialize(record);
+        var old = RecordAuditSnapshot.FromEntity(record);
         record.CisloViditelneTyp = RecordDisplayNumberTypeMeeting;
         record.CisloViditelneA = meeting.CisloJednani;
         record.CisloViditelneB = nextOrder;
         record.CisloJednaniZdrojId = meeting.Id;
         record.CisloViditelne = $"{meeting.CisloJednani}-{nextOrder}";
         await dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "projektove_zaznamy",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Assign,
+            AuditEntityType.Record,
             record.Id.ToString(CultureInfo.InvariantCulture),
-            "assign_meeting_identifier",
             old,
-            JsonSerializer.Serialize(record),
-            ct);
+            RecordAuditSnapshot.FromEntity(record)));
+        await dbContext.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
     }
 
     private async Task<SaveRecordValidationContext> ValidateRecordSaveCommandAsync(
@@ -1246,21 +1267,21 @@ public sealed partial class RecordService
 
         var (tx, ownsTransaction) = await BeginSerializableTransactionIfNeededAsync(ct);
         await using var _ = tx;
+        var oldScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, ct);
         var normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, ct);
+        await dbContext.SaveChangesAsync(ct);
+        var newScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
+            AuditEntityType.RecordSchedule,
+            entity.Id.ToString(CultureInfo.InvariantCulture),
+            oldScheduleSnapshot,
+            newScheduleSnapshot));
         await dbContext.SaveChangesAsync(ct);
         if (ownsTransaction && tx is not null)
         {
             await tx.CommitAsync(ct);
         }
-
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "zaznam_harmonogram_hodnoty",
-            entity.Id.ToString(CultureInfo.InvariantCulture),
-            "upsert",
-            null,
-            JsonSerializer.Serialize(normalizedScheduleValues),
-            ct);
 
         return entity.Id;
     }
@@ -1426,6 +1447,10 @@ public sealed partial class RecordService
                 .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId))
                 .ToListAsync(ct))
             .ToDictionary(x => x.TypId, x => x.HodnotaInt);
+        var submittedByType = submittedValues
+            .Where(x => allowedTypeIds.Contains(x.TypId))
+            .GroupBy(x => x.TypId)
+            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
 
         var desired = new Dictionary<int, int>();
 
@@ -1439,7 +1464,11 @@ public sealed partial class RecordService
 
         foreach (var typeId in delayTypeIds)
         {
-            if (existingByType.TryGetValue(typeId, out var existingDelay))
+            if (submittedByType.TryGetValue(typeId, out var submittedDelay))
+            {
+                desired[typeId] = submittedDelay;
+            }
+            else if (existingByType.TryGetValue(typeId, out var existingDelay))
             {
                 desired[typeId] = existingDelay;
             }
@@ -1561,18 +1590,15 @@ public sealed partial class RecordService
     private DateTime GetLocalNow()
         => timeProvider.GetLocalNow().LocalDateTime;
 
-    private async Task WriteAuditAsync(int? actorOsobaId, string entityType, string entityId, string action, string? oldValue, string? newValue, CancellationToken ct)
+    private async Task<RecordScheduleAuditSnapshot?> LoadRecordScheduleAuditSnapshotAsync(int recordId, CancellationToken ct)
     {
-        dbContext.AuthzAuditLog.Add(new AuthzAuditLogEntity
-        {
-            ActorOsobaId = actorOsobaId,
-            EntityType = entityType,
-            EntityId = entityId,
-            Action = action,
-            OldValue = oldValue,
-            NewValue = newValue,
-            CreatedAt = timeProvider.GetUtcNow().UtcDateTime
-        });
-        await dbContext.SaveChangesAsync(ct);
+        var rows = await dbContext.ZaznamHarmonogramHodnoty
+            .AsNoTracking()
+            .Where(x => x.ZaznamId == recordId)
+            .OrderBy(x => x.TypId)
+            .ThenBy(x => x.Id)
+            .ToListAsync(ct);
+
+        return rows.Count == 0 ? null : RecordScheduleAuditSnapshot.FromEntities(recordId, rows);
     }
 }

@@ -13,10 +13,24 @@ function configureNavigationRuntime(runtime = {}) {
 }
 
 // PmTracker.Web/wwwroot/js/modules/navigationShared.js
+function appendCurrentAsUser(url) {
+  const currentUrl = new URL(window.location.href);
+  const asUser = currentUrl.searchParams.get("asUser");
+  if (!asUser) {
+    return url;
+  }
+  const resolvedUrl = new URL(url, window.location.origin);
+  if (resolvedUrl.origin !== window.location.origin || resolvedUrl.searchParams.has("asUser")) {
+    return url;
+  }
+  resolvedUrl.searchParams.set("asUser", asUser);
+  return `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`;
+}
 async function fetchHtmlDocument(url) {
-  const response = await fetch(url, {
+  const response = await fetch(appendCurrentAsUser(url), {
     headers: { "X-Requested-With": "XMLHttpRequest" },
-    credentials: "same-origin"
+    credentials: "same-origin",
+    cache: "no-store"
   });
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
@@ -25,9 +39,10 @@ async function fetchHtmlDocument(url) {
   return new DOMParser().parseFromString(html, "text/html");
 }
 async function fetchHtmlFragment(url) {
-  const response = await fetch(url, {
+  const response = await fetch(appendCurrentAsUser(url), {
     headers: { "X-Requested-With": "XMLHttpRequest" },
-    credentials: "same-origin"
+    credentials: "same-origin",
+    cache: "no-store"
   });
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
@@ -408,922 +423,6 @@ function initCommentSortUi(scope = document) {
     }
   });
 }
-// PmTracker.Web/wwwroot/js/modules/filters.js
-var projectFilterStoragePrefix = "pmtracker.projectFilters.v1.project.";
-var projectRecordFilterPanelStorageKey = "pmtracker.filters.open";
-var legacyProjectFilterPrefixes = [
-  "pmtracker.filter.",
-  "pmtracker.schedule.filter.",
-  "pmtracker.gantt.filter."
-];
-var legacyProjectFilterKeys = [
-  "pmtracker.records.view",
-  "pmtracker.gantt.filters.open"
-];
-var legacyGanttStoragePrefixes = [
-  "pmtracker.gantt.pinned.",
-  "pmtracker.gantt.expanded."
-];
-var recordMeetingCommentStateCache = new Map;
-var recordMeetingCommentStateRequests = new Map;
-var recordMeetingCommentStateLoadingMessage = "Načítání dat pro filtr jednání-vyjádření...";
-var recordMeetingCommentStateErrorMessage = "Nepodařilo se načíst data pro filtr jednání-vyjádření.";
-var projectFilterConfigs = {
-  records: {
-    rootSelector: '[data-project-filter-scope="records"]',
-    inputSelector: "[data-filter-key]",
-    keyAttribute: "data-filter-key",
-    chipRowSelector: '[data-filter-chip-row="records"]',
-    statusSelector: '[data-filter-save-status="records"]',
-    fields: [
-      { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
-      { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true },
-      { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
-      { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
-      { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
-      { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
-      { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní úkoly" },
-      { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé záznamy" },
-      { inputKey: "jednani-vyjadreni-stav", stateKey: "jednaniVyjadreniStav", type: "select", chipLabel: "Jednání-vyjádření" },
-      { inputKey: "groupBySubsystem", stateKey: "groupBySubsystem", type: "checkbox", skipChip: true }
-    ]
-  },
-  schedule: {
-    rootSelector: '[data-project-filter-scope="schedule"]',
-    inputSelector: "[data-schedule-filter-key]",
-    keyAttribute: "data-schedule-filter-key",
-    chipRowSelector: '[data-filter-chip-row="schedule"]',
-    statusSelector: '[data-filter-save-status="schedule"]',
-    fields: [
-      { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
-      { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true }
-    ]
-  }
-};
-var projectPrintRelevantRecordStateKeys = [
-  "subsystem",
-  "kategorie",
-  "stav",
-  "typ",
-  "vlastnik",
-  "aktivni",
-  "mine",
-  "jednaniVyjadreniStav"
-];
-function normalizeFilterText(value) {
-  if (!value) {
-    return "";
-  }
-  return value.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-function normalizeFilterToken(value) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  return String(value).trim().toUpperCase();
-}
-function normalizeSubsystemSortMode(value) {
-  const candidate = String(value || "").trim().toLowerCase();
-  if (candidate === "alpha-asc" || candidate === "alpha-desc" || candidate === "project-desc") {
-    return candidate;
-  }
-  return "project-asc";
-}
-function buildSubsystemSortMeta(source = {}) {
-  return {
-    name: String(source.name || "").trim() || "-",
-    code: String(source.code || "").trim(),
-    order: Number.isInteger(source.order) ? source.order : Number.parseInt(source.order || "0", 10) || 0,
-    hasProjectOrder: source.hasProjectOrder === true || source.hasProjectOrder === "true"
-  };
-}
-function readSubsystemGroupSortMeta(element) {
-  if (!(element instanceof Element)) {
-    return buildSubsystemSortMeta();
-  }
-  return buildSubsystemSortMeta({
-    name: element.getAttribute("data-subsystem-name") || "",
-    code: element.getAttribute("data-subsystem-kod") || "",
-    order: element.getAttribute("data-subsystem-order") || "0",
-    hasProjectOrder: element.getAttribute("data-subsystem-order-active") === "true"
-  });
-}
-function compareSubsystemAlpha(left, right) {
-  const byName = left.name.localeCompare(right.name, "cs");
-  if (byName !== 0) {
-    return byName;
-  }
-  return left.code.localeCompare(right.code, "cs");
-}
-function compareSubsystemSortMeta(leftSource, rightSource, sortMode) {
-  const left = buildSubsystemSortMeta(leftSource);
-  const right = buildSubsystemSortMeta(rightSource);
-  const resolvedMode = normalizeSubsystemSortMode(sortMode);
-  const alpha = compareSubsystemAlpha(left, right);
-  if (resolvedMode === "alpha-asc") {
-    return alpha;
-  }
-  if (resolvedMode === "alpha-desc") {
-    return alpha * -1;
-  }
-  if (left.hasProjectOrder && right.hasProjectOrder) {
-    if (left.order !== right.order) {
-      return resolvedMode === "project-desc" ? right.order - left.order : left.order - right.order;
-    }
-    return alpha;
-  }
-  if (left.hasProjectOrder !== right.hasProjectOrder) {
-    return left.hasProjectOrder ? -1 : 1;
-  }
-  return resolvedMode === "project-desc" ? alpha * -1 : alpha;
-}
-function sortSubsystemGroupsInContainer(container, sortMode) {
-  if (!(container instanceof Element)) {
-    return [];
-  }
-  const groups = Array.from(container.querySelectorAll("[data-subsystem-group]")).filter((group) => group instanceof HTMLElement);
-  groups.sort((left, right) => compareSubsystemSortMeta(readSubsystemGroupSortMeta(left), readSubsystemGroupSortMeta(right), sortMode)).forEach((group) => container.appendChild(group));
-  return groups;
-}
-function buildProjectPrintFilterSnapshot() {
-  const state = buildProjectFilterStateFromInputs("records");
-  const snapshot = {
-    subsystem: typeof state.subsystem === "string" ? state.subsystem.trim() : "",
-    kategorie: typeof state.kategorie === "string" ? state.kategorie.trim() : "",
-    stav: typeof state.stav === "string" ? state.stav.trim() : "",
-    typ: typeof state.typ === "string" ? state.typ.trim() : "",
-    vlastnik: typeof state.vlastnik === "string" ? state.vlastnik.trim() : "",
-    aktivni: Boolean(state.aktivni),
-    mine: Boolean(state.mine),
-    jednaniVyjadreniStav: typeof state.jednaniVyjadreniStav === "string" ? state.jednaniVyjadreniStav.trim() : ""
-  };
-  return {
-    ...snapshot,
-    hasRelevantFilters: projectPrintRelevantRecordStateKeys.some((key) => Boolean(snapshot[key]))
-  };
-}
-function buildProjectPrintFilterQueryParams(useCurrentFilters) {
-  const snapshot = buildProjectPrintFilterSnapshot();
-  const params = new URLSearchParams;
-  if (!useCurrentFilters) {
-    params.set("useCurrentFilters", "false");
-    return { snapshot, params };
-  }
-  params.set("useCurrentFilters", "true");
-  if (snapshot.subsystem) {
-    params.set("subsystem", snapshot.subsystem);
-  }
-  if (snapshot.kategorie) {
-    params.set("kategorie", snapshot.kategorie);
-  }
-  if (snapshot.stav) {
-    params.set("stav", snapshot.stav);
-  }
-  if (snapshot.typ) {
-    params.set("typ", snapshot.typ);
-  }
-  if (snapshot.vlastnik) {
-    params.set("vlastnik", snapshot.vlastnik);
-  }
-  if (snapshot.aktivni) {
-    params.set("aktivni", "true");
-  }
-  if (snapshot.mine) {
-    params.set("mine", "true");
-  }
-  if (snapshot.jednaniVyjadreniStav) {
-    params.set("jednaniVyjadreniStav", snapshot.jednaniVyjadreniStav);
-  }
-  return { snapshot, params };
-}
-function getProjectFilterRoot(scope) {
-  const config = getProjectFilterConfig(scope);
-  if (!config) {
-    return null;
-  }
-  const root = document.querySelector(config.rootSelector);
-  return root instanceof HTMLElement ? root : null;
-}
-function getProjectFilterProjectId(scope) {
-  const root = getProjectFilterRoot(scope);
-  const projectId = (root?.dataset.projectId || "").trim();
-  return projectId || "0";
-}
-function getProjectDetailRoot() {
-  const root = document.querySelector("[data-project-detail-root]");
-  return root instanceof HTMLElement ? root : null;
-}
-function getProjectRecordsPanel() {
-  const panel = document.querySelector('[data-tab-panel="zaznamy"]');
-  return panel instanceof HTMLElement ? panel : null;
-}
-function normalizeRecordMeetingCommentStatesPayload(payload) {
-  if (!payload || typeof payload !== "object") {
-    return {};
-  }
-  const rawStates = payload.statesByRecordId && typeof payload.statesByRecordId === "object" ? payload.statesByRecordId : payload;
-  const normalized = {};
-  Object.entries(rawStates).forEach(([recordId, values]) => {
-    const normalizedRecordId = String(recordId || "").trim();
-    if (!normalizedRecordId) {
-      return;
-    }
-    const normalizedValues = Array.isArray(values) ? values.map((value) => normalizeFilterToken(value)).filter(Boolean) : [];
-    normalized[normalizedRecordId] = Array.from(new Set(normalizedValues));
-  });
-  return normalized;
-}
-function applyCachedRecordMeetingCommentStates(projectId) {
-  const normalizedProjectId = String(projectId || "").trim();
-  if (!normalizedProjectId || !recordMeetingCommentStateCache.has(normalizedProjectId)) {
-    return false;
-  }
-  const statesByRecordId = recordMeetingCommentStateCache.get(normalizedProjectId) || {};
-  const recordsPanel = getProjectRecordsPanel();
-  if (!(recordsPanel instanceof HTMLElement)) {
-    return false;
-  }
-  recordsPanel.querySelectorAll(".record-card[data-record-id]").forEach((card) => {
-    if (!(card instanceof HTMLElement)) {
-      return;
-    }
-    const recordId = (card.dataset.recordId || "").trim();
-    const values = Array.isArray(statesByRecordId[recordId]) ? statesByRecordId[recordId] : [];
-    card.dataset.filterVyjadreniJednaniStavy = values.join("|");
-  });
-  return true;
-}
-async function ensureRecordMeetingCommentStatesLoaded() {
-  const projectRoot = getProjectDetailRoot();
-  const projectId = getProjectFilterProjectId("records");
-  const loadUrl = (projectRoot?.dataset.recordMeetingCommentStatesUrl || "").trim();
-  if (!projectId || projectId === "0" || !loadUrl) {
-    return false;
-  }
-  if (applyCachedRecordMeetingCommentStates(projectId)) {
-    return true;
-  }
-  const existingRequest = recordMeetingCommentStateRequests.get(projectId);
-  if (existingRequest instanceof Promise) {
-    return existingRequest;
-  }
-  setProjectFilterSaveStatus("records", recordMeetingCommentStateLoadingMessage);
-  const request = (async () => {
-    try {
-      const response = await fetch(loadUrl, {
-        headers: {
-          Accept: "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        },
-        credentials: "same-origin"
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = await response.json();
-      recordMeetingCommentStateCache.set(projectId, normalizeRecordMeetingCommentStatesPayload(payload));
-      applyCachedRecordMeetingCommentStates(projectId);
-      setProjectFilterSaveStatus("records", "");
-      applyProjectRecordFilters();
-      return true;
-    } catch (error) {
-      setProjectFilterSaveStatus("records", recordMeetingCommentStateErrorMessage);
-      return false;
-    } finally {
-      recordMeetingCommentStateRequests.delete(projectId);
-    }
-  })();
-  recordMeetingCommentStateRequests.set(projectId, request);
-  return request;
-}
-function readJsonStorage(storage, key) {
-  if (!key) {
-    return null;
-  }
-  try {
-    const raw = storage.getItem(key);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch (error) {
-    return null;
-  }
-}
-function writeJsonStorage(storage, key, value) {
-  if (!key) {
-    return;
-  }
-  storage.setItem(key, JSON.stringify(value));
-}
-function hasSelectOptionValue(input, value) {
-  if (!(input instanceof HTMLSelectElement)) {
-    return false;
-  }
-  return Array.from(input.options).some((option) => option.value === value);
-}
-function readProjectFilterInputValue(input, field) {
-  if (input instanceof HTMLInputElement && field.type === "checkbox") {
-    return input.checked;
-  }
-  if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
-    return input.value;
-  }
-  return field.type === "checkbox" ? false : "";
-}
-function applyProjectFilterStateToInputs(scope, state) {
-  const config = getProjectFilterConfig(scope);
-  if (!config) {
-    return;
-  }
-  config.fields.forEach((field) => {
-    const input = getProjectFilterInput(scope, field.inputKey);
-    if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
-      return;
-    }
-    const value = state[field.stateKey];
-    if (field.type === "checkbox" && input instanceof HTMLInputElement) {
-      input.checked = Boolean(value);
-      return;
-    }
-    input.value = typeof value === "string" ? value : "";
-  });
-}
-function readStoredProjectFilterState(scope, kind, fallbackState) {
-  const storage = kind === "state" ? sessionStorage : localStorage;
-  const key = getProjectFilterStorageKey(scope, kind);
-  const rawState = readJsonStorage(storage, key);
-  if (!rawState) {
-    return null;
-  }
-  return normalizeProjectFilterState(scope, rawState, fallbackState);
-}
-function persistProjectFilterSessionState(scope) {
-  const currentState = buildProjectFilterStateFromInputs(scope);
-  const normalizedState = normalizeProjectFilterState(scope, currentState, currentState);
-  const key = getProjectFilterStorageKey(scope, "state");
-  writeJsonStorage(sessionStorage, key, normalizedState);
-  return normalizedState;
-}
-function buildProjectFilterChipLabel(field, input) {
-  if (field.type === "checkbox") {
-    return field.chipLabel || "";
-  }
-  if (!(input instanceof HTMLSelectElement)) {
-    return "";
-  }
-  const option = input.selectedOptions[0];
-  const optionText = option?.textContent?.trim() || "";
-  if (!optionText) {
-    return "";
-  }
-  return `${field.chipLabel}: ${optionText}`;
-}
-function applyProjectFilterScope(scope, options = {}) {
-  if (scope === "records") {
-    const state = buildProjectFilterStateFromInputs(scope);
-    applyRecordsView(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
-    return;
-  }
-  if (typeof options.applyScope === "function") {
-    options.applyScope(scope, buildProjectFilterStateFromInputs(scope));
-  }
-}
-function removeMatchingStorageKeys(storage, predicate) {
-  const keys = [];
-  for (let i = 0;i < storage.length; i += 1) {
-    const key = storage.key(i);
-    if (key && predicate(key)) {
-      keys.push(key);
-    }
-  }
-  keys.forEach((key) => storage.removeItem(key));
-}
-function getProjectFilterConfig(scope) {
-  return projectFilterConfigs[scope] || null;
-}
-function getProjectFilterInput(scope, inputKey) {
-  const config = getProjectFilterConfig(scope);
-  const root = getProjectFilterRoot(scope);
-  if (!config || !(root instanceof HTMLElement)) {
-    return null;
-  }
-  const input = root.querySelector(`${config.inputSelector}[${config.keyAttribute}="${inputKey}"]`);
-  return input instanceof HTMLInputElement || input instanceof HTMLSelectElement ? input : null;
-}
-function getProjectFilterCurrentUserId(scope) {
-  return normalizeFilterToken(getProjectFilterRoot(scope)?.dataset.currentUserId || "");
-}
-function getProjectFilterStorageKey(scope, kind) {
-  const projectId = getProjectFilterProjectId(scope);
-  if (!projectId || projectId === "0") {
-    return "";
-  }
-  return `${projectFilterStoragePrefix}${projectId}.${scope}.${kind}`;
-}
-function normalizeProjectFilterState(scope, rawState, fallbackState) {
-  const config = getProjectFilterConfig(scope);
-  if (!config) {
-    return {};
-  }
-  const normalized = {};
-  const source = rawState && typeof rawState === "object" ? rawState : {};
-  const fallback = fallbackState && typeof fallbackState === "object" ? fallbackState : {};
-  config.fields.forEach((field) => {
-    const input = getProjectFilterInput(scope, field.inputKey);
-    const fallbackValue = fallback[field.stateKey];
-    const sourceValue = source[field.stateKey];
-    if (field.type === "checkbox") {
-      if (typeof sourceValue === "boolean") {
-        normalized[field.stateKey] = sourceValue;
-        return;
-      }
-      if (sourceValue === "true" || sourceValue === "false") {
-        normalized[field.stateKey] = sourceValue === "true";
-        return;
-      }
-      normalized[field.stateKey] = Boolean(fallbackValue);
-      return;
-    }
-    const fallbackText = typeof fallbackValue === "string" ? fallbackValue : "";
-    const candidate = typeof sourceValue === "string" ? sourceValue : fallbackText;
-    if (candidate && input instanceof HTMLSelectElement && !hasSelectOptionValue(input, candidate)) {
-      normalized[field.stateKey] = fallbackText && hasSelectOptionValue(input, fallbackText) ? fallbackText : "";
-      return;
-    }
-    normalized[field.stateKey] = candidate;
-  });
-  return normalized;
-}
-function buildProjectFilterStateFromInputs(scope) {
-  const config = getProjectFilterConfig(scope);
-  if (!config) {
-    return {};
-  }
-  const state = {};
-  config.fields.forEach((field) => {
-    const input = getProjectFilterInput(scope, field.inputKey);
-    state[field.stateKey] = readProjectFilterInputValue(input, field);
-  });
-  return state;
-}
-function setProjectFilterSaveStatus(scope, message) {
-  const config = getProjectFilterConfig(scope);
-  const root = getProjectFilterRoot(scope);
-  if (!config || !(root instanceof HTMLElement)) {
-    return;
-  }
-  const status = root.querySelector(config.statusSelector);
-  if (status instanceof HTMLElement) {
-    status.textContent = message || "";
-  }
-}
-function renderProjectFilterChips(scope) {
-  const config = getProjectFilterConfig(scope);
-  const root = getProjectFilterRoot(scope);
-  if (!config || !(root instanceof HTMLElement)) {
-    return;
-  }
-  const chipRow = root.querySelector(config.chipRowSelector);
-  if (!(chipRow instanceof HTMLElement)) {
-    return;
-  }
-  chipRow.innerHTML = "";
-  const state = buildProjectFilterStateFromInputs(scope);
-  const chips = [];
-  config.fields.forEach((field) => {
-    if (field.skipChip) {
-      return;
-    }
-    const value = state[field.stateKey];
-    const isActive = field.type === "checkbox" ? Boolean(value) : Boolean(value);
-    if (!isActive) {
-      return;
-    }
-    const input = getProjectFilterInput(scope, field.inputKey);
-    const label = buildProjectFilterChipLabel(field, input);
-    if (!label) {
-      return;
-    }
-    const chip = document.createElement("span");
-    chip.className = "active-filter-chip";
-    const text = document.createElement("span");
-    text.className = "active-filter-chip-label";
-    text.textContent = label;
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "active-filter-chip-remove";
-    remove.setAttribute("data-filter-chip-remove", scope);
-    remove.setAttribute("data-filter-chip-key", field.inputKey);
-    remove.setAttribute("aria-label", `Odebrat filtr ${label}`);
-    remove.textContent = "×";
-    chip.append(text, remove);
-    chips.push(chip);
-  });
-  chipRow.hidden = chips.length === 0;
-  chips.forEach((chip) => chipRow.appendChild(chip));
-}
-function handleProjectFilterInputChange(scope, options = {}) {
-  persistProjectFilterSessionState(scope);
-  renderProjectFilterChips(scope);
-  setProjectFilterSaveStatus(scope, "");
-  applyProjectFilterScope(scope, options);
-}
-function restoreProjectFilterScope(scope) {
-  const fallbackState = buildProjectFilterStateFromInputs(scope);
-  const restoredState = readStoredProjectFilterState(scope, "state", fallbackState) || readStoredProjectFilterState(scope, "defaults", fallbackState) || fallbackState;
-  applyProjectFilterStateToInputs(scope, restoredState);
-  persistProjectFilterSessionState(scope);
-  renderProjectFilterChips(scope);
-  return restoredState;
-}
-function saveProjectFilterDefaults(scope) {
-  const state = persistProjectFilterSessionState(scope);
-  const key = getProjectFilterStorageKey(scope, "defaults");
-  writeJsonStorage(localStorage, key, state);
-  setProjectFilterSaveStatus(scope, "Výchozí filtry uloženy v tomto prohlížeči.");
-}
-function clearProjectFilterInput(scope, inputKey) {
-  const input = getProjectFilterInput(scope, inputKey);
-  if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
-    return;
-  }
-  if (input instanceof HTMLInputElement && input.type === "checkbox") {
-    input.checked = false;
-  } else {
-    input.value = "";
-  }
-}
-function clearProjectFilterPreferenceStorage() {
-  removeMatchingStorageKeys(localStorage, (key) => key.startsWith(projectFilterStoragePrefix) || legacyProjectFilterKeys.includes(key) || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix)) || legacyGanttStoragePrefixes.some((prefix) => key.startsWith(prefix)));
-  removeMatchingStorageKeys(sessionStorage, (key) => key.startsWith(projectFilterStoragePrefix) || legacyProjectFilterKeys.includes(key) || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix)) || legacyGanttStoragePrefixes.some((prefix) => key.startsWith(prefix)));
-}
-function setFilterPanelOpen(open) {
-  const filterPanel = document.querySelector("[data-filter-panel]");
-  const filterToggle = document.querySelector("[data-filter-toggle]");
-  if (!(filterPanel instanceof HTMLElement)) {
-    return;
-  }
-  filterPanel.classList.toggle("collapsed", !open);
-  if (filterToggle instanceof HTMLElement) {
-    filterToggle.setAttribute("aria-expanded", String(open));
-  }
-  localStorage.setItem(projectRecordFilterPanelStorageKey, String(open));
-}
-function setRecordFilterVisibility(element, isVisible) {
-  if (!(element instanceof HTMLElement)) {
-    return;
-  }
-  element.classList.toggle("is-filter-hidden", !isVisible);
-  element.hidden = !isVisible;
-}
-function applyProjectRecordFilters() {
-  const recordsPanel = getProjectRecordsPanel();
-  if (!(recordsPanel instanceof HTMLElement)) {
-    return;
-  }
-  const cards = recordsPanel.querySelectorAll(".record-card[data-record-id]");
-  if (cards.length === 0) {
-    return;
-  }
-  const state = buildProjectFilterStateFromInputs("records");
-  const currentUserId = getProjectFilterCurrentUserId("records");
-  const hasCurrentUser = currentUserId && currentUserId !== "0";
-  const filters = {
-    subsystem: normalizeFilterToken(state.subsystem),
-    kategorie: normalizeFilterToken(state.kategorie),
-    stav: normalizeFilterToken(state.stav),
-    typ: normalizeFilterToken(state.typ),
-    vlastnik: normalizeFilterToken(state.vlastnik),
-    onlyActive: Boolean(state.aktivni),
-    mine: Boolean(state.mine),
-    meetingCommentState: normalizeFilterToken(state.jednaniVyjadreniStav)
-  };
-  const projectId = getProjectFilterProjectId("records");
-  const hasMeetingCommentStateCache = applyCachedRecordMeetingCommentStates(projectId);
-  if (filters.meetingCommentState && !hasMeetingCommentStateCache) {
-    ensureRecordMeetingCommentStatesLoaded();
-  }
-  cards.forEach((item) => {
-    if (!(item instanceof HTMLElement)) {
-      return;
-    }
-    const subsystem = normalizeFilterToken(item.dataset.filterSubsystemKod || item.dataset.filterSubsystem);
-    const kategorie = normalizeFilterToken(item.dataset.filterKategorieKod || item.dataset.filterKategorie);
-    const stav = normalizeFilterToken(item.dataset.filterStavKod || item.dataset.filterStav);
-    const typ = normalizeFilterToken(item.dataset.filterTypKod || item.dataset.filterTyp);
-    const vlastnik = normalizeFilterToken(item.dataset.filterVlastnikId || item.dataset.filterVlastnik);
-    const isActive = item.dataset.filterAktivni === "true";
-    const isTask = item.dataset.filterJeUkol === "true";
-    const commentMeetingStates = (item.dataset.filterVyjadreniJednaniStavy || "").split(/[|,]/g).map((value) => normalizeFilterToken(value)).filter(Boolean);
-    const matchesMeetingCommentState = !filters.meetingCommentState || !hasMeetingCommentStateCache || isTask && commentMeetingStates.includes(filters.meetingCommentState);
-    const matchesMine = !filters.mine || hasCurrentUser && vlastnik === currentUserId;
-    const matches = (!filters.subsystem || subsystem === filters.subsystem) && (!filters.kategorie || kategorie === filters.kategorie) && (!filters.stav || stav === filters.stav) && (!filters.typ || typ === filters.typ) && (!filters.vlastnik || vlastnik === filters.vlastnik) && (!filters.onlyActive || isActive) && matchesMine && matchesMeetingCommentState;
-    setRecordFilterVisibility(item, matches);
-  });
-  recordsPanel.querySelectorAll(".subsystem-group").forEach((group) => {
-    if (!(group instanceof HTMLElement)) {
-      return;
-    }
-    const hasVisibleCards = Array.from(group.querySelectorAll(".record-card")).some((card) => card instanceof HTMLElement && !card.hidden);
-    setRecordFilterVisibility(group, hasVisibleCards);
-  });
-  scheduleSubsystemIndicatorSync();
-}
-function resolveCurrentSubsystemGroup(groups, anchorY) {
-  if (!Array.isArray(groups) || groups.length === 0) {
-    return null;
-  }
-  let current = groups[0];
-  for (const group of groups) {
-    if (!(group instanceof HTMLElement)) {
-      continue;
-    }
-    const rect = group.getBoundingClientRect();
-    if (rect.bottom <= anchorY) {
-      current = group;
-      continue;
-    }
-    if (rect.top <= anchorY) {
-      current = group;
-    }
-    break;
-  }
-  return current;
-}
-function resolveActiveSubsystemIndicatorShell() {
-  const activePanel = document.querySelector(".tab-panel.active");
-  if (!(activePanel instanceof HTMLElement)) {
-    return null;
-  }
-  const groupedShell = activePanel.querySelector("[data-subsystem-grouped-shell]");
-  if (!(groupedShell instanceof HTMLElement) || groupedShell.hidden) {
-    return null;
-  }
-  return groupedShell;
-}
-function updateSubsystemScrollIndicator() {
-  const indicator = document.querySelector("[data-subsystem-scroll-indicator]");
-  const bubble = document.querySelector("[data-subsystem-scroll-indicator-bubble]");
-  const label = document.querySelector("[data-subsystem-scroll-indicator-label]");
-  if (!(indicator instanceof HTMLElement) || !(bubble instanceof HTMLElement) || !(label instanceof HTMLElement)) {
-    return;
-  }
-  if (window.scrollY <= 0) {
-    indicator.hidden = true;
-    return;
-  }
-  const groupedShell = resolveActiveSubsystemIndicatorShell();
-  if (!(groupedShell instanceof HTMLElement)) {
-    indicator.hidden = true;
-    return;
-  }
-  const visibleGroups = Array.from(groupedShell.querySelectorAll("[data-subsystem-group]")).filter((group) => group instanceof HTMLElement && !group.hidden);
-  if (visibleGroups.length === 0) {
-    indicator.hidden = true;
-    return;
-  }
-  const shellRect = groupedShell.getBoundingClientRect();
-  if (shellRect.bottom <= 120 || shellRect.top >= window.innerHeight) {
-    indicator.hidden = true;
-    return;
-  }
-  const anchorY = Math.max(132, Math.min(window.innerHeight * 0.35, 220));
-  const currentGroup = resolveCurrentSubsystemGroup(visibleGroups, anchorY);
-  const subsystemName = currentGroup instanceof HTMLElement ? (currentGroup.getAttribute("data-subsystem-name") || "").trim() : "";
-  if (!subsystemName) {
-    indicator.hidden = true;
-    return;
-  }
-  const bubbleTravel = Math.max(0, indicator.clientHeight - bubble.offsetHeight);
-  const currentRect = currentGroup.getBoundingClientRect();
-  const currentCenter = currentRect.top + currentRect.height / 2;
-  const progress = Math.max(0, Math.min(1, (currentCenter - shellRect.top) / Math.max(shellRect.height, 1)));
-  bubble.style.transform = `translateY(${Math.round(progress * bubbleTravel)}px)`;
-  label.textContent = subsystemName;
-  indicator.hidden = false;
-}
-function scheduleSubsystemIndicatorSync() {
-  if (!(document.body instanceof HTMLElement)) {
-    return;
-  }
-  const currentFrame = Number.parseInt(document.body.dataset.subsystemIndicatorFrame || "0", 10);
-  if (Number.isInteger(currentFrame) && currentFrame > 0) {
-    window.cancelAnimationFrame(currentFrame);
-  }
-  const nextFrame = window.requestAnimationFrame(() => {
-    document.body.dataset.subsystemIndicatorFrame = "0";
-    updateSubsystemScrollIndicator();
-  });
-  document.body.dataset.subsystemIndicatorFrame = String(nextFrame);
-}
-function initSubsystemScrollIndicator() {
-  const indicator = document.querySelector("[data-subsystem-scroll-indicator]");
-  if (!(indicator instanceof HTMLElement) || !(document.body instanceof HTMLElement)) {
-    return;
-  }
-  if (document.body.dataset.subsystemIndicatorReady !== "true") {
-    document.body.dataset.subsystemIndicatorReady = "true";
-    window.addEventListener("scroll", scheduleSubsystemIndicatorSync, { passive: true });
-    window.addEventListener("resize", scheduleSubsystemIndicatorSync);
-  }
-  scheduleSubsystemIndicatorSync();
-}
-function applyRecordsView(view) {
-  const recordsPanel = getProjectRecordsPanel();
-  if (!(recordsPanel instanceof HTMLElement)) {
-    return;
-  }
-  const groupBySubsystemInput = getProjectFilterInput("records", "groupBySubsystem");
-  const resolvedView = groupBySubsystemInput instanceof HTMLInputElement ? groupBySubsystemInput.checked ? "subsystem" : "flat" : view;
-  const shells = recordsPanel.querySelectorAll("[data-records-view]");
-  if (shells.length === 0) {
-    return;
-  }
-  const groupedList = recordsPanel.querySelector("[data-record-grouped-list]");
-  const flatList = recordsPanel.querySelector("[data-record-flat-list]");
-  const cards = Array.from(recordsPanel.querySelectorAll(".record-card[data-record-id]")).filter((card) => card instanceof HTMLElement);
-  const sortMode = normalizeSubsystemSortMode(buildProjectFilterStateFromInputs("records").sortBy);
-  if (groupedList instanceof HTMLElement && flatList instanceof HTMLElement && cards.length > 0) {
-    const groupsByKey = new Map;
-    const orderedGroups = [];
-    cards.forEach((card) => {
-      const subsystemName = (card.getAttribute("data-filter-subsystem") || "").trim() || "-";
-      const subsystemCode = (card.getAttribute("data-filter-subsystem-kod") || "").trim();
-      const subsystemOrder = Number.parseInt(card.getAttribute("data-filter-subsystem-order") || "0", 10) || 0;
-      const subsystemHasProjectOrder = card.getAttribute("data-filter-subsystem-order-active") === "true";
-      const groupKey = `${subsystemCode}\x00${subsystemName}`;
-      let group = groupsByKey.get(groupKey);
-      if (!group) {
-        group = {
-          meta: {
-            name: subsystemName,
-            code: subsystemCode,
-            order: subsystemOrder,
-            hasProjectOrder: subsystemHasProjectOrder
-          },
-          cards: []
-        };
-        groupsByKey.set(groupKey, group);
-        orderedGroups.push(group);
-      }
-      group.cards.push(card);
-    });
-    orderedGroups.sort((left, right) => compareSubsystemSortMeta(left.meta, right.meta, sortMode));
-    if (resolvedView === "subsystem") {
-      groupedList.innerHTML = "";
-      orderedGroups.forEach((group) => {
-        const currentGroup = document.createElement("div");
-        currentGroup.className = "subsystem-group";
-        currentGroup.setAttribute("data-subsystem-group", "");
-        currentGroup.setAttribute("data-subsystem-name", group.meta.name);
-        currentGroup.setAttribute("data-subsystem-kod", group.meta.code);
-        currentGroup.setAttribute("data-subsystem-order", String(group.meta.order));
-        currentGroup.setAttribute("data-subsystem-order-active", String(group.meta.hasProjectOrder));
-        const heading = document.createElement("h3");
-        heading.textContent = group.meta.name;
-        currentGroup.appendChild(heading);
-        const currentGroupCards = document.createElement("div");
-        currentGroupCards.className = "card-list";
-        group.cards.forEach((card) => currentGroupCards.appendChild(card));
-        currentGroup.appendChild(currentGroupCards);
-        groupedList.appendChild(currentGroup);
-      });
-    } else {
-      orderedGroups.forEach((group) => {
-        group.cards.forEach((card) => flatList.appendChild(card));
-      });
-      groupedList.innerHTML = "";
-    }
-  }
-  shells.forEach((shell) => {
-    const mode = shell.getAttribute("data-records-view");
-    shell.toggleAttribute("hidden", mode !== resolvedView);
-  });
-  applyProjectRecordFilters();
-  scheduleSubsystemIndicatorSync();
-}
-function restoreFilterState() {
-  return restoreProjectFilterScope("records");
-}
-function persistFilterState(input, options = {}) {
-  handleProjectFilterInputChange("records", options);
-}
-function invalidateRecordMeetingCommentStates(projectId) {
-  const normalizedProjectId = String(projectId || "").trim();
-  if (!normalizedProjectId) {
-    return;
-  }
-  recordMeetingCommentStateCache.delete(normalizedProjectId);
-  recordMeetingCommentStateRequests.delete(normalizedProjectId);
-}
-
-// PmTracker.Web/wwwroot/js/modules/meetingOverview.js
-var FIRST_ROW_TOLERANCE_PX = 2;
-function getMeetingYearGroups(scope) {
-  return Array.from(scope.querySelectorAll("[data-meeting-year-group]")).filter((group) => group instanceof HTMLElement);
-}
-function getMeetingCardSlots(scope) {
-  return Array.from(scope.querySelectorAll("[data-meeting-card-wrap]")).filter((slot) => slot instanceof HTMLElement);
-}
-function getMeetingId(slot) {
-  if (!(slot instanceof HTMLElement)) {
-    return "";
-  }
-  return slot.dataset.meetingId || "";
-}
-function getFirstVisualRowSlots(grid) {
-  const slots = getMeetingCardSlots(grid).filter((slot) => !slot.hidden);
-  if (slots.length === 0) {
-    return [];
-  }
-  const firstTop = Math.min(...slots.map((slot) => slot.offsetTop));
-  return slots.filter((slot) => Math.abs(slot.offsetTop - firstTop) <= FIRST_ROW_TOLERANCE_PX);
-}
-function formatMeetingCount(count) {
-  return `${count} jednání`;
-}
-function updateMeetingYearCount(group, visibleCount) {
-  const count = group.querySelector("[data-meeting-year-count]");
-  if (!(count instanceof HTMLElement)) {
-    return;
-  }
-  count.textContent = formatMeetingCount(visibleCount);
-}
-function clearPreviewHiddenSlots(scope) {
-  getMeetingCardSlots(scope).forEach((slot) => {
-    if (slot.dataset.meetingPreviewHidden !== "true") {
-      return;
-    }
-    slot.hidden = false;
-    delete slot.dataset.meetingPreviewHidden;
-  });
-}
-function countMeetingSlots(group) {
-  return getMeetingCardSlots(group).length;
-}
-function applyMeetingYearState(group) {
-  if (!(group instanceof HTMLElement)) {
-    return;
-  }
-  const body = group.querySelector("[data-meeting-year-body]");
-  const grid = group.querySelector("[data-meeting-year-grid]");
-  const toggle = group.querySelector("[data-meeting-year-toggle]");
-  if (!(body instanceof HTMLElement) || !(grid instanceof HTMLElement) || !(toggle instanceof HTMLElement)) {
-    return;
-  }
-  const state = group.dataset.meetingYearState || "collapsed";
-  clearPreviewHiddenSlots(group);
-  if (state === "collapsed") {
-    body.hidden = true;
-    body.classList.remove("is-preview");
-    body.style.removeProperty("max-height");
-    toggle.setAttribute("aria-expanded", "false");
-    return;
-  }
-  body.hidden = false;
-  toggle.setAttribute("aria-expanded", "true");
-  if (state !== "preview") {
-    body.classList.remove("is-preview");
-    body.style.removeProperty("max-height");
-    return;
-  }
-  body.classList.add("is-preview");
-  body.style.removeProperty("max-height");
-  const firstRowSlots = getFirstVisualRowSlots(grid);
-  const firstRowIds = new Set(firstRowSlots.map(getMeetingId).filter(Boolean));
-  getMeetingCardSlots(grid).forEach((slot) => {
-    const meetingId = getMeetingId(slot);
-    if (!meetingId || firstRowIds.has(meetingId)) {
-      return;
-    }
-    slot.hidden = true;
-    slot.dataset.meetingPreviewHidden = "true";
-  });
-}
-function syncYearGroupedMeetingOverview(root) {
-  getMeetingYearGroups(root).forEach((group) => {
-    updateMeetingYearCount(group, countMeetingSlots(group));
-    applyMeetingYearState(group);
-  });
-}
-function initMeetingOverview(scope = document) {
-  const roots = Array.from(scope.querySelectorAll("[data-meeting-overview]")).filter((root) => root instanceof HTMLElement);
-  roots.forEach((root) => {
-    syncYearGroupedMeetingOverview(root);
-  });
-}
-function toggleMeetingYearGroup(toggle) {
-  const group = toggle instanceof HTMLElement ? toggle.closest("[data-meeting-year-group]") : null;
-  if (!(group instanceof HTMLElement)) {
-    return;
-  }
-  const currentState = group.dataset.meetingYearState || "collapsed";
-  group.dataset.meetingYearState = currentState === "preview" ? "open" : currentState === "open" ? "collapsed" : "open";
-  applyMeetingYearState(group);
-}
-
 // PmTracker.Web/wwwroot/js/modules/utils.js
 var msPerDay = 24 * 60 * 60 * 1000;
 var dateMonths = [
@@ -1340,20 +439,20 @@ var dateMonths = [
   "Listopad",
   "Prosinec"
 ];
-function normalizeFilterText2(value) {
+function normalizeFilterText(value) {
   if (!value) {
     return "";
   }
   return value.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
-function normalizeFilterToken2(value) {
+function normalizeFilterToken(value) {
   if (value === null || value === undefined) {
     return "";
   }
   return String(value).trim().toUpperCase();
 }
 function normalizeSearchText2(value) {
-  return normalizeFilterText2(value);
+  return normalizeFilterText(value);
 }
 function containsWordPrefix(text, token) {
   if (!text || !token) {
@@ -1691,6 +790,817 @@ async function copyTextToClipboard(text) {
   const copied = document.execCommand("copy");
   document.body.removeChild(helper);
   return copied;
+}
+
+// PmTracker.Web/wwwroot/js/modules/filters.js
+var projectFilterStoragePrefix = "pmtracker.projectFilters.v1.project.";
+var projectRecordFilterPanelStorageKey = "pmtracker.filters.open";
+var legacyProjectFilterPrefixes = [
+  "pmtracker.filter.",
+  "pmtracker.schedule.filter.",
+  "pmtracker.gantt.filter."
+];
+var legacyProjectFilterKeys = [
+  "pmtracker.records.view",
+  "pmtracker.gantt.filters.open"
+];
+var legacyGanttStoragePrefixes = [
+  "pmtracker.gantt.pinned.",
+  "pmtracker.gantt.expanded."
+];
+var recordMeetingCommentStateCache = new Map;
+var recordMeetingCommentStateRequests = new Map;
+var recordMeetingCommentStateLoadingMessage = "Načítání dat pro filtr jednání-vyjádření...";
+var recordMeetingCommentStateErrorMessage = "Nepodařilo se načíst data pro filtr jednání-vyjádření.";
+var projectFilterConfigs = {
+  records: {
+    rootSelector: '[data-project-filter-scope="records"]',
+    inputSelector: "[data-filter-key]",
+    keyAttribute: "data-filter-key",
+    chipRowSelector: '[data-filter-chip-row="records"]',
+    statusSelector: '[data-filter-save-status="records"]',
+    fields: [
+      { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+      { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true },
+      { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
+      { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
+      { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
+      { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
+      { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní úkoly" },
+      { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé záznamy" },
+      { inputKey: "jednani-vyjadreni-stav", stateKey: "jednaniVyjadreniStav", type: "select", chipLabel: "Jednání-vyjádření" },
+      { inputKey: "groupBySubsystem", stateKey: "groupBySubsystem", type: "checkbox", skipChip: true }
+    ]
+  },
+  schedule: {
+    rootSelector: '[data-project-filter-scope="schedule"]',
+    inputSelector: "[data-schedule-filter-key]",
+    keyAttribute: "data-schedule-filter-key",
+    chipRowSelector: '[data-filter-chip-row="schedule"]',
+    statusSelector: '[data-filter-save-status="schedule"]',
+    fields: [
+      { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+      { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true }
+    ]
+  }
+};
+var projectPrintRelevantRecordStateKeys = [
+  "subsystem",
+  "kategorie",
+  "stav",
+  "typ",
+  "vlastnik",
+  "aktivni",
+  "mine",
+  "jednaniVyjadreniStav"
+];
+function normalizeFilterText2(value) {
+  if (!value) {
+    return "";
+  }
+  return value.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+function normalizeFilterToken2(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value).trim().toUpperCase();
+}
+function normalizeSubsystemSortMode(value) {
+  const candidate = String(value || "").trim().toLowerCase();
+  if (candidate === "alpha-asc" || candidate === "alpha-desc" || candidate === "project-desc") {
+    return candidate;
+  }
+  return "project-asc";
+}
+function buildSubsystemSortMeta(source = {}) {
+  return {
+    name: String(source.name || "").trim() || "-",
+    code: String(source.code || "").trim(),
+    order: Number.isInteger(source.order) ? source.order : Number.parseInt(source.order || "0", 10) || 0,
+    hasProjectOrder: source.hasProjectOrder === true || source.hasProjectOrder === "true"
+  };
+}
+function readSubsystemGroupSortMeta(element) {
+  if (!(element instanceof Element)) {
+    return buildSubsystemSortMeta();
+  }
+  return buildSubsystemSortMeta({
+    name: element.getAttribute("data-subsystem-name") || "",
+    code: element.getAttribute("data-subsystem-kod") || "",
+    order: element.getAttribute("data-subsystem-order") || "0",
+    hasProjectOrder: element.getAttribute("data-subsystem-order-active") === "true"
+  });
+}
+function compareSubsystemAlpha(left, right) {
+  const byName = left.name.localeCompare(right.name, "cs");
+  if (byName !== 0) {
+    return byName;
+  }
+  return left.code.localeCompare(right.code, "cs");
+}
+function compareSubsystemSortMeta(leftSource, rightSource, sortMode) {
+  const left = buildSubsystemSortMeta(leftSource);
+  const right = buildSubsystemSortMeta(rightSource);
+  const resolvedMode = normalizeSubsystemSortMode(sortMode);
+  const alpha = compareSubsystemAlpha(left, right);
+  if (resolvedMode === "alpha-asc") {
+    return alpha;
+  }
+  if (resolvedMode === "alpha-desc") {
+    return alpha * -1;
+  }
+  if (left.hasProjectOrder && right.hasProjectOrder) {
+    if (left.order !== right.order) {
+      return resolvedMode === "project-desc" ? right.order - left.order : left.order - right.order;
+    }
+    return alpha;
+  }
+  if (left.hasProjectOrder !== right.hasProjectOrder) {
+    return left.hasProjectOrder ? -1 : 1;
+  }
+  return resolvedMode === "project-desc" ? alpha * -1 : alpha;
+}
+function sortSubsystemGroupsInContainer(container, sortMode) {
+  if (!(container instanceof Element)) {
+    return [];
+  }
+  const groups = Array.from(container.querySelectorAll("[data-subsystem-group]")).filter((group) => group instanceof HTMLElement);
+  groups.sort((left, right) => compareSubsystemSortMeta(readSubsystemGroupSortMeta(left), readSubsystemGroupSortMeta(right), sortMode)).forEach((group) => container.appendChild(group));
+  return groups;
+}
+function buildProjectPrintFilterSnapshot() {
+  const state = buildProjectFilterStateFromInputs("records");
+  const snapshot = {
+    subsystem: typeof state.subsystem === "string" ? state.subsystem.trim() : "",
+    kategorie: typeof state.kategorie === "string" ? state.kategorie.trim() : "",
+    stav: typeof state.stav === "string" ? state.stav.trim() : "",
+    typ: typeof state.typ === "string" ? state.typ.trim() : "",
+    vlastnik: typeof state.vlastnik === "string" ? state.vlastnik.trim() : "",
+    aktivni: Boolean(state.aktivni),
+    mine: Boolean(state.mine),
+    jednaniVyjadreniStav: typeof state.jednaniVyjadreniStav === "string" ? state.jednaniVyjadreniStav.trim() : ""
+  };
+  return {
+    ...snapshot,
+    hasRelevantFilters: projectPrintRelevantRecordStateKeys.some((key) => Boolean(snapshot[key]))
+  };
+}
+function buildProjectPrintFilterQueryParams(useCurrentFilters) {
+  const snapshot = buildProjectPrintFilterSnapshot();
+  const params = new URLSearchParams;
+  if (!useCurrentFilters) {
+    params.set("useCurrentFilters", "false");
+    return { snapshot, params };
+  }
+  params.set("useCurrentFilters", "true");
+  if (snapshot.subsystem) {
+    params.set("subsystem", snapshot.subsystem);
+  }
+  if (snapshot.kategorie) {
+    params.set("kategorie", snapshot.kategorie);
+  }
+  if (snapshot.stav) {
+    params.set("stav", snapshot.stav);
+  }
+  if (snapshot.typ) {
+    params.set("typ", snapshot.typ);
+  }
+  if (snapshot.vlastnik) {
+    params.set("vlastnik", snapshot.vlastnik);
+  }
+  if (snapshot.aktivni) {
+    params.set("aktivni", "true");
+  }
+  if (snapshot.mine) {
+    params.set("mine", "true");
+  }
+  if (snapshot.jednaniVyjadreniStav) {
+    params.set("jednaniVyjadreniStav", snapshot.jednaniVyjadreniStav);
+  }
+  return { snapshot, params };
+}
+function getProjectFilterRoot(scope) {
+  const config = getProjectFilterConfig(scope);
+  if (!config) {
+    return null;
+  }
+  const root = document.querySelector(config.rootSelector);
+  return root instanceof HTMLElement ? root : null;
+}
+function getProjectFilterProjectId(scope) {
+  const root = getProjectFilterRoot(scope);
+  const projectId = (root?.dataset.projectId || "").trim();
+  return projectId || "0";
+}
+function getProjectDetailRoot() {
+  const root = document.querySelector("[data-project-detail-root]");
+  return root instanceof HTMLElement ? root : null;
+}
+function getProjectRecordsPanel() {
+  const panel = document.querySelector('[data-tab-panel="zaznamy"]');
+  return panel instanceof HTMLElement ? panel : null;
+}
+function normalizeRecordMeetingCommentStatesPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+  const rawStates = payload.statesByRecordId && typeof payload.statesByRecordId === "object" ? payload.statesByRecordId : payload;
+  const normalized = {};
+  Object.entries(rawStates).forEach(([recordId, values]) => {
+    const normalizedRecordId = String(recordId || "").trim();
+    if (!normalizedRecordId) {
+      return;
+    }
+    const normalizedValues = Array.isArray(values) ? values.map((value) => normalizeFilterToken2(value)).filter(Boolean) : [];
+    normalized[normalizedRecordId] = Array.from(new Set(normalizedValues));
+  });
+  return normalized;
+}
+function applyCachedRecordMeetingCommentStates(projectId) {
+  const normalizedProjectId = String(projectId || "").trim();
+  if (!normalizedProjectId || !recordMeetingCommentStateCache.has(normalizedProjectId)) {
+    return false;
+  }
+  const statesByRecordId = recordMeetingCommentStateCache.get(normalizedProjectId) || {};
+  const recordsPanel = getProjectRecordsPanel();
+  if (!(recordsPanel instanceof HTMLElement)) {
+    return false;
+  }
+  recordsPanel.querySelectorAll(".record-card[data-record-id]").forEach((card) => {
+    if (!(card instanceof HTMLElement)) {
+      return;
+    }
+    const recordId = (card.dataset.recordId || "").trim();
+    const values = Array.isArray(statesByRecordId[recordId]) ? statesByRecordId[recordId] : [];
+    card.dataset.filterVyjadreniJednaniStavy = values.join("|");
+  });
+  return true;
+}
+async function ensureRecordMeetingCommentStatesLoaded() {
+  const projectRoot = getProjectDetailRoot();
+  const projectId = getProjectFilterProjectId("records");
+  const loadUrl = (projectRoot?.dataset.recordMeetingCommentStatesUrl || "").trim();
+  if (!projectId || projectId === "0" || !loadUrl) {
+    return false;
+  }
+  if (applyCachedRecordMeetingCommentStates(projectId)) {
+    return true;
+  }
+  const existingRequest = recordMeetingCommentStateRequests.get(projectId);
+  if (existingRequest instanceof Promise) {
+    return existingRequest;
+  }
+  setProjectFilterSaveStatus("records", recordMeetingCommentStateLoadingMessage);
+  const request = (async () => {
+    try {
+      const response = await fetch(loadUrl, {
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "same-origin"
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      recordMeetingCommentStateCache.set(projectId, normalizeRecordMeetingCommentStatesPayload(payload));
+      applyCachedRecordMeetingCommentStates(projectId);
+      setProjectFilterSaveStatus("records", "");
+      applyProjectRecordFilters();
+      return true;
+    } catch (error) {
+      setProjectFilterSaveStatus("records", recordMeetingCommentStateErrorMessage);
+      return false;
+    } finally {
+      recordMeetingCommentStateRequests.delete(projectId);
+    }
+  })();
+  recordMeetingCommentStateRequests.set(projectId, request);
+  return request;
+}
+function readJsonStorage(storage, key) {
+  if (!key) {
+    return null;
+  }
+  try {
+    const raw = storage.getItem(key);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (error) {
+    return null;
+  }
+}
+function writeJsonStorage(storage, key, value) {
+  if (!key) {
+    return;
+  }
+  storage.setItem(key, JSON.stringify(value));
+}
+function hasSelectOptionValue(input, value) {
+  if (!(input instanceof HTMLSelectElement)) {
+    return false;
+  }
+  return Array.from(input.options).some((option) => option.value === value);
+}
+function readProjectFilterInputValue(input, field) {
+  if (input instanceof HTMLInputElement && field.type === "checkbox") {
+    return input.checked;
+  }
+  if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+    return input.value;
+  }
+  return field.type === "checkbox" ? false : "";
+}
+function applyProjectFilterStateToInputs(scope, state) {
+  const config = getProjectFilterConfig(scope);
+  if (!config) {
+    return;
+  }
+  config.fields.forEach((field) => {
+    const input = getProjectFilterInput(scope, field.inputKey);
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+      return;
+    }
+    const value = state[field.stateKey];
+    if (field.type === "checkbox" && input instanceof HTMLInputElement) {
+      input.checked = Boolean(value);
+      return;
+    }
+    input.value = typeof value === "string" ? value : "";
+  });
+}
+function readStoredProjectFilterState(scope, kind, fallbackState) {
+  const storage = kind === "state" ? sessionStorage : localStorage;
+  const key = getProjectFilterStorageKey(scope, kind);
+  const rawState = readJsonStorage(storage, key);
+  if (!rawState) {
+    return null;
+  }
+  return normalizeProjectFilterState(scope, rawState, fallbackState);
+}
+function persistProjectFilterSessionState(scope) {
+  const currentState = buildProjectFilterStateFromInputs(scope);
+  const normalizedState = normalizeProjectFilterState(scope, currentState, currentState);
+  const key = getProjectFilterStorageKey(scope, "state");
+  writeJsonStorage(sessionStorage, key, normalizedState);
+  return normalizedState;
+}
+function buildProjectFilterChipLabel(field, input) {
+  if (field.type === "checkbox") {
+    return field.chipLabel || "";
+  }
+  if (!(input instanceof HTMLSelectElement)) {
+    return "";
+  }
+  const option = input.selectedOptions[0];
+  const optionText = option?.textContent?.trim() || "";
+  if (!optionText) {
+    return "";
+  }
+  return `${field.chipLabel}: ${optionText}`;
+}
+function applyProjectFilterScope(scope, options = {}) {
+  if (scope === "records") {
+    const state = buildProjectFilterStateFromInputs(scope);
+    applyRecordsView(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
+    return;
+  }
+  if (typeof options.applyScope === "function") {
+    options.applyScope(scope, buildProjectFilterStateFromInputs(scope));
+  }
+}
+function removeMatchingStorageKeys(storage, predicate) {
+  const keys = [];
+  for (let i = 0;i < storage.length; i += 1) {
+    const key = storage.key(i);
+    if (key && predicate(key)) {
+      keys.push(key);
+    }
+  }
+  keys.forEach((key) => storage.removeItem(key));
+}
+function getProjectFilterConfig(scope) {
+  return projectFilterConfigs[scope] || null;
+}
+function getProjectFilterInput(scope, inputKey) {
+  const config = getProjectFilterConfig(scope);
+  const root = getProjectFilterRoot(scope);
+  if (!config || !(root instanceof HTMLElement)) {
+    return null;
+  }
+  const input = root.querySelector(`${config.inputSelector}[${config.keyAttribute}="${inputKey}"]`);
+  return input instanceof HTMLInputElement || input instanceof HTMLSelectElement ? input : null;
+}
+function getProjectFilterCurrentUserId(scope) {
+  return normalizeFilterToken2(getProjectFilterRoot(scope)?.dataset.currentUserId || "");
+}
+function getProjectFilterStorageKey(scope, kind) {
+  const projectId = getProjectFilterProjectId(scope);
+  if (!projectId || projectId === "0") {
+    return "";
+  }
+  return `${projectFilterStoragePrefix}${projectId}.${scope}.${kind}`;
+}
+function normalizeProjectFilterState(scope, rawState, fallbackState) {
+  const config = getProjectFilterConfig(scope);
+  if (!config) {
+    return {};
+  }
+  const normalized = {};
+  const source = rawState && typeof rawState === "object" ? rawState : {};
+  const fallback = fallbackState && typeof fallbackState === "object" ? fallbackState : {};
+  config.fields.forEach((field) => {
+    const input = getProjectFilterInput(scope, field.inputKey);
+    const fallbackValue = fallback[field.stateKey];
+    const sourceValue = source[field.stateKey];
+    if (field.type === "checkbox") {
+      if (typeof sourceValue === "boolean") {
+        normalized[field.stateKey] = sourceValue;
+        return;
+      }
+      if (sourceValue === "true" || sourceValue === "false") {
+        normalized[field.stateKey] = sourceValue === "true";
+        return;
+      }
+      normalized[field.stateKey] = Boolean(fallbackValue);
+      return;
+    }
+    const fallbackText = typeof fallbackValue === "string" ? fallbackValue : "";
+    const candidate = typeof sourceValue === "string" ? sourceValue : fallbackText;
+    if (candidate && input instanceof HTMLSelectElement && !hasSelectOptionValue(input, candidate)) {
+      normalized[field.stateKey] = fallbackText && hasSelectOptionValue(input, fallbackText) ? fallbackText : "";
+      return;
+    }
+    normalized[field.stateKey] = candidate;
+  });
+  return normalized;
+}
+function buildProjectFilterStateFromInputs(scope) {
+  const config = getProjectFilterConfig(scope);
+  if (!config) {
+    return {};
+  }
+  const state = {};
+  config.fields.forEach((field) => {
+    const input = getProjectFilterInput(scope, field.inputKey);
+    state[field.stateKey] = readProjectFilterInputValue(input, field);
+  });
+  return state;
+}
+function setProjectFilterSaveStatus(scope, message) {
+  const config = getProjectFilterConfig(scope);
+  const root = getProjectFilterRoot(scope);
+  if (!config || !(root instanceof HTMLElement)) {
+    return;
+  }
+  const status = root.querySelector(config.statusSelector);
+  if (status instanceof HTMLElement) {
+    status.textContent = message || "";
+  }
+}
+function renderProjectFilterChips(scope) {
+  const config = getProjectFilterConfig(scope);
+  const root = getProjectFilterRoot(scope);
+  if (!config || !(root instanceof HTMLElement)) {
+    return;
+  }
+  const chipRow = root.querySelector(config.chipRowSelector);
+  if (!(chipRow instanceof HTMLElement)) {
+    return;
+  }
+  chipRow.innerHTML = "";
+  const state = buildProjectFilterStateFromInputs(scope);
+  const chips = [];
+  config.fields.forEach((field) => {
+    if (field.skipChip) {
+      return;
+    }
+    const value = state[field.stateKey];
+    const isActive = field.type === "checkbox" ? Boolean(value) : Boolean(value);
+    if (!isActive) {
+      return;
+    }
+    const input = getProjectFilterInput(scope, field.inputKey);
+    const label = buildProjectFilterChipLabel(field, input);
+    if (!label) {
+      return;
+    }
+    const chip = document.createElement("span");
+    chip.className = "active-filter-chip";
+    const text = document.createElement("span");
+    text.className = "active-filter-chip-label";
+    text.textContent = label;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "active-filter-chip-remove";
+    remove.setAttribute("data-filter-chip-remove", scope);
+    remove.setAttribute("data-filter-chip-key", field.inputKey);
+    remove.setAttribute("aria-label", `Odebrat filtr ${label}`);
+    remove.textContent = "×";
+    chip.append(text, remove);
+    chips.push(chip);
+  });
+  chipRow.hidden = chips.length === 0;
+  chips.forEach((chip) => chipRow.appendChild(chip));
+}
+function handleProjectFilterInputChange(scope, options = {}) {
+  persistProjectFilterSessionState(scope);
+  renderProjectFilterChips(scope);
+  setProjectFilterSaveStatus(scope, "");
+  applyProjectFilterScope(scope, options);
+}
+function restoreProjectFilterScope(scope) {
+  const fallbackState = buildProjectFilterStateFromInputs(scope);
+  const restoredState = readStoredProjectFilterState(scope, "state", fallbackState) || readStoredProjectFilterState(scope, "defaults", fallbackState) || fallbackState;
+  applyProjectFilterStateToInputs(scope, restoredState);
+  persistProjectFilterSessionState(scope);
+  renderProjectFilterChips(scope);
+  return restoredState;
+}
+function saveProjectFilterDefaults(scope) {
+  const state = persistProjectFilterSessionState(scope);
+  const key = getProjectFilterStorageKey(scope, "defaults");
+  writeJsonStorage(localStorage, key, state);
+  setProjectFilterSaveStatus(scope, "Výchozí filtry uloženy v tomto prohlížeči.");
+}
+function clearProjectFilterInput(scope, inputKey) {
+  const input = getProjectFilterInput(scope, inputKey);
+  if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+    return;
+  }
+  if (input instanceof HTMLInputElement && input.type === "checkbox") {
+    input.checked = false;
+  } else {
+    input.value = "";
+  }
+}
+function clearProjectFilterPreferenceStorage() {
+  removeMatchingStorageKeys(localStorage, (key) => key.startsWith(projectFilterStoragePrefix) || legacyProjectFilterKeys.includes(key) || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix)) || legacyGanttStoragePrefixes.some((prefix) => key.startsWith(prefix)));
+  removeMatchingStorageKeys(sessionStorage, (key) => key.startsWith(projectFilterStoragePrefix) || legacyProjectFilterKeys.includes(key) || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix)) || legacyGanttStoragePrefixes.some((prefix) => key.startsWith(prefix)));
+}
+function setFilterPanelOpen(open) {
+  const filterPanel = document.querySelector("[data-filter-panel]");
+  const filterToggle = document.querySelector("[data-filter-toggle]");
+  if (!(filterPanel instanceof HTMLElement)) {
+    return;
+  }
+  filterPanel.classList.toggle("collapsed", !open);
+  if (filterToggle instanceof HTMLElement) {
+    filterToggle.setAttribute("aria-expanded", String(open));
+  }
+  localStorage.setItem(projectRecordFilterPanelStorageKey, String(open));
+}
+function setRecordFilterVisibility(element, isVisible) {
+  if (!(element instanceof HTMLElement)) {
+    return;
+  }
+  element.classList.toggle("is-filter-hidden", !isVisible);
+  element.hidden = !isVisible;
+}
+function applyProjectRecordFilters() {
+  const recordsPanel = getProjectRecordsPanel();
+  if (!(recordsPanel instanceof HTMLElement)) {
+    return;
+  }
+  const cards = recordsPanel.querySelectorAll(".record-card[data-record-id]");
+  if (cards.length === 0) {
+    return;
+  }
+  const state = buildProjectFilterStateFromInputs("records");
+  const currentUserId = getProjectFilterCurrentUserId("records");
+  const hasCurrentUser = currentUserId && currentUserId !== "0";
+  const filters = {
+    subsystem: normalizeFilterToken2(state.subsystem),
+    kategorie: normalizeFilterToken2(state.kategorie),
+    stav: normalizeFilterToken2(state.stav),
+    typ: normalizeFilterToken2(state.typ),
+    vlastnik: normalizeFilterToken2(state.vlastnik),
+    onlyActive: Boolean(state.aktivni),
+    mine: Boolean(state.mine),
+    meetingCommentState: normalizeFilterToken2(state.jednaniVyjadreniStav)
+  };
+  const projectId = getProjectFilterProjectId("records");
+  const hasMeetingCommentStateCache = applyCachedRecordMeetingCommentStates(projectId);
+  if (filters.meetingCommentState && !hasMeetingCommentStateCache) {
+    ensureRecordMeetingCommentStatesLoaded();
+  }
+  cards.forEach((item) => {
+    if (!(item instanceof HTMLElement)) {
+      return;
+    }
+    const subsystem = normalizeFilterToken2(item.dataset.filterSubsystemKod || item.dataset.filterSubsystem);
+    const kategorie = normalizeFilterToken2(item.dataset.filterKategorieKod || item.dataset.filterKategorie);
+    const stav = normalizeFilterToken2(item.dataset.filterStavKod || item.dataset.filterStav);
+    const typ = normalizeFilterToken2(item.dataset.filterTypKod || item.dataset.filterTyp);
+    const vlastnik = normalizeFilterToken2(item.dataset.filterVlastnikId || item.dataset.filterVlastnik);
+    const isActive = item.dataset.filterAktivni === "true";
+    const isTask = item.dataset.filterJeUkol === "true";
+    const commentMeetingStates = (item.dataset.filterVyjadreniJednaniStavy || "").split(/[|,]/g).map((value) => normalizeFilterToken2(value)).filter(Boolean);
+    const matchesMeetingCommentState = !filters.meetingCommentState || !hasMeetingCommentStateCache || isTask && commentMeetingStates.includes(filters.meetingCommentState);
+    const matchesMine = !filters.mine || hasCurrentUser && vlastnik === currentUserId;
+    const matches = (!filters.subsystem || subsystem === filters.subsystem) && (!filters.kategorie || kategorie === filters.kategorie) && (!filters.stav || stav === filters.stav) && (!filters.typ || typ === filters.typ) && (!filters.vlastnik || vlastnik === filters.vlastnik) && (!filters.onlyActive || isActive) && matchesMine && matchesMeetingCommentState;
+    setRecordFilterVisibility(item, matches);
+  });
+  recordsPanel.querySelectorAll(".subsystem-group").forEach((group) => {
+    if (!(group instanceof HTMLElement)) {
+      return;
+    }
+    const hasVisibleCards = Array.from(group.querySelectorAll(".record-card")).some((card) => card instanceof HTMLElement && !card.hidden);
+    setRecordFilterVisibility(group, hasVisibleCards);
+  });
+  scheduleSubsystemIndicatorSync();
+}
+function resolveCurrentSubsystemGroup(groups, anchorY) {
+  if (!Array.isArray(groups) || groups.length === 0) {
+    return null;
+  }
+  let current = groups[0];
+  for (const group of groups) {
+    if (!(group instanceof HTMLElement)) {
+      continue;
+    }
+    const rect = group.getBoundingClientRect();
+    if (rect.bottom <= anchorY) {
+      current = group;
+      continue;
+    }
+    if (rect.top <= anchorY) {
+      current = group;
+    }
+    break;
+  }
+  return current;
+}
+function resolveActiveSubsystemIndicatorShell() {
+  const activePanel = document.querySelector(".tab-panel.active");
+  if (!(activePanel instanceof HTMLElement)) {
+    return null;
+  }
+  const groupedShell = activePanel.querySelector("[data-subsystem-grouped-shell]");
+  if (!(groupedShell instanceof HTMLElement) || groupedShell.hidden) {
+    return null;
+  }
+  return groupedShell;
+}
+function updateSubsystemScrollIndicator() {
+  const indicator = document.querySelector("[data-subsystem-scroll-indicator]");
+  const bubble = document.querySelector("[data-subsystem-scroll-indicator-bubble]");
+  const label = document.querySelector("[data-subsystem-scroll-indicator-label]");
+  if (!(indicator instanceof HTMLElement) || !(bubble instanceof HTMLElement) || !(label instanceof HTMLElement)) {
+    return;
+  }
+  if (window.scrollY <= 0) {
+    indicator.hidden = true;
+    return;
+  }
+  const groupedShell = resolveActiveSubsystemIndicatorShell();
+  if (!(groupedShell instanceof HTMLElement)) {
+    indicator.hidden = true;
+    return;
+  }
+  const visibleGroups = Array.from(groupedShell.querySelectorAll("[data-subsystem-group]")).filter((group) => group instanceof HTMLElement && !group.hidden);
+  if (visibleGroups.length === 0) {
+    indicator.hidden = true;
+    return;
+  }
+  const shellRect = groupedShell.getBoundingClientRect();
+  if (shellRect.bottom <= 120 || shellRect.top >= window.innerHeight) {
+    indicator.hidden = true;
+    return;
+  }
+  const anchorY = Math.max(132, Math.min(window.innerHeight * 0.35, 220));
+  const currentGroup = resolveCurrentSubsystemGroup(visibleGroups, anchorY);
+  const subsystemName = currentGroup instanceof HTMLElement ? (currentGroup.getAttribute("data-subsystem-name") || "").trim() : "";
+  if (!subsystemName) {
+    indicator.hidden = true;
+    return;
+  }
+  const bubbleTravel = Math.max(0, indicator.clientHeight - bubble.offsetHeight);
+  const currentRect = currentGroup.getBoundingClientRect();
+  const currentCenter = currentRect.top + currentRect.height / 2;
+  const progress = Math.max(0, Math.min(1, (currentCenter - shellRect.top) / Math.max(shellRect.height, 1)));
+  bubble.style.transform = `translateY(${Math.round(progress * bubbleTravel)}px)`;
+  label.textContent = subsystemName;
+  indicator.hidden = false;
+}
+function scheduleSubsystemIndicatorSync() {
+  if (!(document.body instanceof HTMLElement)) {
+    return;
+  }
+  const currentFrame = Number.parseInt(document.body.dataset.subsystemIndicatorFrame || "0", 10);
+  if (Number.isInteger(currentFrame) && currentFrame > 0) {
+    window.cancelAnimationFrame(currentFrame);
+  }
+  const nextFrame = window.requestAnimationFrame(() => {
+    document.body.dataset.subsystemIndicatorFrame = "0";
+    updateSubsystemScrollIndicator();
+  });
+  document.body.dataset.subsystemIndicatorFrame = String(nextFrame);
+}
+function initSubsystemScrollIndicator() {
+  const indicator = document.querySelector("[data-subsystem-scroll-indicator]");
+  if (!(indicator instanceof HTMLElement) || !(document.body instanceof HTMLElement)) {
+    return;
+  }
+  if (document.body.dataset.subsystemIndicatorReady !== "true") {
+    document.body.dataset.subsystemIndicatorReady = "true";
+    window.addEventListener("scroll", scheduleSubsystemIndicatorSync, { passive: true });
+    window.addEventListener("resize", scheduleSubsystemIndicatorSync);
+  }
+  scheduleSubsystemIndicatorSync();
+}
+function applyRecordsView(view) {
+  const recordsPanel = getProjectRecordsPanel();
+  if (!(recordsPanel instanceof HTMLElement)) {
+    return;
+  }
+  const groupBySubsystemInput = getProjectFilterInput("records", "groupBySubsystem");
+  const resolvedView = groupBySubsystemInput instanceof HTMLInputElement ? groupBySubsystemInput.checked ? "subsystem" : "flat" : view;
+  const shells = recordsPanel.querySelectorAll("[data-records-view]");
+  if (shells.length === 0) {
+    return;
+  }
+  const groupedList = recordsPanel.querySelector("[data-record-grouped-list]");
+  const flatList = recordsPanel.querySelector("[data-record-flat-list]");
+  const cards = Array.from(recordsPanel.querySelectorAll(".record-card[data-record-id]")).filter((card) => card instanceof HTMLElement);
+  const sortMode = normalizeSubsystemSortMode(buildProjectFilterStateFromInputs("records").sortBy);
+  if (groupedList instanceof HTMLElement && flatList instanceof HTMLElement && cards.length > 0) {
+    const groupsByKey = new Map;
+    const orderedGroups = [];
+    cards.forEach((card) => {
+      const subsystemName = (card.getAttribute("data-filter-subsystem") || "").trim() || "-";
+      const subsystemCode = (card.getAttribute("data-filter-subsystem-kod") || "").trim();
+      const subsystemOrder = Number.parseInt(card.getAttribute("data-filter-subsystem-order") || "0", 10) || 0;
+      const subsystemHasProjectOrder = card.getAttribute("data-filter-subsystem-order-active") === "true";
+      const groupKey = `${subsystemCode}\x00${subsystemName}`;
+      let group = groupsByKey.get(groupKey);
+      if (!group) {
+        group = {
+          meta: {
+            name: subsystemName,
+            code: subsystemCode,
+            order: subsystemOrder,
+            hasProjectOrder: subsystemHasProjectOrder
+          },
+          cards: []
+        };
+        groupsByKey.set(groupKey, group);
+        orderedGroups.push(group);
+      }
+      group.cards.push(card);
+    });
+    orderedGroups.sort((left, right) => compareSubsystemSortMeta(left.meta, right.meta, sortMode));
+    if (resolvedView === "subsystem") {
+      groupedList.innerHTML = "";
+      orderedGroups.forEach((group) => {
+        const currentGroup = document.createElement("div");
+        currentGroup.className = "subsystem-group";
+        currentGroup.setAttribute("data-subsystem-group", "");
+        currentGroup.setAttribute("data-subsystem-name", group.meta.name);
+        currentGroup.setAttribute("data-subsystem-kod", group.meta.code);
+        currentGroup.setAttribute("data-subsystem-order", String(group.meta.order));
+        currentGroup.setAttribute("data-subsystem-order-active", String(group.meta.hasProjectOrder));
+        const heading = document.createElement("h3");
+        heading.textContent = group.meta.name;
+        currentGroup.appendChild(heading);
+        const currentGroupCards = document.createElement("div");
+        currentGroupCards.className = "card-list";
+        group.cards.forEach((card) => currentGroupCards.appendChild(card));
+        currentGroup.appendChild(currentGroupCards);
+        groupedList.appendChild(currentGroup);
+      });
+    } else {
+      orderedGroups.forEach((group) => {
+        group.cards.forEach((card) => flatList.appendChild(card));
+      });
+      groupedList.innerHTML = "";
+    }
+  }
+  shells.forEach((shell) => {
+    const mode = shell.getAttribute("data-records-view");
+    shell.toggleAttribute("hidden", mode !== resolvedView);
+  });
+  applyProjectRecordFilters();
+  scheduleSubsystemIndicatorSync();
+}
+function restoreFilterState() {
+  return restoreProjectFilterScope("records");
+}
+function persistFilterState(input, options = {}) {
+  handleProjectFilterInputChange("records", options);
+}
+function invalidateRecordMeetingCommentStates(projectId) {
+  const normalizedProjectId = String(projectId || "").trim();
+  if (!normalizedProjectId) {
+    return;
+  }
+  recordMeetingCommentStateCache.delete(normalizedProjectId);
+  recordMeetingCommentStateRequests.delete(normalizedProjectId);
 }
 
 // PmTracker.Web/wwwroot/js/modules/ui.js
@@ -2418,6 +2328,294 @@ function isInteractionInsideFloatingControl(target, anchor, panel) {
   return anchor instanceof HTMLElement && anchor.contains(target) || panel instanceof HTMLElement && panel.contains(target);
 }
 
+// PmTracker.Web/wwwroot/js/modules/recordLazyLoading.js
+var cardInteractiveSelector = [
+  "button",
+  "a",
+  "input",
+  "select",
+  "textarea",
+  "label",
+  "[data-stop-propagation]",
+  "[contenteditable='true']"
+].join(", ");
+function applyRecordCommentSortDirection(card, direction) {
+  const normalizedDirection = direction === "desc" ? "desc" : "asc";
+  const section = card.querySelector("[data-comment-sort-section]");
+  if (!(section instanceof HTMLElement)) {
+    return;
+  }
+  applyCommentSort(section, normalizedDirection);
+  const toggle = section.querySelector("[data-comment-sort-toggle]");
+  if (toggle instanceof HTMLButtonElement) {
+    setCommentSortButtonLabel(toggle, normalizedDirection);
+  }
+}
+async function loadRecordDetail(cardOrChild, options = {}) {
+  const card = resolveRecordCardElement(cardOrChild);
+  if (!(card instanceof HTMLElement)) {
+    return false;
+  }
+  const detailUrl = typeof options.url === "string" && options.url ? options.url : (card.dataset.recordDetailUrl || "").trim();
+  if (!detailUrl) {
+    return false;
+  }
+  const forceReload = options.force === true;
+  if (card.dataset.recordDetailLoaded === "true" && !forceReload) {
+    return true;
+  }
+  const detailShell = card.querySelector("[data-record-detail-shell]");
+  if (!(detailShell instanceof HTMLElement)) {
+    return false;
+  }
+  const placeholder = detailShell.querySelector("[data-record-detail-placeholder]");
+  const errorContainer = resolveOrCreateErrorContainer(detailShell, "data-record-detail-error");
+  setLazyLoadingState(detailShell, placeholder, errorContainer, true);
+  try {
+    detailShell.innerHTML = await fetchHtmlFragment(detailUrl);
+    card.dataset.recordDetailLoaded = "true";
+    navigationRuntime.initRecordFormEnhancements?.(detailShell);
+    queueRainbowSegmentRender(detailShell);
+    return true;
+  } catch (error) {
+    card.dataset.recordDetailLoaded = "false";
+    setLazyLoadingState(detailShell, placeholder, errorContainer, false);
+    renderLazyLoadError(errorContainer, "Nepodařilo se načíst detail záznamu.", "data-record-detail-retry");
+    return false;
+  }
+}
+async function loadRecordComments(cardOrChild, options = {}) {
+  const card = resolveRecordCardElement(cardOrChild);
+  if (!(card instanceof HTMLElement)) {
+    return false;
+  }
+  const commentsShell = card.querySelector("[data-record-comments-shell]");
+  if (!(commentsShell instanceof HTMLElement)) {
+    return false;
+  }
+  const baseCommentsUrl = typeof options.url === "string" && options.url ? options.url : (commentsShell.dataset.recordCommentsBaseUrl || commentsShell.dataset.recordCommentsUrl || card.dataset.recordCommentsBaseUrl || card.dataset.recordCommentsUrl || "").trim();
+  if (!baseCommentsUrl) {
+    return false;
+  }
+  const requestUrl = buildRecordCommentsRequestUrl(baseCommentsUrl, {
+    limit: options.limit,
+    loadAll: options.loadAll === true
+  }) || baseCommentsUrl;
+  const forceReload = options.force === true;
+  const alreadyLoaded = commentsShell.dataset.recordCommentsLoaded === "true" || card.dataset.recordCommentsLoaded === "true";
+  if (alreadyLoaded && !forceReload) {
+    return true;
+  }
+  const placeholder = commentsShell.querySelector("[data-record-comments-placeholder]");
+  const errorContainer = resolveOrCreateErrorContainer(commentsShell, "data-record-comments-error");
+  setLazyLoadingState(commentsShell, placeholder, errorContainer, true);
+  try {
+    commentsShell.innerHTML = await fetchHtmlFragment(requestUrl);
+    commentsShell.dataset.recordCommentsLoaded = "true";
+    commentsShell.dataset.recordCommentsUrl = requestUrl;
+    commentsShell.dataset.recordCommentsBaseUrl = baseCommentsUrl;
+    card.dataset.recordCommentsLoaded = "true";
+    card.dataset.recordCommentsBaseUrl = baseCommentsUrl;
+    navigationRuntime.initRecordFormEnhancements?.(commentsShell);
+    initCommentSortUi(commentsShell);
+    if (options.sortDirection === "asc" || options.sortDirection === "desc") {
+      applyRecordCommentSortDirection(card, options.sortDirection);
+    }
+    return true;
+  } catch (error) {
+    commentsShell.dataset.recordCommentsLoaded = "false";
+    card.dataset.recordCommentsLoaded = "false";
+    setLazyLoadingState(commentsShell, placeholder, errorContainer, false);
+    renderLazyLoadError(errorContainer, "Nepodařilo se načíst vyjádření.", "data-record-comments-retry");
+    return false;
+  }
+}
+async function toggleRecordCard(cardOrChild, options = {}) {
+  const card = resolveRecordCardElement(cardOrChild);
+  if (!(card instanceof HTMLElement)) {
+    return;
+  }
+  const shouldExpand = options.expand === true ? true : options.collapse === true ? false : card.classList.contains("collapsed");
+  card.classList.toggle("collapsed", !shouldExpand);
+  const header = card.querySelector("[data-record-toggle]");
+  if (header instanceof HTMLElement) {
+    header.setAttribute("aria-expanded", String(shouldExpand));
+  }
+  if (shouldExpand) {
+    await Promise.all([
+      loadRecordDetail(card, { force: options.force === true }),
+      loadRecordComments(card, { force: options.force === true })
+    ]);
+  }
+}
+function initProjectRecordDeepLink(scope = document) {
+  const panel = scope instanceof HTMLElement && scope.matches('[data-tab-panel="zaznamy"]') ? scope : scope.querySelector?.('[data-tab-panel="zaznamy"][data-project-detail-root]');
+  if (!(panel instanceof HTMLElement)) {
+    return;
+  }
+  const targetRecordId = String(panel.dataset.recordTargetId || "").trim();
+  if (!targetRecordId || panel.dataset.recordTargetHandled === "true") {
+    return;
+  }
+  const targetCard = panel.querySelector(`.record-card[data-record-id="${CSS.escape(targetRecordId)}"]`);
+  if (!(targetCard instanceof HTMLElement)) {
+    return;
+  }
+  panel.dataset.recordTargetHandled = "true";
+  const openComments = panel.dataset.recordTargetOpenComments === "true";
+  window.requestAnimationFrame(async () => {
+    await toggleRecordCard(targetCard, { expand: true });
+    targetCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (openComments) {
+      const commentsShell = targetCard.querySelector("[data-record-comments-shell]");
+      if (commentsShell instanceof HTMLElement) {
+        commentsShell.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  });
+}
+function handleNavigationCardClick(target) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  const navCard = target.closest("[data-href]");
+  if (!(navCard instanceof HTMLElement)) {
+    return false;
+  }
+  if (target.closest(cardInteractiveSelector)) {
+    return false;
+  }
+  const href = navCard.getAttribute("data-href");
+  if (!href) {
+    return false;
+  }
+  window.location.href = href;
+  return true;
+}
+function handleNavigationCardKeydown(event, target) {
+  if (!(event instanceof KeyboardEvent) || !(target instanceof Element)) {
+    return false;
+  }
+  if (event.key !== "Enter" && event.key !== " ") {
+    return false;
+  }
+  if (!(target instanceof HTMLElement) || !target.matches("[data-href]")) {
+    return false;
+  }
+  const href = target.getAttribute("data-href");
+  if (!href) {
+    return false;
+  }
+  event.preventDefault();
+  window.location.href = href;
+  return true;
+}
+
+// PmTracker.Web/wwwroot/js/modules/meetingOverview.js
+var FIRST_ROW_TOLERANCE_PX = 2;
+function getMeetingYearGroups(scope) {
+  return Array.from(scope.querySelectorAll("[data-meeting-year-group]")).filter((group) => group instanceof HTMLElement);
+}
+function getMeetingCardSlots(scope) {
+  return Array.from(scope.querySelectorAll("[data-meeting-card-wrap]")).filter((slot) => slot instanceof HTMLElement);
+}
+function getMeetingId(slot) {
+  if (!(slot instanceof HTMLElement)) {
+    return "";
+  }
+  return slot.dataset.meetingId || "";
+}
+function getFirstVisualRowSlots(grid) {
+  const slots = getMeetingCardSlots(grid).filter((slot) => !slot.hidden);
+  if (slots.length === 0) {
+    return [];
+  }
+  const firstTop = Math.min(...slots.map((slot) => slot.offsetTop));
+  return slots.filter((slot) => Math.abs(slot.offsetTop - firstTop) <= FIRST_ROW_TOLERANCE_PX);
+}
+function formatMeetingCount(count) {
+  return `${count} jednání`;
+}
+function updateMeetingYearCount(group, visibleCount) {
+  const count = group.querySelector("[data-meeting-year-count]");
+  if (!(count instanceof HTMLElement)) {
+    return;
+  }
+  count.textContent = formatMeetingCount(visibleCount);
+}
+function clearPreviewHiddenSlots(scope) {
+  getMeetingCardSlots(scope).forEach((slot) => {
+    if (slot.dataset.meetingPreviewHidden !== "true") {
+      return;
+    }
+    slot.hidden = false;
+    delete slot.dataset.meetingPreviewHidden;
+  });
+}
+function countMeetingSlots(group) {
+  return getMeetingCardSlots(group).length;
+}
+function applyMeetingYearState(group) {
+  if (!(group instanceof HTMLElement)) {
+    return;
+  }
+  const body = group.querySelector("[data-meeting-year-body]");
+  const grid = group.querySelector("[data-meeting-year-grid]");
+  const toggle = group.querySelector("[data-meeting-year-toggle]");
+  if (!(body instanceof HTMLElement) || !(grid instanceof HTMLElement) || !(toggle instanceof HTMLElement)) {
+    return;
+  }
+  const state = group.dataset.meetingYearState || "collapsed";
+  clearPreviewHiddenSlots(group);
+  if (state === "collapsed") {
+    body.hidden = true;
+    body.classList.remove("is-preview");
+    body.style.removeProperty("max-height");
+    toggle.setAttribute("aria-expanded", "false");
+    return;
+  }
+  body.hidden = false;
+  toggle.setAttribute("aria-expanded", "true");
+  if (state !== "preview") {
+    body.classList.remove("is-preview");
+    body.style.removeProperty("max-height");
+    return;
+  }
+  body.classList.add("is-preview");
+  body.style.removeProperty("max-height");
+  const firstRowSlots = getFirstVisualRowSlots(grid);
+  const firstRowIds = new Set(firstRowSlots.map(getMeetingId).filter(Boolean));
+  getMeetingCardSlots(grid).forEach((slot) => {
+    const meetingId = getMeetingId(slot);
+    if (!meetingId || firstRowIds.has(meetingId)) {
+      return;
+    }
+    slot.hidden = true;
+    slot.dataset.meetingPreviewHidden = "true";
+  });
+}
+function syncYearGroupedMeetingOverview(root) {
+  getMeetingYearGroups(root).forEach((group) => {
+    updateMeetingYearCount(group, countMeetingSlots(group));
+    applyMeetingYearState(group);
+  });
+}
+function initMeetingOverview(scope = document) {
+  const roots = Array.from(scope.querySelectorAll("[data-meeting-overview]")).filter((root) => root instanceof HTMLElement);
+  roots.forEach((root) => {
+    syncYearGroupedMeetingOverview(root);
+  });
+}
+function toggleMeetingYearGroup(toggle) {
+  const group = toggle instanceof HTMLElement ? toggle.closest("[data-meeting-year-group]") : null;
+  if (!(group instanceof HTMLElement)) {
+    return;
+  }
+  const currentState = group.dataset.meetingYearState || "collapsed";
+  group.dataset.meetingYearState = currentState === "preview" ? "open" : currentState === "open" ? "collapsed" : "open";
+  applyMeetingYearState(group);
+}
+
 // PmTracker.Web/wwwroot/js/modules/schedule.js
 function syncScheduleExpandButton(button, details) {
   if (!(button instanceof HTMLButtonElement) || !(details instanceof HTMLElement)) {
@@ -2500,13 +2698,13 @@ function applyProjectScheduleFilters() {
   }
   const state = buildProjectFilterStateFromInputs("schedule");
   const filters = {
-    subsystem: normalizeFilterToken2(state.subsystem)
+    subsystem: normalizeFilterToken(state.subsystem)
   };
   cards.forEach((item) => {
     if (!(item instanceof HTMLElement)) {
       return;
     }
-    const subsystem = normalizeFilterToken2(item.dataset.scheduleFilterSubsystemKod || item.dataset.scheduleFilterSubsystem);
+    const subsystem = normalizeFilterToken(item.dataset.scheduleFilterSubsystemKod || item.dataset.scheduleFilterSubsystem);
     const matches = !filters.subsystem || subsystem === filters.subsystem;
     setRecordFilterVisibility(item, matches);
   });
@@ -2571,29 +2769,29 @@ class ProjectGanttBoard {
     const currentUserId = getProjectFilterCurrentUserId("gantt");
     const hasCurrentUser = currentUserId && currentUserId !== "0";
     return {
-      subsystem: normalizeFilterToken2(getGanttFilterValue("subsystem")),
-      kategorie: normalizeFilterToken2(getGanttFilterValue("kategorie")),
-      stav: normalizeFilterToken2(getGanttFilterValue("stav")),
-      typ: normalizeFilterToken2(getGanttFilterValue("typ")),
-      vlastnik: normalizeFilterToken2(getGanttFilterValue("vlastnik")),
+      subsystem: normalizeFilterToken(getGanttFilterValue("subsystem")),
+      kategorie: normalizeFilterToken(getGanttFilterValue("kategorie")),
+      stav: normalizeFilterToken(getGanttFilterValue("stav")),
+      typ: normalizeFilterToken(getGanttFilterValue("typ")),
+      vlastnik: normalizeFilterToken(getGanttFilterValue("vlastnik")),
       onlyActive: Boolean(getGanttFilterValue("aktivni")),
       mine: Boolean(getGanttFilterValue("mine")),
       currentUserId,
       hasCurrentUser,
-      stihani: normalizeFilterToken2(getGanttFilterValue("stihani"))
+      stihani: normalizeFilterToken(getGanttFilterValue("stihani"))
     };
   }
   matchesFilters(node, filters) {
     if (!(node instanceof HTMLElement)) {
       return false;
     }
-    const subsystem = normalizeFilterToken2(node.dataset.ganttFilterSubsystemKod || node.dataset.ganttFilterSubsystem);
-    const kategorie = normalizeFilterToken2(node.dataset.ganttFilterKategorieKod || node.dataset.ganttFilterKategorie);
-    const stav = normalizeFilterToken2(node.dataset.ganttFilterStavKod || node.dataset.ganttFilterStav);
-    const typ = normalizeFilterToken2(node.dataset.ganttFilterTypKod || node.dataset.ganttFilterTyp);
-    const vlastnik = normalizeFilterToken2(node.dataset.ganttFilterVlastnikId || node.dataset.ganttFilterVlastnik);
+    const subsystem = normalizeFilterToken(node.dataset.ganttFilterSubsystemKod || node.dataset.ganttFilterSubsystem);
+    const kategorie = normalizeFilterToken(node.dataset.ganttFilterKategorieKod || node.dataset.ganttFilterKategorie);
+    const stav = normalizeFilterToken(node.dataset.ganttFilterStavKod || node.dataset.ganttFilterStav);
+    const typ = normalizeFilterToken(node.dataset.ganttFilterTypKod || node.dataset.ganttFilterTyp);
+    const vlastnik = normalizeFilterToken(node.dataset.ganttFilterVlastnikId || node.dataset.ganttFilterVlastnik);
     const isActive = node.dataset.ganttFilterAktivni === "true";
-    const stihani = normalizeFilterToken2(node.dataset.ganttFilterStihani);
+    const stihani = normalizeFilterToken(node.dataset.ganttFilterStihani);
     const matchesMine = !filters.mine || filters.hasCurrentUser && vlastnik === filters.currentUserId;
     return (!filters.subsystem || subsystem === filters.subsystem) && (!filters.kategorie || kategorie === filters.kategorie) && (!filters.stav || stav === filters.stav) && (!filters.typ || typ === filters.typ) && (!filters.vlastnik || vlastnik === filters.vlastnik) && (!filters.onlyActive || isActive) && matchesMine && (!filters.stihani || stihani === filters.stihani);
   }
@@ -3607,7 +3805,7 @@ function parseCzechDateTime(value) {
   return Number.isNaN(valueDate.getTime()) ? null : valueDate.getTime();
 }
 function parseBooleanValue(value) {
-  const normalized = normalizeFilterText(value);
+  const normalized = normalizeFilterText2(value);
   if (!normalized || normalized === "-") {
     return null;
   }
@@ -3634,7 +3832,7 @@ function parseComparableValue(rawValue, type) {
     const parsed = Number.parseFloat(normalized);
     return Number.isFinite(parsed) ? parsed : null;
   }
-  return normalizeFilterText(rawValue);
+  return normalizeFilterText2(rawValue);
 }
 function resolveCellValue(row, columnIndex) {
   const cells = Array.from(row.children).filter((cell2) => cell2 instanceof HTMLTableCellElement);
@@ -3647,10 +3845,10 @@ function resolveCellValue(row, columnIndex) {
 function buildSearchText(row) {
   const explicit = (row.dataset.tableSearchText || "").trim();
   if (explicit) {
-    return normalizeFilterText(explicit);
+    return normalizeFilterText2(explicit);
   }
   const text = Array.from(row.children).filter((cell) => cell instanceof HTMLTableCellElement && !cell.classList.contains("table-actions")).map((cell) => cell.textContent || "").join(" ");
-  return normalizeFilterText(text);
+  return normalizeFilterText2(text);
 }
 function ensureEmptyRow(table) {
   const tbody = table.tBodies[0];
@@ -3740,7 +3938,7 @@ function sortTableRows(table) {
   }
 }
 function filterTableRows(root, table) {
-  const query = normalizeFilterText(root.querySelector("[data-table-tools-search-input]") instanceof HTMLInputElement ? root.querySelector("[data-table-tools-search-input]").value : "");
+  const query = normalizeFilterText2(root.querySelector("[data-table-tools-search-input]") instanceof HTMLInputElement ? root.querySelector("[data-table-tools-search-input]").value : "");
   const rows = getDataRows(table);
   let visibleCount = 0;
   rows.forEach((row) => {
@@ -3977,6 +4175,7 @@ function initProjectTabs() {
 }
 function initProjectRecordsUi(options = {}) {
   projectNavigationController.initRecordsUi(options);
+  initProjectRecordDeepLink(document);
 }
 async function loadProjectTabPanel(tabNameOrPanel, options = {}) {
   const panel = resolveProjectTabPanel(tabNameOrPanel);
@@ -4003,6 +4202,7 @@ async function loadProjectTabPanel(tabNameOrPanel, options = {}) {
       initCommentSortUi(currentPanel);
       if (tabKey === "zaznamy") {
         initProjectRecordsUi();
+        initProjectRecordDeepLink(currentPanel);
       } else if (tabKey === "harmonogram") {
         initProjectScheduleUi();
         renderStaticTimelineAxes(currentPanel);
@@ -4025,162 +4225,6 @@ async function ensureProjectTabLoaded(tabName, options = {}) {
     return true;
   }
   return loadProjectTabPanel(normalizedTabName, options);
-}
-// PmTracker.Web/wwwroot/js/modules/recordLazyLoading.js
-var cardInteractiveSelector = [
-  "button",
-  "a",
-  "input",
-  "select",
-  "textarea",
-  "label",
-  "[data-stop-propagation]",
-  "[contenteditable='true']"
-].join(", ");
-function applyRecordCommentSortDirection(card, direction) {
-  const normalizedDirection = direction === "desc" ? "desc" : "asc";
-  const section = card.querySelector("[data-comment-sort-section]");
-  if (!(section instanceof HTMLElement)) {
-    return;
-  }
-  applyCommentSort(section, normalizedDirection);
-  const toggle = section.querySelector("[data-comment-sort-toggle]");
-  if (toggle instanceof HTMLButtonElement) {
-    setCommentSortButtonLabel(toggle, normalizedDirection);
-  }
-}
-async function loadRecordDetail(cardOrChild, options = {}) {
-  const card = resolveRecordCardElement(cardOrChild);
-  if (!(card instanceof HTMLElement)) {
-    return false;
-  }
-  const detailUrl = typeof options.url === "string" && options.url ? options.url : (card.dataset.recordDetailUrl || "").trim();
-  if (!detailUrl) {
-    return false;
-  }
-  const forceReload = options.force === true;
-  if (card.dataset.recordDetailLoaded === "true" && !forceReload) {
-    return true;
-  }
-  const detailShell = card.querySelector("[data-record-detail-shell]");
-  if (!(detailShell instanceof HTMLElement)) {
-    return false;
-  }
-  const placeholder = detailShell.querySelector("[data-record-detail-placeholder]");
-  const errorContainer = resolveOrCreateErrorContainer(detailShell, "data-record-detail-error");
-  setLazyLoadingState(detailShell, placeholder, errorContainer, true);
-  try {
-    detailShell.innerHTML = await fetchHtmlFragment(detailUrl);
-    card.dataset.recordDetailLoaded = "true";
-    navigationRuntime.initRecordFormEnhancements?.(detailShell);
-    queueRainbowSegmentRender(detailShell);
-    return true;
-  } catch (error) {
-    card.dataset.recordDetailLoaded = "false";
-    setLazyLoadingState(detailShell, placeholder, errorContainer, false);
-    renderLazyLoadError(errorContainer, "Nepodařilo se načíst detail záznamu.", "data-record-detail-retry");
-    return false;
-  }
-}
-async function loadRecordComments(cardOrChild, options = {}) {
-  const card = resolveRecordCardElement(cardOrChild);
-  if (!(card instanceof HTMLElement)) {
-    return false;
-  }
-  const commentsShell = card.querySelector("[data-record-comments-shell]");
-  if (!(commentsShell instanceof HTMLElement)) {
-    return false;
-  }
-  const baseCommentsUrl = typeof options.url === "string" && options.url ? options.url : (commentsShell.dataset.recordCommentsBaseUrl || commentsShell.dataset.recordCommentsUrl || card.dataset.recordCommentsBaseUrl || card.dataset.recordCommentsUrl || "").trim();
-  if (!baseCommentsUrl) {
-    return false;
-  }
-  const requestUrl = buildRecordCommentsRequestUrl(baseCommentsUrl, {
-    limit: options.limit,
-    loadAll: options.loadAll === true
-  }) || baseCommentsUrl;
-  const forceReload = options.force === true;
-  const alreadyLoaded = commentsShell.dataset.recordCommentsLoaded === "true" || card.dataset.recordCommentsLoaded === "true";
-  if (alreadyLoaded && !forceReload) {
-    return true;
-  }
-  const placeholder = commentsShell.querySelector("[data-record-comments-placeholder]");
-  const errorContainer = resolveOrCreateErrorContainer(commentsShell, "data-record-comments-error");
-  setLazyLoadingState(commentsShell, placeholder, errorContainer, true);
-  try {
-    commentsShell.innerHTML = await fetchHtmlFragment(requestUrl);
-    commentsShell.dataset.recordCommentsLoaded = "true";
-    commentsShell.dataset.recordCommentsUrl = requestUrl;
-    commentsShell.dataset.recordCommentsBaseUrl = baseCommentsUrl;
-    card.dataset.recordCommentsLoaded = "true";
-    card.dataset.recordCommentsBaseUrl = baseCommentsUrl;
-    navigationRuntime.initRecordFormEnhancements?.(commentsShell);
-    initCommentSortUi(commentsShell);
-    if (options.sortDirection === "asc" || options.sortDirection === "desc") {
-      applyRecordCommentSortDirection(card, options.sortDirection);
-    }
-    return true;
-  } catch (error) {
-    commentsShell.dataset.recordCommentsLoaded = "false";
-    card.dataset.recordCommentsLoaded = "false";
-    setLazyLoadingState(commentsShell, placeholder, errorContainer, false);
-    renderLazyLoadError(errorContainer, "Nepodařilo se načíst vyjádření.", "data-record-comments-retry");
-    return false;
-  }
-}
-async function toggleRecordCard(cardOrChild, options = {}) {
-  const card = resolveRecordCardElement(cardOrChild);
-  if (!(card instanceof HTMLElement)) {
-    return;
-  }
-  const shouldExpand = options.expand === true ? true : options.collapse === true ? false : card.classList.contains("collapsed");
-  card.classList.toggle("collapsed", !shouldExpand);
-  const header = card.querySelector("[data-record-toggle]");
-  if (header instanceof HTMLElement) {
-    header.setAttribute("aria-expanded", String(shouldExpand));
-  }
-  if (shouldExpand) {
-    await Promise.all([
-      loadRecordDetail(card, { force: options.force === true }),
-      loadRecordComments(card, { force: options.force === true })
-    ]);
-  }
-}
-function handleNavigationCardClick(target) {
-  if (!(target instanceof Element)) {
-    return false;
-  }
-  const navCard = target.closest("[data-href]");
-  if (!(navCard instanceof HTMLElement)) {
-    return false;
-  }
-  if (target.closest(cardInteractiveSelector)) {
-    return false;
-  }
-  const href = navCard.getAttribute("data-href");
-  if (!href) {
-    return false;
-  }
-  window.location.href = href;
-  return true;
-}
-function handleNavigationCardKeydown(event, target) {
-  if (!(event instanceof KeyboardEvent) || !(target instanceof Element)) {
-    return false;
-  }
-  if (event.key !== "Enter" && event.key !== " ") {
-    return false;
-  }
-  if (!(target instanceof HTMLElement) || !target.matches("[data-href]")) {
-    return false;
-  }
-  const href = target.getAttribute("data-href");
-  if (!href) {
-    return false;
-  }
-  event.preventDefault();
-  window.location.href = href;
-  return true;
 }
 // PmTracker.Web/wwwroot/js/modules/recordRefresh.js
 function invalidateRecordMeetingCommentStateCacheForPayload(payload) {
@@ -5133,7 +5177,7 @@ async function openUrlModal(url, trigger) {
     return;
   }
   try {
-    const response = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+    const response = await fetch(appendCurrentAsUser(url), { headers: { "X-Requested-With": "XMLHttpRequest" } });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -8614,7 +8658,7 @@ function initModalAjaxSubmit() {
     }
     const submitterAction = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter.getAttribute("formaction") || submitter.formAction || "" : "";
     const submitterMethod = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter.getAttribute("formmethod") || submitter.formMethod || "" : "";
-    const action = submitterAction || target.getAttribute("action") || window.location.href;
+    const action = appendCurrentAsUser(submitterAction || target.getAttribute("action") || window.location.href);
     const method = (submitterMethod || target.getAttribute("method") || "post").toUpperCase();
     const blockedSnapshot = buildFormDataSnapshot(new FormData(target, submitter instanceof HTMLElement ? submitter : undefined), 120);
     if (sessionState.stale) {
@@ -8807,6 +8851,82 @@ function initTheme() {
   });
 }
 
+// PmTracker.Web/wwwroot/js/modules/dashboard.js
+function resolvePanelShell(panelOrKey) {
+  if (panelOrKey instanceof HTMLElement && panelOrKey.matches("[data-dashboard-panel]")) {
+    return panelOrKey;
+  }
+  if (typeof panelOrKey !== "string" || !panelOrKey) {
+    return null;
+  }
+  const panel = document.querySelector(`[data-dashboard-panel="${CSS.escape(panelOrKey)}"]`);
+  return panel instanceof HTMLElement ? panel : null;
+}
+async function loadDashboardPanel(panelOrKey, options = {}) {
+  const panel = resolvePanelShell(panelOrKey);
+  if (!(panel instanceof HTMLElement)) {
+    return false;
+  }
+  const loadUrl = typeof options.url === "string" && options.url ? options.url : (panel.dataset.dashboardPanelUrl || "").trim();
+  if (!loadUrl) {
+    return false;
+  }
+  const content = panel.querySelector("[data-dashboard-panel-content]");
+  const placeholder = panel.querySelector("[data-dashboard-panel-placeholder]");
+  const errorContainer = resolveOrCreateErrorContainer(panel, "data-dashboard-panel-error");
+  if (!(content instanceof HTMLElement)) {
+    return false;
+  }
+  setLazyLoadingState(panel, placeholder, errorContainer, true);
+  try {
+    content.innerHTML = await fetchHtmlFragment(loadUrl);
+    panel.dataset.dashboardPanelUrl = loadUrl;
+    setLazyLoadingState(panel, placeholder, errorContainer, false);
+    return true;
+  } catch {
+    setLazyLoadingState(panel, placeholder, errorContainer, false);
+    renderLazyLoadError(errorContainer, "Nepodařilo se načíst obsah panelu.", "data-dashboard-panel-retry");
+    return false;
+  }
+}
+function initDashboardShell() {
+  const shell = document.querySelector("[data-dashboard-shell]");
+  if (!(shell instanceof HTMLElement) || shell.dataset.dashboardReady === "true") {
+    return;
+  }
+  shell.dataset.dashboardReady = "true";
+  shell.querySelectorAll("[data-dashboard-panel]").forEach((panel) => {
+    if (panel instanceof HTMLElement) {
+      loadDashboardPanel(panel);
+    }
+  });
+}
+function handleDashboardClick(target) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  const retryButton = target.closest("[data-dashboard-panel-retry]");
+  if (retryButton instanceof HTMLButtonElement) {
+    const panel = retryButton.closest("[data-dashboard-panel]");
+    if (panel instanceof HTMLElement) {
+      loadDashboardPanel(panel);
+    }
+    return true;
+  }
+  const loadMoreButton = target.closest("[data-dashboard-news-load-more]");
+  if (loadMoreButton instanceof HTMLButtonElement) {
+    const panel = loadMoreButton.closest("[data-dashboard-panel]");
+    if (panel instanceof HTMLElement) {
+      const loadUrl = loadMoreButton.getAttribute("data-dashboard-news-load-more") || "";
+      if (loadUrl) {
+        loadDashboardPanel(panel, { url: loadUrl });
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
 // PmTracker.Web/wwwroot/js/modules/bootstrap.js
 var projectIndexFilterOptions = {
   hideDoneStorageKey: "pmtracker.projects.hideDone",
@@ -8975,6 +9095,10 @@ function handleDocumentClick(event) {
     if (panel instanceof HTMLElement) {
       loadProjectTabPanel(panel, { force: true });
     }
+    return;
+  }
+  if (handleDashboardClick(target)) {
+    event.preventDefault();
     return;
   }
   const recordCommentsRetry = target.closest("[data-record-comments-retry]");
@@ -9169,6 +9293,7 @@ function bootstrapPmTrackerApp() {
     () => initTableTools(document),
     () => initMeetingOverview(document),
     () => initProjectIndexUi(),
+    () => initDashboardShell(),
     () => initSessionCoordinator(),
     () => initModalAjaxSubmit()
   ]);

@@ -1,3 +1,4 @@
+import { appendCurrentAsUser } from "./navigationShared.js";
 import { reportClientDiagnostic } from "./utils.js";
 
 const modalRoot = document.getElementById("modal-root");
@@ -140,7 +141,7 @@ export async function openUrlModal(url, trigger) {
     }
 
     try {
-        const response = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        const response = await fetch(appendCurrentAsUser(url), { headers: { "X-Requested-With": "XMLHttpRequest" } });
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }

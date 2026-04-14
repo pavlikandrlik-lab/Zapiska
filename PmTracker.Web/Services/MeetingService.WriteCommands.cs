@@ -1,9 +1,9 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services;
 
@@ -36,20 +36,20 @@ public sealed partial class MeetingService
                 throw new InvalidOperationException("Uzavřené jednání nelze upravovat. Nejprve jednání otevřete.");
             }
 
+            var old = MeetingAuditSnapshot.FromEntity(existing);
             existing.CisloJednani = command.CisloJednani;
             existing.DatumPlanovane = command.DatumPlanovane.Date;
             existing.CasZacatek = command.CasZacatek;
             existing.Misto = command.Misto?.Trim();
             existing.StavJednaniId = statusId;
             await dbContext.SaveChangesAsync(ct);
-            await WriteAuditAsync(
-                currentUser.OsobaId,
-                "jednani",
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Update,
+                AuditEntityType.Meeting,
                 existing.Id.ToString(CultureInfo.InvariantCulture),
-                "update",
-                null,
-                JsonSerializer.Serialize(existing),
-                ct);
+                old,
+                MeetingAuditSnapshot.FromEntity(existing)));
+            await dbContext.SaveChangesAsync(ct);
             return existing.Id;
         }
 
@@ -65,15 +65,14 @@ public sealed partial class MeetingService
         };
         dbContext.Jednani.Add(created);
         await dbContext.SaveChangesAsync(ct);
-        await CreateMeetingAttendanceSnapshotAsync(created.Id, command.ProjektId, ct);
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "jednani",
+        await CreateMeetingAttendanceSnapshotAsync(created.Id, command.ProjektId, currentUser.OsobaId, ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.Meeting,
             created.Id.ToString(CultureInfo.InvariantCulture),
-            "create",
             null,
-            JsonSerializer.Serialize(created),
-            ct);
+            MeetingAuditSnapshot.FromEntity(created)));
+        await dbContext.SaveChangesAsync(ct);
         return created.Id;
     }
 
@@ -95,7 +94,9 @@ public sealed partial class MeetingService
             .Where(x => x.JednaniId == command.JednaniId)
             .ToListAsync(ct);
 
-        var oldMeeting = JsonSerializer.Serialize(meeting);
+        var oldMeeting = MeetingAuditSnapshot.FromEntity(meeting);
+        var oldAttendanceSnapshots = attendanceRows.Select(AttendanceAuditSnapshot.FromEntity).ToList();
+        var oldCommentSnapshots = commentRows.Select(CommentAuditSnapshot.FromEntity).ToList();
         if (attendanceRows.Count > 0)
         {
             dbContext.Ucast.RemoveRange(attendanceRows);
@@ -114,20 +115,33 @@ public sealed partial class MeetingService
         dbContext.Jednani.Remove(meeting);
         await dbContext.SaveChangesAsync(ct);
 
-        var meta = JsonSerializer.Serialize(new
+        foreach (var oldAttendanceSnapshot in oldAttendanceSnapshots)
         {
-            Meeting = meeting,
-            DeletedAttendance = attendanceRows.Count,
-            DeletedComments = commentRows.Count
-        });
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "jednani",
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Delete,
+                AuditEntityType.Attendance,
+                $"{oldAttendanceSnapshot.JednaniId}:{oldAttendanceSnapshot.OsobaId}",
+                oldAttendanceSnapshot,
+                null));
+        }
+
+        foreach (var oldCommentSnapshot in oldCommentSnapshots)
+        {
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Delete,
+                AuditEntityType.Comment,
+                oldCommentSnapshot.Id.ToString(CultureInfo.InvariantCulture),
+                oldCommentSnapshot,
+                null));
+        }
+
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Delete,
+            AuditEntityType.Meeting,
             command.JednaniId.ToString(CultureInfo.InvariantCulture),
-            "delete",
             oldMeeting,
-            meta,
-            ct);
+            null));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public Task SaveAttendanceAsync(SaveAttendanceCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -181,19 +195,25 @@ public sealed partial class MeetingService
                 };
                 dbContext.Ucast.Add(entity);
                 existingRows[row.OsobaId] = entity;
+                await dbContext.SaveChangesAsync(ct);
+                auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                    AuditActionType.Create,
+                    AuditEntityType.Attendance,
+                    $"{meetingId}:{row.OsobaId}",
+                    null,
+                    AttendanceAuditSnapshot.FromEntity(entity)));
             }
             else
             {
+                var old = AttendanceAuditSnapshot.FromEntity(entity);
                 entity.StavUcastiId = stateId;
+                auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                    AuditActionType.Update,
+                    AuditEntityType.Attendance,
+                    $"{meetingId}:{row.OsobaId}",
+                    old,
+                    AttendanceAuditSnapshot.FromEntity(entity)));
             }
-
-            AddAuditEntry(
-                currentUser.OsobaId,
-                "ucast",
-                $"{meetingId}:{row.OsobaId}",
-                "upsert",
-                null,
-                JsonSerializer.Serialize(entity));
         }
 
         await dbContext.SaveChangesAsync(ct);
@@ -205,6 +225,7 @@ public sealed partial class MeetingService
             .FirstOrDefaultAsync(x => x.Id == command.JednaniId, ct)
             ?? throw new InvalidOperationException($"Jednání {command.JednaniId} nebylo nalezeno.");
 
+        var old = MeetingAuditSnapshot.FromEntity(meeting);
         var statusId = await ResolveMeetingStatusIdAsync(command.Stav, ct);
         meeting.StavJednaniId = statusId;
         if (command.UzavritJednani)
@@ -217,14 +238,13 @@ public sealed partial class MeetingService
         }
 
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "jednani",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Update,
+            AuditEntityType.Meeting,
             meeting.Id.ToString(CultureInfo.InvariantCulture),
-            "status_update",
-            null,
-            JsonSerializer.Serialize(meeting),
-            ct);
+            old,
+            MeetingAuditSnapshot.FromEntity(meeting)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public Task SaveMeetingNoteAsync(SaveMeetingNoteCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -269,7 +289,13 @@ public sealed partial class MeetingService
             StavUcastiId = await ResolveDefaultAttendanceStatusIdAsync(ct)
         };
         dbContext.Ucast.Add(entity);
-        AddAuditEntry(currentUser.OsobaId, "ucast", $"{command.JednaniId}:{personId}", "create", null, JsonSerializer.Serialize(entity));
+        await dbContext.SaveChangesAsync(ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.Attendance,
+            $"{command.JednaniId}:{personId}",
+            null,
+            AttendanceAuditSnapshot.FromEntity(entity)));
         await dbContext.SaveChangesAsync(ct);
     }
 
@@ -308,7 +334,7 @@ public sealed partial class MeetingService
             ?? throw new InvalidOperationException("Není nadefinován žádný stav účasti.");
     }
 
-    private async Task CreateMeetingAttendanceSnapshotAsync(int meetingId, int projectId, CancellationToken ct)
+    private async Task CreateMeetingAttendanceSnapshotAsync(int meetingId, int projectId, int? actorOsobaId, CancellationToken ct)
     {
         var participantIds = await BuildDefaultAttendanceParticipantIdsAsync(projectId, ct);
         if (participantIds.Count == 0)
@@ -338,6 +364,17 @@ public sealed partial class MeetingService
         }
 
         dbContext.Ucast.AddRange(rows);
+        await dbContext.SaveChangesAsync(ct);
+        foreach (var row in rows)
+        {
+            auditWriteService.Add(actorOsobaId, new AuditWriteEntry(
+                AuditActionType.Create,
+                AuditEntityType.Attendance,
+                $"{row.JednaniId}:{row.OsobaId}",
+                null,
+                AttendanceAuditSnapshot.FromEntity(row)));
+        }
+
         await dbContext.SaveChangesAsync(ct);
     }
 
@@ -413,26 +450,4 @@ public sealed partial class MeetingService
         return result;
     }
 
-    private DateTime GetUtcNow()
-        => timeProvider.GetUtcNow().UtcDateTime;
-
-    private void AddAuditEntry(int? actorOsobaId, string entityType, string entityId, string action, string? oldValue, string? newValue)
-    {
-        dbContext.AuthzAuditLog.Add(new AuthzAuditLogEntity
-        {
-            ActorOsobaId = actorOsobaId,
-            EntityType = entityType,
-            EntityId = entityId,
-            Action = action,
-            OldValue = oldValue,
-            NewValue = newValue,
-            CreatedAt = GetUtcNow()
-        });
-    }
-
-    private async Task WriteAuditAsync(int? actorOsobaId, string entityType, string entityId, string action, string? oldValue, string? newValue, CancellationToken ct)
-    {
-        AddAuditEntry(actorOsobaId, entityType, entityId, action, oldValue, newValue);
-        await dbContext.SaveChangesAsync(ct);
-    }
 }

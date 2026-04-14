@@ -240,14 +240,14 @@ public sealed class CiselnikDataStoreSecurityTests
         var audit = await dbContext.AuthzAuditLog
             .AsNoTracking()
             .Where(x => x.Id > auditBefore)
-            .Where(x => x.EntityType == "ciselnik:typy-ukolu")
-            .Where(x => x.Action == "upsert")
+            .Where(x => x.EntityType == "ciselnik")
+            .Where(x => x.Action == "create")
             .OrderByDescending(x => x.Id)
             .FirstOrDefaultAsync();
 
         audit.Should().NotBeNull();
         audit!.ActorOsobaId.Should().Be(currentUser.OsobaId);
-        audit.EntityId.Should().Be("new");
+        int.Parse(audit.EntityId).Should().BeGreaterThan(0);
         audit.NewValue.Should().Contain(code);
     }
 
@@ -282,7 +282,7 @@ public sealed class CiselnikDataStoreSecurityTests
         var audit = await dbContext.AuthzAuditLog
             .AsNoTracking()
             .Where(x => x.Id > auditBefore)
-            .Where(x => x.EntityType == "ciselnik:typy-ukolu")
+            .Where(x => x.EntityType == "ciselnik")
             .Where(x => x.Action == "delete")
             .OrderByDescending(x => x.Id)
             .FirstOrDefaultAsync();

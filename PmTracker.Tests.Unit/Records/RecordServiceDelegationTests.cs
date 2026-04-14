@@ -1,6 +1,7 @@
 using FluentAssertions;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
+using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Tests.Unit.Records;
@@ -11,7 +12,7 @@ public sealed class RecordServiceDelegationTests
     public async Task AddCommentAsync_ShouldDelegateToCommentService()
     {
         var commentService = new FakeCommentService();
-        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, new FakePendingScheduleProposalLockEvaluator(), TimeProvider.System);
+        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, new FakePendingScheduleProposalLockEvaluator(), new FakeAuditWriteService(), TimeProvider.System);
         var command = new AddCommentCommand
         {
             ZaznamId = 13,
@@ -73,6 +74,16 @@ public sealed class RecordServiceDelegationTests
             => Task.CompletedTask;
 
         public Task SaveMeetingNotesBatchAsync(int meetingId, IEnumerable<(int ZaznamId, string Text)> rows, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => Task.CompletedTask;
+    }
+
+    private sealed class FakeAuditWriteService : IAuditWriteService
+    {
+        public void Add(int? actorOsobaId, AuditWriteEntry entry)
+        {
+        }
+
+        public Task WriteAsync(int? actorOsobaId, AuditWriteEntry entry, CancellationToken ct = default)
             => Task.CompletedTask;
     }
 }

@@ -146,7 +146,9 @@ public sealed class RecordDeleteDataStoreTests
 
         var auditRow = await dbContext.AuthzAuditLog
             .AsNoTracking()
-            .Where(x => x.EntityType == "projektove_zaznamy" && x.EntityId == recordId.ToString() && x.Action == "hard_delete")
+            .Where(x => x.EntityType == "zaznam"
+                && x.EntityId == recordId.ToString()
+                && x.Action == "delete")
             .OrderByDescending(x => x.Id)
             .FirstOrDefaultAsync();
 

@@ -10,6 +10,7 @@ export {
 export {
     handleNavigationCardClick,
     handleNavigationCardKeydown,
+    initProjectRecordDeepLink,
     loadRecordComments,
     loadRecordDetail,
     toggleRecordCard

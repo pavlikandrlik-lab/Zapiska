@@ -1,0 +1,28 @@
+@model IReadOnlyList<DashboardNewsItemViewModel>
+
+@if (Model.Count == 0)
+{
+    <p class="muted">Zatím nejsou k dispozici žádné nové relevantní změny.</p>
+}
+else
+{
+    <div class="dashboard-news-list">
+        @foreach (var item in Model)
+        {
+            <a class="dashboard-news-item" href="@item.DetailUrl">
+                <div class="dashboard-news-item-top">
+                    <span class="dashboard-news-label">@item.EventLabel</span>
+                    <time datetime="@item.CreatedAt.ToString("O")">@item.CreatedAt.ToString("dd.MM.yyyy HH:mm")</time>
+                </div>
+                <div class="dashboard-news-title">@item.Title</div>
+                <p class="dashboard-item-description">@item.Description</p>
+                @if (!string.IsNullOrWhiteSpace(item.ProjectLabel))
+                {
+                    <div class="dashboard-item-meta">
+                        <span>@item.ProjectLabel</span>
+                    </div>
+                }
+            </a>
+        }
+    </div>
+}

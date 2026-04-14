@@ -22,7 +22,8 @@
 <body class="app-body">
     @{
         var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).ToLowerInvariant();
-        string NavClass(string controller) => currentController == controller ? "app-nav-link active" : "app-nav-link";
+        var suppressActiveNavigation = string.Equals(currentController, "dashboard", System.StringComparison.OrdinalIgnoreCase);
+        string NavClass(string controller) => !suppressActiveNavigation && currentController == controller ? "app-nav-link active" : "app-nav-link";
         var nav = ViewData["NavPermissions"] as NavPermissionsViewModel;
         var roleList = nav?.CurrentUserRoles is { Count: > 0 } roles
             ? string.Join(", ", roles)
@@ -32,7 +33,7 @@
 
     <header class="app-header">
         <div class="app-topbar">
-            <a class="app-brand" asp-controller="Home" asp-action="Index" aria-label="Přejít na hlavní přehled">
+            <a class="app-brand" asp-controller="Dashboard" asp-action="Index" aria-label="Přejít na hlavní přehled">
                 <div class="app-logo" aria-hidden="true">
                     <img class="app-logo-image" src="~/images/zapiska-logo.svg" alt="" />
                 </div>
@@ -86,7 +87,7 @@
         </div>
 
         <nav class="app-nav" aria-label="Hlavní menu">
-            <a class="@NavClass("home")" asp-controller="Home" asp-action="Index">Přehled</a>
+            <a class="@NavClass("dashboard")" asp-controller="Dashboard" asp-action="Index">Přehled</a>
             <a class="@NavClass("projekty")" asp-controller="Projekty" asp-action="Index">Projekty</a>
             @if (nav?.CanViewPeople == true)
             {

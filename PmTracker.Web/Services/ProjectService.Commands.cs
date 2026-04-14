@@ -1,9 +1,9 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services;
 
@@ -12,18 +12,26 @@ public sealed partial class ProjectService
     public async Task<int> SaveProjectAsync(SaveProjectCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
         var statusId = await ResolveProjectStatusIdAsync(command.Stav, ct);
+        await using var tx = await dbContext.Database.BeginTransactionAsync(ct);
         if (command.Id.HasValue)
         {
             var existing = await dbContext.Projekty.FirstOrDefaultAsync(x => x.Id == command.Id.Value, ct)
                 ?? throw new InvalidOperationException($"Projekt {command.Id.Value} nebyl nalezen.");
 
-            var old = JsonSerializer.Serialize(existing);
+            var old = ProjectAuditSnapshot.FromEntity(existing);
             existing.CelyNazev = command.Nazev.Trim();
             existing.Zkratka = command.Zkratka.Trim();
             existing.StavId = statusId;
             existing.PouzivatIdentJednani = command.PouzivatIdentJednani;
             await dbContext.SaveChangesAsync(ct);
-            await WriteAuditAsync(currentUser.OsobaId, "projekty", existing.Id.ToString(CultureInfo.InvariantCulture), "update", old, JsonSerializer.Serialize(existing), ct);
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Update,
+                AuditEntityType.Project,
+                existing.Id.ToString(CultureInfo.InvariantCulture),
+                old,
+                ProjectAuditSnapshot.FromEntity(existing)));
+            await dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
             return existing.Id;
         }
 
@@ -37,7 +45,14 @@ public sealed partial class ProjectService
         dbContext.Projekty.Add(created);
         await dbContext.SaveChangesAsync(ct);
 
-        await WriteAuditAsync(currentUser.OsobaId, "projekty", created.Id.ToString(CultureInfo.InvariantCulture), "create", null, JsonSerializer.Serialize(created), ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.Project,
+            created.Id.ToString(CultureInfo.InvariantCulture),
+            null,
+            ProjectAuditSnapshot.FromEntity(created)));
+        await dbContext.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         return created.Id;
     }
 
@@ -56,10 +71,16 @@ public sealed partial class ProjectService
         var project = await dbContext.Projekty.FirstOrDefaultAsync(x => x.Id == command.ProjektId, ct)
             ?? throw new InvalidOperationException($"Projekt {command.ProjektId} nebyl nalezen.");
 
-        var old = JsonSerializer.Serialize(project);
+        var old = ProjectAuditSnapshot.FromEntity(project);
         project.StavId = deletedStatusId;
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "projekty", project.Id.ToString(CultureInfo.InvariantCulture), "soft_delete", old, JsonSerializer.Serialize(project), ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.SoftDelete,
+            AuditEntityType.Project,
+            project.Id.ToString(CultureInfo.InvariantCulture),
+            old,
+            ProjectAuditSnapshot.FromEntity(project)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     private async Task<int> ResolveProjectStatusIdAsync(string value, CancellationToken ct)

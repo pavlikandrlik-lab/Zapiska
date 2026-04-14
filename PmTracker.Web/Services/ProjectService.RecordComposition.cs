@@ -207,21 +207,6 @@ public sealed partial class ProjectService
         return RecordNumberAllocator.FindLowestAvailablePositive(existingOrders);
     }
 
-    private async Task WriteAuditAsync(int? actorOsobaId, string entityType, string entityId, string action, string? oldValue, string? newValue, CancellationToken ct)
-    {
-        dbContext.AuthzAuditLog.Add(new AuthzAuditLogEntity
-        {
-            ActorOsobaId = actorOsobaId,
-            EntityType = entityType,
-            EntityId = entityId,
-            Action = action,
-            OldValue = oldValue,
-            NewValue = newValue,
-            CreatedAt = timeProvider.GetUtcNow().UtcDateTime
-        });
-        await dbContext.SaveChangesAsync(ct);
-    }
-
     private string BuildDisplayName(string? titul, string jmeno, string prijmeni, int id)
     {
         var displayName = personIdentityMatcher.BuildPersonName(titul, jmeno, prijmeni);

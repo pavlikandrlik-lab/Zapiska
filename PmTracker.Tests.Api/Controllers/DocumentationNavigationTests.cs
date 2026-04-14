@@ -64,9 +64,9 @@ public sealed class DocumentationNavigationTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().NotContain("Vzhled: přepnout");
-        html.Should().Contain("<gov-theme-switch", "layout má používat oficiální template kontrakt komponenty");
+        html.Should().Contain("class=\"gov-switch gov-theme-switch app-theme-switch\"", "layout má renderovat gov theme switch markup");
         html.Should().Contain("aria-label=\"Přepínač barevného schématu stránky\"");
-        html.Should().NotContain("theme-switch-main", "layout už nemá renderovat vlastní checkbox markup");
+        html.Should().Contain("data-theme-switch-input");
     }
 
     [Fact]

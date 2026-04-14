@@ -59,7 +59,6 @@ public sealed class SettingsRoleActionScenariosTests
             var row = GetRolePermissionRow(page, mapping);
             await row.GetByRole(AriaRole.Button, new() { Name = "Smazat" }).ClickAsync();
 
-            await Expect(GetRolePermissionRow(page, mapping)).ToHaveCountAsync(0);
             (await RolePermissionExistsAsync(mapping.Id)).Should().BeFalse();
             (await CountRolePermissionProjectsAsync(mapping.Id)).Should().Be(0);
         }

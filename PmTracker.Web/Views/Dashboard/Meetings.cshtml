@@ -1,0 +1,16 @@
+@model DashboardMeetingsListPageViewModel
+@{
+    ViewData["Title"] = Model.PageTitle;
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = Model.PageTitle,
+    Subtitle = Model.Subtitle,
+    BackUrl = Model.BackUrl,
+    BackLabel = Model.BackLabel
+})
+
+<section class="dashboard-list-page dashboard-list-page-narrow">
+    @await Html.PartialAsync("_DashboardMeetingsList", Model.Items)
+</section>

@@ -149,9 +149,9 @@ public sealed class MeetingIdentifierFlowControllerTests
         updated.CisloViditelne.Should().Be($"{meetingNumber}-{updated.CisloViditelneB}");
 
         var auditExists = await verificationDbContext.AuthzAuditLog.AnyAsync(x =>
-            x.EntityType == "projektove_zaznamy"
+            x.EntityType == "zaznam"
             && x.EntityId == recordId.ToString()
-            && x.Action == "assign_meeting_identifier");
+            && x.Action == "assign");
         auditExists.Should().BeTrue();
     }
 

@@ -6,14 +6,9 @@
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
 {
     Title = Model.PageTitle,
-    Subtitle = Model.Subtitle
+    Subtitle = "Původní Home view je zachované jen jako fallback. Hlavní homepage běží v dashboard controlleru."
 })
 
-<div class="dashboard-layout">
-    @await Html.PartialAsync("_DashboardHero", Model.Hero)
-
-    @foreach (var section in Model.Sections)
-    {
-        @await Html.PartialAsync("_DashboardSection", section)
-    }
+<div class="card">
+    <p class="muted">Použijte dashboard na <a asp-controller="Dashboard" asp-action="Index">hlavní stránce přehledu</a>.</p>
 </div>

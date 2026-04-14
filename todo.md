@@ -40,6 +40,16 @@ H - V globální záložce `Jednání` mají být pod sebou projekty, každý pr
 H - V projektové záložce `Jednání` se má začínat přímo ročními lištami pro vybraný projekt; aktuální rok má být výchozím stavem částečně rozbalený tak, aby byl vidět první řádek jednání v daném roce.
 ### 3.1 Projektový dashboard
 - Přidat pro každý projekt samostatný `projektový dashboard` pro rychlou analytiku přímo v aplikaci bez potřeby SQL nebo Power BI; konkrétní grafy, statistiky a KPI budou doplněny později.
+- Doplnit možnost z `projektového přehledu` vygenerovat `výzvu`.
+- Dashboard rozdělit na 3 stránky / záložky:
+- 1) `Úkoly v prodlení` včetně harmonogramu a doplňujících informací.
+- 2) `NES v prodlení`.
+- 3) `Statické informace`.
+- Na stránce `Úkoly v prodlení` zobrazit úkoly s harmonogramem seřazené podle velikosti prodlení v harmonogramu.
+- Zobrazit nesrovnalosti ze `ServiceDesk`, které jsou v prodlení, včetně vazby na úkoly, pokud vazba existuje.
+- Zobrazit `PMP` a `PNF` v prodlení včetně jejich počtu.
+- Přidat bar graf `celkově vyčerpáno z určité sumy`; suma bude zadávaná ručně na projektu (doplnit příslušný sloupec do tabulky projektu).
+- Doplnit roční statistiky úkolů: kolik úkolů bylo splněno, kolik nesplněno, kolik bylo v prodlení, kolik se prodlužovalo, kolik bylo zrušeno a další relevantní roční KPI.
 
 ## 4. Tisk, historické zobrazení a pravidla pro snapshoty
 

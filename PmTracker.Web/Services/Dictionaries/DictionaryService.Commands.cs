@@ -1,9 +1,9 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Dictionaries;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services.Dictionaries;
 
@@ -28,17 +28,33 @@ public sealed partial class DictionaryService
         }
 
         await NormalizeDictionaryLockStateAsync(key, command, currentUser, ct);
+        var detailBefore = command.Id.HasValue
+            ? await BuildCiselnikDetailAsync(key, currentUser, ct)
+            : null;
+        var oldRow = command.Id.HasValue
+            ? detailBefore?.Polozky.FirstOrDefault(x => x.Id == command.Id.Value)
+            : null;
         await handler(command, ct);
 
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            $"ciselnik:{command.Key}",
-            command.Id?.ToString(CultureInfo.InvariantCulture) ?? "new",
-            "upsert",
-            null,
-            JsonSerializer.Serialize(command),
-            ct);
+        var detailAfter = await BuildCiselnikDetailAsync(key, currentUser, ct);
+        var persistedRow = command.Id.HasValue
+            ? detailAfter.Polozky.FirstOrDefault(x => x.Id == command.Id.Value)
+            : detailAfter.Polozky.FirstOrDefault(x =>
+                string.Equals(x.Kod, command.Kod, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(x.Nazev, command.Nazev, StringComparison.OrdinalIgnoreCase));
+        if (persistedRow is null)
+        {
+            throw new InvalidOperationException("Uloženou položku číselníku se nepodařilo dohledat pro audit.");
+        }
+
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            oldRow is null ? AuditActionType.Create : AuditActionType.Update,
+            AuditEntityType.Dictionary,
+            persistedRow.Id.ToString(CultureInfo.InvariantCulture),
+            oldRow is null ? null : ToDictionaryAuditSnapshot(key, oldRow),
+            ToDictionaryAuditSnapshot(key, persistedRow)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task DeleteCiselnikRowAsync(
@@ -80,14 +96,13 @@ public sealed partial class DictionaryService
             throw new InvalidOperationException($"Položku '{rowForAudit.Nazev}' nelze smazat, protože je používána v aplikaci.", ex);
         }
 
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            $"ciselnik:{command.Key}",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Delete,
+            AuditEntityType.Dictionary,
             command.Id.ToString(CultureInfo.InvariantCulture),
-            "delete",
-            JsonSerializer.Serialize(rowForAudit),
-            null,
-            ct);
+            ToDictionaryAuditSnapshot(key, rowForAudit),
+            null));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     private IReadOnlyDictionary<string, Func<SaveCiselnikRowCommand, CancellationToken, Task>> BuildCiselnikSaveHandlers()
@@ -458,25 +473,13 @@ public sealed partial class DictionaryService
         set.Remove(row);
     }
 
-    private async Task WriteAuditAsync(
-        int? actorOsobaId,
-        string entityType,
-        string entityId,
-        string action,
-        string? oldValue,
-        string? newValue,
-        CancellationToken ct)
-    {
-        dbContext.AuthzAuditLog.Add(new AuthzAuditLogEntity
-        {
-            ActorOsobaId = actorOsobaId,
-            EntityType = entityType,
-            EntityId = entityId,
-            Action = action,
-            OldValue = oldValue,
-            NewValue = newValue,
-            CreatedAt = DateTime.UtcNow
-        });
-        await dbContext.SaveChangesAsync(ct);
-    }
+    private static DictionaryAuditSnapshot ToDictionaryAuditSnapshot(string key, CiselnikRadekViewModel row)
+        => new(
+            key,
+            row.Id,
+            row.Kod,
+            row.Nazev,
+            row.IsLocked,
+            null,
+            row.HodnotyNavicRaw.FirstOrDefault() ?? row.HodnotyNavic.FirstOrDefault());
 }

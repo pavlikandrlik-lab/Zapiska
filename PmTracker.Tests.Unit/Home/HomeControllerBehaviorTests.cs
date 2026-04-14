@@ -1,11 +1,9 @@
-using System.Reflection;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using PmTracker.Web.Controllers;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Home;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Home;
@@ -13,36 +11,23 @@ namespace PmTracker.Tests.Unit.Home;
 public sealed class HomeControllerBehaviorTests
 {
     [Fact]
-    public void Index_ShouldRenderDashboardView()
+    public void Index_ShouldRedirectToDashboard()
     {
-        var dashboard = new DashboardPageViewModel
-        {
-            PageTitle = "Přehled",
-            Subtitle = "Výchozí rozcestník",
-            Hero = new DashboardHeroViewModel
-            {
-                Eyebrow = "Dashboard",
-                Title = "Dobrý den",
-                Description = "Popis",
-                Stats = []
-            },
-            Sections = []
-        };
-        var controller = CreateController(new FakeHomeDashboardService { Dashboard = dashboard });
+        var controller = CreateController();
 
         var result = controller.Index();
 
-        var view = result.Should().BeOfType<ViewResult>().Subject;
-        view.Model.Should().BeSameAs(dashboard);
+        var redirect = result.Should().BeOfType<RedirectToActionResult>().Subject;
+        redirect.ControllerName.Should().Be("Dashboard");
+        redirect.ActionName.Should().Be("Index");
     }
 
-    private static HomeController CreateController(IHomeDashboardService dashboardService)
+    private static HomeController CreateController()
     {
         var controller = new HomeController(
             new FakeUserContextResolver(),
             TimeProvider.System,
-            NullLoggerFactory.Instance,
-            dashboardService)
+            NullLoggerFactory.Instance)
         {
             ControllerContext = new ControllerContext
             {
@@ -56,7 +41,7 @@ public sealed class HomeControllerBehaviorTests
 
     private static void SetCurrentUserContext(HomeController controller, CurrentUserContextViewModel userContext)
     {
-        var field = typeof(BaseController).GetField("<CurrentUserContext>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+        var field = typeof(BaseController).GetField("<CurrentUserContext>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         field.Should().NotBeNull();
         field!.SetValue(controller, userContext);
     }
@@ -78,16 +63,6 @@ public sealed class HomeControllerBehaviorTests
             DeletedProjectIds = [],
             PermissionGrants = []
         };
-    }
-
-    private sealed class FakeHomeDashboardService : IHomeDashboardService
-    {
-        public DashboardPageViewModel Dashboard { get; set; } = null!;
-
-        public DashboardPageViewModel BuildDashboard(CurrentUserContextViewModel currentUser)
-        {
-            return Dashboard;
-        }
     }
 
     private sealed class FakeUserContextResolver : IUserContextResolver

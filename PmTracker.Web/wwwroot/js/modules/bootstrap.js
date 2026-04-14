@@ -74,6 +74,7 @@ import { debounce } from "./utils.js";
 import { initSessionCoordinator } from "./session.js";
 import { initTheme } from "./theme.js";
 import { initTableTools } from "./tableTools.js";
+import { handleDashboardClick, initDashboardShell } from "./dashboard.js";
 
 const projectIndexFilterOptions = {
     hideDoneStorageKey: "pmtracker.projects.hideDone",
@@ -276,6 +277,11 @@ function handleDocumentClick(event) {
         if (panel instanceof HTMLElement) {
             void loadProjectTabPanel(panel, { force: true });
         }
+        return;
+    }
+
+    if (handleDashboardClick(target)) {
+        event.preventDefault();
         return;
     }
 
@@ -504,6 +510,7 @@ export function bootstrapPmTrackerApp() {
         () => initTableTools(document),
         () => initMeetingOverview(document),
         () => initProjectIndexUi(),
+        () => initDashboardShell(),
         () => initSessionCoordinator(),
         () => initModalAjaxSubmit()
     ]);

@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Data;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services;
 
@@ -74,7 +74,13 @@ public sealed partial class ProjectService
         };
         dbContext.ObsazeniProjektu.Add(entity);
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "obsazeni_projektu", entity.Id.ToString(CultureInfo.InvariantCulture), "create", null, JsonSerializer.Serialize(entity), ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.ProjectMembership,
+            entity.Id.ToString(CultureInfo.InvariantCulture),
+            null,
+            ProjectMembershipAuditSnapshot.FromEntity(entity)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task DeactivateProjectRoleAsync(DeactivateProjectRoleCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -86,10 +92,16 @@ public sealed partial class ProjectService
             return;
         }
 
-        var old = JsonSerializer.Serialize(entity);
+        var old = ProjectMembershipAuditSnapshot.FromEntity(entity);
         entity.DatumOdebrani = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "obsazeni_projektu", entity.Id.ToString(CultureInfo.InvariantCulture), "deactivate", old, JsonSerializer.Serialize(entity), ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Deactivate,
+            AuditEntityType.ProjectMembership,
+            entity.Id.ToString(CultureInfo.InvariantCulture),
+            old,
+            ProjectMembershipAuditSnapshot.FromEntity(entity)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task AssignProjectSubsystemAsync(AssignProjectSubsystemCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -113,8 +125,14 @@ public sealed partial class ProjectService
         };
         dbContext.ProjektSubsystemy.Add(entity);
         await dbContext.SaveChangesAsync(ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.ProjectSubsystem,
+            entity.Id.ToString(CultureInfo.InvariantCulture),
+            null,
+            ProjectSubsystemAuditSnapshot.FromEntity(entity)));
+        await dbContext.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "projekt_subsystemy", entity.Id.ToString(CultureInfo.InvariantCulture), "create", null, JsonSerializer.Serialize(entity), ct);
     }
 
     public async Task ReorderProjectSubsystemAsync(ReorderProjectSubsystemCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -145,8 +163,8 @@ public sealed partial class ProjectService
 
         var current = activeSubsystems[currentIndex];
         var target = activeSubsystems[targetIndex];
-        var currentOld = JsonSerializer.Serialize(current);
-        var targetOld = JsonSerializer.Serialize(target);
+        var currentOld = ProjectSubsystemAuditSnapshot.FromEntity(current, activeSubsystems);
+        var targetOld = ProjectSubsystemAuditSnapshot.FromEntity(target, activeSubsystems);
         var currentOrder = current.Poradi;
         var targetOrder = target.Poradi;
         var temporaryOrder = activeSubsystems.Max(x => x.Poradi) + 1;
@@ -157,10 +175,24 @@ public sealed partial class ProjectService
         target.Poradi = currentOrder;
         current.Poradi = targetOrder;
         await dbContext.SaveChangesAsync(ct);
+        var reorderedSubsystems = activeSubsystems
+            .OrderBy(x => x.Poradi)
+            .ThenBy(x => x.Id)
+            .ToList();
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Reorder,
+            AuditEntityType.ProjectSubsystem,
+            current.Id.ToString(CultureInfo.InvariantCulture),
+            currentOld,
+            ProjectSubsystemAuditSnapshot.FromEntity(current, reorderedSubsystems)));
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Reorder,
+            AuditEntityType.ProjectSubsystem,
+            target.Id.ToString(CultureInfo.InvariantCulture),
+            targetOld,
+            ProjectSubsystemAuditSnapshot.FromEntity(target, reorderedSubsystems)));
+        await dbContext.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-
-        await WriteAuditAsync(currentUser.OsobaId, "projekt_subsystemy", current.Id.ToString(CultureInfo.InvariantCulture), "reorder", currentOld, JsonSerializer.Serialize(current), ct);
-        await WriteAuditAsync(currentUser.OsobaId, "projekt_subsystemy", target.Id.ToString(CultureInfo.InvariantCulture), "reorder", targetOld, JsonSerializer.Serialize(target), ct);
     }
 
     public async Task DeactivateProjectSubsystemAsync(DeactivateProjectSubsystemCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -179,10 +211,16 @@ public sealed partial class ProjectService
             throw new InvalidOperationException("K přiřazení subsystému existují aktivní role. Nejdříve je deaktivujte.");
         }
 
-        var old = JsonSerializer.Serialize(entity);
+        var old = ProjectSubsystemAuditSnapshot.FromEntity(entity);
         entity.DatumOdebrani = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "projekt_subsystemy", entity.Id.ToString(CultureInfo.InvariantCulture), "deactivate", old, JsonSerializer.Serialize(entity), ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Deactivate,
+            AuditEntityType.ProjectSubsystem,
+            entity.Id.ToString(CultureInfo.InvariantCulture),
+            old,
+            ProjectSubsystemAuditSnapshot.FromEntity(entity)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task AssignProjectSubsystemRoleAsync(AssignProjectSubsystemRoleCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -252,7 +290,13 @@ public sealed partial class ProjectService
         };
         dbContext.ObsazeniSubsystemuProjektu.Add(entity);
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "obsazeni_subsystemu_projektu", entity.Id.ToString(CultureInfo.InvariantCulture), "create", null, JsonSerializer.Serialize(entity), ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.ProjectSubsystemRole,
+            entity.Id.ToString(CultureInfo.InvariantCulture),
+            null,
+            ProjectSubsystemRoleAuditSnapshot.FromEntity(entity)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     public async Task DeactivateProjectSubsystemRoleAsync(DeactivateProjectSubsystemRoleCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -264,10 +308,16 @@ public sealed partial class ProjectService
             return;
         }
 
-        var old = JsonSerializer.Serialize(entity);
+        var old = ProjectSubsystemRoleAuditSnapshot.FromEntity(entity);
         entity.DatumOdebrani = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(currentUser.OsobaId, "obsazeni_subsystemu_projektu", entity.Id.ToString(CultureInfo.InvariantCulture), "deactivate", old, JsonSerializer.Serialize(entity), ct);
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Deactivate,
+            AuditEntityType.ProjectSubsystemRole,
+            entity.Id.ToString(CultureInfo.InvariantCulture),
+            old,
+            ProjectSubsystemRoleAuditSnapshot.FromEntity(entity)));
+        await dbContext.SaveChangesAsync(ct);
     }
 
     private async Task<int> ResolveSubsystemIdAsync(string value, CancellationToken ct)

@@ -17,13 +17,13 @@ public sealed class HomeObsazeniControllerTests
     [Theory]
     [InlineData("/Home")]
     [InlineData("/Home/Index")]
-    public async Task HomeIndexRoutes_ShouldRedirectToProjectsIndex_WhenUserIsResolved(string route)
+    public async Task HomeIndexRoutes_ShouldRedirectToDashboard_WhenUserIsResolved(string route)
     {
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync(AppendAsUser(route, _fixture.AdminOsobaId.ToString()));
 
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-        GetLocation(response).Should().Be("/");
+        GetLocation(response).Should().Be("/dashboard");
     }
 
     [Fact]
@@ -43,13 +43,13 @@ public sealed class HomeObsazeniControllerTests
     [InlineData("/Obsazeni")]
     [InlineData("/Obsazeni/Index")]
     [InlineData("/Obsazeni?projektId=123")]
-    public async Task ObsazeniRoutes_ShouldRedirectToProjectsIndex_ForCompatibility(string route)
+    public async Task ObsazeniRoutes_ShouldRedirectToProjectsList_ForCompatibility(string route)
     {
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync(AppendAsUser(route, _fixture.AdminOsobaId.ToString()));
 
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-        GetLocation(response).Should().Be("/");
+        GetLocation(response).Should().Be("/Projekty");
     }
 
     [Theory]

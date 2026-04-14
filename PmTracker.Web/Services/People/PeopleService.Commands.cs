@@ -1,9 +1,9 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services.People;
 
@@ -14,7 +14,7 @@ public sealed partial class PeopleService
         CurrentUserContextViewModel currentUser,
         CancellationToken ct = default)
     {
-        var organizationId = await ResolveOrganizationIdAsync(command.Organizace, ct);
+        var organizationId = await ResolveOrganizationIdAsync(command.Organizace, currentUser.OsobaId, ct);
         var orgUnitId = await ResolveOrgUnitIdAsync(command.OrganizacniCelek, ct);
         var email = textNormalizer.NormalizeEmail(command.Email);
 
@@ -24,7 +24,7 @@ public sealed partial class PeopleService
                 .FirstOrDefaultAsync(x => x.Id == command.Id.Value, ct)
                 ?? throw new InvalidOperationException($"Osoba {command.Id.Value} nebyla nalezena.");
 
-            var old = JsonSerializer.Serialize(existing);
+            var old = PersonAuditSnapshot.FromEntity(existing);
             existing.OrganizaceId = organizationId;
             existing.OrganizacniCelekId = orgUnitId;
             existing.LocationLocked = command.LocationLocked && existing.GuidAd.HasValue;
@@ -40,14 +40,13 @@ public sealed partial class PeopleService
             }
 
             await dbContext.SaveChangesAsync(ct);
-            await WriteAuditAsync(
-                currentUser.OsobaId,
-                "osoby",
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Update,
+                AuditEntityType.Person,
                 existing.Id.ToString(CultureInfo.InvariantCulture),
-                existing.GuidAd.HasValue ? "update_ad_location" : "update_manual",
                 old,
-                JsonSerializer.Serialize(existing),
-                ct);
+                PersonAuditSnapshot.FromEntity(existing)));
+            await dbContext.SaveChangesAsync(ct);
             return existing.Id;
         }
 
@@ -65,14 +64,13 @@ public sealed partial class PeopleService
         };
         dbContext.Osoby.Add(entity);
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "osoby",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.Person,
             entity.Id.ToString(CultureInfo.InvariantCulture),
-            "create_manual",
             null,
-            JsonSerializer.Serialize(entity),
-            ct);
+            PersonAuditSnapshot.FromEntity(entity)));
+        await dbContext.SaveChangesAsync(ct);
         return entity.Id;
     }
 
@@ -88,8 +86,8 @@ public sealed partial class PeopleService
 
         var guidAd = command.GuidAd.Value;
         var adLogin = NormalizeAdLogin(command.AdLogin);
-        var organizationId = await ResolveOrganizationForAdAsync(command.Organizace, command.AdCompany, ct);
-        var orgUnitId = await ResolveOrgUnitForAdAsync(command.OrganizacniCelek, command.AdDepartment, command.AdCompany, ct);
+        var organizationId = await ResolveOrganizationForAdAsync(command.Organizace, command.AdCompany, currentUser.OsobaId, ct);
+        var orgUnitId = await ResolveOrgUnitForAdAsync(command.OrganizacniCelek, command.AdDepartment, command.AdCompany, currentUser.OsobaId, ct);
         var titul = string.IsNullOrWhiteSpace(command.Titul) ? null : command.Titul.Trim();
         var email = textNormalizer.NormalizeEmail(command.Email)
             ?? throw new InvalidOperationException("AD osoba musí mít vyplněný email.");
@@ -97,6 +95,7 @@ public sealed partial class PeopleService
             .FirstOrDefaultAsync(x => x.GuidAd == guidAd, ct);
         if (existing is not null)
         {
+            var old = PersonAuditSnapshot.FromEntity(existing);
             existing.Jmeno = command.Jmeno.Trim();
             existing.Prijmeni = command.Prijmeni.Trim();
             existing.Titul = titul;
@@ -106,14 +105,13 @@ public sealed partial class PeopleService
             existing.OrganizacniCelekId = orgUnitId;
             existing.LocationLocked = command.LocationLocked;
             await dbContext.SaveChangesAsync(ct);
-            await WriteAuditAsync(
-                currentUser.OsobaId,
-                "osoby",
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Update,
+                AuditEntityType.Person,
                 existing.Id.ToString(CultureInfo.InvariantCulture),
-                "sync_ad",
-                null,
-                JsonSerializer.Serialize(existing),
-                ct);
+                old,
+                PersonAuditSnapshot.FromEntity(existing)));
+            await dbContext.SaveChangesAsync(ct);
             return existing.Id;
         }
 
@@ -131,14 +129,13 @@ public sealed partial class PeopleService
         };
         dbContext.Osoby.Add(entity);
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "osoby",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.Person,
             entity.Id.ToString(CultureInfo.InvariantCulture),
-            "create_ad",
             null,
-            JsonSerializer.Serialize(entity),
-            ct);
+            PersonAuditSnapshot.FromEntity(entity)));
+        await dbContext.SaveChangesAsync(ct);
         return entity.Id;
     }
 
@@ -184,7 +181,7 @@ public sealed partial class PeopleService
             throw new InvalidOperationException("Osobu nelze odstranit, protože je navázaná na projektová data. Nejprve odeberte vazby.");
         }
 
-        var old = JsonSerializer.Serialize(person);
+        var old = PersonAuditSnapshot.FromEntity(person);
 
         var userRoles = await dbContext.AuthzUserRoles
             .Where(x => x.OsobaId == person.Id)
@@ -202,27 +199,18 @@ public sealed partial class PeopleService
             dbContext.AuthzSuperadmins.RemoveRange(superadminRows);
         }
 
-        var auditRows = await dbContext.AuthzAuditLog
-            .Where(x => x.ActorOsobaId == person.Id)
-            .ToListAsync(ct);
-        foreach (var auditRow in auditRows)
-        {
-            auditRow.ActorOsobaId = null;
-        }
-
         dbContext.Osoby.Remove(person);
         await dbContext.SaveChangesAsync(ct);
-        await WriteAuditAsync(
-            currentUser.OsobaId,
-            "osoby",
+        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Delete,
+            AuditEntityType.Person,
             command.Id.ToString(CultureInfo.InvariantCulture),
-            "delete",
             old,
-            null,
-            ct);
+            null));
+        await dbContext.SaveChangesAsync(ct);
     }
 
-    private async Task<int> ResolveOrganizationIdAsync(string? organization, CancellationToken ct)
+    private async Task<int> ResolveOrganizationIdAsync(string? organization, int? actorOsobaId, CancellationToken ct)
     {
         if (!string.IsNullOrWhiteSpace(organization))
         {
@@ -247,6 +235,7 @@ public sealed partial class PeopleService
     private async Task<int> ResolveOrganizationForAdAsync(
         string? selectedOrganization,
         string? adCompany,
+        int? actorOsobaId,
         CancellationToken ct)
     {
         var normalizedSelection = NormalizeCiselnikSelection(selectedOrganization);
@@ -258,7 +247,7 @@ public sealed partial class PeopleService
                 return resolved.Value;
             }
 
-            return await EnsureOrganizationExistsAsync(normalizedSelection, null, ct);
+            return await EnsureOrganizationExistsAsync(normalizedSelection, null, actorOsobaId, ct);
         }
 
         var parsed = ParseAdCompanyToOrgData(adCompany);
@@ -280,7 +269,7 @@ public sealed partial class PeopleService
                 return byName.Value;
             }
 
-            return await EnsureOrganizationExistsAsync(parsed.OrganizationName, derivedCode, ct);
+            return await EnsureOrganizationExistsAsync(parsed.OrganizationName, derivedCode, actorOsobaId, ct);
         }
 
         var moByCode = await ResolveOrganizationIdOrNullAsync("MO", ct);
@@ -301,6 +290,7 @@ public sealed partial class PeopleService
         string? selectedOrgUnit,
         string? adDepartment,
         string? adCompany,
+        int? actorOsobaId,
         CancellationToken ct)
     {
         var normalizedSelection = NormalizeCiselnikSelection(selectedOrgUnit);
@@ -321,6 +311,7 @@ public sealed partial class PeopleService
             return await EnsureOrgUnitExistsAsync(
                 parsedSelection.Name ?? normalizedSelection,
                 parsedSelection.Code,
+                actorOsobaId,
                 ct);
         }
 
@@ -348,7 +339,7 @@ public sealed partial class PeopleService
             }
         }
 
-        return await EnsureOrgUnitExistsAsync(parsed.Name ?? parsed.Code!, parsed.Code, ct);
+        return await EnsureOrgUnitExistsAsync(parsed.Name ?? parsed.Code!, parsed.Code, actorOsobaId, ct);
     }
 
     private Task<int?> ResolveOrgUnitIdAsync(string? orgUnit, CancellationToken ct)
@@ -391,6 +382,7 @@ public sealed partial class PeopleService
     private async Task<int> EnsureOrganizationExistsAsync(
         string value,
         string? preferredCode,
+        int? actorOsobaId,
         CancellationToken ct)
     {
         var trimmed = value.Trim();
@@ -410,12 +402,20 @@ public sealed partial class PeopleService
 
         dbContext.CiselnikOrganizace.Add(entity);
         await dbContext.SaveChangesAsync(ct);
+        auditWriteService.Add(actorOsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.Dictionary,
+            entity.Id.ToString(CultureInfo.InvariantCulture),
+            null,
+            new DictionaryAuditSnapshot("organizace", entity.Id, entity.Kod, entity.Nazev, entity.IsLocked)));
+        await dbContext.SaveChangesAsync(ct);
         return entity.Id;
     }
 
     private async Task<int> EnsureOrgUnitExistsAsync(
         string value,
         string? preferredCode,
+        int? actorOsobaId,
         CancellationToken ct)
     {
         var trimmed = value.Trim();
@@ -434,6 +434,13 @@ public sealed partial class PeopleService
         };
 
         dbContext.CiselnikOrganizacniCelky.Add(entity);
+        await dbContext.SaveChangesAsync(ct);
+        auditWriteService.Add(actorOsobaId, new AuditWriteEntry(
+            AuditActionType.Create,
+            AuditEntityType.Dictionary,
+            entity.Id.ToString(CultureInfo.InvariantCulture),
+            null,
+            new DictionaryAuditSnapshot("organizacni-celky", entity.Id, entity.Kod, entity.Nazev, entity.IsLocked)));
         await dbContext.SaveChangesAsync(ct);
         return entity.Id;
     }
@@ -643,25 +650,4 @@ public sealed partial class PeopleService
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
-    private async Task WriteAuditAsync(
-        int? actorOsobaId,
-        string entityType,
-        string entityId,
-        string action,
-        string? oldValue,
-        string? newValue,
-        CancellationToken ct)
-    {
-        dbContext.AuthzAuditLog.Add(new AuthzAuditLogEntity
-        {
-            ActorOsobaId = actorOsobaId,
-            EntityType = entityType,
-            EntityId = entityId,
-            Action = action,
-            OldValue = oldValue,
-            NewValue = newValue,
-            CreatedAt = DateTime.UtcNow
-        });
-        await dbContext.SaveChangesAsync(ct);
-    }
 }

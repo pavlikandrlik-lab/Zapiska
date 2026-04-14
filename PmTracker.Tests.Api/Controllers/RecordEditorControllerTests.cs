@@ -1063,9 +1063,9 @@ public sealed class RecordEditorControllerTests
         (await verificationDbContext.ZaznamHistorieZmenTypu.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
 
         var auditExists = await verificationDbContext.AuthzAuditLog.AnyAsync(x =>
-            x.EntityType == "projektove_zaznamy" &&
+            x.EntityType == "zaznam" &&
             x.EntityId == recordId.ToString() &&
-            x.Action == "hard_delete");
+            x.Action == "delete");
         auditExists.Should().BeTrue();
     }
 
