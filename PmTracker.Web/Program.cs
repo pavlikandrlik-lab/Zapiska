@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Server.IISIntegration;
 using PmTracker.Web.Filters;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Search;
 using PmTracker.Web.Services.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
 builder.Services
     .AddPmTrackerDataStore(builder.Configuration);
+builder.Services.AddPmTrackerSearch(builder.Configuration);
 
 var app = builder.Build();
 

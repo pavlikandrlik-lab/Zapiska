@@ -34,3 +34,57 @@ Tento soubor je vstupní instalační dokument. Kompletní detail je rozdělen d
 
 ## 5) Poznámka ke změnám
 Detailní SOP postupy jsou závazně vedené v `docs/technical/*` a in-app pod `/Dokumentace/Technicka/*`.
+
+## 6) Globální vyhledávání (OpenSearch)
+
+Od verze 1.1.5 je v aplikaci připraveno globální vyhledávání nad projekty, záznamy, jednáními, osobami, subsystémy, vyjádřeními a návrhy záznamů. Ve výchozím stavu je **vypnuté** a aktivuje se přes konfiguraci.
+
+### 6.1) Předpoklady
+- Běžící OpenSearch 2.x (single-node stačí).
+- SQL migrace `db_upgrade_1_1_5_search_checkpoint.sql` aplikovaná v DB.
+
+### 6.2) Lokální OpenSearch pro vývoj
+```
+docker run -d --name pmtracker-opensearch -p 9200:9200 \
+  -e discovery.type=single-node \
+  -e DISABLE_SECURITY_PLUGIN=true \
+  opensearchproject/opensearch:2.15.0
+```
+
+### 6.3) Konfigurace v `appsettings.Production.json`
+```json
+"PmTracker": {
+  "Search": {
+    "Enabled": true,
+    "Provider": "OpenSearch",
+    "Uri": "http://opensearch-host:9200",
+    "Username": "",
+    "Password": "",
+    "IndexName": "pmtracker-search-v1",
+    "ReindexIntervalSeconds": 30,
+    "PostFilterCandidateMultiplier": 3,
+    "Embeddings": {
+      "Enabled": false,
+      "Provider": "None",
+      "Endpoint": "",
+      "ApiKey": "",
+      "Model": "text-embedding-3-small",
+      "Dimensions": 384
+    }
+  }
+}
+```
+- `Enabled=false` → UI prvek se skryje a všechny služby jsou no-op.
+- `Embeddings.Enabled=true` vyžaduje Azure OpenAI endpoint + klíč (provider `AzureOpenAI`).
+
+### 6.4) První naplnění indexu
+Po zapnutí feature flagu spusť jako superadmin:
+```
+POST /Search/Reindex
+```
+Endpoint iteruje všechny entity a nahraje je do OpenSearch v dávkách po 500. Inkrementální aktualizace pak běží automaticky každých `ReindexIntervalSeconds` přes audit log.
+
+### 6.5) Ověření
+- `GET http://opensearch-host:9200/pmtracker-search-v1/_count` – počet dokumentů.
+- V navbaru aplikace se objeví vyhledávací pole; stránka `/Search?q=...` vrací výsledky seskupené podle typu entity.
+- Výsledky jsou filtrovány post-filter přes `IPermissionEvaluationService` – uživatel nikdy neuvidí entitu mimo svůj scope.

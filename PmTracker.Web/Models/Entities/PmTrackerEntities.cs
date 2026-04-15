@@ -430,3 +430,11 @@ public sealed class AuthzAuditLogEntity
     public string? NewValue { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+public sealed class SearchReindexCheckpointEntity
+{
+    public int Id { get; set; }
+    public long LastProcessedAuditId { get; set; }
+    public DateTime? LastProcessedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}

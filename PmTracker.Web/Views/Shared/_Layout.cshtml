@@ -1,4 +1,5 @@
 @inject PmTracker.Web.Services.Common.IApplicationVersionProvider ApplicationVersionProvider
+@inject Microsoft.Extensions.Options.IOptions<PmTracker.Web.Services.Search.SearchOptions> SearchOptionsAccessor
 
 @{
     var themeModeCookie = Context.Request.Cookies["pmtracker.theme.mode"];
@@ -41,6 +42,14 @@
                     <div class="app-title">Zápiska</div>
                 </div>
             </a>
+
+            @if (SearchOptionsAccessor.Value.Enabled)
+            {
+                <form data-global-search method="get" asp-controller="Search" asp-action="Index" class="app-search" role="search">
+                    <input type="search" name="q" placeholder="Hledat…" aria-label="Globální vyhledávání" autocomplete="off" />
+                    <div data-global-search-dropdown class="app-search-dropdown" hidden></div>
+                </form>
+            }
 
             <div class="app-user-tools">
                 <label class="gov-switch gov-theme-switch app-theme-switch" data-theme-switch>
@@ -144,6 +153,10 @@
 
     <script src="~/lib/quill/quill.min.js" asp-append-version="true"></script>
     <script src="~/js/site.bundle.js" asp-append-version="true"></script>
+    @if (SearchOptionsAccessor.Value.Enabled)
+    {
+        <script src="~/js/global-search.js" asp-append-version="true"></script>
+    }
     @RenderSection("Scripts", required: false)
 </body>
 </html>

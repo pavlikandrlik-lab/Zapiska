@@ -1,0 +1,83 @@
+@model PmTracker.Web.Services.Search.GlobalSearchPageViewModel
+@using PmTracker.Web.Services.Search
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Query) ? "Vyhledávání" : $"Vyhledávání: {Model.Query}";
+
+    string TypeLabel(string t) => t switch
+    {
+        EntityDocumentMapper.TypeProjekt => "Projekty",
+        EntityDocumentMapper.TypeZaznam => "Záznamy",
+        EntityDocumentMapper.TypeJednani => "Jednání",
+        EntityDocumentMapper.TypeOsoba => "Osoby",
+        EntityDocumentMapper.TypeSubsystem => "Subsystémy",
+        EntityDocumentMapper.TypeVyjadreni => "Vyjádření",
+        EntityDocumentMapper.TypeZaznamNavrh => "Návrhy záznamů",
+        _ => t
+    };
+
+    // Zaznamy nemají vlastní detail — zobrazují se v detailu projektu.
+    // Osoby nemají detail stránku.
+    // Subsystémy jsou v číselníku.
+    // ZaznamNavrh — ProposalDetail vyžaduje projektId + proposalId.
+    string TypeDetailUrl(SearchHit h) => h.EntityType switch
+    {
+        EntityDocumentMapper.TypeProjekt => $"/Projekty/Detail/{h.EntityId}",
+        EntityDocumentMapper.TypeZaznam => h.ProjektId.HasValue
+            ? $"/Projekty/Detail/{h.ProjektId}?recordId={h.EntityId}"
+            : "#",
+        EntityDocumentMapper.TypeJednani => $"/Jednani/Detail/{h.EntityId}",
+        EntityDocumentMapper.TypeOsoba => "/Osoby/Index",
+        EntityDocumentMapper.TypeSubsystem => "/Ciselniky/Detail/subsystemy",
+        EntityDocumentMapper.TypeVyjadreni => h.Meta.TryGetValue("zaznam_id", out var zid) && h.ProjektId.HasValue
+            ? $"/Projekty/Detail/{h.ProjektId}?recordId={zid}"
+            : "#",
+        EntityDocumentMapper.TypeZaznamNavrh => h.ProjektId.HasValue
+            ? $"/Navrhy/ProposalDetail?projektId={h.ProjektId}&proposalId={h.EntityId}"
+            : "#",
+        _ => "#"
+    };
+}
+
+<section class="page-section">
+    <h1>Vyhledávání</h1>
+
+    @if (!Model.SearchEnabled)
+    {
+        <p class="alert alert-info">Globální vyhledávání je momentálně vypnuté (konfigurace <code>PmTracker:Search:Enabled</code>).</p>
+    }
+    else
+    {
+        <form method="get" asp-controller="Search" asp-action="Index" class="search-form">
+            <input type="search" name="q" value="@Model.Query" placeholder="Hledat…" aria-label="Hledaný výraz" autofocus />
+            <button type="submit">Hledat</button>
+        </form>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Query) && Model.Result.Hits.Count == 0)
+        {
+            <p>Žádné výsledky pro „@Model.Query".</p>
+        }
+        else if (Model.Result.Groups.Count > 0)
+        {
+            <p class="search-meta">Nalezeno @Model.Result.Hits.Count výsledků (kandidátů @Model.Result.TotalCandidates).</p>
+
+            foreach (var group in Model.Result.Groups)
+            {
+                <section class="search-group">
+                    <h2>@TypeLabel(group.Key) (@group.Value.Count)</h2>
+                    <ul class="search-hits">
+                        @foreach (var hit in group.Value)
+                        {
+                            <li>
+                                <a href="@TypeDetailUrl(hit)">@hit.Title</a>
+                                @if (!string.IsNullOrWhiteSpace(hit.Snippet))
+                                {
+                                    <div class="search-snippet">@Html.Raw(hit.Snippet)</div>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+        }
+    }
+</section>
