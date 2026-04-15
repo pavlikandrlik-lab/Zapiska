@@ -8,6 +8,7 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Audit;
+using PmTracker.Web.Services.Dashboard;
 
 namespace PmTracker.Web.Services;
 
@@ -41,6 +42,7 @@ public sealed class RecordProposalService : IRecordProposalService
     private readonly IPendingScheduleProposalLockEvaluator _pendingScheduleProposalLockEvaluator;
     private readonly RecordProposalPayloadMapper _payloadMapper;
     private readonly IHarmonogramService _harmonogramService;
+    private readonly IPriorityMatrixRebuildService _priorityMatrixRebuildService;
     private readonly IAuditWriteService _auditWriteService;
     private readonly TimeProvider _timeProvider;
 
@@ -51,6 +53,7 @@ public sealed class RecordProposalService : IRecordProposalService
         IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator,
         RecordProposalPayloadMapper payloadMapper,
         IHarmonogramService harmonogramService,
+        IPriorityMatrixRebuildService priorityMatrixRebuildService,
         IAuditWriteService auditWriteService,
         TimeProvider timeProvider)
     {
@@ -60,6 +63,7 @@ public sealed class RecordProposalService : IRecordProposalService
         _pendingScheduleProposalLockEvaluator = pendingScheduleProposalLockEvaluator;
         _payloadMapper = payloadMapper;
         _harmonogramService = harmonogramService;
+        _priorityMatrixRebuildService = priorityMatrixRebuildService;
         _auditWriteService = auditWriteService;
         _timeProvider = timeProvider;
     }
@@ -1024,6 +1028,10 @@ public sealed class RecordProposalService : IRecordProposalService
         }
 
         await _dbContext.SaveChangesAsync(ct);
+        if (schedulePayload.ChangesTermDeadline || schedulePayload.ChangesSchedulePlan)
+        {
+            await _priorityMatrixRebuildService.RebuildForRecordAsync(record.Id, ct);
+        }
         _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             AuditActionType.Update,
             AuditEntityType.Record,

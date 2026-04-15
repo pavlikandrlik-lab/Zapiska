@@ -32,6 +32,8 @@ public sealed class PmTrackerDbContext : DbContext
     public DbSet<ObsazeniSubsystemuProjektuEntity> ObsazeniSubsystemuProjektu => Set<ObsazeniSubsystemuProjektuEntity>();
     public DbSet<ProjektovyZaznamEntity> ProjektoveZaznamy => Set<ProjektovyZaznamEntity>();
     public DbSet<ZaznamNavrhEntity> ZaznamNavrhy => Set<ZaznamNavrhEntity>();
+    public DbSet<ZaznamPriorityUzivateleEntity> ZaznamPriorityUzivatelu => Set<ZaznamPriorityUzivateleEntity>();
+    public DbSet<ZaznamPriorityRebuildStateEntity> ZaznamPriorityRebuildState => Set<ZaznamPriorityRebuildStateEntity>();
     public DbSet<ZaznamHistorieZmenTypuEntity> ZaznamHistorieZmenTypu => Set<ZaznamHistorieZmenTypuEntity>();
     public DbSet<ZaznamHistorieTerminuEntity> ZaznamHistorieTerminu => Set<ZaznamHistorieTerminuEntity>();
     public DbSet<ZaznamHistorieVlastnikEntity> ZaznamHistorieVlastnik => Set<ZaznamHistorieVlastnikEntity>();

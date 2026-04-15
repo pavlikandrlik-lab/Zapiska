@@ -267,6 +267,7 @@ public sealed partial class RecordService
         }
 
         await dbContext.SaveChangesAsync(ct);
+        await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, ct);
         auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             command.Id.HasValue ? AuditActionType.Update : AuditActionType.Create,
             AuditEntityType.Record,
@@ -370,6 +371,14 @@ public sealed partial class RecordService
             dbContext.Vyjadreni.RemoveRange(commentRows);
         }
 
+        var priorityRows = await dbContext.ZaznamPriorityUzivatelu
+            .Where(x => x.ZaznamId == command.ZaznamId)
+            .ToListAsync(ct);
+        if (priorityRows.Count > 0)
+        {
+            dbContext.ZaznamPriorityUzivatelu.RemoveRange(priorityRows);
+        }
+
         if (historyTypeRows.Count > 0
             || historyDeadlineRows.Count > 0
             || historyOwnerRows.Count > 0
@@ -379,7 +388,8 @@ public sealed partial class RecordService
             || externalLinkRows.Count > 0
             || collaborationRows.Count > 0
             || scheduleRows.Count > 0
-            || commentRows.Count > 0)
+            || commentRows.Count > 0
+            || priorityRows.Count > 0)
         {
             await dbContext.SaveChangesAsync(ct);
         }
@@ -1078,21 +1088,7 @@ public sealed partial class RecordService
             ?? throw new InvalidOperationException($"Kategorie '{value}' neexistuje.");
 
     private static bool IsTaskCategory(string? categoryCode, string? categoryName)
-    {
-        if (!string.IsNullOrWhiteSpace(categoryCode)
-            && (Ci.Equals(categoryCode.Trim(), "U") || Ci.Equals(categoryCode.Trim(), "UKOL")))
-        {
-            return true;
-        }
-
-        if (string.IsNullOrWhiteSpace(categoryName))
-        {
-            return false;
-        }
-
-        return categoryName.Contains("úkol", StringComparison.OrdinalIgnoreCase)
-            || categoryName.Contains("ukol", StringComparison.OrdinalIgnoreCase);
-    }
+        => RecordCategoryClassifier.IsTaskCategory(categoryCode, categoryName);
 
     private async Task<int> ResolveStavUkoluIdAsync(string value, CancellationToken ct)
         => await dbContext.CiselnikStavuUkolu
@@ -1267,9 +1263,15 @@ public sealed partial class RecordService
 
         var (tx, ownsTransaction) = await BeginSerializableTransactionIfNeededAsync(ct);
         await using var _ = tx;
+        var oldPlanValues = await LoadSchedulePlanValueMapAsync(entity.Id, scheduleTypeDefinitions, ct);
         var oldScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, ct);
         var normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, ct);
         await dbContext.SaveChangesAsync(ct);
+        var newPlanValues = await LoadSchedulePlanValueMapAsync(entity.Id, scheduleTypeDefinitions, ct);
+        if (!ScheduleValueMapsEqual(oldPlanValues, newPlanValues))
+        {
+            await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, ct);
+        }
         var newScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, ct);
         auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
@@ -1600,5 +1602,46 @@ public sealed partial class RecordService
             .ToListAsync(ct);
 
         return rows.Count == 0 ? null : RecordScheduleAuditSnapshot.FromEntities(recordId, rows);
+    }
+
+    private async Task<Dictionary<int, int>> LoadSchedulePlanValueMapAsync(
+        int recordId,
+        IReadOnlyList<RecordScheduleTypeDefinition> scheduleTypeDefinitions,
+        CancellationToken ct)
+    {
+        var durationTypeIds = scheduleTypeDefinitions
+            .Select(x => x.DurationTypeId)
+            .Where(x => x > 0)
+            .Distinct()
+            .ToHashSet();
+        if (durationTypeIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.ZaznamHarmonogramHodnoty
+            .AsNoTracking()
+            .Where(x => x.ZaznamId == recordId && durationTypeIds.Contains(x.TypId))
+            .ToDictionaryAsync(x => x.TypId, x => x.HodnotaInt, ct);
+    }
+
+    private static bool ScheduleValueMapsEqual(
+        IReadOnlyDictionary<int, int> left,
+        IReadOnlyDictionary<int, int> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        foreach (var pair in left)
+        {
+            if (!right.TryGetValue(pair.Key, out var otherValue) || otherValue != pair.Value)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

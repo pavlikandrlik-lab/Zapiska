@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using System.Globalization;
 using PmTracker.Web.Data;
 using PmTracker.Web.Services.ActiveDirectory;
 using PmTracker.Web.Services.Common;
@@ -24,9 +25,23 @@ public static class DataStoreServiceCollectionExtensions
 {
     public static IServiceCollection AddPmTrackerDataStore(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddLogging();
         services.TryAddSingleton(TimeProvider.System);
         services.Configure<PmTrackerDataOptions>(configuration.GetSection(PmTrackerDataOptions.SectionName));
         services.Configure<ActiveDirectoryOptions>(configuration.GetSection(ActiveDirectoryOptions.SectionName));
+        services.AddOptions<DashboardPriorityOptions>()
+            .Bind(configuration.GetSection(DashboardPriorityOptions.SectionName))
+            .Validate(options => options.PriorityHorizonDays > 0, "PriorityHorizonDays musí být > 0.")
+            .Validate(options => options.PriorityOverdueCapDays >= 0, "PriorityOverdueCapDays musí být >= 0.")
+            .Validate(
+                options => TimeOnly.TryParseExact(
+                    options.PriorityNightlyRebuildTime,
+                    "HH:mm",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out _),
+                "PriorityNightlyRebuildTime musí mít formát HH:mm.")
+            .ValidateOnStart();
         services.AddDbContext<PmTrackerDbContext>((sp, optionsBuilder) =>
         {
             var dataOptions = sp.GetRequiredService<IOptions<PmTrackerDataOptions>>().Value;
@@ -53,6 +68,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IPermissionEvaluationService, PermissionEvaluationService>();
         services.AddScoped<ICommentAuthorizationPolicy, CommentAuthorizationPolicy>();
         services.AddScoped<IAuditWriteService, AuditWriteService>();
+        services.AddScoped<PriorityMatrixRebuildService>();
         services.AddScoped<IRichTextContentService, RichTextContentService>();
         services.AddScoped<HarmonogramService>();
         services.AddScoped<CommentService>();
@@ -62,9 +78,13 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<RecordProposalService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<HomeDashboardService>();
+        services.AddScoped<IPriorityScoringService, PriorityScoringService>();
+        services.AddScoped<IDashboardPriorityQuery, DashboardPriorityQuery>();
+        services.AddScoped<IPriorityMatrixRebuildService>(sp => sp.GetRequiredService<PriorityMatrixRebuildService>());
         services.AddScoped<PeopleService>();
         services.AddScoped<ProfileService>();
         services.AddScoped<DictionaryService>();
+        services.AddSingleton<IPriorityMatrixRebuildQueue, PriorityMatrixRebuildQueue>();
         services.AddScoped<IHarmonogramService>(sp => sp.GetRequiredService<HarmonogramService>());
         services.AddScoped<ICommentService>(sp => sp.GetRequiredService<CommentService>());
         services.AddScoped<IMeetingService>(sp => sp.GetRequiredService<MeetingService>());
@@ -99,6 +119,9 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<ISettingsModalModelFactory, SettingsModalModelFactory>();
         services.AddScoped<ISettingsService, SettingsService>();
         services.AddHostedService<SqlStartupValidatorHostedService>();
+        services.AddHostedService<PriorityMatrixBootstrapHostedService>();
+        services.AddHostedService<PriorityMatrixNightlyRebuildHostedService>();
+        services.AddHostedService<PriorityMatrixQueuedRebuildHostedService>();
 
         return services;
     }

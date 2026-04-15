@@ -11,11 +11,16 @@ public sealed class DashboardService : IDashboardService
     private const int NewsBatchSize = 200;
     private const string LegacyRecordEntityType = "projektove_zaznamy";
     private readonly PmTrackerDbContext _dbContext;
+    private readonly IDashboardPriorityQuery _dashboardPriorityQuery;
     private readonly TimeProvider _timeProvider;
 
-    public DashboardService(PmTrackerDbContext dbContext, TimeProvider timeProvider)
+    public DashboardService(
+        PmTrackerDbContext dbContext,
+        IDashboardPriorityQuery dashboardPriorityQuery,
+        TimeProvider timeProvider)
     {
         _dbContext = dbContext;
+        _dashboardPriorityQuery = dashboardPriorityQuery;
         _timeProvider = timeProvider;
     }
 
@@ -34,12 +39,14 @@ public sealed class DashboardService : IDashboardService
 
     public async Task<DashboardFocusPanelViewModel> BuildFocusPanelAsync(CurrentUserContextViewModel currentUser, int limit, CancellationToken ct)
     {
-        var allItems = await BuildFocusItemsAsync(currentUser, ct);
+        var totalCount = await _dashboardPriorityQuery.CountForUserAsync(currentUser.OsobaId, ct);
+        var priorityItems = await _dashboardPriorityQuery.GetTopForUserAsync(currentUser.OsobaId, Math.Max(limit, 0), ct);
+        var items = await BuildFocusItemDetailsAsync(priorityItems.Select(item => item.RecordId).ToList(), ct);
         return new DashboardFocusPanelViewModel
         {
-            TotalCount = allItems.Count,
+            TotalCount = totalCount,
             ListUrl = "/dashboard/focus",
-            Items = allItems.Take(Math.Max(limit, 0)).ToList()
+            Items = items
         };
     }
 
@@ -72,6 +79,7 @@ public sealed class DashboardService : IDashboardService
 
     public async Task<DashboardFocusListPageViewModel> BuildFocusListPageAsync(CurrentUserContextViewModel currentUser, CancellationToken ct)
     {
+        var priorityItems = await _dashboardPriorityQuery.GetAllForUserAsync(currentUser.OsobaId, ct);
         return new DashboardFocusListPageViewModel
         {
             CurrentUserContext = currentUser,
@@ -79,7 +87,7 @@ public sealed class DashboardService : IDashboardService
             Subtitle = "Relevantní neukončené záznamy přes všechny vaše projekty.",
             BackUrl = "/dashboard",
             BackLabel = "Zpět na přehled",
-            Items = await BuildFocusItemsAsync(currentUser, ct)
+            Items = await BuildFocusItemDetailsAsync(priorityItems.Select(item => item.RecordId).ToList(), ct)
         };
     }
 
@@ -116,7 +124,61 @@ public sealed class DashboardService : IDashboardService
         };
     }
 
-    private async Task<List<DashboardFocusItemViewModel>> BuildFocusItemsAsync(CurrentUserContextViewModel currentUser, CancellationToken ct)
+    private async Task<List<DashboardFocusItemViewModel>> BuildFocusItemDetailsAsync(IReadOnlyList<int> recordIds, CancellationToken ct)
+    {
+        if (recordIds.Count == 0)
+        {
+            return [];
+        }
+
+        var detailRows = await (
+                from record in _dbContext.ProjektoveZaznamy.AsNoTracking()
+                join project in _dbContext.Projekty.AsNoTracking() on record.ProjektId equals project.Id
+                join owner in _dbContext.Osoby.AsNoTracking() on record.VlastnikId equals owner.Id
+                join subsystem in _dbContext.Subsystemy.AsNoTracking() on record.SubsystemId equals subsystem.Id
+                join state in _dbContext.CiselnikStavuUkolu.AsNoTracking() on record.StavUkoluId equals state.Id into stateGroup
+                from state in stateGroup.DefaultIfEmpty()
+                where recordIds.Contains(record.Id)
+                select new FocusRecordDetailRow(
+                    record.Id,
+                    record.ProjektId,
+                    project.Zkratka,
+                    project.CelyNazev,
+                    record.CisloViditelne ?? string.Empty,
+                    record.Nazev,
+                    record.Cil,
+                    record.VlastnikId,
+                    BuildPersonDisplayName(owner.Jmeno, owner.Prijmeni),
+                    subsystem.Nazev,
+                    state != null ? state.Nazev : "Bez stavu",
+                    record.DatumZalozeni,
+                    record.DatumUkonceni))
+            .ToListAsync(ct);
+
+        var detailRowsById = detailRows.ToDictionary(row => row.RecordId);
+
+        return recordIds
+            .Where(detailRowsById.ContainsKey)
+            .Select(recordId => detailRowsById[recordId])
+            .Select(row => new DashboardFocusItemViewModel
+            {
+                RecordId = row.RecordId,
+                ProjectId = row.ProjectId,
+                ProjectCode = row.ProjectCode,
+                ProjectName = row.ProjectName,
+                RecordNumber = row.RecordNumber,
+                Title = row.Title,
+                Goal = row.Goal,
+                Owner = row.Owner,
+                Subsystem = row.Subsystem,
+                State = row.State,
+                CreatedAt = row.CreatedAt,
+                Deadline = row.Deadline
+            })
+            .ToList();
+    }
+
+    private async Task<HashSet<int>> BuildRelevantRecordIdsForDashboardNewsAsync(CurrentUserContextViewModel currentUser, CancellationToken ct)
     {
         var userOsobaId = currentUser.OsobaId;
         var accessibleProjectIds = BuildAccessibleProjectIds(currentUser);
@@ -150,27 +212,14 @@ public sealed class DashboardService : IDashboardService
 
         var candidateRows = await (
                 from record in _dbContext.ProjektoveZaznamy.AsNoTracking()
-                join project in _dbContext.Projekty.AsNoTracking() on record.ProjektId equals project.Id
-                join owner in _dbContext.Osoby.AsNoTracking() on record.VlastnikId equals owner.Id
-                join subsystem in _dbContext.Subsystemy.AsNoTracking() on record.SubsystemId equals subsystem.Id
                 join state in _dbContext.CiselnikStavuUkolu.AsNoTracking() on record.StavUkoluId equals state.Id into stateGroup
                 from state in stateGroup.DefaultIfEmpty()
                 where (!record.StavUkoluId.HasValue || !(state != null && state.IsFinal))
                     && (hasGlobalProjectRead || accessibleProjectIds.Contains(record.ProjektId))
-                select new FocusRecordRow(
+                select new RelevantRecordRow(
                     record.Id,
                     record.ProjektId,
-                    project.Zkratka,
-                    project.CelyNazev,
-                    record.CisloViditelne ?? string.Empty,
-                    record.Nazev,
-                    record.Cil,
                     record.VlastnikId,
-                    BuildPersonDisplayName(owner.Jmeno, owner.Prijmeni),
-                    subsystem.Nazev,
-                    state != null ? state.Nazev : "Bez stavu",
-                    record.DatumZalozeni,
-                    record.DatumUkonceni,
                     record.SubsystemId))
             .ToListAsync(ct);
 
@@ -179,23 +228,8 @@ public sealed class DashboardService : IDashboardService
                 row.OwnerId == userOsobaId
                 || collaborationSet.Contains(row.RecordId)
                 || leadSubsystemSet.Contains($"{row.ProjectId}:{row.SubsystemId}"))
-            .OrderBy(row => row.Title, StringComparer.CurrentCultureIgnoreCase)
-            .Select(row => new DashboardFocusItemViewModel
-            {
-                RecordId = row.RecordId,
-                ProjectId = row.ProjectId,
-                ProjectCode = row.ProjectCode,
-                ProjectName = row.ProjectName,
-                RecordNumber = row.RecordNumber,
-                Title = row.Title,
-                Goal = row.Goal,
-                Owner = row.Owner,
-                Subsystem = row.Subsystem,
-                State = row.State,
-                CreatedAt = row.CreatedAt,
-                Deadline = row.Deadline
-            })
-            .ToList();
+            .Select(row => row.RecordId)
+            .ToHashSet();
     }
 
     private async Task<List<DashboardMeetingItemViewModel>> BuildMeetingItemsAsync(CurrentUserContextViewModel currentUser, CancellationToken ct)
@@ -237,9 +271,7 @@ public sealed class DashboardService : IDashboardService
         var userOsobaId = currentUser.OsobaId;
         var accessibleProjectIds = BuildAccessibleProjectIds(currentUser);
         var hasGlobalProjectRead = HasGlobalProjectReadAccess(currentUser);
-        var relevantRecordIds = (await BuildFocusItemsAsync(currentUser, ct))
-            .Select(item => item.RecordId)
-            .ToHashSet();
+        var relevantRecordIds = await BuildRelevantRecordIdsForDashboardNewsAsync(currentUser, ct);
 
         var items = new List<DashboardNewsItemViewModel>();
         var skip = 0;
@@ -490,7 +522,7 @@ public sealed class DashboardService : IDashboardService
             .ToHashSet();
     }
 
-    private sealed record FocusRecordRow(
+    private sealed record FocusRecordDetailRow(
         int RecordId,
         int ProjectId,
         string ProjectCode,
@@ -503,7 +535,12 @@ public sealed class DashboardService : IDashboardService
         string Subsystem,
         string State,
         DateTime CreatedAt,
-        DateTime? Deadline,
+        DateTime? Deadline);
+
+    private sealed record RelevantRecordRow(
+        int RecordId,
+        int ProjectId,
+        int OwnerId,
         int SubsystemId);
 
     private sealed record AuditRow(

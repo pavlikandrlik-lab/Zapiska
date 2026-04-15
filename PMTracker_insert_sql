@@ -274,6 +274,30 @@ CREATE TABLE dbo.zaznam_navrhy (
 );
 GO
 
+CREATE TABLE dbo.zaznam_priority_uzivatelu (
+    zaznam_id int NOT NULL,
+    osoba_id int NOT NULL,
+    score int NOT NULL,
+    computed_at datetime2 NOT NULL CONSTRAINT DF_zaznam_priority_uzivatelu_computed_at DEFAULT (SYSUTCDATETIME()),
+    role_weight int NOT NULL,
+    deadline_signal int NOT NULL,
+    milestone_signal int NOT NULL,
+    CONSTRAINT PK_zaznam_priority_uzivatelu PRIMARY KEY (zaznam_id, osoba_id)
+);
+GO
+
+CREATE TABLE dbo.zaznam_priority_rebuild_state (
+    id int NOT NULL CONSTRAINT PK_zaznam_priority_rebuild_state PRIMARY KEY,
+    last_full_rebuild_at datetime2 NULL,
+    last_full_rebuild_status nvarchar(16) NOT NULL CONSTRAINT DF_zaznam_priority_rebuild_state_status DEFAULT (N'NEVER'),
+    last_full_rebuild_duration_ms bigint NULL,
+    last_full_rebuild_task_count int NULL,
+    updated_at datetime2 NOT NULL CONSTRAINT DF_zaznam_priority_rebuild_state_updated_at DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT CK_zaznam_priority_rebuild_state_singleton CHECK (id = 1),
+    CONSTRAINT CK_zaznam_priority_rebuild_state_status CHECK (last_full_rebuild_status IN (N'NEVER', N'SUCCESS', N'FAILED', N'RUNNING'))
+);
+GO
+
 CREATE TABLE dbo.zaznam_harmonogram_hodnoty (
     id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_zaznam_harmonogram_hodnoty PRIMARY KEY,
     zaznam_id int NOT NULL,
@@ -504,6 +528,8 @@ ALTER TABLE dbo.zaznam_navrhy ADD CONSTRAINT FK_zaznam_navrhy_subsystem FOREIGN 
 ALTER TABLE dbo.zaznam_navrhy ADD CONSTRAINT FK_zaznam_navrhy_created_by FOREIGN KEY (created_by_osoba_id) REFERENCES dbo.osoby(id);
 ALTER TABLE dbo.zaznam_navrhy ADD CONSTRAINT FK_zaznam_navrhy_decided_by FOREIGN KEY (decided_by_osoba_id) REFERENCES dbo.osoby(id);
 ALTER TABLE dbo.zaznam_navrhy ADD CONSTRAINT FK_zaznam_navrhy_approved_record FOREIGN KEY (approved_record_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_priority_uzivatelu ADD CONSTRAINT FK_zaznam_priority_uzivatelu_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
+ALTER TABLE dbo.zaznam_priority_uzivatelu ADD CONSTRAINT FK_zaznam_priority_uzivatelu_osoba FOREIGN KEY (osoba_id) REFERENCES dbo.osoby(id);
 
 ALTER TABLE dbo.zaznam_harmonogram_hodnoty ADD CONSTRAINT FK_zaznam_harmonogram_hodnoty_zaznam FOREIGN KEY (zaznam_id) REFERENCES dbo.projektove_zaznamy(id);
 ALTER TABLE dbo.zaznam_harmonogram_hodnoty ADD CONSTRAINT FK_zaznam_harmonogram_hodnoty_typ FOREIGN KEY (typ_id) REFERENCES dbo.ciselnik_harmonogram_typu(id);
@@ -577,6 +603,8 @@ CREATE INDEX IX_zaznam_navrhy_zaznam_typ_stav ON dbo.zaznam_navrhy(zaznam_id, ty
 CREATE UNIQUE INDEX UX_zaznam_navrhy_pending_schedule_per_record
     ON dbo.zaznam_navrhy(zaznam_id, typ_navrhu)
     WHERE stav = N'PENDING' AND typ_navrhu = N'SCHEDULE_PLAN_CHANGE';
+CREATE INDEX IX_zaznam_priority_uzivatelu_osoba_score_zaznam
+    ON dbo.zaznam_priority_uzivatelu(osoba_id, score DESC, zaznam_id ASC);
 
 CREATE INDEX IX_vyjadreni_autor_osoba_id ON dbo.vyjadreni(autor_osoba_id);
 

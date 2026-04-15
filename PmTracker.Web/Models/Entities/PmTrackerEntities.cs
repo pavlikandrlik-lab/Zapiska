@@ -222,6 +222,27 @@ public sealed class ZaznamNavrhEntity
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 }
 
+public sealed class ZaznamPriorityUzivateleEntity
+{
+    public int ZaznamId { get; set; }
+    public int OsobaId { get; set; }
+    public int Score { get; set; }
+    public DateTime ComputedAt { get; set; }
+    public int RoleWeight { get; set; }
+    public int DeadlineSignal { get; set; }
+    public int MilestoneSignal { get; set; }
+}
+
+public sealed class ZaznamPriorityRebuildStateEntity
+{
+    public int Id { get; set; }
+    public DateTime? LastFullRebuildAt { get; set; }
+    public string LastFullRebuildStatus { get; set; } = string.Empty;
+    public long? LastFullRebuildDurationMs { get; set; }
+    public int? LastFullRebuildTaskCount { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
 public sealed class ZaznamHistorieZmenTypuEntity
 {
     public int Id { get; set; }

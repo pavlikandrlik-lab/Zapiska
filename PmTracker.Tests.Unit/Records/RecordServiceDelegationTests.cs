@@ -2,6 +2,7 @@ using FluentAssertions;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Audit;
+using PmTracker.Web.Services.Dashboard;
 using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Tests.Unit.Records;
@@ -12,7 +13,7 @@ public sealed class RecordServiceDelegationTests
     public async Task AddCommentAsync_ShouldDelegateToCommentService()
     {
         var commentService = new FakeCommentService();
-        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, new FakePendingScheduleProposalLockEvaluator(), new FakeAuditWriteService(), TimeProvider.System);
+        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, new FakePendingScheduleProposalLockEvaluator(), new FakePriorityMatrixRebuildService(), new FakeAuditWriteService(), TimeProvider.System);
         var command = new AddCommentCommand
         {
             ZaznamId = 13,
@@ -84,6 +85,18 @@ public sealed class RecordServiceDelegationTests
         }
 
         public Task WriteAsync(int? actorOsobaId, AuditWriteEntry entry, CancellationToken ct = default)
+            => Task.CompletedTask;
+    }
+
+    private sealed class FakePriorityMatrixRebuildService : IPriorityMatrixRebuildService
+    {
+        public Task FullRebuildAsync(CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task RebuildForRecordAsync(int recordId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task QueueRebuildForSubsystemAsync(int subsystemId, CancellationToken ct = default)
             => Task.CompletedTask;
     }
 }

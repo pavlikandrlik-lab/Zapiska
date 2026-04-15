@@ -297,6 +297,7 @@ public sealed partial class ProjectService
             null,
             ProjectSubsystemRoleAuditSnapshot.FromEntity(entity)));
         await dbContext.SaveChangesAsync(ct);
+        await priorityMatrixRebuildService.QueueRebuildForSubsystemAsync(projectSubsystem.SubsystemId, ct);
     }
 
     public async Task DeactivateProjectSubsystemRoleAsync(DeactivateProjectSubsystemRoleCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -318,6 +319,14 @@ public sealed partial class ProjectService
             old,
             ProjectSubsystemRoleAuditSnapshot.FromEntity(entity)));
         await dbContext.SaveChangesAsync(ct);
+        var subsystemId = await dbContext.ProjektSubsystemy.AsNoTracking()
+            .Where(x => x.Id == entity.ProjektSubsystemId)
+            .Select(x => (int?)x.SubsystemId)
+            .FirstOrDefaultAsync(ct);
+        if (subsystemId.HasValue)
+        {
+            await priorityMatrixRebuildService.QueueRebuildForSubsystemAsync(subsystemId.Value, ct);
+        }
     }
 
     private async Task<int> ResolveSubsystemIdAsync(string value, CancellationToken ct)

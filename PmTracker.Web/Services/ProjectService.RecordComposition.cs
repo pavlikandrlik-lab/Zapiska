@@ -5,6 +5,7 @@ using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Web.Services;
 
@@ -167,21 +168,7 @@ public sealed partial class ProjectService
         => MeetingStatePolicy.IsReadOnly(meeting, status);
 
     private static bool IsTaskCategory(string? categoryCode, string? categoryName)
-    {
-        if (!string.IsNullOrWhiteSpace(categoryCode)
-            && (Ci.Equals(categoryCode.Trim(), "U") || Ci.Equals(categoryCode.Trim(), "UKOL")))
-        {
-            return true;
-        }
-
-        if (string.IsNullOrWhiteSpace(categoryName))
-        {
-            return false;
-        }
-
-        return categoryName.Contains("úkol", StringComparison.OrdinalIgnoreCase)
-            || categoryName.Contains("ukol", StringComparison.OrdinalIgnoreCase);
-    }
+        => RecordCategoryClassifier.IsTaskCategory(categoryCode, categoryName);
 
     private async Task<int> GetNextCisloZaznamuTransactionalAsync(int projektId, CancellationToken ct)
     {

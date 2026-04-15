@@ -5,6 +5,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
+using PmTracker.Web.Services.Dashboard;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Dictionaries;
 using PmTracker.Web.Services.Export;
@@ -61,6 +62,15 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
 
     public ProjektNavrhyTabViewModel BuildProjectProposalsTab(int id, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordProposalService>().BuildProjectProposalsTabAsync(id, currentUser).GetAwaiter().GetResult();
+
+    public DashboardFocusPanelViewModel BuildDashboardFocusPanel(CurrentUserContextViewModel currentUser, int limit)
+        => services.GetRequiredService<IDashboardService>().BuildFocusPanelAsync(currentUser, limit, CancellationToken.None).GetAwaiter().GetResult();
+
+    public DashboardFocusListPageViewModel BuildDashboardFocusList(CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IDashboardService>().BuildFocusListPageAsync(currentUser, CancellationToken.None).GetAwaiter().GetResult();
+
+    public void FullRebuildPriorityMatrix()
+        => services.GetRequiredService<IPriorityMatrixRebuildService>().FullRebuildAsync(CancellationToken.None).GetAwaiter().GetResult();
 
     public CiselnikDetailViewModel BuildCiselnikDetail(string id, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IDictionaryService>().BuildCiselnikDetailAsync(id, currentUser).GetAwaiter().GetResult();

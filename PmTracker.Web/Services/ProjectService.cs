@@ -5,6 +5,7 @@ using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Audit;
+using PmTracker.Web.Services.Dashboard;
 
 namespace PmTracker.Web.Services;
 
@@ -22,6 +23,7 @@ public sealed partial class ProjectService :
     private readonly IMeetingService meetingService;
     private readonly ICommentService commentService;
     private readonly IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator;
+    private readonly IPriorityMatrixRebuildService priorityMatrixRebuildService;
     private readonly IAuditWriteService auditWriteService;
     private readonly TimeProvider timeProvider;
 
@@ -34,6 +36,7 @@ public sealed partial class ProjectService :
         IMeetingService meetingService,
         ICommentService commentService,
         IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator,
+        IPriorityMatrixRebuildService priorityMatrixRebuildService,
         IAuditWriteService auditWriteService,
         TimeProvider timeProvider)
     {
@@ -45,6 +48,7 @@ public sealed partial class ProjectService :
         this.meetingService = meetingService;
         this.commentService = commentService;
         this.pendingScheduleProposalLockEvaluator = pendingScheduleProposalLockEvaluator;
+        this.priorityMatrixRebuildService = priorityMatrixRebuildService;
         this.auditWriteService = auditWriteService;
         this.timeProvider = timeProvider;
     }

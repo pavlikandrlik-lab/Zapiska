@@ -106,6 +106,47 @@ internal sealed class RecordProposalEntityConfiguration : IEntityTypeConfigurati
     }
 }
 
+internal sealed class RecordPriorityMatrixEntityConfiguration : IEntityTypeConfiguration<ZaznamPriorityUzivateleEntity>
+{
+    public void Configure(EntityTypeBuilder<ZaznamPriorityUzivateleEntity> builder)
+    {
+        builder.ToTable("zaznam_priority_uzivatelu");
+        builder.HasKey(x => new { x.ZaznamId, x.OsobaId });
+        builder.Property(x => x.ZaznamId).HasColumnName("zaznam_id");
+        builder.Property(x => x.OsobaId).HasColumnName("osoba_id");
+        builder.Property(x => x.Score).HasColumnName("score");
+        builder.Property(x => x.ComputedAt).HasColumnName("computed_at");
+        builder.Property(x => x.RoleWeight).HasColumnName("role_weight");
+        builder.Property(x => x.DeadlineSignal).HasColumnName("deadline_signal");
+        builder.Property(x => x.MilestoneSignal).HasColumnName("milestone_signal");
+        builder.HasIndex(x => new { x.OsobaId, x.Score, x.ZaznamId })
+            .HasDatabaseName("IX_zaznam_priority_uzivatelu_osoba_score_zaznam")
+            .IsDescending(false, true, false);
+    }
+}
+
+internal sealed class RecordPriorityRebuildStateEntityConfiguration : IEntityTypeConfiguration<ZaznamPriorityRebuildStateEntity>
+{
+    public void Configure(EntityTypeBuilder<ZaznamPriorityRebuildStateEntity> builder)
+    {
+        builder.ToTable("zaznam_priority_rebuild_state", table =>
+        {
+            table.HasCheckConstraint("CK_zaznam_priority_rebuild_state_singleton", "id = 1");
+            table.HasCheckConstraint(
+                "CK_zaznam_priority_rebuild_state_status",
+                "last_full_rebuild_status IN ('NEVER', 'SUCCESS', 'FAILED', 'RUNNING')");
+        });
+
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).HasColumnName("id");
+        builder.Property(x => x.LastFullRebuildAt).HasColumnName("last_full_rebuild_at");
+        builder.Property(x => x.LastFullRebuildStatus).HasColumnName("last_full_rebuild_status").HasMaxLength(16);
+        builder.Property(x => x.LastFullRebuildDurationMs).HasColumnName("last_full_rebuild_duration_ms");
+        builder.Property(x => x.LastFullRebuildTaskCount).HasColumnName("last_full_rebuild_task_count");
+        builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+    }
+}
+
 internal sealed class RecordDeadlineHistoryEntityConfiguration : IEntityTypeConfiguration<ZaznamHistorieTerminuEntity>
 {
     public void Configure(EntityTypeBuilder<ZaznamHistorieTerminuEntity> builder)

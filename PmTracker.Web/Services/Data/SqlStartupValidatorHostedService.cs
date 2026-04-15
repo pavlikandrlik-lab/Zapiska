@@ -76,7 +76,15 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             throw new InvalidOperationException("V DB chybí sloupec dbo.osoby.email. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
         }
 
-        foreach (var requiredTable in new[] { "dbo.projekt_subsystemy", "dbo.ciselnik_roli_subsystemu", "dbo.obsazeni_subsystemu_projektu", "dbo.zaznam_navrhy" })
+        foreach (var requiredTable in new[]
+                 {
+                     "dbo.projekt_subsystemy",
+                     "dbo.ciselnik_roli_subsystemu",
+                     "dbo.obsazeni_subsystemu_projektu",
+                     "dbo.zaznam_navrhy",
+                     "dbo.zaznam_priority_uzivatelu",
+                     "dbo.zaznam_priority_rebuild_state"
+                 })
         {
             if (!await HasTableAsync(dbContext, requiredTable, ct))
             {
@@ -138,6 +146,27 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             {
                 throw new InvalidOperationException($"V DB chybí sloupec dbo.zaznam_navrhy.{requiredColumn}. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_3_record_proposals.sql.");
             }
+        }
+
+        foreach (var requiredColumn in new[] { "zaznam_id", "osoba_id", "score", "computed_at", "role_weight", "deadline_signal", "milestone_signal" })
+        {
+            if (!await HasColumnAsync(dbContext, "dbo.zaznam_priority_uzivatelu", requiredColumn, ct))
+            {
+                throw new InvalidOperationException($"V DB chybí sloupec dbo.zaznam_priority_uzivatelu.{requiredColumn}. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_4_record_priority_matrix.sql.");
+            }
+        }
+
+        foreach (var requiredColumn in new[] { "id", "last_full_rebuild_at", "last_full_rebuild_status", "last_full_rebuild_duration_ms", "last_full_rebuild_task_count", "updated_at" })
+        {
+            if (!await HasColumnAsync(dbContext, "dbo.zaznam_priority_rebuild_state", requiredColumn, ct))
+            {
+                throw new InvalidOperationException($"V DB chybí sloupec dbo.zaznam_priority_rebuild_state.{requiredColumn}. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_4_record_priority_matrix.sql.");
+            }
+        }
+
+        if (!await HasIndexAsync(dbContext, "dbo.zaznam_priority_uzivatelu", "IX_zaznam_priority_uzivatelu_osoba_score_zaznam", ct))
+        {
+            throw new InvalidOperationException("V DB chybí index IX_zaznam_priority_uzivatelu_osoba_score_zaznam. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_4_record_priority_matrix.sql.");
         }
 
         _logger.LogInformation("SQL startup validace proběhla úspěšně.");
@@ -331,6 +360,51 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             constraintParam.ParameterName = "@constraintName";
             constraintParam.Value = constraintName;
             command.Parameters.Add(constraintParam);
+
+            var result = await command.ExecuteScalarAsync(ct);
+            return Convert.ToInt32(result) > 0;
+        }
+        finally
+        {
+            if (mustClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static async Task<bool> HasIndexAsync(
+        PmTrackerDbContext dbContext,
+        string tableName,
+        string indexName,
+        CancellationToken ct)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var mustClose = connection.State != ConnectionState.Open;
+        if (mustClose)
+        {
+            await connection.OpenAsync(ct);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT COUNT(*)
+                FROM sys.indexes
+                WHERE object_id = OBJECT_ID(@tableName)
+                  AND name = @indexName
+                """;
+
+            var tableParam = command.CreateParameter();
+            tableParam.ParameterName = "@tableName";
+            tableParam.Value = tableName;
+            command.Parameters.Add(tableParam);
+
+            var indexParam = command.CreateParameter();
+            indexParam.ParameterName = "@indexName";
+            indexParam.Value = indexName;
+            command.Parameters.Add(indexParam);
 
             var result = await command.ExecuteScalarAsync(ct);
             return Convert.ToInt32(result) > 0;
