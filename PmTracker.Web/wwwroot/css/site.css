@@ -124,23 +124,99 @@
     gap: 12px;
 }
 
-/* ── Global search (header) ─────────────────────────────────────────────── */
+/* ── Global search (header, gov design system) ──────────────────────────── */
 
-.app-search {
+.app-search,
+.gov-search {
     flex: 1;
-    max-width: 480px;
+    max-width: 560px;
     position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
 }
 
-.app-search input[type="search"] {
+.gov-search-field {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    background-color: var(--gov-color-surface);
+    border: 1px solid var(--gov-color-border);
+    border-right: none;
+    border-top-left-radius: var(--gov-radius-sm);
+    border-bottom-left-radius: var(--gov-radius-sm);
+    padding-left: 12px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    min-width: 0;
+}
+
+.gov-search-field:focus-within {
+    border-color: var(--gov-color-primary);
+    box-shadow: 0 0 0 3px rgba(0, 94, 165, 0.15);
+    z-index: 1;
+}
+
+.gov-search-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gov-color-muted);
+    flex-shrink: 0;
+}
+
+.gov-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    height: 40px;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: var(--app-text-primary);
+    line-height: 1.35;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+.gov-search-input::-webkit-search-cancel-button {
+    cursor: pointer;
+}
+
+.gov-search-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+    height: 40px;
+    background-color: var(--gov-color-primary);
+    color: #ffffff;
+    border: 1px solid var(--gov-color-primary);
+    border-top-right-radius: var(--gov-radius-sm);
+    border-bottom-right-radius: var(--gov-radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    flex-shrink: 0;
+}
+
+.gov-search-submit:hover,
+.gov-search-submit:focus-visible {
+    background-color: color-mix(in srgb, var(--gov-color-primary) 88%, #000 12%);
+    border-color: color-mix(in srgb, var(--gov-color-primary) 88%, #000 12%);
+    outline: none;
+}
+
+/* Legacy single-input layout (fallback for any remaining raw input) */
+.app-search input[type="search"]:not(.gov-search-input) {
     width: 100%;
-    height: 38px;
+    height: 40px;
     padding: 7px 12px 7px 36px;
     font-size: 14px;
     border-radius: var(--gov-radius-sm);
     border: 1px solid var(--gov-color-border);
     background-color: var(--gov-color-surface);
-    /* Magnifying-glass icon (currentColor approximated as #505a5f for light mode) */
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23505a5f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: 10px center;
@@ -151,7 +227,7 @@
     box-sizing: border-box;
 }
 
-.app-search input[type="search"]:focus {
+.app-search input[type="search"]:not(.gov-search-input):focus {
     outline: none;
     border-color: var(--gov-color-primary);
     box-shadow: 0 0 0 3px rgba(0, 94, 165, 0.15);
@@ -5727,8 +5803,29 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     }
 }
 @media (max-width: 768px) {
-    .app-search {
+    .app-search,
+    .gov-search {
+        flex: 1 1 100%;
+        max-width: 100%;
+        order: 3;
+        margin-top: 8px;
+    }
+
+    .gov-search-submit span {
         display: none;
+    }
+
+    .gov-search-submit {
+        padding: 0 12px;
+    }
+
+    .gov-search-submit::before {
+        content: "";
+        width: 16px;
+        height: 16px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: center;
     }
 }
 
