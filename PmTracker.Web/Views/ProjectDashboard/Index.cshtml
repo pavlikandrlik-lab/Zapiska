@@ -1,0 +1,80 @@
+@model ProjectDashboardPageViewModel
+@{
+    ViewData["Title"] = $"Dashboard – {Model.Projekt.Zkratka}";
+}
+
+@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
+{
+    Title = $"Dashboard – {Model.Projekt.Nazev}",
+    Subtitle = Model.Projekt.Stav
+})
+
+<section class="dashboard-fullwidth" data-project-dashboard-shell data-project-id="@Model.Projekt.Id">
+    <div class="dashboard-header-row">
+        <a class="btn small ghost" href="@Model.BackUrl">Zpět na projekt</a>
+    </div>
+
+    <div class="dashboard-tabs" role="tablist">
+        <button class="dashboard-tab @(Model.ActiveTab == "zaznamy" ? "active" : null)"
+                data-dashboard-tab="zaznamy" type="button">
+            Záznamy
+        </button>
+        <button class="dashboard-tab @(Model.ActiveTab == "nes" ? "active" : null)"
+                data-dashboard-tab="nes" type="button">
+            NES v prodlení
+        </button>
+        <button class="dashboard-tab @(Model.ActiveTab == "statistiky" ? "active" : null)"
+                data-dashboard-tab="statistiky" type="button">
+            Statické informace
+        </button>
+        <button class="dashboard-tab @(Model.ActiveTab == "vyzvy" ? "active" : null)"
+                data-dashboard-tab="vyzvy" type="button">
+            Výzvy
+        </button>
+    </div>
+
+    <section class="dashboard-tab-panel @(Model.ActiveTab == "zaznamy" ? "active" : null)"
+             data-dashboard-tab-panel="zaznamy"
+             data-dashboard-panel="records"
+             data-dashboard-panel-url="@Model.RecordsPanelUrl">
+        <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
+            <div class="record-loading-line"></div>
+            <div class="record-loading-line short"></div>
+            <div class="record-loading-line"></div>
+        </div>
+        <div data-dashboard-panel-content></div>
+    </section>
+
+    <section class="dashboard-tab-panel @(Model.ActiveTab == "nes" ? "active" : null)"
+             data-dashboard-tab-panel="nes"
+             data-dashboard-panel="nes"
+             data-dashboard-panel-url="@Model.NesPanelUrl">
+        <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
+            <div class="record-loading-line"></div>
+            <div class="record-loading-line short"></div>
+        </div>
+        <div data-dashboard-panel-content></div>
+    </section>
+
+    <section class="dashboard-tab-panel @(Model.ActiveTab == "statistiky" ? "active" : null)"
+             data-dashboard-tab-panel="statistiky"
+             data-dashboard-panel="statistics"
+             data-dashboard-panel-url="@Model.StatisticsPanelUrl">
+        <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
+            <div class="record-loading-line"></div>
+            <div class="record-loading-line short"></div>
+        </div>
+        <div data-dashboard-panel-content></div>
+    </section>
+
+    <section class="dashboard-tab-panel @(Model.ActiveTab == "vyzvy" ? "active" : null)"
+             data-dashboard-tab-panel="vyzvy"
+             data-dashboard-panel="vyzvy"
+             data-dashboard-panel-url="@Model.VyzvyPanelUrl">
+        <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
+            <div class="record-loading-line"></div>
+            <div class="record-loading-line short"></div>
+        </div>
+        <div data-dashboard-panel-content></div>
+    </section>
+</section>

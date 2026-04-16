@@ -1,0 +1,144 @@
+@model ProjectDashboardRecordsPanelViewModel
+
+<div class="dashboard-panel-body">
+    <div class="dashboard-category-filter-row">
+        <button class="btn small ghost active" type="button" data-dashboard-category-filter="">
+            Vše
+        </button>
+        <button class="btn small ghost" type="button" data-dashboard-category-filter="delayed">
+            V prodlení
+        </button>
+        <button class="btn small ghost" type="button" data-dashboard-category-filter="awaiting">
+            Čeká na skutečnost
+        </button>
+        <button class="btn small ghost" type="button" data-dashboard-category-filter="approaching">
+            Blíží se termín
+        </button>
+    </div>
+
+    @if (Model.IsEmpty)
+    {
+        <p class="muted">Žádné záznamy k zobrazení — všechny úkoly jsou v pořádku.</p>
+    }
+    else
+    {
+        <div class="dashboard-records-table-wrapper">
+            <table class="dashboard-records-table">
+                <thead>
+                    <tr>
+                        <th>Číslo</th>
+                        <th>Název</th>
+                        <th>Subsystém</th>
+                        <th>Vlastník</th>
+                        <th>Termín ukončení</th>
+                        <th>Kategorie</th>
+                        <th>Nejhorší odchylka</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var record in Model.Records)
+                    {
+                        var categorySlug = record.Category switch
+                        {
+                            DashboardRecordCategory.Delayed => "delayed",
+                            DashboardRecordCategory.AwaitingActual => "awaiting",
+                            DashboardRecordCategory.ApproachingDeadline => "approaching",
+                            _ => ""
+                        };
+                        var categoryLabel = record.Category switch
+                        {
+                            DashboardRecordCategory.Delayed => "V prodlení",
+                            DashboardRecordCategory.AwaitingActual => "Čeká na skutečnost",
+                            DashboardRecordCategory.ApproachingDeadline => "Blíží se termín",
+                            _ => ""
+                        };
+                        var badgeClass = record.Category switch
+                        {
+                            DashboardRecordCategory.Delayed => "badge-danger",
+                            DashboardRecordCategory.AwaitingActual => "badge-warning",
+                            DashboardRecordCategory.ApproachingDeadline => "badge-caution",
+                            _ => ""
+                        };
+                        <tr data-dashboard-expandable-row
+                            data-category="@categorySlug"
+                            data-record-id="@record.RecordId">
+                            <td>@record.CisloViditelne</td>
+                            <td>@record.Nazev</td>
+                            <td title="@record.Subsystem">@record.SubsystemKod</td>
+                            <td>@record.Vlastnik</td>
+                            <td>@record.TerminUkonceni.ToString("dd.MM.yyyy")</td>
+                            <td>
+                                <span class="badge @badgeClass">@categoryLabel</span>
+                            </td>
+                            <td>
+                                @if (record.WorstOffsetDays > 0)
+                                {
+                                    <span>+@record.WorstOffsetDays&nbsp;dní</span>
+                                }
+                                else
+                                {
+                                    <span class="muted">—</span>
+                                }
+                            </td>
+                        </tr>
+                        <tr class="dashboard-expandable-detail" data-dashboard-expandable-detail="@record.RecordId" hidden>
+                            <td colspan="7">
+                                <div class="dashboard-expandable-detail-body">
+                                    @if (record.ProblematicSteps.Count > 0)
+                                    {
+                                        <table class="dashboard-steps-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Krok</th>
+                                                    <th>Plánovaný termín</th>
+                                                    <th>Skutečný termín</th>
+                                                    <th>Odchylka</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var step in record.ProblematicSteps)
+                                                {
+                                                    <tr>
+                                                        <td>@step.StepName</td>
+                                                        <td>@step.PlannedDate.ToString("dd.MM.yyyy")</td>
+                                                        <td>
+                                                            @if (step.ActualDate.HasValue)
+                                                            {
+                                                                @step.ActualDate.Value.ToString("dd.MM.yyyy")
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="muted">—</span>
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            @if (step.OffsetDays > 0)
+                                                            {
+                                                                <span class="text-danger">+@step.OffsetDays&nbsp;dní</span>
+                                                            }
+                                                            else if (step.DaysSincePlanExpired > 0)
+                                                            {
+                                                                <span class="muted">Čeká (@step.DaysSincePlanExpired&nbsp;dní)</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="muted">—</span>
+                                                            }
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    }
+                                    <div class="dashboard-expandable-detail-actions">
+                                        <a class="btn small ghost" href="@record.ScheduleUrl">Přejít na harmonogram</a>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

@@ -1,0 +1,8 @@
+@model ProjectDashboardVyzvyPanelViewModel
+
+@if (!Model.IsServiceDeskIntegrated)
+{
+    <div class="dashboard-placeholder-message">
+        <p class="muted">@Model.PlaceholderMessage</p>
+    </div>
+}

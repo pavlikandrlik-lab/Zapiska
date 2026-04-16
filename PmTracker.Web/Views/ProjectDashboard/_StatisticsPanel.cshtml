@@ -1,0 +1,186 @@
+@model ProjectDashboardStatisticsPanelViewModel
+
+<div class="dashboard-panel-body">
+    <div class="dashboard-statistics-header">
+        <label class="dashboard-year-select-label">
+            Rok:
+            <select data-dashboard-year-select>
+                @foreach (var year in Model.AvailableYears)
+                {
+                    if (year == Model.SelectedYear)
+                    {
+                        <option value="@year" selected="selected">@year</option>
+                    }
+                    else
+                    {
+                        <option value="@year">@year</option>
+                    }
+                }
+            </select>
+        </label>
+    </div>
+
+    @if (!Model.HasData)
+    {
+        <p class="muted">Za vybraný rok nejsou k dispozici žádné záznamy.</p>
+    }
+    else
+    {
+        <div class="dashboard-kpi-grid">
+            <div class="dashboard-kpi-card">
+                <span class="dashboard-kpi-number">@Model.Kpi.Splneno</span>
+                <span class="dashboard-kpi-label">Splněno</span>
+                @if (Model.Kpi.SplnenoPrevYear.HasValue)
+                {
+                    var diff = Model.Kpi.Splneno - Model.Kpi.SplnenoPrevYear.Value;
+                    <span class="dashboard-kpi-trend @(diff >= 0 ? "trend-up" : "trend-down")" title="Oproti předchozímu roku (@Model.Kpi.SplnenoPrevYear.Value)">
+                        @(diff >= 0 ? "▲" : "▼") @Math.Abs(diff)
+                    </span>
+                }
+            </div>
+
+            <div class="dashboard-kpi-card">
+                <span class="dashboard-kpi-number">@Model.Kpi.VProdleni</span>
+                <span class="dashboard-kpi-label">V prodlení</span>
+                @if (Model.Kpi.VProdleniPrevYear.HasValue)
+                {
+                    var diff = Model.Kpi.VProdleni - Model.Kpi.VProdleniPrevYear.Value;
+                    <span class="dashboard-kpi-trend @(diff <= 0 ? "trend-up" : "trend-down")" title="Oproti předchozímu roku (@Model.Kpi.VProdleniPrevYear.Value)">
+                        @(diff >= 0 ? "▲" : "▼") @Math.Abs(diff)
+                    </span>
+                }
+            </div>
+
+            <div class="dashboard-kpi-card">
+                <span class="dashboard-kpi-number">@Model.Kpi.VcasnostPlneniPct.ToString("F1") %</span>
+                <span class="dashboard-kpi-label">Včasnost plnění</span>
+                @if (Model.Kpi.VcasnostPlneniPctPrevYear.HasValue)
+                {
+                    var diff = Model.Kpi.VcasnostPlneniPct - Model.Kpi.VcasnostPlneniPctPrevYear.Value;
+                    <span class="dashboard-kpi-trend @(diff >= 0 ? "trend-up" : "trend-down")" title="Oproti předchozímu roku (@Model.Kpi.VcasnostPlneniPctPrevYear.Value.ToString("F1") %)">
+                        @(diff >= 0 ? "▲" : "▼") @Math.Abs(diff).ToString("F1") %
+                    </span>
+                }
+            </div>
+
+            <div class="dashboard-kpi-card">
+                <span class="dashboard-kpi-number">@Model.Kpi.PrumerneProdleniDni.ToString("F1")</span>
+                <span class="dashboard-kpi-label">Průměrné prodlení (dny)</span>
+                @if (Model.Kpi.PrumerneProdleniDniPrevYear.HasValue)
+                {
+                    var diff = Model.Kpi.PrumerneProdleniDni - Model.Kpi.PrumerneProdleniDniPrevYear.Value;
+                    <span class="dashboard-kpi-trend @(diff <= 0 ? "trend-up" : "trend-down")" title="Oproti předchozímu roku (@Model.Kpi.PrumerneProdleniDniPrevYear.Value.ToString("F1"))">
+                        @(diff >= 0 ? "▲" : "▼") @Math.Abs(diff).ToString("F1")
+                    </span>
+                }
+            </div>
+
+            <div class="dashboard-kpi-card">
+                <span class="dashboard-kpi-number">@Model.Kpi.Prodlouzeno</span>
+                <span class="dashboard-kpi-label">Prodlouženo</span>
+                @if (Model.Kpi.ProdlouzenoPrevYear.HasValue)
+                {
+                    var diff = Model.Kpi.Prodlouzeno - Model.Kpi.ProdlouzenoPrevYear.Value;
+                    <span class="dashboard-kpi-trend @(diff <= 0 ? "trend-up" : "trend-down")" title="Oproti předchozímu roku (@Model.Kpi.ProdlouzenoPrevYear.Value)">
+                        @(diff >= 0 ? "▲" : "▼") @Math.Abs(diff)
+                    </span>
+                }
+            </div>
+
+            <div class="dashboard-kpi-card">
+                <span class="dashboard-kpi-number">@Model.Kpi.Preneseno</span>
+                <span class="dashboard-kpi-label">Přeneseno</span>
+                @if (Model.Kpi.PrenesenoPrevYear.HasValue)
+                {
+                    var diff = Model.Kpi.Preneseno - Model.Kpi.PrenesenoPrevYear.Value;
+                    <span class="dashboard-kpi-trend @(diff <= 0 ? "trend-up" : "trend-down")" title="Oproti předchozímu roku (@Model.Kpi.PrenesenoPrevYear.Value)">
+                        @(diff >= 0 ? "▲" : "▼") @Math.Abs(diff)
+                    </span>
+                }
+            </div>
+
+            <div class="dashboard-kpi-card">
+                <span class="dashboard-kpi-number">@Model.Kpi.Zruseno</span>
+                <span class="dashboard-kpi-label">Zrušeno</span>
+                @if (Model.Kpi.ZrusenoPrevYear.HasValue)
+                {
+                    var diff = Model.Kpi.Zruseno - Model.Kpi.ZrusenoPrevYear.Value;
+                    <span class="dashboard-kpi-trend @(diff <= 0 ? "trend-up" : "trend-down")" title="Oproti předchozímu roku (@Model.Kpi.ZrusenoPrevYear.Value)">
+                        @(diff >= 0 ? "▲" : "▼") @Math.Abs(diff)
+                    </span>
+                }
+            </div>
+        </div>
+
+        @if (Model.Quarters.Count > 0)
+        {
+            <div class="dashboard-section">
+                <h3>Čtvrtletní přehled</h3>
+                <table class="dashboard-quarters-table">
+                    <thead>
+                        <tr>
+                            <th>Čtvrtletí</th>
+                            <th>Plánované ukončení</th>
+                            <th>Skutečné ukončení</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var q in Model.Quarters)
+                        {
+                            <tr>
+                                <td>Q@q.Quarter</td>
+                                <td>@q.PlannedCompletions</td>
+                                <td>@q.ActualCompletions</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (Model.SubsystemStats.Count > 0)
+        {
+            <div class="dashboard-section">
+                <h3>Statistiky dle subsystému</h3>
+                <table class="dashboard-subsystem-table">
+                    <thead>
+                        <tr>
+                            <th>Subsystém</th>
+                            <th>Splněno</th>
+                            <th>V prodlení</th>
+                            <th>Zrušeno</th>
+                            <th>Prodlouženo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var sub in Model.SubsystemStats)
+                        {
+                            <tr>
+                                <td title="@sub.SubsystemNazev">@sub.SubsystemKod</td>
+                                <td>@sub.Splneno</td>
+                                <td>@sub.VProdleni</td>
+                                <td>@sub.Zruseno</td>
+                                <td>@sub.Prodlouzeno</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (Model.AttendanceRate.HasValue)
+        {
+            <div class="dashboard-section">
+                <h3>Účast na jednáních</h3>
+                <p class="dashboard-attendance-rate">@Model.AttendanceRate.Value.ToString("F1") %</p>
+            </div>
+        }
+    }
+
+    @if (!Model.IsServiceDeskIntegrated)
+    {
+        <div class="dashboard-section">
+            <p class="muted">Statistiky ServiceDesk nejsou k dispozici — napojení na ServiceDesk není aktivní.</p>
+        </div>
+    }
+</div>
