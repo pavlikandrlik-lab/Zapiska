@@ -184,6 +184,24 @@ public sealed class DashboardService : IDashboardService
         var accessibleProjectIds = BuildAccessibleProjectIds(currentUser);
         var hasGlobalProjectRead = HasGlobalProjectReadAccess(currentUser);
 
+        var candidateRows = await (
+                from record in _dbContext.ProjektoveZaznamy.AsNoTracking()
+                join state in _dbContext.CiselnikStavuUkolu.AsNoTracking() on record.StavUkoluId equals state.Id into stateGroup
+                from state in stateGroup.DefaultIfEmpty()
+                where (!record.StavUkoluId.HasValue || !(state != null && state.IsFinal))
+                    && (hasGlobalProjectRead || accessibleProjectIds.Contains(record.ProjektId))
+                select new RelevantRecordRow(
+                    record.Id,
+                    record.ProjektId,
+                    record.VlastnikId,
+                    record.SubsystemId))
+            .ToListAsync(ct);
+
+        if (hasGlobalProjectRead)
+        {
+            return candidateRows.Select(row => row.RecordId).ToHashSet();
+        }
+
         var collaborationRecordIds = await _dbContext.ZaznamSpoluprace.AsNoTracking()
             .Where(item => item.OsobaId == userOsobaId)
             .Select(item => item.ZaznamId)
@@ -209,19 +227,6 @@ public sealed class DashboardService : IDashboardService
         var leadSubsystemSet = leadAssignments
             .Select(item => $"{item.ProjektId}:{item.SubsystemId}")
             .ToHashSet(StringComparer.Ordinal);
-
-        var candidateRows = await (
-                from record in _dbContext.ProjektoveZaznamy.AsNoTracking()
-                join state in _dbContext.CiselnikStavuUkolu.AsNoTracking() on record.StavUkoluId equals state.Id into stateGroup
-                from state in stateGroup.DefaultIfEmpty()
-                where (!record.StavUkoluId.HasValue || !(state != null && state.IsFinal))
-                    && (hasGlobalProjectRead || accessibleProjectIds.Contains(record.ProjektId))
-                select new RelevantRecordRow(
-                    record.Id,
-                    record.ProjektId,
-                    record.VlastnikId,
-                    record.SubsystemId))
-            .ToListAsync(ct);
 
         return candidateRows
             .Where(row =>
