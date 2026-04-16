@@ -266,7 +266,6 @@ public sealed partial class RecordService
             }
         }
 
-        await dbContext.SaveChangesAsync(ct);
         await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, ct);
         auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             command.Id.HasValue ? AuditActionType.Update : AuditActionType.Create,
@@ -906,6 +905,30 @@ public sealed partial class RecordService
             return;
         }
 
+        // F-11: Soft concurrency check pro harmonogram
+        if (!string.IsNullOrEmpty(command.ScheduleVersion) && existingRecord is not null)
+        {
+            var currentMaxUpdatedAt = await dbContext.ZaznamHarmonogramHodnoty
+                .Where(x => x.ZaznamId == existingRecord.Id)
+                .MaxAsync(x => (DateTime?)x.UpdatedAt, ct);
+
+            var currentVersion = currentMaxUpdatedAt.HasValue
+                ? currentMaxUpdatedAt.Value.Ticks.ToString("X16")
+                : string.Empty;
+
+            if (currentVersion != command.ScheduleVersion)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    "ScheduleVersion",
+                    "Harmonogram byl mezitím upraven jiným uživatelem. Načtěte záznam znovu.",
+                    "schedule",
+                    "schedule_stale_data",
+                    null);
+                return;
+            }
+        }
+
         IReadOnlyList<RecordScheduleTypeDefinition> typeDefinitions;
         try
         {
@@ -992,6 +1015,43 @@ public sealed partial class RecordService
                     "schedule",
                     "schedule_duration_negative",
                     item.Hodnota.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (Math.Abs(item.Hodnota) > 10_000)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.Hodnota",
+                    "Hodnota harmonogramového kroku je mimo povolený rozsah (max ±10 000 dnů).",
+                    "schedule",
+                    "schedule_value_out_of_range",
+                    item.Hodnota.ToString(CultureInfo.InvariantCulture));
+            }
+        }
+
+        // Bug 3: validace že duration + delay >= 0 pro každý krok
+        var valueByTypeId = command.HarmonogramHodnoty
+            .Where(x => x.TypId > 0)
+            .GroupBy(x => x.TypId)
+            .ToDictionary(g => g.Key, g => g.First().Hodnota);
+
+        foreach (var typDef in typeDefinitions)
+        {
+            if (typDef.DelayTypeId <= 0 || typDef.DurationTypeId <= 0) continue;
+
+            if (!valueByTypeId.TryGetValue(typDef.DelayTypeId, out var delayValue)) continue;
+            if (!valueByTypeId.TryGetValue(typDef.DurationTypeId, out var durationValue)) continue;
+
+            if (durationValue + delayValue < 0)
+            {
+                var delayIndex = firstIndexByType.TryGetValue(typDef.DelayTypeId, out var di) ? di : 0;
+                AddRecordValidationIssue(
+                    issues,
+                    $"HarmonogramHodnoty[{delayIndex}].Hodnota",
+                    "Skutečná délka kroku nesmí být záporná (trvání + odchylka < 0).",
+                    "schedule",
+                    "schedule_actual_negative",
+                    delayValue.ToString(CultureInfo.InvariantCulture));
             }
         }
     }

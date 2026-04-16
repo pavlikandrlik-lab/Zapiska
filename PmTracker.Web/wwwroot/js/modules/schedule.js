@@ -717,6 +717,38 @@ export function renderStaticTimelineAxes(scope) {
     });
 }
 
+// F-07: New async function that calls the server-side /Schedule/Recalc endpoint.
+// Replaces the local buildSchedulePlanAndActual calculation for the recalcAll path.
+async function fetchSchedulePreview(startDate, deadlineDate, steps, antiForgeryToken) {
+    const payload = {
+        recordId: 0,
+        startDate: formatIsoDate(startDate),
+        deadlineDate: formatIsoDate(deadlineDate),
+        steps: steps.map(s => ({
+            stepIndex: s.stepIndex,
+            durationTypeId: s.durationTypeId || 0,
+            delayTypeId: s.delayTypeId || 0,
+            durationDays: s.duration,
+            delayDays: s.delay
+        }))
+    };
+    const response = await fetch('/Schedule/Recalc', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': antiForgeryToken
+        },
+        body: JSON.stringify(payload),
+        credentials: 'same-origin'
+    });
+    if (!response.ok) {
+        return null;
+    }
+    return await response.json();
+}
+
+// F-07: replaced by server-side /Schedule/Recalc endpoint — kept for use in
+// recalcFromDate / recalcFromDelayDate which need local date arithmetic before recalcAll.
 function buildSchedulePlanAndActual(state, startDate) {
     const plan = [];
     const actual = [];
@@ -861,6 +893,13 @@ export class ScheduleBlockRenderer {
             })
             .filter((entry) => entry && Number.isInteger(entry.stepIndex))
             .sort((left, right) => left.stepIndex - right.stepIndex);
+        // TODO F-04: editorRows je pole řazené dle stepIndex (KrokIndex, 1-based).
+        // Přístup přes this.editorRows[index] v recalcFromDate/recalcFromDelayDate
+        // používá 0-based forEach index — to funguje správně, pokud KrokIndex hodnoty
+        // nemají mezery. Pokud by mezery nastaly (smazaný krok), je potřeba přepsat
+        // na Map<stepIndex, entry> a upravit všechny přístupy (readState, writeState,
+        // renderEditorRows, bind). Aktuálně ponecháme pole; při výskytu mezery v KrokIndex
+        // by bylo nutno tuto refaktorizaci dokončit.
         this.editorRows = Array.from(root.querySelectorAll("tr[data-schedule-step-row]"))
             .map((row) => {
                 if (!(row instanceof HTMLTableRowElement)) {
@@ -965,6 +1004,24 @@ export class ScheduleBlockRenderer {
         return parseIsoDate(this.root.dataset.scheduleDeadline) || startDate;
     }
 
+    readTypeId(input) {
+        if (!(input instanceof HTMLInputElement)) {
+            return 0;
+        }
+
+        const stacked = input.closest(".schedule-stacked-input");
+        if (!(stacked instanceof HTMLElement)) {
+            return 0;
+        }
+
+        const hidden = stacked.querySelector("input[type='hidden']");
+        if (!(hidden instanceof HTMLInputElement)) {
+            return 0;
+        }
+
+        return Number.parseInt(hidden.value || "0", 10) || 0;
+    }
+
     readState() {
         if (this.editorRows.length > 0) {
             return this.editorRows.map((entry) => ({
@@ -972,7 +1029,9 @@ export class ScheduleBlockRenderer {
                 name: String(entry.row.dataset.stepName || "").trim(),
                 color: String(entry.row.dataset.stepColor || "").trim(),
                 duration: this.normalizeInt(entry.durationInput),
-                delay: this.normalizeSignedInt(entry.delayInput)
+                delay: this.normalizeSignedInt(entry.delayInput),
+                durationTypeId: this.readTypeId(entry.durationInput),
+                delayTypeId: this.readTypeId(entry.delayInput)
             }));
         }
 
@@ -981,7 +1040,9 @@ export class ScheduleBlockRenderer {
             name: String(entry.row.dataset.stepName || "").trim(),
             color: String(entry.row.dataset.stepColor || "").trim(),
             duration: Math.max(0, Number.parseInt(entry.row.dataset.stepDuration || "0", 10) || 0),
-            delay: Number.parseInt(entry.row.dataset.stepDelay || "0", 10) || 0
+            delay: Number.parseInt(entry.row.dataset.stepDelay || "0", 10) || 0,
+            durationTypeId: 0,
+            delayTypeId: 0
         }));
     }
 
@@ -1158,6 +1219,7 @@ export class ScheduleBlockRenderer {
             const rawActualRight = toSchedulePercent(actualItem.end, startDate, totalDays);
 
             if (item.duration > 0) {
+                skippedCompactActualWidth = 0;  // Reset při každém viditelném kroku
                 const planLeft = Math.max(previousPlanRight, rawPlanLeft);
                 const planRight = Math.max(planLeft, rawPlanRight);
                 const planWidth = Math.max(0, planRight - planLeft);
@@ -1173,13 +1235,19 @@ export class ScheduleBlockRenderer {
                 const actualLeft = Math.max(previousActualRight, adjustedActualLeft);
                 const actualRight = Math.max(actualLeft, adjustedActualRight);
                 const actualWidth = Math.max(0, actualRight - actualLeft);
-                this.applySegmentLayout(
-                    actualSegment,
-                    actualLeft,
-                    actualWidth,
-                    `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)} - ${formatDisplayDate(actualItem.end)}`);
+                if (actualWidth <= 0) {
+                    this.resetSegmentLayout(actualSegment);
+                } else {
+                    this.applySegmentLayout(
+                        actualSegment,
+                        actualLeft,
+                        actualWidth,
+                        `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)} - ${formatDisplayDate(actualItem.end)}`);
+                }
                 previousActualRight = actualRight;
             } else {
+                // Akumuluj přeskočenou šířku jen pro bezprostředně sousední nulové kroky.
+                // Reset se provede při dalším duration>0 kroku níže.
                 skippedCompactActualWidth += Math.max(0, rawActualRight - rawActualLeft);
                 this.resetSegmentLayout(plannedSegment);
                 this.resetSegmentLayout(actualSegment);
@@ -1288,10 +1356,43 @@ export class ScheduleBlockRenderer {
 
             entry.row.dataset.stepDuration = String(this.normalizeInt(entry.durationInput));
             entry.row.dataset.stepDelay = String(this.normalizeSignedInt(entry.delayInput));
+
+            // F-15: Dynamicky nastavit min pro delay input, aby duration + delay >= 0
+            if (entry.durationInput instanceof HTMLInputElement && entry.delayInput instanceof HTMLInputElement) {
+                const currentDuration = parseInt(entry.durationInput.value, 10) || 0;
+                entry.delayInput.min = -currentDuration;
+            }
         });
     }
 
-    recalcAll() {
+    getAntiForgeryToken() {
+        // Try the enclosing form first (editor context)
+        if (this.form instanceof HTMLFormElement) {
+            const tokenInput = this.form.querySelector('input[name="__RequestVerificationToken"]');
+            if (tokenInput instanceof HTMLInputElement && tokenInput.value) {
+                return tokenInput.value;
+            }
+        }
+
+        // Fall back to a dedicated data attribute placed by the view
+        const dedicated = this.root.querySelector("[data-schedule-antiforgery]");
+        if (dedicated instanceof HTMLInputElement && dedicated.value) {
+            return dedicated.value;
+        }
+
+        // Last resort: scan the whole document
+        const global = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (global instanceof HTMLInputElement && global.value) {
+            return global.value;
+        }
+
+        return "";
+    }
+
+    // F-07: recalcAll is now async — calls /Schedule/Recalc server endpoint.
+    // Falls back to local buildSchedulePlanAndActual when the fetch fails so the
+    // UI stays functional even if the endpoint is temporarily unavailable.
+    async recalcAll() {
         const state = this.readState();
         if (state.length === 0) {
             return;
@@ -1299,12 +1400,55 @@ export class ScheduleBlockRenderer {
 
         const startDate = this.getStartDate();
         const deadlineDate = this.getDeadlineDate(startDate);
-        const { plan, actual } = buildSchedulePlanAndActual(state, startDate);
-        this.renderEditorRows(plan, actual);
-        this.renderSummary(plan, actual, state, startDate, deadlineDate);
-        this.renderOverview(plan, actual, state, startDate, deadlineDate);
-        this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
-        queueRainbowSegmentRender(this.root);
+
+        // Debounce: cancel previous pending recalc and schedule a new one.
+        if (this._recalcDebounceTimer !== undefined) {
+            clearTimeout(this._recalcDebounceTimer);
+        }
+
+        await new Promise((resolve) => {
+            this._recalcDebounceTimer = setTimeout(resolve, 150);
+        });
+
+        // Try server-side calculation first
+        const token = this.getAntiForgeryToken();
+        let usedServerData = false;
+
+        if (token) {
+            try {
+                const serverResult = await fetchSchedulePreview(startDate, deadlineDate, state, token);
+                if (serverResult && Array.isArray(serverResult.steps)) {
+                    // Build plan/actual arrays from server response for the renderers
+                    const plan = serverResult.steps.map((s) => ({
+                        start: parseIsoDate(s.planStart) || startDate,
+                        end: parseIsoDate(s.planEnd) || startDate
+                    }));
+                    const actual = serverResult.steps.map((s) => ({
+                        start: parseIsoDate(s.actualStart) || startDate,
+                        end: parseIsoDate(s.actualEnd) || startDate
+                    }));
+
+                    this.renderEditorRows(plan, actual);
+                    this.renderSummary(plan, actual, state, startDate, deadlineDate);
+                    this.renderOverview(plan, actual, state, startDate, deadlineDate);
+                    this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
+                    queueRainbowSegmentRender(this.root);
+                    usedServerData = true;
+                }
+            } catch (_err) {
+                // Fall through to local calculation
+            }
+        }
+
+        if (!usedServerData) {
+            // Fallback: local calculation (F-07 kept as fallback)
+            const { plan, actual } = buildSchedulePlanAndActual(state, startDate);
+            this.renderEditorRows(plan, actual);
+            this.renderSummary(plan, actual, state, startDate, deadlineDate);
+            this.renderOverview(plan, actual, state, startDate, deadlineDate);
+            this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
+            queueRainbowSegmentRender(this.root);
+        }
     }
 
     bindNumericStepper(button, input, delta, onChange) {
@@ -1348,12 +1492,7 @@ export class ScheduleBlockRenderer {
             }
         };
 
-        button.addEventListener("mousedown", (event) => {
-            if (!(event instanceof MouseEvent) || event.button !== 0) {
-                return;
-            }
-
-            event.preventDefault();
+        const startRepeat = () => {
             suppressClickOnce = true;
             stepOnce();
             stopRepeat();
@@ -1362,7 +1501,21 @@ export class ScheduleBlockRenderer {
                     stepOnce();
                 }, repeatIntervalMs);
             }, repeatDelayMs);
+        };
+
+        button.addEventListener("mousedown", (event) => {
+            if (!(event instanceof MouseEvent) || event.button !== 0) {
+                return;
+            }
+
+            event.preventDefault();
+            startRepeat();
         });
+
+        button.addEventListener("touchstart", (event) => {
+            event.preventDefault();
+            startRepeat();
+        }, { passive: false });
 
         button.addEventListener("click", () => {
             if (suppressClickOnce) {
@@ -1375,6 +1528,8 @@ export class ScheduleBlockRenderer {
 
         button.addEventListener("mouseup", stopRepeat);
         button.addEventListener("mouseleave", stopRepeat);
+        button.addEventListener("touchend", stopRepeat);
+        button.addEventListener("touchcancel", stopRepeat);
         button.addEventListener("blur", () => {
             stopRepeat();
             suppressClickOnce = false;
@@ -1394,7 +1549,13 @@ export class ScheduleBlockRenderer {
 
         this.editorRows.forEach((entry, index) => {
             if (entry.durationInput instanceof HTMLInputElement) {
-                entry.durationInput.addEventListener("input", () => this.recalcFromDuration(index));
+                let durationDebounceTimer = null;
+                entry.durationInput.addEventListener("input", () => {
+                    clearTimeout(durationDebounceTimer);
+                    durationDebounceTimer = setTimeout(() => {
+                        this.recalcFromDuration(index);
+                    }, 150);
+                });
                 entry.durationInput.addEventListener("change", () => {
                     entry.durationInput.value = String(this.normalizeInt(entry.durationInput));
                     this.recalcFromDuration(index);
@@ -1402,7 +1563,13 @@ export class ScheduleBlockRenderer {
             }
 
             if (entry.delayInput instanceof HTMLInputElement) {
-                entry.delayInput.addEventListener("input", () => this.recalcFromDelay(index));
+                let delayDebounceTimer = null;
+                entry.delayInput.addEventListener("input", () => {
+                    clearTimeout(delayDebounceTimer);
+                    delayDebounceTimer = setTimeout(() => {
+                        this.recalcFromDelay(index);
+                    }, 150);
+                });
                 entry.delayInput.addEventListener("change", () => {
                     entry.delayInput.value = String(this.normalizeSignedInt(entry.delayInput));
                     this.recalcFromDelay(index);

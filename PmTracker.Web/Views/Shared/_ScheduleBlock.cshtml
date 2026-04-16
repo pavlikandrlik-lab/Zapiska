@@ -11,7 +11,6 @@
     var overviewSegmentCssClass = isEditor ? "schedule-mini-gantt-segment" : "schedule-overview-segment";
     var overviewMarkerCssClass = isEditor ? "schedule-mini-gantt-marker" : "schedule-overview-marker";
     var visibleCompactSteps = Model.Kroky
-        .Where(krok => krok.TrvaniDni > 0)
         .OrderBy(krok => krok.KrokIndex)
         .ToList();
     var editorInputIndex = 0;
@@ -27,19 +26,23 @@
      style="--record-schedule-delay-color:@Model.DelayBarvaHex;">
     @if (isEditor)
     {
-        @if (Model.EditorScheduleFieldsLocked)
+        @if (!string.IsNullOrEmpty(Model.ScheduleVersion))
+        {
+            <input type="hidden" name="ScheduleVersion" value="@Model.ScheduleVersion" />
+        }
+        @if (Model.Permissions.IsScheduleLocked)
         {
             <div class="alert warning">
                 Harmonogram je do vyřízení aktivního návrhu uzamčený.
             </div>
         }
-        else if (Model.EditorPlanFieldsLocked)
+        else if (Model.Permissions.IsPlanLocked)
         {
             <div class="alert warning">
                 Plánová část harmonogramu je do vyřízení aktivního návrhu uzamčená.
             </div>
         }
-        else if (Model.EditorCanEditPlanOnly)
+        else if (Model.Permissions.CanEditDuration && !Model.Permissions.CanEditDelay)
         {
             <div class="alert info">
                 V tomto režimu lze měnit pouze plánovou část harmonogramu. Skutečnost zůstává jen pro čtení.
@@ -47,11 +50,11 @@
         }
 
         <div class="schedule-summary-grid">
-            <div><span class="label">Termín úkolu:</span> <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></div>
+            <div><span class="label">Termín:</span> <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></div>
             <div><span class="label">Plán dokončení:</span> <strong data-schedule-summary-baseline>@Model.Souhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></div>
             <div><span class="label">Skutečné dokončení:</span> <strong data-schedule-summary-shifted>@Model.Souhrn.SkutecneDokonceni.ToString("dd.MM.yyyy")</strong></div>
             <div><span class="label">Trvání:</span> <strong data-schedule-summary-duration>@Model.Souhrn.CelkoveTrvaniDni</strong> dnů</div>
-            <div><span class="label">Celková odchylka:</span> <strong data-schedule-summary-delay>@Model.Souhrn.CelkovaOdchylkaDni</strong> dnů</div>
+            <div><span class="label">Suma odchylek kroků:</span> <strong data-schedule-summary-delay>@Model.Souhrn.CelkovaOdchylkaDni</strong> dnů</div>
             <div class="schedule-status-line @(Model.Souhrn.Stihame ? "ok" : "late")">
                 <span class="label">Stav:</span>
                 <strong data-schedule-summary-state>@(Model.Souhrn.Stihame ? "Stíháme" : "Nestíháme")</strong>
@@ -88,7 +91,12 @@
                         var segmentTitle = row.Item1 == "planned"
                             ? $"{krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
                             : $"{krok.Nazev}: skutečnost {krok.SkutecneDatum:dd.MM.yyyy}";
+                        var ariaLabel = row.Item1 == "planned"
+                            ? $"Krok {krok.KrokIndex} {krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
+                            : $"Krok {krok.KrokIndex} {krok.Nazev}: skutečnost {krok.SkutecneDatum:dd.MM.yyyy}";
                         <span class="@overviewSegmentCssClass"
+                              role="img"
+                              aria-label="@ariaLabel"
                               data-rainbow-segment-label-full="@krok.Nazev"
                               data-rainbow-segment-label-short="@krok.KrokIndex"
                               data-schedule-segment-kind="@row.Item1"
@@ -122,8 +130,8 @@
         <div class="schedule-layered-summary">
             <span>Plán: <strong data-schedule-summary-baseline>@Model.Souhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></span>
             <span>Skutečnost: <strong data-schedule-summary-shifted>@Model.Souhrn.SkutecneDokonceni.ToString("dd.MM.yyyy")</strong></span>
-            <span>Termín úkolu: <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></span>
-            <span>Překročení: <strong data-schedule-summary-overrun>@(Model.Souhrn.PrekroceniDni > 0 ? $"{Model.Souhrn.PrekroceniDni} dnů" : "0 dnů")</strong></span>
+            <span>Termín: <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></span>
+            <span><span title="Suma odchylek všech kroků harmonogramu">Překročení:</span> <strong data-schedule-summary-overrun>@(Model.Souhrn.PrekroceniDni > 0 ? $"{Model.Souhrn.PrekroceniDni} dnů" : "0 dnů")</strong></span>
         </div>
 
         <div class="gantt-steps schedule-steps" data-schedule-steps data-schedule-record-id="@Model.RecordId" hidden="hidden">
@@ -162,12 +170,18 @@
                                  data-schedule-breakdown-today
                                  title="Dnes"></div>
                             <span class="schedule-layered-segment planned"
+                                  role="img"
+                                  aria-label="Krok @krok.KrokIndex @krok.Nazev: plán @krok.BaselineDatum.ToString("dd.MM.yyyy")"
+                                  data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: plán @krok.BaselineDatum.ToString("dd.MM.yyyy")"
                                   data-rainbow-segment-label-full="@krok.Nazev"
                                   data-rainbow-segment-label-short="@krok.KrokIndex"
                                   data-schedule-breakdown-segment="planned"
                                   data-step-index="@krok.KrokIndex"
                                   style="background:@krok.BarvaHex;"></span>
                             <span class="schedule-layered-segment actual"
+                                  role="img"
+                                  aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
+                                  data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
                                   data-schedule-breakdown-segment="actual"
                                   data-step-index="@krok.KrokIndex"></span>
                         }
@@ -201,18 +215,15 @@
                         var delayChanged = krok.ZpozdeniTypId > 0 && Model.EditorChangedTypeTooltips.ContainsKey(krok.ZpozdeniTypId);
                         var durationTooltip = durationChanged ? Model.EditorChangedTypeTooltips[krok.TrvaniTypId] : null;
                         var delayTooltip = delayChanged ? Model.EditorChangedTypeTooltips[krok.ZpozdeniTypId] : null;
-                        var canEditDuration = !Model.EditorPlanFieldsLocked
-                            && !Model.EditorScheduleFieldsLocked
-                            && (Model.EditorCanEditScheduleFull
-                                || Model.EditorCanEditPlanOnly
-                                || (Model.EditorCanEditScheduleAddOnly && krok.TrvaniDni <= 0));
-                        var canEditDelay = !Model.EditorCanEditPlanOnly
-                            && !Model.EditorScheduleFieldsLocked
-                            && (Model.EditorCanEditScheduleFull || Model.EditorCanEditScheduleAddOnly);
-                        var durationDisabled = !Model.EditorJeUkolKategorie || durationStaticDisabled || !canEditDuration;
-                        var delayDisabled = !Model.EditorJeUkolKategorie || delayStaticDisabled || !canEditDelay;
-                        var dateDisabled = !Model.EditorJeUkolKategorie || stepStaticDisabled || !canEditDuration;
-                        var delayDateDisabled = !Model.EditorJeUkolKategorie || delayStaticDisabled || !canEditDelay;
+                        var canEditDuration = !Model.Permissions.IsPlanLocked
+                            && !Model.Permissions.IsScheduleLocked
+                            && Model.Permissions.CanEditDuration;
+                        var canEditDelay = !Model.Permissions.IsScheduleLocked
+                            && Model.Permissions.CanEditDelay;
+                        var durationDisabled = !Model.Permissions.IsTaskCategory || durationStaticDisabled || !canEditDuration;
+                        var delayDisabled = !Model.Permissions.IsTaskCategory || delayStaticDisabled || !canEditDelay;
+                        var dateDisabled = !Model.Permissions.IsTaskCategory || stepStaticDisabled || !canEditDuration;
+                        var delayDateDisabled = !Model.Permissions.IsTaskCategory || delayStaticDisabled || !canEditDelay;
                         <tr data-schedule-step-row
                             data-step-index="@krok.KrokIndex"
                             data-step-name="@krok.Nazev"
@@ -261,7 +272,7 @@
                                         <button class="icon-btn schedule-step-btn"
                                                 type="button"
                                                 data-schedule-duration-inc
-                                                aria-label="Přidat 1 den"
+                                                aria-label="Přidat 1 den trvání: @krok.Nazev"
                                                 @((durationDisabled) ? "disabled=\"disabled\"" : null)>
                                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -271,7 +282,7 @@
                                         <button class="icon-btn schedule-step-btn"
                                                 type="button"
                                                 data-schedule-duration-dec
-                                                aria-label="Odebrat 1 den"
+                                                aria-label="Odebrat 1 den trvání: @krok.Nazev"
                                                 @((durationDisabled) ? "disabled=\"disabled\"" : null)>
                                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                 <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -318,7 +329,7 @@
                                         <button class="icon-btn schedule-step-btn"
                                                 type="button"
                                                 data-schedule-delay-inc
-                                                aria-label="Přidat 1 den odchylky"
+                                                aria-label="Přidat 1 den odchylky: @krok.Nazev"
                                                 @((delayDisabled) ? "disabled=\"disabled\"" : null)>
                                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -328,7 +339,7 @@
                                         <button class="icon-btn schedule-step-btn"
                                                 type="button"
                                                 data-schedule-delay-dec
-                                                aria-label="Odebrat 1 den odchylky"
+                                                aria-label="Odebrat 1 den odchylky: @krok.Nazev"
                                                 @((delayDisabled) ? "disabled=\"disabled\"" : null)>
                                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                                 <line x1="5" y1="12" x2="19" y2="12"></line>

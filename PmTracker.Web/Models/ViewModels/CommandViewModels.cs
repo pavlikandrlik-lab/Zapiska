@@ -84,6 +84,8 @@ public sealed class SaveRecordCommand
     public string? UiContext { get; set; }
 
     public int? MeetingId { get; set; }
+
+    public string? ScheduleVersion { get; set; }
 }
 
 public sealed class DeleteRecordCommand

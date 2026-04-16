@@ -1,4 +1,5 @@
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Services;
 
@@ -12,12 +13,8 @@ public sealed partial class ProjectService
         string delayBarvaHex,
         HarmonogramSouhrnViewModel souhrn,
         IReadOnlyList<HarmonogramKrokEditViewModel> kroky,
-        bool editorJeUkolKategorie = false,
-        bool editorCanEditScheduleFull = false,
-        bool editorCanEditScheduleAddOnly = false,
-        bool editorCanEditPlanOnly = false,
-        bool editorPlanFieldsLocked = false,
-        bool editorScheduleFieldsLocked = false)
+        ScheduleEditorPermissionSet? permissions = null,
+        string scheduleVersion = "")
     {
         return new HarmonogramBlockViewModel
         {
@@ -28,13 +25,9 @@ public sealed partial class ProjectService
             DelayBarvaHex = delayBarvaHex,
             Souhrn = souhrn,
             Kroky = kroky,
-            EditorJeUkolKategorie = editorJeUkolKategorie,
-            EditorCanEditScheduleFull = editorCanEditScheduleFull,
-            EditorCanEditScheduleAddOnly = editorCanEditScheduleAddOnly,
-            EditorCanEditPlanOnly = editorCanEditPlanOnly,
-            EditorPlanFieldsLocked = editorPlanFieldsLocked,
-            EditorScheduleFieldsLocked = editorScheduleFieldsLocked,
-            EditorChangedTypeTooltips = new Dictionary<int, string>()
+            Permissions = permissions ?? ScheduleEditorPermissionSet.ForReadOnly(),
+            EditorChangedTypeTooltips = new Dictionary<int, string>(),
+            ScheduleVersion = scheduleVersion
         };
     }
 }

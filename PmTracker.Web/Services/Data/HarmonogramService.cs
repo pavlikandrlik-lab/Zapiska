@@ -282,6 +282,8 @@ internal sealed class HarmonogramService(
                 .FirstOrDefaultAsync(x => x.Verze == schemaVersion, ct);
             if (schema is null)
             {
+                // F-06: Fallback to active schema when requested version not found
+                // TODO: Add logger.LogWarning when ILogger is injected
                 return await LoadActiveHarmonogramSchemaAsync(ct);
             }
 
@@ -298,6 +300,8 @@ internal sealed class HarmonogramService(
         }
         catch (Exception ex) when (IsMissingHarmonogramCatalogSchema(ex))
         {
+            // F-06: Fallback due to missing schema
+            // TODO: Add logger.LogWarning when ILogger is injected
             return BuildFallbackSchemaDefinition(schemaVersion);
         }
     }
@@ -340,6 +344,8 @@ internal sealed class HarmonogramService(
         var krokIndex = 1;
         foreach (var duration in durationRows)
         {
+            // F-19: KrokKey párování - fallback na KrokPoradi pokud KrokKey selže
+            // TODO F-19: Přidat ILogger warning pro KrokKey fallback (logger není v constructor injektován)
             var delayType = delayRows.FirstOrDefault(x => x.KrokKey == duration.KrokKey)
                 ?? delayRows.FirstOrDefault(x => x.KrokPoradi == duration.KrokPoradi);
 
@@ -791,6 +797,12 @@ internal sealed class HarmonogramService(
             dbContext.CiselnikHarmonogramTypu.RemoveRange(orphanDelayRows);
         }
 
+        // F-18: Optimization - precompute delay rows by KrokKey to avoid O(n²) complexity
+        var delayRowsByKrokKey = rows
+            .Where(x => x.JeZpozdeni)
+            .GroupBy(x => x.KrokKey)
+            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Id).ToList());
+
         for (var index = 0; index < durationRows.Count; index += 1)
         {
             var order = index + 1;
@@ -799,10 +811,7 @@ internal sealed class HarmonogramService(
             duration.Hodnota = order;
             duration.BarvaHex = NormalizeHexColor(duration.BarvaHex, ResolveDefaultStepColor(order));
 
-            var delayRows = rows
-                .Where(x => x.JeZpozdeni && x.KrokKey == duration.KrokKey)
-                .OrderBy(x => x.Id)
-                .ToList();
+            var delayRows = delayRowsByKrokKey.TryGetValue(duration.KrokKey, out var dr) ? dr : new List<HarmonogramTypEntity>();
             foreach (var delay in delayRows)
             {
                 delay.KrokPoradi = order;

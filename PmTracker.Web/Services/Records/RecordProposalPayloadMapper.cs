@@ -202,11 +202,7 @@ public sealed class RecordProposalPayloadMapper
             DelayBarvaHex = model.HarmonogramBlok.DelayBarvaHex,
             Souhrn = model.HarmonogramBlok.Souhrn,
             Kroky = rebuiltSteps,
-            EditorJeUkolKategorie = model.HarmonogramBlok.EditorJeUkolKategorie,
-            EditorCanEditScheduleFull = model.HarmonogramBlok.EditorCanEditScheduleFull,
-            EditorCanEditScheduleAddOnly = model.HarmonogramBlok.EditorCanEditScheduleAddOnly,
-            EditorCanEditPlanOnly = model.HarmonogramBlok.EditorCanEditPlanOnly,
-            EditorPlanFieldsLocked = model.HarmonogramBlok.EditorPlanFieldsLocked
+            Permissions = model.HarmonogramBlok.Permissions
         };
     }
 

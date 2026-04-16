@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Records;
+using PmTracker.Web.Services.Schedules;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
@@ -447,9 +448,27 @@ public sealed class ZaznamyController : BaseController
         model.CanEditScheduleFull = canEditRecord || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, model.ProjektId);
         model.CanEditScheduleAddOnly = !model.CanEditScheduleFull
             && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, model.ProjektId);
-        model.HarmonogramBlok.EditorJeUkolKategorie = model.JeUkolKategorie;
-        model.HarmonogramBlok.EditorCanEditScheduleFull = model.CanEditScheduleFull;
-        model.HarmonogramBlok.EditorCanEditScheduleAddOnly = model.CanEditScheduleAddOnly;
+        var existingPermissions = model.HarmonogramBlok.Permissions;
+        var schedulePermissions = existingPermissions.IsScheduleLocked || existingPermissions.IsPlanLocked
+            ? existingPermissions with { IsTaskCategory = model.JeUkolKategorie }
+            : model.CanEditScheduleFull
+                ? ScheduleEditorPermissionSet.ForFullEdit(model.JeUkolKategorie)
+                : model.CanEditScheduleAddOnly
+                    ? ScheduleEditorPermissionSet.ForAddOnly(model.JeUkolKategorie)
+                    : existingPermissions with { IsTaskCategory = model.JeUkolKategorie };
+        model.HarmonogramBlok = new HarmonogramBlockViewModel
+        {
+            RecordId = model.HarmonogramBlok.RecordId,
+            Mode = model.HarmonogramBlok.Mode,
+            DatumZalozeni = model.HarmonogramBlok.DatumZalozeni,
+            TerminUkonceni = model.HarmonogramBlok.TerminUkonceni,
+            DelayBarvaHex = model.HarmonogramBlok.DelayBarvaHex,
+            Souhrn = model.HarmonogramBlok.Souhrn,
+            Kroky = model.HarmonogramBlok.Kroky,
+            Permissions = schedulePermissions,
+            EditorChangedTypeTooltips = model.HarmonogramBlok.EditorChangedTypeTooltips,
+            ScheduleVersion = model.HarmonogramBlok.ScheduleVersion
+        };
         model.ActiveEditorTab = !canEditRecord && canManageSchedule && model.JeUkolKategorie
             ? EditorTabSchedule
             : EditorTabBasic;

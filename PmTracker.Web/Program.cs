@@ -11,6 +11,7 @@ builder.Services.AddControllersWithViews(options =>
 {
     options.Filters.Add<AjaxAntiforgeryResultFilter>();
 });
+builder.Services.AddScoped<PmTracker.Web.Services.Schedules.SchedulePreviewService>();
 builder.Services.AddAuthentication(IISDefaults.AuthenticationScheme);
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();

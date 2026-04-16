@@ -49,7 +49,7 @@
     <div class="schedule-project-list" data-project-schedule-list data-subsystem-grouped-shell>
         @if (Model.HarmonogramUkoly.Count == 0)
         {
-            <p class="muted">V projektu zatím nejsou úkoly s harmonogramem.</p>
+            <p class="muted">V projektu zatím nejsou záznamy s harmonogramem.</p>
         }
         else
         {
@@ -107,6 +107,12 @@
                                 </div>
 
                                 @await Html.PartialAsync("_ScheduleBlock", item.HarmonogramBlok)
+
+                                @* F-05: Placeholder pro záznamy bez zadaného harmonogramu *@
+                                @if (item.HarmonogramBlok.Souhrn.CelkoveTrvaniDni == 0)
+                                {
+                                    <p class="muted" style="font-size:12px;margin:4px 0 0;">Záznam zatím nemá zadány kroky harmonogramu. Upravte harmonogram v detailu záznamu.</p>
+                                }
                             </article>
                         }
                     </div>

@@ -10,6 +10,8 @@
     --gov-color-surface: #ffffff;
     --gov-shadow-soft: 0 2px 8px rgba(11, 12, 12, 0.08);
     --gov-radius: 8px;
+    --gov-radius-sm: 6px;
+    --gov-radius-lg: 12px;
     --gov-font: "Roboto", Arial, Helvetica, sans-serif;
     --app-bg-start: #f3f2f1;
     --app-bg-mid: #f3f2f1;
@@ -38,6 +40,9 @@
     --gov-color-bg: #0f1419;
     --gov-color-surface: #1b2128;
     --gov-shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.28);
+    --gov-radius: 8px;
+    --gov-radius-sm: 6px;
+    --gov-radius-lg: 12px;
     --app-bg-start: #0f1419;
     --app-bg-mid: #0f1419;
     --app-bg-end: #0f1419;

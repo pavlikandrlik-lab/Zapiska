@@ -9,6 +9,7 @@ using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Dashboard;
+using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Services;
 
@@ -597,10 +598,7 @@ public sealed class RecordProposalService : IRecordProposalService
         model.CanEditScheduleAddOnly = false;
         model.HarmonogramBlok = CloneScheduleBlock(
             model.HarmonogramBlok,
-            editorCanEditScheduleFull: true,
-            editorCanEditScheduleAddOnly: false,
-            editorCanEditPlanOnly: false,
-            editorPlanFieldsLocked: false);
+            permissions: ScheduleEditorPermissionSet.ForFullEdit(model.HarmonogramBlok.Permissions.IsTaskCategory));
         model.ActiveEditorTab = "schedule";
         model.SecondaryNote = "V návrhu lze měnit termín ukončení a celý harmonogram. Ostatní metadata záznamu zůstávají jen pro čtení.";
     }
@@ -636,10 +634,7 @@ public sealed class RecordProposalService : IRecordProposalService
         model.ActiveEditorTab = "basic";
         model.HarmonogramBlok = CloneScheduleBlock(
             model.HarmonogramBlok,
-            editorCanEditScheduleFull: true,
-            editorCanEditScheduleAddOnly: false,
-            editorCanEditPlanOnly: false,
-            editorPlanFieldsLocked: false);
+            permissions: ScheduleEditorPermissionSet.ForFullEdit(model.HarmonogramBlok.Permissions.IsTaskCategory));
     }
 
     private static void ValidateCommonProposalInput(SaveRecordCommand command)
@@ -896,11 +891,7 @@ public sealed class RecordProposalService : IRecordProposalService
         model.ActiveEditorTab = "basic";
         model.HarmonogramBlok = CloneScheduleBlock(
             model.HarmonogramBlok,
-            editorCanEditScheduleFull: false,
-            editorCanEditScheduleAddOnly: false,
-            editorCanEditPlanOnly: false,
-            editorPlanFieldsLocked: false,
-            editorScheduleFieldsLocked: false,
+            permissions: ScheduleEditorPermissionSet.ForReadOnly(),
             editorChangedTypeTooltips: changedScheduleTypeTooltips);
         model.CanApproveProposal = canDecide && isPending;
         model.CanRejectProposal = canDecide && isPending;
@@ -917,11 +908,7 @@ public sealed class RecordProposalService : IRecordProposalService
         HarmonogramSouhrnViewModel? souhrn = null,
         IReadOnlyList<HarmonogramKrokEditViewModel>? kroky = null,
         DateTime? terminUkonceni = null,
-        bool? editorCanEditScheduleFull = null,
-        bool? editorCanEditScheduleAddOnly = null,
-        bool? editorCanEditPlanOnly = null,
-        bool? editorPlanFieldsLocked = null,
-        bool? editorScheduleFieldsLocked = null,
+        ScheduleEditorPermissionSet? permissions = null,
         IReadOnlyDictionary<int, string>? editorChangedTypeTooltips = null)
     {
         return new HarmonogramBlockViewModel
@@ -933,12 +920,7 @@ public sealed class RecordProposalService : IRecordProposalService
             DelayBarvaHex = source.DelayBarvaHex,
             Souhrn = souhrn ?? source.Souhrn,
             Kroky = kroky ?? source.Kroky,
-            EditorJeUkolKategorie = source.EditorJeUkolKategorie,
-            EditorCanEditScheduleFull = editorCanEditScheduleFull ?? source.EditorCanEditScheduleFull,
-            EditorCanEditScheduleAddOnly = editorCanEditScheduleAddOnly ?? source.EditorCanEditScheduleAddOnly,
-            EditorCanEditPlanOnly = editorCanEditPlanOnly ?? source.EditorCanEditPlanOnly,
-            EditorPlanFieldsLocked = editorPlanFieldsLocked ?? source.EditorPlanFieldsLocked,
-            EditorScheduleFieldsLocked = editorScheduleFieldsLocked ?? source.EditorScheduleFieldsLocked,
+            Permissions = permissions ?? source.Permissions,
             EditorChangedTypeTooltips = editorChangedTypeTooltips ?? source.EditorChangedTypeTooltips
         };
     }

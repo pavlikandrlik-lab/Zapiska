@@ -240,8 +240,15 @@ export function formatDisplayDate(date) {
     return `${day}.${month}.${year}`;
 }
 
+/**
+ * Vrátí "day stamp" pro účely diff kalkulací.
+ * Používá lokální datum konzistentně s parseIsoDate a addCalendarDays,
+ * čímž se vyhne DST chybám při přechodu letního/zimního času.
+ */
 export function toUtcDayStamp(date) {
-    return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+    // Operujeme v local time konzistentně s ostatními date operacemi v aplikaci.
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    return d.getTime();
 }
 
 export function diffCalendarDays(a, b) {

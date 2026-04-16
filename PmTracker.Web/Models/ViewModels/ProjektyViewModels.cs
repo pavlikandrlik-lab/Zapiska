@@ -1,3 +1,5 @@
+using PmTracker.Web.Services.Schedules;
+
 namespace PmTracker.Web.Models.ViewModels;
 
 public sealed class ProjektyIndexViewModel
@@ -188,13 +190,9 @@ public sealed class HarmonogramBlockViewModel
     public string DelayBarvaHex { get; init; } = "#dc2626";
     public HarmonogramSouhrnViewModel Souhrn { get; init; } = new();
     public IReadOnlyList<HarmonogramKrokEditViewModel> Kroky { get; init; } = Array.Empty<HarmonogramKrokEditViewModel>();
-    public bool EditorJeUkolKategorie { get; set; }
-    public bool EditorCanEditScheduleFull { get; set; }
-    public bool EditorCanEditScheduleAddOnly { get; set; }
-    public bool EditorCanEditPlanOnly { get; set; }
-    public bool EditorPlanFieldsLocked { get; set; }
-    public bool EditorScheduleFieldsLocked { get; set; }
+    public ScheduleEditorPermissionSet Permissions { get; set; } = ScheduleEditorPermissionSet.ForReadOnly();
     public IReadOnlyDictionary<int, string> EditorChangedTypeTooltips { get; set; } = new Dictionary<int, string>();
+    public string ScheduleVersion { get; init; } = string.Empty;
 }
 
 public sealed class ProjektHarmonogramTabViewModel

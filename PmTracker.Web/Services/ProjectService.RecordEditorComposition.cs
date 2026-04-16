@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Records;
+using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Services;
 
@@ -155,6 +156,19 @@ public sealed partial class ProjectService
             ? await pendingScheduleProposalLockEvaluator.EvaluateAsync(record.Id, ct)
             : new PendingScheduleProposalLockState(false, null, null, false, false);
 
+        // F-11: Soft concurrency check — načti MAX(UpdatedAt) harmonogramových hodnot jako version stamp
+        var scheduleVersion = string.Empty;
+        if (!isCreate && isTaskCategory && record.Id > 0)
+        {
+            var maxUpdatedAt = await dbContext.ZaznamHarmonogramHodnoty
+                .Where(x => x.ZaznamId == record.Id)
+                .MaxAsync(x => (DateTime?)x.UpdatedAt, ct);
+            if (maxUpdatedAt.HasValue)
+            {
+                scheduleVersion = maxUpdatedAt.Value.Ticks.ToString("X16");
+            }
+        }
+
         return new ZaznamEditViewModel
         {
             Id = record.Id,
@@ -202,9 +216,10 @@ public sealed partial class ProjectService
                 harmonogramSchema.DelayBarvaHex,
                 harmonogramSouhrn,
                 harmonogramBlokKroky,
-                editorJeUkolKategorie: isTaskCategory,
-                editorPlanFieldsLocked: pendingScheduleProposalLock.LocksSchedule,
-                editorScheduleFieldsLocked: pendingScheduleProposalLock.LocksSchedule),
+                permissions: pendingScheduleProposalLock.LocksSchedule
+                    ? ScheduleEditorPermissionSet.ForActiveScheduleProposal(isTaskCategory)
+                    : ScheduleEditorPermissionSet.ForFullEdit(isTaskCategory),
+                scheduleVersion: scheduleVersion),
             DostupniVlastnici = ownerCandidates,
             DostupniSpolupracovnici = collaborationCandidates,
             VybraniSpolupracovniciIds = selectedCollaborationIds,

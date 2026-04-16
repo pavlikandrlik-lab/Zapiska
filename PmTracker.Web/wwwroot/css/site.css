@@ -1345,7 +1345,7 @@
 
 .project-card {
     border: 1px solid var(--gov-color-border);
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     padding: 18px;
     background: var(--gov-color-surface);
     box-shadow: none;
@@ -1498,7 +1498,7 @@
     color: var(--app-text-primary);
     text-decoration: none;
     padding: 10px 16px;
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     font-weight: 500;
     font-size: 14px;
     text-align: center;
@@ -1561,7 +1561,7 @@
 .icon-btn {
     width: 34px;
     height: 34px;
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     border: 1px solid var(--gov-color-border);
     background: #fff;
     color: var(--gov-color-muted);
@@ -3286,7 +3286,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     min-width: 290px;
     max-width: 380px;
     border: 1px solid var(--gov-color-border);
-    border-radius: 10px;
+    border-radius: var(--gov-radius-sm);
     background: var(--gov-color-surface);
     color: var(--app-text-primary);
     box-shadow: var(--gov-shadow-soft);
@@ -3366,10 +3366,109 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .comment {
     border: 1px solid var(--gov-color-border);
-    border-radius: 10px;
-    padding: 10px 12px;
+    border-radius: var(--gov-radius);
+    padding: 10px 14px;
     margin-bottom: 8px;
-    background: #f8fafc;
+    background: var(--gov-color-surface);
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.comment-identity {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.comment-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--gov-color-primary) 15%, transparent);
+    color: var(--gov-color-primary);
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.comment-identity-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.comment-author {
+    font-size: 13px;
+    display: block;
+    line-height: 1.3;
+}
+
+.comment-subline {
+    font-size: 12px;
+    color: var(--gov-color-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    line-height: 1.3;
+    margin-top: 1px;
+}
+
+.comment-meeting-chip {
+    color: var(--gov-color-muted);
+}
+
+.comment-actions-inline {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.comment-edit-toggle,
+.comment-delete-btn {
+    width: 28px;
+    height: 28px;
+    opacity: 0.6;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.comment-edit-toggle:hover,
+.comment-delete-btn:hover {
+    opacity: 1;
+}
+
+.comment-delete-btn:hover {
+    color: var(--gov-color-accent);
+    border-color: var(--gov-color-accent);
+}
+
+.comment-edit-details {
+    width: auto;
+}
+
+.comment-edit-details[open] {
+    width: 100%;
+}
+
+.comment-edit-toggle {
+    list-style: none;
+    cursor: pointer;
+}
+
+.comment-edit-toggle::-webkit-details-marker {
+    display: none;
 }
 
 .comment-text {
@@ -3427,53 +3526,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     color: var(--gov-color-primary);
     text-decoration: underline;
     text-underline-offset: 0.12em;
-}
-
-.comment-header {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    margin-bottom: 6px;
-}
-
-.comment-toolbar {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-top: 8px;
-}
-
-.comment-toolbar-actions {
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-    flex-wrap: wrap;
-}
-
-.comment-edit-details {
-    width: auto;
-}
-
-.comment-edit-details summary {
-    list-style: none;
-    cursor: pointer;
-}
-
-.comment-edit-details summary::-webkit-details-marker {
-    display: none;
-}
-
-.comment-action-chip {
-    text-decoration: none;
-}
-
-.comment-edit-details[open] {
-    width: 100%;
-}
-
-.comment-edit-details[open] .comment-action-chip {
-    border-color: var(--gov-color-primary);
 }
 
 .comment-delete-form-inline {
@@ -4113,7 +4165,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .filter-shell {
     border: 1px solid var(--gov-color-border);
-    border-radius: 14px;
+    border-radius: var(--gov-radius-lg);
     padding: 10px 12px;
     background: rgba(255, 255, 255, 0.85);
     margin-bottom: 16px;
@@ -4265,7 +4317,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .meeting-year-group {
     border: 1px solid var(--gov-color-border);
-    border-radius: 16px;
+    border-radius: var(--gov-radius-lg);
     background: color-mix(in srgb, var(--gov-color-primary) 4%, var(--gov-color-surface));
     overflow: hidden;
 }
@@ -4333,7 +4385,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .meeting-card {
     border: 1px solid var(--gov-color-border);
-    border-radius: 14px;
+    border-radius: var(--gov-radius);
     padding: 11px;
     background: #fff;
     display: flex;
@@ -4950,6 +5002,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 :root[data-theme="dark"] .project-card {
     background: var(--gov-color-surface);
+}
+
+:root[data-theme="dark"] .comment-avatar {
+    background: color-mix(in srgb, var(--gov-color-primary) 20%, transparent);
 }
 
 :root[data-theme="dark"] .btn {
