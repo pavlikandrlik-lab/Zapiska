@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.ProjectDashboard;
 using PmTracker.Web.Services.Security;
 using System.Globalization;
 
@@ -21,6 +22,7 @@ public sealed class ProjektyController : BaseController
     private readonly IProjectService _projectService;
     private readonly IMeetingService _meetingService;
     private readonly IRecordProposalService _recordProposalService;
+    private readonly IProjectDashboardService _projectDashboardService;
 
     public ProjektyController(
         IUserContextResolver userContextResolver,
@@ -28,12 +30,14 @@ public sealed class ProjektyController : BaseController
         ILoggerFactory loggerFactory,
         IProjectService projectService,
         IMeetingService meetingService,
-        IRecordProposalService recordProposalService)
+        IRecordProposalService recordProposalService,
+        IProjectDashboardService projectDashboardService)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _projectService = projectService;
         _meetingService = meetingService;
         _recordProposalService = recordProposalService;
+        _projectDashboardService = projectDashboardService;
     }
 
     public async Task<IActionResult> Index(CancellationToken ct = default)
@@ -678,7 +682,8 @@ public sealed class ProjektyController : BaseController
         model.CanManageRecords = canManageRecords;
         model.CanManageSchedules = canManageSchedules;
         model.CanViewProposals = await _recordProposalService.CanViewProposalTabAsync(projectId, CurrentUserContext, ct);
-        model.CanViewDashboard = CurrentUserContext.IsSuperAdmin;
+        model.CanViewDashboard = CurrentUserContext.IsSuperAdmin
+            || await _projectDashboardService.CanAccessDashboardAsync(projectId, CurrentUserContext.OsobaId, ct);
         model.PageTitle = model.Projekt.Nazev;
         model.BackUrl = Url.Action("Index", "Projekty") ?? "/Projekty";
         model.BackLabel = "Zpět na přehled";

@@ -30,7 +30,12 @@ public sealed class ProjectDashboardService : IProjectDashboardService
                 Zkratka = x.p.Zkratka,
                 Stav = x.s.Nazev
             })
-            .FirstAsync(ct);
+            .FirstOrDefaultAsync(ct);
+
+        if (projekt is null)
+        {
+            throw new InvalidOperationException($"Projekt s ID {projectId} nebyl nalezen.");
+        }
 
         return new ProjectDashboardPageViewModel
         {
@@ -219,12 +224,16 @@ public sealed class ProjectDashboardService : IProjectDashboardService
             .ToDictionaryAsync(s => s.Id, s => new SubsystemInfo(s.Kod, s.Nazev), ct);
 
         var recordIds = allRecords.Select(r => r.Id).ToList();
-        var historyTermin = await _dbContext.ZaznamHistorieTerminu.AsNoTracking()
+        var historyTerminRaw = await _dbContext.ZaznamHistorieTerminu.AsNoTracking()
             .Where(h => recordIds.Contains(h.ZaznamId))
             .ToListAsync(ct);
 
-        var currentYearKpi = ComputeYearKpi(allRecords, finalStates, historyTermin, yearStart, yearEnd);
-        var prevYearKpi = ComputeYearKpi(allRecords, finalStates, historyTermin,
+        var historyTerminByRecord = historyTerminRaw
+            .GroupBy(h => h.ZaznamId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<ZaznamHistorieTerminuEntity>)g.ToList());
+
+        var currentYearKpi = ComputeYearKpi(allRecords, finalStates, historyTerminByRecord, yearStart, yearEnd);
+        var prevYearKpi = ComputeYearKpi(allRecords, finalStates, historyTerminByRecord,
             new DateTime(year - 1, 1, 1), new DateTime(year - 1, 12, 31));
 
         var quarters = Enumerable.Range(1, 4).Select(q =>
@@ -254,8 +263,8 @@ public sealed class ProjectDashboardService : IProjectDashboardService
                     Splneno = yearRecords.Count(r => r.StavUkoluId.HasValue && finalStates.ContainsKey(r.StavUkoluId.Value)),
                     VProdleni = 0, // Requires schedule computation per record — simplified for now
                     Zruseno = 0, // Would need "cancelled" state detection — simplified for now
-                    Prodlouzeno = g.Count(r => historyTermin.Any(h => h.ZaznamId == r.Id
-                        && h.DatumZmeny >= yearStart && h.DatumZmeny <= yearEnd))
+                    Prodlouzeno = g.Count(r => historyTerminByRecord.TryGetValue(r.Id, out var rh)
+                        && rh.Any(h => h.DatumZmeny >= yearStart && h.DatumZmeny <= yearEnd))
                 };
             })
             .Where(s => s.Splneno > 0 || s.Prodlouzeno > 0)
@@ -330,7 +339,7 @@ public sealed class ProjectDashboardService : IProjectDashboardService
     private static YearKpiSnapshot ComputeYearKpi(
         List<RecordStatRow> allRecords,
         Dictionary<int, string> finalStates,
-        List<ZaznamHistorieTerminuEntity> historyTermin,
+        Dictionary<int, IReadOnlyList<ZaznamHistorieTerminuEntity>> historyByRecord,
         DateTime yearStart,
         DateTime yearEnd)
     {
@@ -348,32 +357,34 @@ public sealed class ProjectDashboardService : IProjectDashboardService
         var preneseno = yearRecords.Count(r => !r.StavUkoluId.HasValue || !finalStates.ContainsKey(r.StavUkoluId.Value));
 
         // Extended: records whose deadline was changed during this year
-        var prodlouzeno = allRecords.Count(r => historyTermin.Any(h =>
-            h.ZaznamId == r.Id && h.DatumZmeny >= yearStart && h.DatumZmeny <= yearEnd));
+        var prodlouzeno = allRecords.Count(r =>
+            historyByRecord.TryGetValue(r.Id, out var rh)
+            && rh.Any(h => h.DatumZmeny >= yearStart && h.DatumZmeny <= yearEnd));
 
         // On-time: completed records whose actual completion date <= original deadline
-        // For simplicity, we compare DatumUkonceni with the earliest history entry's PuvodniDatum
         var onTimeCount = completedRecords.Count(r =>
         {
-            var originalDeadline = historyTermin
-                .Where(h => h.ZaznamId == r.Id)
-                .OrderBy(h => h.DatumZmeny)
-                .Select(h => (DateTime?)h.PuvodniDatum)
-                .FirstOrDefault() ?? r.DatumUkonceni;
+            if (!historyByRecord.TryGetValue(r.Id, out var rh) || rh.Count == 0)
+            {
+                return true; // No deadline change history — considered on-time
+            }
+
+            var originalDeadline = rh.OrderBy(h => h.DatumZmeny).First().PuvodniDatum;
             return r.DatumUkonceni <= originalDeadline;
         });
         var vcasnostPct = splneno > 0 ? Math.Round(100.0 * onTimeCount / splneno, 1) : 0;
 
-        // Delayed and average delay — simplified: records with deadline extension history
+        // Delayed and average delay — records with deadline extension history
         var delayedRecords = yearRecords
-            .Where(r => historyTermin.Any(h => h.ZaznamId == r.Id && h.NoveDatum > h.PuvodniDatum))
+            .Where(r => historyByRecord.TryGetValue(r.Id, out var rh)
+                && rh.Any(h => h.NoveDatum > h.PuvodniDatum))
             .ToList();
         var vProdleni = delayedRecords.Count;
         var prumerneProdleniDni = delayedRecords.Count > 0
             ? Math.Round(delayedRecords.Average(r =>
             {
-                var lastChange = historyTermin
-                    .Where(h => h.ZaznamId == r.Id && h.NoveDatum > h.PuvodniDatum)
+                var lastChange = historyByRecord[r.Id]
+                    .Where(h => h.NoveDatum > h.PuvodniDatum)
                     .OrderByDescending(h => h.DatumZmeny)
                     .First();
                 return (lastChange.NoveDatum - lastChange.PuvodniDatum).TotalDays;

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using PmTracker.Web.Controllers;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.ProjectDashboard;
 using PmTracker.Web.Services;
 
 namespace PmTracker.Tests.Unit.Projects;
@@ -323,7 +324,8 @@ public sealed class ProjektyControllerBehaviorTests
             loggerFactory: NullLoggerFactory.Instance,
             projectService: projectService,
             meetingService: meetingService ?? new FakeMeetingService(),
-            recordProposalService: recordProposalService ?? new FakeRecordProposalService())
+            recordProposalService: recordProposalService ?? new FakeRecordProposalService(),
+            projectDashboardService: new FakeProjectDashboardService())
         {
             ControllerContext = new ControllerContext
             {
@@ -649,5 +651,26 @@ public sealed class ProjektyControllerBehaviorTests
 
         public Task RejectAndEditProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => throw new NotSupportedException();
+    }
+
+    private sealed class FakeProjectDashboardService : IProjectDashboardService
+    {
+        public Task<ProjectDashboardPageViewModel> BuildDashboardPageAsync(int projectId, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<ProjectDashboardRecordsPanelViewModel> BuildRecordsPanelAsync(int projectId, DateTime referenceDate, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<ProjectDashboardStatisticsPanelViewModel> BuildStatisticsPanelAsync(int projectId, int year, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public ProjectDashboardNesPanelViewModel BuildNesPanel()
+            => throw new NotSupportedException();
+
+        public ProjectDashboardVyzvyPanelViewModel BuildVyzvyPanel()
+            => throw new NotSupportedException();
+
+        public Task<bool> CanAccessDashboardAsync(int projectId, int osobaId, CancellationToken ct = default)
+            => Task.FromResult(false);
     }
 }
