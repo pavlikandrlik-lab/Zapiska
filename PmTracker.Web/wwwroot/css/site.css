@@ -71,7 +71,7 @@
 .app-brand:focus-visible {
     outline: 2px solid var(--gov-color-primary);
     outline-offset: 3px;
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
 }
 
 .app-logo {
@@ -332,7 +332,7 @@
     right: 0;
     top: calc(100% + 4px);
     width: 248px;
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
@@ -387,7 +387,7 @@
     position: fixed;
     min-width: 280px;
     max-width: min(360px, calc(100vw - 24px));
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
     box-shadow: var(--gov-shadow-soft);
@@ -464,7 +464,7 @@
     position: fixed;
     min-width: 300px;
     max-width: min(360px, calc(100vw - 24px));
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
     box-shadow: var(--gov-shadow-soft);
@@ -531,7 +531,7 @@
     width: 26px;
     height: 26px;
     border: 1px solid var(--gov-color-border);
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     background: transparent;
     color: var(--gov-color-muted);
     font-size: 18px;
@@ -981,7 +981,7 @@
 .docs-toc {
     background: var(--gov-color-surface);
     border: 1px solid var(--gov-color-border);
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     padding: 14px;
 }
 
@@ -1051,7 +1051,7 @@
 
 .docs-content code {
     background: #f1f5f9;
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     padding: 1px 6px;
     font-size: 13px;
 }
@@ -1647,7 +1647,7 @@ input[type="search"],
 select,
 textarea {
     width: 100%;
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
     padding: 10px 12px;
@@ -1816,7 +1816,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     z-index: 280;
     background: var(--gov-color-surface);
     border: 1px solid var(--gov-color-border);
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     box-shadow: var(--gov-shadow-soft);
     padding: 8px 9px 9px;
 }
@@ -1830,7 +1830,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     z-index: 90;
     background: var(--gov-color-surface);
     border: 1px solid var(--gov-color-border);
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     box-shadow: var(--gov-shadow-soft);
     padding: 10px 12px 12px;
 }
@@ -1862,7 +1862,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .app-date-select {
     min-height: 30px;
     border: 1px solid var(--gov-color-border);
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     background-color: var(--gov-color-surface);
     color: var(--app-text-primary);
     font-size: 11px;
@@ -1933,7 +1933,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .app-time-option {
     min-height: 38px;
     border: 1px solid var(--gov-color-border);
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     background: var(--gov-color-surface);
     color: var(--app-text-primary);
     font-size: 14px;
@@ -2157,7 +2157,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .record-editor-close-guard-dialog {
     width: min(420px, 100%);
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
     box-shadow: var(--gov-shadow-soft);
@@ -2196,7 +2196,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .schedule-summary-grid {
     border: 1px solid var(--gov-color-border);
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     padding: 10px 12px;
     background: #fafafa;
     display: grid;
@@ -2215,7 +2215,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .schedule-mini-gantt {
     border: 1px solid var(--gov-color-border);
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     padding: 10px 12px;
     background: var(--gov-color-surface);
     display: grid;
@@ -2477,7 +2477,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .schedule-table-wrap {
     border: 1px solid var(--gov-color-border);
-    border-radius: 12px;
+    border-radius: var(--gov-radius-lg);
     overflow-x: auto;
     overflow-y: visible;
 }
@@ -2537,7 +2537,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .schedule-step-btn {
     width: 24px;
     height: 20px;
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     padding: 0;
 }
 
@@ -2662,7 +2662,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .schedule-card {
     border: 1px solid var(--gov-color-border);
-    border-radius: 12px;
+    border-radius: var(--gov-radius-lg);
     background: var(--gov-color-surface);
     padding: 12px 14px;
     box-shadow: var(--gov-shadow-soft);
@@ -2970,7 +2970,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .gantt-picker {
     border: 1px solid var(--gov-color-border);
-    border-radius: 12px;
+    border-radius: var(--gov-radius-lg);
     background: var(--gov-color-surface);
     box-shadow: var(--gov-shadow-soft);
     padding: 10px;
@@ -3009,7 +3009,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .gantt-task {
     border: 1px solid var(--gov-color-border);
-    border-radius: 12px;
+    border-radius: var(--gov-radius-lg);
     background: var(--gov-color-surface);
     box-shadow: var(--gov-shadow-soft);
     padding: 12px;
@@ -3221,7 +3221,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin: 12px 0 8px;
     padding: 14px 16px;
     border: 1px dashed var(--gov-color-border);
-    border-radius: 12px;
+    border-radius: var(--gov-radius-lg);
     background: color-mix(in srgb, var(--gov-color-surface) 92%, #e2e8f0 8%);
 }
 
@@ -3260,7 +3260,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin: 12px 0 8px;
     padding: 12px 14px;
     border: 1px solid #fecaca;
-    border-radius: 12px;
+    border-radius: var(--gov-radius-lg);
     background: #fef2f2;
     color: #991b1b;
 }
@@ -3790,7 +3790,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .modal {
     background: var(--gov-color-surface);
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     padding: 12px 14px 16px;
     width: min(760px, 100%);
     max-width: 100%;
@@ -3831,7 +3831,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: 34px;
     height: 34px;
     border: 1px solid var(--gov-color-border);
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     background: var(--gov-color-surface);
     color: var(--app-text-primary);
     font-size: 18px;
@@ -3899,7 +3899,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .external-row {
     border: 1px solid var(--gov-color-border);
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     padding: 12px;
     display: grid;
     gap: 12px;
@@ -3920,14 +3920,14 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: grid;
     gap: 8px;
     border: 1px solid var(--gov-color-border);
-    border-radius: 8px;
+    border-radius: var(--gov-radius);
     background: #fafafa;
     padding: 10px;
 }
 
 .collab-options {
     border: 1px solid var(--gov-color-border);
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     background: var(--gov-color-surface);
     max-height: 220px;
     overflow: auto;
@@ -3986,7 +3986,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .office-search-panel {
     border: 1px solid var(--gov-color-border);
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     background: var(--gov-color-surface);
     box-shadow: var(--gov-shadow-soft);
     position: absolute;
@@ -4135,7 +4135,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .search-results {
     border: 1px dashed var(--gov-color-border);
-    border-radius: 12px;
+    border-radius: var(--gov-radius-lg);
     padding: 10px;
     display: grid;
     gap: 8px;
@@ -4907,7 +4907,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .profile-role-card {
     border: 1px solid var(--gov-color-border);
-    border-radius: 12px;
+    border-radius: var(--gov-radius-lg);
     background: var(--gov-color-surface);
     padding: 0 14px 14px;
 }
@@ -5945,7 +5945,7 @@ html {
     width: auto;
     min-width: 100px;
     min-height: 36px;
-    border-radius: 6px;
+    border-radius: var(--gov-radius-sm);
     border: 1px solid var(--gov-color-border);
     background: var(--gov-color-surface);
     background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
