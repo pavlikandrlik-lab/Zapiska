@@ -172,7 +172,15 @@
                     AriaLabel = "Otevřít kalendář"
                 })
         </label>
-        <label class="@(terminUkonceniChanged ? "proposal-field-changed" : null)"
+        @{
+            var terminUkonceniEditableHighlight = Model.IsSchedulePlanProposalEditor && !terminUkonceniLocked;
+            var terminUkonceniClasses = string.Join(' ', new[]
+            {
+                terminUkonceniChanged ? "proposal-field-changed" : null,
+                terminUkonceniEditableHighlight ? "proposal-field-editable" : null
+            }.Where(c => !string.IsNullOrEmpty(c)));
+        }
+        <label class="@terminUkonceniClasses"
                title="@terminUkonceniTooltip">
             Termín ukončení
             @await Html.PartialAsync(
@@ -184,7 +192,11 @@
                     DisplayValue = terminUkonceniDisplay,
                     Locked = terminUkonceniLocked,
                     AriaLabel = "Otevřít kalendář",
-                    ContainerCssClass = terminUkonceniChanged ? "proposal-field-changed" : null
+                    ContainerCssClass = string.Join(' ', new[]
+                    {
+                        terminUkonceniChanged ? "proposal-field-changed" : null,
+                        terminUkonceniEditableHighlight ? "proposal-field-editable" : null
+                    }.Where(c => !string.IsNullOrEmpty(c)))
                 })
         </label>
     </div>

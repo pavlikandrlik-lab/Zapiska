@@ -2100,13 +2100,25 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .proposal-field-changed {
     background: rgba(245, 158, 11, 0.12);
-    border-radius: 8px;
+    border-radius: var(--gov-radius-sm);
 }
 
 .proposal-field-changed .app-date-display-input,
 .proposal-field-changed .schedule-days-input-stacked,
 .proposal-field-changed .app-date-trigger {
     background-color: rgba(245, 158, 11, 0.08);
+}
+
+.proposal-field-editable {
+    background: rgba(34, 197, 94, 0.12);
+    border-radius: var(--gov-radius-sm);
+    padding: 4px 6px;
+}
+
+.proposal-field-editable .app-date-display-input,
+.proposal-field-editable .schedule-days-input-stacked,
+.proposal-field-editable .app-date-trigger {
+    background-color: rgba(34, 197, 94, 0.08);
 }
 
 .record-editor-actions {
