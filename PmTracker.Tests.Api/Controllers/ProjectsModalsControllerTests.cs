@@ -154,7 +154,7 @@ public sealed class ProjectsModalsControllerTests
         var decodedHtml = WebUtility.HtmlDecode(html);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        decodedHtml.Should().Contain("Nová porada");
+        decodedHtml.Should().Contain("Nové jednání");
         html.Should().Contain($"name=\"ProjektId\" value=\"{projectId}\"");
         html.Should().Contain("name=\"CisloJednani\"");
         html.Should().Contain("value=\"14\"", "další číslo jednání se má odvodit jako max+1");

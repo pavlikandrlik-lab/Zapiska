@@ -101,7 +101,7 @@ public sealed class ProjektyControllerBehaviorTests
         {
             NewMeetingModalResult = new MeetingModalViewModel
             {
-                Title = "Nová porada",
+                Title = "Nové jednání",
                 Command = new SaveMeetingCommand
                 {
                     ProjektId = projectId,

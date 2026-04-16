@@ -20,8 +20,8 @@ public sealed class MeetingDateTimePickerScenariosTests
         var page = await _fixture.NewPageAsync();
 
         await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=jednani&asUser={_fixture.AdminOsobaId}");
-        await page.GetByRole(AriaRole.Button, new() { Name = "Nová porada" }).ClickAsync();
-        await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Nová porada" })).ToBeVisibleAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Nové jednání" }).ClickAsync();
+        await Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Nové jednání" })).ToBeVisibleAsync();
 
         var modal = page.Locator(".modal-overlay");
         var dateField = modal.Locator("[data-app-date-field]").First;

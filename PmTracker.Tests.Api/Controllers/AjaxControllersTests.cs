@@ -51,7 +51,8 @@ public sealed class AjaxControllersTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var html = await response.Content.ReadAsStringAsync();
-        html.Should().Contain("Upravit poradu");
+        var decodedHtml = System.Net.WebUtility.HtmlDecode(html);
+        decodedHtml.Should().Contain("Upravit jednání");
         html.Should().Contain($"name=\"Id\" value=\"{meetingId}\"");
         html.Should().Contain("data-current-meeting-number=\"126\"");
     }

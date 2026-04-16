@@ -119,7 +119,7 @@ public sealed class ModalFloatingPanelScenariosTests
         var page = await _fixture.NewPageAsync();
 
         await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=jednani&asUser={_fixture.AdminOsobaId}");
-        await page.GetByRole(AriaRole.Button, new() { Name = "Nová porada" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Nové jednání" }).ClickAsync();
 
         var modal = page.Locator(".modal-overlay");
         var dateDisplay = modal.Locator("[data-app-date-field] [data-app-date-display]").First;
@@ -146,7 +146,7 @@ public sealed class ModalFloatingPanelScenariosTests
         var page = await _fixture.NewPageAsync();
 
         await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=jednani&asUser={_fixture.AdminOsobaId}");
-        await page.GetByRole(AriaRole.Button, new() { Name = "Nová porada" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Nové jednání" }).ClickAsync();
 
         var modal = page.Locator(".modal-overlay");
         await modal.Locator("[data-app-date-field] [data-app-date-display]").First.ClickAsync();

@@ -14,7 +14,7 @@ public sealed partial class MeetingService
 
         return new MeetingModalViewModel
         {
-            Title = "Nová porada",
+            Title = "Nové jednání",
             Command = new SaveMeetingCommand
             {
                 ProjektId = projectId,
@@ -57,7 +57,7 @@ public sealed partial class MeetingService
 
         return new MeetingModalViewModel
         {
-            Title = "Upravit poradu",
+            Title = "Upravit jednání",
             Command = new SaveMeetingCommand
             {
                 Id = meeting.Id,

@@ -11,6 +11,7 @@
     var overviewSegmentCssClass = isEditor ? "schedule-mini-gantt-segment" : "schedule-overview-segment";
     var overviewMarkerCssClass = isEditor ? "schedule-mini-gantt-marker" : "schedule-overview-marker";
     var visibleCompactSteps = Model.Kroky
+        .Where(krok => krok.TrvaniDni > 0)
         .OrderBy(krok => krok.KrokIndex)
         .ToList();
     var editorInputIndex = 0;
