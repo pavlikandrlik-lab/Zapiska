@@ -67,7 +67,8 @@ public sealed class SchedulePreviewService
                 (s.DelayTypeId, s.DelayDays)
             })
             .Where(x => x.Item1 > 0)
-            .ToDictionary(x => x.Item1, x => x.Item2);
+            .GroupBy(x => x.Item1)
+            .ToDictionary(g => g.Key, g => g.First().Item2);
 
         var computation = ScheduleTimelineCalculator.Compute(request.StartDate, stepDefs, values);
         var summary = ScheduleTimelineCalculator.Summarize(computation, request.DeadlineDate);

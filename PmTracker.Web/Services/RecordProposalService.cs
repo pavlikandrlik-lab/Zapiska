@@ -596,6 +596,8 @@ public sealed class RecordProposalService : IRecordProposalService
         model.CanEditRecord = false;
         model.CanEditScheduleFull = true;
         model.CanEditScheduleAddOnly = false;
+        model.ShowExternalTab = false;
+        model.ShowCollaborationTab = false;
         model.HarmonogramBlok = CloneScheduleBlock(
             model.HarmonogramBlok,
             permissions: ScheduleEditorPermissionSet.ForFullEdit(model.HarmonogramBlok.Permissions.IsTaskCategory));

@@ -217,7 +217,8 @@
                         var delayTooltip = delayChanged ? Model.EditorChangedTypeTooltips[krok.ZpozdeniTypId] : null;
                         var canEditDuration = !Model.Permissions.IsPlanLocked
                             && !Model.Permissions.IsScheduleLocked
-                            && Model.Permissions.CanEditDuration;
+                            && Model.Permissions.CanEditDuration
+                            && (!Model.Permissions.IsAddOnlyMode || krok.TrvaniDni <= 0);
                         var canEditDelay = !Model.Permissions.IsScheduleLocked
                             && Model.Permissions.CanEditDelay;
                         var durationDisabled = !Model.Permissions.IsTaskCategory || durationStaticDisabled || !canEditDuration;

@@ -11,7 +11,18 @@ public static class SearchServiceCollectionExtensions
         services.Configure<SearchOptions>(configuration.GetSection(SearchOptions.SectionName));
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddHttpClient<ISearchClient, OpenSearchClient>();
+        var searchSection = configuration.GetSection(SearchOptions.SectionName);
+        var provider = searchSection.GetValue<string>("Provider") ?? "OpenSearch";
+
+        if (string.Equals(provider, "SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddScoped<ISearchClient, SqlServerSearchClient>();
+        }
+        else
+        {
+            services.AddHttpClient<ISearchClient, OpenSearchClient>();
+        }
+
         services.AddHttpClient<AzureOpenAIEmbeddingService>();
 
         services.AddSingleton<NullEmbeddingService>();

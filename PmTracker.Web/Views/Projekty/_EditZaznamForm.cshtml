@@ -69,13 +69,13 @@
         <button class="record-modal-tab"
                 type="button"
                 data-record-modal-tab="external"
-                @(canUseBasicTabs ? null : "hidden=\"hidden\"")>
+                @(canUseBasicTabs && Model.ShowExternalTab ? null : "hidden=\"hidden\"")>
             Externí vazby
         </button>
         <button class="record-modal-tab"
                 type="button"
                 data-record-modal-tab="collaboration"
-                @(canUseBasicTabs ? null : "hidden=\"hidden\"")>
+                @(canUseBasicTabs && Model.ShowCollaborationTab ? null : "hidden=\"hidden\"")>
             Spolupráce
         </button>
         <button class="record-modal-tab @(defaultEditorTab == "schedule" ? "active" : null)"
@@ -95,21 +95,27 @@
             ["IsActive"] = defaultEditorTab == "basic"
         })
 
-    @await Html.PartialAsync(
-        "~/Views/Projekty/_EditZaznamExternalPanel.cshtml",
-        Model,
-        new ViewDataDictionary(ViewData)
-        {
-            ["IsActive"] = false
-        })
+    @if (Model.ShowExternalTab)
+    {
+        @await Html.PartialAsync(
+            "~/Views/Projekty/_EditZaznamExternalPanel.cshtml",
+            Model,
+            new ViewDataDictionary(ViewData)
+            {
+                ["IsActive"] = false
+            })
+    }
 
-    @await Html.PartialAsync(
-        "~/Views/Projekty/_EditZaznamCollaborationPanel.cshtml",
-        Model,
-        new ViewDataDictionary(ViewData)
-        {
-            ["IsActive"] = false
-        })
+    @if (Model.ShowCollaborationTab)
+    {
+        @await Html.PartialAsync(
+            "~/Views/Projekty/_EditZaznamCollaborationPanel.cshtml",
+            Model,
+            new ViewDataDictionary(ViewData)
+            {
+                ["IsActive"] = false
+            })
+    }
 
     @await Html.PartialAsync(
         "~/Views/Projekty/_EditZaznamSchedulePanel.cshtml",

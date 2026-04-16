@@ -270,6 +270,7 @@ export function renderModalFormErrors(form, payload) {
         }
 
         form.insertBefore(summary, form.firstElementChild);
+        summary.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
     if (firstInvalidTab) {
@@ -726,10 +727,10 @@ export function initModalAjaxSubmit() {
         }
 
         const submitterAction = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
-            ? (submitter.getAttribute("formaction") || submitter.formAction || "")
+            ? (submitter.getAttribute("formaction") || "")
             : "";
         const submitterMethod = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
-            ? (submitter.getAttribute("formmethod") || submitter.formMethod || "")
+            ? (submitter.getAttribute("formmethod") || "")
             : "";
         const action = appendCurrentAsUser(submitterAction || target.getAttribute("action") || window.location.href);
         const method = (submitterMethod || target.getAttribute("method") || "post").toUpperCase();

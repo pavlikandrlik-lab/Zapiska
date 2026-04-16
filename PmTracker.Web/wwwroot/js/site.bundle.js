@@ -8314,6 +8314,7 @@ function renderModalFormErrors(form, payload) {
       summary.appendChild(diagnosticBlock);
     }
     form.insertBefore(summary, form.firstElementChild);
+    summary.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
   if (firstInvalidTab) {
     setRecordFormTab(form, firstInvalidTab);
@@ -8656,8 +8657,8 @@ function initModalAjaxSubmit() {
       target.reportValidity();
       return;
     }
-    const submitterAction = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter.getAttribute("formaction") || submitter.formAction || "" : "";
-    const submitterMethod = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter.getAttribute("formmethod") || submitter.formMethod || "" : "";
+    const submitterAction = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter.getAttribute("formaction") || "" : "";
+    const submitterMethod = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter.getAttribute("formmethod") || "" : "";
     const action = appendCurrentAsUser(submitterAction || target.getAttribute("action") || window.location.href);
     const method = (submitterMethod || target.getAttribute("method") || "post").toUpperCase();
     const blockedSnapshot = buildFormDataSnapshot(new FormData(target, submitter instanceof HTMLElement ? submitter : undefined), 120);

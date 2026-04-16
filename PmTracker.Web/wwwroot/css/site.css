@@ -124,6 +124,59 @@
     gap: 12px;
 }
 
+/* ── Global search (header) ─────────────────────────────────────────────── */
+
+.app-search {
+    flex: 1;
+    max-width: 480px;
+    position: relative;
+}
+
+.app-search input[type="search"] {
+    width: 100%;
+    height: 38px;
+    padding: 7px 12px 7px 36px;
+    font-size: 14px;
+    border-radius: var(--gov-radius-sm);
+    border: 1px solid var(--gov-color-border);
+    background-color: var(--gov-color-surface);
+    /* Magnifying-glass icon (currentColor approximated as #505a5f for light mode) */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23505a5f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+    background-size: 16px 16px;
+    color: var(--app-text-primary);
+    line-height: 1.35;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+}
+
+.app-search input[type="search"]:focus {
+    outline: none;
+    border-color: var(--gov-color-primary);
+    box-shadow: 0 0 0 3px rgba(0, 94, 165, 0.15);
+}
+
+.app-search-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--gov-color-surface);
+    border: 1px solid var(--gov-color-border);
+    border-radius: var(--gov-radius-sm);
+    box-shadow: var(--gov-shadow-soft);
+    z-index: 100;
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.app-search-dropdown[hidden] {
+    display: none;
+}
+
+/* ── End global search ──────────────────────────────────────────────────── */
+
 .gov-theme-switch,
 .gov-switch {
     position: relative;
@@ -4945,6 +4998,19 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border-bottom-color: var(--gov-color-border);
 }
 
+:root[data-theme="dark"] .app-search input[type="search"] {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a0aec0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="dark"] .app-search input[type="search"]:focus {
+    box-shadow: 0 0 0 3px rgba(0, 94, 165, 0.25);
+}
+
+:root[data-theme="dark"] .app-search-dropdown {
+    background: #111b2d;
+    border-color: #31415e;
+}
+
 :root[data-theme="dark"] .user-menu-toggle:hover {
     background: #16233a;
 }
@@ -5663,6 +5729,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
         gap: 10px;
     }
 }
+@media (max-width: 768px) {
+    .app-search {
+        display: none;
+    }
+}
+
 html {
     scroll-padding-top: 92px;
 }

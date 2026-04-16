@@ -559,6 +559,8 @@ public sealed class ZaznamEditViewModel
     public IReadOnlyDictionary<int, string> ProposalChangedScheduleTypeTooltips { get; set; } = new Dictionary<int, string>();
     public bool AllowBasicMetadataEdit { get; set; } = true;
     public bool AllowTermDeadlineEdit { get; set; } = true;
+    public bool ShowExternalTab { get; set; } = true;
+    public bool ShowCollaborationTab { get; set; } = true;
     public bool HasPendingScheduleProposalLock { get; set; }
     public int? PendingScheduleProposalId { get; set; }
     public string? PendingScheduleProposalMessage { get; set; }
