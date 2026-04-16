@@ -507,7 +507,7 @@ public sealed class ProjektyController : BaseController
                 refreshUrl: Url.Action(nameof(JednaniTabPartial), "Projekty", new { id = command.ProjektId }),
                 projectId: command.ProjektId,
                 tab: "jednani",
-                message: "Porada byla uložena.")),
+                message: "Jednání bylo uloženo.")),
             operation: () => _meetingService.SaveMeetingAsync(command, CurrentUserContext, ct));
     }
 
@@ -533,7 +533,7 @@ public sealed class ProjektyController : BaseController
                 refreshUrl: Url.Action(nameof(JednaniTabPartial), "Projekty", new { id = command.ProjektId }),
                 projectId: command.ProjektId,
                 tab: "jednani",
-                message: "Porada byla smazána.")),
+                message: "Jednání bylo smazáno.")),
             operation: () => _meetingService.DeleteMeetingAsync(command, CurrentUserContext, ct));
     }
 
