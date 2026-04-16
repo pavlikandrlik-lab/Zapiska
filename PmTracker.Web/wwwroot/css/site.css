@@ -3427,55 +3427,44 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .comment-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
-    margin-bottom: 8px;
+    gap: 16px;
+    flex-wrap: wrap;
 }
 
-.comment-identity {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
+.comment-text {
     flex: 1;
-    min-width: 0;
+    min-width: 300px;
+    margin: 0;
 }
 
-.comment-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--gov-color-primary) 15%, transparent);
-    color: var(--gov-color-primary);
-    font-size: 12px;
-    font-weight: 600;
+.comment-metadata {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
     flex-shrink: 0;
-    line-height: 1;
 }
 
-.comment-identity-text {
-    flex: 1;
-    min-width: 0;
+.comment-info {
+    text-align: right;
 }
 
 .comment-author {
     font-size: 13px;
     display: block;
     line-height: 1.3;
+    font-weight: 600;
 }
 
 .comment-subline {
     font-size: 12px;
     color: var(--gov-color-muted);
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    align-items: center;
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-end;
     line-height: 1.3;
-    margin-top: 1px;
+    margin-top: 2px;
 }
 
 .comment-meeting-chip {
@@ -3522,10 +3511,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .comment-edit-toggle::-webkit-details-marker {
     display: none;
-}
-
-.comment-text {
-    margin: 0;
 }
 
 .richtext-render {
