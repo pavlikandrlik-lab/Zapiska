@@ -1127,6 +1127,7 @@ export class ScheduleBlockRenderer {
 
         segment.style.left = formatSchedulePercent(leftPercent);
         segment.style.width = formatScheduleSegmentWidth(widthPercent);
+        segment.style.display = widthPercent > 0 ? "" : "none";
         if (title) {
             segment.title = title;
         }
@@ -1139,6 +1140,7 @@ export class ScheduleBlockRenderer {
 
         segment.style.left = "0%";
         segment.style.width = "0%";
+        segment.style.display = "none";
     }
 
     renderSummary(plan, actual, state, startDate, deadlineDate) {
