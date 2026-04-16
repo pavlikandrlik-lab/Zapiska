@@ -75,6 +75,11 @@ import { initSessionCoordinator } from "./session.js";
 import { initTheme } from "./theme.js";
 import { initTableTools } from "./tableTools.js";
 import { handleDashboardClick, initDashboardShell } from "./dashboard.js";
+import {
+    handleProjectDashboardChange,
+    handleProjectDashboardClick,
+    initProjectDashboardShell
+} from "./projectDashboard.js";
 
 const projectIndexFilterOptions = {
     hideDoneStorageKey: "pmtracker.projects.hideDone",
@@ -285,6 +290,11 @@ function handleDocumentClick(event) {
         return;
     }
 
+    if (handleProjectDashboardClick(target)) {
+        event.preventDefault();
+        return;
+    }
+
     const recordCommentsRetry = target.closest("[data-record-comments-retry]");
     if (recordCommentsRetry instanceof HTMLButtonElement) {
         event.preventDefault();
@@ -383,6 +393,10 @@ function handleDocumentChange(event) {
         if (form instanceof HTMLFormElement) {
             initRecordSchedulePlanner(form);
         }
+    }
+
+    if (handleProjectDashboardChange(target)) {
+        return;
     }
 }
 
@@ -511,6 +525,7 @@ export function bootstrapPmTrackerApp() {
         () => initMeetingOverview(document),
         () => initProjectIndexUi(),
         () => initDashboardShell(),
+        () => initProjectDashboardShell(),
         () => initSessionCoordinator(),
         () => initModalAjaxSubmit()
     ]);

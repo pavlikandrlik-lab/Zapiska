@@ -61,6 +61,13 @@
             Návrhy
         </a>
     }
+    @if (Model.CanViewDashboard)
+    {
+        <a class="tab"
+           href="@Url.Action("Index", "ProjectDashboard", new { id = Model.Projekt.Id })">
+            Dashboard
+        </a>
+    }
 </div>
 
 @await Html.PartialAsync(

@@ -47,6 +47,7 @@ public sealed class ProjektDetailViewModel : BaseViewModel
     public bool CanManageRecords { get; set; }
     public bool CanManageSchedules { get; set; }
     public bool CanViewProposals { get; set; }
+    public bool CanViewDashboard { get; set; }
     public int CurrentUserOsobaId { get; set; }
     public int? TargetRecordId { get; set; }
     public bool TargetRecordOpenComments { get; set; }

@@ -678,6 +678,7 @@ public sealed class ProjektyController : BaseController
         model.CanManageRecords = canManageRecords;
         model.CanManageSchedules = canManageSchedules;
         model.CanViewProposals = await _recordProposalService.CanViewProposalTabAsync(projectId, CurrentUserContext, ct);
+        model.CanViewDashboard = CurrentUserContext.IsSuperAdmin;
         model.PageTitle = model.Projekt.Nazev;
         model.BackUrl = Url.Action("Index", "Projekty") ?? "/Projekty";
         model.BackLabel = "Zpět na přehled";
