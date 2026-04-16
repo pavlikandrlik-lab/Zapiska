@@ -72,6 +72,7 @@ public sealed class ProjectDashboardService : IProjectDashboardService
                 where record.ProjektId == projectId
                     && taskCategoryIds.Contains(record.KategorieId)
                     && (!record.StavUkoluId.HasValue || !finalStateIds.Contains(record.StavUkoluId.Value))
+                orderby record.DatumZalozeni descending
                 select new
                 {
                     record.Id,
@@ -84,6 +85,7 @@ public sealed class ProjectDashboardService : IProjectDashboardService
                     SubsystemNazev = subsystem.Nazev,
                     VlastnikJmeno = owner.Jmeno + " " + owner.Prijmeni
                 })
+            .Take(500)
             .ToListAsync(ct);
 
         if (records.Count == 0)
