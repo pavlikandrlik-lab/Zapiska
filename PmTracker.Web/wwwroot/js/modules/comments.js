@@ -49,35 +49,45 @@ export function applyCommentSort(section, direction) {
 
     const normalizedDirection = normalizeCommentSortDirection(direction);
     const list = section.querySelector("[data-comment-list]");
-    if (!(list instanceof HTMLElement)) {
-        return;
-    }
+    const paginationActions = section.querySelector(".comment-pagination-actions");
 
-    const items = Array.from(list.querySelectorAll("[data-comment-item]"))
-        .filter((item) => item instanceof HTMLElement);
-    if (items.length <= 1) {
-        return;
-    }
+    if (list instanceof HTMLElement) {
+        const items = Array.from(list.querySelectorAll("[data-comment-item]"))
+            .filter((item) => item instanceof HTMLElement);
 
-    items.sort((aNode, bNode) => {
-        const aMeeting = Number(aNode.getAttribute("data-comment-meeting") || "0");
-        const bMeeting = Number(bNode.getAttribute("data-comment-meeting") || "0");
-        const aDate = Date.parse(aNode.getAttribute("data-comment-date") || "");
-        const bDate = Date.parse(bNode.getAttribute("data-comment-date") || "");
-        const aId = Number(aNode.getAttribute("data-comment-id") || "0");
-        const bId = Number(bNode.getAttribute("data-comment-id") || "0");
-        if (normalizedDirection === "desc") {
-            return (bMeeting - aMeeting)
-                || ((Number.isFinite(bDate) ? bDate : 0) - (Number.isFinite(aDate) ? aDate : 0))
-                || (bId - aId);
+        if (items.length > 1) {
+            items.sort((aNode, bNode) => {
+                const aMeeting = Number(aNode.getAttribute("data-comment-meeting") || "0");
+                const bMeeting = Number(bNode.getAttribute("data-comment-meeting") || "0");
+                const aDate = Date.parse(aNode.getAttribute("data-comment-date") || "");
+                const bDate = Date.parse(bNode.getAttribute("data-comment-date") || "");
+                const aId = Number(aNode.getAttribute("data-comment-id") || "0");
+                const bId = Number(bNode.getAttribute("data-comment-id") || "0");
+                if (normalizedDirection === "desc") {
+                    return (bMeeting - aMeeting)
+                        || ((Number.isFinite(bDate) ? bDate : 0) - (Number.isFinite(aDate) ? aDate : 0))
+                        || (bId - aId);
+                }
+
+                return (aMeeting - bMeeting)
+                    || ((Number.isFinite(aDate) ? aDate : 0) - (Number.isFinite(bDate) ? bDate : 0))
+                    || (aId - bId);
+            });
+
+            items.forEach((item) => list.appendChild(item));
         }
+    }
 
-        return (aMeeting - bMeeting)
-            || ((Number.isFinite(aDate) ? aDate : 0) - (Number.isFinite(bDate) ? bDate : 0))
-            || (aId - bId);
-    });
+    if (paginationActions instanceof HTMLElement && list instanceof HTMLElement) {
+        if (normalizedDirection === "asc") {
+            if (list.parentElement === section) {
+                section.insertBefore(paginationActions, list);
+            }
+        } else if (paginationActions.previousElementSibling !== list) {
+            list.after(paginationActions);
+        }
+    }
 
-    items.forEach((item) => list.appendChild(item));
     section.setAttribute("data-comment-sort-direction", normalizedDirection);
 }
 
