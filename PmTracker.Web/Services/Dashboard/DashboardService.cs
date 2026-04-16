@@ -3,6 +3,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Audit;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Web.Services.Dashboard;
 
@@ -184,24 +185,6 @@ public sealed class DashboardService : IDashboardService
         var accessibleProjectIds = BuildAccessibleProjectIds(currentUser);
         var hasGlobalProjectRead = HasGlobalProjectReadAccess(currentUser);
 
-        var candidateRows = await (
-                from record in _dbContext.ProjektoveZaznamy.AsNoTracking()
-                join state in _dbContext.CiselnikStavuUkolu.AsNoTracking() on record.StavUkoluId equals state.Id into stateGroup
-                from state in stateGroup.DefaultIfEmpty()
-                where (!record.StavUkoluId.HasValue || !(state != null && state.IsFinal))
-                    && (hasGlobalProjectRead || accessibleProjectIds.Contains(record.ProjektId))
-                select new RelevantRecordRow(
-                    record.Id,
-                    record.ProjektId,
-                    record.VlastnikId,
-                    record.SubsystemId))
-            .ToListAsync(ct);
-
-        if (hasGlobalProjectRead)
-        {
-            return candidateRows.Select(row => row.RecordId).ToHashSet();
-        }
-
         var collaborationRecordIds = await _dbContext.ZaznamSpoluprace.AsNoTracking()
             .Where(item => item.OsobaId == userOsobaId)
             .Select(item => item.ZaznamId)
@@ -227,6 +210,19 @@ public sealed class DashboardService : IDashboardService
         var leadSubsystemSet = leadAssignments
             .Select(item => $"{item.ProjektId}:{item.SubsystemId}")
             .ToHashSet(StringComparer.Ordinal);
+
+        var candidateRows = await (
+                from record in _dbContext.ProjektoveZaznamy.AsNoTracking()
+                join state in _dbContext.CiselnikStavuUkolu.AsNoTracking() on record.StavUkoluId equals state.Id into stateGroup
+                from state in stateGroup.DefaultIfEmpty()
+                where (!record.StavUkoluId.HasValue || !(state != null && state.IsFinal))
+                    && (hasGlobalProjectRead || accessibleProjectIds.Contains(record.ProjektId))
+                select new RelevantRecordRow(
+                    record.Id,
+                    record.ProjektId,
+                    record.VlastnikId,
+                    record.SubsystemId))
+            .ToListAsync(ct);
 
         return candidateRows
             .Where(row =>
@@ -359,13 +355,16 @@ public sealed class DashboardService : IDashboardService
                 : (await (
                         from record in _dbContext.ProjektoveZaznamy.AsNoTracking()
                         join project in _dbContext.Projekty.AsNoTracking() on record.ProjektId equals project.Id
+                        join category in _dbContext.CiselnikKategoriiZaznamu.AsNoTracking() on record.KategorieId equals category.Id
                         select new RecordAuditRow(
                             record.Id,
                             record.ProjektId,
                             project.Zkratka,
                             project.CelyNazev,
                             record.CisloViditelne ?? string.Empty,
-                            record.Nazev))
+                            record.Nazev,
+                            category.Kod ?? string.Empty,
+                            category.Nazev ?? string.Empty))
                     .Where(item => recordIds.Contains(item.RecordId))
                     .ToDictionaryAsync(item => item.RecordId, ct));
 
@@ -432,6 +431,33 @@ public sealed class DashboardService : IDashboardService
                         continue;
                     }
 
+                    var isCreate = string.Equals(row.Action, AuditActionType.Create.ToDatabaseValue(), StringComparison.OrdinalIgnoreCase);
+                    var isTask = RecordCategoryClassifier.IsTaskCategory(record.CategoryCode, record.CategoryName);
+                    var isInfoOrDecision = RecordCategoryClassifier.IsInformationOrDecisionCategory(record.CategoryCode, record.CategoryName);
+
+                    if (isTask)
+                    {
+                        if (!relevantRecordIds.Contains(record.RecordId))
+                        {
+                            continue;
+                        }
+                    }
+                    else if (isInfoOrDecision)
+                    {
+                        if (!isCreate)
+                        {
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+                    var eventLabel = isTask
+                        ? (isCreate ? "Nový úkol" : "Změna úkolu")
+                        : (string.IsNullOrWhiteSpace(record.CategoryName) ? "Nový záznam" : $"Nové: {record.CategoryName}");
+
                     items.Add(new DashboardNewsItemViewModel
                     {
                         AuditLogId = row.Id,
@@ -439,7 +465,7 @@ public sealed class DashboardService : IDashboardService
                         RecordId = record.RecordId,
                         EntityType = row.EntityType,
                         Action = row.Action,
-                        EventLabel = string.Equals(row.Action, AuditActionType.Create.ToDatabaseValue(), StringComparison.OrdinalIgnoreCase) ? "Nový záznam" : "Změna záznamu",
+                        EventLabel = eventLabel,
                         Title = $"{record.RecordNumber} - {record.RecordTitle}",
                         Description = $"Projekt {BuildProjectLabel(record.ProjectCode, record.ProjectName)}",
                         ProjectLabel = BuildProjectLabel(record.ProjectCode, record.ProjectName),
@@ -571,7 +597,9 @@ public sealed class DashboardService : IDashboardService
         string ProjectCode,
         string ProjectName,
         string RecordNumber,
-        string RecordTitle);
+        string RecordTitle,
+        string CategoryCode,
+        string CategoryName);
 
     private sealed record MeetingAuditRow(
         int MeetingId,
