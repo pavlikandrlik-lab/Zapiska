@@ -6,6 +6,7 @@ public static class ProjectRoleCodes
     public const string Host = "HOST";
     public const string ProjectAdmin = "ADM_PROJ";
     public const string ProjectManager = "PROJ_MAN";
+    public const string Gestor = "GEST";
 }
 
 public static class SubsystemRoleCodes
