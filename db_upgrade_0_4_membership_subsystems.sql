@@ -140,8 +140,12 @@ DECLARE @leadRoleId int = (
     ORDER BY id
 );
 
+-- Pokud subsystemy.vedouci_osoba_id neexistuje (fresh install), přeskočit migraci.
+-- Blok musí být v dynamickém SQL, protože parse-time name resolution by jinak
+-- stejně vyhodilo 'Invalid column name' i v IF-větvi, která se nemá vykonat.
 IF @leadRoleId IS NOT NULL AND COL_LENGTH('dbo.subsystemy', 'vedouci_osoba_id') IS NOT NULL
 BEGIN
+    DECLARE @sql nvarchar(max) = N'
     INSERT INTO dbo.obsazeni_subsystemu_projektu (projekt_subsystem_id, osoba_id, role_subsystemu_id)
     SELECT ps.id, s.vedouci_osoba_id, @leadRoleId
     FROM dbo.projekt_subsystemy ps
@@ -154,6 +158,8 @@ BEGIN
             AND existing.osoba_id = s.vedouci_osoba_id
             AND existing.role_subsystemu_id = @leadRoleId
             AND existing.datum_odebrani IS NULL
-      );
+      );';
+
+    EXEC sp_executesql @sql, N'@leadRoleId int', @leadRoleId = @leadRoleId;
 END
 GO

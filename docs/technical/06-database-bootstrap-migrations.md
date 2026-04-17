@@ -24,9 +24,15 @@ Dokument popisuje standardní databázový lifecycle: inicializaci baseline, apl
 ## 5. Detailní postup
 ### 5.1 Pořadí spuštění skriptů
 1. `PMTracker_insert_sql`
-2. `db_upgrade_1_1_0_signed_schedule_actual.sql`
-3. `db_upgrade_1_1_1_external_link_estimated_price.sql`
-4. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
+2. `db_upgrade_0_4_membership_subsystems.sql`
+3. `db_upgrade_1_1_0_signed_schedule_actual.sql`
+4. `db_upgrade_1_1_1_external_link_estimated_price.sql`
+5. `db_upgrade_1_1_2_project_subsystem_order.sql`
+6. `db_upgrade_1_1_3_record_proposals.sql`
+7. `db_upgrade_1_1_4_record_priority_matrix.sql`
+8. `db_upgrade_1_1_5_search_checkpoint.sql`
+9. `db_upgrade_1_1_6_project_roles_manager_gestor.sql`
+10. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
 
 ### 5.2 Fresh install
 ```powershell
