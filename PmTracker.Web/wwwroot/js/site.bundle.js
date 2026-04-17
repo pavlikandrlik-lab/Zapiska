@@ -5646,7 +5646,7 @@ function initCustomTimePickers(scope) {
     };
     const render = () => {
       grid.innerHTML = "";
-      for (let hour = 0;hour < 24; hour += 1) {
+      for (let hour = 6;hour <= 22; hour += 1) {
         for (let minute = 0;minute < 60; minute += 15) {
           const timeText = formatTime(hour, minute);
           const button = document.createElement("button");
