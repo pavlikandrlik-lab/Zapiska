@@ -70,6 +70,7 @@ function applyMeetingYearState(group) {
 
     const state = group.dataset.meetingYearState || "collapsed";
     clearPreviewHiddenSlots(group);
+    delete group.dataset.meetingYearHasHidden;
 
     if (state === "collapsed") {
         body.hidden = true;
@@ -80,8 +81,8 @@ function applyMeetingYearState(group) {
     }
 
     body.hidden = false;
-    toggle.setAttribute("aria-expanded", "true");
     if (state !== "preview") {
+        toggle.setAttribute("aria-expanded", "true");
         body.classList.remove("is-preview");
         body.style.removeProperty("max-height");
         return;
@@ -91,6 +92,7 @@ function applyMeetingYearState(group) {
     body.style.removeProperty("max-height");
     const firstRowSlots = getFirstVisualRowSlots(grid);
     const firstRowIds = new Set(firstRowSlots.map(getMeetingId).filter(Boolean));
+    let hiddenCount = 0;
     getMeetingCardSlots(grid).forEach((slot) => {
         const meetingId = getMeetingId(slot);
         if (!meetingId || firstRowIds.has(meetingId)) {
@@ -99,7 +101,17 @@ function applyMeetingYearState(group) {
 
         slot.hidden = true;
         slot.dataset.meetingPreviewHidden = "true";
+        hiddenCount += 1;
     });
+
+    if (hiddenCount > 0) {
+        group.dataset.meetingYearHasHidden = "true";
+    }
+
+    // aria-expanded: v preview reflektuje, zda je co dorozbalovat.
+    // Skryté karty → uživatel může ještě expandovat → aria-expanded="false".
+    // Nic neskryto (první řádek = celý rok) → aria-expanded="true" (kliknutí zavírá).
+    toggle.setAttribute("aria-expanded", hiddenCount > 0 ? "false" : "true");
 }
 
 function syncYearGroupedMeetingOverview(root) {
@@ -127,11 +139,17 @@ export function toggleMeetingYearGroup(toggle) {
     }
 
     const currentState = group.dataset.meetingYearState || "collapsed";
-    group.dataset.meetingYearState = currentState === "preview"
-        ? "open"
-        : currentState === "open"
-            ? "collapsed"
-            : "open";
+    const hasHidden = group.dataset.meetingYearHasHidden === "true";
+
+    if (currentState === "open") {
+        group.dataset.meetingYearState = "collapsed";
+    } else if (currentState === "preview") {
+        // Když jsou v preview skryté další karty → rozbalíme na plný open.
+        // Když v preview nic skryté není (vše se vešlo na první řádek) → zabalíme.
+        group.dataset.meetingYearState = hasHidden ? "open" : "collapsed";
+    } else {
+        group.dataset.meetingYearState = "open";
+    }
 
     applyMeetingYearState(group);
 }

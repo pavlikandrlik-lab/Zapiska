@@ -4544,8 +4544,14 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin-top: -4px;
 }
 
+/* Šipka nahoru = rok je "plně otevřený" (kliknutí ho zabalí).
+   - open: všechna jednání viditelná
+   - preview BEZ skrytých karet: jeden řádek se vešel celý, kliknutí zabalí
+   Šipka dolů (default 45deg) = je co rozbalovat:
+   - collapsed
+   - preview SE skrytými kartami (více řádků, ukazuje se jen první) */
 .meeting-year-group[data-meeting-year-state="open"] .meeting-year-chevron,
-.meeting-year-group[data-meeting-year-state="preview"] .meeting-year-chevron {
+.meeting-year-group[data-meeting-year-state="preview"]:not([data-meeting-year-has-hidden="true"]) .meeting-year-chevron {
     transform: rotate(-135deg);
     margin-top: 4px;
 }
