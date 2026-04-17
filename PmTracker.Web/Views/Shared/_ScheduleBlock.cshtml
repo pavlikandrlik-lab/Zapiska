@@ -10,8 +10,13 @@
     var overviewAxisCssClass = isEditor ? "timeline-axis schedule-mini-gantt-axis-track" : "timeline-axis schedule-overview-axis";
     var overviewSegmentCssClass = isEditor ? "schedule-mini-gantt-segment" : "schedule-overview-segment";
     var overviewMarkerCssClass = isEditor ? "schedule-mini-gantt-marker" : "schedule-overview-marker";
-    var visibleCompactSteps = Model.Kroky
-        .Where(krok => krok.TrvaniDni > 0)
+    // V editoru musíme vyrenderovat segmenty pro VŠECHNY kroky (i zero-duration),
+    // aby je JS mohl zobrazit, když uživatel zadá kladné trvání. Segmenty s width=0
+    // se schovávají přes display:none ve schedule.js (applySegmentLayout/resetSegmentLayout).
+    // V readonly (card) variantě filtrujeme zero-duration, abychom se vyhnuli artefaktům.
+    var visibleCompactSteps = (isEditor
+            ? Model.Kroky
+            : Model.Kroky.Where(krok => krok.TrvaniDni > 0))
         .OrderBy(krok => krok.KrokIndex)
         .ToList();
     var editorInputIndex = 0;
@@ -95,6 +100,9 @@
                         var ariaLabel = row.Item1 == "planned"
                             ? $"Krok {krok.KrokIndex} {krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
                             : $"Krok {krok.KrokIndex} {krok.Nazev}: skutečnost {krok.SkutecneDatum:dd.MM.yyyy}";
+                        // Zero-duration kroky: schováme hned při SSR, JS je zobrazí po applySegmentLayout,
+                        // když uživatel zadá kladné trvání v editoru.
+                        var initialHidden = krok.TrvaniDni <= 0 ? "display:none;" : string.Empty;
                         <span class="@overviewSegmentCssClass"
                               role="img"
                               aria-label="@ariaLabel"
@@ -102,7 +110,7 @@
                               data-rainbow-segment-label-short="@krok.KrokIndex"
                               data-schedule-segment-kind="@row.Item1"
                               data-step-index="@krok.KrokIndex"
-                              style="background:@krok.BarvaHex;"
+                              style="background:@krok.BarvaHex;@initialHidden"
                               title="@segmentTitle"></span>
                     }
                 </div>
@@ -149,7 +157,7 @@
                      data-axis-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
                      data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"></div>
             </div>
-            @foreach (var krok in Model.Kroky.OrderBy(k => k.KrokIndex))
+            @foreach (var krok in Model.Kroky.Where(k => k.TrvaniDni > 0).OrderBy(k => k.KrokIndex))
             {
                 var offsetLabel = krok.OdchylkaDni > 0 ? $"+{krok.OdchylkaDni} dnů" : $"{krok.OdchylkaDni} dnů";
                 var offsetCssClass = krok.OdchylkaDni > 0 ? "late" : krok.OdchylkaDni < 0 ? "ahead" : null;
@@ -165,26 +173,24 @@
                         <span class="gantt-step-offset @offsetCssClass" data-schedule-offset>@offsetLabel</span>
                     </div>
                     <div class="schedule-layered-track schedule-layered-track--step" data-schedule-breakdown-track>
-                        @if (krok.TrvaniDni > 0)
-                        {
-                            <div class="schedule-layered-marker today"
-                                 data-schedule-breakdown-today
-                                 title="Dnes"></div>
-                            <span class="schedule-layered-segment planned"
-                                  role="img"
-                                  aria-label="Krok @krok.KrokIndex @krok.Nazev: plán @krok.BaselineDatum.ToString("dd.MM.yyyy")"
-                                  data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: plán @krok.BaselineDatum.ToString("dd.MM.yyyy")"
-                                  data-rainbow-segment-label-full="@krok.Nazev"
-                                  data-rainbow-segment-label-short="@krok.KrokIndex"
-                                  data-schedule-breakdown-segment="planned"
-                                  data-step-index="@krok.KrokIndex"
-                                  style="background:@krok.BarvaHex;"></span>
-                            <span class="schedule-layered-segment actual"
-                                  role="img"
-                                  aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
-                                  data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
-                                  data-schedule-breakdown-segment="actual"
-                                  data-step-index="@krok.KrokIndex"></span>
+                        <div class="schedule-layered-marker today"
+                             data-schedule-breakdown-today
+                             title="Dnes"></div>
+                        <span class="schedule-layered-segment planned"
+                              role="img"
+                              aria-label="Krok @krok.KrokIndex @krok.Nazev: plán @krok.BaselineDatum.ToString("dd.MM.yyyy")"
+                              data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: plán @krok.BaselineDatum.ToString("dd.MM.yyyy")"
+                              data-rainbow-segment-label-full="@krok.Nazev"
+                              data-rainbow-segment-label-short="@krok.KrokIndex"
+                              data-schedule-breakdown-segment="planned"
+                              data-step-index="@krok.KrokIndex"
+                              style="background:@krok.BarvaHex;"></span>
+                        <span class="schedule-layered-segment actual"
+                              role="img"
+                              aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
+                              data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
+                              data-schedule-breakdown-segment="actual"
+                              data-step-index="@krok.KrokIndex"></span>
                         }
                     </div>
                 </div>
