@@ -124,113 +124,162 @@
     gap: 12px;
 }
 
-/* ── Global search (header, gov design system) ──────────────────────────── */
+/* ── Global search (header) ─────────────────────────────────────────────── */
+/* Převzato 1:1 z @gov-design-system-ce/styles 4.2.7 (lib/html/components/gov-form-search.css)
+   a sesterských komponent gov-form-input a gov-button. Proměnné jsou namapovány
+   na naše --gov-color-* tokeny z govcz.css. */
 
-.app-search,
-.gov-search {
+.app-search {
     flex: 1;
     max-width: 560px;
     position: relative;
     display: flex;
     align-items: stretch;
-    gap: 0;
 }
 
-.gov-search-field {
-    flex: 1;
+.gov-form-search {
     position: relative;
     display: flex;
+    width: 100%;
+    padding-right: 4px;
     align-items: center;
+    border-radius: var(--gov-radius);
     background-color: var(--gov-color-surface);
     border: 1px solid var(--gov-color-border);
-    border-right: none;
-    border-top-left-radius: var(--gov-radius-sm);
-    border-bottom-left-radius: var(--gov-radius-sm);
-    padding-left: 12px;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gov-form-search > * {
+    flex: 1 1 auto;
+}
+
+.gov-form-search [slot="input"] {
+    flex: 1 1 auto;
     min-width: 0;
 }
 
-.gov-search-field:focus-within {
-    border-color: var(--gov-color-primary);
-    box-shadow: 0 0 0 3px rgba(0, 94, 165, 0.15);
-    z-index: 1;
+.gov-form-search [slot="button"] {
+    flex: 0 0 auto;
 }
 
-.gov-search-icon {
+.gov-form-search:focus,
+.gov-form-search:focus-visible,
+.gov-form-search:focus-within {
+    outline: none;
+    border-color: var(--gov-color-primary);
+    box-shadow: 0 0 0 3px rgba(0, 94, 165, 0.15);
+}
+
+.gov-form-search[data-size="m"] {
+    height: 44px;
+    gap: 8px;
+}
+
+.gov-form-search[data-size="l"] {
+    height: 48px;
+    gap: 10px;
+}
+
+.gov-form-search[data-color="neutral"] {
+    border-color: var(--gov-color-border);
+}
+
+.gov-form-search[data-color="primary"] {
+    border-color: var(--gov-color-primary);
+}
+
+@media not all and (pointer: coarse) {
+    .gov-form-search:hover {
+        background-color: color-mix(in srgb, var(--gov-color-surface) 94%, var(--gov-color-primary) 6%);
+    }
+}
+
+/* gov-form-input uvnitř gov-form-search (bez vlastního border) */
+.gov-form-search .gov-form-input {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background-color: transparent;
+    min-width: 0;
+}
+
+.gov-form-search .gov-form-input .element {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding-left: 12px;
+    border-width: 0;
+    background-color: transparent;
+    min-width: 0;
+}
+
+.gov-form-search .gov-form-input .element:focus-within {
+    outline: none;
+}
+
+.gov-form-input__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 8px 4px;
+    font-size: 15px;
+    color: var(--app-text-primary);
+    line-height: 1.4;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.gov-form-input__input::-webkit-search-cancel-button {
+    cursor: pointer;
+}
+
+.gov-form-input__input::placeholder {
+    color: var(--gov-color-muted);
+}
+
+.gov-icon.gov-icon--system {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: var(--gov-color-muted);
     flex-shrink: 0;
+    width: 20px;
+    height: 20px;
 }
 
-.gov-search-input {
-    flex: 1;
-    border: none;
-    outline: none;
-    background: transparent;
-    height: 40px;
-    padding: 8px 12px;
-    font-size: 14px;
-    color: var(--app-text-primary);
-    line-height: 1.35;
-    box-sizing: border-box;
-    min-width: 0;
-}
-
-.gov-search-input::-webkit-search-cancel-button {
-    cursor: pointer;
-}
-
-.gov-search-submit {
+/* gov-button uvnitř gov-form-search */
+.gov-form-search .gov-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0 18px;
-    height: 40px;
+    padding: 0 16px;
+    height: 36px;
     background-color: var(--gov-color-primary);
     color: #ffffff;
     border: 1px solid var(--gov-color-primary);
-    border-top-right-radius: var(--gov-radius-sm);
-    border-bottom-right-radius: var(--gov-radius-sm);
+    border-radius: var(--gov-radius-sm);
     font-size: 14px;
     font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
     transition: background-color 0.15s ease, border-color 0.15s ease;
-    flex-shrink: 0;
+    white-space: nowrap;
 }
 
-.gov-search-submit:hover,
-.gov-search-submit:focus-visible {
+.gov-form-search .gov-button:hover,
+.gov-form-search .gov-button:focus-visible {
     background-color: color-mix(in srgb, var(--gov-color-primary) 88%, #000 12%);
     border-color: color-mix(in srgb, var(--gov-color-primary) 88%, #000 12%);
     outline: none;
 }
 
-/* Legacy single-input layout (fallback for any remaining raw input) */
-.app-search input[type="search"]:not(.gov-search-input) {
-    width: 100%;
-    height: 40px;
-    padding: 7px 12px 7px 36px;
-    font-size: 14px;
-    border-radius: var(--gov-radius-sm);
-    border: 1px solid var(--gov-color-border);
-    background-color: var(--gov-color-surface);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23505a5f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: 10px center;
-    background-size: 16px 16px;
-    color: var(--app-text-primary);
-    line-height: 1.35;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    box-sizing: border-box;
-}
-
-.app-search input[type="search"]:not(.gov-search-input):focus {
-    outline: none;
-    border-color: var(--gov-color-primary);
-    box-shadow: 0 0 0 3px rgba(0, 94, 165, 0.15);
+.gov-form-search .gov-button__label {
+    display: inline-block;
 }
 
 .app-search-dropdown {
@@ -5071,12 +5120,17 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border-bottom-color: var(--gov-color-border);
 }
 
-:root[data-theme="dark"] .app-search input[type="search"] {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a0aec0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+:root[data-theme="dark"] .gov-form-search {
+    background-color: var(--gov-color-surface);
+    border-color: var(--gov-color-border);
 }
 
-:root[data-theme="dark"] .app-search input[type="search"]:focus {
+:root[data-theme="dark"] .gov-form-search:focus-within {
     box-shadow: 0 0 0 3px rgba(0, 94, 165, 0.25);
+}
+
+:root[data-theme="dark"] .gov-form-input__input {
+    color: var(--app-text-primary);
 }
 
 :root[data-theme="dark"] .app-search-dropdown {
@@ -5803,23 +5857,22 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     }
 }
 @media (max-width: 768px) {
-    .app-search,
-    .gov-search {
+    .app-search {
         flex: 1 1 100%;
         max-width: 100%;
         order: 3;
         margin-top: 8px;
     }
 
-    .gov-search-submit span {
+    .gov-form-search .gov-button__label {
         display: none;
     }
 
-    .gov-search-submit {
+    .gov-form-search .gov-button {
         padding: 0 12px;
     }
 
-    .gov-search-submit::before {
+    .gov-form-search .gov-button::before {
         content: "";
         width: 16px;
         height: 16px;

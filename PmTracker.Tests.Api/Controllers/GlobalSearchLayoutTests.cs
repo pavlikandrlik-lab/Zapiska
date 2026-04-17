@@ -24,7 +24,7 @@ public sealed class GlobalSearchLayoutTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain("data-global-search", "search form musí být vždy v layoutu");
-        html.Should().Contain("class=\"gov-search app-search\"", "search musí používat gov design system třídy");
+        html.Should().Contain("gov-form-search", "kořenový kontejner musí být gov-form-search dle designsystem.gov.cz");
         html.Should().Contain("role=\"search\"", "form musí mít semantickou roli search");
         html.Should().Contain("name=\"q\"", "input pro dotaz musí být pojmenovaný q");
         html.Should().Contain("action=\"/Search", "form musí odkazovat na /Search");
@@ -39,7 +39,8 @@ public sealed class GlobalSearchLayoutTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain("gov-search-submit", "musí být klikatelné tlačítko pro odeslání");
+        html.Should().Contain("slot=\"button\"", "submit je ve slotu button dle gov-form-search");
+        html.Should().Contain("class=\"gov-button\"", "tlačítko používá gov-button třídu");
         html.Should().Contain("type=\"submit\"", "tlačítko musí být submit");
         html.Should().Contain("aria-label=\"Vyhledat\"", "tlačítko má přístupný popis");
     }
@@ -53,7 +54,8 @@ public sealed class GlobalSearchLayoutTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain("gov-search-input", "input musí mít gov design třídu");
+        html.Should().Contain("slot=\"input\"", "input je ve slotu input dle gov-form-search");
+        html.Should().Contain("gov-form-input__input", "input musí mít BEM třídu gov-form-input__input");
         html.Should().Contain("type=\"search\"", "input musí být typu search");
         html.Should().Contain("aria-label=\"Globální vyhledávání\"", "input musí mít přístupný popis");
     }
