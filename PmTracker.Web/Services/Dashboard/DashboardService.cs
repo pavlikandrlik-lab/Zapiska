@@ -337,6 +337,7 @@ public sealed class DashboardService : IDashboardService
                 ? new Dictionary<int, CommentAuditRow>()
                 : (await (
                         from comment in _dbContext.Vyjadreni.AsNoTracking()
+                        where commentIds.Contains(comment.Id)
                         join record in _dbContext.ProjektoveZaznamy.AsNoTracking() on comment.ZaznamId equals record.Id
                         join project in _dbContext.Projekty.AsNoTracking() on record.ProjektId equals project.Id
                         select new CommentAuditRow(
@@ -347,13 +348,13 @@ public sealed class DashboardService : IDashboardService
                             project.CelyNazev,
                             record.CisloViditelne ?? string.Empty,
                             record.Nazev))
-                    .Where(item => commentIds.Contains(item.CommentId))
                     .ToDictionaryAsync(item => item.CommentId, ct));
 
             var recordsById = recordIds.Count == 0
                 ? new Dictionary<int, RecordAuditRow>()
                 : (await (
                         from record in _dbContext.ProjektoveZaznamy.AsNoTracking()
+                        where recordIds.Contains(record.Id)
                         join project in _dbContext.Projekty.AsNoTracking() on record.ProjektId equals project.Id
                         join category in _dbContext.CiselnikKategoriiZaznamu.AsNoTracking() on record.KategorieId equals category.Id
                         select new RecordAuditRow(
@@ -365,13 +366,13 @@ public sealed class DashboardService : IDashboardService
                             record.Nazev,
                             category.Kod ?? string.Empty,
                             category.Nazev ?? string.Empty))
-                    .Where(item => recordIds.Contains(item.RecordId))
                     .ToDictionaryAsync(item => item.RecordId, ct));
 
             var meetingsById = meetingIds.Count == 0
                 ? new Dictionary<int, MeetingAuditRow>()
                 : (await (
                         from meeting in _dbContext.Jednani.AsNoTracking()
+                        where meetingIds.Contains(meeting.Id)
                         join project in _dbContext.Projekty.AsNoTracking() on meeting.ProjektId equals project.Id
                         select new MeetingAuditRow(
                             meeting.Id,
@@ -381,7 +382,6 @@ public sealed class DashboardService : IDashboardService
                             meeting.CisloJednani,
                             meeting.DatumPlanovane,
                             meeting.CasZacatek))
-                    .Where(item => meetingIds.Contains(item.MeetingId))
                     .ToDictionaryAsync(item => item.MeetingId, ct));
 
             foreach (var row in auditRows)

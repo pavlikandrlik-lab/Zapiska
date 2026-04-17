@@ -102,9 +102,9 @@ H - Při schválení se mají do provozních dat propsat pouze schválené změn
 - Výsledky vyhledávání se mají filtrovat podle oprávnění a scope aktuálního uživatele; preferovaná varianta je hledat nad širším indexem a teprve nad výsledky aplikovat autorizaci.
 - Vyhledávací engine má být postavený na `Elasticsearch` nebo `OpenSearch`; finální volba technologie se může rozhodnout později.
 - Vyhledávání má být sémantické, ale zároveň praktické, předvídatelné a nepřehnaně „kreativní“.
-- Zachovat a dotáhnout audit změn v celé aplikaci pro všechny akce, které mění data.
-- Každá write akce musí auditně zaznamenat minimálně kdo akci provedl, kdy byla provedena, jaký typ akce proběhl, nad jakou entitou nebo záznamem proběhla a jaká data byla po změně uložena; pokud to dává smysl, audit má ukládat i stav před změnou.
-- Stávající auditní řešení se má projít a ověřit na úplnost tak, aby žádná akce měnící data nezůstala mimo auditní log.
+H - Zachovat a dotáhnout audit změn v celé aplikaci pro všechny akce, které mění data.
+H - Každá write akce musí auditně zaznamenat minimálně kdo akci provedl, kdy byla provedena, jaký typ akce proběhl, nad jakou entitou nebo záznamem proběhla a jaká data byla po změně uložena; pokud to dává smysl, audit má ukládat i stav před změnou.
+H - Stávající auditní řešení se má projít a ověřit na úplnost tak, aby žádná akce měnící data nezůstala mimo auditní log.
 
 ## 8. Pozdější a technicky náročnější fáze
 
@@ -116,3 +116,5 @@ H - Při schválení se mají do provozních dat propsat pouze schválené změn
 - Detailní mapování zdrojových textů, pravidel parsování a převodu do harmonogramu bude doplněno až ve chvíli, kdy budou k dispozici konkrétní příklady a rozhodovací pravidla.
 
 ## 9. Uživatelský dashboard
+
+~~H - Opravit panel `Co je nového` v pravém dolním rohu — aktuálně hlásí `Nepodařilo se načíst obsah panelu` i při běžném načtení.~~ **Vyřešeno 2026-04-17** — chyba byla v EF Core LINQ překladu (`.Where(... Contains(item.Id))` za projekcí do positional `record` typu). Filtr přesunutý před projekci. Zároveň: prázdný stav upraven na `Nic nového se neudálo.`, výchozí `take` stránky `/dashboard/news` zvýšený z 20 na 50. Specifikace zůstává v [docs/specs/dashboard-user-news.md](docs/specs/dashboard-user-news.md). Pokryto regression testem `DashboardServiceNewsQueryShapeTests`.

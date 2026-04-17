@@ -12,7 +12,7 @@ public sealed class DashboardController : BaseController
     private const int FocusHomepageLimit = 8;
     private const int MeetingsHomepageLimit = 5;
     private const int NewsHomepageLimit = 5;
-    private const int NewsListDefaultTake = 20;
+    private const int NewsListDefaultTake = 50;
 
     private readonly IDashboardService _dashboardService;
 

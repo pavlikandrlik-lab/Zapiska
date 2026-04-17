@@ -20,6 +20,11 @@
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/user-guide.md`
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/qa.md`
 
+## 2a. Funkční specifikace (očekávané chování modulů)
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/specs/meetings-year-grouping.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/specs/record-proposal-editor.md`
+- `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/specs/dashboard-user-news.md`
+
 ## 3. Release dokumentace
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/changelog/releases/`
 - `/Users/Pavel.Andrlik/Documents/PM Tracker/CHANGELOG.md`
