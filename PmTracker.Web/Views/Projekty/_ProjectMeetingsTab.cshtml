@@ -17,20 +17,29 @@
     }
     else
     {
+        @*
+            Projektová záložka Jednání: historické roky JSOU ROZBALENÉ (state="open"),
+            protože jde jen o jeden projekt a uživatel vidí vše najednou.
+            Aplikační záložka /Jednani/Index naopak historii skrývá (state="collapsed"),
+            protože tam je více projektů a seznam by byl příliš dlouhý.
+            Viz docs/specs/meetings-year-grouping.md.
+        *@
         <div class="meeting-year-stack"
              data-meeting-overview="year-grouped"
+             data-meeting-history-default="open"
              data-meeting-preview-year="@(Model.PreviewRok?.ToString() ?? string.Empty)">
             @foreach (var rok in Model.RocniSkupiny)
             {
                 var isPreviewYear = Model.PreviewRok.HasValue && rok.Rok == Model.PreviewRok.Value;
+                var initialState = isPreviewYear ? "preview" : "open";
                 <section class="meeting-year-group"
                          data-meeting-year-group
                          data-meeting-year="@rok.Rok"
-                         data-meeting-year-state="@(isPreviewYear ? "preview" : "collapsed")">
+                         data-meeting-year-state="@initialState">
                     <button class="meeting-year-toggle"
                             type="button"
                             data-meeting-year-toggle
-                            aria-expanded="@(isPreviewYear ? "true" : "false")">
+                            aria-expanded="@(initialState == "collapsed" ? "false" : "true")">
                         <span class="meeting-year-toggle-main">
                             <span class="meeting-year-title">@rok.Rok</span>
                             <span class="meeting-year-count" data-meeting-year-count>@rok.PocetJednani jednání</span>
@@ -39,7 +48,7 @@
                     </button>
                     <div class="meeting-year-body@(isPreviewYear ? " is-preview" : null)"
                          data-meeting-year-body
-                         @(isPreviewYear ? null : "hidden")>
+                         @(initialState == "collapsed" ? "hidden" : null)>
                         <div class="meeting-grid" data-meeting-year-grid>
                             @foreach (var jednani in rok.Jednani)
                             {

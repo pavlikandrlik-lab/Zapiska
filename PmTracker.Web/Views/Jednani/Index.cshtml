@@ -23,8 +23,15 @@
         }
         else
         {
+            @*
+                Aplikační záložka Jednání: historické roky jsou SBALENÉ (state="collapsed"),
+                protože se zobrazuje více projektů uživatele. Aktuální rok má preview režim.
+                Projektová záložka jednání naopak historii nechává rozbalenou.
+                Viz docs/specs/meetings-year-grouping.md.
+            *@
             <div class="meeting-year-stack"
                  data-meeting-overview="year-grouped"
+                 data-meeting-history-default="collapsed"
                  data-meeting-preview-year="@(projekt.PreviewRok?.ToString() ?? string.Empty)">
                 @foreach (var rok in projekt.RocniSkupiny)
                 {
