@@ -114,6 +114,79 @@ public sealed class RecordEditModalCloseScenariosTests
         await page.Context.CloseAsync();
     }
 
+    /// <summary>
+    /// Reprodukce bugu: po přepnutí na záložku Harmonogram v editoru záznamu
+    /// přestane modal reagovat na zavírání (křížek ani Escape nefungují), protože
+    /// JS v schedule planneru přepíše hodnoty UiHarmonogramDatumy[*] a form se
+    /// stane "dirty" → close guard dialog blokuje zavření.
+    /// Test běží na úkolovém záznamu (záložka harmonogram v projektu).
+    /// </summary>
+    [Fact]
+    public async Task RecordEditModal_ShouldCloseViaCloseButton_AfterSwitchingToHarmonogramTab()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
+        await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
+        await page.ReloadAsync();
+
+        if (await page.Locator(".schedule-card").CountAsync() == 0)
+        {
+            // Projekt nemá úkolový záznam se scheduledem; test přeskočíme.
+            await page.Context.CloseAsync();
+            return;
+        }
+
+        await page.Locator(".schedule-card .btn.small", new() { HasTextString = "Upravit" }).First.ClickAsync();
+
+        var modal = page.Locator(".modal-overlay");
+        await Expect(modal.Locator("form[data-record-editor-form='true']")).ToBeVisibleAsync();
+
+        // Přepnout na záložku Harmonogram
+        await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+        await Expect(modal.Locator("[data-record-modal-panel=\"schedule\"].active")).ToBeVisibleAsync();
+
+        // Kliknout na křížek → modal se musí zavřít bez close-guardu
+        await modal.GetByRole(AriaRole.Button, new() { Name = "Zavřít dialog" }).ClickAsync();
+
+        // Pokud se objeví close guard, máme bug — uživatel ho nečekal
+        await Expect(page.Locator("[data-record-editor-close-guard]")).ToHaveCountAsync(0);
+        await Expect(page.Locator(".modal-overlay")).ToHaveCountAsync(0);
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
+    public async Task RecordEditModal_ShouldCloseViaEscape_AfterSwitchingToHarmonogramTab()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
+        await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
+        await page.ReloadAsync();
+
+        if (await page.Locator(".schedule-card").CountAsync() == 0)
+        {
+            await page.Context.CloseAsync();
+            return;
+        }
+
+        await page.Locator(".schedule-card .btn.small", new() { HasTextString = "Upravit" }).First.ClickAsync();
+
+        var modal = page.Locator(".modal-overlay");
+        await Expect(modal.Locator("form[data-record-editor-form='true']")).ToBeVisibleAsync();
+
+        await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+        await Expect(modal.Locator("[data-record-modal-panel=\"schedule\"].active")).ToBeVisibleAsync();
+
+        await page.Keyboard.PressAsync("Escape");
+
+        await Expect(page.Locator("[data-record-editor-close-guard]")).ToHaveCountAsync(0);
+        await Expect(page.Locator(".modal-overlay")).ToHaveCountAsync(0);
+
+        await page.Context.CloseAsync();
+    }
+
     private static ILocatorAssertions Expect(ILocator locator)
     {
         return Assertions.Expect(locator);

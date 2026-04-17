@@ -7102,6 +7102,15 @@ function setRecordFormTab2(form, tabKey) {
     if (harmonogramPanel instanceof HTMLElement) {
       queueRainbowSegmentRender(harmonogramPanel);
     }
+    // Schedule planner přepsal hodnoty UiHarmonogramDatumy[*] a normalizoval
+    // duration/delay inputy. Toto není uživatelská změna — obnovíme snapshot,
+    // aby se po přepnutí na schedule tab nespouštěl close guard a modal šel zavřít.
+    // Viz docs/specs/record-proposal-editor.md / modal-close-guard.
+    window.requestAnimationFrame(() => {
+      if (form.isConnected) {
+        form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
+      }
+    });
   }
 }
 function initExternalLinksEditors(scope) {
@@ -7538,6 +7547,10 @@ function shouldIgnoreRecordEditorField(name) {
   }
   const normalized = String(name).trim().toLowerCase();
   if (!normalized) {
+    return true;
+  }
+  // UiHarmonogramDatumy jsou vypočítaná datumy, nikoli uživatelský vstup — viz modules/recordEditor.js
+  if (normalized.startsWith("uiharmonogramdatumy")) {
     return true;
   }
   return normalized === "__requestverificationtoken" || normalized === "presentation" || normalized === "returnurl" || normalized === "editortab";

@@ -628,6 +628,16 @@ export function setRecordFormTab(form, tabKey) {
         if (harmonogramPanel instanceof HTMLElement) {
             queueRainbowSegmentRender(harmonogramPanel);
         }
+
+        // Schedule planner přepsal hodnoty UiHarmonogramDatumy[*] a normalizoval
+        // duration/delay inputy. Toto není uživatelská změna — obnovíme snapshot,
+        // aby se po přepnutí na schedule tab nespouštěl close guard a modal šel
+        // zavřít. Viz docs/specs/modal-close-guard.md.
+        window.requestAnimationFrame(() => {
+            if (form.isConnected) {
+                form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
+            }
+        });
     }
 }
 
@@ -1170,6 +1180,15 @@ export function shouldIgnoreRecordEditorField(name) {
 
     const normalized = String(name).trim().toLowerCase();
     if (!normalized) {
+        return true;
+    }
+
+    // UiHarmonogramDatumy jsou VYPOČÍTANÁ datumy z duration + typeId,
+    // přepisuje je JS při přepnutí na schedule tab (ScheduleRenderer.renderEditorRows →
+    // setDateInputValue). Nejsou to přímý uživatelský vstup — skutečné hodnoty jsou
+    // v HarmonogramHodnoty[N].Hodnota (duration dny). Vyloučit ze snapshotu jinak
+    // by přepnutí na tab Harmonogram způsobilo falešně-dirty stav a blokovalo zavření.
+    if (normalized.startsWith("uiharmonogramdatumy")) {
         return true;
     }
 
