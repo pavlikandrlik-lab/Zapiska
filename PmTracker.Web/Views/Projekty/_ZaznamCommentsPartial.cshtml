@@ -111,15 +111,21 @@
             {
                 <button type="button"
                         class="btn small ghost"
-                        data-record-comments-load-more>
-                    Zobrazit dalších @Model.LoadStep
+                        data-record-comments-load-more
+                        data-label-desc="Další"
+                        data-label-asc="Zobrazit předchozí (@Model.LoadStep)"
+                        title="Zobrazit dalších @Model.LoadStep vyjádření">
+                    Další
                 </button>
             }
             @if (Model.CanLoadAll)
             {
                 <button type="button"
                         class="btn small ghost"
-                        data-record-comments-load-all>
+                        data-record-comments-load-all
+                        data-label-desc="Zobrazit vše"
+                        data-label-asc="Zobrazit vše"
+                        title="Zobrazit všechna vyjádření">
                     Zobrazit vše
                 </button>
             }

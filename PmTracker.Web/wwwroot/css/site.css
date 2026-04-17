@@ -3730,6 +3730,26 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     flex-wrap: wrap;
     margin-top: 10px;
+    justify-content: flex-end;
+}
+
+/* ASC (vzestupně): sort toggle je vpravo nahoře v headeru,
+   pagination tlačítka se zobrazí POD ním, také zarovnaná vpravo.
+   Dosáhneme toho přes flex-direction column na pravém sloupci headeru. */
+.record-comments-header--stacked-right {
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+.record-comments-header--stacked-right .comment-sort-toggle {
+    margin-left: auto;
+}
+
+.record-comments-header--stacked-right .comment-pagination-actions--in-header {
+    flex-basis: 100%;
+    margin-top: 6px;
+    margin-left: auto;
+    justify-content: flex-end;
 }
 
 .comment-form textarea,

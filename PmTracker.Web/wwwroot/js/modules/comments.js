@@ -78,14 +78,44 @@ export function applyCommentSort(section, direction) {
         }
     }
 
-    if (paginationActions instanceof HTMLElement && list instanceof HTMLElement) {
-        if (normalizedDirection === "asc") {
-            if (list.parentElement === section) {
-                section.insertBefore(paginationActions, list);
+    // Pozicování pagination tlačítek podle směru řazení
+    // (viz docs/specs/record-comments.md):
+    // - DESC (nejnovější nahoře, starší dole): tlačítka POD listem vpravo.
+    //   Další načtené záznamy přibydou dole = další stránka starších vyjádření.
+    //   Texty: „Další", „Zobrazit vše".
+    // - ASC (nejstarší nahoře, nejnovější dole): sort toggle vpravo nahoře
+    //   v headeru; POD ním (sloupcově) tlačítka pagination, vpravo.
+    //   V ASC pagination načítá „předchozí" (starší, přidávají se nad začátek).
+    const header = section.querySelector(".record-comments-header");
+    if (header instanceof HTMLElement) {
+        header.classList.toggle("record-comments-header--stacked-right", normalizedDirection === "asc");
+    }
+
+    if (paginationActions instanceof HTMLElement) {
+        paginationActions.classList.toggle("comment-pagination-actions--in-header", normalizedDirection === "asc");
+
+        if (normalizedDirection === "asc" && header instanceof HTMLElement) {
+            if (paginationActions.parentElement !== header) {
+                header.appendChild(paginationActions);
             }
-        } else if (paginationActions.previousElementSibling !== list) {
-            list.after(paginationActions);
+        } else if (normalizedDirection === "desc" && list instanceof HTMLElement) {
+            if (paginationActions.previousElementSibling !== list) {
+                list.after(paginationActions);
+            }
         }
+
+        // Přepnout texty tlačítek podle směru (viz specifikace).
+        paginationActions.querySelectorAll("button[data-label-asc][data-label-desc]").forEach((btn) => {
+            if (!(btn instanceof HTMLElement)) {
+                return;
+            }
+            const label = normalizedDirection === "asc"
+                ? btn.getAttribute("data-label-asc")
+                : btn.getAttribute("data-label-desc");
+            if (typeof label === "string" && label.length > 0) {
+                btn.textContent = label;
+            }
+        });
     }
 
     section.setAttribute("data-comment-sort-direction", normalizedDirection);
