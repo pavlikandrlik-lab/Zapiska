@@ -429,6 +429,11 @@ export function updateTaskTypeVisibility(categorySelect) {
     const scheduleTab = form.querySelector("[data-record-schedule-tab]");
     const schedulePanel = form.querySelector("[data-record-schedule-panel]");
     const scheduleNote = form.querySelector("[data-record-schedule-note]");
+    // V proposal editoru (návrh úpravy harmonogramu) je základní metadata
+    // server-side zamčená (AllowBasicMetadataEdit=false). JS NESMÍ toto
+    // serverové zámek odemknout, i když je záznam kategorie Úkol.
+    // Viz docs/specs/record-proposal-editor.md.
+    const metadataLocked = form.dataset.metadataLocked === "true";
 
     if (topRow instanceof HTMLElement) {
         topRow.dataset.hasType = isTask ? "true" : "false";
@@ -441,7 +446,7 @@ export function updateTaskTypeVisibility(categorySelect) {
     const typeSelect = typeRow.querySelector("select");
     typeRow.hidden = !isTask;
     if (typeSelect instanceof HTMLSelectElement) {
-        typeSelect.disabled = !isTask;
+        typeSelect.disabled = !isTask || metadataLocked;
         if (!isTask) {
             typeSelect.value = "";
         }

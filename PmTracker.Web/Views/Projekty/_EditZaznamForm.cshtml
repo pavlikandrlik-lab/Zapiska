@@ -45,6 +45,8 @@
       data-record-form-tabs="true"
       data-record-schedule-form="true"
       data-schedule-permission-mode="@schedulePermissionMode"
+      data-metadata-locked="@(Model.AllowBasicMetadataEdit ? "false" : "true")"
+      data-is-proposal-editor="@(Model.IsProposalEditor ? "true" : "false")"
       data-is-create="@(Model.IsCreate ? "true" : "false")">
     <input type="hidden" name="Id" value="@(Model.IsCreate ? null : Model.Id)" />
     <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
