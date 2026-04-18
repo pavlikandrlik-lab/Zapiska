@@ -16,6 +16,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Zápiska</title>
+    <link rel="stylesheet" href="~/lib/gov-design-system/styles/lib/tokens.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/gov-design-system/dist/core/core.min.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/govcz.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/lib/quill/quill.snow.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -50,33 +52,35 @@
                   class="app-search"
                   role="search"
                   data-search-enabled="@(SearchOptionsAccessor.Value.Enabled ? "true" : "false")">
-                <div class="gov-form-search" data-size="m" data-color="neutral">
-                    <div slot="input" class="gov-form-input" data-size="m" data-color="neutral" data-variant="solid">
-                        <div class="element">
-                            <div slot="icon-start" class="gov-icon gov-icon--system" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="11" cy="11" r="8"></circle>
-                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                                </svg>
-                            </div>
-                            <input type="search"
-                                   name="q"
-                                   class="gov-form-input__input"
-                                   placeholder="Hledání"
-                                   aria-label="Globální vyhledávání"
-                                   autocomplete="off" />
-                        </div>
+                <gov-form-control size="m" class="gov-form-control" type="input">
+                    <div class="gov-form-control__holder">
+                        <gov-form-group>
+                            <gov-form-search color="primary" size="m">
+                                <gov-form-input slot="input" size="m" name="q" placeholder="Hledání">
+                                    <span class="element">
+                                        <input type="text"
+                                               id="app-global-search-input"
+                                               name="q"
+                                               placeholder="Hledání"
+                                               aria-label="Globální vyhledávání"
+                                               autocomplete="off" />
+                                    </span>
+                                </gov-form-input>
+                                <gov-button slot="button-erase" size="s" color="primary" type="base">
+                                    <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
+                                </gov-button>
+                                <gov-button slot="button" color="primary" size="s" type="solid">
+                                    Hledat
+                                </gov-button>
+                            </gov-form-search>
+                        </gov-form-group>
                     </div>
-                    <div slot="button">
-                        <button type="submit" class="gov-button" data-size="m" data-variant="primary" data-type="solid" aria-label="Vyhledat">
-                            <span class="gov-button__label">Hledat</span>
-                        </button>
-                    </div>
-                </div>
+                </gov-form-control>
                 <div data-global-search-dropdown class="app-search-dropdown" hidden></div>
             </form>
 
             <div class="app-user-tools">
+                <!-- gov-theme-switch nepodporuje auto mod: gov-theme-switch preklapa pouze light/dark; nase theme.js implementuje troj-stavovy rezim (light/dark/auto) s persistenci do cookie pmtracker.theme.mode a responzi na prefers-color-scheme. Nahrazeni by ztratilo auto rezim. Zachovano puvodnim custom CSS aproximaci. -->
                 <label class="gov-switch gov-theme-switch app-theme-switch" data-theme-switch>
                     <input type="checkbox"
                            data-theme-switch-input
@@ -142,7 +146,7 @@
     <main id="main" class="app-main">
         @if (TempData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
         {
-            <div class="alert alert-error">@errorMessage</div>
+            <gov-message color="error">@errorMessage</gov-message>
         }
         @RenderBody()
     </main>
@@ -176,12 +180,10 @@
 
     <div id="modal-root" class="modal-root" aria-hidden="true"></div>
 
+    <script type="module" src="~/lib/gov-design-system/dist/core/core.esm.min.js" asp-append-version="true"></script>
     <script src="~/lib/quill/quill.min.js" asp-append-version="true"></script>
     <script src="~/js/site.bundle.js" asp-append-version="true"></script>
-    @if (SearchOptionsAccessor.Value.Enabled)
-    {
-        <script src="~/js/global-search.js" asp-append-version="true"></script>
-    }
+    <script src="~/js/global-search.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)
 </body>
 </html>

@@ -38,6 +38,7 @@ public static class SearchServiceCollectionExtensions
 
         services.AddScoped<ISearchIndexer, SearchIndexer>();
         services.AddScoped<IGlobalSearchService, GlobalSearchService>();
+        services.AddScoped<IDbSuggestService, DbSuggestService>();
         services.AddHostedService<SearchReindexHostedService>();
 
         return services;

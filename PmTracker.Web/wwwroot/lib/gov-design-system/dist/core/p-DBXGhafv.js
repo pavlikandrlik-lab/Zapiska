@@ -1,0 +1,2 @@
+import{p as o}from"./p-CQvUntGY.js";import{S as l}from"./p-BcQO4NH2.js";o(l,["_XS","_S","_M","_L","_XL"]);const r={root:"gov-form-label",label:"gov-form-label__label"};export{r as F};
+//# sourceMappingURL=p-DBXGhafv.js.map

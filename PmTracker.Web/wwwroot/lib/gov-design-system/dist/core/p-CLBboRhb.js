@@ -1,0 +1,2 @@
+import{C as o}from"./p-U40vKHrs.js";import{S as t}from"./p-BcQO4NH2.js";import{p as s}from"./p-CQvUntGY.js";const r=s(o,["PRIMARY","NEUTRAL"]);const p=s(t,["_S","_M","_L"]);var a;(function(o){o["TOP"]="top";o["RIGHT"]="right";o["BOTTOM"]="bottom";o["LEFT"]="left"})(a||(a={}));const n={root:"gov-tooltip"};const c={root:"gov-tooltip-content"};export{r as T,p as a,c as b,a as c,n as d};
+//# sourceMappingURL=p-CLBboRhb.js.map

@@ -1,0 +1,2 @@
+import{r as s,h as t,H as r,g as e}from"./p-DT2tslUp.js";import{G as o}from"./p-C6JN9gdb.js";import{g as a}from"./p-BBOh2pxy.js";import"./p-BcQO4NH2.js";const i=class{constructor(t){s(this,t);this.h=a(this.host)}render(){return t(r,{key:"18d145fce4ae449e277684f8b0274ed60b759568",class:this.h.classes(o.root),role:"list"},t("slot",{key:"a37b3c0533fe8ef2fa5513e9c489f5b98247d4de"}))}get host(){return e(this)}};export{i as gov_grid};
+//# sourceMappingURL=p-ade69b24.entry.js.map

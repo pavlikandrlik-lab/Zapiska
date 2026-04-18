@@ -32,8 +32,10 @@ Panel zobrazuje **5 vyjádření** jako stránku (`LoadStep`). Uživatel může:
 
 | Směr řazení | Pozice sort toggle | Pozice pagination tlačítek | Text load-more | Text load-all |
 | --- | --- | --- | --- | --- |
-| **DESC** (nejnovější nahoře, starší dole) | vpravo v headeru | **POD listem**, vpravo | **„Další"** | **„Zobrazit vše"** |
+| **DESC** (nejnovější nahoře, starší dole) | vpravo v headeru | **POD listem**, vpravo | **„Další (5)"** | **„Zobrazit vše"** |
 | **ASC** (nejstarší nahoře, nejnovější dole) | vpravo v headeru | **POD sort toggle** v headeru, vpravo (sloupcově) | **„Zobrazit předchozí (5)"** | **„Zobrazit vše"** |
+
+Obě varianty obsahují v závorce **počet záznamů, které se při kliknutí dají načíst** (`LoadStep`, default 5), aby měl uživatel jasno, kolik jich přibude.
 
 ### Důvod
 
@@ -73,9 +75,9 @@ Pagination (jen jeden blok v DOM, JS ho přesouvá):
 ```html
 <div class="comment-pagination-actions [comment-pagination-actions--in-header]">
     <button data-record-comments-load-more
-            data-label-desc="Další"
+            data-label-desc="Další (5)"
             data-label-asc="Zobrazit předchozí (5)">
-        Další
+        Další (5)
     </button>
     <button data-record-comments-load-all
             data-label-desc="Zobrazit vše"
@@ -141,3 +143,9 @@ Každý komentář (`.comment`) má dva sloupce:
    pro pagination tlačítka — vždy jen přes dat-label atributy, aby se respektoval směr.
 3. **Nové pagination tlačítko** musí mít oba `data-label-*` atributy a musí
    respektovat `.comment-pagination-actions--in-header` třídu pro ASC layout.
+4. **Synchronizace bundle**: pokud měníš logiku `comments.js`, uprav **i**
+   `PmTracker.Web/wwwroot/js/site.bundle.js`. Aplikace v prohlížeči načítá
+   pouze bundle (`_Layout.cshtml` má jen `<script src="~/js/site.bundle.js">`),
+   moduly slouží jen pro vývoj. Pokud bundle obsahuje zastaralou funkci
+   `applyCommentSort` bez přesunu pagination a přepínání textů, pozorované
+   chování je „tlačítka zůstávají dole a text se nemění" — i když modul je v pořádku.

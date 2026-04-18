@@ -161,26 +161,50 @@ function applyCommentSort(section, direction) {
   }
   const normalizedDirection = normalizeCommentSortDirection(direction);
   const list = section.querySelector("[data-comment-list]");
-  if (!(list instanceof HTMLElement)) {
-    return;
-  }
-  const items = Array.from(list.querySelectorAll("[data-comment-item]")).filter((item) => item instanceof HTMLElement);
-  if (items.length <= 1) {
-    return;
-  }
-  items.sort((aNode, bNode) => {
-    const aMeeting = Number(aNode.getAttribute("data-comment-meeting") || "0");
-    const bMeeting = Number(bNode.getAttribute("data-comment-meeting") || "0");
-    const aDate = Date.parse(aNode.getAttribute("data-comment-date") || "");
-    const bDate = Date.parse(bNode.getAttribute("data-comment-date") || "");
-    const aId = Number(aNode.getAttribute("data-comment-id") || "0");
-    const bId = Number(bNode.getAttribute("data-comment-id") || "0");
-    if (normalizedDirection === "desc") {
-      return bMeeting - aMeeting || (Number.isFinite(bDate) ? bDate : 0) - (Number.isFinite(aDate) ? aDate : 0) || bId - aId;
+  const paginationActions = section.querySelector(".comment-pagination-actions");
+  if (list instanceof HTMLElement) {
+    const items = Array.from(list.querySelectorAll("[data-comment-item]")).filter((item) => item instanceof HTMLElement);
+    if (items.length > 1) {
+      items.sort((aNode, bNode) => {
+        const aMeeting = Number(aNode.getAttribute("data-comment-meeting") || "0");
+        const bMeeting = Number(bNode.getAttribute("data-comment-meeting") || "0");
+        const aDate = Date.parse(aNode.getAttribute("data-comment-date") || "");
+        const bDate = Date.parse(bNode.getAttribute("data-comment-date") || "");
+        const aId = Number(aNode.getAttribute("data-comment-id") || "0");
+        const bId = Number(bNode.getAttribute("data-comment-id") || "0");
+        if (normalizedDirection === "desc") {
+          return bMeeting - aMeeting || (Number.isFinite(bDate) ? bDate : 0) - (Number.isFinite(aDate) ? aDate : 0) || bId - aId;
+        }
+        return aMeeting - bMeeting || (Number.isFinite(aDate) ? aDate : 0) - (Number.isFinite(bDate) ? bDate : 0) || aId - bId;
+      });
+      items.forEach((item) => list.appendChild(item));
     }
-    return aMeeting - bMeeting || (Number.isFinite(aDate) ? aDate : 0) - (Number.isFinite(bDate) ? bDate : 0) || aId - bId;
-  });
-  items.forEach((item) => list.appendChild(item));
+  }
+  const header = section.querySelector(".record-comments-header");
+  if (header instanceof HTMLElement) {
+    header.classList.toggle("record-comments-header--stacked-right", normalizedDirection === "asc");
+  }
+  if (paginationActions instanceof HTMLElement) {
+    paginationActions.classList.toggle("comment-pagination-actions--in-header", normalizedDirection === "asc");
+    if (normalizedDirection === "asc" && header instanceof HTMLElement) {
+      if (paginationActions.parentElement !== header) {
+        header.appendChild(paginationActions);
+      }
+    } else if (normalizedDirection === "desc" && list instanceof HTMLElement) {
+      if (paginationActions.previousElementSibling !== list) {
+        list.after(paginationActions);
+      }
+    }
+    paginationActions.querySelectorAll("button[data-label-asc][data-label-desc]").forEach((btn) => {
+      if (!(btn instanceof HTMLElement)) {
+        return;
+      }
+      const label = normalizedDirection === "asc" ? btn.getAttribute("data-label-asc") : btn.getAttribute("data-label-desc");
+      if (typeof label === "string" && label.length > 0) {
+        btn.textContent = label;
+      }
+    });
+  }
   section.setAttribute("data-comment-sort-direction", normalizedDirection);
 }
 function resolveRecordCommentsShell(source) {

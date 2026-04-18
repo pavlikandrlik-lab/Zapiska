@@ -33,9 +33,9 @@
 
     @if (!hasMeetingOptions)
     {
-        <div class="alert danger">
+        <gov-message color="error">
             Není dostupné žádné neuzavřené jednání.
-        </div>
+        </gov-message>
     }
 
     @await Html.PartialAsync(

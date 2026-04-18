@@ -36,9 +36,9 @@ public sealed class CommentPaginationMarkupTests
     {
         var view = LoadText("PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml");
 
-        view.Should().Contain(
-            "data-label-desc=\"Další\"",
-            "v DESC se načtou další starší vyjádření");
+        view.Should().MatchRegex(
+            @"data-label-desc=""Další \(\d+\)""|data-label-desc=""Další \(@Model\.LoadStep\)""",
+            "DESC label obsahuje počet záznamů „Další (N)\"");
         view.Should().Contain(
             "data-label-asc=\"Zobrazit předchozí",
             "v ASC se načtou předchozí (starší) vyjádření nahoře");

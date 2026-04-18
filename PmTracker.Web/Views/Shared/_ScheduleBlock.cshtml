@@ -38,21 +38,21 @@
         }
         @if (Model.Permissions.IsScheduleLocked)
         {
-            <div class="alert warning">
+            <gov-message color="warning">
                 Harmonogram je do vyřízení aktivního návrhu uzamčený.
-            </div>
+            </gov-message>
         }
         else if (Model.Permissions.IsPlanLocked)
         {
-            <div class="alert warning">
+            <gov-message color="warning">
                 Plánová část harmonogramu je do vyřízení aktivního návrhu uzamčená.
-            </div>
+            </gov-message>
         }
         else if (Model.Permissions.CanEditDuration && !Model.Permissions.CanEditDelay)
         {
-            <div class="alert info">
+            <gov-message color="primary">
                 V tomto režimu lze měnit pouze plánovou část harmonogramu. Skutečnost zůstává jen pro čtení.
-            </div>
+            </gov-message>
         }
 
         <div class="schedule-summary-grid">

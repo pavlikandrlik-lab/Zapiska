@@ -52,12 +52,12 @@
                             DashboardRecordCategory.ApproachingDeadline => "Blíží se termín",
                             _ => ""
                         };
-                        var badgeClass = record.Category switch
+                        var tagColor = record.Category switch
                         {
-                            DashboardRecordCategory.Delayed => "badge-danger",
-                            DashboardRecordCategory.AwaitingActual => "badge-warning",
-                            DashboardRecordCategory.ApproachingDeadline => "badge-caution",
-                            _ => ""
+                            DashboardRecordCategory.Delayed => "error",
+                            DashboardRecordCategory.AwaitingActual => "warning",
+                            DashboardRecordCategory.ApproachingDeadline => "neutral",
+                            _ => "neutral"
                         };
                         <tr data-dashboard-expandable-row
                             data-category="@categorySlug"
@@ -68,7 +68,7 @@
                             <td>@record.Vlastnik</td>
                             <td>@record.TerminUkonceni.ToString("dd.MM.yyyy")</td>
                             <td>
-                                <span class="badge @badgeClass">@categoryLabel</span>
+                                <gov-tag color="@tagColor" size="s">@categoryLabel</gov-tag>
                             </td>
                             <td>
                                 @if (record.WorstOffsetDays > 0)

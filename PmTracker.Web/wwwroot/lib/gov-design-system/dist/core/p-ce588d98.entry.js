@@ -1,0 +1,2 @@
+import{r as s,h as t,H as a,g as r}from"./p-DT2tslUp.js";import{a as o}from"./p-Q99QrOoi.js";import{g as e}from"./p-BBOh2pxy.js";const c=class{constructor(t){s(this,t);this.h=e(this.host)}render(){return t(a,{key:"397a057c9e14fa21904f79a2c0b0c006476d53a4",class:this.h.classes(o.root)},t("slot",{key:"29373dc179d00e3e3f34ae4da070815d04d1a355"}))}get host(){return r(this)}};export{c as gov_layout_column};
+//# sourceMappingURL=p-ce588d98.entry.js.map

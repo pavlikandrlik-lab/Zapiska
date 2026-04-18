@@ -1,0 +1,2 @@
+import{i as r,b as t}from"./p-DNztiAH0.js";const n=n=>{if(r(n)&&n.length){try{console.log(n);const r=JSON.parse(n);if(Array.isArray(r)||t(r)){return r}}catch(r){console.log(r);return null}}return null};const e=(r,t)=>{if(Number.isInteger(r)&&Number.isInteger(t)){return[...Array(t+1).keys()].slice(r)}return[]};const s=t=>{if(Array.isArray(t)){return t}else if(r(t)){const r=n(t);if(Array.isArray(r)){return r}}return[]};export{e as c,s as p};
+//# sourceMappingURL=p-Ccwpa1ck.js.map

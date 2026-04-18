@@ -87,7 +87,7 @@
                                         </div>
                                     </div>
                                     <div class="schedule-card-actions">
-                                        <span class="badge @(item.Stihame ? "schedule-badge-ok" : "schedule-badge-late")">@(item.Stihame ? "Stíháme" : "Nestíháme")</span>
+                                        <gov-tag color="@(item.Stihame ? "success" : "error")" size="s">@(item.Stihame ? "Stíháme" : "Nestíháme")</gov-tag>
                                         <button class="btn small ghost"
                                                 type="button"
                                                 data-schedule-expand-toggle

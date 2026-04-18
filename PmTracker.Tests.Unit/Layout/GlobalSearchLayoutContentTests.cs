@@ -59,17 +59,15 @@ public sealed class GlobalSearchLayoutContentTests
     {
         var layout = LoadLayoutSource();
 
-        // Struktura přesně podle @gov-design-system-ce/styles (gov-form-search)
-        layout.Should().Contain("class=\"gov-form-search\"", "wrapper musí mít gov-form-search třídu (viz designsystem.gov.cz)");
+        // Struktura využívá skutečné Web Components z @gov-design-system-ce/components
+        layout.Should().Contain("<gov-form-search", "wrapper musí být skutečný gov-form-search Web Component");
         layout.Should().Contain("slot=\"input\"", "vstupní pole je umístěno ve slotu input");
         layout.Should().Contain("slot=\"button\"", "tlačítko je umístěno ve slotu button");
 
-        layout.Should().Contain("class=\"gov-form-input__input\"", "input musí mít BEM třídu gov-form-input__input");
-        layout.Should().Contain("type=\"search\"", "input musí mít search type");
         layout.Should().Contain("name=\"q\"", "input musí mít jméno q");
 
-        layout.Should().Contain("class=\"gov-button\"", "submit musí mít gov-button třídu");
-        layout.Should().Contain("type=\"submit\"", "submit tlačítko musí být klikatelné");
+        layout.Should().Contain("<gov-button", "submit musí být gov-button Web Component");
+        layout.Should().Contain("Hledat", "submit button musí obsahovat text Hledat");
     }
 
     [Fact]
@@ -87,8 +85,8 @@ public sealed class GlobalSearchLayoutContentTests
     {
         var layout = LoadLayoutSource();
 
-        // data-size a data-color jsou oficiální atributy gov-form-search
-        layout.Should().Contain("data-size=\"m\"", "gov-form-search musí mít atribut data-size");
-        layout.Should().Contain("data-color=\"neutral\"", "gov-form-search musí mít atribut data-color");
+        // size a color jsou oficiální atributy gov-form-search Web Component
+        layout.Should().Contain("size=\"m\"", "gov-form-search musí mít atribut size");
+        layout.Should().Contain("color=\"primary\"", "gov-form-search musí mít atribut color");
     }
 }

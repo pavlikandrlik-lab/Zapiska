@@ -1,0 +1,2 @@
+const t=t=>t!==undefined&&t!==null;const n=(t,n)=>Object.prototype.hasOwnProperty.call(t,n);const o=t=>typeof t==="object";const s=n=>t(n)&&typeof n==="string";const e=n=>t(n)&&typeof n==="number";export{e as a,o as b,n as h,s as i};
+//# sourceMappingURL=p-DNztiAH0.js.map

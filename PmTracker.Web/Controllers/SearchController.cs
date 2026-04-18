@@ -9,6 +9,7 @@ namespace PmTracker.Web.Controllers;
 public sealed class SearchController : BaseController
 {
     private readonly IGlobalSearchService _searchService;
+    private readonly IDbSuggestService _dbSuggest;
     private readonly ISearchIndexer _indexer;
     private readonly SearchOptions _options;
     private readonly ILogger<SearchController> _logger;
@@ -18,11 +19,13 @@ public sealed class SearchController : BaseController
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
         IGlobalSearchService searchService,
+        IDbSuggestService dbSuggest,
         ISearchIndexer indexer,
         IOptions<SearchOptions> options)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _searchService = searchService;
+        _dbSuggest = dbSuggest;
         _indexer = indexer;
         _options = options.Value;
         _logger = loggerFactory.CreateLogger<SearchController>();
@@ -46,20 +49,19 @@ public sealed class SearchController : BaseController
     [HttpGet]
     public async Task<IActionResult> Suggest(string? q, CancellationToken cancellationToken)
     {
-        if (!_options.Enabled || string.IsNullOrWhiteSpace(q))
+        if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
         {
             return Json(new { hits = Array.Empty<object>() });
         }
 
-        var result = await _searchService.SearchAsync(q, CurrentUserContext, pageSize: 8, cancellationToken);
-        var payload = result.Hits.Select(h => new
+        var hits = await _dbSuggest.SuggestAsync(q, CurrentUserContext, limit: 10, cancellationToken);
+        var payload = hits.Select(h => new
         {
-            type = h.EntityType,
-            id = h.EntityId,
-            projektId = h.ProjektId,
+            type = h.Type,
             title = h.Title,
             snippet = h.Snippet,
-            url = BuildDetailUrl(h)
+            url = h.Url,
+            projektNazev = h.ProjektNazev
         });
         return Json(new { hits = payload });
     }

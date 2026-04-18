@@ -101,9 +101,9 @@
         </div>
         @if (!Model.MaDostupneJednaniProCislo)
         {
-            <div class="alert danger">
+            <gov-message color="error">
                 Není dostupné žádné neuzavřené jednání. Založení záznamu je zablokováno.
-            </div>
+            </gov-message>
         }
     }
     else if (!Model.IsCreate && Model.MuzeDoplnitIdentifikatorJednani)
@@ -153,9 +153,9 @@
 
     @if (Model.HasPendingScheduleProposalLock && !string.IsNullOrWhiteSpace(Model.PendingScheduleProposalMessage))
     {
-        <div class="alert warning">
+        <gov-message color="warning">
             @Model.PendingScheduleProposalMessage
-        </div>
+        </gov-message>
     }
 
     <div class="record-form-row record-form-row-dates">

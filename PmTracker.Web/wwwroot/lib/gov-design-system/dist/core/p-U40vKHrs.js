@@ -1,0 +1,2 @@
+var r;(function(r){r["DEFAULT"]="default";r["PRIMARY"]="primary";r["SECONDARY"]="secondary";r["NEUTRAL"]="neutral";r["ERROR"]="error";r["SUCCESS"]="success";r["WARNING"]="warning";r["DISABLED"]="disabled";r["BLACK"]="black";r["WHITE"]="white";r["CUSTOM"]="custom"})(r||(r={}));export{r as C};
+//# sourceMappingURL=p-U40vKHrs.js.map
