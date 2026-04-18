@@ -1,3 +1,16 @@
+// PmTracker.Web/wwwroot/js/modules/eventBus.js
+(function installPmTrackerGovClickAdapter() {
+  const dispatched = new WeakSet();
+  document.addEventListener("gov-click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (dispatched.has(event)) return;
+    dispatched.add(event);
+    const native = new MouseEvent("click", { bubbles: true, cancelable: true, composed: true, detail: 1 });
+    target.dispatchEvent(native);
+  });
+})();
+
 // PmTracker.Web/wwwroot/js/modules/navigationRuntime.js
 var navigationRuntime = {
   initRecordFormEnhancements: null,
