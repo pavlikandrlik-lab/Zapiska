@@ -58,8 +58,11 @@ public sealed class PmFieldTagHelper : TagHelper
             + $"{ContentEncoder.Encode(Label)}{requiredMarker}</gov-form-label>";
 
         // gov-form-input wrapper atributy (pro Web Component)
+        // gov-form-input renderuje vlastní <input> v shadow DOM — nepředáváme žádný vnitřní input.
+        // identifier atribut nastaví id shadow-DOM inputu (label for="{id}" pak funguje správně).
         var wrapperAttrs = new StringBuilder();
         wrapperAttrs.Append($" name=\"{WebUtility.HtmlEncode(Name)}\"");
+        wrapperAttrs.Append($" identifier=\"{WebUtility.HtmlEncode(id)}\"");
         wrapperAttrs.Append($" input-type=\"{WebUtility.HtmlEncode(InputType)}\"");
         wrapperAttrs.Append($" size=\"{sizeAttr}\"");
         if (!string.IsNullOrEmpty(Placeholder))
@@ -69,20 +72,7 @@ public sealed class PmFieldTagHelper : TagHelper
         if (Required) wrapperAttrs.Append(" required");
         if (Disabled) wrapperAttrs.Append(" disabled");
 
-        // Vnitřní light-DOM <input> (slot="element") — gov-form-input očekává
-        var innerInput = new StringBuilder();
-        innerInput.Append($"<input id=\"{WebUtility.HtmlEncode(id)}\"");
-        innerInput.Append($" name=\"{WebUtility.HtmlEncode(Name)}\"");
-        innerInput.Append($" type=\"{WebUtility.HtmlEncode(InputType)}\"");
-        if (!string.IsNullOrEmpty(Placeholder))
-            innerInput.Append($" placeholder=\"{WebUtility.HtmlEncode(Placeholder)}\"");
-        if (!string.IsNullOrEmpty(Value))
-            innerInput.Append($" value=\"{WebUtility.HtmlEncode(Value)}\"");
-        if (Required) innerInput.Append(" required");
-        if (Disabled) innerInput.Append(" disabled");
-        innerInput.Append(" />");
-
-        var inputHtml = $"<gov-form-input{wrapperAttrs}><span class=\"element\">{innerInput}</span></gov-form-input>";
+        var inputHtml = $"<gov-form-input{wrapperAttrs}></gov-form-input>";
 
         var messageHtml = "";
         if (!string.IsNullOrEmpty(Error))
