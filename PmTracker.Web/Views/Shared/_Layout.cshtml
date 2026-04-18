@@ -52,30 +52,18 @@
                   class="app-search"
                   role="search"
                   data-search-enabled="@(SearchOptionsAccessor.Value.Enabled ? "true" : "false")">
-                <gov-form-control size="m" class="gov-form-control" type="input">
-                    <div class="gov-form-control__holder">
-                        <gov-form-group>
-                            <gov-form-search color="primary" size="m">
-                                <gov-form-input slot="input" size="m" name="q" placeholder="Hledání">
-                                    <span class="element">
-                                        <input type="text"
-                                               id="app-global-search-input"
-                                               name="q"
-                                               placeholder="Hledání"
-                                               aria-label="Globální vyhledávání"
-                                               autocomplete="off" />
-                                    </span>
-                                </gov-form-input>
-                                <gov-button slot="button-erase" size="s" color="primary" type="base">
-                                    <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
-                                </gov-button>
-                                <gov-button slot="button" color="primary" size="s" type="solid">
-                                    Hledat
-                                </gov-button>
-                            </gov-form-search>
-                        </gov-form-group>
-                    </div>
-                </gov-form-control>
+                <gov-form-search color="primary" size="m">
+                    <gov-form-input slot="input" size="m" name="q" placeholder="Hledání"
+                                    identifier="app-global-search-input"
+                                    aria-label="Globální vyhledávání"
+                                    autocomplete="off"></gov-form-input>
+                    <gov-button slot="button-erase" size="s" color="primary" type="base">
+                        <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
+                    </gov-button>
+                    <gov-button slot="button" color="primary" size="s" type="solid">
+                        Hledat
+                    </gov-button>
+                </gov-form-search>
                 <div data-global-search-dropdown class="app-search-dropdown" hidden></div>
             </form>
 

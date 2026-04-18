@@ -34,11 +34,16 @@ public sealed class GlobalSearchMarkupTests
         return File.ReadAllText(layoutPath);
     }
 
+    /// <summary>
+    /// gov-form-control byl odstraněn — gov-form-search je samostatná komponenta
+    /// a nepotřebuje být obalena gov-form-control ani gov-form-group.
+    /// </summary>
     [Fact]
-    public void Layout_MaGovFormControl_Tag()
+    public void Layout_NemaGovFormControl_Tag()
     {
         var layout = LoadLayoutSource();
-        layout.Should().Contain("<gov-form-control", "search používá skutečný Web Component gov-form-control");
+        layout.Should().NotContain("<gov-form-control",
+            "gov-form-search je samostatná komponenta — gov-form-control by způsoboval duplicitní hydrataci");
     }
 
     [Fact]

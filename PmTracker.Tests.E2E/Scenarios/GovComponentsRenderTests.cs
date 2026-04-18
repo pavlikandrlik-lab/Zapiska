@@ -123,6 +123,10 @@ public sealed class GovComponentsRenderTests
             "document.querySelector('gov-form-input[placeholder=\"Hledání\"]')?.getAttribute('placeholder')");
         inputPlaceholder.Should().Be("Hledání", "gov-form-input musí mít placeholder 'Hledání'");
 
+        // Ověřit, že v hlavičce je přesně JEDNO vyhledávací textové pole (bez duplicity)
+        var inputCount = await page.Locator("form[data-global-search] input[type='text']").CountAsync();
+        inputCount.Should().Be(1, "v hlavičce smí být pouze jedno vyhledávací pole");
+
         await page.Context.CloseAsync();
     }
 
