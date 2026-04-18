@@ -15,6 +15,9 @@ public sealed class PmBadgeTagHelper : TagHelper
     public PmBadgeVariant Variant { get; set; } = PmBadgeVariant.Neutral;
     public PmComponentSize Size { get; set; } = PmComponentSize.Medium;
 
+    /// <summary>Vizuální typ: Subtle (výchozí) / Bold.</summary>
+    public PmBadgeType Type { get; set; } = PmBadgeType.Subtle;
+
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         output.TagName = "gov-tag";
@@ -29,6 +32,7 @@ public sealed class PmBadgeTagHelper : TagHelper
             _ => "neutral"
         };
         output.Attributes.SetAttribute("color", color);
+        output.Attributes.SetAttribute("type", Type == PmBadgeType.Bold ? "bold" : "subtle");
         output.Attributes.SetAttribute("size", Size.ToGovAttribute());
 
         if (!output.Content.IsModified)
