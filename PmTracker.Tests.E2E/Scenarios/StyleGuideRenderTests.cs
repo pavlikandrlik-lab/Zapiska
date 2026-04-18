@@ -99,6 +99,37 @@ public sealed class StyleGuideRenderTests
     }
 
     [Fact]
+    public async Task StyleGuide_ObsahujeSekceFaze2C()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        var response = await page.GotoAsync($"{_fixture.BaseUrl}/StyleGuide");
+        response!.Status.Should().Be(200);
+
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        foreach (var section in new[] { "dialog", "tooltip", "toast", "skeleton", "loading" })
+        {
+            var count = await page.Locator($"[data-styleguide-section=\"{section}\"]").CountAsync();
+            count.Should().Be(1, $"Sekce {section} musí být přesně jednou ve StyleGuide (Fáze 2C)");
+        }
+
+        // Sanity: gov komponenty odpovídající novým pm-* wrapperům jsou přítomné
+        (await page.Locator("gov-dialog").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(1, "1 pm-dialog ukázka");
+        (await page.Locator("gov-tooltip").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(2, "2 pm-tooltip ukázky");
+        (await page.Locator("gov-toast").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(4, "4 pm-toast varianty (Info/Success/Warning/Error)");
+        (await page.Locator("gov-skeleton").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(5, "≥5 pm-skeleton ukázek (3 velikosti + 2 kruhy)");
+        (await page.Locator("gov-loading").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(3, "3 pm-loading velikosti");
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
     public async Task StyleGuide_PmButton_Klikatelne_PropagujeClick()
     {
         var page = await _fixture.NewPageAsync();

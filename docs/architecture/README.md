@@ -27,6 +27,13 @@ Jeden wrapper = jeden bod změny při upgradu gov DS verze.
 - [pm-card — karty](cards.md)
 - [pm-pagination — stránkování](pagination.md)
 
+### Fáze 2C — interaktivní & feedback primitivy (hotovo 2026-04-19)
+- [pm-dialog — modální dialogy](dialogs.md)
+- [pm-tooltip — bubliny nápovědy](tooltips.md)
+- [pm-toast — notifikace u okraje](toasts.md)
+- [pm-skeleton — placeholdery při načítání](skeletons.md)
+- [pm-loading — spinner](loadings.md)
+
 ## Infrastruktura
 
 - [Design tokens (CSS proměnné)](tokens.md)
