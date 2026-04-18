@@ -1694,15 +1694,18 @@
     outline-offset: 1px;
 }
 
-input[type="text"],
-input[type="email"],
-input[type="date"],
-input[type="time"],
-input[type="datetime-local"],
-input[type="number"],
-input[type="search"],
-select,
-textarea {
+/* Globální form styl — vyloučíme inputy uvnitř gov-* Web Components,
+   ty si styl řídí samy a přebíjení z venku jim rozbíjí layout
+   (např. gov-form-search má fix height z gov tokenu, náš padding:10px ho přečuhuje). */
+input[type="text"]:not(gov-form-input input):not(gov-form-search input),
+input[type="email"]:not(gov-form-input input):not(gov-form-search input),
+input[type="date"]:not(gov-form-input input):not(gov-form-search input),
+input[type="time"]:not(gov-form-input input):not(gov-form-search input),
+input[type="datetime-local"]:not(gov-form-input input):not(gov-form-search input),
+input[type="number"]:not(gov-form-input input):not(gov-form-search input),
+input[type="search"]:not(gov-form-input input):not(gov-form-search input),
+select:not(gov-form-select select),
+textarea:not(gov-form-input textarea) {
     width: 100%;
     border-radius: var(--gov-radius-sm);
     border: 1px solid var(--gov-color-border);
