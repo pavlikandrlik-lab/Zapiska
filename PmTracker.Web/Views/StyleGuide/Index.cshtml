@@ -81,37 +81,41 @@
             (není obalena do <code>pm-*</code>), protože je zapojená na typeahead dropdown v <code>_Layout</code>.
         </p>
 
-        <h3>Výchozí (Medium)</h3>
-        <form role="search" onsubmit="return false;" class="styleguide-search-form">
-            <gov-form-search color="primary" size="m">
-                <gov-form-input slot="input" size="m" name="q" placeholder="Hledání"
-                                identifier="styleguide-search-m"
-                                aria-label="Ukázka vyhledávání"
-                                autocomplete="off"></gov-form-input>
-                <gov-button slot="button-erase" size="s" color="primary" type="base">
-                    <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
-                </gov-button>
-                <gov-button slot="button" color="primary" size="s" type="solid">
-                    Hledat
-                </gov-button>
-            </gov-form-search>
-        </form>
+        <h3>Výchozí (Medium) — 1:1 kopie <code>.app-search</code> z hlavičky</h3>
+        <div class="styleguide-search-wrapper">
+            <form role="search" class="app-search" onsubmit="return false;">
+                <gov-form-search color="primary" size="m">
+                    <gov-form-input slot="input" size="m" name="q" placeholder="Hledání"
+                                    identifier="styleguide-search-m"
+                                    aria-label="Ukázka vyhledávání"
+                                    autocomplete="off"></gov-form-input>
+                    <gov-button slot="button-erase" size="s" color="primary" type="base">
+                        <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
+                    </gov-button>
+                    <gov-button slot="button" color="primary" size="s" type="solid">
+                        Hledat
+                    </gov-button>
+                </gov-form-search>
+            </form>
+        </div>
 
         <h3>Small</h3>
-        <form role="search" onsubmit="return false;" class="styleguide-search-form">
-            <gov-form-search color="primary" size="s">
-                <gov-form-input slot="input" size="s" name="q" placeholder="Hledání"
-                                identifier="styleguide-search-s"
-                                aria-label="Ukázka vyhledávání (small)"
-                                autocomplete="off"></gov-form-input>
-                <gov-button slot="button-erase" size="xs" color="primary" type="base">
-                    <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
-                </gov-button>
-                <gov-button slot="button" color="primary" size="xs" type="solid">
-                    Hledat
-                </gov-button>
-            </gov-form-search>
-        </form>
+        <div class="styleguide-search-wrapper">
+            <form role="search" class="app-search" onsubmit="return false;">
+                <gov-form-search color="primary" size="s">
+                    <gov-form-input slot="input" size="s" name="q" placeholder="Hledání"
+                                    identifier="styleguide-search-s"
+                                    aria-label="Ukázka vyhledávání (small)"
+                                    autocomplete="off"></gov-form-input>
+                    <gov-button slot="button-erase" size="xs" color="primary" type="base">
+                        <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
+                    </gov-button>
+                    <gov-button slot="button" color="primary" size="xs" type="solid">
+                        Hledat
+                    </gov-button>
+                </gov-form-search>
+            </form>
+        </div>
     </article>
 </section>
 
@@ -120,6 +124,5 @@
 .styleguide-page h2 { margin-block-end: var(--pm-spacing-m); }
 .styleguide-page h3 { margin-block: var(--pm-spacing-m) var(--pm-spacing-xs); font-size: var(--pm-font-size-m); color: var(--pm-color-text-muted); }
 .styleguide-row { display: flex; gap: var(--pm-spacing-s); flex-wrap: wrap; align-items: center; }
-.styleguide-search-form { flex: 1; max-width: 640px; margin-block-end: var(--pm-spacing-m); display: flex; align-items: stretch; }
-.styleguide-search-form gov-form-search { width: 100%; }
+.styleguide-search-wrapper { display: flex; max-width: 560px; margin-block-end: var(--pm-spacing-m); }
 </style>
