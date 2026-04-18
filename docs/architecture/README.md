@@ -34,6 +34,9 @@ Jeden wrapper = jeden bod změny při upgradu gov DS verze.
 - [pm-skeleton — placeholdery při načítání](skeletons.md)
 - [pm-loading — spinner](loadings.md)
 
+### Fáze 2D — migrace Views (probíhá)
+- [pm-search — vyhledávací input s volitelným submit tlačítkem](searches.md)
+
 ## Infrastruktura
 
 - [Design tokens (CSS proměnné)](tokens.md)
