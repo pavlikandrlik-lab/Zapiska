@@ -72,4 +72,23 @@ public class PmLinkTagHelperTests
         var textIndex = html.IndexOf("Zpět");
         Assert.True(iconIndex < textIndex, "Icon should come before text for icon-position=start");
     }
+
+    [Fact]
+    public async Task XssInIcon_IsEscapedInAttribute()
+    {
+        var tagHelper = new PmLinkTagHelper
+        {
+            Href = "/",
+            Icon = "\" onmouseover=\"alert(1)"
+        };
+        var context = TagHelperTestHelpers.MakeContext();
+        var output = TagHelperTestHelpers.MakeOutput("pm-link", childContent: "Click");
+        await tagHelper.ProcessAsync(context, output);
+
+        var html = output.Content.GetContent();
+        // Uvozovky v Icon NESMÍ uzavřít name="…" a otevřít onmouseover event handler
+        Assert.DoesNotContain("onmouseover=\"alert", html);
+        // Raw uvozovky musí být escapovány na &quot;
+        Assert.Contains("&quot;", html);
+    }
 }
