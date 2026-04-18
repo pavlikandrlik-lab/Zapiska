@@ -41,6 +41,35 @@ public sealed class StyleGuideRenderTests
     }
 
     [Fact]
+    public async Task StyleGuide_ObsahujeSekceFaze2A()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        var response = await page.GotoAsync($"{_fixture.BaseUrl}/StyleGuide");
+        response!.Status.Should().Be(200);
+
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        foreach (var section in new[] { "select", "textarea", "checkbox", "radio", "switch" })
+        {
+            var count = await page.Locator($"[data-styleguide-section=\"{section}\"]").CountAsync();
+            count.Should().Be(1, $"Sekce {section} musí být přesně jednou ve StyleGuide (Fáze 2A)");
+        }
+
+        // Sanity: gov komponenty odpovídající novým pm-* wrapperům jsou přítomné
+        (await page.Locator("gov-form-select").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(3, "3 pm-select ukázky ve StyleGuide");
+        (await page.Locator("gov-form-checkbox").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(3, "3 pm-checkbox ukázky");
+        (await page.Locator("gov-form-radio-group").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(2, "2 pm-radio-group (vertical + horizontal)");
+        (await page.Locator("gov-form-switch").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(3, "3 pm-switch ukázky");
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
     public async Task StyleGuide_PmButton_Klikatelne_PropagujeClick()
     {
         var page = await _fixture.NewPageAsync();
