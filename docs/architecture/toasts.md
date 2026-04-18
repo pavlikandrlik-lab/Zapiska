@@ -32,7 +32,9 @@ toast.show();
 | `Variant` | `PmToastVariant` | `Info` | Info/Success/Warning/Error → color. |
 | `Gravity` | `PmToastGravity` | `Top` | Svislá pozice. |
 | `Position` | `PmToastPosition` | `Right` | Vodorovná pozice. |
-| `Size` | `PmComponentSize` | `Medium` | s/m/l. |
+
+> **Pozn.:** `gov-toast` v gov-design-system 4.2.9 nepodporuje atribut `size`.
+> Pokud budoucí verze doplní size prop, lze jej přidat zpět.
 
 ## Mapování pm → gov
 

@@ -45,7 +45,6 @@ public sealed class PmToastTagHelper : TagHelper
     public PmToastVariant Variant { get; set; } = PmToastVariant.Info;
     public PmToastGravity Gravity { get; set; } = PmToastGravity.Top;
     public PmToastPosition Position { get; set; } = PmToastPosition.Right;
-    public PmComponentSize Size { get; set; } = PmComponentSize.Medium;
 
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
@@ -69,7 +68,9 @@ public sealed class PmToastTagHelper : TagHelper
             PmToastPosition.Center => "center",
             _ => "right"
         });
-        output.Attributes.SetAttribute("size", Size.ToGovAttribute());
+        // Pozn.: gov-toast (gov-design-system 4.2.9) nepodporuje atribut size.
+        // Nenastavujeme ho, aby nevznikal dead attribute. Pokud budoucí verze
+        // gov-toast přidá size, lze property doplnit zpět.
 
         var child = await output.GetChildContentAsync();
         output.Content.SetHtmlContent(child.GetContent());

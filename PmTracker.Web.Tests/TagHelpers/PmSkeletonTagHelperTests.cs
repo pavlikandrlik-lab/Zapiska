@@ -6,7 +6,7 @@ namespace PmTracker.Web.Tests.TagHelpers;
 public class PmSkeletonTagHelperTests
 {
     [Fact]
-    public void Default_RendersGovSkeletonMedium()
+    public void Default_RendersGovSkeletonMediumWithoutShapeAttr()
     {
         var tagHelper = new PmSkeletonTagHelper();
 
@@ -14,6 +14,8 @@ public class PmSkeletonTagHelperTests
 
         Assert.Contains("<gov-skeleton", html);
         Assert.Contains("size=\"m\"", html);
+        // Default shape nemá emitovat shape atribut (gov-skeleton bere default tvar interně)
+        Assert.DoesNotContain("shape=", html);
     }
 
     [Fact]
