@@ -29,6 +29,21 @@ Postavit v PM Tracker aplikaci solidní architektonickou kostru podle standardů
 | Tlačítka/UI | Varianta Y — Razor TagHelper wrapper (`pm-*` komponenty) |
 | Breakpointy | Vlastní, ale číselně shodné s gov DS (576/768/992/1200/1400) |
 | Branch workflow | Nová větev `codex/senior-refactor-fase-1`, ověření, pak merge |
+| Integrační jobs | **Hangfire** (enterprise standard, dashboard, retry, DB persist) |
+| Config runtime | DB-backed přes Hangfire + UI `/Nastaveni/Integrace` |
+| Druhá DB | Read-only `TicketingReadOnlyDbContext` přes servisní účet |
+| Domain typy ticketů | NES (nesrovnalost), PMP (požadavek metodické podpory), PNF (požadavek nové funkcionality) |
+
+## Domain kontext — rozšíření z 2. kola brainstormingu
+
+Fáze 1 zahrnuje **písemné specifikace** pro business domény, které budou implementovány v pozdějších fázích:
+
+- `docs/specs/ticketing-integration.md` — čtení z ticketing DB (fáze 3)
+- `docs/specs/automat-vytezovani-vyjadreni.md` — automat + manuální tagy (fáze 3)
+- `docs/specs/harmonogram-plan-vs-skutecnost.md` — plán vs. skutečnost (fáze 4)
+- `docs/specs/dashboard-prodleni.md` — NES/PMP/PNF prodlení (fáze 5)
+
+Každý dokument obsahuje sekci **„Otevřené otázky"** — věci čekající na rozhodnutí vedení (finální fráze, redukce kroků harmonogramu, definice prodlení). Dokumenty jsou **živé** — doplňují se, jak business specifikuje.
 
 ## Architektura
 
