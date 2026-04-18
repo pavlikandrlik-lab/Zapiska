@@ -219,6 +219,18 @@
             </pm-card>
         </div>
     </article>
+    <article data-styleguide-section="pagination">
+        <h2>Stránkování (<code>pm-pagination</code>)</h2>
+
+        <h3>Uprostřed (3 / 12)</h3>
+        <pm-pagination current="3" total-pages="12" url-template="?page={0}" />
+
+        <h3>První stránka (1 / 5)</h3>
+        <pm-pagination current="1" total-pages="5" url-template="?page={0}" />
+
+        <h3>Poslední stránka (5 / 5)</h3>
+        <pm-pagination current="5" total-pages="5" url-template="?page={0}" />
+    </article>
 </section>
 
 <style>
