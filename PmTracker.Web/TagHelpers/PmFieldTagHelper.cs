@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Unicode;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
@@ -16,6 +18,10 @@ namespace PmTracker.Web.TagHelpers;
 [HtmlTargetElement("pm-field")]
 public sealed class PmFieldTagHelper : TagHelper
 {
+    // Unicode-aware encoder: zachová diakritiku, escapuje pouze <>&"'
+    private static readonly HtmlEncoder ContentEncoder =
+        HtmlEncoder.Create(UnicodeRanges.All);
+
     public string Name { get; set; } = "";
     public string Label { get; set; } = "";
 
@@ -43,7 +49,7 @@ public sealed class PmFieldTagHelper : TagHelper
         var requiredMarker = Required ? " <span aria-hidden=\"true\">*</span>" : "";
 
         var labelHtml = $"<gov-form-label slot=\"top\" for=\"{WebUtility.HtmlEncode(id)}\" size=\"{sizeAttr}\">"
-            + $"{WebUtility.HtmlEncode(Label)}{requiredMarker}</gov-form-label>";
+            + $"{ContentEncoder.Encode(Label)}{requiredMarker}</gov-form-label>";
 
         // gov-form-input wrapper atributy (pro Web Component)
         var wrapperAttrs = new StringBuilder();
@@ -74,9 +80,9 @@ public sealed class PmFieldTagHelper : TagHelper
 
         var messageHtml = "";
         if (!string.IsNullOrEmpty(Error))
-            messageHtml = $"<gov-form-message slot=\"bottom\" variant=\"error\">{Error}</gov-form-message>";
+            messageHtml = $"<gov-form-message slot=\"bottom\" variant=\"error\">{ContentEncoder.Encode(Error!)}</gov-form-message>";
         else if (!string.IsNullOrEmpty(Help))
-            messageHtml = $"<gov-form-message slot=\"bottom\">{Help}</gov-form-message>";
+            messageHtml = $"<gov-form-message slot=\"bottom\">{ContentEncoder.Encode(Help!)}</gov-form-message>";
 
         output.Content.SetHtmlContent(labelHtml + inputHtml + messageHtml);
         return Task.CompletedTask;

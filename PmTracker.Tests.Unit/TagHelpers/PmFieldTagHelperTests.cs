@@ -88,4 +88,33 @@ public sealed class PmFieldTagHelperTests
         var html = GetAllHtml(output);
         html.Should().Contain("value=\"a@b.cz\"");
     }
+
+    [Fact]
+    public async Task Error_SCeskouDiakritikou_SeNeztrati()
+    {
+        var helper = new PmFieldTagHelper { Name = "x", Label = "X", Error = "Povinné pole — nezapomeňte" };
+        var output = await RenderAsync(helper);
+        var html = GetAllHtml(output);
+        html.Should().Contain("Povinné pole", "česká diakritika má zůstat zachovaná");
+        html.Should().Contain("nezapomeňte", "UTF-8 znaky nemají být encoded do entit");
+    }
+
+    [Fact]
+    public async Task Error_SHtmlInjekci_JeEscaped()
+    {
+        var helper = new PmFieldTagHelper { Name = "x", Label = "X", Error = "<script>alert('x')</script>" };
+        var output = await RenderAsync(helper);
+        var html = GetAllHtml(output);
+        html.Should().NotContain("<script>", "HTML injekce v Error musí být escapovaná (XSS ochrana)");
+        html.Should().Contain("&lt;script&gt;", "escape na &lt;&gt; entity");
+    }
+
+    [Fact]
+    public async Task Label_SCeskouDiakritikou_SeNeztrati()
+    {
+        var helper = new PmFieldTagHelper { Name = "email", Label = "E-mailová adresa" };
+        var output = await RenderAsync(helper);
+        var html = GetAllHtml(output);
+        html.Should().Contain("E-mailová adresa", "diakritika v label má zůstat");
+    }
 }
