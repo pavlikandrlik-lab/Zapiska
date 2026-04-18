@@ -257,6 +257,21 @@
             </pm-tooltip>
         </div>
     </article>
+
+    <article data-styleguide-section="toast">
+        <h2>Toast (<code>pm-toast</code>)</h2>
+        <p>
+            Toast se obvykle vytváří za běhu aplikace přes JS
+            (<code>document.createElement</code> + <code>.show()</code>).
+            Zde jen ukázka statického markupu variant:
+        </p>
+        <div class="styleguide-row" style="flex-direction: column; align-items: flex-start;">
+            <pm-toast variant="Info" gravity="Top" position="Right">Informativní zpráva.</pm-toast>
+            <pm-toast variant="Success" gravity="Top" position="Right">Úspěšně uloženo.</pm-toast>
+            <pm-toast variant="Warning" gravity="Top" position="Right">Upozornění — zkontrolujte vstup.</pm-toast>
+            <pm-toast variant="Error" gravity="Top" position="Right">Chyba — akce selhala.</pm-toast>
+        </div>
+    </article>
 </section>
 
 <style>
