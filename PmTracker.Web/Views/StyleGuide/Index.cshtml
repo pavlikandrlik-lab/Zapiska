@@ -231,6 +231,19 @@
         <h3>Poslední stránka (5 / 5)</h3>
         <pm-pagination current="5" total-pages="5" url-template="?page={0}" />
     </article>
+    <article data-styleguide-section="dialog">
+        <h2>Dialog (<code>pm-dialog</code>)</h2>
+        <p>
+            Klikni na tlačítko — otevře se modální dialog. Gov-dialog JS řídí
+            otevření/zavření přes <code>.show()</code> / <code>.close()</code>.
+        </p>
+        <pm-button variant="Primary" onclick="document.getElementById('styleguide-demo-dialog').show()">Otevřít dialog</pm-button>
+
+        <pm-dialog id="styleguide-demo-dialog" title="Ukázkový dialog">
+            <p>Toto je demonstrace <code>pm-dialog</code> komponenty.</p>
+            <pm-button variant="Primary" onclick="document.getElementById('styleguide-demo-dialog').close()">Zavřít</pm-button>
+        </pm-dialog>
+    </article>
 </section>
 
 <style>
