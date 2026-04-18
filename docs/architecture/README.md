@@ -21,6 +21,12 @@ Jeden wrapper = jeden bod změny při upgradu gov DS verze.
 - [pm-radio + pm-radio-group — výběr 1-z-N](radios.md)
 - [pm-switch — on/off přepínač](switches.md)
 
+### Fáze 2B — navigační & layout primitivy (hotovo 2026-04-19)
+- [pm-link — odkazy (interní i externí)](links.md)
+- [pm-tabs + pm-tabs-item — záložky](tabs.md)
+- [pm-card — karty](cards.md)
+- [pm-pagination — stránkování](pagination.md)
+
 ## Infrastruktura
 
 - [Design tokens (CSS proměnné)](tokens.md)

@@ -70,6 +70,35 @@ public sealed class StyleGuideRenderTests
     }
 
     [Fact]
+    public async Task StyleGuide_ObsahujeSekceFaze2B()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        var response = await page.GotoAsync($"{_fixture.BaseUrl}/StyleGuide");
+        response!.Status.Should().Be(200);
+
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        foreach (var section in new[] { "link", "tabs", "card", "pagination" })
+        {
+            var count = await page.Locator($"[data-styleguide-section=\"{section}\"]").CountAsync();
+            count.Should().Be(1, $"Sekce {section} musí být přesně jednou ve StyleGuide (Fáze 2B)");
+        }
+
+        // Sanity: gov komponenty odpovídající novým pm-* wrapperům jsou přítomné
+        (await page.Locator("gov-link").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(4, "4 pm-link ukázky ve StyleGuide");
+        (await page.Locator("gov-tabs").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(2, "2 pm-tabs (horizontal + chip)");
+        (await page.Locator("gov-card").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(2, "2 pm-card (default + klikací)");
+        (await page.Locator("gov-pagination").CountAsync())
+            .Should().BeGreaterThanOrEqualTo(3, "3 pm-pagination (uprostřed, první, poslední)");
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
     public async Task StyleGuide_PmButton_Klikatelne_PropagujeClick()
     {
         var page = await _fixture.NewPageAsync();
