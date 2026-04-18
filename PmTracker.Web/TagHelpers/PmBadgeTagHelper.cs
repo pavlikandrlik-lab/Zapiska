@@ -32,7 +32,11 @@ public sealed class PmBadgeTagHelper : TagHelper
             _ => "neutral"
         };
         output.Attributes.SetAttribute("color", color);
-        output.Attributes.SetAttribute("type", Type == PmBadgeType.Bold ? "bold" : "subtle");
+        output.Attributes.SetAttribute("type", Type switch
+        {
+            PmBadgeType.Bold => "bold",
+            _ => "subtle"
+        });
         output.Attributes.SetAttribute("size", Size.ToGovAttribute());
 
         if (!output.Content.IsModified)

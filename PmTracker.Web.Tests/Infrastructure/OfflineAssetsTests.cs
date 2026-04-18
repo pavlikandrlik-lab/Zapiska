@@ -9,12 +9,20 @@ namespace PmTracker.Web.Tests.Infrastructure;
 /// </summary>
 public sealed class OfflineAssetsTests
 {
-    // Cesta k wwwroot/assets/icons/components/ — relativně k výstupnímu adresáři
-    private static readonly string IconsComponentsDir = Path.GetFullPath(
-        Path.Combine(
-            AppContext.BaseDirectory,
-            "..", "..", "..", "..",
-            "PmTracker.Web", "wwwroot", "assets", "icons", "components"));
+    private static string FindSolutionRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "PmTracker.sln")))
+        {
+            dir = dir.Parent;
+        }
+        if (dir == null)
+            throw new InvalidOperationException("Solution root (PmTracker.sln) not found.");
+        return dir.FullName;
+    }
+
+    private static readonly string IconsComponentsDir =
+        Path.Combine(FindSolutionRoot(), "PmTracker.Web", "wwwroot", "assets", "icons", "components");
 
     [Fact]
     public void ComponentsIconsDirectory_Exists()

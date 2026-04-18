@@ -30,6 +30,7 @@ public sealed class PmBadgeTagHelperTests
 
         var html = TagHelperTestHelpers.Render(output);
         Assert.Contains("type=\"bold\"", html);
+        Assert.DoesNotContain("type=\"subtle\"", html);
     }
 
     [Fact]
