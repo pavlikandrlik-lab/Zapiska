@@ -73,7 +73,7 @@ public sealed class PmButtonTagHelper : TagHelper
         }
 
         // Zajistit, že child content se propaguje (default content)
-        if (output.Content.IsModified == false)
+        if (!output.Content.IsModified)
         {
             var child = await output.GetChildContentAsync();
             output.Content.SetHtmlContent(child);

@@ -18,7 +18,13 @@ namespace PmTracker.Web.TagHelpers;
 [HtmlTargetElement("pm-field")]
 public sealed class PmFieldTagHelper : TagHelper
 {
-    // Unicode-aware encoder: zachová diakritiku, escapuje pouze <>&"'
+    // Encoding strategie:
+    //   - ContentEncoder (Unicode-aware): pro text mezi tagy (Label, Help, Error)
+    //     zachovává diakritiku (é, í, á…), escapuje pouze <>&"' pro XSS ochranu.
+    //   - WebUtility.HtmlEncode: pro atributy (name, id, value, placeholder) —
+    //     entity pro non-ASCII v atributech jsou bezpečné a prohlížeč je korektně
+    //     dekóduje při čtení hodnoty.
+    // Rozdíl je záměrný: text potřebuje zachovat čitelnost, atributy potřebují strict escape.
     private static readonly HtmlEncoder ContentEncoder =
         HtmlEncoder.Create(UnicodeRanges.All);
 

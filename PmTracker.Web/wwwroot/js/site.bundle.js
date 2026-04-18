@@ -11,6 +11,18 @@
   });
 })();
 
+// appEventBus — delegation helper (exposed na window pro legacy moduly)
+// API: window.appEventBus.on(selector, eventName, handler)
+// Viz docs/architecture/js-modules.md
+window.appEventBus = {
+  on(selector, eventName, handler) {
+    document.addEventListener(eventName, (event) => {
+      const target = event.target instanceof Element ? event.target.closest(selector) : null;
+      if (target) handler(event, target);
+    });
+  }
+};
+
 // PmTracker.Web/wwwroot/js/modules/navigationRuntime.js
 var navigationRuntime = {
   initRecordFormEnhancements: null,
