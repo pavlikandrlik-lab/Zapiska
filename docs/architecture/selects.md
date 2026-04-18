@@ -30,7 +30,7 @@ Thin wrapper nad `<gov-form-control>` + `<gov-form-select>` z gov-design-system.
 | `Error` | `string?` | Chybové hlášení (přepíše Help, přidá `invalid`). |
 | `Size` | `PmComponentSize` | Small / Medium (výchozí) / Large. |
 
-`PmSelectOption` je record: `(Value, Text, selected, disabled)`.
+`PmSelectOption` je record: `(Value, Text, Selected, Disabled)`.
 
 ## Mapování pm → gov
 
