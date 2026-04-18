@@ -70,9 +70,11 @@ public class PmSearchTagHelperTests
         var output = TagHelperTestHelpers.MakeOutput("pm-search", childContent: "");
         await tagHelper.ProcessAsync(context, output);
 
-        Assert.Equal("l", output.Attributes["size"]?.Value?.ToString());
         var html = TagHelperTestHelpers.Render(output);
         Assert.Contains("size=\"l\"", html);
+        // Ověřit, že size="l" je na root elementu (gov-form-search) i na vnořeném gov-form-input
+        Assert.Contains("<gov-form-search color=\"primary\" size=\"l\"", html);
+        Assert.Contains("<gov-form-input slot=\"input\" size=\"l\"", html);
     }
 
     [Fact]
@@ -122,7 +124,57 @@ public class PmSearchTagHelperTests
         await tagHelper.ProcessAsync(context, output);
 
         var html = TagHelperTestHelpers.Render(output);
-        Assert.Contains("Jméno, příjmení", html);
-        Assert.DoesNotContain("&#", html);
+        // WebUtility.HtmlEncode emituje Unicode jako numerické entity (&#xxx;), což je korektní HTML
+        // a parser v prohlížeči je dekóduje zpět na původní znak. Ověřujeme sémantiku přes HtmlDecode.
+        var decoded = System.Net.WebUtility.HtmlDecode(html);
+        Assert.Contains("Jméno, příjmení", decoded);
+    }
+
+    [Fact]
+    public async Task AriaLabel_DefaultsToHledat_WhenNoAriaLabelAndNoPlaceholder()
+    {
+        var tagHelper = new PmSearchTagHelper { Name = "q" };
+        var context = TagHelperTestHelpers.MakeContext();
+        var output = TagHelperTestHelpers.MakeOutput("pm-search", childContent: "");
+        await tagHelper.ProcessAsync(context, output);
+
+        var html = TagHelperTestHelpers.Render(output);
+        Assert.Contains("aria-label=\"Hledat\"", html);
+    }
+
+    [Fact]
+    public async Task AriaLabel_FallsBackToPlaceholder_WhenAriaLabelNotSet()
+    {
+        var tagHelper = new PmSearchTagHelper
+        {
+            Name = "q",
+            Placeholder = "Vyhledat osobu…"
+        };
+        var context = TagHelperTestHelpers.MakeContext();
+        var output = TagHelperTestHelpers.MakeOutput("pm-search", childContent: "");
+        await tagHelper.ProcessAsync(context, output);
+
+        var html = TagHelperTestHelpers.Render(output);
+        // Po HTML-dekodaci musí aria-label obsahovat placeholder text
+        var decoded = System.Net.WebUtility.HtmlDecode(html);
+        Assert.Contains("aria-label=\"Vyhledat osobu…\"", decoded);
+    }
+
+    [Fact]
+    public async Task AriaLabel_ExplicitValue_OverridesPlaceholder()
+    {
+        var tagHelper = new PmSearchTagHelper
+        {
+            Name = "q",
+            Placeholder = "Hledat…",
+            AriaLabel = "Globální vyhledávání"
+        };
+        var context = TagHelperTestHelpers.MakeContext();
+        var output = TagHelperTestHelpers.MakeOutput("pm-search", childContent: "");
+        await tagHelper.ProcessAsync(context, output);
+
+        var html = TagHelperTestHelpers.Render(output);
+        var decoded = System.Net.WebUtility.HtmlDecode(html);
+        Assert.Contains("aria-label=\"Globální vyhledávání\"", decoded);
     }
 }

@@ -1,5 +1,5 @@
-using System.Text.Encodings.Web;
-using System.Text.Unicode;
+using System.Net;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
 namespace PmTracker.Web.TagHelpers;
@@ -15,10 +15,6 @@ namespace PmTracker.Web.TagHelpers;
 [HtmlTargetElement("pm-search", TagStructure = TagStructure.NormalOrSelfClosing)]
 public sealed class PmSearchTagHelper : TagHelper
 {
-    // HtmlEncoder.Create(UnicodeRanges.All) encodes pouze HTML nebezpečné znaky (<, >, ", &, ')
-    // a zachovává diakritiku (é, í, á, ě, …). Bezpečné pro XSS ochranu i Unicode vstup.
-    private static readonly HtmlEncoder AttributeEncoder = HtmlEncoder.Create(UnicodeRanges.All);
-
     /// <summary>Atribut name (odesílá se jako GET parametr).</summary>
     public string Name { get; set; } = "q";
 
@@ -41,7 +37,7 @@ public sealed class PmSearchTagHelper : TagHelper
     /// <summary>Pokud true, input dostane autofocus.</summary>
     public bool Autofocus { get; set; }
 
-    public override void Process(TagHelperContext context, TagHelperOutput output)
+    public override Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         output.TagName = "gov-form-search";
         output.TagMode = TagMode.StartTagAndEndTag;
@@ -50,10 +46,10 @@ public sealed class PmSearchTagHelper : TagHelper
         output.Attributes.SetAttribute("color", "primary");
         output.Attributes.SetAttribute("size", size);
 
-        var safeName = AttributeEncoder.Encode(Name);
-        var safePlaceholder = AttributeEncoder.Encode(Placeholder ?? string.Empty);
-        var safeValue = AttributeEncoder.Encode(Value ?? string.Empty);
-        var safeAriaLabel = AttributeEncoder.Encode(AriaLabel ?? Placeholder ?? "Hledat");
+        var safeName = WebUtility.HtmlEncode(Name);
+        var safePlaceholder = WebUtility.HtmlEncode(Placeholder ?? string.Empty);
+        var safeValue = WebUtility.HtmlEncode(Value ?? string.Empty);
+        var safeAriaLabel = WebUtility.HtmlEncode(AriaLabel ?? Placeholder ?? "Hledat");
         var autofocusAttr = Autofocus ? " autofocus" : string.Empty;
 
         var inputHtml =
@@ -68,5 +64,7 @@ public sealed class PmSearchTagHelper : TagHelper
                 $"<gov-button slot=\"button\" color=\"primary\" size=\"{size}\" type=\"solid\" native-type=\"submit\">Hledat</gov-button>";
             output.Content.AppendHtml(buttonHtml);
         }
+
+        return Task.CompletedTask;
     }
 }

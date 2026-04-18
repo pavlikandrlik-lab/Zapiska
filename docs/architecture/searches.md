@@ -25,7 +25,7 @@ Thin wrapper nad `<gov-form-search>` + vnořený `<gov-form-input type="search" 
 | `Name` | `string` | `"q"` | Atribut `name` inputu. |
 | `Placeholder` | `string?` | `null` | Atribut `placeholder`. |
 | `Value` | `string?` | `null` | Aktuální hodnota. |
-| `AriaLabel` | `string?` | `Placeholder` nebo `"Hledat"` | Atribut `aria-label`. |
+| `AriaLabel` | `string?` | `null` (při renderu fallback na `Placeholder`, pak `"Hledat"`) | Atribut `aria-label`. |
 | `Size` | `PmComponentSize` | `Medium` | Velikost (s/m/l). |
 | `Submit` | `bool` | `false` | Přidá `<gov-button slot="button">Hledat</gov-button>`. |
 | `Autofocus` | `bool` | `false` | Přidá `autofocus` na input. |
@@ -41,7 +41,7 @@ Thin wrapper nad `<gov-form-search>` + vnořený `<gov-form-input type="search" 
 
 ## Poznámky
 
-- Všechny user-supplied hodnoty (`Placeholder`, `Value`, `Name`, `AriaLabel`) jsou encodované přes `HtmlEncoder.Create(UnicodeRanges.All)` — plná XSS ochrana (escapuje `<`, `>`, `"`, `&`, `'`) při zachování diakritiky (é, í, á, ě, …).
+- Všechny user-supplied hodnoty (`Placeholder`, `Value`, `Name`, `AriaLabel`) jsou encodované přes `WebUtility.HtmlEncode` — plná XSS ochrana (escapuje `<`, `>`, `"`, `&`). Numerické entity pro non-ASCII znaky jsou korektní HTML; prohlížeč je dekóduje zpět na původní znak.
 - Pro person-picker pattern (`data-person-picker-input`) zachovejte `<input type="search">` beze změny — pm-search se tam nehodí (gov-form-input by rozbil existující JS handler).
 
 ## Viz také
