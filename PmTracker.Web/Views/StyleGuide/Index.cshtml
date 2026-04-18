@@ -81,40 +81,40 @@
             (není obalena do <code>pm-*</code>), protože je zapojená na typeahead dropdown v <code>_Layout</code>.
         </p>
 
-        <h3>Výchozí (Medium) — 1:1 kopie <code>.app-search</code> z hlavičky</h3>
+        <h3>Výchozí (Medium) — oficiální markup z designsystem.gov.cz</h3>
         <div class="styleguide-search-wrapper">
-            <form role="search" class="app-search" onsubmit="return false;">
-                <gov-form-search color="primary" size="m">
-                    <gov-form-input slot="input" size="m" name="q" placeholder="Hledání"
-                                    identifier="styleguide-search-m"
-                                    aria-label="Ukázka vyhledávání"
-                                    autocomplete="off"></gov-form-input>
-                    <gov-button slot="button-erase" size="s" color="primary" type="base">
-                        <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
-                    </gov-button>
-                    <gov-button slot="button" color="primary" size="s" type="solid">
-                        Hledat
-                    </gov-button>
-                </gov-form-search>
-            </form>
+            <gov-form-control>
+                <gov-form-group>
+                    <gov-form-search color="primary" size="m">
+                        <gov-form-input slot="input" size="m" name="q" placeholder="Co hledáte"
+                                        identifier="styleguide-search-m"
+                                        aria-label="Ukázka vyhledávání"
+                                        autocomplete="off"></gov-form-input>
+                        <gov-button slot="button-erase" size="s" color="primary" type="base">
+                            <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
+                        </gov-button>
+                        <gov-button slot="button" color="primary" size="s" type="solid">Hledat</gov-button>
+                    </gov-form-search>
+                </gov-form-group>
+            </gov-form-control>
         </div>
 
         <h3>Small</h3>
         <div class="styleguide-search-wrapper">
-            <form role="search" class="app-search" onsubmit="return false;">
-                <gov-form-search color="primary" size="s">
-                    <gov-form-input slot="input" size="s" name="q" placeholder="Hledání"
-                                    identifier="styleguide-search-s"
-                                    aria-label="Ukázka vyhledávání (small)"
-                                    autocomplete="off"></gov-form-input>
-                    <gov-button slot="button-erase" size="xs" color="primary" type="base">
-                        <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
-                    </gov-button>
-                    <gov-button slot="button" color="primary" size="xs" type="solid">
-                        Hledat
-                    </gov-button>
-                </gov-form-search>
-            </form>
+            <gov-form-control>
+                <gov-form-group>
+                    <gov-form-search color="primary" size="s">
+                        <gov-form-input slot="input" size="s" name="q" placeholder="Co hledáte"
+                                        identifier="styleguide-search-s"
+                                        aria-label="Ukázka vyhledávání (small)"
+                                        autocomplete="off"></gov-form-input>
+                        <gov-button slot="button-erase" size="xs" color="primary" type="base">
+                            <gov-icon slot="icon-start" name="x" type="components"></gov-icon>
+                        </gov-button>
+                        <gov-button slot="button" color="primary" size="xs" type="solid">Hledat</gov-button>
+                    </gov-form-search>
+                </gov-form-group>
+            </gov-form-control>
         </div>
     </article>
 </section>
