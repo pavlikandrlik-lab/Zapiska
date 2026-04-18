@@ -1,0 +1,83 @@
+@{
+    ViewData["Title"] = "Style Guide — pm-* komponenty";
+}
+
+<section class="styleguide-page">
+    <header>
+        <h1>PM Tracker — Style Guide</h1>
+        <p>Přehled aplikačních UI komponent (<code>pm-*</code>). Úplná dokumentace: <code>docs/architecture/</code>.</p>
+    </header>
+
+    <article data-styleguide-section="tlacitka">
+        <h2>Tlačítka (<code>pm-button</code>)</h2>
+
+        <h3>Varianty</h3>
+        <div class="styleguide-row">
+            <pm-button variant="Primary">Primary</pm-button>
+            <pm-button variant="Secondary">Secondary</pm-button>
+            <pm-button variant="Destructive">Destructive</pm-button>
+            <pm-button variant="Ghost">Ghost</pm-button>
+        </div>
+
+        <h3>Velikosti</h3>
+        <div class="styleguide-row">
+            <pm-button variant="Primary" size="Small">Small</pm-button>
+            <pm-button variant="Primary" size="Medium">Medium</pm-button>
+            <pm-button variant="Primary" size="Large">Large</pm-button>
+        </div>
+
+        <h3>S ikonou</h3>
+        <div class="styleguide-row">
+            <pm-button variant="Primary" icon="check">Uložit</pm-button>
+            <pm-button variant="Secondary" icon="arrow-right" icon-position="end">Dále</pm-button>
+        </div>
+
+        <h3>Disabled / Link</h3>
+        <div class="styleguide-row">
+            <pm-button variant="Primary" disabled="true">Disabled</pm-button>
+            <pm-button variant="Ghost" href="/">Link k /</pm-button>
+        </div>
+    </article>
+
+    <article data-styleguide-section="alerty">
+        <h2>Alerty (<code>pm-alert</code>)</h2>
+        <pm-alert variant="Info">Informační zpráva pro uživatele.</pm-alert>
+        <pm-alert variant="Success">Akce proběhla úspěšně.</pm-alert>
+        <pm-alert variant="Warning">Upozornění — zkontrolujte vstupy.</pm-alert>
+        <pm-alert variant="Error">Chyba — akce se nezdařila.</pm-alert>
+    </article>
+
+    <article data-styleguide-section="badge">
+        <h2>Badge (<code>pm-badge</code>)</h2>
+        <div class="styleguide-row">
+            <pm-badge variant="Neutral">Neutral</pm-badge>
+            <pm-badge variant="Primary">Primary</pm-badge>
+            <pm-badge variant="Success">Success</pm-badge>
+            <pm-badge variant="Warning">Warning</pm-badge>
+            <pm-badge variant="Error">Error</pm-badge>
+        </div>
+    </article>
+
+    <article data-styleguide-section="pole">
+        <h2>Pole (<code>pm-field</code>)</h2>
+        <pm-field name="jmeno" label="Jméno" placeholder="Zadejte jméno" />
+        <pm-field name="email" label="E-mail" input-type="email" required="true" help="Slouží k zasílání notifikací" />
+        <pm-field name="chyba" label="S chybou" error="Pole je povinné" />
+    </article>
+
+    <article data-styleguide-section="ikony">
+        <h2>Ikony (<code>pm-icon</code>)</h2>
+        <div class="styleguide-row">
+            <pm-icon name="check" aria-label="Hotovo" />
+            <pm-icon name="x" aria-label="Zavřít" />
+            <pm-icon name="arrow-right" aria-label="Dále" />
+        </div>
+    </article>
+</section>
+
+<style>
+.styleguide-page article { margin-block: var(--pm-spacing-xl); padding-block-end: var(--pm-spacing-l); border-bottom: 1px solid var(--pm-color-border); }
+.styleguide-page h2 { margin-block-end: var(--pm-spacing-m); }
+.styleguide-page h3 { margin-block: var(--pm-spacing-m) var(--pm-spacing-xs); font-size: var(--pm-font-size-m); color: var(--pm-color-text-muted); }
+.styleguide-row { display: flex; gap: var(--pm-spacing-s); flex-wrap: wrap; align-items: center; }
+</style>
