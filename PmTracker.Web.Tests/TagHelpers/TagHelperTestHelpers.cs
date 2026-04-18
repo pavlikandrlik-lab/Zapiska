@@ -42,4 +42,16 @@ internal static class TagHelperTestHelpers
         output.WriteTo(sw, HtmlEncoder.Default);
         return sw.ToString();
     }
+
+    /// <summary>
+    /// Convenience overload: vytvoří kontext + output, zavolá ProcessAsync a vrátí HTML string.
+    /// Vhodné pro tag helpery bez child content.
+    /// </summary>
+    public static string Render(TagHelper tagHelper, string tagName = "pm-tag")
+    {
+        var ctx = MakeContext(tagName);
+        var output = MakeOutput(tagName, "");
+        tagHelper.ProcessAsync(ctx, output).GetAwaiter().GetResult();
+        return Render(output);
+    }
 }

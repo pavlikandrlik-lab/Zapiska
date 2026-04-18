@@ -117,6 +117,22 @@
             </gov-form-control>
         </div>
     </article>
+
+    <article data-styleguide-section="select">
+        <h2>Select (<code>pm-select</code>)</h2>
+        @{
+            var selectOptions = new List<PmTracker.Web.TagHelpers.PmSelectOption>
+            {
+                new("", "Vyberte…", true, true),
+                new("nova", "Nová", false, false),
+                new("rozpracovana", "Rozpracovaná", false, false),
+                new("uzavrena", "Uzavřená", false, false)
+            };
+        }
+        <pm-select name="stav_ukazka" label="Stav záznamu" options="selectOptions" help="Výběr z číselníku" />
+        <pm-select name="povinny_ukazka" label="Povinný výběr" options="selectOptions" required="true" />
+        <pm-select name="chyba_ukazka" label="S chybou" options="selectOptions" error="Vyberte prosím hodnotu" />
+    </article>
 </section>
 
 <style>
