@@ -15,8 +15,8 @@ public class PmSelectTagHelperTests
             Label = "Stav záznamu",
             Options = new List<PmSelectOption>
             {
-                new("nova", "Nová", selected: false, disabled: false),
-                new("rozpracovana", "Rozpracovaná", selected: true, disabled: false)
+                new("nova", "Nová", Selected: false, Disabled: false),
+                new("rozpracovana", "Rozpracovaná", Selected: true, Disabled: false)
             }
         };
 
@@ -40,8 +40,8 @@ public class PmSelectTagHelperTests
             Label = "Role",
             Options = new List<PmSelectOption>
             {
-                new("--", "Vyberte…", selected: true, disabled: true),
-                new("admin", "Administrátor", selected: false, disabled: false)
+                new("--", "Vyberte…", Selected: true, Disabled: true),
+                new("admin", "Administrátor", Selected: false, Disabled: false)
             }
         };
 
@@ -60,7 +60,7 @@ public class PmSelectTagHelperTests
             Required = true,
             Options = new List<PmSelectOption>
             {
-                new("a", "A", selected: false, disabled: false)
+                new("a", "A", Selected: false, Disabled: false)
             }
         };
 
@@ -79,7 +79,7 @@ public class PmSelectTagHelperTests
             Label = "Velikost měření",
             Options = new List<PmSelectOption>
             {
-                new("s", "Malá", selected: false, disabled: false)
+                new("s", "Malá", Selected: false, Disabled: false)
             }
         };
 
@@ -98,7 +98,7 @@ public class PmSelectTagHelperTests
             Label = "<script>alert('xss')</script>",
             Options = new List<PmSelectOption>
             {
-                new("a", "A", selected: false, disabled: false)
+                new("a", "A", Selected: false, Disabled: false)
             }
         };
 

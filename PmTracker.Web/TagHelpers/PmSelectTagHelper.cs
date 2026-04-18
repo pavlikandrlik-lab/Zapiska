@@ -64,8 +64,8 @@ public sealed class PmSelectTagHelper : TagHelper
         foreach (var opt in Options)
         {
             optionsHtml.Append($"<option value=\"{WebUtility.HtmlEncode(opt.Value)}\"");
-            if (opt.selected) optionsHtml.Append(" selected");
-            if (opt.disabled) optionsHtml.Append(" disabled");
+            if (opt.Selected) optionsHtml.Append(" selected");
+            if (opt.Disabled) optionsHtml.Append(" disabled");
             optionsHtml.Append($">{ContentEncoder.Encode(opt.Text)}</option>");
         }
 
