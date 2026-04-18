@@ -30,19 +30,24 @@ public sealed class GovComponentsReplacementTests
     }
 
     /// <summary>
-    /// gov-theme-switch záměrně NEBYL použit: gov-theme-switch podporuje pouze přepínání
-    /// light/dark, ale naše theme.js implementuje trojstavový režim (light/dark/auto)
-    /// s persistencí do cookie pmtracker.theme.mode a responzí na prefers-color-scheme.
-    /// Nahrazení by ztratilo auto mód. Layout proto obsahuje komentář s odůvodněním.
+    /// gov-theme-switch Web Component je použita v _Layout.cshtml.
+    /// CSS aproximace (label+input+SVG ikonky) byla odstraněna a nahrazena skutečnou gov komponentou.
+    /// theme.js zachycuje gov-change event a řídí 3-stavový model (light/dark/auto).
     /// </summary>
     [Fact]
     public void Layout_MaGovThemeSwitch_NeboPuvodniCssAproximaciSZduvodnenim()
     {
         var content = ReadView("Shared", "_Layout.cshtml");
 
-        // Záměrně ponechaná CSS aproximace — musí existovat komentář s odůvodněním
-        content.Should().Contain("gov-theme-switch nepodporuje auto mod",
-            "_Layout.cshtml musí obsahovat komentář vysvětlující, proč gov-theme-switch nebyl použit");
+        // Skutečná gov Web Component musí být přítomna
+        content.Should().Contain("<gov-theme-switch",
+            "_Layout.cshtml musí obsahovat <gov-theme-switch> Web Component");
+
+        // Původní CSS aproximace musí být odstraněna
+        content.Should().NotContain("<span class=\"gov-theme-switch-icon-sun\">",
+            "_Layout.cshtml nesmí obsahovat starou CSS aproximaci gov-theme-switch-icon-sun");
+        content.Should().NotContain("<span class=\"gov-theme-switch-icon gov-theme-switch-icon-sun\">",
+            "_Layout.cshtml nesmí obsahovat starou CSS aproximaci gov-theme-switch-icon");
     }
 
     /// <summary>

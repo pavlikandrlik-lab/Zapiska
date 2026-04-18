@@ -1,5 +1,6 @@
 const themeStorageKey = "pmtracker.theme.mode";
 const themeSwitchSelector = "[data-theme-switch]";
+const govThemeSwitchTag = "gov-theme-switch";
 const mediaDark = window.matchMedia("(prefers-color-scheme: dark)");
 const themeCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 
@@ -79,6 +80,16 @@ function syncThemeSwitches(effectiveTheme) {
 }
 
 function syncThemeSwitchElement(element, effectiveTheme) {
+    // Synchronizace gov-theme-switch Web Component
+    const govSwitch = element.querySelector(govThemeSwitchTag);
+    if (govSwitch instanceof HTMLElement) {
+        // Nastavíme theme property/atribut dle aktuálního efektivního tématu.
+        // gov-theme-switch přijímá "light" | "dark" | "auto".
+        govSwitch.setAttribute("theme", effectiveTheme);
+        return;
+    }
+
+    // Fallback: původní custom input (pro případné další instance)
     const input = element.querySelector("[data-theme-switch-input]");
     const label = element.querySelector("[data-theme-switch-label]");
     if (!(input instanceof HTMLInputElement) || !(label instanceof HTMLElement)) {
@@ -114,6 +125,42 @@ function getThemeSwitchAttribute(element, attributeName, fallback) {
     return value && value.trim().length > 0 ? value.trim() : fallback;
 }
 
+/**
+ * Připojí gov-change listener na gov-theme-switch Web Component.
+ * gov-theme-switch emituje CustomEvent "gov-change" s detail.state = "light" | "dark".
+ * My zachytíme event, uložíme volbu naší cookies a synchronizujeme html atributy.
+ * Auto-mód gov-theme-switch neemituje — při kliknutí vždy přepíná na light nebo dark.
+ */
+function bindGovThemeSwitch(element) {
+    const govSwitch = element.querySelector(govThemeSwitchTag);
+    if (!(govSwitch instanceof HTMLElement)) {
+        return false;
+    }
+
+    if (element.dataset.themeSwitchBound === "true") {
+        return true;
+    }
+
+    govSwitch.addEventListener("gov-change", (event) => {
+        const detail = event.detail;
+        const newMode = detail && isThemeMode(detail.state) ? detail.state : null;
+        if (!newMode) {
+            return;
+        }
+
+        // gov-theme-switch již nastavil data-theme na <html> interně.
+        // My navíc uložíme do naší cookie a nastavíme data-theme-mode.
+        persistThemeMode(newMode);
+        document.documentElement.setAttribute("data-theme-mode", newMode);
+        // gov-theme-switch sám nastaví data-theme, ale pro jistotu synchronizujeme
+        document.documentElement.setAttribute("data-theme", resolveEffectiveTheme(newMode));
+        element.setAttribute("data-theme-switch-state", newMode);
+    });
+
+    element.dataset.themeSwitchBound = "true";
+    return true;
+}
+
 export function initTheme() {
     const stored = getStoredThemeMode();
     if (stored && !getThemeCookieMode()) {
@@ -144,6 +191,12 @@ export function initTheme() {
             return;
         }
 
+        // Pokus o binding gov-theme-switch Web Component
+        if (bindGovThemeSwitch(element)) {
+            return;
+        }
+
+        // Fallback: původní custom input
         const input = element.querySelector("[data-theme-switch-input]");
         if (input instanceof HTMLInputElement) {
             input.addEventListener("change", () => {

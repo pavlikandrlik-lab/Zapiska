@@ -8767,6 +8767,7 @@ function initModalAjaxSubmit() {
 // PmTracker.Web/wwwroot/js/modules/theme.js
 var themeStorageKey = "pmtracker.theme.mode";
 var themeSwitchSelector = "[data-theme-switch]";
+var govThemeSwitchTag = "gov-theme-switch";
 var mediaDark = window.matchMedia("(prefers-color-scheme: dark)");
 var themeCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 function isThemeMode(value) {
@@ -8827,6 +8828,13 @@ function syncThemeSwitches(effectiveTheme) {
   });
 }
 function syncThemeSwitchElement(element, effectiveTheme) {
+  // Synchronizace gov-theme-switch Web Component
+  const govSwitch = element.querySelector(govThemeSwitchTag);
+  if (govSwitch instanceof HTMLElement) {
+    govSwitch.setAttribute("theme", effectiveTheme);
+    return;
+  }
+  // Fallback: původní custom input
   const input = element.querySelector("[data-theme-switch-input]");
   const label = element.querySelector("[data-theme-switch-label]");
   if (!(input instanceof HTMLInputElement) || !(label instanceof HTMLElement)) {
@@ -8855,6 +8863,28 @@ function getThemeSwitchAttribute(element, attributeName, fallback) {
   const value = element.getAttribute(attributeName);
   return value && value.trim().length > 0 ? value.trim() : fallback;
 }
+function bindGovThemeSwitch(element) {
+  const govSwitch = element.querySelector(govThemeSwitchTag);
+  if (!(govSwitch instanceof HTMLElement)) {
+    return false;
+  }
+  if (element.dataset.themeSwitchBound === "true") {
+    return true;
+  }
+  govSwitch.addEventListener("gov-change", (event) => {
+    const detail = event.detail;
+    const newMode = detail && isThemeMode(detail.state) ? detail.state : null;
+    if (!newMode) {
+      return;
+    }
+    persistThemeMode(newMode);
+    document.documentElement.setAttribute("data-theme-mode", newMode);
+    document.documentElement.setAttribute("data-theme", resolveEffectiveTheme(newMode));
+    element.setAttribute("data-theme-switch-state", newMode);
+  });
+  element.dataset.themeSwitchBound = "true";
+  return true;
+}
 function initTheme() {
   const stored = getStoredThemeMode();
   if (stored && !getThemeCookieMode()) {
@@ -8879,6 +8909,11 @@ function initTheme() {
     if (element.dataset.themeSwitchBound === "true") {
       return;
     }
+    // Pokus o binding gov-theme-switch Web Component
+    if (bindGovThemeSwitch(element)) {
+      return;
+    }
+    // Fallback: původní custom input
     const input = element.querySelector("[data-theme-switch-input]");
     if (input instanceof HTMLInputElement) {
       input.addEventListener("change", () => {

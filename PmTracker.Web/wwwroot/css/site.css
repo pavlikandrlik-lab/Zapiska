@@ -272,7 +272,9 @@
 
 /* ── End global search ──────────────────────────────────────────────────── */
 
-.gov-theme-switch,
+/* gov-theme-switch CSS aproximace odstraněna — nahrazena gov-theme-switch Web Component */
+/* Stávající .gov-switch pravidla ponechána pro filtry v projektech (shadow DOM nezasahuje) */
+
 .gov-switch {
     position: relative;
     display: inline-flex;
@@ -282,7 +284,6 @@
     cursor: pointer;
 }
 
-.gov-theme-switch input,
 .gov-switch input {
     position: absolute;
     inset: 0;
@@ -295,7 +296,6 @@
     z-index: 2;
 }
 
-.gov-theme-switch-track,
 .gov-switch-track {
     position: relative;
     width: 52px;
@@ -308,34 +308,6 @@
     pointer-events: none;
 }
 
-.gov-theme-switch-icon {
-    position: absolute;
-    top: 50%;
-    width: 12px;
-    height: 12px;
-    color: #4b5563;
-    transform: translateY(-50%);
-    transition: opacity 0.14s ease, color 0.14s ease;
-    pointer-events: none;
-}
-
-.gov-theme-switch-icon svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-    fill: currentColor;
-}
-
-.gov-theme-switch-icon-sun {
-    left: 7px;
-    color: #8a5a00;
-}
-
-.gov-theme-switch-icon-moon {
-    right: 7px;
-}
-
-.gov-theme-switch-thumb,
 .gov-switch-thumb {
     position: absolute;
     top: 2px;
@@ -350,39 +322,29 @@
     pointer-events: none;
 }
 
-.gov-theme-switch input:checked + .gov-theme-switch-track,
 .gov-switch input:checked + .gov-switch-track {
     background: var(--gov-color-primary);
     border-color: var(--gov-color-primary);
     box-shadow: inset 0 1px 1px rgba(5, 51, 117, 0.24);
 }
 
-.gov-theme-switch input:checked + .gov-theme-switch-track .gov-theme-switch-thumb,
 .gov-switch input:checked + .gov-switch-track .gov-switch-thumb {
     transform: translateX(24px);
 }
 
-.gov-theme-switch input:checked + .gov-theme-switch-track .gov-theme-switch-icon-sun,
-.gov-switch input:checked + .gov-switch-track .gov-theme-switch-icon-sun {
-    opacity: 0.45;
-}
-
-.gov-theme-switch input:checked + .gov-theme-switch-track .gov-theme-switch-icon-moon,
-.gov-switch input:checked + .gov-switch-track .gov-theme-switch-icon-moon {
-    color: #eef4ff;
-}
-
-.gov-theme-switch input:focus-visible + .gov-theme-switch-track,
 .gov-switch input:focus-visible + .gov-switch-track {
     outline: 2px solid var(--gov-color-primary);
     outline-offset: 2px;
 }
 
-.gov-theme-switch-label,
 .gov-switch-label {
     font-size: 14px;
     color: var(--app-text-primary);
     font-weight: 600;
+}
+
+[data-theme-switch] {
+    flex-shrink: 0;
 }
 
 .app-theme-switch {
@@ -5126,30 +5088,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background: #16233a;
 }
 
-:root[data-theme="dark"] .gov-theme-switch-track,
 :root[data-theme="dark"] .gov-switch-track {
     background: #2d3a53;
     border-color: #405273;
 }
 
-:root[data-theme="dark"] .gov-theme-switch-thumb,
 :root[data-theme="dark"] .gov-switch-thumb {
     background: #dce5ff;
-}
-
-:root[data-theme="dark"] .gov-theme-switch-icon-sun,
-:root[data-theme="dark"] .gov-switch .gov-theme-switch-icon-sun {
-    color: #f3c96b;
-}
-
-:root[data-theme="dark"] .gov-theme-switch-icon-moon,
-:root[data-theme="dark"] .gov-switch .gov-theme-switch-icon-moon {
-    color: #b7c8ea;
-}
-
-:root[data-theme="dark"] .gov-theme-switch input:checked + .gov-theme-switch-track .gov-theme-switch-icon-moon,
-:root[data-theme="dark"] .gov-switch input:checked + .gov-switch-track .gov-theme-switch-icon-moon {
-    color: #f8fbff;
 }
 
 :root[data-theme="dark"] .badge {
@@ -5715,10 +5660,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
         min-width: 0;
         width: 100%;
         text-align: left;
-    }
-
-    .gov-theme-switch-label {
-        font-size: 13px;
     }
 
     .dashboard-hero {
