@@ -14,25 +14,30 @@ public sealed class TokensCssTests
         return dir!;
     }
 
+    // DRY helpers
+    private static string TokensCssPath =>
+        Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "css", "tokens.css");
+
+    private static string TokensCssContent() => File.ReadAllText(TokensCssPath);
+
     [Fact]
     public void TokensCss_Existuje()
     {
-        var path = Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "css", "tokens.css");
-        File.Exists(path).Should().BeTrue();
+        File.Exists(TokensCssPath).Should().BeTrue();
     }
 
     [Fact]
     public void TokensCss_ObsahujePmColorAliasy()
     {
-        var content = File.ReadAllText(Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "css", "tokens.css"));
+        var content = TokensCssContent();
         content.Should().Contain("--pm-color-primary");
-        content.Should().Contain("var(--gov-color-");
+        content.Should().Contain("var(--color-primary-600");
     }
 
     [Fact]
     public void TokensCss_ObsahujeSpacingAliasy()
     {
-        var content = File.ReadAllText(Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "css", "tokens.css"));
+        var content = TokensCssContent();
         content.Should().Contain("--pm-spacing-s");
         content.Should().Contain("--pm-spacing-m");
         content.Should().Contain("--pm-spacing-l");
@@ -41,7 +46,7 @@ public sealed class TokensCssTests
     [Fact]
     public void TokensCss_ObsahujeBreakpointy()
     {
-        var content = File.ReadAllText(Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "css", "tokens.css"));
+        var content = TokensCssContent();
         content.Should().Contain("--pm-bp-sm");
         content.Should().Contain("--pm-bp-md");
         content.Should().Contain("--pm-bp-lg");
@@ -52,7 +57,7 @@ public sealed class TokensCssTests
     [Fact]
     public void TokensCss_ObsahujeZIndexStack()
     {
-        var content = File.ReadAllText(Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "css", "tokens.css"));
+        var content = TokensCssContent();
         content.Should().Contain("--pm-z-header");
         content.Should().Contain("--pm-z-dropdown");
         content.Should().Contain("--pm-z-modal");
@@ -76,5 +81,30 @@ public sealed class TokensCssTests
         var siteCssIndex = layout.IndexOf("~/css/site.css", StringComparison.Ordinal);
         tokensIndex.Should().BeGreaterThan(coreCssIndex, "tokens.css musí být po gov core.min.css (přepisuje gov tokeny)");
         tokensIndex.Should().BeLessThan(siteCssIndex, "tokens.css musí být před site.css (aby ji site.css viděla)");
+    }
+
+    [Fact]
+    public void TokensCss_NeobsahujeNeexistujiciGovPrefix()
+    {
+        // gov-design-system 4.2.7 NEpoužívá prefix --gov-*.
+        // Regresní test: kdyby někdo v budoucnu přidal --gov-* odkaz, neresolvoval by na gov tokens.
+        var content = TokensCssContent();
+        content.Should().NotContain("var(--gov-",
+            "gov-design-system nepoužívá --gov- prefix; odkaz by resolvoval pouze fallback");
+    }
+
+    [Fact]
+    public void TokensCss_ReferencovanyGovTokenExistuje()
+    {
+        // Ověř, že aspoň jeden token referencovaný v tokens.css skutečně existuje
+        // v gov-design-system styles. Kdyby někdo přepsal token bez ověření v gov DS,
+        // tento test to odchytí.
+        var pmContent = TokensCssContent();
+        var govTokensPath = Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "lib", "gov-design-system", "styles", "lib", "tokens.min.css");
+        var govContent = File.ReadAllText(govTokensPath);
+
+        // Vezmi jeden reprezentativní token z pm (--color-primary-600) a ověř, že je v gov
+        pmContent.Should().Contain("var(--color-primary-600", "pm-color-primary odkazuje na --color-primary-600");
+        govContent.Should().Contain("--color-primary-600:", "--color-primary-600 musí existovat v gov DS");
     }
 }
