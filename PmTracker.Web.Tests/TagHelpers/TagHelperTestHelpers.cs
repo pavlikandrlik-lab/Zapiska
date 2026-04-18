@@ -23,15 +23,17 @@ internal static class TagHelperTestHelpers
 
     public static TagHelperOutput MakeOutput(
         string tagName = "pm-tag",
-        string innerHtml = "Content")
+        string innerHtml = "Content",
+        string? childContent = null)
     {
+        var html = childContent ?? innerHtml;
         return new TagHelperOutput(
             tagName,
             attributes: new TagHelperAttributeList(),
             getChildContentAsync: (_, _) =>
             {
                 var content = new DefaultTagHelperContent();
-                content.SetHtmlContent(innerHtml);
+                content.SetHtmlContent(html);
                 return Task.FromResult<TagHelperContent>(content);
             });
     }

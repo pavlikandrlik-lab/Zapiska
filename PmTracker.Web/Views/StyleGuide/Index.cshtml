@@ -148,6 +148,20 @@
             <pm-checkbox name="ukazka_cb3" label="Zakázaná volba" disabled="true" />
         </div>
     </article>
+    <article data-styleguide-section="radio">
+        <h2>Radio (<code>pm-radio-group</code> + <code>pm-radio</code>)</h2>
+        <h3>Vertical</h3>
+        <pm-radio-group legend="Priorita">
+            <pm-radio name="priorita_v" value="nizka" label="Nízká" />
+            <pm-radio name="priorita_v" value="normalni" label="Normální" checked="true" />
+            <pm-radio name="priorita_v" value="vysoka" label="Vysoká" />
+        </pm-radio-group>
+        <h3>Horizontal</h3>
+        <pm-radio-group legend="Stav" orientation="Horizontal">
+            <pm-radio name="stav_h" value="nova" label="Nová" checked="true" />
+            <pm-radio name="stav_h" value="vyrizena" label="Vyřízena" />
+        </pm-radio-group>
+    </article>
 </section>
 
 <style>
