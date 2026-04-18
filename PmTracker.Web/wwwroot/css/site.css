@@ -1704,8 +1704,8 @@ input[type="time"]:not(gov-form-input input):not(gov-form-search input),
 input[type="datetime-local"]:not(gov-form-input input):not(gov-form-search input),
 input[type="number"]:not(gov-form-input input):not(gov-form-search input),
 input[type="search"]:not(gov-form-input input):not(gov-form-search input),
-select:not(gov-form-select select),
-textarea:not(gov-form-input textarea) {
+select:not(gov-form-select select):not(pm-select select),
+textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
     width: 100%;
     border-radius: var(--gov-radius-sm);
     border: 1px solid var(--gov-color-border);
@@ -1716,7 +1716,7 @@ textarea:not(gov-form-input textarea) {
     color: var(--app-text-primary);
 }
 
-select {
+select:not(gov-form-select select):not(pm-select select) {
     min-height: 44px;
     background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
     background-position: calc(100% - 19px) 18px, calc(100% - 13px) 18px;
@@ -1726,7 +1726,7 @@ select {
     padding-right: 34px;
 }
 
-textarea {
+textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
     resize: vertical;
     min-height: 120px;
 }
