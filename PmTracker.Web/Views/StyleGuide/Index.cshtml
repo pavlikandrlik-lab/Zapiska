@@ -244,6 +244,19 @@
             <pm-button variant="Primary" onclick="document.getElementById('styleguide-demo-dialog').close()">Zavřít</pm-button>
         </pm-dialog>
     </article>
+
+    <article data-styleguide-section="tooltip">
+        <h2>Tooltip (<code>pm-tooltip</code>)</h2>
+        <p>Najeď myší na prvek, uvidíš bublinu.</p>
+        <div class="styleguide-row">
+            <pm-tooltip text="Klikněte pro uložení záznamu">
+                <pm-button variant="Primary">Uložit</pm-button>
+            </pm-tooltip>
+            <pm-tooltip text="Stav projektu">
+                <pm-badge variant="Success">Aktivní</pm-badge>
+            </pm-tooltip>
+        </div>
+    </article>
 </section>
 
 <style>
