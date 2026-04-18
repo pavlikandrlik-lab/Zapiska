@@ -102,4 +102,59 @@ public sealed class PmFieldTagHelperTests
         Assert.Contains("gov-form-input", html);
         Assert.Contains("required", html);
     }
+
+    [Fact]
+    public async Task XssInLabel_IsEscaped()
+    {
+        var helper = new PmFieldTagHelper
+        {
+            Name = "pole",
+            Label = "<script>alert(1)</script>"
+        };
+        var ctx = TagHelperTestHelpers.MakeContext("pm-field");
+        var output = TagHelperTestHelpers.MakeOutput("pm-field");
+
+        await helper.ProcessAsync(ctx, output);
+
+        var html = TagHelperTestHelpers.Render(output);
+        Assert.DoesNotContain("<script>alert", html);
+        Assert.Contains("&lt;script&gt;", html);
+    }
+
+    [Fact]
+    public async Task XssInError_IsEscaped()
+    {
+        var helper = new PmFieldTagHelper
+        {
+            Name = "pole",
+            Label = "Pole",
+            Error = "<img src=x onerror=alert(1)>"
+        };
+        var ctx = TagHelperTestHelpers.MakeContext("pm-field");
+        var output = TagHelperTestHelpers.MakeOutput("pm-field");
+
+        await helper.ProcessAsync(ctx, output);
+
+        var html = TagHelperTestHelpers.Render(output);
+        Assert.DoesNotContain("<img src=x onerror=alert", html);
+        Assert.Contains("&lt;img src=x", html);
+    }
+
+    [Fact]
+    public async Task LabelWithDiacritics_PreservesUnicode()
+    {
+        var helper = new PmFieldTagHelper
+        {
+            Name = "pole",
+            Label = "E-mail uživatele"
+        };
+        var ctx = TagHelperTestHelpers.MakeContext("pm-field");
+        var output = TagHelperTestHelpers.MakeOutput("pm-field");
+
+        await helper.ProcessAsync(ctx, output);
+
+        var html = TagHelperTestHelpers.Render(output);
+        Assert.Contains("E-mail uživatele", html);
+        Assert.DoesNotContain("&#", html);
+    }
 }

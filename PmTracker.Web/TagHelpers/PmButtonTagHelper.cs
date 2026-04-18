@@ -1,3 +1,4 @@
+using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
@@ -64,8 +65,12 @@ public sealed class PmButtonTagHelper : TagHelper
 
         if (!string.IsNullOrWhiteSpace(Icon))
         {
+            // Icon + slotName pocházejí z user-supplied properties → encodujeme,
+            // abychom zabránili XSS přes uzavření atributu (name="…" → event handler).
             var slotName = IconPosition == "end" ? "icon-end" : "icon-start";
-            var iconHtml = $"<gov-icon slot=\"{slotName}\" name=\"{Icon}\" type=\"components\"></gov-icon>";
+            var safeSlot = WebUtility.HtmlEncode(slotName);
+            var safeIcon = WebUtility.HtmlEncode(Icon);
+            var iconHtml = $"<gov-icon slot=\"{safeSlot}\" name=\"{safeIcon}\" type=\"components\"></gov-icon>";
             if (IconPosition == "end")
                 output.PostContent.AppendHtml(iconHtml);
             else

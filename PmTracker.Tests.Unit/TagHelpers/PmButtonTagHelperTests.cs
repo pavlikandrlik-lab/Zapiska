@@ -114,6 +114,19 @@ public sealed class PmButtonTagHelperTests
     }
 
     [Fact]
+    public async Task XssInIcon_JeEscapovanoVAtributu()
+    {
+        // Regrese: Icon byl dřív interpolován raw do HTML stringu.
+        // Útok přes uzavření atributu event handlerem musí být zablokován.
+        var helper = new PmButtonTagHelper { Icon = "\" onmouseover=\"alert(1)" };
+        var output = await RenderAsync(helper);
+
+        var html = output.PreContent.GetContent();
+        html.Should().NotContain("onmouseover=\"alert");
+        html.Should().Contain("&quot;");
+    }
+
+    [Fact]
     public async Task Href_Pridana_RendrujeGovButtonJakoOdkaz()
     {
         var helper = new PmButtonTagHelper { Href = "/Projekty/Detail/5" };
