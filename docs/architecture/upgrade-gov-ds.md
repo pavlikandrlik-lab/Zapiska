@@ -13,6 +13,15 @@ Aktuální verze:
 V adresáři `PmTracker.Web/wwwroot/lib/gov-design-system/dist/core/` smazat staré soubory
 a stáhnout všechny `p-*.js` + `core.esm.min.js` + `core.min.css` (viz `docs/specs/offline-deployment.md`).
 
+> **Pozn. pro non-module prohlížeče**
+> Oficiální návod pro "Usage with basic HTML" na `designsystem.gov.cz` zmiňuje
+> dvojici `<script type="module" src="core.esm.js">` + `<script nomodule src="core.js">`.
+> V npm package `@gov-design-system-ce/components@4.2.9` je však **jen ESM varianta** —
+> non-module `core.js` Stencil v novějších verzích negeneruje. Doporučení v dokumentaci
+> je zastaralé (platilo pro starší verze gov DS). Cílíme proto výhradně na moderní
+> prohlížeče s ES modules (Chrome 61+, Firefox 60+, Safari 11+, Edge 16+).
+> Nemá smysl se snažit o `nomodule` fallback — zdrojový soubor neexistuje.
+
 ### 2. Aktualizovat verze v kódu
 
 - `docs/specs/offline-deployment.md` — tabulka aktuálních knihoven
