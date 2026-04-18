@@ -1,0 +1,74 @@
+/*
+ * PM Tracker design tokens
+ * ---------------------------------------------------------
+ * Tato vrstva přemapovává gov-design-system tokeny na aplikační
+ * semantika (--pm-*). Všechen CSS v site.css a komponentách má
+ * používat --pm-* proměnné, ne přímé --gov-* ani hardcoded hodnoty.
+ *
+ * Zdroj gov tokenů: ~/lib/gov-design-system/styles/lib/tokens.min.css
+ * Dokumentace: docs/architecture/tokens.md
+ */
+
+:root {
+    /* Barvy — semantické aliasy */
+    --pm-color-primary: var(--gov-color-primary-600, #005ea5);
+    --pm-color-primary-strong: var(--gov-color-primary-700, #003d6b);
+    --pm-color-primary-soft: var(--gov-color-primary-100, #e6f0f9);
+    --pm-color-success: var(--gov-color-success-600, #00703c);
+    --pm-color-warning: var(--gov-color-warning-600, #b25000);
+    --pm-color-error: var(--gov-color-error-600, #d4351c);
+    --pm-color-neutral: var(--gov-color-secondary-500, #626262);
+
+    --pm-color-text: var(--gov-color-secondary-900, #1d1d1b);
+    --pm-color-text-muted: var(--gov-color-secondary-600, #505050);
+    --pm-color-background: var(--gov-color-base-white, #ffffff);
+    --pm-color-surface: var(--gov-color-secondary-50, #f5f5f5);
+    --pm-color-border: var(--gov-color-secondary-200, #d0d0d0);
+
+    /* Spacing — 4pt grid vycházející z gov */
+    --pm-spacing-3xs: var(--gov-spacing-3xs, 2px);
+    --pm-spacing-2xs: var(--gov-spacing-2xs, 4px);
+    --pm-spacing-xs: var(--gov-spacing-xs, 8px);
+    --pm-spacing-s: var(--gov-spacing-s, 12px);
+    --pm-spacing-m: var(--gov-spacing-m, 16px);
+    --pm-spacing-l: var(--gov-spacing-l, 24px);
+    --pm-spacing-xl: var(--gov-spacing-xl, 32px);
+    --pm-spacing-2xl: var(--gov-spacing-2xl, 48px);
+    --pm-spacing-3xl: var(--gov-spacing-3xl, 64px);
+
+    /* Radius */
+    --pm-radius-s: var(--gov-radius-s, 4px);
+    --pm-radius-m: var(--gov-radius-m, 6px);
+    --pm-radius-l: var(--gov-radius-l, 12px);
+    --pm-radius-round: 9999px;
+
+    /* Typografie */
+    --pm-font-family-body: var(--gov-font-family-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+    --pm-font-family-display: var(--gov-font-family-sans, system-ui, -apple-system, "Segoe UI", sans-serif);
+    --pm-font-size-xs: var(--gov-font-size-xs, 12px);
+    --pm-font-size-s: var(--gov-font-size-s, 14px);
+    --pm-font-size-m: var(--gov-font-size-m, 16px);
+    --pm-font-size-l: var(--gov-font-size-l, 18px);
+    --pm-font-size-xl: var(--gov-font-size-xl, 24px);
+    --pm-font-weight-normal: 400;
+    --pm-font-weight-medium: 500;
+    --pm-font-weight-semibold: 600;
+    --pm-font-weight-bold: 700;
+
+    /* Breakpointy (shodné s gov DS numericky) */
+    --pm-bp-sm: 576px;   /* malé tablety */
+    --pm-bp-md: 768px;   /* tablety */
+    --pm-bp-lg: 992px;   /* malé desktopy */
+    --pm-bp-xl: 1200px;  /* standardní desktopy */
+    --pm-bp-2xl: 1400px; /* wide-screen 1440p+ */
+
+    /* Z-index stack (semantic layers) */
+    --pm-z-base: 1;
+    --pm-z-elevated: 10;
+    --pm-z-sticky: 50;
+    --pm-z-header: 100;
+    --pm-z-dropdown: 200;
+    --pm-z-overlay: 500;
+    --pm-z-modal: 1000;
+    --pm-z-toast: 2000;
+}
