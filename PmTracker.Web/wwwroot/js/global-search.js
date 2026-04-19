@@ -22,6 +22,33 @@
     dropdown.setAttribute('id', 'global-search-listbox');
     dropdown.setAttribute('role', 'listbox');
 
+    // Erase (křížek) tlačítko — zobrazuje se jen když je v inputu text.
+    // gov-form-search má slot="button-erase" ale bez built-in logiky viditelnosti.
+    var eraseButton = form.querySelector('[data-global-search-erase]');
+
+    function syncEraseVisibility() {
+        if (!eraseButton) return;
+        if (input.value && input.value.length > 0) {
+            eraseButton.hidden = false;
+        } else {
+            eraseButton.hidden = true;
+        }
+    }
+
+    if (eraseButton) {
+        eraseButton.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            input.value = '';
+            syncEraseVisibility();
+            clearDropdown();
+            input.focus();
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    }
+
+    input.addEventListener('input', syncEraseVisibility);
+    syncEraseVisibility();
+
     function clearDropdown() {
         dropdown.innerHTML = '';
         dropdown.hidden = true;
