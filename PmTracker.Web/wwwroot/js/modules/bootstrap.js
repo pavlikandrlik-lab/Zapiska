@@ -42,6 +42,7 @@ import {
     isRecordEditorFormDirty,
     openRecordEditor,
     prepareRecordEditorFormNavigation,
+    promptRecordEditorDiscard,
     recordEditorState,
     refreshRecordEditorPreferenceUi,
     requestRecordEditorModalClose,
@@ -362,9 +363,66 @@ function handleDocumentClick(event) {
         return;
     }
 
+    // Outbound link gate (2026-04-19 noc 2): když je otevřený page-level
+    // record editor s nezavřenými změnami, jakýkoliv <a href> (menu, breadcrumbs,
+    // logo) musí projít přes app-level confirm dialog, ne mlčky navigovat.
+    // User hlásil: "dialog přeskočí, musíš upravit vnitřní logiku aby se
+    // počkalo na volbu v dialogu a potom se teprve odešlo nebo zůstalo".
+    // Předchozí nativní beforeunload dialog byl záměrně odstraněn; tohle ho
+    // nahrazuje app-level ekvivalentem.
+    if (maybeGuardOutboundNavigation(target, event)) {
+        return;
+    }
+
     if (handleNavigationCardClick(target)) {
         event.preventDefault();
     }
+}
+
+function maybeGuardOutboundNavigation(target, event) {
+    const anchor = target.closest("a[href]");
+    if (!(anchor instanceof HTMLElement)) {
+        return false;
+    }
+
+    const href = anchor.getAttribute("href") || "";
+    if (!href || href.startsWith("#") || href.startsWith("javascript:") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+        return false;
+    }
+
+    if (anchor instanceof HTMLAnchorElement && (anchor.hasAttribute("download") || (anchor.target && anchor.target !== "" && anchor.target !== "_self"))) {
+        return false;
+    }
+
+    // Pokud je pod anchor jeden z našich data-* hooks, příslušný handler
+    // už výše event.preventDefault + vlastní dialog řešil a return.
+    // Do tohoto bodu se ti tedy dostanou jen "obyčejné" odkazy.
+
+    const pageEditorForm = document.querySelector('form[data-record-editor-form="true"][data-record-editor-presentation="page"]');
+    if (!(pageEditorForm instanceof HTMLFormElement)) {
+        return false;
+    }
+
+    if (pageEditorForm.dataset.recordEditorNavigating === "true") {
+        return false;
+    }
+
+    if (!isRecordEditorFormDirty(pageEditorForm)) {
+        return false;
+    }
+
+    event.preventDefault();
+    const targetHref = anchor instanceof HTMLAnchorElement ? anchor.href : href;
+    (async () => {
+        // promptRecordEditorDiscard interně volá prepareRecordEditorFormNavigation
+        // při zvolení "zahodit změny" — nastaví recordEditorNavigating=true,
+        // takže window.location.assign už bez dalšího dialogu projde.
+        const canLeave = await promptRecordEditorDiscard(pageEditorForm, anchor);
+        if (canLeave) {
+            window.location.assign(targetHref);
+        }
+    })();
+    return true;
 }
 
 function handleDocumentOverlayKeydown(event) {

@@ -210,7 +210,10 @@ function applyCommentSort(section, direction) {
         }
         return aMeeting - bMeeting || (Number.isFinite(aDate) ? aDate : 0) - (Number.isFinite(bDate) ? bDate : 0) || aId - bId;
       });
-      items.forEach((item) => list.appendChild(item));
+      items.forEach((item) => {
+        const movable = item.closest("[data-comment-wrapper]") || item;
+        list.appendChild(movable);
+      });
     }
   }
   const header = section.querySelector(".record-comments-header");
@@ -9336,9 +9339,44 @@ function handleDocumentClick(event) {
   if (target.closest("[data-stop-propagation]")) {
     return;
   }
+  if (maybeGuardOutboundNavigation(target, event)) {
+    return;
+  }
   if (handleNavigationCardClick(target)) {
     event.preventDefault();
   }
+}
+function maybeGuardOutboundNavigation(target, event) {
+  const anchor = target.closest("a[href]");
+  if (!(anchor instanceof HTMLElement)) {
+    return false;
+  }
+  const href = anchor.getAttribute("href") || "";
+  if (!href || href.startsWith("#") || href.startsWith("javascript:") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+    return false;
+  }
+  if (anchor instanceof HTMLAnchorElement && (anchor.hasAttribute("download") || anchor.target && anchor.target !== "" && anchor.target !== "_self")) {
+    return false;
+  }
+  const pageEditorForm = document.querySelector('form[data-record-editor-form="true"][data-record-editor-presentation="page"]');
+  if (!(pageEditorForm instanceof HTMLFormElement)) {
+    return false;
+  }
+  if (pageEditorForm.dataset.recordEditorNavigating === "true") {
+    return false;
+  }
+  if (!isRecordEditorFormDirty(pageEditorForm)) {
+    return false;
+  }
+  event.preventDefault();
+  const targetHref = anchor instanceof HTMLAnchorElement ? anchor.href : href;
+  (async () => {
+    const canLeave = await promptRecordEditorDiscard(pageEditorForm, anchor);
+    if (canLeave) {
+      window.location.assign(targetHref);
+    }
+  })();
+  return true;
 }
 function handleDocumentOverlayKeydown(event) {
   if (event.key === "Escape" && recordEditorState2.closeGuard instanceof HTMLElement) {

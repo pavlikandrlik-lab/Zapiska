@@ -89,7 +89,16 @@ export function applyCommentSort(section, direction) {
                     || (aId - bId);
             });
 
-            items.forEach((item) => list.appendChild(item));
+            // Move at wrapper level — _ZaznamCommentsPartial wrapuje .comment
+            // do .comment-wrapper (který drží meta NAD dlaždicí); bez `closest`
+            // by sort oddělil .comment od jeho meta, výsledek je
+            // "všechny metas nahoře, všechny comments dole" (user hlásil
+            // 2026-04-19 noc 2).
+            // _TaskItemPartial (Jednani) wrapper nemá → fallback na item samotný.
+            items.forEach((item) => {
+                const movable = item.closest("[data-comment-wrapper]") || item;
+                list.appendChild(movable);
+            });
         }
     }
 
