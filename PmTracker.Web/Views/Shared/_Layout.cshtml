@@ -162,6 +162,12 @@
 
     <div id="modal-root" class="modal-root" aria-hidden="true"></div>
 
+    @* Fáze 2E: globální floating-root pro pickery mounté nad modály.
+       Gov-dialog shadow DOM není vhodný host (z-index + positioning kolize),
+       takže person-picker / datetime-picker mají singleton root zde.
+       ui.js:getFloatingLayerRoot vrací tohle vždy. *@
+    <div id="floating-panel-root" aria-hidden="true"></div>
+
     <script type="module" src="~/lib/gov-design-system/dist/core/core.esm.min.js" asp-append-version="true"></script>
     <script src="~/lib/quill/quill.min.js" asp-append-version="true"></script>
     <script src="~/js/site.bundle.js" asp-append-version="true"></script>

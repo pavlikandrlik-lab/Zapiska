@@ -2155,6 +2155,12 @@ function getGlobalFloatingLayerRoot() {
   if (globalFloatingRoot instanceof HTMLElement && globalFloatingRoot.isConnected) {
     return globalFloatingRoot;
   }
+  // Fáze 2E: prefer statický element z _Layout.cshtml (výkon + prediktabilita)
+  const existing = document.getElementById("floating-panel-root");
+  if (existing instanceof HTMLElement) {
+    globalFloatingRoot = existing;
+    return existing;
+  }
   const root = document.createElement("div");
   root.className = "app-floating-root";
   root.setAttribute("data-app-floating-root", "true");
@@ -2164,13 +2170,10 @@ function getGlobalFloatingLayerRoot() {
   return root;
 }
 function getFloatingLayerRoot(container) {
-  const overlay = container instanceof Element ? container.closest(".modal-overlay") : null;
-  if (overlay instanceof HTMLElement) {
-    const modalRoot = overlay.querySelector("[data-modal-floating-root]");
-    if (modalRoot instanceof HTMLElement) {
-      return modalRoot;
-    }
-  }
+  // Fáze 2E: floating pickery (person, datetime) nejsou mountovány uvnitř
+  // gov-dialog (shadow DOM vs. floating positioning kolize). Vždy vrátíme
+  // globální root #floating-panel-root v _Layout.cshtml. Parametr `container`
+  // je tu pro zpětnou kompatibilitu API, ale ignorovaný.
   return getGlobalFloatingLayerRoot();
 }
 function getFloatingPanelAnchor(panel) {
@@ -5222,14 +5225,14 @@ function getActiveModalOverlay() {
   if (!(modalRoot instanceof HTMLElement)) {
     return null;
   }
-  return modalRoot.querySelector(".modal-overlay");
+  // Fáze 2E: modal root je gov-dialog (ne .modal-overlay div)
+  return modalRoot.querySelector("gov-dialog");
 }
 function getActiveModalContainer2() {
-  const overlay = getActiveModalOverlay();
-  if (!(overlay instanceof HTMLElement)) {
-    return null;
-  }
-  return overlay.querySelector("[data-modal-container]");
+  // Fáze 2E: data-modal-container je na gov-dialog samotném (v _ModalLayout),
+  // ne na vnitřním .modal-container divu.
+  const dialog = getActiveModalOverlay();
+  return dialog instanceof HTMLElement ? dialog : null;
 }
 function isModalOpen() {
   return modalRoot instanceof HTMLElement && modalRoot.getAttribute("aria-hidden") !== "true" && modalRoot.childElementCount > 0;
@@ -5276,6 +5279,16 @@ function setModalContent(content, trigger) {
   modalRoot.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
   modalState.lastTrigger = trigger instanceof HTMLElement ? trigger : null;
+  // Fáze 2E: zajistit open stav na vloženém gov-dialog. Razor už renderuje
+  // open="true", ale custom element se upgradne asynchronně — setAttribute
+  // zajistí CSS display:block i před hydratací.
+  const dialog2 = modalRoot.querySelector("gov-dialog");
+  if (dialog2 instanceof HTMLElement) {
+    dialog2.setAttribute("open", "true");
+    if (typeof dialog2.show === "function") {
+      try { dialog2.show(); } catch { /* gov-dialog.show() může throw při duplicitním volání — ignoruj */ }
+    }
+  }
   modalRuntime.initRecordFormEnhancements?.(modalRoot);
   modalRuntime.initPermissionMetadataBindings?.(modalRoot);
   window.requestAnimationFrame(() => {
@@ -5288,6 +5301,17 @@ function closeModal() {
   }
   const focusTarget = modalState.lastTrigger;
   modalRuntime.closeAllFloatingPanels?.();
+  // Fáze 2E: gov-dialog musí dostat removeAttribute("open") (a volitelně
+  // .close()) před unmountem, aby proběhl její cleanup (focus restore,
+  // backdrop teardown). Try/catch kolem .close() kvůli defensivnímu volání
+  // před hydratací.
+  const dialog3 = modalRoot.querySelector("gov-dialog");
+  if (dialog3 instanceof HTMLElement) {
+    dialog3.removeAttribute("open");
+    if (typeof dialog3.close === "function") {
+      try { dialog3.close(); } catch { /* ignorovat — už může být zavřený */ }
+    }
+  }
   modalRoot.innerHTML = "";
   modalRoot.style.pointerEvents = "none";
   modalRoot.setAttribute("aria-hidden", "true");
@@ -5314,14 +5338,13 @@ async function openUrlModal(url, trigger) {
     reportClientDiagnostic("modal-load-failed", { url });
     if (modalRoot instanceof HTMLElement) {
       modalRoot.innerHTML = `
-                <div class="modal-overlay" aria-hidden="false">
-                    <div class="modal-container" role="dialog" aria-modal="true" tabindex="-1">
-                        <p>Nepodařilo se načíst obsah dialogu.</p>
-                        <div class="modal-actions">
-                            <button type="button" class="btn btn-secondary" data-modal-close>Zavřít</button>
-                        </div>
+                <gov-dialog open="true" data-modal-container data-modal-variant="default" aria-labelledby="modal-error-title" tabindex="-1">
+                    <h2 id="modal-error-title" class="sr-only">Chyba načtení dialogu</h2>
+                    <p>Nepodařilo se načíst obsah dialogu.</p>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" data-modal-close>Zavřít</button>
                     </div>
-                </div>`;
+                </gov-dialog>`;
       modalRoot.style.pointerEvents = "auto";
       modalRoot.setAttribute("aria-hidden", "false");
       document.body.classList.add("modal-open");
@@ -9271,7 +9294,8 @@ function handleDocumentClick(event) {
     requestRecordEditorModalClose(closeTarget instanceof HTMLElement ? closeTarget : null);
     return;
   }
-  if (target.classList.contains("modal-overlay")) {
+  // Fáze 2E: backdrop click — target je gov-dialog přímo (ne vnitřní element).
+  if (target instanceof HTMLElement && target.tagName === "GOV-DIALOG" && target.hasAttribute("data-modal-container")) {
     event.preventDefault();
     requestRecordEditorModalClose(target);
     return;

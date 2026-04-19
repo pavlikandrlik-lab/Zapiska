@@ -598,6 +598,13 @@ export function getGlobalFloatingLayerRoot() {
         return globalFloatingRoot;
     }
 
+    // Fáze 2E: prefer statický element z _Layout.cshtml (výkon + prediktabilita)
+    const existing = document.getElementById("floating-panel-root");
+    if (existing instanceof HTMLElement) {
+        globalFloatingRoot = existing;
+        return existing;
+    }
+
     const root = document.createElement("div");
     root.className = "app-floating-root";
     root.setAttribute("data-app-floating-root", "true");
@@ -608,17 +615,10 @@ export function getGlobalFloatingLayerRoot() {
 }
 
 export function getFloatingLayerRoot(container) {
-    const overlay = container instanceof Element
-        ? container.closest(".modal-overlay")
-        : null;
-
-    if (overlay instanceof HTMLElement) {
-        const modalRoot = overlay.querySelector("[data-modal-floating-root]");
-        if (modalRoot instanceof HTMLElement) {
-            return modalRoot;
-        }
-    }
-
+    // Fáze 2E: floating pickery (person, datetime) nejsou mountovány uvnitř
+    // gov-dialog (shadow DOM vs. floating positioning kolize). Vždy vrátíme
+    // globální root #floating-panel-root v _Layout.cshtml. Parametr `container`
+    // je tu pro zpětnou kompatibilitu API, ale ignorovaný.
     return getGlobalFloatingLayerRoot();
 }
 

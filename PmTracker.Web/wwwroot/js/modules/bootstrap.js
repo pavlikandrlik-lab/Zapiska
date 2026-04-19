@@ -281,7 +281,8 @@ function handleDocumentClick(event) {
         return;
     }
 
-    if (target.classList.contains("modal-overlay")) {
+    // Fáze 2E: backdrop click — target je gov-dialog přímo (ne vnitřní element).
+    if (target instanceof HTMLElement && target.tagName === "GOV-DIALOG" && target.hasAttribute("data-modal-container")) {
         event.preventDefault();
         void requestRecordEditorModalClose(target);
         return;
