@@ -1,6 +1,7 @@
 import { initCommentSortUi } from "./comments.js";
 import { initProjectRecordDeepLink } from "./recordLazyLoading.js";
 import {
+    applyProjectRecordFilters,
     applyRecordsView,
     initSubsystemScrollIndicator,
     restoreFilterState,
@@ -174,6 +175,11 @@ class ProjectNavigationController {
         else {
             this.options.applyRecordsView?.(showGroupedView ? "subsystem" : "flat");
         }
+        // Po refreshi (save/update záznamu) musí kontroler aplikovat uložené
+        // filtry na nově vykreslenou DOM. Bez tohoto volání se filter chipy
+        // v UI zobrazily, ale záznamy byly všechny viditelné (user report
+        // 2026-04-19: "po uložení záznamu se neaplikuje filtr").
+        this.options.applyProjectRecordFilters?.();
         this.options.initSubsystemScrollIndicator?.();
     }
 }
@@ -186,6 +192,7 @@ const projectNavigationController = new ProjectNavigationController({
     restoreFilterState,
     setProjectFilterSaveStatus,
     applyRecordsView,
+    applyProjectRecordFilters,
     initSubsystemScrollIndicator
 });
 

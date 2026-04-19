@@ -69,6 +69,7 @@ export async function loadRecordDetail(cardOrChild, options = {}) {
     try {
         detailShell.innerHTML = await fetchHtmlFragment(detailUrl);
         card.dataset.recordDetailLoaded = "true";
+        detailShell.removeAttribute("aria-busy");
         navigationRuntime.initRecordFormEnhancements?.(detailShell);
         queueRainbowSegmentRender(detailShell);
         return true;
@@ -125,6 +126,10 @@ export async function loadRecordComments(cardOrChild, options = {}) {
         commentsShell.dataset.recordCommentsBaseUrl = baseCommentsUrl;
         card.dataset.recordCommentsLoaded = "true";
         card.dataset.recordCommentsBaseUrl = baseCommentsUrl;
+        // Clear busy stav — bez tohoto `aria-busy="true"` persistoval na shell
+        // po úspěšném načtení (placeholder + errorContainer byly po innerHTML
+        // replace GC'd, ale parent atribut zůstal). Viz bug 2026-04-19.
+        commentsShell.removeAttribute("aria-busy");
         navigationRuntime.initRecordFormEnhancements?.(commentsShell);
         initCommentSortUi(commentsShell);
         if (options.sortDirection === "asc" || options.sortDirection === "desc") {

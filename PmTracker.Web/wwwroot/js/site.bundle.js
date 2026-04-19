@@ -2482,6 +2482,7 @@ async function loadRecordDetail(cardOrChild, options = {}) {
   try {
     detailShell.innerHTML = await fetchHtmlFragment(detailUrl);
     card.dataset.recordDetailLoaded = "true";
+    detailShell.removeAttribute("aria-busy");
     navigationRuntime.initRecordFormEnhancements?.(detailShell);
     queueRainbowSegmentRender(detailShell);
     return true;
@@ -2524,6 +2525,7 @@ async function loadRecordComments(cardOrChild, options = {}) {
     commentsShell.dataset.recordCommentsBaseUrl = baseCommentsUrl;
     card.dataset.recordCommentsLoaded = "true";
     card.dataset.recordCommentsBaseUrl = baseCommentsUrl;
+    commentsShell.removeAttribute("aria-busy");
     navigationRuntime.initRecordFormEnhancements?.(commentsShell);
     initCommentSortUi(commentsShell);
     if (options.sortDirection === "asc" || options.sortDirection === "desc") {
@@ -4242,6 +4244,7 @@ class ProjectNavigationController {
     } else {
       this.options.applyRecordsView?.(showGroupedView ? "subsystem" : "flat");
     }
+    this.options.applyProjectRecordFilters?.();
     this.options.initSubsystemScrollIndicator?.();
   }
 }
@@ -4253,6 +4256,7 @@ var projectNavigationController = new ProjectNavigationController({
   restoreFilterState,
   setProjectFilterSaveStatus,
   applyRecordsView,
+  applyProjectRecordFilters,
   initSubsystemScrollIndicator
 });
 function replaceProjectTabPanelFromHtml(tabKey, html, loadUrl) {
@@ -9154,6 +9158,31 @@ function handleDocumentClick(event) {
   if (printTrigger) {
     event.preventDefault();
     handlePrintTriggerClick(printTrigger);
+    return;
+  }
+  const commentEditToggle = target.closest("[data-comment-edit-toggle]");
+  if (isButtonLike(commentEditToggle)) {
+    event.preventDefault();
+    const comment = commentEditToggle.closest("[data-comment-item]");
+    const form = comment?.querySelector("[data-comment-edit-form]");
+    if (form instanceof HTMLFormElement) {
+      form.hidden = false;
+      const actions = comment.querySelector(".comment-actions");
+      if (actions instanceof HTMLElement) actions.hidden = true;
+      form.querySelector("textarea")?.focus();
+    }
+    return;
+  }
+  const commentEditCancel = target.closest("[data-comment-edit-cancel]");
+  if (isButtonLike(commentEditCancel)) {
+    event.preventDefault();
+    const comment = commentEditCancel.closest("[data-comment-item]");
+    const form = comment?.querySelector("[data-comment-edit-form]");
+    if (form instanceof HTMLFormElement) {
+      form.hidden = true;
+      const actions = comment.querySelector(".comment-actions");
+      if (actions instanceof HTMLElement) actions.hidden = false;
+    }
     return;
   }
   const filterChipRemove = target.closest("[data-filter-chip-remove]");

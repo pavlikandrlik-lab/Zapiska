@@ -67,10 +67,12 @@ public sealed class ProposalEditorLockedFieldsTests
             "var metadataLocked = !Model.AllowBasicMetadataEdit;",
             "panel musí odvozovat metadataLocked z AllowBasicMetadataEdit");
 
-        // TypUkolu select disable
+        // TypUkolu select disable — metadataLocked musí i nadále disablovat select
+        // A navíc v proposal módu (IsProposalEditor) taky (user report opakovaně,
+        // commit 2026-04-19 večer).
         source.Should().MatchRegex(
-            "name=\"TypUkolu\"[^>]*@\\(metadataLocked \\? \"disabled=\\\\\"disabled\\\\\"\" : null\\)",
-            "select TypUkolu musí respektovat metadataLocked");
+            "name=\"TypUkolu\"[^>]*metadataLocked \\|\\| Model\\.IsProposalEditor[^>]*disabled",
+            "select TypUkolu musí respektovat metadataLocked || Model.IsProposalEditor");
     }
 
     [Fact]

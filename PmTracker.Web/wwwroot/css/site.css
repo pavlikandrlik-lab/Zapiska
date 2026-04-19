@@ -2187,8 +2187,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background-color: rgba(245, 158, 11, 0.08);
 }
 
+/* Proposal editable field — podbarvené zelené pole v návrhu. User report
+   2026-04-19: "tento je přes citrix blbě vidět, aplikace běží přes citrix" →
+   ztmavnění o pár odstínů (Tailwind green-600) a zvýšení opacity. */
 .proposal-field-editable {
-    background: rgba(34, 197, 94, 0.12);
+    background: rgba(22, 163, 74, 0.22);
     border-radius: var(--gov-radius-sm);
     padding: 4px 6px;
 }
@@ -2196,7 +2199,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .proposal-field-editable .app-date-display-input,
 .proposal-field-editable .schedule-days-input-stacked,
 .proposal-field-editable .app-date-trigger {
-    background-color: rgba(34, 197, 94, 0.08);
+    background-color: rgba(22, 163, 74, 0.16);
 }
 
 .record-editor-actions {
@@ -3227,6 +3230,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 10px;
 }
 
+/* Chip stavu záznamu v akční liště — stejná výška jako sousední tlačítka
+   (icon-btn 34px, gov-button Small ~32px). User: "chip stavu má jinou velikost
+   než tlačítka, srovnej chip do velikosti tlačítek". */
+.record-actions > .badge {
+    min-height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    line-height: 1;
+}
+
 .record-title-wrap {
     flex: 1;
 }
@@ -3301,6 +3314,18 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: 1px dashed var(--gov-color-border);
     border-radius: var(--gov-radius-lg);
     background: color-mix(in srgb, var(--gov-color-surface) 92%, #e2e8f0 8%);
+}
+
+/* Bug fix 2026-04-19: `display: grid` v .record-loading-placeholder přebíjel
+   HTML atribut `hidden` (defaultně display:none), takže po úspěšném načtení
+   vyjádření (kdy JS nastaví placeholder.hidden = true) zůstal spinner viditelný
+   → user: "po úpravě záznamu se místo vyjádření točí načítání infinite". */
+.record-loading-placeholder[hidden] {
+    display: none !important;
+}
+
+.record-loading-error[hidden] {
+    display: none !important;
 }
 
 .record-loading-line {
@@ -3515,31 +3540,35 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background: var(--gov-color-surface);
 }
 
-/* === Meta řádek vyjádření (2026-04-19 redesign) ================
-   Horní řádek: autor · datum · jednání chip vlevo, akce vpravo.
-   Text je pod metou (full-width), ne vedle. User feedback: vertikální
-   stack autor/datum/jednání/akce byl "bordel" + akce malé a neviditelné. */
+/* === Layout vyjádření (2026-04-19 večer — druhý redesign) =========
+   User zpětná vazba: "horizontální čára rozděluje okno na 2 oblasti, dej to
+   do prdele, vypadá to hrozně". "Uživatel, datum, jednání chci vpravo, klidně
+   na jednom řádku". "Tlačítka Upravit chci dole, nahoře bude uživatel datum jednání".
+   "Quill celý posere a ukáže se jen v pravé polovině" (kvůli <details> flex cell).
+
+   Struktura komentu: meta (meta-info) nahoře vpravo; text uprostřed full-width;
+   edit form full-width pod textem; actions (Upravit + Smazat) dole. Žádná dashed
+   čára, žádný border-bottom. Upravit není <details>, je to plain toggle button. */
 
 .comment-meta {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px dashed color-mix(in srgb, var(--gov-color-border) 70%, transparent);
+    margin-bottom: 6px;
 }
 
 .comment-meta-info {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: 6px;
     font-size: 13px;
     color: var(--gov-color-muted);
     min-width: 0;
-    flex: 1;
+    margin-left: auto;
 }
 
 .comment-author {
@@ -3575,52 +3604,23 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     font-size: 14px;
 }
 
+/* Actions dole — Upravit + Smazat side-by-side, stejná velikost (oba pm-button Small). */
 .comment-actions {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
-    flex-shrink: 0;
+    justify-content: flex-end;
+    margin-top: 6px;
+    flex-wrap: wrap;
 }
 
-/* <details> se <summary> stylovaným jako tlačítko (nelze dát pm-button
-   uvnitř <summary>, protože <summary> musí být přímý child <details>). */
-.comment-edit-details {
-    width: auto;
-}
-
-.comment-edit-details[open] {
-    width: 100%;
-}
-
-.comment-edit-toggle {
-    list-style: none;
-    cursor: pointer;
-    display: inline-flex;
+.comment-edit-actions {
+    display: flex;
+    gap: 8px;
     align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    font-size: 12px;
-    line-height: 1;
-    color: var(--app-text-primary);
-    background: transparent;
-    border: 1px solid var(--gov-color-border);
-    border-radius: var(--gov-radius-sm);
-    transition: background 0.15s, border-color 0.15s;
-}
-
-.comment-edit-toggle:hover {
-    background: color-mix(in srgb, var(--gov-color-primary) 5%, transparent);
-    border-color: var(--gov-color-primary);
-}
-
-.comment-edit-toggle::-webkit-details-marker {
-    display: none;
-}
-
-/* Delete button uvnitř pm-button (gov-button) — ikonka + text inline */
-.comment-delete-btn svg,
-.comment-edit-toggle svg {
-    flex-shrink: 0;
+    justify-content: flex-end;
+    margin-top: 8px;
+    flex-wrap: wrap;
 }
 
 .richtext-render {
@@ -3684,11 +3684,22 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: grid;
     gap: 8px;
     margin-top: 8px;
+    width: 100%;
+}
+
+.comment-edit-form[hidden] {
+    display: none !important;
 }
 
 .comment-edit-form textarea {
     width: 100%;
-    min-height: 92px;
+    min-height: 120px;
+}
+
+/* Rich-text editor musí být plné šířky — ne omezený flex cellem předchozího
+   <details> wrapperu. */
+.comment-edit-form .richtext-host {
+    width: 100%;
 }
 
 .comment-form {
@@ -3704,6 +3715,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     flex-wrap: wrap;
     margin-top: 10px;
     justify-content: flex-end;
+}
+
+/* Sort toggle label visibility — CSS-driven přes data-atribut na sekci.
+   Nepoužíváme `hidden` atribut na <span> dětech gov-button, protože gov-button
+   custom element při hydrataci přesouvá children do svého inner <button class="element">
+   a ztratí `hidden` atribut (user report 2026-04-19: "zobrazuje se najednou
+   vzestupně i sestupně v jednom okně"). */
+[data-comment-sort-section][data-comment-sort-direction="asc"] [data-comment-sort-label="desc"],
+[data-comment-sort-section][data-comment-sort-direction="desc"] [data-comment-sort-label="asc"] {
+    display: none !important;
 }
 
 /* ASC (vzestupně): sort toggle je vpravo nahoře v headeru,

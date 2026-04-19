@@ -166,6 +166,35 @@ function handleDocumentClick(event) {
         return;
     }
 
+    // Comment edit toggle — nahrazuje původní <details>/<summary> mechanizmus
+    // (který zavíral edit form do flex cellu s omezenou šířkou → Quill "jen v pravé polovině").
+    const commentEditToggle = target.closest("[data-comment-edit-toggle]");
+    if (isButtonLike(commentEditToggle)) {
+        event.preventDefault();
+        const comment = commentEditToggle.closest("[data-comment-item]");
+        const form = comment?.querySelector("[data-comment-edit-form]");
+        if (form instanceof HTMLFormElement) {
+            form.hidden = false;
+            const actions = comment.querySelector(".comment-actions");
+            if (actions instanceof HTMLElement) actions.hidden = true;
+            form.querySelector("textarea")?.focus();
+        }
+        return;
+    }
+
+    const commentEditCancel = target.closest("[data-comment-edit-cancel]");
+    if (isButtonLike(commentEditCancel)) {
+        event.preventDefault();
+        const comment = commentEditCancel.closest("[data-comment-item]");
+        const form = comment?.querySelector("[data-comment-edit-form]");
+        if (form instanceof HTMLFormElement) {
+            form.hidden = true;
+            const actions = comment.querySelector(".comment-actions");
+            if (actions instanceof HTMLElement) actions.hidden = false;
+        }
+        return;
+    }
+
     const filterChipRemove = target.closest("[data-filter-chip-remove]");
     if (filterChipRemove instanceof HTMLButtonElement) {
         event.preventDefault();

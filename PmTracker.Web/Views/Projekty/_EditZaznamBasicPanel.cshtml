@@ -38,9 +38,16 @@
                 }
             </select>
         </label>
+        @*
+            Typ úkolu — v návrhu (IsProposalEditor) se NESMÍ měnit, protože
+            změna typu úkolu není součástí návrhového workflow (návrh
+            harmonogramu / vytvoření záznamu). User opakovaně (2026-04-19 večer):
+            "v návrhu v záložce základní údaje je možné rozkliknout Typ úkolu
+            a vybrat něco jiného, pořád to není opravené".
+        *@
         <label class="record-form-type-row" data-typ-ukolu-row>
             Typ úkolu
-            <select name="TypUkolu" @(metadataLocked ? "disabled=\"disabled\"" : null)>
+            <select name="TypUkolu" @(metadataLocked || Model.IsProposalEditor ? "disabled=\"disabled\"" : null)>
                 <option value="">-</option>
                 @foreach (var typ in Model.TypyUkolu)
                 {
