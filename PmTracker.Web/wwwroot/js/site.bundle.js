@@ -167,7 +167,7 @@ function setStoredCommentSortDirection(direction) {
   localStorage.setItem(commentSortDirectionStorageKey, normalizeCommentSortDirection(direction));
 }
 function setCommentSortButtonLabel(button, direction) {
-  if (!(button instanceof HTMLButtonElement)) {
+  if (!isButtonLike(button)) {
     return;
   }
   button.textContent = direction === "desc" ? "Řazení: jednání sestupně" : "Řazení: jednání vzestupně";
@@ -349,7 +349,7 @@ async function reloadProjectRecordCommentsPanel(source, options = {}) {
     if (section instanceof HTMLElement) {
       applyCommentSort(section, sortDirection);
       const toggle = section.querySelector("[data-comment-sort-toggle]");
-      if (toggle instanceof HTMLButtonElement) {
+      if (isButtonLike(toggle)) {
         setCommentSortButtonLabel(toggle, sortDirection);
       }
     }
@@ -370,7 +370,7 @@ function applyCommentSortToAllSections(direction, scope = document) {
     }
     applyCommentSort(section, normalizedDirection);
     const toggle = section.querySelector("[data-comment-sort-toggle]");
-    if (toggle instanceof HTMLButtonElement) {
+    if (isButtonLike(toggle)) {
       setCommentSortButtonLabel(toggle, normalizedDirection);
     }
   });
@@ -388,42 +388,42 @@ function initCommentSortUi(scope = document) {
     const defaultDirection = getStoredCommentSortDirection();
     applyCommentSort(section, defaultDirection);
     const toggle = section.querySelector("[data-comment-sort-toggle]");
-    if (!(toggle instanceof HTMLButtonElement)) {
+    if (!isButtonLike(toggle)) {
       return;
     }
     setCommentSortButtonLabel(toggle, defaultDirection);
     if (toggle.dataset.commentSortReady === "true") {
       const loadMoreButtonReady = section.querySelector("[data-record-comments-load-more]");
       const loadAllButtonReady = section.querySelector("[data-record-comments-load-all]");
-      if (loadMoreButtonReady instanceof HTMLButtonElement && loadMoreButtonReady.dataset.commentLoadMoreReady !== "true") {
+      if (isButtonLike(loadMoreButtonReady) && loadMoreButtonReady.dataset.commentLoadMoreReady !== "true") {
         loadMoreButtonReady.dataset.commentLoadMoreReady = "true";
         loadMoreButtonReady.addEventListener("click", async () => {
           const state = readRecordCommentsPanelState(section);
           if (!state) {
             return;
           }
-          loadMoreButtonReady.disabled = true;
+          setButtonDisabled(loadMoreButtonReady, true);
           try {
             await reloadProjectRecordCommentsPanel(loadMoreButtonReady, {
               limit: state.loadedCount + state.loadStep,
               sortDirection: getCommentSortDirection(section)
             });
           } finally {
-            loadMoreButtonReady.disabled = false;
+            setButtonDisabled(loadMoreButtonReady, false);
           }
         });
       }
-      if (loadAllButtonReady instanceof HTMLButtonElement && loadAllButtonReady.dataset.commentLoadAllReady !== "true") {
+      if (isButtonLike(loadAllButtonReady) && loadAllButtonReady.dataset.commentLoadAllReady !== "true") {
         loadAllButtonReady.dataset.commentLoadAllReady = "true";
         loadAllButtonReady.addEventListener("click", async () => {
-          loadAllButtonReady.disabled = true;
+          setButtonDisabled(loadAllButtonReady, true);
           try {
             await reloadProjectRecordCommentsPanel(loadAllButtonReady, {
               loadAll: true,
               sortDirection: getCommentSortDirection(section)
             });
           } finally {
-            loadAllButtonReady.disabled = false;
+            setButtonDisabled(loadAllButtonReady, false);
           }
         });
       }
@@ -437,36 +437,36 @@ function initCommentSortUi(scope = document) {
       applyCommentSortToAllSections(next, document);
     });
     const loadMoreButton = section.querySelector("[data-record-comments-load-more]");
-    if (loadMoreButton instanceof HTMLButtonElement && loadMoreButton.dataset.commentLoadMoreReady !== "true") {
+    if (isButtonLike(loadMoreButton) && loadMoreButton.dataset.commentLoadMoreReady !== "true") {
       loadMoreButton.dataset.commentLoadMoreReady = "true";
       loadMoreButton.addEventListener("click", async () => {
         const state = readRecordCommentsPanelState(section);
         if (!state) {
           return;
         }
-        loadMoreButton.disabled = true;
+        setButtonDisabled(loadMoreButton, true);
         try {
           await reloadProjectRecordCommentsPanel(loadMoreButton, {
             limit: state.loadedCount + state.loadStep,
             sortDirection: getCommentSortDirection(section)
           });
         } finally {
-          loadMoreButton.disabled = false;
+          setButtonDisabled(loadMoreButton, false);
         }
       });
     }
     const loadAllButton = section.querySelector("[data-record-comments-load-all]");
-    if (loadAllButton instanceof HTMLButtonElement && loadAllButton.dataset.commentLoadAllReady !== "true") {
+    if (isButtonLike(loadAllButton) && loadAllButton.dataset.commentLoadAllReady !== "true") {
       loadAllButton.dataset.commentLoadAllReady = "true";
       loadAllButton.addEventListener("click", async () => {
-        loadAllButton.disabled = true;
+        setButtonDisabled(loadAllButton, true);
         try {
           await reloadProjectRecordCommentsPanel(loadAllButton, {
             loadAll: true,
             sortDirection: getCommentSortDirection(section)
           });
         } finally {
-          loadAllButton.disabled = false;
+          setButtonDisabled(loadAllButton, false);
         }
       });
     }
@@ -818,6 +818,32 @@ function buildFormDataSnapshot(formData, maxFields) {
   return lines.join(`
 `);
 }
+
+// ===== Fáze 2D helpers — gov-button compatibility =====
+// Synchronizováno s PmTracker.Web/wwwroot/js/modules/utils.js
+function isButtonLike(el) {
+    if (!(el instanceof HTMLElement)) return false;
+    if (el instanceof HTMLButtonElement) return true;
+    if (el instanceof HTMLInputElement) {
+        const t = el.type;
+        return t === "submit" || t === "button" || t === "reset";
+    }
+    return el.tagName.toLowerCase() === "gov-button";
+}
+
+function setButtonDisabled(el, disabled) {
+    if (!(el instanceof HTMLElement)) return;
+    if (disabled) {
+        el.setAttribute("disabled", "disabled");
+        if ("disabled" in el) el.disabled = true;
+    } else {
+        el.removeAttribute("disabled");
+        if ("disabled" in el) el.disabled = false;
+    }
+}
+
+const SUBMIT_SELECTOR = 'button[type="submit"], input[type="submit"], gov-button[native-type="submit"]';
+
 async function copyTextToClipboard(text) {
   const value = String(text || "");
   if (!value) {
@@ -1694,8 +1720,8 @@ function refreshPrintPreferenceUi() {
     element.textContent = getPrintFormatLabel(preferred);
   });
   document.querySelectorAll("[data-print-preference-reset]").forEach((element) => {
-    if (element instanceof HTMLButtonElement) {
-      element.disabled = preferred === null;
+    if (isButtonLike(element)) {
+      setButtonDisabled(element, preferred === null);
     }
   });
 }
@@ -2667,7 +2693,7 @@ function toggleMeetingYearGroup(toggle) {
 
 // PmTracker.Web/wwwroot/js/modules/schedule.js
 function syncScheduleExpandButton(button, details) {
-  if (!(button instanceof HTMLButtonElement) || !(details instanceof HTMLElement)) {
+  if (!isButtonLike(button) || !(details instanceof HTMLElement)) {
     return;
   }
   const expanded = !details.hidden;
@@ -2675,8 +2701,8 @@ function syncScheduleExpandButton(button, details) {
   button.setAttribute("aria-expanded", String(expanded));
 }
 function toggleScheduleBreakdown(toggleOrTarget) {
-  const button = toggleOrTarget instanceof HTMLButtonElement ? toggleOrTarget : toggleOrTarget instanceof Element ? toggleOrTarget.closest("[data-schedule-expand-toggle]") : null;
-  if (!(button instanceof HTMLButtonElement)) {
+  const button = isButtonLike(toggleOrTarget) ? toggleOrTarget : toggleOrTarget instanceof Element ? toggleOrTarget.closest("[data-schedule-expand-toggle]") : null;
+  if (!isButtonLike(button)) {
     return false;
   }
   const owningCard = button.closest("[data-schedule-item]");
@@ -2703,7 +2729,7 @@ function toggleScheduleBreakdown(toggleOrTarget) {
 function initScheduleExpandUi(scope) {
   const root = scope instanceof Element ? scope : document;
   root.querySelectorAll("[data-schedule-expand-toggle]").forEach((button) => {
-    if (!(button instanceof HTMLButtonElement)) {
+    if (!isButtonLike(button)) {
       return;
     }
     const card = button.closest("[data-schedule-item]");
@@ -6196,7 +6222,7 @@ function initAdPersonPickers(scope) {
     const submitButton = form?.querySelector("[data-ad-submit]");
     const panel = wrapper.querySelector("[data-ad-search-panel]");
     const results = wrapper.querySelector("[data-ad-results]");
-    if (!searchUrl || !(form instanceof HTMLFormElement) || !(anchor instanceof HTMLElement) || !(queryInput instanceof HTMLInputElement) || !(queryHidden instanceof HTMLInputElement) || !(guidInput instanceof HTMLInputElement) || !(adLoginInput instanceof HTMLInputElement) || !(adCompanyInput instanceof HTMLInputElement) || !(adDepartmentInput instanceof HTMLInputElement) || !(jmenoInput instanceof HTMLInputElement) || !(prijmeniInput instanceof HTMLInputElement) || !(titulInput instanceof HTMLInputElement) || !(emailInput instanceof HTMLInputElement) || !(orgSelect instanceof HTMLSelectElement) || !(orgCreateHint instanceof HTMLElement) || !(orgUnitSelect instanceof HTMLSelectElement) || !(orgUnitCreateHint instanceof HTMLElement) || !(panel instanceof HTMLElement) || !(results instanceof HTMLElement) || !(submitButton instanceof HTMLButtonElement)) {
+    if (!searchUrl || !(form instanceof HTMLFormElement) || !(anchor instanceof HTMLElement) || !(queryInput instanceof HTMLInputElement) || !(queryHidden instanceof HTMLInputElement) || !(guidInput instanceof HTMLInputElement) || !(adLoginInput instanceof HTMLInputElement) || !(adCompanyInput instanceof HTMLInputElement) || !(adDepartmentInput instanceof HTMLInputElement) || !(jmenoInput instanceof HTMLInputElement) || !(prijmeniInput instanceof HTMLInputElement) || !(titulInput instanceof HTMLInputElement) || !(emailInput instanceof HTMLInputElement) || !(orgSelect instanceof HTMLSelectElement) || !(orgCreateHint instanceof HTMLElement) || !(orgUnitSelect instanceof HTMLSelectElement) || !(orgUnitCreateHint instanceof HTMLElement) || !(panel instanceof HTMLElement) || !(results instanceof HTMLElement) || !isButtonLike(submitButton)) {
       return;
     }
     wrapper.dataset.adPickerReady = "true";
@@ -6221,7 +6247,7 @@ function initAdPersonPickers(scope) {
       emailInput.value = "";
       clearGeneratedOption(orgSelect, orgCreateHint);
       clearGeneratedOption(orgUnitSelect, orgUnitCreateHint);
-      submitButton.disabled = true;
+      setButtonDisabled(submitButton, true);
     };
     const normalizeText = (value) => (value || "").toString().trim().toLowerCase();
     const clearGeneratedOption = (select, hint) => {
@@ -6411,7 +6437,7 @@ function initAdPersonPickers(scope) {
       tryAutoSelectOrgUnit(row);
       queryHidden.value = queryInput.value.trim();
       queryInput.value = row.email ? `${row.displayName} <${row.email}>` : row.displayName;
-      submitButton.disabled = false;
+      setButtonDisabled(submitButton, false);
       closePanel();
     };
     const renderResults = () => {
@@ -6704,8 +6730,8 @@ function refreshRecordEditorPreferenceUi() {
     element.textContent = getRecordEditorPreferenceLabel(preferred);
   });
   document.querySelectorAll("[data-record-editor-preference-reset]").forEach((element) => {
-    if (element instanceof HTMLButtonElement) {
-      element.disabled = preferred === null;
+    if (isButtonLike(element)) {
+      setButtonDisabled(element, preferred === null);
     }
   });
 }
@@ -7170,7 +7196,7 @@ function initExternalLinksEditors(scope) {
     const rowsContainer = editor.querySelector("[data-external-links]");
     const addButton = editor.querySelector("[data-external-add]");
     const template = editor.querySelector("template[data-external-template]");
-    if (!(rowsContainer instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement) || !(template instanceof HTMLTemplateElement)) {
+    if (!(rowsContainer instanceof HTMLElement) || !isButtonLike(addButton) || !(template instanceof HTMLTemplateElement)) {
       return;
     }
     editor.dataset.externalLinksReady = "true";
@@ -7251,7 +7277,7 @@ function initExternalLinksEditors(scope) {
         return;
       }
       const removeButton = target.closest("[data-external-remove]");
-      if (!(removeButton instanceof HTMLButtonElement)) {
+      if (!isButtonLike(removeButton)) {
         return;
       }
       const row = removeButton.closest("[data-external-row]");
@@ -8471,12 +8497,12 @@ function initConfirmSubmitToggles(scope) {
       return;
     }
     const checkbox = form.querySelector("[data-confirm-submit-checkbox]");
-    const submit = form.querySelector('[data-confirm-submit-button], button[type="submit"], input[type="submit"]');
-    if (!(checkbox instanceof HTMLInputElement) || checkbox.type !== "checkbox" || !(submit instanceof HTMLButtonElement || submit instanceof HTMLInputElement)) {
+    const submit = form.querySelector(`[data-confirm-submit-button], ${SUBMIT_SELECTOR}`);
+    if (!(checkbox instanceof HTMLInputElement) || checkbox.type !== "checkbox" || !isButtonLike(submit)) {
       return;
     }
     const sync = () => {
-      submit.disabled = !checkbox.checked;
+      setButtonDisabled(submit, !checkbox.checked);
     };
     checkbox.addEventListener("change", sync);
     sync();
@@ -8489,17 +8515,17 @@ function setFormSubmitting(form, submitting) {
   }
   const confirmationCheckbox = form.querySelector("[data-confirm-submit-checkbox]");
   const hasConfirmationGate = form.dataset.confirmSubmitToggle === "true" && confirmationCheckbox instanceof HTMLInputElement && confirmationCheckbox.type === "checkbox";
-  form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((element) => {
-    if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
+  form.querySelectorAll(SUBMIT_SELECTOR).forEach((element) => {
+    if (isButtonLike(element)) {
       if (submitting) {
-        element.disabled = true;
+        setButtonDisabled(element, true);
         return;
       }
       if (hasConfirmationGate && !confirmationCheckbox.checked) {
-        element.disabled = true;
+        setButtonDisabled(element, true);
         return;
       }
-      element.disabled = false;
+      setButtonDisabled(element, false);
     }
   });
 }
@@ -8719,8 +8745,8 @@ function initModalAjaxSubmit() {
       target.reportValidity();
       return;
     }
-    const submitterAction = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter.getAttribute("formaction") || "" : "";
-    const submitterMethod = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter.getAttribute("formmethod") || "" : "";
+    const submitterAction = isButtonLike(submitter) ? submitter.getAttribute("formaction") || "" : "";
+    const submitterMethod = isButtonLike(submitter) ? submitter.getAttribute("formmethod") || "" : "";
     const action = appendCurrentAsUser(submitterAction || target.getAttribute("action") || window.location.href);
     const method = (submitterMethod || target.getAttribute("method") || "post").toUpperCase();
     const blockedSnapshot = buildFormDataSnapshot(new FormData(target, submitter instanceof HTMLElement ? submitter : undefined), 120);
@@ -9012,7 +9038,7 @@ function handleDashboardClick(target) {
     return true;
   }
   const loadMoreButton = target.closest("[data-dashboard-news-load-more]");
-  if (loadMoreButton instanceof HTMLButtonElement) {
+  if (isButtonLike(loadMoreButton)) {
     const panel = loadMoreButton.closest("[data-dashboard-panel]");
     if (panel instanceof HTMLElement) {
       const loadUrl = loadMoreButton.getAttribute("data-dashboard-news-load-more") || "";
@@ -9064,13 +9090,13 @@ function handleDocumentClick(event) {
     return;
   }
   const resetPrintPreference = target.closest("[data-print-preference-reset]");
-  if (resetPrintPreference instanceof HTMLButtonElement) {
+  if (isButtonLike(resetPrintPreference)) {
     event.preventDefault();
     clearStoredPrintFormat();
     return;
   }
   const resetProjectFilterPreferences = target.closest("[data-project-filter-preferences-reset]");
-  if (resetProjectFilterPreferences instanceof HTMLButtonElement) {
+  if (isButtonLike(resetProjectFilterPreferences)) {
     event.preventDefault();
     clearProjectFilterPreferenceStorage();
     const status = document.querySelector("[data-project-filter-preferences-status]");
@@ -9080,7 +9106,7 @@ function handleDocumentClick(event) {
     return;
   }
   const resetRecordEditorPreference = target.closest("[data-record-editor-preference-reset]");
-  if (resetRecordEditorPreference instanceof HTMLButtonElement) {
+  if (isButtonLike(resetRecordEditorPreference)) {
     event.preventDefault();
     clearStoredRecordEditorPreference();
     const status = document.querySelector("[data-record-editor-preference-status]");
@@ -9107,7 +9133,7 @@ function handleDocumentClick(event) {
     return;
   }
   const saveDefaultsButton = target.closest("[data-filter-save-defaults]");
-  if (saveDefaultsButton instanceof HTMLButtonElement) {
+  if (isButtonLike(saveDefaultsButton)) {
     event.preventDefault();
     const scope = saveDefaultsButton.getAttribute("data-filter-save-defaults") || "";
     if (scope) {
@@ -9128,7 +9154,7 @@ function handleDocumentClick(event) {
     return;
   }
   const scheduleExpandToggle = target.closest("[data-schedule-expand-toggle]");
-  if (scheduleExpandToggle instanceof HTMLButtonElement) {
+  if (isButtonLike(scheduleExpandToggle)) {
     event.preventDefault();
     toggleScheduleBreakdown(scheduleExpandToggle);
     return;
