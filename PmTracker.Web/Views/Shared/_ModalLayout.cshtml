@@ -7,27 +7,44 @@
     }
 
     var variant = ViewData["ModalVariant"]?.ToString();
-    var modalVariantClass = string.Equals(variant, "record-editor", StringComparison.OrdinalIgnoreCase)
-        ? "modal--record-editor"
+    var normalizedVariant = string.Equals(variant, "record-editor", StringComparison.OrdinalIgnoreCase)
+        ? "record-editor"
         : string.Equals(variant, "wide", StringComparison.OrdinalIgnoreCase)
-            ? "modal--wide"
-            : "modal--default";
+            ? "wide"
+            : "default";
 
     var overflowVisible = ViewData["ModalOverflowVisible"] is bool overflowBool
         ? overflowBool
         : string.Equals(ViewData["ModalOverflowVisible"]?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
-    var overflowClass = overflowVisible ? "modal--overflow-visible" : string.Empty;
 }
-<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="@modalTitleId">
-    <div class="modal @modalVariantClass @overflowClass" data-modal-container tabindex="-1">
-        <div class="modal-header">
-            <button class="modal-close" type="button" data-modal-close aria-label="Zavřít dialog">
-                <span class="modal-close-icon" aria-hidden="true">&#10005;</span>
-            </button>
-        </div>
-        <div class="modal-content">
-            @RenderBody()
-        </div>
+@*
+    Fáze 2E: <gov-dialog> nahrazuje custom .modal-overlay markup.
+    Variants (default/wide/record-editor) + overflow-visible flag nese
+    data-modal-variant / data-modal-overflow-visible atribut; CSS scope
+    přes gov-dialog[data-modal-variant="..."] přibude v Task 5.
+
+    Kompatibilita pro Task 3 JS:
+    - data-modal-container — JS v modals.js + ajax.js hledá [data-modal-container]
+      pro zásahy do modálu; nastaveno přímo na gov-dialog.
+    - data-modal-close — close button zachovává tento atribut pro
+      bootstrap.js click handler (app-level close flow s dirty-check).
+    - Title slot — prázdný v layoutu; jednotlivé view si rendrují svůj
+      vlastní <h2 id="record-modal-title">...</h2> uvnitř body, takže
+      přemapování není potřeba (potvrzeno v plan Task 0 findings).
+    - Floating-root (pro person/datetime pickery) je přemístěn do globálního
+      #floating-panel-root v _Layout.cshtml (Task 3); floating-root atribut
+      se v tomto layoutu již nevyskytuje (shadow DOM kolize gov-dialog).
+*@
+<gov-dialog open="true"
+            data-modal-container
+            data-modal-variant="@normalizedVariant"
+            data-modal-overflow-visible="@(overflowVisible ? "true" : "false")"
+            aria-labelledby="@modalTitleId"
+            tabindex="-1">
+    <button class="modal-close" type="button" data-modal-close aria-label="Zavřít dialog" slot="header-actions">
+        <span class="modal-close-icon" aria-hidden="true">&#10005;</span>
+    </button>
+    <div class="modal-content">
+        @RenderBody()
     </div>
-    <div class="modal-floating-root" data-modal-floating-root aria-hidden="true"></div>
-</div>
+</gov-dialog>
