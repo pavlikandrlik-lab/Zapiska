@@ -5,16 +5,17 @@
     {
         if (Model.UseRecordEditorBackNavigation)
         {
-            <a class="btn small ghost"
-               href="@Model.BackUrl"
-               data-record-editor-cancel
-               data-record-editor-back-url="@Model.BackUrl">
+            <pm-button variant="Ghost"
+                       size="Small"
+                       href="@Model.BackUrl"
+                       data-record-editor-cancel="true"
+                       data-record-editor-back-url="@Model.BackUrl">
                 @(Model.BackLabel ?? "Zpět")
-            </a>
+            </pm-button>
         }
         else
         {
-            <a class="btn small ghost" href="@Model.BackUrl">@(Model.BackLabel ?? "Zpět")</a>
+            <pm-button variant="Ghost" size="Small" href="@Model.BackUrl">@(Model.BackLabel ?? "Zpět")</pm-button>
         }
     }
     <div class="page-header-content">
