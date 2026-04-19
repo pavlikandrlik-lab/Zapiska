@@ -20,7 +20,7 @@
     <div class="project-header-row">
         @if (!string.IsNullOrWhiteSpace(Model.BackUrl))
         {
-            <a class="btn small ghost" href="@Model.BackUrl">@(Model.BackLabel ?? "Zpět")</a>
+            <pm-button variant="Ghost" size="Small" href="@Model.BackUrl">@(Model.BackLabel ?? "Zpět")</pm-button>
             <span class="project-header-divider">|</span>
         }
         <h1 class="project-title-inline">@Model.PageTitle</h1>

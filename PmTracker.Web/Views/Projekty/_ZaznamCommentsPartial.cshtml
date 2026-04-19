@@ -14,9 +14,9 @@
         <h4>Vyjádření</h4>
         @if (Model.Vyjadreni.Count > 1)
         {
-            <button type="button" class="btn small ghost comment-sort-toggle" data-comment-sort-toggle>
+            <pm-button variant="Ghost" size="Small" class="comment-sort-toggle" data-comment-sort-toggle="true">
                 Řazení: jednání vzestupně
-            </button>
+            </pm-button>
         }
     </div>
     @if (Model.Vyjadreni.Count == 0)
@@ -78,7 +78,7 @@
                                                       required
                                                       data-rich-text="true"
                                                       data-rich-text-min-height="92">@RichTextContentService.ToSafeHtml(vyjadreni.Text)</textarea>
-                                            <button class="btn small" type="submit">Uložit změnu</button>
+                                            <pm-button variant="Secondary" size="Small" native-type="submit">Uložit změnu</pm-button>
                                         </form>
                                     </details>
                                     <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
@@ -109,25 +109,25 @@
         <div class="comment-pagination-actions">
             @if (Model.CanLoadMore)
             {
-                <button type="button"
-                        class="btn small ghost"
-                        data-record-comments-load-more
-                        data-label-desc="Další (@Model.LoadStep)"
-                        data-label-asc="Zobrazit předchozí (@Model.LoadStep)"
-                        title="Zobrazit dalších @Model.LoadStep vyjádření">
+                <pm-button variant="Ghost"
+                           size="Small"
+                           data-record-comments-load-more="true"
+                           data-label-desc="Další (@Model.LoadStep)"
+                           data-label-asc="Zobrazit předchozí (@Model.LoadStep)"
+                           title="Zobrazit dalších @Model.LoadStep vyjádření">
                     Další (@Model.LoadStep)
-                </button>
+                </pm-button>
             }
             @if (Model.CanLoadAll)
             {
-                <button type="button"
-                        class="btn small ghost"
-                        data-record-comments-load-all
-                        data-label-desc="Zobrazit vše"
-                        data-label-asc="Zobrazit vše"
-                        title="Zobrazit všechna vyjádření">
+                <pm-button variant="Ghost"
+                           size="Small"
+                           data-record-comments-load-all="true"
+                           data-label-desc="Zobrazit vše"
+                           data-label-asc="Zobrazit vše"
+                           title="Zobrazit všechna vyjádření">
                     Zobrazit vše
-                </button>
+                </pm-button>
             }
         </div>
     }
@@ -151,7 +151,7 @@
                         <option value="@jednani.Id">@jednani.Label</option>
                     }
                 </select>
-                <button class="btn small primary" type="submit">Uložit</button>
+                <pm-button variant="Primary" size="Small" native-type="submit">Uložit</pm-button>
             </div>
         </form>
     }

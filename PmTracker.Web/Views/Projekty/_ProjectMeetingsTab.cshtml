@@ -7,7 +7,7 @@
     @if (Model.CanCreateMeetings)
     {
         <div class="panel-header">
-            <button class="btn primary" type="button" data-modal-url="@Url.Action("NewMeetingModal", "Projekty", new { projektId = Model.ProjektId })">Nové jednání</button>
+            <pm-button variant="Primary" data-modal-url="@Url.Action("NewMeetingModal", "Projekty", new { projektId = Model.ProjektId })">Nové jednání</pm-button>
         </div>
     }
 

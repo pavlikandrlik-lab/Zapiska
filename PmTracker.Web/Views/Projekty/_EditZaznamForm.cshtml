@@ -130,29 +130,26 @@
     <div class="record-editor-actions @(isPagePresentation ? "record-editor-actions-page" : "record-editor-actions-modal")">
         @if (!Model.IsProposalEditor && !Model.IsProposalDecisionDetail && !Model.IsCreate && !string.IsNullOrWhiteSpace(deleteRecordModalUrl))
         {
-            <button class="btn ghost danger"
-                    type="button"
-                    data-modal-url="@deleteRecordModalUrl">
+            <pm-button variant="Destructive"
+                       data-modal-url="@deleteRecordModalUrl">
                 Smazat natrvalo
-            </button>
+            </pm-button>
         }
         @if (isPagePresentation)
         {
-            <button class="btn"
-                    type="button"
-                    data-record-editor-cancel
-                    data-record-editor-back-url="@Model.BackUrl">
+            <pm-button variant="Secondary"
+                       data-record-editor-cancel="true"
+                       data-record-editor-back-url="@Model.BackUrl">
                 Zrušit a vrátit se
-            </button>
+            </pm-button>
         }
         else
         {
-            <button class="btn"
-                    type="button"
-                    data-modal-close
-                    data-record-editor-back-url="@Model.BackUrl">
+            <pm-button variant="Secondary"
+                       data-modal-close="true"
+                       data-record-editor-back-url="@Model.BackUrl">
                 Zrušit
-            </button>
+            </pm-button>
         }
         @if (!string.IsNullOrWhiteSpace(Model.SecondaryNote))
         {
@@ -166,53 +163,52 @@
             }
             @if (Model.CanApproveProposal)
             {
-                <button class="btn primary"
-                        type="submit"
-                        formaction="@Url.Action("ApproveProposal", "Navrhy")"
-                        formmethod="post">
+                <pm-button variant="Primary"
+                           native-type="submit"
+                           formaction="@Url.Action("ApproveProposal", "Navrhy")"
+                           formmethod="post">
                     Schválit
-                </button>
+                </pm-button>
             }
             @if (Model.CanRejectProposal)
             {
-                <button class="btn ghost"
-                        type="submit"
-                        formaction="@Url.Action("RejectProposal", "Navrhy")"
-                        formmethod="post">
+                <pm-button variant="Ghost"
+                           native-type="submit"
+                           formaction="@Url.Action("RejectProposal", "Navrhy")"
+                           formmethod="post">
                     Zamítnout
-                </button>
+                </pm-button>
             }
             @if (Model.CanRejectAndEditProposal)
             {
-                <button class="btn"
-                        type="submit"
-                        formaction="@Url.Action("RejectAndEditProposal", "Navrhy")"
-                        formmethod="post">
+                <pm-button variant="Secondary"
+                           native-type="submit"
+                           formaction="@Url.Action("RejectAndEditProposal", "Navrhy")"
+                           formmethod="post">
                     Zamítnout a upravit
-                </button>
+                </pm-button>
             }
             @if (Model.CanPrefillProposalForm)
             {
-                <button class="btn"
-                        type="button"
-                        data-record-editor-url="@Url.Action("EditFromProposal", "Navrhy", new { projektId = Model.ProjektId, proposalId = Model.ProposalId })"
-                        data-record-editor-project-id="@Model.ProjektId"
-                        data-record-editor-label="@($"Předvyplnit formulář z návrhu #{Model.ProposalId}")">
+                <pm-button variant="Secondary"
+                           data-record-editor-url="@Url.Action("EditFromProposal", "Navrhy", new { projektId = Model.ProjektId, proposalId = Model.ProposalId })"
+                           data-record-editor-project-id="@Model.ProjektId"
+                           data-record-editor-label="@($"Předvyplnit formulář z návrhu #{Model.ProposalId}")">
                     Předvyplnit formulář
-                </button>
+                </pm-button>
             }
         }
         else
         {
-            <button class="btn primary"
-                    type="submit"
-                    disabled="@(createBlockedByMissingMeeting ? "disabled" : null)">
+            <pm-button variant="Primary"
+                       native-type="submit"
+                       disabled="@createBlockedByMissingMeeting">
                 @(!string.IsNullOrWhiteSpace(Model.PrimaryActionLabel)
                     ? Model.PrimaryActionLabel
                     : (isPagePresentation
                         ? (Model.IsCreate ? "Založit a vrátit se do projektu" : "Uložit a vrátit se do projektu")
                         : (Model.IsCreate ? "Založit záznam" : "Uložit")))
-            </button>
+            </pm-button>
         }
     </div>
 </form>

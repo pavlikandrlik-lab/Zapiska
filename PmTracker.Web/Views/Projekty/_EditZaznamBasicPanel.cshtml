@@ -111,11 +111,11 @@
         <div class="record-form-row">
             <div class="record-identifier-assign">
                 <span class="muted">Tento záznam má ještě původní inkrementální číslo. Identifikátor z jednání lze doplnit jednorázově.</span>
-                <button class="btn small"
-                        type="button"
-                        data-modal-url="@Url.Action("AssignMeetingIdentifierModal", "Zaznamy", new { projektId = Model.ProjektId, zaznamId = Model.Id })">
+                <pm-button variant="Secondary"
+                           size="Small"
+                           data-modal-url="@Url.Action("AssignMeetingIdentifierModal", "Zaznamy", new { projektId = Model.ProjektId, zaznamId = Model.Id })">
                     Doplnit identifikátor z jednání
-                </button>
+                </pm-button>
             </div>
         </div>
     }

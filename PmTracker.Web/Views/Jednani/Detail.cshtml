@@ -44,30 +44,29 @@
         <p class="muted">Uzamkl: @(string.IsNullOrWhiteSpace(Model.Jednani.UzamklOsoba) ? "-" : Model.Jednani.UzamklOsoba)</p>
     }
     <div class="header-actions meeting-detail-actions">
-        <a class="btn ghost"
-           href="@meetingPrintUrl"
-           target="_blank"
-           rel="noopener"
-           data-print-trigger="true"
-           data-print-pdf-url="@meetingPrintUrl"
-           data-print-word-url="@meetingWordUrl"
-           data-print-label="Tisk jednání č. @Model.Jednani.CisloJednani">
+        <pm-button variant="Ghost"
+                   href="@meetingPrintUrl"
+                   target="_blank"
+                   rel="noopener"
+                   data-print-trigger="true"
+                   data-print-pdf-url="@meetingPrintUrl"
+                   data-print-word-url="@meetingWordUrl"
+                   data-print-label="Tisk jednání č. @Model.Jednani.CisloJednani">
             Tisk
-        </a>
+        </pm-button>
         @if (canEditMeetingFields)
         {
-            <button class="btn"
-                    type="button"
-                    data-modal-url="@Url.Action("EditMeetingModal", "Projekty", new { projektId = Model.ProjektId, meetingId = Model.Jednani.Id })">
+            <pm-button variant="Secondary"
+                       data-modal-url="@Url.Action("EditMeetingModal", "Projekty", new { projektId = Model.ProjektId, meetingId = Model.Jednani.Id })">
                 Upravit jednání
-            </button>
+            </pm-button>
         }
         @if (Model.CanEditMeeting)
         {
             <form asp-controller="Projekty" asp-action="DeleteMeeting" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
                 <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
                 <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
-                <button class="btn ghost" type="submit">Smazat</button>
+                <pm-button variant="Ghost" native-type="submit">Smazat</pm-button>
             </form>
         }
     </div>
@@ -83,19 +82,19 @@
             <div class="meeting-attendance-header-actions">
                 @if (canEditMeetingFields)
                 {
-                    <button class="btn small"
-                            type="button"
-                            data-modal-url="@Url.Action("AddMeetingParticipantModal", "Jednani", new { projektId = Model.ProjektId, jednaniId = Model.Jednani.Id })">
+                    <pm-button variant="Secondary"
+                               size="Small"
+                               data-modal-url="@Url.Action("AddMeetingParticipantModal", "Jednani", new { projektId = Model.ProjektId, jednaniId = Model.Jednani.Id })">
                         Přidat osobu
-                    </button>
+                    </pm-button>
                 }
-                <button class="btn small ghost"
-                        type="button"
-                        data-meeting-attendance-toggle
-                        aria-expanded="false"
-                        aria-controls="@attendancePanelId">
+                <pm-button variant="Ghost"
+                           size="Small"
+                           data-meeting-attendance-toggle="true"
+                           aria-expanded="false"
+                           aria-controls="@attendancePanelId">
                     Zobrazit účast
-                </button>
+                </pm-button>
             </div>
         </div>
         <div class="meeting-attendance-panel" id="@attendancePanelId" data-meeting-attendance-panel hidden>
@@ -147,7 +146,7 @@
                 @if (canEditMeetingFields)
                 {
                     <div class="meeting-notes-actions">
-                        <button class="btn small" type="submit">Uložit účast</button>
+                        <pm-button variant="Secondary" size="Small" native-type="submit">Uložit účast</pm-button>
                     </div>
                 }
             </form>
@@ -186,7 +185,7 @@
                         </select>
                         @if (canEditMeetingFields)
                         {
-                            <button class="btn" type="submit">Uložit stav</button>
+                            <pm-button variant="Secondary" native-type="submit">Uložit stav</pm-button>
                         }
                     </form>
                     @if (Model.CanEditMeeting)
@@ -200,7 +199,7 @@
                                 <input type="hidden" name="Stav" value="@otevrenyStav.Value" />
                                 <input type="hidden" name="OtevritJednani" value="true" />
                                 <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                                <button class="btn" type="submit">Otevřít jednání</button>
+                                <pm-button variant="Secondary" native-type="submit">Otevřít jednání</pm-button>
                             </form>
                             }
                         }
@@ -213,7 +212,7 @@
                                 <input type="hidden" name="Stav" value="@uzavrenyStav.Value" />
                                 <input type="hidden" name="UzavritJednani" value="true" />
                                 <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                                <button class="btn ghost" type="submit">Uzavřít jednání</button>
+                                <pm-button variant="Ghost" native-type="submit">Uzavřít jednání</pm-button>
                             </form>
                             }
                         }
@@ -227,12 +226,11 @@
                 <h2>Zápis úkolů</h2>
                 @if (Model.CanEditRecords)
                 {
-                    <button class="btn primary"
-                            type="button"
-                            data-record-editor-url="@createRecordInMeetingUrl"
-                            data-record-editor-label="Nový záznam">
+                    <pm-button variant="Primary"
+                               data-record-editor-url="@createRecordInMeetingUrl"
+                               data-record-editor-label="Nový záznam">
                         Nový záznam
-                    </button>
+                    </pm-button>
                 }
             </div>
             <div class="task-list">

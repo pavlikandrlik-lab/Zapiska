@@ -71,25 +71,25 @@
                 </a>
                 @if (summary.CanEditRecord || summary.CanManageSchedule)
                 {
-                    <button class="btn small"
-                            type="button"
-                            data-record-editor-url="@editRecordUrl"
-                            data-record-editor-project-id="@projektId"
-                            data-record-editor-label="@($"{summary.EditButtonLabel} záznam #{summary.CisloViditelne}")"
-                            data-stop-propagation="true">
+                    <pm-button variant="Secondary"
+                               size="Small"
+                               data-record-editor-url="@editRecordUrl"
+                               data-record-editor-project-id="@projektId"
+                               data-record-editor-label="@($"{summary.EditButtonLabel} záznam #{summary.CisloViditelne}")"
+                               data-stop-propagation="true">
                         @summary.EditButtonLabel
-                    </button>
+                    </pm-button>
                 }
                 @if (summary.CanCreateScheduleProposal && !string.IsNullOrWhiteSpace(summary.ScheduleProposalUrl))
                 {
-                    <button class="btn small ghost"
-                            type="button"
-                            data-record-editor-url="@summary.ScheduleProposalUrl"
-                            data-record-editor-project-id="@projektId"
-                            data-record-editor-label="@($"Navrhnout změnu termínu a harmonogramu záznamu #{summary.CisloViditelne}")"
-                            data-stop-propagation="true">
+                    <pm-button variant="Ghost"
+                               size="Small"
+                               data-record-editor-url="@summary.ScheduleProposalUrl"
+                               data-record-editor-project-id="@projektId"
+                               data-record-editor-label="@($"Navrhnout změnu termínu a harmonogramu záznamu #{summary.CisloViditelne}")"
+                               data-stop-propagation="true">
                         Navrhnout termín a harmonogram
-                    </button>
+                    </pm-button>
                 }
                 <span class="record-toggle-indicator" aria-hidden="true">›</span>
             </div>

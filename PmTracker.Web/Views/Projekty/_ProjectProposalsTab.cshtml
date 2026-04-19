@@ -9,13 +9,12 @@
         <div class="panel-header-actions">
             @if (Model.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.CreateRecordProposalUrl))
             {
-                <button class="btn primary"
-                        type="button"
-                        data-record-editor-url="@Model.CreateRecordProposalUrl"
-                        data-record-editor-project-id="@Model.ProjektId"
-                        data-record-editor-label="Nový návrh založení záznamu">
+                <pm-button variant="Primary"
+                           data-record-editor-url="@Model.CreateRecordProposalUrl"
+                           data-record-editor-project-id="@Model.ProjektId"
+                           data-record-editor-label="Nový návrh založení záznamu">
                     Nový návrh záznamu
-                </button>
+                </pm-button>
             }
         </div>
     </div>
@@ -60,13 +59,13 @@
                             <div class="proposal-card-actions">
                                 @if (!string.IsNullOrWhiteSpace(item.DetailUrl))
                                 {
-                                    <button class="btn small"
-                                            type="button"
-                                            data-record-editor-url="@item.DetailUrl"
-                                            data-record-editor-project-id="@item.ProjektId"
-                                            data-record-editor-label="@($"Detail návrhu #{item.Id}")">
+                                    <pm-button variant="Secondary"
+                                               size="Small"
+                                               data-record-editor-url="@item.DetailUrl"
+                                               data-record-editor-project-id="@item.ProjektId"
+                                               data-record-editor-label="@($"Detail návrhu #{item.Id}")">
                                         Detail návrhu
-                                    </button>
+                                    </pm-button>
                                 }
                                 @if (item.CanApprove)
                                 {
@@ -77,7 +76,7 @@
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ProjektId" value="@item.ProjektId" />
                                         <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <button class="btn small primary" type="submit">Schválit</button>
+                                        <pm-button variant="Primary" size="Small" native-type="submit">Schválit</pm-button>
                                     </form>
                                 }
                                 @if (item.CanReject)
@@ -89,7 +88,7 @@
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ProjektId" value="@item.ProjektId" />
                                         <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <button class="btn small ghost" type="submit">Zamítnout</button>
+                                        <pm-button variant="Ghost" size="Small" native-type="submit">Zamítnout</pm-button>
                                     </form>
                                 }
                                 @if (item.CanRejectAndTakeOver)
@@ -101,20 +100,20 @@
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ProjektId" value="@item.ProjektId" />
                                         <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <button class="btn small" type="submit">Zamítnout a převzít data</button>
+                                        <pm-button variant="Secondary" size="Small" native-type="submit">Zamítnout a převzít data</pm-button>
                                     </form>
                                 }
                                 @if (item.CanPrefillCreateForm
                                      && !string.Equals(item.Stav, RecordProposalStateCodes.Pending, StringComparison.OrdinalIgnoreCase)
                                      && !string.IsNullOrWhiteSpace(item.PrefillCreateFormUrl))
                                 {
-                                    <button class="btn small"
-                                            type="button"
-                                            data-record-editor-url="@item.PrefillCreateFormUrl"
-                                            data-record-editor-project-id="@item.ProjektId"
-                                            data-record-editor-label="@($"Předvyplnit formulář z návrhu #{item.Id}")">
+                                    <pm-button variant="Secondary"
+                                               size="Small"
+                                               data-record-editor-url="@item.PrefillCreateFormUrl"
+                                               data-record-editor-project-id="@item.ProjektId"
+                                               data-record-editor-label="@($"Předvyplnit formulář z návrhu #{item.Id}")">
                                         Předvyplnit formulář
-                                    </button>
+                                    </pm-button>
                                 }
                             </div>
                         </article>
@@ -165,13 +164,13 @@
                             <div class="proposal-card-actions">
                                 @if (!string.IsNullOrWhiteSpace(item.DetailUrl))
                                 {
-                                    <button class="btn small"
-                                            type="button"
-                                            data-record-editor-url="@item.DetailUrl"
-                                            data-record-editor-project-id="@item.ProjektId"
-                                            data-record-editor-label="@($"Detail návrhu #{item.Id}")">
+                                    <pm-button variant="Secondary"
+                                               size="Small"
+                                               data-record-editor-url="@item.DetailUrl"
+                                               data-record-editor-project-id="@item.ProjektId"
+                                               data-record-editor-label="@($"Detail návrhu #{item.Id}")">
                                         Detail návrhu
-                                    </button>
+                                    </pm-button>
                                 }
                                 @if (item.CanApprove)
                                 {
@@ -182,7 +181,7 @@
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ProjektId" value="@item.ProjektId" />
                                         <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <button class="btn small primary" type="submit">Schválit</button>
+                                        <pm-button variant="Primary" size="Small" native-type="submit">Schválit</pm-button>
                                     </form>
                                 }
                                 @if (item.CanReject)
@@ -194,7 +193,7 @@
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ProjektId" value="@item.ProjektId" />
                                         <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <button class="btn small ghost" type="submit">Zamítnout</button>
+                                        <pm-button variant="Ghost" size="Small" native-type="submit">Zamítnout</pm-button>
                                     </form>
                                 }
                                 @if (item.CanRejectAndEdit)
@@ -206,7 +205,7 @@
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ProjektId" value="@item.ProjektId" />
                                         <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <button class="btn small" type="submit">Zamítnout a upravit</button>
+                                        <pm-button variant="Secondary" size="Small" native-type="submit">Zamítnout a upravit</pm-button>
                                     </form>
                                 }
                             </div>

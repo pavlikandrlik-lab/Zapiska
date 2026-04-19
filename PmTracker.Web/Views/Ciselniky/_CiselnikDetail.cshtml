@@ -31,7 +31,7 @@
 @if (Model.CanEditThisCiselnik && Model.CanCreate)
 {
     <div class="header-actions">
-        <a class="btn primary" href="#ciselnik-novy-radek">Nová položka</a>
+        <pm-button variant="Primary" href="#ciselnik-novy-radek">Nová položka</pm-button>
     </div>
 }
 
@@ -88,13 +88,13 @@
                     @if (Model.CanEditThisCiselnik)
                     {
                         <div class="table-actions-inline">
-                            <button class="btn small" type="button" data-modal-url="@Url.Action("EditRow", "Ciselniky", new { key = Model.Key, id = polozka.Id })" disabled="@((locked && !polozka.CanChangeLockState) || !polozka.CanEdit)">Upravit</button>
+                            <pm-button variant="Secondary" size="Small" data-modal-url="@Url.Action("EditRow", "Ciselniky", new { key = Model.Key, id = polozka.Id })" disabled="@((locked && !polozka.CanChangeLockState) || !polozka.CanEdit)">Upravit</pm-button>
                             @if (polozka.CanDelete)
                             {
                                 <form class="table-action-inline-form" asp-controller="Ciselniky" asp-action="DeleteRow" method="post" onsubmit="return confirm('Opravdu chcete tuto položku smazat?');">
                                     <input type="hidden" name="Key" value="@Model.Key" />
                                     <input type="hidden" name="Id" value="@polozka.Id" />
-                                    <button class="btn small ghost" type="submit" disabled="@(locked && !polozka.CanChangeLockState)">Smazat</button>
+                                    <pm-button variant="Ghost" size="Small" native-type="submit" disabled="@(locked && !polozka.CanChangeLockState)">Smazat</pm-button>
                                 </form>
                             }
                         </div>
@@ -183,7 +183,7 @@
                 </label>
             }
             <div class="form-actions">
-                <button class="btn primary" type="submit">Uložit</button>
+                <pm-button variant="Primary" native-type="submit">Uložit</pm-button>
             </div>
         </form>
     </section>

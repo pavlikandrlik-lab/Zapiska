@@ -15,36 +15,34 @@
          data-record-meeting-comment-states-url="@Model.MeetingCommentStatesUrl">
     <div class="panel-header">
         <div class="panel-header-actions">
-            <a class="btn ghost"
-               href="@Model.ProjectPrintUrl"
-               target="_blank"
-               rel="noopener"
-               data-print-trigger="true"
-               data-project-print-trigger="true"
-               data-print-pdf-url="@Model.ProjectPrintUrl"
-               data-print-word-url="@Model.ProjectWordUrl"
-               data-print-label="Tisk projektu">
+            <pm-button variant="Ghost"
+                       href="@Model.ProjectPrintUrl"
+                       target="_blank"
+                       rel="noopener"
+                       data-print-trigger="true"
+                       data-project-print-trigger="true"
+                       data-print-pdf-url="@Model.ProjectPrintUrl"
+                       data-print-word-url="@Model.ProjectWordUrl"
+                       data-print-label="Tisk projektu">
                 Tisk projektu
-            </a>
+            </pm-button>
             @if (Model.CanManageRecords)
             {
-                <button class="btn primary"
-                        type="button"
-                        data-record-editor-url="@Model.CreateRecordEditorUrl"
-                        data-record-editor-project-id="@Model.ProjektId"
-                        data-record-editor-label="Nový záznam">
+                <pm-button variant="Primary"
+                           data-record-editor-url="@Model.CreateRecordEditorUrl"
+                           data-record-editor-project-id="@Model.ProjektId"
+                           data-record-editor-label="Nový záznam">
                     Nový záznam
-                </button>
+                </pm-button>
             }
             @if (Model.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.CreateRecordProposalUrl))
             {
-                <button class="btn"
-                        type="button"
-                        data-record-editor-url="@Model.CreateRecordProposalUrl"
-                        data-record-editor-project-id="@Model.ProjektId"
-                        data-record-editor-label="Nový návrh založení záznamu">
+                <pm-button variant="Secondary"
+                           data-record-editor-url="@Model.CreateRecordProposalUrl"
+                           data-record-editor-project-id="@Model.ProjektId"
+                           data-record-editor-label="Nový návrh založení záznamu">
                     Nový návrh záznamu
-                </button>
+                </pm-button>
             }
         </div>
     </div>
@@ -156,7 +154,7 @@
                 </label>
             </div>
             <div class="filter-actions">
-                <button class="btn small ghost" type="button" data-filter-save-defaults="records">Uložit jako výchozí</button>
+                <pm-button variant="Ghost" size="Small" data-filter-save-defaults="records">Uložit jako výchozí</pm-button>
                 <span class="filter-save-status" data-filter-save-status="records" aria-live="polite"></span>
             </div>
         </div>

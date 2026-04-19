@@ -16,7 +16,7 @@
 <div class="projects-header-actions">
     @if (Model.CanCreate)
     {
-        <button class="btn primary" type="button" data-modal-url="@Url.Action("NewProjectModal", "Projekty")">Nový projekt</button>
+        <pm-button variant="Primary" data-modal-url="@Url.Action("NewProjectModal", "Projekty")">Nový projekt</pm-button>
     }
     @if (canHideDone || canHideDeleted)
     {
@@ -78,11 +78,11 @@
                 <div class="project-card-actions" data-stop-propagation="true">
                     @if (projekt.CanEdit)
                     {
-                        <button class="btn small" type="button" data-modal-url="@Url.Action("EditProjectModal", "Projekty", new { id = projekt.Id })">Upravit</button>
+                        <pm-button variant="Secondary" size="Small" data-modal-url="@Url.Action("EditProjectModal", "Projekty", new { id = projekt.Id })">Upravit</pm-button>
                     }
                     @if (projekt.CanDelete)
                     {
-                        <button class="btn small ghost" type="button" data-modal-url="@Url.Action("DeleteProjectModal", "Projekty", new { id = projekt.Id })">Smazat</button>
+                        <pm-button variant="Ghost" size="Small" data-modal-url="@Url.Action("DeleteProjectModal", "Projekty", new { id = projekt.Id })">Smazat</pm-button>
                     }
                 </div>
             </article>

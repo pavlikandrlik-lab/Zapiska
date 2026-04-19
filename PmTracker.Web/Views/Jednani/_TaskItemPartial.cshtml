@@ -10,9 +10,9 @@
     @if (ukol.Vyjadreni.Count > 1)
     {
         <div class="record-comments-header compact">
-            <button type="button" class="btn small ghost comment-sort-toggle" data-comment-sort-toggle>
+            <pm-button variant="Ghost" size="Small" class="comment-sort-toggle" data-comment-sort-toggle="true">
                 Řazení: jednání vzestupně
-            </button>
+            </pm-button>
         </div>
     }
     @if (ukol.Vyjadreni.Count == 0)
@@ -55,7 +55,7 @@
                                                   required
                                                   data-rich-text="true"
                                                   data-rich-text-min-height="92">@RichTextContentService.ToSafeHtml(vyjadreni.Text)</textarea>
-                                        <button class="btn small" type="submit">Uložit změnu</button>
+                                        <pm-button variant="Secondary" size="Small" native-type="submit">Uložit změnu</pm-button>
                                     </form>
                                 </details>
                                 <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
@@ -64,7 +64,7 @@
                                     <input type="hidden" name="zaznamId" value="@ukol.ZaznamId" />
                                     <input type="hidden" name="uiContext" value="meeting" />
                                     <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                    <button class="btn small ghost" type="submit">Smazat</button>
+                                    <pm-button variant="Ghost" size="Small" native-type="submit">Smazat</pm-button>
                                 </form>
                             </div>
                         </div>
@@ -90,7 +90,7 @@
                       data-rich-text="true"
                       data-rich-text-min-height="132"></textarea>
             <div class="meeting-notes-actions">
-                <button class="btn primary" type="submit">Uložit vyjádření</button>
+                <pm-button variant="Primary" native-type="submit">Uložit vyjádření</pm-button>
             </div>
         </form>
     }

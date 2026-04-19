@@ -40,7 +40,7 @@
                 </label>
             </div>
             <div class="filter-actions">
-                <button class="btn small ghost" type="button" data-filter-save-defaults="schedule">Uložit jako výchozí</button>
+                <pm-button variant="Ghost" size="Small" data-filter-save-defaults="schedule">Uložit jako výchozí</pm-button>
                 <span class="filter-save-status" data-filter-save-status="schedule" aria-live="polite"></span>
             </div>
         </div>
@@ -88,20 +88,20 @@
                                     </div>
                                     <div class="schedule-card-actions">
                                         <gov-tag color="@(item.Stihame ? "success" : "error")" size="s">@(item.Stihame ? "Stíháme" : "Nestíháme")</gov-tag>
-                                        <button class="btn small ghost"
-                                                type="button"
-                                                data-schedule-expand-toggle
-                                                data-schedule-record-id="@item.ZaznamId"
-                                                aria-expanded="false">Rozpad</button>
+                                        <pm-button variant="Ghost"
+                                                   size="Small"
+                                                   data-schedule-expand-toggle="true"
+                                                   data-schedule-record-id="@item.ZaznamId"
+                                                   aria-expanded="false">Rozpad</pm-button>
                                         @if (item.CanManageSchedule)
                                         {
-                                            <button class="btn small"
-                                                    type="button"
-                                                    data-record-editor-url="@item.ScheduleEditUrl"
-                                                    data-record-editor-project-id="@Model.ProjektId"
-                                                    data-record-editor-label="@($"Upravit záznam #{item.CisloViditelne}")">
+                                            <pm-button variant="Secondary"
+                                                       size="Small"
+                                                       data-record-editor-url="@item.ScheduleEditUrl"
+                                                       data-record-editor-project-id="@Model.ProjektId"
+                                                       data-record-editor-label="@($"Upravit záznam #{item.CisloViditelne}")">
                                                 Upravit
-                                            </button>
+                                            </pm-button>
                                         }
                                     </div>
                                 </div>

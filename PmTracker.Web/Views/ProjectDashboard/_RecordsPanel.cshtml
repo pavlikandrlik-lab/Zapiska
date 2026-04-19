@@ -2,18 +2,18 @@
 
 <div class="dashboard-panel-body">
     <div class="dashboard-category-filter-row">
-        <button class="btn small ghost active" type="button" data-dashboard-category-filter="">
+        <pm-button variant="Ghost" size="Small" class="active" data-dashboard-category-filter="">
             Vše
-        </button>
-        <button class="btn small ghost" type="button" data-dashboard-category-filter="delayed">
+        </pm-button>
+        <pm-button variant="Ghost" size="Small" data-dashboard-category-filter="delayed">
             V prodlení
-        </button>
-        <button class="btn small ghost" type="button" data-dashboard-category-filter="awaiting">
+        </pm-button>
+        <pm-button variant="Ghost" size="Small" data-dashboard-category-filter="awaiting">
             Čeká na skutečnost
-        </button>
-        <button class="btn small ghost" type="button" data-dashboard-category-filter="approaching">
+        </pm-button>
+        <pm-button variant="Ghost" size="Small" data-dashboard-category-filter="approaching">
             Blíží se termín
-        </button>
+        </pm-button>
     </div>
 
     @if (Model.IsEmpty)
@@ -131,7 +131,7 @@
                                         </table>
                                     }
                                     <div class="dashboard-expandable-detail-actions">
-                                        <a class="btn small ghost" href="@record.ScheduleUrl">Přejít na harmonogram</a>
+                                        <pm-button variant="Ghost" size="Small" href="@record.ScheduleUrl">Přejít na harmonogram</pm-button>
                                     </div>
                                 </div>
                             </td>

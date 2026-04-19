@@ -14,8 +14,8 @@
 <div class="header-actions">
     @if (Model.CanManagePeople)
     {
-        <button class="btn" type="button" data-modal-url="@Url.Action("AdPersonModal", "Osoby")">Přidat z AD</button>
-        <button class="btn primary" type="button" data-modal-url="@Url.Action("ManualPersonModal", "Osoby")">Přidat ručně</button>
+        <pm-button variant="Secondary" data-modal-url="@Url.Action("AdPersonModal", "Osoby")">Přidat z AD</pm-button>
+        <pm-button variant="Primary" data-modal-url="@Url.Action("ManualPersonModal", "Osoby")">Přidat ručně</pm-button>
     }
     else
     {
@@ -76,16 +76,16 @@
                 @if (Model.CanManagePeople)
                 {
                     <td class="table-actions">
-                        <button class="btn small"
-                                type="button"
-                                data-modal-url="@Url.Action("ManualPersonModal", "Osoby", new { id = osoba.Id })">Upravit</button>
+                        <pm-button variant="Secondary"
+                                   size="Small"
+                                   data-modal-url="@Url.Action("ManualPersonModal", "Osoby", new { id = osoba.Id })">Upravit</pm-button>
                         <form class="table-action-inline-form"
                               asp-controller="Osoby"
                               asp-action="Delete"
                               method="post"
                               onsubmit="return confirm('Opravdu odstranit osobu @($"{osoba.Jmeno} {osoba.Prijmeni}")?');">
                             <input type="hidden" name="Id" value="@osoba.Id" />
-                            <button class="btn ghost small" type="submit">Odstranit</button>
+                            <pm-button variant="Ghost" size="Small" native-type="submit">Odstranit</pm-button>
                         </form>
                     </td>
                 }

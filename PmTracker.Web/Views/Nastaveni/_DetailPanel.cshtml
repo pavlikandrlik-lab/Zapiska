@@ -20,11 +20,10 @@
             <h3>Role</h3>
             @if (Model.CanManageSettings)
             {
-                <button class="btn primary"
-                        type="button"
-                        data-modal-url="@Url.Action("RoleModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
+                <pm-button variant="Primary"
+                           data-modal-url="@Url.Action("RoleModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
                     Nová role
-                </button>
+                </pm-button>
             }
         </div>
         <table class="table">
@@ -52,12 +51,12 @@
                             @if (Model.CanManageSettings)
                             {
                                 <div class="table-actions-inline">
-                                    <button class="btn small"
-                                            type="button"
-                                            data-modal-url="@Url.Action("RoleModal", "Nastaveni", new { id = role.Id, userId = selectedUserId, projektId = selectedProjektId })"
-                                            disabled="@role.IsSystem">
+                                    <pm-button variant="Secondary"
+                                               size="Small"
+                                               data-modal-url="@Url.Action("RoleModal", "Nastaveni", new { id = role.Id, userId = selectedUserId, projektId = selectedProjektId })"
+                                               disabled="@role.IsSystem">
                                         Upravit
-                                    </button>
+                                    </pm-button>
                                     <form asp-controller="Nastaveni"
                                           asp-action="ToggleRole"
                                           method="post"
@@ -72,9 +71,9 @@
                                         {
                                             <input type="hidden" name="projektId" value="@selectedProjektId.Value" />
                                         }
-                                        <button class="btn small ghost" type="submit" disabled="@role.IsSystem">
+                                        <pm-button variant="Ghost" size="Small" native-type="submit" disabled="@role.IsSystem">
                                             @(role.IsActive ? "Deaktivovat" : "Aktivovat")
-                                        </button>
+                                        </pm-button>
                                     </form>
                                 </div>
                             }
@@ -96,11 +95,10 @@ else if (Model.SectionKey == "akce")
             <h3>Katalog akcí</h3>
             @if (Model.CanManageSettings)
             {
-                <button class="btn primary"
-                        type="button"
-                        data-modal-url="@Url.Action("PermissionModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
+                <pm-button variant="Primary"
+                           data-modal-url="@Url.Action("PermissionModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
                     Nová akce
-                </button>
+                </pm-button>
             }
         </div>
         @foreach (var category in Model.PermissionCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Nazev, StringComparer.CurrentCultureIgnoreCase))
@@ -130,12 +128,12 @@ else if (Model.SectionKey == "akce")
                                     @if (Model.CanManageSettings)
                                     {
                                         <div class="table-actions-inline">
-                                            <button class="btn small"
-                                                    type="button"
-                                                    data-modal-url="@Url.Action("PermissionModal", "Nastaveni", new { id = permission.Id, userId = selectedUserId, projektId = selectedProjektId })"
-                                                    disabled="@permission.IsSystem">
+                                            <pm-button variant="Secondary"
+                                                       size="Small"
+                                                       data-modal-url="@Url.Action("PermissionModal", "Nastaveni", new { id = permission.Id, userId = selectedUserId, projektId = selectedProjektId })"
+                                                       disabled="@permission.IsSystem">
                                                 Upravit
-                                            </button>
+                                            </pm-button>
                                             <form asp-controller="Nastaveni"
                                                   asp-action="TogglePermission"
                                                   method="post"
@@ -150,9 +148,9 @@ else if (Model.SectionKey == "akce")
                                                 {
                                                     <input type="hidden" name="projektId" value="@selectedProjektId.Value" />
                                                 }
-                                                <button class="btn small ghost" type="submit" disabled="@permission.IsSystem">
+                                                <pm-button variant="Ghost" size="Small" native-type="submit" disabled="@permission.IsSystem">
                                                     @(permission.IsActive ? "Deaktivovat" : "Aktivovat")
-                                                </button>
+                                                </pm-button>
                                             </form>
                                         </div>
                                     }
@@ -176,11 +174,10 @@ else if (Model.SectionKey == "role-akce")
             <h3>Mapování role -> akce</h3>
             @if (Model.CanManageSettings)
             {
-                <button class="btn primary"
-                        type="button"
-                        data-modal-url="@Url.Action("RolePermissionModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
+                <pm-button variant="Primary"
+                           data-modal-url="@Url.Action("RolePermissionModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
                     Přidat mapování
-                </button>
+                </pm-button>
             }
         </div>
         <p class="muted settings-hint">
@@ -214,11 +211,11 @@ else if (Model.SectionKey == "role-akce")
                                 <div class="table-actions-inline">
                                     @if (map.IsAllowed)
                                     {
-                                        <button class="btn small"
-                                                type="button"
-                                                data-modal-url="@Url.Action("RolePermissionModal", "Nastaveni", new { id = map.Id, userId = selectedUserId, projektId = selectedProjektId })">
+                                        <pm-button variant="Secondary"
+                                                   size="Small"
+                                                   data-modal-url="@Url.Action("RolePermissionModal", "Nastaveni", new { id = map.Id, userId = selectedUserId, projektId = selectedProjektId })">
                                             Upravit
-                                        </button>
+                                        </pm-button>
                                     }
                                     <form class="table-action-inline-form"
                                           asp-controller="Nastaveni"
@@ -234,7 +231,7 @@ else if (Model.SectionKey == "role-akce")
                                                 UserId = selectedUserId,
                                                 ProjektId = selectedProjektId
                                             })
-                                        <button class="btn small ghost" type="submit">Smazat</button>
+                                        <pm-button variant="Ghost" size="Small" native-type="submit">Smazat</pm-button>
                                     </form>
                                 </div>
                             }
@@ -256,12 +253,11 @@ else if (Model.SectionKey == "uzivatele-role")
             <h3>Mapování uživatelů na role</h3>
             @if (Model.CanManageSettings)
             {
-                <button class="btn primary"
-                        type="button"
-                        data-modal-url="@Url.Action("UserRolesModal", "Nastaveni", new { osobaId = defaultAssignmentUserId, userId = selectedUserId, projektId = selectedProjektId })"
-                        disabled="@(!defaultAssignmentUserId.HasValue)">
+                <pm-button variant="Primary"
+                           data-modal-url="@Url.Action("UserRolesModal", "Nastaveni", new { osobaId = defaultAssignmentUserId, userId = selectedUserId, projektId = selectedProjektId })"
+                           disabled="@(!defaultAssignmentUserId.HasValue)">
                     Přiřadit roli
-                </button>
+                </pm-button>
             }
         </div>
         <table class="table">
@@ -284,11 +280,11 @@ else if (Model.SectionKey == "uzivatele-role")
                             @if (Model.CanManageSettings)
                             {
                                 <div class="settings-stack-actions">
-                                    <button class="btn small"
-                                            type="button"
-                                            data-modal-url="@Url.Action("UserRolesModal", "Nastaveni", new { osobaId = row.OsobaId, userId = selectedUserId, projektId = selectedProjektId })">
+                                    <pm-button variant="Secondary"
+                                               size="Small"
+                                               data-modal-url="@Url.Action("UserRolesModal", "Nastaveni", new { osobaId = row.OsobaId, userId = selectedUserId, projektId = selectedProjektId })">
                                         Upravit role
-                                    </button>
+                                    </pm-button>
                                     @foreach (var role in row.RoleAssignments)
                                     {
                                         <form asp-controller="Nastaveni"
@@ -306,7 +302,7 @@ else if (Model.SectionKey == "uzivatele-role")
                                             {
                                                 <input type="hidden" name="projektId" value="@selectedProjektId.Value" />
                                             }
-                                            <button class="btn small ghost" type="submit">Odebrat @role.RoleKod</button>
+                                            <pm-button variant="Ghost" size="Small" native-type="submit">Odebrat @role.RoleKod</pm-button>
                                         </form>
                                     }
                                 </div>
