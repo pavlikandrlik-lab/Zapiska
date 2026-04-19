@@ -3928,128 +3928,45 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     pointer-events: none;
 }
 
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    --modal-vpad: clamp(18px, 6vh, 72px);
-    background: rgba(15, 23, 42, 0.45);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow-x: hidden;
-    overflow-y: auto;
-    padding: var(--modal-vpad) 24px;
-    z-index: 1;
-}
-
-.modal-floating-root,
 .app-floating-root {
     position: fixed;
     inset: 0;
     pointer-events: none;
-}
-
-.modal-floating-root {
-    z-index: 2;
-}
-
-.app-floating-root {
     z-index: 1900;
-}
-
-.modal {
-    background: var(--gov-color-surface);
-    border-radius: var(--gov-radius);
-    padding: 12px 14px 16px;
-    width: min(760px, 100%);
-    max-width: 100%;
-    max-height: calc(100dvh - (var(--modal-vpad) * 2));
-    box-shadow: var(--gov-shadow-soft);
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.modal.modal--default {
-    width: min(760px, 100%);
-}
-
-.modal.modal--wide {
-    width: min(1080px, 100%);
-}
-
-.modal.modal--record-editor {
-    width: min(1180px, 100%);
-}
-
-.modal.modal--overflow-visible {
-    overflow: visible;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 0 2px 8px 2px;
-    flex: 0 0 auto;
-}
-
-.modal-close {
-    position: static;
-    width: 34px;
-    height: 34px;
-    border: 1px solid var(--gov-color-border);
-    border-radius: var(--gov-radius-sm);
-    background: var(--gov-color-surface);
-    color: var(--app-text-primary);
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-}
-
-.modal-close:hover {
-    background: rgba(148, 163, 184, 0.14);
-}
-
-.modal-close-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-    transform: translateY(-1px);
-}
-
-.modal-content h2 {
-    margin-top: 0;
-}
-
-.modal-content {
-    overflow-x: hidden;
-    overflow-y: auto;
-    min-height: 0;
-    padding: 0 6px 6px 2px;
-    scrollbar-gutter: stable both-edges;
-}
-
-.modal.modal--wide .modal-content {
-    overflow-x: auto;
-}
-
-.modal.modal--record-editor .modal-content {
-    overflow-x: auto;
-}
-
-.modal.modal--overflow-visible .modal-content {
-    overflow: visible;
 }
 
 .modal-open {
     overflow: hidden;
+}
+
+/* === gov-dialog modály (Fáze 2E) =====================================
+   Nahrazuje custom .modal-overlay / .modal.modal--* strukturu. Variants
+   řízeny přes data-modal-variant="default|wide|record-editor".
+   Gov-dialog sám poskytuje backdrop + visual hierarchy; block-close=true
+   na elementu disabluje jeho Esc/backdrop handler — close flow jde vždy
+   přes náš bootstrap.js (gov-close listener + dirty-check). */
+
+gov-dialog[data-modal-container] {
+    /* Default variant ponechává gov-dialog vestavěné max-width (~52rem). */
+}
+
+gov-dialog[data-modal-container][data-modal-variant="wide"] {
+    --gov-dialog-max-width: 1100px;
+}
+
+gov-dialog[data-modal-container][data-modal-variant="record-editor"] {
+    --gov-dialog-max-width: 1280px;
+    --gov-dialog-max-height: 92vh;
+}
+
+gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .modal-content {
+    overflow: visible;
+}
+
+gov-dialog[data-modal-container] .modal-content {
+    /* Body wrapper uvnitř gov-dialog default slotu — padding konzistentní
+       s dříve používaným .modal-content. */
+    padding: 16px;
 }
 
 .section-divider {
@@ -4187,7 +4104,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     max-width: calc(100vw - 16px);
 }
 
-.modal.modal--overflow-visible .office-search-panel {
+gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-search-panel {
     z-index: 2600;
     max-height: min(420px, 55dvh);
 }
@@ -5837,15 +5754,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
         grid-template-columns: 1fr;
     }
 
-    .modal {
-        width: 100%;
-        max-height: calc(100vh - 36px);
-    }
-
-    .modal-overlay {
-        --modal-vpad: 16px;
-        align-items: flex-start;
-        padding: 16px;
+    gov-dialog[data-modal-container] {
+        --gov-dialog-max-height: calc(100vh - 36px);
     }
 
     .record-form-row-top,

@@ -533,6 +533,19 @@ function handleWindowBeforeUnload(_event) {
     // záměrně prázdné — žádný nativní confirm dialog
 }
 
+function handleGovCloseEvent(event) {
+    // gov-dialog emituje gov-close při kliknutí na vestavěný X button.
+    // block-close="true" + block-backdrop-close="true" na dialogu zabraňují
+    // self-close; event je čistě "žádost o zavření" kterou musí schválit
+    // náš dirty-check flow (promptRecordEditorDiscard).
+    const target = event.target;
+    if (target instanceof HTMLElement && target.tagName === "GOV-DIALOG" && target.hasAttribute("data-modal-container")) {
+        event.preventDefault();
+        event.stopPropagation();
+        void requestRecordEditorModalClose(target);
+    }
+}
+
 const rerenderRainbowLabelsOnResize = debounce(() => {
     renderAllRainbowSegmentLabels(document);
 }, 120);
@@ -578,7 +591,8 @@ export function bootstrapPmTrackerApp() {
         { type: "keydown", handler: handleDocumentOverlayKeydown },
         { type: "change", handler: handleDocumentChange },
         { type: "input", handler: handleDocumentInput },
-        { type: "keydown", handler: handleDocumentCardKeydown }
+        { type: "keydown", handler: handleDocumentCardKeydown },
+        { type: "gov-close", handler: handleGovCloseEvent }
     ]);
 
     bindEventGroup(window, [

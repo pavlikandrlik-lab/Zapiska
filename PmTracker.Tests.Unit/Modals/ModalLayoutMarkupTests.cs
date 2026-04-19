@@ -52,9 +52,9 @@ public sealed class ModalLayoutMarkupTests
         layout.Should().Contain(
             "data-modal-container",
             "JS používá [data-modal-container] selector (modals.js, ajax.js)");
-        layout.Should().Contain(
+        layout.Should().NotContain(
             "data-modal-close",
-            "close button zachovává data-modal-close pro bootstrap.js click handler");
+            "Task 5: vlastní X button odstraněn (gov-dialog má vestavěný); [data-modal-close] contract zůstává v _ModalFormActions + per-view partials");
         layout.Should().Contain(
             "data-modal-variant=\"@normalizedVariant\"",
             "variant se propaguje jako data-modal-variant atribut (místo CSS class)");
@@ -70,5 +70,21 @@ public sealed class ModalLayoutMarkupTests
         layout.Should().NotContain(
             "data-modal-floating-root",
             "floating-root přemístěn mimo gov-dialog (Task 3)");
+    }
+
+    [Fact]
+    public void Bootstrap_ShouldListenForGovCloseEvent()
+    {
+        var js = LoadText("PmTracker.Web/wwwroot/js/modules/bootstrap.js");
+
+        js.Should().Contain(
+            "\"gov-close\"",
+            "bootstrap.js musí poslouchat gov-dialog emitted gov-close event (vestavěný X)");
+        js.Should().Contain(
+            "handleGovCloseEvent",
+            "musí existovat handler pro gov-close");
+        js.Should().Contain(
+            "requestRecordEditorModalClose",
+            "gov-close handler musí volat app-level dirty-check flow");
     }
 }

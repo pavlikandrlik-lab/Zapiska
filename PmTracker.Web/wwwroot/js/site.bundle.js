@@ -9494,6 +9494,18 @@ function handleWindowBeforeUnload(_event) {
   // edge dialogové okno, problikne i dialog aplikace, je to chybné chování".
   // App-level prompt (promptRecordEditorDiscard) řeší in-app navigace.
 }
+function handleGovCloseEvent(event) {
+  // gov-dialog emituje gov-close při kliknutí na vestavěný X button.
+  // block-close="true" + block-backdrop-close="true" na dialogu zabraňují
+  // self-close; event je čistě "žádost o zavření" kterou musí schválit
+  // náš dirty-check flow (promptRecordEditorDiscard).
+  const target = event.target;
+  if (target instanceof HTMLElement && target.tagName === "GOV-DIALOG" && target.hasAttribute("data-modal-container")) {
+    event.preventDefault();
+    event.stopPropagation();
+    void requestRecordEditorModalClose(target);
+  }
+}
 var rerenderRainbowLabelsOnResize = debounce(() => {
   renderAllRainbowSegmentLabels(document);
 }, 120);
@@ -9532,7 +9544,8 @@ function bootstrapPmTrackerApp() {
     { type: "keydown", handler: handleDocumentOverlayKeydown },
     { type: "change", handler: handleDocumentChange },
     { type: "input", handler: handleDocumentInput },
-    { type: "keydown", handler: handleDocumentCardKeydown }
+    { type: "keydown", handler: handleDocumentCardKeydown },
+    { type: "gov-close", handler: handleGovCloseEvent }
   ]);
   bindEventGroup(window, [
     { type: "beforeunload", handler: handleWindowBeforeUnload },
