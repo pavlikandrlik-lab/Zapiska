@@ -1,6 +1,21 @@
 # Bugy v zobrazení seznamu jednání
 
-**Status:** Nahlášeno 2026-04-18, k opravě při migraci Views v rámci Fáze 2D (nebo dříve, pokud se Jednání migrují v 2A/2B/2C).
+> **Status 2026-04-19 (po Fázi 2D Task 7):** Pravděpodobně opraveno před nahlášením.
+>
+> Revizní audit zjistil, že oba reportované bugy měly opravné commity **před** datem nahlášení (2026-04-18):
+> - **Bug 1 (šipka):** opravena commitem [`1886862`](https://github.com/) — 2026-04-17 `fix: šipka rozbalovače roku jednání podle skutečné viditelnosti karet`
+> - **Bug 2 (render logika):** implementována commitem [`db2560d`](https://github.com/) — 2026-04-17 `feat: rozdílné výchozí chování let jednání mezi aplikační a projektovou záložkou`
+>
+> Aktuální stav kódu odpovídá [docs/specs/meetings-year-grouping.md](../specs/meetings-year-grouping.md):
+> - `CSS site.css:4491-4512` — default šipka ↓, open/preview-bez-skrytých → ↑
+> - `JS meetingOverview.js` — toggle collapsed↔open, preview→open při skrytých kartách
+> - `_ProjectMeetingsTab.cshtml` — historické roky state="open"
+> - `_Jednani/Index.cshtml` — historické roky state="collapsed", aktuální "preview"
+> - Unit testy `MeetingsYearGroupingTests.cs` + E2E `MeetingOverviewYearGroupingScenariosTests.cs` pokrývají spec.
+>
+> **Žádost:** zkontrolovat v aktuálním buildu (hard-refresh CTRL+F5 / Shift+Reload, protože JS může být cachovaný). Pokud bug přetrvává, upřesnit reprodukční kroky a přidat novou sekci níže.
+
+**Historický kontext** (původní bug report, zachován pro dohledání):
 
 ## Bug 1 — Projektový dashboard, záložka Jednání: chybná orientace šipky
 
