@@ -70,23 +70,31 @@ public sealed class MeetingOverviewYearGroupingScenariosTests
         var previousYearGroup = page.Locator($"[data-meeting-year='{currentYear - 1}']").First;
         var previousYearBody = previousYearGroup.Locator("[data-meeting-year-body]");
 
+        // Projektová záložka (docs/specs/meetings-year-grouping.md): historické roky
+        // startují ve stavu OPEN = viditelné (user chce vidět plnou historii jednoho
+        // projektu). Aktuální rok startuje v preview (jen první řádek karet).
         await Expect(currentYearBody).ToBeVisibleAsync();
-        await Expect(previousYearBody).ToBeHiddenAsync();
+        await Expect(previousYearBody).ToBeVisibleAsync();
 
         var previewVisibleCount = await currentYearBody.Locator("[data-meeting-card-wrap]:visible").CountAsync();
         previewVisibleCount.Should().BeGreaterThan(0);
         previewVisibleCount.Should().BeLessThan(7);
 
+        // Historický rok ve stavu open má vidět všechna jednání (2).
+        (await previousYearBody.Locator("[data-meeting-card-wrap]:visible").CountAsync()).Should().Be(2);
+
+        // Klik na toggle aktuálního roku v preview režimu s hidden kartami → rozbalí vše
         await currentYearGroup.Locator("[data-meeting-year-toggle]").ClickAsync();
         var fullVisibleCount = await currentYearBody.Locator("[data-meeting-card-wrap]:visible").CountAsync();
         fullVisibleCount.Should().Be(7);
 
+        // Druhý klik → collapsed
         await currentYearGroup.Locator("[data-meeting-year-toggle]").ClickAsync();
         await Expect(currentYearBody).ToBeHiddenAsync();
 
+        // Historický rok (open) → klik jej zabalí
         await previousYearGroup.Locator("[data-meeting-year-toggle]").ClickAsync();
-        await Expect(previousYearBody).ToBeVisibleAsync();
-        (await previousYearBody.Locator("[data-meeting-card-wrap]:visible").CountAsync()).Should().Be(2);
+        await Expect(previousYearBody).ToBeHiddenAsync();
 
         await page.Context.CloseAsync();
     }
