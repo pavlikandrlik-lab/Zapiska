@@ -57,6 +57,24 @@ export function isModalOpen() {
         && modalRoot.childElementCount > 0;
 }
 
+function activateInsertedGovDialog() {
+    if (!(modalRoot instanceof HTMLElement)) {
+        return;
+    }
+
+    const dialog = modalRoot.querySelector("gov-dialog");
+    if (!(dialog instanceof HTMLElement)) {
+        return;
+    }
+
+    // Explicitní `open="true"` pro případ, že Razor renderoval atribut ale
+    // gov-dialog se ještě neupgradoval (custom element se upgraduje asynchronně).
+    dialog.setAttribute("open", "true");
+    if (typeof dialog.show === "function") {
+        try { dialog.show(); } catch { /* .show() může throw při duplicitním volání nebo pre-hydration */ }
+    }
+}
+
 export function getFocusableElementsWithinModal(container) {
     if (!(container instanceof HTMLElement)) {
         return [];
@@ -105,20 +123,12 @@ export function setModalContent(content, trigger) {
     modalRuntime.closeAllFloatingPanels?.();
     modalRoot.innerHTML = "";
     modalRoot.appendChild(content);
+    // Vestigial z .modal-overlay éry — ponecháváme defensivně (neovlivňuje gov-dialog).
     modalRoot.style.pointerEvents = "auto";
     modalRoot.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
     modalState.lastTrigger = trigger instanceof HTMLElement ? trigger : null;
-    // Fáze 2E: zajistit open stav na vloženém gov-dialog. Razor už renderuje
-    // open="true", ale custom element se upgradne asynchronně — setAttribute
-    // zajistí CSS display:block i před hydratací.
-    const dialog = modalRoot.querySelector("gov-dialog");
-    if (dialog instanceof HTMLElement) {
-        dialog.setAttribute("open", "true");
-        if (typeof dialog.show === "function") {
-            try { dialog.show(); } catch { /* gov-dialog.show() může throw při duplicitním volání — ignoruj */ }
-        }
-    }
+    activateInsertedGovDialog();
 
     modalRuntime.initRecordFormEnhancements?.(modalRoot);
     modalRuntime.initPermissionMetadataBindings?.(modalRoot);
@@ -148,6 +158,7 @@ export function closeModal() {
     }
 
     modalRoot.innerHTML = "";
+    // Vestigial z .modal-overlay éry — ponecháváme defensivně (neovlivňuje gov-dialog).
     modalRoot.style.pointerEvents = "none";
     modalRoot.setAttribute("aria-hidden", "true");
     document.body.classList.remove("modal-open");
@@ -176,17 +187,19 @@ export async function openUrlModal(url, trigger) {
         reportClientDiagnostic("modal-load-failed", { url });
         if (modalRoot instanceof HTMLElement) {
             modalRoot.innerHTML = `
-                <gov-dialog open="true" data-modal-container data-modal-variant="default" aria-labelledby="modal-error-title" tabindex="-1">
+                <gov-dialog open="true" block-close="true" block-backdrop-close="true" data-modal-container data-modal-variant="default" aria-labelledby="modal-error-title" tabindex="-1">
                     <h2 id="modal-error-title" class="sr-only">Chyba načtení dialogu</h2>
                     <p>Nepodařilo se načíst obsah dialogu.</p>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" data-modal-close>Zavřít</button>
                     </div>
                 </gov-dialog>`;
+            // Vestigial z .modal-overlay éry — ponecháváme defensivně (neovlivňuje gov-dialog).
             modalRoot.style.pointerEvents = "auto";
             modalRoot.setAttribute("aria-hidden", "false");
             document.body.classList.add("modal-open");
             modalState.lastTrigger = trigger instanceof HTMLElement ? trigger : null;
+            activateInsertedGovDialog();
             focusInitialModalElement();
         }
     }
@@ -222,12 +235,4 @@ export function trapFocusInModal(event) {
         event.preventDefault();
         first.focus({ preventScroll: true });
     }
-}
-
-export function isModalOverlayClickTarget(target) {
-    // Fáze 2E: backdrop click = uživatel klikl na gov-dialog element samotný
-    // (ne na jeho content). Gov-dialog renderuje backdrop ve shadow DOM;
-    // z venku se to projeví click eventem s target === gov-dialog.
-    const dialog = getActiveModalOverlay();
-    return dialog instanceof HTMLElement && target === dialog;
 }

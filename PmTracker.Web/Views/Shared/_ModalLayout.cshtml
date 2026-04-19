@@ -39,8 +39,16 @@
     (viz p-c99cc786.entry.js), Razor je nevydává jako HTML atributy. Jsou přítomné
     až po upgrade custom elementu (vyžaduje JS). Pre-upgrade stav je pro naši
     aplikaci přijatelný, protože celá aplikace vyžaduje JS pro provoz.
+
+    block-close="true" + block-backdrop-close="true" činí gov-dialog purely
+    presentational — Esc + backdrop click + vestavěný X button NEvyvolávají
+    self-close přímo přes gov-dialog interní handlery. Tím kontrolujeme close
+    přes bootstrap.js (data-modal-close handler s dirty-check →
+    requestRecordEditorModalClose).
 *@
 <gov-dialog open="true"
+            block-close="true"
+            block-backdrop-close="true"
             data-modal-container
             data-modal-variant="@normalizedVariant"
             data-modal-overflow-visible="@(overflowVisible ? "true" : "false")"
