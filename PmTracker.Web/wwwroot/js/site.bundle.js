@@ -8808,7 +8808,7 @@ function initModalAjaxSubmit() {
     if (!(target instanceof HTMLFormElement) || target.dataset.ajaxSubmit !== "true") {
       return;
     }
-    const isModalForm = target.closest(".modal-overlay") instanceof HTMLElement;
+    const isModalForm = target.closest("gov-dialog[data-modal-container]") instanceof HTMLElement;
     if (event.defaultPrevented) {
       return;
     }
