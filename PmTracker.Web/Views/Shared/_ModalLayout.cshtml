@@ -34,6 +34,11 @@
     - Floating-root (pro person/datetime pickery) je přemístěn do globálního
       #floating-panel-root v _Layout.cshtml (Task 3); floating-root atribut
       se v tomto layoutu již nevyskytuje (shadow DOM kolize gov-dialog).
+
+    role="dialog" + aria-modal="true" jsou interní součástí gov-dialog shadow DOM
+    (viz p-c99cc786.entry.js), Razor je nevydává jako HTML atributy. Jsou přítomné
+    až po upgrade custom elementu (vyžaduje JS). Pre-upgrade stav je pro naši
+    aplikaci přijatelný, protože celá aplikace vyžaduje JS pro provoz.
 *@
 <gov-dialog open="true"
             data-modal-container
@@ -41,7 +46,15 @@
             data-modal-overflow-visible="@(overflowVisible ? "true" : "false")"
             aria-labelledby="@modalTitleId"
             tabindex="-1">
-    <button class="modal-close" type="button" data-modal-close aria-label="Zavřít dialog" slot="header-actions">
+    @*
+        Close button: ponecháváme vlastní <button data-modal-close> s class modal-close
+        jako JS hook (bootstrap.js delegace volá requestRecordEditorModalClose s dirty-check).
+        Bez slot atributu — gov-dialog 4.2.9 neexpozuje "header-actions" slot (jen icon / title /
+        footer / default). Button spadne do default slotu a renderuje se uvnitř content oblasti.
+        Gov-dialog má vestavěný close button v headeru (gov-button.gov-dialog__close); jeho
+        event wiring v bootstrap.js proběhne v Task 5/6 po runtime verifikaci (Task 4).
+    *@
+    <button class="modal-close" type="button" data-modal-close aria-label="Zavřít dialog">
         <span class="modal-close-icon" aria-hidden="true">&#10005;</span>
     </button>
     <div class="modal-content">
