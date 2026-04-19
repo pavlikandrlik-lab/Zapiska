@@ -46,7 +46,7 @@ public sealed class ModalFormActionsTests
         var view = LoadText("PmTracker.Web/Views/Projekty/DeleteRecordModal.cshtml");
 
         view.Should().Contain(
-            "SubmitVariant = PmTracker.Web.TagHelpers.PmButtonVariant.Destructive",
+            "SubmitVariant = PmButtonVariant.Destructive",
             "delete modal musí používat Destructive variant (červené tlačítko)");
         view.Should().NotContain(
             "btn ghost danger",
@@ -62,7 +62,7 @@ public sealed class ModalFormActionsTests
             "SubmitVariant { get; init; }",
             "SubmitVariant property musí existovat");
         model.Should().Contain(
-            "PmTracker.Web.TagHelpers.PmButtonVariant.Primary",
+            "PmButtonVariant.Primary",
             "default hodnota SubmitVariant je Primary");
         model.Should().NotContain(
             "SubmitCssClass",

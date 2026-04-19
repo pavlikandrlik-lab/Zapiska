@@ -1,3 +1,5 @@
+using PmTracker.Web.TagHelpers;
+
 namespace PmTracker.Web.Models.ViewModels;
 
 public sealed class ProjectModalViewModel
@@ -135,8 +137,8 @@ public sealed class ModalFormActionsViewModel
     public string CancelLabel { get; init; } = "Zrušit";
     // Fáze 2E: PmButtonVariant nahrazuje volný CSS string.
     // Legacy string property odstraněna (původně "btn primary" / "btn ghost danger").
-    public PmTracker.Web.TagHelpers.PmButtonVariant SubmitVariant { get; init; }
-        = PmTracker.Web.TagHelpers.PmButtonVariant.Primary;
+    public PmButtonVariant SubmitVariant { get; init; }
+        = PmButtonVariant.Primary;
     public bool DisableSubmit { get; init; }
 }
 
