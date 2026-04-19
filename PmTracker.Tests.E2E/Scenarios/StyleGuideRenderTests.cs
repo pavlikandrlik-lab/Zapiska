@@ -108,11 +108,19 @@ public sealed class StyleGuideRenderTests
 
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-        foreach (var section in new[] { "dialog", "tooltip", "toast", "skeleton", "loading" })
+        // Sekce "loading" byla 2026-04-19 večer odstraněna (pm-loading renderuje
+        // gov-loading s fullscreen backdropem a blokoval celou StyleGuide stránku).
+        // Viz komentář v Views/StyleGuide/Index.cshtml a docs/architecture/loadings.md.
+        foreach (var section in new[] { "dialog", "tooltip", "toast", "skeleton" })
         {
             var count = await page.Locator($"[data-styleguide-section=\"{section}\"]").CountAsync();
             count.Should().Be(1, $"Sekce {section} musí být přesně jednou ve StyleGuide (Fáze 2C)");
         }
+
+        // pm-loading showcase ve StyleGuide ZAKÁZANÝ: gov-loading.__content má
+        // position: fixed a z-index 101 — jako inline demo blokuje UI.
+        (await page.Locator("gov-loading").CountAsync())
+            .Should().Be(0, "pm-loading nesmí být inline-renderovaný ve StyleGuide (blokuje UI přes gov-backdrop)");
 
         // Sanity: gov komponenty odpovídající novým pm-* wrapperům jsou přítomné
         (await page.Locator("gov-dialog").CountAsync())
@@ -123,8 +131,6 @@ public sealed class StyleGuideRenderTests
             .Should().BeGreaterThanOrEqualTo(4, "4 pm-toast varianty (Info/Success/Warning/Error)");
         (await page.Locator("gov-skeleton").CountAsync())
             .Should().BeGreaterThanOrEqualTo(5, "≥5 pm-skeleton ukázek (3 velikosti + 2 kruhy)");
-        (await page.Locator("gov-loading").CountAsync())
-            .Should().BeGreaterThanOrEqualTo(3, "3 pm-loading velikosti");
 
         await page.Context.CloseAsync();
     }
