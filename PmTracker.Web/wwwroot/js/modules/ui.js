@@ -1,4 +1,4 @@
-import { debounce, measureTextWidth, parseColorChannels, getContrastTextColor, pickSegmentLabel } from "./utils.js";
+import { debounce, isButtonLike, measureTextWidth, parseColorChannels, getContrastTextColor, pickSegmentLabel, setButtonDisabled } from "./utils.js";
 import { buildProjectPrintFilterQueryParams, buildProjectPrintFilterSnapshot } from "./filters.js";
 
 const printFormatStorageKey = "pmtracker.print.preferredFormat";
@@ -54,8 +54,8 @@ export function refreshPrintPreferenceUi() {
     });
 
     document.querySelectorAll("[data-print-preference-reset]").forEach((element) => {
-        if (element instanceof HTMLButtonElement) {
-            element.disabled = preferred === null;
+        if (isButtonLike(element)) {
+            setButtonDisabled(element, preferred === null);
         }
     });
 }

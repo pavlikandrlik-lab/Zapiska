@@ -1,4 +1,4 @@
-import { parseJsonPayload, reportClientDiagnostic } from "./utils.js";
+import { isButtonLike, parseJsonPayload, reportClientDiagnostic, setButtonDisabled } from "./utils.js";
 import { closeModal, isModalOpen, openUrlModal, modalState } from "./modals.js";
 import { closeAllFloatingPanels, positionPrintChooser, queueRainbowSegmentRender } from "./ui.js";
 import {
@@ -68,8 +68,8 @@ export function refreshRecordEditorPreferenceUi() {
     });
 
     document.querySelectorAll("[data-record-editor-preference-reset]").forEach((element) => {
-        if (element instanceof HTMLButtonElement) {
-            element.disabled = preferred === null;
+        if (isButtonLike(element)) {
+            setButtonDisabled(element, preferred === null);
         }
     });
 }
@@ -651,7 +651,7 @@ export function initExternalLinksEditors(scope) {
         const addButton = editor.querySelector("[data-external-add]");
         const template = editor.querySelector("template[data-external-template]");
         if (!(rowsContainer instanceof HTMLElement)
-            || !(addButton instanceof HTMLButtonElement)
+            || !isButtonLike(addButton)
             || !(template instanceof HTMLTemplateElement)) {
             return;
         }
@@ -753,7 +753,7 @@ export function initExternalLinksEditors(scope) {
             }
 
             const removeButton = target.closest("[data-external-remove]");
-            if (!(removeButton instanceof HTMLButtonElement)) {
+            if (!isButtonLike(removeButton)) {
                 return;
             }
 

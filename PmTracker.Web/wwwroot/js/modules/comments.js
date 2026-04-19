@@ -1,5 +1,6 @@
 import { navigationRuntime } from "./navigationRuntime.js";
 import { fetchHtmlFragment } from "./navigationShared.js";
+import { isButtonLike, setButtonDisabled } from "./utils.js";
 
 const commentSortDirectionStorageKey = "pmtracker.comments.sortDirection";
 const defaultRecordCommentsLoadStep = 5;
@@ -18,7 +19,7 @@ export function setStoredCommentSortDirection(direction) {
 }
 
 export function setCommentSortButtonLabel(button, direction) {
-    if (!(button instanceof HTMLButtonElement)) {
+    if (!isButtonLike(button)) {
         return;
     }
 
@@ -270,7 +271,7 @@ export async function reloadProjectRecordCommentsPanel(source, options = {}) {
         if (section instanceof HTMLElement) {
             applyCommentSort(section, sortDirection);
             const toggle = section.querySelector("[data-comment-sort-toggle]");
-            if (toggle instanceof HTMLButtonElement) {
+            if (isButtonLike(toggle)) {
                 setCommentSortButtonLabel(toggle, sortDirection);
             }
         }
@@ -296,7 +297,7 @@ export function applyCommentSortToAllSections(direction, scope = document) {
 
         applyCommentSort(section, normalizedDirection);
         const toggle = section.querySelector("[data-comment-sort-toggle]");
-        if (toggle instanceof HTMLButtonElement) {
+        if (isButtonLike(toggle)) {
             setCommentSortButtonLabel(toggle, normalizedDirection);
         }
     });
@@ -318,7 +319,7 @@ export function initCommentSortUi(scope = document) {
         applyCommentSort(section, defaultDirection);
 
         const toggle = section.querySelector("[data-comment-sort-toggle]");
-        if (!(toggle instanceof HTMLButtonElement)) {
+        if (!isButtonLike(toggle)) {
             return;
         }
 
@@ -326,7 +327,7 @@ export function initCommentSortUi(scope = document) {
         if (toggle.dataset.commentSortReady === "true") {
             const loadMoreButtonReady = section.querySelector("[data-record-comments-load-more]");
             const loadAllButtonReady = section.querySelector("[data-record-comments-load-all]");
-            if (loadMoreButtonReady instanceof HTMLButtonElement && loadMoreButtonReady.dataset.commentLoadMoreReady !== "true") {
+            if (isButtonLike(loadMoreButtonReady) && loadMoreButtonReady.dataset.commentLoadMoreReady !== "true") {
                 loadMoreButtonReady.dataset.commentLoadMoreReady = "true";
                 loadMoreButtonReady.addEventListener("click", async () => {
                     const state = readRecordCommentsPanelState(section);
@@ -334,7 +335,7 @@ export function initCommentSortUi(scope = document) {
                         return;
                     }
 
-                    loadMoreButtonReady.disabled = true;
+                    setButtonDisabled(loadMoreButtonReady, true);
                     try {
                         await reloadProjectRecordCommentsPanel(loadMoreButtonReady, {
                             limit: state.loadedCount + state.loadStep,
@@ -342,15 +343,15 @@ export function initCommentSortUi(scope = document) {
                         });
                     }
                     finally {
-                        loadMoreButtonReady.disabled = false;
+                        setButtonDisabled(loadMoreButtonReady, false);
                     }
                 });
             }
 
-            if (loadAllButtonReady instanceof HTMLButtonElement && loadAllButtonReady.dataset.commentLoadAllReady !== "true") {
+            if (isButtonLike(loadAllButtonReady) && loadAllButtonReady.dataset.commentLoadAllReady !== "true") {
                 loadAllButtonReady.dataset.commentLoadAllReady = "true";
                 loadAllButtonReady.addEventListener("click", async () => {
-                    loadAllButtonReady.disabled = true;
+                    setButtonDisabled(loadAllButtonReady, true);
                     try {
                         await reloadProjectRecordCommentsPanel(loadAllButtonReady, {
                             loadAll: true,
@@ -358,7 +359,7 @@ export function initCommentSortUi(scope = document) {
                         });
                     }
                     finally {
-                        loadAllButtonReady.disabled = false;
+                        setButtonDisabled(loadAllButtonReady, false);
                     }
                 });
             }
@@ -374,7 +375,7 @@ export function initCommentSortUi(scope = document) {
         });
 
         const loadMoreButton = section.querySelector("[data-record-comments-load-more]");
-        if (loadMoreButton instanceof HTMLButtonElement && loadMoreButton.dataset.commentLoadMoreReady !== "true") {
+        if (isButtonLike(loadMoreButton) && loadMoreButton.dataset.commentLoadMoreReady !== "true") {
             loadMoreButton.dataset.commentLoadMoreReady = "true";
             loadMoreButton.addEventListener("click", async () => {
                 const state = readRecordCommentsPanelState(section);
@@ -382,7 +383,7 @@ export function initCommentSortUi(scope = document) {
                     return;
                 }
 
-                loadMoreButton.disabled = true;
+                setButtonDisabled(loadMoreButton, true);
                 try {
                     await reloadProjectRecordCommentsPanel(loadMoreButton, {
                         limit: state.loadedCount + state.loadStep,
@@ -390,16 +391,16 @@ export function initCommentSortUi(scope = document) {
                     });
                 }
                 finally {
-                    loadMoreButton.disabled = false;
+                    setButtonDisabled(loadMoreButton, false);
                 }
             });
         }
 
         const loadAllButton = section.querySelector("[data-record-comments-load-all]");
-        if (loadAllButton instanceof HTMLButtonElement && loadAllButton.dataset.commentLoadAllReady !== "true") {
+        if (isButtonLike(loadAllButton) && loadAllButton.dataset.commentLoadAllReady !== "true") {
             loadAllButton.dataset.commentLoadAllReady = "true";
             loadAllButton.addEventListener("click", async () => {
-                loadAllButton.disabled = true;
+                setButtonDisabled(loadAllButton, true);
                 try {
                     await reloadProjectRecordCommentsPanel(loadAllButton, {
                         loadAll: true,
@@ -407,7 +408,7 @@ export function initCommentSortUi(scope = document) {
                     });
                 }
                 finally {
-                    loadAllButton.disabled = false;
+                    setButtonDisabled(loadAllButton, false);
                 }
             });
         }

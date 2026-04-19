@@ -70,7 +70,7 @@ import {
     queueFloatingPanelReposition,
     renderAllRainbowSegmentLabels
 } from "./ui.js";
-import { debounce } from "./utils.js";
+import { debounce, isButtonLike } from "./utils.js";
 import { initSessionCoordinator } from "./session.js";
 import { initTheme } from "./theme.js";
 import { initTableTools } from "./tableTools.js";
@@ -131,14 +131,14 @@ function handleDocumentClick(event) {
     }
 
     const resetPrintPreference = target.closest("[data-print-preference-reset]");
-    if (resetPrintPreference instanceof HTMLButtonElement) {
+    if (isButtonLike(resetPrintPreference)) {
         event.preventDefault();
         clearStoredPrintFormat();
         return;
     }
 
     const resetProjectFilterPreferences = target.closest("[data-project-filter-preferences-reset]");
-    if (resetProjectFilterPreferences instanceof HTMLButtonElement) {
+    if (isButtonLike(resetProjectFilterPreferences)) {
         event.preventDefault();
         clearProjectFilterPreferenceStorage();
         const status = document.querySelector("[data-project-filter-preferences-status]");
@@ -149,7 +149,7 @@ function handleDocumentClick(event) {
     }
 
     const resetRecordEditorPreference = target.closest("[data-record-editor-preference-reset]");
-    if (resetRecordEditorPreference instanceof HTMLButtonElement) {
+    if (isButtonLike(resetRecordEditorPreference)) {
         event.preventDefault();
         clearStoredRecordEditorPreference();
         const status = document.querySelector("[data-record-editor-preference-status]");
@@ -179,7 +179,7 @@ function handleDocumentClick(event) {
     }
 
     const saveDefaultsButton = target.closest("[data-filter-save-defaults]");
-    if (saveDefaultsButton instanceof HTMLButtonElement) {
+    if (isButtonLike(saveDefaultsButton)) {
         event.preventDefault();
         const scope = saveDefaultsButton.getAttribute("data-filter-save-defaults") || "";
         if (scope) {
@@ -203,7 +203,7 @@ function handleDocumentClick(event) {
     }
 
     const scheduleExpandToggle = target.closest("[data-schedule-expand-toggle]");
-    if (scheduleExpandToggle instanceof HTMLButtonElement) {
+    if (isButtonLike(scheduleExpandToggle)) {
         event.preventDefault();
         toggleScheduleBreakdown(scheduleExpandToggle);
         return;

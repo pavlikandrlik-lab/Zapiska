@@ -438,6 +438,44 @@ export function buildFormDataSnapshot(formData, maxFields) {
     return lines.join("\n");
 }
 
+/**
+ * Vrací true pro DOM elementy, které reprezentují "button-like" UI kontrolu:
+ * native <button>, <input type="submit|button|reset">, nebo gov-button Web Component.
+ * Používej místo instanceof HTMLButtonElement tam, kde může vstupovat gov-button
+ * z pm-button wrapperu (Fáze 2D).
+ */
+export function isButtonLike(el) {
+    if (!(el instanceof HTMLElement)) return false;
+    if (el instanceof HTMLButtonElement) return true;
+    if (el instanceof HTMLInputElement) {
+        const t = el.type;
+        return t === "submit" || t === "button" || t === "reset";
+    }
+    return el.tagName.toLowerCase() === "gov-button";
+}
+
+/**
+ * Nastaví disabled stav pro button-like element.
+ * Pro <gov-button> musí nastavit DOM atribut (custom element ho sleduje),
+ * .disabled property na JS instanci nemusí mít efekt.
+ */
+export function setButtonDisabled(el, disabled) {
+    if (!(el instanceof HTMLElement)) return;
+    if (disabled) {
+        el.setAttribute("disabled", "disabled");
+        if ("disabled" in el) el.disabled = true;
+    } else {
+        el.removeAttribute("disabled");
+        if ("disabled" in el) el.disabled = false;
+    }
+}
+
+/**
+ * Vrátí selektor pro všechny submit tlačítka ve formuláři, včetně gov-button.
+ */
+export const SUBMIT_SELECTOR =
+    'button[type="submit"], input[type="submit"], gov-button[native-type="submit"]';
+
 export async function copyTextToClipboard(text) {
     const value = String(text || "");
     if (!value) {

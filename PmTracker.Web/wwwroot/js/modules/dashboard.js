@@ -4,6 +4,7 @@ import {
     resolveOrCreateErrorContainer,
     setLazyLoadingState
 } from "./navigationShared.js";
+import { isButtonLike } from "./utils.js";
 
 function resolvePanelShell(panelOrKey) {
     if (panelOrKey instanceof HTMLElement && panelOrKey.matches("[data-dashboard-panel]")) {
@@ -83,7 +84,7 @@ export function handleDashboardClick(target) {
     }
 
     const loadMoreButton = target.closest("[data-dashboard-news-load-more]");
-    if (loadMoreButton instanceof HTMLButtonElement) {
+    if (isButtonLike(loadMoreButton)) {
         const panel = loadMoreButton.closest("[data-dashboard-panel]");
         if (panel instanceof HTMLElement) {
             const loadUrl = loadMoreButton.getAttribute("data-dashboard-news-load-more") || "";

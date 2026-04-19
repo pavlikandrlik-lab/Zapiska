@@ -5,9 +5,12 @@ import {
     buildFormDataSnapshot,
     buildResponseHeadersSnapshot,
     copyTextToClipboard,
+    isButtonLike,
     isPlainObject,
     parseJsonPayload,
     resolveAjaxResponseTraceId,
+    setButtonDisabled,
+    SUBMIT_SELECTOR,
     truncateDiagnosticBody
 } from "./utils.js";
 import {
@@ -391,15 +394,15 @@ export function initConfirmSubmitToggles(scope) {
         }
 
         const checkbox = form.querySelector("[data-confirm-submit-checkbox]");
-        const submit = form.querySelector('[data-confirm-submit-button], button[type="submit"], input[type="submit"]');
+        const submit = form.querySelector(`[data-confirm-submit-button], ${SUBMIT_SELECTOR}`);
         if (!(checkbox instanceof HTMLInputElement)
             || checkbox.type !== "checkbox"
-            || !(submit instanceof HTMLButtonElement || submit instanceof HTMLInputElement)) {
+            || !isButtonLike(submit)) {
             return;
         }
 
         const sync = () => {
-            submit.disabled = !checkbox.checked;
+            setButtonDisabled(submit, !checkbox.checked);
         };
 
         checkbox.addEventListener("change", sync);
@@ -418,19 +421,19 @@ export function setFormSubmitting(form, submitting) {
         && confirmationCheckbox instanceof HTMLInputElement
         && confirmationCheckbox.type === "checkbox";
 
-    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((element) => {
-        if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
+    form.querySelectorAll(SUBMIT_SELECTOR).forEach((element) => {
+        if (isButtonLike(element)) {
             if (submitting) {
-                element.disabled = true;
+                setButtonDisabled(element, true);
                 return;
             }
 
             if (hasConfirmationGate && !confirmationCheckbox.checked) {
-                element.disabled = true;
+                setButtonDisabled(element, true);
                 return;
             }
 
-            element.disabled = false;
+            setButtonDisabled(element, false);
         }
     });
 }
@@ -726,10 +729,10 @@ export function initModalAjaxSubmit() {
             return;
         }
 
-        const submitterAction = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
+        const submitterAction = isButtonLike(submitter)
             ? (submitter.getAttribute("formaction") || "")
             : "";
-        const submitterMethod = submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
+        const submitterMethod = isButtonLike(submitter)
             ? (submitter.getAttribute("formmethod") || "")
             : "";
         const action = appendCurrentAsUser(submitterAction || target.getAttribute("action") || window.location.href);

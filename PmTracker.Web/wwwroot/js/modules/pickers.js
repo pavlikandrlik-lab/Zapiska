@@ -4,6 +4,7 @@ import {
     formatDisplayDate,
     formatIsoDate,
     formatTime,
+    isButtonLike,
     isSameCalendarDate,
     normalizeSearchText,
     parseDisplayDate,
@@ -12,7 +13,8 @@ import {
     parseJsonPayload,
     parseTimeValue,
     reportClientDiagnostic,
-    scoreSearchCandidate
+    scoreSearchCandidate,
+    setButtonDisabled
 } from "./utils.js";
 import {
     isInteractionInsideFloatingControl,
@@ -975,7 +977,7 @@ export function initAdPersonPickers(scope) {
             || !(orgUnitCreateHint instanceof HTMLElement)
             || !(panel instanceof HTMLElement)
             || !(results instanceof HTMLElement)
-            || !(submitButton instanceof HTMLButtonElement)) {
+            || !isButtonLike(submitButton)) {
             return;
         }
 
@@ -1003,7 +1005,7 @@ export function initAdPersonPickers(scope) {
             emailInput.value = "";
             clearGeneratedOption(orgSelect, orgCreateHint);
             clearGeneratedOption(orgUnitSelect, orgUnitCreateHint);
-            submitButton.disabled = true;
+            setButtonDisabled(submitButton, true);
         };
 
         const normalizeText = (value) => (value || "").toString().trim().toLowerCase();
@@ -1234,7 +1236,7 @@ export function initAdPersonPickers(scope) {
             tryAutoSelectOrgUnit(row);
             queryHidden.value = queryInput.value.trim();
             queryInput.value = row.email ? `${row.displayName} <${row.email}>` : row.displayName;
-            submitButton.disabled = false;
+            setButtonDisabled(submitButton, false);
             closePanel();
         };
 

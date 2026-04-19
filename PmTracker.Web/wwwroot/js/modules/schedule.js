@@ -5,6 +5,7 @@ import {
     formatAxisMonthYear,
     formatDisplayDate,
     formatIsoDate,
+    isButtonLike,
     measureTextWidth,
     msPerDay,
     normalizeFilterToken,
@@ -26,7 +27,7 @@ import {
 import { queueRainbowSegmentRender } from "./ui.js";
 
 function syncScheduleExpandButton(button, details) {
-    if (!(button instanceof HTMLButtonElement) || !(details instanceof HTMLElement)) {
+    if (!isButtonLike(button) || !(details instanceof HTMLElement)) {
         return;
     }
 
@@ -36,12 +37,12 @@ function syncScheduleExpandButton(button, details) {
 }
 
 export function toggleScheduleBreakdown(toggleOrTarget) {
-    const button = toggleOrTarget instanceof HTMLButtonElement
+    const button = isButtonLike(toggleOrTarget)
         ? toggleOrTarget
         : toggleOrTarget instanceof Element
             ? toggleOrTarget.closest("[data-schedule-expand-toggle]")
             : null;
-    if (!(button instanceof HTMLButtonElement)) {
+    if (!isButtonLike(button)) {
         return false;
     }
 
@@ -74,7 +75,7 @@ export function toggleScheduleBreakdown(toggleOrTarget) {
 export function initScheduleExpandUi(scope) {
     const root = scope instanceof Element ? scope : document;
     root.querySelectorAll("[data-schedule-expand-toggle]").forEach((button) => {
-        if (!(button instanceof HTMLButtonElement)) {
+        if (!isButtonLike(button)) {
             return;
         }
 
