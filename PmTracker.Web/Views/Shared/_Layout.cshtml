@@ -46,6 +46,10 @@
                 </div>
             </a>
 
+            @* Globální hledání v layoutu používá gov-form-search přímo (ne pm-search), protože
+               pm-search (Fáze 2D) zatím nepodporuje slot="button-erase" (clear query button)
+               ani atributy identifier + autocomplete na vnořeném gov-form-input.
+               Tech debt: rozšířit pm-search o Erasable property a předávání dalších atributů. *@
             <form data-global-search
                   method="get"
                   asp-controller="Search"
