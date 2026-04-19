@@ -1698,3 +1698,62 @@ PmTracker.Web/Views/Shared/_ModalFormActions.cshtml: 1 (ponecháno — Submit bu
 **Type consistency:** `PmSearchTagHelper` property `Submit` (bool, Task 1) konzistentně použitá v Task 5 jako `submit="true"` (Razor camelCase konvence). `variant="Secondary"` / `variant="Primary"` / `variant="Ghost"` / `variant="Destructive"` konzistentně mapované po celém plánu. `size="Small"/"Medium"/"Large"` (PmComponentSize enum) též konzistentní.
 
 Plán vypadá v pořádku.
+
+---
+
+## Výsledky Fáze 2D
+
+**Dokončeno:** 2026-04-19 (9 commitů: `22f778f` baseline → `66805f4` layout docs + `bf69000` meetings tests + Task 8 finální commit)
+
+### Metriky před / po
+
+| Metrika | Před 2D | Po 2D |
+|---|---|---|
+| `.btn` v produkčních Views (mimo StyleGuide) | 103 výskytů ve 27 souborech | **1** (vědomě ponechaný `<summary>` v _TaskItemPartial:46) |
+| `<input type="search">` v Views | 12 výskytů | **11** (9 person-picker + 2 table-tools — nemigrovatelné bez JS refaktoru) |
+| `<gov-button>` v produkčních Views mimo Layout | 2 (uvnitř gov-form-search) | **2** (ponecháno — slot button-erase/button, řeší 2E+) |
+| `<pm-button>` výskytů v Views | 0 | **116** |
+| `<pm-search>` výskytů v Views | 0 | **1** (Search/Index) |
+| `pm-*` TagHelpery | 21 | **22** (+pm-search) |
+| Unit testy (Web.Tests) | 89 | **106** (+17: 11 pm-search, 2 meetings spec tests, …) |
+| Unit testy (Tests.Unit) | 322 | **324** (+2 meetings CSS/JS spec tests) |
+| Api testy | 276/287 (11 pre-existing red) | **276/287** (baseline beze změny) |
+| E2E smoke scénáře | 3 (StyleGuideRenderTests 2A/2B/2C) | **6** (+PhaseD_ViewsMigrationTests: Dashboard, SearchIndex, ProjektyIndex) |
+
+### Opraveno / ověřeno
+
+- **Task 1**: nový `pm-search` wrapper + 11 unit testů + docs
+- **Task 2-4**: ~92 výskytů `.btn` migrovaných na `pm-button` ve 22 souborech (+ shared partials)
+- **Task 5**: Search/Index migrován na pm-search
+- **Task 6**: _Layout globální hledání dokumentačně vysvětleno (pm-search zatím nemá Erasable/Identifier/Autocomplete)
+- **Task 7**: Meetings display bugy zrevidovány — už byly opraveny v commitech z 2026-04-17 před nahlášením. Přidány 2 defenzivní unit testy na CSS a JS spec.
+- **Task 8**: E2E smoke testy + finální audit + dokumentace 2E
+
+### Odloženo na 2E
+
+- **Modální systém** (`modal-overlay` → `pm-dialog`/nový `pm-modal`): 33 views + AJAX pipeline refaktor — [docs/known-issues/modal-migration-to-pm-dialog.md](../../known-issues/modal-migration-to-pm-dialog.md)
+- **_ModalFormActions submit button** — ponechán `@Model.SubmitCssClass` (dynamická `.btn` třída), migruje se spolu s modály
+
+### Tech debt pro pozdější fáze
+
+- **pm-search rozšíření** (Erasable slot, Identifier, Autocomplete atributy) — [docs/known-issues/pm-search-missing-features.md](../../known-issues/pm-search-missing-features.md)
+- **table-tools search refaktor** — `tableTools.js:199` `instanceof HTMLInputElement` check brání migraci Osoby/Index + _ProjectTeamTab
+- **person-picker refaktor** — native `<input>` reference v pickers.js blokuje migraci 7 modálů
+- **DRY label/help/error** v PmFieldTagHelper/PmSelectTagHelper/PmTextareaTagHelper (pre-existing z Fáze 2A review, ~30 dup řádků)
+- **Rename**: `PmSkeletonShape.Default` → `Rectangle`, `PmTabsType.Default` → `Underline` (breaking)
+
+### Baseline preserved
+
+Po celou fázi 2D (8 úkolů, 9 commitů) **žádná regrese** v testech:
+- Web.Tests: 89 → 106 (+17, všechny nové pass)
+- Tests.Unit: 322 → 324 (+2, nové pass)
+- Tests.Api: 276/287 (11 pre-existing red beze změny — Layout BEM tests, redirect tests, suggest endpoint tests)
+- Build: 0 chyb, 0 warnings po každém úkolu
+
+### Speciální rozhodnutí během 2D
+
+1. **_Layout.cshtml gov-button ponechán** — slot="button-erase" (clear query) a slot="button" (submit) uvnitř gov-form-search. pm-search zatím nepodporuje erase slot.
+2. **_ModalFormActions submit button ponechán** — `@Model.SubmitCssClass` má dynamické hodnoty (`"btn primary"`, `"btn ghost danger"`). Řeší se spolu s modals v 2E.
+3. **_TaskItemPartial.cshtml:46 `<summary class="btn small ghost">` ponechán** — `<summary>` je semantický HTML element pro `<details>` toggle, nesmí být `<pm-button>` (accessibility).
+4. **Osoby/Index + _ProjectTeamTab search inputy nemigrovány** — `data-table-tools-search-input` vyžaduje nativní `HTMLInputElement` (tableTools.js:199).
+5. **Meetings bugs Task 7** — audit ukázal, že bugy byly opraveny v commitech `1886862` + `db2560d` z 2026-04-17 (den před nahlášením). Místo přepisování kódu byly přidány 2 defenzivní testy na CSS a JS spec, bug report aktualizován s žádostí o re-verifikaci.
