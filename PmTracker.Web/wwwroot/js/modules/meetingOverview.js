@@ -56,6 +56,18 @@ function countMeetingSlots(group) {
     return getMeetingCardSlots(group).length;
 }
 
+// Explicitní swap chevron ikon — nepoužíváme CSS rotate, protože gov-icon
+// custom element renderuje SVG s vlastním mask/transform a kompozitní transform
+// tvoří artefakty (user 2026-04-19 noc: "šipky u jednání jsou pořád blbě"
+// po prvním pokusu s rotate 180deg). Swap `name` atributu je robustní —
+// gov-icon si sám správně vyrenderuje chevron-up / chevron-down SVG.
+function setMeetingYearChevron(group, name) {
+    const chevron = group.querySelector(".meeting-year-chevron");
+    if (chevron instanceof HTMLElement && chevron.getAttribute("name") !== name) {
+        chevron.setAttribute("name", name);
+    }
+}
+
 function applyMeetingYearState(group) {
     if (!(group instanceof HTMLElement)) {
         return;
@@ -77,6 +89,7 @@ function applyMeetingYearState(group) {
         body.classList.remove("is-preview");
         body.style.removeProperty("max-height");
         toggle.setAttribute("aria-expanded", "false");
+        setMeetingYearChevron(group, "chevron-down");
         return;
     }
 
@@ -85,6 +98,7 @@ function applyMeetingYearState(group) {
         toggle.setAttribute("aria-expanded", "true");
         body.classList.remove("is-preview");
         body.style.removeProperty("max-height");
+        setMeetingYearChevron(group, "chevron-up");
         return;
     }
 
@@ -111,7 +125,11 @@ function applyMeetingYearState(group) {
     // aria-expanded: v preview reflektuje, zda je co dorozbalovat.
     // Skryté karty → uživatel může ještě expandovat → aria-expanded="false".
     // Nic neskryto (první řádek = celý rok) → aria-expanded="true" (kliknutí zavírá).
-    toggle.setAttribute("aria-expanded", hiddenCount > 0 ? "false" : "true");
+    const canExpandMore = hiddenCount > 0;
+    toggle.setAttribute("aria-expanded", canExpandMore ? "false" : "true");
+    // Preview s skrytými = chevron-down (uživatel může dorozbalit);
+    // preview bez skrytých = chevron-up (kliknutí zabalí).
+    setMeetingYearChevron(group, canExpandMore ? "chevron-down" : "chevron-up");
 }
 
 function syncYearGroupedMeetingOverview(root) {

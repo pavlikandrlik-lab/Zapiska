@@ -228,15 +228,8 @@ function applyCommentSort(section, direction) {
         list.after(paginationActions);
       }
     }
-    paginationActions.querySelectorAll("[data-label-asc][data-label-desc]").forEach((btn) => {
-      if (!(btn instanceof HTMLElement)) {
-        return;
-      }
-      const label = normalizedDirection === "asc" ? btn.getAttribute("data-label-asc") : btn.getAttribute("data-label-desc");
-      if (typeof label === "string" && label.length > 0) {
-        btn.textContent = label;
-      }
-    });
+    // Pagination labels swappují přes CSS (data-comment-pagination-label),
+    // ne přes textContent — gov-button hydratace duplikovala obsah.
   }
   section.setAttribute("data-comment-sort-direction", normalizedDirection);
 }
@@ -2665,6 +2658,12 @@ function clearPreviewHiddenSlots(scope) {
 function countMeetingSlots(group) {
   return getMeetingCardSlots(group).length;
 }
+function setMeetingYearChevron(group, name) {
+  const chevron = group.querySelector(".meeting-year-chevron");
+  if (chevron instanceof HTMLElement && chevron.getAttribute("name") !== name) {
+    chevron.setAttribute("name", name);
+  }
+}
 function applyMeetingYearState(group) {
   if (!(group instanceof HTMLElement)) {
     return;
@@ -2677,24 +2676,28 @@ function applyMeetingYearState(group) {
   }
   const state = group.dataset.meetingYearState || "collapsed";
   clearPreviewHiddenSlots(group);
+  delete group.dataset.meetingYearHasHidden;
   if (state === "collapsed") {
     body.hidden = true;
     body.classList.remove("is-preview");
     body.style.removeProperty("max-height");
     toggle.setAttribute("aria-expanded", "false");
+    setMeetingYearChevron(group, "chevron-down");
     return;
   }
   body.hidden = false;
-  toggle.setAttribute("aria-expanded", "true");
   if (state !== "preview") {
+    toggle.setAttribute("aria-expanded", "true");
     body.classList.remove("is-preview");
     body.style.removeProperty("max-height");
+    setMeetingYearChevron(group, "chevron-up");
     return;
   }
   body.classList.add("is-preview");
   body.style.removeProperty("max-height");
   const firstRowSlots = getFirstVisualRowSlots(grid);
   const firstRowIds = new Set(firstRowSlots.map(getMeetingId).filter(Boolean));
+  let hiddenCount = 0;
   getMeetingCardSlots(grid).forEach((slot) => {
     const meetingId = getMeetingId(slot);
     if (!meetingId || firstRowIds.has(meetingId)) {
@@ -2702,7 +2705,14 @@ function applyMeetingYearState(group) {
     }
     slot.hidden = true;
     slot.dataset.meetingPreviewHidden = "true";
+    hiddenCount += 1;
   });
+  if (hiddenCount > 0) {
+    group.dataset.meetingYearHasHidden = "true";
+  }
+  const canExpandMore = hiddenCount > 0;
+  toggle.setAttribute("aria-expanded", canExpandMore ? "false" : "true");
+  setMeetingYearChevron(group, canExpandMore ? "chevron-down" : "chevron-up");
 }
 function syncYearGroupedMeetingOverview(root) {
   getMeetingYearGroups(root).forEach((group) => {
@@ -7061,6 +7071,9 @@ function updateTaskTypeVisibility(categorySelect) {
   const scheduleTab = form.querySelector("[data-record-schedule-tab]");
   const schedulePanel = form.querySelector("[data-record-schedule-panel]");
   const scheduleNote = form.querySelector("[data-record-schedule-note]");
+  // Proposal editor — TypUkolu nesmí být měnitelný v žádném návrhovém módu.
+  const metadataLocked = form.dataset.metadataLocked === "true";
+  const isProposalEditor = form.dataset.isProposalEditor === "true";
   if (topRow instanceof HTMLElement) {
     topRow.dataset.hasType = isTask ? "true" : "false";
   }
@@ -7070,7 +7083,7 @@ function updateTaskTypeVisibility(categorySelect) {
   const typeSelect = typeRow.querySelector("select");
   typeRow.hidden = !isTask;
   if (typeSelect instanceof HTMLSelectElement) {
-    typeSelect.disabled = !isTask;
+    typeSelect.disabled = !isTask || metadataLocked || isProposalEditor;
     if (!isTask) {
       typeSelect.value = "";
     }
@@ -9167,8 +9180,9 @@ function handleDocumentClick(event) {
     const form = comment?.querySelector("[data-comment-edit-form]");
     if (form instanceof HTMLFormElement) {
       form.hidden = false;
-      const actions = comment.querySelector(".comment-actions");
-      if (actions instanceof HTMLElement) actions.hidden = true;
+      if (comment instanceof HTMLElement) {
+        comment.dataset.editing = "true";
+      }
       form.querySelector("textarea")?.focus();
     }
     return;
@@ -9180,8 +9194,9 @@ function handleDocumentClick(event) {
     const form = comment?.querySelector("[data-comment-edit-form]");
     if (form instanceof HTMLFormElement) {
       form.hidden = true;
-      const actions = comment.querySelector(".comment-actions");
-      if (actions instanceof HTMLElement) actions.hidden = false;
+      if (comment instanceof HTMLElement) {
+        comment.removeAttribute("data-editing");
+      }
     }
     return;
   }
@@ -9402,19 +9417,10 @@ function handleDocumentCardKeydown(event) {
   }
   handleNavigationCardKeydown(event, target);
 }
-function handleWindowBeforeUnload(event) {
-  const pageEditorForm = document.querySelector('form[data-record-editor-form="true"][data-record-editor-presentation="page"]');
-  if (!(pageEditorForm instanceof HTMLFormElement)) {
-    return;
-  }
-  if (pageEditorForm.dataset.recordEditorNavigating === "true") {
-    return;
-  }
-  if (!isRecordEditorFormDirty(pageEditorForm)) {
-    return;
-  }
-  event.preventDefault();
-  event.returnValue = "";
+function handleWindowBeforeUnload(_event) {
+  // Nativní browser dialog odstraněn — user 2026-04-19 noc: "vyskočí windows
+  // edge dialogové okno, problikne i dialog aplikace, je to chybné chování".
+  // App-level prompt (promptRecordEditorDiscard) řeší in-app navigace.
 }
 var rerenderRainbowLabelsOnResize = debounce(() => {
   renderAllRainbowSegmentLabels(document);

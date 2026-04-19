@@ -437,11 +437,18 @@ export function updateTaskTypeVisibility(categorySelect) {
     const scheduleTab = form.querySelector("[data-record-schedule-tab]");
     const schedulePanel = form.querySelector("[data-record-schedule-panel]");
     const scheduleNote = form.querySelector("[data-record-schedule-note]");
-    // V proposal editoru (návrh úpravy harmonogramu) je základní metadata
-    // server-side zamčená (AllowBasicMetadataEdit=false). JS NESMÍ toto
-    // serverové zámek odemknout, i když je záznam kategorie Úkol.
-    // Viz docs/specs/record-proposal-editor.md.
+    // V proposal editoru (návrh úpravy harmonogramu I návrh založení
+    // záznamu) NESMÍ být TypUkolu měnitelný — typ úkolu není součástí
+    // návrhového workflow. Razor to zajišťuje přes
+    // `metadataLocked || IsProposalEditor`, ale JS musí mít stejnou
+    // logiku, jinak na event změny kategorie typeSelect.disabled=false
+    // re-enable typeSelect. User report 2026-04-19 noc: "F není to opraveno,
+    // stále mohu rozkliknout a rozbalí se mi nabídka - Typ úkolu".
+    // Root cause: ConfigureCreateProposalEditor ponechává
+    // AllowBasicMetadataEdit=true (návrh založení má být editable kromě
+    // typu), takže metadataLocked=false a samotný check nestačí.
     const metadataLocked = form.dataset.metadataLocked === "true";
+    const isProposalEditor = form.dataset.isProposalEditor === "true";
 
     if (topRow instanceof HTMLElement) {
         topRow.dataset.hasType = isTask ? "true" : "false";
@@ -454,7 +461,7 @@ export function updateTaskTypeVisibility(categorySelect) {
     const typeSelect = typeRow.querySelector("select");
     typeRow.hidden = !isTask;
     if (typeSelect instanceof HTMLSelectElement) {
-        typeSelect.disabled = !isTask || metadataLocked;
+        typeSelect.disabled = !isTask || metadataLocked || isProposalEditor;
         if (!isTask) {
             typeSelect.value = "";
         }

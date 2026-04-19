@@ -119,19 +119,11 @@ export function applyCommentSort(section, direction) {
             }
         }
 
-        // Přepnout texty tlačítek podle směru (viz specifikace).
-        // Selector bez tag prefix — akceptuje nativní <button> i <gov-button> (pm-button wrapper, Fáze 2D).
-        paginationActions.querySelectorAll("[data-label-asc][data-label-desc]").forEach((btn) => {
-            if (!(btn instanceof HTMLElement)) {
-                return;
-            }
-            const label = normalizedDirection === "asc"
-                ? btn.getAttribute("data-label-asc")
-                : btn.getAttribute("data-label-desc");
-            if (typeof label === "string" && label.length > 0) {
-                btn.textContent = label;
-            }
-        });
+        // Labely uvnitř pagination tlačítek jsou dva <span>y s
+        // data-comment-pagination-label; aktivní určuje ancestor's
+        // data-comment-sort-direction (viz site.css). Textová manipulace
+        // přes textContent na gov-button způsobovala duplikaci (user hlásil
+        // "vidí obě hodnoty současně"); CSS-driven pattern je robustnější.
     }
 
     section.setAttribute("data-comment-sort-direction", normalizedDirection);

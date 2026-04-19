@@ -175,8 +175,9 @@ function handleDocumentClick(event) {
         const form = comment?.querySelector("[data-comment-edit-form]");
         if (form instanceof HTMLFormElement) {
             form.hidden = false;
-            const actions = comment.querySelector(".comment-actions");
-            if (actions instanceof HTMLElement) actions.hidden = true;
+            if (comment instanceof HTMLElement) {
+                comment.dataset.editing = "true";
+            }
             form.querySelector("textarea")?.focus();
         }
         return;
@@ -189,8 +190,9 @@ function handleDocumentClick(event) {
         const form = comment?.querySelector("[data-comment-edit-form]");
         if (form instanceof HTMLFormElement) {
             form.hidden = true;
-            const actions = comment.querySelector(".comment-actions");
-            if (actions instanceof HTMLElement) actions.hidden = false;
+            if (comment instanceof HTMLElement) {
+                comment.removeAttribute("data-editing");
+            }
         }
         return;
     }
@@ -461,22 +463,15 @@ function handleDocumentCardKeydown(event) {
     handleNavigationCardKeydown(event, target);
 }
 
-function handleWindowBeforeUnload(event) {
-    const pageEditorForm = document.querySelector('form[data-record-editor-form="true"][data-record-editor-presentation="page"]');
-    if (!(pageEditorForm instanceof HTMLFormElement)) {
-        return;
-    }
-
-    if (pageEditorForm.dataset.recordEditorNavigating === "true") {
-        return;
-    }
-
-    if (!isRecordEditorFormDirty(pageEditorForm)) {
-        return;
-    }
-
-    event.preventDefault();
-    event.returnValue = "";
+// Dřívější implementace triggrovala nativní browser "Opravdu odejít?" dialog
+// (Edge/Chrome). User 2026-04-19 noc: "vyskočí windows edge dialogové okno,
+// než ze stránky odejdu tak problikne i dialog aplikace, mě se více líbí
+// dialog aplikace, ne windows edge okno, je to chybné chování".
+// Řešení: no-op. App-level dialog přes promptRecordEditorDiscard se volá
+// při in-app navigaci (Cancel, Back, close modal). Tab close / URL change
+// beze dvojitého dialogu — tradeoff, který user explicitně akceptuje.
+function handleWindowBeforeUnload(_event) {
+    // záměrně prázdné — žádný nativní confirm dialog
 }
 
 const rerenderRainbowLabelsOnResize = debounce(() => {

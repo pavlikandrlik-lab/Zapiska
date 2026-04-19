@@ -6,8 +6,11 @@ namespace PmTracker.Tests.Unit.Projects;
 /// <summary>
 /// Pokrývá specifikaci docs/specs/record-comments.md.
 ///
-/// Pagination tlačítka (Další / Zobrazit předchozí / Zobrazit vše) musí
-/// - mít oba data-label-desc a data-label-asc atributy (JS přepíná texty)
+/// Pagination tlačítka (Další / Předchozí / Zobrazit vše) musí
+/// - obsahovat dva &lt;span&gt; s data-comment-pagination-label="asc|desc"
+///   (CSS-driven visibility podle data-comment-sort-direction na sekci —
+///   gov-button hydratace duplikovala obsah při textContent swap,
+///   user 2026-04-19 noc: "Další zobrazit předchozí zobrazit vše zobrazit vše")
 /// - respektovat class .comment-pagination-actions--in-header v ASC režimu
 /// - být zarovnaná vpravo přes justify-content: flex-end
 /// </summary>
@@ -37,26 +40,22 @@ public sealed class CommentPaginationMarkupTests
         var view = LoadText("PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml");
 
         view.Should().MatchRegex(
-            @"data-label-desc=""Další \(\d+\)""|data-label-desc=""Další \(@Model\.LoadStep\)""",
-            "DESC label obsahuje počet záznamů „Další (N)\"");
-        view.Should().Contain(
-            "data-label-asc=\"Zobrazit předchozí",
-            "v ASC se načtou předchozí (starší) vyjádření nahoře");
+            @"<span data-comment-pagination-label=""desc"">Další \(@Model\.LoadStep\)</span>",
+            "DESC label je span obsahující „Další (N)\"");
+        view.Should().MatchRegex(
+            @"<span data-comment-pagination-label=""asc"">Předchozí \(@Model\.LoadStep\)</span>",
+            "ASC label je span obsahující „Předchozí (N)\" (user preference 2026-04-19 noc: krátký „Předchozí\", ne „Zobrazit předchozí\")");
     }
 
     [Fact]
-    public void LoadAllButton_ShouldHaveDirectionalLabels()
+    public void LoadAllButton_ShouldShowAllLabel()
     {
         var view = LoadText("PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml");
 
-        // Obě varianty mají text "Zobrazit vše" — sémanticky stejné
         view.Should().Contain("data-record-comments-load-all");
         view.Should().MatchRegex(
-            @"data-record-comments-load-all\b[\s\S]*?data-label-desc=""Zobrazit vše""",
-            "load-all tlačítko má data-label-desc=Zobrazit vše");
-        view.Should().MatchRegex(
-            @"data-record-comments-load-all\b[\s\S]*?data-label-asc=""Zobrazit vše""",
-            "load-all tlačítko má data-label-asc=Zobrazit vše");
+            @"data-record-comments-load-all\b[\s\S]*?Zobrazit vše[\s\S]*?</pm-button>",
+            "load-all tlačítko obsahuje text „Zobrazit vše\" (stejný pro ASC i DESC)");
     }
 
     [Fact]
@@ -83,22 +82,34 @@ public sealed class CommentPaginationMarkupTests
     }
 
     [Fact]
-    public void Js_ShouldSwitchLabelsAndPositionByDirection()
+    public void Js_ShouldPositionPaginationByDirection()
     {
         var js = LoadText("PmTracker.Web/wwwroot/js/modules/comments.js");
 
-        js.Should().Contain(
-            "data-label-asc",
-            "JS čte ASC label z atributu");
-        js.Should().Contain(
-            "data-label-desc",
-            "JS čte DESC label z atributu");
         js.Should().Contain(
             "record-comments-header--stacked-right",
             "JS přidává třídu stacked-right na header v ASC");
         js.Should().Contain(
             "comment-pagination-actions--in-header",
             "JS přidává třídu in-header na pagination v ASC");
+        // Textová manipulace byla nahrazena CSS-driven visibility — JS už
+        // nesetuje textContent na gov-button (duplikovalo obsah).
+        js.Should().NotContain(
+            "btn.textContent =",
+            "JS nesmí setovat textContent na gov-button (gov hydratace duplikuje)");
+    }
+
+    [Fact]
+    public void Css_ShouldHideInactivePaginationLabel()
+    {
+        var css = LoadText("PmTracker.Web/wwwroot/css/site.css");
+
+        css.Should().Contain(
+            "[data-comment-pagination-label=\"desc\"]",
+            "CSS cílí neaktivní DESC label v ASC módu");
+        css.Should().Contain(
+            "[data-comment-pagination-label=\"asc\"]",
+            "CSS cílí neaktivní ASC label v DESC módu");
     }
 
     [Fact]

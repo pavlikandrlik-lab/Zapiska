@@ -3536,45 +3536,49 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: 1px solid var(--gov-color-border);
     border-radius: var(--gov-radius);
     padding: 12px 14px;
-    margin-bottom: 8px;
+    margin-bottom: 0;
     background: var(--gov-color-surface);
+    overflow: hidden;
 }
 
-/* === Layout vyjádření (2026-04-19 večer — druhý redesign) =========
-   User zpětná vazba: "horizontální čára rozděluje okno na 2 oblasti, dej to
-   do prdele, vypadá to hrozně". "Uživatel, datum, jednání chci vpravo, klidně
-   na jednom řádku". "Tlačítka Upravit chci dole, nahoře bude uživatel datum jednání".
-   "Quill celý posere a ukáže se jen v pravé polovině" (kvůli <details> flex cell).
+/* === Layout vyjádření (2026-04-19 noc — redesign iterace 2) =========
+   User feedback po prvním redesignu: "nad vlastním textem je moc místa
+   protože hlavička s informacemi toto místo sbírá, obě tlačítka - Upravit
+   i Smazat budou vpravo (...), Uživatel a datum úpravy bude vpravo nad
+   dlaždicí vyjádření (...), Jednání č. 123 zůstane tam kde je a až se
+   k němu dostane text vyjádření tak se zalomí na další řádku, opticky
+   to bude takový pravý blok jednání a pod tím tlačítka".
 
-   Struktura komentu: meta (meta-info) nahoře vpravo; text uprostřed full-width;
-   edit form full-width pod textem; actions (Upravit + Smazat) dole. Žádná dashed
-   čára, žádný border-bottom. Upravit není <details>, je to plain toggle button. */
+   Výsledná struktura:
+     .comment-wrapper
+       .comment-meta-outer   — NAD kartou, vpravo, autor + datum
+       .comment             — karta
+         .comment-tile-side  — float: right, obsahuje Jednání chip + akce
+         .comment-text       — teče vlevo, obtéká side block
+         .comment-edit-form  — skrytý form full-width pod tím vším
 
-.comment-meta {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 6px;
+   Float: right zajišťuje přirozené obtékání textu kolem bloku.
+   Clear-fix se zajistí přes overflow: hidden na .comment. */
+
+.comment-wrapper {
+    display: block;
+    margin: 0 0 10px 0;
 }
 
-.comment-meta-info {
+.comment-meta-outer {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
     justify-content: flex-end;
+    align-items: baseline;
     gap: 6px;
-    font-size: 13px;
+    padding: 0 4px 2px;
+    font-size: 12px;
     color: var(--gov-color-muted);
-    min-width: 0;
-    margin-left: auto;
 }
 
 .comment-author {
     font-weight: 600;
     color: var(--app-text-primary);
-    font-size: 13px;
+    font-size: 12px;
 }
 
 .comment-sep {
@@ -3583,6 +3587,19 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .comment-date {
     font-variant-numeric: tabular-nums;
+}
+
+/* Pravý float blok uvnitř karty: chip nahoře + akční buttony pod ním.
+   Float zajišťuje, že .comment-text teče vlevo a wrappne pod blok až
+   když se blok skončí. */
+.comment-tile-side {
+    float: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    margin: 0 0 6px 12px;
+    max-width: 60%;
 }
 
 .comment-meeting-chip {
@@ -3598,19 +3615,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .comment-text {
-    flex: 1;
-    min-width: 0;
     margin: 0;
     font-size: 14px;
 }
 
-/* Actions dole — Upravit + Smazat side-by-side, stejná velikost (oba pm-button Small). */
+/* Actions (Upravit + Smazat) uvnitř tile-side — side-by-side, stejná velikost. */
 .comment-actions {
     display: flex;
     gap: 8px;
     align-items: center;
     justify-content: flex-end;
-    margin-top: 6px;
     flex-wrap: wrap;
 }
 
@@ -3685,9 +3699,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 8px;
     margin-top: 8px;
     width: 100%;
+    clear: both;
 }
 
 .comment-edit-form[hidden] {
+    display: none !important;
+}
+
+/* V edit módu skryjeme pravý side blok a text — edit form má plnou šířku. */
+.comment[data-editing="true"] .comment-tile-side,
+.comment[data-editing="true"] .comment-text {
     display: none !important;
 }
 
@@ -3724,6 +3745,15 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    vzestupně i sestupně v jednom okně"). */
 [data-comment-sort-section][data-comment-sort-direction="asc"] [data-comment-sort-label="desc"],
 [data-comment-sort-section][data-comment-sort-direction="desc"] [data-comment-sort-label="asc"] {
+    display: none !important;
+}
+
+/* Pagination tlačítka — stejný pattern: dva <span>y, aktivní určuje
+   data-comment-sort-direction na sekci. Důvod duplikuje sort toggle logiku
+   (user report 2026-04-19 večer 2: "Další zobrazit předchozí zobrazit vše
+   zobrazit vše" — textContent swap na gov-button duplikoval obsah). */
+[data-comment-sort-section][data-comment-sort-direction="asc"] [data-comment-pagination-label="desc"],
+[data-comment-sort-section][data-comment-sort-direction="desc"] [data-comment-pagination-label="asc"] {
     display: none !important;
 }
 
@@ -4547,22 +4577,14 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     color: var(--gov-color-muted);
 }
 
-/* gov-icon chevron-down — šipka renderovaná jako SVG Web Component.
-   Výchozí rotate 0 = šipka ↓ (rozbalit). State open / preview bez hidden
-   = rotate 180 = šipka ↑ (zabalit). Proti původnímu CSS border-triku je
-   intuitivně čitelná a konzistentní s gov design systemem. */
+/* gov-icon chevron — šipka se swapuje přes JS (chevron-down/chevron-up),
+   ne přes CSS rotate. Důvod: gov-icon interně vyhazuje SVG přes mask
+   a kompozitní transform tvoří artefakty (user 2026-04-19 noc: "šipky
+   u jednání jsou pořád blbě"). Viz meetingOverview.js setMeetingYearChevron. */
 .meeting-year-chevron {
     flex: 0 0 auto;
     font-size: 16px;
-    transform: rotate(0deg);
-    transform-origin: 50% 50%;
-    transition: transform 0.18s ease;
     color: currentColor;
-}
-
-.meeting-year-group[data-meeting-year-state="open"] .meeting-year-chevron,
-.meeting-year-group[data-meeting-year-state="preview"]:not([data-meeting-year-has-hidden="true"]) .meeting-year-chevron {
-    transform: rotate(180deg);
 }
 
 .meeting-year-body {

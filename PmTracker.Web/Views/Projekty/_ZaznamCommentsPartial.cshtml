@@ -32,27 +32,31 @@
                 var canEditThisComment = vyjadreni.LzeUpravit
                     && (Model.CanEditRecord
                         || (vyjadreni.CanEditOwnAsSubsystemLeader && vyjadreni.AutorOsobaId == Model.CurrentUserOsobaId));
-                <div class="comment"
-                     data-comment-item
-                     data-comment-meeting="@(vyjadreni.JednaniCislo ?? 0)"
-                     data-comment-date="@vyjadreni.Datum.ToString("O")"
-                     data-comment-id="@vyjadreni.Id">
-                    @*
-                        Layout 2026-04-19 večer (redesign):
-                        - .comment-meta = horní řádek, meta-info zarovnaný VPRAVO (user preference)
-                        - .comment-text = uprostřed, full-width
-                        - .comment-edit-form = skrytý form pod textem, plná šířka pro Quill
-                        - .comment-actions = spodní řádek, Upravit + Smazat stejná velikost (oba Secondary/Destructive pm-button)
-                        Žádná horizontální dashed čára — meta není border-separated, user: "vypadá to hrozně".
-                    *@
-                    <div class="comment-meta">
-                        <div class="comment-meta-info">
-                            <span class="comment-author">@vyjadreni.Autor</span>
-                            <span class="comment-sep" aria-hidden="true">·</span>
-                            <time class="comment-date" datetime="@vyjadreni.Datum.ToString("O")">@vyjadreni.Datum.ToString("dd.MM.yyyy")</time>
+                @*
+                    Layout 2026-04-19 noc (redesign iterace 2 po user feedback):
+                    - .comment-meta-outer NAD kartou, zarovnaný vpravo (autor + datum)
+                    - V kartě: float: right blok (.comment-tile-side) obsahující
+                      [Jednání chip] + dole [Upravit][Smazat] — buttony stejně velké
+                    - .comment-text teče vlevo, obtéká pravý blok (naturally wraps)
+                    - .comment-edit-form sourozenec textu, plná šířka pro Quill;
+                      když je aktivní, skrývá text i side block přes data-editing na kartě
+                    User (2026-04-19 noc): "opticky to bude takový pravý blok jednání
+                    a pod tím tlačítka, zhruba to vyjde na stejno".
+                *@
+                <div class="comment-wrapper" data-comment-wrapper>
+                    <div class="comment-meta-outer">
+                        <span class="comment-author">@vyjadreni.Autor</span>
+                        <span class="comment-sep" aria-hidden="true">·</span>
+                        <time class="comment-date" datetime="@vyjadreni.Datum.ToString("O")">@vyjadreni.Datum.ToString("dd.MM.yyyy")</time>
+                    </div>
+                    <div class="comment"
+                         data-comment-item
+                         data-comment-meeting="@(vyjadreni.JednaniCislo ?? 0)"
+                         data-comment-date="@vyjadreni.Datum.ToString("O")"
+                         data-comment-id="@vyjadreni.Id">
+                        <div class="comment-tile-side">
                             @if (vyjadreni.JednaniDatum.HasValue)
                             {
-                                <span class="comment-sep" aria-hidden="true">·</span>
                                 <span class="comment-meeting-chip">
                                     @if (vyjadreni.JednaniCislo.HasValue)
                                     {
@@ -64,37 +68,40 @@
                                     }
                                 </span>
                             }
+                            @if (canEditThisComment)
+                            {
+                                <div class="comment-actions">
+                                    <pm-button variant="Secondary" size="Small" data-comment-edit-toggle="true" aria-label="Upravit vyjádření">Upravit</pm-button>
+                                    <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
+                                        <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                        <input type="hidden" name="uiContext" value="project" />
+                                        <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
+                                        <input type="hidden" name="Id" value="@vyjadreni.Id" />
+                                        <pm-button variant="Destructive" size="Small" native-type="submit" aria-label="Smazat vyjádření">Smazat</pm-button>
+                                    </form>
+                                </div>
+                            }
                         </div>
-                    </div>
-                    <div class="comment-text richtext-render" data-comment-text>@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
-                    @if (canEditThisComment)
-                    {
-                        <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true" data-comment-edit-form hidden>
-                            <input type="hidden" name="projektId" value="@Model.ProjektId" />
-                            <input type="hidden" name="uiContext" value="project" />
-                            <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
-                            <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                            <textarea rows="3"
-                                      name="Text"
-                                      required
-                                      data-rich-text="true"
-                                      data-rich-text-min-height="92">@RichTextContentService.ToSafeHtml(vyjadreni.Text)</textarea>
-                            <div class="comment-edit-actions">
-                                <pm-button variant="Secondary" size="Small" data-comment-edit-cancel="true">Zrušit úpravu</pm-button>
-                                <pm-button variant="Primary" size="Small" native-type="submit">Uložit změnu</pm-button>
-                            </div>
-                        </form>
-                        <div class="comment-actions">
-                            <pm-button variant="Secondary" size="Small" data-comment-edit-toggle="true" aria-label="Upravit vyjádření">Upravit</pm-button>
-                            <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
+                        <div class="comment-text richtext-render" data-comment-text>@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
+                        @if (canEditThisComment)
+                        {
+                            <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true" data-comment-edit-form hidden>
                                 <input type="hidden" name="projektId" value="@Model.ProjektId" />
                                 <input type="hidden" name="uiContext" value="project" />
                                 <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
                                 <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                <pm-button variant="Destructive" size="Small" native-type="submit" aria-label="Smazat vyjádření">Smazat</pm-button>
+                                <textarea rows="3"
+                                          name="Text"
+                                          required
+                                          data-rich-text="true"
+                                          data-rich-text-min-height="92">@RichTextContentService.ToSafeHtml(vyjadreni.Text)</textarea>
+                                <div class="comment-edit-actions">
+                                    <pm-button variant="Secondary" size="Small" data-comment-edit-cancel="true">Zrušit úpravu</pm-button>
+                                    <pm-button variant="Primary" size="Small" native-type="submit">Uložit změnu</pm-button>
+                                </div>
                             </form>
-                        </div>
-                    }
+                        }
+                    </div>
                 </div>
             }
         </div>
@@ -103,15 +110,21 @@
     @if (Model.CanLoadMore || Model.CanLoadAll)
     {
         <div class="comment-pagination-actions">
+            @*
+                Labely jsou dva <span>y s data-comment-pagination-label a CSS
+                skrývá neaktivní podle rodičovského data-comment-sort-direction.
+                Důvod: gov-button hydratace propaguje children, ale pokud se
+                nastaví textContent na outer, duplikuje — user hlásí "vidí
+                obojí zároveň". CSS-driven pattern se už osvědčil u sort toggle.
+            *@
             @if (Model.CanLoadMore)
             {
                 <pm-button variant="Ghost"
                            size="Small"
                            data-record-comments-load-more="true"
-                           data-label-desc="Další (@Model.LoadStep)"
-                           data-label-asc="Zobrazit předchozí (@Model.LoadStep)"
-                           title="Zobrazit dalších @Model.LoadStep vyjádření">
-                    Další (@Model.LoadStep)
+                           title="Zobrazit @Model.LoadStep dalších vyjádření">
+                    <span data-comment-pagination-label="desc">Další (@Model.LoadStep)</span>
+                    <span data-comment-pagination-label="asc">Předchozí (@Model.LoadStep)</span>
                 </pm-button>
             }
             @if (Model.CanLoadAll)
@@ -119,8 +132,6 @@
                 <pm-button variant="Ghost"
                            size="Small"
                            data-record-comments-load-all="true"
-                           data-label-desc="Zobrazit vše"
-                           data-label-asc="Zobrazit vše"
                            title="Zobrazit všechna vyjádření">
                     Zobrazit vše
                 </pm-button>

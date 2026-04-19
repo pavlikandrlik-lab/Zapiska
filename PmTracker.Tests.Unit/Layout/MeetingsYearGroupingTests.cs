@@ -91,27 +91,30 @@ public sealed class MeetingsYearGroupingTests
     }
 
     [Fact]
-    public void ChevronCss_ShouldMatchSpecForOpenAndPreviewStates()
+    public void ChevronJs_ShouldSwapIconNameByState()
     {
+        // User 2026-04-19 noc: "šipky u jednání jsou pořád blbě" i po CSS rotate
+        // opravě. Root cause: gov-icon web component renderuje SVG přes mask/transform,
+        // kompozitní CSS rotate vytváří artefakty. Přechod na JS-driven swap
+        // `name` atributu (chevron-up / chevron-down) — robustní, nezávislé
+        // na interní implementaci gov-icon.
+        var js = LoadViewSource("PmTracker.Web/wwwroot/js/modules/meetingOverview.js");
+
+        js.Should().Contain(
+            "setMeetingYearChevron(group, \"chevron-down\")",
+            "collapsed stav (nebo preview se skrytými) = chevron-down");
+        js.Should().Contain(
+            "setMeetingYearChevron(group, \"chevron-up\")",
+            "open stav (nebo preview bez skrytých) = chevron-up");
+        js.Should().Contain(
+            "chevron.setAttribute(\"name\", name)",
+            "setMeetingYearChevron mění `name` atribut gov-icon");
+
+        // CSS už nesmí mít transform: rotate — swap name dělá JS
         var css = LoadViewSource("PmTracker.Web/wwwroot/css/site.css");
-
-        // Default (collapsed): rotate(0deg) — gov-icon chevron-down ukazuje nativně dolů
-        css.Should().Contain(
-            "transform: rotate(0deg);",
-            "výchozí šipka (collapsed / preview se skrytými kartami) musí být neotočená gov-icon chevron-down");
-
-        // Open + preview bez skrytých karet: rotate(180deg) — chevron otočen nahoru
-        css.Should().Contain(
-            "rotate(180deg)",
-            "šipka pro plně otevřený stav musí být otočená o 180° (gov-icon chevron-down → nahoru)");
-
-        // Selektor musí zahrnovat oba state-y (open + preview:not([has-hidden]))
-        css.Should().Contain(
-            "[data-meeting-year-state=\"open\"]",
-            "CSS musí řídit šipku přes atribut data-meeting-year-state=\"open\"");
-        css.Should().Contain(
-            "[data-meeting-year-state=\"preview\"]:not([data-meeting-year-has-hidden=\"true\"])",
-            "CSS musí řídit šipku přes preview state bez atributu data-meeting-year-has-hidden");
+        css.Should().NotMatchRegex(
+            @"\.meeting-year-chevron\s*\{[^}]*transform:\s*rotate",
+            ".meeting-year-chevron už nepoužívá CSS rotate (gov-icon artefakty)");
     }
 
     [Fact]

@@ -53,8 +53,11 @@ public sealed class ProposalEditorLockedFieldsTests
             "form.dataset.metadataLocked === \"true\"",
             "JS musí číst zámek z data-metadata-locked");
         source.Should().Contain(
-            "typeSelect.disabled = !isTask || metadataLocked;",
-            "TypUkolu select musí zůstat disabled pokud server zamkl metadata, i pro kategorii Úkol");
+            "form.dataset.isProposalEditor === \"true\"",
+            "JS musí číst proposal flag z data-is-proposal-editor (ConfigureCreateProposalEditor ponechává AllowBasicMetadataEdit=true, takže samotný metadataLocked nestačí)");
+        source.Should().Contain(
+            "typeSelect.disabled = !isTask || metadataLocked || isProposalEditor;",
+            "TypUkolu select musí zůstat disabled pro proposal editory i když metadata nejsou locked (typ úkolu není součástí návrhového workflow)");
     }
 
     [Fact]
