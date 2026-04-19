@@ -2,5 +2,6 @@
 
 <div class="form-actions">
     <pm-button variant="Secondary" data-modal-close="true">@Model.CancelLabel</pm-button>
-    <button class="@Model.SubmitCssClass" type="submit" disabled="@(Model.DisableSubmit ? "disabled" : null)">@Model.SubmitLabel</button>
+    <pm-button variant="@Model.SubmitVariant" native-type="submit"
+               disabled="@Model.DisableSubmit">@Model.SubmitLabel</pm-button>
 </div>

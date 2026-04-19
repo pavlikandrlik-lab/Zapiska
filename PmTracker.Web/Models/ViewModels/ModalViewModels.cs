@@ -133,7 +133,10 @@ public sealed class ModalFormActionsViewModel
 {
     public string SubmitLabel { get; init; } = "Uložit";
     public string CancelLabel { get; init; } = "Zrušit";
-    public string SubmitCssClass { get; init; } = "btn primary";
+    // Fáze 2E: PmButtonVariant nahrazuje volný CSS string.
+    // Legacy string property odstraněna (původně "btn primary" / "btn ghost danger").
+    public PmTracker.Web.TagHelpers.PmButtonVariant SubmitVariant { get; init; }
+        = PmTracker.Web.TagHelpers.PmButtonVariant.Primary;
     public bool DisableSubmit { get; init; }
 }
 
