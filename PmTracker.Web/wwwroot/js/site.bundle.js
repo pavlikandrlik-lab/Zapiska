@@ -170,8 +170,16 @@ function setCommentSortButtonLabel(button, direction) {
   if (!isButtonLike(button)) {
     return;
   }
-  button.textContent = direction === "desc" ? "Řazení: jednání sestupně" : "Řazení: jednání vzestupně";
-  button.setAttribute("aria-pressed", direction === "desc" ? "true" : "false");
+  const isDesc = direction === "desc";
+  const ascLabel = button.querySelector('[data-comment-sort-label="asc"]');
+  const descLabel = button.querySelector('[data-comment-sort-label="desc"]');
+  if (ascLabel instanceof HTMLElement && descLabel instanceof HTMLElement) {
+    ascLabel.hidden = isDesc;
+    descLabel.hidden = !isDesc;
+  } else {
+    button.textContent = isDesc ? "Řazení: jednání sestupně" : "Řazení: jednání vzestupně";
+  }
+  button.setAttribute("aria-pressed", isDesc ? "true" : "false");
 }
 function getCommentSortDirection(scope) {
   const section = scope instanceof HTMLElement && scope.matches("[data-comment-sort-section]") ? scope : scope instanceof Element ? scope.closest("[data-comment-sort-section]") : null;
@@ -220,7 +228,7 @@ function applyCommentSort(section, direction) {
         list.after(paginationActions);
       }
     }
-    paginationActions.querySelectorAll("button[data-label-asc][data-label-desc]").forEach((btn) => {
+    paginationActions.querySelectorAll("[data-label-asc][data-label-desc]").forEach((btn) => {
       if (!(btn instanceof HTMLElement)) {
         return;
       }
