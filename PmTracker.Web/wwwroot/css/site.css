@@ -4526,27 +4526,22 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     color: var(--gov-color-muted);
 }
 
+/* gov-icon chevron-down — šipka renderovaná jako SVG Web Component.
+   Výchozí rotate 0 = šipka ↓ (rozbalit). State open / preview bez hidden
+   = rotate 180 = šipka ↑ (zabalit). Proti původnímu CSS border-triku je
+   intuitivně čitelná a konzistentní s gov design systemem. */
 .meeting-year-chevron {
-    width: 12px;
-    height: 12px;
-    border-right: 2px solid currentColor;
-    border-bottom: 2px solid currentColor;
-    transform: rotate(45deg);
-    transition: transform 0.18s ease;
     flex: 0 0 auto;
-    margin-top: -4px;
+    font-size: 16px;
+    transform: rotate(0deg);
+    transform-origin: 50% 50%;
+    transition: transform 0.18s ease;
+    color: currentColor;
 }
 
-/* Šipka nahoru = rok je "plně otevřený" (kliknutí ho zabalí).
-   - open: všechna jednání viditelná
-   - preview BEZ skrytých karet: jeden řádek se vešel celý, kliknutí zabalí
-   Šipka dolů (default 45deg) = je co rozbalovat:
-   - collapsed
-   - preview SE skrytými kartami (více řádků, ukazuje se jen první) */
 .meeting-year-group[data-meeting-year-state="open"] .meeting-year-chevron,
 .meeting-year-group[data-meeting-year-state="preview"]:not([data-meeting-year-has-hidden="true"]) .meeting-year-chevron {
-    transform: rotate(-135deg);
-    margin-top: 4px;
+    transform: rotate(180deg);
 }
 
 .meeting-year-body {

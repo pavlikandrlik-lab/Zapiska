@@ -95,15 +95,15 @@ public sealed class MeetingsYearGroupingTests
     {
         var css = LoadViewSource("PmTracker.Web/wwwroot/css/site.css");
 
-        // Default (collapsed): rotate(45deg) = šipka dolů
+        // Default (collapsed): rotate(0deg) — gov-icon chevron-down ukazuje nativně dolů
         css.Should().Contain(
-            "transform: rotate(45deg);",
-            "výchozí šipka (collapsed / preview se skrytými kartami) musí mířit dolů");
+            "transform: rotate(0deg);",
+            "výchozí šipka (collapsed / preview se skrytými kartami) musí být neotočená gov-icon chevron-down");
 
-        // Open + preview bez skrytých karet: rotate(-135deg) = šipka nahoru
+        // Open + preview bez skrytých karet: rotate(180deg) — chevron otočen nahoru
         css.Should().Contain(
-            "rotate(-135deg)",
-            "šipka pro plně otevřený stav musí být obrácená (nahoru)");
+            "rotate(180deg)",
+            "šipka pro plně otevřený stav musí být otočená o 180° (gov-icon chevron-down → nahoru)");
 
         // Selektor musí zahrnovat oba state-y (open + preview:not([has-hidden]))
         css.Should().Contain(
@@ -112,6 +112,26 @@ public sealed class MeetingsYearGroupingTests
         css.Should().Contain(
             "[data-meeting-year-state=\"preview\"]:not([data-meeting-year-has-hidden=\"true\"])",
             "CSS musí řídit šipku přes preview state bez atributu data-meeting-year-has-hidden");
+    }
+
+    [Fact]
+    public void MeetingChevron_ShouldBeGovIconNotCssBorderTrick()
+    {
+        // User feedback 2026-04-19: původní CSS border-right/border-bottom chevron
+        // byl "napíču, blbě" — diagonální chevron uživatel neinterpretoval jako šipku.
+        // Přechod na <gov-icon name="chevron-down"> pro intuitivní render.
+        var projectView = LoadViewSource("PmTracker.Web/Views/Projekty/_ProjectMeetingsTab.cshtml");
+        var globalView = LoadViewSource("PmTracker.Web/Views/Jednani/Index.cshtml");
+
+        foreach (var view in new[] { projectView, globalView })
+        {
+            view.Should().Contain(
+                "<gov-icon class=\"meeting-year-chevron\" name=\"chevron-down\"",
+                "oba views musí používat gov-icon (ne CSS border hack) pro chevron");
+            view.Should().NotContain(
+                "<span class=\"meeting-year-chevron\"",
+                "starý span chevron nesmí zůstat — byl nahrazen gov-icon elementem");
+        }
     }
 
     [Fact]
