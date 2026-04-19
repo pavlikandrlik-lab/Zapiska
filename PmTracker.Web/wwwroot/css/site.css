@@ -1789,6 +1789,11 @@ textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
     white-space: pre-wrap;
     padding: 10px 12px;
     overflow-y: hidden;
+    /* Explicit reset — editor nesmí dědít bold/heading font-weight z parent
+       containeru (např. .form-group label, .comment-header). Bold stále
+       dostupný přes toolbar tlačítko Bold (uloží se jako <strong>). */
+    font-weight: 400;
+    font-family: inherit;
 }
 
 .richtext-host .ql-editor p {
