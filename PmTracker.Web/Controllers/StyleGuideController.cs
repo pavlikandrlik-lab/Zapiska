@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Services.Security;
@@ -7,9 +6,10 @@ namespace PmTracker.Web.Controllers;
 
 /// <summary>
 /// Living style guide — přehled pm-* TagHelper komponent pro vývojáře.
-/// Přístup: kdokoli přihlášený (nejde o citlivá data).
+/// Přístup přes BaseController + UserContextResolver (stejný pattern jako ostatní
+/// kontrolery). [Authorize] nelze použít: AddAuthentication(IISDefaults.AuthenticationScheme)
+/// nemá v Kestrel dev módu funkční ChallengeAsync → 500.
 /// </summary>
-[Authorize]
 public sealed class StyleGuideController : BaseController
 {
     public StyleGuideController(

@@ -88,7 +88,7 @@
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ProjektId" value="@item.ProjektId" />
                                         <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <pm-button variant="Ghost" size="Small" native-type="submit">Zamítnout</pm-button>
+                                        <pm-button variant="Secondary" size="Small" native-type="submit">Zamítnout</pm-button>
                                     </form>
                                 }
                                 @if (item.CanRejectAndTakeOver)
@@ -193,7 +193,7 @@
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ProjektId" value="@item.ProjektId" />
                                         <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <pm-button variant="Ghost" size="Small" native-type="submit">Zamítnout</pm-button>
+                                        <pm-button variant="Secondary" size="Small" native-type="submit">Zamítnout</pm-button>
                                     </form>
                                 }
                                 @if (item.CanRejectAndEdit)

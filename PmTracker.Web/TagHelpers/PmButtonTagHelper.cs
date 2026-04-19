@@ -47,10 +47,11 @@ public sealed class PmButtonTagHelper : TagHelper
             PmButtonVariant.Primary => ("primary", "solid"),
             PmButtonVariant.Secondary => ("primary", "outlined"),
             PmButtonVariant.Destructive => ("error", "solid"),
-            // Ghost = outlined neutral (viditelný 1px šedý border, transparentní bg).
-            // Po user testing 2026-04-19: původní "base" neutral neměla žádné ohraničení
-            // a uživatel nepoznal že je to kliknutelné tlačítko. Viz docs/architecture/buttons.md.
-            PmButtonVariant.Ghost => ("neutral", "outlined"),
+            // Ghost = base neutral (bez ohraničení, transparentní bg) — tichá akce
+            // v pozadí. User rozhodnutí 2026-04-19: Ghost vrácen na base; kde byla
+            // potřeba výraznější rozeznavatelnost, view přešly na Secondary.
+            // Viz docs/architecture/buttons.md.
+            PmButtonVariant.Ghost => ("neutral", "base"),
             _ => ("primary", "outlined")
         };
 
