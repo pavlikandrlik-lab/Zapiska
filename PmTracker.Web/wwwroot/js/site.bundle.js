@@ -1693,6 +1693,23 @@ var printState = {
   trigger: null,
   hoverTimerId: 0
 };
+var auxFloatingChoosers = new Set();
+function registerFloatingChooser(popover, trigger) {
+  if (!(popover instanceof HTMLElement) || !(trigger instanceof HTMLElement)) {
+    return;
+  }
+  auxFloatingChoosers.add({ popover, trigger });
+}
+function unregisterFloatingChooser(popover) {
+  if (!(popover instanceof HTMLElement)) {
+    return;
+  }
+  for (const entry of auxFloatingChoosers) {
+    if (entry.popover === popover) {
+      auxFloatingChoosers.delete(entry);
+    }
+  }
+}
 var floatingPanelRegistry = new Set;
 var globalFloatingRoot = null;
 function getStoredPrintFormat() {
@@ -2084,21 +2101,29 @@ function initPrintFormatChooser() {
     }
     clearPrintHoverTimer();
   });
+  const repositionAuxChoosers = () => {
+    for (const entry of auxFloatingChoosers) {
+      if (entry.popover instanceof HTMLElement
+          && entry.popover.isConnected
+          && entry.trigger instanceof HTMLElement
+          && entry.trigger.isConnected) {
+        positionPrintChooser(entry.popover, entry.trigger);
+      } else {
+        auxFloatingChoosers.delete(entry);
+      }
+    }
+  };
   window.addEventListener("scroll", () => {
     if (printState.popover instanceof HTMLElement && printState.trigger instanceof HTMLElement) {
       positionPrintChooser(printState.popover, printState.trigger);
     }
-    if (recordEditorState.chooser instanceof HTMLElement && recordEditorState.chooserTrigger instanceof HTMLElement) {
-      positionPrintChooser(recordEditorState.chooser, recordEditorState.chooserTrigger);
-    }
+    repositionAuxChoosers();
   }, true);
   window.addEventListener("resize", () => {
     if (printState.popover instanceof HTMLElement && printState.trigger instanceof HTMLElement) {
       positionPrintChooser(printState.popover, printState.trigger);
     }
-    if (recordEditorState.chooser instanceof HTMLElement && recordEditorState.chooserTrigger instanceof HTMLElement) {
-      positionPrintChooser(recordEditorState.chooser, recordEditorState.chooserTrigger);
-    }
+    repositionAuxChoosers();
   });
 }
 function renderRainbowSegmentLabel(segment) {
@@ -6754,6 +6779,7 @@ function closeRecordEditorChooser(options) {
   const restoreFocus = Boolean(settings.restoreFocus);
   const trigger = recordEditorState2.chooserTrigger;
   if (recordEditorState2.chooser instanceof HTMLElement) {
+    unregisterFloatingChooser(recordEditorState2.chooser);
     recordEditorState2.chooser.remove();
   }
   recordEditorState2.chooser = null;
@@ -6899,6 +6925,7 @@ function showRecordEditorChooser(trigger) {
   const popover = createRecordEditorChooser(trigger);
   document.body.appendChild(popover);
   positionPrintChooser(popover, trigger);
+  registerFloatingChooser(popover, trigger);
   recordEditorState2.chooser = popover;
   recordEditorState2.chooserTrigger = trigger;
   const firstAction = popover.querySelector("[data-record-editor-mode]");
@@ -7973,7 +8000,7 @@ function promptRecordEditorDiscard(form, trigger) {
   closeRecordEditorCloseGuard({ restoreFocus: false });
   return new Promise((resolve) => {
     const isModalForm = modalRoot2 instanceof HTMLElement && modalRoot2.contains(form);
-    const host = isModalForm ? getActiveModalContainer() : document.body;
+    const host = isModalForm ? getActiveModalContainer2() : document.body;
     if (!(host instanceof HTMLElement)) {
       resolve(window.confirm("Máte neuložené změny. Chcete je zahodit?"));
       return;

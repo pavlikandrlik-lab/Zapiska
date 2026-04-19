@@ -9,6 +9,31 @@ export const printState = {
     hoverTimerId: 0
 };
 
+// Reposition hook — recordEditor chooser (popover kotvený nad tlačítkem
+// přes positionPrintChooser) se musí po scroll/resize přepozicovat.
+// Nelze importovat recordEditorState přímo (vzniká cyklická závislost
+// ui.js ↔ recordEditor.js), proto runtime registrace: recordEditor.js
+// sem při otevření chooseru zaregistruje svůj popover a trigger.
+export const auxFloatingChoosers = new Set();
+
+export function registerFloatingChooser(popover, trigger) {
+    if (!(popover instanceof HTMLElement) || !(trigger instanceof HTMLElement)) {
+        return;
+    }
+    auxFloatingChoosers.add({ popover, trigger });
+}
+
+export function unregisterFloatingChooser(popover) {
+    if (!(popover instanceof HTMLElement)) {
+        return;
+    }
+    for (const entry of auxFloatingChoosers) {
+        if (entry.popover === popover) {
+            auxFloatingChoosers.delete(entry);
+        }
+    }
+}
+
 export const floatingPanelRegistry = new Set();
 
 let globalFloatingRoot = null;
@@ -497,14 +522,25 @@ export function initPrintFormatChooser() {
         clearPrintHoverTimer();
     });
 
+    const repositionAuxChoosers = () => {
+        for (const entry of auxFloatingChoosers) {
+            if (entry.popover instanceof HTMLElement
+                && entry.popover.isConnected
+                && entry.trigger instanceof HTMLElement
+                && entry.trigger.isConnected) {
+                positionPrintChooser(entry.popover, entry.trigger);
+            } else {
+                auxFloatingChoosers.delete(entry);
+            }
+        }
+    };
+
     window.addEventListener("scroll", () => {
         if (printState.popover instanceof HTMLElement && printState.trigger instanceof HTMLElement) {
             positionPrintChooser(printState.popover, printState.trigger);
         }
 
-        if (recordEditorState.chooser instanceof HTMLElement && recordEditorState.chooserTrigger instanceof HTMLElement) {
-            positionPrintChooser(recordEditorState.chooser, recordEditorState.chooserTrigger);
-        }
+        repositionAuxChoosers();
     }, true);
 
     window.addEventListener("resize", () => {
@@ -512,9 +548,7 @@ export function initPrintFormatChooser() {
             positionPrintChooser(printState.popover, printState.trigger);
         }
 
-        if (recordEditorState.chooser instanceof HTMLElement && recordEditorState.chooserTrigger instanceof HTMLElement) {
-            positionPrintChooser(recordEditorState.chooser, recordEditorState.chooserTrigger);
-        }
+        repositionAuxChoosers();
     });
 }
 

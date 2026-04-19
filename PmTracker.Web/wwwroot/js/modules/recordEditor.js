@@ -1,6 +1,12 @@
 import { isButtonLike, parseJsonPayload, reportClientDiagnostic, setButtonDisabled } from "./utils.js";
-import { closeModal, isModalOpen, openUrlModal, modalState } from "./modals.js";
-import { closeAllFloatingPanels, positionPrintChooser, queueRainbowSegmentRender } from "./ui.js";
+import { closeModal, getActiveModalContainer, isModalOpen, openUrlModal, modalState } from "./modals.js";
+import {
+    closeAllFloatingPanels,
+    positionPrintChooser,
+    queueRainbowSegmentRender,
+    registerFloatingChooser,
+    unregisterFloatingChooser
+} from "./ui.js";
 import {
     initAdPersonPickers,
     initCollabPickers,
@@ -88,6 +94,7 @@ export function closeRecordEditorChooser(options) {
     const trigger = recordEditorState.chooserTrigger;
 
     if (recordEditorState.chooser instanceof HTMLElement) {
+        unregisterFloatingChooser(recordEditorState.chooser);
         recordEditorState.chooser.remove();
     }
 
@@ -269,6 +276,7 @@ export function showRecordEditorChooser(trigger) {
     const popover = createRecordEditorChooser(trigger);
     document.body.appendChild(popover);
     positionPrintChooser(popover, trigger);
+    registerFloatingChooser(popover, trigger);
     recordEditorState.chooser = popover;
     recordEditorState.chooserTrigger = trigger;
 
