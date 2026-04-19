@@ -3510,82 +3510,80 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .comment {
     border: 1px solid var(--gov-color-border);
     border-radius: var(--gov-radius);
-    padding: 10px 14px;
+    padding: 12px 14px;
     margin-bottom: 8px;
     background: var(--gov-color-surface);
 }
 
-.comment-header {
+/* === Meta řádek vyjádření (2026-04-19 redesign) ================
+   Horní řádek: autor · datum · jednání chip vlevo, akce vpravo.
+   Text je pod metou (full-width), ne vedle. User feedback: vertikální
+   stack autor/datum/jednání/akce byl "bordel" + akce malé a neviditelné. */
+
+.comment-meta {
     display: flex;
-    gap: 16px;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
     flex-wrap: wrap;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed color-mix(in srgb, var(--gov-color-border) 70%, transparent);
+}
+
+.comment-meta-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--gov-color-muted);
+    min-width: 0;
+    flex: 1;
+}
+
+.comment-author {
+    font-weight: 600;
+    color: var(--app-text-primary);
+    font-size: 13px;
+}
+
+.comment-sep {
+    opacity: 0.45;
+}
+
+.comment-date {
+    font-variant-numeric: tabular-nums;
+}
+
+.comment-meeting-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: color-mix(in srgb, var(--gov-color-primary) 10%, transparent);
+    border-radius: 10px;
+    color: var(--gov-color-primary);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
 }
 
 .comment-text {
     flex: 1;
-    min-width: 300px;
+    min-width: 0;
     margin: 0;
+    font-size: 14px;
 }
 
-.comment-metadata {
+.comment-actions {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-.comment-info {
-    text-align: right;
-}
-
-.comment-author {
-    font-size: 13px;
-    display: block;
-    line-height: 1.3;
-    font-weight: 600;
-}
-
-.comment-subline {
-    font-size: 12px;
-    color: var(--gov-color-muted);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    align-items: flex-end;
-    line-height: 1.3;
-    margin-top: 2px;
-}
-
-.comment-meeting-chip {
-    color: var(--gov-color-muted);
-}
-
-.comment-actions-inline {
-    display: flex;
-    gap: 4px;
+    gap: 6px;
     align-items: center;
     flex-shrink: 0;
 }
 
-.comment-edit-toggle,
-.comment-delete-btn {
-    width: 28px;
-    height: 28px;
-    opacity: 0.6;
-    transition: opacity 0.15s, color 0.15s;
-}
-
-.comment-edit-toggle:hover,
-.comment-delete-btn:hover {
-    opacity: 1;
-}
-
-.comment-delete-btn:hover {
-    color: var(--gov-color-accent);
-    border-color: var(--gov-color-accent);
-}
-
+/* <details> se <summary> stylovaným jako tlačítko (nelze dát pm-button
+   uvnitř <summary>, protože <summary> musí být přímý child <details>). */
 .comment-edit-details {
     width: auto;
 }
@@ -3597,10 +3595,32 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .comment-edit-toggle {
     list-style: none;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1;
+    color: var(--app-text-primary);
+    background: transparent;
+    border: 1px solid var(--gov-color-border);
+    border-radius: var(--gov-radius-sm);
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.comment-edit-toggle:hover {
+    background: color-mix(in srgb, var(--gov-color-primary) 5%, transparent);
+    border-color: var(--gov-color-primary);
 }
 
 .comment-edit-toggle::-webkit-details-marker {
     display: none;
+}
+
+/* Delete button uvnitř pm-button (gov-button) — ikonka + text inline */
+.comment-delete-btn svg,
+.comment-edit-toggle svg {
+    flex-shrink: 0;
 }
 
 .richtext-render {

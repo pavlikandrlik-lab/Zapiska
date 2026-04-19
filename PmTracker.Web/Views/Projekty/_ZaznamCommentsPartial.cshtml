@@ -37,69 +37,69 @@
                      data-comment-meeting="@(vyjadreni.JednaniCislo ?? 0)"
                      data-comment-date="@vyjadreni.Datum.ToString("O")"
                      data-comment-id="@vyjadreni.Id">
-                    <div class="comment-header">
-                        <div class="comment-text richtext-render">@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
-                        <div class="comment-metadata">
-                            <div class="comment-info">
-                                <strong class="comment-author">@vyjadreni.Autor</strong>
-                                <div class="comment-subline">
-                                    <span>@vyjadreni.Datum.ToString("dd.MM.yyyy")</span>
-                                    @if (vyjadreni.JednaniDatum.HasValue)
-                                    {
-                                        <span class="comment-meeting-chip">
-                                            @if (vyjadreni.JednaniCislo.HasValue)
-                                            {
-                                                @:· Jednání č. @vyjadreni.JednaniCislo (@vyjadreni.JednaniDatum.Value.ToString("dd.MM.yyyy"))
-                                            }
-                                            else
-                                            {
-                                                @:· Jednání @vyjadreni.JednaniDatum.Value.ToString("dd.MM.yyyy")
-                                            }
-                                        </span>
-                                    }
-                                </div>
-                            </div>
-                            @if (canEditThisComment)
+                    <div class="comment-meta">
+                        <div class="comment-meta-info">
+                            <span class="comment-author">@vyjadreni.Autor</span>
+                            <span class="comment-sep" aria-hidden="true">·</span>
+                            <time class="comment-date" datetime="@vyjadreni.Datum.ToString("O")">@vyjadreni.Datum.ToString("dd.MM.yyyy")</time>
+                            @if (vyjadreni.JednaniDatum.HasValue)
                             {
-                                <div class="comment-actions-inline">
-                                    <details class="comment-edit-details">
-                                        <summary class="icon-btn comment-edit-toggle" aria-label="Upravit vyjádření">
-                                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                            </svg>
-                                        </summary>
-                                        <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true">
-                                            <input type="hidden" name="projektId" value="@Model.ProjektId" />
-                                            <input type="hidden" name="uiContext" value="project" />
-                                            <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
-                                            <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                            <textarea rows="3"
-                                                      name="Text"
-                                                      required
-                                                      data-rich-text="true"
-                                                      data-rich-text-min-height="92">@RichTextContentService.ToSafeHtml(vyjadreni.Text)</textarea>
-                                            <pm-button variant="Secondary" size="Small" native-type="submit">Uložit změnu</pm-button>
-                                        </form>
-                                    </details>
-                                    <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
+                                <span class="comment-sep" aria-hidden="true">·</span>
+                                <span class="comment-meeting-chip">
+                                    @if (vyjadreni.JednaniCislo.HasValue)
+                                    {
+                                        @:Jednání č. @vyjadreni.JednaniCislo (@vyjadreni.JednaniDatum.Value.ToString("dd.MM.yyyy"))
+                                    }
+                                    else
+                                    {
+                                        @:Jednání @vyjadreni.JednaniDatum.Value.ToString("dd.MM.yyyy")
+                                    }
+                                </span>
+                            }
+                        </div>
+                        @if (canEditThisComment)
+                        {
+                            <div class="comment-actions">
+                                <details class="comment-edit-details">
+                                    <summary class="comment-edit-toggle" aria-label="Upravit vyjádření">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                        </svg>
+                                        <span>Upravit</span>
+                                    </summary>
+                                    <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true">
                                         <input type="hidden" name="projektId" value="@Model.ProjektId" />
                                         <input type="hidden" name="uiContext" value="project" />
                                         <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
                                         <input type="hidden" name="Id" value="@vyjadreni.Id" />
-                                        <button class="icon-btn comment-delete-btn" type="submit" aria-label="Smazat vyjádření">
-                                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                <polyline points="3 6 5 6 21 6"/>
-                                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                                <path d="M10 11v6M14 11v6"/>
-                                                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                                            </svg>
-                                        </button>
+                                        <textarea rows="3"
+                                                  name="Text"
+                                                  required
+                                                  data-rich-text="true"
+                                                  data-rich-text-min-height="92">@RichTextContentService.ToSafeHtml(vyjadreni.Text)</textarea>
+                                        <pm-button variant="Primary" size="Small" native-type="submit">Uložit změnu</pm-button>
                                     </form>
-                                </div>
-                            }
-                        </div>
+                                </details>
+                                <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
+                                    <input type="hidden" name="projektId" value="@Model.ProjektId" />
+                                    <input type="hidden" name="uiContext" value="project" />
+                                    <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
+                                    <input type="hidden" name="Id" value="@vyjadreni.Id" />
+                                    <pm-button variant="Destructive" size="Small" native-type="submit" class="comment-delete-btn" aria-label="Smazat vyjádření">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                            <polyline points="3 6 5 6 21 6"/>
+                                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                            <path d="M10 11v6M14 11v6"/>
+                                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                                        </svg>
+                                        <span>Smazat</span>
+                                    </pm-button>
+                                </form>
+                            </div>
+                        }
                     </div>
+                    <div class="comment-text richtext-render">@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
                 </div>
             }
         </div>
