@@ -17,7 +17,7 @@
     @if (Model.CanLoadMore && !string.IsNullOrWhiteSpace(Model.LoadMoreUrl))
     {
         <div class="dashboard-page-actions">
-            <a class="btn" href="@Model.LoadMoreUrl">Načíst další</a>
+            <pm-button variant="Secondary" href="@Model.LoadMoreUrl">Načíst další</pm-button>
         </div>
     }
 </section>

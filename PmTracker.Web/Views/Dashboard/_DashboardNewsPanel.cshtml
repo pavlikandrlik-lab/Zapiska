@@ -14,12 +14,8 @@
     <div class="dashboard-panel-footer">
         @if (Model.CanLoadMore && !string.IsNullOrWhiteSpace(Model.LoadMoreUrl))
         {
-            <button class="btn small"
-                    type="button"
-                    data-dashboard-news-load-more="@Model.LoadMoreUrl">
-                Načíst více
-            </button>
+            <pm-button variant="Secondary" size="Small" data-dashboard-news-load-more="@Model.LoadMoreUrl">Načíst více</pm-button>
         }
-        <a class="btn ghost small" href="@Model.ListUrl">Zobrazit více</a>
+        <pm-button variant="Ghost" size="Small" href="@Model.ListUrl">Zobrazit více</pm-button>
     </div>
 </div>
