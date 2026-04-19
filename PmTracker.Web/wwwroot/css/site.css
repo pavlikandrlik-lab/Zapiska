@@ -5240,13 +5240,22 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
         var(--gov-color-surface);
 }
 
-:root[data-theme="dark"] input[type="text"],
-:root[data-theme="dark"] input[type="email"],
-:root[data-theme="dark"] input[type="date"],
-:root[data-theme="dark"] input[type="time"],
-:root[data-theme="dark"] input[type="datetime-local"],
-:root[data-theme="dark"] input[type="number"],
-:root[data-theme="dark"] input[type="search"],
+/*
+ * Dark theme override pro nativní formulářové kontrolní prvky.
+ * POZOR: scope `:not(gov-form-input input):not(gov-form-search input):not([role="search"] input)`
+ * musí být na KAŽDÉM input[type=...] selektoru. Gov-form-input a gov-form-search
+ * renderují vnitřní <input type="text"> v LIGHT DOM — bez exclusion se globální
+ * pravidlo aplikuje uvnitř host wrapperu a vznikne tmavší vnořený box
+ * (rgb(17,27,45) uvnitř rgb(38,38,38) host → user: "uvnitř nějaký tmavý element").
+ * Viz docs/architecture/components-theming.md a memory feedback_gov_web_components_css_scoping.
+ */
+:root[data-theme="dark"] input[type="text"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
+:root[data-theme="dark"] input[type="email"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
+:root[data-theme="dark"] input[type="date"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
+:root[data-theme="dark"] input[type="time"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
+:root[data-theme="dark"] input[type="datetime-local"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
+:root[data-theme="dark"] input[type="number"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
+:root[data-theme="dark"] input[type="search"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
 :root[data-theme="dark"] select:not(gov-form-select select):not(pm-select select),
 :root[data-theme="dark"] textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
     background: #111b2d;
