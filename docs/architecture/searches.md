@@ -41,8 +41,9 @@ Thin wrapper nad `<gov-form-search>` + vnořený `<gov-form-input type="search" 
 
 ## Poznámky
 
-- Všechny user-supplied hodnoty (`Placeholder`, `Value`, `Name`, `AriaLabel`) jsou encodované přes `WebUtility.HtmlEncode` — plná XSS ochrana (escapuje `<`, `>`, `"`, `&`). Numerické entity pro non-ASCII znaky jsou korektní HTML; prohlížeč je dekóduje zpět na původní znak.
-- Pro person-picker pattern (`data-person-picker-input`) zachovejte `<input type="search">` beze změny — pm-search se tam nehodí (gov-form-input by rozbil existující JS handler).
+- Všechny user-supplied hodnoty (`Placeholder`, `Value`, `Name`, `AriaLabel`) jsou HTML-encodované pro ochranu před XSS při manuálním skládání atributů.
+- **Nepoužívat pro person-picker** — pattern `data-person-picker-input` vyžaduje nativní `<input type="search">` referenci (JS čte `.value`, poslouchá `input` event). Gov-form-input by to rozbilo.
+- **Nepoužívat pro table-tools filter** — pattern `data-table-tools-search-input` (Osoby/Index, Projekty/_ProjectTeamTab) kontroluje `instanceof HTMLInputElement` v `tableTools.js:199`. Migrace vyžaduje refaktor toho JS handleru, což je mimo scope 2D.
 
 ## Viz také
 - [pm-button](./buttons.md)

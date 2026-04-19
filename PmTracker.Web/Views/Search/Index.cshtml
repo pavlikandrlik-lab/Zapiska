@@ -48,8 +48,7 @@
     else
     {
         <form method="get" asp-controller="Search" asp-action="Index" class="search-form">
-            <input type="search" name="q" value="@Model.Query" placeholder="Hledat…" aria-label="Hledaný výraz" autofocus />
-            <button type="submit">Hledat</button>
+            <pm-search name="q" value="@Model.Query" placeholder="Hledat…" aria-label="Hledaný výraz" autofocus="true" submit="true" />
         </form>
 
         @if (!string.IsNullOrWhiteSpace(Model.Query) && Model.Result.Hits.Count == 0)
