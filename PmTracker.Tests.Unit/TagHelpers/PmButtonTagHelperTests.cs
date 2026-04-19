@@ -62,12 +62,16 @@ public sealed class PmButtonTagHelperTests
     }
 
     [Fact]
-    public async Task Ghost_Rendruje_GovButtonBaseNeutral()
+    public async Task Ghost_Rendruje_GovButtonOutlinedNeutral()
     {
         var helper = new PmButtonTagHelper { Variant = PmButtonVariant.Ghost };
         var output = await RenderAsync(helper);
+        // Ghost = outlined neutral (viditelný 1px šedý border, transparentní bg).
+        // Změna z base neutral po user testing 2026-04-19 — base variant
+        // neměla žádné ohraničení, uživatel nepoznal že je to tlačítko.
+        // Viz docs/architecture/buttons.md.
         output.Attributes["color"].Value.Should().Be("neutral");
-        output.Attributes["type"].Value.Should().Be("base");
+        output.Attributes["type"].Value.Should().Be("outlined");
     }
 
     [Fact]

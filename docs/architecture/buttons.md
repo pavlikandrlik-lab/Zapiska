@@ -29,7 +29,9 @@ Thin-wrapper nad `<gov-button>`. Jeden bod změny mapování při upgrade gov DS
 | Primary | primary | solid |
 | Secondary | primary | outlined |
 | Destructive | error | solid |
-| Ghost | neutral | base |
+| Ghost | neutral | outlined |
+
+**Historie Ghost variant:** do 2026-04-19 byla Ghost mapovaná na `(neutral, base)` — gov-button typu *base* nemá border ani background, takže ghost tlačítka byla v UI neviditelná (uživatelský feedback). Změněno na `(neutral, outlined)` — šedé 1px ohraničení, transparentní pozadí, neutralní šedá barva textu. Stále nekonkuruje Primary (který je `solid`), jen má viditelné affordance.
 
 ## Kdy použít kterou variantu
 
