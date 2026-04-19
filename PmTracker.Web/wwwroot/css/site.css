@@ -1788,12 +1788,23 @@ textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
     overflow-wrap: anywhere;
     white-space: pre-wrap;
     padding: 10px 12px;
-    overflow-y: hidden;
+    max-height: 240px;
+    overflow-y: auto;
     /* Explicit reset — editor nesmí dědít bold/heading font-weight z parent
        containeru (např. .form-group label, .comment-header). Bold stále
        dostupný přes toolbar tlačítko Bold (uloží se jako <strong>). */
     font-weight: 400;
     font-family: inherit;
+}
+
+/* Quill inicializuje obsah jako <p>. Ty nesmí dědit bold ze širšího kontextu
+   (modal .form-group apod.). Explicitní normal weight. Toolbar Bold stále
+   funguje — vloží <strong> uvnitř <p>, což má vlastní bold styl. */
+.richtext-host .ql-editor p,
+.richtext-host .ql-editor li,
+.richtext-host .ql-editor ol,
+.richtext-host .ql-editor ul {
+    font-weight: 400;
 }
 
 .richtext-host .ql-editor p {

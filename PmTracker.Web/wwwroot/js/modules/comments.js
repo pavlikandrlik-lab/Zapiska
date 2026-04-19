@@ -23,10 +23,24 @@ export function setCommentSortButtonLabel(button, direction) {
         return;
     }
 
-    button.textContent = direction === "desc"
-        ? "Řazení: jednání sestupně"
-        : "Řazení: jednání vzestupně";
-    button.setAttribute("aria-pressed", direction === "desc" ? "true" : "false");
+    const isDesc = direction === "desc";
+
+    // Tlačítko má v sobě dvě <span data-comment-sort-label="asc|desc"> —
+    // přepínáme hidden atribut místo textContent, aby přepis nerozbil
+    // slot content gov-button custom elementu (Fáze 2D migrace).
+    const ascLabel = button.querySelector('[data-comment-sort-label="asc"]');
+    const descLabel = button.querySelector('[data-comment-sort-label="desc"]');
+    if (ascLabel instanceof HTMLElement && descLabel instanceof HTMLElement) {
+        ascLabel.hidden = isDesc;
+        descLabel.hidden = !isDesc;
+    } else {
+        // Fallback pro testy / případy, kdy label spans chybí
+        button.textContent = isDesc
+            ? "Řazení: jednání sestupně"
+            : "Řazení: jednání vzestupně";
+    }
+
+    button.setAttribute("aria-pressed", isDesc ? "true" : "false");
 }
 
 export function getCommentSortDirection(scope) {
@@ -106,7 +120,8 @@ export function applyCommentSort(section, direction) {
         }
 
         // Přepnout texty tlačítek podle směru (viz specifikace).
-        paginationActions.querySelectorAll("button[data-label-asc][data-label-desc]").forEach((btn) => {
+        // Selector bez tag prefix — akceptuje nativní <button> i <gov-button> (pm-button wrapper, Fáze 2D).
+        paginationActions.querySelectorAll("[data-label-asc][data-label-desc]").forEach((btn) => {
             if (!(btn instanceof HTMLElement)) {
                 return;
             }

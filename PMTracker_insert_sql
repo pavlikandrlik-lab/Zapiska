@@ -718,6 +718,7 @@ GO
 
 MERGE dbo.ciselnik_stavu_ukolu AS target
 USING (VALUES
+    (N'NEW', N'Nezahájeno', 0, 1),
     (N'OPEN', N'Rozpracováno', 0, 1),
     (N'DONE', N'Hotovo', 1, 1)
 ) AS source(kod, nazev, is_final, is_locked)

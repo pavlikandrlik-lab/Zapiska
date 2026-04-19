@@ -14,8 +14,9 @@
         <h4>Vyjádření</h4>
         @if (Model.Vyjadreni.Count > 1)
         {
-            <pm-button variant="Ghost" size="Small" class="comment-sort-toggle" data-comment-sort-toggle="true">
-                Řazení: jednání vzestupně
+            <pm-button variant="Secondary" size="Small" class="comment-sort-toggle" data-comment-sort-toggle="true">
+                <span data-comment-sort-label="asc">Řazení: jednání vzestupně</span>
+                <span data-comment-sort-label="desc" hidden>Řazení: jednání sestupně</span>
             </pm-button>
         }
     </div>
