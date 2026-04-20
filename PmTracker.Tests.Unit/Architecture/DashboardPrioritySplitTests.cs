@@ -74,4 +74,56 @@ public sealed class DashboardPrioritySplitTests
         content.Should().Contain("class PriorityMatrixNightlyRebuildHostedService");
         content.Should().Contain("class PriorityMatrixQueuedRebuildHostedService");
     }
+
+    [Fact]
+    public void QueryFile_ShouldContainOnlyQueryClass()
+    {
+        var content = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Dashboard/DashboardPriorityQuery.cs"));
+        content.Should().Contain("class DashboardPriorityQuery", "query třída musí být v query souboru");
+        content.Should().NotContain("class PriorityMatrixRebuildService", "query soubor je izolovaný od rebuild logiky");
+        content.Should().NotContain("class PriorityScoringService", "query soubor je izolovaný od scoring logiky");
+    }
+
+    [Fact]
+    public void RebuildServiceFile_ShouldContainRebuildTypes()
+    {
+        var content = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Dashboard/PriorityMatrixRebuildService.cs"));
+        content.Should().Contain("class PriorityMatrixRebuildService");
+        content.Should().Contain("class PriorityMatrixRebuildQueue");
+        content.Should().Contain("interface IPriorityMatrixRebuildQueue");
+        content.Should().NotContain("class PriorityMatrixBootstrapHostedService", "hosted services jsou v samostatném souboru");
+        content.Should().NotContain("class DashboardPriorityQuery", "query je v samostatném souboru");
+    }
+
+    [Theory]
+    [InlineData("PmTracker.Web/Services/Dashboard/DashboardPriorityModels.cs")]
+    [InlineData("PmTracker.Web/Services/Dashboard/DashboardPriorityScoringService.cs")]
+    [InlineData("PmTracker.Web/Services/Dashboard/DashboardPriorityQuery.cs")]
+    [InlineData("PmTracker.Web/Services/Dashboard/PriorityMatrixRebuildService.cs")]
+    [InlineData("PmTracker.Web/Services/Dashboard/PriorityMatrixHostedServices.cs")]
+    public void SplitFile_ShouldUseDashboardNamespace(string relativePath)
+    {
+        var content = File.ReadAllText(ResolvePath(relativePath));
+        content.Should().Contain(
+            "namespace PmTracker.Web.Services.Dashboard;",
+            $"{relativePath} musí být ve správném namespace (file-scoped, konzistentní se stylem složky)");
+    }
+
+    [Fact]
+    public void ModelsFile_ShouldNotImportEntityFramework()
+    {
+        var content = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Dashboard/DashboardPriorityModels.cs"));
+        content.Should().NotContain(
+            "using Microsoft.EntityFrameworkCore",
+            "Models soubor nesmí importovat EF — musí být čistý leaf bez dependency na persistence vrstvy");
+    }
+
+    [Fact]
+    public void ScoringServiceFile_ShouldNotImportEntityFramework()
+    {
+        var content = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Dashboard/DashboardPriorityScoringService.cs"));
+        content.Should().NotContain(
+            "using Microsoft.EntityFrameworkCore",
+            "Scoring je pure compute — nesmí mít EF dependency");
+    }
 }
