@@ -44,6 +44,9 @@ export async function loadDashboardPanel(panelOrKey, options = {}) {
         content.innerHTML = await fetchHtmlFragment(loadUrl);
         panel.dataset.dashboardPanelUrl = loadUrl;
         setLazyLoadingState(panel, placeholder, errorContainer, false);
+        if (content.dispatchEvent) {
+            content.dispatchEvent(new CustomEvent("pm:panel-loaded", { bubbles: true, detail: { url: loadUrl } }));
+        }
         return true;
     }
     catch {

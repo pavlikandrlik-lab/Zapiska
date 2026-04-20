@@ -195,6 +195,9 @@ async function reloadStatisticsPanel(shell, year) {
     try {
         content.innerHTML = await fetchHtmlFragment(url.href);
         setLazyLoadingState(panel, placeholder, errorContainer, false);
+        if (content.dispatchEvent) {
+            content.dispatchEvent(new CustomEvent("pm:panel-loaded", { bubbles: true, detail: { url: url.href } }));
+        }
     }
     catch {
         setLazyLoadingState(panel, placeholder, errorContainer, false);
