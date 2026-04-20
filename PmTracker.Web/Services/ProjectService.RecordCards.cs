@@ -181,7 +181,7 @@ public sealed partial class ProjectService
                         PredpokladanaCena = link.PredpokladanaCena,
                         ServiceDeskTicketId = ticketId,
                         ServiceDeskUrl = BuildServiceDeskUrl(ticketId),
-                        Vyzva = link.Vyzva.HasValue ? vyzvaById.GetValueOrDefault(link.Vyzva.Value)?.Kod : null,
+                        Vyzva = link.VyzvaId.HasValue ? vyzvaById.GetValueOrDefault(link.VyzvaId.Value)?.Kod : null,
                         DatumObjednani = link.DatumObjednani,
                         DatumPlanDodani = link.PlanDodani,
                         DatumDodani = link.DatumDodani,

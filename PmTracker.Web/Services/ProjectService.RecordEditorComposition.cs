@@ -109,7 +109,7 @@ public sealed partial class ProjectService
                     Typ = extTypes.FirstOrDefault(et => et.Id == x.TypOdkazuId)?.Kod ?? string.Empty,
                     Cislo = x.Cislo,
                     PredpokladanaCena = x.PredpokladanaCena,
-                    Vyzva = x.Vyzva.HasValue ? vyzvyById.GetValueOrDefault(x.Vyzva.Value) : null,
+                    Vyzva = x.VyzvaId.HasValue ? vyzvyById.GetValueOrDefault(x.VyzvaId.Value) : null,
                     DatumObjednani = x.DatumObjednani,
                     PlanDodani = x.PlanDodani,
                     DatumDodani = x.DatumDodani,

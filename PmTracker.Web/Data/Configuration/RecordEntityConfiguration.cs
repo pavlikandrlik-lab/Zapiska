@@ -233,7 +233,18 @@ internal sealed class RecordExternalLinkEntityConfiguration : IEntityTypeConfigu
         builder.Property(x => x.PlanDodani).HasColumnName("plan_dodani");
         builder.Property(x => x.DatumDodani).HasColumnName("datum_dodani");
         builder.Property(x => x.DatumPrevzeti).HasColumnName("datum_prevzeti");
-        builder.Property(x => x.Vyzva).HasColumnName("vyzva");
+        builder.Property(x => x.VyzvaId).HasColumnName("vyzva_id");
+        builder.Property(x => x.ZaradidDoVyzvy).HasColumnName("zaradid_do_vyzvy").HasDefaultValue(false);
+
+        builder.HasOne<VyzvaEntity>()
+            .WithMany()
+            .HasForeignKey(x => x.VyzvaId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(x => x.Cislo)
+            .HasDatabaseName("ux_zaznam_externi_odkazy_cislo_in_vyzve")
+            .HasFilter("[vyzva_id] IS NOT NULL")
+            .IsUnique();
     }
 }
 

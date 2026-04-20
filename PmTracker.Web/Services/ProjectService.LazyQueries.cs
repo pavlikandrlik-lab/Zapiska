@@ -280,8 +280,8 @@ public sealed partial class ProjectService
             .Distinct()
             .ToArray();
         var vyzvaIds = externalLinks
-            .Where(x => x.Vyzva.HasValue)
-            .Select(x => x.Vyzva!.Value)
+            .Where(x => x.VyzvaId.HasValue)
+            .Select(x => x.VyzvaId!.Value)
             .Distinct()
             .ToArray();
 
@@ -337,7 +337,7 @@ public sealed partial class ProjectService
                     PredpokladanaCena = link.PredpokladanaCena,
                     ServiceDeskTicketId = ticketId,
                     ServiceDeskUrl = BuildServiceDeskUrl(ticketId),
-                    Vyzva = link.Vyzva.HasValue ? vyzvaById.GetValueOrDefault(link.Vyzva.Value)?.Kod : null,
+                    Vyzva = link.VyzvaId.HasValue ? vyzvaById.GetValueOrDefault(link.VyzvaId.Value)?.Kod : null,
                     DatumObjednani = link.DatumObjednani,
                     DatumPlanDodani = link.PlanDodani,
                     DatumDodani = link.DatumDodani,

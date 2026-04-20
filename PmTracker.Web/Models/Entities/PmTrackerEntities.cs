@@ -303,7 +303,8 @@ public sealed class ZaznamExterniOdkazEntity
     public DateTime? PlanDodani { get; set; }
     public DateTime? DatumDodani { get; set; }
     public DateTime? DatumPrevzeti { get; set; }
-    public int? Vyzva { get; set; }
+    public int? VyzvaId { get; set; }
+    public bool ZaradidDoVyzvy { get; set; }
 }
 
 public sealed class ZaznamSpolupraceEntity

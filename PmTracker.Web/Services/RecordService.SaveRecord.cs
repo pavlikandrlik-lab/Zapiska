@@ -1091,7 +1091,7 @@ public sealed partial class RecordService
                 PlanDodani = link.PlanDodani,
                 DatumDodani = link.DatumDodani,
                 DatumPrevzeti = link.DatumPrevzeti,
-                Vyzva = await ResolveVyzvaIdAsync(link.Vyzva, ct)
+                VyzvaId = await ResolveVyzvaIdAsync(link.Vyzva, ct)
             });
         }
     }
