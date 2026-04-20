@@ -29,13 +29,7 @@ public sealed partial class VyzvaService : IVyzvaService
     private static VyzvaResult<T>.Fail Fail<T>(VyzvaErrorCode code, string msg)
         => new(new VyzvaError(code, msg));
 
-    // Dočasné stuby — nahradí se v Task 28-31.
-    public Task<IReadOnlyList<VyzvaBufferItem>> GetBufferAsync(int projektId, CancellationToken ct)
-        => throw new NotImplementedException("Task 28");
-    public Task<IReadOnlyList<VyzvaDetail>> GetVyzvyAsync(int projektId, CancellationToken ct)
-        => throw new NotImplementedException("Task 28");
-    public Task<VyzvaDetail?> GetVyzvaAsync(int vyzvaId, CancellationToken ct)
-        => throw new NotImplementedException("Task 28");
+    // Dočasné stuby — nahradí se v Task 29-31.
     public Task<VyzvaResult<VyzvaDetail>> ZaloztVyzvuZBufferuAsync(int projektId, int zalozilOsobaId, DateTime now, CancellationToken ct)
         => throw new NotImplementedException("Task 29");
     public Task<VyzvaResult<VyzvaDetail>> ZmenitStavAsync(int vyzvaId, VyzvaStav novyStav, int zmenilOsobaId, DateTime now, CancellationToken ct)
