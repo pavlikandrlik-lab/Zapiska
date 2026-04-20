@@ -207,7 +207,9 @@ public sealed class ProjectDashboardControllerBehaviorTests
         {
             return new ProjectDashboardVyzvyPanelViewModel
             {
-                IsServiceDeskIntegrated = false
+                ProjektId = 0,
+                MuzeEditovat = false,
+                ChybaProjektuMessage = "Panel výzev se připravuje.",
             };
         }
 

@@ -321,7 +321,12 @@ public sealed class ProjectDashboardService : IProjectDashboardService
 
     public ProjectDashboardVyzvyPanelViewModel BuildVyzvyPanel()
     {
-        return new ProjectDashboardVyzvyPanelViewModel { IsServiceDeskIntegrated = false };
+        return new ProjectDashboardVyzvyPanelViewModel
+        {
+            ProjektId = 0,
+            MuzeEditovat = false,
+            ChybaProjektuMessage = "Panel výzev se připravuje.",
+        };
     }
 
     public async Task<bool> CanAccessDashboardAsync(int projectId, int osobaId, CancellationToken ct = default)

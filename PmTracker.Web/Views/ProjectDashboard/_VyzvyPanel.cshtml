@@ -1,8 +1,8 @@
 @model ProjectDashboardVyzvyPanelViewModel
 
-@if (!Model.IsServiceDeskIntegrated)
+@if (!string.IsNullOrWhiteSpace(Model.ChybaProjektuMessage))
 {
     <div class="dashboard-placeholder-message">
-        <p class="muted">@Model.PlaceholderMessage</p>
+        <p class="muted">@Model.ChybaProjektuMessage</p>
     </div>
 }
