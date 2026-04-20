@@ -37,19 +37,19 @@ Markup:
 
 | Rok | Výchozí stav | Zobrazení |
 | --- | --- | --- |
-| **Aktuální rok** (PreviewRok) | `preview` | Body viditelný, pouze první řádek karet (stejně jako v `/Jednani/Index`). |
-| **Historické roky** | `open` | Body je viditelný, **všechny karty jsou zobrazené**. Uživatel může rok sbalit ručně kliknutím na záhlaví. |
+| **Aktuální rok** (PreviewRok) | `preview` | Body viditelný, pouze první řádek karet (stejné jako `/Jednani/Index`). |
+| **Historické roky** | `collapsed` | Body je `hidden`, karty nejsou v DOMu viditelné. Uživatel musí rok ručně rozkliknout year-chevronem. |
 
-**Důvod**: v detailu projektu jsou pouze jednání daného projektu, takže zobrazit celou historii není neúnosné a uživatel ocení plný přehled bez rozklikávání.
+**Důvod**: konzistence s aplikační záložkou — user 2026-04-20 si vyžádal sjednocené chování, aby na historické jednání bylo vždy nutné explicitní kliknutí (proti přehlcení dlouhou historií).
 
 Markup:
 
 ```html
 <div class="meeting-year-stack"
      data-meeting-overview="year-grouped"
-     data-meeting-history-default="open"
+     data-meeting-history-default="collapsed"
      data-meeting-preview-year="2026">
-    <!-- aktuální rok state="preview", ostatní state="open" -->
+    <!-- aktuální rok state="preview", ostatní state="collapsed" -->
 </div>
 ```
 

@@ -42,18 +42,17 @@ public sealed class MeetingsYearGroupingTests
     }
 
     [Fact]
-    public void ProjectJednaniTab_ShouldDefaultHistoricalYearsToOpen()
+    public void ProjectJednaniTab_ShouldDefaultHistoricalYearsToCollapsed()
     {
         var source = LoadViewSource("PmTracker.Web/Views/Projekty/_ProjectMeetingsTab.cshtml");
 
         source.Should().Contain(
-            "data-meeting-history-default=\"open\"",
-            "projektová záložka Jednání musí rozbalit historické roky (jen jeden projekt)");
+            "data-meeting-history-default=\"collapsed\"",
+            "projektová záložka Jednání nyní sbalené historické roky (konzistentní s aplikační záložkou)");
 
-        // Aktuální rok je preview, ostatní open
         source.Should().Contain(
-            "isPreviewYear ? \"preview\" : \"open\"",
-            "projektová záložka musí nastavit historické roky do stavu open");
+            "isPreviewYear ? \"preview\" : \"collapsed\"",
+            "projektová záložka musí nastavit historické roky do stavu collapsed");
     }
 
     [Fact]
