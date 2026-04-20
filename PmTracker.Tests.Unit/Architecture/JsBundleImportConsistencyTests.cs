@@ -58,27 +58,28 @@ public sealed class JsBundleImportConsistencyTests
     [Fact]
     public void UiModule_MustNotReferenceRecordEditorStateWithoutImport()
     {
-        var source = ReadModule("PmTracker.Web/wwwroot/js/modules/ui.js");
+        // Fáze 3B Task 5: ui.js je barrel — runtime registry
+        // registerFloatingChooser je v submodulu ui/print.js (aux chooser
+        // infrastructure pro print popover + potenciálně další dropdowns).
+        var source = ReadModule("PmTracker.Web/wwwroot/js/modules/ui/print.js");
 
-        // Strip line comments tak, aby identifier v komentáři (vysvětlení proč
-        // runtime registry neimportuje recordEditorState) nespouštěl detekci.
+        // Strip komentáře, aby identifier v komentářích nezapočítával.
         var stripped = Regex.Replace(source, @"//.*$", string.Empty, RegexOptions.Multiline);
         stripped = Regex.Replace(stripped, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline);
 
         var directReferenceRegex = new Regex(@"\brecordEditorState\b");
         if (directReferenceRegex.IsMatch(stripped))
         {
-            // Pokud ui.js reálně odkazuje recordEditorState, musí ho importovat
             var importRegex = new Regex(@"import\s*\{[^}]*\brecordEditorState\b[^}]*\}\s*from");
             importRegex.IsMatch(stripped).Should().BeTrue(
-                "ui.js nesmí používat recordEditorState bez importu (vede na ReferenceError za runtime při scroll/resize).");
+                "ui/print.js nesmí používat recordEditorState bez importu (vede na ReferenceError za runtime při scroll/resize).");
         }
         else
         {
-            // Preferred stav: ui.js používá runtime registry decoupled od recordEditor.js
+            // Preferred stav: aux chooser registry decoupled od recordEditor
             source.Should().Contain(
                 "registerFloatingChooser",
-                "ui.js by měla exportovat registerFloatingChooser runtime registry pro decoupling s recordEditor.js");
+                "ui/print.js exportuje registerFloatingChooser runtime registry (aux chooser infrastructure)");
         }
     }
 
