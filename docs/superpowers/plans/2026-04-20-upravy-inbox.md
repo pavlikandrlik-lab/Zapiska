@@ -211,6 +211,38 @@ Společný root-cause pattern: Fáze 2E přepnula modaly z custom overlay na gov
 
 ---
 
+### Úprava #11 — Broken icon references v ranní fix (pencil + calendar-clock) ✅ VYŘEŠENO
+
+- **Kde:**
+  - `PmTracker.Web/Views/Projekty/_ZaznamPartial.cshtml:82` — `<gov-icon name="pencil" type="basic">` (Upravit záznam)
+  - `PmTracker.Web/Views/Projekty/_ZaznamPartial.cshtml:95` — `<gov-icon name="calendar-clock" type="basic">` (Navrhnout termín/harmonogram)
+  - `PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml:75,83` — `<gov-icon name="pencil|trash" type="basic">` (edit/delete komentář)
+- **Co (bývalý stav):** Icon-only tlačítka na .record-actions panelu ukazovala prázdné bílé rámečky. Network 404 na `/assets/icons/basic/pencil.svg` a `/assets/icons/basic/calendar-clock.svg`.
+- **Root cause:** `type="basic"` hledal ikony ve složce `/wwwroot/assets/icons/basic/` která neexistuje. Všechny ikony žijí v `/components/`. `calendar-clock.svg` neexistoval ani v components — použit byl tedy `plus` jako ikona pro "nový návrh".
+- **Status:** ✅ **VYŘEŠENO** 2026-04-20 — Playwright re-verify: 0 × 404, ikony vizuálně viditelné (`/tmp/pm-after-fix-zaznamy.png`).
+- **Commity:** ještě neuncommited; bude v bundle commitu
+- **Provedené změny:**
+  1. `_ZaznamPartial.cshtml:82` pencil type="basic" → `type="components"`
+  2. `_ZaznamPartial.cshtml:95` calendar-clock type="basic" → `plus type="components"` (calendar-clock v gov 4.2.9 neexistuje)
+  3. `_ZaznamCommentsPartial.cshtml:75` pencil type="basic" → `type="components"`
+  4. `_ZaznamCommentsPartial.cshtml:83` trash type="basic" → `type="components"`
+  5. `DashboardActionButtonsTests.ZaznamPartial_ProposeButton_ShouldBeIconOnly` — expectace změněna z `calendar-clock` na `plus` s komentářem proč
+  6. Nový `PmTracker.Tests.Unit/Layout/GovIconReferencesTests.cs` — regression guard validuje každý `<gov-icon name=X type=Y>` v Views proti existujícímu souboru v `wwwroot/assets/icons/{type}/{name}.svg`
+- **Komentář:**
+  - Ranní fix úprava #6 ikony zavedla s chybným `type="basic"` — nebyla architecture test pro existenci souboru. Nově doplněný `GovIconReferencesTests` to zachytí do budoucna.
+  - Existující `meeting-year-chevron` používal správně `type="components"` — precedent byl, ranní fix ho ignoroval.
+
+---
+
+### Úprava #12 — aria-label na icon-only buttons ❌ FALSE POSITIVE
+
+- **Původní pozorování:** Playwright detekce hlásila že icon-only `<gov-button>` nemají `aria-label` (pouze `title`).
+- **Verifikace:** Raw server HTML má `aria-label="Upravit"` ✓. Gov-button web component při hydraci přesouvá `aria-label` z host elementu do vnitřního `<button class="element" aria-label="Upravit">` (viz deep-dive `/tmp/playwright-aria-check.js`). Screen readers čtou z vnitřního button → accessibility **je správná**.
+- **Status:** ❌ **FALSE POSITIVE** — Úprava není nutná. Detection script se díval na špatný element.
+- **Lesson learned:** `gov-button.getAttribute('aria-label')` vrací null po hydraci, ale `gov-button.querySelector('button.element').getAttribute('aria-label')` vrací skutečnou hodnotu. Future Playwright testy: audit aria na `.element` child, nebo přes `page.locator('gov-button').first().getByLabel('Upravit')`.
+
+---
+
 ## Pozorování z předchozího review (nezařazená, k rozhodnutí)
 
 Během Playwright review byly odhaleny tyto potenciální issues, které nepatří k recent refactoru, ale stojí za zvážení při systémovém fixu:

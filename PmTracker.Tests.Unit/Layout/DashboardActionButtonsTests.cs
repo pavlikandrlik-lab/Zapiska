@@ -23,9 +23,12 @@ public sealed class DashboardActionButtonsTests
     [Fact]
     public void ZaznamPartial_ProposeButton_ShouldBeIconOnly()
     {
+        // Pozn.: gov-design-system 4.2.9 neobsahuje ikonu calendar-clock.
+        // Původní úprava #6 ji referencovala → 404. Náhrada za "plus" (nový
+        // návrh). Viz Úprava #11 v docs/superpowers/plans/2026-04-20-upravy-inbox.md.
         var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Projekty/_ZaznamPartial.cshtml"));
-        view.Should().Contain("gov-icon name=\"calendar-clock\"",
-            "Navrhnout termín má gov-icon calendar-clock");
+        view.Should().Contain("gov-icon name=\"plus\"",
+            "Navrhnout termín má gov-icon plus (calendar-clock v gov 4.2.9 neexistuje)");
         view.Should().Contain("aria-label=\"Navrhnout termín a harmonogram\"");
     }
 
