@@ -53,6 +53,9 @@ Kontroly:
 - povinné ISO/SOP sekce v `docs/technical/*.md`,
 - konzistence základního názvosloví.
 
+### 5.5 Visual / Playwright smoke
+Pro UI změny (nový JS modul, nový panel, velký CSS patch) platí samostatná governance: viz `docs/technical/11-visual-testing-governance.md`. Obsahuje prerekvizity, šablonu testovacího skriptu, testovací matrix, známé pitfally (Gov Design System `::before` bullet interference, `site.bundle.js` sync) a checklist před merge.
+
 ## 6. Verifikace
 - Všechny test skripty končí `exit code 0`.
 - Coverage summary splní threshold.

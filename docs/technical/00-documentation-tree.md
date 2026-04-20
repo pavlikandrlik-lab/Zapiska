@@ -88,6 +88,7 @@ Tento dokument je kořenový strom dokumentace vytvořený rekurzivním postupem
 - `N5.1 Instalace a deployment IIS` (list)
 - `N5.2 Provozní runbooky` (list)
 - `N5.3 Testování a quality gates` (list)
+- `N5.3.1 Visual/Playwright smoke governance` (list)
 - `N5.4 Troubleshooting a recovery` (list)
 - `N6 Řízená evoluce architektury`
 - `N6.1 Baseline a sprint plán bezpečného refaktoru` (list)
@@ -119,6 +120,7 @@ Tento dokument je kořenový strom dokumentace vytvořený rekurzivním postupem
 | N5.1 | Deployment | `docs/technical/04-installation-deployment-iis.md`, `docs/technical/05-web-server-iis-config.md` |
 | N5.2 | Runbooky | `docs/technical/08-operations-runbooks.md` |
 | N5.3 | Testy + docs gate | `docs/technical/09-testing-quality.md` |
+| N5.3.1 | Visual/Playwright smoke governance | `docs/technical/11-visual-testing-governance.md` |
 | N5.4 | Recovery | `docs/technical/10-troubleshooting-recovery.md` |
 | N6.1 | Baseline refaktoru + sprint plán | `docs/technical/11-architecture-refactor-prompt-sequence.md`, `docs/technical/12-architecture-refactor-baseline.md` |
 
