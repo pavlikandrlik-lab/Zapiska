@@ -2,6 +2,7 @@
 @using PmTracker.Web.Services.Search
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Query) ? "Vyhledávání" : $"Vyhledávání: {Model.Query}";
+    ViewData["BodyClass"] = "dashboard-page";
 
     string TypeLabel(string t) => t switch
     {
