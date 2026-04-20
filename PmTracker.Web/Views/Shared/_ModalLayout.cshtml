@@ -52,6 +52,7 @@
             block-backdrop-close="true"
             data-modal-container
             data-modal-variant="@normalizedVariant"
+            @Html.Raw(string.Equals(normalizedVariant, "record-editor") ? "data-modal-scrollable=\"true\"" : "")
             data-modal-overflow-visible="@(overflowVisible ? "true" : "false")"
             aria-labelledby="@modalTitleId"
             tabindex="-1">

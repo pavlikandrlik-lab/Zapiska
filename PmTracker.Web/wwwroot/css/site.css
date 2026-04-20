@@ -3963,10 +3963,20 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .modal-cont
     overflow: visible;
 }
 
+/* Úprava #9/2 (2026-04-20): modaly defaultně NEscrollovatelné.
+   Opt-in přes data-modal-scrollable="true" pro legitimní výjimky
+   (aktuálně jen record-editor form delší než viewport). Viz spec
+   docs/specs/modal-layout-rules.md. */
 gov-dialog[data-modal-container] .modal-content {
     /* Body wrapper uvnitř gov-dialog default slotu — padding konzistentní
        s dříve používaným .modal-content. */
     padding: 16px;
+    overflow: hidden;
+}
+
+gov-dialog[data-modal-container][data-modal-scrollable="true"] .modal-content {
+    overflow-y: auto;
+    max-height: calc(92vh - 32px); /* interní scroll region uvnitř dialogu */
 }
 
 .section-divider {
