@@ -9193,17 +9193,6 @@ function handleDashboardClick(target) {
     }
     return true;
   }
-  const loadMoreButton = target.closest("[data-dashboard-news-load-more]");
-  if (isButtonLike(loadMoreButton)) {
-    const panel = loadMoreButton.closest("[data-dashboard-panel]");
-    if (panel instanceof HTMLElement) {
-      const loadUrl = loadMoreButton.getAttribute("data-dashboard-news-load-more") || "";
-      if (loadUrl) {
-        loadDashboardPanel(panel, { url: loadUrl });
-      }
-    }
-    return true;
-  }
   return false;
 }
 

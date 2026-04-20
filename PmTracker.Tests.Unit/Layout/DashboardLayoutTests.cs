@@ -58,4 +58,27 @@ public sealed class DashboardLayoutTests
         css.Should().Contain("@media (max-width: 1024px)",
             "responsive fallback stacking pod 1024px");
     }
+
+    [Theory]
+    [InlineData("PmTracker.Web/Views/Dashboard/_DashboardFocusPanel.cshtml")]
+    [InlineData("PmTracker.Web/Views/Dashboard/_DashboardMeetingsPanel.cshtml")]
+    [InlineData("PmTracker.Web/Views/Dashboard/_DashboardNewsPanel.cshtml")]
+    public void DashboardPanels_ShouldUseZobrazitViceOnly(string relativePath)
+    {
+        var view = File.ReadAllText(ResolvePath(relativePath));
+        view.Should().NotContain("Načíst více",
+            $"úprava #4: 'Načíst více' smazáno napříč dashboard panely ({relativePath})");
+        view.Should().Contain("Zobrazit více",
+            "jediné unified CTA");
+    }
+
+    [Fact]
+    public void DashboardJs_ShouldNotReferenceLoadMore()
+    {
+        var js = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/dashboard.js"));
+        js.Should().NotContain("data-dashboard-news-load-more",
+            "lazy-load pagination smazána — 'Zobrazit více' routuje na /Dashboard/News");
+        js.Should().NotContain("loadMoreButton",
+            "load-more JS handler smazán");
+    }
 }

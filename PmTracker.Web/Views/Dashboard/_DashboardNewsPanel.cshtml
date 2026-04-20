@@ -12,10 +12,6 @@
     @await Html.PartialAsync("_DashboardNewsList", Model.Items)
 
     <div class="dashboard-panel-footer">
-        @if (Model.CanLoadMore && !string.IsNullOrWhiteSpace(Model.LoadMoreUrl))
-        {
-            <pm-button variant="Secondary" size="Small" data-dashboard-news-load-more="@Model.LoadMoreUrl">Načíst více</pm-button>
-        }
         <pm-button variant="Ghost" size="Small" href="@Model.ListUrl">Zobrazit více</pm-button>
     </div>
 </div>
