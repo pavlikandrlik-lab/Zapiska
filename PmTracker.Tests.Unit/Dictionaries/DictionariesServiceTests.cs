@@ -1,5 +1,4 @@
 using FluentAssertions;
-using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Data;
@@ -12,8 +11,8 @@ public sealed class DictionaryServiceTests
     [Fact]
     public async Task SaveHarmonogramStepRowAsync_ShouldDelegateToHarmonogramService()
     {
-        var harmonogramService = new FakeHarmonogramService();
-        var sut = new DictionaryService(null!, harmonogramService, new FakeAuditWriteService());
+        var harmonogramCatalogService = new FakeHarmonogramCatalogService();
+        var sut = new DictionaryService(null!, harmonogramCatalogService, new FakeAuditWriteService());
         var command = new SaveCiselnikRowCommand
         {
             Key = "harmonogram-kroky",
@@ -23,14 +22,14 @@ public sealed class DictionaryServiceTests
 
         await sut.SaveHarmonogramStepRowAsync(command);
 
-        harmonogramService.LastSaveCommand.Should().BeSameAs(command);
+        harmonogramCatalogService.LastSaveCommand.Should().BeSameAs(command);
     }
 
     [Fact]
     public async Task DeleteHarmonogramStepRowAsync_ShouldDelegateToHarmonogramService()
     {
-        var harmonogramService = new FakeHarmonogramService();
-        var sut = new DictionaryService(null!, harmonogramService, new FakeAuditWriteService());
+        var harmonogramCatalogService = new FakeHarmonogramCatalogService();
+        var sut = new DictionaryService(null!, harmonogramCatalogService, new FakeAuditWriteService());
         var command = new DeleteCiselnikRowCommand
         {
             Key = "harmonogram-kroky",
@@ -39,21 +38,14 @@ public sealed class DictionaryServiceTests
 
         await sut.DeleteHarmonogramStepRowAsync(command);
 
-        harmonogramService.LastDeleteCommand.Should().BeSameAs(command);
+        harmonogramCatalogService.LastDeleteCommand.Should().BeSameAs(command);
     }
 
-    private sealed class FakeHarmonogramService : IHarmonogramService
+    private sealed class FakeHarmonogramCatalogService : IHarmonogramCatalogService
     {
         public SaveCiselnikRowCommand? LastSaveCommand { get; private set; }
         public DeleteCiselnikRowCommand? LastDeleteCommand { get; private set; }
 
-        public Task<HarmonogramSchemaDefinition> GetActiveHarmonogramSchemaAsync(CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<HarmonogramSchemaDefinition> GetSchemaForRecordAsync(ProjektovyZaznamEntity record, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<HarmonogramSchemaDefinition> GetSchemaForRecordAsync(int schemaVersion, CancellationToken ct = default) => throw new NotSupportedException();
-        public IReadOnlyList<RecordScheduleTypeDefinition> BuildRecordScheduleTypeDefinitions(HarmonogramSchemaDefinition schema) => throw new NotSupportedException();
-        public IReadOnlyList<HarmonogramVypocetKroku> BuildHarmonogramVypocetPublic(DateTime datumZalozeni, IReadOnlyList<HarmonogramTypPar> typy, IReadOnlyDictionary<int, int>? hodnoty) => throw new NotSupportedException();
-        public HarmonogramSouhrnViewModel BuildHarmonogramSouhrn(IReadOnlyList<HarmonogramVypocetKroku> kroky, DateTime terminUkolu) => throw new NotSupportedException();
-        public Task<int> EnsurePersistedActiveHarmonogramSchemaVersionAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task<CiselnikDetailViewModel> BuildHarmonogramKrokyCiselnikDetailAsync(string key, bool canChangeLockState, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> CountHarmonogramCatalogRowsAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task<CiselnikDetailViewModel> BuildCiselnikDetailAsync(string id, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();

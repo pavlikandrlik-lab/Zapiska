@@ -8,10 +8,10 @@ namespace PmTracker.Web.Services.Dictionaries;
 public sealed partial class DictionaryService : IDictionaryService, IDictionariesCommandsComposition
 {
     private readonly PmTrackerDbContext dbContext;
-    private readonly IHarmonogramService harmonogramService;
+    private readonly IHarmonogramCatalogService harmonogramService;
     private readonly IAuditWriteService auditWriteService;
 
-    public DictionaryService(PmTrackerDbContext dbContext, IHarmonogramService harmonogramService, IAuditWriteService auditWriteService)
+    public DictionaryService(PmTrackerDbContext dbContext, IHarmonogramCatalogService harmonogramService, IAuditWriteService auditWriteService)
     {
         this.dbContext = dbContext;
         this.harmonogramService = harmonogramService;

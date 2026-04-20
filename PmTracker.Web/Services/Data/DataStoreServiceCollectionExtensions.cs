@@ -71,6 +71,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<PriorityMatrixRebuildService>();
         services.AddScoped<IRichTextContentService, RichTextContentService>();
         services.AddScoped<HarmonogramService>();
+        services.AddScoped<HarmonogramCatalogService>();
         services.AddScoped<CommentService>();
         services.AddScoped<MeetingService>();
         services.AddScoped<ProjectService>();
@@ -86,6 +87,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<DictionaryService>();
         services.AddSingleton<IPriorityMatrixRebuildQueue, PriorityMatrixRebuildQueue>();
         services.AddScoped<IHarmonogramService>(sp => sp.GetRequiredService<HarmonogramService>());
+        services.AddScoped<IHarmonogramCatalogService>(sp => sp.GetRequiredService<HarmonogramCatalogService>());
         services.AddScoped<ICommentService>(sp => sp.GetRequiredService<CommentService>());
         services.AddScoped<IMeetingService>(sp => sp.GetRequiredService<MeetingService>());
         services.AddScoped<IProjectService>(sp => sp.GetRequiredService<ProjectService>());
