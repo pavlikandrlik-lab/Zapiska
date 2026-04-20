@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Server.IISIntegration;
+using PmTracker.ServiceDesk.Sql;
 using PmTracker.Web.Filters;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
@@ -18,6 +19,7 @@ builder.Services.AddSingleton<IApplicationVersionProvider, ApplicationVersionPro
 builder.Services
     .AddPmTrackerDataStore(builder.Configuration);
 builder.Services.AddPmTrackerSearch(builder.Configuration);
+builder.Services.AddServiceDeskIntegration(builder.Configuration);
 
 var app = builder.Build();
 
