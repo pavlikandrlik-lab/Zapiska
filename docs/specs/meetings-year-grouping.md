@@ -15,22 +15,57 @@ Obě místa používají stejnou šablonu DOM (`.meeting-year-stack` → `.meeti
 
 ### Aplikační záložka `/Jednani/Index`
 
-| Rok | Výchozí stav | Zobrazení |
+#### Struktura projekt-karty
+
+V každé projekt-kartě se zobrazuje:
+
+1. **Hlavička projektu** (`<header class="meeting-header">`) — název + `+N starších roků` counter + chevron. Celá hlavička je **klikatelný toggle** pro rozpad/sbalení historických roků (`data-project-history-toggle`).
+2. **Aktuální rok** (`PreviewRok`) — **vždy viditelný** year-group v `state="preview"` (první řádek karet).
+3. **Historické roky** — schované ve wrapperu `[data-project-history-body][hidden]`. Po kliknutí na hlavičku projektu se zobrazí jako year-groups v `state="collapsed"` (každý rok má vlastní year-chevron pro rozbalení jednání).
+
+#### Viditelnost
+
+| Element | Default | Po kliknutí na header |
 | --- | --- | --- |
-| **Aktuální rok** (PreviewRok) | `preview` | Body je viditelný, ale zobrazen pouze **první řádek karet**. Ostatní karty jsou v DOM, mají `hidden` a `data-meeting-preview-hidden="true"`. |
-| **Historické roky** | `collapsed` | Body je `hidden`, karty v DOM neuvidí ani uživatel ani screen reader. |
+| Hlavička projektu | viditelná, chevron-down | chevron-up |
+| Aktuální rok year-group | `state="preview"` | nezměněno |
+| Historické year-groups | `hidden` (skryté) | viditelné, každý `state="collapsed"` |
 
-**Důvod**: na stránce `/Jednani/Index` je víc projektů za sebou, rozbalená historie by udělala scroll nepřehledným.
+**Důvod**: projekt-karta drží jen aktuální dění; starší historie je tichá, ale jedno kliknutí ji ukáže. Each year-group je pak individuálně collapsed (další click-through pro jednání).
 
-Markup:
+#### Markup
 
 ```html
-<div class="meeting-year-stack"
-     data-meeting-overview="year-grouped"
-     data-meeting-history-default="collapsed"
-     data-meeting-preview-year="2026">
-    <!-- aktuální rok state="preview", ostatní state="collapsed" -->
-</div>
+<section class="card meeting-project-overview" data-project-card>
+    <header class="meeting-header"
+            role="button"
+            data-project-history-toggle
+            aria-controls="project-history-42"
+            aria-expanded="false"
+            tabindex="0">
+        <h2>Název projektu</h2>
+        <span class="meeting-project-history-count" aria-hidden="true">+3 starších roků</span>
+        <gov-icon class="meeting-project-chevron" name="chevron-down" ...></gov-icon>
+    </header>
+
+    <!-- Aktuální rok vždy viditelný -->
+    <div class="meeting-year-stack" data-meeting-overview="year-grouped"
+         data-meeting-history-default="collapsed"
+         data-meeting-preview-year="2026">
+        <section class="meeting-year-group" data-meeting-year-state="preview">...</section>
+    </div>
+
+    <!-- Historické roky za toggle -->
+    <div class="meeting-project-history-body"
+         id="project-history-42"
+         data-project-history-body
+         hidden>
+        <div class="meeting-year-stack" ...>
+            <section class="meeting-year-group" data-meeting-year-state="collapsed">...</section>
+            <!-- další historické year-groups -->
+        </div>
+    </div>
+</section>
 ```
 
 ### Projektová záložka `/Projekty/Detail/{id}?tab=jednani`

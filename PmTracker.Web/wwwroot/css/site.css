@@ -4445,6 +4445,57 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     gap: 14px;
 }
 
+/* ==========================================================================
+   Projekt-level history toggle (úprava #2, 2026-04-20)
+   Klikatelná hlavička projekt-karty na /Jednani/Index rozbalí/sbalí
+   wrapper historických year-groups. Konzistentní pattern s year-toggle.
+   ========================================================================== */
+
+.meeting-project-overview .meeting-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0;
+}
+
+.meeting-project-overview .meeting-header > h2 {
+    flex: 1 1 auto;
+    margin: 0;
+}
+
+.meeting-project-overview .meeting-header[data-project-history-toggle] {
+    cursor: pointer;
+    user-select: none;
+    padding: 8px 12px;
+    border-radius: var(--gov-radius);
+    transition: background-color 0.15s ease;
+}
+
+.meeting-project-overview .meeting-header[data-project-history-toggle]:hover {
+    background: color-mix(in srgb, var(--gov-color-primary) 5%, transparent);
+}
+
+.meeting-project-overview .meeting-header[data-project-history-toggle]:focus-visible {
+    outline: 2px solid var(--gov-color-primary);
+    outline-offset: 2px;
+}
+
+.meeting-project-history-count {
+    font-size: 13px;
+    color: var(--gov-color-muted);
+    font-weight: 400;
+}
+
+.meeting-project-chevron {
+    flex: 0 0 auto;
+    font-size: 16px;
+    color: currentColor;
+}
+
+.meeting-project-history-body {
+    margin-top: 10px;
+}
+
 .meeting-year-stack {
     display: flex;
     flex-direction: column;

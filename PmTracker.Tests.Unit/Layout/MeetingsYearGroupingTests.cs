@@ -29,16 +29,19 @@ public sealed class MeetingsYearGroupingTests
     [Fact]
     public void ApplicationJednaniIndex_ShouldDefaultHistoricalYearsToCollapsed()
     {
+        // Index.cshtml nastavuje data-meeting-history-default; year-group stav
+        // je v extrahovaném partialu _MeetingYearGroup.cshtml (DRY, úprava #2).
         var source = LoadViewSource("PmTracker.Web/Views/Jednani/Index.cshtml");
+        var partial = LoadViewSource("PmTracker.Web/Views/Jednani/_MeetingYearGroup.cshtml");
 
         source.Should().Contain(
             "data-meeting-history-default=\"collapsed\"",
             "aplikační záložka /Jednani/Index musí sbalovat historické roky (více projektů na stránce)");
 
-        // Aktuální rok je preview, ostatní collapsed
-        source.Should().Contain(
-            "isPreviewYear ? \"preview\" : \"collapsed\"",
-            "aplikační záložka musí nastavit historické roky do stavu collapsed");
+        // Aktuální rok je preview, ostatní collapsed — logika je v partialu _MeetingYearGroup
+        partial.Should().Contain(
+            "IsPreviewYear ? \"preview\" : \"collapsed\"",
+            "partial _MeetingYearGroup musí nastavit historické roky do stavu collapsed");
     }
 
     [Fact]
@@ -58,7 +61,12 @@ public sealed class MeetingsYearGroupingTests
     [Fact]
     public void BothViews_ShouldUseSameMarkupStructure()
     {
-        var app = LoadViewSource("PmTracker.Web/Views/Jednani/Index.cshtml");
+        // Po úpravě #2: aplikační záložka extrahovala year-group markup do
+        // _MeetingYearGroup.cshtml partialu (DRY). Selektory pro JS/CSS musí
+        // existovat v kombinaci Index.cshtml + partial.
+        var appIndex = LoadViewSource("PmTracker.Web/Views/Jednani/Index.cshtml");
+        var appPartial = LoadViewSource("PmTracker.Web/Views/Jednani/_MeetingYearGroup.cshtml");
+        var app = appIndex + appPartial; // kombinace tvoří kompletní markup
         var project = LoadViewSource("PmTracker.Web/Views/Projekty/_ProjectMeetingsTab.cshtml");
 
         // Sdílená DOM struktura — spec vyžaduje konzistentní selektory pro JS i CSS
@@ -122,8 +130,11 @@ public sealed class MeetingsYearGroupingTests
         // User feedback 2026-04-19: původní CSS border-right/border-bottom chevron
         // byl "napíču, blbě" — diagonální chevron uživatel neinterpretoval jako šipku.
         // Přechod na <gov-icon name="chevron-down"> pro intuitivní render.
+        // Po úpravě #2: aplikační záložka používá _MeetingYearGroup.cshtml partial.
         var projectView = LoadViewSource("PmTracker.Web/Views/Projekty/_ProjectMeetingsTab.cshtml");
-        var globalView = LoadViewSource("PmTracker.Web/Views/Jednani/Index.cshtml");
+        var appIndex = LoadViewSource("PmTracker.Web/Views/Jednani/Index.cshtml");
+        var appPartial = LoadViewSource("PmTracker.Web/Views/Jednani/_MeetingYearGroup.cshtml");
+        var globalView = appIndex + appPartial; // kombinace tvoří kompletní markup
 
         foreach (var view in new[] { projectView, globalView })
         {
@@ -134,6 +145,55 @@ public sealed class MeetingsYearGroupingTests
                 "<span class=\"meeting-year-chevron\"",
                 "starý span chevron nesmí zůstat — byl nahrazen gov-icon elementem");
         }
+    }
+
+    [Fact]
+    public void ApplicationJednaniIndex_ShouldWrapHistoricalYearsInProjectHistoryBody()
+    {
+        // Úprava #2: historické roky na /Jednani/Index jsou defaultně skryté za
+        // project-level toggle v hlavičce projektu. Markup: [data-project-history-body][hidden]
+        // kolem historických year-groups; aktuální rok zůstává mimo wrapper.
+        var source = LoadViewSource("PmTracker.Web/Views/Jednani/Index.cshtml");
+
+        source.Should().Contain("data-project-history-toggle",
+            "hlavička projekt-karty je klikatelný toggle");
+        source.Should().Contain("data-project-history-body",
+            "wrapper kolem historických year-groups");
+        source.Should().Contain("role=\"button\"",
+            "hlavička je role button pro accessibility");
+        source.Should().MatchRegex(
+            @"data-project-history-body[^>]*hidden",
+            "wrapper historických roků je defaultně hidden");
+    }
+
+    [Fact]
+    public void ProjectHistoryToggleJs_ShouldExportAndHandleToggle()
+    {
+        var js = LoadViewSource("PmTracker.Web/wwwroot/js/modules/meetingOverview.js");
+
+        js.Should().Contain("export function toggleProjectHistory",
+            "meetingOverview.js musí exportovat toggleProjectHistory");
+        js.Should().Contain("[data-project-card]",
+            "JS používá [data-project-card] selector pro scope");
+        js.Should().Contain("[data-project-history-body]",
+            "JS musí toggle-ovat [data-project-history-body]");
+
+        var bootstrap = LoadViewSource("PmTracker.Web/wwwroot/js/modules/bootstrap.js");
+        bootstrap.Should().Contain("toggleProjectHistory",
+            "bootstrap.js importuje + volá toggleProjectHistory");
+        bootstrap.Should().Contain("[data-project-history-toggle]",
+            "bootstrap.js deleguje click na [data-project-history-toggle]");
+    }
+
+    [Fact]
+    public void ProjectHistoryCss_ShouldStyleHeaderAsToggle()
+    {
+        var css = LoadViewSource("PmTracker.Web/wwwroot/css/site.css");
+
+        css.Should().Contain(".meeting-header[data-project-history-toggle]",
+            "CSS stylizuje toggle-able header (pointer, hover)");
+        css.Should().Contain(".meeting-project-chevron",
+            "chevron má vlastní class pro swap name attribut");
     }
 
     [Fact]

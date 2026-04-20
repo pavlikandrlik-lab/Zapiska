@@ -96,3 +96,11 @@ public sealed class JednaniTaskItemPartialViewModel
     public int CurrentUserOsobaId { get; init; }
     public required JednaniUkolViewModel Ukol { get; init; }
 }
+
+public sealed class MeetingYearGroupPartialViewModel
+{
+    public JednaniYearGroupViewModel Rok { get; init; } = null!;
+    public bool IsPreviewYear { get; init; }
+    public int ProjektId { get; init; }
+    public bool CanDeleteMeetings { get; init; }
+}

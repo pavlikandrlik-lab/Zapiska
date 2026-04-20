@@ -148,6 +148,41 @@ export function initMeetingOverview(scope = document) {
     });
 }
 
+// Úprava #2 (2026-04-20): project-level history toggle v aplikační
+// záložce /Jednani/Index. Klikání na hlavičku projekt-karty rozbalí / sbalí
+// wrapper historických year-groups. Shodný vzorec jako year-toggle, ale
+// o úroveň výše (project-level vs. year-level).
+export function toggleProjectHistory(toggleEl) {
+    if (!(toggleEl instanceof HTMLElement)) {
+        return;
+    }
+
+    const card = toggleEl.closest("[data-project-card]");
+    if (!(card instanceof HTMLElement)) {
+        return;
+    }
+
+    const body = card.querySelector("[data-project-history-body]");
+    if (!(body instanceof HTMLElement)) {
+        return;
+    }
+
+    const chevron = toggleEl.querySelector(".meeting-project-chevron");
+    const isExpanded = toggleEl.getAttribute("aria-expanded") === "true";
+    const nextExpanded = !isExpanded;
+
+    toggleEl.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
+    if (nextExpanded) {
+        body.removeAttribute("hidden");
+    } else {
+        body.setAttribute("hidden", "");
+    }
+
+    if (chevron instanceof HTMLElement) {
+        chevron.setAttribute("name", nextExpanded ? "chevron-up" : "chevron-down");
+    }
+}
+
 export function toggleMeetingYearGroup(toggle) {
     const group = toggle instanceof HTMLElement
         ? toggle.closest("[data-meeting-year-group]")

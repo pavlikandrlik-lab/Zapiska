@@ -2741,6 +2741,31 @@ function toggleMeetingYearGroup(toggle) {
   group.dataset.meetingYearState = currentState === "preview" ? "open" : currentState === "open" ? "collapsed" : "open";
   applyMeetingYearState(group);
 }
+function toggleProjectHistory(toggleEl) {
+  if (!(toggleEl instanceof HTMLElement)) {
+    return;
+  }
+  const card = toggleEl.closest("[data-project-card]");
+  if (!(card instanceof HTMLElement)) {
+    return;
+  }
+  const body = card.querySelector("[data-project-history-body]");
+  if (!(body instanceof HTMLElement)) {
+    return;
+  }
+  const chevron = toggleEl.querySelector(".meeting-project-chevron");
+  const isExpanded = toggleEl.getAttribute("aria-expanded") === "true";
+  const nextExpanded = !isExpanded;
+  toggleEl.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
+  if (nextExpanded) {
+    body.removeAttribute("hidden");
+  } else {
+    body.setAttribute("hidden", "");
+  }
+  if (chevron instanceof HTMLElement) {
+    chevron.setAttribute("name", nextExpanded ? "chevron-up" : "chevron-down");
+  }
+}
 
 // PmTracker.Web/wwwroot/js/modules/schedule.js
 function syncScheduleExpandButton(button, details) {
@@ -9262,6 +9287,12 @@ function handleDocumentClick(event) {
     toggleMeetingAttendancePanel(attendanceToggle);
     return;
   }
+  const projectHistoryToggle = target.closest("[data-project-history-toggle]");
+  if (projectHistoryToggle instanceof HTMLElement) {
+    event.preventDefault();
+    toggleProjectHistory(projectHistoryToggle);
+    return;
+  }
   const meetingYearToggle = target.closest("[data-meeting-year-toggle]");
   if (meetingYearToggle instanceof HTMLButtonElement) {
     event.preventDefault();
@@ -9489,6 +9520,20 @@ function handleDocumentCardKeydown(event) {
   }
   handleNavigationCardKeydown(event, target);
 }
+function handleProjectHistoryKeydown(event) {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const projectHistoryToggle = target.closest("[data-project-history-toggle]");
+  if (projectHistoryToggle instanceof HTMLElement && projectHistoryToggle === target) {
+    event.preventDefault();
+    toggleProjectHistory(projectHistoryToggle);
+  }
+}
 function handleWindowBeforeUnload(_event) {
   // Nativní browser dialog odstraněn — user 2026-04-19 noc: "vyskočí windows
   // edge dialogové okno, problikne i dialog aplikace, je to chybné chování".
@@ -9545,6 +9590,7 @@ function bootstrapPmTrackerApp() {
     { type: "change", handler: handleDocumentChange },
     { type: "input", handler: handleDocumentInput },
     { type: "keydown", handler: handleDocumentCardKeydown },
+    { type: "keydown", handler: handleProjectHistoryKeydown },
     { type: "gov-close", handler: handleGovCloseEvent }
   ]);
   bindEventGroup(window, [

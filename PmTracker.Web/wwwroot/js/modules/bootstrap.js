@@ -17,7 +17,7 @@ import {
     toggleRecordCard,
     toggleMeetingAttendancePanel
 } from "./navigation.js";
-import { initMeetingOverview, toggleMeetingYearGroup } from "./meetingOverview.js";
+import { initMeetingOverview, toggleMeetingYearGroup, toggleProjectHistory } from "./meetingOverview.js";
 import {
     clearProjectFilterInput,
     clearProjectFilterPreferenceStorage,
@@ -224,6 +224,13 @@ function handleDocumentClick(event) {
     if (attendanceToggle instanceof HTMLButtonElement) {
         event.preventDefault();
         toggleMeetingAttendancePanel(attendanceToggle);
+        return;
+    }
+
+    const projectHistoryToggle = target.closest("[data-project-history-toggle]");
+    if (projectHistoryToggle instanceof HTMLElement) {
+        event.preventDefault();
+        toggleProjectHistory(projectHistoryToggle);
         return;
     }
 
@@ -522,6 +529,21 @@ function handleDocumentCardKeydown(event) {
     handleNavigationCardKeydown(event, target);
 }
 
+function handleProjectHistoryKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " ") {
+        return;
+    }
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+        return;
+    }
+    const projectHistoryToggle = target.closest("[data-project-history-toggle]");
+    if (projectHistoryToggle instanceof HTMLElement && projectHistoryToggle === target) {
+        event.preventDefault();
+        toggleProjectHistory(projectHistoryToggle);
+    }
+}
+
 // Dřívější implementace triggrovala nativní browser "Opravdu odejít?" dialog
 // (Edge/Chrome). User 2026-04-19 noc: "vyskočí windows edge dialogové okno,
 // než ze stránky odejdu tak problikne i dialog aplikace, mě se více líbí
@@ -592,6 +614,7 @@ export function bootstrapPmTrackerApp() {
         { type: "change", handler: handleDocumentChange },
         { type: "input", handler: handleDocumentInput },
         { type: "keydown", handler: handleDocumentCardKeydown },
+        { type: "keydown", handler: handleProjectHistoryKeydown },
         { type: "gov-close", handler: handleGovCloseEvent }
     ]);
 
