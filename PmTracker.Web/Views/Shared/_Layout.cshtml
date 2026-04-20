@@ -125,7 +125,11 @@
         </nav>
     </header>
 
-    <main id="main" class="app-main">
+    @{
+        var bodyClass = ViewData["BodyClass"]?.ToString();
+        var mainClass = bodyClass == "dashboard-page" ? "app-main app-main--fluid" : "app-main";
+    }
+    <main id="main" class="@mainClass">
         @if (TempData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
         {
             <gov-message color="error">@errorMessage</gov-message>
