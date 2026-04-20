@@ -34,3 +34,9 @@ publish.zip
 *.log
 *.local.json
 gov-kits/
+
+# Citlivé vzorky dokumentů (reálné výzvy, tickety apod.) — nesmí se commitovat
+*.docx
+*.doc
+*.xlsx
+*.xls
