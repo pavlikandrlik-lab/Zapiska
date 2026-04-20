@@ -40,6 +40,16 @@
         </span>
         <span class="gov-switch-label">Používat identifikátor záznamů podle jednání (808-1)</span>
     </label>
+    <label>
+        Místo plnění (pro generování výzev)
+        <textarea name="MistoPlneni" rows="2" maxlength="500"
+                  placeholder="např. FIS (EIS): VZ 8201, Tychonova 1, 160 01 Praha 6">@Model.Command.MistoPlneni</textarea>
+    </label>
+    <label>
+        Číslo rámcové smlouvy (pro generování výzev)
+        <input type="text" name="CisloRamcoveSmlouvy" maxlength="100"
+               placeholder="např. 23106000271" value="@Model.Command.CisloRamcoveSmlouvy" />
+    </label>
 
     @await Html.PartialAsync(
         "_ModalFormActions",

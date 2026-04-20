@@ -23,6 +23,8 @@ public sealed partial class ProjectService
                 StavKod = statuses.GetValueOrDefault(project.StavId)?.Kod,
                 Stav = statuses.GetValueOrDefault(project.StavId)?.Nazev ?? "-",
                 PouzivatIdentJednani = project.PouzivatIdentJednani,
+                MistoPlneni = project.MistoPlneni,
+                CisloRamcoveSmlouvy = project.CisloRamcoveSmlouvy,
                 CanEdit = true,
                 CanDelete = true
             })
@@ -39,7 +41,9 @@ public sealed partial class ProjectService
                 x.Zkratka,
                 Nazev = x.CelyNazev,
                 x.StavId,
-                x.PouzivatIdentJednani
+                x.PouzivatIdentJednani,
+                x.MistoPlneni,
+                x.CisloRamcoveSmlouvy
             })
             .FirstOrDefaultAsync(ct);
         if (project is null)
@@ -60,6 +64,8 @@ public sealed partial class ProjectService
             StavKod = status?.Kod,
             Stav = status?.Nazev ?? "-",
             PouzivatIdentJednani = project.PouzivatIdentJednani,
+            MistoPlneni = project.MistoPlneni,
+            CisloRamcoveSmlouvy = project.CisloRamcoveSmlouvy,
             CanEdit = true,
             CanDelete = true
         };

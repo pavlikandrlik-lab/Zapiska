@@ -64,7 +64,9 @@ public sealed partial class ProjektyController
                 Nazev = project.Nazev,
                 Zkratka = project.Zkratka,
                 Stav = selectedStatus,
-                PouzivatIdentJednani = project.PouzivatIdentJednani
+                PouzivatIdentJednani = project.PouzivatIdentJednani,
+                MistoPlneni = project.MistoPlneni,
+                CisloRamcoveSmlouvy = project.CisloRamcoveSmlouvy
             },
             StavyProjektu = statusOptions
         };

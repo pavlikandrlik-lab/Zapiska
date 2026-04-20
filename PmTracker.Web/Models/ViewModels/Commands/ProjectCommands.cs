@@ -18,6 +18,12 @@ public sealed class SaveProjectCommand
     public string Stav { get; set; } = string.Empty;
 
     public bool PouzivatIdentJednani { get; set; }
+
+    [StringLength(500)]
+    public string? MistoPlneni { get; set; }
+
+    [StringLength(100)]
+    public string? CisloRamcoveSmlouvy { get; set; }
 }
 
 public sealed class SoftDeleteProjectCommand

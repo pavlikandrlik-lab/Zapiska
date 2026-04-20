@@ -19,6 +19,8 @@ public sealed class ProjektListItemViewModel
     public string? StavKod { get; init; }
     public required string Stav { get; init; }
     public bool PouzivatIdentJednani { get; init; }
+    public string? MistoPlneni { get; init; }
+    public string? CisloRamcoveSmlouvy { get; init; }
     public bool CanEdit { get; init; }
     public bool CanDelete { get; init; }
 }

@@ -23,6 +23,8 @@ public sealed partial class ProjectService
             existing.Zkratka = command.Zkratka.Trim();
             existing.StavId = statusId;
             existing.PouzivatIdentJednani = command.PouzivatIdentJednani;
+            existing.MistoPlneni = NormalizeOrNull(command.MistoPlneni);
+            existing.CisloRamcoveSmlouvy = NormalizeOrNull(command.CisloRamcoveSmlouvy);
             await dbContext.SaveChangesAsync(ct);
             auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
                 AuditActionType.Update,
@@ -40,7 +42,9 @@ public sealed partial class ProjectService
             CelyNazev = command.Nazev.Trim(),
             Zkratka = command.Zkratka.Trim(),
             StavId = statusId,
-            PouzivatIdentJednani = command.PouzivatIdentJednani
+            PouzivatIdentJednani = command.PouzivatIdentJednani,
+            MistoPlneni = NormalizeOrNull(command.MistoPlneni),
+            CisloRamcoveSmlouvy = NormalizeOrNull(command.CisloRamcoveSmlouvy)
         };
         dbContext.Projekty.Add(created);
         await dbContext.SaveChangesAsync(ct);
@@ -82,6 +86,9 @@ public sealed partial class ProjectService
             ProjectAuditSnapshot.FromEntity(project)));
         await dbContext.SaveChangesAsync(ct);
     }
+
+    private static string? NormalizeOrNull(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private async Task<int> ResolveProjectStatusIdAsync(string value, CancellationToken ct)
     {
