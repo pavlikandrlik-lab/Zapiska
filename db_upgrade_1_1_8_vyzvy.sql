@@ -65,15 +65,21 @@ BEGIN
 END;
 
 -- 5. FK + filtered unique index
+-- Pozn.: referujeme sloupec vyzva_id, který vznikl renamem v kroku 3. V rámci
+-- jednoho batche parser sloupec nevidí, proto používáme dynamic SQL.
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'fk_zeo_vyzva')
-    ALTER TABLE dbo.zaznam_externi_odkazy
+BEGIN
+    EXEC('ALTER TABLE dbo.zaznam_externi_odkazy
         ADD CONSTRAINT fk_zeo_vyzva
-        FOREIGN KEY (vyzva_id) REFERENCES dbo.vyzvy(id) ON DELETE SET NULL;
+        FOREIGN KEY (vyzva_id) REFERENCES dbo.vyzvy(id) ON DELETE SET NULL');
+END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_zaznam_externi_odkazy_cislo_in_vyzve')
-    CREATE UNIQUE INDEX ux_zaznam_externi_odkazy_cislo_in_vyzve
+BEGIN
+    EXEC('CREATE UNIQUE INDEX ux_zaznam_externi_odkazy_cislo_in_vyzve
         ON dbo.zaznam_externi_odkazy (cislo)
-        WHERE vyzva_id IS NOT NULL;
+        WHERE vyzva_id IS NOT NULL');
+END;
 
 -- 6. Audit
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'vyzva_historie_stavu')
