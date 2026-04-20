@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PmTracker.Web.Data;
 
@@ -11,9 +12,11 @@ using PmTracker.Web.Data;
 namespace PmTracker.Web.Migrations
 {
     [DbContext(typeof(PmTrackerDbContext))]
-    partial class PmTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260420154159_VyzvyFaze1")]
+    partial class VyzvyFaze1
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
