@@ -76,8 +76,10 @@
                                data-record-editor-url="@editRecordUrl"
                                data-record-editor-project-id="@projektId"
                                data-record-editor-label="@($"{summary.EditButtonLabel} záznam #{summary.CisloViditelne}")"
-                               data-stop-propagation="true">
-                        @summary.EditButtonLabel
+                               data-stop-propagation="true"
+                               aria-label="@summary.EditButtonLabel"
+                               title="@summary.EditButtonLabel">
+                        <gov-icon name="pencil" type="basic" aria-hidden="true"></gov-icon>
                     </pm-button>
                 }
                 @if (summary.CanCreateScheduleProposal && !string.IsNullOrWhiteSpace(summary.ScheduleProposalUrl))
@@ -87,8 +89,10 @@
                                data-record-editor-url="@summary.ScheduleProposalUrl"
                                data-record-editor-project-id="@projektId"
                                data-record-editor-label="@($"Navrhnout změnu termínu a harmonogramu záznamu #{summary.CisloViditelne}")"
-                               data-stop-propagation="true">
-                        Navrhnout termín a harmonogram
+                               data-stop-propagation="true"
+                               aria-label="Navrhnout termín a harmonogram"
+                               title="Navrhnout termín a harmonogram">
+                        <gov-icon name="calendar-clock" type="basic" aria-hidden="true"></gov-icon>
                     </pm-button>
                 }
                 <span class="record-toggle-indicator" aria-hidden="true">›</span>

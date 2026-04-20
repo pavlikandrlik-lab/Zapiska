@@ -6194,3 +6194,16 @@ html {
         min-height: 280px;
     }
 }
+
+/* Úprava #6 (2026-04-20): icon-only pm-button — kompaktní padding,
+   ikona vycentrovaná. Accessibility via aria-label + title. */
+pm-button[size="Small"]:has(gov-icon:only-child),
+pm-button[size="Small"] gov-button:has(gov-icon:only-child) {
+    --gov-button-padding-inline: 8px;
+    --gov-button-padding-block: 6px;
+}
+
+pm-button gov-icon {
+    font-size: 16px;
+    line-height: 1;
+}
