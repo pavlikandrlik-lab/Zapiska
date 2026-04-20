@@ -47,7 +47,9 @@ public sealed class ProposalEditorLockedFieldsTests
     [Fact]
     public void RecordEditorJs_ShouldRespectMetadataLockedInTaskTypeVisibility()
     {
-        var source = LoadText("PmTracker.Web/wwwroot/js/modules/recordEditor.js");
+        // Fáze 3B Task 1: recordEditor.js je barrel — updateTaskTypeVisibility
+        // je v submodulu recordEditor/form.js
+        var source = LoadText("PmTracker.Web/wwwroot/js/modules/recordEditor/form.js");
 
         source.Should().Contain(
             "form.dataset.metadataLocked === \"true\"",
