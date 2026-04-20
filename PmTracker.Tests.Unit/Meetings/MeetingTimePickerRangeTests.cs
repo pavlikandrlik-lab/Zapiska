@@ -34,16 +34,17 @@ public sealed class MeetingTimePickerRangeTests
     [Fact]
     public void PickerSource_ShouldUseSixToTwentyTwoRange()
     {
-        var source = LoadText("PmTracker.Web/wwwroot/js/modules/pickers.js");
+        // Fáze 3B Task 3: time picker logika přesunuta do pickers/time.js
+        var source = LoadText("PmTracker.Web/wwwroot/js/modules/pickers/time.js");
 
         source.Should().MatchRegex(
             @"for\s*\(\s*let\s+hour\s*=\s*6\s*;\s*hour\s*<=\s*22\s*;",
-            "zdrojový modul pickers.js musí omezit rozsah na 6–22");
+            "zdrojový modul pickers/time.js musí omezit rozsah na 6–22");
 
         // Safety-net: neexistuje v modulu žádný for-loop s 0..24
         source.Should().NotMatchRegex(
             @"for\s*\(\s*let\s+hour\s*=\s*0\s*;\s*hour\s*<\s*24\s*;",
-            "modul pickers.js nesmí obsahovat starý rozsah 0–24");
+            "modul pickers/time.js nesmí obsahovat starý rozsah 0–24");
     }
 
     [Fact]
