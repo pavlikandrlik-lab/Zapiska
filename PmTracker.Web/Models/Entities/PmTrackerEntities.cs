@@ -141,6 +141,8 @@ public sealed class ProjektEntity
     public string CelyNazev { get; set; } = string.Empty;
     public int StavId { get; set; }
     public bool PouzivatIdentJednani { get; set; }
+    public string? MistoPlneni { get; set; }
+    public string? CisloRamcoveSmlouvy { get; set; }
 }
 
 public sealed class ObsazeniProjektuEntity

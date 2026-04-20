@@ -15,6 +15,8 @@ internal sealed class ProjectEntityConfiguration : IEntityTypeConfiguration<Proj
         builder.Property(x => x.CelyNazev).HasColumnName("cely_nazev");
         builder.Property(x => x.StavId).HasColumnName("stav_id");
         builder.Property(x => x.PouzivatIdentJednani).HasColumnName("pouzivat_ident_jednani");
+        builder.Property(x => x.MistoPlneni).HasColumnName("misto_plneni").HasMaxLength(500);
+        builder.Property(x => x.CisloRamcoveSmlouvy).HasColumnName("cislo_ramcove_smlouvy").HasMaxLength(100);
     }
 }
 
