@@ -4466,61 +4466,271 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     height: 100%;
 }
 
-.meeting-project-overview {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
 /* ==========================================================================
-   Projekt-level history toggle (úprava #2, 2026-04-20)
-   Klikatelná hlavička projekt-karty na /Jednani/Index rozbalí/sbalí
-   wrapper historických year-groups. Konzistentní pattern s year-toggle.
+   Jednani/Index — 2-sloupcové rozložení projekt-karty (2026-04-20)
+   Levý sidebar: projekt-info (zkratka, stav, název, místo, statistiky, akce).
+   Pravý sloupec: meetings-area (year-groupy + history toggle).
+   Na tabletech (<960px) stackuje vertikálně.
    ========================================================================== */
 
-.meeting-project-overview .meeting-header {
+.meeting-project-overview {
+    display: grid;
+    grid-template-columns: minmax(260px, 300px) 1fr;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.meeting-project-overview__sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-xs);
+    padding: var(--pm-spacing-m) var(--pm-spacing-m) var(--pm-spacing-s);
+    background: linear-gradient(170deg,
+        color-mix(in srgb, var(--pm-color-primary) 4%, var(--pm-color-background)) 0%,
+        color-mix(in srgb, var(--pm-color-primary) 10%, var(--pm-color-background)) 100%);
+    border-right: 1px solid var(--pm-color-border);
+    position: relative;
+}
+
+.meeting-project-overview__sidebar::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--pm-color-primary);
+}
+
+.meeting-project-overview__ticker {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--pm-color-primary);
+    font-weight: var(--pm-font-weight-bold);
+}
+
+.meeting-project-overview__heading {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0;
+    gap: var(--pm-spacing-xs);
+    flex-wrap: wrap;
 }
 
-.meeting-project-overview .meeting-header > h2 {
-    flex: 1 1 auto;
+.meeting-project-overview__zkratka {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: var(--pm-radius-s);
+    background: var(--pm-color-primary);
+    color: var(--pm-color-background);
+    font-size: 10px;
+    font-weight: var(--pm-font-weight-bold);
+    letter-spacing: 0.05em;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+}
+
+.meeting-project-overview__stav {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: var(--pm-font-weight-semibold);
+    color: var(--pm-color-neutral);
+}
+
+.meeting-project-overview__stav::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: var(--pm-radius-round);
+    background: currentColor;
+}
+
+.meeting-project-overview__stav--running {
+    color: var(--pm-color-success);
+}
+
+.meeting-project-overview__stav--paused {
+    color: var(--pm-color-warning);
+}
+
+.meeting-project-overview__stav--done {
+    color: var(--pm-color-neutral);
+}
+
+.meeting-project-overview__nazev {
     margin: 0;
+    font-size: var(--pm-font-size-l);
+    font-weight: var(--pm-font-weight-semibold);
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+    color: var(--pm-color-text);
 }
 
-.meeting-project-overview .meeting-header[data-project-history-toggle] {
+.meeting-project-overview__meta {
+    margin: 0;
+    padding: var(--pm-spacing-xs) 0 0;
+    font-size: var(--pm-font-size-xs);
+    color: var(--pm-color-text-muted);
+    line-height: 1.5;
+    border-top: 1px solid color-mix(in srgb, var(--pm-color-border) 60%, transparent);
+}
+
+.meeting-project-overview__meta dt {
+    font-size: 10px;
+    font-weight: var(--pm-font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--pm-color-text-muted);
+    margin-top: var(--pm-spacing-xs);
+}
+
+.meeting-project-overview__meta dd {
+    margin: 2px 0 0;
+    color: var(--pm-color-text);
+}
+
+.meeting-project-overview__stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--pm-spacing-2xs);
+    margin-top: var(--pm-spacing-2xs);
+}
+
+.meeting-project-overview__stat {
+    background: var(--pm-color-background);
+    border: 1px solid var(--pm-color-border);
+    border-radius: var(--pm-radius-m);
+    padding: var(--pm-spacing-xs) var(--pm-spacing-s);
+    text-align: center;
+}
+
+.meeting-project-overview__stat b {
+    display: block;
+    font-size: var(--pm-font-size-l);
+    font-weight: var(--pm-font-weight-bold);
+    color: var(--pm-color-primary-strong);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.meeting-project-overview__stat span {
+    display: block;
+    margin-top: 4px;
+    font-size: 9px;
+    font-weight: var(--pm-font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--pm-color-text-muted);
+}
+
+.meeting-project-overview__actions {
+    margin-top: auto;
+    padding-top: var(--pm-spacing-s);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--pm-spacing-2xs);
+}
+
+.meeting-project-overview__actions pm-button {
+    display: block;
+    width: 100%;
+}
+
+.meeting-project-overview__actions gov-button {
+    width: 100%;
+}
+
+.meeting-project-overview__meetings {
+    padding: var(--pm-spacing-m) var(--pm-spacing-m) var(--pm-spacing-s);
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-s);
+    min-width: 0;
+}
+
+/* Na 4K+ rozlišeních s malým počtem jednání se karty zbytečně roztáhnou přes
+   celou meetings area. Omezíme grid item max-width aby karty zůstaly čitelné
+   (auto-fill-like chování bez rozpínání jedinců). */
+.meeting-project-overview__meetings .meeting-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 320px));
+}
+
+.meeting-project-overview__history {
+    margin-top: var(--pm-spacing-xs);
+    border-top: 1px dashed var(--pm-color-border);
+    padding-top: var(--pm-spacing-s);
+}
+
+.meeting-project-overview__history-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--pm-color-primary);
+    font: inherit;
+    font-size: var(--pm-font-size-xs);
+    font-weight: var(--pm-font-weight-medium);
+    padding: 6px 10px;
+    border-radius: var(--pm-radius-s);
     cursor: pointer;
-    user-select: none;
-    padding: 8px 12px;
-    border-radius: var(--gov-radius);
-    transition: background-color 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.meeting-project-overview .meeting-header[data-project-history-toggle]:hover {
-    background: color-mix(in srgb, var(--gov-color-primary) 5%, transparent);
+.meeting-project-overview__history-toggle:hover {
+    background: color-mix(in srgb, var(--pm-color-primary) 8%, transparent);
+    border-color: color-mix(in srgb, var(--pm-color-primary) 20%, transparent);
 }
 
-.meeting-project-overview .meeting-header[data-project-history-toggle]:focus-visible {
-    outline: 2px solid var(--gov-color-primary);
+.meeting-project-overview__history-toggle:focus-visible {
+    outline: 2px solid var(--pm-color-primary);
     outline-offset: 2px;
 }
 
-.meeting-project-history-count {
-    font-size: 13px;
-    color: var(--gov-color-muted);
-    font-weight: 400;
+.meeting-project-overview__history-toggle .meeting-project-chevron {
+    font-size: 14px;
+    transition: transform 0.2s ease;
+}
+
+.meeting-project-overview__history-toggle[aria-expanded="true"] .meeting-project-chevron {
+    transform: rotate(180deg);
+}
+
+.meeting-project-overview__history-body {
+    margin-top: var(--pm-spacing-xs);
 }
 
 .meeting-project-chevron {
     flex: 0 0 auto;
-    font-size: 16px;
-    color: currentColor;
 }
 
-.meeting-project-history-body {
-    margin-top: 10px;
+/* Responsive fallback — na tablet+ stack nad sebou */
+@media (max-width: 959px) {
+    .meeting-project-overview {
+        grid-template-columns: 1fr;
+    }
+
+    .meeting-project-overview__sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--pm-color-border);
+    }
+
+    .meeting-project-overview__sidebar::after {
+        right: auto;
+        left: 0;
+        top: auto;
+        bottom: 0;
+        width: 100%;
+        height: 3px;
+    }
+
+    .meeting-project-overview__actions {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 .meeting-year-stack {

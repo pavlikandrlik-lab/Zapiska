@@ -35,10 +35,17 @@ public sealed class JednaniController : BaseController
                 {
                     ProjektId = project.ProjektId,
                     ProjektNazev = project.ProjektNazev,
+                    ProjektZkratka = project.ProjektZkratka,
+                    ProjektStavKod = project.ProjektStavKod,
+                    ProjektStav = project.ProjektStav,
+                    MistoPlneni = project.MistoPlneni,
+                    PocetLetos = project.PocetLetos,
+                    PocetCelkem = project.PocetCelkem,
                     Jednani = project.Jednani,
                     RocniSkupiny = project.RocniSkupiny,
                     PreviewRok = MeetingYearGroupBuilder.ResolvePreviewYear(project.RocniSkupiny, GetLocalNow().Year),
-                    CanDeleteMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, project.ProjektId)
+                    CanDeleteMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, project.ProjektId),
+                    CanCreateMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, project.ProjektId)
                 })
                 .ToList()
         });

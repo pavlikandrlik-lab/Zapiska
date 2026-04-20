@@ -20,11 +20,16 @@ public sealed partial class MeetingService
         var meetingRowsQuery =
             from meeting in dbContext.Jednani.AsNoTracking()
             join project in dbContext.Projekty.AsNoTracking() on meeting.ProjektId equals project.Id
+            join projectStatus in dbContext.CiselnikStavuProjektu.AsNoTracking() on project.StavId equals projectStatus.Id
             join status in dbContext.CiselnikStavuJednani.AsNoTracking() on meeting.StavJednaniId equals status.Id
             select new
             {
                 ProjektId = project.Id,
                 ProjektNazev = project.CelyNazev,
+                ProjektZkratka = project.Zkratka,
+                ProjektStavKod = projectStatus.Kod,
+                ProjektStav = projectStatus.Nazev,
+                ProjektMistoPlneni = project.MistoPlneni,
                 ProjectSortKey = project.Zkratka,
                 meeting.Id,
                 meeting.CisloJednani,
@@ -58,8 +63,10 @@ public sealed partial class MeetingService
             : await dbContext.Osoby.AsNoTracking()
                 .Where(x => lockedPersonIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
+        var currentYear = DateTime.UtcNow.Year;
+
         return rows
-            .GroupBy(x => new { x.ProjektId, x.ProjektNazev })
+            .GroupBy(x => new { x.ProjektId, x.ProjektNazev, x.ProjektZkratka, x.ProjektStavKod, x.ProjektStav, x.ProjektMistoPlneni })
             .Select(group =>
             {
                 var meetings = group
@@ -82,6 +89,12 @@ public sealed partial class MeetingService
                 {
                     ProjektId = group.Key.ProjektId,
                     ProjektNazev = group.Key.ProjektNazev,
+                    ProjektZkratka = group.Key.ProjektZkratka,
+                    ProjektStavKod = group.Key.ProjektStavKod,
+                    ProjektStav = group.Key.ProjektStav,
+                    MistoPlneni = group.Key.ProjektMistoPlneni,
+                    PocetCelkem = meetings.Count,
+                    PocetLetos = meetings.Count(m => m.Datum.Year == currentYear),
                     Jednani = meetings,
                     RocniSkupiny = MeetingYearGroupBuilder.BuildYearGroups(meetings)
                 };

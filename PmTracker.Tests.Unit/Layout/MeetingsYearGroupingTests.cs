@@ -150,17 +150,19 @@ public sealed class MeetingsYearGroupingTests
     [Fact]
     public void ApplicationJednaniIndex_ShouldWrapHistoricalYearsInProjectHistoryBody()
     {
-        // Úprava #2: historické roky na /Jednani/Index jsou defaultně skryté za
-        // project-level toggle v hlavičce projektu. Markup: [data-project-history-body][hidden]
-        // kolem historických year-groups; aktuální rok zůstává mimo wrapper.
+        // Úprava #2 + sidebar redesign (2026-04-20): historické roky jsou skryté za
+        // project-level toggle. Dříve byl toggle na hlavičce; po redesignu je jako
+        // <button> v meetings area (button element = implicitní role=button).
+        // Markup: [data-project-history-body][hidden] kolem historických year-groups.
         var source = LoadViewSource("PmTracker.Web/Views/Jednani/Index.cshtml");
 
         source.Should().Contain("data-project-history-toggle",
-            "hlavička projekt-karty je klikatelný toggle");
+            "project-level toggle má data atribut pro JS delegaci");
         source.Should().Contain("data-project-history-body",
             "wrapper kolem historických year-groups");
-        source.Should().Contain("role=\"button\"",
-            "hlavička je role button pro accessibility");
+        source.Should().MatchRegex(
+            @"<button[^>]*data-project-history-toggle",
+            "toggle je button element (implicitní role=button)");
         source.Should().MatchRegex(
             @"data-project-history-body[^>]*hidden",
             "wrapper historických roků je defaultně hidden");
@@ -188,12 +190,14 @@ public sealed class MeetingsYearGroupingTests
     [Fact]
     public void ProjectHistoryCss_ShouldStyleHeaderAsToggle()
     {
+        // Po sidebar redesign (2026-04-20): toggle je button v meetings area,
+        // ne klikatelná header. CSS stylizuje novou třídu.
         var css = LoadViewSource("PmTracker.Web/wwwroot/css/site.css");
 
-        css.Should().Contain(".meeting-header[data-project-history-toggle]",
-            "CSS stylizuje toggle-able header (pointer, hover)");
+        css.Should().Contain(".meeting-project-overview__history-toggle",
+            "CSS stylizuje history toggle button v meetings area");
         css.Should().Contain(".meeting-project-chevron",
-            "chevron má vlastní class pro swap name attribut");
+            "chevron má vlastní class pro rotaci při aria-expanded=true");
     }
 
     [Fact]

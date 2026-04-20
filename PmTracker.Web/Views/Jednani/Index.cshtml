@@ -1,6 +1,7 @@
 @model JednaniIndexViewModel
 @{
     ViewData["Title"] = "Jednání";
+    ViewData["BodyClass"] = "dashboard-page";
 }
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
@@ -21,80 +22,124 @@
         .ToList();
     var hasHistory = historicalYearGroups.Count > 0;
     var historyBodyId = $"project-history-{projekt.ProjektId}";
+    var stavModifier = projekt.ProjektStavKod?.ToLowerInvariant() switch
+    {
+        "running" or "rozbehnut" => "running",
+        "paused" or "pozastaven" => "paused",
+        "done" or "ukoncen" => "done",
+        _ => "neutral"
+    };
 
     <section class="card meeting-project-overview" data-project-card>
-        @if (hasHistory)
-        {
-            <header class="meeting-header"
-                    role="button"
-                    data-project-history-toggle
-                    aria-controls="@historyBodyId"
-                    aria-expanded="false"
-                    tabindex="0">
-                <h2>@projekt.ProjektNazev</h2>
-                <span class="meeting-project-history-count" aria-hidden="true">
-                    +@historicalYearGroups.Count starších @(historicalYearGroups.Count == 1 ? "rok" : historicalYearGroups.Count < 5 ? "roky" : "roků")
-                </span>
-                <gov-icon class="meeting-project-chevron" name="chevron-down" type="components" aria-hidden="true"></gov-icon>
-            </header>
-        }
-        else
-        {
-            <header class="meeting-header">
-                <h2>@projekt.ProjektNazev</h2>
-            </header>
-        }
-
-        @if (projekt.Jednani.Count == 0)
-        {
-            <p class="muted">Projekt zatím nemá evidovaná jednání.</p>
-        }
-        else
-        {
-            @* Aktuální rok — vždy viditelný *@
-            @if (previewYearGroups.Count > 0)
+        <aside class="meeting-project-overview__sidebar">
+            <span class="meeting-project-overview__ticker">Projekt</span>
+            <div class="meeting-project-overview__heading">
+                @if (!string.IsNullOrWhiteSpace(projekt.ProjektZkratka))
+                {
+                    <span class="meeting-project-overview__zkratka">@projekt.ProjektZkratka</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(projekt.ProjektStav))
+                {
+                    <span class="meeting-project-overview__stav meeting-project-overview__stav--@stavModifier">@projekt.ProjektStav</span>
+                }
+            </div>
+            <h2 class="meeting-project-overview__nazev">@projekt.ProjektNazev</h2>
+            @if (!string.IsNullOrWhiteSpace(projekt.MistoPlneni))
             {
-                <div class="meeting-year-stack"
-                     data-meeting-overview="year-grouped"
-                     data-meeting-history-default="collapsed"
-                     data-meeting-preview-year="@(projekt.PreviewRok?.ToString() ?? string.Empty)">
-                    @foreach (var rok in previewYearGroups)
-                    {
-                        @await Html.PartialAsync("_MeetingYearGroup", new MeetingYearGroupPartialViewModel
-                        {
-                            Rok = rok,
-                            IsPreviewYear = true,
-                            ProjektId = projekt.ProjektId,
-                            CanDeleteMeetings = projekt.CanDeleteMeetings
-                        })
-                    }
-                </div>
+                <dl class="meeting-project-overview__meta">
+                    <dt>Místo plnění</dt>
+                    <dd>@projekt.MistoPlneni</dd>
+                </dl>
             }
+            <div class="meeting-project-overview__stats">
+                <div class="meeting-project-overview__stat">
+                    <b>@projekt.PocetLetos</b>
+                    <span>Letos</span>
+                </div>
+                <div class="meeting-project-overview__stat">
+                    <b>@projekt.PocetCelkem</b>
+                    <span>Celkem</span>
+                </div>
+            </div>
+            <div class="meeting-project-overview__actions">
+                <pm-button variant="Secondary"
+                           size="Small"
+                           href="@(Url.Action("Detail", "Projekty", new { id = projekt.ProjektId, tab = "jednani" }) ?? $"/Projekty/Detail/{projekt.ProjektId}?tab=jednani")">
+                    Detail projektu
+                </pm-button>
+                @if (projekt.CanCreateMeetings)
+                {
+                    <pm-button variant="Primary"
+                               size="Small"
+                               data-modal-url="@Url.Action("NewMeetingModal", "Projekty", new { projektId = projekt.ProjektId })">
+                        Nové jednání
+                    </pm-button>
+                }
+            </div>
+        </aside>
 
-            @* Historické roky — uvnitř toggleable wrapperu *@
-            @if (hasHistory)
+        <div class="meeting-project-overview__meetings">
+            @if (projekt.Jednani.Count == 0)
             {
-                <div class="meeting-project-history-body"
-                     id="@historyBodyId"
-                     data-project-history-body
-                     hidden>
+                <p class="muted">Projekt zatím nemá evidovaná jednání.</p>
+            }
+            else
+            {
+                @* Aktuální rok — vždy viditelný *@
+                @if (previewYearGroups.Count > 0)
+                {
                     <div class="meeting-year-stack"
                          data-meeting-overview="year-grouped"
                          data-meeting-history-default="collapsed"
-                         data-meeting-preview-year="">
-                        @foreach (var rok in historicalYearGroups)
+                         data-meeting-preview-year="@(projekt.PreviewRok?.ToString() ?? string.Empty)">
+                        @foreach (var rok in previewYearGroups)
                         {
                             @await Html.PartialAsync("_MeetingYearGroup", new MeetingYearGroupPartialViewModel
                             {
                                 Rok = rok,
-                                IsPreviewYear = false,
+                                IsPreviewYear = true,
                                 ProjektId = projekt.ProjektId,
                                 CanDeleteMeetings = projekt.CanDeleteMeetings
                             })
                         }
                     </div>
-                </div>
+                }
+
+                @if (hasHistory)
+                {
+                    var historyMeetingsCount = historicalYearGroups.Sum(r => r.PocetJednani);
+                    <div class="meeting-project-overview__history">
+                        <button type="button"
+                                class="meeting-project-overview__history-toggle"
+                                data-project-history-toggle
+                                aria-controls="@historyBodyId"
+                                aria-expanded="false">
+                            <gov-icon class="meeting-project-chevron" name="chevron-down" type="components" aria-hidden="true"></gov-icon>
+                            <span>+@historicalYearGroups.Count starších @(historicalYearGroups.Count == 1 ? "rok" : historicalYearGroups.Count < 5 ? "roky" : "roků") (@historyMeetingsCount @(historyMeetingsCount == 1 ? "jednání" : historyMeetingsCount < 5 ? "jednání" : "jednání"))</span>
+                        </button>
+                        <div class="meeting-project-overview__history-body"
+                             id="@historyBodyId"
+                             data-project-history-body
+                             hidden>
+                            <div class="meeting-year-stack"
+                                 data-meeting-overview="year-grouped"
+                                 data-meeting-history-default="collapsed"
+                                 data-meeting-preview-year="">
+                                @foreach (var rok in historicalYearGroups)
+                                {
+                                    @await Html.PartialAsync("_MeetingYearGroup", new MeetingYearGroupPartialViewModel
+                                    {
+                                        Rok = rok,
+                                        IsPreviewYear = false,
+                                        ProjektId = projekt.ProjektId,
+                                        CanDeleteMeetings = projekt.CanDeleteMeetings
+                                    })
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
             }
-        }
+        </div>
     </section>
 }

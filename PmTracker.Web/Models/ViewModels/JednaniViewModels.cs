@@ -12,10 +12,17 @@ public sealed class JednaniProjektListItemViewModel
 {
     public int ProjektId { get; init; }
     public required string ProjektNazev { get; init; }
+    public string ProjektZkratka { get; init; } = string.Empty;
+    public string? ProjektStavKod { get; init; }
+    public string? ProjektStav { get; init; }
+    public string? MistoPlneni { get; init; }
+    public int PocetLetos { get; init; }
+    public int PocetCelkem { get; init; }
     public required IReadOnlyList<JednaniListItemViewModel> Jednani { get; init; }
     public IReadOnlyList<JednaniYearGroupViewModel> RocniSkupiny { get; init; } = Array.Empty<JednaniYearGroupViewModel>();
     public int? PreviewRok { get; set; }
     public bool CanDeleteMeetings { get; set; }
+    public bool CanCreateMeetings { get; set; }
 }
 
 public sealed class JednaniYearGroupViewModel
