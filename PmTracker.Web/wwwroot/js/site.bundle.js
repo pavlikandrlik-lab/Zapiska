@@ -871,7 +871,7 @@ async function copyTextToClipboard(text) {
   return copied;
 }
 
-// PmTracker.Web/wwwroot/js/modules/filters.js
+// PmTracker.Web/wwwroot/js/modules/filters/ (Fáze 3B Task 4: projectFilter.js + recordDisplay.js + printFilter.js + index.js)
 var projectFilterStoragePrefix = "pmtracker.projectFilters.v1.project.";
 var projectRecordFilterPanelStorageKey = "pmtracker.filters.open";
 var legacyProjectFilterPrefixes = [
