@@ -1,6 +1,7 @@
 @model DashboardFocusListPageViewModel
 @{
     ViewData["Title"] = Model.PageTitle;
+    ViewData["BodyClass"] = "dashboard-page";
 }
 
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
