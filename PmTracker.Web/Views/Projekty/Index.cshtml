@@ -1,6 +1,7 @@
 @model ProjektyIndexViewModel
 @{
     ViewData["Title"] = "Projekty";
+    ViewData["BodyClass"] = "dashboard-page";
     var canHideDone = Model.StavyProjektu.Any(x => string.Equals(x.Value, "DONE", StringComparison.OrdinalIgnoreCase));
     var canHideDeleted = Model.StavyProjektu.Any(x => string.Equals(x.Value, "DELETED", StringComparison.OrdinalIgnoreCase));
 }
