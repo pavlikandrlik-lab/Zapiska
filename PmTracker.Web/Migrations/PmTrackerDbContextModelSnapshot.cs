@@ -590,6 +590,38 @@ namespace PmTracker.Web.Migrations
                     b.ToTable("ciselnik_typu_ukolu", (string)null);
                 });
 
+            modelBuilder.Entity("PmTracker.Web.Models.Entities.CiselnikVyzvaEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_locked");
+
+                    b.Property<string>("Kod")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("kod");
+
+                    b.Property<string>("Nazev")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("nazev");
+
+                    b.Property<DateTime>("Rok")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("rok");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ciselnik_vyzvy", (string)null);
+                });
+
             modelBuilder.Entity("PmTracker.Web.Models.Entities.HarmonogramSablonaEntity", b =>
                 {
                     b.Property<int>("Verze")
@@ -872,16 +904,6 @@ namespace PmTracker.Web.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("cely_nazev");
 
-                    b.Property<string>("CisloRamcoveSmlouvy")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("cislo_ramcove_smlouvy");
-
-                    b.Property<string>("MistoPlneni")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
-                        .HasColumnName("misto_plneni");
-
                     b.Property<bool>("PouzivatIdentJednani")
                         .HasColumnType("bit")
                         .HasColumnName("pouzivat_ident_jednani");
@@ -919,10 +941,6 @@ namespace PmTracker.Web.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("datum_prirazeni");
 
-                    b.Property<int>("Poradi")
-                        .HasColumnType("int")
-                        .HasColumnName("poradi");
-
                     b.Property<int>("ProjektId")
                         .HasColumnType("int")
                         .HasColumnName("projekt_id");
@@ -932,11 +950,6 @@ namespace PmTracker.Web.Migrations
                         .HasColumnName("subsystem_id");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ProjektId", "Poradi")
-                        .IsUnique()
-                        .HasDatabaseName("UX_projekt_subsystemy_projekt_poradi_aktivni")
-                        .HasFilter("[datum_odebrani] IS NULL");
 
                     b.HasIndex("ProjektId", "SubsystemId")
                         .IsUnique()
@@ -1056,29 +1069,6 @@ namespace PmTracker.Web.Migrations
                         });
                 });
 
-            modelBuilder.Entity("PmTracker.Web.Models.Entities.SearchReindexCheckpointEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("int")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime?>("LastProcessedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("last_processed_at");
-
-                    b.Property<long>("LastProcessedAuditId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("last_processed_audit_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("search_reindex_checkpoint", "dbo");
-                });
-
             modelBuilder.Entity("PmTracker.Web.Models.Entities.SubsystemEntity", b =>
                 {
                     b.Property<int>("Id")
@@ -1157,114 +1147,6 @@ namespace PmTracker.Web.Migrations
                     b.ToTable("vyjadreni", (string)null);
                 });
 
-            modelBuilder.Entity("PmTracker.Web.Models.Entities.VyzvaEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CisloRamcoveSmlouvySnapshot")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("cislo_ramcove_smlouvy_snapshot");
-
-                    b.Property<DateTime?>("DatumOdeslani")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("datum_odeslani");
-
-                    b.Property<DateTime>("DatumZalozeni")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("datum_zalozeni");
-
-                    b.Property<string>("Kod")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("kod");
-
-                    b.Property<string>("MistoPlneniSnapshot")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
-                        .HasColumnName("misto_plneni_snapshot");
-
-                    b.Property<int?>("OdeslalOsobaId")
-                        .HasColumnType("int")
-                        .HasColumnName("odeslal_osoba_id");
-
-                    b.Property<int>("PoradoveVRoce")
-                        .HasColumnType("int")
-                        .HasColumnName("poradove_v_roce");
-
-                    b.Property<int>("ProjektId")
-                        .HasColumnType("int")
-                        .HasColumnName("projekt_id");
-
-                    b.Property<int>("Rok")
-                        .HasColumnType("int")
-                        .HasColumnName("rok");
-
-                    b.Property<byte>("Stav")
-                        .HasColumnType("tinyint")
-                        .HasColumnName("stav");
-
-                    b.Property<int>("ZalozilOsobaId")
-                        .HasColumnType("int")
-                        .HasColumnName("zalozil_osoba_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjektId", "DatumZalozeni")
-                        .HasDatabaseName("ix_vyzvy_projekt_datum_desc");
-
-                    b.HasIndex("CisloRamcoveSmlouvySnapshot", "Rok", "PoradoveVRoce")
-                        .IsUnique()
-                        .HasDatabaseName("ux_vyzvy_smlouva_rok_poradove");
-
-                    b.ToTable("vyzvy", (string)null);
-                });
-
-            modelBuilder.Entity("PmTracker.Web.Models.Entities.VyzvaHistorieStavuEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("DatumZmeny")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("datum_zmeny");
-
-                    b.Property<byte>("NovyStav")
-                        .HasColumnType("tinyint")
-                        .HasColumnName("novy_stav");
-
-                    b.Property<byte?>("PuvodniStav")
-                        .HasColumnType("tinyint")
-                        .HasColumnName("puvodni_stav");
-
-                    b.Property<int>("VyzvaId")
-                        .HasColumnType("int")
-                        .HasColumnName("vyzva_id");
-
-                    b.Property<int>("ZmenilOsobaId")
-                        .HasColumnType("int")
-                        .HasColumnName("zmenil_osoba_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("VyzvaId")
-                        .HasDatabaseName("ix_vyzva_historie_stavu_vyzva_id");
-
-                    b.ToTable("vyzva_historie_stavu", (string)null);
-                });
-
             modelBuilder.Entity("PmTracker.Web.Models.Entities.ZaznamExterniOdkazEntity", b =>
                 {
                     b.Property<int>("Id")
@@ -1276,7 +1158,7 @@ namespace PmTracker.Web.Migrations
 
                     b.Property<string>("Cislo")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("cislo");
 
                     b.Property<DateTime?>("DatumDodani")
@@ -1303,28 +1185,15 @@ namespace PmTracker.Web.Migrations
                         .HasColumnType("int")
                         .HasColumnName("typ_odkazu_id");
 
-                    b.Property<int?>("VyzvaId")
+                    b.Property<int?>("Vyzva")
                         .HasColumnType("int")
-                        .HasColumnName("vyzva_id");
-
-                    b.Property<bool>("ZaradidDoVyzvy")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false)
-                        .HasColumnName("zaradid_do_vyzvy");
+                        .HasColumnName("vyzva");
 
                     b.Property<int>("ZaznamId")
                         .HasColumnType("int")
                         .HasColumnName("zaznam_id");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Cislo")
-                        .IsUnique()
-                        .HasDatabaseName("ux_zaznam_externi_odkazy_cislo_in_vyzve")
-                        .HasFilter("[vyzva_id] IS NOT NULL");
-
-                    b.HasIndex("VyzvaId");
 
                     b.ToTable("zaznam_externi_odkazy", (string)null);
                 });
@@ -1552,172 +1421,6 @@ namespace PmTracker.Web.Migrations
                     b.ToTable("zaznam_historie_zmen_typu", (string)null);
                 });
 
-            modelBuilder.Entity("PmTracker.Web.Models.Entities.ZaznamNavrhEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("ApprovedRecordId")
-                        .HasColumnType("int")
-                        .HasColumnName("approved_record_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<int>("CreatedByOsobaId")
-                        .HasColumnType("int")
-                        .HasColumnName("created_by_osoba_id");
-
-                    b.Property<DateTime?>("DecidedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("decided_at");
-
-                    b.Property<int?>("DecidedByOsobaId")
-                        .HasColumnType("int")
-                        .HasColumnName("decided_by_osoba_id");
-
-                    b.Property<string>("PayloadJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("payload_json");
-
-                    b.Property<int>("ProjektId")
-                        .HasColumnType("int")
-                        .HasColumnName("projekt_id");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion")
-                        .HasColumnName("row_version");
-
-                    b.Property<string>("Stav")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)")
-                        .HasColumnName("stav");
-
-                    b.Property<int>("SubsystemId")
-                        .HasColumnType("int")
-                        .HasColumnName("subsystem_id");
-
-                    b.Property<string>("TypNavrhu")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)")
-                        .HasColumnName("typ_navrhu");
-
-                    b.Property<int?>("ZaznamId")
-                        .HasColumnType("int")
-                        .HasColumnName("zaznam_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjektId", "CreatedAt")
-                        .HasDatabaseName("IX_zaznam_navrhy_projekt_created_at");
-
-                    b.HasIndex("ZaznamId", "TypNavrhu")
-                        .IsUnique()
-                        .HasDatabaseName("UX_zaznam_navrhy_pending_schedule_per_record")
-                        .HasFilter("[stav] = 'PENDING' AND [typ_navrhu] = 'SCHEDULE_PLAN_CHANGE'");
-
-                    b.HasIndex("ZaznamId", "TypNavrhu", "Stav")
-                        .HasDatabaseName("IX_zaznam_navrhy_zaznam_typ_stav");
-
-                    b.ToTable("zaznam_navrhy", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_zaznam_navrhy_stav", "stav IN ('PENDING', 'APPROVED', 'REJECTED')");
-
-                            t.HasCheckConstraint("CK_zaznam_navrhy_typ", "typ_navrhu IN ('CREATE_RECORD', 'SCHEDULE_PLAN_CHANGE')");
-                        });
-                });
-
-            modelBuilder.Entity("PmTracker.Web.Models.Entities.ZaznamPriorityRebuildStateEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("LastFullRebuildAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("last_full_rebuild_at");
-
-                    b.Property<long?>("LastFullRebuildDurationMs")
-                        .HasColumnType("bigint")
-                        .HasColumnName("last_full_rebuild_duration_ms");
-
-                    b.Property<string>("LastFullRebuildStatus")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)")
-                        .HasColumnName("last_full_rebuild_status");
-
-                    b.Property<int?>("LastFullRebuildTaskCount")
-                        .HasColumnType("int")
-                        .HasColumnName("last_full_rebuild_task_count");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("zaznam_priority_rebuild_state", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_zaznam_priority_rebuild_state_singleton", "id = 1");
-
-                            t.HasCheckConstraint("CK_zaznam_priority_rebuild_state_status", "last_full_rebuild_status IN ('NEVER', 'SUCCESS', 'FAILED', 'RUNNING')");
-                        });
-                });
-
-            modelBuilder.Entity("PmTracker.Web.Models.Entities.ZaznamPriorityUzivateleEntity", b =>
-                {
-                    b.Property<int>("ZaznamId")
-                        .HasColumnType("int")
-                        .HasColumnName("zaznam_id");
-
-                    b.Property<int>("OsobaId")
-                        .HasColumnType("int")
-                        .HasColumnName("osoba_id");
-
-                    b.Property<DateTime>("ComputedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("computed_at");
-
-                    b.Property<int>("DeadlineSignal")
-                        .HasColumnType("int")
-                        .HasColumnName("deadline_signal");
-
-                    b.Property<int>("MilestoneSignal")
-                        .HasColumnType("int")
-                        .HasColumnName("milestone_signal");
-
-                    b.Property<int>("RoleWeight")
-                        .HasColumnType("int")
-                        .HasColumnName("role_weight");
-
-                    b.Property<int>("Score")
-                        .HasColumnType("int")
-                        .HasColumnName("score");
-
-                    b.HasKey("ZaznamId", "OsobaId");
-
-                    b.HasIndex("OsobaId", "Score", "ZaznamId")
-                        .IsDescending(false, true, false)
-                        .HasDatabaseName("IX_zaznam_priority_uzivatelu_osoba_score_zaznam");
-
-                    b.ToTable("zaznam_priority_uzivatelu", (string)null);
-                });
-
             modelBuilder.Entity("PmTracker.Web.Models.Entities.ZaznamSpolupraceEntity", b =>
                 {
                     b.Property<int>("ZaznamId")
@@ -1766,32 +1469,6 @@ namespace PmTracker.Web.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_projektove_zaznamy_harmonogram_sablona");
-                });
-
-            modelBuilder.Entity("PmTracker.Web.Models.Entities.VyzvaEntity", b =>
-                {
-                    b.HasOne("PmTracker.Web.Models.Entities.ProjektEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ProjektId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("PmTracker.Web.Models.Entities.VyzvaHistorieStavuEntity", b =>
-                {
-                    b.HasOne("PmTracker.Web.Models.Entities.VyzvaEntity", null)
-                        .WithMany()
-                        .HasForeignKey("VyzvaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("PmTracker.Web.Models.Entities.ZaznamExterniOdkazEntity", b =>
-                {
-                    b.HasOne("PmTracker.Web.Models.Entities.VyzvaEntity", null)
-                        .WithMany()
-                        .HasForeignKey("VyzvaId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("PmTracker.Web.Models.Entities.CiselnikStavuProjektuEntity", b =>
