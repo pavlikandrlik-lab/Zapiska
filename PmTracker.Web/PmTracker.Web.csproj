@@ -22,6 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PmTracker.ServiceDesk.Contracts\PmTracker.ServiceDesk.Contracts.csproj" />
+    <ProjectReference Include="..\PmTracker.ServiceDesk.Sql\PmTracker.ServiceDesk.Sql.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="..\docs\technical\*.md">
       <Link>DocsContent\technical\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
