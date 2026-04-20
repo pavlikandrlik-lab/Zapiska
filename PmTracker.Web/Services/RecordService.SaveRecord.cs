@@ -13,6 +13,11 @@ using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services;
 
+/// <summary>
+/// Fáze 3C Task 1: RecordService.SaveRecord.cs — SaveRecordAsync + private
+/// helpers pro validaci, harmonogram persistence, external links, collaborators.
+/// Další operace (Delete, MeetingIdentifier) v samostatných partials.
+/// </summary>
 public sealed partial class RecordService
 {
     private static readonly StringComparer Ci = StringComparer.OrdinalIgnoreCase;
@@ -291,188 +296,6 @@ public sealed partial class RecordService
         }
 
         return entity.Id;
-    }
-
-    public async Task DeleteRecordAsync(DeleteRecordCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
-    {
-        var record = await dbContext.ProjektoveZaznamy
-            .FirstOrDefaultAsync(x => x.Id == command.ZaznamId, ct)
-            ?? throw new InvalidOperationException($"Záznam {command.ZaznamId} nebyl nalezen.");
-
-        if (record.ProjektId != command.ProjektId)
-        {
-            throw new InvalidOperationException("Záznam nepatří do vybraného projektu.");
-        }
-
-        await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-
-        var historyTypeRows = await dbContext.ZaznamHistorieZmenTypu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var historyDeadlineRows = await dbContext.ZaznamHistorieTerminu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var historyOwnerRows = await dbContext.ZaznamHistorieVlastnik.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var historySubsystemRows = await dbContext.ZaznamHistorieSubsystem.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var historyStateRows = await dbContext.ZaznamHistorieStavuZaznamu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var historyProjectStateRows = await dbContext.ZaznamHistorieStavuProjektu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var externalLinkRows = await dbContext.ZaznamExterniOdkazy.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var collaborationRows = await dbContext.ZaznamSpoluprace.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var scheduleRows = await dbContext.ZaznamHarmonogramHodnoty.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var commentRows = await dbContext.Vyjadreni.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var oldRecord = RecordAuditSnapshot.FromEntity(record);
-        var oldScheduleSnapshot = RecordScheduleAuditSnapshot.FromEntities(command.ZaznamId, scheduleRows);
-        var oldCommentSnapshots = commentRows.Select(CommentAuditSnapshot.FromEntity).ToList();
-
-        if (historyTypeRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieZmenTypu.RemoveRange(historyTypeRows);
-        }
-
-        if (historyDeadlineRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieTerminu.RemoveRange(historyDeadlineRows);
-        }
-
-        if (historyOwnerRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieVlastnik.RemoveRange(historyOwnerRows);
-        }
-
-        if (historySubsystemRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieSubsystem.RemoveRange(historySubsystemRows);
-        }
-
-        if (historyStateRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieStavuZaznamu.RemoveRange(historyStateRows);
-        }
-
-        if (historyProjectStateRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieStavuProjektu.RemoveRange(historyProjectStateRows);
-        }
-
-        if (externalLinkRows.Count > 0)
-        {
-            dbContext.ZaznamExterniOdkazy.RemoveRange(externalLinkRows);
-        }
-
-        if (collaborationRows.Count > 0)
-        {
-            dbContext.ZaznamSpoluprace.RemoveRange(collaborationRows);
-        }
-
-        if (scheduleRows.Count > 0)
-        {
-            dbContext.ZaznamHarmonogramHodnoty.RemoveRange(scheduleRows);
-        }
-
-        if (commentRows.Count > 0)
-        {
-            dbContext.Vyjadreni.RemoveRange(commentRows);
-        }
-
-        var priorityRows = await dbContext.ZaznamPriorityUzivatelu
-            .Where(x => x.ZaznamId == command.ZaznamId)
-            .ToListAsync(ct);
-        if (priorityRows.Count > 0)
-        {
-            dbContext.ZaznamPriorityUzivatelu.RemoveRange(priorityRows);
-        }
-
-        if (historyTypeRows.Count > 0
-            || historyDeadlineRows.Count > 0
-            || historyOwnerRows.Count > 0
-            || historySubsystemRows.Count > 0
-            || historyStateRows.Count > 0
-            || historyProjectStateRows.Count > 0
-            || externalLinkRows.Count > 0
-            || collaborationRows.Count > 0
-            || scheduleRows.Count > 0
-            || commentRows.Count > 0
-            || priorityRows.Count > 0)
-        {
-            await dbContext.SaveChangesAsync(ct);
-        }
-
-        dbContext.ProjektoveZaznamy.Remove(record);
-        await dbContext.SaveChangesAsync(ct);
-        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Delete,
-            AuditEntityType.Record,
-            command.ZaznamId.ToString(CultureInfo.InvariantCulture),
-            oldRecord,
-            null));
-        if (scheduleRows.Count > 0)
-        {
-            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                AuditActionType.Delete,
-                AuditEntityType.RecordSchedule,
-                command.ZaznamId.ToString(CultureInfo.InvariantCulture),
-                oldScheduleSnapshot,
-                null));
-        }
-
-        foreach (var oldCommentSnapshot in oldCommentSnapshots)
-        {
-            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                AuditActionType.Delete,
-                AuditEntityType.Comment,
-                oldCommentSnapshot.Id.ToString(CultureInfo.InvariantCulture),
-                oldCommentSnapshot,
-                null));
-        }
-
-        await dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-    }
-
-    public async Task AssignMeetingIdentifierAsync(
-        AssignMeetingIdentifierCommand command,
-        CurrentUserContextViewModel currentUser,
-        IRecordWriteCommandsComposition composition,
-        CancellationToken ct = default)
-    {
-        await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-
-        var record = await dbContext.ProjektoveZaznamy
-            .FromSqlRaw("SELECT * FROM projektove_zaznamy WITH (UPDLOCK, HOLDLOCK) WHERE id = {0}", command.ZaznamId)
-            .FirstOrDefaultAsync(ct)
-            ?? throw new InvalidOperationException($"Záznam {command.ZaznamId} nebyl nalezen.");
-        if (record.ProjektId != command.ProjektId)
-        {
-            throw new InvalidOperationException("Záznam nepatří do vybraného projektu.");
-        }
-
-        if (record.CisloViditelneTyp == RecordDisplayNumberTypeMeeting)
-        {
-            throw new InvalidOperationException("Záznam už má identifikátor podle jednání.");
-        }
-
-        var openMeetings = await LoadOpenProjectMeetingsAsync(command.ProjektId, ct);
-        if (openMeetings.Count == 0)
-        {
-            throw new InvalidOperationException("Není dostupné žádné neuzavřené jednání.");
-        }
-
-        var meeting = openMeetings
-            .FirstOrDefault(x => x.Id == command.JednaniId)
-            ?? throw new InvalidOperationException("Vybrané jednání neexistuje.");
-
-        var nextOrder = await composition.AllocateMeetingOrderTransactionalAsync(command.ProjektId, meeting.CisloJednani, ct);
-        var old = RecordAuditSnapshot.FromEntity(record);
-        record.CisloViditelneTyp = RecordDisplayNumberTypeMeeting;
-        record.CisloViditelneA = meeting.CisloJednani;
-        record.CisloViditelneB = nextOrder;
-        record.CisloJednaniZdrojId = meeting.Id;
-        record.CisloViditelne = $"{meeting.CisloJednani}-{nextOrder}";
-        await dbContext.SaveChangesAsync(ct);
-        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Assign,
-            AuditEntityType.Record,
-            record.Id.ToString(CultureInfo.InvariantCulture),
-            old,
-            RecordAuditSnapshot.FromEntity(record)));
-        await dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
     }
 
     private async Task<SaveRecordValidationContext> ValidateRecordSaveCommandAsync(
@@ -1622,9 +1445,6 @@ public sealed partial class RecordService
         return normalizedResult;
     }
 
-    private static bool IsMeetingReadOnly(JednaniEntity? meeting, CiselnikStavuJednaniEntity? status)
-        => MeetingStatePolicy.IsReadOnly(meeting, status);
-
     private async Task<(IDbContextTransaction? Transaction, bool OwnsTransaction)> BeginSerializableTransactionIfNeededAsync(CancellationToken ct)
     {
         if (dbContext.Database.CurrentTransaction is not null)
@@ -1635,19 +1455,6 @@ public sealed partial class RecordService
         var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         return (transaction, true);
     }
-
-    private Task<List<OpenMeetingRow>> LoadOpenProjectMeetingsAsync(int projectId, CancellationToken ct)
-        => (
-                from meeting in dbContext.Jednani.AsNoTracking()
-                join state in dbContext.CiselnikStavuJednani.AsNoTracking() on meeting.StavJednaniId equals state.Id
-                where meeting.ProjektId == projectId
-                    && !meeting.UzamklOsobaId.HasValue
-                    && state.Kod != "CLOSED"
-                    && !EF.Functions.Like(state.Nazev, "%uzav%")
-                select new OpenMeetingRow(
-                    meeting.Id,
-                    meeting.CisloJednani))
-            .ToListAsync(ct);
 
     private DateTime GetLocalNow()
         => timeProvider.GetLocalNow().LocalDateTime;
