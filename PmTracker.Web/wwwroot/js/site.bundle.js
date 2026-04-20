@@ -9586,13 +9586,25 @@ function handleGovCloseEvent(event) {
   // gov-dialog emituje gov-close při kliknutí na vestavěný X button.
   // block-close="true" + block-backdrop-close="true" na dialogu zabraňují
   // self-close; event je čistě "žádost o zavření" kterou musí schválit
-  // náš dirty-check flow (promptRecordEditorDiscard).
-  const target = event.target;
-  if (target instanceof HTMLElement && target.tagName === "GOV-DIALOG" && target.hasAttribute("data-modal-container")) {
+  // náš flow (dirty-check nebo přímé zavření).
+  const dialog = event.target;
+  if (!(dialog instanceof HTMLElement) || dialog.tagName !== "GOV-DIALOG") {
+    return;
+  }
+  // Record-editor má vlastní dirty-check flow — gov-close je žádost
+  // o zavření, kterou musí schválit promptRecordEditorDiscard.
+  if (dialog.matches('[data-modal-variant="record-editor"]') ||
+    document.querySelector("[data-record-editor-form][data-dirty='true']")) {
     event.preventDefault();
     event.stopPropagation();
-    void requestRecordEditorModalClose(target);
+    void requestRecordEditorModalClose(dialog);
+    return;
   }
+  // Fallback pro všechny non-record-editor modaly (Přidat ručně, AD search,
+  // Přidat projektovou roli, atd.) — gov-close je fire-and-close,
+  // žádný dirty-check není potřeba.
+  event.preventDefault();
+  closeModal();
 }
 var rerenderRainbowLabelsOnResize = debounce(() => {
   renderAllRainbowSegmentLabels(document);
