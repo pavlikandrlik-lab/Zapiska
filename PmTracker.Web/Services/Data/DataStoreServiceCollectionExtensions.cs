@@ -7,7 +7,6 @@ using PmTracker.Web.Services.ActiveDirectory;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Dictionaries;
 using PmTracker.Web.Services.Export;
-using PmTracker.Web.Services.Export.Queries;
 using PmTracker.Web.Services.People;
 using PmTracker.Web.Services.Profile;
 using PmTracker.Web.Services;

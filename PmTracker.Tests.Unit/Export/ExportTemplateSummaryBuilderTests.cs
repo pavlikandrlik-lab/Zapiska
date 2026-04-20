@@ -1,5 +1,5 @@
 using FluentAssertions;
-using PmTracker.Web.Services.Export.Queries;
+using PmTracker.Web.Services.Export;
 
 namespace PmTracker.Tests.Unit.Export;
 
