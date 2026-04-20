@@ -1,5 +1,6 @@
 using System.IO;
 using FluentAssertions;
+using static PmTracker.Tests.Unit.Architecture.ArchitectureTestBase;
 
 namespace PmTracker.Tests.Unit.Architecture;
 
@@ -9,24 +10,6 @@ namespace PmTracker.Tests.Unit.Architecture;
 /// </summary>
 public sealed class DashboardPrioritySplitTests
 {
-    private static string RepoRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "PmTracker.sln")))
-        {
-            directory = directory.Parent;
-        }
-
-        if (directory is null)
-        {
-            throw new InvalidOperationException("Nepodařilo se najít kořen repozitáře (PmTracker.sln).");
-        }
-
-        return directory.FullName;
-    }
-
-    private static string ResolvePath(string relative) =>
-        Path.Combine(RepoRoot(), relative.Replace('/', Path.DirectorySeparatorChar));
 
     [Fact]
     public void OriginalGodFile_ShouldBeDeleted()

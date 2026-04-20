@@ -1,5 +1,6 @@
 using System.IO;
 using FluentAssertions;
+using static PmTracker.Tests.Unit.Architecture.ArchitectureTestBase;
 
 namespace PmTracker.Tests.Unit.Architecture;
 
@@ -9,24 +10,6 @@ namespace PmTracker.Tests.Unit.Architecture;
 /// </summary>
 public sealed class ExportTemplateQueriesSplitTests
 {
-    private static string RepoRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "PmTracker.sln")))
-        {
-            directory = directory.Parent;
-        }
-
-        if (directory is null)
-        {
-            throw new InvalidOperationException("Nepodařilo se najít kořen repozitáře (PmTracker.sln).");
-        }
-
-        return directory.FullName;
-    }
-
-    private static string ResolvePath(string relative) =>
-        Path.Combine(RepoRoot(), relative.Replace('/', Path.DirectorySeparatorChar));
 
     [Fact]
     public void Orchestration_ShouldBeSlim()
@@ -80,6 +63,18 @@ public sealed class ExportTemplateQueriesSplitTests
         var content = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Export/ExportProjectionModels.cs"));
         content.Should().Contain("ExportTemplateQueryResult");
         content.Should().Contain("ExportTemplateSummaryProjection");
+    }
+
+    [Fact]
+    public void ProjectionModels_ShouldNotImportEntityFramework()
+    {
+        var content = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Export/ExportProjectionModels.cs"));
+        content.Should().NotContain(
+            "using Microsoft.EntityFrameworkCore",
+            "Projection models musí být čisté record types bez EF závislosti");
+        content.Should().NotContain(
+            "using PmTracker.Web.Data",
+            "Projection models nesmí záviset na DbContext");
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System.IO;
 using FluentAssertions;
+using static PmTracker.Tests.Unit.Architecture.ArchitectureTestBase;
 
 namespace PmTracker.Tests.Unit.Architecture;
 
@@ -9,24 +10,6 @@ namespace PmTracker.Tests.Unit.Architecture;
 /// </summary>
 public sealed class OpenXmlWordExportSplitTests
 {
-    private static string RepoRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "PmTracker.sln")))
-        {
-            directory = directory.Parent;
-        }
-
-        if (directory is null)
-        {
-            throw new InvalidOperationException("Nepodařilo se najít kořen repozitáře (PmTracker.sln).");
-        }
-
-        return directory.FullName;
-    }
-
-    private static string ResolvePath(string relative) =>
-        Path.Combine(RepoRoot(), relative.Replace('/', Path.DirectorySeparatorChar));
 
     [Theory]
     [InlineData("PmTracker.Web/Services/Export/OpenXmlWordExportService.cs")]
@@ -84,5 +67,13 @@ public sealed class OpenXmlWordExportSplitTests
         var file = ResolvePath("PmTracker.Web/Services/Export/OpenXmlWordExportService.cs");
         var loc = File.ReadAllLines(file).Length;
         loc.Should().BeLessThan(400, "core orchestrator je štíhlý — section helpers přesunuty do partials");
+    }
+
+    [Fact]
+    public void CoreFile_ShouldDeclareSealedPartial()
+    {
+        var content = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Export/OpenXmlWordExportService.cs"));
+        content.Should().Contain("sealed partial class OpenXmlWordExportService",
+            "core soubor deklaruje sealed partial class (ne jen partial — prevent accidental inheritance)");
     }
 }

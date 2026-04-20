@@ -90,6 +90,12 @@ public sealed class PdfExportRecordViewModel
     public required IReadOnlyList<PdfExportCommentViewModel> Vyjadreni { get; init; }
 }
 
+/// <summary>
+/// Narrow model pro partial view _PdfRolesBlock.cshtml.
+/// Seskupuje pouze dvě hodnoty, které partial potřebuje, místo předávání celého PdfExportTemplateViewModel.
+/// </summary>
+public sealed record PdfRolesBlockViewModel(bool IsMeeting, IReadOnlyList<PdfRoleAssignmentViewModel> ProjektoveRole);
+
 public sealed class PdfExportCommentViewModel
 {
     public required string Autor { get; init; }

@@ -48,8 +48,8 @@
                     }
                 </div>
             }
-            @await Html.PartialAsync("_PdfRolesBlock", Model)
-            @await Html.PartialAsync("_PdfAttendanceBlock", Model)
+            @await Html.PartialAsync("_PdfRolesBlock", new PmTracker.Web.Models.ViewModels.PdfRolesBlockViewModel(Model.IsMeeting, Model.ProjektoveRole))
+            @await Html.PartialAsync("_PdfAttendanceBlock", Model.Dochazka)
         </header>
 
         <table class="records-table">

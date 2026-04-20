@@ -14,7 +14,7 @@ public static class OpenXmlWordElements
     internal const int RecordTitleHalfPoints = 24;
 
     /// <summary>Segment textu s volitelným formátováním pro <see cref="CreateRichParagraph"/>.</summary>
-    public readonly record struct TextSegment(
+    internal readonly record struct TextSegment(
         string Text,
         bool Bold = false,
         bool Italic = false,

@@ -375,8 +375,8 @@ public sealed class ExportAttendanceProjectionBuilder(
 {
     private static readonly StringComparer Ci = StringComparer.OrdinalIgnoreCase;
 
-    private sealed record ProjectRoleExportRow(int OsobaId, string Osoba, string RoleKod);
-    private sealed record SubsystemRoleExportRow(int OsobaId, string Osoba);
+    private sealed record AttendanceRoleRow(int OsobaId, string Osoba, string RoleKod);
+    private sealed record AttendanceSubsystemRow(int OsobaId, string Osoba);
 
     public async Task<IReadOnlyList<PdfAttendanceGroupViewModel>> BuildAttendanceGroupsAsync(int meetingId, int projectId, CancellationToken ct = default)
     {
@@ -458,7 +458,7 @@ public sealed class ExportAttendanceProjectionBuilder(
         ];
     }
 
-    private async Task<List<ProjectRoleExportRow>> BuildActiveProjectRoleAssignmentsAsync(int projectId, CancellationToken ct)
+    private async Task<List<AttendanceRoleRow>> BuildActiveProjectRoleAssignmentsAsync(int projectId, CancellationToken ct)
     {
         var assignments = await dbContext.ObsazeniProjektu.AsNoTracking()
             .Where(x => x.ProjektId == projectId && !x.DatumOdebrani.HasValue)
@@ -476,7 +476,7 @@ public sealed class ExportAttendanceProjectionBuilder(
             {
                 var person = people.GetValueOrDefault(assignment.OsobaId);
                 var role = roles.GetValueOrDefault(assignment.RoleId);
-                return new ProjectRoleExportRow(
+                return new AttendanceRoleRow(
                     assignment.OsobaId,
                     BuildDisplayNameFromOsoba(person),
                     role?.Kod ?? "-");
@@ -484,7 +484,7 @@ public sealed class ExportAttendanceProjectionBuilder(
             .ToList();
     }
 
-    private async Task<List<SubsystemRoleExportRow>> BuildActiveProjectSubsystemRoleAssignmentsAsync(int projectId, CancellationToken ct)
+    private async Task<List<AttendanceSubsystemRow>> BuildActiveProjectSubsystemRoleAssignmentsAsync(int projectId, CancellationToken ct)
     {
         var projectSubsystems = await dbContext.ProjektSubsystemy.AsNoTracking()
             .Where(x => x.ProjektId == projectId && !x.DatumOdebrani.HasValue)
@@ -501,7 +501,7 @@ public sealed class ExportAttendanceProjectionBuilder(
                 .ToDictionaryAsync(x => x.Id, ct);
 
         return assignments
-            .Select(assignment => new SubsystemRoleExportRow(
+            .Select(assignment => new AttendanceSubsystemRow(
                 assignment.OsobaId,
                 BuildDisplayNameFromOsoba(people.GetValueOrDefault(assignment.OsobaId))))
             .ToList();
