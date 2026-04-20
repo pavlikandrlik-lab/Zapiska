@@ -6100,9 +6100,16 @@ html {
    Responsive fallback <1024px stacked + scrollable.
    ========================================================================== */
 
+/* Širokoúhlý layout (2026-04-20): fluid tier pro data-heavy views.
+   clamp padding: FHD 1920 → ~38px, 4K 3840 → 48px (cap),
+   tablet <768 → 16px (minimum). Content uvnitř si řídí vlastní
+   constraints (reading-block max-width: 72ch, form-panel 900px,
+   tabulky 100%, card grids auto-fill). Viz spec:
+   docs/superpowers/specs/2026-04-20-sirokouhly-layout-design.md */
 .app-main--fluid {
     max-width: none;
-    padding: 0;
+    margin: 0;
+    padding: 0 clamp(16px, 2vw, 48px);
 }
 
 .dashboard-shell {
