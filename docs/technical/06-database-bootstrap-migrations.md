@@ -76,7 +76,8 @@ SELECT COUNT(*) AS superadmins_count FROM authz.superadmins;
 - `dbo.harmonogram_sablony`
 - `dbo.ciselnik_harmonogram_typu`
 - `dbo.ciselnik_typu_externich_odkazu`
-- `dbo.ciselnik_vyzvy`
+- `dbo.vyzvy`
+- `dbo.vyzva_historie_stavu`
 - `dbo.ciselnik_organizace`
 - `dbo.ciselnik_organizacni_celky`
 

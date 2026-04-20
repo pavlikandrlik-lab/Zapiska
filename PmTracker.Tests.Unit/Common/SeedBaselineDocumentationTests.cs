@@ -96,7 +96,8 @@ public sealed class SeedBaselineDocumentationTests
         document.Should().Contain("dbo.harmonogram_sablony");
         document.Should().Contain("dbo.ciselnik_harmonogram_typu");
         document.Should().Contain("dbo.ciselnik_typu_externich_odkazu");
-        document.Should().Contain("dbo.ciselnik_vyzvy");
+        document.Should().Contain("dbo.vyzvy");
+        document.Should().Contain("dbo.vyzva_historie_stavu");
         document.Should().Contain("dbo.ciselnik_organizace");
         document.Should().Contain("dbo.ciselnik_organizacni_celky");
     }
