@@ -324,12 +324,20 @@ public sealed class ProjectDashboardService : IProjectDashboardService
         return new ProjectDashboardNesPanelViewModel { IsServiceDeskIntegrated = false };
     }
 
-    public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
+    public async Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
         int projektId, int osobaId, bool isSuperOrAppAdmin, CancellationToken ct)
     {
-        // ACL doplníme v Task 4
-        var muzeEditovat = isSuperOrAppAdmin; // dočasně — non-admin má read-only
-        return _vyzvyPanelBuilder.BuildAsync(projektId, muzeEditovat, ct);
+        var muzeEditovat = isSuperOrAppAdmin || await CanUserEditProjectVyzvyAsync(projektId, osobaId, ct);
+        return await _vyzvyPanelBuilder.BuildAsync(projektId, muzeEditovat, ct);
+    }
+
+    private async Task<bool> CanUserEditProjectVyzvyAsync(int projektId, int osobaId, CancellationToken ct)
+    {
+        var povoleneRolyKody = new[] { "proj_man", "adm_proj" };
+        return await _dbContext.ObsazeniProjektu.AsNoTracking()
+            .Where(o => o.ProjektId == projektId && o.OsobaId == osobaId && o.DatumOdebrani == null)
+            .Join(_dbContext.CiselnikRoliProjektu, o => o.RoleId, r => r.Id, (o, r) => r.Kod)
+            .AnyAsync(kod => povoleneRolyKody.Contains(kod), ct);
     }
 
     public async Task<bool> CanAccessDashboardAsync(int projectId, int osobaId, CancellationToken ct = default)
