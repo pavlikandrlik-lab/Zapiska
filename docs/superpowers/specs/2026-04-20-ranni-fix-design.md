@@ -311,9 +311,22 @@ Current rozlišovací podmínka (record-editor vs. ostatní) ověřit při imple
 
 ---
 
-## Side — #10 modal width bonus (ověření root cause, bez fixu)
+## Side — #10 modal width CSS var — root cause zdokumentován
 
-Během implementace Sekce C ověřím v `node_modules/@gov-design-system/` (nebo v publish-lib copies) aktuální CSS custom property name pro gov-dialog `max-width`. Dokumentace-only. Fix samotný odložen na rozhodnutí o full-width app (post ranní fix).
+**Investigace 2026-04-20:**
+V `PmTracker.Web/wwwroot/lib/gov-design-system/dist/` (verze 4.2.9) jsou dostupné custom properties pro gov-dialog:
+- `--max-width` (fallback: `52.5rem`) — jediná CSS var pro šířku; používána jako `max-width: var(--max-width, 52.5rem)` v `.gov-dialog__dialog`
+- Žádné `--gov-dialog-max-width` ani `--gov-dialog-max-height` v dist CSS **neexistují**
+- `max-height` je hardcoded `75vh` — nemá CSS var slot; override vyžaduje `:part()` nebo wrapper element
+
+Naše site.css používá `--gov-dialog-max-width`, správný název je `--max-width`.
+
+**Fix (odložený — čeká na rozhodnutí #4 full-width app):**
+1. Nahradit `--gov-dialog-max-width` za `--max-width` v gov-dialog variantách wide / record-editor
+2. Pro max-height najít alternativu přes `:part()` nebo wrapper (nemá CSS var slot)
+3. Ověřit přes Playwright harness po fixu
+
+Scope: pure CSS change, deferred za ranní opravu.
 
 ---
 

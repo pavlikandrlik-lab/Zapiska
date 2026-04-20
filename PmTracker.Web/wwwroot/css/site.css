@@ -3950,6 +3950,21 @@ gov-dialog[data-modal-container] {
     /* Default variant ponechává gov-dialog vestavěné max-width (~52rem). */
 }
 
+/* Úprava #10 INVESTIGATION (2026-04-20): aktuální varianty wide / record-editor
+   nastavují --gov-dialog-max-width, ale při Playwright verifikaci v harness
+   (pm-modal-harness.html) se width NEAPLIKUJE — modal zůstává v defaultní
+   ~52rem šířce. Hypotéza: aktuální verze gov-design-system (4.2.9) používá
+   v shadow DOM jinou custom property nebo ji vůbec nečte.
+
+   Deferred fix: po rozhodnutí o full-width app-wide layout (Úprava #4 +
+   potenciální #4b pro celou app). Viz docs/superpowers/specs/2026-04-20-ranni-fix-design.md
+   sekce "Side — #10".
+
+   Zjištěné dostupné custom properties v dist CSS (grep PmTracker.Web/wwwroot/lib/gov-design-system):
+   - gov-dialog (komponenta) používá: --max-width (fallback 52.5rem), max-height je hardcoded 75vh
+   - žádné --gov-dialog-max-width ani --gov-dialog-max-height v dist CSS neexistují
+   - správné property pro max-width override: --max-width
+   - max-height nemá CSS var slot (hardcoded) — override musí jít přes :part() nebo wrapper */
 gov-dialog[data-modal-container][data-modal-variant="wide"] {
     --gov-dialog-max-width: 1100px;
 }
