@@ -29,9 +29,7 @@ public sealed partial class VyzvaService : IVyzvaService
     private static VyzvaResult<T>.Fail Fail<T>(VyzvaErrorCode code, string msg)
         => new(new VyzvaError(code, msg));
 
-    // Dočasné stuby — nahradí se v Task 30-31.
-    public Task<VyzvaResult<VyzvaDetail>> ZmenitStavAsync(int vyzvaId, VyzvaStav novyStav, int zmenilOsobaId, DateTime now, CancellationToken ct)
-        => throw new NotImplementedException("Task 30");
+    // Dočasné stuby — nahradí se v Task 31.
     public Task<VyzvaResult<Unit>> NastavitZaradidAsync(int externiOdkazId, bool zaradit, CancellationToken ct)
         => throw new NotImplementedException("Task 31");
     public Task<VyzvaResult<Unit>> PrerditPnfAsync(int externiOdkazId, int? cilovaVyzvaId, CancellationToken ct)
