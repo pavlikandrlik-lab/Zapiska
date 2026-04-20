@@ -36,7 +36,6 @@ public sealed class ZaznamEditViewModel
     public required IReadOnlyList<int> VybraniSpolupracovniciIds { get; set; }
     public required IReadOnlyList<ExterniOdkazEditViewModel> ExterniVazby { get; set; }
     public required IReadOnlyList<string> TypyExternichOdkazu { get; set; }
-    public required IReadOnlyList<string> Vyzvy { get; set; }
     public string UiContext { get; set; } = "project";
     public int? MeetingId { get; set; }
     public string Presentation { get; set; } = "modal";
@@ -108,7 +107,9 @@ public sealed class ExterniOdkazEditViewModel
     public string? Typ { get; set; }
     public string? Cislo { get; set; }
     public decimal? PredpokladanaCena { get; set; }
-    public string? Vyzva { get; set; }
+    public int? VyzvaId { get; set; }
+    public string? VyzvaKod { get; set; }
+    public bool ZaradidDoVyzvy { get; set; }
     public DateTime? DatumObjednani { get; set; }
     public DateTime? PlanDodani { get; set; }
     public DateTime? DatumDodani { get; set; }

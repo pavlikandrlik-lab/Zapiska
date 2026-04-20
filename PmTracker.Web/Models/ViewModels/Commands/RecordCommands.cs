@@ -79,6 +79,8 @@ public sealed class SaveRecordExterniVazbaCommand
     public string? Cislo { get; set; }
     public string? PredpokladanaCena { get; set; }
     public string? Vyzva { get; set; }
+    public int? VyzvaId { get; set; }
+    public bool ZaradidDoVyzvy { get; set; }
     public DateTime? DatumObjednani { get; set; }
     public DateTime? PlanDodani { get; set; }
     public DateTime? DatumDodani { get; set; }

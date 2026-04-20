@@ -58,23 +58,6 @@
                                disabled="@(showEstimatedPrice ? null : "disabled")" />
                     </label>
                     <label>
-                        Výzva
-                        <select name="ExterniVazby[@i].Vyzva">
-                            <option value="">—</option>
-                            @foreach (var vyzva in Model.Vyzvy)
-                            {
-                                if (vyzva == vazba.Vyzva)
-                                {
-                                    <option selected="selected">@vyzva</option>
-                                }
-                                else
-                                {
-                                    <option>@vyzva</option>
-                                }
-                            }
-                        </select>
-                    </label>
-                    <label>
                         Datum objednání
                         @await Html.PartialAsync(
                             "_AppDateField",
@@ -159,16 +142,6 @@
                            inputmode="decimal"
                            data-external-price-input
                            disabled="disabled" />
-                </label>
-                <label>
-                    Výzva
-                    <select name="ExterniVazby[__index__].Vyzva">
-                        <option value="">—</option>
-                        @foreach (var vyzva in Model.Vyzvy)
-                        {
-                            <option>@vyzva</option>
-                        }
-                    </select>
                 </label>
                 <label>
                     Datum objednání
