@@ -1,0 +1,21 @@
+@model PdfExportTemplateViewModel
+@if (!Model.IsMeeting && Model.ProjektoveRole.Count > 0)
+{
+    <div class="project-roles">
+        <div class="project-roles-head">
+            <div>Osoba</div>
+            <div>Typ role</div>
+            <div>Role</div>
+            <div>Subsystém</div>
+        </div>
+        @foreach (var member in Model.ProjektoveRole)
+        {
+            <div class="project-roles-row">
+                <div>@member.Osoba</div>
+                <div>@member.TypRole</div>
+                <div>@member.Role</div>
+                <div>@(string.IsNullOrWhiteSpace(member.Subsystem) ? "-" : member.Subsystem)</div>
+            </div>
+        }
+    </div>
+}

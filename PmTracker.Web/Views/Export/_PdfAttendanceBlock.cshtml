@@ -1,0 +1,13 @@
+@model PdfExportTemplateViewModel
+@if (Model.Dochazka.Count > 0)
+{
+    <div class="attendance">
+        @foreach (var attendanceGroup in Model.Dochazka)
+        {
+            <div class="attendance-row">
+                <div class="attendance-label">@attendanceGroup.Stav:</div>
+                <div>@string.Join(", ", attendanceGroup.Osoby)</div>
+            </div>
+        }
+    </div>
+}

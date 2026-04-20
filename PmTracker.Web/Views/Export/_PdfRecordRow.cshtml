@@ -1,0 +1,107 @@
+@model PdfExportRecordViewModel
+@inject PmTracker.Web.Services.Common.IRichTextContentService RichTextContentService
+@{
+    static (string Header, string Details) SplitExternalLinkDisplay(string value)
+    {
+        var normalized = (value ?? string.Empty).Trim();
+        var detailsIndex = normalized.IndexOf(" (", StringComparison.Ordinal);
+        if (detailsIndex <= 0 || !normalized.EndsWith(')'))
+        {
+            return (normalized, string.Empty);
+        }
+
+        return (normalized[..detailsIndex], normalized[detailsIndex..]);
+    }
+
+    var recordCode = string.IsNullOrWhiteSpace(Model.TypUkoluKod)
+        ? (string.IsNullOrWhiteSpace(Model.KategorieKod) ? "-" : Model.KategorieKod)
+        : Model.TypUkoluKod;
+    var subsystemCode = string.IsNullOrWhiteSpace(Model.SubsystemKod) ? "-" : Model.SubsystemKod;
+}
+<tr class="task-row @(Model.IsPaused ? "paused" : string.Empty)">
+    <td>
+        <div class="record-title-row">
+            <h2 class="record-title"><span class="record-code-badge">@recordCode@Model.CisloViditelne</span> - @Model.Nazev</h2>
+            <span class="record-subsystem-code">@subsystemCode</span>
+        </div>
+        <p class="record-meta"><strong>Stav:</strong> @Model.Stav | <strong>Typ úkolu:</strong> @(string.IsNullOrWhiteSpace(Model.TypUkolu) ? "-" : Model.TypUkolu)</p>
+        @if (!string.IsNullOrWhiteSpace(Model.Cil))
+        {
+            <p class="record-goal"><strong>Cíl:</strong> @Model.Cil</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Popis))
+        {
+            var safeRecordDescriptionHtml = RichTextContentService.ToSafeHtml(Model.Popis);
+            if (!string.IsNullOrWhiteSpace(safeRecordDescriptionHtml))
+            {
+            <div class="record-desc">
+                <strong>Popis:</strong>
+                @Html.Raw(safeRecordDescriptionHtml)
+            </div>
+            }
+        }
+        @if (Model.ExterniVazby.Count > 0)
+        {
+            <div class="record-external-block">
+                <ul class="record-external-list">
+                    @foreach (var externalLink in Model.ExterniVazby)
+                    {
+                        var externalParts = SplitExternalLinkDisplay(externalLink);
+                        <li>
+                            <strong>@externalParts.Header</strong>@externalParts.Details
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (Model.Vyjadreni.Count > 0)
+        {
+            <ul class="comment-list">
+                @foreach (var vyjadreni in Model.Vyjadreni)
+                {
+                    var highlightStyle = !string.IsNullOrWhiteSpace(vyjadreni.HighlightColor)
+                        ? $"color:{vyjadreni.HighlightColor};"
+                        : string.Empty;
+                    var meetingRef = vyjadreni.JednaniCislo.HasValue
+                        ? $"jednání č. {vyjadreni.JednaniCislo}{(vyjadreni.JednaniDatum.HasValue ? $" ({vyjadreni.JednaniDatum.Value:dd.MM.yyyy})" : string.Empty)}"
+                        : "jednání";
+                    var commentHeader = $"{meetingRef} | {vyjadreni.Autor} | {vyjadreni.Datum:dd.MM.yyyy}";
+                    <li class="comment-item" style="@highlightStyle">
+                        <div class="comment-item-head">@commentHeader</div>
+                        <div class="comment-item-text">@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
+                    </li>
+                }
+            </ul>
+        }
+    </td>
+    <td>
+        <p><strong>Vlastník:</strong> @Model.Vlastnik</p>
+        @if (Model.Spoluprace.Count > 0)
+        {
+            <p class="section-label"><strong>Spolupráce:</strong></p>
+            <ul class="people-list">
+                @foreach (var osoba in Model.Spoluprace)
+                {
+                    <li>@osoba</li>
+                }
+            </ul>
+        }
+    </td>
+    <td>
+        <ul class="date-list">
+            <li><strong>Založeno:</strong> @Model.DatumZalozeni.ToString("dd.MM.yyyy")</li>
+            <li><strong>Aktuální termín:</strong> @(Model.Termin?.ToString("dd.MM.yyyy") ?? "-")</li>
+        </ul>
+        @if (Model.HistorieTerminu.Count > 0)
+        {
+            <p class="section-label"><strong>Historie termínů:</strong></p>
+            <ul class="term-history">
+                @foreach (var oldDate in Model.HistorieTerminu.OrderByDescending(date => date))
+                {
+                    <li><s>@oldDate.ToString("dd.MM.yyyy")</s></li>
+                }
+            </ul>
+        }
+    </td>
+</tr>
