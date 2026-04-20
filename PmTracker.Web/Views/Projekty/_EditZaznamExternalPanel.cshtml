@@ -57,6 +57,28 @@
                                data-external-price-input
                                disabled="@(showEstimatedPrice ? null : "disabled")" />
                     </label>
+                    @{
+                        var isPnf = string.Equals(vazba.Typ, "PNF", StringComparison.OrdinalIgnoreCase);
+                        var statusText = vazba.VyzvaKod is not null
+                            ? $"Zařazeno do výzvy {vazba.VyzvaKod}"
+                            : vazba.ZaradidDoVyzvy
+                                ? "Čeká se (buffer projektu)"
+                                : null;
+                    }
+                    <div class="vyzvy-switch-wrap" data-external-vyzvy-switch-wrap
+                         @(isPnf ? null : "hidden=\"hidden\"")>
+                        <label class="pm-switch-label">
+                            <input type="hidden" name="ExterniVazby[@i].VyzvaId" value="@vazba.VyzvaId" />
+                            <input type="hidden" name="ExterniVazby[@i].ZaradidDoVyzvy" value="@(vazba.ZaradidDoVyzvy ? "true" : "false")" data-external-vyzvy-switch-state />
+                            <input type="checkbox"
+                                   class="pm-switch"
+                                   data-vyzvy-switch
+                                   data-externi-odkaz-id="@vazba.Id"
+                                   @(vazba.ZaradidDoVyzvy ? "checked=\"checked\"" : null) />
+                            Zařadit do další výzvy
+                        </label>
+                        <span class="vyzvy-switch-status" data-vyzvy-switch-status>@statusText</span>
+                    </div>
                     <label>
                         Datum objednání
                         @await Html.PartialAsync(
@@ -143,6 +165,15 @@
                            data-external-price-input
                            disabled="disabled" />
                 </label>
+                <div class="vyzvy-switch-wrap" data-external-vyzvy-switch-wrap hidden="hidden">
+                    <label class="pm-switch-label">
+                        <input type="hidden" name="ExterniVazby[__index__].VyzvaId" value="" />
+                        <input type="hidden" name="ExterniVazby[__index__].ZaradidDoVyzvy" value="false" data-external-vyzvy-switch-state />
+                        <input type="checkbox" class="pm-switch" data-vyzvy-switch data-externi-odkaz-id="" />
+                        Zařadit do další výzvy
+                    </label>
+                    <span class="vyzvy-switch-status" data-vyzvy-switch-status></span>
+                </div>
                 <label>
                     Datum objednání
                     @await Html.PartialAsync(
