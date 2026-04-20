@@ -22,6 +22,13 @@ public sealed class TicketingReadOnlyDbContext : DbContext
     public override Task<int> SaveChangesAsync(CancellationToken ct = default)
         => throw new InvalidOperationException("TicketingReadOnlyDbContext is strictly read-only.");
 
+    /// <summary>
+    /// Seed helper viditelný pouze pro testy přes <c>InternalsVisibleTo</c>.
+    /// Obchází read-only guard a volá <see cref="DbContext.SaveChanges()"/> základní třídy,
+    /// aby testy mohly naplnit <c>InMemory</c> provider.
+    /// </summary>
+    internal int SaveChangesForTests() => base.SaveChanges();
+
     protected override void OnModelCreating(ModelBuilder mb)
     {
         mb.Entity<HotZaznamEntity>(e =>

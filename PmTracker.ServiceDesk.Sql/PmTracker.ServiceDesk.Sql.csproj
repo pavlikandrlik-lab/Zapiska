@@ -19,4 +19,8 @@
   <ItemGroup>
     <ProjectReference Include="..\PmTracker.ServiceDesk.Contracts\PmTracker.ServiceDesk.Contracts.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PmTracker.Tests.Unit" />
+  </ItemGroup>
 </Project>
