@@ -1,3 +1,5 @@
+@import "components/vyzvy-panel.css";
+
 :root {
     --schedule-step-1: #ef4444;
     --schedule-step-2: #f97316;

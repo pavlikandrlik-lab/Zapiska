@@ -1,0 +1,98 @@
+.vyzvy-panel { display: flex; flex-direction: column; gap: 1.5rem; padding: 1rem 0; }
+
+.vyzvy-card {
+  background: var(--pm-surface, #ffffff);
+  border: 1px solid var(--pm-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.vyzvy-card-buffer { border-left: 4px solid var(--token-warning, #f59e0b); }
+.vyzvy-card-vyzva { border-left: 4px solid var(--token-muted, #94a3b8); }
+
+.vyzvy-card-vyzva[data-stav="Priprava"] { border-left-color: var(--token-warning, #f59e0b); }
+.vyzvy-card-vyzva[data-stav="Odeslano"] { border-left-color: var(--token-success, #10b981); }
+.vyzvy-card-vyzva[data-stav="Zruseno"] { border-left-color: var(--token-muted, #94a3b8); opacity: 0.75; }
+
+.vyzvy-card-header {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding-bottom: 0.75rem; cursor: pointer;
+}
+
+.vyzvy-card-title { margin: 0; font-size: 1rem; font-weight: 600; }
+
+.vyzvy-card-badge { padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 500; }
+
+.badge-warning { background: #fef3c7; color: #92400e; }
+.badge-success { background: #d1fae5; color: #065f46; }
+.badge-muted   { background: #e2e8f0; color: #475569; }
+
+.vyzvy-card-meta { margin-left: auto; font-size: 0.8125rem; color: var(--pm-text-muted, #64748b); }
+
+.vyzvy-card-toggle-btn { background: transparent; border: none; cursor: pointer; font-size: 1rem; color: var(--pm-text-muted, #64748b); }
+
+.vyzvy-card-body { display: none; padding-top: 0.75rem; border-top: 1px solid var(--pm-border, #e2e8f0); }
+.vyzvy-card.open > .vyzvy-card-body { display: block; }
+
+.vyzvy-card-footer {
+  display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;
+  padding-top: 0.75rem; border-top: 1px solid var(--pm-border, #e2e8f0); margin-top: 0.75rem;
+}
+
+.vyzvy-polozky { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+
+.vyzvy-polozka {
+  display: grid; grid-template-columns: auto auto 1fr auto; gap: 0.75rem; align-items: center;
+  padding: 0.5rem 0.75rem; background: var(--pm-surface-alt, #f8fafc); border-radius: 6px; font-size: 0.875rem;
+}
+
+.vyzvy-polozka-cislo { font-family: var(--pm-font-mono, monospace); font-weight: 500; }
+.vyzvy-polozka-meta  { font-family: var(--pm-font-mono, monospace); color: var(--pm-text-muted, #64748b); }
+.vyzvy-polozka-cena  { text-align: right; font-variant-numeric: tabular-nums; }
+
+.vyzvy-polozky-table { width: 100%; border-collapse: collapse; }
+.vyzvy-polozky-table th, .vyzvy-polozky-table td {
+  padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--pm-border, #e2e8f0);
+}
+.vyzvy-polozky-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.vyzvy-polozky-table tr.total td {
+  font-weight: 600; border-top: 2px solid var(--pm-border, #e2e8f0); border-bottom: none;
+}
+
+.vyzvy-stav-menu { position: relative; }
+.vyzvy-stav-menu-list {
+  display: none; position: absolute; top: 100%; right: 0;
+  list-style: none; margin: 0; padding: 0.25rem 0;
+  background: var(--pm-surface, #ffffff); border: 1px solid var(--pm-border, #e2e8f0);
+  border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  min-width: 12rem; z-index: 10;
+}
+.vyzvy-stav-menu.open .vyzvy-stav-menu-list { display: block; }
+.vyzvy-stav-menu-list button {
+  width: 100%; text-align: left; background: transparent; border: none;
+  padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.875rem;
+}
+.vyzvy-stav-menu-list button:hover { background: var(--pm-surface-alt, #f1f5f9); }
+
+.vyzvy-empty { padding: 1rem; text-align: center; }
+.vyzvy-block-reason { margin-left: 0.75rem; font-size: 0.8125rem; }
+
+.vyzvy-switch-wrap { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
+.vyzvy-switch-status { font-size: 0.8125rem; color: var(--pm-text-muted, #64748b); }
+
+.vyzvy-reassign-columns {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr);
+  gap: 1rem; overflow-x: auto; padding: 1rem 0;
+}
+.vyzvy-reassign-column {
+  background: var(--pm-surface-alt, #f8fafc); border-radius: 8px;
+  padding: 0.75rem; min-height: 200px;
+}
+.vyzvy-reassign-column.drag-over { background: #fef3c7; outline: 2px dashed var(--token-warning, #f59e0b); }
+.vyzvy-reassign-item {
+  background: var(--pm-surface, #ffffff); border: 1px solid var(--pm-border, #e2e8f0);
+  border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;
+  cursor: grab; font-size: 0.875rem;
+}
+.vyzvy-reassign-item.dragging { opacity: 0.5; }
