@@ -92,7 +92,11 @@ public sealed class ProjectDashboardController : BaseController
             return Forbid();
         }
 
-        var model = _dashboardService.BuildVyzvyPanel();
+        var model = await _dashboardService.BuildVyzvyPanelAsync(
+            id,
+            CurrentUserContext.OsobaId,
+            CurrentUserContext.IsSuperAdmin,
+            ct);
         return PartialView("~/Views/ProjectDashboard/_VyzvyPanel.cshtml", model);
     }
 

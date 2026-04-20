@@ -203,14 +203,15 @@ public sealed class ProjectDashboardControllerBehaviorTests
             };
         }
 
-        public ProjectDashboardVyzvyPanelViewModel BuildVyzvyPanel()
+        public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
+            int projektId, int osobaId, bool isSuperOrAppAdmin, CancellationToken ct)
         {
-            return new ProjectDashboardVyzvyPanelViewModel
+            return Task.FromResult(new ProjectDashboardVyzvyPanelViewModel
             {
-                ProjektId = 0,
+                ProjektId = projektId,
                 MuzeEditovat = false,
                 ChybaProjektuMessage = "Panel výzev se připravuje.",
-            };
+            });
         }
 
         public Task<bool> CanAccessDashboardAsync(int projectId, int osobaId, CancellationToken ct)

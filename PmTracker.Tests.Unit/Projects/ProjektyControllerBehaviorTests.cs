@@ -667,7 +667,8 @@ public sealed class ProjektyControllerBehaviorTests
         public ProjectDashboardNesPanelViewModel BuildNesPanel()
             => throw new NotSupportedException();
 
-        public ProjectDashboardVyzvyPanelViewModel BuildVyzvyPanel()
+        public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
+            int projektId, int osobaId, bool isSuperOrAppAdmin, CancellationToken ct)
             => throw new NotSupportedException();
 
         public Task<bool> CanAccessDashboardAsync(int projectId, int osobaId, CancellationToken ct = default)

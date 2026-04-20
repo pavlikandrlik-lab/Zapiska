@@ -94,6 +94,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IRecordService>(sp => sp.GetRequiredService<RecordService>());
         services.AddScoped<IRecordProposalService>(sp => sp.GetRequiredService<RecordProposalService>());
         services.AddScoped<IDashboardService>(sp => sp.GetRequiredService<DashboardService>());
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.VyzvyPanelBuilder>();
         services.AddScoped<IProjectDashboardService, ProjectDashboardService>();
         services.AddScoped<IHomeDashboardService>(sp => sp.GetRequiredService<HomeDashboardService>());
         services.AddScoped<IPeopleService>(sp => sp.GetRequiredService<PeopleService>());

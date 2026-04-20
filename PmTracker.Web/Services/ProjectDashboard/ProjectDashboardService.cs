@@ -11,11 +11,16 @@ public sealed class ProjectDashboardService : IProjectDashboardService
 {
     private readonly PmTrackerDbContext _dbContext;
     private readonly IHarmonogramService _harmonogramService;
+    private readonly VyzvyPanelBuilder _vyzvyPanelBuilder;
 
-    public ProjectDashboardService(PmTrackerDbContext dbContext, IHarmonogramService harmonogramService)
+    public ProjectDashboardService(
+        PmTrackerDbContext dbContext,
+        IHarmonogramService harmonogramService,
+        VyzvyPanelBuilder vyzvyPanelBuilder)
     {
         _dbContext = dbContext;
         _harmonogramService = harmonogramService;
+        _vyzvyPanelBuilder = vyzvyPanelBuilder;
     }
 
     public async Task<ProjectDashboardPageViewModel> BuildDashboardPageAsync(int projectId, CancellationToken ct = default)
@@ -319,14 +324,12 @@ public sealed class ProjectDashboardService : IProjectDashboardService
         return new ProjectDashboardNesPanelViewModel { IsServiceDeskIntegrated = false };
     }
 
-    public ProjectDashboardVyzvyPanelViewModel BuildVyzvyPanel()
+    public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
+        int projektId, int osobaId, bool isSuperOrAppAdmin, CancellationToken ct)
     {
-        return new ProjectDashboardVyzvyPanelViewModel
-        {
-            ProjektId = 0,
-            MuzeEditovat = false,
-            ChybaProjektuMessage = "Panel výzev se připravuje.",
-        };
+        // ACL doplníme v Task 4
+        var muzeEditovat = isSuperOrAppAdmin; // dočasně — non-admin má read-only
+        return _vyzvyPanelBuilder.BuildAsync(projektId, muzeEditovat, ct);
     }
 
     public async Task<bool> CanAccessDashboardAsync(int projectId, int osobaId, CancellationToken ct = default)
