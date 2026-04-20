@@ -9199,6 +9199,163 @@ function handleDashboardClick(target) {
   return false;
 }
 
+// PmTracker.Web/wwwroot/js/modules/projectDashboard.js
+var projectDashboardTabStorageKeyPrefix = "pmtracker.projectDashboard.tab.";
+function resolveProjectDashboardShell() {
+  const shell = document.querySelector("[data-project-dashboard-shell]");
+  return shell instanceof HTMLElement ? shell : null;
+}
+function resolveProjectDashboardTabButtons(shell) {
+  return Array.from(shell.querySelectorAll(".dashboard-tab[data-dashboard-tab]"));
+}
+function resolveProjectDashboardTabPanels(shell) {
+  return Array.from(shell.querySelectorAll(".dashboard-tab-panel[data-dashboard-tab-panel]"));
+}
+function resolveProjectDashboardTabPanel(shell, tabKey) {
+  if (!tabKey) return null;
+  const panel = shell.querySelector(`.dashboard-tab-panel[data-dashboard-tab-panel="${CSS.escape(tabKey)}"]`);
+  return panel instanceof HTMLElement ? panel : null;
+}
+function resolveActiveProjectDashboardTabKey(shell) {
+  const projectId = (shell.dataset.projectId || "").trim();
+  if (!projectId) return null;
+  return localStorage.getItem(`${projectDashboardTabStorageKeyPrefix}${projectId}`) || null;
+}
+function persistActiveProjectDashboardTabKey(shell, tabKey) {
+  const projectId = (shell.dataset.projectId || "").trim();
+  if (!projectId || !tabKey) return;
+  localStorage.setItem(`${projectDashboardTabStorageKeyPrefix}${projectId}`, tabKey);
+}
+function setActiveProjectDashboardTab(shell, tabKey) {
+  resolveProjectDashboardTabButtons(shell).forEach((tab) => {
+    tab.classList.toggle("active", tab.getAttribute("data-dashboard-tab") === tabKey);
+  });
+  resolveProjectDashboardTabPanels(shell).forEach((panel) => {
+    panel.classList.toggle("active", panel.getAttribute("data-dashboard-tab-panel") === tabKey);
+  });
+  persistActiveProjectDashboardTabKey(shell, tabKey);
+}
+async function ensureProjectDashboardTabPanelLoaded(shell, tabKey) {
+  const tabPanel = resolveProjectDashboardTabPanel(shell, tabKey);
+  if (!(tabPanel instanceof HTMLElement)) return false;
+  if (!tabPanel.hasAttribute("data-dashboard-panel")) return false;
+  if (tabPanel.dataset.dashboardPanelLoaded === "true") return true;
+  const ok = await loadDashboardPanel(tabPanel);
+  if (ok) tabPanel.dataset.dashboardPanelLoaded = "true";
+  return ok;
+}
+function applyProjectDashboardCategoryFilter(shell, category) {
+  shell.querySelectorAll("[data-dashboard-category-filter]").forEach((btn) => {
+    if (!(btn instanceof HTMLElement)) return;
+    const btnCategory = btn.getAttribute("data-dashboard-category-filter") ?? "";
+    btn.classList.toggle("active", btnCategory === category);
+  });
+  shell.querySelectorAll("[data-dashboard-expandable-row]").forEach((row) => {
+    if (!(row instanceof HTMLElement)) return;
+    const rowCategory = row.dataset.category || "";
+    const visible = !category || rowCategory === category;
+    row.hidden = !visible;
+    const recordId = row.dataset.recordId || "";
+    if (recordId) {
+      const detail = shell.querySelector(`[data-dashboard-expandable-detail="${CSS.escape(recordId)}"]`);
+      if (detail instanceof HTMLElement && !visible) {
+        detail.hidden = true;
+        row.classList.remove("expanded");
+      }
+    }
+  });
+}
+function toggleProjectDashboardExpandableRow(row) {
+  if (!(row instanceof HTMLElement)) return;
+  const recordId = row.dataset.recordId || "";
+  if (!recordId) return;
+  const shell = row.closest("[data-project-dashboard-shell]");
+  if (!(shell instanceof HTMLElement)) return;
+  const detail = shell.querySelector(`[data-dashboard-expandable-detail="${CSS.escape(recordId)}"]`);
+  if (!(detail instanceof HTMLElement)) return;
+  const isExpanded = !detail.hidden;
+  detail.hidden = isExpanded;
+  row.classList.toggle("expanded", !isExpanded);
+}
+async function reloadProjectDashboardStatisticsPanel(shell, year) {
+  const panel = shell.querySelector('[data-dashboard-tab-panel="statistiky"]');
+  if (!(panel instanceof HTMLElement)) return;
+  const baseUrl = (panel.dataset.dashboardPanelUrl || "").trim();
+  if (!baseUrl) return;
+  const url = new URL(baseUrl, window.location.origin);
+  url.searchParams.set("year", String(year));
+  const content = panel.querySelector("[data-dashboard-panel-content]");
+  const placeholder = panel.querySelector("[data-dashboard-panel-placeholder]");
+  const errorContainer = resolveOrCreateErrorContainer(panel, "data-dashboard-panel-error");
+  if (!(content instanceof HTMLElement)) return;
+  setLazyLoadingState(panel, placeholder, errorContainer, true);
+  try {
+    content.innerHTML = await fetchHtmlFragment(url.href);
+    setLazyLoadingState(panel, placeholder, errorContainer, false);
+    if (content.dispatchEvent) {
+      content.dispatchEvent(new CustomEvent("pm:panel-loaded", { bubbles: true, detail: { url: url.href } }));
+    }
+  } catch {
+    setLazyLoadingState(panel, placeholder, errorContainer, false);
+    renderLazyLoadError(errorContainer, "Nepodařilo se načíst statistiky.", "data-dashboard-panel-retry");
+  }
+}
+function initProjectDashboardShell() {
+  const shell = resolveProjectDashboardShell();
+  if (!(shell instanceof HTMLElement) || shell.dataset.projectDashboardReady === "true") return;
+  shell.dataset.projectDashboardReady = "true";
+  const tabs = resolveProjectDashboardTabButtons(shell);
+  if (tabs.length === 0) return;
+  const firstTabKey = tabs[0].getAttribute("data-dashboard-tab") || "";
+  const persistedTabKey = resolveActiveProjectDashboardTabKey(shell);
+  const availableKeys = new Set(tabs.map((t) => t.getAttribute("data-dashboard-tab")));
+  const tabToActivate = persistedTabKey && availableKeys.has(persistedTabKey) ? persistedTabKey : firstTabKey;
+  setActiveProjectDashboardTab(shell, tabToActivate);
+  void ensureProjectDashboardTabPanelLoaded(shell, tabToActivate);
+  tabs.forEach((tab) => {
+    if (!(tab instanceof HTMLElement) || tab.dataset.projectDashboardTabReady === "true") return;
+    tab.dataset.projectDashboardTabReady = "true";
+    tab.addEventListener("click", () => {
+      const key = tab.getAttribute("data-dashboard-tab") || "";
+      if (!key) return;
+      setActiveProjectDashboardTab(shell, key);
+      void ensureProjectDashboardTabPanelLoaded(shell, key);
+    });
+  });
+}
+function handleProjectDashboardClick(target) {
+  if (!(target instanceof Element)) return false;
+  const shell = target.closest("[data-project-dashboard-shell]");
+  if (!(shell instanceof HTMLElement)) return false;
+  const categoryFilterBtn = target.closest("[data-dashboard-category-filter]");
+  if (categoryFilterBtn instanceof HTMLElement) {
+    const category = categoryFilterBtn.getAttribute("data-dashboard-category-filter") ?? "";
+    applyProjectDashboardCategoryFilter(shell, category);
+    return true;
+  }
+  const expandableRow = target.closest("[data-dashboard-expandable-row]");
+  if (expandableRow instanceof HTMLElement) {
+    if (target.closest("a, button")) return false;
+    toggleProjectDashboardExpandableRow(expandableRow);
+    return true;
+  }
+  return false;
+}
+function handleProjectDashboardChange(target) {
+  if (!(target instanceof Element)) return false;
+  const shell = target.closest("[data-project-dashboard-shell]");
+  if (!(shell instanceof HTMLElement)) return false;
+  const yearSelect = target.closest("[data-dashboard-year-select]");
+  if (yearSelect instanceof HTMLSelectElement) {
+    const year = parseInt(yearSelect.value, 10);
+    if (year > 0) {
+      void reloadProjectDashboardStatisticsPanel(shell, year);
+    }
+    return true;
+  }
+  return false;
+}
+
 // PmTracker.Web/wwwroot/js/modules/bootstrap.js
 var projectIndexFilterOptions = {
   hideDoneStorageKey: "pmtracker.projects.hideDone",
@@ -9407,6 +9564,10 @@ function handleDocumentClick(event) {
     event.preventDefault();
     return;
   }
+  if (handleProjectDashboardClick(target)) {
+    event.preventDefault();
+    return;
+  }
   const recordCommentsRetry = target.closest("[data-record-comments-retry]");
   if (recordCommentsRetry instanceof HTMLButtonElement) {
     event.preventDefault();
@@ -9526,6 +9687,9 @@ function handleDocumentChange(event) {
     if (form instanceof HTMLFormElement) {
       initRecordSchedulePlanner(form);
     }
+  }
+  if (handleProjectDashboardChange(target)) {
+    return;
   }
 }
 function handleDocumentInput(event) {
@@ -9666,6 +9830,7 @@ function bootstrapPmTrackerApp() {
     () => initMeetingOverview(document),
     () => initProjectIndexUi(),
     () => initDashboardShell(),
+    () => initProjectDashboardShell(),
     () => initSessionCoordinator(),
     () => initModalAjaxSubmit()
   ]);

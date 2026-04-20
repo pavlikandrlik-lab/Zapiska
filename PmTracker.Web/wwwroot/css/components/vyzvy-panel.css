@@ -41,6 +41,9 @@
 }
 
 .vyzvy-polozky { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+/* Gov Design System adds `::before { content: "●" }` na všechny `ul > li` —
+   u komponent výzvy je potřeba tyto bullet pseudo-elementy skrýt. */
+.vyzvy-polozky > li::before { content: none !important; }
 
 .vyzvy-polozka {
   display: grid; grid-template-columns: auto auto 1fr auto; gap: 0.75rem; align-items: center;
@@ -62,16 +65,24 @@
 
 .vyzvy-stav-menu { position: relative; }
 .vyzvy-stav-menu-list {
-  display: none; position: absolute; top: 100%; right: 0;
+  display: none; position: absolute; top: calc(100% + 4px); right: 0;
   list-style: none; margin: 0; padding: 0.25rem 0;
   background: var(--pm-surface, #ffffff); border: 1px solid var(--pm-border, #e2e8f0);
-  border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  min-width: 12rem; z-index: 10;
+  border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  min-width: 14rem; z-index: 20;
 }
+.vyzvy-stav-menu-list > li {
+  margin: 0; padding: 0;
+  display: block;
+}
+/* Gov Design System přidává `::before { content: "●" }` na `ul > li` —
+   v menu musíme pseudo-element vypnout, jinak čouhá zleva mimo container. */
+.vyzvy-stav-menu-list > li::before { content: none !important; }
 .vyzvy-stav-menu.open .vyzvy-stav-menu-list { display: block; }
 .vyzvy-stav-menu-list button {
   width: 100%; text-align: left; background: transparent; border: none;
   padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.875rem;
+  color: var(--pm-text, #0f172a);
 }
 .vyzvy-stav-menu-list button:hover { background: var(--pm-surface-alt, #f1f5f9); }
 
@@ -96,3 +107,33 @@
   cursor: grab; font-size: 0.875rem;
 }
 .vyzvy-reassign-item.dragging { opacity: 0.5; }
+
+/* Generic overlay modal used for dynamic Vyzvy dialogs (reassign). */
+.pm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 24px 24px;
+  background: rgba(15, 23, 42, 0.55);
+  overflow-y: auto;
+}
+.pm-modal[hidden] { display: none; }
+.pm-modal > .modal-body {
+  width: min(960px, 100%);
+  background: var(--pm-surface, #ffffff);
+  border: 1px solid var(--pm-border, #e2e8f0);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.28);
+  padding: 1.25rem 1.5rem 1rem;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+}
+.pm-modal > .modal-body > h2 { margin-top: 0; }
+.pm-modal .modal-footer {
+  display: flex; justify-content: flex-end; gap: 0.5rem;
+  padding-top: 0.75rem; margin-top: 0.75rem;
+  border-top: 1px solid var(--pm-border, #e2e8f0);
+}
