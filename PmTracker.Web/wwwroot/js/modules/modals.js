@@ -130,11 +130,57 @@ export function setModalContent(content, trigger) {
     modalState.lastTrigger = trigger instanceof HTMLElement ? trigger : null;
     activateInsertedGovDialog();
 
+    const activeDialog = modalRoot.querySelector("gov-dialog[data-modal-container]");
+    if (activeDialog instanceof HTMLElement) {
+        // Čekej tick na custom element upgrade
+        requestAnimationFrame(() => reparentFloatingRootIntoModal(activeDialog));
+    }
+
     modalRuntime.initRecordFormEnhancements?.(modalRoot);
     modalRuntime.initPermissionMetadataBindings?.(modalRoot);
     window.requestAnimationFrame(() => {
         focusInitialModalElement();
     });
+}
+
+// Úprava #7 (2026-04-20): Floating portal (#floating-panel-root) je light DOM
+// element v _Layout.cshtml. Gov-dialog má vlastní shadow DOM stacking context →
+// picker panely render-ují za modalem. Řešení: při openModal přesun root DO
+// aktivního gov-dialogu, při closeModal vrátit zpět (původní parent + position).
+let floatingRootOriginalParent = null;
+let floatingRootOriginalNextSibling = null;
+
+export function reparentFloatingRootIntoModal(dialog) {
+    if (!(dialog instanceof HTMLElement)) {
+        return;
+    }
+    const root = document.getElementById("floating-panel-root");
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+    // Už uvnitř modalu? (idempotent guard)
+    if (root.parentElement === dialog) {
+        return;
+    }
+    if (floatingRootOriginalParent === null) {
+        floatingRootOriginalParent = root.parentElement;
+        floatingRootOriginalNextSibling = root.nextSibling;
+    }
+    dialog.prepend(root);
+}
+
+export function restoreFloatingRoot() {
+    const root = document.getElementById("floating-panel-root");
+    if (!(root instanceof HTMLElement) || floatingRootOriginalParent === null) {
+        return;
+    }
+    if (floatingRootOriginalNextSibling && floatingRootOriginalNextSibling.parentNode === floatingRootOriginalParent) {
+        floatingRootOriginalParent.insertBefore(root, floatingRootOriginalNextSibling);
+    } else {
+        floatingRootOriginalParent.appendChild(root);
+    }
+    floatingRootOriginalParent = null;
+    floatingRootOriginalNextSibling = null;
 }
 
 export function closeModal() {
@@ -157,6 +203,7 @@ export function closeModal() {
         }
     }
 
+    restoreFloatingRoot();
     modalRoot.innerHTML = "";
     // Vestigial z .modal-overlay éry — ponecháváme defensivně (neovlivňuje gov-dialog).
     modalRoot.style.pointerEvents = "none";

@@ -5235,6 +5235,43 @@ var modalRuntime = {
 var modalState = {
   lastTrigger: null
 };
+// Úprava #7 (2026-04-20): Floating portal (#floating-panel-root) je light DOM
+// element v _Layout.cshtml. Gov-dialog má vlastní shadow DOM stacking context →
+// picker panely render-ují za modalem. Řešení: při openModal přesun root DO
+// aktivního gov-dialogu, při closeModal vrátit zpět (původní parent + position).
+var floatingRootOriginalParent = null;
+var floatingRootOriginalNextSibling = null;
+function reparentFloatingRootIntoModal(dialog) {
+  if (!(dialog instanceof HTMLElement)) {
+    return;
+  }
+  const root = document.getElementById("floating-panel-root");
+  if (!(root instanceof HTMLElement)) {
+    return;
+  }
+  // Už uvnitř modalu? (idempotent guard)
+  if (root.parentElement === dialog) {
+    return;
+  }
+  if (floatingRootOriginalParent === null) {
+    floatingRootOriginalParent = root.parentElement;
+    floatingRootOriginalNextSibling = root.nextSibling;
+  }
+  dialog.prepend(root);
+}
+function restoreFloatingRoot() {
+  const root = document.getElementById("floating-panel-root");
+  if (!(root instanceof HTMLElement) || floatingRootOriginalParent === null) {
+    return;
+  }
+  if (floatingRootOriginalNextSibling && floatingRootOriginalNextSibling.parentNode === floatingRootOriginalParent) {
+    floatingRootOriginalParent.insertBefore(root, floatingRootOriginalNextSibling);
+  } else {
+    floatingRootOriginalParent.appendChild(root);
+  }
+  floatingRootOriginalParent = null;
+  floatingRootOriginalNextSibling = null;
+}
 function configureModalRuntime(runtime = {}) {
   if (typeof runtime.closeAllFloatingPanels === "function") {
     modalRuntime.closeAllFloatingPanels = runtime.closeAllFloatingPanels;
@@ -5321,6 +5358,11 @@ function setModalContent(content, trigger) {
   document.body.classList.add("modal-open");
   modalState.lastTrigger = trigger instanceof HTMLElement ? trigger : null;
   activateInsertedGovDialog();
+  const activeDialog2 = modalRoot.querySelector("gov-dialog[data-modal-container]");
+  if (activeDialog2 instanceof HTMLElement) {
+    // Čekej tick na custom element upgrade
+    requestAnimationFrame(() => reparentFloatingRootIntoModal(activeDialog2));
+  }
   modalRuntime.initRecordFormEnhancements?.(modalRoot);
   modalRuntime.initPermissionMetadataBindings?.(modalRoot);
   window.requestAnimationFrame(() => {
@@ -5344,6 +5386,7 @@ function closeModal() {
       try { dialog3.close(); } catch { /* ignorovat — už může být zavřený */ }
     }
   }
+  restoreFloatingRoot();
   modalRoot.innerHTML = "";
   // Vestigial z .modal-overlay éry — ponecháváme defensivně (neovlivňuje gov-dialog).
   modalRoot.style.pointerEvents = "none";
