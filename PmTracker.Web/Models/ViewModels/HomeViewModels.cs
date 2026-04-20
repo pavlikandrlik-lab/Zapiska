@@ -102,6 +102,7 @@ public sealed class DashboardNewsItemViewModel
     public string EntityType { get; init; } = string.Empty;
     public string Action { get; init; } = string.Empty;
     public string EventLabel { get; init; } = string.Empty;
+    public string ActorName { get; init; } = string.Empty;
     public string Title { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
     public string ProjectLabel { get; init; } = string.Empty;

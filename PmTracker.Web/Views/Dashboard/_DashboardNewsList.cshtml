@@ -15,13 +15,20 @@ else
                     <time datetime="@item.CreatedAt.ToString("O")">@item.CreatedAt.ToString("dd.MM.yyyy HH:mm")</time>
                 </div>
                 <div class="dashboard-news-title">@item.Title</div>
-                <p class="dashboard-item-description">@item.Description</p>
-                @if (!string.IsNullOrWhiteSpace(item.ProjectLabel))
+                @if (!string.IsNullOrWhiteSpace(item.Description))
                 {
-                    <div class="dashboard-item-meta">
-                        <span>@item.ProjectLabel</span>
-                    </div>
+                    <p class="dashboard-item-description">@item.Description</p>
                 }
+                <div class="dashboard-item-meta">
+                    @if (!string.IsNullOrWhiteSpace(item.ActorName))
+                    {
+                        <span class="dashboard-news-actor">@item.ActorName</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(item.ProjectLabel))
+                    {
+                        <span class="dashboard-news-project">@item.ProjectLabel</span>
+                    }
+                </div>
             </a>
         }
     </div>

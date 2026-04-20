@@ -309,6 +309,24 @@ public sealed class DashboardService : IDashboardService
 
             skip += auditRows.Count;
 
+            // Úprava #5 (2026-04-20): ActorName resolve z OsobaId → celé jméno (pro popis
+            // "Pavel Andrlík • [kontext]"). Batch lookup podle ActorOsobaId v auditu.
+            var actorIds = auditRows
+                .Where(r => r.ActorOsobaId.HasValue)
+                .Select(r => r.ActorOsobaId!.Value)
+                .Distinct()
+                .ToArray();
+
+            var actorNameMap = actorIds.Length == 0
+                ? new Dictionary<int, string>()
+                : await _dbContext.Osoby
+                    .Where(o => actorIds.Contains(o.Id))
+                    .Select(o => new { o.Id, FullName = (o.Jmeno + " " + o.Prijmeni).Trim() })
+                    .ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
+
+            string ResolveActorName(int? actorId) =>
+                actorId.HasValue && actorNameMap.TryGetValue(actorId.Value, out var name) ? name : string.Empty;
+
             var commentIds = auditRows
                 .Where(item => item.EntityType == AuditEntityType.Comment.ToDatabaseValue())
                 .Select(item => ParseIntId(item.EntityId))
@@ -347,7 +365,8 @@ public sealed class DashboardService : IDashboardService
                             project.Zkratka,
                             project.CelyNazev,
                             record.CisloViditelne ?? string.Empty,
-                            record.Nazev))
+                            record.Nazev,
+                            comment.TextVyjadreni))
                     .ToDictionaryAsync(item => item.CommentId, ct));
 
             var recordsById = recordIds.Count == 0
@@ -365,7 +384,8 @@ public sealed class DashboardService : IDashboardService
                             record.CisloViditelne ?? string.Empty,
                             record.Nazev,
                             category.Kod ?? string.Empty,
-                            category.Nazev ?? string.Empty))
+                            category.Nazev ?? string.Empty,
+                            record.Cil))
                     .ToDictionaryAsync(item => item.RecordId, ct));
 
             var meetingsById = meetingIds.Count == 0
@@ -399,6 +419,8 @@ public sealed class DashboardService : IDashboardService
                         continue;
                     }
 
+                    var commentActorName = ResolveActorName(row.ActorOsobaId);
+                    var commentContext = TruncateFirstLine(comment.CommentText, 120);
                     items.Add(new DashboardNewsItemViewModel
                     {
                         AuditLogId = row.Id,
@@ -407,8 +429,9 @@ public sealed class DashboardService : IDashboardService
                         EntityType = row.EntityType,
                         Action = row.Action,
                         EventLabel = string.Equals(row.Action, AuditActionType.Create.ToDatabaseValue(), StringComparison.OrdinalIgnoreCase) ? "Nové vyjádření" : "Upravené vyjádření",
+                        ActorName = commentActorName,
                         Title = $"{comment.RecordNumber} - {comment.RecordTitle}",
-                        Description = $"Záznam v projektu {BuildProjectLabel(comment.ProjectCode, comment.ProjectName)}",
+                        Description = commentContext,
                         ProjectLabel = BuildProjectLabel(comment.ProjectCode, comment.ProjectName),
                         RecordNumber = comment.RecordNumber,
                         CreatedAt = row.CreatedAt,
@@ -458,6 +481,8 @@ public sealed class DashboardService : IDashboardService
                         ? (isCreate ? "Nový úkol" : "Změna úkolu")
                         : (string.IsNullOrWhiteSpace(record.CategoryName) ? "Nový záznam" : $"Nové: {record.CategoryName}");
 
+                    var recordActorName = ResolveActorName(row.ActorOsobaId);
+                    var recordContext = TruncateFirstLine(record.Cil, 120);
                     items.Add(new DashboardNewsItemViewModel
                     {
                         AuditLogId = row.Id,
@@ -466,8 +491,9 @@ public sealed class DashboardService : IDashboardService
                         EntityType = row.EntityType,
                         Action = row.Action,
                         EventLabel = eventLabel,
+                        ActorName = recordActorName,
                         Title = $"{record.RecordNumber} - {record.RecordTitle}",
-                        Description = $"Projekt {BuildProjectLabel(record.ProjectCode, record.ProjectName)}",
+                        Description = recordContext,
                         ProjectLabel = BuildProjectLabel(record.ProjectCode, record.ProjectName),
                         RecordNumber = record.RecordNumber,
                         CreatedAt = row.CreatedAt,
@@ -495,8 +521,9 @@ public sealed class DashboardService : IDashboardService
                     EntityType = row.EntityType,
                     Action = row.Action,
                     EventLabel = string.Equals(row.Action, AuditActionType.Create.ToDatabaseValue(), StringComparison.OrdinalIgnoreCase) ? "Nové jednání" : "Změna jednání",
+                    ActorName = ResolveActorName(row.ActorOsobaId),
                     Title = $"Jednání č. {meeting.MeetingNumber}",
-                    Description = $"{BuildProjectLabel(meeting.ProjectCode, meeting.ProjectName)} • {meeting.Date:dd.MM.yyyy} v {meeting.StartTime:HH\\:mm}",
+                    Description = $"{meeting.Date:dd.MM.yyyy} v {meeting.StartTime:HH\\:mm}",
                     ProjectLabel = BuildProjectLabel(meeting.ProjectCode, meeting.ProjectName),
                     CreatedAt = row.CreatedAt,
                     OpensComments = false
@@ -525,6 +552,23 @@ public sealed class DashboardService : IDashboardService
     private static int? ParseIntId(string? entityId)
     {
         return int.TryParse(entityId, out var value) ? value : null;
+    }
+
+    private static string TruncateFirstLine(string? source, int maxLen)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return string.Empty;
+        }
+        var firstLine = source
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n', 2)[0]
+            .Trim();
+        if (firstLine.Length <= maxLen)
+        {
+            return firstLine;
+        }
+        return firstLine.Substring(0, Math.Max(0, maxLen - 1)).TrimEnd() + "…";
     }
 
     private static bool HasGlobalProjectReadAccess(CurrentUserContextViewModel currentUser)
@@ -589,7 +633,8 @@ public sealed class DashboardService : IDashboardService
         string ProjectCode,
         string ProjectName,
         string RecordNumber,
-        string RecordTitle);
+        string RecordTitle,
+        string? CommentText);
 
     private sealed record RecordAuditRow(
         int RecordId,
@@ -599,7 +644,8 @@ public sealed class DashboardService : IDashboardService
         string RecordNumber,
         string RecordTitle,
         string CategoryCode,
-        string CategoryName);
+        string CategoryName,
+        string? Cil);
 
     private sealed record MeetingAuditRow(
         int MeetingId,
