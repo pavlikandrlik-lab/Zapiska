@@ -1,0 +1,115 @@
+@using System.Globalization
+@model VyzvyPanelVyzvaViewModel
+@{
+    var muzeEditovat = ViewData["MuzeEditovat"] as bool? ?? false;
+    var projektId = ViewData["ProjektId"] as int? ?? 0;
+    var badgeClass = Model.Stav switch
+    {
+        "Priprava" => "badge-warning",
+        "Odeslano" => "badge-success",
+        "Zruseno" => "badge-muted",
+        _ => "badge-muted",
+    };
+    var defaultOpen = !Model.Kolapsovano;
+}
+
+<article class="vyzvy-card vyzvy-card-vyzva @(defaultOpen ? "open" : null)"
+         data-vyzvy-vyzva
+         data-vyzva-id="@Model.Id"
+         data-stav="@Model.Stav">
+    <header class="vyzvy-card-header" data-vyzvy-toggle>
+        <h3 class="vyzvy-card-title">Výzva @Model.Kod</h3>
+        <span class="vyzvy-card-badge @badgeClass">@Model.Stav</span>
+        <span class="vyzvy-card-meta">
+            @Model.DatumZalozeni.ToString("dd.MM.yyyy")
+            @if (!string.IsNullOrWhiteSpace(Model.ZalozilJmeno))
+            {
+                <text> · @Model.ZalozilJmeno</text>
+            }
+        </span>
+        <button type="button" class="vyzvy-card-toggle-btn" aria-expanded="@(defaultOpen ? "true" : "false")">
+            <span class="vyzvy-card-toggle-icon">@(defaultOpen ? "▼" : "▶")</span>
+        </button>
+    </header>
+
+    <div class="vyzvy-card-body">
+        @if (Model.Polozky.Count == 0)
+        {
+            <p class="vyzvy-card-empty muted">Výzva neobsahuje žádné PNF.</p>
+        }
+        else
+        {
+            <table class="vyzvy-polozky-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Č. úkolu VP</th>
+                        <th>HTL</th>
+                        <th>Název</th>
+                        <th class="num">Cena</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ var index = 0; }
+                    @foreach (var p in Model.Polozky)
+                    {
+                        var pismeno = ((char)('a' + index)).ToString();
+                        index++;
+                        <tr>
+                            <td>@pismeno)</td>
+                            <td>@(p.CisloViditelneZaznamu ?? "—")</td>
+                            <td>@p.Cislo</td>
+                            <td>@(p.StrucneNazev ?? "(bez názvu z HOT)")</td>
+                            <td class="num">
+                                @(p.PredpokladanaCena?.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ")) ?? "—")
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.CelkovaCena.HasValue)
+                    {
+                        <tr class="total">
+                            <td colspan="4">CELKEM (předpokládaná cena)</td>
+                            <td class="num">@Model.CelkovaCena.Value.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ")) Kč</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <footer class="vyzvy-card-footer">
+        <button type="button" class="pm-button ghost" disabled title="Export Word bude dostupný v další fázi">
+            Stáhnout Word ✗
+        </button>
+
+        @if (muzeEditovat)
+        {
+            <button type="button"
+                    class="pm-button ghost"
+                    data-vyzvy-action="otevrit-reassign"
+                    data-projekt-id="@projektId">
+                Upravit přiřazení PNF
+            </button>
+
+            @if (Model.PovoleneStavy.Count > 0)
+            {
+                <div class="vyzvy-stav-menu" data-vyzvy-stav-menu>
+                    <button type="button" class="pm-button ghost" data-vyzvy-stav-toggle>Změnit stav ▾</button>
+                    <ul class="vyzvy-stav-menu-list">
+                        @foreach (var s in Model.PovoleneStavy)
+                        {
+                            <li>
+                                <button type="button"
+                                        data-vyzvy-action="zmenit-stav"
+                                        data-vyzva-id="@Model.Id"
+                                        data-novy-stav="@s">
+                                    Přepnout na: @s
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        }
+    </footer>
+</article>

@@ -1,8 +1,38 @@
+@using System.Globalization
 @model ProjectDashboardVyzvyPanelViewModel
 
-@if (!string.IsNullOrWhiteSpace(Model.ChybaProjektuMessage))
-{
-    <div class="dashboard-placeholder-message">
-        <p class="muted">@Model.ChybaProjektuMessage</p>
-    </div>
-}
+<section class="vyzvy-panel"
+         data-vyzvy-panel
+         data-project-id="@Model.ProjektId"
+         data-muze-editovat="@(Model.MuzeEditovat ? "true" : "false")">
+
+    @if (!string.IsNullOrWhiteSpace(Model.ChybaProjektuMessage))
+    {
+        <div class="dashboard-placeholder-message">
+            <p class="muted">@Model.ChybaProjektuMessage</p>
+        </div>
+    }
+
+    @await Html.PartialAsync("_VyzvyPanel.BufferCard", Model.Buffer, new ViewDataDictionary(ViewData)
+    {
+        { "MuzeEditovat", Model.MuzeEditovat },
+        { "ProjektId", Model.ProjektId }
+    })
+
+    @if (Model.Vyzvy.Count == 0)
+    {
+        <div class="vyzvy-empty muted">Projekt zatím nemá žádnou výzvu.</div>
+    }
+    else
+    {
+        foreach (var v in Model.Vyzvy)
+        {
+            @await Html.PartialAsync("_VyzvyPanel.VyzvaCard", v, new ViewDataDictionary(ViewData)
+            {
+                { "MuzeEditovat", Model.MuzeEditovat },
+                { "ProjektId", Model.ProjektId }
+            })
+        }
+    }
+
+</section>

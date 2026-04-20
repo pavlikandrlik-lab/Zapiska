@@ -1,0 +1,59 @@
+@using System.Globalization
+@model VyzvyPanelBufferViewModel
+@{
+    var muzeEditovat = ViewData["MuzeEditovat"] as bool? ?? false;
+    var projektId = ViewData["ProjektId"] as int? ?? 0;
+}
+
+<article class="vyzvy-card vyzvy-card-buffer" data-vyzvy-buffer>
+    <header class="vyzvy-card-header">
+        <h3 class="vyzvy-card-title">Buffer — čeká na zařazení</h3>
+        <span class="vyzvy-card-badge badge-muted">@Model.Polozky.Count PNF</span>
+    </header>
+
+    @if (Model.Polozky.Count == 0)
+    {
+        <p class="vyzvy-card-empty muted">
+            Buffer je prázdný. U PNF v externích vazbách zapněte přepínač „Zařadit do další výzvy".
+        </p>
+    }
+    else
+    {
+        <ul class="vyzvy-polozky">
+            @foreach (var p in Model.Polozky)
+            {
+                <li class="vyzvy-polozka" data-vyzvy-polozka data-externi-odkaz-id="@p.ExterniOdkazId">
+                    <span class="vyzvy-polozka-cislo">@p.Cislo</span>
+                    @if (!string.IsNullOrWhiteSpace(p.CisloViditelneZaznamu))
+                    {
+                        <span class="vyzvy-polozka-meta">@p.CisloViditelneZaznamu</span>
+                    }
+                    <span class="vyzvy-polozka-nazev">@(p.StrucneNazev ?? "(bez názvu z HOT)")</span>
+                    @if (p.PredpokladanaCena.HasValue)
+                    {
+                        <span class="vyzvy-polozka-cena">
+                            @p.PredpokladanaCena.Value.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ")) Kč
+                        </span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+
+    <footer class="vyzvy-card-footer">
+        @if (muzeEditovat)
+        {
+            <button type="button"
+                    class="pm-button primary"
+                    data-vyzvy-action="zalozit"
+                    data-projekt-id="@projektId"
+                    @(Model.MuzeZaloztVyzvu ? null : "disabled=\"disabled\"")>
+                Založit výzvu z bufferu
+            </button>
+            @if (!Model.MuzeZaloztVyzvu && !string.IsNullOrWhiteSpace(Model.DuvodBlokace))
+            {
+                <span class="muted vyzvy-block-reason">@Model.DuvodBlokace</span>
+            }
+        }
+    </footer>
+</article>
