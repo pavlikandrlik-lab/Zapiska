@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 
 namespace PmTracker.Web.Services.Dictionaries;
@@ -192,17 +193,17 @@ public sealed partial class DictionaryService
                 Nazev = "Výzvy",
                 CanChangeLockState = canChangeLockState,
                 SloupceNavic = ["Rok"],
-                Polozky = await dbContext.CiselnikVyzvy
+                Polozky = await dbContext.Vyzvy
                     .AsNoTracking()
                     .OrderBy(x => x.Kod)
                     .Select(x => new CiselnikRadekViewModel
                     {
                         Id = x.Id,
                         Kod = x.Kod,
-                        Nazev = x.Nazev,
-                        IsLocked = x.IsLocked,
+                        Nazev = "Výzva " + x.Kod,
+                        IsLocked = x.Stav == VyzvaStav.Odeslano,
                         CanChangeLockState = canChangeLockState,
-                        HodnotyNavic = new[] { x.Rok.ToString("yyyy", CultureInfo.InvariantCulture) }
+                        HodnotyNavic = new[] { x.Rok.ToString(CultureInfo.InvariantCulture) }
                     })
                     .ToListAsync(ct)
             },
@@ -291,7 +292,7 @@ public sealed partial class DictionaryService
             new() { Key = "organizace", Nazev = "Organizace", PocetPolozek = await dbContext.CiselnikOrganizace.CountAsync(ct) },
             new() { Key = "organizacni-celky", Nazev = "Organizační celky", PocetPolozek = await dbContext.CiselnikOrganizacniCelky.CountAsync(ct) },
             new() { Key = "subsystemy", Nazev = "Subsystémy", PocetPolozek = await dbContext.Subsystemy.CountAsync(ct) },
-            new() { Key = "vyzvy", Nazev = "Výzvy", PocetPolozek = await dbContext.CiselnikVyzvy.CountAsync(ct) }
+            new() { Key = "vyzvy", Nazev = "Výzvy", PocetPolozek = await dbContext.Vyzvy.CountAsync(ct) }
         };
     }
 }

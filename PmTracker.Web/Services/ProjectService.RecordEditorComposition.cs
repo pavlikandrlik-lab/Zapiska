@@ -77,7 +77,7 @@ public sealed partial class ProjectService
         var collaborationCandidates = await BuildRecordOwnerCandidatesAsync(record.ProjektId, null, ct);
 
         var extTypes = await dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().OrderBy(x => x.Kod).ToListAsync(ct);
-        var vyzvyById = (await dbContext.CiselnikVyzvy.AsNoTracking()
+        var vyzvyById = (await dbContext.Vyzvy.AsNoTracking()
                 .OrderBy(x => x.Kod)
                 .Select(x => new
                 {

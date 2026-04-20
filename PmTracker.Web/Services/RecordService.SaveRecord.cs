@@ -587,8 +587,8 @@ public sealed partial class RecordService
         var typeRows = await dbContext.CiselnikTypuExternichOdkazu.AsNoTracking()
             .Select(x => new { x.Id, x.Kod, x.Nazev })
             .ToListAsync(ct);
-        var vyzvaRows = await dbContext.CiselnikVyzvy.AsNoTracking()
-            .Select(x => new { x.Id, x.Kod, x.Nazev })
+        var vyzvaRows = await dbContext.Vyzvy.AsNoTracking()
+            .Select(x => new { x.Id, x.Kod })
             .ToListAsync(ct);
 
         for (var index = 0; index < links.Count; index++)
@@ -647,8 +647,7 @@ public sealed partial class RecordService
 
             if (!string.IsNullOrWhiteSpace(vyzvaValue))
             {
-                var vyzvaExists = vyzvaRows.Any(x => string.Equals(x.Kod, vyzvaValue, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(x.Nazev, vyzvaValue, StringComparison.OrdinalIgnoreCase));
+                var vyzvaExists = vyzvaRows.Any(x => string.Equals(x.Kod, vyzvaValue, StringComparison.OrdinalIgnoreCase));
                 if (!vyzvaExists)
                 {
                     AddRecordValidationIssue(
@@ -1048,8 +1047,8 @@ public sealed partial class RecordService
             return null;
         }
 
-        return await dbContext.CiselnikVyzvy
-            .Where(x => x.Kod == value || x.Nazev == value)
+        return await dbContext.Vyzvy
+            .Where(x => x.Kod == value)
             .Select(x => (int?)x.Id)
             .FirstOrDefaultAsync(ct);
     }

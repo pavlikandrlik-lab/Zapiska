@@ -301,8 +301,8 @@ public sealed partial class ProjectService
                 .Where(x => externalTypeIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
         var vyzvaById = vyzvaIds.Length == 0
-            ? new Dictionary<int, CiselnikVyzvaEntity>()
-            : await dbContext.CiselnikVyzvy.AsNoTracking()
+            ? new Dictionary<int, VyzvaEntity>()
+            : await dbContext.Vyzvy.AsNoTracking()
                 .Where(x => vyzvaIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
 

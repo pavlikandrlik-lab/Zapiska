@@ -52,7 +52,7 @@ public sealed partial class ProjectService
             .ToDictionary(group => group.Key, group => group.ToList());
 
         var extTypeById = (await dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
-        var vyzvaById = (await dbContext.CiselnikVyzvy.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
+        var vyzvaById = (await dbContext.Vyzvy.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
         var externalByRecord = (await dbContext.ZaznamExterniOdkazy.AsNoTracking()
                 .Where(x => recordIds.Contains(x.ZaznamId))
                 .OrderBy(x => x.Id)

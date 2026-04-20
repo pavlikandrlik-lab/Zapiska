@@ -278,7 +278,7 @@ public sealed partial class DictionaryService
             ["subsystemy"] = (command, ct) => RemoveCiselnikRowAsync(dbContext.Subsystemy, command.Id, "subsystemy", ct),
             [HarmonogramKrokyCiselnikKey] = harmonogramService.DeleteHarmonogramStepRowAsync,
             ["stavy-jednani"] = (command, ct) => RemoveCiselnikRowAsync(dbContext.CiselnikStavuJednani, command.Id, "stavy-jednani", ct),
-            ["vyzvy"] = (command, ct) => RemoveCiselnikRowAsync(dbContext.CiselnikVyzvy, command.Id, "vyzvy", ct)
+            ["vyzvy"] = (command, ct) => RemoveCiselnikRowAsync(dbContext.Vyzvy, command.Id, "vyzvy", ct)
         };
     }
 
@@ -311,7 +311,7 @@ public sealed partial class DictionaryService
             "stavy-ucasti" => dbContext.CiselnikStavuUcasti.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefaultAsync(ct),
             "organizace" => dbContext.CiselnikOrganizace.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefaultAsync(ct),
             "organizacni-celky" => dbContext.CiselnikOrganizacniCelky.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefaultAsync(ct),
-            "vyzvy" => dbContext.CiselnikVyzvy.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefaultAsync(ct),
+            "vyzvy" => dbContext.Vyzvy.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)(x.Stav == VyzvaStav.Odeslano)).FirstOrDefaultAsync(ct),
             "stavy-jednani" => dbContext.CiselnikStavuJednani.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefaultAsync(ct),
             HarmonogramKrokyCiselnikKey => Task.FromResult<bool?>(true),
             _ => Task.FromResult<bool?>(null)
@@ -404,37 +404,41 @@ public sealed partial class DictionaryService
 
     private async Task SaveVyzvaRowAsync(SaveCiselnikRowCommand command, CancellationToken ct)
     {
-        var year = DateTime.Today;
+        var year = DateTime.Today.Year;
         var yearRaw = command.HodnotyNavic.FirstOrDefault();
         if (!string.IsNullOrWhiteSpace(yearRaw))
         {
             if (int.TryParse(yearRaw, out var y) && y > 1900 && y < 9999)
             {
-                year = new DateTime(y, 1, 1);
+                year = y;
             }
             else if (DateTime.TryParse(yearRaw, out var parsed))
             {
-                year = new DateTime(parsed.Year, 1, 1);
+                year = parsed.Year;
             }
         }
 
         if (command.Id.HasValue)
         {
-            var row = await dbContext.CiselnikVyzvy.FirstOrDefaultAsync(x => x.Id == command.Id.Value, ct)
+            var row = await dbContext.Vyzvy.FirstOrDefaultAsync(x => x.Id == command.Id.Value, ct)
                 ?? throw new InvalidOperationException($"Řádek {command.Id.Value} nebyl nalezen.");
             row.Kod = command.Kod.Trim();
-            row.Nazev = command.Nazev.Trim();
             row.Rok = year;
-            row.IsLocked = command.IsLocked;
             return;
         }
 
-        dbContext.CiselnikVyzvy.Add(new CiselnikVyzvaEntity
+        // TODO (fáze 2): fallback číselníkový upsert přes dictionary UI; povinná pole jsou placeholder.
+        dbContext.Vyzvy.Add(new VyzvaEntity
         {
+            ProjektId = 1,
             Kod = command.Kod.Trim(),
-            Nazev = command.Nazev.Trim(),
+            PoradoveVRoce = 0,
             Rok = year,
-            IsLocked = command.IsLocked
+            Stav = VyzvaStav.Priprava,
+            DatumZalozeni = DateTime.UtcNow,
+            ZalozilOsobaId = 0,
+            MistoPlneniSnapshot = string.Empty,
+            CisloRamcoveSmlouvySnapshot = string.Empty,
         });
     }
 

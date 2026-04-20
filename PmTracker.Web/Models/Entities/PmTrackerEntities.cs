@@ -82,15 +82,6 @@ public sealed class CiselnikOrganizacniCelekEntity
     public bool IsLocked { get; set; }
 }
 
-public sealed class CiselnikVyzvaEntity
-{
-    public int Id { get; set; }
-    public string Kod { get; set; } = string.Empty;
-    public string Nazev { get; set; } = string.Empty;
-    public DateTime Rok { get; set; }
-    public bool IsLocked { get; set; }
-}
-
 public sealed class CiselnikStavuJednaniEntity
 {
     public int Id { get; set; }

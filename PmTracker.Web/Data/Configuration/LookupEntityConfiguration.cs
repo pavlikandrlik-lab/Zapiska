@@ -141,20 +141,6 @@ internal sealed class OrganizationUnitLookupEntityConfiguration : IEntityTypeCon
     }
 }
 
-internal sealed class ChallengeLookupEntityConfiguration : IEntityTypeConfiguration<CiselnikVyzvaEntity>
-{
-    public void Configure(EntityTypeBuilder<CiselnikVyzvaEntity> builder)
-    {
-        builder.ToTable("ciselnik_vyzvy");
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Id).HasColumnName("id");
-        builder.Property(x => x.Kod).HasColumnName("kod");
-        builder.Property(x => x.Nazev).HasColumnName("nazev");
-        builder.Property(x => x.Rok).HasColumnName("rok");
-        builder.Property(x => x.IsLocked).HasColumnName("is_locked");
-    }
-}
-
 internal sealed class MeetingStateLookupEntityConfiguration : IEntityTypeConfiguration<CiselnikStavuJednaniEntity>
 {
     public void Configure(EntityTypeBuilder<CiselnikStavuJednaniEntity> builder)

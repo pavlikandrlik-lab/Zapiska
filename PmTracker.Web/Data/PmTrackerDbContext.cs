@@ -20,7 +20,7 @@ public sealed class PmTrackerDbContext : DbContext
     public DbSet<CiselnikStavuUcastiEntity> CiselnikStavuUcasti => Set<CiselnikStavuUcastiEntity>();
     public DbSet<CiselnikOrganizaceEntity> CiselnikOrganizace => Set<CiselnikOrganizaceEntity>();
     public DbSet<CiselnikOrganizacniCelekEntity> CiselnikOrganizacniCelky => Set<CiselnikOrganizacniCelekEntity>();
-    public DbSet<CiselnikVyzvaEntity> CiselnikVyzvy => Set<CiselnikVyzvaEntity>();
+    public DbSet<VyzvaEntity> Vyzvy => Set<VyzvaEntity>();
     public DbSet<CiselnikStavuJednaniEntity> CiselnikStavuJednani => Set<CiselnikStavuJednaniEntity>();
     public DbSet<HarmonogramSablonaEntity> HarmonogramSablony => Set<HarmonogramSablonaEntity>();
     public DbSet<HarmonogramTypEntity> CiselnikHarmonogramTypu => Set<HarmonogramTypEntity>();
