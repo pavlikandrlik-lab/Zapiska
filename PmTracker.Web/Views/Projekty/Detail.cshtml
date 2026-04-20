@@ -1,6 +1,7 @@
 @model ProjektDetailViewModel
 @{
     ViewData["Title"] = $"Projekt {Model.Projekt.Zkratka}";
+    ViewData["BodyClass"] = "dashboard-page";
     var asUser = Context.Request.Query["asUser"].ToString();
     var recordsTabUrl = Url.Action("Detail", "Projekty", new
     {

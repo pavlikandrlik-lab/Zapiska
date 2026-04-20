@@ -57,4 +57,66 @@ public sealed class LayoutWidthPolicyTests
         layout.Should().Contain("app-main--fluid",
             "switch přikládá třídu app-main--fluid k main elementu");
     }
+
+    [Fact]
+    public void ProjektyDetail_ShouldUseFluidLayout()
+    {
+        var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Projekty/Detail.cshtml"));
+        view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Projekty/Detail je data-heavy (5 tabs, karty, grid) → fluid tier");
+    }
+
+    [Fact]
+    public void ProjektyIndex_ShouldUseFluidLayout()
+    {
+        var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Projekty/Index.cshtml"));
+        view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Projekty/Index seznam karet → fluid tier (víc sloupců na 4K)");
+    }
+
+    [Fact]
+    public void ProjectDashboardIndex_ShouldUseFluidLayout()
+    {
+        var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/ProjectDashboard/Index.cshtml"));
+        view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "ProjectDashboard panely (zaznamy, NES, výzvy, stats) → fluid tier");
+    }
+
+    [Fact]
+    public void JednaniDetail_ShouldUseFluidLayout()
+    {
+        var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Jednani/Detail.cshtml"));
+        view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Jednani/Detail (zápis + účastníci + úkoly + attendance) → fluid tier");
+    }
+
+    [Fact]
+    public void SearchIndex_ShouldUseFluidLayout()
+    {
+        var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Search/Index.cshtml"));
+        view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Search/Index hit list napříč entitami → fluid tier");
+    }
+
+    [Fact]
+    public void DashboardFocus_ShouldUseFluidLayout()
+    {
+        var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Dashboard/Focus.cshtml"));
+        view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Dashboard/Focus full list záznamů → fluid tier");
+    }
+
+    [Fact]
+    public void DashboardMeetingsAndNews_ShouldStayNarrow()
+    {
+        // Úmyslně ponecháno narrow pro reading UX newsfeed / chronological feed.
+        // YAGNI override — pokud později user bude chtít wide, změníme tehdy.
+        var meetings = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Dashboard/Meetings.cshtml"));
+        var news = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Dashboard/News.cshtml"));
+
+        meetings.Should().NotContain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Dashboard/Meetings je chronological feed — reading UX, ne data grid");
+        news.Should().NotContain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Dashboard/News je newsfeed — reading UX");
+    }
 }
