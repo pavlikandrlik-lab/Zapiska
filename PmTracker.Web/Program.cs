@@ -5,6 +5,7 @@ using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Search;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Vyzvy;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,7 @@ builder.Services
     .AddPmTrackerDataStore(builder.Configuration);
 builder.Services.AddPmTrackerSearch(builder.Configuration);
 builder.Services.AddServiceDeskIntegration(builder.Configuration);
+builder.Services.AddVyzvyServices();
 
 var app = builder.Build();
 
