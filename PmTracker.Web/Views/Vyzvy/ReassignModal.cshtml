@@ -1,0 +1,65 @@
+@using PmTracker.Web.Services.Vyzvy.Contracts
+@model PmTracker.Web.Models.ViewModels.Vyzvy.ReassignModalViewModel
+
+<div class="modal-body">
+    <h2>Upravit přiřazení PNF</h2>
+    <p class="muted">Přetáhni PNF mezi bufferem a výzvami ve stavu <em>Priprava</em>. Odeslané výzvy nejsou v úpravě viditelné.</p>
+
+    <div class="vyzvy-reassign-columns" data-vyzvy-reassign-columns data-projekt-id="@Model.ProjektId">
+
+        <section class="vyzvy-reassign-column"
+                 data-vyzvy-reassign-target
+                 data-cilova-vyzva-id="">
+            <header>
+                <h3>Buffer</h3>
+                <span class="muted">@Model.BufferPolozky.Count PNF</span>
+            </header>
+            <div class="vyzvy-reassign-items">
+                @foreach (var item in Model.BufferPolozky)
+                {
+                    <div class="vyzvy-reassign-item"
+                         draggable="true"
+                         data-vyzvy-reassign-item
+                         data-externi-odkaz-id="@item.ExterniOdkazId">
+                        <strong>@item.Cislo</strong>
+                        @if (!string.IsNullOrWhiteSpace(item.StrucneNazev))
+                        {
+                            <div class="muted">@item.StrucneNazev</div>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+
+        @foreach (var vyzva in Model.PripravaVyzvy)
+        {
+            <section class="vyzvy-reassign-column"
+                     data-vyzvy-reassign-target
+                     data-cilova-vyzva-id="@vyzva.Id">
+                <header>
+                    <h3>@vyzva.Kod</h3>
+                    <span class="muted">Priprava · @vyzva.Polozky.Count PNF</span>
+                </header>
+                <div class="vyzvy-reassign-items">
+                    @foreach (var polozka in vyzva.Polozky)
+                    {
+                        <div class="vyzvy-reassign-item"
+                             draggable="true"
+                             data-vyzvy-reassign-item
+                             data-externi-odkaz-id="@polozka.ExterniOdkazId">
+                            <strong>@polozka.Cislo</strong>
+                            @if (!string.IsNullOrWhiteSpace(polozka.StrucneNazev))
+                            {
+                                <div class="muted">@polozka.StrucneNazev</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+
+    <div class="modal-footer">
+        <button type="button" class="pm-button ghost" data-vyzvy-reassign-close>Zavřít</button>
+    </div>
+</div>
