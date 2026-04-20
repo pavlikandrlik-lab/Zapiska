@@ -1,6 +1,7 @@
 @model JednaniDetailViewModel
 @{
     ViewData["Title"] = "Detail jednání";
+    ViewData["BodyClass"] = "dashboard-page";
     var uzavrenyStav = Model.StavyJednani.FirstOrDefault(x => string.Equals(x.Value, Model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase));
     var otevrenyStav = Model.StavyJednani.FirstOrDefault(x => string.Equals(x.Value, Model.OtevrenyStavKod, StringComparison.OrdinalIgnoreCase));
     var isLocked = !string.IsNullOrWhiteSpace(Model.UzavrenyStavKod)
