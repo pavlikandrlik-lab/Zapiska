@@ -341,6 +341,28 @@ UI:
 
 ---
 
+### Úprava #16 — Search: FTS index nebyl nikdy vytvořen → full-rebuild UX
+
+- **Kde:** globální vyhledávání (celá aplikace), [SearchController.Reindex](PmTracker.Web/Controllers/SearchController.cs#L71) existuje jako POST endpoint pro super-admin, ale **UI tlačítko chybí** (žádný způsob, jak ho z UI spustit).
+- **Root cause (2026-04-21, ověřeno v logu na VYVOJ serveru):**
+  - [SqlServerSearchClient.EnsureIndexAsync](PmTracker.Web/Services/Search/SqlServerSearchClient.cs#L30) vytváří `SearchIndex` tabulku + `SearchCatalog` + FTS index — ale **je volán JEN z `IndexEntityAsync` a `FullReindexAsync`**, ne při startupu.
+  - [SearchReindexHostedService.RunCycleAsync](PmTracker.Web/Services/Search/SearchReindexHostedService.cs#L67) zpracovává pouze nové záznamy v `AuthzAuditLog` od `LastProcessedAuditId`. Pokud žádné nejsou → `IndexEntityAsync` se nevolá → `EnsureIndexAsync` se nevolá → FTS index **zůstává neexistující**.
+  - Při prvním search query FREETEXTTABLE padá: `Cannot use a FREETEXT predicate on table 'SearchIndex' because it is not full-text indexed.` — `SqlServerSearchClient.SearchAsync` to má v catch-u a graceful vrací prázdný výsledek.
+  - Symptom pro uživatele: vyhledávání vrací „nic nenalezeno" bez varování.
+- **Očekávání:**
+  1. **Při startu aplikace** jednou zavolat `EnsureIndexAsync` (vytvoří tabulku + FTS katalog + FTS index, pokud chybí) → Search je připraven i když je DB prázdná / bez audit logu.
+  2. **Úvodní full reindex** pro existující data bez audit log entries — buď automaticky při prvním startu (detekce prázdného indexu), nebo přes UI tlačítko v Nastavení.
+  3. **UI tlačítko „Reindexovat vyhledávání"** v Nastavení pro super-admin (POST /Search/Reindex už existuje) + status panel s počtem indexovaných dokumentů a time stamp posledního reindexu.
+  4. **Ošetřit případ, že SQL Server account nemá permission na FTS** — zalogovat jasnou chybu („Account <x> nemá CREATE FULLTEXT CATALOG permission — full-text search je nedostupný, kontaktujte DBA"). Aktuálně se to ztrácí v catch-u bez user-facing zprávy.
+- **Status:** 🆕 nová — priorita **HIGH** (blokuje globální vyhledávání pro všechny nové DB deploymenty)
+- **Komentář / dopady:**
+  - Permission SQL: `CREATE FULLTEXT CATALOG` vyžaduje `ALTER ANY FULLTEXT CATALOG` nebo `db_owner`. `CREATE FULLTEXT INDEX` vyžaduje `ALTER` permission na tabulce + `REFERENCES` na FTS katalog. Většina app service accountů tato práva **nemá** → FTS setup musí proběhnout jako **DBA one-time task** při zakládání DB, NE za běhu aplikace.
+  - Alternativní řešení: dát FTS setup do SQL migration skriptu (`PmTracker.ServiceDesk.Sql/...` nebo ekvivalent) namísto runtime EnsureIndex — pak se vytvoří v kontextu DBA účtu při deployment / upgrade.
+- **Vazba:** souvisí s úpravou #3 (auth audit) — startup bootstrapping by měl mít vlastní permission check.
+- **Vazba:** souvisí s [docs/technical/14-local-dev-secrets.md](docs/technical/14-local-dev-secrets.md) — setup nové dev DB musí zahrnovat FTS bootstrap.
+
+---
+
 ## Pozorování z předchozího review (nezařazená, k rozhodnutí)
 
 Během Playwright review byly odhaleny tyto potenciální issues, které nepatří k recent refactoru, ale stojí za zvážení při systémovém fixu:
