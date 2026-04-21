@@ -104,7 +104,63 @@ Přiřazení bublin ke krokům **musí respektovat chronologický pořádek**. P
 - `DatumPrevzeti datetime2?` — **už existuje**.
 - `Cislo varchar` — 6místný identifikátor tiketu v ServiceDesku (= `HOT_ZAZNAMY.id`).
 
-### 4.1.1 Co z `intranetNEW.dbo.HOT_*` NEpoužíváme (upřesnění 2026-04-21)
+### 4.1.1 Přesné schéma tabulek `HOT_*` (potvrzeno 2026-04-21 z `SD_servicedesk/hotline.txt`)
+
+**`HOT_ZAZNAMY` — kmenový ticket:**
+
+```
+radek, subsystem, typ_zaznamu, id, rok, pid, modul, utvar, datum, zpracoval,
+schvalil, uzivatel, kancelar, kontakt, verze, zavaznost, strucne, popis, stav,
+schvaleno, faxvfu, p_reseni, p_resiteli, zal_HFU, id_vyrobce, res_tym,
+dat_res_t, term_pl, splneno, priznak_zamceni, vyjadreni_CA, email, dat_dod,
+export, dodavatel, dulezitost, priznak_gdpr, sla_deadline
+```
+
+Klíčová pole pro Use-case A:
+- `id` — **6místné číslo pro lidi** (to, co uživatel vidí v UI PM Trackeru)
+- `pid` — **alfanumerický identifikátor typu `A400P023RVVP`** (interní párování napříč HOT_* tabulkami; **většina dalších tabulek se připojuje přes `pid`, ne `id`**)
+- `typ_zaznamu` — `NES` / `PMP` / `PNF` (string)
+- `stav` — text, konkrétně `N'archiv'` / `N'otevřeno'` / `N'dodavatel'` / `N'od dodavatele'` / `N'k dodavateli'`
+- `strucne` — krátký popis (ticket title)
+- `datum` — datum založení (= zdroj pro krok K1)
+
+**`HOT_VYJADRENI` — jednotlivá vyjádření (komentáře):**
+
+```
+id, typ, pid, datum, zpracoval, popis, tym, export, id_export,
+viditelne_dodavateli
+```
+
+- `id` — **PK, jednoznačný identifikátor vyjádření**. Použije se v `zaznam_harmonogram_vyjadreni_vazba.hot_vyjadreni_id`. V kolegově C# modelu není zmapován, ale na SQL úrovni existuje.
+- `typ` — `"05"` / `"25"` / `"16"` (= to, co kolega v C# property `Comment.CommentType`)
+- `pid` — **FK na `HOT_ZAZNAMY.pid`** (nikoli `id`!). Join: `v.pid = z.pid`.
+- `datum` — kdy bylo vyjádření zapsáno
+- `zpracoval` — textové jméno autora
+- `popis` — text vyjádření (v HOT uložené jako HTML)
+- `tym` — textová zkratka týmu (např. `FIS`, `ISSP`)
+
+**KLÍČOVÉ:** Sloupec `user_category` **v HOT_VYJADRENI neexistuje**. Kolegova C# property `Comment.UserCategory` (ZP/VS/RT/PM/DO/EO) se **odvozuje v aplikační vrstvě** ze `zpracoval` + `tym` + permissions mapy (`Hotline.cs` řádky 270–311). Pro naše LIKE predikáty to znamená:
+
+- **Filtrovat přímo v textu `popis`** (role je typicky součástí textu: „Projektový manažer - FIS předal záznam dodavateli…", „Vedoucí informačního systému – ISSP předal záznam dodavateli…").
+- **Neukazovat v SQL filter na neexistující sloupec.** Pokud by text sám nebyl dostatečně specifický, sekundárně filtrovat na `tym` (např. `tym = N'PM'` — ale **ověřit v reálné DB, zda `tym` drží přesně tyto hodnoty**, může to být zkratka subsystému, ne role).
+
+**`HOT_KALKULACE` — APTI kalkulace (pro Fázi 1 Výzvy):**
+
+```
+id, pracnost_a, pracnost_p, pracnost_t, pracnost_i, sazba_a, sazba_p, sazba_t,
+sazba_i, cena_a, cena_p, cena_t, cena_i, cena, pid, popis, akceptace, datum,
+export, datum_akceptace, id_export, termin, text_termin, id_kalk,
+vyjadreni_kalk, datum_fakturace, verze, cislo_faktury, datum_dodani, pocet_l,
+sazba_l, cena_l, rozpad_licence
+```
+
+- `pid` — FK na `HOT_ZAZNAMY.pid` (potvrzeno — přímý join, žádný HOT_PID mezikrok)
+- `akceptace` — text, hodnoty: `N'Akceptováno'`, `N'Fakturováno'`, `N'Fakturovat'`, a další
+- `verze` — verze kalkulace, pro akceptovanou kalkulaci se bere nejvyšší verze (ale spolehlivější je filtrovat přímo na `akceptace`)
+
+**Nepoužíváme:** `HOT_PID`, `HOT_VYJADRENI_TEXT`, `HOT_DODAVATEL`, `HOT_IS`, `HOT_IS_LIMIT`, `HOT_MODULY`, `HOT_SUBSYSTEM`, `HOT_TYMY`. V budoucí fázi (Use-case B) možná dáme UI na dodavatele přes `HOT_DODAVATEL`, ale Plán C se bez toho obejde.
+
+### 4.1.2 Co z `intranetNEW.dbo.HOT_*` NEpoužíváme (upřesnění 2026-04-21)
 
 Kolega v `SD_servicedesk/Hotline.cs` pracuje s dalšími entitami, které pro use-case A **nejsou relevantní**:
 
@@ -377,42 +433,54 @@ Přidaný krok se zařadí na správnou chronologickou pozici (podle indexu 1–
 
 ### 8.1 Textové predikáty
 
-**ZÁSADA:** ServiceDesk je starý a nedokonalý systém — **nelze** se spoléhat na strukturovaná data (workflow table, transfer types, stavové enumy). **Jedinou spolehlivou cestou je striktní textový match** nad `HOT_VYJADRENI.popis`. Pokud je tentýž text vygenerován různými rolemi (např. „předal záznam dodavateli" od PM vs. od VS FIS), bere se **jen ten od relevantní role** — predikát proto kombinuje **text** a **kategorii autora** (`user_category`).
+**ZÁSADA:** ServiceDesk je starý a nedokonalý systém — **nelze** se spoléhat na strukturovaná data (workflow table, transfer types, stavové enumy). **Jedinou spolehlivou cestou je striktní textový match** nad `HOT_VYJADRENI.popis`. Role autora je **obsažena přímo v textu** vyjádření (např. „Projektový manažer - FIS předal záznam dodavateli : …"), takže stačí textový match — není třeba filtrovat zvlášť na kategorii.
+
+**Join `HOT_VYJADRENI → HOT_ZAZNAMY`: přes `pid`, ne přes `id`.** V `HOT_ZAZNAMY` je `id` 6místné číslo (co vidí uživatel) a `pid` je alfanumerický identifikátor typu `A400P023RVVP`. Všechny HOT tabulky se joinují přes `pid`.
+
+**Schéma `HOT_VYJADRENI` (potvrzeno z hotline.txt):** `id, typ, pid, datum, zpracoval, popis, tym, export, id_export, viditelne_dodavateli`. Sloupec `user_category` **neexistuje** — kolega ho skládá v C# vrstvě.
 
 **Tabulka `HOT_VYJADRENI` (intranetNEW.dbo):**
 
-| # | Krok / pole | Text match (`popis LIKE N'%...%'`) | Role autora (`user_category`) | Řazení / výběr |
+| # | Krok / pole | Text match (`popis LIKE N'%...%'`) | Typ vyjádření (`typ`) | Řazení / výběr |
 |---|---|---|---|---|
 | **K1** | Krok 1 (všichni) | — (není vyjádření) | — | `HOT_ZAZNAMY.datum` = datum založení tiketu |
-| **K3** | Krok 3 (PMP) | `%Záznam byl založen a předán dodavateli k řešení pod značkou:%` | libovolné | první ASC |
-| **K4** | Krok 4 (PMP) | `%Dodavatel přidal řešení%` | `DO` (dodavatel) | **poslední** DESC |
-| **K6** | Krok 6 (PNF) | `%Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována.%` | `PM` (projektový manažer) | první ASC |
-| **K7** | Krok 7 (PNF) | `%Dodavatel přidal řešení%` | `DO` (dodavatel) | **poslední** DESC |
-| **K10** | Krok 10 (PNF) | `%Záznam byl převeden do archivu.%` | libovolné (typicky systémové) | jediný |
-| **D-O** | `DatumObjednani` (PMP + PNF) | stejné jako K6 | `PM` | první ASC |
-| **D-D** | `DatumDodani` (PMP + PNF) | stejné jako K4 / K7 | `DO` | **poslední** DESC |
-| **D-P** | `DatumPrevzeti` (všichni) | stejné jako K10 | libovolné | jediný |
+| **K3** | Krok 3 (PMP) | `%Záznam byl založen a předán dodavateli k řešení pod značkou:%` | libovolné (typicky `"25"` systémová) | první ASC |
+| **K4** | Krok 4 (PMP) | `%Dodavatel přidal řešení%` | libovolné | **poslední** DESC |
+| **K6** | Krok 6 (PNF) | `%Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována.%` | `"25"` (systémová) | první ASC |
+| **K7** | Krok 7 (PNF) | `%Dodavatel přidal řešení%` | libovolné | **poslední** DESC |
+| **K10** | Krok 10 (PNF) | `%Záznam byl převeden do archivu.%` | `"25"` (systémová) | jediný |
+| **D-O** | `DatumObjednani` (PMP + PNF) | stejné jako K6 | `"25"` | první ASC |
+| **D-D** | `DatumDodani` (PMP + PNF) | stejné jako K4 / K7 | libovolné | **poslední** DESC |
+| **D-P** | `DatumPrevzeti` (všichni) | stejné jako K10 | `"25"` | jediný |
 
 **Důležité detaily:**
 
-1. **Role `user_category` je pojistka proti false-positive** — stejný text může vygenerovat více rolí. Např. „Vedoucí informačního systému – ISSP předal záznam dodavateli" a „Projektový manažer – FIS předal záznam dodavateli" jsou různé vyjádření s různým obchodním významem. Filter na konkrétní roli (PM) zaručuje, že bere jen „to pravé".
-2. **Case-sensitivity** závisí na collation databáze. Výchozí predpoklad: `Czech_CI_AS` (case-insensitive, accent-sensitive) — LIKE bude matchovat bez ohledu na velikost písmen, ale diakritika se respektuje.
-3. **Neexistuje fallback na alternativní text.** Pokud ServiceDesk má variantu („Dodavatel dodal řešení" místo „Dodavatel přidal řešení"), vyjádření se **nezachytí**. Uživatel to řeší ručně přes chat modal.
-4. **`K1` (příprava zadání) nečte z `HOT_VYJADRENI`.** Datum je `HOT_ZAZNAMY.datum` (= datum založení tiketu).
-5. **Plán dodání** (budoucí rozšíření, zatím mimo scope): `popis LIKE N'%předal záznam dodavateli : %s termínem plnění dodavatele%'` s regex extrakcí `dd.mm.yyyy` — pozor na role autora (buď PM nebo VS+ISSP dle dokumentu).
+1. **Text sám obsahuje roli autora** — stejný text může vygenerovat více rolí. Např. „Vedoucí informačního systému – ISSP předal záznam dodavateli : …" a „Projektový manažer – FIS předal záznam dodavateli : …" jsou různá vyjádření s různým obchodním významem, ale **liší se v textu samotném**. LIKE pattern specifický pro roli (např. `%Projektový manažer%předal záznam dodavateli%`) je bezpečnější než závislost na neexistujícím sloupci.
+2. **Fallback `tym` sloupec** — pokud by se ukázalo, že text nestačí, lze sekundárně filtrovat na `HOT_VYJADRENI.tym` (zkratka týmu, např. `FIS`, `ISSP`). V Plánu C se to ověří na reálných datech.
+3. **Case-sensitivity** závisí na collation databáze. Výchozí předpoklad: `Czech_CI_AS` (case-insensitive, accent-sensitive) — LIKE matchuje bez ohledu na velikost, ale diakritika se respektuje.
+4. **Neexistuje fallback na alternativní text.** Pokud ServiceDesk má variantu („Dodavatel dodal řešení" místo „Dodavatel přidal řešení"), vyjádření se **nezachytí**. Uživatel to řeší ručně přes chat modal.
+5. **`K1` (příprava zadání) nečte z `HOT_VYJADRENI`.** Datum je `HOT_ZAZNAMY.datum` (= datum založení tiketu).
+6. **Plán dodání** (mimo scope, pozn.): `popis LIKE N'%předal záznam dodavateli : %s termínem plnění dodavatele%'` s regex extrakcí `dd.mm.yyyy`. Role v textu (PM nebo VS+ISSP).
 
-**SQL template pro jeden krok:**
+**SQL template pro jeden krok (K6 = odeslání požadavku na výrobu, PNF):**
 
 ```sql
-SELECT TOP 1 v.datum, v.popis, v.user_category, v.zpracoval
+-- Join HOT_VYJADRENI.pid → HOT_ZAZNAMY.pid (NE přes id)
+-- HOT_ZAZNAMY.id je 6místné číslo, které zadal uživatel v Zápisce
+-- HOT_ZAZNAMY.pid je alfanumerický kód, používá se jako join key v HOT_*
+SELECT TOP 1 v.id, v.datum, v.popis, v.zpracoval, v.tym, v.typ
 FROM intranetnew.dbo.HOT_VYJADRENI v
-WHERE v.hot_zaznam_id = @cislo
+INNER JOIN intranetnew.dbo.HOT_ZAZNAMY z ON z.pid = v.pid
+WHERE z.id = @cislo6
   AND v.popis LIKE N'%Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována.%'
-  AND v.user_category = N'PM'
 ORDER BY v.datum ASC;
 ```
 
-*(FK sloupec `hot_zaznam_id` — předpoklad; název se ověří při prvním setkání s reálnou DB.)*
+`v.id` se uloží do `zaznam_harmonogram_vyjadreni_vazba.hot_vyjadreni_id` (BIGINT/INT dle reálného typu v produkční DB — ověří se v Plánu C první task).
+
+**Archivní filter pro Hangfire (T4) — použití `HOT_ZAZNAMY.stav`:**
+
+Uživatelem potvrzeno: `HOT_ZAZNAMY.stav` je text, pro archivovaný tiket má hodnotu `N'archiv'` (ne „archivováno" jak bylo dříve uvedeno). Pro filtrování non-archivních se použije `stav <> N'archiv'` (nebo `stav IN (N'otevřeno', N'dodavatel', N'od dodavatele', N'k dodavateli')` pro striktnější filtr).
 
 ### 8.2 Lifecycle vytěžování — triggery
 
@@ -441,7 +509,7 @@ Automat běží v **reakci na uživatelské události**, ne trvale. Primární s
 Otevření editoru záznamu je **nejsilnější signál**, že uživatel se chystá se záznamem pracovat (harmonogram, externí vazby, vyjádření). Proto se právě v tu chvíli spustí harvest **všech** externích vazeb daného záznamu, které:
 
 - mají `Cislo IS NOT NULL` (napojené na ServiceDesk),
-- NEjsou v archivním stavu v ServiceDesku (`HOT_ZAZNAMY.stav != 'archivováno'`),
+- NEjsou v archivním stavu v ServiceDesku (`HOT_ZAZNAMY.stav <> N'archiv'`),
 - mají `LastHarvestedAt < NOW - 5 minut` (není čerstvě harvestnuté).
 
 Harvest běží **async** — editor se uživateli zobrazí okamžitě, data harmonogramu jsou vidět z poslední DB hodnoty, nové hodnoty z ServiceDesku dorazí typicky do 1–3 sekund (pokud má záznam 3 vazby). Když uživatel prokliká na záložku harmonogram za 5 s, už tam má aktuální data. Pokud ne, Plán C zajistí SignalR push / polling v editoru (mimo tento spec).
