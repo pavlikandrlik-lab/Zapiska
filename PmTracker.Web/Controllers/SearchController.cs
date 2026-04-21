@@ -83,6 +83,31 @@ public sealed class SearchController : BaseController
         return Json(new { indexed = count });
     }
 
+    /// <summary>
+    /// Status fulltextového indexu pro super-admin dashboard (Profil/Index).
+    /// Viz inbox úprava #16 — UI tlačítko „Reindexovat vyhledávání".
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> Status(
+        [FromServices] ISearchClient client,
+        CancellationToken cancellationToken)
+    {
+        if (!CurrentUserContext.IsSuperAdmin)
+        {
+            return Forbid();
+        }
+
+        var count = await client.GetDocumentCountAsync(cancellationToken);
+        var searchable = await client.IsSearchableAsync(cancellationToken);
+        return Json(new
+        {
+            enabled = _options.Enabled,
+            provider = _options.Provider,
+            isSearchable = searchable,
+            documentCount = count,
+        });
+    }
+
     // Zaznamy nemají vlastní detail stránku — záznam se zobrazuje v detailu projektu.
     // Osoby nemají detail stránku.
     // Subsystémy jsou součástí číselníků.

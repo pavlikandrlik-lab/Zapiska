@@ -56,6 +56,42 @@
         <pm-button variant="Secondary" data-record-editor-preference-reset="true">Zrušit uloženou volbu</pm-button>
         <p class="profile-preference-status" data-record-editor-preference-status aria-live="polite"></p>
     </section>
+
+    @* Inbox #16 (2026-04-21): Reindex vyhledávání — viditelné jen pro super-admina.
+       Status + tlačítko se načítají AJAXem z /Search/Status a /Search/Reindex. *@
+    @if (Model.Uzivatel.IsSuperAdmin)
+    {
+        <section class="card profile-preferences-card"
+                 data-search-admin-card
+                 data-status-url="@Url.Action("Status", "Search")"
+                 data-reindex-url="@Url.Action("Reindex", "Search")">
+            <h2>Vyhledávání (admin)</h2>
+            <p class="muted">Stav fulltextového indexu a ruční reindex všech entit.</p>
+            <dl class="search-admin-status">
+                <div>
+                    <dt>Provider</dt>
+                    <dd data-search-provider>–</dd>
+                </div>
+                <div>
+                    <dt>Povoleno</dt>
+                    <dd data-search-enabled>–</dd>
+                </div>
+                <div>
+                    <dt>FTS index</dt>
+                    <dd data-search-fts>–</dd>
+                </div>
+                <div>
+                    <dt>Dokumentů v indexu</dt>
+                    <dd data-search-count>–</dd>
+                </div>
+            </dl>
+            <div class="search-admin-actions">
+                <pm-button variant="Secondary" data-search-reindex-trigger>Reindexovat vše</pm-button>
+            </div>
+            <p class="profile-preference-status" data-search-reindex-status aria-live="polite"></p>
+            @Html.AntiForgeryToken()
+        </section>
+    }
 </div>
 
 <section id="moje-prava" class="card profile-rights-card">

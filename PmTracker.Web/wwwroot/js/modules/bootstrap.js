@@ -161,6 +161,14 @@ function handleDocumentClick(event) {
         return;
     }
 
+    // Inbox #16 — super-admin reindex vyhledávání (Profil/Index karta).
+    const reindexTrigger = target.closest("[data-search-reindex-trigger]");
+    if (isButtonLike(reindexTrigger)) {
+        event.preventDefault();
+        handleSearchReindexClick(reindexTrigger);
+        return;
+    }
+
     const printTrigger = target.closest("[data-print-trigger]");
     if (printTrigger) {
         event.preventDefault();
@@ -386,6 +394,80 @@ function handleDocumentClick(event) {
     if (handleNavigationCardClick(target)) {
         event.preventDefault();
     }
+}
+
+async function handleSearchReindexClick(trigger) {
+    const card = trigger.closest("[data-search-admin-card]");
+    if (!(card instanceof HTMLElement)) {
+        return;
+    }
+    const reindexUrl = card.dataset.reindexUrl;
+    if (!reindexUrl) {
+        return;
+    }
+    const status = card.querySelector("[data-search-reindex-status]");
+    const token = card.querySelector('input[name="__RequestVerificationToken"]');
+    if (!(token instanceof HTMLInputElement)) {
+        if (status) status.textContent = "Chybí anti-forgery token.";
+        return;
+    }
+
+    if (status) status.textContent = "Reindexuji…";
+    trigger.setAttribute("disabled", "disabled");
+    try {
+        const response = await fetch(reindexUrl, {
+            method: "POST",
+            headers: { "RequestVerificationToken": token.value, "Accept": "application/json" },
+            credentials: "same-origin"
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            if (status) status.textContent = `Reindex selhal: HTTP ${response.status} ${text.slice(0, 120)}`;
+            return;
+        }
+        const payload = await response.json().catch(() => ({}));
+        if (status) status.textContent = `Reindex dokončen. Indexováno dokumentů: ${payload.indexed ?? "?"}`;
+        // Refresh status panel
+        loadSearchAdminStatus(card).catch(() => {});
+    } catch (err) {
+        if (status) status.textContent = `Reindex selhal: ${err && err.message ? err.message : err}`;
+    } finally {
+        trigger.removeAttribute("disabled");
+    }
+}
+
+async function loadSearchAdminStatus(card) {
+    const statusUrl = card.dataset.statusUrl;
+    if (!statusUrl) return;
+    try {
+        const response = await fetch(statusUrl, {
+            method: "GET",
+            headers: { "Accept": "application/json" },
+            credentials: "same-origin"
+        });
+        if (!response.ok) {
+            return;
+        }
+        const data = await response.json();
+        const provider = card.querySelector("[data-search-provider]");
+        const enabled = card.querySelector("[data-search-enabled]");
+        const fts = card.querySelector("[data-search-fts]");
+        const count = card.querySelector("[data-search-count]");
+        if (provider) provider.textContent = data.provider ?? "–";
+        if (enabled) enabled.textContent = data.enabled ? "ano" : "ne";
+        if (fts) fts.textContent = data.isSearchable ? "připraven" : "NENÍ nakonfigurovaný";
+        if (count) count.textContent = typeof data.documentCount === "number" ? data.documentCount.toLocaleString("cs-CZ") : "–";
+    } catch {
+        // silent — status panel zůstane s pomlčkami
+    }
+}
+
+function initSearchAdminCard() {
+    document.querySelectorAll("[data-search-admin-card]").forEach(card => {
+        if (card instanceof HTMLElement) {
+            loadSearchAdminStatus(card).catch(() => {});
+        }
+    });
 }
 
 function maybeGuardOutboundNavigation(target, event) {
@@ -662,6 +744,7 @@ export function bootstrapPmTrackerApp() {
         () => initDashboardShell(),
         () => initProjectDashboardShell(),
         () => initSessionCoordinator(),
-        () => initModalAjaxSubmit()
+        () => initModalAjaxSubmit(),
+        () => initSearchAdminCard()
     ]);
 }

@@ -5180,6 +5180,40 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     grid-template-columns: repeat(auto-fit, minmax(240px, 360px));
 }
 
+/* Inbox #16 — admin karta pro reindex vyhledávání */
+.search-admin-status {
+    margin: 12px 0;
+    display: grid;
+    gap: 8px;
+}
+
+.search-admin-status > div {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 8px;
+    align-items: baseline;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--gov-color-border);
+}
+
+.search-admin-status dt {
+    font-size: 12px;
+    color: var(--app-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.search-admin-status dd {
+    margin: 0;
+    font-weight: 600;
+}
+
+.search-admin-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
 .profile-meta {
     margin: 0;
     display: grid;

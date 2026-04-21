@@ -208,4 +208,43 @@ public sealed class OpenSearchClient : ISearchClient
         }
         return new SearchQueryResponse { Hits = hits, TotalCandidates = total };
     }
+
+    public async Task<long> GetDocumentCountAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"{_options.IndexName}/_count", cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                return 0;
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("count", out var countEl) && countEl.TryGetInt64(out var count)
+                ? count
+                : 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Nelze zjistit počet dokumentů v OpenSearch indexu.");
+            return 0;
+        }
+    }
+
+    public async Task<bool> IsSearchableAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _httpClient.SendAsync(
+                new HttpRequestMessage(HttpMethod.Head, _options.IndexName),
+                cancellationToken).ConfigureAwait(false);
+            return response.StatusCode == System.Net.HttpStatusCode.OK;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Nelze ověřit dostupnost OpenSearch indexu.");
+            return false;
+        }
+    }
 }

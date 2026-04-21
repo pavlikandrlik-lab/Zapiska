@@ -36,6 +36,12 @@ public sealed class SearchReindexHostedService : BackgroundService
             return;
         }
 
+        // Inbox #16 (2026-04-21): Startup bootstrap.
+        // Starý stav: EnsureIndexAsync se volal JEN z IndexEntityAsync/FullReindexAsync.
+        // Na nové DB (bez AuditLog entries pro existující data) se nikdy nezavolal → FTS index chyběl.
+        // Fix: při startu zavolat EnsureIndexAsync + pokud je SearchIndex prázdný, udělat full reindex.
+        await RunBootstrapAsync(stoppingToken).ConfigureAwait(false);
+
         var interval = TimeSpan.FromSeconds(Math.Max(5, _options.ReindexIntervalSeconds));
 
         while (!stoppingToken.IsCancellationRequested)
@@ -61,6 +67,56 @@ public sealed class SearchReindexHostedService : BackgroundService
             {
                 break;
             }
+        }
+    }
+
+    private async Task RunBootstrapAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var client = scope.ServiceProvider.GetRequiredService<ISearchClient>();
+            var indexer = scope.ServiceProvider.GetRequiredService<ISearchIndexer>();
+
+            // 1. EnsureIndex je idempotent — vytvoří tabulku, FTS katalog, FTS index (pokud chybí).
+            await client.EnsureIndexAsync(cancellationToken).ConfigureAwait(false);
+
+            // 2. Ověř, zda je FTS index opravdu nakonfigurovaný. Pokud ne (typicky SQL account
+            //    bez FTS permission), zaloguj hlasitě — admin musí zavolat DBA.
+            var searchable = await client.IsSearchableAsync(cancellationToken).ConfigureAwait(false);
+            if (!searchable)
+            {
+                _logger.LogError(
+                    "FTS index na tabulce SearchIndex NENÍ nakonfigurovaný. " +
+                    "Vyhledávání nebude fungovat, dokud DBA nespustí: " +
+                    "CREATE FULLTEXT CATALOG SearchCatalog AS DEFAULT; " +
+                    "CREATE FULLTEXT INDEX ON SearchIndex(Title, Body, Keywords) KEY INDEX <pk> ON SearchCatalog;");
+                return;
+            }
+
+            // 3. Pokud je SearchIndex prázdný (new deploy / DB import bez auditu),
+            //    spusť jednorázový full reindex.
+            var docCount = await client.GetDocumentCountAsync(cancellationToken).ConfigureAwait(false);
+            if (docCount == 0)
+            {
+                _logger.LogInformation("SearchIndex je prázdný — spouštím úvodní full reindex…");
+                var indexed = await indexer.FullReindexAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogInformation("Úvodní full reindex dokončen: {Count} dokumentů.", indexed);
+            }
+            else
+            {
+                _logger.LogInformation("SearchIndex připraven: {Count} dokumentů.", docCount);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Search bootstrap selhal. Aplikace pokračuje, ale vyhledávání může být omezené. " +
+                "Super-admin může spustit reindex ručně z Nastavení.");
         }
     }
 

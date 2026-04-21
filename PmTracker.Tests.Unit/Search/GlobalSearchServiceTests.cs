@@ -103,6 +103,8 @@ public sealed class GlobalSearchServiceTests
         public Task BulkIndexAsync(IReadOnlyCollection<SearchDocument> documents, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task DeleteDocumentAsync(string entityType, string entityId, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<SearchQueryResponse> SearchAsync(SearchQueryRequest request, CancellationToken cancellationToken) => Task.FromResult(Response);
+        public Task<long> GetDocumentCountAsync(CancellationToken cancellationToken) => Task.FromResult(0L);
+        public Task<bool> IsSearchableAsync(CancellationToken cancellationToken) => Task.FromResult(true);
     }
 
     private sealed class FakeEmbeddingService : IEmbeddingService

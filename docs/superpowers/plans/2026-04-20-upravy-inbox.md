@@ -341,7 +341,7 @@ UI:
 
 ---
 
-### Úprava #16 — Search: FTS index nebyl nikdy vytvořen → full-rebuild UX
+### Úprava #16 — Search: FTS index nebyl nikdy vytvořen → full-rebuild UX ✅ VYŘEŠENO 2026-04-21
 
 - **Kde:** globální vyhledávání (celá aplikace), [SearchController.Reindex](PmTracker.Web/Controllers/SearchController.cs#L71) existuje jako POST endpoint pro super-admin, ale **UI tlačítko chybí** (žádný způsob, jak ho z UI spustit).
 - **Root cause (2026-04-21, ověřeno v logu na VYVOJ serveru):**
@@ -354,12 +354,19 @@ UI:
   2. **Úvodní full reindex** pro existující data bez audit log entries — buď automaticky při prvním startu (detekce prázdného indexu), nebo přes UI tlačítko v Nastavení.
   3. **UI tlačítko „Reindexovat vyhledávání"** v Nastavení pro super-admin (POST /Search/Reindex už existuje) + status panel s počtem indexovaných dokumentů a time stamp posledního reindexu.
   4. **Ošetřit případ, že SQL Server account nemá permission na FTS** — zalogovat jasnou chybu („Account <x> nemá CREATE FULLTEXT CATALOG permission — full-text search je nedostupný, kontaktujte DBA"). Aktuálně se to ztrácí v catch-u bez user-facing zprávy.
-- **Status:** 🆕 nová — priorita **HIGH** (blokuje globální vyhledávání pro všechny nové DB deploymenty)
-- **Komentář / dopady:**
-  - Permission SQL: `CREATE FULLTEXT CATALOG` vyžaduje `ALTER ANY FULLTEXT CATALOG` nebo `db_owner`. `CREATE FULLTEXT INDEX` vyžaduje `ALTER` permission na tabulce + `REFERENCES` na FTS katalog. Většina app service accountů tato práva **nemá** → FTS setup musí proběhnout jako **DBA one-time task** při zakládání DB, NE za běhu aplikace.
-  - Alternativní řešení: dát FTS setup do SQL migration skriptu (`PmTracker.ServiceDesk.Sql/...` nebo ekvivalent) namísto runtime EnsureIndex — pak se vytvoří v kontextu DBA účtu při deployment / upgrade.
-- **Vazba:** souvisí s úpravou #3 (auth audit) — startup bootstrapping by měl mít vlastní permission check.
-- **Vazba:** souvisí s [docs/technical/14-local-dev-secrets.md](docs/technical/14-local-dev-secrets.md) — setup nové dev DB musí zahrnovat FTS bootstrap.
+- **Status:** ✅ **VYŘEŠENO 2026-04-21**
+- **Provedený fix:**
+  1. `SearchReindexHostedService.RunBootstrapAsync` — při startu aplikace zavolá `EnsureIndexAsync`, ověří `IsSearchableAsync`, a pokud je SearchIndex prázdný, spustí `FullReindexAsync`. Pokud EnsureIndex selže (typicky SQL account bez FTS permission), zaloguje **jasnou chybu s konkrétním SQL pro DBA**: `CREATE FULLTEXT CATALOG SearchCatalog AS DEFAULT; CREATE FULLTEXT INDEX ON SearchIndex(Title, Body, Keywords) KEY INDEX <pk> ON SearchCatalog;`
+  2. `ISearchClient` rozšířen o `GetDocumentCountAsync` + `IsSearchableAsync` (implementováno v SqlServerSearchClient + OpenSearchClient).
+  3. `GET /Search/Status` endpoint — JSON status pro super-admina (provider, enabled, isSearchable, documentCount).
+  4. UI karta „Vyhledávání (admin)" v [Profil/Index.cshtml](PmTracker.Web/Views/Profil/Index.cshtml) — viditelná jen pro `IsSuperAdmin`, AJAX load statusu při otevření stránky, tlačítko „Reindexovat vše" (volá existující `POST /Search/Reindex`). Status panel ukazuje provider / FTS stav / počet dokumentů.
+- **Verifikace (Playwright 2026-04-21):**
+  - Karta renderována pro super-admina: provider=SqlServer, enabled=ano, FTS="NENÍ nakonfigurovaný" (dev SQL Server bez FTS permission), count=5.
+  - /Search/Status vrací JSON 200: `{"enabled":true,"provider":"SqlServer","isSearchable":false,"documentCount":5}`.
+  - /Search?q=projekt vrací 200 (graceful empty když FTS chybí).
+  - Bootstrap log: `fail: FTS index na tabulce SearchIndex NENÍ nakonfigurovaný. Vyhledávání nebude fungovat, dokud DBA nespustí: CREATE FULLTEXT CATALOG SearchCatalog AS DEFAULT; CREATE FULLTEXT INDEX ON SearchIndex(Title, Body, Keywords) KEY INDEX <pk> ON SearchCatalog;` — přesně user-actionable error.
+- **Poznámka pro deployment:** SQL account obvykle nemá `CREATE FULLTEXT CATALOG` permission. Při prvním deployi nové DB musí DBA jednorázově spustit SQL skript (viz log chybová zpráva). Na existujících instalacích, kde má app account `db_owner` (dev docker), se FTS setup provede sám při startu.
+- **Architecture guard:** `SearchBootstrapTests` — 6 testů ověřuje existenci RunBootstrapAsync, IsSearchableAsync call, GetDocumentCountAsync/IsSearchableAsync v clientovi, Status endpoint v controlleru, admin kartu v Profil/Index.
 
 ---
 

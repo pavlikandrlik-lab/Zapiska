@@ -299,6 +299,59 @@ public sealed class SqlServerSearchClient : ISearchClient
     }
 
     // -------------------------------------------------------------------------
+    // GetDocumentCountAsync / IsSearchableAsync (Inbox #16 — status panel + bootstrap)
+    // -------------------------------------------------------------------------
+
+    public async Task<long> GetDocumentCountAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            var count = await ExecuteScalarAsync<int>(conn, """
+                IF NOT EXISTS (
+                    SELECT 1 FROM sys.objects
+                    WHERE object_id = OBJECT_ID(N'SearchIndex') AND type = 'U'
+                )
+                    SELECT 0
+                ELSE
+                    SELECT COUNT(*) FROM SearchIndex;
+                """, cancellationToken).ConfigureAwait(false);
+
+            return count;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Nelze zjistit počet dokumentů v SearchIndex.");
+            return 0;
+        }
+    }
+
+    public async Task<bool> IsSearchableAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            var hasFtsIndex = await ExecuteScalarAsync<int>(conn, """
+                SELECT CASE WHEN EXISTS (
+                    SELECT 1 FROM sys.fulltext_indexes
+                    WHERE object_id = OBJECT_ID('SearchIndex')
+                ) THEN 1 ELSE 0 END;
+                """, cancellationToken).ConfigureAwait(false);
+
+            return hasFtsIndex == 1;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Nelze ověřit dostupnost FTS indexu.");
+            return false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
