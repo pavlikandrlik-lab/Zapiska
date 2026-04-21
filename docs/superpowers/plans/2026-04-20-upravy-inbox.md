@@ -263,6 +263,84 @@ Společný root-cause pattern: Fáze 2E přepnula modaly z custom overlay na gov
 
 ---
 
+### Úprava #14 — Automatická periodická synchronizace osob s AD
+
+- **Kde:** globální záložka Osoby + Nastavení (nová sekce „Synchronizace s AD")
+- **Co (chybí):** aplikace nemá žádný mechanismus pro pravidelnou synchronizaci již existujících osob (`OsobaEntity`) s AD. Data (jméno, příjmení, email, organizace) se zapíšou při prvním výběru osoby z AD a dál se neaktualizují.
+- **Očekávání:**
+  - Background service pravidelně prochází osoby s neprázdným `GuidAd` a obnovuje Jmeno/Prijmeni/Titul/Email/Company/Department z AD
+  - V Nastavení (admin-only) sekce „Synchronizace s AD" s polemi: **switch enabled/disabled**, **perioda** (např. 1h, 6h, 12h, 24h) + **anchor time** („začátek první periody")
+  - Tlačítko „Spustit teď" + status panel s `LastRunAt` + count / errors z posledního běhu
+- **Status:** 🆕 nová — design brainstormed 2026-04-21 (Varianta A + DRY sync infrastructure — viz níže)
+
+**Algoritmus aligned schedule:**
+```
+if now <= anchor:
+    next = anchor
+else:
+    elapsed = now - anchor
+    ticks   = ceil(elapsed / period)
+    next    = anchor + ticks * period
+```
+
+**Ověřené příklady:**
+
+| Perioda | Anchor | Now | Next |
+|---|---|---|---|
+| 12h | 00:00 | 08:00 | 12:00 (anchor + 1·12h) |
+| 1h | 16:00 | 14:25 | 16:00 (now < anchor) |
+| 1h | 14:38 | 14:30 | 14:38, pak 15:38, 16:38, … |
+
+**Architektura (Varianta A — vlastní BackgroundService + DRY infra, NE Hangfire/Quartz):**
+
+```
+Shared infrastructure (budou využívat i další sync joby — viz Úprava #15):
+  - SyncScheduleCalculator (pure static, zero I/O, unit-testable)
+  - ISyncJobSettings (interface: IsEnabled, PeriodMinutes, AnchorTimeOfDay, LastRunAt?, LastResultJson?)
+  - SyncHostedServiceBase<TSettings> : BackgroundService (abstract generic loop)
+
+Per-job specific (AD sync):
+  - AdSyncSettingsEntity : ISyncJobSettings (EF migrace, singleton row)
+  - AdSyncService.SyncAllAsync(ct) — volá IActiveDirectoryService.ListByGuidsAsync (přidat) + update DB + audit log
+  - AdSyncHostedService : SyncHostedServiceBase<AdSyncSettingsEntity>
+
+UI:
+  - Shared partial _SyncJobSettingsCard.cshtml (reusable pro AD + ServiceDesk)
+  - Nastaveni/Index — nová sekce „Synchronizace"
+```
+
+**Permission:** **existující `settings.manage`** (app-admin + super-admin). Žádný nový permission key není potřeba — rozhodnuto user 2026-04-21.
+
+**Existující context v aplikaci (které se využije):**
+- `IActiveDirectoryService.SearchUsersAsync(query)` — rozšířit o `ListByGuidsAsync(guids)`
+- Pattern `BackgroundService` + `TimeProvider` — viz `SearchReindexHostedService`, `PriorityMatrixHostedServices`
+- `OsobaEntity.GuidAd` (Guid?) — primární match klíč; fallback `AdLogin`
+
+**Edge cases:**
+- App restart mezi ticky → ignoruje missed ticky, `next` se přepočítá od `now` (žádný backlog)
+- Sync selže → log + neruší loop, další tick normálně
+- Config změna za běhu → hosted service reloaduje settings na každý iteraci loopu
+- Osoba v DB bez `GuidAd` → přeskočí
+- Osoba smazaná v AD → označit v audit logu „AD not found", **NEPROMAZAT** záznam (FK + historie)
+
+**Rozsah:** ~10 tasků, ~1-1.5 dne implementace.
+
+**Priorita v pořadí úprav:** **čeká po** #3 (auth audit) → výzvy → servicedesk napojení. Detailní spec + plán bude vytvořen až před implementací (nebo v jiném chatu — viz následující prompt).
+
+---
+
+### Úprava #15 — Automatická periodická synchronizace se ServiceDesk
+
+- **Kde:** celá aplikace (nová feature, závisí na dokončení **ServiceDesk integrace**, kterou připravuje jiný chat)
+- **Co (chybí):** po napojení na ServiceDesk bude aplikace potřebovat pravidelně hledat změny v ticketech (nové tickety, change events, stav updates)
+- **Očekávání:** stejný pattern jako #14 — background service s aligned-schedule, config v Nastavení (switch enabled, perioda, anchor), „Spustit teď" + status panel
+- **Status:** 🆕 připravované rozšíření — design bude detailován až po dokončení ServiceDesk API integrace
+- **Vazba na #14:** **sdílí infrastrukturu** — `SyncScheduleCalculator`, `ISyncJobSettings`, `SyncHostedServiceBase`, shared UI partial `_SyncJobSettingsCard.cshtml`. Přidání SD sync pak = pouze 3 soubory (`ServiceDeskSyncSettingsEntity`, `ServiceDeskSyncService`, `ServiceDeskSyncHostedService`) + registrace v DI + další karta v Nastavení.
+- **Permission:** stejné `settings.manage`, bez nového klíče.
+- **Priorita:** až po dokončení ServiceDesk API integrace (druhý chat).
+
+---
+
 ## Pozorování z předchozího review (nezařazená, k rozhodnutí)
 
 Během Playwright review byly odhaleny tyto potenciální issues, které nepatří k recent refactoru, ale stojí za zvážení při systémovém fixu:
