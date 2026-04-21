@@ -119,4 +119,28 @@ public sealed class LayoutWidthPolicyTests
         news.Should().NotContain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
             "Dashboard/News je newsfeed — reading UX");
     }
+
+    [Fact]
+    public void CiselnikyIndex_ShouldUseFluidLayout()
+    {
+        var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Ciselniky/Index.cshtml"));
+        view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Ciselniky/Index seznam tabulek → fluid tier (jednotnost s ostatními data views)");
+    }
+
+    [Fact]
+    public void CiselnikyDetail_ShouldUseFluidLayout()
+    {
+        var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Ciselniky/Detail.cshtml"));
+        view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Ciselniky/Detail tabulka řádků → fluid tier");
+    }
+
+    [Fact]
+    public void NastaveniIndex_ShouldUseFluidLayout()
+    {
+        var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Nastaveni/Index.cshtml"));
+        view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Nastaveni/Index master-detail (sidebar + panel) → fluid tier");
+    }
 }

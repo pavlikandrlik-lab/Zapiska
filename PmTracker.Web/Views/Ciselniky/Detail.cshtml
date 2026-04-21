@@ -1,6 +1,7 @@
 @model CiselnikDetailViewModel
 @{
     ViewData["Title"] = Model.Nazev;
+    ViewData["BodyClass"] = "dashboard-page";
 }
 
 @await Html.PartialAsync("_CiselnikDetail", Model)
