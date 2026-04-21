@@ -67,4 +67,14 @@ public sealed class DashboardFocusCardLayoutTests
             @"\.dashboard-item-description\s*\{[\s\S]*?-webkit-line-clamp\s*:\s*2",
             "popis záznamu se zkrátí na max 2 řádky, aby karty měly konzistentní výšku");
     }
+
+    [Fact]
+    public void SiteCss_DashboardListPage_ShouldRemoveCapInFluidTier()
+    {
+        var css = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/css/site.css"));
+
+        css.Should().MatchRegex(
+            @"\.app-main--fluid\s+\.dashboard-list-page\s*\{[\s\S]*?max-width\s*:\s*none",
+            "ve fluid tier (Dashboard/Focus atd.) se max-width 76rem zruší, aby karty využily celou šířku na FHD/4K");
+    }
 }

@@ -847,6 +847,13 @@
     max-width: 76rem;
 }
 
+/* Focus list-page uvnitř fluid tier (Dashboard/Focus) — zrušit max-width cap,
+   aby karty využily celou šířku na FHD/4K. Pod fluid je padding na úrovni
+   app-main--fluid, tak to neovlivní narrow views. */
+.app-main--fluid .dashboard-list-page {
+    max-width: none;
+}
+
 .dashboard-list-page-narrow {
     max-width: 56rem;
 }
