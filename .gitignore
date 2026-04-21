@@ -35,6 +35,12 @@ publish.zip
 *.local.json
 gov-kits/
 
+# Runtime credentials (real credentials nikdy v gitu — viz docs/technical/14-local-dev-secrets.md).
+# appsettings.example.json zůstává v gitu jako schema template.
+PmTracker.Web/appsettings.json
+PmTracker.Web/appsettings.Development.json
+PmTracker.Web/appsettings.Production.json
+
 # Citlivé vzorky dokumentů (reálné výzvy, tickety apod.) — nesmí se commitovat
 *.docx
 *.doc

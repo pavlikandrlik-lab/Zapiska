@@ -1,11 +1,24 @@
 # 14. Lokální konfigurace vývojového prostředí
 
-## Princip: appsettings + User Secrets (ne plaintext v repu)
+## Princip: appsettings v .gitignore, v gitu jen schema template
 
-Repo obsahuje `PmTracker.Web/appsettings.json` s **placeholder / neutrálními** hodnotami
-pouze jako **strukturu a default**. Skutečné credentials (connection stringy, API klíče,
-hesla) se do gitu **nikdy** necommitují. Podle stroje, na kterém se aplikace spouští,
-se secrets nastavují různě.
+- `PmTracker.Web/appsettings.json` je v `.gitignore` — **obsahuje reálné runtime
+  credentials**. Lokálně na dev stroji (Mac s docker SQL) nebo na Windows VYVOJ stroji
+  v něm jsou skutečné connection stringy. Při `dotnet publish` se bere tento lokální
+  soubor a kopíruje do publish artefaktu → produkce/testing ho dostane s hotovými
+  credentials
+- `PmTracker.Web/appsettings.example.json` je v gitu — **schema template s placeholder
+  hodnotami**. Slouží jako dokumentace struktury a jako fallback pro nového vývojáře,
+  který repo naklonuje (zkopíruje si `.example.json` → `appsettings.json` a doplní
+  credentials pro své prostředí)
+- `PmTracker.Web/appsettings.Development.json` je také v `.gitignore` — lokální dev
+  override (typicky docker localhost SQL credentials)
+- Architecture test [AppSettingsCredentialLeakGuardTests](../../PmTracker.Tests.Unit/Architecture/AppSettingsCredentialLeakGuardTests.cs)
+  hlídá **template soubor** — pokud někdo omylem zacommituje reálné credentials do
+  `appsettings.example.json`, build padne
+
+Alternativní `dotnet user-secrets` je také podporovaný (user secrets přepíší
+`appsettings.json`) — ale jeho použití je **volitelné**. Oba pattern koexistují.
 
 ## Tři prostředí, tři způsoby
 
@@ -29,22 +42,30 @@ jen pro prostředí, ke kterému se fyzicky dostane.
 - Oproti přepisování `appsettings.json` lokálně: není riziko commitu skutečných credentials,
   schéma v repu se udržuje aktuální automaticky
 
-## Dev Mac — first-time setup (nebo když selžou testy kvůli DB)
+## Nový stroj / nový vývojář — first-time setup
 
-1. Naklonuj repo, otevři kořen
-2. Ujisti se, že běží docker/colima SQL Server na `localhost:1433`. Pokud ne:
+1. Naklonuj repo
+2. Zkopíruj template:
    ```bash
-   # macOS s colima
+   cp PmTracker.Web/appsettings.example.json PmTracker.Web/appsettings.json
+   ```
+3. Otevři `PmTracker.Web/appsettings.json` a vyplň `ConnectionStrings:PmTrackerDb`
+   podle svého prostředí:
+   - **Mac dev s docker/colima**: `Server=localhost,1433;Database=PmTracker;User Id=sa;Password=PmTracker!2026;TrustServerCertificate=True;MultipleActiveResultSets=True`
+   - **Windows VYVOJ server (za Citrixem)**: `Server=HOSTNAME\INSTANCE;Database=PM_Tracker_VYVOJ;User Id=<ucet>;Password=<heslo>;Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=True`
+4. Ujisti se, že na Macu běží docker/colima SQL Server. Pokud ne:
+   ```bash
    colima start
    docker run --name pmtracker-mssql -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=PmTracker!2026' \
      -p 1433:1433 -d mcr.microsoft.com/mssql/server:2022-latest
    ```
-3. Aplikace při spuštění v `Development` prostředí použije `appsettings.Development.json`
-   (docker defaults) — **žádné user-secrets nepotřebuješ**.
-4. Spusť aplikaci:
+5. Spusť aplikaci:
    ```bash
    dotnet run --project PmTracker.Web
    ```
+
+`appsettings.json` je v `.gitignore` → git ti ho neuvidí, tvé credentials nikdy
+nezacommituješ omylem.
 
 ## Windows VYVOJ server — setup credentials
 

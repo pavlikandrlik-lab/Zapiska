@@ -17,7 +17,10 @@ namespace PmTracker.Tests.Unit.Architecture;
 /// </summary>
 public sealed class AppSettingsCredentialLeakGuardTests
 {
-    private const string AppSettingsPath = "PmTracker.Web/appsettings.json";
+    // appsettings.json je v .gitignore (obsahuje runtime credentials — lokálně a po publishi).
+    // V gitu je jen appsettings.example.json jako schema template — ten je chráněný proti
+    // leaku reálných credentials. Viz docs/technical/14-local-dev-secrets.md.
+    private const string AppSettingsPath = "PmTracker.Web/appsettings.example.json";
 
     // Placeholder hodnoty, které jsou povolené (slouží jen jako schema template).
     private static readonly string[] AllowedPlaceholderUsers =
