@@ -135,6 +135,10 @@
                             @if (Model.CanManageTeam)
                             {
                                 <div class="table-actions-inline">
+                                    @* Direction je v hidden input, NE na pm-button — gov-button
+                                       hydrace nepropaguje `value` na vnitřní <button>, form by pak
+                                       poslal Direction="" a model binding defaultně "up".
+                                       Viz inbox úprava #13 (2026-04-21). *@
                                     <form class="table-action-inline-form"
                                           asp-controller="Projekty"
                                           asp-action="ReorderProjectSubsystem"
@@ -142,7 +146,8 @@
                                           data-ajax-submit="true">
                                         <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
                                         <input type="hidden" name="ProjektSubsystemId" value="@subsystem.ProjektSubsystemId" />
-                                        <pm-button variant="Ghost" size="Small" native-type="submit" name="Direction" value="up" disabled="@(!subsystem.CanMoveUp)">Nahoru</pm-button>
+                                        <input type="hidden" name="Direction" value="up" />
+                                        <pm-button variant="Ghost" size="Small" native-type="submit" disabled="@(!subsystem.CanMoveUp)">Nahoru</pm-button>
                                     </form>
                                     <form class="table-action-inline-form"
                                           asp-controller="Projekty"
@@ -151,7 +156,8 @@
                                           data-ajax-submit="true">
                                         <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
                                         <input type="hidden" name="ProjektSubsystemId" value="@subsystem.ProjektSubsystemId" />
-                                        <pm-button variant="Ghost" size="Small" native-type="submit" name="Direction" value="down" disabled="@(!subsystem.CanMoveDown)">Dolů</pm-button>
+                                        <input type="hidden" name="Direction" value="down" />
+                                        <pm-button variant="Ghost" size="Small" native-type="submit" disabled="@(!subsystem.CanMoveDown)">Dolů</pm-button>
                                     </form>
                                     <form class="table-action-inline-form"
                                           asp-controller="Projekty"

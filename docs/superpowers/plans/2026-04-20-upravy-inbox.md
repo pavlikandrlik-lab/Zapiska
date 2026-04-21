@@ -243,6 +243,20 @@ Společný root-cause pattern: Fáze 2E přepnula modaly z custom overlay na gov
 
 ---
 
+### Úprava #13 — Subsystém reorder "Dolů" jde místo dolů nahoru (gov-button name/value propagation)
+
+- **Kde:** [_ProjectTeamTab.cshtml:145,154](PmTracker.Web/Views/Projekty/_ProjectTeamTab.cshtml#L145-L154) — reorder forms v týmové tabulce projektu
+- **Co (současný stav):** Nahoru funguje, Dolů taky jde nahoru.
+- **Root cause (2026-04-21, ověřeno Playwright):**
+  - Markup: `<pm-button name="Direction" value="up|down" native-type="submit">` — atributy `name` a `value` se na `<gov-button>` host elementu správně zachovají
+  - ALE: při hydraci gov-button přesune `name` na vnitřní `<button class="element">`, zatímco **`value` se nepropaguje** (inner button: `name="Direction" value=null type="submit"`)
+  - Při submitu form pošle `Direction=` (prázdná hodnota) → ASP.NET model binding nedodrží prázdný string a použije default z property: `Direction = ProjectSubsystemReorderDirections.Up` = `"up"` → oba buttony posílají up
+- **Fix:** přesunout `Direction` z `pm-button` atributu na `<input type="hidden" name="Direction" value="up|down" />` uvnitř každého formuláře. Hidden input se vždy submituje nezávisle na submit-button name/value propagation.
+- **Status:** ✅ VYŘEŠENO 2026-04-21
+- **Architecture guard:** regression test — `pm-button` tag nemá `native-type="submit"` s `name=` + `value=` atributy (pattern vede k bugu kvůli gov-button hydraci).
+
+---
+
 ## Pozorování z předchozího review (nezařazená, k rozhodnutí)
 
 Během Playwright review byly odhaleny tyto potenciální issues, které nepatří k recent refactoru, ale stojí za zvážení při systémovém fixu:
