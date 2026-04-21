@@ -143,4 +143,21 @@ public sealed class LayoutWidthPolicyTests
         view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
             "Nastaveni/Index master-detail (sidebar + panel) → fluid tier");
     }
+
+    [Fact]
+    public void ProfilIndex_ShouldUseFluidLayout()
+    {
+        var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Profil/Index.cshtml"));
+        view.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Profil/Index — 4 preference karty potřebují šířku FHD+, jinak se zalamují do 2 řádek");
+    }
+
+    [Fact]
+    public void SiteCss_ProfileLayout_ShouldUseCompactGrid()
+    {
+        var css = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/css/site.css"));
+        css.Should().MatchRegex(
+            @"\.profile-layout\s*\{[\s\S]*?grid-template-columns\s*:\s*repeat\(\s*auto-fit\s*,\s*minmax\(\s*240px\s*,\s*360px\s*\)",
+            "profile-layout používá repeat(auto-fit, minmax(240px, 360px)) → 4 karty vedle sebe na FHD, cap 360px brání obřím kartám na 4K");
+    }
 }

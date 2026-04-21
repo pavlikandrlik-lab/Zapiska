@@ -10,21 +10,35 @@ else
         @foreach (var item in Model)
         {
             <a class="dashboard-focus-item" href="@item.DetailUrl">
-                <div class="dashboard-focus-item-top">
+                <div class="dashboard-focus-identity">
                     <span class="dashboard-item-project">@item.ProjectCode</span>
                     <span class="badge">@item.State</span>
                 </div>
-                <div class="dashboard-focus-title">@item.RecordNumber - @item.Title</div>
-                @if (!string.IsNullOrWhiteSpace(item.Goal))
-                {
-                    <p class="dashboard-item-description">@item.Goal</p>
-                }
-                <div class="dashboard-item-meta">
-                    <span>Vlastník: @item.Owner</span>
-                    <span>Subsystem: @item.Subsystem</span>
-                    <span>Založeno: @item.CreatedAt.ToString("dd.MM.yyyy")</span>
-                    <span>Termín: @(item.Deadline?.ToString("dd.MM.yyyy") ?? "-")</span>
+                <div class="dashboard-focus-content">
+                    <div class="dashboard-focus-title">@item.RecordNumber - @item.Title</div>
+                    @if (!string.IsNullOrWhiteSpace(item.Goal))
+                    {
+                        <p class="dashboard-item-description">@item.Goal</p>
+                    }
                 </div>
+                <dl class="dashboard-focus-meta">
+                    <div>
+                        <dt>Vlastník</dt>
+                        <dd>@item.Owner</dd>
+                    </div>
+                    <div>
+                        <dt>Subsystem</dt>
+                        <dd>@item.Subsystem</dd>
+                    </div>
+                    <div>
+                        <dt>Založeno</dt>
+                        <dd>@item.CreatedAt.ToString("dd.MM.yyyy")</dd>
+                    </div>
+                    <div>
+                        <dt>Termín</dt>
+                        <dd>@(item.Deadline?.ToString("dd.MM.yyyy") ?? "-")</dd>
+                    </div>
+                </dl>
             </a>
         }
     </div>
