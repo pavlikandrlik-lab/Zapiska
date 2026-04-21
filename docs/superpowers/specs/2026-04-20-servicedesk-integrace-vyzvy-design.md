@@ -271,9 +271,9 @@ Pro každý PNF zařazený ve výzvě (`Vyzva.Id = X AND ZaznamExterniOdkaz.Vyzv
 
 ### 7.4 APTI tabulka per PNF
 
-Filtr: `HOT_KALKULACE.pid = HOT_PID.id AND HOT_PID.PID = ZaznamExterniOdkaz.Cislo AND HOT_KALKULACE.akceptace = 'Akceptováno'`.
+Filtr: `HOT_KALKULACE.pid = HOT_ZAZNAMY.pid AND HOT_ZAZNAMY.id = ZaznamExterniOdkaz.Cislo AND HOT_KALKULACE.akceptace = N'Akceptováno'`.
 
-*(Přesné mapování `HOT_PID` ↔ 6-místné Cislo je otevřený bod — ověřit v implementaci. Alternativa: přímý filtr `HOT_KALKULACE.pid = ZaznamExterniOdkaz.Cislo` pokud `pid` je 6-místné číslo a HOT_PID není potřeba.)*
+*(Potvrzeno uživatelem 2026-04-21: **HOT_KALKULACE.pid = HOT_ZAZNAMY.pid přímo**. Tabulka `HOT_PID` je v produkční DB přítomná, ale obsahuje stejný `pid` jako `HOT_ZAZNAMY` a nemá dodatečnou obchodní hodnotu — do mappingu se nezahrnuje.)*
 
 | Sloupec Wordu | Zdroj |
 |---|---|
@@ -303,7 +303,7 @@ Pokud PNF nemá žádnou kalkulaci s `akceptace='Akceptováno'` → tabulka prá
 **Primárně:**
 - `HOT_ZAZNAMY` — `id`, `typ_zaznamu` (filtr na PNF), `strucne`, `popis`
 - `HOT_KALKULACE` — APTI rozpad + cena, filtr `akceptace='Akceptováno'`
-- `HOT_PID` — mapping 6-místné PID na interní `id` (ověřit vztah)
+- ~~`HOT_PID`~~ — **nepoužívat** (potvrzeno 2026-04-21, tabulka existuje ale `pid` je stejný jako `HOT_ZAZNAMY.pid`, žádná přidaná hodnota)
 
 **Kontextově (pro zobrazení seznamu):**
 - `HOT_IS`, `HOT_SUBSYSTEM`, `HOT_MODULY`, `HOT_DODAVATEL` — jen kdyby bylo potřeba zobrazit v UI detail PNF (např. dodavatel)
@@ -339,7 +339,7 @@ Pokud PNF nemá žádnou kalkulaci s `akceptace='Akceptováno'` → tabulka prá
 
 1. **Název kódu B** („Programové úpravy" vs. „Rekonfigurace"): ve vzorovém Wordu se střídá per PNF. Drží to HOT (nějaký sloupec `HOT_KALKULACE.popis`?) nebo je to volba proj_mana v UI výzvy? Default v implementaci: **pevně „Programové úpravy"**, přejmenování až na požadavek.
 2. **Termín plnění** ve Wordu (např. „do: 31. 3. 2026"): je to atribut výzvy, nebo se odvozuje z `HOT_KALKULACE.termin`? Dnes předpokládám nový atribut `Vyzva.TerminPlneniSnapshot` s hodnotou doplněnou při zakládání nebo odesílání výzvy.
-3. **Mapping `HOT_PID` ↔ 6-místné Cislo**: otestovat při implementaci, zda `HOT_KALKULACE.pid` je přímo 6-místné Cislo (pak HOT_PID netřeba) nebo interní FK (pak join přes HOT_PID.id).
+3. ~~Mapping HOT_PID~~ — **UZAVŘENO 2026-04-21:** `HOT_KALKULACE.pid = HOT_ZAZNAMY.pid` přímo, HOT_PID se nepoužívá.
 4. **Přesné Gov komponenty DnD**: Gov design system má drag & drop? Pokud ne, doplnit externí knihovnu kompatibilní s Gov styly.
 5. **Vodoznak „NÁVRH"**: technika v OpenXML — watermark header nebo overlay text. Upřesníme v implementaci.
 
@@ -379,7 +379,7 @@ Pokud PNF nemá žádnou kalkulaci s `akceptace='Akceptováno'` → tabulka prá
 2. EF migrace: rename `CiselnikVyzva` → `Vyzva` + nová pole + enum stav.
 3. EF migrace: `ZaznamExterniOdkaz.ZaradidDoVyzvy` + rename sloupce `Vyzva` → `VyzvaId` + filtered unique index.
 4. Migrace: `VyzvaHistorieStavu` tabulka.
-5. `TicketingReadOnlyDbContext` + entity `HotZaznam`, `HotKalkulace`, `HotPid` + mapping + DTO.
+5. `TicketingReadOnlyDbContext` + entity `HotZaznam`, `HotKalkulace` + mapping + DTO. *(HotPid odstraněno 2026-04-21 — nepoužívá se, viz §10.)*
 6. `VyzvaService` — založení výzvy, přechody stavu, přeřazování PNF, auto-číslování.
 7. `TicketingQueryService` — dotazy do HOT_KALKULACE, HOT_ZAZNAMY.
 8. Unit testy pro buffer/auto-číslování/přechody.

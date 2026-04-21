@@ -104,6 +104,14 @@ Přiřazení bublin ke krokům **musí respektovat chronologický pořádek**. P
 - `DatumPrevzeti datetime2?` — **už existuje**.
 - `Cislo varchar` — 6místný identifikátor tiketu v ServiceDesku (= `HOT_ZAZNAMY.id`).
 
+### 4.1.1 Co z `intranetNEW.dbo.HOT_*` NEpoužíváme (upřesnění 2026-04-21)
+
+Kolega v `SD_servicedesk/Hotline.cs` pracuje s dalšími entitami, které pro use-case A **nejsou relevantní**:
+
+- **`TicketExternal`** (resp. tabulka, která ho napájí) — rozšiřující tabulka pro synchronizaci s externím ServiceDeskem dodavatele (SLA, SupplierTag, Deadline, Workflow/TransferType 1–11, HoursAtSupplier, atd.). Obchodní hodnota pro vytěžování vyjádření = žádná. **Do `TicketingReadOnlyDbContext` se NEmapuje.**
+- **`HOT_PID`** — tabulka existuje v produkci, ale `pid` v ní je totožný s `HOT_ZAZNAMY.pid`. Historický artefakt. Join `HOT_KALKULACE.pid = HOT_ZAZNAMY.pid` **přímo**, bez mezikroku přes HOT_PID (viz Fáze 1 spec §8.2).
+- **`HOT_WORKFLOW`** / transfer types (1 = založení, 2 = předání dodavateli, 3 = převzetí od dodavatele, 5 = archivace, 10/11 = prodloužení/schválení termínu) — vypadá to jako atraktivní zdroj strukturovaných dat, ale **NEpoužívat**. Důvod (uživatelská instrukce): ServiceDesk je starý a nespolehlivý, strukturovaná data tam lžou/chybí; jediné spolehlivé jsou **texty v `HOT_VYJADRENI.popis`** + role autora (`user_category`). Viz §8.1.
+
 ### 4.2 Nové sloupce na `ZaznamExterniOdkazEntity`
 
 | Sloupec | Typ | Účel |
@@ -369,21 +377,42 @@ Přidaný krok se zařadí na správnou chronologickou pozici (podle indexu 1–
 
 ### 8.1 Textové predikáty
 
+**ZÁSADA:** ServiceDesk je starý a nedokonalý systém — **nelze** se spoléhat na strukturovaná data (workflow table, transfer types, stavové enumy). **Jedinou spolehlivou cestou je striktní textový match** nad `HOT_VYJADRENI.popis`. Pokud je tentýž text vygenerován různými rolemi (např. „předal záznam dodavateli" od PM vs. od VS FIS), bere se **jen ten od relevantní role** — predikát proto kombinuje **text** a **kategorii autora** (`user_category`).
+
 **Tabulka `HOT_VYJADRENI` (intranetNEW.dbo):**
 
-| Krok / pole | SQL predikát (LIKE, case-insensitive dle collation) |
-|---|---|
-| Krok 1 (všichni) | datum založení tiketu z `HOT_ZAZNAMY` (nezávisí na vyjádření) |
-| Krok 3 (PMP) | `popis LIKE N'%Záznam byl založen a předán dodavateli k řešení pod značkou:%'` → první ASC |
-| Krok 4 (PMP) | `popis LIKE N'%Dodavatel přidal řešení%'` → **poslední** DESC |
-| Krok 6 (PNF) | `popis LIKE N'%Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována.%'` → první ASC |
-| Krok 7 (PNF) | `popis LIKE N'%Dodavatel přidal řešení%'` → **poslední** DESC |
-| Krok 10 (PNF) | `popis LIKE N'%Záznam byl převeden do archivu.%'` → jediný |
-| `DatumObjednani` (PMP + PNF) | stejné jako Krok 6 (first match) |
-| `DatumDodani` (PMP + PNF) | poslední „Dodavatel přidal řešení" |
-| `DatumPrevzeti` (všichni) | „Záznam byl převeden do archivu." |
+| # | Krok / pole | Text match (`popis LIKE N'%...%'`) | Role autora (`user_category`) | Řazení / výběr |
+|---|---|---|---|---|
+| **K1** | Krok 1 (všichni) | — (není vyjádření) | — | `HOT_ZAZNAMY.datum` = datum založení tiketu |
+| **K3** | Krok 3 (PMP) | `%Záznam byl založen a předán dodavateli k řešení pod značkou:%` | libovolné | první ASC |
+| **K4** | Krok 4 (PMP) | `%Dodavatel přidal řešení%` | `DO` (dodavatel) | **poslední** DESC |
+| **K6** | Krok 6 (PNF) | `%Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována.%` | `PM` (projektový manažer) | první ASC |
+| **K7** | Krok 7 (PNF) | `%Dodavatel přidal řešení%` | `DO` (dodavatel) | **poslední** DESC |
+| **K10** | Krok 10 (PNF) | `%Záznam byl převeden do archivu.%` | libovolné (typicky systémové) | jediný |
+| **D-O** | `DatumObjednani` (PMP + PNF) | stejné jako K6 | `PM` | první ASC |
+| **D-D** | `DatumDodani` (PMP + PNF) | stejné jako K4 / K7 | `DO` | **poslední** DESC |
+| **D-P** | `DatumPrevzeti` (všichni) | stejné jako K10 | libovolné | jediný |
 
-**Plán dodání** (zatím mimo scope, ale pozn.): `popis LIKE N'%předal záznam dodavateli : %s termínem plnění dodavatele%'` + regex na `dd.mm.yyyy` v textu.
+**Důležité detaily:**
+
+1. **Role `user_category` je pojistka proti false-positive** — stejný text může vygenerovat více rolí. Např. „Vedoucí informačního systému – ISSP předal záznam dodavateli" a „Projektový manažer – FIS předal záznam dodavateli" jsou různé vyjádření s různým obchodním významem. Filter na konkrétní roli (PM) zaručuje, že bere jen „to pravé".
+2. **Case-sensitivity** závisí na collation databáze. Výchozí predpoklad: `Czech_CI_AS` (case-insensitive, accent-sensitive) — LIKE bude matchovat bez ohledu na velikost písmen, ale diakritika se respektuje.
+3. **Neexistuje fallback na alternativní text.** Pokud ServiceDesk má variantu („Dodavatel dodal řešení" místo „Dodavatel přidal řešení"), vyjádření se **nezachytí**. Uživatel to řeší ručně přes chat modal.
+4. **`K1` (příprava zadání) nečte z `HOT_VYJADRENI`.** Datum je `HOT_ZAZNAMY.datum` (= datum založení tiketu).
+5. **Plán dodání** (budoucí rozšíření, zatím mimo scope): `popis LIKE N'%předal záznam dodavateli : %s termínem plnění dodavatele%'` s regex extrakcí `dd.mm.yyyy` — pozor na role autora (buď PM nebo VS+ISSP dle dokumentu).
+
+**SQL template pro jeden krok:**
+
+```sql
+SELECT TOP 1 v.datum, v.popis, v.user_category, v.zpracoval
+FROM intranetnew.dbo.HOT_VYJADRENI v
+WHERE v.hot_zaznam_id = @cislo
+  AND v.popis LIKE N'%Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována.%'
+  AND v.user_category = N'PM'
+ORDER BY v.datum ASC;
+```
+
+*(FK sloupec `hot_zaznam_id` — předpoklad; název se ověří při prvním setkání s reálnou DB.)*
 
 ### 8.2 Lifecycle vytěžování — triggery
 
@@ -759,13 +788,20 @@ WHERE Kod LIKE 'HS11_%' OR Nazev LIKE N'%fakturace%';
 
 ## 13. Otevřené body (k doladění v implementačním plánu)
 
-1. **`HOT_VYJADRENI` schema** — přesné názvy sloupců (`typ_komentare`, `autor`, `popis`, `datum`) + CommentType hodnoty `"05"`, `"25"`, `"16"` (z `SD_servicedesk/Details.cshtml`) — ověřit mapování proti produkční DB (čeká na Fázi 4 ServiceDesk mapping).
-2. **Přesné LIKE patterns** pro textové predikáty — diakritika, collation, lokalizace dodavatelů mohou ovlivnit matching.
-3. **Hangfire polling vs. on-demand** — interval, zdroje datumu (kolik zaznamů lze dotázat naráz bez zátěže ServiceDesku).
-4. **Vnitřní struktura localStorage payload** — schéma + verze (forward compat).
-5. **Přesné gov komponenty** pro stepper (vertikální) a floating dropdown — ověřit v docs Gov Design System.
-6. **UI indikátor „Vytěženo před 2 dny"** — formátování (relative time) + refresh.
-7. **Integrace s dashboardem prodlení (Use-case B)** — jak se data z této fáze napojí na dashboard.
+1. **`HOT_VYJADRENI` schema** — přesné názvy sloupců a FK na `HOT_ZAZNAMY`. Z `SD_servicedesk/Details.cshtml` víme semanticky property `Popis`, `Datum`, `Zpracoval`, `Tym`, `CommentType` (hodnoty `"05"`, `"25"`, `"16"`), `UserCategory` (hodnoty `ZP`/`VS`/`RT`/`PM`/`DO`/`EO`). První implementační task bude „ověř mapping proti reálné DB a adjust EF configuration" — uživatel potvrdil, že bude kontrolovat z reálných dat. Ostatní architektura je na tomto mappingu nezávislá.
+2. **Diakritika + collation** při LIKE — default `Czech_CI_AS` (case-insensitive, accent-sensitive). Pokud by produkce měla jinou collation, přidá se `COLLATE Czech_CI_AI` klauzule k textovým porovnáním.
+3. **Hangfire interval default + UI konfigurace** — **UZAVŘENO 2026-04-21:** default 1 hodina, konfigurovatelné v admin panelu (§8.6), Hangfire je záložní síť, primární trigger je T5 otevření editoru.
+4. **Vnitřní struktura localStorage payload** — schéma + verze (forward compat). Doplníme v Plánu C (Task 1 strukturální design).
+5. **Přesné gov komponenty** pro stepper (vertikální) a floating dropdown — ověří se při implementaci Plánu C; pokud Gov stepper neumí vertikální custom content, použije se `gov-card` seznam (fallback).
+6. **UI indikátor „Vytěženo před 2 dny"** — formátování (relative time) + refresh. Detail v Plánu C.
+7. **Integrace s dashboardem prodlení (Use-case B)** — jak se data z této fáze napojí na dashboard. Mimo scope, samostatný spec.
+
+### 13.1 Uzavřené body (potvrzeno uživatelem 2026-04-21)
+
+- ❌ **TicketExternal** — nepoužívat. Je to rozšíření pro synchronizaci se ServiceDeskem dodavatele, obchodní hodnota žádná.
+- ❌ **HOT_WORKFLOW / TransferType 1–11** — nepoužívat jako zdroj dat pro harvest. Jediná spolehlivá cesta jsou texty v `HOT_VYJADRENI.popis` + role autora (`user_category`). Uživatel explicitně: „důležité je co je napsáno, někdy jsou texty stejné ale rozdíl je kdo akci provedl".
+- ❌ **HOT_PID** — nepoužívat. Join `HOT_KALKULACE.pid = HOT_ZAZNAMY.pid` přímo (Fáze 1 spec aktualizován).
+- ✅ **Role autora v LIKE predikátech** — `user_category` filter je povinná součást každého predikátu, kde by stejný text mohl být generován různými rolemi (§8.1 tabulka).
 
 ---
 
