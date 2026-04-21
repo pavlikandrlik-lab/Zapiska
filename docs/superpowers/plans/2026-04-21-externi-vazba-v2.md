@@ -50,7 +50,8 @@
 7. **Task 7** — JS modul `chatModalStub.js` (otvírá stub modal).
 8. **Task 8** — Integrovat moduly do `site.bundle.js` + bootstrap.
 9. **Task 9** — Playwright visual smoke test nové karty.
-10. **Task 10** — Full build + test + git clean.
+10. **Task 10** — `IHarvestScheduler` stub + volání po uložení záznamu (T2 call-site).
+11. **Task 11** — Full build + test + git clean.
 
 ---
 
@@ -1230,7 +1231,174 @@ pkill -f "PmTracker.Web/bin" 2>/dev/null
 
 ---
 
-## Task 10: Full build + test + git clean
+## Task 10: `IHarvestScheduler` stub + T2 call-site
+
+**Files:**
+- Create: `PmTracker.Web/Services/ServiceDesk/IHarvestScheduler.cs`
+- Create: `PmTracker.Web/Services/ServiceDesk/NoOpHarvestScheduler.cs`
+- Modify: `PmTracker.Web/Services/RecordService.SaveRecord.cs` (zavolat scheduler po SaveChanges)
+- Modify: `PmTracker.Web/Program.cs` (DI registrace)
+- Test: `PmTracker.Tests.Unit/ServiceDesk/HarvestSchedulerContractTests.cs`
+
+**Kontext:** Plán B přináší uložení externí vazby do DB, ale Plán C bude potřebovat volat `IHarvestScheduler.ScheduleHarvestAsync(externiOdkazId)` přímo po SaveChanges. Plán B proto dodá **call-site** a **stub** implementaci (no-op). Plán C pak stub nahradí reálnou Hangfire-based třídou.
+
+- [ ] **Step 1: Napsat failující contract test**
+
+Vytvoř `PmTracker.Tests.Unit/ServiceDesk/HarvestSchedulerContractTests.cs`:
+
+```csharp
+using FluentAssertions;
+using PmTracker.Web.Services.ServiceDesk;
+using Xunit;
+
+namespace PmTracker.Tests.Unit.ServiceDesk;
+
+public sealed class HarvestSchedulerContractTests
+{
+    [Fact]
+    public async Task NoOpHarvestScheduler_ScheduleHarvestAsync_CompletesWithoutError()
+    {
+        IHarvestScheduler sut = new NoOpHarvestScheduler();
+        await sut.ScheduleHarvestAsync(42);
+        // No assertion — jen že to skončí bez výjimky.
+    }
+
+    [Fact]
+    public async Task NoOpHarvestScheduler_ScheduleHarvestForRecordAsync_CompletesWithoutError()
+    {
+        IHarvestScheduler sut = new NoOpHarvestScheduler();
+        await sut.ScheduleHarvestForRecordAsync(123);
+    }
+
+    [Fact]
+    public async Task NoOpHarvestScheduler_ScheduleHarvestAsync_WithNegativeId_DoesNotThrow()
+    {
+        IHarvestScheduler sut = new NoOpHarvestScheduler();
+        var act = async () => await sut.ScheduleHarvestAsync(-1);
+        await act.Should().NotThrowAsync();
+    }
+}
+```
+
+- [ ] **Step 2: Spustit test (musí failnout — třídy neexistují)**
+
+Run: `dotnet test PmTracker.Tests.Unit --filter "HarvestSchedulerContractTests" --no-restore`
+
+Expected: COMPILATION ERROR (nebo FAIL).
+
+- [ ] **Step 3: Vytvořit interface**
+
+Vytvoř `PmTracker.Web/Services/ServiceDesk/IHarvestScheduler.cs`:
+
+```csharp
+namespace PmTracker.Web.Services.ServiceDesk;
+
+/// <summary>
+/// Pláno­vač harvestu vyjádření z intranetNEW ServiceDesku.
+/// Fire-and-forget API — implementace má vrátit okamžitě,
+/// skutečný harvest běží na pozadí (Hangfire / Task.Run dle implementace).
+/// </summary>
+public interface IHarvestScheduler
+{
+    /// <summary>
+    /// T2, T7 — harvest jedné externí vazby (po uložení nebo po schválení návrhu).
+    /// </summary>
+    Task ScheduleHarvestAsync(int externiOdkazId, CancellationToken ct = default);
+
+    /// <summary>
+    /// T5, T8 — harvest všech externích vazeb daného projektového záznamu
+    /// (při otevření editoru nebo lazy otevření tabu).
+    /// </summary>
+    Task ScheduleHarvestForRecordAsync(int zaznamId, CancellationToken ct = default);
+}
+```
+
+- [ ] **Step 4: Vytvořit no-op implementaci**
+
+Vytvoř `PmTracker.Web/Services/ServiceDesk/NoOpHarvestScheduler.cs`:
+
+```csharp
+namespace PmTracker.Web.Services.ServiceDesk;
+
+/// <summary>
+/// Placeholder implementace — call-site pro Plán B, nic neharvestuje.
+/// Plán C nahradí Hangfire-based implementací.
+/// </summary>
+internal sealed class NoOpHarvestScheduler : IHarvestScheduler
+{
+    public Task ScheduleHarvestAsync(int externiOdkazId, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    public Task ScheduleHarvestForRecordAsync(int zaznamId, CancellationToken ct = default)
+        => Task.CompletedTask;
+}
+```
+
+- [ ] **Step 5: Registrovat v DI**
+
+Otevři `PmTracker.Web/Program.cs`. Najdi blok s `builder.Services.Add...` pro ostatní services (např. kolem ServiceDesk registrace).
+
+Run: `grep -n "AddServiceDesk\|AddScoped.*ITicketingQuery" PmTracker.Web/Program.cs`
+
+Přidej za odpovídající řádek:
+
+```csharp
+builder.Services.AddScoped<IHarvestScheduler, NoOpHarvestScheduler>();
+```
+
+- [ ] **Step 6: Zavolat z `RecordService.SaveRecord`**
+
+Otevři `PmTracker.Web/Services/RecordService.SaveRecord.cs`.
+
+Najdi konec metody `SaveRecordAsync` (nebo místo, kde se `SaveChangesAsync` volá naposled a entity mají ID).
+
+Run: `grep -n "SaveChangesAsync\|return\|externiVazby" PmTracker.Web/Services/RecordService.SaveRecord.cs | head -20`
+
+Cíl: po uložení externích vazeb (kdy mají Id) zavolat `_harvestScheduler.ScheduleHarvestAsync(id)` pro každou vazbu, která má `Cislo != null` a je nová nebo změněná.
+
+**Postup:**
+
+a) Inject `IHarvestScheduler` do konstruktoru třídy `RecordService`. Najdi konstruktor:
+
+Run: `grep -n "public RecordService\|RecordService(" PmTracker.Web/Services/RecordService.cs`
+
+Přidej `IHarvestScheduler harvestScheduler` do parametrů konstruktoru + přiřaď do private field.
+
+b) V `SaveRecordAsync` za uložení externích vazeb (po všech `SaveChangesAsync`) přidej:
+
+```csharp
+foreach (var vazba in zaznam.ExterniVazby)
+{
+    if (!string.IsNullOrWhiteSpace(vazba.Cislo))
+    {
+        _ = _harvestScheduler.ScheduleHarvestAsync(vazba.Id, ct);
+    }
+}
+```
+
+(`_ = ...` zahazuje Task — fire-and-forget dle kontraktu.)
+
+- [ ] **Step 7: Build + spustit test**
+
+Run: `dotnet build --no-restore && dotnet test PmTracker.Tests.Unit --filter "HarvestSchedulerContractTests" --no-restore`
+
+Expected: 0 build errors, 3/3 testy passed.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add PmTracker.Web/Services/ServiceDesk/IHarvestScheduler.cs \
+        PmTracker.Web/Services/ServiceDesk/NoOpHarvestScheduler.cs \
+        PmTracker.Web/Services/RecordService.SaveRecord.cs \
+        PmTracker.Web/Services/RecordService.cs \
+        PmTracker.Web/Program.cs \
+        PmTracker.Tests.Unit/ServiceDesk/HarvestSchedulerContractTests.cs
+git commit -m "feat(servicedesk): IHarvestScheduler stub + T2 call-site v RecordService.SaveRecord"
+```
+
+---
+
+## Task 11: Full build + test + git clean
 
 **Files:**
 - (verifikace)
@@ -1245,13 +1413,13 @@ Expected: 0 errors, 0 warnings.
 
 Run: `dotnet test PmTracker.Tests.Unit --no-restore --no-build`
 
-Expected: všechny testy passed (po Plánech A + B: ~620 testů).
+Expected: všechny testy passed (po Plánech A + B: ~623 testů).
 
 - [ ] **Step 3: Git status + git log**
 
 Run: `git status && git log --oneline | head -15`
 
-Expected: pracovní strom čistý, ~9 commitů z tohoto plánu + 7 z Plánu A.
+Expected: pracovní strom čistý, ~10 commitů z tohoto plánu + 7 z Plánu A.
 
 - [ ] **Step 4: Bez dalšího commitu — plán hotov**
 

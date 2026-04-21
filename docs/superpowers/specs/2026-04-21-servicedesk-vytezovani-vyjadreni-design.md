@@ -385,13 +385,63 @@ Přidaný krok se zařadí na správnou chronologickou pozici (podle indexu 1–
 
 **Plán dodání** (zatím mimo scope, ale pozn.): `popis LIKE N'%předal záznam dodavateli : %s termínem plnění dodavatele%'` + regex na `dd.mm.yyyy` v textu.
 
-### 8.2 Lifecycle vytěžování
+### 8.2 Lifecycle vytěžování — triggery
 
-Automat se spouští ve **dvou momentech**:
+Automat běží v **reakci na uživatelské události**, ne trvale. Primární strategie: **proaktivní harvest ve chvíli, kdy se uživatel chystá s daty pracovat**. Hangfire periodický job je jen záložní síť pro tickety, které se dlouho neotevřely.
 
-1. **Při vytvoření externí vazby** (po auto-sync 6místného čísla) — jedno-rázově, naplní všechna relevantní pole.
-2. **Při příchodu nového vyjádření** do ServiceDesku — pokud existuje externí vazba s tímto `hot_zaznam_id`, automat zkontroluje, zda nové vyjádření spouští nějaký krok.
-   - Mechanizmus detekce: polling Hangfire job (např. 1× za 15 minut) — ověřuje `HOT_VYJADRENI.datum > ZaznamExterniOdkazEntity.LastHarvestedAt`. *Přesný interval + Hangfire vs. on-demand — rozhodne implementační plán.*
+#### 8.2.1 Tabulka triggerů
+
+| # | Událost | Rozsah | Frekvence | Sync/Async |
+|---|---|---|---|---|
+| **T1** | Uživatel napsal 6 cifer do pole `Číslo` | 0 tiketů (jen lookup `HOT_ZAZNAMY`, žádný harvest vyjádření) | Debounce 400 ms | Sync |
+| **T2** | Uložení formuláře záznamu s novou / upravenou externí vazbou | 1 tiket (nově vložený nebo s změněným `Cislo`) | Hned po commit | **Async** (background) |
+| **T3** | Uživatel klikne „Spustit vytěžení znovu" v chat modalu | 1 tiket | On-demand | Sync (spinner) |
+| **T4** | Hangfire periodický batch job — **pouze non-archivované tickety** | N tiketů (všechny s `LastHarvestedAt < now - interval`) | Konfigurovatelné v admin panelu, **default 1 hodina** | Async |
+| **T5** | Otevření editoru projektového záznamu (`EditZaznamModal` / `EditZaznamPage`) | N tiketů (všechny externí vazby daného záznamu, které nejsou v archivu) | 1× na load | **Async** (editor se zobrazí okamžitě, harvest doběhne na pozadí; UI si data při refresh / při otevření tabu stáhne) |
+| **T6** | Otevření chat modalu | 0 tiketů pokud `LastHarvestedAt < 5 min`; jinak 1 tiket (harvest před zobrazením dat) | On-demand | Sync (krátký spinner, jinak okamžitě) |
+| **T7** | Schválení návrhu `CREATE_RECORD` s externími vazbami | M tiketů | Po schválení | Async |
+| **T8** | Otevření záložky **Externí vazby** nebo **Harmonogram** v editoru záznamu (pokud T5 ještě neproběhl) | N tiketů (lazy fallback) | Poprvé když tab aktivován | Async |
+
+#### 8.2.2 Rozdíl lookup vs. harvest
+
+- **Lookup** (T1) = rychlý dotaz `SELECT TOP 1 ... FROM HOT_ZAZNAMY WHERE id=?`. Vrací Typ a Strucne. **Nezapisuje** do PM Tracker DB.
+- **Harvest** (T2, T3, T4, T5, T7, T8) = průchod všech vyjádření tiketu (`SELECT ... FROM HOT_VYJADRENI WHERE hot_zaznam_id=? AND datum > @last_harvested_at`), aplikace LIKE predikátů, zápis do `zaznam_harmonogram_vyjadreni_vazba` + `HS0X_DELAY` + update `LastHarvestedAt`.
+
+#### 8.2.3 Primární proaktivní strategie — T5
+
+Otevření editoru záznamu je **nejsilnější signál**, že uživatel se chystá se záznamem pracovat (harmonogram, externí vazby, vyjádření). Proto se právě v tu chvíli spustí harvest **všech** externích vazeb daného záznamu, které:
+
+- mají `Cislo IS NOT NULL` (napojené na ServiceDesk),
+- NEjsou v archivním stavu v ServiceDesku (`HOT_ZAZNAMY.stav != 'archivováno'`),
+- mají `LastHarvestedAt < NOW - 5 minut` (není čerstvě harvestnuté).
+
+Harvest běží **async** — editor se uživateli zobrazí okamžitě, data harmonogramu jsou vidět z poslední DB hodnoty, nové hodnoty z ServiceDesku dorazí typicky do 1–3 sekund (pokud má záznam 3 vazby). Když uživatel prokliká na záložku harmonogram za 5 s, už tam má aktuální data. Pokud ne, Plán C zajistí SignalR push / polling v editoru (mimo tento spec).
+
+#### 8.2.4 Záložní síť — T4 Hangfire periodický job
+
+Hangfire job pokrývá případ, kdy se k tiketu dlouho nikdo nevrátil, ale:
+- Dashboard prodlení (Use-case B) nebo reporty se opírají o aktuální datumy bez otevření editoru.
+- Uživatel zapomněl otevřít záznam, do kterého ServiceDesk poslal nová vyjádření.
+
+**Default interval: 1 hodina.** Konfigurovatelné v admin nastavení (viz §8.5) — mezi hodnotami `15min / 30min / 1h / 3h / 6h / 12h / disabled`. Doporučení pro produkci: 1–3 hodiny.
+
+**Filtr kandidátů pro Hangfire job:**
+```sql
+SELECT id FROM zaznam_externi_odkazy
+WHERE cislo IS NOT NULL
+  AND (last_harvested_at IS NULL
+       OR last_harvested_at < DATEADD(minute, -@interval_minutes, SYSUTCDATETIME()))
+  -- Vyloučit archivované tickety (poslední znám hodnota v PM Tracker DB)
+  AND (datum_prevzeti IS NULL
+       OR datum_prevzeti > DATEADD(day, -7, SYSUTCDATETIME()))
+       -- 7denní grace window: právě archivované tickety ještě můžou dostat
+       -- pozdní vyjádření (např. uzavření SLA), takže je harvestujeme ještě týden;
+       -- starší archivy přeskočíme, protože se stejně nic nezmění
+```
+
+**Throttle:** max 4 paralelní HOT DB requesty.
+
+**Zrušení kompletně:** admin nastaví interval = `disabled`. Hangfire job se nespustí. Zůstanou jen reaktivní triggery (T2, T3, T5, T6, T7, T8).
 
 ### 8.3 Automat vítězí nad uživatelem (nové vyjádření)
 
@@ -446,11 +496,100 @@ shift_downstream_steps(startKrok, minDatum):
 
 ### 8.5 Re-harvest — co zahazuje
 
-Uživatelsky spuštěný re-harvest:
+Uživatelsky spuštěný re-harvest (trigger T3):
 
 - **Zahazuje všechny vazby** (auto + manual) pro **automatické kroky** (1, 3, 4, 6, 7, 10).
 - **Nezahazuje** vazby pro **ruční kroky** (2, 5, 8, 9) — automat je stejně neřeší.
 - Confirm: „Všechna přiřazení automatických kroků budou smazána a nahrazena podle aktuálního ServiceDesku. Ruční kroky zůstanou beze změny."
+
+### 8.6 Admin nastavení synchronizace — nová sekce `/Nastaveni?section=servicedesk-sync`
+
+Nové admin rozhraní pro řízení Hangfire periodického jobu (T4) a celkového chování synchronizace. Dostupné jen pro role **`app_admin`** a **`SuperAdmin`**.
+
+#### 8.6.1 Konfigurovatelné hodnoty
+
+| Klíč | Typ | Default | Rozsah | Popis |
+|---|---|---|---|---|
+| `servicedesk.sync.hangfire.interval` | enum | `1h` | `disabled`, `15min`, `30min`, `1h`, `3h`, `6h`, `12h` | Perioda T4 batch jobu. |
+| `servicedesk.sync.hangfire.maxParallelism` | int | `4` | `1`–`16` | Počet paralelních HOT DB requestů v jednom ticku. |
+| `servicedesk.sync.hangfire.archiveGraceDays` | int | `7` | `0`–`30` | Počet dní po archivaci tiketu, kdy ho T4 ještě harvestuje (grace window pro pozdní vyjádření). Potom se přeskočí. |
+| `servicedesk.sync.editor.freshnessMinutes` | int | `5` | `0`–`60` | T5/T8: pokud `LastHarvestedAt < NOW - N min`, harvest se přeskočí (tiket je „čerstvý"). 0 = harvestuj vždy. |
+| `servicedesk.sync.timeout.seconds` | int | `30` | `5`–`120` | Timeout per tiket per harvest. |
+| `servicedesk.sync.enabled` | bool | `true` | | Master killswitch — když `false`, žádný harvest (T2, T3, T4, T5, T6, T7, T8) neběží. Lookup (T1) zůstává. |
+
+#### 8.6.2 Datový model — tabulka `servicedesk_sync_settings`
+
+Klíč-hodnota tabulka pro tyto konfigurace. Jednoduchá `nvarchar` storage + runtime parsing. Důvod: nepotřebujeme strukturované sloupce, rozšíření nových klíčů v budoucnu je triviální.
+
+```sql
+CREATE TABLE dbo.servicedesk_sync_settings
+(
+  klic             NVARCHAR(200) NOT NULL PRIMARY KEY,
+  hodnota          NVARCHAR(MAX) NOT NULL,
+  updated_at       DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_by_osoba_id INT NULL FOREIGN KEY REFERENCES dbo.osoby(id)
+);
+```
+
+Seed při spuštění skriptu naplní 6 výchozích klíčů.
+
+#### 8.6.3 UI — karta „Synchronizace ServiceDesku" v Nastavení
+
+Přidá se do navigace `/Nastaveni` (levý sloupec sekcí) nová položka **„Synchronizace ServiceDesku"** (section key `servicedesk-sync`), viditelná jen pro `app_admin` / `SuperAdmin`.
+
+Layout:
+
+```
+┌─ Synchronizace ServiceDesku ───────────────────────────────┐
+│                                                            │
+│ Master kill-switch                                         │
+│ ○ Zapnuto    ○ Vypnuto                                     │
+│                                                            │
+│ Periodický harvest (Hangfire)                              │
+│ Interval:  [1 hodina ▾]                                    │
+│   Možnosti: Vypnuto / 15 min / 30 min / 1h / 3h / 6h / 12h │
+│                                                            │
+│ Max paralelních requestů:  [ 4 ]                           │
+│ Grace window po archivaci (dny):  [ 7 ]                    │
+│                                                            │
+│ Proaktivní harvest při otevření editoru (T5 / T8)          │
+│ „Čerstvost" tiketu (min.):  [ 5 ]                          │
+│   (pokud je tiket harvestnutý do N minut, přeskočí se)     │
+│                                                            │
+│ Timeout per tiket (s):  [ 30 ]                             │
+│                                                            │
+│ [Uložit změny]  [Obnovit výchozí]                          │
+│                                                            │
+│ ─── Stav synchronizace ─────────────────────────────────── │
+│ Poslední spuštění Hangfire jobu:  21.4.2026 14:32          │
+│ Zpracováno tiketů:  12                                     │
+│ Chyby:  0                                                  │
+│ Průměrná doba harvestu per tiket:  185 ms                  │
+│ [Spustit nyní]  [Zobrazit log]                             │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
+```
+
+Komponenta: **`gov-card` s `gov-form-input` / `gov-select` / `gov-switch`**. Žádná vlastní CSS.
+
+Akce v patce karty (jen `SuperAdmin`):
+- **Spustit nyní** — force trigger Hangfire jobu mimo interval.
+- **Zobrazit log** — otevře modal s posledních 50 Hangfire-job runs (datum, počet zpracovaných, chyby).
+
+#### 8.6.4 API endpointy
+
+| Method | Route | Popis |
+|---|---|---|
+| GET | `/Nastaveni/ServiceDeskSync` | Render card view (přístup jen pro admin role). |
+| POST | `/Nastaveni/ServiceDeskSync/Save` | Uložit hodnoty. |
+| POST | `/Nastaveni/ServiceDeskSync/RunNow` | Force spuštění Hangfire jobu. |
+| GET | `/Nastaveni/ServiceDeskSync/Log` | JSON seznam posledních runs. |
+
+#### 8.6.5 Runtime integrace
+
+- Služba `IServiceDeskSyncSettings` — cached reader, refresh cache při každém save (pub/sub přes `IMemoryCache.Remove` hook).
+- Hangfire job při každém ticku čte aktuální interval → pokud se změnil, pře-registruje cron.
+- Editor controller (`ZaznamyController.Edit`) v T5 volá `IHarvestScheduler.ScheduleHarvestForRecord` s `freshnessMinutes` parametrem.
 
 ---
 
@@ -517,11 +656,24 @@ V patce modalu:
 
 | Method | Route | Body | Popis |
 |---|---|---|---|
-| POST | `/Zaznamy/ExterniOdkaz/Sync` | `{ cislo }` | Lookup 6místného čísla v ServiceDesku → vrátí `{ typ, strucne, datumObjednani, datumDodani, datumPrevzeti, hotVyjadreniExist }` |
-| GET | `/Zaznamy/Vyjadreni/List` | `?externiOdkazId=X` | Vrátí seznam vyjádření pro modal (timeline). |
+| POST | `/ExterniOdkaz/Sync` | `{ cislo }` | **T1** — lookup 6místného čísla v ServiceDesku → vrátí `{ nalezeno, typ, strucne }`. |
+| GET | `/Zaznamy/Vyjadreni/List` | `?externiOdkazId=X` | **T6** — vrátí seznam vyjádření pro modal (timeline). |
 | POST | `/Zaznamy/HarmonogramVazba/Save` | celý localStorage snapshot | Bulk upsert — server udělá diff proti DB, aplikuje rozdíly, vrátí nový server_state. |
-| POST | `/Zaznamy/HarmonogramVazba/ReHarvest` | `{ externiOdkazId }` | Smaže všechny auto kroky + spustí automat znovu. |
+| POST | `/Zaznamy/HarmonogramVazba/ReHarvest` | `{ externiOdkazId }` | **T3** — smaže všechny auto kroky + spustí automat znovu (synchronně). |
 | POST | `/Zaznamy/HarmonogramSkutecnost/ManualSet` | `{ zaznamId, krokKey, datum }` | Jen pro ruční kroky 2/5/8/9 bez vazby. |
+| GET | `/Nastaveni/ServiceDeskSync` | — | **Admin** — render karty s nastavením synchronizace. |
+| POST | `/Nastaveni/ServiceDeskSync/Save` | hodnoty ze form | **Admin** — uložit hodnoty klíčů do `servicedesk_sync_settings`. |
+| POST | `/Nastaveni/ServiceDeskSync/RunNow` | — | **SuperAdmin** — force trigger Hangfire jobu. |
+| GET | `/Nastaveni/ServiceDeskSync/Log` | `?limit=50` | **Admin** — JSON posledních Hangfire runs. |
+
+### 10.1 Interní služby (ne HTTP, ale součást kontraktu)
+
+| Rozhraní | Metoda | Popis |
+|---|---|---|
+| `IHarvestScheduler` | `ScheduleHarvestAsync(int externiOdkazId)` | **T2, T7** — fire-and-forget po uložení externí vazby. |
+| `IHarvestScheduler` | `ScheduleHarvestForRecordAsync(int zaznamId)` | **T5, T8** — harvest všech vazeb daného záznamu (async). |
+| `IVyjadreniHarvestService` | `HarvestTicketAsync(int externiOdkazId, CancellationToken ct)` | Skutečná implementace harvestu (synchronní uvnitř Hangfire jobu). |
+| `IServiceDeskSyncSettings` | `GetAsync()` / `SaveAsync(settings)` | Cached config reader/writer pro §8.6 klíče. |
 
 ---
 
@@ -595,6 +747,13 @@ WHERE Kod LIKE 'HS11_%' OR Nazev LIKE N'%fakturace%';
 23. ✅ ACL: `records.edit` pro schéma 1; `records.schedule.edit` pro schéma 2; subsystem lead pro schéma 3.
 24. ✅ Gov komponenty místo Bootstrap (překlad z `SD_servicedesk/Details.cshtml`).
 25. ✅ Unit testy + Playwright visual smoke test na modal.
+26. ✅ Triggery T1–T8 implementovány dle §8.2 tabulky.
+27. ✅ Otevření editoru záznamu (T5) spouští async harvest všech jeho externích vazeb.
+28. ✅ Otevření záložky Externí vazby / Harmonogram (T8) spouští lazy harvest, pokud T5 ještě neproběhl.
+29. ✅ Hangfire batch job (T4) filtruje archivované tickety (7denní grace window).
+30. ✅ Admin karta `/Nastaveni?section=servicedesk-sync` pro interval + parallelism + grace window + freshness + timeout + killswitch.
+31. ✅ Tabulka `servicedesk_sync_settings` + `IServiceDeskSyncSettings` cached reader.
+32. ✅ `IHarvestScheduler` stub v Plánu B, reálná implementace v Plánu C.
 
 ---
 
