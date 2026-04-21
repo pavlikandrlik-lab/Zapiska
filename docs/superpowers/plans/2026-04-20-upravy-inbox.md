@@ -190,13 +190,19 @@ Společný root-cause pattern: Fáze 2E přepnula modaly z custom overlay na gov
 2. **Floating portal stacking** — `#floating-panel-root` z-index nad gov-dialog shadow DOM
 3. **Modal overflow policy** — default `overflow: hidden`, opt-in scroll jen pro record-editor přes data-flag
 
-### Úprava #10 — Modal úprav záznamu (record-editor): rozšířit (deferred na wide-screen iteraci)
+### Úprava #10 — Modal úprav záznamu (record-editor): rozšířit ✅ VYŘEŠENO 2026-04-21
 
 - **Kde:** Modal pro edit/create záznamu (`_EditZaznamForm.cshtml`) — render v `gov-dialog[data-modal-variant="record-editor"]`
 - **Co (současný stav):** Modal je vizuálně úzký (~52rem), user má pocit těsného layoutu. Uživatel cítí, že se tam nevejde vše pohodlně.
 - **Očekávání:** Větší šířka modalu — ideálně ~1280px (nebo širší) pro record-editor varianta.
-- **User governance:** **DEFERRED** — user explicitně říká "možná nechat až pro úpravy celé obrazovky na wide screen". Tj. tato úprava čeká na rozhodnutí o app-wide full-width layoutu (viz Úprava #4 + #4b).
-- **Status:** ⏸ **odložená** — čeká na rozhodnutí full-width layout strategie
+- **User governance:** DEFERRED do 2026-04-21, pak implementováno po dokončení fluid tier layoutu.
+- **Status:** ✅ **VYŘEŠENO 2026-04-21** — root cause: gov-dialog 4.2.9 čte `--max-width` (ne `--gov-dialog-max-width`), max-height hardcoded 75vh override jen přes přímý class selector.
+- **Fix (commit b…):**
+  1. `--gov-dialog-max-width` → `--max-width` (wide: 1100px, record-editor: 1280px)
+  2. Nový selector `gov-dialog[data-modal-variant="record-editor"] .gov-dialog__dialog { max-height: 92vh }`
+  3. Mobile media query: stejný pattern pro `max-height: calc(100vh - 36px)`
+- **Verifikace (Playwright probe, viewport 1920×1080):** wide 840×810 → 1100×810, record-editor 840×810 → **1280×994** (92vh)
+- **Architecture guard:** `GovDialogVariantWidthTests` — 3 testy (obsolete var not used, wide uses --max-width, record-editor uses --max-width + .gov-dialog__dialog max-height override)
 - **Komentář / dopady — KRITICKÁ VAZBA na pre-existing CSS issue:**
   - **Pre-existing bug (zdokumentován v review):** `gov-dialog[data-modal-variant="record-editor"]` má v CSS `--gov-dialog-max-width: 1280px`, ale vizuálně modal zůstává defaultní ~52rem. **Custom property se neaplikuje** — pravděpodobně mismatch názvu CSS custom property s aktuální verzí gov-design-system (shadow DOM ho nečte).
   - Playwright harness (pm-modal-harness.html) to potvrdil: wide (1100px) i record-editor (1280px) varianty vykreslují stejně široko jako default.

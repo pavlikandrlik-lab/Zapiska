@@ -4033,28 +4033,24 @@ gov-dialog[data-modal-container] {
     /* Default variant ponechává gov-dialog vestavěné max-width (~52rem). */
 }
 
-/* Úprava #10 INVESTIGATION (2026-04-20): aktuální varianty wide / record-editor
-   nastavují --gov-dialog-max-width, ale při Playwright verifikaci v harness
-   (pm-modal-harness.html) se width NEAPLIKUJE — modal zůstává v defaultní
-   ~52rem šířce. Hypotéza: aktuální verze gov-design-system (4.2.9) používá
-   v shadow DOM jinou custom property nebo ji vůbec nečte.
-
-   Deferred fix: po rozhodnutí o full-width app-wide layout (Úprava #4 +
-   potenciální #4b pro celou app). Viz docs/superpowers/specs/2026-04-20-ranni-fix-design.md
-   sekce "Side — #10".
-
-   Zjištěné dostupné custom properties v dist CSS (grep PmTracker.Web/wwwroot/lib/gov-design-system):
-   - gov-dialog (komponenta) používá: --max-width (fallback 52.5rem), max-height je hardcoded 75vh
-   - žádné --gov-dialog-max-width ani --gov-dialog-max-height v dist CSS neexistují
-   - správné property pro max-width override: --max-width
-   - max-height nemá CSS var slot (hardcoded) — override musí jít přes :part() nebo wrapper */
+/* Úprava #10 RESOLVED (2026-04-21): gov-dialog variantní šířka.
+   Root cause (ověřeno Playwright probe): gov-dialog 4.2.9 dist CSS používá
+   .gov-dialog__dialog { max-width: var(--max-width, 52.5rem); max-height: 75vh }.
+   Naše dřívější --gov-dialog-max-width rules se nenapíchly → všechny modaly měly
+   defaultních 840px. gov-dialog NEMÁ shadow DOM → override max-height jde přes
+   přímý class selector na .gov-dialog__dialog. */
 gov-dialog[data-modal-container][data-modal-variant="wide"] {
-    --gov-dialog-max-width: 1100px;
+    --max-width: 1100px;
 }
 
 gov-dialog[data-modal-container][data-modal-variant="record-editor"] {
-    --gov-dialog-max-width: 1280px;
-    --gov-dialog-max-height: 92vh;
+    --max-width: 1280px;
+}
+
+gov-dialog[data-modal-container][data-modal-variant="record-editor"] .gov-dialog__dialog {
+    /* max-height nemá CSS var — override jen přes light-DOM class selector.
+       92vh místo default 75vh dává record-editor formuláři víc vertikálního prostoru. */
+    max-height: 92vh;
 }
 
 gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .modal-content {
@@ -6126,8 +6122,10 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
         grid-template-columns: 1fr;
     }
 
-    gov-dialog[data-modal-container] {
-        --gov-dialog-max-height: calc(100vh - 36px);
+    gov-dialog[data-modal-container] .gov-dialog__dialog {
+        /* Mobile (< breakpoint): prakticky full-viewport modal (minus 36px safe gutter).
+           Override přes přímý class selector — gov-dialog max-height nemá CSS var. */
+        max-height: calc(100vh - 36px);
     }
 
     .record-form-row-top,
