@@ -4,8 +4,19 @@
 
 Repo obsahuje `PmTracker.Web/appsettings.json` s **placeholder / neutrálními** hodnotami
 pouze jako **strukturu a default**. Skutečné credentials (connection stringy, API klíče,
-hesla) se do gitu **nikdy** necommitují. Každý vývojář si je nastaví lokálně přes
-**.NET User Secrets Manager**.
+hesla) se do gitu **nikdy** necommitují. Podle stroje, na kterém se aplikace spouští,
+se secrets nastavují různě.
+
+## Tři prostředí, tři způsoby
+
+| Prostředí | Kde běží SQL Server | Konfigurace credentials |
+|---|---|---|
+| **Dev Mac (lokální editace a rychlé testy)** | Docker / Colima na `localhost:1433` | **Nic nenastavovat** — `appsettings.Development.json` obsahuje `sa / PmTracker!2026` jako docker default a je v .gitignore |
+| **Windows VYVOJ server (za Citrix bránou)** | Nativní Windows SQL Server s produkčně podobnými daty | Přes RDP/Citrix session na ten Windows stroj: `dotnet user-secrets set "ConnectionStrings:PmTrackerDb" "..." --project PmTracker.Web` |
+| **Produkce (IIS)** | Produkční SQL Server | Environment variables v IIS Web.config `<environmentVariables>` sekci, případně Azure Key Vault |
+
+User Secrets jsou per-user per-stroj — každý vývojář si na svém stroji uloží credentials
+jen pro prostředí, ke kterému se fyzicky dostane.
 
 ## Proč User Secrets
 
@@ -18,25 +29,43 @@ hesla) se do gitu **nikdy** necommitují. Každý vývojář si je nastaví lok�
 - Oproti přepisování `appsettings.json` lokálně: není riziko commitu skutečných credentials,
   schéma v repu se udržuje aktuální automaticky
 
-## První setup — nový stroj / nový vývojář
+## Dev Mac — first-time setup (nebo když selžou testy kvůli DB)
 
-1. Naklonuj repo, otevři kořenový adresář
-2. Ověř, že `PmTracker.Web/PmTracker.Web.csproj` obsahuje `<UserSecretsId>` (je commitnuté v repu).
-   Pokud ne (fresh repo), spusť:
+1. Naklonuj repo, otevři kořen
+2. Ujisti se, že běží docker/colima SQL Server na `localhost:1433`. Pokud ne:
    ```bash
-   dotnet user-secrets init --project PmTracker.Web
+   # macOS s colima
+   colima start
+   docker run --name pmtracker-mssql -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=PmTracker!2026' \
+     -p 1433:1433 -d mcr.microsoft.com/mssql/server:2022-latest
    ```
-3. Nastav svůj connection string (každý vývojář má svůj server):
+3. Aplikace při spuštění v `Development` prostředí použije `appsettings.Development.json`
+   (docker defaults) — **žádné user-secrets nepotřebuješ**.
+4. Spusť aplikaci:
    ```bash
-   dotnet user-secrets set "ConnectionStrings:PmTrackerDb" \
-     "Server=VLASTNI_SERVER;Database=PM_Tracker_VYVOJ;User Id=<ucet>;Password=<heslo>;Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=True" \
-     --project PmTracker.Web
+   dotnet run --project PmTracker.Web
    ```
-4. Ověř výpis (zobrazí se maskované):
-   ```bash
+
+## Windows VYVOJ server — setup credentials
+
+Když se přihlásíš přes RDP / Citrix session na Windows server s aplikací a potřebuješ
+propojit s lokálním Windows SQL Serverem:
+
+1. Otevři PowerShell / CMD v kořeni projektu
+2. Ověř, že `.csproj` obsahuje `<UserSecretsId>` (je commitnutý — stejný pro všechny stroje):
+   ```powershell
    dotnet user-secrets list --project PmTracker.Web
    ```
-5. Spusť aplikaci — měla by startovat proti tvému serveru bez dalšího zásahu.
+3. Nastav connection string **svého** Windows SQL Serveru:
+   ```powershell
+   dotnet user-secrets set "ConnectionStrings:PmTrackerDb" `
+     "Server=HOSTNAME\INSTANCE;Database=PM_Tracker_VYVOJ;User Id=<ucet>;Password=<heslo>;Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=True" `
+     --project PmTracker.Web
+   ```
+4. User secrets se uloží do `%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json`
+   na tomhle stroji — žádný jiný stroj je nevidí, v repu nejsou.
+5. Spusť aplikaci (přes `dotnet run` nebo deployuj do IIS) — přihlásí se na Windows
+   SQL Server pod těmito credentials.
 
 ## Další secrets, které se běžně nastavují lokálně
 
