@@ -14,7 +14,6 @@ public sealed class TicketingReadOnlyDbContext : DbContext
 
     internal DbSet<HotZaznamEntity> HotZaznamy => Set<HotZaznamEntity>();
     internal DbSet<HotKalkulaceEntity> HotKalkulace => Set<HotKalkulaceEntity>();
-    internal DbSet<HotPidEntity> HotPid => Set<HotPidEntity>();
 
     public override int SaveChanges()
         => throw new InvalidOperationException("TicketingReadOnlyDbContext is strictly read-only.");
@@ -82,13 +81,5 @@ public sealed class TicketingReadOnlyDbContext : DbContext
             e.HasIndex(x => new { x.Pid, x.Akceptace }).HasDatabaseName("ix_hot_kalkulace_pid_akceptace");
         });
 
-        mb.Entity<HotPidEntity>(e =>
-        {
-            e.ToTable("HOT_PID", "dbo");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("id");
-            e.Property(x => x.Pid).HasColumnName("PID");
-            e.Property(x => x.IdxPou).HasColumnName("idx_pou");
-        });
     }
 }
