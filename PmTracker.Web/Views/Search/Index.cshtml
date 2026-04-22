@@ -71,7 +71,7 @@
                                 <a href="@TypeDetailUrl(hit)">@hit.Title</a>
                                 @if (!string.IsNullOrWhiteSpace(hit.Snippet))
                                 {
-                                    <div class="search-snippet">@Html.Raw(hit.Snippet)</div>
+                                    <div class="search-snippet">@hit.Snippet</div>
                                 }
                             </li>
                         }
