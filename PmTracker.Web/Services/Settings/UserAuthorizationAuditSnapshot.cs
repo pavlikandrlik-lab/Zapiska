@@ -2,7 +2,7 @@ using PmTracker.Web.Models.ViewModels;
 
 namespace PmTracker.Web.Services.Settings;
 
-public sealed class UserAuthorizationSnapshot
+public sealed class UserAuthorizationAuditSnapshot
 {
     public required IReadOnlyList<string> RoleKody { get; init; }
     public required IReadOnlyList<PermissionGrantViewModel> PermissionGrants { get; init; }

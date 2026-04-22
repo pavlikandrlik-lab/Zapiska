@@ -31,13 +31,13 @@ public sealed class SuperAdminSourceTests
     }
 
     [Fact]
-    public void UserAuthorizationSnapshotBuilder_ShouldNotContainHardcodedSuperadminFallback()
+    public void UserAuthorizationAuditSnapshotBuilder_ShouldNotContainHardcodedSuperadminFallback()
     {
-        var code = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Settings/UserAuthorizationSnapshotBuilder.cs"));
+        var code = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Settings/UserAuthorizationAuditSnapshotBuilder.cs"));
 
         // Nesmí obsahovat žádný fallback porovnávající role kód "SUPERADMIN" — ani string.Equals, ani Ci.Equals / StringComparer styl
         code.Should().NotMatchRegex(
             @"""SUPERADMIN""",
-            "hardcoded SUPERADMIN string fallback musí být odstraněn i z UserAuthorizationSnapshotBuilder");
+            "hardcoded SUPERADMIN string fallback musí být odstraněn i z UserAuthorizationAuditSnapshotBuilder");
     }
 }

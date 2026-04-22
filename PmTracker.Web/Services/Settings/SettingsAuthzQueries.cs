@@ -8,7 +8,7 @@ namespace PmTracker.Web.Services.Settings;
 
 public sealed class SettingsAuthzQueries(
     PmTrackerDbContext dbContext,
-    IUserAuthorizationSnapshotBuilder userAuthorizationSnapshotBuilder,
+    IUserAuthorizationAuditSnapshotBuilder userAuthorizationSnapshotBuilder,
     IPersonIdentityMatcher personIdentityMatcher,
     ITextNormalizer textNormalizer) : ISettingsAuthzQueries
 {

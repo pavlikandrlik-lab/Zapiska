@@ -6,17 +6,17 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Services.Settings;
 
-public sealed class UserAuthorizationSnapshotBuilder(
+public sealed class UserAuthorizationAuditSnapshotBuilder(
     PmTrackerDbContext dbContext,
-    ITextNormalizer textNormalizer) : IUserAuthorizationSnapshotBuilder
+    ITextNormalizer textNormalizer) : IUserAuthorizationAuditSnapshotBuilder
 {
     private static readonly StringComparer Ci = StringComparer.OrdinalIgnoreCase;
 
-    public async Task<UserAuthorizationSnapshot> BuildAsync(int osobaId, CancellationToken ct = default)
+    public async Task<UserAuthorizationAuditSnapshot> BuildAsync(int osobaId, CancellationToken ct = default)
     {
         var roleKody = await BuildUserRoleCodesAsync(osobaId, ct);
 
-        return new UserAuthorizationSnapshot
+        return new UserAuthorizationAuditSnapshot
         {
             RoleKody = roleKody,
             PermissionGrants = await BuildUserPermissionGrantsAsync(osobaId, ct),

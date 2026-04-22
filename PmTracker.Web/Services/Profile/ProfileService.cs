@@ -7,11 +7,11 @@ namespace PmTracker.Web.Services.Profile;
 public sealed partial class ProfileService : IProfileService
 {
     private readonly PmTrackerDbContext dbContext;
-    private readonly IUserAuthorizationSnapshotBuilder userAuthorizationSnapshotBuilder;
+    private readonly IUserAuthorizationAuditSnapshotBuilder userAuthorizationSnapshotBuilder;
 
     public ProfileService(
         PmTrackerDbContext dbContext,
-        IUserAuthorizationSnapshotBuilder userAuthorizationSnapshotBuilder)
+        IUserAuthorizationAuditSnapshotBuilder userAuthorizationSnapshotBuilder)
     {
         this.dbContext = dbContext;
         this.userAuthorizationSnapshotBuilder = userAuthorizationSnapshotBuilder;

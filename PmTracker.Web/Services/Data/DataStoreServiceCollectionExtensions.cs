@@ -117,7 +117,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IExportTemplateQueries, ExportTemplateQueries>();
         services.AddScoped<IExportTemplateUseCase, ExportTemplateUseCase>();
         services.AddScoped<IWordExportService, OpenXmlWordExportService>();
-        services.AddScoped<IUserAuthorizationSnapshotBuilder, UserAuthorizationSnapshotBuilder>();
+        services.AddScoped<IUserAuthorizationAuditSnapshotBuilder, UserAuthorizationAuditSnapshotBuilder>();
         services.AddScoped<ISettingsAuthzQueries, SettingsAuthzQueries>();
         services.AddScoped<ISettingsAuthzCommands, SettingsAuthzCommands>();
         services.AddScoped<ISettingsModalModelFactory, SettingsModalModelFactory>();
