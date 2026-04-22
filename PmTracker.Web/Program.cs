@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Server.IISIntegration;
 using PmTracker.ServiceDesk.Sql;
 using PmTracker.Web.Extensions;
 using PmTracker.Web.Filters;
+using PmTracker.Web.Middleware;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Search;
@@ -66,6 +67,10 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseAuthentication();
+// HIGH-1 fix: naplnit HttpContext.Items[osobaId] PŘED UseAuthorization(),
+// aby PermissionAuthorizationHandler mohl číst osoba z ICurrentUserAccessor
+// při vyhodnocení [Authorize(Policy = "permission:xxx")] policies.
+app.UseMiddleware<UserContextMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();

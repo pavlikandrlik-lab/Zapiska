@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
+using PmTracker.Web.Middleware;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Security;
 
@@ -82,7 +83,13 @@ public abstract partial class BaseController : Controller
 
     public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        var resolved = await _userContextResolver.ResolveAsync(context.HttpContext, context.HttpContext.RequestAborted);
+        // HIGH-1 fix: UserContextMiddleware běží před UseAuthorization() a cachuje
+        // výsledek resolveru do HttpContext.Items. Čteme cache, aby se resolver nevolal
+        // podruhé (vyhne se duplicitní DB práci). Pokud middleware resolve přeskočil
+        // (anonymous request), spustíme ho ručně zde — získáme rich error result pro
+        // AccessDenied rendering / JSON ProblemDetails.
+        var resolved = context.HttpContext.Items[UserContextMiddleware.UserContextCacheKey] as UserContextResolutionResult
+            ?? await _userContextResolver.ResolveAsync(context.HttpContext, context.HttpContext.RequestAborted);
 
         if (!resolved.IsSuccess || resolved.UserContext is null)
         {
