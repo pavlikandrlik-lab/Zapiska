@@ -43,19 +43,22 @@ public sealed class UserContextResolver : IUserContextResolver
     private readonly ILogger<UserContextResolver> _logger;
     private readonly ITextNormalizer _textNormalizer;
     private readonly IPersonIdentityMatcher _personIdentityMatcher;
+    private readonly IAuthorizationService _authzService;
 
     public UserContextResolver(
         PmTrackerDbContext dbContext,
         IWebHostEnvironment environment,
         ILogger<UserContextResolver> logger,
         ITextNormalizer textNormalizer,
-        IPersonIdentityMatcher personIdentityMatcher)
+        IPersonIdentityMatcher personIdentityMatcher,
+        IAuthorizationService authzService)
     {
         _dbContext = dbContext;
         _environment = environment;
         _logger = logger;
         _textNormalizer = textNormalizer;
         _personIdentityMatcher = personIdentityMatcher;
+        _authzService = authzService;
     }
 
     /// <summary>
@@ -373,8 +376,10 @@ public sealed class UserContextResolver : IUserContextResolver
         httpContext.Items[CurrentUserAccessor.HttpContextItemKey] = osoba.Id;
 
         // Fáze D Task D4: postavit AuthorizationSnapshot — kanonická in-memory projekce pro tento request.
-        var authzBuilder = new AuthorizationSnapshotBuilder(_dbContext);
-        var authzSnapshot = await authzBuilder.BuildAsync(osoba.Id, ct);
+        // M3 fix: používáme IAuthorizationService místo přímého new AuthorizationSnapshotBuilder, aby
+        // per-request ConcurrentDictionary cache v AuthorizationService zachytila toto volání a sdílela
+        // snapshot s PermissionAuthorizationHandler v rámci stejného HTTP requestu.
+        var authzSnapshot = await _authzService.BuildSnapshotAsync(osoba.Id, ct);
 
         var context = new CurrentUserContextViewModel
         {

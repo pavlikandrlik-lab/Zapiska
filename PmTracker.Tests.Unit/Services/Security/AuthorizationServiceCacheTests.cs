@@ -174,4 +174,42 @@ public sealed class AuthorizationServiceCacheTests
             Times.Once,
             "RequirePermissionAsync musí využít cache — builder se zavolá jen jednou");
     }
+
+    // ---------------------------------------------------------------------------
+    // M3 — per-request dedup: resolver-like caller + handler-like caller = one build
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Simulates the M3 fix: UserContextResolver (resolver-like caller) and
+    /// PermissionAuthorizationHandler (handler-like caller) both call BuildSnapshotAsync
+    /// on the same AuthorizationService instance (Scoped per request). Builder must be
+    /// invoked exactly once — the second caller gets the cached Task.
+    /// </summary>
+    [Fact]
+    public async Task BuildSnapshot_FromResolverThenHandler_BuildsOnce()
+    {
+        // Arrange
+        const int osobaId = 55;
+        var snapshot = MakeSnapshot();
+
+        var builderMock = new Mock<IAuthorizationSnapshotBuilder>();
+        builderMock
+            .Setup(b => b.BuildAsync(osobaId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(snapshot);
+
+        // Single shared instance — mirrors Scoped DI lifetime within one HTTP request
+        var sharedService = new AuthorizationService(builderMock.Object);
+
+        // Act — simulate resolver calling first, then handler calling second
+        var resolverResult = await sharedService.BuildSnapshotAsync(osobaId, CancellationToken.None);
+        var handlerResult = await sharedService.BuildSnapshotAsync(osobaId, CancellationToken.None);
+
+        // Assert
+        resolverResult.Should().BeSameAs(snapshot, "resolver must get the correct snapshot");
+        handlerResult.Should().BeSameAs(snapshot, "handler must get the same cached snapshot");
+        builderMock.Verify(
+            b => b.BuildAsync(osobaId, It.IsAny<CancellationToken>()),
+            Times.Once,
+            "builder must be called exactly once even when both resolver and handler call BuildSnapshotAsync");
+    }
 }
