@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.ActiveDirectory;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Audit;
 
@@ -112,6 +113,11 @@ public sealed partial class PeopleService
                 old,
                 PersonAuditSnapshot.FromEntity(existing)));
             await dbContext.SaveChangesAsync(ct);
+
+            // Reactive AD refresh — po pick existující osoby. Queue dedup
+            // (§13.1) zajistí, že opakovaný save-stejné-osoby je no-op.
+            await adReactiveQueue.EnqueueAsync(
+                new AdReactiveSyncRequest(existing.Id, AdReactiveSource.PersonPicked), ct);
             return existing.Id;
         }
 
@@ -136,6 +142,10 @@ public sealed partial class PeopleService
             null,
             PersonAuditSnapshot.FromEntity(entity)));
         await dbContext.SaveChangesAsync(ct);
+
+        // Reactive AD refresh — po prvním picku nové osoby z AD.
+        await adReactiveQueue.EnqueueAsync(
+            new AdReactiveSyncRequest(entity.Id, AdReactiveSource.PersonPicked), ct);
         return entity.Id;
     }
 

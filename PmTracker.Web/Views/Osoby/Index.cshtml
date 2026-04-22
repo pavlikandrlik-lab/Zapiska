@@ -23,6 +23,11 @@
     }
 </div>
 
+@if (TempData["AdSyncStatus"] is string adStatus)
+{
+    <pm-alert variant="Info" role="status">@adStatus</pm-alert>
+}
+
 <section class="card" data-osoby-table-card data-table-tools-root>
     <div class="table-tools-toolbar">
         <label class="table-tools-search">
@@ -79,6 +84,16 @@
                         <pm-button variant="Secondary"
                                    size="Small"
                                    data-modal-url="@Url.Action("ManualPersonModal", "Osoby", new { id = osoba.Id })">Upravit</pm-button>
+                        @if (osoba.JeAdUcet)
+                        {
+                            <form class="table-action-inline-form"
+                                  asp-controller="Osoby"
+                                  asp-action="SyncFromAd"
+                                  asp-route-id="@osoba.Id"
+                                  method="post">
+                                <pm-button variant="Ghost" size="Small" native-type="submit" title="Načíst aktuální data z AD">Aktualizovat z AD</pm-button>
+                            </form>
+                        }
                         <form class="table-action-inline-form"
                               asp-controller="Osoby"
                               asp-action="Delete"
