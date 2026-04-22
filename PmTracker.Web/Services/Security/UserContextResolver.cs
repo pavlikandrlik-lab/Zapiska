@@ -118,6 +118,63 @@ public sealed class UserContextResolver : IUserContextResolver
             .ToList();
     }
 
+    /// <summary>
+    /// Načte subsystémové-role granty pro danou osobu z DB cesty:
+    /// ObsazeniSubsystemuProjektu × CiselnikRoliSubsystemu (přes FK AuthzRoleId)
+    /// × AuthzRolePermissions. Výsledný VM používá ProjektId ze spojeného ProjektSubsystemy řádku.
+    /// Fáze B náhrada za <c>SubsystemRolePermissionGrantBuilder</c>.
+    /// </summary>
+    public static async Task<IReadOnlyList<PermissionGrantViewModel>> LoadDbDrivenSubsystemRoleGrantsAsync(
+        PmTrackerDbContext dbContext,
+        int osobaId,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(dbContext);
+
+        var rows = await (
+                from assignment in dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
+                where assignment.OsobaId == osobaId && !assignment.DatumOdebrani.HasValue
+                join lookupRole in dbContext.CiselnikRoliSubsystemu.AsNoTracking()
+                    on assignment.RoleSubsystemuId equals lookupRole.Id
+                where lookupRole.AuthzRoleId != null
+                join projectSubsystem in dbContext.ProjektSubsystemy.AsNoTracking()
+                    on assignment.ProjektSubsystemId equals projectSubsystem.Id
+                where !projectSubsystem.DatumOdebrani.HasValue
+                join authzRole in dbContext.AuthzRoles.AsNoTracking()
+                    on lookupRole.AuthzRoleId equals authzRole.Id
+                where authzRole.IsActive
+                join rp in dbContext.AuthzRolePermissions.AsNoTracking()
+                    on authzRole.Id equals rp.RoleId
+                where rp.IsAllowed
+                join permission in dbContext.AuthzPermissions.AsNoTracking()
+                    on rp.PermissionId equals permission.Id
+                where permission.IsActive
+                select new
+                {
+                    permission.Klic,
+                    permission.ScopeLevel,
+                    projectSubsystem.ProjektId
+                })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(r => r.Klic)
+            .Select(group => new PermissionGrantViewModel
+            {
+                PermissionKey = group.Key,
+                ScopeLevel = group.First().ScopeLevel.ToString().ToUpperInvariant(),
+                ScopeMode = "INCLUDE",
+                IsAllowed = true,
+                ProjectIds = group
+                    .Select(r => r.ProjektId)
+                    .Distinct()
+                    .OrderBy(x => x)
+                    .ToList(),
+                SourceType = "SUBSYSTEM_ROLE"
+            })
+            .ToList();
+    }
+
     public async Task<UserContextResolutionResult> ResolveAsync(HttpContext httpContext, CancellationToken ct = default)
     {
         int? osobaId = null;
@@ -395,6 +452,21 @@ public sealed class UserContextResolver : IUserContextResolver
             .ToListAsync(ct);
         var implicitSubsystemRoleGrants = SubsystemRolePermissionGrantBuilder.BuildImplicitSubsystemRoleGrants(activeSubsystemRoleAssignments);
         grants.AddRange(implicitSubsystemRoleGrants);
+
+        // Fáze B — Task B2: DB-driven subsystémové granty jako doplněk builderu. Deduplikace stejná jako u projektových.
+        var dbDrivenSubsystemGrants = await LoadDbDrivenSubsystemRoleGrantsAsync(_dbContext, osoba.Id, ct);
+        foreach (var dbGrant in dbDrivenSubsystemGrants)
+        {
+            var alreadyPresent = grants.Any(existing =>
+                string.Equals(existing.PermissionKey, dbGrant.PermissionKey, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.ScopeMode, dbGrant.ScopeMode, StringComparison.OrdinalIgnoreCase)
+                && existing.ProjectIds.OrderBy(x => x).SequenceEqual(dbGrant.ProjectIds.OrderBy(x => x)));
+
+            if (!alreadyPresent)
+            {
+                grants.Add(dbGrant);
+            }
+        }
 
         var projectRoleProjectIds = activeProjectRoleAssignments
             .Select(x => x.ProjectId)
