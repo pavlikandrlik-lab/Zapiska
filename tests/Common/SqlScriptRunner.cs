@@ -18,6 +18,7 @@ public static class SqlScriptRunner
         foreach (var scriptPath in scriptPaths)
         {
             var sql = await File.ReadAllTextAsync(scriptPath, cancellationToken);
+            var batchIndex = 0;
             foreach (var batch in SplitBatches(sql))
             {
                 if (string.IsNullOrWhiteSpace(batch))
@@ -25,10 +26,20 @@ public static class SqlScriptRunner
                     continue;
                 }
 
+                batchIndex++;
                 await using var command = connection.CreateCommand();
                 command.CommandText = batch;
                 command.CommandTimeout = 120;
-                await command.ExecuteNonQueryAsync(cancellationToken);
+                try
+                {
+                    await command.ExecuteNonQueryAsync(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"SQL script '{Path.GetFileName(scriptPath)}' failed in batch #{batchIndex}: {ex.Message}",
+                        ex);
+                }
             }
         }
     }

@@ -31,6 +31,16 @@ public sealed partial class RecordProposalService
                         ?? throw new InvalidOperationException("Payload návrhu založení záznamu je neplatný.");
                     var saveCommand = _payloadMapper.BuildSaveCommand(createPayload);
                     approvedRecordId = await _recordService.SaveRecordAsync(saveCommand, currentUser, ct);
+
+                    if (approvedRecordId.HasValue
+                        && (createPayload.HarmonogramVazby.Count > 0 || createPayload.ManualActualKroky.Count > 0))
+                    {
+                        await ApplyApprovedCreateProposalAuxiliariesAsync(
+                            approvedRecordId.Value,
+                            createPayload,
+                            currentUser,
+                            ct);
+                    }
                 }
                 else if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
                 {
@@ -293,6 +303,107 @@ public sealed partial class RecordProposalService
         }
 
         await _dbContext.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Plán D (schéma 3 — CREATE_RECORD): po vytvoření záznamu aplikuje vedlejší efekty
+    /// z payloadu — ruční skutečnosti kroků a pre-bound vazby bublin na kroky.
+    /// Externí odkazy jsou namapovány přes <c>ExterniOdkazIndex</c> = index v pořadí
+    /// vložení (query seřazená ASC dle Id).
+    /// </summary>
+    private async Task ApplyApprovedCreateProposalAuxiliariesAsync(
+        int newRecordId,
+        CreateRecordProposalPayload createPayload,
+        CurrentUserContextViewModel currentUser,
+        CancellationToken ct)
+    {
+        var externiOdkazyIds = await _dbContext.ZaznamExterniOdkazy
+            .AsNoTracking()
+            .Where(x => x.ZaznamId == newRecordId)
+            .OrderBy(x => x.Id)
+            .Select(x => x.Id)
+            .ToListAsync(ct);
+
+        // HarmonogramVazby → zaznam_harmonogram_vyjadreni_vazba + DELAY upsert
+        if (createPayload.HarmonogramVazby.Count > 0)
+        {
+            var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+            foreach (var v in createPayload.HarmonogramVazby)
+            {
+                if (v.ExterniOdkazIndex < 0 || v.ExterniOdkazIndex >= externiOdkazyIds.Count)
+                {
+                    throw new InvalidOperationException(
+                        $"Vazba vyjádření odkazuje na externí index {v.ExterniOdkazIndex}, který neexistuje v nově vytvořených externích odkazech.");
+                }
+
+                var externiOdkazId = externiOdkazyIds[v.ExterniOdkazIndex];
+                _dbContext.VyjadreniVazby.Add(new ZaznamHarmonogramVyjadreniVazbaEntity
+                {
+                    ZaznamId = newRecordId,
+                    KrokKey = v.KrokKey,
+                    ExterniOdkazId = externiOdkazId,
+                    HotVyjadreniId = v.HotVyjadreniId,
+                    DatumVyjadreni = v.DatumVyjadreni.UtcDateTime,
+                    Source = (byte)VazbaSource.Manual,
+                    Stav = (byte)VazbaStav.Active,
+                    CreatedAt = nowUtc,
+                    CreatedByOsobaId = currentUser.OsobaId
+                });
+            }
+            await _dbContext.SaveChangesAsync(ct);
+        }
+
+        // ManualActualKroky → DELAY upsert (odchylka dnů)
+        if (createPayload.ManualActualKroky.Count > 0)
+        {
+            var record = await _dbContext.ProjektoveZaznamy
+                .FirstOrDefaultAsync(x => x.Id == newRecordId, ct)
+                ?? throw new InvalidOperationException($"Nově vytvořený záznam {newRecordId} nebyl nalezen.");
+            var schema = await _harmonogramService.GetSchemaForRecordAsync(record, ct);
+            var plannedTypeIds = schema.Kroky
+                .Select(x => x.TrvaniTypId)
+                .Where(x => x > 0)
+                .ToHashSet();
+
+            var overrides = ComputeManualActualOverrides(
+                createPayload.ManualActualKroky,
+                schema,
+                record.DatumZalozeni,
+                plannedTypeIds,
+                Array.Empty<SaveRecordHarmonogramValueCommand>());
+
+            var existingByTypId = await _dbContext.ZaznamHarmonogramHodnoty
+                .Where(x => x.ZaznamId == newRecordId && overrides.Select(o => o.DelayTypId).Contains(x.TypId))
+                .ToDictionaryAsync(x => x.TypId, ct);
+
+            var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+            foreach (var ov in overrides)
+            {
+                if (existingByTypId.TryGetValue(ov.DelayTypId, out var existing))
+                {
+                    existing.HodnotaInt = ov.OdchylkaDni;
+                    existing.UpdatedAt = nowUtc;
+                }
+                else
+                {
+                    _dbContext.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+                    {
+                        ZaznamId = newRecordId,
+                        TypId = ov.DelayTypId,
+                        HodnotaInt = ov.OdchylkaDni,
+                        UpdatedAt = nowUtc
+                    });
+                }
+            }
+            await _dbContext.SaveChangesAsync(ct);
+        }
+
+        // Fire-and-forget harvest pro všechny externí odkazy — pokusí se
+        // doplnit další vyjádření, která mezitím přibyla.
+        if (externiOdkazyIds.Count > 0)
+        {
+            await _harvestScheduler.ScheduleHarvestForRecordAsync(newRecordId, ct);
+        }
     }
 
     /// <summary>

@@ -12,19 +12,19 @@ IF NOT EXISTS (
     WHERE object_id = OBJECT_ID('authz.roles') AND name = 'scope'
 )
 BEGIN
-    ALTER TABLE authz.roles
-        ADD scope NVARCHAR(16) NOT NULL CONSTRAINT df_authz_roles_scope DEFAULT 'GLOBAL';
+    EXEC('ALTER TABLE authz.roles ADD scope NVARCHAR(16) NOT NULL CONSTRAINT df_authz_roles_scope DEFAULT ''GLOBAL''');
 END;
 
 -- 2. CHECK constraint pro povolené hodnoty.
+-- EXEC obaluje DDL, aby deferred compilation vyřešila referenci na sloupec 'scope',
+-- který v rámci stejného batche nemusí být ještě parser-visible (SqlScriptRunner spouští
+-- skript jako jeden batch; sqlcmd/SSMS by využil implicitní GO, ale ADO.NET ne).
 IF NOT EXISTS (
     SELECT 1 FROM sys.check_constraints
     WHERE parent_object_id = OBJECT_ID('authz.roles') AND name = 'ck_authz_roles_scope'
 )
 BEGIN
-    ALTER TABLE authz.roles
-        ADD CONSTRAINT ck_authz_roles_scope
-            CHECK (scope IN ('GLOBAL','PROJECT','SUBSYSTEM'));
+    EXEC('ALTER TABLE authz.roles ADD CONSTRAINT ck_authz_roles_scope CHECK (scope IN (''GLOBAL'',''PROJECT'',''SUBSYSTEM''))');
 END;
 
 COMMIT TRANSACTION;

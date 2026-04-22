@@ -1,0 +1,686 @@
+﻿@model DataLayer.Hotline.Model.Ticket
+@{
+    int defaultTab = ViewBag.DefaultTab;
+    ViewBag.Title = "Detail tiketu";
+    ViewBag.Breadcrumbs = new Navigation.BreadCrumbs() { Main = "Helpdesk - Hotline", MainController = "Ticket", MainAction = "Index", ParentAction = "Index", Title = ViewBag.Title, Parent = "Tikety", ParentController = "Ticket" };
+    bool isOnlyViewer = (Model.Perm.Any(q => q.Key == "EO") && Model.Perm.Count() == 1) ? true : false; ;
+    bool isOnlyViewerWithoutGDPRAccces = (Model.Perm.Any(q => q.Key == "EO") && Model.Perm.Count() == 1 && Model.GDPR) ? true : false; ;
+    bool isFISManager = ViewBag.isFISManager;
+    if (isFISManager) { isOnlyViewer = false; isOnlyViewerWithoutGDPRAccces = false; }
+}
+@RenderPage("~/Views/Shared/_Modal.cshtml")
+<div class="page-inner">
+    @Html.Partial("_Breadcrumbs")
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    @if (Model == null)
+                    {
+                        <div>K zobrazení tohoto záznamu nemáte oprávnění nebo tento záznam neexistuje.</div>
+                    }
+                    else
+                    {
+                        <div class="row">
+                            <div class="col-11 fw-bold h2 text-uppercase">@Model.TypZaznamu @Model.Id - @Model.Strucne</div>
+                            <div class="col-1 text-right"><a href="@ViewBag.HotlineLink@Model.PID" target="_blank"><i class="fa fa-lg fa-up-right-from-square tltp" title="Zobrazení záznamu v Hotline" data-toggle="tooltip" data-placement="left"></i></a></div>
+                            <div class="col-11 fw-bold h5 text-uppercase"><span class='tltp' title="<div class='text-left'><i>Proč to vidím?</i><br>@string.Join("<br>", Model.Perm.Select(q => q.UserText).ToArray())@((isFISManager)? "<br>Manažer FIS" : "")</div>" data-toggle="tooltip" data-html="true" data-placement="left">@{
+                                if (Model.Perm.Select(q => q.Key).Contains("ZP"))
+                                { <i class="fa-regular fa-user mr-1"></i> }
+                                if (Model.Perm.Select(q => q.Key).Contains("VS"))
+                                { <i class="fa fa-user-tie mr-1"></i> }
+                                if (Model.Perm.Select(q => q.Key).Contains("RT"))
+                                { <i class="fa fa-people-group mr-1"></i> }
+                                if (Model.Perm.Select(q => q.Key).Contains("PM"))
+                                { <i class="fa fa-stamp mr-1"></i> }
+                                if (Model.Perm.Select(q => q.Key).Contains("DO"))
+                                { <i class="fa fa-industry mr-1"></i> }
+                                if (Model.Perm.Select(q => q.Key).Contains("EO"))
+                                { <i class="fa fa-glasses mr-1"></i> }
+                                if (isFISManager)
+                                { <i class="fa fa-bookmark mr-1"></i> } }</span> Stav: @Helper.FirstLetterUpper(Model.Stav) - @Model.ResTym
+                            </div>
+                        </div>
+                        <hr />
+
+                        <div class="row">
+                            <div class="col-xl-1 col-lg-2">
+                                <div class="nav flex-column nav-pills nav-primary nav-pills-no-bd nav-pills-icons" id="hotline-tab-with-icon" role="tablist" aria-orientation="vertical">
+                                    <a onclick="setQueryStringParameter('pg', '1')" class="nav-link  @((defaultTab == 1) ? "active" : "")" id="hotline-info-icons" data-toggle="pill" href="#hotline-info" role="tab" aria-controls="hotline-info-icons" aria-selected="@((defaultTab == 1) ? "true" : "false")">
+                                        <i class="fa fa-info"></i>
+                                        Informace
+                                    </a>
+                                    @if (!isOnlyViewerWithoutGDPRAccces)
+                                    {
+                                        <a onclick="setQueryStringParameter('pg', '2')" class="nav-link @((defaultTab == 2) ? "active" : "")" id="hotline-comment-icons" data-toggle="pill" href="#hotline-comment" role="tab" aria-controls="hotline-comment-icons" aria-selected="@((defaultTab == 2) ? "true" : "false")">
+                                            <i class="fa fa-comment"></i>
+                                            Vyjádření
+                                        </a>
+                                        <a onclick="setQueryStringParameter('pg', '3')" class="nav-link  @((defaultTab == 3) ? "active" : "")" id="hotline-attachment-icons" data-toggle="pill" href="#hotline-attachment" role="tab" aria-controls="hotline-attachment-icons" aria-selected="@((defaultTab == 3) ? "true" : "false")">
+                                            <i class="fa fa-file"></i>
+                                            Přílohy
+                                        </a>
+                                        if (!isOnlyViewer)
+                                        {
+                                            <a onclick="setQueryStringParameter('pg', '4')" class="nav-link  @((defaultTab == 4) ? "active" : "")" id="hotline-kalkulace-icons" data-toggle="pill" href="#hotline-kalkulace" role="tab" aria-controls="hotline-kalkulace-icons" aria-selected="@((defaultTab == 4) ? "true" : "false")">
+                                                <i class="fa fa-money-bill-1-wave"></i>
+                                                Kalkulace
+                                            </a>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-xl-11  col-lg-10">
+                                <div class="tab-content" id="hotline-icon-tabContent">
+                                    <div class="tab-pane fade @((defaultTab == 1) ? "show active" : "")" id="hotline-info" role="tabpanel" aria-labelledby="hotline-info-icons">
+                                        <div class="row">
+                                            <div class="col-lg-12 col-xl-7">
+                                                <div class="ml-2">
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 col-sm-4  text-uppercase font-weight-bold">Předmět</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 fw-bold text-uppercase">@Model.Strucne</div>
+                                                    </div>
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 col-sm-4 text-uppercase font-weight-bold">Číslo HTL</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 ">@Model.Id</div>
+                                                    </div>
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 col-sm-4 text-uppercase font-weight-bold">Typ</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 ">@Model.TypZaznamu</div>
+                                                    </div>
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 col-sm-4 text-uppercase font-weight-bold">Kategorie</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 ">@Model.Dulezitost</div>
+                                                    </div>
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 col-sm-4 text-uppercase font-weight-bold">Subsystém</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 ">@Model.Subsystem</div>
+                                                    </div>
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 col-sm-4 text-uppercase font-weight-bold">Modul</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 ">@Model.Modul</div>
+                                                    </div>
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 text-uppercase font-weight-bold">Zpracoval</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 ">@Model.Zpracoval</div>
+                                                    </div>
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 text-uppercase font-weight-bold">Dodavatel</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 ">@Model.Dodavatel</div>
+                                                    </div>
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 text-uppercase font-weight-bold">Verze modulu</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 ">@Model.Verze</div>
+                                                    </div>
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 text-uppercase font-weight-bold">PID</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 ">@Model.PID</div>
+                                                    </div>
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-2 col-lg-4 col-md-3 col-sm-4 text-uppercase font-weight-bold">GDPR</div>
+                                                        <div class="col-10 col-lg-8 col-md-9 col-sm-8 ">@((Model.GDPR) ? "Ano" : "Ne")</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-xl-5 col-lg-12">
+                                                <div class="ml-2">
+                                                    <div class="row border-bottom pb-2 pt-2">
+                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4 text-uppercase font-weight-bold">Založeno</div>
+                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8 ">@((Model.Datum.HasValue) ? ((DateTime)Model.Datum).ToString("d.M.yyyy HH:mm.ss") : "")</div>
+                                                    </div>
+                                                    <div class="row pb-2 pt-2 @if (Model.Stav == "archiv")
+                                                    { <text>border-bottom</text> } ">
+                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">Termín splnění týmu</div>
+                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8 ">
+                                                            @{
+                                                                bool bySLA = false;
+                                                                if (Model.Stav == "dodavatel" || Model.Stav == "pro dodavatele")
+                                                                {
+                                                                    if (Model.TicketExternal != null)
+                                                                    {
+                                                                        if (Model.TicketExternal.HasSLA)
+                                                                        {
+                                                                            if (!Model.TicketExternal.AllowedTimeProlong)
+                                                                            {
+                                                                                bySLA = true;
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                            @if (bySLA)
+                                                            {
+                                                                <text>Termín se řídí SLA</text>
+                                                            }
+                                                            else
+                                                            {
+                                                                if (Model.DatResTym.HasValue)
+                                                                {
+                                                                    <text>@(((DateTime)Model.DatResTym).ToString("d.M.yyyy"))</text>
+    }
+    }
+
+    @{
+        if (Model.Stav == "dodavatel" && Model.Perm.Select(q => q.Key).Contains("PM"))
+        {
+            <button type="button" class="btn btn-link float-right p-0 m-0" data-toggle="modal" data-target="#editTerminSplneni" title="Úprava termínu splnění" data-toggle="tooltip" data-placement="left"><i class="fa fa-pencil"></i></button><div class="modal fade" id="editTerminSplneni" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+                @using (Html.BeginForm("UpdateTerminSplneni", "Ticket", FormMethod.Post, new { id = "termin-spleneni-form", }))
+                {
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h2 class="modal-title" id="modalLabel">Úprava termínu splnění @Model.TypZaznamu firmou @Model.Dodavatel z pozice projektového manažera</h2>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label for="termin-splneni" class="col-form-label">Nový termín:</label>
+                                    <div class="input-group date">
+                                        <input type="text" class="form-control" name="terminSplneni" id="terminSplneni" value="@(((DateTime)Model.DatResTym).ToString("dd.MM.yyyy"))"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-link float-left" data-dismiss="modal">Zavřít</button>
+                                <input type="submit" class="btn btn-primary" value="Uložit" />
+                                <input type="hidden" value="@Model.Id" name="id" />
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <script>
+                $('#termin-spleneni-form').submit(function () {
+                    $('input[type=submit]').prop("disabled", true);
+                    $('input[type=submit]').addClass("disabled");
+                });
+                $('.input-group.date').datepicker({
+                    language: "cs",
+                    format: "dd.mm.yyyy",
+                    autoclose: true,
+                    maxViewMode: true,
+                    todayBtn: true,
+                    todayHighlight: true
+                });
+            </script>
+        }
+
+
+    }
+</div>
+                                                    </div>
+                                                    @if (Model.Stav != "archiv" && !bySLA)
+                                                    {
+                                                        <div class="row border-bottom pb-2 pt-2">
+                                                            <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold"></div>
+                                                            <div class="col-7 col-lg-8 col-md-9 col-sm-8  font-weight-bold font-italic @{if (Model.DaysResTym == null) { <text>text-secondary</text> }
+                                                        else if (Model.DaysResTym < 0) { <text>text-danger</text> }
+                                                        else if (Model.DaysResTym < 5) { <text>text-warning</text> }
+                                                        else { <text>text-success</text> } } ">
+                                                                @if (Model.DaysResTym == null)
+                                                                {<text>Neznámý termín týmu</text> }
+                                                            else if (Model.DaysResTym < 0)
+                                                            { <text>V prodlení o @Helper.GetDaysToText(Math.Abs((int)Model.DaysResTym))</text> }
+                                                        else
+                                                        { <text>Zbývá @Helper.GetDaysToText((int)Model.DaysResTym)</text>}
+
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                <div class="row border-bottom pb-2 pt-2">
+                                                </div>
+
+                                                            }
+                                                            <div class="row border-bottom pb-2 pt-2">
+                                                                <div class="col-5 col-lg-4 col-md-3 col-sm-4 text-uppercase font-weight-bold">Aktuálně řeší tým</div>
+                                                                <div class="col-7 col-lg-8 col-md-9 col-sm-8 ">@Model.ResTym</div>
+                                                            </div>
+                                                            <div class="row border-bottom pb-2 pt-2">
+                                                                <div class="col-5 col-lg-4 col-md-3 col-sm-4 text-uppercase font-weight-bold">Stav</div>
+                                                                <div class="col-7 col-lg-8 col-md-9 col-sm-8 fw-bold text-uppercase">@Helper.FirstLetterUpper(Model.Stav)</div>
+                                                            </div>
+                                                            <div class="row pb-2 pt-2">
+                                                                <div class="col-12">&nbsp;</div>
+                                                            </div>
+
+                                                            @if (Model.TicketExternal != null)
+                                                            {
+                                                                <div class="row border-bottom pb-2 pt-2">
+                                                                    <div class="col-12 font-weight-bold undeli">Synchronizováno s externím tiketovacím systémem</div>
+                                                                </div>
+                                                                if (Model.TicketExternal.SupplierTag != null)
+                                                                {
+                                                                    <div class="row border-bottom pb-2 pt-2">
+                                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">ID u dodavatele</div>
+                                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8 fw-bold ">@Model.TicketExternal.SupplierTag</div>
+                                                                    </div>
+                                                                }
+                                                                <div class="row border-bottom pb-2 pt-2">
+                                                                    <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">Celkový čas u dodavatele</div>
+                                                                    @if (Model.TicketExternal.OutsideSpentTime != null)
+                                                                    {
+                                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8 fw-bold ">
+                                                                            <span class="tltp" title="Celkový čas pro aktuálního dodavatele zahrnuje pouze pracovní dny.">@Model.TicketExternal.HoursAtSupplier hodin</span>
+
+                                                                        </div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <div class="col-7  col-lg-8 col-md-9 col-sm-8 ">Doba není k dispozici</div>
+                                                                    }
+                                                                </div>
+
+                                                                if (Model.TicketExternal.Product != null)
+                                                                {
+                                                                    <div class="row border-bottom pb-2 pt-2">
+                                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">Produkt</div>
+                                                                        <div class="col-7  col-lg-8 col-md-9 col-sm-8 ">@Model.TicketExternal.Product</div>
+                                                                    </div>
+                                                                }
+
+                                                                if (Model.TicketExternal.Version != null)
+                                                                {
+                                                                    <div class="row border-bottom pb-2 pt-2">
+                                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">Verze</div>
+                                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8 ">@Model.TicketExternal.Version</div>
+                                                                    </div>
+                                                                }
+
+                                                                if (Model.TicketExternal.SLAName != null)
+                                                                {
+                                                                    <div class="row border-bottom pb-2 pt-2">
+                                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">SLA</div>
+                                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8 ">@Model.TicketExternal.SLAName</div>
+                                                                    </div>
+                                                                }
+                                                                if (Model.TicketExternal.SLAName != null)
+                                                                {
+                                                                    <div class="row border-bottom pb-2 pt-2">
+                                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">Čas na řešení tohoto SLA</div>
+                                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8 ">@Model.TicketExternal.SLATime hodin</div>
+                                                                    </div>
+                                                                }
+                                                                if (Model.TicketExternal.SLAName != null && Model.Stav == "dodavatel")
+                                                                {
+                                                                    <div class="row border-bottom pb-2 pt-2">
+                                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">Plnění SLA</div>
+                                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8  fw-bold">
+                                                                            @if (Model.TicketExternal.HasSLA)
+                                                                            {
+                                                                                if (Model.TicketExternal.AllowedTimeProlong)
+                                                                                {
+                                                                                    if (Model.DatResTym.Value.Date < DateTime.Now)
+                                                                                    {
+                                                                                        <span class="text-danger">
+                                                                                            Tiket je v prodlení i přes schválenou změnu termínu na @Model.DatResTym.Value.ToLongDateString()
+                                                                                        </span>
+                                                                                    }
+                                                                                    else
+                                                                                    {
+                                                                                        <span>Schválena změna termínu na @Model.DatResTym.Value.ToLongDateString()</span>
+                                                                                    }
+
+                                                                                }
+                                                                                else
+                                                                                {
+                                                                                    if (!Model.TicketExternal.DeadLinePassed)
+                                                                                    {
+                                                                                        <span class="tltp" title="">
+                                                                                            Termín vyprší @if (Model.TicketExternal.Deadline != null)
+                                                                                            {@(Model.TicketExternal.Deadline.ToLongDateString() + " " + Model.TicketExternal.Deadline.ToString("HH:mm"));
+                                                                                                /* Zbývá @(Model.TicketExternal.RemainingHours > 24 ? Helper.GetDaysToText((int)Math.Abs(Math.Ceiling((decimal)Model.TicketExternal.RemainingHours / 24))) : Helper.GetHoursToText((int)Math.Abs(Math.Ceiling((decimal)Model.TicketExternal.RemainingHours)))) */
+                                                                                            }
+
+                                                                                        </span>
+                                                                                    }
+                                                                                    else
+                                                                                    {
+                                                                                        <span class="text-danger">
+                                                                                            @if (Model.TicketExternal.DelayInWorkdays != 0)
+                                                                                            {<text>Dle smlouvy v prodlení o @Helper.GetDaysToText(Model.TicketExternal.DelayInWorkdays)  -</text>}
+                                                                                            Termín vypršel @if (Model.TicketExternal.Deadline != null)
+                                                                                            {@(Model.TicketExternal.Deadline.ToLongDateString() + " " + Model.TicketExternal.Deadline.ToString("HH:mm"));
+                                                                                            }
+                                                                                        </span>
+                                                                                    }
+                                                                                }
+
+                                                                            }
+                                                                        </div>
+                                                                    </div>
+                                                                }
+
+                                                                if (Model.TicketExternal.Category != null)
+                                                                {
+                                                                    <div class="row border-bottom pb-2 pt-2">
+                                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">Kategorie</div>
+                                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8 ">@Model.TicketExternal.Category</div>
+                                                                    </div>
+                                                                }
+
+                                                                if (Model.TicketExternal.KP != null)
+                                                                {
+                                                                    <div class="row border-bottom pb-2 pt-2">
+                                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">Konfigurační položka</div>
+                                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8 ">@Model.TicketExternal.KP</div>
+                                                                    </div>
+                                                                }
+                                                                if (Model.TicketExternal.SyncID != null)
+                                                                {
+                                                                    <div class="row border-bottom pb-2 pt-2">
+                                                                        <div class="col-5 col-lg-4 col-md-3 col-sm-4  text-uppercase font-weight-bold">Synchronizační ID</div>
+                                                                        <div class="col-7 col-lg-8 col-md-9 col-sm-8 ">@Model.TicketExternal.SyncID</div>
+                                                                    </div>
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                            }
+
+                                                        </div>
+                                                    </div>
+                                        </div>
+
+                                        @if (!isOnlyViewerWithoutGDPRAccces)
+                                        {
+                                            <div class="row">
+                                                <div class="pb-2 pt-2 ml-2">
+                                                    <div class="col-12 text-uppercase font-weight-bold pb-2">Popis</div>
+                                                    <div class="col-12">@Html.Raw(Model.Popis)</div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+
+                                    @if (!isOnlyViewerWithoutGDPRAccces)
+                                    {
+                                        <div class="tab-pane fade @((defaultTab == 2) ? "show active" : "")" id="hotline-comment" role="tabpanel" aria-labelledby="hotline-comment-icons">
+                                            <div class="row justify-content-center h-100">
+                                                <div class="col-md-12 col-xl-12 chat">
+                                                    <div class="chat-card">
+                                                        <div class="chat-card-body chat-msg_card_body">
+                                                            @{
+                                                                string lastCommentType = "";
+                                                                foreach (var comment in Model.Comments)
+                                                                {
+                                                                    if (lastCommentType == "25" && comment.CommentType == "05")
+                                                                    {
+                                                                        <div class="pt-3"></div>
+                                                                    }
+                                                                    lastCommentType = comment.CommentType;
+                                                                    if (comment.CommentType == "05" || comment.CommentType == "25")
+                                                                    {
+                                                                        <div class="d-flex justify-content-center mb-2">
+                                                                            <div class="chat-tech-message tech-box">
+                                                                                <span class=" tltp" title="@comment.Zpracoval @comment.Datum" data-toggle="tooltip" data-placement="left">@Html.Raw(comment.Popis)</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    }
+                                                                    else if (comment.CommentType == "16")
+                                                                    {
+                                                                        <div class="d-flex mb-2">
+                                                                            <div class="img_cont_msg">
+                                                                            </div>
+                                                                            <div class="pl-3">
+                                                                                <a href="#hotline-kalkulace" class="ext-tab-link text-xl-left display-4"><i class="fa fa-money-check-dollar"></i></a>
+                                                                            </div>
+                                                                        </div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <div class="d-flex @((comment.IsUserComment) ? "justify-content-end" : "justify-content-start") mb-4">
+                                                                            @if (comment.IsUserComment)
+                                                                            {
+                                                                                <div class="msg_container_send">
+                                                                                    <div class="@((comment.IsUserComment) ? "chat-author-name-send" : "chat-author-name") mb-1">@comment.Zpracoval <span class="font-italic">(@comment.Tym)</span></div>
+                                                                                    @Html.Raw(comment.Popis)
+                                                                                    <span class="msg_time_send">@comment.Datum</span>
+                                                                                </div>
+                                                                            }
+                                                                            <div class="img_cont_msg">
+                                                                                <div class="avatar-labeled user_img_msg rounded-circle" style="" title="@comment.UserReadeableCategory" data-toggle="tooltip" data-placement="right">
+                                                                                    <i class="fa @((comment.UserCategory == "ZP") ? "fa-regular fa-user" : (comment.UserCategory == "VS") ? "fa-user-tie" : (comment.UserCategory == "DO") ? "fa-industry" : (comment.UserCategory == "PM") ? "fa-stamp" : "fa-people-group")"></i>
+                                                                                </div>
+                                                                            </div>
+                                                                            @if (!comment.IsUserComment)
+                                                                            {
+                                                                                <div class="msg_container">
+                                                                                    <div class="chat-author-name mb-1">@comment.Zpracoval <span class="font-italic">(@comment.Tym)</span></div>
+                                                                                    @Html.Raw(comment.Popis)
+                                                                                    <span class="msg_time">@comment.Datum</span>
+                                                                                </div>
+                                                                            }
+                                                                        </div>
+                                                                    }
+                                                                }
+                                                            }
+                                                        </div>
+                                                        <div class="chat-card-footer pt-4">
+                                                            @if (Model.Stav == "dodavatel" || Model.Stav == "pro dodavatele")
+                                                            {
+                                                                using (Html.BeginForm("CreateComment", "Ticket", FormMethod.Post, new { id = "comment-form" }))
+                                                                {
+                                                                    <div class="m-0 p-0 w-100 d-flex border border-primary rounded-xl">
+                                                                        <div class="p-0 flex-fill">
+                                                                            <div class="input-group border-right">
+                                                                                <div class="input-group-prepend rounded-0">
+                                                                                    <div class="input-group-text rounded-0" id="user-name-form">
+                                                                                        @Session["BasicName"]
+                                                                                    </div>
+                                                                                </div>
+                                                                                <select class="custom-select rounded-0 border-0" id="user-group" name="perm">
+                                                                                    @foreach (var p in Model.Perm)
+                                                                                    {
+                                                                                        <option value="@p.TymText">@p.TymText</option>
+                                                                                    }
+                                                                                </select>
+                                                                            </div>
+                                                                            <div class="input-group border-top border-right">
+                                                                                <div class="input-group-prepend">
+                                                                                    <label class="input-group-text attach_btn bg-body border border-primary">
+                                                                                        <input type="file" id="btnUpload" value="Upload" /><i class="fas fa-paperclip"></i>
+                                                                                    </label>
+                                                                                </div>
+                                                                                <textarea name="comment" class="form-control type_msg bg-light text-dark" placeholder="Zanechte zprávu dodavateli nebo přetáhněte soubor(y) do tohoto pole pro přímé nahrání..." id="textSection"></textarea>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="p-0">
+                                                                            <button type="submit" class="input-group-text   rounded-0 send_btn bg-body h-100" title="Odeslat zprávu" data-toggle="tooltip" data-placement="left"><i class="fas fa-location-arrow"></i></button>
+                                                                        </div>
+                                                                    </div>
+                                                                    <input type="hidden" value="@Model.Id" id="id-ticket" />
+                                                                }
+                                                                @Scripts.Render("~/bundles/filedrop")
+                                                                <script type="text/javascript">
+
+                                                        $("#textSection").filedrop({
+                                                        fallback_id: 'btnUpload',
+                                                            fallback_dropzoneClick: false,
+                                                            url: '@Url.Action("UploadAttachment")',
+                                                            paramname: 'fileData',
+                                                            data: {
+                                                            IdTicket: '@Model.Id',
+                                                                Perm: function(){
+                                                                    return  $("#user-group option:selected").val()
+                                                                    },
+                                                            },
+                                                            headers: {
+                                                                'content-type': 'multipart/form-data; charset=UTF-8'
+                                                            },
+                                                            maxfiles: 10,
+                                                            maxfilesize: 100,
+                                                            error: function (err, file) {
+                                                                switch (err) {
+                                                                    /* TODO: prepracovat do fuknce v main.js s navaznosti na modulpopup
+
+                                                                    case "BrowserNotSupported":
+                                                                          break;
+                                                                      case "TooManyFiles":
+                                                                          break;
+                                                                      case "FileTooLarge":
+                                                                          break;
+                                                                      case "FileTypeNotAllowed":
+                                                                          break;
+                                                                      case "NotFound":
+                                                                          break;
+                                                                      case "NotReadable":
+                                                                          break;
+                                                                      case "AbortError":
+                                                                          break;
+                                                                      case "ReadError":
+                                                                          break;
+                                                                      case "FileExtensionNotAllowed":
+                                                                          break;*/
+                                                                                        default:
+                                                                        alert(err);
+                                                                                        break;
+                                                                                    }
+                                                            },
+                                                            dragOver: function () {
+                                                                $('#textSection').removeClass('bg-light text-dark', 200).addClass('bg-primary text-white', 200);
+                                                            },
+                                                            dragLeave: function () {
+                                                                $('#textSection').addClass('bg-light text-dark', 200).removeClass('bg-primary text-white', 200);
+                                                            },
+                                                            drop: function () {
+                                                                $('#textSection').addClass('bg-light text-dark', 200).removeClass('bg-primary text-white', 200);
+                                                            },
+                                                            uploadFinished: function (i, file, response, time) {
+                                                                //TODO: optimalizovat do mainjs společně s odesíláním koemntáře
+                                                                try {
+                                                                    if (response.state == true || response.state == false) {
+                                                                        $('.chat-card-body').append("<div class='d-flex justify-content-end mb-4'><div class='msg_container_send'><div class='chat-author-name-send mb-1'>" + $("#user-name-form").text() + "<span class='font-italic'>(" + $("#user-group option:selected").val() + ")</span></div>"
+                                                                            + response.text + "<span class='msg_time_send'>" + new Date().toLocaleString('cs-CZ') + "</span></div><div class='img_cont_msg'><div class='avatar-labeled user_img_msg rounded-circle'><i class='fa fa-user-check'></i></div></div></div>")
+                                                                    }
+                                                                } catch (e) {
+                                                                    $('.chat-card-body').append("<div class='d-flex justify-content-end mb-4'><div class='msg_container_send'><div class='chat-author-name-send mb-1'>" + $("#user-name-form").text() + "<span class='font-italic'>(" + $("#user-group option:selected").val() + ")</span></div>"
+                                                                        + "Chyba v přenosu dat!<span class='msg_time_send'>" + new Date().toLocaleString('cs-CZ') + "</span></div><div class='img_cont_msg'><div class='avatar-labeled user_img_msg rounded-circle'><i class='fa fa-user-check'></i></div></div></div>")
+                                                                    }
+                                                            },
+                                                            afterAll: function (e) {
+
+                                                            }
+                                                        });
+                                                        $(function () {
+                                                            var frm = $("#comment-form");
+                                                            frm.submit(function (event) {
+                                                                event.preventDefault();
+                                                                console.log("test");
+                                                                $.ajax({
+                                                                type: frm.attr("method"),
+                                                                    url: frm.attr("action"),
+                                                                    data: JSON.stringify({
+                                                                    IdTicket: '@Model.Id',
+                                                                        Popis: $("#textSection").val(),
+                                                                        Perm: $("#user-group option:selected").val()
+                                                                    }),
+                                                                    contentType: "application/json, charset=utf-8",
+                                                                    success: function (response) {
+                                                                        $("#textSection").val("");
+                                                                        try {
+                                                                            if (response.state == true || response.state == false) {
+                                                                                $('.chat-card-body').append("<div class='d-flex justify-content-end mb-4'><div class='msg_container_send'><div class='chat-author-name-send mb-1'>" + $("#user-name-form").text() + "<span class='font-italic'>(" + $("#user-group option:selected").val() + ")</span></div>"
+                                                                                    + response.text + "<span class='msg_time_send'>" + new Date().toLocaleString('cs-CZ') + "</span></div><div class='img_cont_msg'><div class='avatar-labeled user_img_msg rounded-circle'><i class='fa fa-user-check'></i></div></div></div>")
+                                                                            } else { throw 0; }
+                                                                        } catch (e) {
+                                                                            $('.chat-card-body').append("<div class='d-flex justify-content-end mb-4'><div class='msg_container_send'><div class='chat-author-name-send mb-1'>" + $("#user-name-form").text() + "<span class='font-italic'>(" + $("#user-group option:selected").val() + ")</span></div>"
+                                                                                + "Chyba v přenosu dat!<span class='msg_time_send'>" + new Date().toLocaleString('cs-CZ') + "</span></div><div class='img_cont_msg'><div class='avatar-labeled user_img_msg rounded-circle'><i class='fa fa-user-check'></i></div></div></div>")
+                                                                        }
+                                                                    },
+                                                                    error: function () {
+                                                                        $('.chat-card-body').append("<div class='d-flex justify-content-end mb-4'><div class='msg_container_send'><div class='chat-author-name-send mb-1'>" + $("#user-name-form").text() + "<span class='font-italic'>(" + $("#user-group option:selected").val() + ")</span></div>"
+                                                                            + "Chyba v přenosu dat!<span class='msg_time_send'>" + new Date().toLocaleString('cs-CZ') + "</span></div><div class='img_cont_msg'><div class='avatar-labeled user_img_msg rounded-circle'><i class='fa fa-user-check'></i></div></div></div>")
+                                                                    }
+                                                                });
+                                                            });
+                                                        });
+                                                                </script>
+                                                            }
+                                                            else
+                                                            {
+                                                                <div class="font-italic m-3 text-center"><i class="fa fa-info-circle"></i> Chatovat můžete pouze v případě, že je záznam u dodavatele nebo na cestě k dodavateli.</div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="tab-pane fade @((defaultTab == 3) ? "show active" : "")" id="hotline-attachment" role="tabpanel" aria-labelledby="hotline-attachment-icons">
+                                            <div class="list-group p-1 m-1">
+                                                @foreach (var attachment in Model.Attachments)
+                                                {
+                                                    <a href="@Url.Action("GetAttachment", new { id = Model.Id, att = attachment.Id + "_" + attachment.FileName })" class="list-group-item list-group-item-action list-group-item-light flex-column border">
+
+
+                                                        <div class="d-flex">
+                                                            <i class="fa fa-file@(!string.IsNullOrEmpty(attachment.FileType) ? "-" + attachment.FileType : "") p-1 pr-2"></i>
+                                                            <h5 class="mb-1 chat-author-name">@attachment.Nazev</h5>
+                                                        </div>
+                                                        <p class="mb-1">@attachment.Zpracoval - @attachment.Tym</p><small>@attachment.Vytvoreno</small>
+                                                    </a>
+
+                                                }
+                                                @if (Model.Attachments.Count() == 0)
+                                                {
+                                                    <div class="font-italic text-center justify-content-center  text-primary">K tomuto záznamu se navážou žádné přílohy.</div>
+                                                }
+                                            </div>
+                                        </div>
+                                                                if (!isOnlyViewer)
+                                                                {
+                                            <div class="tab-pane fade @((defaultTab == 4) ? "show active" : "")" id="hotline-kalkulace" role="tabpanel" aria-labelledby="hotline-kalkulace-icons">
+                                                <div class="list-group p-1 m-1">
+                                                    @if (Model.Perm.Select(q => q.Key).Any(q => new string[] { "VS", "PM" }.Contains(q)) || isFISManager)
+                                                    {
+                                                        foreach (var kalkulace in Model.Kalkulace)
+                                                        {
+                                                            <div class="list-group-item list-group-item-action list-group-item-light flex-column border ">
+                                                                <div class="d-flex border-bottom">
+                                                                    <h4 class="mb-1 chat-author-name text-uppercase font-weight-bold">@kalkulace.Popis</h4>
+                                                                </div>
+
+                                                                <div class="row border-bottom pb-2 pt-2">
+                                                                    <div class="col-2  text-uppercase font-weight-bold">Cena</div>
+                                                                    <div class="col-10 ">@kalkulace.Cena Kč</div>
+                                                                </div>
+                                                                <div class="row border-bottom pb-2 pt-2">
+                                                                    <div class="col-2  text-uppercase font-weight-bold">Vytvořeno</div>
+                                                                    <div class="col-10 ">@kalkulace.Datum</div>
+                                                                </div>
+                                                                <div class="row border-bottom pb-2 pt-2">
+                                                                    <div class="col-2  text-uppercase font-weight-bold">Stav akceptace</div>
+                                                                    <div class="col-10 ">@kalkulace.Akceptace</div>
+                                                                </div>
+                                                                <div class="row pb-2 pt-2">
+                                                                    <div class="col-2  text-uppercase font-weight-bold">Vyjádření za MO</div>
+                                                                    <div class="col-10 ">@Html.Raw(kalkulace.Vyjadreni)</div>
+                                                                </div>
+                                                            </div>
+                                                        }
+                                                        if (Model.Kalkulace.Count() == 0)
+                                                        {
+                                                            <div class="font-italic text-center justify-content-center text-primary">K tomuto záznamu se navážou žádné kalkulace.</div>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="font-italic text-center justify-content-center text-danger">Nejste oprávněnou osobou pro zobrazení kalkulací.</div>
+
+                                                    }
+                                                </div>
+                                            </div>
+                                                                    }
+                                                                }
+                                    </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

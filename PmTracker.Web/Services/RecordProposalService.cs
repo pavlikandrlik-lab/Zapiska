@@ -8,6 +8,7 @@ using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Dashboard;
 using PmTracker.Web.Services.Schedules;
+using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Web.Services;
 
@@ -43,6 +44,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
     private readonly IHarmonogramService _harmonogramService;
     private readonly IPriorityMatrixRebuildService _priorityMatrixRebuildService;
     private readonly IAuditWriteService _auditWriteService;
+    private readonly IHarvestScheduler _harvestScheduler;
     private readonly TimeProvider _timeProvider;
 
     public RecordProposalService(
@@ -54,6 +56,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
         IHarmonogramService harmonogramService,
         IPriorityMatrixRebuildService priorityMatrixRebuildService,
         IAuditWriteService auditWriteService,
+        IHarvestScheduler harvestScheduler,
         TimeProvider timeProvider)
     {
         _dbContext = dbContext;
@@ -64,6 +67,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
         _harmonogramService = harmonogramService;
         _priorityMatrixRebuildService = priorityMatrixRebuildService;
         _auditWriteService = auditWriteService;
+        _harvestScheduler = harvestScheduler;
         _timeProvider = timeProvider;
     }
 

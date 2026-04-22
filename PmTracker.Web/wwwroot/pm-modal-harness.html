@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8">
+    <title>PM Tracker — Phase 2E gov-dialog harness</title>
+    <link rel="stylesheet" href="http://127.0.0.1:8766/lib/gov-design-system/dist/core/core.min.css">
+    <link rel="stylesheet" href="http://127.0.0.1:8766/css/site.css">
+    <style>
+        body { margin: 24px; font-family: system-ui; }
+        #modal-root { position: fixed; inset: 0; pointer-events: none; }
+        .harness-btn { margin: 0 8px 8px 0; padding: 8px 14px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>PM Tracker — Phase 2E gov-dialog harness</h1>
+
+    <h2>Test 1 — default modal (width ~52rem, ESC does NOT close)</h2>
+    <button class="harness-btn" id="open-default">Open default modal</button>
+
+    <h2>Test 2 — wide modal (width ~80rem)</h2>
+    <button class="harness-btn" id="open-wide">Open wide modal</button>
+
+    <h2>Test 3 — record-editor modal (tall, ~92vh)</h2>
+    <button class="harness-btn" id="open-editor">Open record-editor modal</button>
+
+    <h2>Test 4 — overflow-visible modal</h2>
+    <button class="harness-btn" id="open-overflow">Open overflow-visible modal</button>
+
+    <div id="modal-root"></div>
+    <div id="floating-panel-root" aria-hidden="true"></div>
+
+    <script type="module" src="http://127.0.0.1:8766/lib/gov-design-system/dist/core/core.esm.min.js"></script>
+    <script>
+        // Minimal simulation of setModalContent/closeModal from modals.js
+        // for harness testing (no AJAX, no dirty check — just markup + show/close).
+        const modalRoot = document.getElementById("modal-root");
+
+        function openModal(variant, overflowVisible) {
+            const overflow = overflowVisible ? "true" : "false";
+            modalRoot.innerHTML = `
+                <gov-dialog open="true"
+                            block-close="true"
+                            block-backdrop-close="true"
+                            data-modal-container
+                            data-modal-variant="${variant}"
+                            data-modal-overflow-visible="${overflow}"
+                            aria-labelledby="harness-modal-title"
+                            tabindex="-1">
+                    <button class="modal-close" type="button" data-modal-close aria-label="Zavřít dialog">
+                        <span class="modal-close-icon" aria-hidden="true">&#10005;</span>
+                    </button>
+                    <div class="modal-content">
+                        <h2 id="harness-modal-title">Harness Modal (variant=${variant})</h2>
+                        <p>Lorem ipsum dolor sit amet. variant: <strong>${variant}</strong>, overflow-visible: <strong>${overflow}</strong>.</p>
+                        <p>Pro reálný test form submit/dirty-check přepněte na Citrix.</p>
+                        <button type="button" data-modal-close class="harness-btn">Close via data-modal-close</button>
+                    </div>
+                </gov-dialog>`;
+            modalRoot.style.pointerEvents = "auto";
+
+            // Wait a tick for gov-dialog CE upgrade, then ensure open
+            requestAnimationFrame(() => {
+                const dialog = modalRoot.querySelector("gov-dialog");
+                if (dialog && typeof dialog.show === "function") {
+                    try { dialog.show(); } catch {}
+                }
+            });
+        }
+
+        function closeModal() {
+            const dialog = modalRoot.querySelector("gov-dialog");
+            if (dialog) {
+                dialog.removeAttribute("open");
+                if (typeof dialog.close === "function") {
+                    try { dialog.close(); } catch {}
+                }
+            }
+            modalRoot.innerHTML = "";
+            modalRoot.style.pointerEvents = "none";
+        }
+
+        document.getElementById("open-default").addEventListener("click", () => openModal("default", false));
+        document.getElementById("open-wide").addEventListener("click", () => openModal("wide", false));
+        document.getElementById("open-editor").addEventListener("click", () => openModal("record-editor", false));
+        document.getElementById("open-overflow").addEventListener("click", () => openModal("default", true));
+
+        document.addEventListener("click", (event) => {
+            const target = event.target;
+            if (target.closest("[data-modal-close]")) {
+                closeModal();
+            }
+        });
+
+        window.__harnessReady = true;
+    </script>
+</body>
+</html>

@@ -1,0 +1,1327 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="PM Tracker (Zapiska)" id="pmtracker-model" version="5.0.0">
+  <purpose>Kompletni dokumentacni ArchiMate model aplikace PM Tracker (interni aplikace pro evidenci a rizeni projektu, jednani, zaznamu, tymu a ciselniku). Model zachycuje cca 70-85 % funkcionality; zbytek se doplni po dokonceni. Generovano z /tmp/gen_archimate.py - editujte generator, ne vystupni soubor.</purpose>
+  <folder name="Strategy" id="folder-strategy" type="strategy"/>
+  <folder name="Business" id="folder-business" type="business">
+    <folder name="Actors" id="folder-business-actors">
+      <element xsi:type="archimate:BusinessActor" name="Projektovy manazer (PM)" id="ba-pm" documentation="Ridi projekt, eviduje zaznamy, planuje jednani, spravuje tym. Role PROJ_MAN."/>
+      <element xsi:type="archimate:BusinessActor" name="Vlastnik projektu" id="ba-vlastnik" documentation="Business Owner - schvaluje jednani, odpovida za projekt ke sponzorovi. Role VLASTNIK_PROJEKTU."/>
+      <element xsi:type="archimate:BusinessActor" name="Admin projektu" id="ba-admin-proj" documentation="Administrator projektu - spravuje metadata, tym, ciselniky; nema schvalovaci prava. Role ADM_PROJ."/>
+      <element xsi:type="archimate:BusinessActor" name="Vedouci subsystemu" id="ba-vedouci-ss" documentation="Odpovida za subsystem, komentuje zaznamy tykajici se jeho subsystemu. Role VEDOUCI_SUBSYSTEMU."/>
+      <element xsi:type="archimate:BusinessActor" name="Zastupce vedouciho subsystemu" id="ba-zastupce-ss" documentation="Zastupuje vedouciho subsystemu v komentarich. Role ZASTUPCE_VEDOUCIHO_SUBSYSTEMU."/>
+      <element xsi:type="archimate:BusinessActor" name="Metodik subsystemu" id="ba-metodik-ss" documentation="Metodicke vedeni subsystemu, navrhove dokumenty. Role METODIK_SUBSYSTEMU."/>
+      <element xsi:type="archimate:BusinessActor" name="Clen tymu projektu" id="ba-clen-tymu" documentation="Osoba priradena k tymu projektu, read-only pristup k relevantnim zaznamum."/>
+      <element xsi:type="archimate:BusinessActor" name="SuperAdmin / IT Admin" id="ba-super-admin" documentation="Systemovy administrator - spravuje uzivatele, role, permission mapping, ciselniky."/>
+    </folder>
+    <folder name="Roles" id="folder-business-roles">
+      <element xsi:type="archimate:BusinessRole" name="Role PM" id="br-project-manager" documentation="Klic rolovych opravneni pro projektoveho manazera (projects.edit, records.edit, meetings.create, team.manage)."/>
+      <element xsi:type="archimate:BusinessRole" name="Role vlastnika projektu" id="br-project-owner" documentation="Klic pro vlastnika (projects.edit, meetings.edit, schvalovani jednani)."/>
+      <element xsi:type="archimate:BusinessRole" name="Role admina projektu" id="br-project-admin" documentation="Klic pro admina projektu (projects.edit metadata, team.manage, people.manage)."/>
+      <element xsi:type="archimate:BusinessRole" name="Role vedouciho subsystemu" id="br-subsystem-lead" documentation="Klic pro vedouciho/zastupce/metodika subsystemu (records.comment.subsystemlead, schedule.edit)."/>
+      <element xsi:type="archimate:BusinessRole" name="Role clena tymu" id="br-team-member" documentation="Implicitni role pro cleny tymu (read-only pristup k priraznenym projektum)."/>
+      <element xsi:type="archimate:BusinessRole" name="Role systemoveho administratora" id="br-system-admin" documentation="Plna prava (settings.manage, ciselniky.edit, users/roles/permissions)."/>
+    </folder>
+    <folder name="Functions" id="folder-business-functions">
+      <element xsi:type="archimate:BusinessFunction" name="Rizeni projektu" id="bf-rizeni-projektu" documentation="Funkce zastresujici kompletni lifecycle projektu - zalozeni, harmonogram, tym, uzavreni."/>
+      <element xsi:type="archimate:BusinessFunction" name="Rizeni jednani" id="bf-rizeni-jednani" documentation="Funkce planovani a evidence jednani vcetne schvalovaciho workflow."/>
+      <element xsi:type="archimate:BusinessFunction" name="Evidence zaznamu / ukolu" id="bf-evidence-ukolu" documentation="Funkce evidence zaznamu (tasks) s harmonogramem, prioritou, komentari subsystemu."/>
+      <element xsi:type="archimate:BusinessFunction" name="Personalni sprava" id="bf-personalni-sprava" documentation="Funkce onboardingu osob (AD lookup), spravy uzivatelu a jejich prirazeni."/>
+      <element xsi:type="archimate:BusinessFunction" name="Referencni data / Ciselniky" id="bf-referencni-data" documentation="Funkce spravy lookup values - stavy, kategorie, role, subsystemy, typy."/>
+      <element xsi:type="archimate:BusinessFunction" name="Sprava vyzev (Tender)" id="bf-tender-management" documentation="Funkce evidence vyzev v ramci projektu a jejich stavoveho workflow."/>
+      <element xsi:type="archimate:BusinessFunction" name="Reporting" id="bf-reporting" documentation="Funkce reportovani - exporty, dashboardy, priority matrix."/>
+      <element xsi:type="archimate:BusinessFunction" name="Bezpecnost &amp; autorizace" id="bf-bezpecnost-autz" documentation="Funkce rizeni pristupu - role, permissions, scopes (Global/Project/Subsystem)."/>
+    </folder>
+    <folder name="Processes" id="folder-business-processes">
+      <element xsi:type="archimate:BusinessProcess" name="Sprava projektu (lifecycle)" id="bp-sprava-projektu" documentation="Proces od zalozeni projektu, pres aktualizaci metadat, harmonogramu, az po uzavreni."/>
+      <element xsi:type="archimate:BusinessProcess" name="Planovani a evidence jednani" id="bp-planovani-jednani" documentation="Zalozeni jednani, pozvani ucastniku, evidence prubehu."/>
+      <element xsi:type="archimate:BusinessProcess" name="Schvalovani jednani" id="bp-schvalovani-jednani" documentation="Workflow prechodu jednani ze stavu &#x27;otevrene&#x27; do &#x27;uzavrene&#x27; se zaznamem o schvaleni."/>
+      <element xsi:type="archimate:BusinessProcess" name="Sprava zaznamu a harmonogramu" id="bp-sprava-zaznamu" documentation="Zalozeni/edit zaznamu, planovany vs. skutecny harmonogram, prioritni matrix."/>
+      <element xsi:type="archimate:BusinessProcess" name="Sprava tymu projektu" id="bp-sprava-tymu" documentation="Prirazovani osob k projektu, roli a subsystemu."/>
+      <element xsi:type="archimate:BusinessProcess" name="Sprava osob (AD onboarding)" id="bp-sprava-osob" documentation="Vyhledani osoby v AD, manualni vytvoreni interniho zaznamu, aktualizace."/>
+      <element xsi:type="archimate:BusinessProcess" name="Sprava vyzev (Vyzvy)" id="bp-sprava-vyzev" documentation="Evidence vyzev, sledovani stavu a vazeb na projekt."/>
+      <element xsi:type="archimate:BusinessProcess" name="Komentare subsystemu k zaznamum" id="bp-komentare-ss" documentation="Vedouci/zastupce/metodik subsystemu pridava vyjadreni k zaznamum ovlivnujicim subsystem."/>
+    </folder>
+    <folder name="Services" id="folder-business-services">
+      <element xsi:type="archimate:BusinessService" name="Sluzba evidence projektu" id="bs-evidence-projektu" documentation="Externi business sluzba - moznost zaznamenavat a aktualizovat informace o projektech."/>
+      <element xsi:type="archimate:BusinessService" name="Sluzba rizeni jednani" id="bs-rizeni-jednani" documentation="Externi business sluzba - planovani jednani, evidence pozvaneek a ucasti."/>
+      <element xsi:type="archimate:BusinessService" name="Sluzba schvalovani jednani" id="bs-schvalovani-jednani" documentation="Externi business sluzba - uzavirani jednani vlastnikem/PM."/>
+      <element xsi:type="archimate:BusinessService" name="Sluzba spravy zaznamu" id="bs-sprava-zaznamu" documentation="Externi business sluzba - evidence zaznamu/ukolu a jejich harmonogramu."/>
+      <element xsi:type="archimate:BusinessService" name="Sluzba reportingu projektu" id="bs-reporting-projektu" documentation="Externi business sluzba - generovani exportu (PDF/Word) a dashboardu."/>
+      <element xsi:type="archimate:BusinessService" name="Sluzba autorizace uzivatelu" id="bs-autorizace-uzivatelu" documentation="Externi business sluzba - prideleni roli a opravneni uzivatelum."/>
+      <element xsi:type="archimate:BusinessService" name="Sluzba evidence vyzev" id="bs-evidence-vyzev" documentation="Externi business sluzba - evidence a sledovani vyzev (Vyzvy)."/>
+      <element xsi:type="archimate:BusinessService" name="Sluzba spravy osob" id="bs-sprava-osob" documentation="Externi business sluzba - onboarding osob z AD, sprava kontaktu."/>
+    </folder>
+  </folder>
+  <folder name="Application" id="folder-application" type="application">
+    <folder name="Components" id="folder-app-components">
+      <folder name="Web &amp; Moduly" id="folder-app-components-web">
+      <element xsi:type="archimate:ApplicationComponent" name="PmTracker.Web (MVC + API)" id="ac-pmtracker-web" documentation="ASP.NET Core MVC monolit, .NET 8, hostujici Web UI, API endpointy a business moduly. Deploy na IIS."/>
+      <element xsi:type="archimate:ApplicationComponent" name="Projects Module" id="ac-projects-module" documentation="Feature modul - CRUD projektu, harmonogram, metadata, subsystemy v projektu."/>
+      <element xsi:type="archimate:ApplicationComponent" name="Records Module" id="ac-records-module" documentation="Feature modul - CRUD zaznamu (tasks), schedule (planovany vs skutecny), priority matrix, navrhy uprav."/>
+      <element xsi:type="archimate:ApplicationComponent" name="Meetings Module" id="ac-meetings-module" documentation="Feature modul - CRUD jednani, ucast, workflow (otevrene/uzavrene), vazby na zaznamy."/>
+      <element xsi:type="archimate:ApplicationComponent" name="People Module" id="ac-people-module" documentation="Feature modul - sprava osob, AD lookup, onboarding, kontaktni udaje."/>
+      <element xsi:type="archimate:ApplicationComponent" name="Team Module" id="ac-team-module" documentation="Feature modul - clenstvi v tymu projektu, prirazovani role a subsystemu."/>
+      <element xsi:type="archimate:ApplicationComponent" name="Ciselniky Module" id="ac-ciselniky-module" documentation="Feature modul - sprava referencnich dat (stavy, kategorie, role, typy)."/>
+      <element xsi:type="archimate:ApplicationComponent" name="Vyzvy Module" id="ac-vyzvy-module" documentation="Feature modul - evidence vyzev v ramci projektu, sledovani stavu."/>
+      <element xsi:type="archimate:ApplicationComponent" name="Dashboard Module" id="ac-dashboard-module" documentation="Feature modul - prehledove dashboardy, priority matrix, kompozitni widgety."/>
+      <element xsi:type="archimate:ApplicationComponent" name="Authorization Module" id="ac-authz-module" documentation="Feature modul - AuthzRole, AuthzPermission, RoleScope (Global/Project/Subsystem), mapping z ciselnik_roli_*."/>
+      <element xsi:type="archimate:ApplicationComponent" name="Documentation Module" id="ac-docs-module" documentation="Feature modul - in-app dokumentace renderovana z docs/*.md pres Markdig."/>
+      </folder>
+      <folder name="Workers &amp; Adapters" id="folder-app-components-workers">
+      <element xsi:type="archimate:ApplicationComponent" name="PmTracker.ServiceDesk.Contracts" id="ac-sd-contracts" documentation="Interface library - kontrakty (IStoredTicketRepository) pro integraci se ServiceDesk."/>
+      <element xsi:type="archimate:ApplicationComponent" name="PmTracker.ServiceDesk.Sql (Adapter)" id="ac-sd-sql" documentation="SQL adapter - read-only dotazy nad externi ServiceDesk databazi."/>
+      <element xsi:type="archimate:ApplicationComponent" name="AD Connector" id="ac-ad-connector" documentation="Wrapper nad System.DirectoryServices pro lookup uzivatelu v Active Directory."/>
+      <element xsi:type="archimate:ApplicationComponent" name="Export Service (PDF/Word)" id="ac-export-service" documentation="Generuje exporty projektu/zaznamu/jednani pres DocumentFormat.OpenXml."/>
+      <element xsi:type="archimate:ApplicationComponent" name="SearchReindex Worker" id="ac-search-worker" documentation="IHostedService - periodicka reindexace full-text vyhledavani (SearchReindexHostedService)."/>
+      <element xsi:type="archimate:ApplicationComponent" name="PriorityMatrix Worker" id="ac-priority-worker" documentation="IHostedService - vypocet priority matrix pro dashboard cache (PriorityMatrixHostedServices)."/>
+      <element xsi:type="archimate:ApplicationComponent" name="SqlStartupValidator Worker" id="ac-sql-validator" documentation="IHostedService - startup validace DB schematu a seed dat (SqlStartupValidatorHostedService)."/>
+      </folder>
+    </folder>
+    <folder name="Services" id="folder-app-services">
+      <element xsi:type="archimate:ApplicationService" name="ProjectManagement Service" id="as-project-mgmt" documentation="CRUD projektu, harmonogram, sprava tymu a subsystemu v projektu."/>
+      <element xsi:type="archimate:ApplicationService" name="RecordManagement Service" id="as-record-mgmt" documentation="CRUD zaznamu, scheduling, navrhy uprav, koment subsystemu."/>
+      <element xsi:type="archimate:ApplicationService" name="MeetingManagement Service" id="as-meeting-mgmt" documentation="CRUD jednani, ucast, workflow otevrene/uzavrene, vazby na zaznamy."/>
+      <element xsi:type="archimate:ApplicationService" name="PeopleDirectory Service" id="as-people-directory" documentation="Adresar osob + lookup v AD, onboarding."/>
+      <element xsi:type="archimate:ApplicationService" name="RoleManagement Service" id="as-role-mgmt" documentation="Sprava AuthzRole, AuthzPermission, RoleScope; permission evaluation."/>
+      <element xsi:type="archimate:ApplicationService" name="ReferenceData Service" id="as-reference-data" documentation="Sprava ciselniku (referencnich dat)."/>
+      <element xsi:type="archimate:ApplicationService" name="TenderManagement Service" id="as-tender-mgmt" documentation="Sprava vyzev (Vyzvy)."/>
+      <element xsi:type="archimate:ApplicationService" name="ExportReporting Service" id="as-export-reporting" documentation="Exporty projektu/zaznamu/jednani do PDF/Word (OpenXml)."/>
+      <element xsi:type="archimate:ApplicationService" name="Dashboard Service" id="as-dashboard" documentation="Prehledove dashboardy, priority matrix."/>
+      <element xsi:type="archimate:ApplicationService" name="InApp Documentation Service" id="as-docs" documentation="In-app dokumentace renderovana z markdown souboru."/>
+      <element xsi:type="archimate:ApplicationService" name="Authentication Service" id="as-authentication" documentation="Autentizace pres Windows Auth + mapping na internal user."/>
+      <element xsi:type="archimate:ApplicationService" name="SearchIndexing Service" id="as-search-indexing" documentation="Full-text vyhledavani napric projekty/zaznamy/jednanimi."/>
+      <element xsi:type="archimate:ApplicationService" name="ServiceDesk Integration Service" id="as-sd-integration" documentation="Integrace se ServiceDesk - read-only ticket lookup."/>
+      <element xsi:type="archimate:ApplicationService" name="AD User Lookup Service" id="as-ad-lookup" documentation="Vyhledavani uzivatelu v Active Directory."/>
+    </folder>
+    <folder name="Functions" id="folder-app-functions">
+      <element xsi:type="archimate:ApplicationFunction" name="Project Lifecycle" id="af-project-lifecycle" documentation="Interni logika zivotniho cyklu projektu."/>
+      <element xsi:type="archimate:ApplicationFunction" name="Record Scheduling" id="af-record-scheduling" documentation="Logika harmonogramu zaznamu - planovany vs skutecny."/>
+      <element xsi:type="archimate:ApplicationFunction" name="Meeting Workflow" id="af-meeting-workflow" documentation="Logika prechodu mezi stavy jednani."/>
+      <element xsi:type="archimate:ApplicationFunction" name="Permission Evaluation" id="af-permission-eval" documentation="Vyhodnoceni opravneni podle role + scope."/>
+      <element xsi:type="archimate:ApplicationFunction" name="Full-Text Indexing" id="af-fulltext-indexing" documentation="Logika plneni a obnovovani vyhledavaciho indexu."/>
+      <element xsi:type="archimate:ApplicationFunction" name="Priority Matrix Computation" id="af-priority-matrix" documentation="Vypocet priority matrix - dashboard cache."/>
+      <element xsi:type="archimate:ApplicationFunction" name="Document Export (OpenXml)" id="af-document-export" documentation="Generovani DOCX/XLSX dokumentu."/>
+      <element xsi:type="archimate:ApplicationFunction" name="AD User Resolution" id="af-ad-resolution" documentation="Resolve AD userName na internal Person."/>
+    </folder>
+    <folder name="Data Objects" id="folder-app-data">
+      <element xsi:type="archimate:DataObject" name="Project" id="do-project" documentation="Entita projektu - nazev, metadata, stav, harmonogram."/>
+      <element xsi:type="archimate:DataObject" name="Record (Zaznam)" id="do-record" documentation="Entita zaznamu/ukolu - planovany termin, priorita, stav."/>
+      <element xsi:type="archimate:DataObject" name="Meeting (Jednani)" id="do-meeting" documentation="Entita jednani - datum, ucast, stav, zapis."/>
+      <element xsi:type="archimate:DataObject" name="Person" id="do-person" documentation="Entita osoby (interni i externi; AD zdroj)."/>
+      <element xsi:type="archimate:DataObject" name="Team Member" id="do-team-member" documentation="Clenstvi osoby v tymu projektu s konkretni roli."/>
+      <element xsi:type="archimate:DataObject" name="AuthzRole" id="do-authz-role" documentation="Rolova definice (authz.role) s Kod, Scope discriminator."/>
+      <element xsi:type="archimate:DataObject" name="AuthzPermission" id="do-authz-permission" documentation="Permission key + role mapping (authz.permission, authz.role_permission)."/>
+      <element xsi:type="archimate:DataObject" name="Ciselnik (lookup)" id="do-ciselnik" documentation="Referencni data - ciselnik_roli_*, stavy, kategorie."/>
+      <element xsi:type="archimate:DataObject" name="Vyzva (Tender)" id="do-vyzva" documentation="Entita vyzvy - typ, stav, datum, vazba na projekt."/>
+      <element xsi:type="archimate:DataObject" name="AuditLog" id="do-audit-log" documentation="Auditni log zmen (kdo, kdy, co)."/>
+    </folder>
+  </folder>
+  <folder name="Technology &amp; Physical" id="folder-technology" type="technology">
+    <folder name="Nodes" id="folder-tech-nodes">
+      <element xsi:type="archimate:Node" name="IIS Web Server" id="tn-web-server" documentation="Windows Server + IIS hostujici PmTracker.Web (.NET 8)."/>
+      <element xsi:type="archimate:Node" name="SQL Server (PmTracker DB)" id="tn-db-server" documentation="Hlavni databaze PM Tracker - projekty, zaznamy, jednani, authz."/>
+      <element xsi:type="archimate:Node" name="SQL Server (ServiceDesk DB) - read-only" id="tn-sd-db" documentation="Externi SD databaze, PM Tracker cte read-only pro Ticketing integraci."/>
+      <element xsi:type="archimate:Node" name="Active Directory Server" id="tn-ad-server" documentation="Domain Controller pro Windows Auth a user lookup."/>
+      <element xsi:type="archimate:Node" name="Klientsky prohlizec" id="tn-client" documentation="End-user browser (Chrome/Edge/Firefox) pres Windows Auth + gov-design-system web components."/>
+    </folder>
+    <folder name="System Software" id="folder-tech-sw">
+      <element xsi:type="archimate:SystemSoftware" name="IIS" id="ss-iis" documentation="Internet Information Services - hosting webove aplikace."/>
+      <element xsi:type="archimate:SystemSoftware" name=".NET 8 Runtime" id="ss-dotnet" documentation="ASP.NET Core 8 runtime."/>
+      <element xsi:type="archimate:SystemSoftware" name="SQL Server 2019+" id="ss-sqlserver" documentation="Microsoft SQL Server - persistence."/>
+      <element xsi:type="archimate:SystemSoftware" name="Windows Authentication" id="ss-windows-auth" documentation="Kerberos/NTLM autentizace pres IIS."/>
+      <element xsi:type="archimate:SystemSoftware" name="Active Directory" id="ss-ad" documentation="Domain Services - uzivatele, skupiny."/>
+      <element xsi:type="archimate:SystemSoftware" name="EF Core 8" id="ss-efcore" documentation="Entity Framework Core - ORM pro SQL Server."/>
+    </folder>
+    <folder name="Services" id="folder-tech-services">
+      <element xsi:type="archimate:TechnologyService" name="Web Hosting (HTTPS)" id="tsvc-web-hosting" documentation="HTTPS hosting sluzba na IIS."/>
+      <element xsi:type="archimate:TechnologyService" name="SQL Database Service" id="tsvc-sql-db" documentation="SQL Server databazova sluzba."/>
+      <element xsi:type="archimate:TechnologyService" name="AD Authentication Service" id="tsvc-ad-auth" documentation="Active Directory authentication a directory lookup."/>
+      <element xsi:type="archimate:TechnologyService" name="ServiceDesk Read-Only DB" id="tsvc-sd-readonly" documentation="Read-only pristup k ServiceDesk databazi."/>
+    </folder>
+  </folder>
+  <folder name="Motivation" id="folder-motivation" type="motivation"/>
+  <folder name="Implementation &amp; Migration" id="folder-impl" type="implementation_migration"/>
+  <folder name="Other" id="folder-other" type="other"/>
+  <folder name="Relations" id="folder-relations" type="relations">
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-pm-r" source="ba-pm" target="br-project-manager"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-vlastnik-r" source="ba-vlastnik" target="br-project-owner"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-admin-r" source="ba-admin-proj" target="br-project-admin"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-vedouci-r" source="ba-vedouci-ss" target="br-subsystem-lead"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-zastupce-r" source="ba-zastupce-ss" target="br-subsystem-lead"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-metodik-r" source="ba-metodik-ss" target="br-subsystem-lead"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-clen-r" source="ba-clen-tymu" target="br-team-member"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-super-r" source="ba-super-admin" target="br-system-admin"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-pm-p-proj" source="br-project-manager" target="bp-sprava-projektu"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-pm-p-plan" source="br-project-manager" target="bp-planovani-jednani"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-pm-p-zazn" source="br-project-manager" target="bp-sprava-zaznamu"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-pm-p-tym" source="br-project-manager" target="bp-sprava-tymu"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-pm-p-vyz" source="br-project-manager" target="bp-sprava-vyzev"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-vlastnik-schval" source="br-project-owner" target="bp-schvalovani-jednani"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-vlastnik-proj" source="br-project-owner" target="bp-sprava-projektu"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-admin-proj" source="br-project-admin" target="bp-sprava-projektu"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-admin-tym" source="br-project-admin" target="bp-sprava-tymu"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-admin-osob" source="br-project-admin" target="bp-sprava-osob"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-ss-kom" source="br-subsystem-lead" target="bp-komentare-ss"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-clen-zazn" source="br-team-member" target="bp-sprava-zaznamu"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-r-sysadm-osob" source="br-system-admin" target="bp-sprava-osob"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-bf-riz-p-proj" source="bf-rizeni-projektu" target="bp-sprava-projektu"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-bf-riz-p-tym" source="bf-rizeni-projektu" target="bp-sprava-tymu"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-bf-jed-p-plan" source="bf-rizeni-jednani" target="bp-planovani-jednani"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-bf-jed-p-schval" source="bf-rizeni-jednani" target="bp-schvalovani-jednani"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-bf-ev-p-zazn" source="bf-evidence-ukolu" target="bp-sprava-zaznamu"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-bf-ev-p-kom" source="bf-evidence-ukolu" target="bp-komentare-ss"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-bf-pers-p-osob" source="bf-personalni-sprava" target="bp-sprava-osob"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-bf-tend-p-vyz" source="bf-tender-management" target="bp-sprava-vyzev"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-p-proj-bs-evid" source="bp-sprava-projektu" target="bs-evidence-projektu"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-p-plan-bs-riz" source="bp-planovani-jednani" target="bs-rizeni-jednani"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-p-schval-bs-schval" source="bp-schvalovani-jednani" target="bs-schvalovani-jednani"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-p-zazn-bs-zazn" source="bp-sprava-zaznamu" target="bs-sprava-zaznamu"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-p-vyz-bs-vyz" source="bp-sprava-vyzev" target="bs-evidence-vyzev"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-p-osob-bs-osob" source="bp-sprava-osob" target="bs-sprava-osob"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-proj" source="ac-pmtracker-web" target="ac-projects-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-rec" source="ac-pmtracker-web" target="ac-records-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-meet" source="ac-pmtracker-web" target="ac-meetings-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-peo" source="ac-pmtracker-web" target="ac-people-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-team" source="ac-pmtracker-web" target="ac-team-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-cis" source="ac-pmtracker-web" target="ac-ciselniky-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-vyz" source="ac-pmtracker-web" target="ac-vyzvy-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-dash" source="ac-pmtracker-web" target="ac-dashboard-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-authz" source="ac-pmtracker-web" target="ac-authz-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-docs" source="ac-pmtracker-web" target="ac-docs-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-web-exp" source="ac-pmtracker-web" target="ac-export-service"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-proj-as" source="ac-projects-module" target="as-project-mgmt"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-rec-as" source="ac-records-module" target="as-record-mgmt"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-meet-as" source="ac-meetings-module" target="as-meeting-mgmt"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-peo-as" source="ac-people-module" target="as-people-directory"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-authz-rolemgmt" source="ac-authz-module" target="as-role-mgmt"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-authz-auth" source="ac-authz-module" target="as-authentication"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-cis-as" source="ac-ciselniky-module" target="as-reference-data"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-vyz-as" source="ac-vyzvy-module" target="as-tender-mgmt"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-exp-as" source="ac-export-service" target="as-export-reporting"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-dash-as" source="ac-dashboard-module" target="as-dashboard"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-docs-as" source="ac-docs-module" target="as-docs"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-search-as" source="ac-search-worker" target="as-search-indexing"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-sdsql-as" source="ac-sd-sql" target="as-sd-integration"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-c-adc-as" source="ac-ad-connector" target="as-ad-lookup"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-c-proj-af" source="ac-projects-module" target="af-project-lifecycle"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-c-rec-af" source="ac-records-module" target="af-record-scheduling"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-c-meet-af" source="ac-meetings-module" target="af-meeting-workflow"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-c-authz-af" source="ac-authz-module" target="af-permission-eval"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-c-search-af" source="ac-search-worker" target="af-fulltext-indexing"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-c-prio-af" source="ac-priority-worker" target="af-priority-matrix"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-c-exp-af" source="ac-export-service" target="af-document-export"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-a-c-adc-af" source="ac-ad-connector" target="af-ad-resolution"/>
+    <element xsi:type="archimate:AccessRelationship" id="rel-acc-proj-do" source="ac-projects-module" target="do-project" accessType="3"/>
+    <element xsi:type="archimate:AccessRelationship" id="rel-acc-rec-do" source="ac-records-module" target="do-record" accessType="3"/>
+    <element xsi:type="archimate:AccessRelationship" id="rel-acc-meet-do" source="ac-meetings-module" target="do-meeting" accessType="3"/>
+    <element xsi:type="archimate:AccessRelationship" id="rel-acc-peo-do" source="ac-people-module" target="do-person" accessType="3"/>
+    <element xsi:type="archimate:AccessRelationship" id="rel-acc-team-do" source="ac-team-module" target="do-team-member" accessType="3"/>
+    <element xsi:type="archimate:AccessRelationship" id="rel-acc-authz-role" source="ac-authz-module" target="do-authz-role" accessType="3"/>
+    <element xsi:type="archimate:AccessRelationship" id="rel-acc-authz-perm" source="ac-authz-module" target="do-authz-permission" accessType="3"/>
+    <element xsi:type="archimate:AccessRelationship" id="rel-acc-cis-do" source="ac-ciselniky-module" target="do-ciselnik" accessType="3"/>
+    <element xsi:type="archimate:AccessRelationship" id="rel-acc-vyz-do" source="ac-vyzvy-module" target="do-vyzva" accessType="3"/>
+    <element xsi:type="archimate:AccessRelationship" id="rel-acc-audit" source="ac-authz-module" target="do-audit-log" accessType="2"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-as-proj-bs" source="as-project-mgmt" target="bs-evidence-projektu"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-as-meet-bs" source="as-meeting-mgmt" target="bs-rizeni-jednani"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-as-meet-bs2" source="as-meeting-mgmt" target="bs-schvalovani-jednani"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-as-rec-bs" source="as-record-mgmt" target="bs-sprava-zaznamu"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-as-role-bs" source="as-role-mgmt" target="bs-autorizace-uzivatelu"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-as-tend-bs" source="as-tender-mgmt" target="bs-evidence-vyzev"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-as-exp-bs" source="as-export-reporting" target="bs-reporting-projektu"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-r-as-peo-bs" source="as-people-directory" target="bs-sprava-osob"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-proj-pm" source="as-project-mgmt" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-proj-own" source="as-project-mgmt" target="br-project-owner"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-proj-adm" source="as-project-mgmt" target="br-project-admin"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-meet-pm" source="as-meeting-mgmt" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-meet-own" source="as-meeting-mgmt" target="br-project-owner"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-rec-pm" source="as-record-mgmt" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-rec-ss" source="as-record-mgmt" target="br-subsystem-lead"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-rec-tm" source="as-record-mgmt" target="br-team-member"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-peo-adm" source="as-people-directory" target="br-project-admin"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-peo-sys" source="as-people-directory" target="br-system-admin"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-role-sys" source="as-role-mgmt" target="br-system-admin"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-refd-sys" source="as-reference-data" target="br-system-admin"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-refd-adm" source="as-reference-data" target="br-project-admin"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-tend-pm" source="as-tender-mgmt" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-exp-pm" source="as-export-reporting" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-exp-own" source="as-export-reporting" target="br-project-owner"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-dash-pm" source="as-dashboard" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-dash-ss" source="as-dashboard" target="br-subsystem-lead"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-dash-tm" source="as-dashboard" target="br-team-member"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-auth-tm" source="as-authentication" target="br-team-member"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-auth-pm" source="as-authentication" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-as-docs-all" source="as-docs" target="br-team-member"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-ad-authz" source="as-ad-lookup" target="ac-authz-module"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-auth-all" source="as-authentication" target="ac-pmtracker-web"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-sd-rec" source="as-sd-integration" target="ac-records-module"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-search-dash" source="as-search-indexing" target="ac-dashboard-module"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-c-sd-sql-contracts" source="ac-sd-sql" target="ac-sd-contracts"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-web-app" source="tn-web-server" target="ac-pmtracker-web"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-web-exp" source="tn-web-server" target="ac-export-service"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-web-search" source="tn-web-server" target="ac-search-worker"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-web-prio" source="tn-web-server" target="ac-priority-worker"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-web-sqlval" source="tn-web-server" target="ac-sql-validator"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-web-ad" source="tn-web-server" target="ac-ad-connector"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-web-sdsql" source="tn-web-server" target="ac-sd-sql"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-db-proj" source="tn-db-server" target="do-project"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-db-rec" source="tn-db-server" target="do-record"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-db-meet" source="tn-db-server" target="do-meeting"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-db-peo" source="tn-db-server" target="do-person"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-db-team" source="tn-db-server" target="do-team-member"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-db-role" source="tn-db-server" target="do-authz-role"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-db-perm" source="tn-db-server" target="do-authz-permission"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-db-cis" source="tn-db-server" target="do-ciselnik"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-db-vyz" source="tn-db-server" target="do-vyzva"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-dep-db-audit" source="tn-db-server" target="do-audit-log"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-ss-iis" source="ss-iis" target="tn-web-server"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-ss-dotnet" source="ss-dotnet" target="tn-web-server"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-ss-efcore" source="ss-efcore" target="tn-web-server"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-ss-wa" source="ss-windows-auth" target="tn-web-server"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-ss-sql-db" source="ss-sqlserver" target="tn-db-server"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-ss-sql-sd" source="ss-sqlserver" target="tn-sd-db"/>
+    <element xsi:type="archimate:AssignmentRelationship" id="rel-ss-ad" source="ss-ad" target="tn-ad-server"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-tsvc-web-r" source="tn-web-server" target="tsvc-web-hosting"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-tsvc-sql-r" source="tn-db-server" target="tsvc-sql-db"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-tsvc-ad-r" source="tn-ad-server" target="tsvc-ad-auth"/>
+    <element xsi:type="archimate:RealizationRelationship" id="rel-tsvc-sd-r" source="tn-sd-db" target="tsvc-sd-readonly"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-tsvc-web-app" source="tsvc-web-hosting" target="ac-pmtracker-web"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-tsvc-sql-web" source="tsvc-sql-db" target="ac-pmtracker-web"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-tsvc-ad-conn" source="tsvc-ad-auth" target="ac-ad-connector"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-tsvc-sd-adapter" source="tsvc-sd-readonly" target="ac-sd-sql"/>
+    <element xsi:type="archimate:FlowRelationship" id="rel-f-client-web" source="tn-client" target="tn-web-server" name="HTTPS"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-evid-pm" source="bs-evidence-projektu" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-evid-own" source="bs-evidence-projektu" target="br-project-owner"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-evid-adm" source="bs-evidence-projektu" target="br-project-admin"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-riz-pm" source="bs-rizeni-jednani" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-riz-own" source="bs-rizeni-jednani" target="br-project-owner"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-schval-own" source="bs-schvalovani-jednani" target="br-project-owner"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-zazn-pm" source="bs-sprava-zaznamu" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-zazn-ss" source="bs-sprava-zaznamu" target="br-subsystem-lead"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-zazn-tm" source="bs-sprava-zaznamu" target="br-team-member"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-rep-pm" source="bs-reporting-projektu" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-rep-own" source="bs-reporting-projektu" target="br-project-owner"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-aut-sys" source="bs-autorizace-uzivatelu" target="br-system-admin"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-vyz-pm" source="bs-evidence-vyzev" target="br-project-manager"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-osob-adm" source="bs-sprava-osob" target="br-project-admin"/>
+    <element xsi:type="archimate:ServingRelationship" id="rel-s-bs-osob-sys" source="bs-sprava-osob" target="br-system-admin"/>
+  </folder>
+  <folder name="Views" id="folder-views" type="diagrams">
+    <folder name="Overview" id="folder-views-overview">
+      <element xsi:type="archimate:ArchimateDiagramModel" name="00 - System Context" id="view-00-context" documentation="Prehledovy pohled - PM Tracker jako centralni aplikace mezi uzivateli a externimi systemy (AD, ServiceDesk DB, hlavni DB).">
+        <child xsi:type="archimate:DiagramObject" id="dgm00-pm" archimateElement="ba-pm" targetConnections="c00-auth-pm">
+          <bounds x="40" y="40" width="140" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgm00-vlastnik" archimateElement="ba-vlastnik">
+          <bounds x="200" y="40" width="140" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgm00-vedss" archimateElement="ba-vedouci-ss">
+          <bounds x="360" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgm00-admin" archimateElement="ba-admin-proj">
+          <bounds x="550" y="40" width="140" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgm00-clen" archimateElement="ba-clen-tymu">
+          <bounds x="710" y="40" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgm00-super" archimateElement="ba-super-admin">
+          <bounds x="880" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgm00-web" archimateElement="ac-pmtracker-web" targetConnections="c00-client-web">
+          <bounds x="400" y="200" width="260" height="90"/>
+          <sourceConnection xsi:type="archimate:Connection" id="c00-auth-pm" source="dgm00-web" target="dgm00-pm" archimateRelationship="rel-s-auth-all"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgm00-ad" archimateElement="tn-ad-server">
+          <bounds x="80" y="400" width="220" height="90"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgm00-db" archimateElement="tn-db-server">
+          <bounds x="360" y="400" width="260" height="90"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgm00-sd" archimateElement="tn-sd-db">
+          <bounds x="680" y="400" width="260" height="90"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgm00-client" archimateElement="tn-client">
+          <bounds x="1000" y="200" width="180" height="90"/>
+          <sourceConnection xsi:type="archimate:Connection" id="c00-client-web" source="dgm00-client" target="dgm00-web" archimateRelationship="rel-f-client-web"/>
+        </child>
+      </element>
+    </folder>
+    <folder name="Business" id="folder-views-business">
+      <element xsi:type="archimate:ArchimateDiagramModel" name="B01 - Katalog aktoru" id="view-b01-actors" documentation="Seznam vsech business actors (externich i internich) PM Trackeru.">
+        <child xsi:type="archimate:DiagramObject" id="dgmB1-ba-pm" archimateElement="ba-pm">
+          <bounds x="40" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB1-ba-vlastnik" archimateElement="ba-vlastnik">
+          <bounds x="240" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB1-ba-admin-proj" archimateElement="ba-admin-proj">
+          <bounds x="440" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB1-ba-vedouci-ss" archimateElement="ba-vedouci-ss">
+          <bounds x="640" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB1-ba-zastupce-ss" archimateElement="ba-zastupce-ss">
+          <bounds x="40" y="130" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB1-ba-metodik-ss" archimateElement="ba-metodik-ss">
+          <bounds x="240" y="130" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB1-ba-clen-tymu" archimateElement="ba-clen-tymu">
+          <bounds x="440" y="130" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB1-ba-super-admin" archimateElement="ba-super-admin">
+          <bounds x="640" y="130" width="170" height="55"/>
+        </child>
+      </element>
+      <element xsi:type="archimate:ArchimateDiagramModel" name="B02 - Aktori &lt;-&gt; Role" id="view-b02-actor-role" documentation="Prirazeni business actors na business roles (assignment). Vice aktoru muze mapovat na stejnou roli (subsystem lead).">
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-ba-pm" archimateElement="ba-pm">
+          <bounds x="40" y="40" width="160" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB2-a-pm-r" source="dgmB2-ba-pm" target="dgmB2-br-project-manager" archimateRelationship="rel-a-pm-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-ba-vlastnik" archimateElement="ba-vlastnik">
+          <bounds x="230" y="40" width="160" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB2-a-vlastnik-r" source="dgmB2-ba-vlastnik" target="dgmB2-br-project-owner" archimateRelationship="rel-a-vlastnik-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-ba-admin-proj" archimateElement="ba-admin-proj">
+          <bounds x="420" y="40" width="160" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB2-a-admin-r" source="dgmB2-ba-admin-proj" target="dgmB2-br-project-admin" archimateRelationship="rel-a-admin-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-ba-vedouci-ss" archimateElement="ba-vedouci-ss">
+          <bounds x="610" y="40" width="160" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB2-a-vedouci-r" source="dgmB2-ba-vedouci-ss" target="dgmB2-br-subsystem-lead" archimateRelationship="rel-a-vedouci-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-ba-zastupce-ss" archimateElement="ba-zastupce-ss">
+          <bounds x="800" y="40" width="160" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB2-a-zastupce-r" source="dgmB2-ba-zastupce-ss" target="dgmB2-br-subsystem-lead" archimateRelationship="rel-a-zastupce-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-ba-metodik-ss" archimateElement="ba-metodik-ss">
+          <bounds x="990" y="40" width="160" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB2-a-metodik-r" source="dgmB2-ba-metodik-ss" target="dgmB2-br-subsystem-lead" archimateRelationship="rel-a-metodik-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-ba-clen-tymu" archimateElement="ba-clen-tymu">
+          <bounds x="1180" y="40" width="160" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB2-a-clen-r" source="dgmB2-ba-clen-tymu" target="dgmB2-br-team-member" archimateRelationship="rel-a-clen-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-ba-super-admin" archimateElement="ba-super-admin">
+          <bounds x="1370" y="40" width="160" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB2-a-super-r" source="dgmB2-ba-super-admin" target="dgmB2-br-system-admin" archimateRelationship="rel-a-super-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-br-project-manager" archimateElement="br-project-manager" targetConnections="cB2-a-pm-r">
+          <bounds x="40" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-br-project-owner" archimateElement="br-project-owner" targetConnections="cB2-a-vlastnik-r">
+          <bounds x="300" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-br-project-admin" archimateElement="br-project-admin" targetConnections="cB2-a-admin-r">
+          <bounds x="560" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-br-subsystem-lead" archimateElement="br-subsystem-lead" targetConnections="cB2-a-vedouci-r cB2-a-zastupce-r cB2-a-metodik-r">
+          <bounds x="820" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-br-team-member" archimateElement="br-team-member" targetConnections="cB2-a-clen-r">
+          <bounds x="1080" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB2-br-system-admin" archimateElement="br-system-admin" targetConnections="cB2-a-super-r">
+          <bounds x="1340" y="240" width="170" height="55"/>
+        </child>
+      </element>
+      <element xsi:type="archimate:ArchimateDiagramModel" name="B03 - Business procesy" id="view-b03-processes" documentation="Role -&gt; Process (assignment) a Process -&gt; Business Service (realization). Ukazuje jak procesy realizuji business sluzby.">
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-br-project-manager" archimateElement="br-project-manager">
+          <bounds x="40" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-pm-p-proj" source="dgmB3-br-project-manager" target="dgmB3-bp-sprava-projektu" archimateRelationship="rel-r-pm-p-proj"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-pm-p-plan" source="dgmB3-br-project-manager" target="dgmB3-bp-planovani-jednani" archimateRelationship="rel-r-pm-p-plan"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-pm-p-zazn" source="dgmB3-br-project-manager" target="dgmB3-bp-sprava-zaznamu" archimateRelationship="rel-r-pm-p-zazn"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-pm-p-tym" source="dgmB3-br-project-manager" target="dgmB3-bp-sprava-tymu" archimateRelationship="rel-r-pm-p-tym"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-pm-p-vyz" source="dgmB3-br-project-manager" target="dgmB3-bp-sprava-vyzev" archimateRelationship="rel-r-pm-p-vyz"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-br-project-owner" archimateElement="br-project-owner">
+          <bounds x="300" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-own-schval" source="dgmB3-br-project-owner" target="dgmB3-bp-schvalovani-jednani" archimateRelationship="rel-r-vlastnik-schval"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-own-proj" source="dgmB3-br-project-owner" target="dgmB3-bp-sprava-projektu" archimateRelationship="rel-r-vlastnik-proj"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-br-project-admin" archimateElement="br-project-admin">
+          <bounds x="560" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-adm-tym" source="dgmB3-br-project-admin" target="dgmB3-bp-sprava-tymu" archimateRelationship="rel-r-admin-tym"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-adm-osob" source="dgmB3-br-project-admin" target="dgmB3-bp-sprava-osob" archimateRelationship="rel-r-admin-osob"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-br-subsystem-lead" archimateElement="br-subsystem-lead">
+          <bounds x="820" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-ss-kom" source="dgmB3-br-subsystem-lead" target="dgmB3-bp-komentare-ss" archimateRelationship="rel-r-ss-kom"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-br-team-member" archimateElement="br-team-member">
+          <bounds x="1080" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-tm-zazn" source="dgmB3-br-team-member" target="dgmB3-bp-sprava-zaznamu" archimateRelationship="rel-r-clen-zazn"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-br-system-admin" archimateElement="br-system-admin">
+          <bounds x="1340" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-sys-osob" source="dgmB3-br-system-admin" target="dgmB3-bp-sprava-osob" archimateRelationship="rel-r-sysadm-osob"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bp-sprava-projektu" archimateElement="bp-sprava-projektu" targetConnections="cB3-r-pm-p-proj cB3-r-own-proj">
+          <bounds x="40" y="240" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-p-proj-bs" source="dgmB3-bp-sprava-projektu" target="dgmB3-bs-evidence-projektu" archimateRelationship="rel-r-p-proj-bs-evid"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bp-planovani-jednani" archimateElement="bp-planovani-jednani" targetConnections="cB3-r-pm-p-plan">
+          <bounds x="230" y="240" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-p-plan-bs" source="dgmB3-bp-planovani-jednani" target="dgmB3-bs-rizeni-jednani" archimateRelationship="rel-r-p-plan-bs-riz"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bp-schvalovani-jednani" archimateElement="bp-schvalovani-jednani" targetConnections="cB3-r-own-schval">
+          <bounds x="420" y="240" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-p-schval-bs" source="dgmB3-bp-schvalovani-jednani" target="dgmB3-bs-schvalovani-jednani" archimateRelationship="rel-r-p-schval-bs-schval"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bp-sprava-zaznamu" archimateElement="bp-sprava-zaznamu" targetConnections="cB3-r-pm-p-zazn cB3-r-tm-zazn">
+          <bounds x="610" y="240" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-p-zazn-bs" source="dgmB3-bp-sprava-zaznamu" target="dgmB3-bs-sprava-zaznamu" archimateRelationship="rel-r-p-zazn-bs-zazn"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bp-sprava-tymu" archimateElement="bp-sprava-tymu" targetConnections="cB3-r-pm-p-tym cB3-r-adm-tym">
+          <bounds x="800" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bp-sprava-osob" archimateElement="bp-sprava-osob" targetConnections="cB3-r-adm-osob cB3-r-sys-osob">
+          <bounds x="990" y="240" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-p-osob-bs" source="dgmB3-bp-sprava-osob" target="dgmB3-bs-sprava-osob" archimateRelationship="rel-r-p-osob-bs-osob"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bp-sprava-vyzev" archimateElement="bp-sprava-vyzev" targetConnections="cB3-r-pm-p-vyz">
+          <bounds x="1180" y="240" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB3-r-p-vyz-bs" source="dgmB3-bp-sprava-vyzev" target="dgmB3-bs-evidence-vyzev" archimateRelationship="rel-r-p-vyz-bs-vyz"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bp-komentare-ss" archimateElement="bp-komentare-ss" targetConnections="cB3-r-ss-kom">
+          <bounds x="1370" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bs-evidence-projektu" archimateElement="bs-evidence-projektu" targetConnections="cB3-r-p-proj-bs">
+          <bounds x="40" y="440" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bs-rizeni-jednani" archimateElement="bs-rizeni-jednani" targetConnections="cB3-r-p-plan-bs">
+          <bounds x="250" y="440" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bs-schvalovani-jednani" archimateElement="bs-schvalovani-jednani" targetConnections="cB3-r-p-schval-bs">
+          <bounds x="460" y="440" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bs-sprava-zaznamu" archimateElement="bs-sprava-zaznamu" targetConnections="cB3-r-p-zazn-bs">
+          <bounds x="670" y="440" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bs-reporting-projektu" archimateElement="bs-reporting-projektu">
+          <bounds x="880" y="440" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bs-autorizace-uzivatelu" archimateElement="bs-autorizace-uzivatelu">
+          <bounds x="1090" y="440" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bs-evidence-vyzev" archimateElement="bs-evidence-vyzev" targetConnections="cB3-r-p-vyz-bs">
+          <bounds x="1300" y="440" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB3-bs-sprava-osob" archimateElement="bs-sprava-osob" targetConnections="cB3-r-p-osob-bs">
+          <bounds x="1510" y="440" width="180" height="55"/>
+        </child>
+      </element>
+      <element xsi:type="archimate:ArchimateDiagramModel" name="B04 - Dekompozice business funkci" id="view-b04-function-decomp" documentation="Business Function -&gt; Process (composition). Ukazuje jak jsou procesy seskupeny do funkci.">
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bf-rizeni-projektu" archimateElement="bf-rizeni-projektu">
+          <bounds x="40" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB4-bf-riz-p-proj" source="dgmB4-bf-rizeni-projektu" target="dgmB4-bp-sprava-projektu" archimateRelationship="rel-c-bf-riz-p-proj"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB4-bf-riz-p-tym" source="dgmB4-bf-rizeni-projektu" target="dgmB4-bp-sprava-tymu" archimateRelationship="rel-c-bf-riz-p-tym"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bf-rizeni-jednani" archimateElement="bf-rizeni-jednani">
+          <bounds x="230" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB4-bf-jed-p-plan" source="dgmB4-bf-rizeni-jednani" target="dgmB4-bp-planovani-jednani" archimateRelationship="rel-c-bf-jed-p-plan"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB4-bf-jed-p-schval" source="dgmB4-bf-rizeni-jednani" target="dgmB4-bp-schvalovani-jednani" archimateRelationship="rel-c-bf-jed-p-schval"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bf-evidence-ukolu" archimateElement="bf-evidence-ukolu">
+          <bounds x="420" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB4-bf-ev-p-zazn" source="dgmB4-bf-evidence-ukolu" target="dgmB4-bp-sprava-zaznamu" archimateRelationship="rel-c-bf-ev-p-zazn"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB4-bf-ev-p-kom" source="dgmB4-bf-evidence-ukolu" target="dgmB4-bp-komentare-ss" archimateRelationship="rel-c-bf-ev-p-kom"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bf-personalni-sprava" archimateElement="bf-personalni-sprava">
+          <bounds x="610" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB4-bf-pers-p-osob" source="dgmB4-bf-personalni-sprava" target="dgmB4-bp-sprava-osob" archimateRelationship="rel-c-bf-pers-p-osob"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bf-referencni-data" archimateElement="bf-referencni-data">
+          <bounds x="800" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bf-tender-management" archimateElement="bf-tender-management">
+          <bounds x="990" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB4-bf-tend-p-vyz" source="dgmB4-bf-tender-management" target="dgmB4-bp-sprava-vyzev" archimateRelationship="rel-c-bf-tend-p-vyz"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bf-reporting" archimateElement="bf-reporting">
+          <bounds x="1180" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bf-bezpecnost-autz" archimateElement="bf-bezpecnost-autz">
+          <bounds x="1370" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bp-sprava-projektu" archimateElement="bp-sprava-projektu" targetConnections="cB4-bf-riz-p-proj">
+          <bounds x="40" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bp-planovani-jednani" archimateElement="bp-planovani-jednani" targetConnections="cB4-bf-jed-p-plan">
+          <bounds x="230" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bp-schvalovani-jednani" archimateElement="bp-schvalovani-jednani" targetConnections="cB4-bf-jed-p-schval">
+          <bounds x="420" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bp-sprava-zaznamu" archimateElement="bp-sprava-zaznamu" targetConnections="cB4-bf-ev-p-zazn">
+          <bounds x="610" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bp-sprava-tymu" archimateElement="bp-sprava-tymu" targetConnections="cB4-bf-riz-p-tym">
+          <bounds x="800" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bp-sprava-osob" archimateElement="bp-sprava-osob" targetConnections="cB4-bf-pers-p-osob">
+          <bounds x="990" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bp-sprava-vyzev" archimateElement="bp-sprava-vyzev" targetConnections="cB4-bf-tend-p-vyz">
+          <bounds x="1180" y="240" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB4-bp-komentare-ss" archimateElement="bp-komentare-ss" targetConnections="cB4-bf-ev-p-kom">
+          <bounds x="1370" y="240" width="170" height="55"/>
+        </child>
+      </element>
+      <element xsi:type="archimate:ArchimateDiagramModel" name="B05 - Konzumace business sluzeb" id="view-b05-service-consumption" documentation="Business Service -&gt; Role (serving) - kdo konzumuje kterou business sluzbu.">
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-br-project-manager" archimateElement="br-project-manager" targetConnections="cB5-bs-evid-pm cB5-bs-riz-pm cB5-bs-zazn-pm cB5-bs-rep-pm cB5-bs-vyz-pm">
+          <bounds x="40" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-br-project-owner" archimateElement="br-project-owner" targetConnections="cB5-bs-evid-own cB5-bs-riz-own cB5-bs-schval-own cB5-bs-rep-own">
+          <bounds x="300" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-br-project-admin" archimateElement="br-project-admin" targetConnections="cB5-bs-evid-adm cB5-bs-osob-adm">
+          <bounds x="560" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-br-subsystem-lead" archimateElement="br-subsystem-lead" targetConnections="cB5-bs-zazn-ss">
+          <bounds x="820" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-br-team-member" archimateElement="br-team-member" targetConnections="cB5-bs-zazn-tm">
+          <bounds x="1080" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-br-system-admin" archimateElement="br-system-admin" targetConnections="cB5-bs-aut-sys cB5-bs-osob-sys">
+          <bounds x="1340" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-bs-evidence-projektu" archimateElement="bs-evidence-projektu">
+          <bounds x="40" y="240" width="180" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-evid-pm" source="dgmB5-bs-evidence-projektu" target="dgmB5-br-project-manager" archimateRelationship="rel-s-bs-evid-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-evid-own" source="dgmB5-bs-evidence-projektu" target="dgmB5-br-project-owner" archimateRelationship="rel-s-bs-evid-own"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-evid-adm" source="dgmB5-bs-evidence-projektu" target="dgmB5-br-project-admin" archimateRelationship="rel-s-bs-evid-adm"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-bs-rizeni-jednani" archimateElement="bs-rizeni-jednani">
+          <bounds x="250" y="240" width="180" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-riz-pm" source="dgmB5-bs-rizeni-jednani" target="dgmB5-br-project-manager" archimateRelationship="rel-s-bs-riz-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-riz-own" source="dgmB5-bs-rizeni-jednani" target="dgmB5-br-project-owner" archimateRelationship="rel-s-bs-riz-own"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-bs-schvalovani-jednani" archimateElement="bs-schvalovani-jednani">
+          <bounds x="460" y="240" width="180" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-schval-own" source="dgmB5-bs-schvalovani-jednani" target="dgmB5-br-project-owner" archimateRelationship="rel-s-bs-schval-own"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-bs-sprava-zaznamu" archimateElement="bs-sprava-zaznamu">
+          <bounds x="670" y="240" width="180" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-zazn-pm" source="dgmB5-bs-sprava-zaznamu" target="dgmB5-br-project-manager" archimateRelationship="rel-s-bs-zazn-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-zazn-ss" source="dgmB5-bs-sprava-zaznamu" target="dgmB5-br-subsystem-lead" archimateRelationship="rel-s-bs-zazn-ss"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-zazn-tm" source="dgmB5-bs-sprava-zaznamu" target="dgmB5-br-team-member" archimateRelationship="rel-s-bs-zazn-tm"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-bs-reporting-projektu" archimateElement="bs-reporting-projektu">
+          <bounds x="880" y="240" width="180" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-rep-pm" source="dgmB5-bs-reporting-projektu" target="dgmB5-br-project-manager" archimateRelationship="rel-s-bs-rep-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-rep-own" source="dgmB5-bs-reporting-projektu" target="dgmB5-br-project-owner" archimateRelationship="rel-s-bs-rep-own"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-bs-autorizace-uzivatelu" archimateElement="bs-autorizace-uzivatelu">
+          <bounds x="1090" y="240" width="180" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-aut-sys" source="dgmB5-bs-autorizace-uzivatelu" target="dgmB5-br-system-admin" archimateRelationship="rel-s-bs-aut-sys"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-bs-evidence-vyzev" archimateElement="bs-evidence-vyzev">
+          <bounds x="1300" y="240" width="180" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-vyz-pm" source="dgmB5-bs-evidence-vyzev" target="dgmB5-br-project-manager" archimateRelationship="rel-s-bs-vyz-pm"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmB5-bs-sprava-osob" archimateElement="bs-sprava-osob">
+          <bounds x="1510" y="240" width="180" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-osob-adm" source="dgmB5-bs-sprava-osob" target="dgmB5-br-project-admin" archimateRelationship="rel-s-bs-osob-adm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cB5-bs-osob-sys" source="dgmB5-bs-sprava-osob" target="dgmB5-br-system-admin" archimateRelationship="rel-s-bs-osob-sys"/>
+        </child>
+      </element>
+    </folder>
+    <folder name="Application" id="folder-views-application">
+      <element xsi:type="archimate:ArchimateDiagramModel" name="A01 - Aplikacni komponenty (katalog)" id="view-a01-components" documentation="PmTracker.Web (monolit) s vnorenymi moduly + vedlejsi workeri a adaptery.">
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-pmtracker-web" archimateElement="ac-pmtracker-web">
+          <bounds x="600" y="40" width="260" height="60"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-web-proj" source="dgmA1-ac-pmtracker-web" target="dgmA1-ac-projects-module" archimateRelationship="rel-c-web-proj"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-web-rec" source="dgmA1-ac-pmtracker-web" target="dgmA1-ac-records-module" archimateRelationship="rel-c-web-rec"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-web-meet" source="dgmA1-ac-pmtracker-web" target="dgmA1-ac-meetings-module" archimateRelationship="rel-c-web-meet"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-web-peo" source="dgmA1-ac-pmtracker-web" target="dgmA1-ac-people-module" archimateRelationship="rel-c-web-peo"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-web-team" source="dgmA1-ac-pmtracker-web" target="dgmA1-ac-team-module" archimateRelationship="rel-c-web-team"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-web-cis" source="dgmA1-ac-pmtracker-web" target="dgmA1-ac-ciselniky-module" archimateRelationship="rel-c-web-cis"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-web-vyz" source="dgmA1-ac-pmtracker-web" target="dgmA1-ac-vyzvy-module" archimateRelationship="rel-c-web-vyz"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-web-dash" source="dgmA1-ac-pmtracker-web" target="dgmA1-ac-dashboard-module" archimateRelationship="rel-c-web-dash"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-web-authz" source="dgmA1-ac-pmtracker-web" target="dgmA1-ac-authz-module" archimateRelationship="rel-c-web-authz"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-web-docs" source="dgmA1-ac-pmtracker-web" target="dgmA1-ac-docs-module" archimateRelationship="rel-c-web-docs"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-projects-module" archimateElement="ac-projects-module" targetConnections="cA1-web-proj">
+          <bounds x="40" y="180" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-records-module" archimateElement="ac-records-module" targetConnections="cA1-web-rec">
+          <bounds x="230" y="180" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-meetings-module" archimateElement="ac-meetings-module" targetConnections="cA1-web-meet">
+          <bounds x="420" y="180" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-people-module" archimateElement="ac-people-module" targetConnections="cA1-web-peo">
+          <bounds x="610" y="180" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-team-module" archimateElement="ac-team-module" targetConnections="cA1-web-team">
+          <bounds x="800" y="180" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-ciselniky-module" archimateElement="ac-ciselniky-module" targetConnections="cA1-web-cis">
+          <bounds x="990" y="180" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-vyzvy-module" archimateElement="ac-vyzvy-module" targetConnections="cA1-web-vyz">
+          <bounds x="1180" y="180" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-dashboard-module" archimateElement="ac-dashboard-module" targetConnections="cA1-web-dash">
+          <bounds x="1370" y="180" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-authz-module" archimateElement="ac-authz-module" targetConnections="cA1-web-authz">
+          <bounds x="1560" y="180" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-docs-module" archimateElement="ac-docs-module" targetConnections="cA1-web-docs">
+          <bounds x="1750" y="180" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-sd-contracts" archimateElement="ac-sd-contracts" targetConnections="cA1-sd-compose">
+          <bounds x="40" y="320" width="200" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-sd-sql" archimateElement="ac-sd-sql">
+          <bounds x="260" y="320" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA1-sd-compose" source="dgmA1-ac-sd-sql" target="dgmA1-ac-sd-contracts" archimateRelationship="rel-c-sd-sql-contracts"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-ad-connector" archimateElement="ac-ad-connector">
+          <bounds x="480" y="320" width="200" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-export-service" archimateElement="ac-export-service">
+          <bounds x="700" y="320" width="200" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-search-worker" archimateElement="ac-search-worker">
+          <bounds x="920" y="320" width="200" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-priority-worker" archimateElement="ac-priority-worker">
+          <bounds x="1140" y="320" width="200" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA1-ac-sql-validator" archimateElement="ac-sql-validator">
+          <bounds x="1360" y="320" width="200" height="55"/>
+        </child>
+      </element>
+      <element xsi:type="archimate:ArchimateDiagramModel" name="A02 - Aplikacni sluzby (katalog)" id="view-a02-services" documentation="Vsech 14 aplikacnich sluzeb + komponenty, ktere je realizuji.">
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-projects-module" archimateElement="ac-projects-module">
+          <bounds x="40" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-proj" source="dgmA2-ac-projects-module" target="dgmA2-as-project-mgmt" archimateRelationship="rel-r-c-proj-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-records-module" archimateElement="ac-records-module">
+          <bounds x="230" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-rec" source="dgmA2-ac-records-module" target="dgmA2-as-record-mgmt" archimateRelationship="rel-r-c-rec-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-meetings-module" archimateElement="ac-meetings-module">
+          <bounds x="420" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-meet" source="dgmA2-ac-meetings-module" target="dgmA2-as-meeting-mgmt" archimateRelationship="rel-r-c-meet-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-people-module" archimateElement="ac-people-module">
+          <bounds x="610" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-peo" source="dgmA2-ac-people-module" target="dgmA2-as-people-directory" archimateRelationship="rel-r-c-peo-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-authz-module" archimateElement="ac-authz-module">
+          <bounds x="800" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-role" source="dgmA2-ac-authz-module" target="dgmA2-as-role-mgmt" archimateRelationship="rel-r-c-authz-rolemgmt"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-auth" source="dgmA2-ac-authz-module" target="dgmA2-as-authentication" archimateRelationship="rel-r-c-authz-auth"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-ciselniky-module" archimateElement="ac-ciselniky-module">
+          <bounds x="990" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-refd" source="dgmA2-ac-ciselniky-module" target="dgmA2-as-reference-data" archimateRelationship="rel-r-c-cis-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-vyzvy-module" archimateElement="ac-vyzvy-module">
+          <bounds x="1180" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-tend" source="dgmA2-ac-vyzvy-module" target="dgmA2-as-tender-mgmt" archimateRelationship="rel-r-c-vyz-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-export-service" archimateElement="ac-export-service">
+          <bounds x="1370" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-exp" source="dgmA2-ac-export-service" target="dgmA2-as-export-reporting" archimateRelationship="rel-r-c-exp-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-dashboard-module" archimateElement="ac-dashboard-module">
+          <bounds x="1560" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-dash" source="dgmA2-ac-dashboard-module" target="dgmA2-as-dashboard" archimateRelationship="rel-r-c-dash-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-docs-module" archimateElement="ac-docs-module">
+          <bounds x="1750" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-docs" source="dgmA2-ac-docs-module" target="dgmA2-as-docs" archimateRelationship="rel-r-c-docs-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-search-worker" archimateElement="ac-search-worker">
+          <bounds x="1940" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-search" source="dgmA2-ac-search-worker" target="dgmA2-as-search-indexing" archimateRelationship="rel-r-c-search-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-sd-sql" archimateElement="ac-sd-sql">
+          <bounds x="2130" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-sd" source="dgmA2-ac-sd-sql" target="dgmA2-as-sd-integration" archimateRelationship="rel-r-c-sdsql-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-ac-ad-connector" archimateElement="ac-ad-connector">
+          <bounds x="2320" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA2-ad" source="dgmA2-ac-ad-connector" target="dgmA2-as-ad-lookup" archimateRelationship="rel-r-c-adc-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-project-mgmt" archimateElement="as-project-mgmt" targetConnections="cA2-proj">
+          <bounds x="40" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-record-mgmt" archimateElement="as-record-mgmt" targetConnections="cA2-rec">
+          <bounds x="230" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-meeting-mgmt" archimateElement="as-meeting-mgmt" targetConnections="cA2-meet">
+          <bounds x="420" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-people-directory" archimateElement="as-people-directory" targetConnections="cA2-peo">
+          <bounds x="610" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-role-mgmt" archimateElement="as-role-mgmt" targetConnections="cA2-role">
+          <bounds x="800" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-reference-data" archimateElement="as-reference-data" targetConnections="cA2-refd">
+          <bounds x="990" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-tender-mgmt" archimateElement="as-tender-mgmt" targetConnections="cA2-tend">
+          <bounds x="1180" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-export-reporting" archimateElement="as-export-reporting" targetConnections="cA2-exp">
+          <bounds x="1370" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-dashboard" archimateElement="as-dashboard" targetConnections="cA2-dash">
+          <bounds x="1560" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-docs" archimateElement="as-docs" targetConnections="cA2-docs">
+          <bounds x="1750" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-search-indexing" archimateElement="as-search-indexing" targetConnections="cA2-search">
+          <bounds x="1940" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-sd-integration" archimateElement="as-sd-integration" targetConnections="cA2-sd">
+          <bounds x="2130" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-ad-lookup" archimateElement="as-ad-lookup" targetConnections="cA2-ad">
+          <bounds x="2320" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA2-as-authentication" archimateElement="as-authentication" targetConnections="cA2-auth">
+          <bounds x="2500" y="240" width="180" height="55"/>
+        </child>
+      </element>
+      <element xsi:type="archimate:ArchimateDiagramModel" name="A03 - Aplikacni funkce" id="view-a03-functions" documentation="Component -&gt; ApplicationFunction (assignment) - interni funkce komponent.">
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-ac-projects-module" archimateElement="ac-projects-module">
+          <bounds x="40" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA3-a-proj" source="dgmA3-ac-projects-module" target="dgmA3-af-project-lifecycle" archimateRelationship="rel-a-c-proj-af"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-ac-records-module" archimateElement="ac-records-module">
+          <bounds x="230" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA3-a-rec" source="dgmA3-ac-records-module" target="dgmA3-af-record-scheduling" archimateRelationship="rel-a-c-rec-af"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-ac-meetings-module" archimateElement="ac-meetings-module">
+          <bounds x="420" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA3-a-meet" source="dgmA3-ac-meetings-module" target="dgmA3-af-meeting-workflow" archimateRelationship="rel-a-c-meet-af"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-ac-authz-module" archimateElement="ac-authz-module">
+          <bounds x="610" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA3-a-authz" source="dgmA3-ac-authz-module" target="dgmA3-af-permission-eval" archimateRelationship="rel-a-c-authz-af"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-ac-search-worker" archimateElement="ac-search-worker">
+          <bounds x="800" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA3-a-search" source="dgmA3-ac-search-worker" target="dgmA3-af-fulltext-indexing" archimateRelationship="rel-a-c-search-af"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-ac-priority-worker" archimateElement="ac-priority-worker">
+          <bounds x="990" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA3-a-prio" source="dgmA3-ac-priority-worker" target="dgmA3-af-priority-matrix" archimateRelationship="rel-a-c-prio-af"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-ac-export-service" archimateElement="ac-export-service">
+          <bounds x="1180" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA3-a-exp" source="dgmA3-ac-export-service" target="dgmA3-af-document-export" archimateRelationship="rel-a-c-exp-af"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-ac-ad-connector" archimateElement="ac-ad-connector">
+          <bounds x="1370" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA3-a-ad" source="dgmA3-ac-ad-connector" target="dgmA3-af-ad-resolution" archimateRelationship="rel-a-c-adc-af"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-af-project-lifecycle" archimateElement="af-project-lifecycle" targetConnections="cA3-a-proj">
+          <bounds x="40" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-af-record-scheduling" archimateElement="af-record-scheduling" targetConnections="cA3-a-rec">
+          <bounds x="230" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-af-meeting-workflow" archimateElement="af-meeting-workflow" targetConnections="cA3-a-meet">
+          <bounds x="420" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-af-permission-eval" archimateElement="af-permission-eval" targetConnections="cA3-a-authz">
+          <bounds x="610" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-af-fulltext-indexing" archimateElement="af-fulltext-indexing" targetConnections="cA3-a-search">
+          <bounds x="800" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-af-priority-matrix" archimateElement="af-priority-matrix" targetConnections="cA3-a-prio">
+          <bounds x="990" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-af-document-export" archimateElement="af-document-export" targetConnections="cA3-a-exp">
+          <bounds x="1180" y="240" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA3-af-ad-resolution" archimateElement="af-ad-resolution" targetConnections="cA3-a-ad">
+          <bounds x="1370" y="240" width="180" height="55"/>
+        </child>
+      </element>
+      <element xsi:type="archimate:ArchimateDiagramModel" name="A04 - Data &amp; Access" id="view-a04-data" documentation="Component -&gt; DataObject (access) - ktery modul ma read/write pristup na kterou datovou entitu.">
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-ac-projects-module" archimateElement="ac-projects-module">
+          <bounds x="40" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA4-proj" source="dgmA4-ac-projects-module" target="dgmA4-do-project" archimateRelationship="rel-acc-proj-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-ac-records-module" archimateElement="ac-records-module">
+          <bounds x="230" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA4-rec" source="dgmA4-ac-records-module" target="dgmA4-do-record" archimateRelationship="rel-acc-rec-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-ac-meetings-module" archimateElement="ac-meetings-module">
+          <bounds x="420" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA4-meet" source="dgmA4-ac-meetings-module" target="dgmA4-do-meeting" archimateRelationship="rel-acc-meet-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-ac-people-module" archimateElement="ac-people-module">
+          <bounds x="610" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA4-peo" source="dgmA4-ac-people-module" target="dgmA4-do-person" archimateRelationship="rel-acc-peo-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-ac-team-module" archimateElement="ac-team-module">
+          <bounds x="800" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA4-team" source="dgmA4-ac-team-module" target="dgmA4-do-team-member" archimateRelationship="rel-acc-team-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-ac-authz-module" archimateElement="ac-authz-module">
+          <bounds x="990" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA4-role" source="dgmA4-ac-authz-module" target="dgmA4-do-authz-role" archimateRelationship="rel-acc-authz-role"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA4-perm" source="dgmA4-ac-authz-module" target="dgmA4-do-authz-permission" archimateRelationship="rel-acc-authz-perm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA4-audit" source="dgmA4-ac-authz-module" target="dgmA4-do-audit-log" archimateRelationship="rel-acc-audit"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-ac-ciselniky-module" archimateElement="ac-ciselniky-module">
+          <bounds x="1180" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA4-cis" source="dgmA4-ac-ciselniky-module" target="dgmA4-do-ciselnik" archimateRelationship="rel-acc-cis-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-ac-vyzvy-module" archimateElement="ac-vyzvy-module">
+          <bounds x="1370" y="40" width="170" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cA4-vyz" source="dgmA4-ac-vyzvy-module" target="dgmA4-do-vyzva" archimateRelationship="rel-acc-vyz-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-do-project" archimateElement="do-project" targetConnections="cA4-proj">
+          <bounds x="40" y="240" width="160" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-do-record" archimateElement="do-record" targetConnections="cA4-rec">
+          <bounds x="220" y="240" width="160" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-do-meeting" archimateElement="do-meeting" targetConnections="cA4-meet">
+          <bounds x="400" y="240" width="160" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-do-person" archimateElement="do-person" targetConnections="cA4-peo">
+          <bounds x="580" y="240" width="160" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-do-team-member" archimateElement="do-team-member" targetConnections="cA4-team">
+          <bounds x="760" y="240" width="160" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-do-authz-role" archimateElement="do-authz-role" targetConnections="cA4-role">
+          <bounds x="940" y="240" width="160" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-do-authz-permission" archimateElement="do-authz-permission" targetConnections="cA4-perm">
+          <bounds x="1120" y="240" width="160" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-do-ciselnik" archimateElement="do-ciselnik" targetConnections="cA4-cis">
+          <bounds x="1300" y="240" width="160" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-do-vyzva" archimateElement="do-vyzva" targetConnections="cA4-vyz">
+          <bounds x="1480" y="240" width="160" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmA4-do-audit-log" archimateElement="do-audit-log" targetConnections="cA4-audit">
+          <bounds x="1660" y="240" width="160" height="55"/>
+        </child>
+      </element>
+    </folder>
+    <folder name="Technology" id="folder-views-technology">
+      <element xsi:type="archimate:ArchimateDiagramModel" name="T01 - Infrastruktura &amp; System Software" id="view-t01-infrastructure" documentation="Fyzicke nody (IIS, SQL, AD, klient) + System Software na nich instalovany.">
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-tn-web-server" archimateElement="tn-web-server" targetConnections="cT1-iis cT1-dotnet cT1-wa cT1-ef cT1-client-web">
+          <bounds x="40" y="40" width="220" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-tn-db-server" archimateElement="tn-db-server" targetConnections="cT1-sql-db">
+          <bounds x="280" y="40" width="220" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-tn-sd-db" archimateElement="tn-sd-db">
+          <bounds x="520" y="40" width="220" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-tn-ad-server" archimateElement="tn-ad-server" targetConnections="cT1-ad">
+          <bounds x="760" y="40" width="220" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-tn-client" archimateElement="tn-client">
+          <bounds x="1000" y="40" width="220" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT1-client-web" source="dgmT1-tn-client" target="dgmT1-tn-web-server" archimateRelationship="rel-f-client-web"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-ss-iis" archimateElement="ss-iis">
+          <bounds x="30" y="220" width="140" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT1-iis" source="dgmT1-ss-iis" target="dgmT1-tn-web-server" archimateRelationship="rel-ss-iis"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-ss-dotnet" archimateElement="ss-dotnet">
+          <bounds x="180" y="220" width="140" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT1-dotnet" source="dgmT1-ss-dotnet" target="dgmT1-tn-web-server" archimateRelationship="rel-ss-dotnet"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-ss-wa" archimateElement="ss-windows-auth">
+          <bounds x="30" y="290" width="180" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT1-wa" source="dgmT1-ss-wa" target="dgmT1-tn-web-server" archimateRelationship="rel-ss-wa"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-ss-efcore" archimateElement="ss-efcore">
+          <bounds x="220" y="290" width="140" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT1-ef" source="dgmT1-ss-efcore" target="dgmT1-tn-web-server" archimateRelationship="rel-ss-efcore"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-ss-sqlserver" archimateElement="ss-sqlserver">
+          <bounds x="280" y="220" width="180" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT1-sql-db" source="dgmT1-ss-sqlserver" target="dgmT1-tn-db-server" archimateRelationship="rel-ss-sql-db"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT1-ss-ad" archimateElement="ss-ad">
+          <bounds x="760" y="220" width="160" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT1-ad" source="dgmT1-ss-ad" target="dgmT1-tn-ad-server" archimateRelationship="rel-ss-ad"/>
+        </child>
+      </element>
+      <element xsi:type="archimate:ArchimateDiagramModel" name="T02 - Technology Services" id="view-t02-services" documentation="Nody realizuji technology services (web hosting, SQL, AD auth, SD read-only).">
+        <child xsi:type="archimate:DiagramObject" id="dgmT2-tn-web-server" archimateElement="tn-web-server">
+          <bounds x="40" y="40" width="220" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT2-web-r" source="dgmT2-tn-web-server" target="dgmT2-tsvc-web-hosting" archimateRelationship="rel-tsvc-web-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT2-tn-db-server" archimateElement="tn-db-server">
+          <bounds x="280" y="40" width="220" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT2-sql-r" source="dgmT2-tn-db-server" target="dgmT2-tsvc-sql-db" archimateRelationship="rel-tsvc-sql-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT2-tn-sd-db" archimateElement="tn-sd-db">
+          <bounds x="520" y="40" width="220" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT2-sd-r" source="dgmT2-tn-sd-db" target="dgmT2-tsvc-sd-readonly" archimateRelationship="rel-tsvc-sd-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT2-tn-ad-server" archimateElement="tn-ad-server">
+          <bounds x="760" y="40" width="220" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cT2-ad-r" source="dgmT2-tn-ad-server" target="dgmT2-tsvc-ad-auth" archimateRelationship="rel-tsvc-ad-r"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT2-tsvc-web-hosting" archimateElement="tsvc-web-hosting" targetConnections="cT2-web-r">
+          <bounds x="40" y="240" width="220" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT2-tsvc-sql-db" archimateElement="tsvc-sql-db" targetConnections="cT2-sql-r">
+          <bounds x="280" y="240" width="220" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT2-tsvc-ad-auth" archimateElement="tsvc-ad-auth" targetConnections="cT2-ad-r">
+          <bounds x="520" y="240" width="220" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmT2-tsvc-sd-readonly" archimateElement="tsvc-sd-readonly" targetConnections="cT2-sd-r">
+          <bounds x="760" y="240" width="220" height="55"/>
+        </child>
+      </element>
+    </folder>
+    <folder name="Business-Application" id="folder-views-ba">
+      <element xsi:type="archimate:ArchimateDiagramModel" name="BA01 - Realizace: App sluzba -&gt; Business sluzba" id="view-ba01-realization" documentation="Aplikacni sluzba -&gt; Business sluzba (realization). Kazda BS ma alespon jeden AS realizator.">
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-bs-evidence-projektu" archimateElement="bs-evidence-projektu" targetConnections="cBA1-proj">
+          <bounds x="40" y="40" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-bs-rizeni-jednani" archimateElement="bs-rizeni-jednani" targetConnections="cBA1-meet">
+          <bounds x="240" y="40" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-bs-schvalovani-jednani" archimateElement="bs-schvalovani-jednani" targetConnections="cBA1-schval">
+          <bounds x="440" y="40" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-bs-sprava-zaznamu" archimateElement="bs-sprava-zaznamu" targetConnections="cBA1-rec">
+          <bounds x="640" y="40" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-bs-reporting-projektu" archimateElement="bs-reporting-projektu" targetConnections="cBA1-exp">
+          <bounds x="840" y="40" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-bs-autorizace-uzivatelu" archimateElement="bs-autorizace-uzivatelu" targetConnections="cBA1-role">
+          <bounds x="1040" y="40" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-bs-evidence-vyzev" archimateElement="bs-evidence-vyzev" targetConnections="cBA1-tend">
+          <bounds x="1240" y="40" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-bs-sprava-osob" archimateElement="bs-sprava-osob" targetConnections="cBA1-peo">
+          <bounds x="1440" y="40" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-as-project-mgmt" archimateElement="as-project-mgmt">
+          <bounds x="40" y="240" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA1-proj" source="dgmBA1-as-project-mgmt" target="dgmBA1-bs-evidence-projektu" archimateRelationship="rel-r-as-proj-bs"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-as-meeting-mgmt" archimateElement="as-meeting-mgmt">
+          <bounds x="260" y="240" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA1-meet" source="dgmBA1-as-meeting-mgmt" target="dgmBA1-bs-rizeni-jednani" archimateRelationship="rel-r-as-meet-bs"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA1-schval" source="dgmBA1-as-meeting-mgmt" target="dgmBA1-bs-schvalovani-jednani" archimateRelationship="rel-r-as-meet-bs2"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-as-record-mgmt" archimateElement="as-record-mgmt">
+          <bounds x="480" y="240" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA1-rec" source="dgmBA1-as-record-mgmt" target="dgmBA1-bs-sprava-zaznamu" archimateRelationship="rel-r-as-rec-bs"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-as-role-mgmt" archimateElement="as-role-mgmt">
+          <bounds x="700" y="240" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA1-role" source="dgmBA1-as-role-mgmt" target="dgmBA1-bs-autorizace-uzivatelu" archimateRelationship="rel-r-as-role-bs"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-as-tender-mgmt" archimateElement="as-tender-mgmt">
+          <bounds x="920" y="240" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA1-tend" source="dgmBA1-as-tender-mgmt" target="dgmBA1-bs-evidence-vyzev" archimateRelationship="rel-r-as-tend-bs"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-as-export-reporting" archimateElement="as-export-reporting">
+          <bounds x="1140" y="240" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA1-exp" source="dgmBA1-as-export-reporting" target="dgmBA1-bs-reporting-projektu" archimateRelationship="rel-r-as-exp-bs"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA1-as-people-directory" archimateElement="as-people-directory">
+          <bounds x="1360" y="240" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA1-peo" source="dgmBA1-as-people-directory" target="dgmBA1-bs-sprava-osob" archimateRelationship="rel-r-as-peo-bs"/>
+        </child>
+      </element>
+      <element xsi:type="archimate:ArchimateDiagramModel" name="BA02 - Kompletni alignment" id="view-ba02-full-alignment" documentation="Kompletni pohled: Role -&gt; BS -&gt; AS -&gt; Component -&gt; Data. Klicovy dokumentacni pohled.">
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-br-project-manager" archimateElement="br-project-manager" targetConnections="cBA2-asp-pm cBA2-asm-pm cBA2-asr-pm cBA2-asexp-pm cBA2-astend-pm cBA2-asdash-pm cBA2-bsevid-pm cBA2-bsriz-pm cBA2-bszazn-pm cBA2-bsrep-pm cBA2-bsvyz-pm">
+          <bounds x="40" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-br-project-owner" archimateElement="br-project-owner" targetConnections="cBA2-asp-own cBA2-asm-own cBA2-asexp-own cBA2-bsevid-own cBA2-bsriz-own cBA2-bsschval-own cBA2-bsrep-own">
+          <bounds x="300" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-br-project-admin" archimateElement="br-project-admin" targetConnections="cBA2-aspeo-adm cBA2-bsevid-adm cBA2-bsosob-adm">
+          <bounds x="560" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-br-subsystem-lead" archimateElement="br-subsystem-lead" targetConnections="cBA2-asr-ss cBA2-asdash-ss cBA2-bszazn-ss">
+          <bounds x="820" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-br-team-member" archimateElement="br-team-member" targetConnections="cBA2-asr-tm cBA2-asdash-tm cBA2-bszazn-tm">
+          <bounds x="1080" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-br-system-admin" archimateElement="br-system-admin" targetConnections="cBA2-aspeo-sys cBA2-asrole-sys cBA2-bsaut-sys cBA2-bsosob-sys">
+          <bounds x="1340" y="40" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-bs-evidence-projektu" archimateElement="bs-evidence-projektu" targetConnections="cBA2-asp-bs">
+          <bounds x="40" y="200" width="190" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsevid-pm" source="dgmBA2-bs-evidence-projektu" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-bs-evid-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsevid-own" source="dgmBA2-bs-evidence-projektu" target="dgmBA2-br-project-owner" archimateRelationship="rel-s-bs-evid-own"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsevid-adm" source="dgmBA2-bs-evidence-projektu" target="dgmBA2-br-project-admin" archimateRelationship="rel-s-bs-evid-adm"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-bs-rizeni-jednani" archimateElement="bs-rizeni-jednani" targetConnections="cBA2-asm-bs">
+          <bounds x="250" y="200" width="190" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsriz-pm" source="dgmBA2-bs-rizeni-jednani" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-bs-riz-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsriz-own" source="dgmBA2-bs-rizeni-jednani" target="dgmBA2-br-project-owner" archimateRelationship="rel-s-bs-riz-own"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-bs-schvalovani-jednani" archimateElement="bs-schvalovani-jednani" targetConnections="cBA2-asm-bs2">
+          <bounds x="460" y="200" width="190" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsschval-own" source="dgmBA2-bs-schvalovani-jednani" target="dgmBA2-br-project-owner" archimateRelationship="rel-s-bs-schval-own"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-bs-sprava-zaznamu" archimateElement="bs-sprava-zaznamu" targetConnections="cBA2-asr-bs">
+          <bounds x="670" y="200" width="190" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bszazn-pm" source="dgmBA2-bs-sprava-zaznamu" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-bs-zazn-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bszazn-ss" source="dgmBA2-bs-sprava-zaznamu" target="dgmBA2-br-subsystem-lead" archimateRelationship="rel-s-bs-zazn-ss"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bszazn-tm" source="dgmBA2-bs-sprava-zaznamu" target="dgmBA2-br-team-member" archimateRelationship="rel-s-bs-zazn-tm"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-bs-reporting-projektu" archimateElement="bs-reporting-projektu" targetConnections="cBA2-asexp-bs">
+          <bounds x="880" y="200" width="190" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsrep-pm" source="dgmBA2-bs-reporting-projektu" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-bs-rep-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsrep-own" source="dgmBA2-bs-reporting-projektu" target="dgmBA2-br-project-owner" archimateRelationship="rel-s-bs-rep-own"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-bs-autorizace-uzivatelu" archimateElement="bs-autorizace-uzivatelu" targetConnections="cBA2-asrole-bs">
+          <bounds x="1090" y="200" width="190" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsaut-sys" source="dgmBA2-bs-autorizace-uzivatelu" target="dgmBA2-br-system-admin" archimateRelationship="rel-s-bs-aut-sys"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-bs-evidence-vyzev" archimateElement="bs-evidence-vyzev" targetConnections="cBA2-astend-bs">
+          <bounds x="1300" y="200" width="190" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsvyz-pm" source="dgmBA2-bs-evidence-vyzev" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-bs-vyz-pm"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-bs-sprava-osob" archimateElement="bs-sprava-osob" targetConnections="cBA2-aspeo-bs">
+          <bounds x="1510" y="200" width="190" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsosob-adm" source="dgmBA2-bs-sprava-osob" target="dgmBA2-br-project-admin" archimateRelationship="rel-s-bs-osob-adm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-bsosob-sys" source="dgmBA2-bs-sprava-osob" target="dgmBA2-br-system-admin" archimateRelationship="rel-s-bs-osob-sys"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-as-project-mgmt" archimateElement="as-project-mgmt" targetConnections="cBA2-acp-as">
+          <bounds x="40" y="360" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asp-bs" source="dgmBA2-as-project-mgmt" target="dgmBA2-bs-evidence-projektu" archimateRelationship="rel-r-as-proj-bs"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asp-pm" source="dgmBA2-as-project-mgmt" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-as-proj-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asp-own" source="dgmBA2-as-project-mgmt" target="dgmBA2-br-project-owner" archimateRelationship="rel-s-as-proj-own"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-as-meeting-mgmt" archimateElement="as-meeting-mgmt" targetConnections="cBA2-acm-as">
+          <bounds x="260" y="360" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asm-bs" source="dgmBA2-as-meeting-mgmt" target="dgmBA2-bs-rizeni-jednani" archimateRelationship="rel-r-as-meet-bs"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asm-bs2" source="dgmBA2-as-meeting-mgmt" target="dgmBA2-bs-schvalovani-jednani" archimateRelationship="rel-r-as-meet-bs2"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asm-pm" source="dgmBA2-as-meeting-mgmt" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-as-meet-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asm-own" source="dgmBA2-as-meeting-mgmt" target="dgmBA2-br-project-owner" archimateRelationship="rel-s-as-meet-own"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-as-record-mgmt" archimateElement="as-record-mgmt" targetConnections="cBA2-acr-as">
+          <bounds x="480" y="360" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asr-bs" source="dgmBA2-as-record-mgmt" target="dgmBA2-bs-sprava-zaznamu" archimateRelationship="rel-r-as-rec-bs"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asr-pm" source="dgmBA2-as-record-mgmt" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-as-rec-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asr-ss" source="dgmBA2-as-record-mgmt" target="dgmBA2-br-subsystem-lead" archimateRelationship="rel-s-as-rec-ss"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asr-tm" source="dgmBA2-as-record-mgmt" target="dgmBA2-br-team-member" archimateRelationship="rel-s-as-rec-tm"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-as-people-directory" archimateElement="as-people-directory" targetConnections="cBA2-acpeo-as">
+          <bounds x="700" y="360" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-aspeo-bs" source="dgmBA2-as-people-directory" target="dgmBA2-bs-sprava-osob" archimateRelationship="rel-r-as-peo-bs"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-aspeo-adm" source="dgmBA2-as-people-directory" target="dgmBA2-br-project-admin" archimateRelationship="rel-s-as-peo-adm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-aspeo-sys" source="dgmBA2-as-people-directory" target="dgmBA2-br-system-admin" archimateRelationship="rel-s-as-peo-sys"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-as-role-mgmt" archimateElement="as-role-mgmt" targetConnections="cBA2-acauthz-as">
+          <bounds x="920" y="360" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asrole-bs" source="dgmBA2-as-role-mgmt" target="dgmBA2-bs-autorizace-uzivatelu" archimateRelationship="rel-r-as-role-bs"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asrole-sys" source="dgmBA2-as-role-mgmt" target="dgmBA2-br-system-admin" archimateRelationship="rel-s-as-role-sys"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-as-export-reporting" archimateElement="as-export-reporting" targetConnections="cBA2-acexp-as">
+          <bounds x="1140" y="360" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asexp-bs" source="dgmBA2-as-export-reporting" target="dgmBA2-bs-reporting-projektu" archimateRelationship="rel-r-as-exp-bs"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asexp-pm" source="dgmBA2-as-export-reporting" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-as-exp-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asexp-own" source="dgmBA2-as-export-reporting" target="dgmBA2-br-project-owner" archimateRelationship="rel-s-as-exp-own"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-as-tender-mgmt" archimateElement="as-tender-mgmt" targetConnections="cBA2-acvyz-as">
+          <bounds x="1360" y="360" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-astend-bs" source="dgmBA2-as-tender-mgmt" target="dgmBA2-bs-evidence-vyzev" archimateRelationship="rel-r-as-tend-bs"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-astend-pm" source="dgmBA2-as-tender-mgmt" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-as-tend-pm"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-as-dashboard" archimateElement="as-dashboard" targetConnections="cBA2-acdash-as">
+          <bounds x="1580" y="360" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asdash-pm" source="dgmBA2-as-dashboard" target="dgmBA2-br-project-manager" archimateRelationship="rel-s-as-dash-pm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asdash-ss" source="dgmBA2-as-dashboard" target="dgmBA2-br-subsystem-lead" archimateRelationship="rel-s-as-dash-ss"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-asdash-tm" source="dgmBA2-as-dashboard" target="dgmBA2-br-team-member" archimateRelationship="rel-s-as-dash-tm"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-ac-projects-module" archimateElement="ac-projects-module">
+          <bounds x="40" y="520" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acp-as" source="dgmBA2-ac-projects-module" target="dgmBA2-as-project-mgmt" archimateRelationship="rel-r-c-proj-as"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acp-do" source="dgmBA2-ac-projects-module" target="dgmBA2-do-project" archimateRelationship="rel-acc-proj-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-ac-meetings-module" archimateElement="ac-meetings-module">
+          <bounds x="260" y="520" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acm-as" source="dgmBA2-ac-meetings-module" target="dgmBA2-as-meeting-mgmt" archimateRelationship="rel-r-c-meet-as"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acm-do" source="dgmBA2-ac-meetings-module" target="dgmBA2-do-meeting" archimateRelationship="rel-acc-meet-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-ac-records-module" archimateElement="ac-records-module">
+          <bounds x="480" y="520" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acr-as" source="dgmBA2-ac-records-module" target="dgmBA2-as-record-mgmt" archimateRelationship="rel-r-c-rec-as"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acr-do" source="dgmBA2-ac-records-module" target="dgmBA2-do-record" archimateRelationship="rel-acc-rec-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-ac-people-module" archimateElement="ac-people-module">
+          <bounds x="700" y="520" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acpeo-as" source="dgmBA2-ac-people-module" target="dgmBA2-as-people-directory" archimateRelationship="rel-r-c-peo-as"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acpeo-do" source="dgmBA2-ac-people-module" target="dgmBA2-do-person" archimateRelationship="rel-acc-peo-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-ac-authz-module" archimateElement="ac-authz-module">
+          <bounds x="920" y="520" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acauthz-as" source="dgmBA2-ac-authz-module" target="dgmBA2-as-role-mgmt" archimateRelationship="rel-r-c-authz-rolemgmt"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acauthz-do" source="dgmBA2-ac-authz-module" target="dgmBA2-do-authz-role" archimateRelationship="rel-acc-authz-role"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-ac-export-service" archimateElement="ac-export-service">
+          <bounds x="1140" y="520" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acexp-as" source="dgmBA2-ac-export-service" target="dgmBA2-as-export-reporting" archimateRelationship="rel-r-c-exp-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-ac-vyzvy-module" archimateElement="ac-vyzvy-module">
+          <bounds x="1360" y="520" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acvyz-as" source="dgmBA2-ac-vyzvy-module" target="dgmBA2-as-tender-mgmt" archimateRelationship="rel-r-c-vyz-as"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acvyz-do" source="dgmBA2-ac-vyzvy-module" target="dgmBA2-do-vyzva" archimateRelationship="rel-acc-vyz-do"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-ac-dashboard-module" archimateElement="ac-dashboard-module">
+          <bounds x="1580" y="520" width="200" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cBA2-acdash-as" source="dgmBA2-ac-dashboard-module" target="dgmBA2-as-dashboard" archimateRelationship="rel-r-c-dash-as"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-do-project" archimateElement="do-project" targetConnections="cBA2-acp-do">
+          <bounds x="40" y="680" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-do-meeting" archimateElement="do-meeting" targetConnections="cBA2-acm-do">
+          <bounds x="230" y="680" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-do-record" archimateElement="do-record" targetConnections="cBA2-acr-do">
+          <bounds x="420" y="680" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-do-person" archimateElement="do-person" targetConnections="cBA2-acpeo-do">
+          <bounds x="610" y="680" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-do-authz-role" archimateElement="do-authz-role" targetConnections="cBA2-acauthz-do">
+          <bounds x="800" y="680" width="170" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmBA2-do-vyzva" archimateElement="do-vyzva" targetConnections="cBA2-acvyz-do">
+          <bounds x="990" y="680" width="170" height="55"/>
+        </child>
+      </element>
+    </folder>
+    <folder name="Application-Technology" id="folder-views-at">
+      <element xsi:type="archimate:ArchimateDiagramModel" name="AT01 - Deployment komponent na nodech" id="view-at01-deployment" documentation="Node -&gt; Component/Data (assignment). Ktery node hostuje kterou aplikacni komponentu a data.">
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-tn-web-server" archimateElement="tn-web-server">
+          <bounds x="40" y="40" width="260" height="90"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-web-app" source="dgmAT1-tn-web-server" target="dgmAT1-ac-pmtracker-web" archimateRelationship="rel-dep-web-app"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-web-exp" source="dgmAT1-tn-web-server" target="dgmAT1-ac-export-service" archimateRelationship="rel-dep-web-exp"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-web-search" source="dgmAT1-tn-web-server" target="dgmAT1-ac-search-worker" archimateRelationship="rel-dep-web-search"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-web-prio" source="dgmAT1-tn-web-server" target="dgmAT1-ac-priority-worker" archimateRelationship="rel-dep-web-prio"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-web-sqlval" source="dgmAT1-tn-web-server" target="dgmAT1-ac-sql-validator" archimateRelationship="rel-dep-web-sqlval"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-web-ad" source="dgmAT1-tn-web-server" target="dgmAT1-ac-ad-connector" archimateRelationship="rel-dep-web-ad"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-web-sdsql" source="dgmAT1-tn-web-server" target="dgmAT1-ac-sd-sql" archimateRelationship="rel-dep-web-sdsql"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-ac-pmtracker-web" archimateElement="ac-pmtracker-web" targetConnections="cAT1-web-app">
+          <bounds x="40" y="160" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-ac-export-service" archimateElement="ac-export-service" targetConnections="cAT1-web-exp">
+          <bounds x="240" y="160" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-ac-search-worker" archimateElement="ac-search-worker" targetConnections="cAT1-web-search">
+          <bounds x="440" y="160" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-ac-priority-worker" archimateElement="ac-priority-worker" targetConnections="cAT1-web-prio">
+          <bounds x="640" y="160" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-ac-sql-validator" archimateElement="ac-sql-validator" targetConnections="cAT1-web-sqlval">
+          <bounds x="840" y="160" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-ac-ad-connector" archimateElement="ac-ad-connector" targetConnections="cAT1-web-ad">
+          <bounds x="1040" y="160" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-ac-sd-sql" archimateElement="ac-sd-sql" targetConnections="cAT1-web-sdsql">
+          <bounds x="1240" y="160" width="180" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-tn-db-server" archimateElement="tn-db-server">
+          <bounds x="40" y="300" width="280" height="90"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-db-proj" source="dgmAT1-tn-db-server" target="dgmAT1-do-project" archimateRelationship="rel-dep-db-proj"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-db-rec" source="dgmAT1-tn-db-server" target="dgmAT1-do-record" archimateRelationship="rel-dep-db-rec"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-db-meet" source="dgmAT1-tn-db-server" target="dgmAT1-do-meeting" archimateRelationship="rel-dep-db-meet"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-db-peo" source="dgmAT1-tn-db-server" target="dgmAT1-do-person" archimateRelationship="rel-dep-db-peo"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-db-team" source="dgmAT1-tn-db-server" target="dgmAT1-do-team-member" archimateRelationship="rel-dep-db-team"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-db-role" source="dgmAT1-tn-db-server" target="dgmAT1-do-authz-role" archimateRelationship="rel-dep-db-role"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-db-perm" source="dgmAT1-tn-db-server" target="dgmAT1-do-authz-permission" archimateRelationship="rel-dep-db-perm"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-db-cis" source="dgmAT1-tn-db-server" target="dgmAT1-do-ciselnik" archimateRelationship="rel-dep-db-cis"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-db-vyz" source="dgmAT1-tn-db-server" target="dgmAT1-do-vyzva" archimateRelationship="rel-dep-db-vyz"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT1-db-audit" source="dgmAT1-tn-db-server" target="dgmAT1-do-audit-log" archimateRelationship="rel-dep-db-audit"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-do-project" archimateElement="do-project" targetConnections="cAT1-db-proj">
+          <bounds x="40" y="420" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-do-record" archimateElement="do-record" targetConnections="cAT1-db-rec">
+          <bounds x="210" y="420" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-do-meeting" archimateElement="do-meeting" targetConnections="cAT1-db-meet">
+          <bounds x="380" y="420" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-do-person" archimateElement="do-person" targetConnections="cAT1-db-peo">
+          <bounds x="550" y="420" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-do-team-member" archimateElement="do-team-member" targetConnections="cAT1-db-team">
+          <bounds x="720" y="420" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-do-authz-role" archimateElement="do-authz-role" targetConnections="cAT1-db-role">
+          <bounds x="890" y="420" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-do-authz-permission" archimateElement="do-authz-permission" targetConnections="cAT1-db-perm">
+          <bounds x="1060" y="420" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-do-ciselnik" archimateElement="do-ciselnik" targetConnections="cAT1-db-cis">
+          <bounds x="1230" y="420" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-do-vyzva" archimateElement="do-vyzva" targetConnections="cAT1-db-vyz">
+          <bounds x="1400" y="420" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-do-audit-log" archimateElement="do-audit-log" targetConnections="cAT1-db-audit">
+          <bounds x="1570" y="420" width="150" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-tn-ad-server" archimateElement="tn-ad-server">
+          <bounds x="360" y="300" width="220" height="90"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT1-tn-sd-db" archimateElement="tn-sd-db">
+          <bounds x="620" y="300" width="260" height="90"/>
+        </child>
+      </element>
+      <element xsi:type="archimate:ArchimateDiagramModel" name="AT02 - Tech Services -&gt; Aplikace" id="view-at02-tech-services" documentation="Technology Services servirovane aplikacnim komponentam.">
+        <child xsi:type="archimate:DiagramObject" id="dgmAT2-tsvc-web-hosting" archimateElement="tsvc-web-hosting">
+          <bounds x="40" y="40" width="220" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT2-web-app" source="dgmAT2-tsvc-web-hosting" target="dgmAT2-ac-pmtracker-web" archimateRelationship="rel-s-tsvc-web-app"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT2-tsvc-sql-db" archimateElement="tsvc-sql-db">
+          <bounds x="280" y="40" width="220" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT2-sql-web" source="dgmAT2-tsvc-sql-db" target="dgmAT2-ac-pmtracker-web" archimateRelationship="rel-s-tsvc-sql-web"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT2-tsvc-ad-auth" archimateElement="tsvc-ad-auth">
+          <bounds x="520" y="40" width="220" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT2-ad-conn" source="dgmAT2-tsvc-ad-auth" target="dgmAT2-ac-ad-connector" archimateRelationship="rel-s-tsvc-ad-conn"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT2-tsvc-sd-readonly" archimateElement="tsvc-sd-readonly">
+          <bounds x="760" y="40" width="220" height="55"/>
+          <sourceConnection xsi:type="archimate:Connection" id="cAT2-sd-adapter" source="dgmAT2-tsvc-sd-readonly" target="dgmAT2-ac-sd-sql" archimateRelationship="rel-s-tsvc-sd-adapter"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT2-ac-pmtracker-web" archimateElement="ac-pmtracker-web" targetConnections="cAT2-web-app cAT2-sql-web">
+          <bounds x="40" y="240" width="220" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT2-ac-ad-connector" archimateElement="ac-ad-connector" targetConnections="cAT2-ad-conn">
+          <bounds x="300" y="240" width="220" height="55"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="dgmAT2-ac-sd-sql" archimateElement="ac-sd-sql" targetConnections="cAT2-sd-adapter">
+          <bounds x="560" y="240" width="220" height="55"/>
+        </child>
+      </element>
+    </folder>
+  </folder>
+</archimate:model>
