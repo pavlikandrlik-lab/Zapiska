@@ -192,31 +192,43 @@ public sealed class JednaniController : BaseController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveStatus(SaveMeetingStatusCommand command, string? returnUrl, CancellationToken ct = default)
     {
-        var projektId = await _meetingService.GetMeetingProjectIdAsync(command.JednaniId, ct);
-        if (!projektId.HasValue)
+        if (command is null) return BadRequest();
+        if (!ModelState.IsValid)
         {
-            return NotFound();
+            if (IsAjaxRequest())
+                return AjaxInvalidModelResult("Uložení stavu jednání selhalo.");
+            TempData["ErrorMessage"] = InvalidFormFallbackMessage;
+            return RedirectToAction(nameof(Detail), new { id = command.JednaniId })!;
         }
 
-        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId.Value))
-        {
-            return Forbid();
-        }
+        var projektId = await _meetingService.GetMeetingProjectIdAsync(command.JednaniId, ct);
+        if (!projektId.HasValue) return NotFound();
+        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId.Value)) return Forbid();
 
         try
         {
             await _meetingService.SaveMeetingStatusAsync(command, CurrentUserContext, ct);
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
+            if (IsAjaxRequest())
+                return AjaxErrorResult(ex.Message);
             TempData["ErrorMessage"] = ex.Message;
+            return RedirectToAction(nameof(Detail), new { id = command.JednaniId })!;
+        }
+
+        if (IsAjaxRequest())
+        {
+            return AjaxSuccessResult(
+                refreshScope: "page",
+                refreshUrl: Url.Action(nameof(Detail), new { id = command.JednaniId }),
+                meetingId: command.JednaniId,
+                uiContext: "meeting",
+                message: "Stav jednání byl uložen.");
         }
 
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
-        {
             return Redirect(returnUrl);
-        }
-
         return RedirectToAction(nameof(Detail), new { id = command.JednaniId })!;
     }
 
@@ -224,10 +236,16 @@ public sealed class JednaniController : BaseController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveAttendance(int projektId, int jednaniId, List<MeetingAttendanceRowInput> rows, string? returnUrl, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId))
+        if (!ModelState.IsValid)
         {
-            return Forbid();
+            if (IsAjaxRequest())
+                return AjaxInvalidModelResult("Uložení účasti selhalo.");
+            TempData["ErrorMessage"] = InvalidFormFallbackMessage;
+            return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
         }
+
+        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId))
+            return Forbid();
 
         try
         {
@@ -237,16 +255,27 @@ public sealed class JednaniController : BaseController
                 CurrentUserContext,
                 ct);
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
+            if (IsAjaxRequest())
+                return AjaxErrorResult(ex.Message);
             TempData["ErrorMessage"] = ex.Message;
+            return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
+        }
+
+        if (IsAjaxRequest())
+        {
+            return AjaxSuccessResult(
+                refreshScope: "page",
+                refreshUrl: Url.Action(nameof(Detail), new { id = jednaniId }),
+                projectId: projektId,
+                meetingId: jednaniId,
+                uiContext: "meeting",
+                message: "Účast byla uložena.");
         }
 
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
-        {
             return Redirect(returnUrl);
-        }
-
         return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
     }
 
@@ -274,10 +303,16 @@ public sealed class JednaniController : BaseController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveNotes(int projektId, int jednaniId, List<MeetingNoteRowInput> rows, string? returnUrl, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
+        if (!ModelState.IsValid)
         {
-            return Forbid();
+            if (IsAjaxRequest())
+                return AjaxInvalidModelResult("Uložení poznámek selhalo.");
+            TempData["ErrorMessage"] = InvalidFormFallbackMessage;
+            return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
         }
+
+        if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
+            return Forbid();
 
         try
         {
@@ -287,16 +322,27 @@ public sealed class JednaniController : BaseController
                 CurrentUserContext,
                 ct);
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
+            if (IsAjaxRequest())
+                return AjaxErrorResult(ex.Message);
             TempData["ErrorMessage"] = ex.Message;
+            return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
+        }
+
+        if (IsAjaxRequest())
+        {
+            return AjaxSuccessResult(
+                refreshScope: "page",
+                refreshUrl: Url.Action(nameof(Detail), new { id = jednaniId }),
+                projectId: projektId,
+                meetingId: jednaniId,
+                uiContext: "meeting",
+                message: "Poznámky byly uloženy.");
         }
 
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
-        {
             return Redirect(returnUrl);
-        }
-
         return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
     }
 
