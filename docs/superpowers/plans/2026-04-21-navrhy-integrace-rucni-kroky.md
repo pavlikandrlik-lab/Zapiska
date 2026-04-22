@@ -8,8 +8,23 @@
 
 **Tech Stack:** .NET 8 ASP.NET Core MVC, EF Core 8, Razor, existující návrhové workflow, Plán C tabulka `zaznam_harmonogram_vyjadreni_vazba`.
 
+> **Authz (doplněno 2026-04-22):** Plán D pracuje se třemi typy uživatelů:
+> 1. **Přímá editace harmonogramu** (schéma 1) — user s `records.edit` permission.
+> 2. **Navrhování změn harmonogramu** (schéma 2 — `SCHEDULE_PLAN_CHANGE` submit) — user s `records.schedule.edit` permission ale bez `records.edit`.
+> 3. **Navrhování nového záznamu** (schéma 3 — `CREATE_RECORD` submit) — subsystem lead role / `records.schedule.add` permission.
+> 4. **Schvalování návrhů** (PM/ADM) — `proposals.approve` permission.
+>
+> **Finální podoba authz modelu se stále upravuje** (commity `98d97f4..e5eb2ed` a dál). Implementátor **MUSÍ** v momentu implementace:
+> - Zkontrolovat aktuální stav `PmTracker.Web/Models/ViewModels/SecurityViewModels.cs` nebo kde jsou `PermissionKeys` definované.
+> - Použít permission keys (nikdy `.HasRole("...")` nebo magic strings) — vzor z existujících controllerů po refaktoru.
+> - Ověřit jména klíčů s autorem authz refaktoru, jména výše jsou orientační (mohou být `Records.Edit`, `RecordsEdit`, `records.edit` nebo jiný camelCase/PascalCase pattern podle current convention).
+> - Pokud ACL attribute má jiný název než `[RequirePermission]` (např. `[AuthorizePermission]`, `[Permission]`), použít aktuální.
+>
+> **Žádné role-kódy v kódu**. Žádný `SUPERADMIN` fallback — `CurrentUserContext.IsSuperAdmin` čte z `AuthzSuperadmins` tabulky (commit `c7c3d88`).
+
 **Předpoklady:**
 - **Plán A, B, C, E hotovy** a nasazeny.
+- **Authz refaktor dokončen** — viz notice výše.
 - Spec 2026-04-21 §5 (tři workflow schémata) a §10.2 (rozšíření payloadů).
 
 ---
@@ -84,7 +99,7 @@ public sealed class RecordProposalPayloadWithManualKrokyTests
             ZaznamId = 42,
             ManualActualKroky = new List<ManualActualKrokDto>
             {
-                new() { KrokKey = Guid.NewGuid(), AbsolutniDatum = new DateTime(2026, 3, 15) }
+                new() { KrokKey = Guid.NewGuid(), AbsolutniDatum = new DateOnly(2026, 3, 15) }
             }
         };
 
@@ -92,7 +107,7 @@ public sealed class RecordProposalPayloadWithManualKrokyTests
         var roundtripped = JsonSerializer.Deserialize<SchedulePlanProposalPayload>(json);
 
         roundtripped!.ManualActualKroky.Should().HaveCount(1);
-        roundtripped.ManualActualKroky[0].AbsolutniDatum.Should().Be(new DateTime(2026, 3, 15));
+        roundtripped.ManualActualKroky[0].AbsolutniDatum.Should().Be(new DateOnly(2026, 3, 15));
     }
 
     [Fact]
@@ -107,7 +122,7 @@ public sealed class RecordProposalPayloadWithManualKrokyTests
                     KrokKey = Guid.NewGuid(),
                     ExterniOdkazIndex = 0,
                     HotVyjadreniId = 99999,
-                    DatumVyjadreni = new DateTime(2026, 3, 14)
+                    DatumVyjadreni = new DateTimeOffset(2026, 3, 14, 9, 30, 0, TimeSpan.Zero)
                 }
             }
         };
@@ -135,7 +150,14 @@ V `RecordProposalViewModels.cs`:
 public sealed class ManualActualKrokDto
 {
     public Guid KrokKey { get; set; }
-    public DateTime AbsolutniDatum { get; set; }
+
+    /// <summary>
+    /// Kalendářní datum skutečnosti zadaný uživatelem.
+    /// DateOnly = bez časové zóny + bez času = žádný DST / Kind / ±1 den shift.
+    /// Posílá se z JS jako "yyyy-MM-dd" ISO string; default ASP.NET Core binder
+    /// DateOnly přijímá právě tento formát.
+    /// </summary>
+    public DateOnly AbsolutniDatum { get; set; }
 }
 
 public sealed class HarmonogramVazbaDto
@@ -143,7 +165,13 @@ public sealed class HarmonogramVazbaDto
     public Guid KrokKey { get; set; }
     public int ExterniOdkazIndex { get; set; }   // index do ExterniVazby[] v payloadu
     public long HotVyjadreniId { get; set; }
-    public DateTime DatumVyjadreni { get; set; }
+
+    /// <summary>
+    /// Timestamp vyjádření z HOT DB (reálný okamžik, ne kalendářní datum).
+    /// DateTimeOffset = absolutní okamžik včetně offsetu; server konverze
+    /// do UTC pro ukládání přes TimeProvider.System.GetUtcNow().
+    /// </summary>
+    public DateTimeOffset DatumVyjadreni { get; set; }
 }
 ```
 
@@ -176,15 +204,11 @@ git commit -m "feat(navrhy): rozšířit SchedulePlan a CreateRecord payloady o 
 
 ---
 
-## Task 2–11: Detailní kroky
-
-Každý úkol následuje stejný TDD pattern jako Task 1: **failing test → implementace → green → commit**. Klíčové úkoly:
-
-### Task 2 — `CreateRecordProposalPayload` HarmonogramVazby
+## Task 2 — `CreateRecordProposalPayload` HarmonogramVazby
 
 Přidání proběhlo již v Task 1 (oba payloady v jednom souboru). Tento task je **merge do Task 1**, přeskoč.
 
-### Task 3 — `RecordProposalPayloadMapper` round-trip
+## Task 3 — `RecordProposalPayloadMapper` round-trip
 
 Najít `BuildSaveCommand()` a `BuildSchedulePayload()` metody, přidat mapping:
 - VM `SaveRecordCommand.ManualActualKroky` ↔ payload `ManualActualKroky[]`
@@ -194,7 +218,7 @@ Test: round-trip `VM → payload → VM` zachová všechny hodnoty.
 
 Commit: `refactor(navrhy): round-trip mapping v RecordProposalPayloadMapper pro manuální kroky + vazby`
 
-### Task 4 — Validace v `SubmitCommands`
+## Task 4 — Validace v `SubmitCommands`
 
 Přidat do `ValidateCommonProposalInput()` / `ValidateScheduleProposalInput()`:
 - Každý `ManualActualKrokDto.KrokKey` musí existovat ve schématu.
@@ -206,20 +230,28 @@ Test: každé nevalidní pole → hlášená chyba ve validation result.
 
 Commit: `feat(navrhy): validace ManualActualKroky a HarmonogramVazby v SubmitCommands`
 
-### Task 5 — `ApplyApprovedScheduleProposalAsync` aplikuje ManualActualKroky
+## Task 5 — `ApplyApprovedScheduleProposalAsync` aplikuje ManualActualKroky
+
+**Typový model (nutno zajistit):**
+
+- Payload `ManualActualKrokDto` má property `AbsolutniDatum` typu **`DateOnly`** (nikoli `DateTime`). `DateOnly` nemá čas ani timezone komponentu, takže se neriskuje ±1 den shift mezi klientem (UTC serializace) a serverem (Local default).
+- UI JS posílá datum ve formátu `"yyyy-MM-dd"` (ISO date bez času). Model binder ASP.NET Core defaultně `DateOnly` přijímá pouze tento formát.
+- `BuildHarmonogramVypocetCore` vrací `planEndDate` taky jako `DateOnly` (pokud tak ještě není, upravit v Task 7 + fix volajících).
 
 Rozšíření existující metody v `RecordProposalService.DecisionCommands.cs` (řádek ~137):
 - Pro každý `ManualActualKrokDto`:
   1. Najít `HarmonogramTyp` s `KrokKey == krokKey && JeZpozdeni == true` (= DELAY řádek)
-  2. Spočítat `planEndDate(krok)` z `BuildHarmonogramVypocetCore(datumZalozeni, typy, hodnoty)`
-  3. `odchylka = absolutniDatum - planEndDate.DateOnly`
+  2. Spočítat `planEndDate(krok)` z `BuildHarmonogramVypocetCore(datumZalozeni, typy, hodnoty)` — vrací `DateOnly`
+  3. `odchylka = absolutniDatum.DayNumber - planEndDate.DayNumber` (diff v kalendářních dnech; `DayNumber` = počet dní od roku 1)
   4. UPSERT `ZaznamHarmonogramHodnotaEntity { TypId = delayTypId, HodnotaInt = odchylka }`
+
+> **Proč `DateOnly`:** starší varianta používala `DateTime - DateTime` → podléhá DST / timezone / Kind nejasnostem (`DateTimeKind.Unspecified` default z binderu → C# tiše považuje za Local). Pro PMO data (plán datum = kalendářní den, ne okamžik) je `DateOnly` jediný správný typ. Jednotný server-side výpočet zamezí, aby ±1 h DST shift generoval ±1 den chybu u odchylky. Pattern „jak to řeší velká firma": všechna kalendářní data skrz `DateOnly`, všechny timestampy skrz `DateTimeOffset.UtcNow` (ze serverového `TimeProvider`), nikdy mix.
 
 Test: předložit payload s manuálním datumem → schválit → ověřit `HS0X_DELAY.HodnotaInt` odpovídá odchylce.
 
 Commit: `feat(navrhy): aplikovat ManualActualKroky při schválení návrhu`
 
-### Task 6 — `ApproveCreateRecord...` aplikuje HarmonogramVazby
+## Task 6 — `ApproveCreateRecord...` aplikuje HarmonogramVazby
 
 Po vytvoření záznamu + externích vazeb:
 - Pro každý `HarmonogramVazbaDto`:
@@ -232,7 +264,7 @@ Test: návrh s 2 vazbami → schválit → ověřit 2 řádky v `VyjadreniVazby`
 
 Commit: `feat(navrhy): aplikovat HarmonogramVazby při schválení CREATE_RECORD návrhu`
 
-### Task 7 — `HarmonogramService.BuildHarmonogramVypocet...` rozšíření
+## Task 7 — `HarmonogramService.BuildHarmonogramVypocet...` rozšíření
 
 Výstup `HarmonogramVypocetKroku` obohatit o:
 - `ZdrojSkutecnosti` (`enum: None / FromVyjadreni / Manual`)
@@ -245,7 +277,7 @@ Test: 3 scénáře (none / from-vyjadreni / manual).
 
 Commit: `feat(harmonogram): BuildHarmonogramVypocet rozšířit o ZdrojSkutecnosti per krok`
 
-### Task 8 — `_EditZaznamSchedulePanel.cshtml` nová struktura
+## Task 8 — `_EditZaznamSchedulePanel.cshtml` nová struktura
 
 Sloupec „Skutečnost" rozlišuje:
 - **Auto krok s vazbou** → read-only čísla odchylky + ikona 🔗 s tooltip „Z vyjádření {datum, autor}", klik otevře chat modal.
@@ -256,19 +288,19 @@ Test: Razor snapshot testy pro každý scénář.
 
 Commit: `feat(harmonogram-ui): sloupec Skutečnost rozlišuje auto/ruční kroky + ikona chat pro vazbu`
 
-### Task 9 — JS aktualizace pro ruční editaci
+## Task 9 — JS aktualizace pro ruční editaci
 
 Při změně data v inputu ručního kroku → POST přes existující `SaveRecordCommand` endpoint. Validace na klientské straně: datum nesmí být v budoucnosti + chronologie.
 
 Commit: `feat(harmonogram-ui): JS ruční editace datumu pro kroky 2/5/8/9`
 
-### Task 10 — Rozšíření pending lock evaluator
+## Task 10 — Rozšíření pending lock evaluator
 
 `PendingScheduleProposalLockEvaluator` musí brát v úvahu i ManualActualKroky — pokud existuje pending SCHEDULE_PLAN_CHANGE návrh, nelze manuálně editovat ty kroky v přímé úpravě (schéma 1).
 
 Commit: `feat(navrhy): rozšířit pending lock o ManualActualKroky`
 
-### Task 11 — Integrační testy all-three-schemas
+## Task 11 — Integrační testy all-three-schemas
 
 `PmTracker.Tests.Unit/Records/ThreeSchemaIntegrationTests.cs` pokrývá:
 

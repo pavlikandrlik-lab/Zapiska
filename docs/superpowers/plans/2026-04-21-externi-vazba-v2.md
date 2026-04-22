@@ -378,6 +378,7 @@ public sealed class ExterniOdkazController(ITicketingQueryService ticketing) : C
     private static readonly Regex SixDigits = new(@"^\d{6}$", RegexOptions.Compiled);
 
     [HttpPost("Sync")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Sync([FromForm] string cislo, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(cislo) || !SixDigits.IsMatch(cislo))
@@ -400,6 +401,8 @@ public sealed class ExterniOdkazController(ITicketingQueryService ticketing) : C
     }
 }
 ```
+
+> **CSRF:** `[ValidateAntiForgeryToken]` vynucuje ověření anti-forgery tokenu. JS modul v Task 6 už token posílá — viz `sync.js` řádky 924-926, které přidávají `__RequestVerificationToken` do FormData. Default ASP.NET Core antiforgery čte token z form field (`__RequestVerificationToken`) nebo z header (`RequestVerificationToken`) — FormData stačí.
 
 - [ ] **Step 5: Upravit test — volat `Sync(cislo, ct)` místo volání s `string`**
 
@@ -1375,12 +1378,18 @@ foreach (var vazba in zaznam.ExterniVazby)
 {
     if (!string.IsNullOrWhiteSpace(vazba.Cislo))
     {
-        _ = _harvestScheduler.ScheduleHarvestAsync(vazba.Id, ct);
+        // await — enqueue do queue je rychlé (<1ms), blokuje request triviálně,
+        // ale zajistí dokončení před disposalem request scope (jinak by
+        // ReactiveHarvestSchedulerAdapter v Plánu revise skončil s disposal
+        // DbContext a enqueue by se ztratil).
+        // CancellationToken.None — scheduler běží na pozadí, nesmí sdílet
+        // request cancellation token (ten se ruší hned po response).
+        await _harvestScheduler.ScheduleHarvestAsync(vazba.Id, CancellationToken.None);
     }
 }
 ```
 
-(`_ = ...` zahazuje Task — fire-and-forget dle kontraktu.)
+> **Rozhodnutí fire-and-forget:** Původní draft plánu používal `_ = scheduler.ScheduleHarvestAsync(..., ct)` (fire-and-forget + request ct). To byla skrytá past: `_ =` nechá Task běžet po SaveRecordAsync return → po response → request scope dispose → DbContext dispose → pokud scheduler pokračuje v běhu (realistické v Plánu revize, kde adapter volá `db.ExterniOdkazy.Where(...)`), dostane `ObjectDisposedException`. Navíc `ct` byl request-scoped, takže enqueue se mohlo tiše zrušit. Řešení: `await` + `CancellationToken.None`.
 
 - [ ] **Step 7: Build + spustit test**
 
