@@ -97,7 +97,7 @@ public sealed class NastaveniController : BaseController
     private static string NormalizeSection(string? section)
     {
         var normalized = (section ?? "role").Trim().ToLowerInvariant();
-        return normalized is "role" or "akce" or "role-akce" or "uzivatele-role" or "efektivni-prava"
+        return normalized is "role" or "akce" or "role-akce" or "uzivatele-role" or "efektivni-prava" or "synchronizace"
             ? normalized
             : "role";
     }

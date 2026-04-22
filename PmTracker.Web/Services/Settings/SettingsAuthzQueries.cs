@@ -3,6 +3,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Sync;
 using PmTrackerAuthzService = PmTracker.Web.Services.Security.IAuthorizationService;
 
 namespace PmTracker.Web.Services.Settings;
@@ -12,7 +13,8 @@ public sealed class SettingsAuthzQueries(
     IUserAuthorizationAuditSnapshotBuilder userAuthorizationSnapshotBuilder,
     IPersonIdentityMatcher personIdentityMatcher,
     ITextNormalizer textNormalizer,
-    PmTrackerAuthzService authzService) : ISettingsAuthzQueries
+    PmTrackerAuthzService authzService,
+    IEnumerable<ISyncJobAdminHandler> syncJobHandlers) : ISettingsAuthzQueries
 {
     private static readonly StringComparer Ci = StringComparer.OrdinalIgnoreCase;
 
@@ -166,8 +168,13 @@ public sealed class SettingsAuthzQueries(
             "role-akce" => ("Mapování rolí na akce", "Nastavení oprávnění a rozsahů ALL / INCLUDE."),
             "uzivatele-role" => ("Přiřazení rolí uživatelům", "Mapování rolí na osoby."),
             "efektivni-prava" => ("Kontrola efektivních práv", "Diagnostický pohled na finální práva uživatele."),
+            "synchronizace" => ("Synchronizace", "Periodické a reaktivní synchronizace (AD, ServiceDesk)."),
             _ => ("Role", "Správa rolí administrátorů.")
         };
+
+        var syncJobCards = normalized == "synchronizace"
+            ? await LoadSyncJobCardsAsync(canManage, ct)
+            : (IReadOnlyList<PmTracker.Web.Models.ViewModels.Sync.SyncJobSettingsCardViewModel>)Array.Empty<PmTracker.Web.Models.ViewModels.Sync.SyncJobSettingsCardViewModel>();
 
         return new NastaveniPanelViewModel
         {
@@ -180,8 +187,19 @@ public sealed class SettingsAuthzQueries(
             RolePermissionScopes = rolePermissionScopes,
             UserRoles = userRoleAssignments,
             EffectivePermissions = await BuildEffectivePermissionPreviewAsync(currentUser, userId, projektId, ct),
-            Projekty = projects
+            Projekty = projects,
+            SyncJobCards = syncJobCards
         };
+    }
+
+    private async Task<IReadOnlyList<PmTracker.Web.Models.ViewModels.Sync.SyncJobSettingsCardViewModel>> LoadSyncJobCardsAsync(bool canManage, CancellationToken ct)
+    {
+        var cards = new List<PmTracker.Web.Models.ViewModels.Sync.SyncJobSettingsCardViewModel>();
+        foreach (var handler in syncJobHandlers)
+        {
+            cards.Add(await handler.LoadCardAsync(canManage, ct));
+        }
+        return cards;
     }
 
     private List<NastaveniSectionItemViewModel> BuildNastaveniSections(CurrentUserContextViewModel currentUser, NastaveniPanelViewModel panel)
@@ -208,6 +226,14 @@ public sealed class SettingsAuthzQueries(
             });
         }
 
+        sections.Add(new NastaveniSectionItemViewModel
+        {
+            Key = "synchronizace",
+            Nazev = "Synchronizace",
+            Popis = "Periodické a reaktivní sync joby",
+            Pocet = panel.SyncJobCards.Count
+        });
+
         return sections;
     }
 
@@ -219,7 +245,7 @@ public sealed class SettingsAuthzQueries(
             return "role";
         }
 
-        return normalized is "role" or "akce" or "role-akce" or "uzivatele-role" or "efektivni-prava"
+        return normalized is "role" or "akce" or "role-akce" or "uzivatele-role" or "efektivni-prava" or "synchronizace"
             ? normalized
             : "role";
     }

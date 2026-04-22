@@ -187,6 +187,18 @@ else if (Model.SectionKey == "uzivatele-role")
         </table>
     </section>
 }
+else if (Model.SectionKey == "synchronizace")
+{
+    <section class="card">
+        <div class="panel-header">
+            <h3>Synchronizace</h3>
+        </div>
+        <p class="muted settings-hint">
+            Správa periodických a reaktivních synchronizací mezi PM Trackerem a externími systémy (AD, ServiceDesk).
+        </p>
+        @await Html.PartialAsync("_SyncPanel", Model.SyncJobCards)
+    </section>
+}
 else
 {
     <section class="card">

@@ -36,6 +36,13 @@ public sealed class NastaveniPanelViewModel : BaseViewModel
     public required IReadOnlyList<UserRoleAssignmentViewModel> UserRoles { get; init; }
     public required EffectivePermissionsPreviewViewModel EffectivePermissions { get; init; }
     public required IReadOnlyList<NastaveniProjektItemViewModel> Projekty { get; init; }
+
+    /// <summary>
+    /// Karty sync jobs — naplněné pouze pro SectionKey == "synchronizace".
+    /// </summary>
+    public IReadOnlyList<PmTracker.Web.Models.ViewModels.Sync.SyncJobSettingsCardViewModel> SyncJobCards { get; init; }
+        = Array.Empty<PmTracker.Web.Models.ViewModels.Sync.SyncJobSettingsCardViewModel>();
+
     public bool CanManageSettings { get; set; }
 }
 
