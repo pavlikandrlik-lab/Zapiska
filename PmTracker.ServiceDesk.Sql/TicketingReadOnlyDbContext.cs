@@ -14,6 +14,7 @@ public sealed class TicketingReadOnlyDbContext : DbContext
 
     internal DbSet<HotZaznamEntity> HotZaznamy => Set<HotZaznamEntity>();
     internal DbSet<HotKalkulaceEntity> HotKalkulace => Set<HotKalkulaceEntity>();
+    internal DbSet<HotVyjadreniEntity> HotVyjadreni => Set<HotVyjadreniEntity>();
 
     public override int SaveChanges()
         => throw new InvalidOperationException("TicketingReadOnlyDbContext is strictly read-only.");
@@ -81,5 +82,20 @@ public sealed class TicketingReadOnlyDbContext : DbContext
             e.HasIndex(x => new { x.Pid, x.Akceptace }).HasDatabaseName("ix_hot_kalkulace_pid_akceptace");
         });
 
+        mb.Entity<HotVyjadreniEntity>(e =>
+        {
+            e.ToTable("HOT_VYJADRENI", "dbo");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Typ).HasColumnName("typ").HasMaxLength(10);
+            e.Property(x => x.Pid).HasColumnName("pid").HasMaxLength(50);
+            e.Property(x => x.Datum).HasColumnName("datum");
+            e.Property(x => x.Zpracoval).HasColumnName("zpracoval").HasMaxLength(200);
+            e.Property(x => x.Popis).HasColumnName("popis");
+            e.Property(x => x.Tym).HasColumnName("tym").HasMaxLength(50);
+            e.Property(x => x.ViditelneDodavateli).HasColumnName("viditelne_dodavateli");
+
+            e.HasIndex(x => x.Pid).HasDatabaseName("ix_hot_vyjadreni_pid");
+        });
     }
 }
