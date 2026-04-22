@@ -4,10 +4,12 @@ internal sealed class HotZaznamEntity
 {
     public long Radek { get; set; }
     public string Id { get; set; } = string.Empty;
+    public string? Pid { get; set; }
     public string? TypZaznamu { get; set; }
     public string? Strucne { get; set; }
     public string? Popis { get; set; }
-    public int? Stav { get; set; }
+    public string? Stav { get; set; }
     public int? Splneno { get; set; }
     public DateTime? SlaDeadline { get; set; }
+    public DateTime? Datum { get; set; }
 }

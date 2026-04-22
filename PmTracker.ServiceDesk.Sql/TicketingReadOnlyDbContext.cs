@@ -40,9 +40,11 @@ public sealed class TicketingReadOnlyDbContext : DbContext
             e.Property(x => x.TypZaznamu).HasColumnName("typ_zaznamu");
             e.Property(x => x.Strucne).HasColumnName("strucne");
             e.Property(x => x.Popis).HasColumnName("popis");
-            e.Property(x => x.Stav).HasColumnName("stav");
+            e.Property(x => x.Pid).HasColumnName("pid").HasMaxLength(50);
+            e.Property(x => x.Stav).HasColumnName("stav").HasMaxLength(50);
             e.Property(x => x.Splneno).HasColumnName("splneno");
             e.Property(x => x.SlaDeadline).HasColumnName("sla_deadline");
+            e.Property(x => x.Datum).HasColumnName("datum");
         });
 
         mb.Entity<HotKalkulaceEntity>(e =>
