@@ -176,6 +176,18 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
                 "V DB chybí sloupec authz.roles.scope. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_2_0_authz_role_scope.sql.");
         }
 
+        if (!await HasColumnAsync(dbContext, "dbo.ciselnik_roli_projektu", "authz_role_id", ct))
+        {
+            throw new InvalidOperationException(
+                "V DB chybí sloupec dbo.ciselnik_roli_projektu.authz_role_id. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_2_1_lookup_role_authz_fk.sql.");
+        }
+
+        if (!await HasColumnAsync(dbContext, "dbo.ciselnik_roli_subsystemu", "authz_role_id", ct))
+        {
+            throw new InvalidOperationException(
+                "V DB chybí sloupec dbo.ciselnik_roli_subsystemu.authz_role_id. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_2_1_lookup_role_authz_fk.sql.");
+        }
+
         _logger.LogInformation("SQL startup validace proběhla úspěšně.");
     }
 
