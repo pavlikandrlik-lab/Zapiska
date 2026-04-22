@@ -114,35 +114,9 @@ public sealed class UserAuthorizationSnapshotBuilder(
             })
             .ToList();
 
-        var implicitProjectRoleSources = await (
-            from assignment in dbContext.ObsazeniProjektu.AsNoTracking()
-            join role in dbContext.CiselnikRoliProjektu.AsNoTracking() on assignment.RoleId equals role.Id
-            where assignment.OsobaId == osobaId
-                && !assignment.DatumOdebrani.HasValue
-            select new ProjectRoleAssignmentGrantSource
-            {
-                RoleCode = role.Kod,
-                ProjectId = assignment.ProjektId
-            })
-            .ToListAsync(ct);
-        var implicitProjectRoleGrants = ProjectRolePermissionGrantBuilder.BuildImplicitProjectRoleGrants(
-            implicitProjectRoleSources);
-
-        var implicitSubsystemRoleSources = await (
-            from assignment in dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
-            join role in dbContext.CiselnikRoliSubsystemu.AsNoTracking() on assignment.RoleSubsystemuId equals role.Id
-            join projectSubsystem in dbContext.ProjektSubsystemy.AsNoTracking() on assignment.ProjektSubsystemId equals projectSubsystem.Id
-            where assignment.OsobaId == osobaId
-                && !assignment.DatumOdebrani.HasValue
-                && !projectSubsystem.DatumOdebrani.HasValue
-            select new SubsystemRoleAssignmentGrantSource
-            {
-                RoleCode = role.Kod,
-                ProjectId = projectSubsystem.ProjektId
-            })
-            .ToListAsync(ct);
-        var implicitSubsystemRoleGrants = SubsystemRolePermissionGrantBuilder.BuildImplicitSubsystemRoleGrants(
-            implicitSubsystemRoleSources);
+        // Fáze B Task B3: DB-driven granty z projektových a subsystémových rolí (buildery smazány).
+        var implicitProjectRoleGrants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(dbContext, osobaId, ct);
+        var implicitSubsystemRoleGrants = await UserContextResolver.LoadDbDrivenSubsystemRoleGrantsAsync(dbContext, osobaId, ct);
 
         return explicitGrants
             .Concat(implicitProjectRoleGrants)

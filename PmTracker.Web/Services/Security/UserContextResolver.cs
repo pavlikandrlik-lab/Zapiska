@@ -406,80 +406,16 @@ public sealed class UserContextResolver : IUserContextResolver
             })
             .ToList();
 
-        var activeProjectRoleAssignments = await (
-                from assignment in _dbContext.ObsazeniProjektu.AsNoTracking()
-                join role in _dbContext.CiselnikRoliProjektu.AsNoTracking() on assignment.RoleId equals role.Id
-                where assignment.OsobaId == osoba.Id
-                    && !assignment.DatumOdebrani.HasValue
-                select new ProjectRoleAssignmentGrantSource
-                {
-                    RoleCode = role.Kod,
-                    ProjectId = assignment.ProjektId
-                })
-            .ToListAsync(ct);
-        var implicitProjectRoleGrants = ProjectRolePermissionGrantBuilder.BuildImplicitProjectRoleGrants(activeProjectRoleAssignments);
-        grants.AddRange(implicitProjectRoleGrants);
-
-        // Fáze B — Task B1: DB-driven granty jako doplněk builderu.
-        // Builder stále aktivní; deduplikace zajistí, že stejný grant (klíč + scope mode + projectIds)
-        // není přidán dvakrát. Po Fázi B3 se builder smaže a zůstane jen tato cesta.
         var dbDrivenProjectGrants = await LoadDbDrivenProjectRoleGrantsAsync(_dbContext, osoba.Id, ct);
-        foreach (var dbGrant in dbDrivenProjectGrants)
-        {
-            var alreadyPresent = grants.Any(existing =>
-                string.Equals(existing.PermissionKey, dbGrant.PermissionKey, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(existing.ScopeMode, dbGrant.ScopeMode, StringComparison.OrdinalIgnoreCase)
-                && existing.ProjectIds.OrderBy(x => x).SequenceEqual(dbGrant.ProjectIds.OrderBy(x => x)));
+        grants.AddRange(dbDrivenProjectGrants);
 
-            if (!alreadyPresent)
-            {
-                grants.Add(dbGrant);
-            }
-        }
-
-        var activeSubsystemRoleAssignments = await (
-                from assignment in _dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
-                join role in _dbContext.CiselnikRoliSubsystemu.AsNoTracking() on assignment.RoleSubsystemuId equals role.Id
-                join projectSubsystem in _dbContext.ProjektSubsystemy.AsNoTracking() on assignment.ProjektSubsystemId equals projectSubsystem.Id
-                where assignment.OsobaId == osoba.Id
-                    && !assignment.DatumOdebrani.HasValue
-                    && !projectSubsystem.DatumOdebrani.HasValue
-                select new SubsystemRoleAssignmentGrantSource
-                {
-                    RoleCode = role.Kod,
-                    ProjectId = projectSubsystem.ProjektId
-                })
-            .ToListAsync(ct);
-        var implicitSubsystemRoleGrants = SubsystemRolePermissionGrantBuilder.BuildImplicitSubsystemRoleGrants(activeSubsystemRoleAssignments);
-        grants.AddRange(implicitSubsystemRoleGrants);
-
-        // Fáze B — Task B2: DB-driven subsystémové granty jako doplněk builderu. Deduplikace stejná jako u projektových.
         var dbDrivenSubsystemGrants = await LoadDbDrivenSubsystemRoleGrantsAsync(_dbContext, osoba.Id, ct);
-        foreach (var dbGrant in dbDrivenSubsystemGrants)
-        {
-            var alreadyPresent = grants.Any(existing =>
-                string.Equals(existing.PermissionKey, dbGrant.PermissionKey, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(existing.ScopeMode, dbGrant.ScopeMode, StringComparison.OrdinalIgnoreCase)
-                && existing.ProjectIds.OrderBy(x => x).SequenceEqual(dbGrant.ProjectIds.OrderBy(x => x)));
+        grants.AddRange(dbDrivenSubsystemGrants);
 
-            if (!alreadyPresent)
-            {
-                grants.Add(dbGrant);
-            }
-        }
-
-        var projectRoleProjectIds = activeProjectRoleAssignments
-            .Select(x => x.ProjectId)
-            .Distinct()
-            .ToList();
-
-        var subsystemRoleProjectIds = activeSubsystemRoleAssignments
-            .Select(x => x.ProjectId)
-            .Distinct()
-            .ToList();
-
-        var visibleProjectIds = projectRoleProjectIds
-            .Concat(subsystemRoleProjectIds)
+        // Fáze B Task B3: visibleProjectIds z ProjectIds DB-driven grantů.
+        var visibleProjectIds = dbDrivenProjectGrants
+            .SelectMany(g => g.ProjectIds)
+            .Concat(dbDrivenSubsystemGrants.SelectMany(g => g.ProjectIds))
             .Distinct()
             .OrderBy(x => x)
             .ToList();
