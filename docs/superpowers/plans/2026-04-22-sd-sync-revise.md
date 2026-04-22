@@ -2088,6 +2088,7 @@ namespace PmTracker.Web.Services.ServiceDesk;
 public sealed class SdActiveSyncJobAdminHandler(
     PmTrackerDbContext db,
     ISyncJobRunLock<SdActiveSyncSettingsEntity> runLock,
+    ManualTriggerSignal<SdActiveSyncSettingsEntity> manualSignal,
     TimeProvider time) : ISyncJobAdminHandler
 {
     public string JobKey => "sd.active";
@@ -2142,34 +2143,46 @@ public sealed class SdActiveSyncJobAdminHandler(
         await db.SaveChangesAsync(ct);
     }
 
-    public Task<ManualRunOutcome> TriggerManualRunAsync(int? editorOsobaId, CancellationToken ct)
+    public async Task<ManualRunOutcome> TriggerManualRunAsync(int? editorOsobaId, CancellationToken ct)
     {
+        // 1-min floor (spec §13.3)
+        var settings = await db.SdActiveSyncSettings.FirstAsync(x => x.Id == 1, ct);
+        if (settings.LastRunAt.HasValue)
+        {
+            var elapsed = time.GetUtcNow().UtcDateTime - settings.LastRunAt.Value;
+            if (elapsed < TimeSpan.FromMinutes(1))
+            {
+                var retryAfter = (int)Math.Ceiling((TimeSpan.FromMinutes(1) - elapsed).TotalSeconds);
+                return new ManualRunOutcome(
+                    Accepted: false,
+                    Message: $"Sync proběhl před {(int)elapsed.TotalSeconds} s. Zkus za {retryAfter} s.");
+            }
+        }
+
+        // Aktuálně běží? (pokud ano, signal by se ztratil protože hosted service
+        // nečeká ve WhenAny; ManualResetEvent signal zůstává ale první, co loop
+        // po skončení RunOnce uvidí, je event → spustí se znova = žádoucí chování
+        // pro admin, který klikl zatímco běží.)
         if (!runLock.TryAcquire())
         {
-            return Task.FromResult(new ManualRunOutcome(
-                Accepted: false,
-                Message: "Sync již běží — počkej prosím na další tick."));
-        }
-        try
-        {
-            // Konkrétní dispatch závisí na kontraktu shared sync-infra.
-            // Obvykle: nastaví flag pro hosted service „teď spusť RunOnce s trigger=Manual".
-            // Alternativa: spustí HarvestScopeAsync přímo (ale pak by musely být audit
-            // fieldy napsány zde, což duplikuje logiku hosted service).
-            // TODO: wire via sdílený mechanismus (sync-infra plán Task 7).
-            return Task.FromResult(new ManualRunOutcome(
+            // Signaluj i tak — po dokončení aktuálního běhu se spustí další.
+            manualSignal.Signal();
+            return new ManualRunOutcome(
                 Accepted: true,
-                Message: "Manual sync naplánován."));
+                Message: "Sync právě běží, po dokončení se spustí další kolo (manual).");
         }
-        finally
-        {
-            runLock.Release();
-        }
+        runLock.Release();  // Jen test, že momentálně neběží.
+
+        // Signal do hosted service — Task.WhenAny(delay, signal.WaitAsync()) ho probudí
+        // a spustí RunOnceAsync(trigger=Manual). Spec §13.2.
+        manualSignal.Signal();
+
+        return new ManualRunOutcome(Accepted: true, Message: "Manual sync naplánován.");
     }
 }
 ```
 
-> **Poznámka:** `ManualRunOutcome` record + keyed manual dispatch je definován shared sync-infra plánem (Task 16). Přizpůsob signaturu tomu, co base infra poskytuje.
+> **Poznámka:** `ManualRunOutcome`, `ManualTriggerSignal<T>`, `ISyncJobRunLock<T>` jsou definovány shared sync-infra (Task 5-7 + Task 16). `ManualTriggerSignal<T>` je DI singleton per T.
 
 - [ ] **Step 3: Implementovat `SdArchiveSyncJobAdminHandler`**
 
@@ -2411,12 +2424,12 @@ git commit -m "feat(servicedesk): T7 (proposal approve) + T8 (tab open) reactive
 
 ## Task 13: `SdSyncController` + T3/T6 direct sync endpointy + Obnovit v modalu
 
-**Kontext:** Uživatel má tři scénáře manuální synchronizace, všechny obcházejí 15-min reactive debounce a aplikují 1-min per-externiOdkazId floor:
-- **T3 — modal open:** user klikne 💬 → před renderováním chat modalu se zavolá `HarvestSingleTicketAsync`. User čeká (spinner). Respektuje 15-min debounce **pokud** byl modal otevřen automaticky bez user akce — v praxi T3 = open modal = user action → 1-min floor, bypass 15-min.
+**Kontext:** Uživatel má tři scénáře manuální synchronizace, všechny používají stejný endpoint s 1-min per-externiOdkazId floor:
+- **T3 — modal open:** user klikne 💬 → před renderováním chat modalu se zavolá `HarvestSingleTicketAsync`. User čeká (spinner). 1-min floor platí — pokud user modal 2× otevřel ve 30s, podruhé se vrátí cached data.
 - **T6 — refresh button na kartě:** user klikne 🔄 na kartě ext. vazby v editoru → `HarvestSingleTicketAsync`. 1-min floor.
-- **„Obnovit" v modalu:** user v otevřeném chat modalu klikne „Obnovit" → re-harvest → refresh rendering modalu. 1-min floor, bypass 15-min.
+- **„Obnovit" v modalu:** user v otevřeném chat modalu klikne „Obnovit" → re-harvest → refresh rendering modalu. 1-min floor.
 
-Všechny tři volají stejný endpoint `POST /SdSync/Ticket/{externiOdkazId}`. Per-ticket lock z Task 6 plus `IMemoryCache` s 1-min TTL tvoří rate-limit ochrany.
+Všechny tři volají stejný endpoint `POST /SdSync/Ticket/{externiOdkazId}`. Per-ticket lock z Task 6 plus `IMemoryCache` s 1-min TTL tvoří rate-limit ochrany. Fingerprint strategie ve `VyjadreniHarvestService` automaticky skipne drill, pokud se v HOT_ZAZNAMY nic nezměnilo — čili i kdyby se 1-min floor propouštělo více volání, reálná práce proti HOT DB je minimální.
 
 Oba volají `IVyjadreniHarvestService.HarvestSingleTicketAsync` → fingerprint logika → drill pokud potřeba → update fingerprints. Per-ticket lock z Task 6 zabraňuje souběhu s periodic tickem; `IMemoryCache` klíč `sd.manual.{externiOdkazId}` s 60s TTL zabraňuje spam-cliku.
 
@@ -2530,6 +2543,7 @@ public sealed class SdSyncController(
     /// Hard floor 1 minuta per-externiOdkazId přes IMemoryCache.
     /// </summary>
     [HttpPost("Ticket/{externiOdkazId:int}")]
+    [ValidateAntiForgeryToken]
     [RequirePermission(PermissionKeys.RecordsView)]
     public async Task<IActionResult> RefreshTicket(int externiOdkazId, CancellationToken ct)
     {
@@ -2567,6 +2581,8 @@ public sealed class SdSyncController(
 
 > **`IMemoryCache` registrace:** pokud ještě není registrovaná v `Program.cs`, přidej `builder.Services.AddMemoryCache();`. `AdLoginCache` z Plánu C už tuto registraci vyžaduje, takže pravděpodobně už existuje.
 
+> **`[ValidateAntiForgeryToken]`:** atribut vynucuje ověření CSRF tokenu na state-changing POST endpointu. JS handlery (Step 3 + Step 4 níže) musí odesílat token v `RequestVerificationToken` header. Projekt má existující helper v `site.bundle.js` — use: `fetch(url, { method: 'POST', headers: { 'RequestVerificationToken': getAntiforgeryToken() } })`. Pokud helper není, extract z `@Html.AntiForgeryToken()` hidden inputu.
+
 > **`[RequirePermission]`:** z existujícího authz systému. Pokud se název liší (`[AuthorizePermission]`, `[Permission]`), přizpůsob.
 
 - [ ] **Step 3: Refresh tlačítko 🔄 v editoru externí vazby (T6)**
@@ -2589,7 +2605,10 @@ document.addEventListener('click', async (e) => {
     if (!btn) return;
     btn.disabled = true;
     try {
-        const resp = await fetch(btn.dataset.sdRefreshUrl, { method: 'POST' });
+        const resp = await fetch(btn.dataset.sdRefreshUrl, {
+            method: 'POST',
+            headers: { 'RequestVerificationToken': window.getAntiforgeryToken() }
+        });
         if (resp.ok) {
             // Toast success, refresh karty (re-fetch last_harvested_at)
         } else if (resp.status === 429) {
@@ -2609,7 +2628,10 @@ V JS modulu `vyjadreniModal.js` (z Plánu C Task 14-18), na `open` handler, pře
 ```javascript
 async function openModal(externiOdkazId) {
     // T3: auto-sync při otevření — 1-min floor v backendu zabezpečí anti-spam
-    const syncResp = await fetch(`/SdSync/Ticket/${externiOdkazId}`, { method: 'POST' });
+    const syncResp = await fetch(`/SdSync/Ticket/${externiOdkazId}`, {
+        method: 'POST',
+        headers: { 'RequestVerificationToken': window.getAntiforgeryToken() }
+    });
     // Ignoruj 429 — znamená že data jsou čerstvá, pokračuj renderingem
     if (!syncResp.ok && syncResp.status !== 429) {
         console.warn('SD sync selhal, zobrazujeme cached data', await syncResp.text());
@@ -2641,7 +2663,10 @@ document.addEventListener('click', async (e) => {
     const externiOdkazId = btn.dataset.modalExterniOdkazId;
     btn.disabled = true;
     try {
-        const resp = await fetch(btn.dataset.modalRefreshUrl, { method: 'POST' });
+        const resp = await fetch(btn.dataset.modalRefreshUrl, {
+            method: 'POST',
+            headers: { 'RequestVerificationToken': window.getAntiforgeryToken() }
+        });
         if (resp.ok) {
             // Re-fetch vyjádření a re-render modal body
             const data = await fetch(`/VyjadreniModal/Fetch?externiOdkazId=${externiOdkazId}`);
