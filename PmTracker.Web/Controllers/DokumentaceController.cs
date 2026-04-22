@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Services.Documentation;
@@ -6,6 +7,7 @@ using PmTracker.Web.Services.Security;
 namespace PmTracker.Web.Controllers;
 
 [Route("Dokumentace")]
+[Authorize]
 public sealed class DokumentaceController : BaseController
 {
     private readonly IDocumentationService _documentationService;

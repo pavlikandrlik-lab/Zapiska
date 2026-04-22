@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -5,6 +6,7 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
+[Authorize]
 public sealed class HomeController : BaseController
 {
     public HomeController(

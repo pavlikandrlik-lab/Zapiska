@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -7,6 +8,7 @@ using PmTracker.Web.Services.Security;
 namespace PmTracker.Web.Controllers;
 
 [Route("dashboard")]
+[Authorize]
 public sealed class DashboardController : BaseController
 {
     private const int FocusHomepageLimit = 8;
