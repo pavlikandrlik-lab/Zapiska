@@ -18,13 +18,6 @@
     <section class="card">
         <div class="panel-header">
             <h3>Role</h3>
-            @if (Model.CanManageSettings)
-            {
-                <pm-button variant="Primary"
-                           data-modal-url="@Url.Action("RoleModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
-                    Nová role
-                </pm-button>
-            }
         </div>
         <table class="table">
             <thead>
@@ -34,54 +27,17 @@
                     <th>Popis</th>
                     <th>Systémová</th>
                     <th>Aktivní</th>
-                    <th class="table-actions">Akce</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var role in Model.Role.OrderBy(x => x.Kod, StringComparer.CurrentCultureIgnoreCase))
                 {
-                    var toggleActiveValue = (!role.IsActive).ToString().ToLowerInvariant();
                     <tr>
                         <td>@role.Kod</td>
                         <td>@role.Nazev</td>
                         <td>@(string.IsNullOrWhiteSpace(role.Popis) ? "-" : role.Popis)</td>
                         <td>@(role.IsSystem ? "Ano" : "Ne")</td>
                         <td>@(role.IsActive ? "Ano" : "Ne")</td>
-                        <td class="table-actions">
-                            @if (Model.CanManageSettings)
-                            {
-                                <div class="table-actions-inline">
-                                    <pm-button variant="Secondary"
-                                               size="Small"
-                                               data-modal-url="@Url.Action("RoleModal", "Nastaveni", new { id = role.Id, userId = selectedUserId, projektId = selectedProjektId })"
-                                               disabled="@role.IsSystem">
-                                        Upravit
-                                    </pm-button>
-                                    <form asp-controller="Nastaveni"
-                                          asp-action="ToggleRole"
-                                          method="post"
-                                          data-ajax-submit="true">
-                                        <input type="hidden" name="Id" value="@role.Id" />
-                                        <input type="hidden" name="IsActive" value="@toggleActiveValue" />
-                                        @if (selectedUserId.HasValue)
-                                        {
-                                            <input type="hidden" name="userId" value="@selectedUserId.Value" />
-                                        }
-                                        @if (selectedProjektId.HasValue)
-                                        {
-                                            <input type="hidden" name="projektId" value="@selectedProjektId.Value" />
-                                        }
-                                        <pm-button variant="Ghost" size="Small" native-type="submit" disabled="@role.IsSystem">
-                                            @(role.IsActive ? "Deaktivovat" : "Aktivovat")
-                                        </pm-button>
-                                    </form>
-                                </div>
-                            }
-                            else
-                            {
-                                <span class="muted">Pouze čtení</span>
-                            }
-                        </td>
                     </tr>
                 }
             </tbody>
@@ -93,13 +49,6 @@ else if (Model.SectionKey == "akce")
     <section class="card">
         <div class="panel-header">
             <h3>Katalog akcí</h3>
-            @if (Model.CanManageSettings)
-            {
-                <pm-button variant="Primary"
-                           data-modal-url="@Url.Action("PermissionModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
-                    Nová akce
-                </pm-button>
-            }
         </div>
         @foreach (var category in Model.PermissionCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Nazev, StringComparer.CurrentCultureIgnoreCase))
         {
@@ -112,53 +61,16 @@ else if (Model.SectionKey == "akce")
                             <th>Název</th>
                             <th>Rozsah</th>
                             <th>Aktivní</th>
-                            <th class="table-actions">Akce</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var permission in Model.Permissions.Where(p => p.CategoryKod == category.Kod).OrderBy(p => p.Klic, StringComparer.CurrentCultureIgnoreCase))
                         {
-                            var toggleActiveValue = (!permission.IsActive).ToString().ToLowerInvariant();
                             <tr>
                                 <td><code>@permission.Klic</code></td>
                                 <td>@permission.Nazev</td>
                                 <td>@permission.ScopeLevel</td>
                                 <td>@(permission.IsActive ? "Ano" : "Ne")</td>
-                                <td class="table-actions">
-                                    @if (Model.CanManageSettings)
-                                    {
-                                        <div class="table-actions-inline">
-                                            <pm-button variant="Secondary"
-                                                       size="Small"
-                                                       data-modal-url="@Url.Action("PermissionModal", "Nastaveni", new { id = permission.Id, userId = selectedUserId, projektId = selectedProjektId })"
-                                                       disabled="@permission.IsSystem">
-                                                Upravit
-                                            </pm-button>
-                                            <form asp-controller="Nastaveni"
-                                                  asp-action="TogglePermission"
-                                                  method="post"
-                                                  data-ajax-submit="true">
-                                                <input type="hidden" name="Id" value="@permission.Id" />
-                                                <input type="hidden" name="IsActive" value="@toggleActiveValue" />
-                                                @if (selectedUserId.HasValue)
-                                                {
-                                                    <input type="hidden" name="userId" value="@selectedUserId.Value" />
-                                                }
-                                                @if (selectedProjektId.HasValue)
-                                                {
-                                                    <input type="hidden" name="projektId" value="@selectedProjektId.Value" />
-                                                }
-                                                <pm-button variant="Ghost" size="Small" native-type="submit" disabled="@permission.IsSystem">
-                                                    @(permission.IsActive ? "Deaktivovat" : "Aktivovat")
-                                                </pm-button>
-                                            </form>
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        <span class="muted">Pouze čtení</span>
-                                    }
-                                </td>
                             </tr>
                         }
                     </tbody>
@@ -172,16 +84,9 @@ else if (Model.SectionKey == "role-akce")
     <section class="card">
         <div class="panel-header">
             <h3>Mapování role -> akce</h3>
-            @if (Model.CanManageSettings)
-            {
-                <pm-button variant="Primary"
-                           data-modal-url="@Url.Action("RolePermissionModal", "Nastaveni", new { userId = selectedUserId, projektId = selectedProjektId })">
-                    Přidat mapování
-                </pm-button>
-            }
         </div>
         <p class="muted settings-hint">
-            Striktní pravidlo pro „Všechny projekty“: jako povolení se počítá pouze <strong>GLOBAL</strong> nebo <strong>ALL</strong>.
+            Striktní pravidlo pro „Všechny projekty": jako povolení se počítá pouze <strong>GLOBAL</strong> nebo <strong>ALL</strong>.
             Mapování <strong>INCLUDE</strong> bez vybraného projektu se v přehledu efektivních práv nebere jako povolené.
         </p>
         <table class="table">
@@ -192,7 +97,6 @@ else if (Model.SectionKey == "role-akce")
                     <th>Rozsah</th>
                     <th>Projekty (INCLUDE)</th>
                     <th>Povoleno</th>
-                    <th class="table-actions">Akce</th>
                 </tr>
             </thead>
             <tbody>
@@ -205,41 +109,6 @@ else if (Model.SectionKey == "role-akce")
                         <td>@map.ScopeMode</td>
                         <td>@(selectedProjekty.Count == 0 ? "-" : string.Join(", ", selectedProjekty))</td>
                         <td>@(map.IsAllowed ? "Ano" : "Ne")</td>
-                        <td class="table-actions">
-                            @if (Model.CanManageSettings)
-                            {
-                                <div class="table-actions-inline">
-                                    @if (map.IsAllowed)
-                                    {
-                                        <pm-button variant="Secondary"
-                                                   size="Small"
-                                                   data-modal-url="@Url.Action("RolePermissionModal", "Nastaveni", new { id = map.Id, userId = selectedUserId, projektId = selectedProjektId })">
-                                            Upravit
-                                        </pm-button>
-                                    }
-                                    <form class="table-action-inline-form"
-                                          asp-controller="Nastaveni"
-                                          asp-action="DeleteRolePermission"
-                                          method="post"
-                                          data-ajax-submit="true"
-                                          onsubmit="return confirm('Opravdu smazat mapování role a akce?');">
-                                        <input type="hidden" name="Id" value="@map.Id" />
-                                        @await Html.PartialAsync(
-                                            "_ContextHiddenFields",
-                                            new ContextHiddenFieldsViewModel
-                                            {
-                                                UserId = selectedUserId,
-                                                ProjektId = selectedProjektId
-                                            })
-                                        <pm-button variant="Ghost" size="Small" native-type="submit">Smazat</pm-button>
-                                    </form>
-                                </div>
-                            }
-                            else
-                            {
-                                <span class="muted">Pouze čtení</span>
-                            }
-                        </td>
                     </tr>
                 }
             </tbody>
@@ -325,7 +194,7 @@ else
             <h3>Efektivní práva</h3>
         </div>
         <p class="muted settings-hint">
-            Pro volbu „Všechny projekty“ je oprávnění povoleno pouze při rozsahu <strong>GLOBAL</strong> nebo <strong>ALL</strong>.
+            Pro volbu „Všechny projekty" je oprávnění povoleno pouze při rozsahu <strong>GLOBAL</strong> nebo <strong>ALL</strong>.
             Rozsah <strong>INCLUDE</strong> bez výběru projektu se nepočítá.
         </p>
         <form class="settings-effective-filters" method="get" asp-controller="Nastaveni" asp-action="Index" data-settings-filter-form>
