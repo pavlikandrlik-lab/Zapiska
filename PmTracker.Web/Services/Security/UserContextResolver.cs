@@ -60,6 +60,64 @@ public sealed class UserContextResolver : IUserContextResolver
         _personIdentityMatcher = personIdentityMatcher;
     }
 
+    /// <summary>
+    /// Načte projektové-role granty pro danou osobu z DB cesty:
+    /// ObsazeniProjektu × CiselnikRoliProjektu (přes FK AuthzRoleId) × AuthzRolePermissions.
+    /// Fáze B náhrada za <c>ProjectRolePermissionGrantBuilder</c>.
+    /// </summary>
+    /// <remarks>
+    /// Sémantika: role s <see cref="RoleScope.Project"/> a mapping se <see cref="ScopeMode.All"/>
+    /// znamená "všechny projekty, kde osoba má tuto roli". Výsledný VM emituje
+    /// <c>ScopeMode="INCLUDE"</c> + <c>ProjectIds=[...]</c> (spec §3.3, VM kontrakt ze spec §3.1).
+    /// </remarks>
+    public static async Task<IReadOnlyList<PermissionGrantViewModel>> LoadDbDrivenProjectRoleGrantsAsync(
+        PmTrackerDbContext dbContext,
+        int osobaId,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(dbContext);
+
+        var rows = await (
+                from assignment in dbContext.ObsazeniProjektu.AsNoTracking()
+                where assignment.OsobaId == osobaId && !assignment.DatumOdebrani.HasValue
+                join lookupRole in dbContext.CiselnikRoliProjektu.AsNoTracking()
+                    on assignment.RoleId equals lookupRole.Id
+                where lookupRole.AuthzRoleId != null
+                join authzRole in dbContext.AuthzRoles.AsNoTracking()
+                    on lookupRole.AuthzRoleId equals authzRole.Id
+                where authzRole.IsActive
+                join rp in dbContext.AuthzRolePermissions.AsNoTracking()
+                    on authzRole.Id equals rp.RoleId
+                where rp.IsAllowed
+                join permission in dbContext.AuthzPermissions.AsNoTracking()
+                    on rp.PermissionId equals permission.Id
+                where permission.IsActive
+                select new
+                {
+                    permission.Klic,
+                    permission.ScopeLevel,
+                    assignment.ProjektId
+                })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(r => r.Klic)
+            .Select(group => new PermissionGrantViewModel
+            {
+                PermissionKey = group.Key,
+                ScopeLevel = group.First().ScopeLevel.ToString().ToUpperInvariant(),
+                ScopeMode = "INCLUDE",
+                IsAllowed = true,
+                ProjectIds = group
+                    .Select(r => r.ProjektId)
+                    .Distinct()
+                    .OrderBy(x => x)
+                    .ToList(),
+                SourceType = "PROJECT_ROLE"
+            })
+            .ToList();
+    }
+
     public async Task<UserContextResolutionResult> ResolveAsync(HttpContext httpContext, CancellationToken ct = default)
     {
         int? osobaId = null;
@@ -304,6 +362,23 @@ public sealed class UserContextResolver : IUserContextResolver
             .ToListAsync(ct);
         var implicitProjectRoleGrants = ProjectRolePermissionGrantBuilder.BuildImplicitProjectRoleGrants(activeProjectRoleAssignments);
         grants.AddRange(implicitProjectRoleGrants);
+
+        // Fáze B — Task B1: DB-driven granty jako doplněk builderu.
+        // Builder stále aktivní; deduplikace zajistí, že stejný grant (klíč + scope mode + projectIds)
+        // není přidán dvakrát. Po Fázi B3 se builder smaže a zůstane jen tato cesta.
+        var dbDrivenProjectGrants = await LoadDbDrivenProjectRoleGrantsAsync(_dbContext, osoba.Id, ct);
+        foreach (var dbGrant in dbDrivenProjectGrants)
+        {
+            var alreadyPresent = grants.Any(existing =>
+                string.Equals(existing.PermissionKey, dbGrant.PermissionKey, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.ScopeMode, dbGrant.ScopeMode, StringComparison.OrdinalIgnoreCase)
+                && existing.ProjectIds.OrderBy(x => x).SequenceEqual(dbGrant.ProjectIds.OrderBy(x => x)));
+
+            if (!alreadyPresent)
+            {
+                grants.Add(dbGrant);
+            }
+        }
 
         var activeSubsystemRoleAssignments = await (
                 from assignment in _dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
