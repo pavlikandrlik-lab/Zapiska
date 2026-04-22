@@ -212,4 +212,51 @@ public sealed class AuthorizationServiceCacheTests
             Times.Once,
             "builder must be called exactly once even when both resolver and handler call BuildSnapshotAsync");
     }
+
+    // ---------------------------------------------------------------------------
+    // M5 — faulted task eviction: retry must be possible after DB transient error
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// First call faults (DB transient error). Faulted Task must be evicted from cache
+    /// so that the second call retries by invoking the builder again.
+    /// </summary>
+    [Fact]
+    public async Task BuildSnapshot_WhenBuilderFaults_EvictsFromCacheAndRetry()
+    {
+        // Arrange
+        const int osobaId = 99;
+        var goodSnapshot = MakeSnapshot();
+        var callCount = 0;
+
+        var builderMock = new Mock<IAuthorizationSnapshotBuilder>();
+        builderMock
+            .Setup(b => b.BuildAsync(osobaId, It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                callCount++;
+                if (callCount == 1)
+                {
+                    return Task.FromException<AuthorizationSnapshot>(
+                        new InvalidOperationException("Simulated DB transient error"));
+                }
+                return Task.FromResult(goodSnapshot);
+            });
+
+        var service = new AuthorizationService(builderMock.Object);
+
+        // Act — first call faults
+        Func<Task> firstCall = async () => await service.BuildSnapshotAsync(osobaId, CancellationToken.None);
+        await firstCall.Should().ThrowAsync<InvalidOperationException>("first call must propagate the builder exception");
+
+        // Second call must retry (builder invoked again), not return the cached faulted task
+        var secondResult = await service.BuildSnapshotAsync(osobaId, CancellationToken.None);
+
+        // Assert
+        secondResult.Should().BeSameAs(goodSnapshot, "second call must succeed after faulted task is evicted");
+        builderMock.Verify(
+            b => b.BuildAsync(osobaId, It.IsAny<CancellationToken>()),
+            Times.Exactly(2),
+            "builder must be invoked twice: first fault + second retry");
+    }
 }
