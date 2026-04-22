@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -69,12 +70,9 @@ public sealed class SearchController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:search.reindex")]
     public async Task<IActionResult> Reindex(CancellationToken cancellationToken)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.SearchReindex))
-        {
-            return Forbid();
-        }
         if (!_options.Enabled)
         {
             return BadRequest(new { error = "Vyhledávání je vypnuté." });
@@ -89,15 +87,11 @@ public sealed class SearchController : BaseController
     /// Viz inbox úprava #16 — UI tlačítko „Reindexovat vyhledávání".
     /// </summary>
     [HttpGet]
+    [Authorize(Policy = "permission:search.reindex")]
     public async Task<IActionResult> Status(
         [FromServices] ISearchClient client,
         CancellationToken cancellationToken)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.SearchReindex))
-        {
-            return Forbid();
-        }
-
         var count = await client.GetDocumentCountAsync(cancellationToken);
         var searchable = await client.IsSearchableAsync(cancellationToken);
         return Json(new

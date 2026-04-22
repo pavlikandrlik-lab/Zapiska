@@ -74,8 +74,8 @@ public sealed class SearchBootstrapTests
         code.Should().MatchRegex(
             @"public\s+async\s+Task<IActionResult>\s+Status\s*\(",
             "SearchController musí mít GET /Search/Status endpoint pro status panel v Profil/Index");
-        code.Should().Contain("HasPermission",
-            "Status endpoint je chráněný — přístup řídí HasPermission(SearchReindex)"); // C6: IsSuperAdmin → HasPermission
+        code.Should().Contain("[Authorize(Policy = \"permission:search.reindex\")]",
+            "Status endpoint je chráněný — přístup řídí [Authorize(Policy)] atribut (D5 migrace)"); // D5: HasPermission → [Authorize(Policy)]
     }
 
     [Fact]

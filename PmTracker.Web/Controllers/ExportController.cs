@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -33,6 +34,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Projekt/{projektId:int}/Tisk")]
+    [Authorize(Policy = "permission:export.pdf")]
     public async Task<IActionResult> ProjektTisk(
         int projektId,
         bool autoPrint = true,
@@ -53,8 +55,6 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportPdf, projektId)) return Forbid();
-
         var filters = BuildProjectExportFilters(
             useCurrentFilters,
             subsystem,
@@ -71,6 +71,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Projekt/{projektId:int}/Word")]
+    [Authorize(Policy = "permission:export.word")]
     public async Task<IActionResult> ProjektWord(
         int projektId,
         bool useCurrentFilters = false,
@@ -90,8 +91,6 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportWord, projektId)) return Forbid();
-
         var filters = BuildProjectExportFilters(
             useCurrentFilters,
             subsystem,
@@ -108,6 +107,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Tisk")]
+    [Authorize(Policy = "permission:export.pdf")]
     public async Task<IActionResult> JednaniTisk(int jednaniId, bool autoPrint = true, CancellationToken ct = default)
     {
         var projectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
@@ -122,13 +122,12 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportPdf, projectId.Value)) return Forbid();
-
         var model = await _exportTemplateUseCase.BuildMeetingTemplateAsync(jednaniId, CurrentUserContext, autoPrint, ct);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Word")]
+    [Authorize(Policy = "permission:export.word")]
     public async Task<IActionResult> JednaniWord(int jednaniId, CancellationToken ct = default)
     {
         var projectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
@@ -143,13 +142,12 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportWord, projectId.Value)) return Forbid();
-
         var model = await _exportTemplateUseCase.BuildMeetingTemplateAsync(jednaniId, CurrentUserContext, autoPrint: false, ct);
         return BuildWordResult(model);
     }
 
     [HttpGet("Ukol/{zaznamId:int}/Tisk")]
+    [Authorize(Policy = "permission:export.pdf")]
     public async Task<IActionResult> UkolTisk(int zaznamId, int projektId, bool autoPrint = true, CancellationToken ct = default)
     {
         var accessCheck = await EnsureProjectReadableAsync(projektId, ct);
@@ -158,13 +156,12 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
-        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportPdf, projektId)) return Forbid();
-
         var model = await _exportTemplateUseCase.BuildTaskTemplateAsync(projektId, zaznamId, CurrentUserContext, autoPrint, ct);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
 
     [HttpGet("Ukol/{zaznamId:int}/Word")]
+    [Authorize(Policy = "permission:export.word")]
     public async Task<IActionResult> UkolWord(int zaznamId, int projektId, CancellationToken ct = default)
     {
         var accessCheck = await EnsureProjectReadableAsync(projektId, ct);
@@ -172,8 +169,6 @@ public sealed class ExportController : BaseController
         {
             return accessCheck;
         }
-
-        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportWord, projektId)) return Forbid();
 
         var model = await _exportTemplateUseCase.BuildTaskTemplateAsync(projektId, zaznamId, CurrentUserContext, autoPrint: false, ct);
         return BuildWordResult(model);

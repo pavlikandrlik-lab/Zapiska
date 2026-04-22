@@ -7,12 +7,12 @@ namespace PmTracker.Tests.Unit.Authorization;
 public sealed class ProjectDashboardAuthzTests
 {
     [Fact]
-    public void ProjectDashboardController_ShouldReferenceDashboardViewPermissionKey()
+    public void ProjectDashboardController_ShouldUseAuthorizePolicyAttribute()
     {
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ProjectDashboardController.cs"));
 
-        code.Should().Contain("PermissionKeys.DashboardView",
-            "ProjectDashboardController musí kontrolovat dashboard.view permission key");
+        code.Should().Contain("[Authorize(Policy = \"permission:dashboard.view\")]",
+            "ProjectDashboardController musí mít [Authorize(Policy)] atribut místo body HasPermission checku");
     }
 
     [Fact]

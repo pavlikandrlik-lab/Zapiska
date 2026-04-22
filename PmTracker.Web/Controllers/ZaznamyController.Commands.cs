@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using PmTracker.Web.Models.ViewModels;
@@ -84,11 +85,12 @@ public sealed partial class ZaznamyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:comments.add")]
     public async Task<IActionResult> AddComment(int projektId, AddCommentCommand command, string? uiContext, int? meetingId, string? returnUrl, CancellationToken ct = default)
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId ?? command.JednaniId, returnUrl);
         return await ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.CommentsAdd, projektId),
+            hasPermission: () => true,
             invalidAjaxMessage: "Vyjádření nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
@@ -99,11 +101,12 @@ public sealed partial class ZaznamyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:comments.edit.own")]
     public async Task<IActionResult> UpdateComment(int projektId, UpdateCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, string? returnUrl, CancellationToken ct = default)
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId, returnUrl);
         return await ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.CommentsEditOwn, projektId),
+            hasPermission: () => true,
             invalidAjaxMessage: "Vyjádření nelze upravit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
@@ -119,11 +122,12 @@ public sealed partial class ZaznamyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:comments.delete.own")]
     public async Task<IActionResult> DeleteComment(int projektId, DeleteCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, string? returnUrl, CancellationToken ct = default)
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId, returnUrl);
         return await ExecuteCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.CommentsDeleteOwn, projektId),
+            hasPermission: () => true,
             onSuccessRedirect: () => Task.FromResult<IActionResult>(redirect()),
             onAjaxSuccess: () => Task.FromResult<IActionResult>(
                 !zaznamId.HasValue || zaznamId.Value <= 0

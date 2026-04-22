@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -24,16 +25,12 @@ public sealed class ProjectDashboardController : BaseController
     }
 
     [HttpGet("")]
+    [Authorize(Policy = "permission:dashboard.view")]
     public async Task<IActionResult> Index(int id, string? dashTab = null, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(id))
         {
             return NotFound();
-        }
-
-        if (!CurrentUserContext.HasPermission(PermissionKeys.DashboardView, id))
-        {
-            return Forbid();
         }
 
         var model = AttachCurrentUser(await _dashboardService.BuildDashboardPageAsync(id, ct));
@@ -46,6 +43,7 @@ public sealed class ProjectDashboardController : BaseController
     }
 
     [HttpGet("records-panel")]
+    [Authorize(Policy = "permission:dashboard.view")]
     public async Task<IActionResult> RecordsPanel(int id, CancellationToken ct = default)
     {
         if (!await EnsureDashboardAccessAsync(id, ct))
@@ -59,6 +57,7 @@ public sealed class ProjectDashboardController : BaseController
     }
 
     [HttpGet("statistics-panel")]
+    [Authorize(Policy = "permission:dashboard.view")]
     public async Task<IActionResult> StatisticsPanel(int id, int? year = null, CancellationToken ct = default)
     {
         if (!await EnsureDashboardAccessAsync(id, ct))
@@ -72,6 +71,7 @@ public sealed class ProjectDashboardController : BaseController
     }
 
     [HttpGet("nes-panel")]
+    [Authorize(Policy = "permission:dashboard.view")]
     public async Task<IActionResult> NesPanel(int id, CancellationToken ct = default)
     {
         if (!await EnsureDashboardAccessAsync(id, ct))
@@ -84,6 +84,7 @@ public sealed class ProjectDashboardController : BaseController
     }
 
     [HttpGet("vyzvy-panel")]
+    [Authorize(Policy = "permission:dashboard.view")]
     public async Task<IActionResult> VyzvyPanel(int id, CancellationToken ct = default)
     {
         if (!await EnsureDashboardAccessAsync(id, ct))
@@ -101,11 +102,6 @@ public sealed class ProjectDashboardController : BaseController
 
     private Task<bool> EnsureDashboardAccessAsync(int projectId, CancellationToken ct)
     {
-        if (!CurrentUserContext.CanAccessProject(projectId))
-        {
-            return Task.FromResult(false);
-        }
-
-        return Task.FromResult(CurrentUserContext.HasPermission(PermissionKeys.DashboardView, projectId));
+        return Task.FromResult(CurrentUserContext.CanAccessProject(projectId));
     }
 }

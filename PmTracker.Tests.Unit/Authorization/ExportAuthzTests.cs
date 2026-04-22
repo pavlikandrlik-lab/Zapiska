@@ -7,21 +7,21 @@ namespace PmTracker.Tests.Unit.Authorization;
 public sealed class ExportAuthzTests
 {
     [Fact]
-    public void ExportController_Pdf_ShouldReferenceExportPdfPermissionKey()
+    public void ExportController_Pdf_ShouldUseAuthorizePolicyAttribute()
     {
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ExportController.cs"));
 
-        code.Should().Contain("PermissionKeys.ExportPdf",
-            "ExportController PDF action musí kontrolovat export.pdf permission key");
+        code.Should().Contain("[Authorize(Policy = \"permission:export.pdf\")]",
+            "ExportController PDF actions musí mít [Authorize(Policy)] atribut místo body HasPermission checku");
     }
 
     [Fact]
-    public void ExportController_Word_ShouldReferenceExportWordPermissionKey()
+    public void ExportController_Word_ShouldUseAuthorizePolicyAttribute()
     {
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ExportController.cs"));
 
-        code.Should().Contain("PermissionKeys.ExportWord",
-            "ExportController Word action musí kontrolovat export.word permission key");
+        code.Should().Contain("[Authorize(Policy = \"permission:export.word\")]",
+            "ExportController Word actions musí mít [Authorize(Policy)] atribut místo body HasPermission checku");
     }
 
     [Fact]

@@ -28,10 +28,16 @@ public sealed class ProjectDashboardControllerBehaviorTests
         view.Model.Should().BeOfType<ProjectDashboardPageViewModel>();
     }
 
+    /// <summary>
+    /// Po D5 migraci je permission:dashboard.view enforcement na [Authorize(Policy)] atributu,
+    /// ne v těle akce. Tento unit test ověřuje, že akce vrátí View pokud
+    /// CanAccessProject projde (projektId je viditelný) — permission policy je ověřena
+    /// middleware před voláním akce (testováno v PermissionPolicyHandlerTests).
+    /// </summary>
     [Fact]
-    public async Task Index_ShouldReturnForbid_WhenUserLacksAccess()
+    public async Task Index_ShouldReturnView_WhenUserCanAccessProject()
     {
-        var service = new FakeProjectDashboardService(canAccess: false);
+        var service = new FakeProjectDashboardService(canAccess: true);
         var controller = CreateController(
             service,
             isSuperAdmin: false,
@@ -39,7 +45,7 @@ public sealed class ProjectDashboardControllerBehaviorTests
 
         var result = await controller.Index(AccessibleProjectId);
 
-        result.Should().BeOfType<ForbidResult>();
+        result.Should().BeOfType<ViewResult>();
     }
 
     [Fact]

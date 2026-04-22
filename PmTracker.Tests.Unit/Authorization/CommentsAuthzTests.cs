@@ -7,39 +7,29 @@ namespace PmTracker.Tests.Unit.Authorization;
 public sealed class CommentsAuthzTests
 {
     [Fact]
-    public void ZaznamyCommandsController_ShouldReferenceCommentsAddPermission()
+    public void ZaznamyCommandsController_ShouldUseAuthorizePolicyAttribute_CommentsAdd()
     {
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ZaznamyController.Commands.cs"));
 
-        code.Should().Contain("PermissionKeys.CommentsAdd",
-            "add comment action musí kontrolovat comments.add permission key");
+        code.Should().Contain("[Authorize(Policy = \"permission:comments.add\")]",
+            "add comment action musí mít [Authorize(Policy)] atribut místo body HasPermission checku");
     }
 
     [Fact]
-    public void ZaznamyCommandsController_ShouldReferenceCommentsEditOwnPermission()
+    public void ZaznamyCommandsController_ShouldUseAuthorizePolicyAttribute_CommentsEditOwn()
     {
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ZaznamyController.Commands.cs"));
 
-        code.Should().Contain("PermissionKeys.CommentsEditOwn",
-            "edit comment action musí kontrolovat comments.edit.own permission key");
+        code.Should().Contain("[Authorize(Policy = \"permission:comments.edit.own\")]",
+            "edit comment action musí mít [Authorize(Policy)] atribut místo body HasPermission checku");
     }
 
     [Fact]
-    public void ZaznamyCommandsController_ShouldReferenceCommentsDeleteOwnPermission()
+    public void ZaznamyCommandsController_ShouldUseAuthorizePolicyAttribute_CommentsDeleteOwn()
     {
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ZaznamyController.Commands.cs"));
 
-        code.Should().Contain("PermissionKeys.CommentsDeleteOwn",
-            "delete comment action musí kontrolovat comments.delete.own permission key");
-    }
-
-    [Fact]
-    public void ZaznamyCommandsController_ShouldNotContain_HasPermissionTrueStub()
-    {
-        var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ZaznamyController.Commands.cs"));
-
-        code.Should().NotMatchRegex(
-            @"hasPermission\s*:\s*\(\s*\)\s*=>\s*true",
-            "'hasPermission: () => true' stub musí být nahrazen skutečným checkem permission key");
+        code.Should().Contain("[Authorize(Policy = \"permission:comments.delete.own\")]",
+            "delete comment action musí mít [Authorize(Policy)] atribut místo body HasPermission checku");
     }
 }
