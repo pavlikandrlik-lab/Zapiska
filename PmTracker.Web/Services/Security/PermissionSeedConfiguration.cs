@@ -1,3 +1,53 @@
+// =============================================================================
+// GLOSSARY — autorizační model PM Trackeru
+// =============================================================================
+//
+// Tento soubor je JEDNÍM ze DVOU autoritativních zdrojů autorizace:
+//   (1) PermissionSeedConfiguration (tento soubor) — katalog rolí, permission
+//       keys, a mappingů mezi nimi. Verzovaný v gitu, review v PR.
+//   (2) ObsazeniProjektu + ObsazeniSubsystemuProjektu — DB tabulky, kam admin
+//       v UI přiřazuje konkrétní osoby do projektových/subsystémových rolí.
+//
+// Manuální UI kompozice rolí z permission keys (tab "Akce/Role/Uživatel-Role"
+// v Nastavení) je zrušena — role jsou nyní definované POUZE v seedu tohoto
+// souboru. Důvod: audit trail v gitu, review four-eyes, žádný drift mezi
+// seedem a runtime. Nové role = PR do tohoto souboru + deploy.
+// Viz spec §3 a plán 2026-04-22-authz-phases-b-to-f.md.
+//
+// TŘI PODOBNÉ POJMY — NEZAMĚŇOVAT:
+//
+//   RoleScope            — úroveň ROLE. Určuje, JAK se role přiřazuje:
+//                           - Global     → přes authz.user_roles (přímo)
+//                           - Project    → přes ObsazeniProjektu (na projekt)
+//                           - Subsystem  → přes ObsazeniSubsystemuProjektu (na subsystém)
+//                         Příklad: VLASTNIK_PROJEKTU má RoleScope.Project.
+//
+//   PermissionScopeLevel — úroveň permission KEY. Určuje, zda key potřebuje
+//                          projektový kontext při kontrole:
+//                           - Global   → nepotřebuje projektId (např. people.manage)
+//                           - Project  → potřebuje projektId (např. projects.edit)
+//                         Příklad: records.edit má PermissionScopeLevel.Project.
+//
+//   ScopeMode            — šířka grantu v role→permission MAPPINGU:
+//                           - All       → všechny entity v rozsahu role (99 % mappingů)
+//                           - Include   → jen vyjmenované entity (role_permission_projects)
+//                           - Own       → jen entity vlastněné osobou (Phase C, comments)
+//                           - Subsystem → jen entity v subsystému osoby (Phase C)
+//                         Příklad: (ADM_PROJ, records.edit, All) = smí editovat
+//                         VŠECHNY záznamy na projektech, kde má ADM_PROJ.
+//
+// Matice platných kombinací (zjednodušeně):
+//
+//   RoleScope  │ PermissionScopeLevel │ ScopeMode typicky
+//   ───────────┼──────────────────────┼──────────────────
+//   Global     │ Global, Project      │ All, Include
+//   Project    │ Project              │ All, Own
+//   Subsystem  │ Project              │ All, Subsystem, Own
+//
+// Resolver (UserContextResolver) interpretuje kombinaci Scope × ScopeMode tak,
+// aby vrátil správnou množinu projektId/subsystemId, kde grant platí.
+// =============================================================================
+
 namespace PmTracker.Web.Services.Security;
 
 public sealed record PermissionCategorySeedItem(string Kod, string Nazev, int SortOrder);
