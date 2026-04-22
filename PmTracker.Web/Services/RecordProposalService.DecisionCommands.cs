@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Audit;
+using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Web.Services;
@@ -173,7 +174,8 @@ public sealed partial class RecordProposalService
             ?? throw new InvalidOperationException($"Záznam {proposal.ZaznamId.Value} nebyl nalezen.");
         var oldRecordSnapshot = RecordAuditSnapshot.FromEntity(record);
 
-        var scheduleTypeDefinitions = await ResolveScheduleTypeDefinitionsAsync(record, ct);
+        var schema = await _harmonogramService.GetSchemaForRecordAsync(record, ct);
+        var scheduleTypeDefinitions = _harmonogramService.BuildRecordScheduleTypeDefinitions(schema);
         var plannedTypeIds = scheduleTypeDefinitions
             .Select(x => x.DurationTypeId)
             .Where(x => x > 0)
@@ -214,6 +216,25 @@ public sealed partial class RecordProposalService
         if (schedulePayload.ChangesTermDeadline)
         {
             record.DatumUkonceni = schedulePayload.TerminUkonceni.Date;
+        }
+
+        // Plán D: aplikace ManualActualKroky[] — přepočet absolutní datum -> odchylka
+        // proti plánovanému konci kroku. Počítá se s plánem PO aplikaci navrhovaných
+        // změn trvání (submittedValues), takže ruční datum z návrhu ctí posun plánu.
+        if (schedulePayload.ManualActualKroky.Count > 0)
+        {
+            var manualOverrides = ComputeManualActualOverrides(
+                schedulePayload.ManualActualKroky,
+                schema,
+                record.DatumZalozeni,
+                plannedTypeIds,
+                submittedValues);
+            foreach (var ov in manualOverrides)
+            {
+                // Přepiš přípravnou hodnotu (schedulePayload.ActualHarmonogramHodnoty) tím,
+                // co dal user v ManualActualKroky. DELAY hodnoty mohou být i záporné.
+                normalizedValues[ov.DelayTypId] = ov.OdchylkaDni;
+            }
         }
 
         foreach (var row in existingRows)
@@ -272,5 +293,81 @@ public sealed partial class RecordProposalService
         }
 
         await _dbContext.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Plán D — sestaví KrokKey -&gt; Poradi a KrokKey -&gt; DelayTypeId mapování pro daný
+    /// záznam a spočítá cílové odchylky z <see cref="ManualActualKrokDto"/> payloadu.
+    /// Plánovaná timeline se počítá s kombinací stávajících hodnot a návrhem změněných
+    /// trvání (<paramref name="submittedValues"/>), takže ruční datum respektuje plán
+    /// PO schválení návrhu.
+    /// </summary>
+    private IReadOnlyList<ManualActualKrokApplier.ManualActualKrokApplied> ComputeManualActualOverrides(
+        IReadOnlyList<ManualActualKrokDto> manualKroky,
+        HarmonogramSchemaDefinition schema,
+        DateTime datumZalozeni,
+        IReadOnlySet<int> plannedTypeIds,
+        IReadOnlyList<SaveRecordHarmonogramValueCommand> submittedValues)
+    {
+        if (manualKroky.Count == 0)
+        {
+            return Array.Empty<ManualActualKrokApplier.ManualActualKrokApplied>();
+        }
+
+        var krokKeyMeta = _dbContext.CiselnikHarmonogramTypu
+            .AsNoTracking()
+            .Where(x => x.SablonaVerze == schema.Verze)
+            .Select(x => new { x.KrokKey, x.KrokPoradi, x.JeZpozdeni, x.Id })
+            .ToList();
+
+        var krokKeyToPoradi = krokKeyMeta
+            .GroupBy(x => x.KrokKey)
+            .ToDictionary(g => g.Key, g => g.First().KrokPoradi);
+        var delayTypIdByKrokKey = krokKeyMeta
+            .Where(x => x.JeZpozdeni)
+            .GroupBy(x => x.KrokKey)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+
+        // Fallback: pokud delay řádek má jiný KrokKey než duration (legacy data), spáruj přes KrokPoradi
+        var delayByPoradi = krokKeyMeta
+            .Where(x => x.JeZpozdeni)
+            .GroupBy(x => x.KrokPoradi)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+        foreach (var mk in manualKroky)
+        {
+            if (delayTypIdByKrokKey.ContainsKey(mk.KrokKey)) continue;
+            if (!krokKeyToPoradi.TryGetValue(mk.KrokKey, out var poradi)) continue;
+            if (delayByPoradi.TryGetValue(poradi, out var fallbackDelayId))
+            {
+                delayTypIdByKrokKey[mk.KrokKey] = fallbackDelayId;
+            }
+        }
+
+        // Sestavit efektivní hodnoty trvání pro timeline: výchozí schéma + submitted override
+        var submittedByType = submittedValues
+            .Where(x => plannedTypeIds.Contains(x.TypId))
+            .GroupBy(x => x.TypId)
+            .ToDictionary(g => g.Key, g => Math.Max(0, g.Last().Hodnota));
+        var existingDurations = _dbContext.ZaznamHarmonogramHodnoty
+            .AsNoTracking()
+            .Where(x => plannedTypeIds.Contains(x.TypId))
+            .Select(x => new { x.TypId, x.HodnotaInt })
+            .ToList()
+            .ToDictionary(x => x.TypId, x => x.HodnotaInt);
+        foreach (var kv in submittedByType)
+        {
+            existingDurations[kv.Key] = kv.Value;
+        }
+
+        var vypocet = _harmonogramService.BuildHarmonogramVypocetPublic(
+            datumZalozeni,
+            schema.Kroky,
+            existingDurations);
+
+        return ManualActualKrokApplier.Compute(
+            manualKroky,
+            vypocet,
+            krokKeyToPoradi,
+            delayTypIdByKrokKey);
     }
 }
