@@ -51,11 +51,29 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// M-4: defense-in-depth security headers — CSP, X-Frame-Options, X-Content-Type-Options,
+// Referrer-Policy + zachovaný X-Trace-Id pro diagnostiku.
+// Intranet gov app: 'unsafe-inline' je nutné dokud neproejdeme nonces pro gov-design-system
+// bootstrap skripty; 'unsafe-eval' NEPOUŽÍVÁME.
 app.Use(async (context, next) =>
 {
     context.Response.OnStarting(() =>
     {
-        context.Response.Headers["X-Trace-Id"] = context.TraceIdentifier;
+        var headers = context.Response.Headers;
+        headers["X-Trace-Id"] = context.TraceIdentifier;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Referrer-Policy"] = "same-origin";
+        headers["Content-Security-Policy"] =
+            "default-src 'self'; " +
+            "script-src 'self' 'unsafe-inline'; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "img-src 'self' data:; " +
+            "font-src 'self' data:; " +
+            "connect-src 'self'; " +
+            "frame-ancestors 'none'; " +
+            "form-action 'self'; " +
+            "base-uri 'self'";
         return Task.CompletedTask;
     });
     await next();
