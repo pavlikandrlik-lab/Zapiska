@@ -13,6 +13,7 @@ public enum VyzvaErrorCode
     ExternalLinkNotPnf = 8,
     VyzvaIsLocked = 9,
     PnfAlreadyInAnotherVyzva = 10,
+    AccessDenied = 11,
 }
 
 public sealed record VyzvaError(VyzvaErrorCode Code, string Message);

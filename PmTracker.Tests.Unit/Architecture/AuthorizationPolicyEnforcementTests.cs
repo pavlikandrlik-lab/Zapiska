@@ -113,11 +113,14 @@ public class AuthorizationPolicyEnforcementTests
             "PmTracker.Web.Controllers.VyzvyController.ZmenitStav",
 
             // SetZaradid: pracuje s ExterniOdkazId — projektId není dostupný v route ani body.
-            // ACL se provádí v service vrstvě (odmítne non-PNF a uzamčené výzvy).
+            // projektId se resolvuje z ExterniOdkazId v service; service volá
+            // IAuthorizationService.HasPermissionAsync(RecordsEdit) — ověřeno VyzvaServiceAssignmentAuthzTests.
             "PmTracker.Web.Controllers.VyzvyController.SetZaradid",
 
             // Prerdit: pracuje s ExterniOdkazId a CilovaVyzvaId — žádný projektId v route.
-            // ACL se provádí v service vrstvě.
+            // projektId se resolvuje z ExterniOdkazId/CilovaVyzvaId v service; service volá
+            // IAuthorizationService.HasPermissionAsync(RecordsEdit) na zdrojovém i cílovém projektu
+            // — ověřeno VyzvaServiceAssignmentAuthzTests.
             "PmTracker.Web.Controllers.VyzvyController.Prerdit",
 
             // ---- ScheduleController ----

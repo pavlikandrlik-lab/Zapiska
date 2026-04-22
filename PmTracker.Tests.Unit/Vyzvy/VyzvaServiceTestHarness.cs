@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Moq;
 using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
+using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Vyzvy;
 
 namespace PmTracker.Tests.Unit.Vyzvy;
@@ -16,8 +18,34 @@ internal static class VyzvaServiceTestHarness
         return new PmTrackerDbContext(opts);
     }
 
-    public static VyzvaService CreateService(PmTrackerDbContext db, ITicketingQueryService? ticketing = null)
-        => new(db, ticketing ?? new StubTicketingQueryService());
+    public static VyzvaService CreateService(
+        PmTrackerDbContext db,
+        ITicketingQueryService? ticketing = null,
+        IAuthorizationService? authz = null,
+        ICurrentUserAccessor? user = null)
+    {
+        // Provide no-op defaults so existing tests continue to pass.
+        // Tests that don't care about authz get a mock that always allows.
+        if (authz == null)
+        {
+            var authzMock = new Mock<IAuthorizationService>();
+            authzMock
+                .Setup(a => a.HasPermissionAsync(
+                    It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            authz = authzMock.Object;
+        }
+
+        if (user == null)
+        {
+            var userMock = new Mock<ICurrentUserAccessor>();
+            userMock.Setup(u => u.OsobaId).Returns(1);
+            user = userMock.Object;
+        }
+
+        return new(db, ticketing ?? new StubTicketingQueryService(), authz, user);
+    }
 
     public static async Task SeedProjektAsync(PmTrackerDbContext db, int projektId = 1)
     {
