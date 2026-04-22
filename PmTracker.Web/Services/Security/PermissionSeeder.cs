@@ -96,7 +96,8 @@ public sealed class PermissionSeeder(PmTrackerDbContext dbContext)
                     Nazev = role.Nazev,
                     Popis = role.Popis,
                     IsSystem = role.IsSystem,
-                    IsActive = true
+                    IsActive = true,
+                    Scope = role.Scope
                 });
                 continue;
             }
@@ -105,6 +106,7 @@ public sealed class PermissionSeeder(PmTrackerDbContext dbContext)
             existing.Popis = role.Popis;
             existing.IsSystem = role.IsSystem;
             existing.IsActive = true;
+            existing.Scope = role.Scope;
         }
     }
 

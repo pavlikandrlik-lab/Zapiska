@@ -1,7 +1,7 @@
 namespace PmTracker.Web.Services.Security;
 
 public sealed record PermissionCategorySeedItem(string Kod, string Nazev, int SortOrder);
-public sealed record RoleSeedItem(string Kod, string Nazev, string Popis, bool IsSystem);
+public sealed record RoleSeedItem(string Kod, string Nazev, string Popis, bool IsSystem, string Scope);
 public sealed record ActionSeedItem(string Klic, string Nazev, string CategoryKod, string ScopeLevel);
 public sealed record RoleActionSeedItem(string RoleKod, string ActionKlic, string ScopeMode, bool IsAllowed);
 
@@ -18,8 +18,21 @@ public static class PermissionSeedConfiguration
 
     public static readonly IReadOnlyList<RoleSeedItem> Roles =
     [
-        new("SUPERADMIN", "Superadmin", "Pevná role s plnými oprávněními.", true),
-        new("APP_ADMIN", "Administrátor aplikace", "Správa aplikace a základních entit.", true)
+        // Globální role
+        new("SUPERADMIN", "Superadmin", "Pevná role s plnými oprávněními.", true, "GLOBAL"),
+        new("APP_ADMIN", "Administrátor aplikace", "Správa aplikace a základních entit.", true, "GLOBAL"),
+
+        // Projektové role (použité v ciselnik_roli_projektu)
+        new("VLASTNIK_PROJEKTU", "Vlastník projektu", "Plný vlastník projektu.", true, "PROJECT"),
+        new("ADM_PROJ", "Projektový admin", "Silný projektový admin bez práva měnit metadata.", true, "PROJECT"),
+        new("PROJ_MAN", "Projektový manažer", "Projektový manažer bez úprav metadat.", true, "PROJECT"),
+        new("HOST", "Host", "Read-only host projektu.", true, "PROJECT"),
+        new("GEST", "Gestor", "Gestor s komentovacími právy.", true, "PROJECT"),
+
+        // Subsystémové role (použité v ciselnik_roli_subsystemu)
+        new("VEDOUCI_SUBSYSTEMU", "Vedoucí subsystému", "Vedoucí subsystému projektu.", true, "SUBSYSTEM"),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "Zástupce vedoucího subsystému", "Zástupce vedoucího, stejná práva jako vedoucí.", true, "SUBSYSTEM"),
+        new("METODIK_SUBSYSTEMU", "Metodik subsystému", "Metodik s komentovacími právy.", true, "SUBSYSTEM")
     ];
 
     public static readonly IReadOnlyList<ActionSeedItem> Actions =
