@@ -35,6 +35,9 @@ public sealed class VyzvyController : BaseController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Zalozit([FromForm] ZaloztRequest request, CancellationToken ct)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(new { success = false, errorCode = "ValidationError", message = "Chybí požadované údaje." });
+
         if (!CurrentUserContext.CanAccessProject(request.ProjektId)) return Forbid();
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -53,6 +56,9 @@ public sealed class VyzvyController : BaseController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ZmenitStav([FromForm] ZmenitStavRequest request, CancellationToken ct)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(new { success = false, errorCode = "ValidationError", message = "Chybí požadované údaje." });
+
         if (!Enum.TryParse<VyzvaStav>(request.NovyStav, ignoreCase: false, out var stav))
             return BadRequest(new { success = false, errorCode = "InvalidStateTransition", message = "Neplatný stav." });
 
@@ -76,6 +82,9 @@ public sealed class VyzvyController : BaseController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SetZaradid([FromForm] SetZaradidRequest request, CancellationToken ct)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(new { success = false, errorCode = "ValidationError", message = "Chybí požadované údaje." });
+
         // ACL: služba sama odmítne non-PNF a uzamčené výzvy.
         // Základní ACL přes CanAccessProject není triviální (vyžadovalo by načíst projektId přes vazbu),
         // plný role check (proj_man/adm_proj) se provádí v UI (VM.MuzeEditovat) a na straně service.
@@ -94,6 +103,9 @@ public sealed class VyzvyController : BaseController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Prerdit([FromForm] PrerditRequest request, CancellationToken ct)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(new { success = false, errorCode = "ValidationError", message = "Chybí požadované údaje." });
+
         var result = await _vyzvaService.PrerditPnfAsync(
             request.ExterniOdkazId, request.CilovaVyzvaId, ct);
 
