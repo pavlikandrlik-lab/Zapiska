@@ -87,6 +87,12 @@ internal sealed class ProjectRoleLookupEntityConfiguration : IEntityTypeConfigur
         builder.Property(x => x.Nazev).HasColumnName("nazev");
         builder.Property(x => x.IsLocked).HasColumnName("is_locked");
         builder.Property(x => x.AuthzRoleId).HasColumnName("authz_role_id");
+
+        // H-3: Index pro join v AuthorizationSnapshotBuilder
+        // (ObsazeniProjektu × CiselnikRoliProjektu × AuthzRoles). Bez indexu table-scan
+        // přes lookup tabulku při každém build() snapshotu per-project permissions.
+        builder.HasIndex(x => x.AuthzRoleId)
+            .HasDatabaseName("ix_ciselnik_roli_projektu_authz_role_id");
     }
 }
 
@@ -101,6 +107,12 @@ internal sealed class SubsystemRoleLookupEntityConfiguration : IEntityTypeConfig
         builder.Property(x => x.Nazev).HasColumnName("nazev");
         builder.Property(x => x.IsLocked).HasColumnName("is_locked");
         builder.Property(x => x.AuthzRoleId).HasColumnName("authz_role_id");
+
+        // H-3: Index pro join v AuthorizationSnapshotBuilder
+        // (ObsazeniSubsystemuProjektu × CiselnikRoliSubsystemu × AuthzRoles). Bez indexu
+        // table-scan přes lookup tabulku při každém build() snapshotu per-subsystem permissions.
+        builder.HasIndex(x => x.AuthzRoleId)
+            .HasDatabaseName("ix_ciselnik_roli_subsystemu_authz_role_id");
     }
 }
 

@@ -16,45 +16,53 @@ public sealed partial class RecordProposalService
         var oldProposalSnapshot = ProposalAuditSnapshot.FromEntity(proposal);
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        try
         {
-            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-            int? approvedRecordId = null;
-
-            if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase))
+            return await strategy.ExecuteAsync(async () =>
             {
-                var payload = DeserializePayload(proposal.PayloadJson);
-                var createPayload = payload.CreateRecord
-                    ?? throw new InvalidOperationException("Payload návrhu založení záznamu je neplatný.");
-                var saveCommand = _payloadMapper.BuildSaveCommand(createPayload);
-                approvedRecordId = await _recordService.SaveRecordAsync(saveCommand, currentUser, ct);
-            }
-            else if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
-            {
-                await ApplyApprovedScheduleProposalAsync(proposal, currentUser, ct);
-                approvedRecordId = proposal.ZaznamId;
-            }
-            else
-            {
-                throw new InvalidOperationException("Neznámý typ návrhu.");
-            }
+                await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+                int? approvedRecordId = null;
 
-            proposal.Stav = RecordProposalStateCodes.Approved;
-            proposal.DecidedByOsobaId = currentUser.OsobaId;
-            proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
-            proposal.ApprovedRecordId = approvedRecordId;
-            await _dbContext.SaveChangesAsync(ct);
-            _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                AuditActionType.Approve,
-                AuditEntityType.RecordProposal,
-                proposal.Id.ToString(CultureInfo.InvariantCulture),
-                oldProposalSnapshot,
-                ProposalAuditSnapshot.FromEntity(proposal)));
-            await _dbContext.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+                if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase))
+                {
+                    var payload = DeserializePayload(proposal.PayloadJson);
+                    var createPayload = payload.CreateRecord
+                        ?? throw new InvalidOperationException("Payload návrhu založení záznamu je neplatný.");
+                    var saveCommand = _payloadMapper.BuildSaveCommand(createPayload);
+                    approvedRecordId = await _recordService.SaveRecordAsync(saveCommand, currentUser, ct);
+                }
+                else if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
+                {
+                    await ApplyApprovedScheduleProposalAsync(proposal, currentUser, ct);
+                    approvedRecordId = proposal.ZaznamId;
+                }
+                else
+                {
+                    throw new InvalidOperationException("Neznámý typ návrhu.");
+                }
 
-            return approvedRecordId;
-        });
+                proposal.Stav = RecordProposalStateCodes.Approved;
+                proposal.DecidedByOsobaId = currentUser.OsobaId;
+                proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
+                proposal.ApprovedRecordId = approvedRecordId;
+                await _dbContext.SaveChangesAsync(ct);
+                _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                    AuditActionType.Approve,
+                    AuditEntityType.RecordProposal,
+                    proposal.Id.ToString(CultureInfo.InvariantCulture),
+                    oldProposalSnapshot,
+                    ProposalAuditSnapshot.FromEntity(proposal)));
+                await _dbContext.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                return approvedRecordId;
+            });
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new InvalidOperationException(
+                "Návrh byl mezitím změněn jiným uživatelem. Obnovte stránku a zkuste znovu.");
+        }
     }
 
     public async Task RejectProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)

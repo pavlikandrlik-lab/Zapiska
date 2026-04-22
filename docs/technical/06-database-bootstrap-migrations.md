@@ -32,7 +32,14 @@ Dokument popisuje standardní databázový lifecycle: inicializaci baseline, apl
 7. `db_upgrade_1_1_4_record_priority_matrix.sql`
 8. `db_upgrade_1_1_5_search_checkpoint.sql`
 9. `db_upgrade_1_1_6_project_roles_manager_gestor.sql`
-10. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
+10. `db_upgrade_1_1_7_new_task_status.sql`
+11. `db_upgrade_1_1_8_vyzvy.sql`
+12. `db_upgrade_1_2_0_authz_role_scope.sql`
+13. `db_upgrade_1_2_1_lookup_role_authz_fk.sql`
+14. `db_upgrade_1_3_0_cleanup_orphaned_role_permissions.sql`
+15. `db_upgrade_1_3_1_history_and_audit_indexes.sql`
+16. `db_upgrade_1_3_2_authz_join_indexes.sql`
+17. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
 
 ### 5.2 Fresh install
 ```powershell
