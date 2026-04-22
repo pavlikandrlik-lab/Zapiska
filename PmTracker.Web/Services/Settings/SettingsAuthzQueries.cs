@@ -195,7 +195,8 @@ public sealed class SettingsAuthzQueries(
     private async Task<IReadOnlyList<PmTracker.Web.Models.ViewModels.Sync.SyncJobSettingsCardViewModel>> LoadSyncJobCardsAsync(bool canManage, CancellationToken ct)
     {
         var cards = new List<PmTracker.Web.Models.ViewModels.Sync.SyncJobSettingsCardViewModel>();
-        foreach (var handler in syncJobHandlers)
+        // Deterministické pořadí: ad.periodic → sd.active → sd.archive → ostatní (alfa).
+        foreach (var handler in syncJobHandlers.OrderBy(h => h.JobKey, StringComparer.OrdinalIgnoreCase))
         {
             cards.Add(await handler.LoadCardAsync(canManage, ct));
         }
