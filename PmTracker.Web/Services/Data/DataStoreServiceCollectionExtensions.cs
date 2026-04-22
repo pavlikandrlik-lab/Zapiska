@@ -146,6 +146,8 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IRecordProposalAuthorizationPolicy, RecordProposalAuthorizationPolicy>();
         services.AddScoped<IPendingScheduleProposalLockEvaluator, PendingScheduleProposalLockEvaluator>();
         services.AddScoped<RecordProposalPayloadMapper>();
+        // Plán D Task 7: resolver zdroje skutečnosti kroku (vyjádření vs. ruční)
+        services.AddScoped<IRecordScheduleActualSourceResolver, RecordScheduleActualSourceResolver>();
         services.AddScoped<IExportCommentProjectionBuilder, ExportCommentProjectionBuilder>();
         services.AddScoped<IExportRoleProjectionBuilder, ExportRoleProjectionBuilder>();
         services.AddScoped<IExportAttendanceProjectionBuilder, ExportAttendanceProjectionBuilder>();
