@@ -85,7 +85,7 @@ public sealed class UserAuthorizationSnapshotBuilder(
             .ToListAsync(ct);
 
         var includeRolePermissionIds = rolePermissions
-            .Where(x => Ci.Equals(x.ScopeMode, "INCLUDE"))
+            .Where(x => Ci.Equals(x.ScopeMode.ToString().ToUpperInvariant(), "INCLUDE"))
             .Select(x => x.RolePermissionId)
             .Distinct()
             .ToList();
@@ -104,9 +104,9 @@ public sealed class UserAuthorizationSnapshotBuilder(
             {
                 PermissionKey = item.Klic,
                 ScopeLevel = item.ScopeLevel,
-                ScopeMode = item.ScopeMode,
+                ScopeMode = item.ScopeMode.ToString().ToUpperInvariant(),
                 IsAllowed = item.IsAllowed,
-                ProjectIds = Ci.Equals(item.ScopeMode, "INCLUDE")
+                ProjectIds = Ci.Equals(item.ScopeMode.ToString().ToUpperInvariant(), "INCLUDE")
                     ? includedProjectIdsByRolePermissionId.GetValueOrDefault(item.RolePermissionId, [])
                     : [],
                 SourceType = "APP_ROLE",

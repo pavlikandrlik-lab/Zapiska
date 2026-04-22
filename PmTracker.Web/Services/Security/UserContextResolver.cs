@@ -28,8 +28,8 @@ public sealed class UserContextResolver : IUserContextResolver
     };
 
     private sealed record ActiveRoleRow(int RoleId, string RoleCode);
-    private sealed record PermissionGrantRaw(string Klic, string ScopeLevel, string ScopeMode, bool IsAllowed, int RolePermissionId);
-    private sealed record PermissionGrantProjectRow(string Klic, string ScopeLevel, string ScopeMode, bool IsAllowed, int RolePermissionId, int? ProjectId);
+    private sealed record PermissionGrantRaw(string Klic, string ScopeLevel, ScopeMode ScopeMode, bool IsAllowed, int RolePermissionId);
+    private sealed record PermissionGrantProjectRow(string Klic, string ScopeLevel, ScopeMode ScopeMode, bool IsAllowed, int RolePermissionId, int? ProjectId);
     private sealed record ResolvedPersonRow(
         int Id,
         string? Titul,
@@ -283,9 +283,9 @@ public sealed class UserContextResolver : IUserContextResolver
             {
                 PermissionKey = item.Raw.Klic,
                 ScopeLevel = item.Raw.ScopeLevel,
-                ScopeMode = item.Raw.ScopeMode,
+                ScopeMode = item.Raw.ScopeMode.ToString().ToUpperInvariant(),
                 IsAllowed = item.Raw.IsAllowed,
-                ProjectIds = item.Raw.ScopeMode.Equals("INCLUDE", StringComparison.OrdinalIgnoreCase)
+                ProjectIds = item.Raw.ScopeMode.ToString().ToUpperInvariant().Equals("INCLUDE", StringComparison.OrdinalIgnoreCase)
                     ? item.ProjectIds
                     : Array.Empty<int>()
             })

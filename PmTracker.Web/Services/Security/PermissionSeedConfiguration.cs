@@ -3,7 +3,7 @@ namespace PmTracker.Web.Services.Security;
 public sealed record PermissionCategorySeedItem(string Kod, string Nazev, int SortOrder);
 public sealed record RoleSeedItem(string Kod, string Nazev, string Popis, bool IsSystem, RoleScope Scope);
 public sealed record ActionSeedItem(string Klic, string Nazev, string CategoryKod, string ScopeLevel);
-public sealed record RoleActionSeedItem(string RoleKod, string ActionKlic, string ScopeMode, bool IsAllowed);
+public sealed record RoleActionSeedItem(string RoleKod, string ActionKlic, ScopeMode ScopeMode, bool IsAllowed);
 
 public static class PermissionSeedConfiguration
 {
@@ -55,69 +55,69 @@ public static class PermissionSeedConfiguration
 
     public static readonly IReadOnlyList<RoleActionSeedItem> RoleMappings =
     [
-        new("SUPERADMIN", "projects.create", "ALL", true),
-        new("SUPERADMIN", "projects.edit", "ALL", true),
-        new("SUPERADMIN", "projects.delete", "ALL", true),
-        new("SUPERADMIN", "records.edit", "ALL", true),
-        new("SUPERADMIN", "records.schedule.add", "ALL", true),
-        new("SUPERADMIN", "records.schedule.edit", "ALL", true),
-        new("SUPERADMIN", "records.comment.subsystemlead", "ALL", true),
-        new("SUPERADMIN", "meetings.create", "ALL", true),
-        new("SUPERADMIN", "meetings.edit", "ALL", true),
-        new("SUPERADMIN", "team.manage", "ALL", true),
-        new("SUPERADMIN", "people.manage", "ALL", true),
-        new("SUPERADMIN", "ciselniky.edit", "ALL", true),
-        new("SUPERADMIN", "settings.view", "ALL", true),
-        new("SUPERADMIN", "settings.manage", "ALL", true),
+        new("SUPERADMIN", "projects.create", ScopeMode.All, true),
+        new("SUPERADMIN", "projects.edit", ScopeMode.All, true),
+        new("SUPERADMIN", "projects.delete", ScopeMode.All, true),
+        new("SUPERADMIN", "records.edit", ScopeMode.All, true),
+        new("SUPERADMIN", "records.schedule.add", ScopeMode.All, true),
+        new("SUPERADMIN", "records.schedule.edit", ScopeMode.All, true),
+        new("SUPERADMIN", "records.comment.subsystemlead", ScopeMode.All, true),
+        new("SUPERADMIN", "meetings.create", ScopeMode.All, true),
+        new("SUPERADMIN", "meetings.edit", ScopeMode.All, true),
+        new("SUPERADMIN", "team.manage", ScopeMode.All, true),
+        new("SUPERADMIN", "people.manage", ScopeMode.All, true),
+        new("SUPERADMIN", "ciselniky.edit", ScopeMode.All, true),
+        new("SUPERADMIN", "settings.view", ScopeMode.All, true),
+        new("SUPERADMIN", "settings.manage", ScopeMode.All, true),
 
-        new("APP_ADMIN", "projects.create", "ALL", true),
-        new("APP_ADMIN", "projects.edit", "ALL", true),
-        new("APP_ADMIN", "records.edit", "ALL", true),
-        new("APP_ADMIN", "records.schedule.add", "ALL", true),
-        new("APP_ADMIN", "records.schedule.edit", "ALL", true),
-        new("APP_ADMIN", "records.comment.subsystemlead", "ALL", true),
-        new("APP_ADMIN", "meetings.create", "ALL", true),
-        new("APP_ADMIN", "meetings.edit", "ALL", true),
-        new("APP_ADMIN", "team.manage", "ALL", true),
-        new("APP_ADMIN", "people.manage", "ALL", true),
-        new("APP_ADMIN", "ciselniky.edit", "ALL", true),
-        new("APP_ADMIN", "settings.view", "ALL", true),
+        new("APP_ADMIN", "projects.create", ScopeMode.All, true),
+        new("APP_ADMIN", "projects.edit", ScopeMode.All, true),
+        new("APP_ADMIN", "records.edit", ScopeMode.All, true),
+        new("APP_ADMIN", "records.schedule.add", ScopeMode.All, true),
+        new("APP_ADMIN", "records.schedule.edit", ScopeMode.All, true),
+        new("APP_ADMIN", "records.comment.subsystemlead", ScopeMode.All, true),
+        new("APP_ADMIN", "meetings.create", ScopeMode.All, true),
+        new("APP_ADMIN", "meetings.edit", ScopeMode.All, true),
+        new("APP_ADMIN", "team.manage", ScopeMode.All, true),
+        new("APP_ADMIN", "people.manage", ScopeMode.All, true),
+        new("APP_ADMIN", "ciselniky.edit", ScopeMode.All, true),
+        new("APP_ADMIN", "settings.view", ScopeMode.All, true),
 
         // Authorization unification — Fáze A — Task A8
         // Projektové role mappings (jen existující permission keys;
         // dashboard/export/comments se přidají ve Fázi C)
-        new("VLASTNIK_PROJEKTU", "projects.edit", "ALL", true),
-        new("VLASTNIK_PROJEKTU", "records.edit", "ALL", true),
-        new("VLASTNIK_PROJEKTU", "records.schedule.add", "ALL", true),
-        new("VLASTNIK_PROJEKTU", "records.schedule.edit", "ALL", true),
-        new("VLASTNIK_PROJEKTU", "records.comment.subsystemlead", "ALL", true),
-        new("VLASTNIK_PROJEKTU", "meetings.create", "ALL", true),
-        new("VLASTNIK_PROJEKTU", "meetings.edit", "ALL", true),
-        new("VLASTNIK_PROJEKTU", "team.manage", "ALL", true),
+        new("VLASTNIK_PROJEKTU", "projects.edit", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "records.edit", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "records.schedule.add", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "records.schedule.edit", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "records.comment.subsystemlead", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "meetings.create", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "meetings.edit", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "team.manage", ScopeMode.All, true),
 
-        new("ADM_PROJ", "records.edit", "ALL", true),
-        new("ADM_PROJ", "records.schedule.add", "ALL", true),
-        new("ADM_PROJ", "records.schedule.edit", "ALL", true),
-        new("ADM_PROJ", "records.comment.subsystemlead", "ALL", true),
-        new("ADM_PROJ", "meetings.create", "ALL", true),
-        new("ADM_PROJ", "meetings.edit", "ALL", true),
-        new("ADM_PROJ", "team.manage", "ALL", true),
+        new("ADM_PROJ", "records.edit", ScopeMode.All, true),
+        new("ADM_PROJ", "records.schedule.add", ScopeMode.All, true),
+        new("ADM_PROJ", "records.schedule.edit", ScopeMode.All, true),
+        new("ADM_PROJ", "records.comment.subsystemlead", ScopeMode.All, true),
+        new("ADM_PROJ", "meetings.create", ScopeMode.All, true),
+        new("ADM_PROJ", "meetings.edit", ScopeMode.All, true),
+        new("ADM_PROJ", "team.manage", ScopeMode.All, true),
 
-        new("PROJ_MAN", "records.edit", "ALL", true),
-        new("PROJ_MAN", "records.schedule.add", "ALL", true),
-        new("PROJ_MAN", "records.schedule.edit", "ALL", true),
-        new("PROJ_MAN", "records.comment.subsystemlead", "ALL", true),
-        new("PROJ_MAN", "meetings.create", "ALL", true),
-        new("PROJ_MAN", "meetings.edit", "ALL", true),
-        new("PROJ_MAN", "team.manage", "ALL", true),
+        new("PROJ_MAN", "records.edit", ScopeMode.All, true),
+        new("PROJ_MAN", "records.schedule.add", ScopeMode.All, true),
+        new("PROJ_MAN", "records.schedule.edit", ScopeMode.All, true),
+        new("PROJ_MAN", "records.comment.subsystemlead", ScopeMode.All, true),
+        new("PROJ_MAN", "meetings.create", ScopeMode.All, true),
+        new("PROJ_MAN", "meetings.edit", ScopeMode.All, true),
+        new("PROJ_MAN", "team.manage", ScopeMode.All, true),
 
-        new("GEST", "records.comment.subsystemlead", "ALL", true),
+        new("GEST", "records.comment.subsystemlead", ScopeMode.All, true),
 
         // Authorization unification — Fáze A — Task A9
         // Subsystémové role mappings (jen existující permission keys;
         // comments.* se přidají ve Fázi C pro METODIK_SUBSYSTEMU)
-        new("VEDOUCI_SUBSYSTEMU", "records.comment.subsystemlead", "ALL", true),
-        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "records.comment.subsystemlead", "ALL", true)
+        new("VEDOUCI_SUBSYSTEMU", "records.comment.subsystemlead", ScopeMode.All, true),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "records.comment.subsystemlead", ScopeMode.All, true)
 
         // HOST — záměrně prázdný (read-only; dashboard/export přijdou ve Fázi C)
         // METODIK_SUBSYSTEMU — záměrně prázdný (comments.* přijdou ve Fázi C)

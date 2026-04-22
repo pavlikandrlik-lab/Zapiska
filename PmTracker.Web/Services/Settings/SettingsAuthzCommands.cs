@@ -4,6 +4,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Audit;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Services.Settings;
 
@@ -369,11 +370,9 @@ public sealed class SettingsAuthzCommands(
 
     public async Task SaveRolePermissionAsync(SaveRolePermissionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
-        var scopeMode = string.Equals(command.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase)
-            ? "INCLUDE"
-            : string.Equals(command.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase)
-                ? "ALL"
-                : throw new InvalidOperationException("Neplatný rozsah mapování role/akce.");
+        var scopeMode = Enum.TryParse<ScopeMode>(command.ScopeMode, ignoreCase: true, out var parsedScopeMode)
+            ? parsedScopeMode
+            : throw new InvalidOperationException("Neplatný rozsah mapování role/akce.");
 
         if (!await dbContext.AuthzRoles.AsNoTracking().AnyAsync(x => x.Id == command.RoleId, ct))
         {
@@ -434,7 +433,7 @@ public sealed class SettingsAuthzCommands(
             .Where(x => x.RolePermissionId == row.Id)
             .ToListAsync(ct);
         dbContext.AuthzRolePermissionProjects.RemoveRange(currentProjects);
-        if (scopeMode == "INCLUDE")
+        if (scopeMode == ScopeMode.Include)
         {
             var projectIds = (command.ProjektIds ?? [])
                 .Where(x => x > 0)

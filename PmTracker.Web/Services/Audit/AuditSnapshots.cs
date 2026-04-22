@@ -324,7 +324,7 @@ internal sealed record AuthzRolePermissionAuditSnapshot(
         entity.Id,
         entity.RoleId,
         entity.PermissionId,
-        entity.ScopeMode,
+        entity.ScopeMode.ToString().ToUpperInvariant(),
         entity.IsAllowed,
         projectIds.OrderBy(item => item).ToList());
 }

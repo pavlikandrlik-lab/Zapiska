@@ -88,7 +88,7 @@ public sealed class SettingsAuthzQueries(
                 RoleKod = roles.FirstOrDefault(role => role.Id == x.RoleId)?.Kod ?? "-",
                 PermissionId = x.PermissionId,
                 PermissionKlic = permissions.FirstOrDefault(permission => permission.Id == x.PermissionId)?.Klic ?? "-",
-                ScopeMode = x.ScopeMode,
+                ScopeMode = x.ScopeMode.ToString().ToUpperInvariant(),
                 IsAllowed = x.IsAllowed,
                 ProjektIds = rolePermissionProjects
                     .Where(project => project.RolePermissionId == x.Id)

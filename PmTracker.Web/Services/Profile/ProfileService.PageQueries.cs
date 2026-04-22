@@ -90,7 +90,7 @@ public sealed partial class ProfileService
             .ToListAsync(ct);
 
         var includeRolePermissionIds = rolePermissions
-            .Where(x => Ci.Equals(x.ScopeMode, "INCLUDE"))
+            .Where(x => Ci.Equals(x.ScopeMode.ToString().ToUpperInvariant(), "INCLUDE"))
             .Select(x => x.Id)
             .Distinct()
             .ToList();
@@ -130,7 +130,7 @@ public sealed partial class ProfileService
                         PermissionNazev = x.Nazev,
                         IsAllowed = x.IsAllowed,
                         ScopeSummary = BuildPermissionScopeSummary(
-                            x.ScopeMode,
+                            x.ScopeMode.ToString().ToUpperInvariant(),
                             includedProjectIdsByRolePermissionId.GetValueOrDefault(x.Id, Array.Empty<int>()),
                             projectCodesById)
                     })

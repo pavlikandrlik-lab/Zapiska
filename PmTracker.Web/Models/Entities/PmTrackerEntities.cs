@@ -399,7 +399,7 @@ public sealed class AuthzRolePermissionEntity
     public int Id { get; set; }
     public int RoleId { get; set; }
     public int PermissionId { get; set; }
-    public string ScopeMode { get; set; } = string.Empty;
+    public ScopeMode ScopeMode { get; set; } = ScopeMode.All;
     public bool IsAllowed { get; set; }
 }
 

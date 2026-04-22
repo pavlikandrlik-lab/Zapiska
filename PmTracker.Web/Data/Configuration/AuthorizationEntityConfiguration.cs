@@ -79,7 +79,13 @@ internal sealed class AuthorizationRolePermissionEntityConfiguration : IEntityTy
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.RoleId).HasColumnName("role_id");
         builder.Property(x => x.PermissionId).HasColumnName("permission_id");
-        builder.Property(x => x.ScopeMode).HasColumnName("scope_mode");
+        builder.Property(x => x.ScopeMode)
+            .HasColumnName("scope_mode")
+            .HasMaxLength(16)
+            .IsRequired()
+            .HasConversion(
+                v => v.ToString().ToUpperInvariant(),
+                v => Enum.Parse<ScopeMode>(v, true));
         builder.Property(x => x.IsAllowed).HasColumnName("is_allowed");
     }
 }
