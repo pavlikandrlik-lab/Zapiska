@@ -100,7 +100,16 @@ public static class PermissionSeedConfiguration
         new("people.manage", "Správa osob", "MASTER", PermissionScopeLevel.Global),
         new("ciselniky.edit", "Editace číselníků", "MASTER", PermissionScopeLevel.Global),
         new("settings.view", "Zobrazit nastavení", "SETTINGS", PermissionScopeLevel.Global),
-        new("settings.manage", "Správa nastavení", "SETTINGS", PermissionScopeLevel.Global)
+        new("settings.manage", "Správa nastavení", "SETTINGS", PermissionScopeLevel.Global),
+        // Fáze C — Task C1: nové permission keys
+        new("dashboard.view", "Zobrazit projektový dashboard", "PROJECTS", PermissionScopeLevel.Project),
+        new("export.pdf", "Exportovat projekt do PDF", "PROJECTS", PermissionScopeLevel.Project),
+        new("export.word", "Exportovat projekt do Word", "PROJECTS", PermissionScopeLevel.Project),
+        new("comments.add", "Přidávat komentáře", "RECORDS", PermissionScopeLevel.Project),
+        new("comments.edit.own", "Upravovat vlastní komentáře", "RECORDS", PermissionScopeLevel.Project),
+        new("comments.delete.own", "Mazat vlastní komentáře", "RECORDS", PermissionScopeLevel.Project),
+        new("search.reindex", "Spustit reindex vyhledávání", "SETTINGS", PermissionScopeLevel.Global),
+        new("projects.read.all", "Číst všechny projekty", "PROJECTS", PermissionScopeLevel.Global)
     ];
 
     public static readonly IReadOnlyList<RoleActionSeedItem> RoleMappings =

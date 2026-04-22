@@ -22,6 +22,14 @@ public static class PermissionKeys
     public const string CiselnikyEdit = "ciselniky.edit";
     public const string SettingsView = "settings.view";
     public const string SettingsManage = "settings.manage";
+    public const string DashboardView = "dashboard.view";
+    public const string ExportPdf = "export.pdf";
+    public const string ExportWord = "export.word";
+    public const string CommentsAdd = "comments.add";
+    public const string CommentsEditOwn = "comments.edit.own";
+    public const string CommentsDeleteOwn = "comments.delete.own";
+    public const string SearchReindex = "search.reindex";
+    public const string ProjectsReadAll = "projects.read.all";
 
     private static readonly PermissionKeyDefinition[] Definitions =
     [
@@ -38,7 +46,15 @@ public static class PermissionKeys
         new(PeopleManage, "Spravovat osoby", "MASTER", "GLOBAL", "Ruční/AD správa osob."),
         new(CiselnikyEdit, "Editovat číselníky", "MASTER", "GLOBAL", "Správa číselníků a referenčních dat."),
         new(SettingsView, "Zobrazit nastavení", "SETTINGS", "GLOBAL", "Read-only přístup do modulu nastavení."),
-        new(SettingsManage, "Spravovat nastavení", "SETTINGS", "GLOBAL", "Správa rolí, akcí a mapování oprávnění.")
+        new(SettingsManage, "Spravovat nastavení", "SETTINGS", "GLOBAL", "Správa rolí, akcí a mapování oprávnění."),
+        new(DashboardView, "Zobrazit projektový dashboard", "PROJECTS", "PROJECT", "Read-only přístup k projektovému dashboardu."),
+        new(ExportPdf, "Exportovat projekt do PDF", "PROJECTS", "PROJECT", "Generování PDF exportu projektu."),
+        new(ExportWord, "Exportovat projekt do Word", "PROJECTS", "PROJECT", "Generování Word exportu projektu."),
+        new(CommentsAdd, "Přidávat komentáře", "RECORDS", "PROJECT", "Vkládání nových komentářů k záznamům."),
+        new(CommentsEditOwn, "Upravovat vlastní komentáře", "RECORDS", "PROJECT", "Úprava komentářů, které osoba sama vložila."),
+        new(CommentsDeleteOwn, "Mazat vlastní komentáře", "RECORDS", "PROJECT", "Smazání komentářů, které osoba sama vložila."),
+        new(SearchReindex, "Spustit reindex vyhledávání", "SETTINGS", "GLOBAL", "Administrátorská akce: full reindex FTS."),
+        new(ProjectsReadAll, "Číst všechny projekty", "PROJECTS", "GLOBAL", "Read-only přístup ke všem projektům (management visibility).")
     ];
 
     private static readonly HashSet<string> SupportedKeys = new(
@@ -55,7 +71,13 @@ public static class PermissionKeys
         RecordsCommentSubsystemLead,
         MeetingsCreate,
         MeetingsEdit,
-        TeamManage
+        TeamManage,
+        DashboardView,
+        ExportPdf,
+        ExportWord,
+        CommentsAdd,
+        CommentsEditOwn,
+        CommentsDeleteOwn
     ],
         StringComparer.OrdinalIgnoreCase);
 
