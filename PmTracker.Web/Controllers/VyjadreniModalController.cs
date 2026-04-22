@@ -79,9 +79,65 @@ public sealed class VyjadreniModalController : Controller
             return Forbid();
         }
 
+        // T3 — direct sync při otevření modalu. User čeká. Per-ticket lock + fingerprint
+        // minimalizuje práci proti HOT DB; pokud fingerprint říká no-change, drill se
+        // preskočí (žádný HOT_VYJADRENI fetch). Spec §8.6.
+        try
+        {
+            await _harvest.HarvestSingleTicketAsync(externiOdkazId, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "T3 direct sync selhal pro externí odkaz {Id} — zobrazím cached data.",
+                externiOdkazId);
+            // Nefail modal open — zobrazíme cached data.
+        }
+
         var vm = await _builder.BuildAsync(externiOdkazId, zaznamId, canEdit: true, ct).ConfigureAwait(false);
         if (vm is null) return NotFound();
         return PartialView("~/Views/Vyjadreni/_ChatModal.cshtml", vm);
+    }
+
+    /// <summary>
+    /// T6 — manuální refresh z chat modalu nebo z karty externí vazby.
+    /// User klikne 🔄 → endpoint synchronně zavolá HarvestSingleTicketAsync, která
+    /// projde fingerprint checkem a případně drillne. Per-externiOdkazId 1-min
+    /// hard floor via IMemoryCache v front-endu/shared middleware je TBD; pro
+    /// teď spoléháme na queue dedup (T2/T5/T7/T8) a per-ticket lock (Task 6).
+    /// </summary>
+    [HttpPost("Refresh")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Refresh([FromForm] int externiOdkazId, [FromForm] int projektId, CancellationToken ct)
+    {
+        if (externiOdkazId <= 0 || projektId <= 0) return BadRequest();
+
+        var osobaId = _currentUser.OsobaId;
+        if (osobaId is null) return Forbid();
+
+        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, projektId, null, ct))
+        {
+            return Forbid();
+        }
+
+        try
+        {
+            var result = await _harvest.HarvestSingleTicketAsync(externiOdkazId, ct).ConfigureAwait(false);
+            return Ok(new
+            {
+                Success = true,
+                result.Fetched,
+                result.Created,
+                result.Superseded,
+                result.Skipped,
+                result.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "T6 refresh selhal pro externí odkaz {Id}.", externiOdkazId);
+            return StatusCode(500, new { Error = "Refresh selhal, viz log." });
+        }
     }
 
     [HttpPost("HarmonogramVazba/Create")]

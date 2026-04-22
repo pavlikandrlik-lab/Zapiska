@@ -165,6 +165,10 @@ public class AuthorizationPolicyEnforcementTests
             // vzor jako ExterniOdkazController.Sync.
             "PmTracker.Web.Controllers.VyjadreniModalController.CreateVazba",
             "PmTracker.Web.Controllers.VyjadreniModalController.DeleteVazba",
+
+            // Refresh (T6 direct sync, sd-sync-revise Task 14): projektId přichází z form body,
+            // ne z route. Manuální _authz.HasPermissionAsync(osobaId, RecordsEdit, projektId).
+            "PmTracker.Web.Controllers.VyjadreniModalController.Refresh",
         };
 
         // Act
