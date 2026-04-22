@@ -33,6 +33,11 @@
     const container = el.querySelector('[data-chat-modal-content]');
     container.innerHTML = '<p class="pm-chat-modal__loading">Načítám…</p>';
     show(el);
+    await loadInto(container);
+  }
+
+  async function loadInto(container) {
+    if (!currentCtx) return;
     try {
       const url = `/Vyjadreni/Modal?externiOdkazId=${encodeURIComponent(currentCtx.externiOdkazId)}&zaznamId=${encodeURIComponent(currentCtx.zaznamId)}`;
       const resp = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } });
@@ -54,6 +59,17 @@
     } catch (err) {
       container.innerHTML = `<gov-alert variant="error">Chyba při načítání: ${err.message || err}</gov-alert>`;
     }
+  }
+
+  /**
+   * Review finding A-5: po úspěšné mutaci (create binding, delete binding) přenačti
+   * partial a re-attach JS moduly. Volané z chatModalDragDrop po úspěšném Create/Delete.
+   */
+  async function refreshModal() {
+    if (!dialogEl) return;
+    const container = dialogEl.querySelector('[data-chat-modal-content]');
+    if (!container) return;
+    await loadInto(container);
   }
 
   function show(el) {
@@ -85,5 +101,5 @@
     document.addEventListener('click', onClick);
   }
 
-  global.pmChatModal = { init, open, close };
+  global.pmChatModal = { init, open, close, refreshModal };
 })(window);

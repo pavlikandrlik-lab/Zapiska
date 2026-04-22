@@ -52,6 +52,11 @@ public sealed class StepperKrokViewModel
     public DateTime? AktualniVyjadreniDatum { get; set; }
     /// <summary>Source 1=Auto, 2=Manual — UI vizuálně rozlišuje.</summary>
     public byte? AktualniSource { get; set; }
+    /// <summary>
+    /// Review finding A-5: ID aktivní vazby (ZaznamHarmonogramVyjadreniVazbaEntity.Id),
+    /// aby UI umělo zavolat Delete endpoint bez re-fetch modalu. null = žádná aktivní vazba.
+    /// </summary>
+    public int? VazbaId { get; set; }
 }
 
 /// <summary>Payload pro POST /Vyjadreni/HarmonogramVazba/Create.</summary>

@@ -10345,7 +10345,7 @@ bootstrapPmTrackerApp();
 })(window);
 
 // =============================================================================
-// PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModal.js (Plán C Task 15)
+// PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModal.js (Plán C Task 15 + A-5 refresh)
 // =============================================================================
 (function (global) {
   'use strict';
@@ -10377,6 +10377,11 @@ bootstrapPmTrackerApp();
     const container = el.querySelector('[data-chat-modal-content]');
     container.innerHTML = '<p class="pm-chat-modal__loading">Načítám…</p>';
     show(el);
+    await loadInto(container);
+  }
+
+  async function loadInto(container) {
+    if (!currentCtx) return;
     try {
       const url = `/Vyjadreni/Modal?externiOdkazId=${encodeURIComponent(currentCtx.externiOdkazId)}&zaznamId=${encodeURIComponent(currentCtx.zaznamId)}`;
       const resp = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } });
@@ -10398,6 +10403,13 @@ bootstrapPmTrackerApp();
     } catch (err) {
       container.innerHTML = `<gov-alert variant="error">Chyba při načítání: ${err.message || err}</gov-alert>`;
     }
+  }
+
+  async function refreshModal() {
+    if (!dialogEl) return;
+    const container = dialogEl.querySelector('[data-chat-modal-content]');
+    if (!container) return;
+    await loadInto(container);
   }
 
   function show(el) {
@@ -10429,11 +10441,11 @@ bootstrapPmTrackerApp();
     document.addEventListener('click', onClick);
   }
 
-  global.pmChatModal = { init, open, close };
+  global.pmChatModal = { init, open, close, refreshModal };
 })(window);
 
 // =============================================================================
-// PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModalDragDrop.js (Tasks 16+17)
+// PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModalDragDrop.js (Tasks 16+17 + A-5 Delete/Refresh)
 // =============================================================================
 (function (global) {
   'use strict';
@@ -10471,6 +10483,22 @@ bootstrapPmTrackerApp();
   async function createBinding(root, payload) {
     const token = getAntiForgeryToken(root);
     const resp = await fetch('/Vyjadreni/HarmonogramVazba/Create', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'RequestVerificationToken': token
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return resp.json();
+  }
+
+  async function deleteBinding(root, payload) {
+    const token = getAntiForgeryToken(root);
+    const resp = await fetch('/Vyjadreni/HarmonogramVazba/Delete', {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
@@ -10527,10 +10555,39 @@ bootstrapPmTrackerApp();
         setStatus(root, 'Ukládám…', null);
         try {
           await createBinding(root, payload);
-          setStatus(root, 'Uloženo. Zavřete a otevřete modal pro aktualizaci.', 'ok');
+          setStatus(root, 'Uloženo.', 'ok');
           clearPending(root);
+          if (global.pmChatModal && typeof global.pmChatModal.refreshModal === 'function') {
+            await global.pmChatModal.refreshModal();
+          }
         } catch (err) {
           setStatus(root, 'Ukládání selhalo: ' + (err.message || err), 'error');
+        }
+      });
+    });
+
+    // A-5: „Odpojit" tlačítka — posílají POST Delete s data-vazba-id, pak refresh.
+    root.querySelectorAll('[data-clear-binding]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const step = btn.closest('[data-step]');
+        if (!step) return;
+        const vazbaId = Number(step.getAttribute('data-vazba-id'));
+        if (!vazbaId) {
+          setStatus(root, 'Chybí data-vazba-id — nelze odpojit.', 'error');
+          return;
+        }
+        const payload = { vazbaId: vazbaId, projektId: projektId };
+        persistPending(root, { op: 'delete', payload });
+        setStatus(root, 'Odpojuji…', null);
+        try {
+          await deleteBinding(root, payload);
+          setStatus(root, 'Odpojeno.', 'ok');
+          clearPending(root);
+          if (global.pmChatModal && typeof global.pmChatModal.refreshModal === 'function') {
+            await global.pmChatModal.refreshModal();
+          }
+        } catch (err) {
+          setStatus(root, 'Odpojení selhalo: ' + (err.message || err), 'error');
         }
       });
     });

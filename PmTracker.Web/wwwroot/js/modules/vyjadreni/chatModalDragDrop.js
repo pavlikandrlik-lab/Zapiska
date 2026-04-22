@@ -116,22 +116,41 @@
         setStatus(root, 'Ukládám…', null);
         try {
           await createBinding(root, payload);
-          setStatus(root, 'Uloženo. Zavřete a otevřete modal pro aktualizaci.', 'ok');
+          setStatus(root, 'Uloženo.', 'ok');
           clearPending(root);
+          // A-5: po úspěšném uložení přenačti modal, ať UI zobrazí nové binding meta a VazbaId.
+          if (global.pmChatModal && typeof global.pmChatModal.refreshModal === 'function') {
+            await global.pmChatModal.refreshModal();
+          }
         } catch (err) {
           setStatus(root, 'Ukládání selhalo: ' + (err.message || err), 'error');
         }
       });
     });
 
-    // „Odpojit" tlačítka — najdeme ID v kroku
+    // A-5: „Odpojit" tlačítka — posílají POST Delete s data-vazba-id, pak refresh.
     root.querySelectorAll('[data-clear-binding]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const step = btn.closest('[data-step]');
         if (!step) return;
-        // Pro delete potřebujeme skutečné vazba-id, které ve VM nemáme — backend by měl
-        // poslat data-vazba-id; prozatím vyhledáme vazbu skrz re-fetch modalu jako fallback.
-        setStatus(root, 'Odpojení musí být podpořeno na backendu — pošlete POST Delete s vazbaId.', 'error');
+        const vazbaId = Number(step.getAttribute('data-vazba-id'));
+        if (!vazbaId) {
+          setStatus(root, 'Chybí data-vazba-id — nelze odpojit.', 'error');
+          return;
+        }
+        const payload = { vazbaId: vazbaId, projektId: projektId };
+        persistPending(root, { op: 'delete', payload });
+        setStatus(root, 'Odpojuji…', null);
+        try {
+          await deleteBinding(root, payload);
+          setStatus(root, 'Odpojeno.', 'ok');
+          clearPending(root);
+          if (global.pmChatModal && typeof global.pmChatModal.refreshModal === 'function') {
+            await global.pmChatModal.refreshModal();
+          }
+        } catch (err) {
+          setStatus(root, 'Odpojení selhalo: ' + (err.message || err), 'error');
+        }
       });
     });
   }

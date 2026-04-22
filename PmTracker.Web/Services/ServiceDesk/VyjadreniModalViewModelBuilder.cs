@@ -93,7 +93,9 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
                 BarvaHex = k.BarvaHex,
                 AktualniVyjadreniId = b?.HotVyjadreniId,
                 AktualniVyjadreniDatum = b?.DatumVyjadreni,
-                AktualniSource = b?.Source
+                AktualniSource = b?.Source,
+                // A-5: předáme reálné vazba-id do UI pro Delete endpoint.
+                VazbaId = b?.Id
             };
         }).ToList();
 
