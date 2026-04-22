@@ -89,47 +89,6 @@ public abstract partial class BaseController
         return Activity.Current?.Id ?? Guid.NewGuid().ToString("N");
     }
 
-    private Dictionary<string, string> ReadFormValuesForDiagnostics()
-    {
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (!HttpContext.Request.HasFormContentType)
-        {
-            return values;
-        }
-
-        try
-        {
-            var form = HttpContext.Request.Form;
-            foreach (var key in form.Keys)
-            {
-                values[key] = string.Join(" | ", form[key].ToArray());
-            }
-        }
-        catch (Exception ex)
-        {
-            values["<form-read-error>"] = ex.Message;
-        }
-
-        return values;
-    }
-
-    private static void AppendDictionarySection(StringBuilder builder, string title, IReadOnlyDictionary<string, string> values)
-    {
-        if (values.Count == 0)
-        {
-            return;
-        }
-
-        builder.AppendLine(title);
-        foreach (var pair in values.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
-        {
-            builder.Append("  ")
-                .Append(pair.Key)
-                .Append(": ")
-                .AppendLine(pair.Value);
-        }
-    }
-
     private static void AppendFieldErrorSection(StringBuilder builder, IReadOnlyDictionary<string, string[]> fieldErrors)
     {
         if (fieldErrors.Count == 0)
@@ -188,7 +147,6 @@ public abstract partial class BaseController
         }
 
         AppendFieldErrorSection(builder, fieldErrors);
-        AppendDictionarySection(builder, "FormValues:", ReadFormValuesForDiagnostics());
 
         if (exception is not null)
         {
@@ -230,7 +188,6 @@ public abstract partial class BaseController
             Message = message,
             ErrorCode = errorCode,
             TraceId = traceId,
-            DiagnosticLog = diagnosticLog,
             FieldErrors = fieldErrors
         };
     }

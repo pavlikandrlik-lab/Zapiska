@@ -35,7 +35,6 @@ public sealed class AjaxAntiforgeryResultFilter(ILogger<AjaxAntiforgeryResultFil
             Message = AntiForgeryMessage,
             ErrorCode = AjaxErrorCodes.RequestValidationFailed,
             TraceId = traceId,
-            DiagnosticLog = diagnosticLog,
             FieldErrors = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
                 [AntiForgeryFieldKey] = new[]

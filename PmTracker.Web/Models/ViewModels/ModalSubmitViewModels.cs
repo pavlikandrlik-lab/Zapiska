@@ -6,7 +6,6 @@ public sealed class ModalSubmitResultViewModel
     public string? Message { get; init; }
     public string? ErrorCode { get; init; }
     public string? TraceId { get; init; }
-    public string? DiagnosticLog { get; init; }
     public Dictionary<string, string[]> FieldErrors { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public string? RefreshScope { get; init; }
     public string? RefreshUrl { get; init; }
