@@ -9,6 +9,7 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Export;
+using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Settings;
 
 namespace PmTracker.Tests.Integration.TestInfrastructure;
@@ -87,8 +88,43 @@ internal static class IntegrationTestHelper
             RoleKody = Array.Empty<string>(),
             VisibleProjectIds = visibleProjectIds?.Distinct().ToArray() ?? grantList.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
             DeletedProjectIds = deletedProjectIds?.Distinct().ToArray() ?? Array.Empty<int>(),
-            PermissionGrants = grantList
+            Authorization = BuildSnapshot(isSuperAdmin, grantList)
         };
+    }
+
+    /// <summary>
+    /// Převede seznam <see cref="PermissionGrantViewModel"/> na <see cref="AuthorizationSnapshot"/>
+    /// pro testovací účely.
+    /// Pouze IsAllowed=true granty se mapují do snapshotu.
+    /// ScopeLevel=GLOBAL nebo ScopeMode=ALL → GlobalPermissions.
+    /// ScopeMode=INCLUDE + ProjectIds → PerProjectPermissions.
+    /// </summary>
+    private static AuthorizationSnapshot BuildSnapshot(bool isSuperAdmin, IReadOnlyList<PermissionGrantViewModel> grants)
+    {
+        var allowed = grants.Where(g => g.IsAllowed).ToList();
+
+        var globalKeys = allowed
+            .Where(g =>
+                string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(g.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase))
+            .Select(g => g.PermissionKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var perProject = allowed
+            .Where(g =>
+                string.Equals(g.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(g => g.ProjectIds.Select(pid => (pid, g.PermissionKey)))
+            .GroupBy(x => x.pid)
+            .ToDictionary(
+                grp => grp.Key,
+                grp => (IReadOnlySet<string>)new HashSet<string>(grp.Select(x => x.PermissionKey), StringComparer.OrdinalIgnoreCase));
+
+        return new AuthorizationSnapshot(
+            IsSuperAdmin: isSuperAdmin,
+            GlobalPermissions: globalKeys,
+            PerProjectPermissions: perProject,
+            PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>());
     }
 
     public static PermissionGrantViewModel AllowProjectPermission(string key, int projectId)

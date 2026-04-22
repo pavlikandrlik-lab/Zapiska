@@ -35,13 +35,6 @@ public sealed class ProjectRoleImplicitPermissionGrantDataStoreTests
         currentUser.HasPermission(PermissionKeys.MeetingsCreate, projectId).Should().BeTrue();
         currentUser.HasPermission(PermissionKeys.MeetingsEdit, projectId).Should().BeTrue();
         currentUser.HasPermission(PermissionKeys.ProjectsEdit, projectId).Should().BeFalse();
-
-        currentUser.PermissionGrants.Should().Contain(x =>
-            x.PermissionKey == PermissionKeys.TeamManage &&
-            x.ScopeLevel == "PROJECT" &&
-            x.ScopeMode == "INCLUDE" &&
-            x.IsAllowed &&
-            x.ProjectIds.SequenceEqual(new[] { projectId }));
     }
 
     [Fact]
@@ -63,13 +56,6 @@ public sealed class ProjectRoleImplicitPermissionGrantDataStoreTests
         currentUser.HasPermission(PermissionKeys.MeetingsCreate, projectId).Should().BeTrue();
         currentUser.HasPermission(PermissionKeys.MeetingsEdit, projectId).Should().BeTrue();
         currentUser.HasPermission(PermissionKeys.ProjectsEdit, projectId).Should().BeFalse();
-
-        currentUser.PermissionGrants.Should().Contain(x =>
-            x.PermissionKey == PermissionKeys.TeamManage &&
-            x.ScopeLevel == "PROJECT" &&
-            x.ScopeMode == "INCLUDE" &&
-            x.IsAllowed &&
-            x.ProjectIds.SequenceEqual(new[] { projectId }));
     }
 
     [Fact]
@@ -91,15 +77,6 @@ public sealed class ProjectRoleImplicitPermissionGrantDataStoreTests
 
         currentUser.VisibleProjectIds.Should().Contain(projectId);
         currentUser.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId).Should().BeTrue();
-        currentUser.PermissionGrants.Should().Contain(x =>
-            x.PermissionKey == PermissionKeys.RecordsCommentSubsystemLead &&
-            x.ScopeLevel == "PROJECT" &&
-            x.ScopeMode == "INCLUDE" &&
-            x.IsAllowed &&
-            x.ProjectIds.SequenceEqual(new[] { projectId }) &&
-            x.SourceType == "SUBSYSTEM_ROLE" &&
-            x.SourceRoleCode == SubsystemRoleCodes.DeputyLead &&
-            x.SourceProjectId == projectId);
 
         profile.OdvozenaPrava.Should().Contain(x =>
             x.PermissionKlic == PermissionKeys.RecordsCommentSubsystemLead &&

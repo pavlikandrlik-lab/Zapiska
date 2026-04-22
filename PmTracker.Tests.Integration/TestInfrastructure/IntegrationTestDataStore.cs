@@ -132,15 +132,6 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
     public void AddMeetingParticipant(AddMeetingParticipantCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IMeetingService>().AddMeetingParticipantAsync(command, currentUser).GetAwaiter().GetResult();
 
-    public void SaveAuthzPermission(SaveAuthzPermissionCommand command, CurrentUserContextViewModel currentUser)
-        => services.GetRequiredService<ISettingsService>().SaveAuthzPermissionAsync(command, currentUser).GetAwaiter().GetResult();
-
-    public void SaveRolePermission(SaveRolePermissionCommand command, CurrentUserContextViewModel currentUser)
-        => services.GetRequiredService<ISettingsService>().SaveRolePermissionAsync(command, currentUser).GetAwaiter().GetResult();
-
-    public void DeleteRolePermission(DeleteRolePermissionCommand command, CurrentUserContextViewModel currentUser)
-        => services.GetRequiredService<ISettingsService>().DeleteRolePermissionAsync(command, currentUser).GetAwaiter().GetResult();
-
     public void SaveCiselnikRow(SaveCiselnikRowCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IDictionaryService>().SaveCiselnikRowAsync(command, currentUser).GetAwaiter().GetResult();
 
