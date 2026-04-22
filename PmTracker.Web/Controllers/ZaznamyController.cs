@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -8,6 +9,7 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
+[Authorize]
 public sealed partial class ZaznamyController : BaseController
 {
     private const string PresentationModal = "modal";
@@ -50,16 +52,12 @@ public sealed partial class ZaznamyController : BaseController
         return View(GetEditorViewPath(model.Presentation), model);
     }
 
+    [Authorize(Policy = "permission:records.edit")]
     public async Task<IActionResult> Create(int projektId, int? jednaniId, string? uiContext, string? presentation, string? returnUrl, CancellationToken ct = default)
     {
         if (!await _recordService.ProjektExistsAsync(projektId, ct))
         {
             return RedirectToAction("Index", "Projekty");
-        }
-
-        if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
-        {
-            return Forbid();
         }
 
         var normalizedUiContext = NormalizeRecordEditorUiContext(uiContext, jednaniId);

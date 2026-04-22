@@ -1,19 +1,15 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
 public sealed partial class ZaznamyController
 {
     [HttpGet]
+    [Authorize(Policy = "permission:records.edit")]
     public async Task<IActionResult> DeleteRecordModal(int projektId, int zaznamId, string? returnUrl, string? uiContext, string? tab, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
-        {
-            return Forbid();
-        }
-
         var model = await _recordService.BuildDeleteRecordModalAsync(projektId, zaznamId, ct);
         ViewData["DeleteRecordReturnUrl"] = NormalizeLocalReturnUrl(returnUrl);
         ViewData["DeleteRecordUiContext"] = string.Equals(uiContext, "page", StringComparison.OrdinalIgnoreCase) ? "page" : "project";
@@ -22,13 +18,9 @@ public sealed partial class ZaznamyController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:records.edit")]
     public async Task<IActionResult> AssignMeetingIdentifierModal(int projektId, int zaznamId, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
-        {
-            return Forbid();
-        }
-
         var model = await _recordService.BuildZaznamEditAsync(zaznamId, ct);
         if (model.ProjektId != projektId)
         {

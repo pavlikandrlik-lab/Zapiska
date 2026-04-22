@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -6,6 +7,7 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
+[Authorize]
 public sealed class NavrhyController : BaseController
 {
     private const string PresentationModal = "modal";
@@ -26,16 +28,12 @@ public sealed class NavrhyController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:records.comment.subsystemlead")]
     public async Task<IActionResult> CreateRecordProposal(int projektId, string? presentation, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
             return NotFound();
-        }
-
-        if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId))
-        {
-            return Forbid();
         }
 
         var model = await _recordProposalService.BuildCreateRecordProposalEditorAsync(projektId, CurrentUserContext, ct: ct);
@@ -44,16 +42,12 @@ public sealed class NavrhyController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:records.comment.subsystemlead")]
     public async Task<IActionResult> CreateScheduleProposal(int projektId, int zaznamId, string? presentation, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
             return NotFound();
-        }
-
-        if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId))
-        {
-            return Forbid();
         }
 
         var model = await _recordProposalService.BuildScheduleProposalEditorAsync(projektId, zaznamId, CurrentUserContext, ct);
@@ -117,10 +111,11 @@ public sealed class NavrhyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:records.comment.subsystemlead")]
     public Task<IActionResult> SubmitCreateProposal(SaveRecordCommand command, CancellationToken ct = default)
     {
         return ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, command.ProjektId),
+            hasPermission: () => CurrentUserContext.CanAccessProject(command.ProjektId),
             invalidAjaxMessage: "Návrh založení záznamu nelze odeslat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToProposalTab(command.ProjektId),
@@ -131,10 +126,11 @@ public sealed class NavrhyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:records.comment.subsystemlead")]
     public Task<IActionResult> SubmitScheduleProposal(SaveRecordCommand command, CancellationToken ct = default)
     {
         return ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, command.ProjektId),
+            hasPermission: () => CurrentUserContext.CanAccessProject(command.ProjektId),
             invalidAjaxMessage: "Návrh změny termínu a harmonogramu nelze odeslat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToProposalTab(command.ProjektId),
