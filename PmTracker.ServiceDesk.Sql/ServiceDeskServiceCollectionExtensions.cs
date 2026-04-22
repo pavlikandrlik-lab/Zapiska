@@ -23,6 +23,7 @@ public static class ServiceDeskServiceCollectionExtensions
         if (!options.Enabled)
         {
             services.AddScoped<ITicketingQueryService, DisabledTicketingQueryService>();
+            services.AddScoped<IVyjadreniQueryService, DisabledVyjadreniQueryService>();
             return services;
         }
 
@@ -41,6 +42,7 @@ public static class ServiceDeskServiceCollectionExtensions
         services.AddScoped<SqlTicketingQueryService>();
         services.AddScoped<ITicketingQueryService>(sp =>
             new CachingTicketingQueryService(sp.GetRequiredService<SqlTicketingQueryService>()));
+        services.AddScoped<IVyjadreniQueryService, SqlVyjadreniQueryService>();
 
         return services;
     }
