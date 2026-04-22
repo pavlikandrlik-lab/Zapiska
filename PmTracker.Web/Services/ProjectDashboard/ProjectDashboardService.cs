@@ -214,9 +214,16 @@ public sealed class ProjectDashboardService : IProjectDashboardService
             .Where(s => s.IsFinal)
             .ToDictionaryAsync(s => s.Id, s => s.Kod, ct);
 
+        // C-3 perf: push year filter to SQL; include prev-year buffer for YoY compare metrics.
+        var rangeStart = yearStart.AddYears(-1);
+        var rangeEnd = yearEnd.AddYears(1).AddDays(-1);
+
         var allRecords = await (
                 from record in _dbContext.ProjektoveZaznamy.AsNoTracking()
-                where record.ProjektId == projectId && taskCategoryIds.Contains(record.KategorieId)
+                where record.ProjektId == projectId
+                    && taskCategoryIds.Contains(record.KategorieId)
+                    && record.DatumUkonceni >= rangeStart
+                    && record.DatumUkonceni <= rangeEnd
                 select new RecordStatRow
                 {
                     Id = record.Id,
@@ -232,7 +239,9 @@ public sealed class ProjectDashboardService : IProjectDashboardService
 
         var recordIds = allRecords.Select(r => r.Id).ToList();
         var historyTerminRaw = await _dbContext.ZaznamHistorieTerminu.AsNoTracking()
-            .Where(h => recordIds.Contains(h.ZaznamId))
+            .Where(h => recordIds.Contains(h.ZaznamId)
+                && h.DatumZmeny >= rangeStart
+                && h.DatumZmeny <= rangeEnd)
             .ToListAsync(ct);
 
         var historyTerminByRecord = historyTerminRaw
