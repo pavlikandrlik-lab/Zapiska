@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Search;
 using PmTracker.Web.Services.Security;
 
@@ -70,7 +71,7 @@ public sealed class SearchController : BaseController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Reindex(CancellationToken cancellationToken)
     {
-        if (!CurrentUserContext.IsSuperAdmin)
+        if (!CurrentUserContext.HasPermission(PermissionKeys.SearchReindex))
         {
             return Forbid();
         }
@@ -92,7 +93,7 @@ public sealed class SearchController : BaseController
         [FromServices] ISearchClient client,
         CancellationToken cancellationToken)
     {
-        if (!CurrentUserContext.IsSuperAdmin)
+        if (!CurrentUserContext.HasPermission(PermissionKeys.SearchReindex))
         {
             return Forbid();
         }
