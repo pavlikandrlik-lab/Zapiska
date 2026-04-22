@@ -15,7 +15,8 @@ public sealed record PendingScheduleProposalLockState(
     int? ProposalId,
     string? Message,
     bool LocksTermDeadline,
-    bool LocksSchedule);
+    bool LocksSchedule,
+    IReadOnlySet<Guid>? LockedManualKrokKeys = null);
 
 public sealed class PendingScheduleProposalLockEvaluator : IPendingScheduleProposalLockEvaluator
 {
@@ -57,6 +58,23 @@ public sealed class PendingScheduleProposalLockEvaluator : IPendingSchedulePropo
         var locksTermDeadline = schedulePayload?.ChangesTermDeadline ?? true;
         var locksSchedule = (schedulePayload?.ChangesSchedulePlan ?? false)
             || (schedulePayload?.ChangesScheduleActual ?? false);
+        // Plán D: KrokKey, pro které pending návrh obsahuje ruční skutečnost.
+        // UI je musí pro přímou editaci (schéma 1) uzamknout, jinak by přímý
+        // zápis kolidoval s návrhem, který čeká na schválení.
+        IReadOnlySet<Guid>? lockedManualKrokKeys = null;
+        if (schedulePayload is not null && schedulePayload.ManualActualKroky.Count > 0)
+        {
+            lockedManualKrokKeys = schedulePayload.ManualActualKroky
+                .Select(x => x.KrokKey)
+                .Where(x => x != Guid.Empty)
+                .ToHashSet();
+            // Manuální kroky patří do actual části — zamykají schedule i pokud
+            // v payloadu nejsou nastavené ChangesScheduleActual flagy.
+            if (lockedManualKrokKeys.Count > 0)
+            {
+                locksSchedule = true;
+            }
+        }
         var message = locksTermDeadline && locksSchedule
             ? "Pro tento záznam už čeká návrh změny termínu a harmonogramu. Tyto části jsou do rozhodnutí uzamčené."
             : locksTermDeadline
@@ -68,6 +86,7 @@ public sealed class PendingScheduleProposalLockEvaluator : IPendingSchedulePropo
             proposal.Id,
             message,
             locksTermDeadline,
-            locksSchedule);
+            locksSchedule,
+            lockedManualKrokKeys);
     }
 }
