@@ -148,7 +148,7 @@ public sealed partial class RecordProposalService
 
     // --- Private helpers used only by SubmitCommands ---
 
-    private static void ValidateCommonProposalInput(SaveRecordCommand command)
+    private void ValidateCommonProposalInput(SaveRecordCommand command)
     {
         if (command.TerminUkonceni.Date < command.DatumZalozeni.Date)
         {
@@ -174,15 +174,29 @@ public sealed partial class RecordProposalService
         {
             throw new InvalidOperationException("Stav úkolu je povinný.");
         }
+
+        ValidateManualActualKroky(command.ManualActualKroky);
+        ValidateHarmonogramVazby(command.HarmonogramVazby, command.ExterniVazby.Count);
     }
 
-    private static void ValidateScheduleProposalInput(SaveRecordCommand command, ProjektovyZaznamEntity record)
+    private void ValidateScheduleProposalInput(SaveRecordCommand command, ProjektovyZaznamEntity record)
     {
         if (command.TerminUkonceni.Date < record.DatumZalozeni.Date)
         {
             throw new InvalidOperationException("Termín ukončení nesmí být dříve než datum založení záznamu.");
         }
+
+        ValidateManualActualKroky(command.ManualActualKroky);
     }
+
+    private void ValidateManualActualKroky(IReadOnlyList<ManualActualKrokDto> manualKroky)
+    {
+        var today = DateOnly.FromDateTime(_timeProvider.GetUtcNow().UtcDateTime.Date);
+        ManualProposalFieldValidator.ValidateManualActualKroky(manualKroky, today);
+    }
+
+    private static void ValidateHarmonogramVazby(IReadOnlyList<HarmonogramVazbaDto> vazby, int externiVazbyCount)
+        => ManualProposalFieldValidator.ValidateHarmonogramVazby(vazby, externiVazbyCount);
 
     private async Task EnsureCreateProposalMeetingSelectionAsync(SaveRecordCommand command, CancellationToken ct)
     {

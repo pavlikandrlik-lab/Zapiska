@@ -6,6 +6,26 @@ public static class RecordProposalTypeCodes
     public const string SchedulePlanChange = "SCHEDULE_PLAN_CHANGE";
 }
 
+/// <summary>
+/// Plán D — kroky harmonogramu, u kterých skutečnost <b>nepřijde</b> z vytěžování
+/// vyjádření (HOT_VYJADRENI), protože nemají textový trigger v ServiceDesku.
+/// Skutečnost u těchto kroků se zadává ručně (ManualActualKrokDto).
+///
+/// Mapování na názvy kroků (podle <c>HarmonogramService.DefaultHarmonogramKroky</c>):
+/// <list type="bullet">
+/// <item>2 — konzultace termínů s dodavatelem</item>
+/// <item>5 — vypořádání připomínek</item>
+/// <item>8 — připomínkování</item>
+/// <item>9 — testování</item>
+/// </list>
+/// </summary>
+public static class HarmonogramManualSteps
+{
+    public static readonly IReadOnlySet<int> KrokPoradi = new HashSet<int> { 2, 5, 8, 9 };
+
+    public static bool IsManual(int krokPoradi) => KrokPoradi.Contains(krokPoradi);
+}
+
 public static class RecordProposalStateCodes
 {
     public const string Pending = "PENDING";
