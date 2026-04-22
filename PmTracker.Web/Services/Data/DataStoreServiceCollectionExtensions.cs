@@ -93,6 +93,9 @@ public static class DataStoreServiceCollectionExtensions
         // cache pak funguje jako bezpečný fallback ("Neznámý (login)").
         services.AddSingleton<IAdLoginResolver, NoOpAdLoginResolver>();
         services.AddSingleton<AdLoginCache>();
+        // Plán C: core harvest logika — volaná z IHarvestScheduler (T2) i ze
+        // synchronního ReHarvest endpointu (admin akce).
+        services.AddScoped<IVyjadreniHarvestService, VyjadreniHarvestService>();
         services.AddScoped<HarmonogramService>();
         services.AddScoped<HarmonogramCatalogService>();
         services.AddScoped<CommentService>();
