@@ -9,7 +9,7 @@ namespace PmTracker.Web.Services.Security;
 /// <c>UserContextResolver.LoadDbDriven*GrantsAsync</c> (Fáze B), ale produkuje
 /// strukturované sety místo VM grantů.
 /// </summary>
-internal sealed class AuthorizationSnapshotBuilder(PmTrackerDbContext db)
+internal sealed class AuthorizationSnapshotBuilder(PmTrackerDbContext db) : IAuthorizationSnapshotBuilder
 {
     public async Task<AuthorizationSnapshot> BuildAsync(int osobaId, CancellationToken ct)
     {
