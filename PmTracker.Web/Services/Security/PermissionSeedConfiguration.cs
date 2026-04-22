@@ -111,8 +111,15 @@ public static class PermissionSeedConfiguration
         new("PROJ_MAN", "meetings.edit", "ALL", true),
         new("PROJ_MAN", "team.manage", "ALL", true),
 
-        new("GEST", "records.comment.subsystemlead", "ALL", true)
+        new("GEST", "records.comment.subsystemlead", "ALL", true),
+
+        // Authorization unification — Fáze A — Task A9
+        // Subsystémové role mappings (jen existující permission keys;
+        // comments.* se přidají ve Fázi C pro METODIK_SUBSYSTEMU)
+        new("VEDOUCI_SUBSYSTEMU", "records.comment.subsystemlead", "ALL", true),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "records.comment.subsystemlead", "ALL", true)
 
         // HOST — záměrně prázdný (read-only; dashboard/export přijdou ve Fázi C)
+        // METODIK_SUBSYSTEMU — záměrně prázdný (comments.* přijdou ve Fázi C)
     ];
 }
