@@ -6,7 +6,7 @@ namespace PmTracker.Tests.Unit.Common;
 
 public sealed class CommentAuthorizationPolicyTests
 {
-    private readonly CommentAuthorizationPolicy _sut = new(new PermissionEvaluationService());
+    private readonly CommentAuthorizationPolicy _sut = new();
 
     [Fact]
     public void CanAddComment_ShouldAllow_WhenUserHasRecordsEdit()

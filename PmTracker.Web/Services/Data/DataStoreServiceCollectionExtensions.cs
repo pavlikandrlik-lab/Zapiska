@@ -65,7 +65,6 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IActiveDirectoryService, ActiveDirectoryService>();
         services.AddScoped<ITextNormalizer, TextNormalizer>();
         services.AddScoped<IPersonIdentityMatcher, PersonIdentityMatcher>();
-        services.AddScoped<IPermissionEvaluationService, PermissionEvaluationService>();
         services.AddScoped<ICommentAuthorizationPolicy, CommentAuthorizationPolicy>();
         services.AddScoped<IAuditWriteService, AuditWriteService>();
         services.AddScoped<PriorityMatrixRebuildService>();

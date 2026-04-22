@@ -4,13 +4,6 @@ namespace PmTracker.Web.Services.Common;
 
 public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
 {
-    private readonly IPermissionEvaluationService _permissionEvaluationService;
-
-    public CommentAuthorizationPolicy(IPermissionEvaluationService permissionEvaluationService)
-    {
-        _permissionEvaluationService = permissionEvaluationService;
-    }
-
     public bool CanCommentAsSubsystemLeader(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds)
     {
         if (currentUser.OsobaId <= 0 || subsystemLeadEquivalentOsobaIds.Count == 0)
@@ -23,12 +16,12 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
             return false;
         }
 
-        return _permissionEvaluationService.HasPermission(currentUser, PermissionKeys.RecordsCommentSubsystemLead, projektId);
+        return currentUser.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId);
     }
 
     public bool CanAddComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, bool isDraftMeeting)
     {
-        if (_permissionEvaluationService.HasPermission(currentUser, PermissionKeys.RecordsEdit, projektId))
+        if (currentUser.HasPermission(PermissionKeys.RecordsEdit, projektId))
         {
             return true;
         }
@@ -38,7 +31,7 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
 
     public bool CanModifyComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, int commentAuthorOsobaId, bool isDraftMeeting)
     {
-        if (_permissionEvaluationService.HasPermission(currentUser, PermissionKeys.RecordsEdit, projektId))
+        if (currentUser.HasPermission(PermissionKeys.RecordsEdit, projektId))
         {
             return true;
         }
