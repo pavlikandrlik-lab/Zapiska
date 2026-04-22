@@ -36,7 +36,7 @@ public sealed partial class RecordProposalService
 
         var payload = _payloadMapper.BuildCreatePayload(command);
         await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        _dbContext.ZaznamNavrhy.Add(new ZaznamNavrhEntity
+        var entity = new ZaznamNavrhEntity
         {
             ProjektId = command.ProjektId,
             SubsystemId = subsystemId.Value,
@@ -45,17 +45,15 @@ public sealed partial class RecordProposalService
             PayloadJson = JsonSerializer.Serialize(payload),
             CreatedByOsobaId = currentUser.OsobaId,
             CreatedAt = _timeProvider.GetUtcNow().UtcDateTime
-        });
+        };
+        _dbContext.ZaznamNavrhy.Add(entity);
         await _dbContext.SaveChangesAsync(ct);
-        var createdProposal = await _dbContext.ZaznamNavrhy
-            .OrderByDescending(x => x.Id)
-            .FirstAsync(x => x.ProjektId == command.ProjektId && x.CreatedByOsobaId == currentUser.OsobaId, ct);
         _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             AuditActionType.Create,
             AuditEntityType.RecordProposal,
-            createdProposal.Id.ToString(CultureInfo.InvariantCulture),
+            entity.Id.ToString(CultureInfo.InvariantCulture),
             null,
-            ProposalAuditSnapshot.FromEntity(createdProposal)));
+            ProposalAuditSnapshot.FromEntity(entity)));
         await _dbContext.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
@@ -117,7 +115,7 @@ public sealed partial class RecordProposalService
         }
 
         await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        _dbContext.ZaznamNavrhy.Add(new ZaznamNavrhEntity
+        var entity = new ZaznamNavrhEntity
         {
             ProjektId = command.ProjektId,
             ZaznamId = record.Id,
@@ -127,17 +125,15 @@ public sealed partial class RecordProposalService
             PayloadJson = JsonSerializer.Serialize(payload),
             CreatedByOsobaId = currentUser.OsobaId,
             CreatedAt = _timeProvider.GetUtcNow().UtcDateTime
-        });
+        };
+        _dbContext.ZaznamNavrhy.Add(entity);
         await _dbContext.SaveChangesAsync(ct);
-        var createdProposal = await _dbContext.ZaznamNavrhy
-            .OrderByDescending(x => x.Id)
-            .FirstAsync(x => x.ZaznamId == record.Id && x.CreatedByOsobaId == currentUser.OsobaId, ct);
         _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             AuditActionType.Create,
             AuditEntityType.RecordProposal,
-            createdProposal.Id.ToString(CultureInfo.InvariantCulture),
+            entity.Id.ToString(CultureInfo.InvariantCulture),
             null,
-            ProposalAuditSnapshot.FromEntity(createdProposal)));
+            ProposalAuditSnapshot.FromEntity(entity)));
         await _dbContext.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
