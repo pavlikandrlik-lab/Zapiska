@@ -1,0 +1,100 @@
+@model PmTracker.Web.Models.ViewModels.SDConnector.SDConnectorViewModel
+@{
+    ViewData["Title"] = "Diagnostika ServiceDesk konektoru";
+}
+
+<section class="pm-sdconnector">
+    <header>
+        <h1>Diagnostika ServiceDesk konektoru</h1>
+        <p class="pm-sdconnector__subtitle">Přehled harvestu vyjádření z intranetNEW. Admin-only (permission: settings.manage).</p>
+    </header>
+
+    @if (TempData["SDConnectorMessage"] is string okMsg)
+    {
+        <gov-alert variant="success" role="status">@okMsg</gov-alert>
+    }
+    @if (TempData["SDConnectorError"] is string errMsg)
+    {
+        <gov-alert variant="error" role="alert">@errMsg</gov-alert>
+    }
+
+    <section class="pm-sdconnector__kpi">
+        <div class="pm-sdconnector__kpi-item">
+            <span class="pm-sdconnector__kpi-label">SD integrace</span>
+            <span class="pm-sdconnector__kpi-value">
+                @(Model.TicketingEnabled ? "Zapnutá" : "Vypnutá")
+            </span>
+            @if (!string.IsNullOrWhiteSpace(Model.TicketingConnectionName))
+            {
+                <small>Connection: @Model.TicketingConnectionName</small>
+            }
+        </div>
+        <div class="pm-sdconnector__kpi-item">
+            <span class="pm-sdconnector__kpi-label">Celkem externích vazeb</span>
+            <span class="pm-sdconnector__kpi-value">@Model.ExterniOdkazCount</span>
+        </div>
+        <div class="pm-sdconnector__kpi-item">
+            <span class="pm-sdconnector__kpi-label">Vytěženo za 24 h</span>
+            <span class="pm-sdconnector__kpi-value">@Model.HarvestedInLastDayCount</span>
+        </div>
+        <div class="pm-sdconnector__kpi-item">
+            <span class="pm-sdconnector__kpi-label">Nikdy nevytěženo</span>
+            <span class="pm-sdconnector__kpi-value">@Model.NeverHarvestedCount</span>
+        </div>
+    </section>
+
+    <section class="pm-sdconnector__rows">
+        <h2>Externí vazby</h2>
+        @if (Model.Rows.Count == 0)
+        {
+            <p class="pm-sdconnector__empty">Žádné externí vazby s vyplněným 6místným číslem tiketu.</p>
+        }
+        else
+        {
+            <table class="pm-sdconnector__table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Číslo</th>
+                        <th>Záznam</th>
+                        <th>Projekt</th>
+                        <th>Vytěženo</th>
+                        <th>Vazby (A / M)</th>
+                        <th>Akce</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr>
+                            <td>@row.ExterniOdkazId</td>
+                            <td><code>@row.Cislo</code></td>
+                            <td><a asp-controller="Zaznamy" asp-action="Edit" asp-route-id="@row.ZaznamId">#@row.ZaznamId</a></td>
+                            <td>@row.ProjektId</td>
+                            <td>
+                                @if (row.LastHarvestedAt.HasValue)
+                                {
+                                    <span title="@row.LastHarvestedAt.Value.ToString("o")">
+                                        @row.LastHarvestedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <em>nikdy</em>
+                                }
+                            </td>
+                            <td>@row.ActiveBindingsCount (@row.AutoBindingsCount / @row.ManualBindingsCount)</td>
+                            <td>
+                                <form method="post" asp-action="ReHarvest" class="pm-sdconnector__action-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="externiOdkazId" value="@row.ExterniOdkazId" />
+                                    <button type="submit" class="pm-sdconnector__btn">Re-harvest</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+</section>
