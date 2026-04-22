@@ -277,8 +277,14 @@ public sealed class DashboardService : IDashboardService
         var items = new List<DashboardNewsItemViewModel>();
         var skip = 0;
 
-        while (true)
+        // C-1 perf safety valve — bound the scan to prevent O(total_audit_log) per dashboard hit.
+        // Tune upper bound based on observed result cardinality once proper SQL-side filtering is available.
+        const int MaxSkipPages = 25; // 25 pages × 200 rows = 5000 rows max scanned per request
+        int pageIndex = 0;
+
+        while (pageIndex < MaxSkipPages)
         {
+            pageIndex++;
             var auditRows = await _dbContext.AuthzAuditLog.AsNoTracking()
                 .Where(item =>
                     item.ActorOsobaId.HasValue
