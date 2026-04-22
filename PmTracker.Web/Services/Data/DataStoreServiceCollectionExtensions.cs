@@ -57,6 +57,10 @@ public static class DataStoreServiceCollectionExtensions
             optionsBuilder.UseSqlServer(connectionString, sqlOptions =>
             {
                 sqlOptions.CommandTimeout(dataOptions.SqlServer.CommandTimeoutSeconds);
+                sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    errorNumbersToAdd: null);
             });
         });
 
