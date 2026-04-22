@@ -86,6 +86,7 @@ internal sealed class ProjectRoleLookupEntityConfiguration : IEntityTypeConfigur
         builder.Property(x => x.Kod).HasColumnName("kod");
         builder.Property(x => x.Nazev).HasColumnName("nazev");
         builder.Property(x => x.IsLocked).HasColumnName("is_locked");
+        builder.Property(x => x.AuthzRoleId).HasColumnName("authz_role_id");
     }
 }
 
