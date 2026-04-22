@@ -5,12 +5,13 @@ namespace PmTracker.Web.Services.Security;
 
 /// <summary>
 /// ASP.NET Core authorization handler pro <see cref="PermissionRequirement"/>. Deleguje kontrolu
-/// na <see cref="IAuthorizationService"/> a extrahuje projektId/subsystemId z route kontextu.
+/// na <see cref="IAuthorizationService"/> a extrahuje projektId/projektSubsystemId z route kontextu.
 /// </summary>
 /// <remarks>
 /// Policies registrované v DI jako "permission:xxx.yyy" (viz <c>AuthorizationPolicyExtensions</c>).
-/// Kontext čtený z route: <c>projektId</c> a <c>subsystemId</c>. Pokud chybí, snapshot pracuje
-/// jako s global-scope checkem (nekontroluje projekt kontext).
+/// Kontext čtený z route: <c>projektId</c> a <c>projektSubsystemId</c>. Pokud klíč chybí, snapshot
+/// pracuje jako global-scope checkem. Pokud klíč PŘÍTOMEN ale neparsovatelný, autorizace selže
+/// closed (return bez Succeed) — M2 fix.
 /// </remarks>
 public sealed class PermissionAuthorizationHandler(
     IAuthorizationService authzService,
@@ -34,12 +35,20 @@ public sealed class PermissionAuthorizationHandler(
         var route = httpContextAccessor.HttpContext?.Request.RouteValues;
         if (route is not null)
         {
-            if (route.TryGetValue("projektId", out var p) && int.TryParse(p?.ToString(), out var pid))
+            if (route.TryGetValue("projektId", out var p) && p is not null)
             {
+                if (!int.TryParse(p.ToString(), out var pid))
+                {
+                    return; // malformed projektId -> fail closed (M2)
+                }
                 projektId = pid;
             }
-            if (route.TryGetValue("subsystemId", out var s) && int.TryParse(s?.ToString(), out var sid))
+            if (route.TryGetValue("projektSubsystemId", out var s) && s is not null)  // M4: subsystemId → projektSubsystemId
             {
+                if (!int.TryParse(s.ToString(), out var sid))
+                {
+                    return; // malformed projektSubsystemId -> fail closed (M2)
+                }
                 subsystemId = sid;
             }
         }
