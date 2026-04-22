@@ -96,6 +96,7 @@ public static class DataStoreServiceCollectionExtensions
         // Plán C: core harvest logika — volaná z IHarvestScheduler (T2) i ze
         // synchronního ReHarvest endpointu (admin akce).
         services.AddScoped<IVyjadreniHarvestService, VyjadreniHarvestService>();
+        services.AddScoped<IVyjadreniModalViewModelBuilder, VyjadreniModalViewModelBuilder>();
         services.AddScoped<HarmonogramService>();
         services.AddScoped<HarmonogramCatalogService>();
         services.AddScoped<CommentService>();

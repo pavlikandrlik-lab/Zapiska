@@ -1,0 +1,167 @@
+@using PmTracker.Web.Models.Entities
+@using PmTracker.Web.Models.ViewModels.Vyjadreni
+@model VyjadreniModalViewModel
+
+@{
+    var canEdit = Model.CanEdit;
+    var autosaveKey = $"pmtracker.chatmodal.autosave.{Model.ZaznamId}.{Model.ExterniOdkazId}";
+}
+
+<div class="pm-chat-modal"
+     data-chat-modal-root
+     data-zaznam-id="@Model.ZaznamId"
+     data-externi-odkaz-id="@Model.ExterniOdkazId"
+     data-projekt-id="@Model.ProjektId"
+     data-autosave-key="@autosaveKey"
+     aria-label="Vyjádření a termíny">
+
+    <header class="pm-chat-modal__header">
+        <div class="pm-chat-modal__title">
+            <span class="pm-chat-modal__cislo">@Model.TiketCislo</span>
+            @if (!string.IsNullOrWhiteSpace(Model.TiketTyp))
+            {
+                <span class="pm-chat-modal__typ">@Model.TiketTyp</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.TiketStrucne))
+            {
+                <span class="pm-chat-modal__strucne">@Model.TiketStrucne</span>
+            }
+        </div>
+        <div class="pm-chat-modal__meta">
+            @if (Model.LastHarvestedAt.HasValue)
+            {
+                <span class="pm-chat-modal__harvested-at" title="Poslední automatické vytěžení">
+                    Vytěženo @Model.LastHarvestedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                </span>
+            }
+            @if (canEdit)
+            {
+                <form class="pm-chat-modal__reharvest-form" data-reharvest-form method="post" action="/Vyjadreni/ReHarvest">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="externiOdkazId" value="@Model.ExterniOdkazId" />
+                    <button type="submit" class="pm-chat-modal__reharvest-btn"
+                            data-reharvest-btn
+                            title="Znovu spustit automatické vytěžení vyjádření">
+                        Re-harvest
+                    </button>
+                </form>
+            }
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.EmptyMessage))
+    {
+        <gov-alert variant="info" role="status">
+            @Model.EmptyMessage
+        </gov-alert>
+    }
+
+    <div class="pm-chat-modal__body" role="group">
+        <section class="pm-chat-modal__timeline" aria-label="Vyjádření">
+            @if (Model.Bubliny.Count == 0)
+            {
+                <p class="pm-chat-modal__empty">Žádné bubliny.</p>
+            }
+            else
+            {
+                <ul class="pm-chat-modal__bubbles" role="list">
+                    @foreach (var bubble in Model.Bubliny.OrderBy(b => b.Datum))
+                    {
+                        var autor = string.IsNullOrWhiteSpace(bubble.Autor) ? bubble.AutorLogin : bubble.Autor;
+                        var klassP = string.IsNullOrWhiteSpace(bubble.Predikat) ? string.Empty : $"pm-chat-bubble--{bubble.Predikat.ToLowerInvariant()}";
+                        var isAssigned = bubble.NavazanoNaKrokKey.HasValue;
+                        <li class="pm-chat-bubble @klassP @(isAssigned ? "pm-chat-bubble--assigned" : string.Empty)"
+                            data-bubble
+                            data-vyjadreni-id="@bubble.VyjadreniId"
+                            data-datum="@bubble.Datum.ToString("o")"
+                            data-predikat="@bubble.Predikat"
+                            draggable="@(canEdit ? "true" : "false")"
+                            role="listitem"
+                            tabindex="0">
+                            <div class="pm-chat-bubble__meta">
+                                <span class="pm-chat-bubble__autor">@autor</span>
+                                @if (!string.IsNullOrWhiteSpace(bubble.Tym))
+                                {
+                                    <span class="pm-chat-bubble__tym">@bubble.Tym</span>
+                                }
+                                <time class="pm-chat-bubble__datum" datetime="@bubble.Datum.ToString("o")">
+                                    @bubble.Datum.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                </time>
+                                @if (isAssigned)
+                                {
+                                    <span class="pm-chat-bubble__pinned" title="Navázáno na krok @bubble.NavazanoNaKrokPoradi">
+                                        Krok @bubble.NavazanoNaKrokPoradi
+                                    </span>
+                                }
+                            </div>
+                            <div class="pm-chat-bubble__popis">
+                                @Html.Raw(bubble.Popis)
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section class="pm-chat-modal__stepper" aria-label="Kroky harmonogramu">
+            <ol class="pm-chat-stepper" role="list">
+                @foreach (var krok in Model.Kroky.OrderBy(k => k.KrokPoradi))
+                {
+                    var bindingDatum = krok.AktualniVyjadreniDatum;
+                    var sourceClass = krok.AktualniSource switch
+                    {
+                        (byte)VazbaSource.Auto => "pm-chat-step--auto",
+                        (byte)VazbaSource.Manual => "pm-chat-step--manual",
+                        _ => string.Empty
+                    };
+                    <li class="pm-chat-step @sourceClass"
+                        data-step
+                        data-krok-key="@krok.KrokKey"
+                        data-krok-poradi="@krok.KrokPoradi"
+                        data-current-vyjadreni-id="@krok.AktualniVyjadreniId"
+                        data-current-datum="@bindingDatum?.ToString("o")"
+                        style="--pm-step-color:@krok.BarvaHex"
+                        aria-dropeffect="move"
+                        role="listitem">
+                        <div class="pm-chat-step__header">
+                            <span class="pm-chat-step__poradi">@krok.KrokPoradi</span>
+                            <span class="pm-chat-step__nazev">@krok.Nazev</span>
+                        </div>
+                        <div class="pm-chat-step__binding">
+                            @if (krok.AktualniVyjadreniId.HasValue)
+                            {
+                                <span class="pm-chat-step__datum">
+                                    @bindingDatum?.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                </span>
+                                @if (canEdit)
+                                {
+                                    <button type="button" class="pm-chat-step__clear"
+                                            data-clear-binding
+                                            title="Odpojit bublinu od kroku">
+                                        Odpojit
+                                    </button>
+                                }
+                            }
+                            else
+                            {
+                                <span class="pm-chat-step__empty">—</span>
+                            }
+                        </div>
+                    </li>
+                }
+            </ol>
+        </section>
+    </div>
+
+    @if (canEdit)
+    {
+        <footer class="pm-chat-modal__footer">
+            <small class="pm-chat-modal__hint">
+                Přetáhněte bublinu na krok vpravo. Změny se ukládají automaticky.
+            </small>
+            <div class="pm-chat-modal__status" data-chat-status aria-live="polite"></div>
+        </footer>
+    }
+
+    @Html.AntiForgeryToken()
+</div>

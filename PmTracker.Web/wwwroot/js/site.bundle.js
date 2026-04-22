@@ -10345,35 +10345,62 @@ bootstrapPmTrackerApp();
 })(window);
 
 // =============================================================================
-// PmTracker.Web/wwwroot/js/modules/externiOdkaz/chatModalStub.js
+// PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModal.js (Plán C Task 15)
 // =============================================================================
 (function (global) {
   'use strict';
 
   let dialogEl = null;
+  let currentCtx = null;
 
   function ensureDialog() {
     if (dialogEl) return dialogEl;
     dialogEl = document.createElement('gov-dialog');
-    dialogEl.setAttribute('size', 'm');
+    dialogEl.setAttribute('size', 'l');
     dialogEl.innerHTML = `
       <div slot="label">Vyjádření a termíny</div>
-      <p>Chat modal s vyjádřeními a drag &amp; drop přiřazením ke krokům harmonogramu se připravuje.
-         V aktuální verzi lze pracovat s ručními sloupci Plán / Skutečnost v záložce Harmonogram.</p>
+      <div class="pm-chat-modal__content" data-chat-modal-content></div>
       <div slot="footer" style="display:flex; justify-content:flex-end">
-        <pm-button variant="Primary" data-chat-stub-close>OK</pm-button>
+        <pm-button variant="Primary" data-chat-modal-close>Zavřít</pm-button>
       </div>
     `;
     document.body.appendChild(dialogEl);
     dialogEl.addEventListener('click', (event) => {
-      const btn = event.target.closest('[data-chat-stub-close]');
-      if (btn) close();
+      if (event.target.closest('[data-chat-modal-close]')) close();
     });
     return dialogEl;
   }
 
-  function open() {
+  async function open(externiOdkazId, zaznamId) {
+    currentCtx = { externiOdkazId: String(externiOdkazId), zaznamId: String(zaznamId) };
     const el = ensureDialog();
+    const container = el.querySelector('[data-chat-modal-content]');
+    container.innerHTML = '<p class="pm-chat-modal__loading">Načítám…</p>';
+    show(el);
+    try {
+      const url = `/Vyjadreni/Modal?externiOdkazId=${encodeURIComponent(currentCtx.externiOdkazId)}&zaznamId=${encodeURIComponent(currentCtx.zaznamId)}`;
+      const resp = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } });
+      if (!resp.ok) {
+        container.innerHTML = `<gov-alert variant="error">Nepodařilo se načíst vyjádření (HTTP ${resp.status}).</gov-alert>`;
+        return;
+      }
+      const html = await resp.text();
+      container.innerHTML = html;
+      const root = container.querySelector('[data-chat-modal-root]');
+      if (root) {
+        if (global.pmChatModalDragDrop && typeof global.pmChatModalDragDrop.attach === 'function') {
+          global.pmChatModalDragDrop.attach(root);
+        }
+        if (global.pmChatModalReharvest && typeof global.pmChatModalReharvest.attach === 'function') {
+          global.pmChatModalReharvest.attach(root);
+        }
+      }
+    } catch (err) {
+      container.innerHTML = `<gov-alert variant="error">Chyba při načítání: ${err.message || err}</gov-alert>`;
+    }
+  }
+
+  function show(el) {
     if (typeof el.show === 'function') el.show();
     else el.setAttribute('open', '');
   }
@@ -10388,26 +10415,190 @@ bootstrapPmTrackerApp();
     const btn = event.target.closest('[data-external-chat-open]');
     if (!btn) return;
     if (btn.hasAttribute('disabled')) return;
+    const externiOdkazId = btn.getAttribute('data-external-odkaz-id');
+    const zaznamId = btn.getAttribute('data-external-zaznam-id');
+    if (!externiOdkazId || !zaznamId) {
+      console.warn('Chat open: chybí data-external-odkaz-id nebo data-external-zaznam-id na', btn);
+      return;
+    }
     event.preventDefault();
-    open();
+    open(externiOdkazId, zaznamId);
   }
 
   function init() {
     document.addEventListener('click', onClick);
   }
 
-  global.pmExterniOdkazChatStub = { init };
+  global.pmChatModal = { init, open, close };
 })(window);
 
 // =============================================================================
-// Init externí odkaz moduly po DOMContentLoaded
+// PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModalDragDrop.js (Tasks 16+17)
+// =============================================================================
+(function (global) {
+  'use strict';
+
+  function getAntiForgeryToken(root) {
+    const input = root.querySelector('input[name="__RequestVerificationToken"]');
+    return input ? input.value : '';
+  }
+
+  function setStatus(root, text, state) {
+    const el = root.querySelector('[data-chat-status]');
+    if (!el) return;
+    el.textContent = text || '';
+    if (state) el.setAttribute('data-status-state', state);
+    else el.removeAttribute('data-status-state');
+  }
+
+  function persistPending(root, entry) {
+    const key = root.getAttribute('data-autosave-key');
+    if (!key) return;
+    try {
+      const raw = global.localStorage.getItem(key);
+      const list = raw ? JSON.parse(raw) : [];
+      list.push({ t: Date.now(), entry });
+      global.localStorage.setItem(key, JSON.stringify(list.slice(-20)));
+    } catch (e) { /* quota / storage disabled */ }
+  }
+
+  function clearPending(root) {
+    const key = root.getAttribute('data-autosave-key');
+    if (!key) return;
+    try { global.localStorage.removeItem(key); } catch (e) { /* ignore */ }
+  }
+
+  async function createBinding(root, payload) {
+    const token = getAntiForgeryToken(root);
+    const resp = await fetch('/Vyjadreni/HarmonogramVazba/Create', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'RequestVerificationToken': token
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return resp.json();
+  }
+
+  function attach(root) {
+    const externiOdkazId = Number(root.getAttribute('data-externi-odkaz-id'));
+    const zaznamId = Number(root.getAttribute('data-zaznam-id'));
+    const projektId = Number(root.getAttribute('data-projekt-id'));
+
+    root.querySelectorAll('[data-bubble][draggable="true"]').forEach((bubble) => {
+      bubble.addEventListener('dragstart', (ev) => {
+        const id = bubble.getAttribute('data-vyjadreni-id');
+        const datum = bubble.getAttribute('data-datum');
+        ev.dataTransfer.setData('application/x-pm-bubble', JSON.stringify({ id, datum }));
+        ev.dataTransfer.effectAllowed = 'move';
+        bubble.classList.add('pm-chat-bubble--dragging');
+      });
+      bubble.addEventListener('dragend', () => bubble.classList.remove('pm-chat-bubble--dragging'));
+    });
+
+    root.querySelectorAll('[data-step]').forEach((step) => {
+      step.addEventListener('dragover', (ev) => {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        step.classList.add('pm-chat-step--drop-target');
+      });
+      step.addEventListener('dragleave', () => step.classList.remove('pm-chat-step--drop-target'));
+      step.addEventListener('drop', async (ev) => {
+        ev.preventDefault();
+        step.classList.remove('pm-chat-step--drop-target');
+        const raw = ev.dataTransfer.getData('application/x-pm-bubble');
+        if (!raw) return;
+        let parsed;
+        try { parsed = JSON.parse(raw); } catch (e) { return; }
+        const krokKey = step.getAttribute('data-krok-key');
+        const payload = {
+          externiOdkazId: externiOdkazId,
+          zaznamId: zaznamId,
+          projektId: projektId,
+          krokKey: krokKey,
+          hotVyjadreniId: Number(parsed.id),
+          datumVyjadreni: parsed.datum
+        };
+        persistPending(root, { op: 'create', payload });
+        setStatus(root, 'Ukládám…', null);
+        try {
+          await createBinding(root, payload);
+          setStatus(root, 'Uloženo. Zavřete a otevřete modal pro aktualizaci.', 'ok');
+          clearPending(root);
+        } catch (err) {
+          setStatus(root, 'Ukládání selhalo: ' + (err.message || err), 'error');
+        }
+      });
+    });
+  }
+
+  global.pmChatModalDragDrop = { attach };
+})(window);
+
+// =============================================================================
+// PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModalReharvest.js (Task 18)
+// =============================================================================
+(function (global) {
+  'use strict';
+
+  function setStatus(root, text, state) {
+    const el = root.querySelector('[data-chat-status]');
+    if (!el) return;
+    el.textContent = text || '';
+    if (state) el.setAttribute('data-status-state', state);
+    else el.removeAttribute('data-status-state');
+  }
+
+  function attach(root) {
+    const form = root.querySelector('[data-reharvest-form]');
+    if (!form) return;
+    const btn = form.querySelector('[data-reharvest-btn]');
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(form);
+      if (btn) btn.setAttribute('disabled', '');
+      setStatus(root, 'Re-harvest běží…', null);
+      try {
+        const resp = await fetch(form.action, {
+          method: 'POST',
+          credentials: 'same-origin',
+          body: fd,
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!resp.ok) {
+          setStatus(root, 'Re-harvest selhal (HTTP ' + resp.status + ').', 'error');
+          return;
+        }
+        const result = await resp.json();
+        const msg = result
+          ? `Re-harvest dokončen: načteno ${result.fetched}, vytvořeno ${result.created}, preskočeno ${result.skipped}.`
+          : 'Re-harvest dokončen.';
+        setStatus(root, msg, 'ok');
+      } catch (err) {
+        setStatus(root, 'Re-harvest selhal: ' + (err.message || err), 'error');
+      } finally {
+        if (btn) btn.removeAttribute('disabled');
+      }
+    });
+  }
+
+  global.pmChatModalReharvest = { attach };
+})(window);
+
+// =============================================================================
+// Init chat modal + externí odkaz moduly po DOMContentLoaded
 // =============================================================================
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function () {
     if (window.pmExterniOdkazSync) window.pmExterniOdkazSync.init();
-    if (window.pmExterniOdkazChatStub) window.pmExterniOdkazChatStub.init();
+    if (window.pmChatModal) window.pmChatModal.init();
   });
 } else {
   if (window.pmExterniOdkazSync) window.pmExterniOdkazSync.init();
-  if (window.pmExterniOdkazChatStub) window.pmExterniOdkazChatStub.init();
+  if (window.pmChatModal) window.pmChatModal.init();
 }
