@@ -10,6 +10,25 @@
 
 **Předpoklad:** Plán C (chat modal + Hangfire harvest implementace) **nemusí být hotov** — Plán E dodá jen konfiguraci + admin UI. Plán C pak použije `IServiceDeskSyncSettings` místo hardcoded hodnot.
 
+> **AKTUALIZACE 2026-04-22 — Plán E je z velké části superseded:**
+> Spec `2026-04-22-sync-infra-and-ad-design.md` zavádí **obecnou** sync admin kartu (`/Nastaveni?section=synchronizace`) s třemi slotty: AD, SD-active, SD-archive. Každý slot je řízen entitou implementující `ISyncJobSettings` (per-job row v singleton tabulce: `is_enabled`, `period_minutes`, `anchor_at`, `last_run_at`, `last_trigger_kind`, `last_result_json`, `is_running`, ...). Admin UI je společná komponenta `_SyncJobSettingsCard.cshtml` + handler per job (`ISyncJobAdminHandler`).
+>
+> **Co z tohoto plánu E platí:**
+> - Motivace + business požadavky (kill-switch, interval, grace window, freshness, timeout, max-parallelism, archive grace).
+> - Principy ACL (`app_admin` / `SuperAdmin`).
+>
+> **Co se v Plánu E NEIMPLEMENTUJE (dělá sync-infra plán):**
+> - Tabulka `servicedesk_sync_settings` jako key-value store — **ZRUŠENO**. Místo toho dvě paralelní singleton-row tabulky `sd_active_sync_settings` + `sd_archive_sync_settings` dle vzoru `ad_sync_settings`.
+> - `IServiceDeskSyncSettings` interface — nahrazeno generickou `ISyncJobSettings` + konkrétními entitami.
+> - `NastaveniServiceDeskSyncController` — nahrazeno generickým `NastaveniSyncController` + keyed `ISyncJobAdminHandler`.
+> - Razor view — nahrazeno shared `_SyncJobSettingsCard.cshtml`.
+>
+> **Doporučení:** Plán E **zahodit jako samostatný dokument** (nebo přepsat na tenké „mapping note" pro SD-specific pole). Místo něj:
+> 1. Nejdřív implementovat `2026-04-22-sync-infra-and-ad.md` (hotový, 19 tasků).
+> 2. Potom napsat `2026-04-22-sd-sync-revise.md` (AD bude template) — dodá SD konzumenty + admin karty + fingerprint sloupce na `zaznam_externi_odkazy`.
+>
+> **Authz:** sync admin karta má ACL `PermissionKeys.SettingsManage` (konzistentně s §6 spec sync-infra, nikoli speciální „SuperAdmin" check).
+
 ---
 
 ## File Structure

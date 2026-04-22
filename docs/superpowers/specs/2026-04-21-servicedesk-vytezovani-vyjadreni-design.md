@@ -1,8 +1,17 @@
 # Spec: ServiceDesk — Vytěžování vyjádření + chat modal + propojení s harmonogramem
 
 **Stav:** návrh (čeká na schválení)
-**Datum:** 2026-04-21
+**Datum:** 2026-04-21, aktualizace 2026-04-22
 **Autor:** Ing. Pavel Andrlík + Claude (brainstorming)
+
+> **AKTUALIZACE 2026-04-22 — superseded sekce, viz níže:**
+> - **Hangfire NEpoužívat.** Spec `2026-04-22-sync-infra-and-ad-design.md` (commit `8b03b82`) zavádí vlastní `PmTracker.Web.Services.Sync` infrastrukturu (`SyncScheduleCalculator`, `SyncHostedServiceBase<T>`, `IReactiveSyncQueue<T>`) postavenou na `BackgroundService` + `Channel<T>` + `TimeProvider`. Všechny zmínky Hangfire v §8.2.4, §10.1, §11 tohoto specu jsou **nahrazeny** touto infrastrukturou. Plán C Task 10/11 (Hangfire) bude upraven — viz Plán `2026-04-22-sync-infra-and-ad.md`.
+> - **SD konzument** bude druhým konzumentem sync infra (po AD), s dvěma paralelními singleton-row tabulkami `sd_active_sync_settings` a `sd_archive_sync_settings` (aktivní tickety periodicky harvestované, archivované méně často). Detaily v samostatném plánu `2026-04-22-sd-sync-revise.md` (k napsání po hotovém AD).
+> - **SD fingerprint** na `zaznam_externi_odkazy`: rozšíření o `last_known_hot_zaznam_datum`, `last_known_max_vyjadreni_id`, `last_known_vyjadreni_count` — umožní skip harvestu, když se ticket nezměnil.
+> - **Reactive triggery pro SD** — stejný vzor jako AD: `IReactiveSyncQueue<SdReactiveSyncRequest>` + `SdReactiveSyncConsumer`. Trigger T2 (po uložení externí vazby) a T5 (otevření editoru) se zapisují do queue, ne přímo volají harvest.
+> - **Permission keys — nové:** commit `e5eb2ed` přidal 8 klíčů včetně `dashboard.view`, `export.pdf`, `export.word`, `comments.add/edit.own/delete.own`, `search.reindex`, `projects.read.all`. Kontrola ACL v tomto specu (§6.4 `records.edit`) zůstává platná; pro re-harvest tlačítko a admin sync kartu se použije **`PermissionKeys.SettingsManage`** místo `records.edit` (konsistentně s §6 spec sync-infra).
+> - **Authz model byl přepsán na DB-driven seed-only** (commity `e554168` → `e4a67d4`). Grant buildery smazány. Nové enumy `RoleScope`, `ScopeMode`, `PermissionScopeLevel` — v kódu Plánu C+D používej enumy, ne string konstanty.
+> - **SUPERADMIN fallback smazán** (`c7c3d88`). Jediný zdroj pravdy je `AuthzSuperadmins` tabulka (→ `osoba.IsSuperAdmin`). Nikde v Plánu C+D nekontroluj role kód `"SUPERADMIN"` — místo toho čti `CurrentUserContext.IsSuperAdmin`.
 **Scope:** Use-case A z plánované ServiceDesk integrace (vytěžování vyjádření). Rozšiřuje stávající architekturu návrhů (`ZaznamNavrhEntity`) a harmonogramu.
 **Navazuje na:**
 - [2026-04-20-servicedesk-integrace-vyzvy-design.md](2026-04-20-servicedesk-integrace-vyzvy-design.md) — Fáze 1 ServiceDesk sdílí read-only DbContext.

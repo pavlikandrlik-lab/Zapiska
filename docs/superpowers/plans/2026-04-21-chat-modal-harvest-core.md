@@ -6,7 +6,15 @@
 
 **Architecture:** Tři samostatné vrstvy. **Backend harvest** = `IVyjadreniHarvestService` + Hangfire batch job + `HotVyjadreniEntity` na read-only ServiceDesk DbContext. **Datový model** = `zaznam_harmonogram_vyjadreni_vazba` tabulka + reálná implementace `IHarvestScheduler` místo no-op stubu z Plánu B. **UI** = chat modal (Razor view + gov-card bubliny + vertikální stepper + drag & drop + localStorage klient) + diagnostická `/SDConnector` stránka. Jméno autora vyjádření se překládá z AD (cache v paměti, nikdy do DB).
 
-**Tech Stack:** .NET 8 ASP.NET Core MVC + Razor, EF Core 8, Hangfire 1.8+, `Microsoft.Data.SqlClient`, Gov Design System 4.2.9, vanilla JS (ES6, bez framework), `IMemoryCache` pro AD resolution cache, xUnit + FluentAssertions + Moq + Playwright. ActiveDirectoryService (existující) pro login→jméno mapping.
+**Tech Stack:** .NET 8 ASP.NET Core MVC + Razor, EF Core 8, ~~Hangfire 1.8+~~ **`PmTracker.Web.Services.Sync`** (sdílená sync infra z plánu `2026-04-22-sync-infra-and-ad.md` — BackgroundService + Channel<T> + TimeProvider), `Microsoft.Data.SqlClient`, Gov Design System 4.2.9, vanilla JS (ES6), `IMemoryCache` pro AD cache, xUnit + FluentAssertions + Moq + Playwright.
+
+> **AKTUALIZACE 2026-04-22:** Tasky 10 + 11 původně počítaly s Hangfire. **Hangfire se zrušil** — používá se vlastní sync infra. Konkrétně:
+> - Task 10 `HangfireHarvestScheduler` → nahradí se `SdReactiveSyncConsumer` (viz §2 spec sync-infra) + zápis do `IReactiveSyncQueue<SdReactiveSyncRequest>`. Stub `IHarvestScheduler` z Plánu B zůstává jako fasáda, uvnitř volá `queue.Enqueue`.
+> - Task 11 `VyjadreniHarvestBatchJob` → nahradí se `SdActiveSyncHostedService : SyncHostedServiceBase<SdActiveSyncSettingsEntity>` + paralelní `SdArchiveSyncHostedService`. Respect `IServiceDeskSyncSettings` + dvě singleton-row tabulky (aktivní vs. archiv).
+> - Spec sync-infra §5.1 — na `zaznam_externi_odkazy` přidat `last_known_hot_zaznam_datum`, `last_known_max_vyjadreni_id`, `last_known_vyjadreni_count` (fingerprint pro skip harvestu, když se ticket nezměnil).
+> - **Plán C se čeká** — implementace až po Plánu 2026-04-22-sync-infra-and-ad (19 tasků). Potom vznikne samostatný plán `2026-04-22-sd-sync-revise.md` který rewrite Plán B Task 10 + Plán C Tasky 10/11 dle sync-infra vzoru.
+>
+> **Authz:** Plán C endpointy (`/Vyjadreni/HarmonogramVazba/*`, `/Vyjadreni/Modal`) používají permission key **`records.edit`** (existující). Pro `/Vyjadreni/ReHarvest` + admin operace použít **`PermissionKeys.SettingsManage`** (nová konstanta z commit `e5eb2ed`). Nikde nekontrolovat `SUPERADMIN` roli — používat `CurrentUserContext.IsSuperAdmin`.
 
 **Předpoklady:**
 - **Plán A** (fakturace cleanup) hotov.

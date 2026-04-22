@@ -6,6 +6,10 @@
 
 **Architecture:** View `_EditZaznamExternalPanel.cshtml` se přerenderuje do nové struktury (2 řádky per karta: horní = inputy, dolní = 3 read-only datumy). `ExterniOdkazEditViewModel` dostane nové pole `LastHarvestedAt`. Nový controller endpoint `POST /Zaznamy/ExterniOdkaz/Sync` volá existující `ITicketingQueryService.GetZaznamAsync` + aplikuje textové predikáty na `HOT_VYJADRENI` (stub — pro Plán B implementujeme jen lookup typu+strucne; samotné vytěžování datumů naplní Plán C). UI JS modul `externiOdkazSync.js` debouncuje input pro 6místné číslo a volá endpoint. Ikona 🗑 nahradí stávající „Odebrat vazbu" text button. Ikona 💬 zatím otevírá `gov-dialog` s textem „Chat modal bude dostupný v další fázi".
 
+> **AKTUALIZACE 2026-04-22:** Task 10 (`IHarvestScheduler` stub) zůstává validní — rozhraní, call-site v `RecordService.SaveRecord` + `NoOpHarvestScheduler` implementace. **Implementace** se však přesune: NoOp zůstane dokud nebude hotový plán `2026-04-22-sync-infra-and-ad.md` + navazující SD sync revise plán. Pak se NoOp nahradí **`SdReactiveSyncProducer`** (který jen zapíše do `IReactiveSyncQueue<SdReactiveSyncRequest>`), ne Hangfire jobem. Signatura `IHarvestScheduler` zůstává, mění se jen jeho implementace.
+>
+> **Authz:** endpoint `POST /Zaznamy/ExterniOdkaz/Sync` chráněn `PermissionKeys.RecordsEdit` (přes existující authz middleware). Nikde nekontrolovat role-kódy — používat permission keys.
+
 **Tech Stack:** .NET 8 ASP.NET Core MVC + Razor, Gov Design System 4.2.9 (`gov-form-input`, `gov-button`, `gov-icon`, `gov-switch`), manuální JS bundle (`site.bundle.js`), EF Core 8, xUnit + FluentAssertions + Playwright.
 
 **Předpoklad:** Plán A (fakturace cleanup) již proběhl — harmonogram má 10 kroků.
