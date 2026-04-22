@@ -283,6 +283,8 @@ public sealed class SettingsAuthzCommands(
             throw new InvalidOperationException("Neplatný rozsah akce.");
         }
 
+        var scopeLevelEnum = Enum.Parse<PermissionScopeLevel>(scopeLevel, true);
+
         if (!await dbContext.AuthzPermissionCategories.AsNoTracking().AnyAsync(x => x.Id == categoryId && x.IsActive, ct))
         {
             throw new InvalidOperationException("Vybraná kategorie akcí neexistuje.");
@@ -316,7 +318,7 @@ public sealed class SettingsAuthzCommands(
             permission.Klic = klic;
             permission.Nazev = nazev;
             permission.CategoryId = categoryId;
-            permission.ScopeLevel = scopeLevel;
+            permission.ScopeLevel = scopeLevelEnum;
             action = AuditActionType.Update;
         }
         else
@@ -326,7 +328,7 @@ public sealed class SettingsAuthzCommands(
                 Klic = klic,
                 Nazev = nazev,
                 CategoryId = categoryId,
-                ScopeLevel = scopeLevel,
+                ScopeLevel = scopeLevelEnum,
                 IsActive = true,
                 IsSystem = false
             };

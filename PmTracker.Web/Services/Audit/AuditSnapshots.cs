@@ -305,7 +305,7 @@ internal sealed record AuthzPermissionAuditSnapshot(
         entity.Klic,
         entity.Nazev,
         entity.CategoryId,
-        entity.ScopeLevel,
+        entity.ScopeLevel.ToString().ToUpperInvariant(),
         entity.IsActive,
         entity.IsSystem);
 }

@@ -54,7 +54,7 @@ public sealed class SettingsAuthzQueries(
                 Klic = x.Klic,
                 Nazev = x.Nazev,
                 CategoryKod = categories.FirstOrDefault(category => category.Id == x.CategoryId)?.Kod ?? "-",
-                ScopeLevel = x.ScopeLevel,
+                ScopeLevel = x.ScopeLevel.ToString().ToUpperInvariant(),
                 IsActive = x.IsActive,
                 IsSystem = x.IsSystem
             })

@@ -42,7 +42,13 @@ internal sealed class AuthorizationPermissionEntityConfiguration : IEntityTypeCo
         builder.Property(x => x.Klic).HasColumnName("klic");
         builder.Property(x => x.Nazev).HasColumnName("nazev");
         builder.Property(x => x.CategoryId).HasColumnName("category_id");
-        builder.Property(x => x.ScopeLevel).HasColumnName("scope_level");
+        builder.Property(x => x.ScopeLevel)
+            .HasColumnName("scope_level")
+            .HasMaxLength(16)
+            .IsRequired()
+            .HasConversion(
+                v => v.ToString().ToUpperInvariant(),
+                v => Enum.Parse<PermissionScopeLevel>(v, true));
         builder.Property(x => x.IsActive).HasColumnName("is_active");
         builder.Property(x => x.IsSystem).HasColumnName("is_system");
     }

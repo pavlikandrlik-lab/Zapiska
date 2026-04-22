@@ -103,7 +103,7 @@ public sealed class UserAuthorizationSnapshotBuilder(
             .Select(item => new PermissionGrantViewModel
             {
                 PermissionKey = item.Klic,
-                ScopeLevel = item.ScopeLevel,
+                ScopeLevel = item.ScopeLevel.ToString().ToUpperInvariant(),
                 ScopeMode = item.ScopeMode.ToString().ToUpperInvariant(),
                 IsAllowed = item.IsAllowed,
                 ProjectIds = Ci.Equals(item.ScopeMode.ToString().ToUpperInvariant(), "INCLUDE")

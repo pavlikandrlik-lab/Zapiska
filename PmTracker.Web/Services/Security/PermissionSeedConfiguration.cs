@@ -2,7 +2,7 @@ namespace PmTracker.Web.Services.Security;
 
 public sealed record PermissionCategorySeedItem(string Kod, string Nazev, int SortOrder);
 public sealed record RoleSeedItem(string Kod, string Nazev, string Popis, bool IsSystem, RoleScope Scope);
-public sealed record ActionSeedItem(string Klic, string Nazev, string CategoryKod, string ScopeLevel);
+public sealed record ActionSeedItem(string Klic, string Nazev, string CategoryKod, PermissionScopeLevel ScopeLevel);
 public sealed record RoleActionSeedItem(string RoleKod, string ActionKlic, ScopeMode ScopeMode, bool IsAllowed);
 
 public static class PermissionSeedConfiguration
@@ -37,20 +37,20 @@ public static class PermissionSeedConfiguration
 
     public static readonly IReadOnlyList<ActionSeedItem> Actions =
     [
-        new("projects.create", "Vytvářet projekty", "PROJECTS", "PROJECT"),
-        new("projects.edit", "Upravovat projekty", "PROJECTS", "PROJECT"),
-        new("projects.delete", "Mazat projekty (soft-delete)", "PROJECTS", "PROJECT"),
-        new("records.edit", "Upravovat projektové záznamy", "RECORDS", "PROJECT"),
-        new("records.schedule.add", "Doplňovat harmonogram úkolu", "RECORDS", "PROJECT"),
-        new("records.schedule.edit", "Upravovat harmonogram úkolu", "RECORDS", "PROJECT"),
-        new("records.comment.subsystemlead", "Přidávat vyjádření jako vedoucí subsystému", "RECORDS", "PROJECT"),
-        new("meetings.create", "Zakládat jednání", "MEETINGS", "PROJECT"),
-        new("meetings.edit", "Upravovat jednání", "MEETINGS", "PROJECT"),
-        new("team.manage", "Správa týmu projektu", "PROJECTS", "PROJECT"),
-        new("people.manage", "Správa osob", "MASTER", "GLOBAL"),
-        new("ciselniky.edit", "Editace číselníků", "MASTER", "GLOBAL"),
-        new("settings.view", "Zobrazit nastavení", "SETTINGS", "GLOBAL"),
-        new("settings.manage", "Správa nastavení", "SETTINGS", "GLOBAL")
+        new("projects.create", "Vytvářet projekty", "PROJECTS", PermissionScopeLevel.Project),
+        new("projects.edit", "Upravovat projekty", "PROJECTS", PermissionScopeLevel.Project),
+        new("projects.delete", "Mazat projekty (soft-delete)", "PROJECTS", PermissionScopeLevel.Project),
+        new("records.edit", "Upravovat projektové záznamy", "RECORDS", PermissionScopeLevel.Project),
+        new("records.schedule.add", "Doplňovat harmonogram úkolu", "RECORDS", PermissionScopeLevel.Project),
+        new("records.schedule.edit", "Upravovat harmonogram úkolu", "RECORDS", PermissionScopeLevel.Project),
+        new("records.comment.subsystemlead", "Přidávat vyjádření jako vedoucí subsystému", "RECORDS", PermissionScopeLevel.Project),
+        new("meetings.create", "Zakládat jednání", "MEETINGS", PermissionScopeLevel.Project),
+        new("meetings.edit", "Upravovat jednání", "MEETINGS", PermissionScopeLevel.Project),
+        new("team.manage", "Správa týmu projektu", "PROJECTS", PermissionScopeLevel.Project),
+        new("people.manage", "Správa osob", "MASTER", PermissionScopeLevel.Global),
+        new("ciselniky.edit", "Editace číselníků", "MASTER", PermissionScopeLevel.Global),
+        new("settings.view", "Zobrazit nastavení", "SETTINGS", PermissionScopeLevel.Global),
+        new("settings.manage", "Správa nastavení", "SETTINGS", PermissionScopeLevel.Global)
     ];
 
     public static readonly IReadOnlyList<RoleActionSeedItem> RoleMappings =

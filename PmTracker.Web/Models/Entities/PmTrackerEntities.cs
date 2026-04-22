@@ -378,7 +378,7 @@ public sealed class AuthzPermissionEntity
     public string Klic { get; set; } = string.Empty;
     public string Nazev { get; set; } = string.Empty;
     public int CategoryId { get; set; }
-    public string ScopeLevel { get; set; } = string.Empty;
+    public PermissionScopeLevel ScopeLevel { get; set; } = PermissionScopeLevel.Project;
     public bool IsActive { get; set; }
     public bool IsSystem { get; set; }
 }

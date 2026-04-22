@@ -28,8 +28,8 @@ public sealed class UserContextResolver : IUserContextResolver
     };
 
     private sealed record ActiveRoleRow(int RoleId, string RoleCode);
-    private sealed record PermissionGrantRaw(string Klic, string ScopeLevel, ScopeMode ScopeMode, bool IsAllowed, int RolePermissionId);
-    private sealed record PermissionGrantProjectRow(string Klic, string ScopeLevel, ScopeMode ScopeMode, bool IsAllowed, int RolePermissionId, int? ProjectId);
+    private sealed record PermissionGrantRaw(string Klic, PermissionScopeLevel ScopeLevel, ScopeMode ScopeMode, bool IsAllowed, int RolePermissionId);
+    private sealed record PermissionGrantProjectRow(string Klic, PermissionScopeLevel ScopeLevel, ScopeMode ScopeMode, bool IsAllowed, int RolePermissionId, int? ProjectId);
     private sealed record ResolvedPersonRow(
         int Id,
         string? Titul,
@@ -282,7 +282,7 @@ public sealed class UserContextResolver : IUserContextResolver
             .Select(item => new PermissionGrantViewModel
             {
                 PermissionKey = item.Raw.Klic,
-                ScopeLevel = item.Raw.ScopeLevel,
+                ScopeLevel = item.Raw.ScopeLevel.ToString().ToUpperInvariant(),
                 ScopeMode = item.Raw.ScopeMode.ToString().ToUpperInvariant(),
                 IsAllowed = item.Raw.IsAllowed,
                 ProjectIds = item.Raw.ScopeMode.ToString().ToUpperInvariant().Equals("INCLUDE", StringComparison.OrdinalIgnoreCase)
