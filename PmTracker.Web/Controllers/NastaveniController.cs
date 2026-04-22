@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -6,6 +7,7 @@ using PmTracker.Web.Services.Settings;
 
 namespace PmTracker.Web.Controllers;
 
+[Authorize(Policy = "permission:settings.view")]
 public sealed class NastaveniController : BaseController
 {
     private readonly ISettingsService _settingsService;
@@ -25,13 +27,8 @@ public sealed class NastaveniController : BaseController
 
     public async Task<IActionResult> Index(string? section, int? userId, int? projektId, CancellationToken ct)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsView))
-        {
-            return RedirectToAction("Index", "Projekty");
-        }
-
         var normalizedSection = NormalizeSection(section);
-        if (normalizedSection == "efektivni-prava" && !CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
+        if (normalizedSection == "efektivni-prava" && !CurrentUserContext.HasPermission(permissionKey: PermissionKeys.SettingsManage))
         {
             return RedirectToAction(nameof(Index), new { section = "role" });
         }
@@ -44,13 +41,8 @@ public sealed class NastaveniController : BaseController
 
     public async Task<IActionResult> Panel(string? section, int? userId, int? projektId, CancellationToken ct)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsView))
-        {
-            return Unauthorized();
-        }
-
         var normalizedSection = NormalizeSection(section);
-        if (normalizedSection == "efektivni-prava" && !CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
+        if (normalizedSection == "efektivni-prava" && !CurrentUserContext.HasPermission(permissionKey: PermissionKeys.SettingsManage))
         {
             return Unauthorized();
         }
@@ -61,13 +53,9 @@ public sealed class NastaveniController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:settings.manage")]
     public async Task<IActionResult> UserRolesModal(int osobaId, int? userId, int? projektId, CancellationToken ct)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
-        {
-            return Forbid();
-        }
-
         var panel = await _settingsService.BuildNastaveniPanelAsync("uzivatele-role", CurrentUserContext, userId, projektId, ct);
         var user = panel.UserRoles.FirstOrDefault(x => x.OsobaId == osobaId);
         if (user is null)
@@ -79,13 +67,9 @@ public sealed class NastaveniController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:settings.manage")]
     public async Task<IActionResult> RoleModal(int? id, int? userId, int? projektId, CancellationToken ct)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
-        {
-            return Forbid();
-        }
-
         var panel = await _settingsService.BuildNastaveniPanelAsync("role", CurrentUserContext, userId, projektId, ct);
         var role = id.HasValue
             ? panel.Role.FirstOrDefault(x => x.Id == id.Value)
@@ -105,13 +89,9 @@ public sealed class NastaveniController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:settings.manage")]
     public async Task<IActionResult> PermissionModal(int? id, int? userId, int? projektId, CancellationToken ct)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
-        {
-            return Forbid();
-        }
-
         var panel = await _settingsService.BuildNastaveniPanelAsync("akce", CurrentUserContext, userId, projektId, ct);
         var permission = id.HasValue
             ? panel.Permissions.FirstOrDefault(x => x.Id == id.Value)
@@ -131,13 +111,9 @@ public sealed class NastaveniController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:settings.manage")]
     public async Task<IActionResult> RolePermissionModal(int? id, int? roleId, int? permissionId, int? userId, int? projektId, CancellationToken ct)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.SettingsManage))
-        {
-            return Forbid();
-        }
-
         var panel = await _settingsService.BuildNastaveniPanelAsync("role-akce", CurrentUserContext, userId, projektId, ct);
         var mapping = id.HasValue
             ? panel.RolePermissionScopes.FirstOrDefault(x => x.Id == id.Value)
@@ -158,6 +134,7 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:settings.manage")]
     public Task<IActionResult> SaveRole(SaveAuthzRoleCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
         return ExecuteSettingsValidatedActionAsync(
@@ -171,6 +148,7 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:settings.manage")]
     public Task<IActionResult> ToggleRole(ToggleAuthzRoleCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
         return ExecuteSettingsActionAsync(
@@ -183,6 +161,7 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:settings.manage")]
     public Task<IActionResult> SavePermission(SaveAuthzPermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
         return ExecuteSettingsValidatedActionAsync(
@@ -201,6 +180,7 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:settings.manage")]
     public Task<IActionResult> TogglePermission(ToggleAuthzPermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
         return ExecuteSettingsActionAsync(
@@ -213,6 +193,7 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:settings.manage")]
     public Task<IActionResult> SaveUserRole(SaveUserRoleAssignmentCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
         return ExecuteSettingsValidatedActionAsync(
@@ -226,6 +207,7 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:settings.manage")]
     public Task<IActionResult> SaveUserRolesForUser(SaveUserRolesForUserCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
         return ExecuteSettingsValidatedActionAsync(
@@ -239,6 +221,7 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:settings.manage")]
     public Task<IActionResult> SaveRolePermission(SaveRolePermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
         return ExecuteSettingsValidatedActionAsync(
@@ -256,6 +239,7 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:settings.manage")]
     public Task<IActionResult> DeleteRolePermission(DeleteRolePermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
         return ExecuteSettingsValidatedActionAsync(
@@ -289,7 +273,7 @@ public sealed class NastaveniController : BaseController
         Func<Task> operation)
     {
         return ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+            hasPermission: () => true,
             invalidAjaxMessage: invalidAjaxMessage,
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToSection(section, userId, projektId),
@@ -309,7 +293,7 @@ public sealed class NastaveniController : BaseController
         Func<Task> operation)
     {
         return ExecuteCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.SettingsManage),
+            hasPermission: () => true,
             onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToSection(section, userId, projektId)),
             onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "nastaveni-panel",
@@ -325,7 +309,7 @@ public sealed class NastaveniController : BaseController
     {
         AttachCurrentUser(panel);
         panel.PageTitle = panel.Nazev;
-        panel.CanManageSettings = CurrentUserContext.HasPermission(PermissionKeys.SettingsManage);
+        panel.CanManageSettings = CurrentUserContext.HasPermission(permissionKey: PermissionKeys.SettingsManage);
     }
 
 }

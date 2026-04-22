@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -7,6 +8,7 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
+[Authorize]
 public sealed class OsobyController : BaseController
 {
     private readonly IActiveDirectoryService _activeDirectoryService;
@@ -28,18 +30,14 @@ public sealed class OsobyController : BaseController
     {
         var model = AttachCurrentUser(await _peopleService.BuildOsobyAsync(ct));
         model.PageTitle = "Osoby";
-        model.CanManagePeople = CurrentUserContext.HasPermission(PermissionKeys.PeopleManage);
+        model.CanManagePeople = CurrentUserContext.HasPermissionPrefix(PermissionKeys.PeoplePrefix);
         return View(model);
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:people.manage")]
     public async Task<IActionResult> AdPersonModal(CancellationToken ct)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.PeopleManage))
-        {
-            return Forbid();
-        }
-
         var searchUrl = Url.Action(nameof(SearchAd), "Osoby") ?? "/Osoby/SearchAd";
         var osobyModel = await _peopleService.BuildOsobyAsync(ct);
         var model = new AdPersonModalViewModel
@@ -54,13 +52,9 @@ public sealed class OsobyController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:people.manage")]
     public async Task<IActionResult> ManualPersonModal(int? id, CancellationToken ct)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.PeopleManage))
-        {
-            return Forbid();
-        }
-
         var osobyModel = await _peopleService.BuildOsobyAsync(ct);
         OsobaListItemViewModel? osoba = null;
 
@@ -102,13 +96,9 @@ public sealed class OsobyController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:people.manage")]
     public async Task<IActionResult> SearchAd([FromQuery(Name = "q")] string? query, CancellationToken ct)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.PeopleManage))
-        {
-            return Forbid();
-        }
-
         var response = await _activeDirectoryService.SearchUsersAsync(query, ct);
 
         return Json(new
@@ -134,10 +124,11 @@ public sealed class OsobyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:people.manage")]
     public async Task<IActionResult> SaveManual(SaveManualPersonCommand command, CancellationToken ct = default)
     {
         return await ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.PeopleManage),
+            hasPermission: () => true,
             invalidAjaxMessage: "Osobu nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
@@ -151,10 +142,11 @@ public sealed class OsobyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:people.manage")]
     public async Task<IActionResult> SaveAd(SaveAdPersonCommand command, CancellationToken ct = default)
     {
         return await ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.PeopleManage),
+            hasPermission: () => true,
             invalidAjaxMessage: "AD osobu nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
@@ -168,10 +160,11 @@ public sealed class OsobyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:people.manage")]
     public async Task<IActionResult> Delete(DeletePersonCommand command, CancellationToken ct = default)
     {
         return await ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.PeopleManage),
+            hasPermission: () => true,
             invalidAjaxMessage: "Osobu nelze odstranit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
