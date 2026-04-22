@@ -352,10 +352,6 @@ public sealed class UserContextResolver : IUserContextResolver
             .ToList();
 
         var isSuperAdmin = osoba.IsSuperAdmin;
-        if (!isSuperAdmin)
-        {
-            isSuperAdmin = roleCodes.Any(code => string.Equals(code, "SUPERADMIN", StringComparison.OrdinalIgnoreCase));
-        }
 
         var grantProjectRows = activeRoleIds.Count == 0
             ? new List<PermissionGrantProjectRow>()

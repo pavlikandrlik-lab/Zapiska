@@ -24,7 +24,6 @@ public sealed class UserAuthorizationSnapshotBuilder(
             DeletedProjectIds = await BuildDeletedProjectIdsAsync(ct),
             IsSuperAdmin = await dbContext.AuthzSuperadmins.AsNoTracking()
                 .AnyAsync(x => x.OsobaId == osobaId, ct)
-                || roleKody.Any(roleCode => Ci.Equals(roleCode, "SUPERADMIN"))
         };
     }
 
