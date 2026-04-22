@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -6,6 +7,7 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
+[Authorize]
 public sealed class CiselnikyController : BaseController
 {
     private readonly IDictionaryService _dictionaryService;
@@ -43,13 +45,9 @@ public sealed class CiselnikyController : BaseController
         return PartialView("_CiselnikDetail", detail);
     }
 
+    [Authorize(Policy = "permission:ciselniky.edit")]
     public async Task<IActionResult> EditRow(string key, int id, CancellationToken ct)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.CiselnikyEdit))
-        {
-            return Forbid();
-        }
-
         if (!DictionarySecurityPolicy.CanAccessDictionary(key, CurrentUserContext.IsSuperAdmin))
         {
             return Forbid();
@@ -89,16 +87,12 @@ public sealed class CiselnikyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:ciselniky.edit")]
     public async Task<IActionResult> SaveRow(SaveCiselnikRowCommand command, CancellationToken ct = default)
     {
         return await ExecuteValidatedCommandAsync(
             hasPermission: async () =>
             {
-                if (!CurrentUserContext.HasPermission(PermissionKeys.CiselnikyEdit))
-                {
-                    return false;
-                }
-
                 if (!DictionarySecurityPolicy.CanAccessDictionary(command.Key, CurrentUserContext.IsSuperAdmin))
                 {
                     return false;
@@ -130,16 +124,12 @@ public sealed class CiselnikyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:ciselniky.edit")]
     public async Task<IActionResult> DeleteRow(DeleteCiselnikRowCommand command, CancellationToken ct = default)
     {
         return await ExecuteCommandAsync(
             hasPermission: async () =>
             {
-                if (!CurrentUserContext.HasPermission(PermissionKeys.CiselnikyEdit))
-                {
-                    return false;
-                }
-
                 if (!DictionarySecurityPolicy.CanAccessDictionary(command.Key, CurrentUserContext.IsSuperAdmin))
                 {
                     return false;
@@ -166,7 +156,7 @@ public sealed class CiselnikyController : BaseController
     {
         AttachCurrentUser(detail);
         detail.PageTitle = detail.Nazev;
-        detail.CanEditCiselnik = CurrentUserContext.HasPermission(PermissionKeys.CiselnikyEdit);
+        detail.CanEditCiselnik = CurrentUserContext.HasPermission("ciselniky.edit");
         detail.IsArchitect = CurrentUserContext.IsSuperAdmin;
     }
 }

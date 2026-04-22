@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.Entities;
@@ -7,6 +8,7 @@ using PmTracker.Web.Services.Vyzvy.Contracts;
 
 namespace PmTracker.Web.Controllers;
 
+[Authorize]
 [Route("vyzvy")]
 public sealed class VyzvyController : BaseController
 {

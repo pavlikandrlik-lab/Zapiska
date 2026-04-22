@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -7,6 +8,7 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
+[Authorize]
 public sealed class JednaniController : BaseController
 {
     private readonly IMeetingService _meetingService;
@@ -162,13 +164,9 @@ public sealed class JednaniController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:meetings.edit")]
     public async Task<IActionResult> AddMeetingParticipantModal(int projektId, int jednaniId, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId))
-        {
-            return Forbid();
-        }
-
         var actualProjectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
         if (actualProjectId != projektId)
         {
