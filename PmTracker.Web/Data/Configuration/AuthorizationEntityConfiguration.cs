@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PmTracker.Web.Models.Entities;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Data.Configuration;
 
@@ -59,7 +60,13 @@ internal sealed class AuthorizationRoleEntityConfiguration : IEntityTypeConfigur
         builder.Property(x => x.Popis).HasColumnName("popis");
         builder.Property(x => x.IsSystem).HasColumnName("is_system");
         builder.Property(x => x.IsActive).HasColumnName("is_active");
-        builder.Property(x => x.Scope).HasColumnName("scope").HasMaxLength(16).IsRequired();
+        builder.Property(x => x.Scope)
+            .HasColumnName("scope")
+            .HasMaxLength(16)
+            .IsRequired()
+            .HasConversion(
+                v => v.ToString().ToUpperInvariant(),
+                v => Enum.Parse<RoleScope>(v, true));
     }
 }
 

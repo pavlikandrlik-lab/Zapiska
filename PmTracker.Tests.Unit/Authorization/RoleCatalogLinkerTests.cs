@@ -20,7 +20,7 @@ public sealed class RoleCatalogLinkerTests
     public async Task LinkAsync_ShouldFillAuthzRoleId_ForProjectRole_WhenAuthzRoleWithSameKodExists()
     {
         await using var db = CreateInMemoryDb();
-        db.AuthzRoles.Add(new AuthzRoleEntity { Id = 10, Kod = "ADM_PROJ", Nazev = "Projektový admin", IsActive = true, Scope = "PROJECT" });
+        db.AuthzRoles.Add(new AuthzRoleEntity { Id = 10, Kod = "ADM_PROJ", Nazev = "Projektový admin", IsActive = true, Scope = RoleScope.Project });
         db.CiselnikRoliProjektu.Add(new CiselnikRoliProjektuEntity { Id = 1, Kod = "ADM_PROJ", Nazev = "Projektový admin" });
         await db.SaveChangesAsync();
 
@@ -35,7 +35,7 @@ public sealed class RoleCatalogLinkerTests
     public async Task LinkAsync_ShouldFillAuthzRoleId_ForSubsystemRole()
     {
         await using var db = CreateInMemoryDb();
-        db.AuthzRoles.Add(new AuthzRoleEntity { Id = 20, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "Vedoucí", IsActive = true, Scope = "SUBSYSTEM" });
+        db.AuthzRoles.Add(new AuthzRoleEntity { Id = 20, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "Vedoucí", IsActive = true, Scope = RoleScope.Subsystem });
         db.CiselnikRoliSubsystemu.Add(new CiselnikRoleSubsystemuEntity { Id = 2, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "Vedoucí" });
         await db.SaveChangesAsync();
 
@@ -64,7 +64,7 @@ public sealed class RoleCatalogLinkerTests
     public async Task LinkAsync_ShouldNotOverwriteExistingLink()
     {
         await using var db = CreateInMemoryDb();
-        db.AuthzRoles.Add(new AuthzRoleEntity { Id = 30, Kod = "PROJ_MAN", Nazev = "PM", IsActive = true, Scope = "PROJECT" });
+        db.AuthzRoles.Add(new AuthzRoleEntity { Id = 30, Kod = "PROJ_MAN", Nazev = "PM", IsActive = true, Scope = RoleScope.Project });
         db.CiselnikRoliProjektu.Add(new CiselnikRoliProjektuEntity { Id = 4, Kod = "PROJ_MAN", Nazev = "PM", AuthzRoleId = 99 });
         await db.SaveChangesAsync();
 

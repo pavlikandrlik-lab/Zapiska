@@ -1,3 +1,5 @@
+using PmTracker.Web.Services.Security;
+
 namespace PmTracker.Web.Models.Entities;
 
 public sealed class CiselnikStavuProjektuEntity
@@ -389,7 +391,7 @@ public sealed class AuthzRoleEntity
     public string? Popis { get; set; }
     public bool IsSystem { get; set; }
     public bool IsActive { get; set; }
-    public string Scope { get; set; } = "GLOBAL";   // GLOBAL | PROJECT | SUBSYSTEM
+    public RoleScope Scope { get; set; } = RoleScope.Global;
 }
 
 public sealed class AuthzRolePermissionEntity

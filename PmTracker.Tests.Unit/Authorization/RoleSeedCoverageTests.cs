@@ -9,7 +9,7 @@ public sealed class RoleSeedCoverageTests
     public void Roles_ShouldContainAllProjectScopeRoles()
     {
         var projectRoles = PermissionSeedConfiguration.Roles
-            .Where(r => r.Scope == "PROJECT")
+            .Where(r => r.Scope == RoleScope.Project)
             .Select(r => r.Kod)
             .OrderBy(x => x)
             .ToList();
@@ -24,7 +24,7 @@ public sealed class RoleSeedCoverageTests
     public void Roles_ShouldContainAllSubsystemScopeRoles()
     {
         var subsystemRoles = PermissionSeedConfiguration.Roles
-            .Where(r => r.Scope == "SUBSYSTEM")
+            .Where(r => r.Scope == RoleScope.Subsystem)
             .Select(r => r.Kod)
             .OrderBy(x => x)
             .ToList();
@@ -39,7 +39,7 @@ public sealed class RoleSeedCoverageTests
     public void Roles_GlobalScope_ShouldContainSuperAdminAndAppAdmin()
     {
         var globalRoles = PermissionSeedConfiguration.Roles
-            .Where(r => r.Scope == "GLOBAL")
+            .Where(r => r.Scope == RoleScope.Global)
             .Select(r => r.Kod)
             .OrderBy(x => x)
             .ToList();

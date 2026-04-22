@@ -32,9 +32,9 @@ public sealed class SeedEndToEndTests
             "VEDOUCI_SUBSYSTEMU", "ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "METODIK_SUBSYSTEMU"
         });
 
-        roles.First(r => r.Kod == "ADM_PROJ").Scope.Should().Be("PROJECT");
-        roles.First(r => r.Kod == "VEDOUCI_SUBSYSTEMU").Scope.Should().Be("SUBSYSTEM");
-        roles.First(r => r.Kod == "APP_ADMIN").Scope.Should().Be("GLOBAL");
+        roles.First(r => r.Kod == "ADM_PROJ").Scope.Should().Be(RoleScope.Project);
+        roles.First(r => r.Kod == "VEDOUCI_SUBSYSTEMU").Scope.Should().Be(RoleScope.Subsystem);
+        roles.First(r => r.Kod == "APP_ADMIN").Scope.Should().Be(RoleScope.Global);
     }
 
     [Fact]
