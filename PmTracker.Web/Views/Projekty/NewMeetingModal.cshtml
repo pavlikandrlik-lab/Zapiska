@@ -17,9 +17,10 @@
         <input type="hidden" name="Id" value="@Model.Command.Id" />
     }
     <input type="hidden" name="ProjektId" value="@Model.Command.ProjektId" />
-    <label>
+    <label for="cislo-jednani">
         Číslo jednání
-        <input type="number"
+        <input id="cislo-jednani"
+               type="number"
                min="1"
                name="CisloJednani"
                value="@Model.Command.CisloJednani"
@@ -57,13 +58,13 @@
             </div>
         </div>
     </label>
-    <label>
+    <label for="misto">
         Místo
-        <input type="text" name="Misto" value="@Model.Command.Misto" placeholder="Zasedačka A" />
+        <input id="misto" type="text" name="Misto" value="@Model.Command.Misto" placeholder="Zasedačka A" />
     </label>
-    <label>
+    <label for="stav-jednani">
         Stav jednání
-        <select name="StavJednani" required>
+        <select id="stav-jednani" name="StavJednani" required>
             @foreach (var status in Model.StavyJednani)
             {
                 var selected = string.Equals(status.Value, Model.Command.StavJednani, StringComparison.OrdinalIgnoreCase);

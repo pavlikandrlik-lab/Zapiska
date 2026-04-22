@@ -22,9 +22,9 @@
      data-record-modal-panel="basic"
      @(isActive ? null : "hidden=\"hidden\"")>
     <div class="record-form-row record-form-row-top" data-record-row-top data-has-type="@(showTaskType ? "true" : "false")">
-        <label>
+        <label for="kategorie">
             Kategorie záznamu
-            <select name="Kategorie" data-kategorie-select @(metadataLocked ? "disabled=\"disabled\"" : null)>
+            <select id="kategorie" name="Kategorie" data-kategorie-select @(metadataLocked ? "disabled=\"disabled\"" : null)>
                 @foreach (var kategorie in Model.KategorieZaznamu)
                 {
                     if (kategorie == Model.Kategorie)
@@ -45,9 +45,9 @@
             "v návrhu v záložce základní údaje je možné rozkliknout Typ úkolu
             a vybrat něco jiného, pořád to není opravené".
         *@
-        <label class="record-form-type-row" data-typ-ukolu-row>
+        <label class="record-form-type-row" for="typ-ukolu" data-typ-ukolu-row>
             Typ úkolu
-            <select name="TypUkolu" @(metadataLocked || Model.IsProposalEditor ? "disabled=\"disabled\"" : null)>
+            <select id="typ-ukolu" name="TypUkolu" @(metadataLocked || Model.IsProposalEditor ? "disabled=\"disabled\"" : null)>
                 <option value="">-</option>
                 @foreach (var typ in Model.TypyUkolu)
                 {
@@ -62,9 +62,9 @@
                 }
             </select>
         </label>
-        <label>
+        <label for="stav">
             Stav úkolu
-            <select name="Stav" @(metadataLocked ? "disabled=\"disabled\"" : null)>
+            <select id="stav" name="Stav" @(metadataLocked ? "disabled=\"disabled\"" : null)>
                 @foreach (var stav in Model.StavyUkolu)
                 {
                     if (stav == Model.Stav)
@@ -78,18 +78,18 @@
                 }
             </select>
         </label>
-        <label class="record-form-number">
+        <label class="record-form-number" for="cislo">
             Číslo
-            <input type="text" value="@Model.CisloViditelne" disabled="disabled" />
+            <input id="cislo" type="text" value="@Model.CisloViditelne" disabled="disabled" />
         </label>
     </div>
 
     @if (Model.IsCreate && Model.PouzivatIdentJednani)
     {
         <div class="record-form-row">
-            <label>
+            <label for="jednani-id-pro-cislo">
                 Jednání pro identifikátor
-                <select name="JednaniIdProCislo"
+                <select id="jednani-id-pro-cislo" name="JednaniIdProCislo"
                         data-record-meeting-number-select="true"
                         required="required"
                         @((Model.MaDostupneJednaniProCislo && !metadataLocked) ? null : "disabled=\"disabled\"")>
@@ -128,16 +128,17 @@
     }
 
     <div class="record-form-row record-form-row-title">
-        <label>
+        <label for="nazev">
             Název
-            <input type="text" name="Nazev" value="@Model.Nazev" @(metadataLocked ? "disabled=\"disabled\"" : null) />
+            <input id="nazev" type="text" name="Nazev" value="@Model.Nazev" @(metadataLocked ? "disabled=\"disabled\"" : null) />
         </label>
     </div>
 
     <div class="record-form-row record-form-row-title">
-        <label>
+        <label for="cil">
             Cíl (volitelné)
-            <textarea class="record-goal-textarea"
+            <textarea id="cil"
+                      class="record-goal-textarea"
                       rows="1"
                       name="Cil"
                       maxlength="500"
@@ -147,9 +148,10 @@
     </div>
 
     <div class="record-form-row">
-        <label>
+        <label for="popis">
             Popis (volitelné)
-            <textarea class="record-description-textarea"
+            <textarea id="popis"
+                      class="record-description-textarea"
                       rows="3"
                       name="Popis"
                       data-rich-text="true"
@@ -209,9 +211,9 @@
     </div>
 
     <div class="record-form-row record-form-row-owner">
-        <label>
+        <label for="subsystem">
             Subsystém
-            <select name="Subsystem" data-record-subsystem-select @(metadataLocked ? "disabled=\"disabled\"" : null)>
+            <select id="subsystem" name="Subsystem" data-record-subsystem-select @(metadataLocked ? "disabled=\"disabled\"" : null)>
                 @foreach (var subsystem in Model.Subsystemy)
                 {
                     var subsystemValue = string.IsNullOrWhiteSpace(subsystem.Kod)
