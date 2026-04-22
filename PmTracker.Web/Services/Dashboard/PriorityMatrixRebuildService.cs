@@ -111,19 +111,23 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
 
         try
         {
-            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-            var result = await RebuildRecordsCoreAsync(targetRecordIds: null, ct);
-            await UpdateRebuildStateAsync(PriorityMatrixRebuildStatuses.Success, result.ProcessedRecordCount, stopwatch.ElapsedMilliseconds, ct);
-            await _dbContext.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+            var strategy = _dbContext.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+                var result = await RebuildRecordsCoreAsync(targetRecordIds: null, ct);
+                await UpdateRebuildStateAsync(PriorityMatrixRebuildStatuses.Success, result.ProcessedRecordCount, stopwatch.ElapsedMilliseconds, ct);
+                await _dbContext.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
 
-            _logger.LogInformation(
-                "Priority matrix full rebuild finished. ProcessedRecords={ProcessedRecords} Created={Created} Updated={Updated} Deleted={Deleted} ElapsedMs={ElapsedMs}",
-                result.ProcessedRecordCount,
-                result.CreatedCount,
-                result.UpdatedCount,
-                result.DeletedCount,
-                stopwatch.ElapsedMilliseconds);
+                _logger.LogInformation(
+                    "Priority matrix full rebuild finished. ProcessedRecords={ProcessedRecords} Created={Created} Updated={Updated} Deleted={Deleted} ElapsedMs={ElapsedMs}",
+                    result.ProcessedRecordCount,
+                    result.CreatedCount,
+                    result.UpdatedCount,
+                    result.DeletedCount,
+                    stopwatch.ElapsedMilliseconds);
+            });
         }
         catch (Exception ex)
         {
@@ -148,19 +152,28 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
             return;
         }
 
-        var ownsTransaction = _dbContext.Database.CurrentTransaction is null;
-        await using var tx = ownsTransaction
-            ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct)
-            : null;
-
-        try
+        if (_dbContext.Database.CurrentTransaction is not null)
         {
+            // Nested: tx ownership + retry je zodpovědnost vnějšího volajícího.
+            var nestedResult = await RebuildRecordsCoreAsync(new HashSet<int> { recordId }, ct);
+            await _dbContext.SaveChangesAsync(ct);
+
+            _logger.LogDebug(
+                "Priority matrix record rebuild finished. RecordId={RecordId} Created={Created} Updated={Updated} Deleted={Deleted}",
+                recordId,
+                nestedResult.CreatedCount,
+                nestedResult.UpdatedCount,
+                nestedResult.DeletedCount);
+            return;
+        }
+
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             var result = await RebuildRecordsCoreAsync(new HashSet<int> { recordId }, ct);
             await _dbContext.SaveChangesAsync(ct);
-            if (ownsTransaction && tx is not null)
-            {
-                await tx.CommitAsync(ct);
-            }
+            await tx.CommitAsync(ct);
 
             _logger.LogDebug(
                 "Priority matrix record rebuild finished. RecordId={RecordId} Created={Created} Updated={Updated} Deleted={Deleted}",
@@ -168,16 +181,7 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
                 result.CreatedCount,
                 result.UpdatedCount,
                 result.DeletedCount);
-        }
-        catch
-        {
-            if (ownsTransaction && tx is not null)
-            {
-                await tx.RollbackAsync(ct);
-            }
-
-            throw;
-        }
+        });
     }
 
     public Task QueueRebuildForSubsystemAsync(int subsystemId, CancellationToken ct = default)
@@ -199,17 +203,21 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
             return;
         }
 
-        await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var result = await RebuildRecordsCoreAsync(targetRecordIds.ToHashSet(), ct);
-        await _dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        _logger.LogInformation(
-            "Priority matrix subsystem rebuild finished. SubsystemId={SubsystemId} ProcessedRecords={ProcessedRecords} Created={Created} Updated={Updated} Deleted={Deleted}",
-            subsystemId,
-            result.ProcessedRecordCount,
-            result.CreatedCount,
-            result.UpdatedCount,
-            result.DeletedCount);
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            var result = await RebuildRecordsCoreAsync(targetRecordIds.ToHashSet(), ct);
+            await _dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            _logger.LogInformation(
+                "Priority matrix subsystem rebuild finished. SubsystemId={SubsystemId} ProcessedRecords={ProcessedRecords} Created={Created} Updated={Updated} Deleted={Deleted}",
+                subsystemId,
+                result.ProcessedRecordCount,
+                result.CreatedCount,
+                result.UpdatedCount,
+                result.DeletedCount);
+        });
     }
 
     private async Task<PriorityRebuildResult> RebuildRecordsCoreAsync(HashSet<int>? targetRecordIds, CancellationToken ct)
