@@ -12,7 +12,7 @@ public sealed class DictionaryServiceTests
     public async Task SaveHarmonogramStepRowAsync_ShouldDelegateToHarmonogramService()
     {
         var harmonogramCatalogService = new FakeHarmonogramCatalogService();
-        var sut = new DictionaryService(null!, harmonogramCatalogService, new FakeAuditWriteService());
+        var sut = new DictionaryService(null!, harmonogramCatalogService, new FakeAuditWriteService(), TimeProvider.System);
         var command = new SaveCiselnikRowCommand
         {
             Key = "harmonogram-kroky",
@@ -29,7 +29,7 @@ public sealed class DictionaryServiceTests
     public async Task DeleteHarmonogramStepRowAsync_ShouldDelegateToHarmonogramService()
     {
         var harmonogramCatalogService = new FakeHarmonogramCatalogService();
-        var sut = new DictionaryService(null!, harmonogramCatalogService, new FakeAuditWriteService());
+        var sut = new DictionaryService(null!, harmonogramCatalogService, new FakeAuditWriteService(), TimeProvider.System);
         var command = new DeleteCiselnikRowCommand
         {
             Key = "harmonogram-kroky",

@@ -16,7 +16,7 @@ public sealed class AjaxAntiforgeryResultFilterTests
     [Fact]
     public async Task OnResultExecutionAsync_ShouldReturnJsonPayload_ForAjaxAntiforgeryFailure()
     {
-        var sut = new AjaxAntiforgeryResultFilter(NullLogger<AjaxAntiforgeryResultFilter>.Instance);
+        var sut = new AjaxAntiforgeryResultFilter(NullLogger<AjaxAntiforgeryResultFilter>.Instance, TimeProvider.System);
         var actionContext = BuildActionContext(isAjax: true);
         var originalResult = new FakeAntiforgeryValidationFailedResult();
         var context = new ResultExecutingContext(
@@ -47,7 +47,7 @@ public sealed class AjaxAntiforgeryResultFilterTests
     [Fact]
     public async Task OnResultExecutionAsync_ShouldPassThrough_ForNonAjaxRequest()
     {
-        var sut = new AjaxAntiforgeryResultFilter(NullLogger<AjaxAntiforgeryResultFilter>.Instance);
+        var sut = new AjaxAntiforgeryResultFilter(NullLogger<AjaxAntiforgeryResultFilter>.Instance, TimeProvider.System);
         var actionContext = BuildActionContext(isAjax: false);
         var originalResult = new FakeAntiforgeryValidationFailedResult();
         var context = new ResultExecutingContext(
