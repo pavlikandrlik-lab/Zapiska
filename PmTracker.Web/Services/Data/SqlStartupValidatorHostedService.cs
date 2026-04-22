@@ -188,6 +188,22 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
                 "V DB chybí sloupec dbo.ciselnik_roli_subsystemu.authz_role_id. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_2_1_lookup_role_authz_fk.sql.");
         }
 
+        // Fáze C — Task C7: ověření cleanup migrace proběhlo.
+        // Pokud DB obsahuje custom (non-system) aktivní role, znamená to, že cleanup
+        // nebyl spuštěn → log warning (ne fatal; seed sám neohrozí fungování aplikace).
+        var customActiveRolesCount = await dbContext.AuthzRoles
+            .AsNoTracking()
+            .CountAsync(r => !r.IsSystem && r.IsActive, ct);
+
+        if (customActiveRolesCount > 0)
+        {
+            _logger.LogWarning(
+                "V DB je {Count} aktivních non-system rolí, které nejsou v seedu. " +
+                "Očekávaná akce: spustit db_upgrade_1_3_0_cleanup_orphaned_role_permissions.sql. " +
+                "Aplikace funguje, ale orphaned role mohou zmást audit.",
+                customActiveRolesCount);
+        }
+
         _logger.LogInformation("SQL startup validace proběhla úspěšně.");
     }
 
