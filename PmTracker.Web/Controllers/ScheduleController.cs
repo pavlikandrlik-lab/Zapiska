@@ -22,6 +22,13 @@ public sealed class ScheduleController : Controller
         {
             return BadRequest();
         }
+
+        const int MaxSteps = 500;  // reasonable upper bound for schedule preview; tune if business evidence suggests otherwise
+        if (request.Steps.Count > MaxSteps)
+        {
+            return BadRequest(new { error = $"Maximální počet kroků je {MaxSteps}." });
+        }
+
         var result = _previewService.Compute(request);
         return Json(result);
     }
