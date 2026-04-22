@@ -10,6 +10,7 @@ public sealed class PermissionSeeder(PmTrackerDbContext dbContext)
     {
         await UpsertCategoriesAsync(ct);
         await UpsertRolesAsync(ct);
+        await dbContext.SaveChangesAsync(ct); // flush categories & roles before UpsertPermissionsAsync reads them
         await UpsertPermissionsAsync(ct);
         await dbContext.SaveChangesAsync(ct);
 
