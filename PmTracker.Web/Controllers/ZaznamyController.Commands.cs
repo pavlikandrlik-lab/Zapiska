@@ -88,7 +88,7 @@ public sealed partial class ZaznamyController
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId ?? command.JednaniId, returnUrl);
         return await ExecuteValidatedCommandAsync(
-            hasPermission: () => true,
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.CommentsAdd, projektId),
             invalidAjaxMessage: "Vyjádření nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
@@ -103,7 +103,7 @@ public sealed partial class ZaznamyController
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId, returnUrl);
         return await ExecuteValidatedCommandAsync(
-            hasPermission: () => true,
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.CommentsEditOwn, projektId),
             invalidAjaxMessage: "Vyjádření nelze upravit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
@@ -123,7 +123,7 @@ public sealed partial class ZaznamyController
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId, returnUrl);
         return await ExecuteCommandAsync(
-            hasPermission: () => true,
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.CommentsDeleteOwn, projektId),
             onSuccessRedirect: () => Task.FromResult<IActionResult>(redirect()),
             onAjaxSuccess: () => Task.FromResult<IActionResult>(
                 !zaznamId.HasValue || zaznamId.Value <= 0
