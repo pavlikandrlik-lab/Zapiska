@@ -575,8 +575,10 @@ git commit -m "feat(authz): DB-driven subsystémové granty v UserContextResolve
 **Files:**
 - Delete: `PmTracker.Web/Services/Common/ProjectRolePermissionGrantBuilder.cs`
 - Delete: `PmTracker.Web/Services/Common/SubsystemRolePermissionGrantBuilder.cs`
-- Delete (pokud existuje): unit testy `PmTracker.Tests.Unit/**/ProjectRolePermissionGrantBuilderTests.cs`, `SubsystemRolePermissionGrantBuilderTests.cs`
+- Delete: `PmTracker.Tests.Unit/Common/ProjectRolePermissionGrantBuilderTests.cs` (3 testů)
+- Delete: `PmTracker.Tests.Unit/Common/SubsystemRolePermissionGrantBuilderTests.cs` (2 testy)
 - Modify: `PmTracker.Web/Services/Security/UserContextResolver.cs` — smazat volání builderů + dedup logiku (DB cesta teď běží sama)
+- **Modify: `PmTracker.Web/Services/Settings/UserAuthorizationSnapshotBuilder.cs`** — tato class VOLÁ oba buildery (řádky 128, 144). MUSÍ být přepsaná na DB cestu (volání `UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync` + `LoadDbDrivenSubsystemRoleGrantsAsync`) — jinak build spadne. Evaluator B1 identifikoval tento dependency.
 - Test: `PmTracker.Tests.Unit/Authorization/ResolverSwapSafetyTests.cs` (new) — asserts vlastník projektu dostane seed granty
 
 ### Step 1 — Najít existující builder testy
