@@ -1,4 +1,6 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Server.IISIntegration;
 using PmTracker.ServiceDesk.Sql;
 using PmTracker.Web.Extensions;
@@ -29,6 +31,19 @@ builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler
 builder.Services.AddAuthorization(options =>
 {
     options.AddPermissionPolicies();
+});
+// M-3: Rate limiter — ochrana drahých FTS endpointů před zneužitím
+// (authentikovaný user hot-loop → DoS na FREETEXTTABLE queries).
+// 30 req / 10s per user; pokud uživatel překročí, vrací 429.
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("search", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 30;
+        limiterOptions.Window = TimeSpan.FromSeconds(10);
+        limiterOptions.QueueLimit = 0;
+    });
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 builder.Services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
 builder.Services
@@ -90,6 +105,10 @@ app.UseAuthentication();
 // při vyhodnocení [Authorize(Policy = "permission:xxx")] policies.
 app.UseMiddleware<UserContextMiddleware>();
 app.UseAuthorization();
+
+// M-3: Rate limiter middleware musí být PO UseAuthorization (user context známý)
+// a PŘED MapControllers (aby [EnableRateLimiting] atributy byly aplikovány).
+app.UseRateLimiter();
 
 app.MapControllers();
 

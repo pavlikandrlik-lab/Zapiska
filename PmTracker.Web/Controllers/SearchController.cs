@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PmTracker.Web.Models.ViewModels;
@@ -8,6 +9,10 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
+// M-3: Rate limit 30 req / 10s per user pro Index a Suggest — FREETEXTTABLE queries
+// jsou drahé. Reindex/Status mají policy gating (search.reindex) — rate limit není
+// potřeba, ale taky neškodí aplikovat celo-controller politiku.
+[EnableRateLimiting("search")]
 public sealed class SearchController : BaseController
 {
     private readonly IGlobalSearchService _searchService;
