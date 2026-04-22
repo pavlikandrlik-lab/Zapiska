@@ -3,6 +3,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTrackerAuthzService = PmTracker.Web.Services.Security.IAuthorizationService;
 
 namespace PmTracker.Web.Services.Settings;
 
@@ -10,7 +11,8 @@ public sealed class SettingsAuthzQueries(
     PmTrackerDbContext dbContext,
     IUserAuthorizationAuditSnapshotBuilder userAuthorizationSnapshotBuilder,
     IPersonIdentityMatcher personIdentityMatcher,
-    ITextNormalizer textNormalizer) : ISettingsAuthzQueries
+    ITextNormalizer textNormalizer,
+    PmTrackerAuthzService authzService) : ISettingsAuthzQueries
 {
     private static readonly StringComparer Ci = StringComparer.OrdinalIgnoreCase;
 
@@ -251,22 +253,8 @@ public sealed class SettingsAuthzQueries(
             };
         }
 
-        var authzSnapshot = await userAuthorizationSnapshotBuilder.BuildAsync(selectedUser.Id, ct);
-        var previewContext = new CurrentUserContextViewModel
-        {
-            OsobaId = selectedUser.Id,
-            Jmeno = selectedUser.Jmeno,
-            Prijmeni = selectedUser.Prijmeni,
-            DisplayName = BuildDisplayName(selectedUser.Titul, selectedUser.Jmeno, selectedUser.Prijmeni, selectedUser.Id),
-            Email = selectedUser.Email?.Trim() ?? string.Empty,
-            OrganizacniCelekKod = null,
-            OrganizacniCelek = "-",
-            IsSuperAdmin = authzSnapshot.IsSuperAdmin,
-            RoleKody = authzSnapshot.RoleKody,
-            VisibleProjectIds = authzSnapshot.VisibleProjectIds,
-            DeletedProjectIds = authzSnapshot.DeletedProjectIds,
-            PermissionGrants = authzSnapshot.PermissionGrants
-        };
+        var auditSnapshot = await userAuthorizationSnapshotBuilder.BuildAsync(selectedUser.Id, ct);
+        var targetAuthz = await authzService.BuildSnapshotAsync(selectedUser.Id, ct);
 
         var permissions = await dbContext.AuthzPermissions.AsNoTracking()
             .Where(x => x.IsActive)
@@ -276,7 +264,7 @@ public sealed class SettingsAuthzQueries(
 
         var rows = permissions.Select(permission =>
         {
-            var grants = previewContext.PermissionGrants
+            var grants = auditSnapshot.PermissionGrants
                 .Where(x => Ci.Equals(x.PermissionKey, permission.Klic))
                 .ToList();
             var scopeSummary = grants.Count == 0
@@ -293,7 +281,7 @@ public sealed class SettingsAuthzQueries(
             {
                 PermissionKlic = permission.Klic,
                 PermissionNazev = permission.Nazev,
-                IsAllowed = previewContext.HasPermission(permission.Klic, selectedProjectId),
+                IsAllowed = targetAuthz.HasPermission(permission.Klic, selectedProjectId),
                 ScopeSummary = scopeSummary,
                 SourceSummary = string.IsNullOrWhiteSpace(sourceSummary) ? "-" : sourceSummary
             };
