@@ -29,7 +29,10 @@ public sealed class SettingsAuthzQueries(
 
     public async Task<NastaveniPanelViewModel> BuildNastaveniPanelAsync(string? section, CurrentUserContextViewModel currentUser, int? userId, int? projektId, CancellationToken ct = default)
     {
-        var canManage = currentUser.HasPermission(PermissionKeys.SettingsManage);
+        var authz = currentUser.Authorization ?? throw new InvalidOperationException(
+            "AuthorizationSnapshot must be populated for this request; UserContextResolver did not set it.");
+
+        var canManage = authz.HasPermission(PermissionKeys.SettingsManage);
         var normalized = NormalizeSettingsSection(section, canManage);
 
         var categories = await dbContext.AuthzPermissionCategories.AsNoTracking()
@@ -188,7 +191,10 @@ public sealed class SettingsAuthzQueries(
             new() { Key = "uzivatele-role", Nazev = "Uživatelé -> Role", Popis = "Přiřazení rolí", Pocet = panel.UserRoles.Count }
         };
 
-        if (currentUser.HasPermission(PermissionKeys.SettingsManage))
+        var authz = currentUser.Authorization ?? throw new InvalidOperationException(
+            "AuthorizationSnapshot must be populated for this request; UserContextResolver did not set it.");
+
+        if (authz.HasPermission(PermissionKeys.SettingsManage))
         {
             sections.Add(new NastaveniSectionItemViewModel
             {
