@@ -66,131 +66,6 @@ public sealed class NastaveniController : BaseController
         return View(_settingsModalModelFactory.BuildUserRolesModal(user, panel.Role, userId, projektId));
     }
 
-    [HttpGet]
-    [Authorize(Policy = "permission:settings.manage")]
-    public async Task<IActionResult> RoleModal(int? id, int? userId, int? projektId, CancellationToken ct)
-    {
-        var panel = await _settingsService.BuildNastaveniPanelAsync("role", CurrentUserContext, userId, projektId, ct);
-        var role = id.HasValue
-            ? panel.Role.FirstOrDefault(x => x.Id == id.Value)
-            : null;
-
-        if (id.HasValue && role is null)
-        {
-            return NotFound();
-        }
-
-        if (role?.IsSystem == true)
-        {
-            return Forbid();
-        }
-
-        return View(_settingsModalModelFactory.BuildRoleModal(role, userId, projektId));
-    }
-
-    [HttpGet]
-    [Authorize(Policy = "permission:settings.manage")]
-    public async Task<IActionResult> PermissionModal(int? id, int? userId, int? projektId, CancellationToken ct)
-    {
-        var panel = await _settingsService.BuildNastaveniPanelAsync("akce", CurrentUserContext, userId, projektId, ct);
-        var permission = id.HasValue
-            ? panel.Permissions.FirstOrDefault(x => x.Id == id.Value)
-            : null;
-
-        if (id.HasValue && permission is null)
-        {
-            return NotFound();
-        }
-
-        if (permission?.IsSystem == true)
-        {
-            return Forbid();
-        }
-
-        return View(_settingsModalModelFactory.BuildPermissionModal(panel, permission, userId, projektId));
-    }
-
-    [HttpGet]
-    [Authorize(Policy = "permission:settings.manage")]
-    public async Task<IActionResult> RolePermissionModal(int? id, int? roleId, int? permissionId, int? userId, int? projektId, CancellationToken ct)
-    {
-        var panel = await _settingsService.BuildNastaveniPanelAsync("role-akce", CurrentUserContext, userId, projektId, ct);
-        var mapping = id.HasValue
-            ? panel.RolePermissionScopes.FirstOrDefault(x => x.Id == id.Value)
-            : null;
-
-        if (id.HasValue && mapping is null)
-        {
-            return NotFound();
-        }
-
-        if (mapping is not null && !mapping.IsAllowed)
-        {
-            return Forbid();
-        }
-
-        return View(_settingsModalModelFactory.BuildRolePermissionModal(panel, mapping, roleId, permissionId, userId, projektId));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
-    public Task<IActionResult> SaveRole(SaveAuthzRoleCommand command, int? userId, int? projektId, CancellationToken ct = default)
-    {
-        return ExecuteSettingsValidatedActionAsync(
-            section: "role",
-            invalidAjaxMessage: "Roli nelze uložit.",
-            successMessage: "Role byla uložena.",
-            userId: userId,
-            projektId: projektId,
-            operation: () => _settingsService.SaveAuthzRoleAsync(command, CurrentUserContext, ct));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
-    public Task<IActionResult> ToggleRole(ToggleAuthzRoleCommand command, int? userId, int? projektId, CancellationToken ct = default)
-    {
-        return ExecuteSettingsActionAsync(
-            section: "role",
-            successMessage: "Stav role byl upraven.",
-            userId: userId,
-            projektId: projektId,
-            operation: () => _settingsService.ToggleAuthzRoleAsync(command, CurrentUserContext, ct));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
-    public Task<IActionResult> SavePermission(SaveAuthzPermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
-    {
-        return ExecuteSettingsValidatedActionAsync(
-            section: "akce",
-            invalidAjaxMessage: "Akci nelze uložit.",
-            successMessage: "Akce byla uložena.",
-            userId: userId,
-            projektId: projektId,
-            operation: async () =>
-            {
-                var panel = await _settingsService.BuildNastaveniPanelAsync("akce", CurrentUserContext, null, null, ct);
-                _settingsModalModelFactory.ApplyPermissionCatalogDefaults(command, panel.PermissionCategories);
-                await _settingsService.SaveAuthzPermissionAsync(command, CurrentUserContext, ct);
-            });
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
-    public Task<IActionResult> TogglePermission(ToggleAuthzPermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
-    {
-        return ExecuteSettingsActionAsync(
-            section: "akce",
-            successMessage: "Stav akce byl upraven.",
-            userId: userId,
-            projektId: projektId,
-            operation: () => _settingsService.ToggleAuthzPermissionAsync(command, CurrentUserContext, ct));
-    }
-
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = "permission:settings.manage")]
@@ -219,38 +94,6 @@ public sealed class NastaveniController : BaseController
             operation: () => _settingsService.SaveUserRolesForUserAsync(command, CurrentUserContext, ct));
     }
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
-    public Task<IActionResult> SaveRolePermission(SaveRolePermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
-    {
-        return ExecuteSettingsValidatedActionAsync(
-            section: "role-akce",
-            invalidAjaxMessage: "Mapování role/akce nelze uložit.",
-            successMessage: "Mapování role/akce bylo uloženo.",
-            userId: userId,
-            projektId: projektId,
-            operation: async () =>
-            {
-                command.IsAllowed = true;
-                await _settingsService.SaveRolePermissionAsync(command, CurrentUserContext, ct);
-            });
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
-    public Task<IActionResult> DeleteRolePermission(DeleteRolePermissionCommand command, int? userId, int? projektId, CancellationToken ct = default)
-    {
-        return ExecuteSettingsValidatedActionAsync(
-            section: "role-akce",
-            invalidAjaxMessage: "Mapování role/akce nelze smazat.",
-            successMessage: "Mapování role/akce bylo smazáno.",
-            userId: userId,
-            projektId: projektId,
-            operation: () => _settingsService.DeleteRolePermissionAsync(command, CurrentUserContext, ct));
-    }
-
     private static string NormalizeSection(string? section)
     {
         var normalized = (section ?? "role").Trim().ToLowerInvariant();
@@ -277,23 +120,6 @@ public sealed class NastaveniController : BaseController
             invalidAjaxMessage: invalidAjaxMessage,
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToSection(section, userId, projektId),
-            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToSection(section, userId, projektId)),
-            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
-                refreshScope: "nastaveni-panel",
-                refreshUrl: BuildPanelRefreshUrl(section, userId, projektId),
-                message: successMessage)),
-            operation: operation);
-    }
-
-    private Task<IActionResult> ExecuteSettingsActionAsync(
-        string section,
-        string successMessage,
-        int? userId,
-        int? projektId,
-        Func<Task> operation)
-    {
-        return ExecuteCommandAsync(
-            hasPermission: () => true,
             onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToSection(section, userId, projektId)),
             onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "nastaveni-panel",
