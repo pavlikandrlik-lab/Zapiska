@@ -27,6 +27,7 @@ public static class DataStoreServiceCollectionExtensions
     public static IServiceCollection AddPmTrackerDataStore(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddLogging();
+        services.AddMemoryCache();
         services.TryAddSingleton(TimeProvider.System);
         services.Configure<PmTrackerDataOptions>(configuration.GetSection(PmTrackerDataOptions.SectionName));
         services.Configure<ActiveDirectoryOptions>(configuration.GetSection(ActiveDirectoryOptions.SectionName));
@@ -77,6 +78,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddSingleton<AdPeriodicSyncHostedService>();
         services.AddHostedService(sp => sp.GetRequiredService<AdPeriodicSyncHostedService>());
         services.AddHostedService<AdReactiveSyncConsumer>();
+        services.AddScoped<ISyncJobAdminHandler, AdSyncJobAdminHandler>();
         services.AddScoped<ITextNormalizer, TextNormalizer>();
         services.AddScoped<IPersonIdentityMatcher, PersonIdentityMatcher>();
         services.AddScoped<ICommentAuthorizationPolicy, CommentAuthorizationPolicy>();
