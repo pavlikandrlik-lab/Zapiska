@@ -69,7 +69,7 @@ public sealed partial class ProjectService
             ProjektId = command.ProjektId,
             OsobaId = personId,
             RoleId = role.Id,
-            DatumPrirazeni = DateTime.UtcNow,
+            DatumPrirazeni = timeProvider.GetUtcNow().UtcDateTime,
             DatumOdebrani = null
         };
         dbContext.ObsazeniProjektu.Add(entity);
@@ -93,7 +93,7 @@ public sealed partial class ProjectService
         }
 
         var old = ProjectMembershipAuditSnapshot.FromEntity(entity);
-        entity.DatumOdebrani = DateTime.UtcNow;
+        entity.DatumOdebrani = timeProvider.GetUtcNow().UtcDateTime;
         await dbContext.SaveChangesAsync(ct);
         auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             AuditActionType.Deactivate,
@@ -121,7 +121,7 @@ public sealed partial class ProjectService
             ProjektId = command.ProjektId,
             SubsystemId = subsystemId,
             Poradi = await ResolveNextProjectSubsystemOrderAsync(command.ProjektId, ct),
-            DatumPrirazeni = DateTime.UtcNow
+            DatumPrirazeni = timeProvider.GetUtcNow().UtcDateTime
         };
         dbContext.ProjektSubsystemy.Add(entity);
         await dbContext.SaveChangesAsync(ct);
@@ -212,7 +212,7 @@ public sealed partial class ProjectService
         }
 
         var old = ProjectSubsystemAuditSnapshot.FromEntity(entity);
-        entity.DatumOdebrani = DateTime.UtcNow;
+        entity.DatumOdebrani = timeProvider.GetUtcNow().UtcDateTime;
         await dbContext.SaveChangesAsync(ct);
         auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             AuditActionType.Deactivate,
@@ -286,7 +286,7 @@ public sealed partial class ProjectService
             ProjektSubsystemId = command.ProjektSubsystemId,
             OsobaId = personId,
             RoleSubsystemuId = role.Id,
-            DatumPrirazeni = DateTime.UtcNow
+            DatumPrirazeni = timeProvider.GetUtcNow().UtcDateTime
         };
         dbContext.ObsazeniSubsystemuProjektu.Add(entity);
         await dbContext.SaveChangesAsync(ct);
@@ -310,7 +310,7 @@ public sealed partial class ProjectService
         }
 
         var old = ProjectSubsystemRoleAuditSnapshot.FromEntity(entity);
-        entity.DatumOdebrani = DateTime.UtcNow;
+        entity.DatumOdebrani = timeProvider.GetUtcNow().UtcDateTime;
         await dbContext.SaveChangesAsync(ct);
         auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
             AuditActionType.Deactivate,

@@ -63,7 +63,7 @@ public sealed partial class MeetingService
             : await dbContext.Osoby.AsNoTracking()
                 .Where(x => lockedPersonIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
-        var currentYear = DateTime.UtcNow.Year;
+        var currentYear = timeProvider.GetUtcNow().Year;
 
         return rows
             .GroupBy(x => new { x.ProjektId, x.ProjektNazev, x.ProjektZkratka, x.ProjektStavKod, x.ProjektStav, x.ProjektMistoPlneni })
