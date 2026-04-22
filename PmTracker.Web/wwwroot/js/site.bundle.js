@@ -10238,3 +10238,176 @@ bootstrapPmTrackerApp();
     }
   });
 })(window);
+
+// =============================================================================
+// PmTracker.Web/wwwroot/js/modules/externiOdkaz/sync.js
+// =============================================================================
+(function (global) {
+  'use strict';
+
+  const DEBOUNCE_MS = 400;
+  const timers = new WeakMap();
+
+  function getCsrfToken() {
+    const input = document.querySelector('input[name="__RequestVerificationToken"]');
+    return input ? input.value : '';
+  }
+
+  function getProjektId(row) {
+    const form = row.closest('[data-record-editor-project-id]');
+    if (!form) return '';
+    return form.getAttribute('data-record-editor-project-id') || '';
+  }
+
+  async function syncCislo(inputEl) {
+    const row = inputEl.closest('[data-external-row]');
+    if (!row) return;
+    const cislo = (inputEl.value || '').trim();
+    if (!/^\d{6}$/.test(cislo)) {
+      setTypDisplay(row, null);
+      setChatEnabled(row, false);
+      row.removeAttribute('data-not-found');
+      return;
+    }
+
+    const projektId = getProjektId(row);
+    if (!projektId) {
+      console.warn('ExterniOdkaz.Sync: chybí projektId na form wrapperu.');
+      return;
+    }
+
+    const form = new FormData();
+    form.append('cislo', cislo);
+    form.append('projektId', projektId);
+    form.append('__RequestVerificationToken', getCsrfToken());
+
+    try {
+      const resp = await fetch('/ExterniOdkaz/Sync', {
+        method: 'POST',
+        body: form,
+        credentials: 'same-origin',
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      if (data.nalezeno) {
+        setTypDisplay(row, data.typ);
+        setTypHidden(row, data.typ);
+        setChatEnabled(row, true);
+        row.removeAttribute('data-not-found');
+      } else {
+        setTypDisplay(row, null);
+        setTypHidden(row, '');
+        setChatEnabled(row, false);
+        row.setAttribute('data-not-found', 'true');
+      }
+    } catch (err) {
+      console.warn('ExterniOdkaz.Sync selhal:', err);
+      row.setAttribute('data-not-found', 'true');
+    }
+  }
+
+  function setTypDisplay(row, typ) {
+    const span = row.querySelector('[data-external-type-display]');
+    if (span) span.textContent = typ || '—';
+  }
+
+  function setTypHidden(row, typ) {
+    const hidden = row.querySelector('[data-external-type-hidden]');
+    if (hidden) hidden.value = typ || '';
+  }
+
+  function setChatEnabled(row, enabled) {
+    const btn = row.querySelector('[data-external-chat-open]');
+    if (!btn) return;
+    if (enabled) {
+      btn.removeAttribute('disabled');
+    } else {
+      btn.setAttribute('disabled', 'disabled');
+    }
+  }
+
+  function onInput(event) {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (!target.hasAttribute('data-external-cislo')) return;
+
+    const existing = timers.get(target);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => syncCislo(target), DEBOUNCE_MS);
+    timers.set(target, timer);
+  }
+
+  function init() {
+    document.addEventListener('input', onInput);
+  }
+
+  global.pmExterniOdkazSync = { init };
+})(window);
+
+// =============================================================================
+// PmTracker.Web/wwwroot/js/modules/externiOdkaz/chatModalStub.js
+// =============================================================================
+(function (global) {
+  'use strict';
+
+  let dialogEl = null;
+
+  function ensureDialog() {
+    if (dialogEl) return dialogEl;
+    dialogEl = document.createElement('gov-dialog');
+    dialogEl.setAttribute('size', 'm');
+    dialogEl.innerHTML = `
+      <div slot="label">Vyjádření a termíny</div>
+      <p>Chat modal s vyjádřeními a drag &amp; drop přiřazením ke krokům harmonogramu se připravuje.
+         V aktuální verzi lze pracovat s ručními sloupci Plán / Skutečnost v záložce Harmonogram.</p>
+      <div slot="footer" style="display:flex; justify-content:flex-end">
+        <pm-button variant="Primary" data-chat-stub-close>OK</pm-button>
+      </div>
+    `;
+    document.body.appendChild(dialogEl);
+    dialogEl.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-chat-stub-close]');
+      if (btn) close();
+    });
+    return dialogEl;
+  }
+
+  function open() {
+    const el = ensureDialog();
+    if (typeof el.show === 'function') el.show();
+    else el.setAttribute('open', '');
+  }
+
+  function close() {
+    if (!dialogEl) return;
+    if (typeof dialogEl.hide === 'function') dialogEl.hide();
+    else dialogEl.removeAttribute('open');
+  }
+
+  function onClick(event) {
+    const btn = event.target.closest('[data-external-chat-open]');
+    if (!btn) return;
+    if (btn.hasAttribute('disabled')) return;
+    event.preventDefault();
+    open();
+  }
+
+  function init() {
+    document.addEventListener('click', onClick);
+  }
+
+  global.pmExterniOdkazChatStub = { init };
+})(window);
+
+// =============================================================================
+// Init externí odkaz moduly po DOMContentLoaded
+// =============================================================================
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.pmExterniOdkazSync) window.pmExterniOdkazSync.init();
+    if (window.pmExterniOdkazChatStub) window.pmExterniOdkazChatStub.init();
+  });
+} else {
+  if (window.pmExterniOdkazSync) window.pmExterniOdkazSync.init();
+  if (window.pmExterniOdkazChatStub) window.pmExterniOdkazChatStub.init();
+}
