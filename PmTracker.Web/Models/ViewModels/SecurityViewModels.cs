@@ -135,7 +135,10 @@ public static class PermissionKeys
         return !string.IsNullOrWhiteSpace(key) && ProjectWriteKeysBlockedForDeletedProjects.Contains(key.Trim());
     }
 
-    private sealed record PermissionKeyDefinition(string Key, string Nazev, string CategoryKod, string ScopeLevel, string Popis);
+    /// <summary>Všechny definice oprávnění. Používá se pro registraci ASP.NET Core policies.</summary>
+    public static IReadOnlyList<PermissionKeyDefinition> AllDefinitions => Definitions;
+
+    public sealed record PermissionKeyDefinition(string Key, string Nazev, string CategoryKod, string ScopeLevel, string Popis);
 }
 
 public sealed class PermissionCatalogEntryViewModel

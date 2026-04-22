@@ -1,11 +1,17 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Server.IISIntegration;
 using PmTracker.ServiceDesk.Sql;
+using PmTracker.Web.Extensions;
 using PmTracker.Web.Filters;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Search;
 using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Vyzvy;
+
+// Aliases to resolve naming collision with Microsoft.AspNetCore.Authorization.IAuthorizationService
+using PmTrackerAuthzService = PmTracker.Web.Services.Security.IAuthorizationService;
+using PmTrackerAuthzServiceImpl = PmTracker.Web.Services.Security.AuthorizationService;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +21,14 @@ builder.Services.AddControllersWithViews(options =>
 });
 builder.Services.AddScoped<PmTracker.Web.Services.Schedules.SchedulePreviewService>();
 builder.Services.AddAuthentication(IISDefaults.AuthenticationScheme);
-builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<PmTrackerAuthzService, PmTrackerAuthzServiceImpl>();
+builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPermissionPolicies();
+});
 builder.Services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
 builder.Services
     .AddPmTrackerDataStore(builder.Configuration);
