@@ -808,6 +808,180 @@ Ověřeno: `Microsoft.Extensions.TimeProvider.Testing` **není** v current depen
 
 ---
 
+## 13. Amendment 2026-04-22 — Rate limiting, manual wake-up, AD reactive debounce
+
+Toto je **amendment** k sekcím 2.x, 3.x, 6.x po revizi s uživatelem při psaní navazujícího plánu [2026-04-22-sd-sync-revise.md](../plans/2026-04-22-sd-sync-revise.md). Platí **pro všechny konzumenty shared sync infra** (AD i SD). Implementace se přidá do Task 7 (SyncHostedServiceBase), Task 10 (AD ListByGuids), Task 14 (AD reactive consumer), Task 16 (NastaveniSyncController).
+
+### 13.1 Dvouúrovňový rate limit
+
+Uživatel potvrdil design: **soft debounce (15 minut)** pro automatické reaktivní triggery, **hard floor (1 minuta)** pro manuální akce. Pravidla:
+
+| Typ spouštění | Pravidlo | Implementace |
+|---|---|---|
+| Reactive auto (AD: PersonPicked; SD: T2/T5/T7/T8) | 15 min per-osobaId (AD) / per-zaznamId (SD), **bypass pokud první harvest** (LastSync IS NULL) | `IReactiveSyncQueue` producer strana: před enqueue check fingerprint column (`osoby.LastAdSyncAt` nebo `zaznam_externi_odkazy.LastHarvestedAt`) |
+| Manual (tlačítka „Aktualizovat z AD", „Obnovit", 🔄) | 1 min per-item, bypass 15-min | `IMemoryCache` klíč `{job}.manual.{itemId}` s 60s TTL; vrátit HTTP 429 + Retry-After header |
+| Admin „Spustit teď" (periodic job) | 1 min per-job floor | Check `settings.LastRunAt`; pokud `now - LastRunAt < 60s`, vrátit zprávu „Proběhl před X sekundami" |
+| Periodic tick (auto) | `PeriodMinutes >= 5` (existující) | Validace beze změn |
+
+**Důvod first-time bypass:** Uživatel přidá novou osobu (PersonPicked) nebo novou externí vazbu (T2) → musí se alespoň jednou načíst, i kdyby byl debounce window. Bez bypass by nový záznam zůstal prázdný.
+
+### 13.2 ManualResetEventSlim pro „Spustit teď"
+
+Původní spec §2.3 nepopisuje, jak handler `ISyncJobAdminHandler.TriggerManualRunAsync` signaluje běžící `SyncHostedServiceBase` loopu. Amendment:
+
+**Per-job `ManualTriggerSignal<TSettings>` v DI singletonem:**
+
+```csharp
+public sealed class ManualTriggerSignal<TSettings>
+    where TSettings : class, ISyncJobSettings
+{
+    private readonly TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public Task WaitAsync(CancellationToken ct) => _tcs.Task.WaitAsync(ct);
+
+    public void Signal()
+    {
+        // Použít Interlocked aby se současné signály neztratily; reset je implicitní
+        // v další iteraci (consumer si načte novou instanci před await).
+        _tcs.TrySetResult();
+    }
+}
+
+// DI:
+services.AddSingleton(typeof(ManualTriggerSignal<>));
+```
+
+**`SyncHostedServiceBase<TSettings>` loop upraven:**
+
+```csharp
+// Místo:
+await Task.Delay(next - now, ct);
+
+// Použij:
+using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+var delayTask = Task.Delay(next - now, cts.Token);
+var signalTask = _manualSignal.WaitAsync(cts.Token);
+var winner = await Task.WhenAny(delayTask, signalTask);
+cts.Cancel();  // zruší druhý task
+var trigger = (winner == signalTask) ? SyncTriggerKind.Manual : SyncTriggerKind.Auto;
+await RunOnceAsync(scope, trigger, ct);
+```
+
+**Controller akce `POST /Nastaveni/Sync/{jobKey}/RunNow`:**
+
+```csharp
+// V keyed handleru (AdSyncJobAdminHandler, SdActiveSyncJobAdminHandler, ...)
+public async Task<ManualRunOutcome> TriggerManualRunAsync(int? editorOsobaId, CancellationToken ct)
+{
+    // 1-min floor check
+    var settings = await LoadSettingsInternalAsync(ct);
+    if (settings.LastRunAt.HasValue)
+    {
+        var elapsed = _time.GetUtcNow().UtcDateTime - settings.LastRunAt.Value;
+        if (elapsed < TimeSpan.FromMinutes(1))
+        {
+            var retryAfter = (int)Math.Ceiling((TimeSpan.FromMinutes(1) - elapsed).TotalSeconds);
+            return new ManualRunOutcome(
+                Accepted: false,
+                Message: $"Sync proběhl před {(int)elapsed.TotalSeconds} s. Zkus za {retryAfter} s.");
+        }
+    }
+
+    // Lock check pro případ, že běží teď
+    if (!_runLock.TryAcquire())
+    {
+        return new ManualRunOutcome(
+            Accepted: false,
+            Message: "Sync právě běží. Počkej na dokončení.");
+    }
+    _runLock.Release();  // Jen jsme ověřili, že momentálně neběží.
+
+    // Signal do hosted service — ten se okamžitě probudí a spustí RunOnceAsync(trigger=Manual)
+    _manualSignal.Signal();
+
+    return new ManualRunOutcome(
+        Accepted: true,
+        Message: "Manual sync naplánován.");
+}
+```
+
+**Latence:** User klikne „Spustit teď" → do ~1 sekundy vidí status „Running from ...". Žádné DB polling, žádné blokování HTTP request threadu.
+
+### 13.3 AD reactive debounce — nový sloupec `osoby.LastAdSyncAt`
+
+Pro 15-min debounce v AD reactive (PersonPicked + ManualUpdate triggery) je potřeba znát „kdy byla osoba naposledy synchronizovaná z AD". Existující `OsobaEntity` **nemá** tento sloupec.
+
+**Nový DB upgrade skript** `db_upgrade_1_3_1_osoba_last_ad_sync_at.sql`:
+
+```sql
+IF NOT EXISTS (SELECT 1 FROM sys.columns
+               WHERE object_id = OBJECT_ID(N'dbo.osoby')
+                 AND name = N'last_ad_sync_at')
+BEGIN
+    ALTER TABLE dbo.osoby ADD last_ad_sync_at DATETIME2 NULL;
+    PRINT N'Sloupec osoby.last_ad_sync_at přidán.';
+END
+ELSE
+BEGIN
+    PRINT N'Sloupec osoby.last_ad_sync_at už existuje.';
+END
+GO
+```
+
+**Entity update:** přidat `DateTime? LastAdSyncAt { get; set; }` do `OsobaEntity`. V `AdSyncService.SyncSinglePersonAsync` a `SyncAllPeopleAsync` po úspěšném update AD dat nastavit `osoba.LastAdSyncAt = time.GetUtcNow().UtcDateTime`.
+
+**Reactive debounce check** v `AdReactiveSyncConsumer.HandleAsync` nebo na producent straně v `OsobyController.CreateFromAd`:
+
+```csharp
+// Producent (před EnqueueAsync):
+var osoba = await db.Osoby.FirstAsync(x => x.Id == osobaId, ct);
+if (osoba.LastAdSyncAt.HasValue
+    && (time.GetUtcNow().UtcDateTime - osoba.LastAdSyncAt.Value) < TimeSpan.FromMinutes(15))
+{
+    // Skip: recently synced
+    return;
+}
+await queue.EnqueueAsync(new AdReactiveSyncRequest(osobaId, AdReactiveSource.PersonPicked), ct);
+```
+
+**Manual button „Aktualizovat z AD":** stejný vzor jako SdSyncController — `IMemoryCache` klíč `ad.manual.{osobaId}` s 60s TTL, vrátit 429 při spam-cliku.
+
+### 13.4 Per-item concurrency lock
+
+Pro operace, kde může souběžně běžet periodic tick + direct sync + reactive consumer nad stejnou entitou (osoba, externí vazba, ticket), se přidá per-item `ConcurrentDictionary<int, SemaphoreSlim>` uvnitř příslušné service třídy:
+
+- `AdSyncService`: lock per-`osobaId`
+- `VyjadreniHarvestService`: lock per-`externiOdkazId` (detailně v sd-sync-revise Task 6)
+
+Acquire s 0s timeout, při nezískání skip (někdo jiný na tom pracuje). Kombinované s `DbUpdateConcurrencyException` retry (1 reload + 1 retry) jako poslední safety net.
+
+### 13.5 Dopady na existující sekce spec
+
+| Sekce | Dopad |
+|---|---|
+| §2.3 SyncHostedServiceBase | Loop upravit per §13.2 — `Task.WhenAny(delay, manualSignal)` |
+| §2.4 ISyncJobRunLock | Zůstává (preserve concurrency guard), doplňuje se manual signal |
+| §3.3 IAdSyncService | SyncAllPeopleAsync + SyncSinglePersonAsync nastavují `LastAdSyncAt` |
+| §3.5 AD reactive triggery | Přidat debounce na producent straně před `queue.EnqueueAsync` |
+| §6.1 Permission | Beze změn |
+| §6.2 UI Nastavení | „Spustit teď" tlačítko signaluje přes `ManualTriggerSignal`; 1-min floor check v handleru |
+| §10 Summary změn | Přidat `db_upgrade_1_3_1_osoba_last_ad_sync_at.sql`, `ManualTriggerSignal<T>` třídu |
+
+### 13.6 Dopady na existující Task v plánu sync-infra-and-ad
+
+| Task | Dopad |
+|---|---|
+| Task 7 (`SyncHostedServiceBase`) | Přidat `ManualTriggerSignal<TSettings>` do konstruktoru + `Task.WhenAny` loop |
+| Task 9 (`AdSyncSettingsEntity`) | Beze změn |
+| Task 10 (`ListByGuidsAsync`) | Beze změn |
+| Task 12 (`AdSyncService`) | Nastavit `osoba.LastAdSyncAt` po každém úspěšném syncu |
+| Task 13 (`AdPeriodicSyncHostedService`) | Beze změn (base class to pokryje) |
+| Task 14 (`AdReactiveSyncConsumer`) | Přidat 15-min debounce check na producent straně (před enqueue, v `OsobyController.CreateFromAd`) |
+| Task 16 (handler + `NastaveniSyncController`) | `TriggerManualRunAsync` použije `ManualTriggerSignal<T>.Signal()` + 1-min floor check. RunNow endpoint vrátí 429 při spam-cliku. |
+| **Nový Task 9a** | DB upgrade `db_upgrade_1_3_1_osoba_last_ad_sync_at.sql` + entity update |
+
+---
+
 ## 12. Reference
 
 - Inbox #14: [docs/superpowers/plans/2026-04-20-upravy-inbox.md:266-329](docs/superpowers/plans/2026-04-20-upravy-inbox.md#L266-L329)

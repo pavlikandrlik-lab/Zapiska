@@ -10,6 +10,16 @@
 
 **Spec:** [docs/superpowers/specs/2026-04-22-sync-infra-and-ad-design.md](docs/superpowers/specs/2026-04-22-sync-infra-and-ad-design.md)
 
+> **🔁 AMENDMENT 2026-04-22:** Spec §13 (rate limit + manual wake-up + AD reactive debounce + `osoby.last_ad_sync_at`) rozšiřuje tento plán:
+> - **Task 7** (`SyncHostedServiceBase`) — přidat `ManualTriggerSignal<TSettings>` injekci + `Task.WhenAny(delay, signal.WaitAsync())` pattern pro realtime manual wake-up.
+> - **Nový Task 9a** — DB upgrade `db_upgrade_1_3_1_osoba_last_ad_sync_at.sql` + property `LastAdSyncAt` na `OsobaEntity`.
+> - **Task 12** (`AdSyncService`) — po úspěšném syncu nastavit `osoba.LastAdSyncAt = time.GetUtcNow().UtcDateTime`.
+> - **Task 14** (`AdReactiveSyncConsumer`) — na producent straně (v `OsobyController.CreateFromAd`) přidat 15-min debounce check na `osoba.LastAdSyncAt` s first-time bypass.
+> - **Task 16** (admin handler) — `TriggerManualRunAsync` use `ManualTriggerSignal<T>.Signal()` + 1-min floor check (vrátit 429 při spam-cliku).
+> - **Task 18** (manual „Aktualizovat z AD" tlačítko) — endpoint má 1-min `IMemoryCache` floor per-osobaId.
+>
+> Detaily viz spec §13.1–§13.6. Implementátor musí tyto změny zahrnout do původních Tasků.
+
 **Předpoklady:**
 - Single-instance aplikace (žádný distributed locking)
 - DB je SQL Server (PM Tracker DB connection)
