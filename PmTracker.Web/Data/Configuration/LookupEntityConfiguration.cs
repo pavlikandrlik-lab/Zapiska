@@ -100,6 +100,7 @@ internal sealed class SubsystemRoleLookupEntityConfiguration : IEntityTypeConfig
         builder.Property(x => x.Kod).HasColumnName("kod");
         builder.Property(x => x.Nazev).HasColumnName("nazev");
         builder.Property(x => x.IsLocked).HasColumnName("is_locked");
+        builder.Property(x => x.AuthzRoleId).HasColumnName("authz_role_id");
     }
 }
 

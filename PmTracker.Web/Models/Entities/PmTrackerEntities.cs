@@ -57,6 +57,7 @@ public sealed class CiselnikRoleSubsystemuEntity
     public string Kod { get; set; } = string.Empty;
     public string Nazev { get; set; } = string.Empty;
     public bool IsLocked { get; set; }
+    public int? AuthzRoleId { get; set; }
 }
 
 public sealed class CiselnikStavuUcastiEntity
