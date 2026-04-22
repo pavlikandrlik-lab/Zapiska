@@ -10,13 +10,17 @@
 
 **Spec:** [docs/superpowers/specs/2026-04-22-sync-infra-and-ad-design.md](docs/superpowers/specs/2026-04-22-sync-infra-and-ad-design.md)
 
-> **🔁 AMENDMENT 2026-04-22:** Spec §13 (rate limit + manual wake-up + AD reactive debounce + `osoby.last_ad_sync_at`) rozšiřuje tento plán:
+> **🔁 AMENDMENT 2026-04-22 (revize v2):** Spec §13 (queue dedup + manual wake-up + 1-min manual floor) rozšiřuje tento plán. **První verze amendmentu zaváděla 15-min debounce + `osoby.last_ad_sync_at`; bylo zrušeno jako over-engineering** (duplikovalo fingerprint strategii, viz spec §13.0).
+>
+> Finální rozsah změn do tasků:
+> - **Task 5** (`IReactiveSyncQueue` + `ReactiveSyncQueue`) — rozšířit o `IHasDedupKey` interface, generic constraint na queue, `_pending HashSet`, `AcknowledgeProcessed` metodu. Přidat test pro dedup semantiku.
+> - **Task 6** (`ReactiveSyncConsumerBase`) — `ExecuteAsync` loop volá `queue.AcknowledgeProcessed(req)` ve `finally` (uvolnění dedup slotu po zpracování).
 > - **Task 7** (`SyncHostedServiceBase`) — přidat `ManualTriggerSignal<TSettings>` injekci + `Task.WhenAny(delay, signal.WaitAsync())` pattern pro realtime manual wake-up.
-> - **Nový Task 9a** — DB upgrade `db_upgrade_1_3_1_osoba_last_ad_sync_at.sql` + property `LastAdSyncAt` na `OsobaEntity`.
-> - **Task 12** (`AdSyncService`) — po úspěšném syncu nastavit `osoba.LastAdSyncAt = time.GetUtcNow().UtcDateTime`.
-> - **Task 14** (`AdReactiveSyncConsumer`) — na producent straně (v `OsobyController.CreateFromAd`) přidat 15-min debounce check na `osoba.LastAdSyncAt` s first-time bypass.
+> - **Task 11** (AD sync models) — `AdReactiveSyncRequest` implementuje `IHasDedupKey` (DedupKey = OsobaId).
 > - **Task 16** (admin handler) — `TriggerManualRunAsync` use `ManualTriggerSignal<T>.Signal()` + 1-min floor check (vrátit 429 při spam-cliku).
 > - **Task 18** (manual „Aktualizovat z AD" tlačítko) — endpoint má 1-min `IMemoryCache` floor per-osobaId.
+>
+> **Žádný nový DB upgrade není potřeba.** Task 9, 12, 13, 14 beze změn oproti původnímu plánu.
 >
 > Detaily viz spec §13.1–§13.6. Implementátor musí tyto změny zahrnout do původních Tasků.
 

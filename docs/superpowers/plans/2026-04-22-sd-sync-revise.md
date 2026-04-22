@@ -40,23 +40,31 @@
 
 ## Rate limiting & concurrency — design principy
 
-Tento plán implementuje **dvou-úrovňový rate limit + per-item konkurenční zámek + idempotentní retry** jako obranu proti race conditions a zbytečnému zátížení HOT DB / AD backendu. Pravidla platí jak pro SD, tak pro AD konzumenta (AD amendment se propíše do sync-infra plánu).
+**Historie rozhodování:** První verze designu (commit `bde0e67`) měla 15-min soft debounce na reaktivní triggery. Při revizi se ukázalo, že **fingerprint strategie ze spec §5 už řeší to samé** (primary HOT_ZAZNAMY.datum check = skip při no-change, cena ~10 ms per batch). Debounce by šetřil 20-50 ms/uživatele/den za cenu UX smog-u („uložil jsem, proč nevidím změnu"). **Zjednodušeno:** reactive triggery běží vždy, fingerprint je dostatečná ochrana; anti-spam řešíme producer-side queue dedup a manual buttons mají 1-min hard floor.
 
-### Rate limit hierarchie
+### Rate limit hierarchie (zjednodušená)
 
-| Typ spouštění | Pravidlo | Zdroj času / klíč |
+| Typ spouštění | Pravidlo | Mechanismus |
 |---|---|---|
-| **Reactive auto** (T2, T5, T7, T8 pro SD; PersonPicked pro AD) | **Soft debounce: 15 minut** per-zaznamId (SD) / per-osobaId (AD). **Výjimka:** pokud `LastHarvestedAt IS NULL` (první harvest), pravidlo se neaplikuje — fire vždycky. | `zaznam_externi_odkazy.LastHarvestedAt` (SD) — existující z Plánu B. Pro AD nový sloupec `osoby.LastAdSyncAt` — viz sync-infra amendment. |
-| **Manual** (tlačítko 🔄 na kartě ext. vazby, „Obnovit" v chat modalu, „Aktualizovat z AD" na detailu osoby) | **Hard floor: 1 minuta** per-externiOdkazId / per-osobaId. **Bypass 15-min** pravidla. Uživatel explicitně chce čerstvá data. | `IMemoryCache` key `sd.manual.{externiOdkazId}` nebo `ad.manual.{osobaId}` s 60s TTL. |
-| **Admin „Spustit teď"** (periodic job manual trigger z `/Nastaveni/synchronizace`) | **Hard floor: 1 minuta** per-job. Pokud job skončil < 60s předtím, vrať message „Sync proběhl před X sekundami, zkus za chvíli". | `settings.LastRunAt` (z `ISyncJobSettings`). |
-| **Periodic tick** (automatický) | `PeriodMinutes >= 5` (existující validace). 1-min floor je implicitně pokryt. | `settings.PeriodMinutes`, `settings.AnchorAt`. |
+| **Reactive auto** (T2, T5, T7, T8 pro SD; PersonPicked pro AD) | Žádný debounce. Vždy enqueue do `IReactiveSyncQueue<T>`. Queue má **producer-side dedup podle `DedupKey`** — pokud stejný `ZaznamId` už v queue čeká, druhý enqueue se no-op-ne. | `ReactiveSyncQueue<T>.EnqueueAsync` check `HashSet<object>` s pending keys. Viz sync-infra spec §13 amendment. |
+| **Manual** (🔄 na kartě, „Obnovit" v modalu, „Aktualizovat z AD" na detailu osoby) | **Hard floor: 1 minuta** per-item. Bypass všech auto-mechanismů. Anti-spam proti double-click. | `IMemoryCache` key `sd.manual.{externiOdkazId}` nebo `ad.manual.{osobaId}` s 60s TTL. HTTP 429 + `Retry-After` header při porušení. |
+| **Admin „Spustit teď"** (periodic job manual trigger) | **Hard floor: 1 minuta** per-job. Anti-spam + anti-race. | Check `settings.LastRunAt`; pokud `now - LastRunAt < 60s`, vrátit message. |
+| **Periodic tick** (automatický) | `PeriodMinutes >= 5` (existující validace). Fingerprint + semafor z `ISyncJobRunLock` chrání před duplicitou. | Beze změn. |
 
-### Důvody pro tento design
+### Proč tato kombinace stačí
 
-1. **Reactive 15-min soft debounce:** Uživatel pracuje na záznamu → ukládá → reotevře → přepíná taby. Bez debounce by T2+T5+T8 spustily 3× harvest během minuty. 15 min je kompromis mezi čerstvostí dat a zátěží HOT DB.
-2. **First-time bypass:** Když uživatel přidá nový ticket k záznamu, **musí** se načíst alespoň jednou. Bez tohoto by nový archivní tiket (který jinak archive periodic sync harvestuje 1×/24h) se nikdy nepárovaly s kroky harmonogramu.
-3. **Manual 1-min hard floor:** User klikne „Obnovit" a za vteřinu znovu (omylem double-click). 1-min mu řekne „ne". Bez floor-u by spam-click generoval 10 requestů.
-4. **Admin „Spustit teď" 1-min floor:** Admin zapnul job, klikne Spustit → vidí Running. Klikne znovu → 1-min floor ho odmítne. Bez tohoto by dva běhy mohly startovat paralelně (řešeno i `ISyncJobRunLock`, ale floor je levnější obrana).
+1. **Queue dedup** řeší reálný problém „user spamuje uložení → 5 duplicitních úloh v queue" za minimální komplexitu (5 řádků v queue implementaci).
+2. **Fingerprint strategie** (spec §5) zajišťuje, že i když stejný record jde přes harvest 3× za hodinu, drill proběhne jen pokud se něco v HOT skutečně změnilo.
+3. **Per-ticket lock** zabraňuje souběhu periodic tick + direct sync + reactive na stejném tiketu.
+4. **Manual 1-min floor** chrání proti user-initiated spam click.
+5. **Admin 1-min floor + `ManualTriggerSignal`** dává adminovi realtime feedback („Running") a zároveň anti-spam.
+6. **Retry na `DbUpdateConcurrencyException`** pokrývá vzácné race, kdy se dva threads protlačí přes lock (čti: těsně po `Release`).
+
+### Co **není** v tomto designu (vědomě odstraněno)
+
+- ~~15-min soft debounce na reaktivní triggery~~ — zbytečné, duplikuje fingerprint strategii.
+- ~~First-time bypass (`LastHarvestedAt IS NULL`)~~ — už se neuplatňuje, nic ho nevyžaduje.
+- ~~`osoby.last_ad_sync_at` sloupec~~ — bez 15-min AD debounce není potřeba. AD reactive události (PersonPicked, ManualUpdate) jsou řídké; queue dedup + 1-min manual floor stačí.
 
 ### Per-item konkurenční zámek (SD)
 
@@ -692,7 +700,13 @@ public enum HarvestScope
     Archive   // HOT_ZAZNAMY.stav = 'archiv'
 }
 
-public sealed record SdReactiveHarvestRequest(int ZaznamId, SdReactiveSource Source);
+public sealed record SdReactiveHarvestRequest(int ZaznamId, SdReactiveSource Source)
+    : IHasDedupKey
+{
+    // Queue dedup: stejný ZaznamId ve stejný moment = nechceme duplicitní enqueue.
+    // Source se ignoruje (ať už user save nebo tab open, harvest je stejný).
+    public object DedupKey => ZaznamId;
+}
 
 public sealed record SdHarvestResult(
     DateTime StartedAt,
@@ -816,7 +830,7 @@ Run: `dotnet test PmTracker.Tests.Unit --filter "ReactiveHarvestSchedulerAdapter
 
 Expected: FAIL (`ReactiveHarvestSchedulerAdapter` neexistuje).
 
-- [ ] **Step 3: Implementovat adapter s debounce logikou**
+- [ ] **Step 3: Implementovat adapter**
 
 Vytvoř `PmTracker.Web/Services/ServiceDesk/ReactiveHarvestSchedulerAdapter.cs`:
 
@@ -828,71 +842,41 @@ using PmTracker.Web.Services.Sync;
 namespace PmTracker.Web.Services.ServiceDesk;
 
 /// <summary>
-/// Implementace <see cref="IHarvestScheduler"/>, která zapisuje request do
-/// sdílené reactive queue s 15-minutovým soft debounce. Skutečný harvest provede
-/// <c>SdReactiveSyncConsumer</c>. Nahrazuje <c>NoOpHarvestScheduler</c> ze stubu Plánu B.
+/// Implementace <see cref="IHarvestScheduler"/>, která jen zapisuje request do
+/// sdílené reactive queue. Skutečný harvest provede <c>SdReactiveSyncConsumer</c>.
+/// Nahrazuje <c>NoOpHarvestScheduler</c> ze stubu Plánu B.
 ///
-/// Debounce algoritmus:
-/// - Pokud některá ext. vazba záznamu má <c>LastHarvestedAt == null</c> (first-time),
-///   enqueue vždy (mandatory initial load).
-/// - Jinak pokud VŠECHNY ext. vazby záznamu mají <c>LastHarvestedAt &gt; now - 15min</c>
-///   (tj. nedávno sync-nuté), skip — data jsou čerstvá.
-/// - Jinak enqueue.
+/// Anti-spam: queue má producer-side dedup podle <c>SdReactiveHarvestRequest.DedupKey</c>
+/// (= ZaznamId), takže opakovaný enqueue stejného záznamu ve stejné minutě je no-op
+/// dokud consumer první nezpracuje. Viz sync-infra spec §13 amendment.
+///
+/// Per-ticket lock + fingerprint strategie ve <see cref="VyjadreniHarvestService"/>
+/// (Task 6) zaručují, že i kdyby dedup propustil duplicitu, drill proběhne nejvýš
+/// jednou per ticket — fingerprint skip pak data idempotentně neaktualizuje.
 /// </summary>
 public sealed class ReactiveHarvestSchedulerAdapter(
     IReactiveSyncQueue<SdReactiveHarvestRequest> queue,
-    PmTrackerDbContext db,
-    TimeProvider time) : IHarvestScheduler
+    PmTrackerDbContext db) : IHarvestScheduler
 {
-    private static readonly TimeSpan SoftDebounceWindow = TimeSpan.FromMinutes(15);
-
     public async Task ScheduleHarvestAsync(int externiOdkazId, CancellationToken ct = default)
     {
-        var link = await db.ExterniOdkazy
+        var zaznamId = await db.ExterniOdkazy
             .Where(x => x.Id == externiOdkazId)
-            .Select(x => new { x.ZaznamId, x.LastHarvestedAt })
+            .Select(x => (int?)x.ZaznamId)
             .FirstOrDefaultAsync(ct);
 
-        if (link is null)
+        if (zaznamId is null)
         {
             return;
         }
 
-        // First-time bypass: nová vazba bez harvestu → vždy fire.
-        var now = time.GetUtcNow().UtcDateTime;
-        if (link.LastHarvestedAt.HasValue
-            && (now - link.LastHarvestedAt.Value) < SoftDebounceWindow)
-        {
-            return;  // skip: recently harvested
-        }
-
         await queue.EnqueueAsync(
-            new SdReactiveHarvestRequest(link.ZaznamId, SdReactiveSource.RecordSave),
+            new SdReactiveHarvestRequest(zaznamId.Value, SdReactiveSource.RecordSave),
             ct);
     }
 
     public async Task ScheduleHarvestForRecordAsync(int zaznamId, CancellationToken ct = default)
     {
-        var links = await db.ExterniOdkazy
-            .Where(x => x.ZaznamId == zaznamId && !string.IsNullOrEmpty(x.Cislo))
-            .Select(x => x.LastHarvestedAt)
-            .ToListAsync(ct);
-
-        if (links.Count == 0)
-        {
-            return;  // žádné ext. vazby = nic neharvestovat
-        }
-
-        // First-time bypass: pokud kterákoliv vazba má null, fire.
-        var now = time.GetUtcNow().UtcDateTime;
-        var anyFirstTime = links.Any(x => !x.HasValue);
-        var allRecent = links.All(x => x.HasValue && (now - x.Value) < SoftDebounceWindow);
-
-        if (!anyFirstTime && allRecent)
-        {
-            return;  // skip: všechny vazby čerstvé
-        }
-
         await queue.EnqueueAsync(
             new SdReactiveHarvestRequest(zaznamId, SdReactiveSource.EditorOpen),
             ct);
@@ -900,80 +884,7 @@ public sealed class ReactiveHarvestSchedulerAdapter(
 }
 ```
 
-**Poznámka k testům:** Test `ReactiveHarvestSchedulerAdapterTests` ze Step 1 doplň třemi novými case:
-
-```csharp
-[Fact]
-public async Task ScheduleHarvestForRecordAsync_SkipsWhenAllLinksRecentlyHarvested()
-{
-    var queue = new Mock<IReactiveSyncQueue<SdReactiveHarvestRequest>>();
-    var fakeTime = new FakeTimeProvider();
-    fakeTime.SetUtcNow(new DateTimeOffset(2026, 4, 22, 12, 0, 0, TimeSpan.Zero));
-
-    using var db = InMemoryDb();
-    db.ExterniOdkazy.Add(new ZaznamExterniOdkazEntity
-    {
-        Id = 1, ZaznamId = 42, Cislo = "100001",
-        LastHarvestedAt = new DateTime(2026, 4, 22, 11, 55, 0, DateTimeKind.Utc)  // před 5 min
-    });
-    await db.SaveChangesAsync();
-
-    var sut = new ReactiveHarvestSchedulerAdapter(queue.Object, db, fakeTime);
-
-    await sut.ScheduleHarvestForRecordAsync(zaznamId: 42);
-
-    queue.Verify(q => q.EnqueueAsync(It.IsAny<SdReactiveHarvestRequest>(), It.IsAny<CancellationToken>()), Times.Never);
-}
-
-[Fact]
-public async Task ScheduleHarvestForRecordAsync_EnqueuesWhenAnyLinkIsFirstTime()
-{
-    var queue = new Mock<IReactiveSyncQueue<SdReactiveHarvestRequest>>();
-    var fakeTime = new FakeTimeProvider();
-    fakeTime.SetUtcNow(new DateTimeOffset(2026, 4, 22, 12, 0, 0, TimeSpan.Zero));
-
-    using var db = InMemoryDb();
-    db.ExterniOdkazy.AddRange(
-        new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 42, Cislo = "100001",
-            LastHarvestedAt = new DateTime(2026, 4, 22, 11, 55, 0, DateTimeKind.Utc) },
-        new ZaznamExterniOdkazEntity { Id = 2, ZaznamId = 42, Cislo = "100002",
-            LastHarvestedAt = null }  // první harvest
-    );
-    await db.SaveChangesAsync();
-
-    var sut = new ReactiveHarvestSchedulerAdapter(queue.Object, db, fakeTime);
-
-    await sut.ScheduleHarvestForRecordAsync(zaznamId: 42);
-
-    queue.Verify(q => q.EnqueueAsync(
-        It.Is<SdReactiveHarvestRequest>(r => r.ZaznamId == 42),
-        It.IsAny<CancellationToken>()), Times.Once);
-}
-
-[Fact]
-public async Task ScheduleHarvestForRecordAsync_EnqueuesWhenLastHarvestOlderThan15Min()
-{
-    var queue = new Mock<IReactiveSyncQueue<SdReactiveHarvestRequest>>();
-    var fakeTime = new FakeTimeProvider();
-    fakeTime.SetUtcNow(new DateTimeOffset(2026, 4, 22, 12, 0, 0, TimeSpan.Zero));
-
-    using var db = InMemoryDb();
-    db.ExterniOdkazy.Add(new ZaznamExterniOdkazEntity
-    {
-        Id = 1, ZaznamId = 42, Cislo = "100001",
-        LastHarvestedAt = new DateTime(2026, 4, 22, 11, 40, 0, DateTimeKind.Utc)  // před 20 min
-    });
-    await db.SaveChangesAsync();
-
-    var sut = new ReactiveHarvestSchedulerAdapter(queue.Object, db, fakeTime);
-
-    await sut.ScheduleHarvestForRecordAsync(zaznamId: 42);
-
-    queue.Verify(q => q.EnqueueAsync(It.IsAny<SdReactiveHarvestRequest>(), It.IsAny<CancellationToken>()), Times.Once);
-}
-```
-
-> **TimeProvider injection:** `Microsoft.Extensions.Time.Testing.FakeTimeProvider` je součástí NuGet `Microsoft.Extensions.TimeProvider.Testing` (přidaný v sync-infra Task 1). V produkci se injectuje `TimeProvider.System`.
+> **`SdReactiveHarvestRequest` musí implementovat `IHasDedupKey`** (interface ze sync-infra §13 amendment) — viz Task 3 amendment níže.
 
 - [ ] **Step 4: Smazat `NoOpHarvestScheduler`**
 

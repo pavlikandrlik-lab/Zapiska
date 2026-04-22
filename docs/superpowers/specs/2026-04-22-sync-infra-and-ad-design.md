@@ -808,22 +808,146 @@ Ověřeno: `Microsoft.Extensions.TimeProvider.Testing` **není** v current depen
 
 ---
 
-## 13. Amendment 2026-04-22 — Rate limiting, manual wake-up, AD reactive debounce
+## 13. Amendment 2026-04-22 — Queue dedup, manual wake-up, 1-min floor
 
-Toto je **amendment** k sekcím 2.x, 3.x, 6.x po revizi s uživatelem při psaní navazujícího plánu [2026-04-22-sd-sync-revise.md](../plans/2026-04-22-sd-sync-revise.md). Platí **pro všechny konzumenty shared sync infra** (AD i SD). Implementace se přidá do Task 7 (SyncHostedServiceBase), Task 10 (AD ListByGuids), Task 14 (AD reactive consumer), Task 16 (NastaveniSyncController).
+Toto je **amendment** k sekcím 2.x, 3.x, 6.x po dvou-kolové revizi s uživatelem při psaní navazujícího plánu [2026-04-22-sd-sync-revise.md](../plans/2026-04-22-sd-sync-revise.md). Platí **pro všechny konzumenty shared sync infra** (AD i SD).
 
-### 13.1 Dvouúrovňový rate limit
+### 13.0 Historie rozhodnutí
 
-Uživatel potvrdil design: **soft debounce (15 minut)** pro automatické reaktivní triggery, **hard floor (1 minuta)** pro manuální akce. Pravidla:
+První draft amendmentu (commit `bde0e67`) zaváděl **15-min soft debounce** na reaktivní triggery s `first-time bypass` logikou a novým sloupcem `osoby.last_ad_sync_at`. Po kritické revizi s uživatelem bylo zjištěno, že:
 
-| Typ spouštění | Pravidlo | Implementace |
-|---|---|---|
-| Reactive auto (AD: PersonPicked; SD: T2/T5/T7/T8) | 15 min per-osobaId (AD) / per-zaznamId (SD), **bypass pokud první harvest** (LastSync IS NULL) | `IReactiveSyncQueue` producer strana: před enqueue check fingerprint column (`osoby.LastAdSyncAt` nebo `zaznam_externi_odkazy.LastHarvestedAt`) |
-| Manual (tlačítka „Aktualizovat z AD", „Obnovit", 🔄) | 1 min per-item, bypass 15-min | `IMemoryCache` klíč `{job}.manual.{itemId}` s 60s TTL; vrátit HTTP 429 + Retry-After header |
-| Admin „Spustit teď" (periodic job) | 1 min per-job floor | Check `settings.LastRunAt`; pokud `now - LastRunAt < 60s`, vrátit zprávu „Proběhl před X sekundami" |
-| Periodic tick (auto) | `PeriodMinutes >= 5` (existující) | Validace beze změn |
+1. **Debounce duplikuje fingerprint strategii ze spec §5.** Fingerprint už zajišťuje, že opakovaný harvest stejného tiketu je levný (1 primary SQL query, ~10 ms) — debounce tedy šetří zanedbatelně malou práci za cenu znatelné komplexity a UX smog-u.
+2. **AD reactive události jsou řídké** (PersonPicked ~1× v lifetime osoby, ManualUpdate = user action). 15-min debounce pro tento profil nic neřeší.
+3. **Skutečný problém je queue spam** — user uloží záznam 5× za minutu → 5× enqueue do `IReactiveSyncQueue`. To řeší producer-side queue dedup, který je jednodušší a lépe odladěný.
 
-**Důvod first-time bypass:** Uživatel přidá novou osobu (PersonPicked) nebo novou externí vazbu (T2) → musí se alespoň jednou načíst, i kdyby byl debounce window. Bez bypass by nový záznam zůstal prázdný.
+**Zrušeno (nerealizovat):** 15-min soft debounce, `first-time bypass` logika, sloupec `osoby.last_ad_sync_at`, DB upgrade skript `db_upgrade_1_3_1`.
+
+**Zachováno:** queue dedup (nová §13.1), `ManualTriggerSignal<T>` (§13.2), 1-min manual floor (§13.3), per-item lock + retry (§13.4).
+
+### 13.1 Producer-side queue dedup
+
+`IReactiveSyncQueue<TRequest>` nepřijme druhý enqueue stejného requestu, dokud první není consumerem zpracován. Klíč dedup je definován requestem přes interface `IHasDedupKey`.
+
+**Interface:**
+
+```csharp
+namespace PmTracker.Web.Services.Sync;
+
+public interface IHasDedupKey
+{
+    /// <summary>
+    /// Klíč pro deduplikaci v queue. Dva requesty se stejným DedupKey se považují
+    /// za duplicitní — jen první se do queue dostane, další se tiše drop-nou.
+    /// Typicky ID entity, které request dotýká (osobaId, zaznamId).
+    /// </summary>
+    object DedupKey { get; }
+}
+```
+
+**Modifikace `IReactiveSyncQueue<TRequest>`:**
+
+```csharp
+public interface IReactiveSyncQueue<TRequest>
+    where TRequest : IHasDedupKey
+{
+    /// <summary>Zapíše request do queue. Pokud už je stejný DedupKey pending, no-op.</summary>
+    ValueTask EnqueueAsync(TRequest request, CancellationToken ct = default);
+
+    /// <summary>Consumer volá po zpracování aby uvolnil dedup slot.</summary>
+    void AcknowledgeProcessed(TRequest request);
+
+    IAsyncEnumerable<TRequest> ReadAllAsync(CancellationToken ct = default);
+    int PendingCount { get; }
+}
+```
+
+**Impl:**
+
+```csharp
+internal sealed class ReactiveSyncQueue<TRequest> : IReactiveSyncQueue<TRequest>
+    where TRequest : IHasDedupKey
+{
+    private readonly Channel<TRequest> _channel = Channel.CreateBounded<TRequest>(
+        new BoundedChannelOptions(capacity: 1000)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = false
+        });
+
+    private readonly object _lock = new();
+    private readonly HashSet<object> _pending = new();
+
+    public async ValueTask EnqueueAsync(TRequest request, CancellationToken ct = default)
+    {
+        lock (_lock)
+        {
+            if (!_pending.Add(request.DedupKey))
+            {
+                return;  // already pending
+            }
+        }
+
+        try
+        {
+            await _channel.Writer.WriteAsync(request, ct);
+        }
+        catch
+        {
+            // Rollback dedup set pokud WriteAsync failne (cancellation, channel closed)
+            lock (_lock) _pending.Remove(request.DedupKey);
+            throw;
+        }
+    }
+
+    public void AcknowledgeProcessed(TRequest request)
+    {
+        lock (_lock) _pending.Remove(request.DedupKey);
+    }
+
+    public IAsyncEnumerable<TRequest> ReadAllAsync(CancellationToken ct = default)
+        => _channel.Reader.ReadAllAsync(ct);
+
+    public int PendingCount
+    {
+        get { lock (_lock) return _pending.Count; }
+    }
+}
+```
+
+**Modifikace `ReactiveSyncConsumerBase<TRequest>`:**
+
+```csharp
+public abstract class ReactiveSyncConsumerBase<TRequest> : BackgroundService
+    where TRequest : IHasDedupKey
+{
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        await foreach (var req in _queue.ReadAllAsync(ct))
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                await HandleAsync(scope, req, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Reactive handler failed for {Key}", req.DedupKey);
+            }
+            finally
+            {
+                _queue.AcknowledgeProcessed(req);
+            }
+        }
+    }
+
+    protected abstract Task HandleAsync(IServiceScope scope, TRequest request, CancellationToken ct);
+}
+```
+
+**Důsledky pro request types:**
+- `AdReactiveSyncRequest(int OsobaId, AdReactiveSource Source)` implementuje `IHasDedupKey` s `DedupKey => OsobaId`.
+- `SdReactiveHarvestRequest(int ZaznamId, SdReactiveSource Source)` implementuje `IHasDedupKey` s `DedupKey => ZaznamId`.
 
 ### 13.2 ManualResetEventSlim pro „Spustit teď"
 
@@ -907,78 +1031,83 @@ public async Task<ManualRunOutcome> TriggerManualRunAsync(int? editorOsobaId, Ca
 
 **Latence:** User klikne „Spustit teď" → do ~1 sekundy vidí status „Running from ...". Žádné DB polling, žádné blokování HTTP request threadu.
 
-### 13.3 AD reactive debounce — nový sloupec `osoby.LastAdSyncAt`
+### 13.3 Manual 1-min hard floor + admin „Spustit teď"
 
-Pro 15-min debounce v AD reactive (PersonPicked + ManualUpdate triggery) je potřeba znát „kdy byla osoba naposledy synchronizovaná z AD". Existující `OsobaEntity` **nemá** tento sloupec.
+**Manual tlačítka (SD 🔄 / „Obnovit" v modalu / AD „Aktualizovat z AD"):**
 
-**Nový DB upgrade skript** `db_upgrade_1_3_1_osoba_last_ad_sync_at.sql`:
+`IMemoryCache` klíč `{job}.manual.{itemId}` s 60s TTL:
+- Před voláním sync service: check cache. Pokud existuje a < 60s → vrátit HTTP 429 + `Retry-After` header.
+- Po úspěšném volání: `cache.Set(key, now, TimeSpan.FromMinutes(1))`.
 
-```sql
-IF NOT EXISTS (SELECT 1 FROM sys.columns
-               WHERE object_id = OBJECT_ID(N'dbo.osoby')
-                 AND name = N'last_ad_sync_at')
-BEGIN
-    ALTER TABLE dbo.osoby ADD last_ad_sync_at DATETIME2 NULL;
-    PRINT N'Sloupec osoby.last_ad_sync_at přidán.';
-END
-ELSE
-BEGIN
-    PRINT N'Sloupec osoby.last_ad_sync_at už existuje.';
-END
-GO
-```
+**Admin „Spustit teď" (`POST /Nastaveni/Sync/{jobKey}/RunNow`):**
 
-**Entity update:** přidat `DateTime? LastAdSyncAt { get; set; }` do `OsobaEntity`. V `AdSyncService.SyncSinglePersonAsync` a `SyncAllPeopleAsync` po úspěšném update AD dat nastavit `osoba.LastAdSyncAt = time.GetUtcNow().UtcDateTime`.
-
-**Reactive debounce check** v `AdReactiveSyncConsumer.HandleAsync` nebo na producent straně v `OsobyController.CreateFromAd`:
+Check `settings.LastRunAt`:
 
 ```csharp
-// Producent (před EnqueueAsync):
-var osoba = await db.Osoby.FirstAsync(x => x.Id == osobaId, ct);
-if (osoba.LastAdSyncAt.HasValue
-    && (time.GetUtcNow().UtcDateTime - osoba.LastAdSyncAt.Value) < TimeSpan.FromMinutes(15))
+public async Task<ManualRunOutcome> TriggerManualRunAsync(int? editorOsobaId, CancellationToken ct)
 {
-    // Skip: recently synced
-    return;
-}
-await queue.EnqueueAsync(new AdReactiveSyncRequest(osobaId, AdReactiveSource.PersonPicked), ct);
-```
+    var settings = await LoadSettingsInternalAsync(ct);
+    if (settings.LastRunAt.HasValue)
+    {
+        var elapsed = _time.GetUtcNow().UtcDateTime - settings.LastRunAt.Value;
+        if (elapsed < TimeSpan.FromMinutes(1))
+        {
+            var retryAfter = (int)Math.Ceiling((TimeSpan.FromMinutes(1) - elapsed).TotalSeconds);
+            return new ManualRunOutcome(
+                Accepted: false,
+                Message: $"Sync proběhl před {(int)elapsed.TotalSeconds} s. Zkus za {retryAfter} s.");
+        }
+    }
 
-**Manual button „Aktualizovat z AD":** stejný vzor jako SdSyncController — `IMemoryCache` klíč `ad.manual.{osobaId}` s 60s TTL, vrátit 429 při spam-cliku.
+    // Lock check (pokud běží, nemůžeme signalovat ani manual)
+    if (!_runLock.TryAcquire())
+    {
+        return new ManualRunOutcome(Accepted: false, Message: "Sync právě běží. Počkej na dokončení.");
+    }
+    _runLock.Release();  // Jen test, že momentálně neběží.
+
+    _manualSignal.Signal();  // Hosted service se probudí a spustí RunOnceAsync(trigger=Manual)
+
+    return new ManualRunOutcome(Accepted: true, Message: "Manual sync naplánován.");
+}
+```
 
 ### 13.4 Per-item concurrency lock
 
-Pro operace, kde může souběžně běžet periodic tick + direct sync + reactive consumer nad stejnou entitou (osoba, externí vazba, ticket), se přidá per-item `ConcurrentDictionary<int, SemaphoreSlim>` uvnitř příslušné service třídy:
+Pro operace, kde může souběžně běžet periodic tick + direct sync + reactive consumer nad stejnou entitou, se přidá per-item `ConcurrentDictionary<int, SemaphoreSlim>` uvnitř příslušné service třídy:
 
-- `AdSyncService`: lock per-`osobaId`
-- `VyjadreniHarvestService`: lock per-`externiOdkazId` (detailně v sd-sync-revise Task 6)
+- `AdSyncService`: lock per-`osobaId` (zde prakticky nikdy nehrozí race, ale pattern pro konzistenci)
+- `VyjadreniHarvestService`: lock per-`externiOdkazId` (detailně v sd-sync-revise Task 6; hlavní use-case je souběh T6 direct sync a periodic tick)
 
-Acquire s 0s timeout, při nezískání skip (někdo jiný na tom pracuje). Kombinované s `DbUpdateConcurrencyException` retry (1 reload + 1 retry) jako poslední safety net.
+Acquire s 0s timeout. Kombinované s `DbUpdateConcurrencyException` retry (1 reload + 1 retry) jako safety net.
 
 ### 13.5 Dopady na existující sekce spec
 
 | Sekce | Dopad |
 |---|---|
 | §2.3 SyncHostedServiceBase | Loop upravit per §13.2 — `Task.WhenAny(delay, manualSignal)` |
-| §2.4 ISyncJobRunLock | Zůstává (preserve concurrency guard), doplňuje se manual signal |
-| §3.3 IAdSyncService | SyncAllPeopleAsync + SyncSinglePersonAsync nastavují `LastAdSyncAt` |
-| §3.5 AD reactive triggery | Přidat debounce na producent straně před `queue.EnqueueAsync` |
+| §2.4 ISyncJobRunLock | Beze změn (preserve concurrency guard) |
+| §2.5 ReactiveSyncQueue | **Zásadní:** přidat `IHasDedupKey` constraint, `_pending HashSet`, `AcknowledgeProcessed` metoda |
+| §2.6 ReactiveSyncConsumerBase | `ExecuteAsync` loop volá `queue.AcknowledgeProcessed(req)` ve `finally` |
+| §3.3 IAdSyncService | Beze změn (žádný LastAdSyncAt) |
+| §3.5 AD reactive triggery | `AdReactiveSyncRequest` implementuje `IHasDedupKey` (DedupKey = OsobaId). Žádný debounce check. |
 | §6.1 Permission | Beze změn |
 | §6.2 UI Nastavení | „Spustit teď" tlačítko signaluje přes `ManualTriggerSignal`; 1-min floor check v handleru |
-| §10 Summary změn | Přidat `db_upgrade_1_3_1_osoba_last_ad_sync_at.sql`, `ManualTriggerSignal<T>` třídu |
+| §10 Summary změn | Přidat `IHasDedupKey.cs`, `ManualTriggerSignal<T>.cs`; **žádný** nový DB upgrade |
 
 ### 13.6 Dopady na existující Task v plánu sync-infra-and-ad
 
 | Task | Dopad |
 |---|---|
+| Task 5 (`IReactiveSyncQueue` + `ReactiveSyncQueue`) | **Rozšířit:** add `IHasDedupKey.cs` file, generic constraint, `_pending HashSet`, `AcknowledgeProcessed` metoda. Přidat test pro dedup semantiku. |
+| Task 6 (`ReactiveSyncConsumerBase`) | `ExecuteAsync` upravit — volat `AcknowledgeProcessed` ve finally bloku. |
 | Task 7 (`SyncHostedServiceBase`) | Přidat `ManualTriggerSignal<TSettings>` do konstruktoru + `Task.WhenAny` loop |
-| Task 9 (`AdSyncSettingsEntity`) | Beze změn |
-| Task 10 (`ListByGuidsAsync`) | Beze změn |
-| Task 12 (`AdSyncService`) | Nastavit `osoba.LastAdSyncAt` po každém úspěšném syncu |
-| Task 13 (`AdPeriodicSyncHostedService`) | Beze změn (base class to pokryje) |
-| Task 14 (`AdReactiveSyncConsumer`) | Přidat 15-min debounce check na producent straně (před enqueue, v `OsobyController.CreateFromAd`) |
+| Task 11 (AD sync models) | `AdReactiveSyncRequest` implementuje `IHasDedupKey` (DedupKey = OsobaId) |
+| Task 12 (`AdSyncService`) | Beze změn (žádný LastAdSyncAt) |
+| Task 13 (`AdPeriodicSyncHostedService`) | Beze změn |
+| Task 14 (`AdReactiveSyncConsumer`) | Beze změn oproti původnímu plánu (žádný debounce check; queue dedup stačí) |
 | Task 16 (handler + `NastaveniSyncController`) | `TriggerManualRunAsync` použije `ManualTriggerSignal<T>.Signal()` + 1-min floor check. RunNow endpoint vrátí 429 při spam-cliku. |
-| **Nový Task 9a** | DB upgrade `db_upgrade_1_3_1_osoba_last_ad_sync_at.sql` + entity update |
+| Task 18 (manual „Aktualizovat z AD" tlačítko) | Endpoint má 1-min `IMemoryCache` floor per-osobaId + HTTP 429 + Retry-After. |
 
 ---
 
