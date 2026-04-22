@@ -15,7 +15,7 @@ public sealed class RecordServiceDelegationTests
     public async Task AddCommentAsync_ShouldDelegateToCommentService()
     {
         var commentService = new FakeCommentService();
-        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, new FakePendingScheduleProposalLockEvaluator(), new FakePriorityMatrixRebuildService(), new FakeAuditWriteService(), new NoOpHarvestScheduler(), TimeProvider.System);
+        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, new FakePendingScheduleProposalLockEvaluator(), new FakePriorityMatrixRebuildService(), new FakeAuditWriteService(), new FakeHarvestScheduler(), TimeProvider.System);
         var command = new AddCommentCommand
         {
             ZaznamId = 13,
@@ -103,6 +103,15 @@ public sealed class RecordServiceDelegationTests
             => Task.CompletedTask;
 
         public Task QueueRebuildForSubsystemAsync(int subsystemId, CancellationToken ct = default)
+            => Task.CompletedTask;
+    }
+
+    private sealed class FakeHarvestScheduler : IHarvestScheduler
+    {
+        public Task ScheduleHarvestAsync(int externiOdkazId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ScheduleHarvestForRecordAsync(int zaznamId, CancellationToken ct = default)
             => Task.CompletedTask;
     }
 }

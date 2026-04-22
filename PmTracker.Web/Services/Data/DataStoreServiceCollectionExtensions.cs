@@ -86,8 +86,10 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IAuditWriteService, AuditWriteService>();
         services.AddScoped<PriorityMatrixRebuildService>();
         services.AddScoped<IRichTextContentService, RichTextContentService>();
-        // Plán B: IHarvestScheduler stub — Plán sd-sync-revise nahradí za ReactiveHarvestSchedulerAdapter.
-        services.AddScoped<IHarvestScheduler, NoOpHarvestScheduler>();
+        // Plán sd-sync-revise Task 4: ReactiveHarvestSchedulerAdapter zapisuje requesty
+        // do IReactiveSyncQueue<SdReactiveHarvestRequest>. Consumer SdReactiveSyncConsumer
+        // provede reálný harvest.
+        services.AddScoped<IHarvestScheduler, ReactiveHarvestSchedulerAdapter>();
         // Plán C: AdLoginCache pro překlad AD login → jméno v chat modalu.
         // IAdLoginResolver je NoOp dokud AD vrstva nedostane login-based lookup;
         // cache pak funguje jako bezpečný fallback ("Neznámý (login)").

@@ -6,9 +6,9 @@ namespace PmTracker.Web.Services.ServiceDesk;
 /// skutečný harvest běží na pozadí (reactive queue / Hangfire dle implementace).
 /// </summary>
 /// <remarks>
-/// Plán B dodává <see cref="NoOpHarvestScheduler"/>. Plán sd-sync-revise
-/// nahradí NoOp za ReactiveHarvestSchedulerAdapter (zapíše do
-/// IReactiveSyncQueue&lt;SdReactiveHarvestRequest&gt;). Signatura se nemění.
+/// Reálnou implementaci dodává <see cref="ReactiveHarvestSchedulerAdapter"/> —
+/// zapisuje do <c>IReactiveSyncQueue&lt;SdReactiveHarvestRequest&gt;</c>, skutečný
+/// harvest provede <c>SdReactiveSyncConsumer</c>.
 /// </remarks>
 public interface IHarvestScheduler
 {
