@@ -19,6 +19,7 @@ using PmTracker.Web.Services.Settings;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.ProjectDashboard;
+using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Web.Services.Data;
 
@@ -85,6 +86,8 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IAuditWriteService, AuditWriteService>();
         services.AddScoped<PriorityMatrixRebuildService>();
         services.AddScoped<IRichTextContentService, RichTextContentService>();
+        // Plán B: IHarvestScheduler stub — Plán sd-sync-revise nahradí za ReactiveHarvestSchedulerAdapter.
+        services.AddScoped<IHarvestScheduler, NoOpHarvestScheduler>();
         services.AddScoped<HarmonogramService>();
         services.AddScoped<HarmonogramCatalogService>();
         services.AddScoped<CommentService>();

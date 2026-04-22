@@ -149,6 +149,14 @@ public class AuthorizationPolicyEnforcementTests
             // Nepotřebuje per-project autorizaci — pracuje jen se vstupy bez DB operace.
             // Třídy kontroleru nemá [Authorize], žádná policy nemůže být aplikována.
             "PmTracker.Web.Controllers.ScheduleController.Recalc",
+
+            // ---- ExterniOdkazController (Plán B) ----
+
+            // Sync: projektId přichází z form body (POST /ExterniOdkaz/Sync) — není v route.
+            // PermissionAuthorizationHandler čte projektId pouze z RouteValues, takže
+            // [Authorize(Policy="permission:records.edit")] by degradoval na global-only check.
+            // Body provádí: _authz.HasPermissionAsync(osobaId, RecordsEdit, projektId).
+            "PmTracker.Web.Controllers.ExterniOdkazController.Sync",
         };
 
         // Act
