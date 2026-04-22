@@ -88,6 +88,11 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IRichTextContentService, RichTextContentService>();
         // Plán B: IHarvestScheduler stub — Plán sd-sync-revise nahradí za ReactiveHarvestSchedulerAdapter.
         services.AddScoped<IHarvestScheduler, NoOpHarvestScheduler>();
+        // Plán C: AdLoginCache pro překlad AD login → jméno v chat modalu.
+        // IAdLoginResolver je NoOp dokud AD vrstva nedostane login-based lookup;
+        // cache pak funguje jako bezpečný fallback ("Neznámý (login)").
+        services.AddSingleton<IAdLoginResolver, NoOpAdLoginResolver>();
+        services.AddSingleton<AdLoginCache>();
         services.AddScoped<HarmonogramService>();
         services.AddScoped<HarmonogramCatalogService>();
         services.AddScoped<CommentService>();
