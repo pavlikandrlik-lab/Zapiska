@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Controllers;
 
+[Authorize]
 public sealed class ScheduleController : Controller
 {
     private readonly SchedulePreviewService _previewService;

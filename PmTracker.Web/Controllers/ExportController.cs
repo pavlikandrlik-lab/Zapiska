@@ -9,6 +9,7 @@ using PmTracker.Web.Services.Security;
 namespace PmTracker.Web.Controllers;
 
 [Route("Export")]
+[Authorize]
 public sealed class ExportController : BaseController
 {
     private const string WordContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -192,6 +193,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpPost("Pdf")]
+    [Authorize(Policy = "permission:export.pdf")]
     public IActionResult Pdf(PdfExportRequestViewModel request)
     {
         if (request.JednaniId.HasValue)
