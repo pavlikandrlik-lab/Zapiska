@@ -9,7 +9,7 @@ namespace PmTracker.Web.Services.Security;
 /// </summary>
 public sealed class CurrentUserAccessor(IHttpContextAccessor httpContextAccessor) : ICurrentUserAccessor
 {
-    internal const string HttpContextItemKey = "pmtracker.authz.osobaId";
+    public const string HttpContextItemKey = "pmtracker.authz.osobaId";
 
     public int? OsobaId
     {

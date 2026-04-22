@@ -423,6 +423,13 @@ public sealed class UserContextResolver : IUserContextResolver
 
         var displayName = BuildDisplayName(osoba.Titul, osoba.Jmeno, osoba.Prijmeni, osoba.Id);
 
+        // Fáze D Task D4: naplnit HttpContext.Items pro CurrentUserAccessor (používají policy handlery).
+        httpContext.Items[CurrentUserAccessor.HttpContextItemKey] = osoba.Id;
+
+        // Fáze D Task D4: postavit AuthorizationSnapshot — kanonická in-memory projekce pro tento request.
+        var authzBuilder = new AuthorizationSnapshotBuilder(_dbContext);
+        var authzSnapshot = await authzBuilder.BuildAsync(osoba.Id, ct);
+
         var context = new CurrentUserContextViewModel
         {
             OsobaId = osoba.Id,
@@ -436,7 +443,8 @@ public sealed class UserContextResolver : IUserContextResolver
             RoleKody = roleCodes,
             VisibleProjectIds = visibleProjectIds,
             DeletedProjectIds = resolvedDeletedProjectIds,
-            PermissionGrants = grants
+            PermissionGrants = grants,
+            Authorization = authzSnapshot
         };
 
         _logger.LogInformation(

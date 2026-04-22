@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Models.ViewModels;
 
@@ -164,6 +165,13 @@ public sealed class CurrentUserContextViewModel
     public required IReadOnlyList<int> VisibleProjectIds { get; init; }
     public required IReadOnlyList<int> DeletedProjectIds { get; init; }
     public required IReadOnlyList<PermissionGrantViewModel> PermissionGrants { get; init; }
+
+    /// <summary>
+    /// Fáze D — kanonická in-memory autorizační projekce pro tento request.
+    /// Nahrazuje legacy <see cref="PermissionGrants"/> postupně (Fáze D6 refactoring). Obě koexistují.
+    /// Null, pokud rezolvér ještě nevyplnil (unauthenticated requests, tests).
+    /// </summary>
+    public AuthorizationSnapshot? Authorization { get; init; }
 
     public bool IsProjectReadOnly(int projektId)
     {
