@@ -1,6 +1,7 @@
 using FluentAssertions;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Common;
 
@@ -14,14 +15,7 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 5,
             visibleProjectIds: [2],
-            grants: new PermissionGrantViewModel
-            {
-                PermissionKey = PermissionKeys.RecordsEdit,
-                ScopeLevel = "PROJECT",
-                ScopeMode = "ALL",
-                IsAllowed = true,
-                ProjectIds = Array.Empty<int>()
-            });
+            globalPermissions: [PermissionKeys.RecordsEdit]);
 
         _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [999], isDraftMeeting: false).Should().BeTrue();
     }
@@ -32,13 +26,9 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 12,
             visibleProjectIds: [2],
-            grants: new PermissionGrantViewModel
+            perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
             {
-                PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
-                ScopeLevel = "PROJECT",
-                ScopeMode = "INCLUDE",
-                IsAllowed = true,
-                ProjectIds = new[] { 2 }
+                { 2, new HashSet<string> { PermissionKeys.RecordsCommentSubsystemLead } }
             });
 
         _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12, 14]).Should().BeTrue();
@@ -52,14 +42,7 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 20,
             visibleProjectIds: [9],
-            grants: new PermissionGrantViewModel
-            {
-                PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
-                ScopeLevel = "PROJECT",
-                ScopeMode = "ALL",
-                IsAllowed = true,
-                ProjectIds = Array.Empty<int>()
-            });
+            globalPermissions: [PermissionKeys.RecordsCommentSubsystemLead]);
 
         _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 20, isDraftMeeting: true).Should().BeTrue();
         _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 30, isDraftMeeting: true).Should().BeFalse();
@@ -71,13 +54,9 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 12,
             visibleProjectIds: [2],
-            grants: new PermissionGrantViewModel
+            perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
             {
-                PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
-                ScopeLevel = "PROJECT",
-                ScopeMode = "INCLUDE",
-                IsAllowed = true,
-                ProjectIds = new[] { 2 }
+                { 2, new HashSet<string> { PermissionKeys.RecordsCommentSubsystemLead } }
             });
 
         _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12], isDraftMeeting: false).Should().BeFalse();
@@ -89,14 +68,7 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 20,
             visibleProjectIds: [9],
-            grants: new PermissionGrantViewModel
-            {
-                PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
-                ScopeLevel = "PROJECT",
-                ScopeMode = "ALL",
-                IsAllowed = true,
-                ProjectIds = Array.Empty<int>()
-            });
+            globalPermissions: [PermissionKeys.RecordsCommentSubsystemLead]);
 
         _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 20, isDraftMeeting: false).Should().BeFalse();
     }
@@ -107,14 +79,7 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 20,
             visibleProjectIds: [9],
-            grants: new PermissionGrantViewModel
-            {
-                PermissionKey = PermissionKeys.RecordsEdit,
-                ScopeLevel = "PROJECT",
-                ScopeMode = "ALL",
-                IsAllowed = true,
-                ProjectIds = Array.Empty<int>()
-            });
+            globalPermissions: [PermissionKeys.RecordsEdit]);
 
         _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [21], commentAuthorOsobaId: 30, isDraftMeeting: false).Should().BeTrue();
     }
@@ -126,13 +91,9 @@ public sealed class CommentAuthorizationPolicyTests
             osobaId: 12,
             visibleProjectIds: [2],
             deletedProjectIds: [2],
-            grants: new PermissionGrantViewModel
+            perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
             {
-                PermissionKey = PermissionKeys.RecordsCommentSubsystemLead,
-                ScopeLevel = "PROJECT",
-                ScopeMode = "INCLUDE",
-                IsAllowed = true,
-                ProjectIds = new[] { 2 }
+                { 2, new HashSet<string> { PermissionKeys.RecordsCommentSubsystemLead } }
             });
 
         _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12]).Should().BeFalse();
@@ -143,7 +104,8 @@ public sealed class CommentAuthorizationPolicyTests
         int osobaId,
         IReadOnlyList<int>? visibleProjectIds = null,
         IReadOnlyList<int>? deletedProjectIds = null,
-        params PermissionGrantViewModel[] grants)
+        IReadOnlyCollection<string>? globalPermissions = null,
+        IReadOnlyDictionary<int, IReadOnlySet<string>>? perProjectPermissions = null)
     {
         return new CurrentUserContextViewModel
         {
@@ -156,9 +118,13 @@ public sealed class CommentAuthorizationPolicyTests
             OrganizacniCelek = "Test",
             IsSuperAdmin = false,
             RoleKody = Array.Empty<string>(),
-            VisibleProjectIds = visibleProjectIds ?? grants.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
+            VisibleProjectIds = visibleProjectIds ?? Array.Empty<int>(),
             DeletedProjectIds = deletedProjectIds ?? Array.Empty<int>(),
-            PermissionGrants = grants
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: false,
+                GlobalPermissions: new HashSet<string>(globalPermissions ?? []),
+                PerProjectPermissions: perProjectPermissions ?? new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         };
     }
 }

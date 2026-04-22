@@ -1,6 +1,7 @@
 using FluentAssertions;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Home;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Home;
 
@@ -35,16 +36,11 @@ public sealed class HomeDashboardServiceTests
             RoleKody = ["USER"],
             VisibleProjectIds = [10, 11],
             DeletedProjectIds = [],
-            PermissionGrants = permissionKeys
-                .Select(permissionKey => new PermissionGrantViewModel
-                {
-                    PermissionKey = permissionKey,
-                    ScopeLevel = "GLOBAL",
-                    ScopeMode = "ALL",
-                    IsAllowed = true,
-                    ProjectIds = []
-                })
-                .ToList()
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: false,
+                GlobalPermissions: new HashSet<string>(permissionKeys),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         };
     }
 }

@@ -143,7 +143,11 @@ public sealed class ProjectDashboardControllerBehaviorTests
             RoleKody = [],
             VisibleProjectIds = visibleProjectIds,
             DeletedProjectIds = [],
-            PermissionGrants = []
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: isSuperAdmin,
+                GlobalPermissions: new HashSet<string>(),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         };
     }
 

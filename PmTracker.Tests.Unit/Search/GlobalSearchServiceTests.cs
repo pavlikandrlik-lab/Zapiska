@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Search;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Search;
 
@@ -92,7 +93,11 @@ public sealed class GlobalSearchServiceTests
             RoleKody = Array.Empty<string>(),
             VisibleProjectIds = visibleProjectIds ?? Array.Empty<int>(),
             DeletedProjectIds = Array.Empty<int>(),
-            PermissionGrants = Array.Empty<PermissionGrantViewModel>()
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: isSuperAdmin,
+                GlobalPermissions: new HashSet<string>(),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         };
 
     private sealed class FakeSearchClient : ISearchClient

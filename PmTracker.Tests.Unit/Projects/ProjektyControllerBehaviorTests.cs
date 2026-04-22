@@ -10,6 +10,7 @@ using PmTracker.Web.Controllers;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.ProjectDashboard;
 using PmTracker.Web.Services;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Projects;
 
@@ -346,7 +347,11 @@ public sealed class ProjektyControllerBehaviorTests
             RoleKody = [],
             VisibleProjectIds = [],
             DeletedProjectIds = [],
-            PermissionGrants = []
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: true,
+                GlobalPermissions: new HashSet<string>(),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         };
     }
 
@@ -365,17 +370,17 @@ public sealed class ProjektyControllerBehaviorTests
             RoleKody = [],
             VisibleProjectIds = [projectId],
             DeletedProjectIds = [],
-            PermissionGrants = permissionKeys
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(permissionKey => new PermissionGrantViewModel
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: false,
+                GlobalPermissions: new HashSet<string>(),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
                 {
-                    PermissionKey = permissionKey,
-                    ScopeLevel = "PROJECT",
-                    ScopeMode = "INCLUDE",
-                    IsAllowed = true,
-                    ProjectIds = [projectId]
-                })
-                .ToList()
+                    {
+                        projectId,
+                        new HashSet<string>(permissionKeys, StringComparer.OrdinalIgnoreCase)
+                    }
+                },
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         };
     }
 

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PmTracker.Web.Controllers;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Meetings;
 
@@ -88,7 +89,11 @@ public sealed class JednaniControllerBehaviorTests
             RoleKody = [],
             VisibleProjectIds = [42],
             DeletedProjectIds = [],
-            PermissionGrants = []
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: false,
+                GlobalPermissions: new HashSet<string>(),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         });
 
         var result = await controller.Index(null);
@@ -127,7 +132,11 @@ public sealed class JednaniControllerBehaviorTests
             RoleKody = [],
             VisibleProjectIds = [],
             DeletedProjectIds = [],
-            PermissionGrants = []
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: true,
+                GlobalPermissions: new HashSet<string>(),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         });
 
         return controller;

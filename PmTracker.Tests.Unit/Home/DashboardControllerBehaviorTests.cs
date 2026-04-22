@@ -74,7 +74,11 @@ public sealed class DashboardControllerBehaviorTests
             RoleKody = [],
             VisibleProjectIds = [1],
             DeletedProjectIds = [],
-            PermissionGrants = []
+            Authorization = new PmTracker.Web.Services.Security.AuthorizationSnapshot(
+                IsSuperAdmin: false,
+                GlobalPermissions: new HashSet<string>(),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         };
     }
 

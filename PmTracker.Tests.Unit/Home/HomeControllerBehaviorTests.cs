@@ -61,7 +61,11 @@ public sealed class HomeControllerBehaviorTests
             RoleKody = [],
             VisibleProjectIds = [1],
             DeletedProjectIds = [],
-            PermissionGrants = []
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: false,
+                GlobalPermissions: new HashSet<string>(),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         };
     }
 

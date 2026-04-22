@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using FluentAssertions;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Settings;
 
 namespace PmTracker.Tests.Unit.Settings;
@@ -46,7 +47,11 @@ public sealed class DeleteRolePermissionCommandTests
             RoleKody = [],
             VisibleProjectIds = [],
             DeletedProjectIds = [],
-            PermissionGrants = []
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: false,
+                GlobalPermissions: new HashSet<string>(),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         };
     }
 

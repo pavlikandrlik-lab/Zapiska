@@ -4,6 +4,7 @@ using PmTracker.Web.Services;
 using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Dashboard;
 using PmTracker.Web.Services.Records;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Records;
 
@@ -43,7 +44,11 @@ public sealed class RecordServiceDelegationTests
             RoleKody = [],
             VisibleProjectIds = [],
             DeletedProjectIds = [],
-            PermissionGrants = []
+            Authorization = new AuthorizationSnapshot(
+                IsSuperAdmin: true,
+                GlobalPermissions: new HashSet<string>(),
+                PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
         };
     }
 
