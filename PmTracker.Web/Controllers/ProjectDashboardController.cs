@@ -31,8 +31,7 @@ public sealed class ProjectDashboardController : BaseController
             return NotFound();
         }
 
-        if (!CurrentUserContext.IsSuperAdmin
-            && !await _dashboardService.CanAccessDashboardAsync(id, CurrentUserContext.OsobaId, ct))
+        if (!CurrentUserContext.HasPermission(PermissionKeys.DashboardView, id))
         {
             return Forbid();
         }
@@ -100,14 +99,13 @@ public sealed class ProjectDashboardController : BaseController
         return PartialView("~/Views/ProjectDashboard/_VyzvyPanel.cshtml", model);
     }
 
-    private async Task<bool> EnsureDashboardAccessAsync(int projectId, CancellationToken ct)
+    private Task<bool> EnsureDashboardAccessAsync(int projectId, CancellationToken ct)
     {
         if (!CurrentUserContext.CanAccessProject(projectId))
         {
-            return false;
+            return Task.FromResult(false);
         }
 
-        return CurrentUserContext.IsSuperAdmin
-            || await _dashboardService.CanAccessDashboardAsync(projectId, CurrentUserContext.OsobaId, ct);
+        return Task.FromResult(CurrentUserContext.HasPermission(PermissionKeys.DashboardView, projectId));
     }
 }
