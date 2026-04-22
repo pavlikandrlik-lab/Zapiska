@@ -1,3 +1,4 @@
+using System.Data;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
@@ -178,45 +179,52 @@ public sealed partial class MeetingService
             .Where(x => x.JednaniId == meetingId && participantIds.Contains(x.OsobaId))
             .ToDictionaryAsync(x => x.OsobaId, ct);
 
-        foreach (var row in normalizedRows)
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            if (!stateIdByValue.TryGetValue(row.StavUcasti, out var stateId))
-            {
-                throw new InvalidOperationException($"Stav účasti '{row.StavUcasti}' neexistuje.");
-            }
+            await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
 
-            if (!existingRows.TryGetValue(row.OsobaId, out var entity))
+            foreach (var row in normalizedRows)
             {
-                entity = new UcastEntity
+                if (!stateIdByValue.TryGetValue(row.StavUcasti, out var stateId))
                 {
-                    JednaniId = meetingId,
-                    OsobaId = row.OsobaId,
-                    StavUcastiId = stateId
-                };
-                dbContext.Ucast.Add(entity);
-                existingRows[row.OsobaId] = entity;
-                await dbContext.SaveChangesAsync(ct);
-                auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                    AuditActionType.Create,
-                    AuditEntityType.Attendance,
-                    $"{meetingId}:{row.OsobaId}",
-                    null,
-                    AttendanceAuditSnapshot.FromEntity(entity)));
-            }
-            else
-            {
-                var old = AttendanceAuditSnapshot.FromEntity(entity);
-                entity.StavUcastiId = stateId;
-                auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                    AuditActionType.Update,
-                    AuditEntityType.Attendance,
-                    $"{meetingId}:{row.OsobaId}",
-                    old,
-                    AttendanceAuditSnapshot.FromEntity(entity)));
-            }
-        }
+                    throw new InvalidOperationException($"Stav účasti '{row.StavUcasti}' neexistuje.");
+                }
 
-        await dbContext.SaveChangesAsync(ct);
+                if (!existingRows.TryGetValue(row.OsobaId, out var entity))
+                {
+                    entity = new UcastEntity
+                    {
+                        JednaniId = meetingId,
+                        OsobaId = row.OsobaId,
+                        StavUcastiId = stateId
+                    };
+                    dbContext.Ucast.Add(entity);
+                    existingRows[row.OsobaId] = entity;
+                    auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                        AuditActionType.Create,
+                        AuditEntityType.Attendance,
+                        $"{meetingId}:{row.OsobaId}",
+                        null,
+                        AttendanceAuditSnapshot.FromEntity(entity)));
+                }
+                else
+                {
+                    var old = AttendanceAuditSnapshot.FromEntity(entity);
+                    entity.StavUcastiId = stateId;
+                    auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                        AuditActionType.Update,
+                        AuditEntityType.Attendance,
+                        $"{meetingId}:{row.OsobaId}",
+                        old,
+                        AttendanceAuditSnapshot.FromEntity(entity)));
+                }
+            }
+
+            // Single SaveChangesAsync after the entire batch (N+1 → 1 roundtrip)
+            await dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
     }
 
     public async Task SaveMeetingStatusAsync(SaveMeetingStatusCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
