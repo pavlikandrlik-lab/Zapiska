@@ -86,12 +86,20 @@ BEGIN TRY
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_typu_externich_odkazu WHERE kod = N'NES')
         INSERT INTO dbo.ciselnik_typu_externich_odkazu(kod, nazev, is_locked) VALUES (N'NES', N'Nesrovnalost', 1);
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_vyzvy WHERE kod = N'DV05')
-        INSERT INTO dbo.ciselnik_vyzvy(kod, nazev, rok, is_locked) VALUES (N'DV05', N'Dílčí výzva 05', '2025-01-01', 0);
-    IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_vyzvy WHERE kod = N'DV06')
-        INSERT INTO dbo.ciselnik_vyzvy(kod, nazev, rok, is_locked) VALUES (N'DV06', N'Dílčí výzva 06', '2026-01-01', 0);
-    IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_vyzvy WHERE kod = N'DV07')
-        INSERT INTO dbo.ciselnik_vyzvy(kod, nazev, rok, is_locked) VALUES (N'DV07', N'Dílčí výzva 07', '2027-01-01', 0);
+    -- Historická ciselnik_vyzvy odstraněna v db_upgrade_1_1_8_vyzvy.sql
+    -- (nahrazena dbo.vyzvy — runtime instance, ne číselník). Seed přeskočí insert,
+    -- pokud tabulka neexistuje, aby zůstal zpětně kompatibilní s čistou 1.1.8+ baseline.
+    IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ciselnik_vyzvy' AND SCHEMA_NAME(schema_id) = 'dbo')
+    BEGIN
+        EXEC('
+            IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_vyzvy WHERE kod = N''DV05'')
+                INSERT INTO dbo.ciselnik_vyzvy(kod, nazev, rok, is_locked) VALUES (N''DV05'', N''Dílčí výzva 05'', ''2025-01-01'', 0);
+            IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_vyzvy WHERE kod = N''DV06'')
+                INSERT INTO dbo.ciselnik_vyzvy(kod, nazev, rok, is_locked) VALUES (N''DV06'', N''Dílčí výzva 06'', ''2026-01-01'', 0);
+            IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_vyzvy WHERE kod = N''DV07'')
+                INSERT INTO dbo.ciselnik_vyzvy(kod, nazev, rok, is_locked) VALUES (N''DV07'', N''Dílčí výzva 07'', ''2027-01-01'', 0);
+        ');
+    END;
 
     -- Meetings dictionaries
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_stavu_jednani WHERE kod = N'DRAFT')
@@ -153,7 +161,6 @@ BEGIN TRY
             (N'HS08_DURATION', N'8. připomínkování', 8, 8, 0, N'#3B82F6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8308')),
             (N'HS09_DURATION', N'9. testování', 9, 9, 0, N'#6366F1', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8309')),
             (N'HS10_DURATION', N'10. nasazení do provozu', 10, 10, 0, N'#8B5CF6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8310')),
-            (N'HS11_DURATION', N'11. fakturace', 11, 11, 0, N'#D946EF', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8311')),
             (N'HS01_DELAY', N'1. příprava zadání dodavateli - zpoždění', 101, 1, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8301')),
             (N'HS02_DELAY', N'2. konzultace termínů s dodavatelem před vytvořením zadání - zpoždění', 102, 2, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8302')),
             (N'HS03_DELAY', N'3. odeslání zadání dodavateli - zpoždění', 103, 3, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8303')),
@@ -163,8 +170,7 @@ BEGIN TRY
             (N'HS07_DELAY', N'7. dodání funkcionality dodavatelem - zpoždění', 107, 7, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8307')),
             (N'HS08_DELAY', N'8. připomínkování - zpoždění', 108, 8, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8308')),
             (N'HS09_DELAY', N'9. testování - zpoždění', 109, 9, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8309')),
-            (N'HS10_DELAY', N'10. nasazení do provozu - zpoždění', 110, 10, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8310')),
-            (N'HS11_DELAY', N'11. fakturace - zpoždění', 111, 11, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8311'))
+            (N'HS10_DELAY', N'10. nasazení do provozu - zpoždění', 110, 10, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8310'))
         ) v(kod, nazev, hodnota, krok_poradi, je_zpozdeni, barva_hex, krok_key)
     )
     MERGE dbo.ciselnik_harmonogram_typu AS target

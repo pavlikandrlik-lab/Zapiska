@@ -529,8 +529,7 @@ public sealed class HarmonogramCatalogService(
         (7, "HS07_DURATION", "7. dodani funkcionality dodavatelem", "#06B6D4"),
         (8, "HS08_DURATION", "8. pripominkovani", "#3B82F6"),
         (9, "HS09_DURATION", "9. testovani", "#6366F1"),
-        (10, "HS10_DURATION", "10. nasazeni do provozu", "#8B5CF6"),
-        (11, "HS11_DURATION", "11. fakturace", "#D946EF")
+        (10, "HS10_DURATION", "10. nasazeni do provozu", "#8B5CF6")
     ];
 
     private static string ResolveDefaultStepColor(int stepIndex)

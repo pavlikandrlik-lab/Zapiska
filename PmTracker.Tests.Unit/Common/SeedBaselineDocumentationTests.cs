@@ -79,7 +79,8 @@ public sealed class SeedBaselineDocumentationTests
         script.Should().Contain("N'PNF', N'Požadavek nové funkcionality'");
         script.Should().Contain("N'NES', N'Nesrovnalost'");
         script.Should().Contain("N'HS01_DURATION'");
-        script.Should().Contain("N'HS11_DELAY'");
+        script.Should().Contain("N'HS10_DELAY'");
+        script.Should().NotContain("HS11");
     }
 
     [Fact]
