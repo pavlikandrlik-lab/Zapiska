@@ -53,6 +53,8 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
+        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportPdf, projektId)) return Forbid();
+
         var filters = BuildProjectExportFilters(
             useCurrentFilters,
             subsystem,
@@ -88,6 +90,8 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
+        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportWord, projektId)) return Forbid();
+
         var filters = BuildProjectExportFilters(
             useCurrentFilters,
             subsystem,
@@ -118,6 +122,8 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
+        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportPdf, projectId.Value)) return Forbid();
+
         var model = await _exportTemplateUseCase.BuildMeetingTemplateAsync(jednaniId, CurrentUserContext, autoPrint, ct);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
@@ -137,6 +143,8 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
+        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportWord, projectId.Value)) return Forbid();
+
         var model = await _exportTemplateUseCase.BuildMeetingTemplateAsync(jednaniId, CurrentUserContext, autoPrint: false, ct);
         return BuildWordResult(model);
     }
@@ -150,6 +158,8 @@ public sealed class ExportController : BaseController
             return accessCheck;
         }
 
+        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportPdf, projektId)) return Forbid();
+
         var model = await _exportTemplateUseCase.BuildTaskTemplateAsync(projektId, zaznamId, CurrentUserContext, autoPrint, ct);
         return View("~/Views/Export/PdfTemplate.cshtml", model);
     }
@@ -162,6 +172,8 @@ public sealed class ExportController : BaseController
         {
             return accessCheck;
         }
+
+        if (!CurrentUserContext.HasPermission(PermissionKeys.ExportWord, projektId)) return Forbid();
 
         var model = await _exportTemplateUseCase.BuildTaskTemplateAsync(projektId, zaznamId, CurrentUserContext, autoPrint: false, ct);
         return BuildWordResult(model);
