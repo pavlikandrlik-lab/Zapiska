@@ -13,6 +13,13 @@ namespace PmTracker.Web.Services.Security;
 /// <c>2026-04-22-authz-phases-c-to-f.md</c>). Nahradí roztříštěný pattern
 /// <c>CurrentUserContext.IsSuperAdmin || PermissionGrants.Any(...)</c> v controllerech
 /// a service vrstvě jediným volání <c>HasPermission(key, projektId?, subsystemId?)</c>.
+///
+/// Sémantika <c>PerProjectPermissions</c>: obsahuje oprávnění z OBOU zdrojů —
+/// přímých projektových rolí (<c>ObsazeniProjektu</c>) i subsystémových rolí
+/// (<c>ObsazeniSubsystemuProjektu</c>) pro nadřazený projekt daného subsystému.
+/// Subsystémově scopovaná oprávnění jsou tedy dostupná i při project-level dotazu
+/// (projektId bez subsystemId), což umožňuje VEDOUCI_SUBSYSTEMU a příbuzným rolím
+/// přístup k project-level features (MEDIUM-1 fix, 2026-04-22).
 /// </remarks>
 public sealed record AuthorizationSnapshot(
     bool IsSuperAdmin,

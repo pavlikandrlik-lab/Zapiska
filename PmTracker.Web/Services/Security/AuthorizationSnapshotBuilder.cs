@@ -9,6 +9,14 @@ namespace PmTracker.Web.Services.Security;
 /// <c>UserContextResolver.LoadDbDriven*GrantsAsync</c> (Fáze B), ale produkuje
 /// strukturované sety místo VM grantů.
 /// </summary>
+/// <remarks>
+/// MEDIUM-1 fix (2026-04-22): subsystémově scopovaná oprávnění jsou automaticky propagována
+/// i do <c>PerProjectPermissions</c> pro nadřazený projekt subsystému. To znamená, že role
+/// jako <c>VEDOUCI_SUBSYSTEMU</c>, <c>ZASTUPCE_VEDOUCIHO_SUBSYSTEMU</c> nebo
+/// <c>METODIK_SUBSYSTEMU</c> umožňují přístup k project-level features (dashboard, seznam
+/// záznamů, export) bez nutnosti explicitního přiřazení projektové role. Viz
+/// <see cref="AuthorizationSnapshot"/> pro sémantiku <c>PerProjectPermissions</c>.
+/// </remarks>
 internal sealed class AuthorizationSnapshotBuilder(PmTrackerDbContext db) : IAuthorizationSnapshotBuilder
 {
     public async Task<AuthorizationSnapshot> BuildAsync(int osobaId, CancellationToken ct)
@@ -47,14 +55,9 @@ internal sealed class AuthorizationSnapshotBuilder(PmTrackerDbContext db) : IAut
                 select new { a.ProjektId, p.Klic })
             .ToListAsync(ct);
 
-        var perProject = projectRows
-            .GroupBy(x => x.ProjektId)
-            .ToDictionary(
-                g => g.Key,
-                g => (IReadOnlySet<string>)new HashSet<string>(g.Select(x => x.Klic), StringComparer.OrdinalIgnoreCase));
-
         // 4. Per-subsystem permissions — via ObsazeniSubsystemuProjektu × CiselnikRoliSubsystemu.AuthzRoleId.
         //    Klíčem je ProjektSubsystemId (z přiřazení), filtrace: aktivní ProjektSubsystemy.
+        //    MEDIUM-1 fix: přidáme ps.ProjektId do projekce, aby bylo možné propagovat do PerProject.
         var subsystemRows = await (
                 from a in db.ObsazeniSubsystemuProjektu.AsNoTracking()
                 where a.OsobaId == osobaId && !a.DatumOdebrani.HasValue
@@ -68,7 +71,7 @@ internal sealed class AuthorizationSnapshotBuilder(PmTrackerDbContext db) : IAut
                 where rp.IsAllowed
                 join p in db.AuthzPermissions.AsNoTracking() on rp.PermissionId equals p.Id
                 where p.IsActive
-                select new { a.ProjektSubsystemId, p.Klic })
+                select new { ps.ProjektId, a.ProjektSubsystemId, p.Klic })
             .ToListAsync(ct);
 
         var perSubsystem = subsystemRows
@@ -77,10 +80,38 @@ internal sealed class AuthorizationSnapshotBuilder(PmTrackerDbContext db) : IAut
                 g => g.Key,
                 g => (IReadOnlySet<string>)new HashSet<string>(g.Select(x => x.Klic), StringComparer.OrdinalIgnoreCase));
 
+        // MEDIUM-1 fix: subsystem-scoped role implikuje project-level přístup pro daný klíč.
+        // Začínáme s mutable work dict z projektových řádků a přidáme příspěvky subsystémů.
+        var perProjectMutable = new Dictionary<int, HashSet<string>>();
+
+        foreach (var row in projectRows)
+        {
+            if (!perProjectMutable.TryGetValue(row.ProjektId, out var set))
+            {
+                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                perProjectMutable[row.ProjektId] = set;
+            }
+            set.Add(row.Klic);
+        }
+
+        foreach (var row in subsystemRows)
+        {
+            if (!perProjectMutable.TryGetValue(row.ProjektId, out var set))
+            {
+                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                perProjectMutable[row.ProjektId] = set;
+            }
+            set.Add(row.Klic);
+        }
+
+        var perProjectFinal = perProjectMutable.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (IReadOnlySet<string>)kvp.Value);
+
         return new AuthorizationSnapshot(
             IsSuperAdmin: isSuperAdmin,
             GlobalPermissions: new HashSet<string>(globalPerms, StringComparer.OrdinalIgnoreCase),
-            PerProjectPermissions: perProject,
+            PerProjectPermissions: perProjectFinal,
             PerSubsystemPermissions: perSubsystem);
     }
 }
