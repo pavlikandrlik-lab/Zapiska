@@ -6,6 +6,7 @@ using PmTracker.Web.Services;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Schedules;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Web.Controllers;
 
@@ -23,17 +24,20 @@ public sealed partial class ZaznamyController : BaseController
 
     private readonly IRecordService _recordService;
     private readonly IRecordUiFlowResolver _recordUiFlowResolver;
+    private readonly IHarvestScheduler _harvestScheduler;
 
     public ZaznamyController(
         IUserContextResolver userContextResolver,
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
         IRecordService recordService,
-        IRecordUiFlowResolver recordUiFlowResolver)
+        IRecordUiFlowResolver recordUiFlowResolver,
+        IHarvestScheduler harvestScheduler)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _recordService = recordService;
         _recordUiFlowResolver = recordUiFlowResolver;
+        _harvestScheduler = harvestScheduler;
     }
 
     public async Task<IActionResult> Edit(int id, string? presentation, string? returnUrl, CancellationToken ct = default)
@@ -47,6 +51,11 @@ public sealed partial class ZaznamyController : BaseController
         {
             return Forbid();
         }
+
+        // T5 trigger (Plán C, spec §8.2.1): otevření editoru spustí proaktivní
+        // harvest vyjádření pro všechny externí vazby záznamu. Fire-and-forget —
+        // scheduler implementace zajišťuje async execution a error isolation.
+        await _harvestScheduler.ScheduleHarvestForRecordAsync(id, ct).ConfigureAwait(false);
 
         PrepareRecordEditorModel(model, presentation, returnUrl, canEditRecord, canManageSchedule);
         return View(GetEditorViewPath(model.Presentation), model);
