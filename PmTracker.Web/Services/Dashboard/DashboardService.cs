@@ -573,28 +573,27 @@ public sealed class DashboardService : IDashboardService
 
     private static bool HasGlobalProjectReadAccess(CurrentUserContextViewModel currentUser)
     {
-        if (currentUser.IsSuperAdmin)
+        var authz = currentUser.Authorization ?? throw new InvalidOperationException(
+            "AuthorizationSnapshot must be populated for this request.");
+
+        if (authz.IsSuperAdmin)
         {
             return true;
         }
 
-        return currentUser.PermissionGrants.Any(grant =>
-            grant.IsAllowed
-            && PermissionKeys.GrantsProjectRead(grant.PermissionKey)
-            && (string.Equals(grant.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(grant.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase)));
+        return authz.GlobalPermissions.Any(PermissionKeys.GrantsProjectRead);
     }
 
     private static HashSet<int> BuildAccessibleProjectIds(CurrentUserContextViewModel currentUser)
     {
-        return currentUser.VisibleProjectIds
-            .Concat(currentUser.PermissionGrants
-                .Where(grant =>
-                    grant.IsAllowed
-                    && PermissionKeys.GrantsProjectRead(grant.PermissionKey)
-                    && string.Equals(grant.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase))
-                .SelectMany(grant => grant.ProjectIds))
-            .ToHashSet();
+        var authz = currentUser.Authorization ?? throw new InvalidOperationException(
+            "AuthorizationSnapshot must be populated for this request.");
+
+        var fromSnapshot = authz.PerProjectPermissions
+            .Where(kvp => kvp.Value.Any(PermissionKeys.GrantsProjectRead))
+            .Select(kvp => kvp.Key);
+
+        return currentUser.VisibleProjectIds.Concat(fromSnapshot).ToHashSet();
     }
 
     private sealed record FocusRecordDetailRow(
