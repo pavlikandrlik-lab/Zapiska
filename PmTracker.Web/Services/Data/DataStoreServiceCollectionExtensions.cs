@@ -96,6 +96,9 @@ public static class DataStoreServiceCollectionExtensions
         services.AddHostedService(sp => sp.GetRequiredService<SdActivePeriodicSyncHostedService>());
         services.AddSingleton<SdArchivePeriodicSyncHostedService>();
         services.AddHostedService(sp => sp.GetRequiredService<SdArchivePeriodicSyncHostedService>());
+        // Plán sd-sync-revise Task 10+11: admin handlery pro karty v /Nastaveni?section=synchronizace
+        services.AddScoped<ISyncJobAdminHandler, SdActiveSyncJobAdminHandler>();
+        services.AddScoped<ISyncJobAdminHandler, SdArchiveSyncJobAdminHandler>();
         // Plán C: AdLoginCache pro překlad AD login → jméno v chat modalu.
         // IAdLoginResolver je NoOp dokud AD vrstva nedostane login-based lookup;
         // cache pak funguje jako bezpečný fallback ("Neznámý (login)").
