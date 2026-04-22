@@ -186,7 +186,7 @@ public sealed partial class RecordService
                     ZaznamId = entity.Id,
                     PuvodniStav = oldStatus.Value,
                     NovyStav = entity.StavUkoluId.Value,
-                    DatumZmeny = DateTime.UtcNow
+                    DatumZmeny = timeProvider.GetUtcNow().UtcDateTime
                 });
             }
         }
@@ -1418,7 +1418,7 @@ public sealed partial class RecordService
             .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId))
             .ToListAsync(ct);
 
-        var now = DateTime.UtcNow;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         foreach (var row in existing)
         {
             if (normalized.TryGetValue(row.TypId, out var value))

@@ -435,7 +435,7 @@ public sealed partial class DictionaryService
             PoradoveVRoce = 0,
             Rok = year,
             Stav = VyzvaStav.Priprava,
-            DatumZalozeni = DateTime.UtcNow,
+            DatumZalozeni = timeProvider.GetUtcNow().UtcDateTime,
             ZalozilOsobaId = 0,
             MistoPlneniSnapshot = string.Empty,
             CisloRamcoveSmlouvySnapshot = string.Empty,
