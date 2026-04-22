@@ -1,3 +1,5 @@
+using PmTracker.Web.Services.Security;
+
 namespace PmTracker.Web.Models.ViewModels;
 
 public sealed class NastaveniDashboardViewModel : BaseViewModel
@@ -64,6 +66,7 @@ public sealed class RoleViewModel
     public required string Popis { get; init; }
     public bool IsSystem { get; init; }
     public bool IsActive { get; init; }
+    public RoleScope Scope { get; init; } = RoleScope.Global;
 }
 
 public sealed class RolePermissionScopeViewModel

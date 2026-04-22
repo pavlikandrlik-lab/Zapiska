@@ -74,7 +74,8 @@ public sealed class SettingsAuthzQueries(
                 Nazev = x.Nazev,
                 Popis = x.Popis ?? string.Empty,
                 IsSystem = x.IsSystem,
-                IsActive = x.IsActive
+                IsActive = x.IsActive,
+                Scope = x.Scope
             })
             .ToListAsync(ct);
 

@@ -1,4 +1,5 @@
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Services.Settings;
 
@@ -69,7 +70,7 @@ public sealed class SettingsModalModelFactory : ISettingsModalModelFactory
     public UserRolesModalViewModel BuildUserRolesModal(UserRoleAssignmentViewModel user, IReadOnlyList<RoleViewModel> roles, int? userId, int? projektId)
     {
         var roleOptions = roles
-            .Where(x => x.IsActive)
+            .Where(x => x.IsActive && x.Scope == RoleScope.Global)
             .OrderBy(x => x.Kod, StringComparer.CurrentCultureIgnoreCase)
             .Select(x => new LookupOptionViewModel
             {
