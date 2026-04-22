@@ -47,6 +47,8 @@ public sealed class PmTrackerDbContext : DbContext
     public DbSet<UcastEntity> Ucast => Set<UcastEntity>();
     public DbSet<VyjadreniEntity> Vyjadreni => Set<VyjadreniEntity>();
     public DbSet<ZaznamHarmonogramHodnotaEntity> ZaznamHarmonogramHodnoty => Set<ZaznamHarmonogramHodnotaEntity>();
+    public DbSet<ZaznamHarmonogramVyjadreniVazbaEntity> VyjadreniVazby
+        => Set<ZaznamHarmonogramVyjadreniVazbaEntity>();
 
     public DbSet<AuthzSuperadminEntity> AuthzSuperadmins => Set<AuthzSuperadminEntity>();
     public DbSet<AuthzPermissionCategoryEntity> AuthzPermissionCategories => Set<AuthzPermissionCategoryEntity>();
