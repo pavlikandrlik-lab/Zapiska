@@ -46,3 +46,13 @@ PmTracker.Web/appsettings.Production.json
 *.doc
 *.xlsx
 *.xls
+
+# Claude Code lokální stav — review finding Q-6/A-9
+.claude/hooks/
+.claude/settings.json
+.claude/worktrees/
+
+# Reference materiál a lokální scratch — review finding Q-6/A-9
+SD_servicedesk/
+PmTracker.archimate
+PmTracker.Web/wwwroot/pm-modal-harness.html
