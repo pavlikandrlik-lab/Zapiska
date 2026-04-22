@@ -114,4 +114,5 @@ public sealed class ExterniOdkazEditViewModel
     public DateTime? PlanDodani { get; set; }
     public DateTime? DatumDodani { get; set; }
     public DateTime? DatumPrevzeti { get; set; }
+    public DateTime? LastHarvestedAt { get; set; }
 }

@@ -115,7 +115,8 @@ public sealed partial class ProjectService
                     DatumObjednani = x.DatumObjednani,
                     PlanDodani = x.PlanDodani,
                     DatumDodani = x.DatumDodani,
-                    DatumPrevzeti = x.DatumPrevzeti
+                    DatumPrevzeti = x.DatumPrevzeti,
+                    LastHarvestedAt = x.LastHarvestedAt
                 })
                 .ToList();
 
