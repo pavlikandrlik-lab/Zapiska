@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -5,6 +6,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Models.ViewModels.Vyjadreni;
+using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.ServiceDesk;
 using IPmAuthorizationService = PmTracker.Web.Services.Security.IAuthorizationService;
@@ -34,6 +36,7 @@ public sealed class VyjadreniModalController : Controller
     private readonly ICurrentUserAccessor _currentUser;
     private readonly TimeProvider _time;
     private readonly ILogger<VyjadreniModalController> _logger;
+    private readonly IAuditWriteService _auditWriteService;
 
     public VyjadreniModalController(
         PmTrackerDbContext db,
@@ -42,7 +45,8 @@ public sealed class VyjadreniModalController : Controller
         IPmAuthorizationService authz,
         ICurrentUserAccessor currentUser,
         TimeProvider time,
-        ILogger<VyjadreniModalController> logger)
+        ILogger<VyjadreniModalController> logger,
+        IAuditWriteService auditWriteService)
     {
         _db = db;
         _builder = builder;
@@ -51,6 +55,7 @@ public sealed class VyjadreniModalController : Controller
         _currentUser = currentUser;
         _time = time;
         _logger = logger;
+        _auditWriteService = auditWriteService;
     }
 
     [HttpGet("Modal")]
@@ -151,9 +156,17 @@ public sealed class VyjadreniModalController : Controller
             return Forbid();
         }
 
-        var eoExists = await _db.ZaznamExterniOdkazy.AsNoTracking()
-            .AnyAsync(x => x.Id == req.ExterniOdkazId && x.ZaznamId == req.ZaznamId, ct);
-        if (!eoExists) return NotFound(new { Error = "Externí odkaz nenalezen nebo nepatří k záznamu." });
+        // Review finding S-4: IDOR — ověř, že externí odkaz nejen existuje a patří k zaznamId,
+        // ale že záznam skutečně patří do req.ProjektId (jinak útočník s records.edit na projekt A
+        // může mutovat vazbu v projektu B). Join explicitní přes _db.ProjektoveZaznamy —
+        // ZaznamExterniOdkazEntity nemá navigation property.
+        var eoRow = await (from eo in _db.ZaznamExterniOdkazy.AsNoTracking()
+                           join z in _db.ProjektoveZaznamy.AsNoTracking() on eo.ZaznamId equals z.Id
+                           where eo.Id == req.ExterniOdkazId && eo.ZaznamId == req.ZaznamId
+                           select new { OwnerProjektId = z.ProjektId })
+                          .FirstOrDefaultAsync(ct);
+        if (eoRow is null) return NotFound(new { Error = "Externí odkaz nenalezen nebo nepatří k záznamu." });
+        if (eoRow.OwnerProjektId != req.ProjektId) return Forbid();
 
         // Superseduj Active binding pro (zaznamId, krokKey)
         var existing = await _db.VyjadreniVazby
@@ -201,6 +214,14 @@ public sealed class VyjadreniModalController : Controller
         if (vazba is null) return NotFound();
         if (vazba.Stav == (byte)VazbaStav.Deleted) return Ok(new { AlreadyDeleted = true });
 
+        // Review finding S-4: IDOR — ověř, že vazba.ZaznamId patří do req.ProjektId.
+        var ownerProjektId = await _db.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == vazba.ZaznamId)
+            .Select(x => (int?)x.ProjektId)
+            .FirstOrDefaultAsync(ct);
+        if (ownerProjektId is null) return NotFound();
+        if (ownerProjektId.Value != req.ProjektId) return Forbid();
+
         vazba.Stav = (byte)VazbaStav.Deleted;
         vazba.DeletedAt = _time.GetUtcNow().UtcDateTime;
         vazba.DeletedByOsobaId = osobaId;
@@ -219,12 +240,30 @@ public sealed class VyjadreniModalController : Controller
         try
         {
             var result = await _harvest.ReHarvestTicketAsync(externiOdkazId, ct).ConfigureAwait(false);
+
+            // Review finding S-3: audit destruktivní admin akce.
+            await _auditWriteService.WriteAsync(_currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Update,
+                AuditEntityType.SdExterniOdkaz,
+                externiOdkazId.ToString(CultureInfo.InvariantCulture),
+                BeforeState: null,
+                AfterState: new
+                {
+                    Action = "reharvest",
+                    Source = "VyjadreniModalController",
+                    result.Fetched,
+                    result.Created,
+                    result.Superseded,
+                    result.Skipped
+                }), ct).ConfigureAwait(false);
+
             return Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "ReHarvest selhal pro externí odkaz {Id}.", externiOdkazId);
-            return StatusCode(500, new { Error = "Re-harvest selhal, viz log." });
+            // Review finding S-3: nelogovat exception.Message do odpovědi, jen trace id.
+            return StatusCode(500, new { Error = $"Re-harvest selhal. TraceId: {HttpContext.TraceIdentifier}" });
         }
     }
 }

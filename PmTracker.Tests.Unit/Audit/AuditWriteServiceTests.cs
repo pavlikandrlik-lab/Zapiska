@@ -42,6 +42,7 @@ public sealed class AuditWriteServiceTests
     [InlineData(AuditEntityType.AuthzRole, "authz_role")]
     [InlineData(AuditEntityType.AuthzPermission, "authz_permission")]
     [InlineData(AuditEntityType.AuthzRolePermission, "authz_role_permission")]
+    [InlineData(AuditEntityType.SdExterniOdkaz, "sd_externi_odkaz")]
     public void ToDatabaseValue_ShouldMapEntityTypes(AuditEntityType entityType, string expected)
     {
         entityType.ToDatabaseValue().Should().Be(expected);

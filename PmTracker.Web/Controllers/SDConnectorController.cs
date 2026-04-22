@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,8 @@ using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels.SDConnector;
+using PmTracker.Web.Services.Audit;
+using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Web.Controllers;
@@ -23,17 +26,26 @@ public sealed class SDConnectorController : Controller
     private readonly IVyjadreniHarvestService _harvest;
     private readonly TimeProvider _time;
     private readonly IOptions<TicketingOptions> _ticketingOptions;
+    private readonly ILogger<SDConnectorController> _logger;
+    private readonly IAuditWriteService _auditWriteService;
+    private readonly ICurrentUserAccessor _currentUser;
 
     public SDConnectorController(
         PmTrackerDbContext db,
         IVyjadreniHarvestService harvest,
         TimeProvider time,
-        IOptions<TicketingOptions> ticketingOptions)
+        IOptions<TicketingOptions> ticketingOptions,
+        ILogger<SDConnectorController> logger,
+        IAuditWriteService auditWriteService,
+        ICurrentUserAccessor currentUser)
     {
         _db = db;
         _harvest = harvest;
         _time = time;
         _ticketingOptions = ticketingOptions;
+        _logger = logger;
+        _auditWriteService = auditWriteService;
+        _currentUser = currentUser;
     }
 
     [HttpGet("")]
@@ -112,12 +124,31 @@ public sealed class SDConnectorController : Controller
         try
         {
             var result = await _harvest.ReHarvestTicketAsync(externiOdkazId, ct).ConfigureAwait(false);
+
+            // Review finding S-3: audit destruktivní admin akce.
+            await _auditWriteService.WriteAsync(_currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Update,
+                AuditEntityType.SdExterniOdkaz,
+                externiOdkazId.ToString(CultureInfo.InvariantCulture),
+                BeforeState: null,
+                AfterState: new
+                {
+                    Action = "reharvest",
+                    Source = "SDConnectorController",
+                    result.Fetched,
+                    result.Created,
+                    result.Superseded,
+                    result.Skipped
+                }), ct).ConfigureAwait(false);
+
             TempData["SDConnectorMessage"] =
                 $"Re-harvest id={externiOdkazId}: načteno {result.Fetched}, vytvořeno {result.Created}, superseded {result.Superseded}, preskočeno {result.Skipped}.";
         }
         catch (Exception ex)
         {
-            TempData["SDConnectorError"] = $"Re-harvest selhal: {ex.Message}";
+            // Review finding S-3: full exception server-side, do UI jen TraceId.
+            _logger.LogError(ex, "ReHarvest selhal pro externí odkaz {Id}.", externiOdkazId);
+            TempData["SDConnectorError"] = $"Re-harvest selhal. TraceId: {HttpContext.TraceIdentifier}";
         }
         return RedirectToAction(nameof(Index));
     }

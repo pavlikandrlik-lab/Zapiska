@@ -35,7 +35,12 @@ public enum AuditEntityType
     AuthzUserRole,
     AuthzRole,
     AuthzPermission,
-    AuthzRolePermission
+    AuthzRolePermission,
+    /// <summary>
+    /// Review finding S-3: admin re-harvest externí vazby (/Vyjadreni/ReHarvest
+    /// nebo /SDConnector/ReHarvest). Entity ID = externiOdkazId.
+    /// </summary>
+    SdExterniOdkaz
 }
 
 public static class AuditActorIds
@@ -91,6 +96,7 @@ internal static class AuditVocabulary
         AuditEntityType.AuthzRole => "authz_role",
         AuditEntityType.AuthzPermission => "authz_permission",
         AuditEntityType.AuthzRolePermission => "authz_role_permission",
+        AuditEntityType.SdExterniOdkaz => "sd_externi_odkaz",
         _ => throw new ArgumentOutOfRangeException(nameof(entityType), entityType, null)
     };
 }
