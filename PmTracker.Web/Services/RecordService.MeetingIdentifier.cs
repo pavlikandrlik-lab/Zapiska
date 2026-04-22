@@ -21,48 +21,52 @@ public sealed partial class RecordService
         IRecordWriteCommandsComposition composition,
         CancellationToken ct = default)
     {
-        await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-
-        var record = await dbContext.ProjektoveZaznamy
-            .FromSqlRaw("SELECT * FROM projektove_zaznamy WITH (UPDLOCK, HOLDLOCK) WHERE id = {0}", command.ZaznamId)
-            .FirstOrDefaultAsync(ct)
-            ?? throw new InvalidOperationException($"Záznam {command.ZaznamId} nebyl nalezen.");
-        if (record.ProjektId != command.ProjektId)
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            throw new InvalidOperationException("Záznam nepatří do vybraného projektu.");
-        }
+            await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
 
-        if (record.CisloViditelneTyp == RecordDisplayNumberTypeMeeting)
-        {
-            throw new InvalidOperationException("Záznam už má identifikátor podle jednání.");
-        }
+            var record = await dbContext.ProjektoveZaznamy
+                .FromSqlRaw("SELECT * FROM projektove_zaznamy WITH (UPDLOCK, HOLDLOCK) WHERE id = {0}", command.ZaznamId)
+                .FirstOrDefaultAsync(ct)
+                ?? throw new InvalidOperationException($"Záznam {command.ZaznamId} nebyl nalezen.");
+            if (record.ProjektId != command.ProjektId)
+            {
+                throw new InvalidOperationException("Záznam nepatří do vybraného projektu.");
+            }
 
-        var openMeetings = await LoadOpenProjectMeetingsAsync(command.ProjektId, ct);
-        if (openMeetings.Count == 0)
-        {
-            throw new InvalidOperationException("Není dostupné žádné neuzavřené jednání.");
-        }
+            if (record.CisloViditelneTyp == RecordDisplayNumberTypeMeeting)
+            {
+                throw new InvalidOperationException("Záznam už má identifikátor podle jednání.");
+            }
 
-        var meeting = openMeetings
-            .FirstOrDefault(x => x.Id == command.JednaniId)
-            ?? throw new InvalidOperationException("Vybrané jednání neexistuje.");
+            var openMeetings = await LoadOpenProjectMeetingsAsync(command.ProjektId, ct);
+            if (openMeetings.Count == 0)
+            {
+                throw new InvalidOperationException("Není dostupné žádné neuzavřené jednání.");
+            }
 
-        var nextOrder = await composition.AllocateMeetingOrderTransactionalAsync(command.ProjektId, meeting.CisloJednani, ct);
-        var old = RecordAuditSnapshot.FromEntity(record);
-        record.CisloViditelneTyp = RecordDisplayNumberTypeMeeting;
-        record.CisloViditelneA = meeting.CisloJednani;
-        record.CisloViditelneB = nextOrder;
-        record.CisloJednaniZdrojId = meeting.Id;
-        record.CisloViditelne = $"{meeting.CisloJednani}-{nextOrder}";
-        await dbContext.SaveChangesAsync(ct);
-        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Assign,
-            AuditEntityType.Record,
-            record.Id.ToString(CultureInfo.InvariantCulture),
-            old,
-            RecordAuditSnapshot.FromEntity(record)));
-        await dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+            var meeting = openMeetings
+                .FirstOrDefault(x => x.Id == command.JednaniId)
+                ?? throw new InvalidOperationException("Vybrané jednání neexistuje.");
+
+            var nextOrder = await composition.AllocateMeetingOrderTransactionalAsync(command.ProjektId, meeting.CisloJednani, ct);
+            var old = RecordAuditSnapshot.FromEntity(record);
+            record.CisloViditelneTyp = RecordDisplayNumberTypeMeeting;
+            record.CisloViditelneA = meeting.CisloJednani;
+            record.CisloViditelneB = nextOrder;
+            record.CisloJednaniZdrojId = meeting.Id;
+            record.CisloViditelne = $"{meeting.CisloJednani}-{nextOrder}";
+            await dbContext.SaveChangesAsync(ct);
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Assign,
+                AuditEntityType.Record,
+                record.Id.ToString(CultureInfo.InvariantCulture),
+                old,
+                RecordAuditSnapshot.FromEntity(record)));
+            await dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
     }
 
     private Task<List<OpenMeetingRow>> LoadOpenProjectMeetingsAsync(int projectId, CancellationToken ct)

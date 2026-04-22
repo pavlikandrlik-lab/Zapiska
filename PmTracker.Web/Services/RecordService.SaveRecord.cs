@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
@@ -88,217 +87,212 @@ public sealed partial class RecordService
             ? null
             : RecordAuditSnapshot.FromEntity(validation.ExistingRecord);
 
-        var (tx, ownsTransaction) = await BeginSerializableTransactionIfNeededAsync(ct);
-        await using var _ = tx;
-
-        ProjektovyZaznamEntity entity;
-        if (command.Id.HasValue)
+        return await ExecuteInSerializableTransactionAsync(async innerCt =>
         {
-            entity = await dbContext.ProjektoveZaznamy
-                .FirstOrDefaultAsync(x => x.Id == command.Id.Value, ct)
-                ?? throw new InvalidOperationException($"Záznam {command.Id.Value} nebyl nalezen.");
-
-            var oldOwner = entity.VlastnikId;
-            var oldDate = entity.DatumUkonceni;
-            var oldSubsystem = entity.SubsystemId;
-            var oldType = entity.AktualniTypUkoluId;
-            var oldStatus = entity.StavUkoluId;
-
-            entity.KategorieId = categoryId;
-            entity.StavUkoluId = statusId;
-            entity.AktualniTypUkoluId = typeId;
-            entity.Nazev = command.Nazev.Trim();
-            entity.Cil = string.IsNullOrWhiteSpace(command.Cil) ? null : command.Cil.Trim();
-            var normalizedDescription = richTextContentService.NormalizeForStorage(command.Popis?.Trim());
-            entity.Popis = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription;
-            entity.VlastnikId = ownerId;
-            entity.DatumZalozeni = command.DatumZalozeni.Date;
-            entity.DatumUkonceni = pendingScheduleProposalLock.LocksTermDeadline
-                ? entity.DatumUkonceni.Date
-                : command.TerminUkonceni.Date;
-            entity.SubsystemId = subsystemId;
-            if (string.IsNullOrWhiteSpace(entity.CisloViditelne))
+            ProjektovyZaznamEntity entity;
+            if (command.Id.HasValue)
             {
-                entity.CisloViditelne = entity.CisloZaznamu.ToString(CultureInfo.InvariantCulture);
-                entity.CisloViditelneTyp = RecordDisplayNumberTypeIncrement;
-                entity.CisloViditelneA = entity.CisloZaznamu;
-                entity.CisloViditelneB = 0;
-                entity.CisloJednaniZdrojId = null;
-            }
+                entity = await dbContext.ProjektoveZaznamy
+                    .FirstOrDefaultAsync(x => x.Id == command.Id.Value, innerCt)
+                    ?? throw new InvalidOperationException($"Záznam {command.Id.Value} nebyl nalezen.");
 
-            if (entity.HarmonogramSablonaVerze <= 0)
-            {
-                entity.HarmonogramSablonaVerze = defaultSchemaVersion;
-            }
+                var oldOwner = entity.VlastnikId;
+                var oldDate = entity.DatumUkonceni;
+                var oldSubsystem = entity.SubsystemId;
+                var oldType = entity.AktualniTypUkoluId;
+                var oldStatus = entity.StavUkoluId;
 
-            await dbContext.SaveChangesAsync(ct);
-
-            if (oldOwner != entity.VlastnikId)
-            {
-                dbContext.ZaznamHistorieVlastnik.Add(new ZaznamHistorieVlastnikEntity
+                entity.KategorieId = categoryId;
+                entity.StavUkoluId = statusId;
+                entity.AktualniTypUkoluId = typeId;
+                entity.Nazev = command.Nazev.Trim();
+                entity.Cil = string.IsNullOrWhiteSpace(command.Cil) ? null : command.Cil.Trim();
+                var normalizedDescription = richTextContentService.NormalizeForStorage(command.Popis?.Trim());
+                entity.Popis = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription;
+                entity.VlastnikId = ownerId;
+                entity.DatumZalozeni = command.DatumZalozeni.Date;
+                entity.DatumUkonceni = pendingScheduleProposalLock.LocksTermDeadline
+                    ? entity.DatumUkonceni.Date
+                    : command.TerminUkonceni.Date;
+                entity.SubsystemId = subsystemId;
+                if (string.IsNullOrWhiteSpace(entity.CisloViditelne))
                 {
-                    ZaznamId = entity.Id,
-                    PuvodniVlastnik = oldOwner,
-                    NovyVlastnik = entity.VlastnikId,
-                    DatumZmeny = GetLocalNow()
-                });
-            }
+                    entity.CisloViditelne = entity.CisloZaznamu.ToString(CultureInfo.InvariantCulture);
+                    entity.CisloViditelneTyp = RecordDisplayNumberTypeIncrement;
+                    entity.CisloViditelneA = entity.CisloZaznamu;
+                    entity.CisloViditelneB = 0;
+                    entity.CisloJednaniZdrojId = null;
+                }
 
-            if (oldDate.Date != entity.DatumUkonceni.Date)
-            {
-                dbContext.ZaznamHistorieTerminu.Add(new ZaznamHistorieTerminuEntity
+                if (entity.HarmonogramSablonaVerze <= 0)
                 {
-                    ZaznamId = entity.Id,
-                    PuvodniDatum = oldDate.Date,
-                    NoveDatum = entity.DatumUkonceni.Date,
-                    DatumZmeny = GetLocalNow(),
-                    Duvod = "Úprava záznamu"
-                });
-            }
+                    entity.HarmonogramSablonaVerze = defaultSchemaVersion;
+                }
 
-            if (oldSubsystem != entity.SubsystemId)
-            {
-                dbContext.ZaznamHistorieSubsystem.Add(new ZaznamHistorieSubsystemEntity
+                await dbContext.SaveChangesAsync(innerCt);
+
+                if (oldOwner != entity.VlastnikId)
                 {
-                    ZaznamId = entity.Id,
-                    PuvodniSubsystem = oldSubsystem,
-                    NovySubsystem = entity.SubsystemId,
-                    DatumZmeny = GetLocalNow()
-                });
-            }
+                    dbContext.ZaznamHistorieVlastnik.Add(new ZaznamHistorieVlastnikEntity
+                    {
+                        ZaznamId = entity.Id,
+                        PuvodniVlastnik = oldOwner,
+                        NovyVlastnik = entity.VlastnikId,
+                        DatumZmeny = GetLocalNow()
+                    });
+                }
 
-            if (oldType != entity.AktualniTypUkoluId && oldType.HasValue && entity.AktualniTypUkoluId.HasValue)
-            {
-                dbContext.ZaznamHistorieZmenTypu.Add(new ZaznamHistorieZmenTypuEntity
+                if (oldDate.Date != entity.DatumUkonceni.Date)
                 {
-                    ZaznamId = entity.Id,
-                    PuvodniTypId = oldType.Value,
-                    NovyTypId = entity.AktualniTypUkoluId.Value,
-                    DatumZmeny = GetLocalNow(),
-                    ZmenilOsobaId = currentUser.OsobaId
-                });
-            }
+                    dbContext.ZaznamHistorieTerminu.Add(new ZaznamHistorieTerminuEntity
+                    {
+                        ZaznamId = entity.Id,
+                        PuvodniDatum = oldDate.Date,
+                        NoveDatum = entity.DatumUkonceni.Date,
+                        DatumZmeny = GetLocalNow(),
+                        Duvod = "Úprava záznamu"
+                    });
+                }
 
-            if (oldStatus != entity.StavUkoluId && oldStatus.HasValue && entity.StavUkoluId.HasValue)
-            {
-                dbContext.ZaznamHistorieStavuZaznamu.Add(new ZaznamHistorieStavuZaznamuEntity
+                if (oldSubsystem != entity.SubsystemId)
                 {
-                    ZaznamId = entity.Id,
-                    PuvodniStav = oldStatus.Value,
-                    NovyStav = entity.StavUkoluId.Value,
-                    DatumZmeny = timeProvider.GetUtcNow().UtcDateTime
-                });
+                    dbContext.ZaznamHistorieSubsystem.Add(new ZaznamHistorieSubsystemEntity
+                    {
+                        ZaznamId = entity.Id,
+                        PuvodniSubsystem = oldSubsystem,
+                        NovySubsystem = entity.SubsystemId,
+                        DatumZmeny = GetLocalNow()
+                    });
+                }
+
+                if (oldType != entity.AktualniTypUkoluId && oldType.HasValue && entity.AktualniTypUkoluId.HasValue)
+                {
+                    dbContext.ZaznamHistorieZmenTypu.Add(new ZaznamHistorieZmenTypuEntity
+                    {
+                        ZaznamId = entity.Id,
+                        PuvodniTypId = oldType.Value,
+                        NovyTypId = entity.AktualniTypUkoluId.Value,
+                        DatumZmeny = GetLocalNow(),
+                        ZmenilOsobaId = currentUser.OsobaId
+                    });
+                }
+
+                if (oldStatus != entity.StavUkoluId && oldStatus.HasValue && entity.StavUkoluId.HasValue)
+                {
+                    dbContext.ZaznamHistorieStavuZaznamu.Add(new ZaznamHistorieStavuZaznamuEntity
+                    {
+                        ZaznamId = entity.Id,
+                        PuvodniStav = oldStatus.Value,
+                        NovyStav = entity.StavUkoluId.Value,
+                        DatumZmeny = timeProvider.GetUtcNow().UtcDateTime
+                    });
+                }
             }
-        }
-        else
-        {
-            var requestedCislo = command.CisloZaznamu > 0 ? command.CisloZaznamu : 0;
-            var cislo = requestedCislo;
-            if (cislo <= 0
-                || await dbContext.ProjektoveZaznamy.AnyAsync(x => x.ProjektId == command.ProjektId && x.CisloZaznamu == cislo, ct))
+            else
             {
-                cislo = await composition.GetNextCisloZaznamuTransactionalAsync(command.ProjektId, ct);
+                var requestedCislo = command.CisloZaznamu > 0 ? command.CisloZaznamu : 0;
+                var cislo = requestedCislo;
+                if (cislo <= 0
+                    || await dbContext.ProjektoveZaznamy.AnyAsync(x => x.ProjektId == command.ProjektId && x.CisloZaznamu == cislo, innerCt))
+                {
+                    cislo = await composition.GetNextCisloZaznamuTransactionalAsync(command.ProjektId, innerCt);
+                }
+
+                var cisloViditelneTyp = RecordDisplayNumberTypeIncrement;
+                var cisloViditelneA = cislo;
+                var cisloViditelneB = 0;
+                int? cisloJednaniZdrojId = null;
+                var cisloViditelne = cislo.ToString(CultureInfo.InvariantCulture);
+
+                if (project.PouzivatIdentJednani)
+                {
+                    var meeting = validation.MeetingForNumbering
+                        ?? throw new InvalidOperationException("Vybrané jednání pro identifikátor nebylo validováno.");
+                    var nextOrder = await composition.AllocateMeetingOrderTransactionalAsync(command.ProjektId, meeting.CisloJednani, innerCt);
+                    cisloViditelneTyp = RecordDisplayNumberTypeMeeting;
+                    cisloViditelneA = meeting.CisloJednani;
+                    cisloViditelneB = nextOrder;
+                    cisloJednaniZdrojId = meeting.Id;
+                    cisloViditelne = $"{meeting.CisloJednani}-{nextOrder}";
+                }
+
+                var normalizedDescription = richTextContentService.NormalizeForStorage(command.Popis?.Trim());
+                entity = new ProjektovyZaznamEntity
+                {
+                    ProjektId = command.ProjektId,
+                    KategorieId = categoryId,
+                    StavUkoluId = statusId,
+                    AktualniTypUkoluId = typeId,
+                    CisloZaznamu = cislo,
+                    CisloViditelne = cisloViditelne,
+                    CisloViditelneTyp = cisloViditelneTyp,
+                    CisloViditelneA = cisloViditelneA,
+                    CisloViditelneB = cisloViditelneB,
+                    CisloJednaniZdrojId = cisloJednaniZdrojId,
+                    Nazev = command.Nazev.Trim(),
+                    Cil = string.IsNullOrWhiteSpace(command.Cil) ? null : command.Cil.Trim(),
+                    Popis = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription,
+                    VlastnikId = ownerId,
+                    DatumZalozeni = command.DatumZalozeni.Date,
+                    DatumUkonceni = command.TerminUkonceni.Date,
+                    SubsystemId = subsystemId,
+                    HarmonogramSablonaVerze = defaultSchemaVersion
+                };
+                dbContext.ProjektoveZaznamy.Add(entity);
             }
 
-            var cisloViditelneTyp = RecordDisplayNumberTypeIncrement;
-            var cisloViditelneA = cislo;
-            var cisloViditelneB = 0;
-            int? cisloJednaniZdrojId = null;
-            var cisloViditelne = cislo.ToString(CultureInfo.InvariantCulture);
+            await dbContext.SaveChangesAsync(innerCt);
+            await ReplaceRecordCollaborationAsync(entity.Id, normalizedCollaborationIds, innerCt);
+            await ReplaceRecordExternalLinksAsync(entity.Id, command.ExterniVazby, innerCt);
 
-            if (project.PouzivatIdentJednani)
+            List<SaveRecordHarmonogramValueCommand>? normalizedScheduleValues = null;
+            RecordScheduleAuditSnapshot? oldScheduleSnapshot = null;
+            if (command.Id.HasValue)
             {
-                var meeting = validation.MeetingForNumbering
-                    ?? throw new InvalidOperationException("Vybrané jednání pro identifikátor nebylo validováno.");
-                var nextOrder = await composition.AllocateMeetingOrderTransactionalAsync(command.ProjektId, meeting.CisloJednani, ct);
-                cisloViditelneTyp = RecordDisplayNumberTypeMeeting;
-                cisloViditelneA = meeting.CisloJednani;
-                cisloViditelneB = nextOrder;
-                cisloJednaniZdrojId = meeting.Id;
-                cisloViditelne = $"{meeting.CisloJednani}-{nextOrder}";
+                oldScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(command.Id.Value, innerCt);
             }
 
-            var normalizedDescription = richTextContentService.NormalizeForStorage(command.Popis?.Trim());
-            entity = new ProjektovyZaznamEntity
+            if (isTaskCategory && command.HarmonogramHodnoty.Count > 0)
             {
-                ProjektId = command.ProjektId,
-                KategorieId = categoryId,
-                StavUkoluId = statusId,
-                AktualniTypUkoluId = typeId,
-                CisloZaznamu = cislo,
-                CisloViditelne = cisloViditelne,
-                CisloViditelneTyp = cisloViditelneTyp,
-                CisloViditelneA = cisloViditelneA,
-                CisloViditelneB = cisloViditelneB,
-                CisloJednaniZdrojId = cisloJednaniZdrojId,
-                Nazev = command.Nazev.Trim(),
-                Cil = string.IsNullOrWhiteSpace(command.Cil) ? null : command.Cil.Trim(),
-                Popis = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription,
-                VlastnikId = ownerId,
-                DatumZalozeni = command.DatumZalozeni.Date,
-                DatumUkonceni = command.TerminUkonceni.Date,
-                SubsystemId = subsystemId,
-                HarmonogramSablonaVerze = defaultSchemaVersion
-            };
-            dbContext.ProjektoveZaznamy.Add(entity);
-        }
-
-        await dbContext.SaveChangesAsync(ct);
-        await ReplaceRecordCollaborationAsync(entity.Id, normalizedCollaborationIds, ct);
-        await ReplaceRecordExternalLinksAsync(entity.Id, command.ExterniVazby, ct);
-
-        List<SaveRecordHarmonogramValueCommand>? normalizedScheduleValues = null;
-        RecordScheduleAuditSnapshot? oldScheduleSnapshot = null;
-        if (command.Id.HasValue)
-        {
-            oldScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(command.Id.Value, ct);
-        }
-
-        if (isTaskCategory && command.HarmonogramHodnoty.Count > 0)
-        {
-            var scheduleTypeDefinitions = await composition.ResolveScheduleTypeDefinitionsForRecordAsync(entity, ct);
-            var valuesToPersist = pendingScheduleProposalLock.LocksSchedule
-                ? await BuildScheduleValuesPreservingLockedScopeAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, pendingScheduleProposalLock, ct)
-                : command.HarmonogramHodnoty;
-            normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, ct);
-        }
-        else if (!isTaskCategory)
-        {
-            var existingScheduleValues = await dbContext.ZaznamHarmonogramHodnoty
-                .Where(x => x.ZaznamId == entity.Id)
-                .ToListAsync(ct);
-            if (existingScheduleValues.Count > 0)
-            {
-                dbContext.ZaznamHarmonogramHodnoty.RemoveRange(existingScheduleValues);
-                normalizedScheduleValues = [];
+                var scheduleTypeDefinitions = await composition.ResolveScheduleTypeDefinitionsForRecordAsync(entity, innerCt);
+                var valuesToPersist = pendingScheduleProposalLock.LocksSchedule
+                    ? await BuildScheduleValuesPreservingLockedScopeAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, pendingScheduleProposalLock, innerCt)
+                    : command.HarmonogramHodnoty;
+                normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, innerCt);
             }
-        }
+            else if (!isTaskCategory)
+            {
+                var existingScheduleValues = await dbContext.ZaznamHarmonogramHodnoty
+                    .Where(x => x.ZaznamId == entity.Id)
+                    .ToListAsync(innerCt);
+                if (existingScheduleValues.Count > 0)
+                {
+                    dbContext.ZaznamHarmonogramHodnoty.RemoveRange(existingScheduleValues);
+                    normalizedScheduleValues = [];
+                }
+            }
 
-        await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, ct);
-        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            command.Id.HasValue ? AuditActionType.Update : AuditActionType.Create,
-            AuditEntityType.Record,
-            entity.Id.ToString(CultureInfo.InvariantCulture),
-            oldRecordSnapshot,
-            RecordAuditSnapshot.FromEntity(entity)));
-        if (normalizedScheduleValues is not null)
-        {
-            var newScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, ct);
+            await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, innerCt);
             auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
-                AuditEntityType.RecordSchedule,
+                command.Id.HasValue ? AuditActionType.Update : AuditActionType.Create,
+                AuditEntityType.Record,
                 entity.Id.ToString(CultureInfo.InvariantCulture),
-                oldScheduleSnapshot,
-                newScheduleSnapshot));
-        }
+                oldRecordSnapshot,
+                RecordAuditSnapshot.FromEntity(entity)));
+            if (normalizedScheduleValues is not null)
+            {
+                var newScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt);
+                auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                    oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
+                    AuditEntityType.RecordSchedule,
+                    entity.Id.ToString(CultureInfo.InvariantCulture),
+                    oldScheduleSnapshot,
+                    newScheduleSnapshot));
+            }
 
-        await dbContext.SaveChangesAsync(ct);
-        if (ownsTransaction && tx is not null)
-        {
-            await tx.CommitAsync(ct);
-        }
-
-        return entity.Id;
+            await dbContext.SaveChangesAsync(innerCt);
+            return entity.Id;
+        }, ct);
     }
 
     private async Task<SaveRecordValidationContext> ValidateRecordSaveCommandAsync(
@@ -1146,31 +1140,27 @@ public sealed partial class RecordService
             valuesToPersist = await BuildScheduleValuesPreservingLockedScopeAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, pendingScheduleProposalLock, ct);
         }
 
-        var (tx, ownsTransaction) = await BeginSerializableTransactionIfNeededAsync(ct);
-        await using var _ = tx;
-        var oldPlanValues = await LoadSchedulePlanValueMapAsync(entity.Id, scheduleTypeDefinitions, ct);
-        var oldScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, ct);
-        var normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, ct);
-        await dbContext.SaveChangesAsync(ct);
-        var newPlanValues = await LoadSchedulePlanValueMapAsync(entity.Id, scheduleTypeDefinitions, ct);
-        if (!ScheduleValueMapsEqual(oldPlanValues, newPlanValues))
+        return await ExecuteInSerializableTransactionAsync(async innerCt =>
         {
-            await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, ct);
-        }
-        var newScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, ct);
-        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
-            AuditEntityType.RecordSchedule,
-            entity.Id.ToString(CultureInfo.InvariantCulture),
-            oldScheduleSnapshot,
-            newScheduleSnapshot));
-        await dbContext.SaveChangesAsync(ct);
-        if (ownsTransaction && tx is not null)
-        {
-            await tx.CommitAsync(ct);
-        }
-
-        return entity.Id;
+            var oldPlanValues = await LoadSchedulePlanValueMapAsync(entity.Id, scheduleTypeDefinitions, innerCt);
+            var oldScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt);
+            var normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, innerCt);
+            await dbContext.SaveChangesAsync(innerCt);
+            var newPlanValues = await LoadSchedulePlanValueMapAsync(entity.Id, scheduleTypeDefinitions, innerCt);
+            if (!ScheduleValueMapsEqual(oldPlanValues, newPlanValues))
+            {
+                await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, innerCt);
+            }
+            var newScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt);
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
+                AuditEntityType.RecordSchedule,
+                entity.Id.ToString(CultureInfo.InvariantCulture),
+                oldScheduleSnapshot,
+                newScheduleSnapshot));
+            await dbContext.SaveChangesAsync(innerCt);
+            return entity.Id;
+        }, ct);
     }
 
     private async Task EnsureScheduleAddScopeAccessAsync(
@@ -1447,15 +1437,30 @@ public sealed partial class RecordService
         return normalizedResult;
     }
 
-    private async Task<(IDbContextTransaction? Transaction, bool OwnsTransaction)> BeginSerializableTransactionIfNeededAsync(CancellationToken ct)
+    /// <summary>
+    /// QW-4: Spustí <paramref name="operation"/> uvnitř Serializable transakce pod
+    /// SqlServer retrying execution strategy. Pokud už na dbContextu běží tx
+    /// (např. volání z <c>RecordProposalService.ApproveProposalAsync</c>), spustí
+    /// operaci přímo bez nové tx a bez strategy — retry je pak zodpovědnost
+    /// vnějšího volajícího.
+    /// </summary>
+    private async Task<T> ExecuteInSerializableTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken ct)
     {
         if (dbContext.Database.CurrentTransaction is not null)
         {
-            return (null, false);
+            return await operation(ct);
         }
 
-        var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        return (transaction, true);
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            var result = await operation(ct);
+            await tx.CommitAsync(ct);
+            return result;
+        });
     }
 
     private DateTime GetLocalNow()

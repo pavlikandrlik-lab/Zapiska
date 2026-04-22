@@ -24,124 +24,128 @@ public sealed partial class RecordService
             throw new InvalidOperationException("Záznam nepatří do vybraného projektu.");
         }
 
-        await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-
-        var historyTypeRows = await dbContext.ZaznamHistorieZmenTypu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var historyDeadlineRows = await dbContext.ZaznamHistorieTerminu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var historyOwnerRows = await dbContext.ZaznamHistorieVlastnik.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var historySubsystemRows = await dbContext.ZaznamHistorieSubsystem.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var historyStateRows = await dbContext.ZaznamHistorieStavuZaznamu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var historyProjectStateRows = await dbContext.ZaznamHistorieStavuProjektu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var externalLinkRows = await dbContext.ZaznamExterniOdkazy.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var collaborationRows = await dbContext.ZaznamSpoluprace.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var scheduleRows = await dbContext.ZaznamHarmonogramHodnoty.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var commentRows = await dbContext.Vyjadreni.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-        var oldRecord = RecordAuditSnapshot.FromEntity(record);
-        var oldScheduleSnapshot = RecordScheduleAuditSnapshot.FromEntities(command.ZaznamId, scheduleRows);
-        var oldCommentSnapshots = commentRows.Select(CommentAuditSnapshot.FromEntity).ToList();
-
-        if (historyTypeRows.Count > 0)
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            dbContext.ZaznamHistorieZmenTypu.RemoveRange(historyTypeRows);
-        }
+            await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
 
-        if (historyDeadlineRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieTerminu.RemoveRange(historyDeadlineRows);
-        }
+            var historyTypeRows = await dbContext.ZaznamHistorieZmenTypu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
+            var historyDeadlineRows = await dbContext.ZaznamHistorieTerminu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
+            var historyOwnerRows = await dbContext.ZaznamHistorieVlastnik.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
+            var historySubsystemRows = await dbContext.ZaznamHistorieSubsystem.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
+            var historyStateRows = await dbContext.ZaznamHistorieStavuZaznamu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
+            var historyProjectStateRows = await dbContext.ZaznamHistorieStavuProjektu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
+            var externalLinkRows = await dbContext.ZaznamExterniOdkazy.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
+            var collaborationRows = await dbContext.ZaznamSpoluprace.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
+            var scheduleRows = await dbContext.ZaznamHarmonogramHodnoty.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
+            var commentRows = await dbContext.Vyjadreni.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
+            var oldRecord = RecordAuditSnapshot.FromEntity(record);
+            var oldScheduleSnapshot = RecordScheduleAuditSnapshot.FromEntities(command.ZaznamId, scheduleRows);
+            var oldCommentSnapshots = commentRows.Select(CommentAuditSnapshot.FromEntity).ToList();
 
-        if (historyOwnerRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieVlastnik.RemoveRange(historyOwnerRows);
-        }
+            if (historyTypeRows.Count > 0)
+            {
+                dbContext.ZaznamHistorieZmenTypu.RemoveRange(historyTypeRows);
+            }
 
-        if (historySubsystemRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieSubsystem.RemoveRange(historySubsystemRows);
-        }
+            if (historyDeadlineRows.Count > 0)
+            {
+                dbContext.ZaznamHistorieTerminu.RemoveRange(historyDeadlineRows);
+            }
 
-        if (historyStateRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieStavuZaznamu.RemoveRange(historyStateRows);
-        }
+            if (historyOwnerRows.Count > 0)
+            {
+                dbContext.ZaznamHistorieVlastnik.RemoveRange(historyOwnerRows);
+            }
 
-        if (historyProjectStateRows.Count > 0)
-        {
-            dbContext.ZaznamHistorieStavuProjektu.RemoveRange(historyProjectStateRows);
-        }
+            if (historySubsystemRows.Count > 0)
+            {
+                dbContext.ZaznamHistorieSubsystem.RemoveRange(historySubsystemRows);
+            }
 
-        if (externalLinkRows.Count > 0)
-        {
-            dbContext.ZaznamExterniOdkazy.RemoveRange(externalLinkRows);
-        }
+            if (historyStateRows.Count > 0)
+            {
+                dbContext.ZaznamHistorieStavuZaznamu.RemoveRange(historyStateRows);
+            }
 
-        if (collaborationRows.Count > 0)
-        {
-            dbContext.ZaznamSpoluprace.RemoveRange(collaborationRows);
-        }
+            if (historyProjectStateRows.Count > 0)
+            {
+                dbContext.ZaznamHistorieStavuProjektu.RemoveRange(historyProjectStateRows);
+            }
 
-        if (scheduleRows.Count > 0)
-        {
-            dbContext.ZaznamHarmonogramHodnoty.RemoveRange(scheduleRows);
-        }
+            if (externalLinkRows.Count > 0)
+            {
+                dbContext.ZaznamExterniOdkazy.RemoveRange(externalLinkRows);
+            }
 
-        if (commentRows.Count > 0)
-        {
-            dbContext.Vyjadreni.RemoveRange(commentRows);
-        }
+            if (collaborationRows.Count > 0)
+            {
+                dbContext.ZaznamSpoluprace.RemoveRange(collaborationRows);
+            }
 
-        var priorityRows = await dbContext.ZaznamPriorityUzivatelu
-            .Where(x => x.ZaznamId == command.ZaznamId)
-            .ToListAsync(ct);
-        if (priorityRows.Count > 0)
-        {
-            dbContext.ZaznamPriorityUzivatelu.RemoveRange(priorityRows);
-        }
+            if (scheduleRows.Count > 0)
+            {
+                dbContext.ZaznamHarmonogramHodnoty.RemoveRange(scheduleRows);
+            }
 
-        if (historyTypeRows.Count > 0
-            || historyDeadlineRows.Count > 0
-            || historyOwnerRows.Count > 0
-            || historySubsystemRows.Count > 0
-            || historyStateRows.Count > 0
-            || historyProjectStateRows.Count > 0
-            || externalLinkRows.Count > 0
-            || collaborationRows.Count > 0
-            || scheduleRows.Count > 0
-            || commentRows.Count > 0
-            || priorityRows.Count > 0)
-        {
+            if (commentRows.Count > 0)
+            {
+                dbContext.Vyjadreni.RemoveRange(commentRows);
+            }
+
+            var priorityRows = await dbContext.ZaznamPriorityUzivatelu
+                .Where(x => x.ZaznamId == command.ZaznamId)
+                .ToListAsync(ct);
+            if (priorityRows.Count > 0)
+            {
+                dbContext.ZaznamPriorityUzivatelu.RemoveRange(priorityRows);
+            }
+
+            if (historyTypeRows.Count > 0
+                || historyDeadlineRows.Count > 0
+                || historyOwnerRows.Count > 0
+                || historySubsystemRows.Count > 0
+                || historyStateRows.Count > 0
+                || historyProjectStateRows.Count > 0
+                || externalLinkRows.Count > 0
+                || collaborationRows.Count > 0
+                || scheduleRows.Count > 0
+                || commentRows.Count > 0
+                || priorityRows.Count > 0)
+            {
+                await dbContext.SaveChangesAsync(ct);
+            }
+
+            dbContext.ProjektoveZaznamy.Remove(record);
             await dbContext.SaveChangesAsync(ct);
-        }
-
-        dbContext.ProjektoveZaznamy.Remove(record);
-        await dbContext.SaveChangesAsync(ct);
-        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Delete,
-            AuditEntityType.Record,
-            command.ZaznamId.ToString(CultureInfo.InvariantCulture),
-            oldRecord,
-            null));
-        if (scheduleRows.Count > 0)
-        {
             auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
                 AuditActionType.Delete,
-                AuditEntityType.RecordSchedule,
+                AuditEntityType.Record,
                 command.ZaznamId.ToString(CultureInfo.InvariantCulture),
-                oldScheduleSnapshot,
+                oldRecord,
                 null));
-        }
+            if (scheduleRows.Count > 0)
+            {
+                auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                    AuditActionType.Delete,
+                    AuditEntityType.RecordSchedule,
+                    command.ZaznamId.ToString(CultureInfo.InvariantCulture),
+                    oldScheduleSnapshot,
+                    null));
+            }
 
-        foreach (var oldCommentSnapshot in oldCommentSnapshots)
-        {
-            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                AuditActionType.Delete,
-                AuditEntityType.Comment,
-                oldCommentSnapshot.Id.ToString(CultureInfo.InvariantCulture),
-                oldCommentSnapshot,
-                null));
-        }
+            foreach (var oldCommentSnapshot in oldCommentSnapshots)
+            {
+                auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                    AuditActionType.Delete,
+                    AuditEntityType.Comment,
+                    oldCommentSnapshot.Id.ToString(CultureInfo.InvariantCulture),
+                    oldCommentSnapshot,
+                    null));
+            }
 
-        await dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+            await dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
     }
 }
