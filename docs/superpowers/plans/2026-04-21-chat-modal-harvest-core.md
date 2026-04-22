@@ -12,14 +12,14 @@
 > - Task 10 `HangfireHarvestScheduler` → nahradí se `SdReactiveSyncConsumer` (viz §2 spec sync-infra) + zápis do `IReactiveSyncQueue<SdReactiveSyncRequest>`. Stub `IHarvestScheduler` z Plánu B zůstává jako fasáda, uvnitř volá `queue.Enqueue`.
 > - Task 11 `VyjadreniHarvestBatchJob` → nahradí se `SdActiveSyncHostedService : SyncHostedServiceBase<SdActiveSyncSettingsEntity>` + paralelní `SdArchiveSyncHostedService`. Respect `IServiceDeskSyncSettings` + dvě singleton-row tabulky (aktivní vs. archiv).
 > - Spec sync-infra §5.1 — na `zaznam_externi_odkazy` přidat `last_known_hot_zaznam_datum`, `last_known_max_vyjadreni_id`, `last_known_vyjadreni_count` (fingerprint pro skip harvestu, když se ticket nezměnil).
-> - **Plán C se čeká** — implementace až po Plánu 2026-04-22-sync-infra-and-ad (19 tasků). Potom vznikne samostatný plán `2026-04-22-sd-sync-revise.md` který rewrite Plán B Task 10 + Plán C Tasky 10/11 dle sync-infra vzoru.
+> - **Revize plán existuje:** [`docs/superpowers/plans/2026-04-22-sd-sync-revise.md`](2026-04-22-sd-sync-revise.md) — 15 úkolů, které rewrite Plán B Task 10 + Plán C Tasky 10/11 dle sync-infra vzoru. Tento Plán C Tasks 1-9, 12-20 zůstávají v platnosti; Tasks 10+11 se neimplementují (viz Task 14 revise plánu).
 >
 > **Authz:** Plán C endpointy (`/Vyjadreni/HarmonogramVazba/*`, `/Vyjadreni/Modal`) používají permission key **`records.edit`** (existující). Pro `/Vyjadreni/ReHarvest` + admin operace použít **`PermissionKeys.SettingsManage`** (nová konstanta z commit `e5eb2ed`). Nikde nekontrolovat `SUPERADMIN` roli — používat `CurrentUserContext.IsSuperAdmin`.
 
 **Předpoklady:**
 - **Plán A** (fakturace cleanup) hotov.
 - **Plán B** (karta externí vazby v2 + `IHarvestScheduler` stub + `NoOpHarvestScheduler`) hotov.
-- **Plán E** (admin sync settings) hotov — `IServiceDeskSyncSettings` funguje, karta v `/Nastaveni/ServiceDeskSync` přístupná adminu.
+- **Plán E superseded** — admin sync karta pro SD přijde z [`2026-04-22-sd-sync-revise.md`](2026-04-22-sd-sync-revise.md) Task 10+11 (keyed handlery pro `sd.active` + `sd.archive` napojené na shared `_SyncJobSettingsCard.cshtml`). Předpokládá hotový sync-infra plán.
 - Spec 2026-04-21-servicedesk-vytezovani-vyjadreni-design.md §4.1.1 s přesným schéma HOT_* a §8.1 s LIKE predikáty.
 
 ---
