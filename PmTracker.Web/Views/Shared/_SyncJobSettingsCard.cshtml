@@ -1,0 +1,86 @@
+@model PmTracker.Web.Models.ViewModels.Sync.SyncJobSettingsCardViewModel
+
+<section class="sync-job-card card" data-sync-job-card data-job-key="@Model.JobKey">
+    <header class="sync-job-card__head">
+        <h3>@Model.Title</h3>
+        @if (!string.IsNullOrWhiteSpace(Model.Description))
+        {
+            <p class="sync-job-card__desc muted">@Model.Description</p>
+        }
+    </header>
+
+    @if (Model.IsRunning)
+    {
+        <div class="sync-job-card__running">
+            Právě běží @(Model.LastTriggerKind == "manual" ? "(manuální spuštění)" : "(automatický tick)")
+            @if (Model.RunStartedAt is not null)
+            {
+                <span>od @Model.RunStartedAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+            }
+        </div>
+    }
+
+    <form asp-controller="NastaveniSync" asp-action="Save" asp-route-jobKey="@Model.JobKey" method="post" class="sync-job-card__form">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="JobKey" value="@Model.JobKey" />
+
+        <label class="sync-job-card__row">
+            <span>Zapnuto</span>
+            <input type="hidden" name="IsEnabled" value="false" />
+            <input type="checkbox" name="IsEnabled" value="true" @(Model.IsEnabled ? "checked" : "") @(Model.CanManage ? "" : "disabled") />
+        </label>
+
+        <label class="sync-job-card__row">
+            <span>Perioda (minuty)</span>
+            <input type="number" name="PeriodMinutes" value="@Model.PeriodMinutes" min="5" max="10080" @(Model.CanManage ? "" : "disabled") />
+        </label>
+
+        <label class="sync-job-card__row">
+            <span>Anchor (UTC)</span>
+            <input type="datetime-local" name="AnchorAt" value="@Model.AnchorAt.UtcDateTime.ToString("yyyy-MM-ddTHH:mm")" @(Model.CanManage ? "" : "disabled") />
+        </label>
+
+        <div class="sync-job-card__actions">
+            <button type="submit" class="pm-button primary" @(Model.CanManage ? "" : "disabled")>Uložit</button>
+        </div>
+    </form>
+
+    @if (Model.CanManage)
+    {
+        <form asp-controller="NastaveniSync" asp-action="RunNow" asp-route-jobKey="@Model.JobKey" method="post" class="sync-job-card__run-now">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="JobKey" value="@Model.JobKey" />
+            <button type="submit" class="pm-button ghost" @(Model.IsRunning ? "disabled" : "")>Spustit teď</button>
+        </form>
+    }
+
+    <div class="sync-job-card__status">
+        <h4>Status posledního běhu</h4>
+        @if (Model.LastRunAt is null)
+        {
+            <p class="muted">Zatím nespuštěno.</p>
+        }
+        else
+        {
+            <dl>
+                <dt>Čas</dt>
+                <dd>@Model.LastRunAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</dd>
+                <dt>Spouštěč</dt>
+                <dd>@(Model.LastTriggerKind == "manual" ? "Manuální" : "Automatický")</dd>
+                @if (Model.LastResult is not null)
+                {
+                    <dt>OK</dt><dd>@Model.LastResult.OkCount</dd>
+                    <dt>Chyby</dt><dd>@Model.LastResult.ErrorCount</dd>
+                    @if (Model.LastResult.DurationMs is not null)
+                    {
+                        <dt>Trvání</dt><dd>@Model.LastResult.DurationMs ms</dd>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.LastResult.ErrorSummary))
+                    {
+                        <dt>Shrnutí chyb</dt><dd>@Model.LastResult.ErrorSummary</dd>
+                    }
+                }
+            </dl>
+        }
+    </div>
+</section>
