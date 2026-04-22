@@ -17,12 +17,19 @@ public sealed partial class RecordProposalService
         var oldProposalSnapshot = ProposalAuditSnapshot.FromEntity(proposal);
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
+        // Review finding C-7: enqueue harvestu musí probíhat PO commit, ne uvnitř
+        // strategy.ExecuteAsync closure, protože retry strategie by firework enqueuenula
+        // vícekrát a rollback by vedl k enqueue bez reálné DB mutace.
+        int? harvestRecordIdToEnqueue = null;
+
         try
         {
-            return await strategy.ExecuteAsync(async () =>
+            var approvedRecordId = await strategy.ExecuteAsync(async () =>
             {
                 await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-                int? approvedRecordId = null;
+                // Reset per pokus — retry by jinak mohl enqueue-ovat ze starého pokusu.
+                harvestRecordIdToEnqueue = null;
+                int? localApprovedRecordId = null;
 
                 if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase))
                 {
@@ -30,22 +37,26 @@ public sealed partial class RecordProposalService
                     var createPayload = payload.CreateRecord
                         ?? throw new InvalidOperationException("Payload návrhu založení záznamu je neplatný.");
                     var saveCommand = _payloadMapper.BuildSaveCommand(createPayload);
-                    approvedRecordId = await _recordService.SaveRecordAsync(saveCommand, currentUser, ct);
+                    localApprovedRecordId = await _recordService.SaveRecordAsync(saveCommand, currentUser, ct);
 
-                    if (approvedRecordId.HasValue
+                    if (localApprovedRecordId.HasValue
                         && (createPayload.HarmonogramVazby.Count > 0 || createPayload.ManualActualKroky.Count > 0))
                     {
-                        await ApplyApprovedCreateProposalAuxiliariesAsync(
-                            approvedRecordId.Value,
+                        var shouldEnqueue = await ApplyApprovedCreateProposalAuxiliariesAsync(
+                            localApprovedRecordId.Value,
                             createPayload,
                             currentUser,
                             ct);
+                        if (shouldEnqueue)
+                        {
+                            harvestRecordIdToEnqueue = localApprovedRecordId;
+                        }
                     }
                 }
                 else if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
                 {
                     await ApplyApprovedScheduleProposalAsync(proposal, currentUser, ct);
-                    approvedRecordId = proposal.ZaznamId;
+                    localApprovedRecordId = proposal.ZaznamId;
                 }
                 else
                 {
@@ -55,7 +66,7 @@ public sealed partial class RecordProposalService
                 proposal.Stav = RecordProposalStateCodes.Approved;
                 proposal.DecidedByOsobaId = currentUser.OsobaId;
                 proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
-                proposal.ApprovedRecordId = approvedRecordId;
+                proposal.ApprovedRecordId = localApprovedRecordId;
                 await _dbContext.SaveChangesAsync(ct);
                 _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
                     AuditActionType.Approve,
@@ -66,8 +77,16 @@ public sealed partial class RecordProposalService
                 await _dbContext.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
 
-                return approvedRecordId;
+                return localApprovedRecordId;
             });
+
+            // Post-commit enqueue — bezpečné vůči retry i rollback.
+            if (harvestRecordIdToEnqueue.HasValue)
+            {
+                await _harvestScheduler.ScheduleHarvestForRecordAsync(harvestRecordIdToEnqueue.Value, ct);
+            }
+
+            return approvedRecordId;
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -310,8 +329,11 @@ public sealed partial class RecordProposalService
     /// z payloadu — ruční skutečnosti kroků a pre-bound vazby bublin na kroky.
     /// Externí odkazy jsou namapovány přes <c>ExterniOdkazIndex</c> = index v pořadí
     /// vložení (query seřazená ASC dle Id).
+    ///
+    /// Review finding C-7: harvest enqueue je vytažen ven; metoda vrací bool, zda má
+    /// caller enqueue-ovat PO commitu.
     /// </summary>
-    private async Task ApplyApprovedCreateProposalAuxiliariesAsync(
+    private async Task<bool> ApplyApprovedCreateProposalAuxiliariesAsync(
         int newRecordId,
         CreateRecordProposalPayload createPayload,
         CurrentUserContextViewModel currentUser,
@@ -398,12 +420,9 @@ public sealed partial class RecordProposalService
             await _dbContext.SaveChangesAsync(ct);
         }
 
-        // Fire-and-forget harvest pro všechny externí odkazy — pokusí se
-        // doplnit další vyjádření, která mezitím přibyla.
-        if (externiOdkazyIds.Count > 0)
-        {
-            await _harvestScheduler.ScheduleHarvestForRecordAsync(newRecordId, ct);
-        }
+        // Review finding C-7: enqueue se přesunulo do ApproveProposalAsync PO commit.
+        // Zde pouze signalizujeme callerovi, zda má enqueue-ovat.
+        return externiOdkazyIds.Count > 0;
     }
 
     /// <summary>

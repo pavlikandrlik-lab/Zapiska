@@ -13,9 +13,13 @@ public sealed class ReactiveSyncQueue<TRequest> : IReactiveSyncQueue<TRequest>
 
     public ReactiveSyncQueue()
     {
+        // Review finding Q-1/P-3/C-1: BoundedChannelFullMode.DropOldest silently
+        // dropping items without removing them from _pending vedlo k permanentní
+        // pin (dedup starvation). Switch na Wait — producer backpressure-uje při
+        // plné queue; dedup absorbuje duplikáty, takže saturace je vzácná.
         _channel = Channel.CreateBounded<TRequest>(new BoundedChannelOptions(DefaultCapacity)
         {
-            FullMode = BoundedChannelFullMode.DropOldest,
+            FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
             SingleWriter = false
         });

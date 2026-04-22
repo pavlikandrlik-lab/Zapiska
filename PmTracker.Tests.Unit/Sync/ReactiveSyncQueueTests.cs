@@ -69,6 +69,29 @@ public sealed class ReactiveSyncQueueTests
         sut.PendingCount.Should().Be(1);
     }
 
+    /// <summary>
+    /// Review finding Q-1/P-3/C-1: DropOldest dříve tiše zahazoval itemy bez uklizení
+    /// _pending HashSet → dedup permanent pin. Po přepnutí na Wait musí dedup pořád
+    /// fungovat tak, že duplikátní DedupKey ihned returne bez zablokování — i když
+    /// je queue jinak plná, duplikátní klíč se přes channel.WriteAsync neposílá.
+    /// </summary>
+    [Fact]
+    public async Task EnqueueAsync_WhenSameDedupKey_ReturnsImmediately_EvenWithoutReader()
+    {
+        var sut = new ReactiveSyncQueue<FakeRequest>();
+
+        await sut.EnqueueAsync(new FakeRequest(99));
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        // Enqueue stejného DedupKey — musí vrátit ihned (přes dedup check), ne čekat.
+        await sut.EnqueueAsync(new FakeRequest(99), cts.Token);
+
+        sut.PendingCount.Should().Be(1,
+            "duplikátní enqueue musí být dedupován, ne zduplikován do channelu");
+        cts.IsCancellationRequested.Should().BeFalse(
+            "dedup cesta nesmí čekat na volné místo v queue");
+    }
+
     [Fact]
     public async Task AcknowledgeProcessed_ReleasesDedupSlot()
     {

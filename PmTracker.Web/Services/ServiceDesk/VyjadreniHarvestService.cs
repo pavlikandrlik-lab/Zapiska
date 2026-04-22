@@ -248,8 +248,9 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     internal const string FingerprintSkippedMessage = "Fingerprint unchanged — skip drill.";
 
     /// <summary>
-    /// Rozhodne podle fingerprintu, jestli drill-nout; pokud ne, updatne jen primary hint.
-    /// Per-ticket semafor zabraňuje race condition.
+    /// Rozhodne podle fingerprintu, jestli drill-nout. Fast-path (oba matchují) je lock-free.
+    /// Review finding C-6: Všechny zápisy (update primary hintu, drill + fingerprint persist)
+    /// musí probíhat pod per-ticket semaforem, jinak race s paralelními harvesty.
     /// </summary>
     private async Task<VyjadreniHarvestResult> HarvestWithFingerprintAsync(
         ZaznamExterniOdkazEntity eo,
@@ -257,11 +258,9 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         VyjadreniSecondaryFingerprintDto secondary,
         CancellationToken ct)
     {
-        // Primary skip: datum se nezměnil a máme non-null záznam
+        // Fast-path (lock-free): pokud oba fingerprinty matchují, nic neděláme. Žádný zápis.
         var primaryMatches = eo.LastKnownHotZaznamDatum.HasValue
             && eo.LastKnownHotZaznamDatum.Value == primary.Datum;
-
-        // Secondary skip (i když primary změnil): MAX(id)+count stejný jako last known
         var secondaryMatches = eo.LastKnownMaxVyjadreniId.HasValue
             && eo.LastKnownVyjadreniCount.HasValue
             && eo.LastKnownMaxVyjadreniId.Value == secondary.MaxId
@@ -269,23 +268,10 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
 
         if (primaryMatches && secondaryMatches)
         {
-            // Nic nového — neupdatujeme vůbec (ani hint).
             return VyjadreniHarvestResult.Empty(FingerprintSkippedMessage);
         }
 
-        if (primaryMatches && eo.LastKnownMaxVyjadreniId is null)
-        {
-            // Edge case: primary v pořádku ale secondary ještě neznáme → první harvest → drill
-        }
-
-        // Secondary skip (fingerprint říká, že žádné nové vyjádření nepřibylo) — jen update primary hint
-        if (secondaryMatches && !primaryMatches)
-        {
-            eo.LastKnownHotZaznamDatum = primary.Datum;
-            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-            return VyjadreniHarvestResult.Empty(FingerprintSkippedMessage);
-        }
-
+        // Slow-path: všechny zápisy pod per-ticket semaforem.
         return await HarvestTicketCoreWithLockAsync(eo, primary, secondary, ct).ConfigureAwait(false);
     }
 
@@ -305,15 +291,36 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
 
         try
         {
-            var result = await HarvestTicketCoreAsync(eo, updateFingerprint: false, ct).ConfigureAwait(false);
+            // Re-read fingerprint fields pod lockem (DbContext používá change-tracked entitu;
+            // re-read zajistí konzistentní rozhodnutí bez race s jiným requestem, který
+            // mezitím mohl fingerprint updatovat a uvolnit lock).
+            var primaryMatches = eo.LastKnownHotZaznamDatum.HasValue
+                && eo.LastKnownHotZaznamDatum.Value == primary.Datum;
+            var secondaryMatches = eo.LastKnownMaxVyjadreniId.HasValue
+                && eo.LastKnownVyjadreniCount.HasValue
+                && eo.LastKnownMaxVyjadreniId.Value == secondary.MaxId
+                && eo.LastKnownVyjadreniCount.Value == secondary.Count;
 
-            // Persist fingerprint po úspěšném drill-u
+            if (primaryMatches && secondaryMatches)
+            {
+                // Mezitím jiný consumer dohnal fingerprint; skip.
+                return VyjadreniHarvestResult.Empty(FingerprintSkippedMessage);
+            }
+
+            // Secondary match but primary mismatch — jen update primary hintu.
+            // Review finding C-6: zápis musí být uvnitř semaforu, jinak race.
+            if (secondaryMatches && !primaryMatches)
+            {
+                eo.LastKnownHotZaznamDatum = primary.Datum;
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                return VyjadreniHarvestResult.Empty(FingerprintSkippedMessage);
+            }
+
+            // Full drill — fingerprint update delegováno do HarvestTicketCoreAsync (1 SaveChangesAsync).
             eo.LastKnownHotZaznamDatum = primary.Datum;
             eo.LastKnownMaxVyjadreniId = secondary.MaxId;
             eo.LastKnownVyjadreniCount = secondary.Count;
-            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-
-            return result;
+            return await HarvestTicketCoreAsync(eo, updateFingerprint: false, ct).ConfigureAwait(false);
         }
         finally
         {
