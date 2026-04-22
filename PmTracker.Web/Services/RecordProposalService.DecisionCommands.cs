@@ -15,61 +15,69 @@ public sealed partial class RecordProposalService
         var proposal = await LoadPendingProposalForDecisionAsync(command, currentUser, ct);
         var oldProposalSnapshot = ProposalAuditSnapshot.FromEntity(proposal);
 
-        await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        int? approvedRecordId = null;
-
-        if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase))
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var payload = DeserializePayload(proposal.PayloadJson);
-            var createPayload = payload.CreateRecord
-                ?? throw new InvalidOperationException("Payload návrhu založení záznamu je neplatný.");
-            var saveCommand = _payloadMapper.BuildSaveCommand(createPayload);
-            approvedRecordId = await _recordService.SaveRecordAsync(saveCommand, currentUser, ct);
-        }
-        else if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
-        {
-            await ApplyApprovedScheduleProposalAsync(proposal, currentUser, ct);
-            approvedRecordId = proposal.ZaznamId;
-        }
-        else
-        {
-            throw new InvalidOperationException("Neznámý typ návrhu.");
-        }
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            int? approvedRecordId = null;
 
-        proposal.Stav = RecordProposalStateCodes.Approved;
-        proposal.DecidedByOsobaId = currentUser.OsobaId;
-        proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
-        proposal.ApprovedRecordId = approvedRecordId;
-        await _dbContext.SaveChangesAsync(ct);
-        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Approve,
-            AuditEntityType.RecordProposal,
-            proposal.Id.ToString(CultureInfo.InvariantCulture),
-            oldProposalSnapshot,
-            ProposalAuditSnapshot.FromEntity(proposal)));
-        await _dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+            if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase))
+            {
+                var payload = DeserializePayload(proposal.PayloadJson);
+                var createPayload = payload.CreateRecord
+                    ?? throw new InvalidOperationException("Payload návrhu založení záznamu je neplatný.");
+                var saveCommand = _payloadMapper.BuildSaveCommand(createPayload);
+                approvedRecordId = await _recordService.SaveRecordAsync(saveCommand, currentUser, ct);
+            }
+            else if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
+            {
+                await ApplyApprovedScheduleProposalAsync(proposal, currentUser, ct);
+                approvedRecordId = proposal.ZaznamId;
+            }
+            else
+            {
+                throw new InvalidOperationException("Neznámý typ návrhu.");
+            }
 
-        return approvedRecordId;
+            proposal.Stav = RecordProposalStateCodes.Approved;
+            proposal.DecidedByOsobaId = currentUser.OsobaId;
+            proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
+            proposal.ApprovedRecordId = approvedRecordId;
+            await _dbContext.SaveChangesAsync(ct);
+            _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Approve,
+                AuditEntityType.RecordProposal,
+                proposal.Id.ToString(CultureInfo.InvariantCulture),
+                oldProposalSnapshot,
+                ProposalAuditSnapshot.FromEntity(proposal)));
+            await _dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+
+            return approvedRecordId;
+        });
     }
 
     public async Task RejectProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
         var proposal = await LoadPendingProposalForDecisionAsync(command, currentUser, ct);
         var oldProposalSnapshot = ProposalAuditSnapshot.FromEntity(proposal);
-        await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        proposal.Stav = RecordProposalStateCodes.Rejected;
-        proposal.DecidedByOsobaId = currentUser.OsobaId;
-        proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
-        await _dbContext.SaveChangesAsync(ct);
-        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Reject,
-            AuditEntityType.RecordProposal,
-            proposal.Id.ToString(CultureInfo.InvariantCulture),
-            oldProposalSnapshot,
-            ProposalAuditSnapshot.FromEntity(proposal)));
-        await _dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            proposal.Stav = RecordProposalStateCodes.Rejected;
+            proposal.DecidedByOsobaId = currentUser.OsobaId;
+            proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
+            await _dbContext.SaveChangesAsync(ct);
+            _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Reject,
+                AuditEntityType.RecordProposal,
+                proposal.Id.ToString(CultureInfo.InvariantCulture),
+                oldProposalSnapshot,
+                ProposalAuditSnapshot.FromEntity(proposal)));
+            await _dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
     }
 
     public async Task RejectAndTakeOverCreateProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -81,19 +89,23 @@ public sealed partial class RecordProposalService
         }
 
         var oldProposalSnapshot = ProposalAuditSnapshot.FromEntity(proposal);
-        await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        proposal.Stav = RecordProposalStateCodes.Rejected;
-        proposal.DecidedByOsobaId = currentUser.OsobaId;
-        proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
-        await _dbContext.SaveChangesAsync(ct);
-        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Reject,
-            AuditEntityType.RecordProposal,
-            proposal.Id.ToString(CultureInfo.InvariantCulture),
-            oldProposalSnapshot,
-            ProposalAuditSnapshot.FromEntity(proposal, "takeover")));
-        await _dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            proposal.Stav = RecordProposalStateCodes.Rejected;
+            proposal.DecidedByOsobaId = currentUser.OsobaId;
+            proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
+            await _dbContext.SaveChangesAsync(ct);
+            _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Reject,
+                AuditEntityType.RecordProposal,
+                proposal.Id.ToString(CultureInfo.InvariantCulture),
+                oldProposalSnapshot,
+                ProposalAuditSnapshot.FromEntity(proposal, "takeover")));
+            await _dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
     }
 
     public async Task RejectAndEditProposalAsync(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -101,19 +113,23 @@ public sealed partial class RecordProposalService
         var proposal = await LoadPendingProposalForDecisionAsync(command, currentUser, ct);
         var oldProposalSnapshot = ProposalAuditSnapshot.FromEntity(proposal);
 
-        await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        proposal.Stav = RecordProposalStateCodes.Rejected;
-        proposal.DecidedByOsobaId = currentUser.OsobaId;
-        proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
-        await _dbContext.SaveChangesAsync(ct);
-        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Reject,
-            AuditEntityType.RecordProposal,
-            proposal.Id.ToString(CultureInfo.InvariantCulture),
-            oldProposalSnapshot,
-            ProposalAuditSnapshot.FromEntity(proposal, "edit")));
-        await _dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            proposal.Stav = RecordProposalStateCodes.Rejected;
+            proposal.DecidedByOsobaId = currentUser.OsobaId;
+            proposal.DecidedAt = _timeProvider.GetUtcNow().UtcDateTime;
+            await _dbContext.SaveChangesAsync(ct);
+            _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Reject,
+                AuditEntityType.RecordProposal,
+                proposal.Id.ToString(CultureInfo.InvariantCulture),
+                oldProposalSnapshot,
+                ProposalAuditSnapshot.FromEntity(proposal, "edit")));
+            await _dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
     }
 
     // --- Private helpers used only by DecisionCommands ---

@@ -35,27 +35,31 @@ public sealed partial class RecordProposalService
         await EnsureCreateProposalMeetingSelectionAsync(command, ct);
 
         var payload = _payloadMapper.BuildCreatePayload(command);
-        await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var entity = new ZaznamNavrhEntity
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            ProjektId = command.ProjektId,
-            SubsystemId = subsystemId.Value,
-            TypNavrhu = RecordProposalTypeCodes.CreateRecord,
-            Stav = RecordProposalStateCodes.Pending,
-            PayloadJson = JsonSerializer.Serialize(payload),
-            CreatedByOsobaId = currentUser.OsobaId,
-            CreatedAt = _timeProvider.GetUtcNow().UtcDateTime
-        };
-        _dbContext.ZaznamNavrhy.Add(entity);
-        await _dbContext.SaveChangesAsync(ct);
-        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Create,
-            AuditEntityType.RecordProposal,
-            entity.Id.ToString(CultureInfo.InvariantCulture),
-            null,
-            ProposalAuditSnapshot.FromEntity(entity)));
-        await _dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            var entity = new ZaznamNavrhEntity
+            {
+                ProjektId = command.ProjektId,
+                SubsystemId = subsystemId.Value,
+                TypNavrhu = RecordProposalTypeCodes.CreateRecord,
+                Stav = RecordProposalStateCodes.Pending,
+                PayloadJson = JsonSerializer.Serialize(payload),
+                CreatedByOsobaId = currentUser.OsobaId,
+                CreatedAt = _timeProvider.GetUtcNow().UtcDateTime
+            };
+            _dbContext.ZaznamNavrhy.Add(entity);
+            await _dbContext.SaveChangesAsync(ct);
+            _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Create,
+                AuditEntityType.RecordProposal,
+                entity.Id.ToString(CultureInfo.InvariantCulture),
+                null,
+                ProposalAuditSnapshot.FromEntity(entity)));
+            await _dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
     }
 
     public async Task SubmitScheduleProposalAsync(SaveRecordCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -114,28 +118,32 @@ public sealed partial class RecordProposalService
             throw new InvalidOperationException("Návrh neobsahuje žádnou změnu termínu ani harmonogramu.");
         }
 
-        await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var entity = new ZaznamNavrhEntity
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            ProjektId = command.ProjektId,
-            ZaznamId = record.Id,
-            SubsystemId = record.SubsystemId,
-            TypNavrhu = RecordProposalTypeCodes.SchedulePlanChange,
-            Stav = RecordProposalStateCodes.Pending,
-            PayloadJson = JsonSerializer.Serialize(payload),
-            CreatedByOsobaId = currentUser.OsobaId,
-            CreatedAt = _timeProvider.GetUtcNow().UtcDateTime
-        };
-        _dbContext.ZaznamNavrhy.Add(entity);
-        await _dbContext.SaveChangesAsync(ct);
-        _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Create,
-            AuditEntityType.RecordProposal,
-            entity.Id.ToString(CultureInfo.InvariantCulture),
-            null,
-            ProposalAuditSnapshot.FromEntity(entity)));
-        await _dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+            await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            var entity = new ZaznamNavrhEntity
+            {
+                ProjektId = command.ProjektId,
+                ZaznamId = record.Id,
+                SubsystemId = record.SubsystemId,
+                TypNavrhu = RecordProposalTypeCodes.SchedulePlanChange,
+                Stav = RecordProposalStateCodes.Pending,
+                PayloadJson = JsonSerializer.Serialize(payload),
+                CreatedByOsobaId = currentUser.OsobaId,
+                CreatedAt = _timeProvider.GetUtcNow().UtcDateTime
+            };
+            _dbContext.ZaznamNavrhy.Add(entity);
+            await _dbContext.SaveChangesAsync(ct);
+            _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Create,
+                AuditEntityType.RecordProposal,
+                entity.Id.ToString(CultureInfo.InvariantCulture),
+                null,
+                ProposalAuditSnapshot.FromEntity(entity)));
+            await _dbContext.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        });
     }
 
     // --- Private helpers used only by SubmitCommands ---
