@@ -55,9 +55,12 @@ public sealed partial class RecordService
         IRecordWriteCommandsComposition composition,
         CancellationToken ct = default)
     {
-        var canEditRecord = currentUser.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId);
-        var canEditScheduleFull = currentUser.HasPermission(PermissionKeys.RecordsScheduleEdit, command.ProjektId);
-        var canAddSchedule = currentUser.HasPermission(PermissionKeys.RecordsScheduleAdd, command.ProjektId);
+        var authz = currentUser.Authorization ?? throw new InvalidOperationException(
+            "AuthorizationSnapshot must be populated for this request; UserContextResolver did not set it.");
+
+        var canEditRecord = authz.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId);
+        var canEditScheduleFull = authz.HasPermission(PermissionKeys.RecordsScheduleEdit, command.ProjektId);
+        var canAddSchedule = authz.HasPermission(PermissionKeys.RecordsScheduleAdd, command.ProjektId);
         if (!canEditRecord)
         {
             if (!canEditScheduleFull && !canAddSchedule)
