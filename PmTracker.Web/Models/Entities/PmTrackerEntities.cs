@@ -387,6 +387,7 @@ public sealed class AuthzRoleEntity
     public string? Popis { get; set; }
     public bool IsSystem { get; set; }
     public bool IsActive { get; set; }
+    public string Scope { get; set; } = "GLOBAL";   // GLOBAL | PROJECT | SUBSYSTEM
 }
 
 public sealed class AuthzRolePermissionEntity

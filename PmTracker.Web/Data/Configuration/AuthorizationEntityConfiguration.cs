@@ -59,6 +59,7 @@ internal sealed class AuthorizationRoleEntityConfiguration : IEntityTypeConfigur
         builder.Property(x => x.Popis).HasColumnName("popis");
         builder.Property(x => x.IsSystem).HasColumnName("is_system");
         builder.Property(x => x.IsActive).HasColumnName("is_active");
+        builder.Property(x => x.Scope).HasColumnName("scope").HasMaxLength(16).IsRequired();
     }
 }
 
