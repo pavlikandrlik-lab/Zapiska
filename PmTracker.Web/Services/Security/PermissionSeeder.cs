@@ -54,6 +54,10 @@ public sealed class PermissionSeeder(PmTrackerDbContext dbContext)
         }
 
         await dbContext.SaveChangesAsync(ct);
+
+        // Authorization unification — Fáze A — Task A7: propojit lookup role s authz.roles přes FK
+        var linker = new RoleCatalogLinker(dbContext);
+        await linker.LinkAsync(ct);
     }
 
     private async Task UpsertCategoriesAsync(CancellationToken ct)
