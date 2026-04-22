@@ -68,6 +68,26 @@ public class AuthorizationPolicyEnforcementTests
             // projektId je v command (form body), ne v route pro create branch.
             "PmTracker.Web.Controllers.ProjektyController.SaveMeeting",
 
+            // ---- ProjektyController team-management (H-1 IDOR fix) ----
+            //
+            // Všechny následující team-management akce dostávají projektId z form body
+            // (command.ProjektId) nebo z query parametru (projektId) — NIKDY z route.
+            // PermissionAuthorizationHandler čte projektId pouze z RouteValues, takže
+            // [Authorize(Policy="permission:team.manage")] by degradoval na global-only
+            // check a zablokoval by oprávněné project-scoped uživatele (+ byl by to latent
+            // IDOR, kdyby byl team.manage grantován globálně).
+            // Per-project check je proveden v body přes ExecuteTeamValidatedActionAsync /
+            // ExecuteTeamActionAsync, které volají CurrentUserContext.HasPermission(TeamManage, projektId).
+            "PmTracker.Web.Controllers.ProjektyController.SaveTeamMember",
+            "PmTracker.Web.Controllers.ProjektyController.RemoveTeamMember",
+            "PmTracker.Web.Controllers.ProjektyController.AssignProjectRole",
+            "PmTracker.Web.Controllers.ProjektyController.DeactivateProjectRole",
+            "PmTracker.Web.Controllers.ProjektyController.AssignProjectSubsystem",
+            "PmTracker.Web.Controllers.ProjektyController.ReorderProjectSubsystem",
+            "PmTracker.Web.Controllers.ProjektyController.DeactivateProjectSubsystem",
+            "PmTracker.Web.Controllers.ProjektyController.AssignProjectSubsystemRole",
+            "PmTracker.Web.Controllers.ProjektyController.DeactivateProjectSubsystemRole",
+
             // ---- JednaniController ----
 
             // SaveStatus: projektId je načten z DB (GetMeetingProjectIdAsync), není v route.

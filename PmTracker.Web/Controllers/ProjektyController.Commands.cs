@@ -120,9 +120,13 @@ public sealed partial class ProjektyController
             operation: () => _meetingService.DeleteMeetingAsync(command, CurrentUserContext, ct));
     }
 
+    // H-1 IDOR: projektId pochází z form body (command.ProjektId nebo query parametr),
+    // ne z route. PermissionAuthorizationHandler čte projektId z RouteValues → pro tyto
+    // akce by policy degradovala na global-only check. Per-project check provádí
+    // ExecuteTeamValidatedActionAsync/ExecuteTeamActionAsync v body (viz níže).
+    // Class-level [Authorize] dále vynucuje authenticated uživatele.
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> SaveTeamMember(SaveTeamMemberCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -135,7 +139,6 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> RemoveTeamMember(RemoveTeamMemberCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamActionAsync(
@@ -145,7 +148,6 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> AssignProjectRole(AssignProjectRoleCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -158,7 +160,6 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> DeactivateProjectRole(DeactivateProjectRoleCommand command, int projektId, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -171,7 +172,6 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> AssignProjectSubsystem(AssignProjectSubsystemCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -184,7 +184,6 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> ReorderProjectSubsystem(ReorderProjectSubsystemCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -197,7 +196,6 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> DeactivateProjectSubsystem(DeactivateProjectSubsystemCommand command, int projektId, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -210,7 +208,6 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> AssignProjectSubsystemRole(AssignProjectSubsystemRoleCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -223,7 +220,6 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> DeactivateProjectSubsystemRole(DeactivateProjectSubsystemRoleCommand command, int projektId, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -255,6 +251,10 @@ public sealed partial class ProjektyController
         }
     }
 
+    // H-1 IDOR fix: per-project kontrola je provedena zde v body.
+    // PermissionAuthorizationHandler čte projektId z RouteValues — ale team-management
+    // akce dostávají projektId z form body (command.ProjektId) nebo query parametru.
+    // Bez této kontroly by uživatel s team.manage na projektu A mohl upravovat projekt B.
     private Task<IActionResult> ExecuteTeamValidatedActionAsync(
         int projektId,
         string invalidAjaxMessage,
@@ -263,7 +263,7 @@ public sealed partial class ProjektyController
         Func<Task> operation)
     {
         return ExecuteValidatedCommandAsync(
-            hasPermission: () => true,
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
             invalidAjaxMessage: invalidAjaxMessage,
             invalidFallbackMessage: invalidFallbackMessage,
             onInvalidRedirect: () => RedirectToTeamTab(projektId),
@@ -275,7 +275,7 @@ public sealed partial class ProjektyController
     private Task<IActionResult> ExecuteTeamActionAsync(int projektId, Func<Task> operation)
     {
         return ExecuteCommandAsync(
-            hasPermission: () => true,
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
             onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToTeamTab(projektId)),
             onAjaxSuccess: null,
             operation: operation);
