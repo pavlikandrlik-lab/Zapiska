@@ -9480,7 +9480,7 @@ function handleDocumentClick(event) {
     return;
   }
   const attendanceToggle = target.closest("[data-meeting-attendance-toggle]");
-  if (attendanceToggle instanceof HTMLButtonElement) {
+  if (isButtonLike(attendanceToggle)) {
     event.preventDefault();
     toggleMeetingAttendancePanel(attendanceToggle);
     return;
