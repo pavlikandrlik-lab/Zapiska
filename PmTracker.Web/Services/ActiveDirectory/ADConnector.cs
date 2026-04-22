@@ -30,6 +30,42 @@ internal static class ADConnector
         return result.Values.ToList();
     }
 
+    public static IReadOnlyList<ADInfo> GetADUsersByGuids(IReadOnlyCollection<Guid> guids, string domain)
+    {
+        if (guids.Count == 0)
+        {
+            return Array.Empty<ADInfo>();
+        }
+
+        var domainName = string.IsNullOrWhiteSpace(domain) ? "acr" : domain.Trim();
+        using var context = new PrincipalContext(ContextType.Domain, domainName);
+
+        var results = new List<ADInfo>(guids.Count);
+        foreach (var guid in guids)
+        {
+            try
+            {
+                using var user = UserPrincipal.FindByIdentity(context, IdentityType.Guid, guid.ToString());
+                if (user is null)
+                {
+                    continue;
+                }
+
+                var info = ToAdInfo(user);
+                if (info is not null)
+                {
+                    results.Add(info);
+                }
+            }
+            catch (Exception)
+            {
+                // Jednotlivé selhání ignorujeme a pokračujeme s dalším GUID.
+            }
+        }
+
+        return results;
+    }
+
     private static void SearchAndCollect(
         PrincipalContext context,
         Action<UserPrincipal> configureProbe,

@@ -92,6 +92,141 @@ public sealed class ActiveDirectoryService : IActiveDirectoryService
         }
     }
 
+    public async Task<ActiveDirectoryBatchResponse> ListByGuidsAsync(
+        IReadOnlyCollection<Guid> guids,
+        CancellationToken ct = default)
+    {
+        if (guids is null || guids.Count == 0)
+        {
+            return new ActiveDirectoryBatchResponse
+            {
+                Available = true,
+                Persons = Array.Empty<ActiveDirectoryPersonResult>(),
+                NotFoundGuids = Array.Empty<Guid>()
+            };
+        }
+
+        if (!OperatingSystem.IsWindows())
+        {
+            _logger.LogInformation("AD ListByGuidsAsync is not available on non-Windows platform.");
+            return new ActiveDirectoryBatchResponse
+            {
+                Available = false,
+                Message = UnavailableMessage(_options.Domain),
+                Persons = Array.Empty<ActiveDirectoryPersonResult>(),
+                NotFoundGuids = guids.ToArray()
+            };
+        }
+
+        var timeoutSeconds = Math.Clamp(_options.QueryTimeoutSeconds, 2, 60);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+
+        var persons = new List<ActiveDirectoryPersonResult>();
+        var found = new HashSet<Guid>();
+
+        try
+        {
+            foreach (var chunk in Chunk(guids, 100))
+            {
+#pragma warning disable CA1416
+                var chunkResults = await Task.Run(
+                    () => ADConnector.GetADUsersByGuids(chunk, _options.Domain ?? string.Empty),
+                    timeoutCts.Token).ConfigureAwait(false);
+#pragma warning restore CA1416
+
+                foreach (var ad in chunkResults)
+                {
+                    var mapped = MapAdInfoToResult(ad);
+                    if (mapped is not null)
+                    {
+                        persons.Add(mapped);
+                        found.Add(ad.GuidAd);
+                    }
+                }
+            }
+
+            var notFound = guids.Where(g => !found.Contains(g)).ToArray();
+            return new ActiveDirectoryBatchResponse
+            {
+                Available = true,
+                Persons = persons,
+                NotFoundGuids = notFound
+            };
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning("AD ListByGuidsAsync timeout.");
+            return new ActiveDirectoryBatchResponse
+            {
+                Available = false,
+                Message = UnavailableMessage(_options.Domain),
+                Persons = persons,
+                NotFoundGuids = guids.Where(g => !found.Contains(g)).ToArray()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "AD ListByGuidsAsync unexpected error.");
+            return new ActiveDirectoryBatchResponse
+            {
+                Available = false,
+                Message = UnavailableMessage(_options.Domain),
+                Persons = persons,
+                NotFoundGuids = guids.Where(g => !found.Contains(g)).ToArray()
+            };
+        }
+    }
+
+    private static IEnumerable<IReadOnlyList<Guid>> Chunk(IReadOnlyCollection<Guid> source, int size)
+    {
+        var batch = new List<Guid>(size);
+        foreach (var g in source)
+        {
+            batch.Add(g);
+            if (batch.Count == size)
+            {
+                yield return batch;
+                batch = new List<Guid>(size);
+            }
+        }
+
+        if (batch.Count > 0)
+        {
+            yield return batch;
+        }
+    }
+
+    private static ActiveDirectoryPersonResult? MapAdInfoToResult(ADInfo user)
+    {
+        if (user.GuidAd == Guid.Empty)
+        {
+            return null;
+        }
+
+        var jmeno = user.FirstName?.Trim() ?? string.Empty;
+        var prijmeni = user.Surname?.Trim() ?? string.Empty;
+        var email = user.Mail?.Trim() ?? string.Empty;
+        var displayName = !string.IsNullOrWhiteSpace(user.DisplayName)
+            ? user.DisplayName.Trim()
+            : string.Join(' ', new[] { jmeno, prijmeni }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+        return new ActiveDirectoryPersonResult
+        {
+            GuidAd = user.GuidAd,
+            AdLogin = string.IsNullOrWhiteSpace(user.Login) ? null : user.Login.Trim(),
+            DisplayName = displayName,
+            Jmeno = jmeno,
+            Prijmeni = prijmeni,
+            Titul = string.IsNullOrWhiteSpace(user.Titul) ? null : user.Titul.Trim(),
+            Email = email,
+            Company = string.IsNullOrWhiteSpace(user.Company) ? null : user.Company.Trim(),
+            Department = string.IsNullOrWhiteSpace(user.Department) ? null : user.Department.Trim(),
+            CanSelect = !string.IsNullOrWhiteSpace(email),
+            DisabledReason = null
+        };
+    }
+
     private static ActiveDirectorySearchResponse NotAvailable(string message)
     {
         return new ActiveDirectorySearchResponse

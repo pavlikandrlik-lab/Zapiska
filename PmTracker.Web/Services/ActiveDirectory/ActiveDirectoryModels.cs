@@ -21,3 +21,11 @@ public sealed class ActiveDirectorySearchResponse
     public string? Message { get; init; }
     public required IReadOnlyList<ActiveDirectoryPersonResult> Results { get; init; }
 }
+
+public sealed class ActiveDirectoryBatchResponse
+{
+    public bool Available { get; init; }
+    public string? Message { get; init; }
+    public required IReadOnlyList<ActiveDirectoryPersonResult> Persons { get; init; }
+    public required IReadOnlyList<Guid> NotFoundGuids { get; init; }
+}
