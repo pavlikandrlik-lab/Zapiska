@@ -124,8 +124,13 @@ public sealed class MarkdownDocumentationService : IDocumentationService
     {
         _environment = environment;
         _pipeline = new MarkdownPipelineBuilder()
-            .UseAdvancedExtensions()
+            .UsePipeTables()
+            .UseTaskLists()
+            .UseAutoLinks()
+            .UseGenericAttributes()
+            .UseEmphasisExtras()
             .UseAutoIdentifiers(AutoIdentifierOptions.GitHub)
+            .DisableHtml()
             .Build();
     }
 
