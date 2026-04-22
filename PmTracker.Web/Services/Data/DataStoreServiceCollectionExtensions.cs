@@ -91,6 +91,11 @@ public static class DataStoreServiceCollectionExtensions
         // provede reálný harvest.
         services.AddScoped<IHarvestScheduler, ReactiveHarvestSchedulerAdapter>();
         services.AddHostedService<SdReactiveSyncConsumer>();
+        // Plán sd-sync-revise Task 8+9: dva periodic hosted services — active/archive
+        services.AddSingleton<SdActivePeriodicSyncHostedService>();
+        services.AddHostedService(sp => sp.GetRequiredService<SdActivePeriodicSyncHostedService>());
+        services.AddSingleton<SdArchivePeriodicSyncHostedService>();
+        services.AddHostedService(sp => sp.GetRequiredService<SdArchivePeriodicSyncHostedService>());
         // Plán C: AdLoginCache pro překlad AD login → jméno v chat modalu.
         // IAdLoginResolver je NoOp dokud AD vrstva nedostane login-based lookup;
         // cache pak funguje jako bezpečný fallback ("Neznámý (login)").
