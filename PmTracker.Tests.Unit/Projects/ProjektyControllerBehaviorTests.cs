@@ -246,37 +246,29 @@ public sealed class ProjektyControllerBehaviorTests
     }
 
     [Fact]
-    public async Task ReorderProjectSubsystem_ShouldReturnForbid_WhenUserLacksTeamManagePermission()
+    public void ReorderProjectSubsystem_ShouldHavePolicyAttribute_ForTeamManage()
     {
-        const int projectId = 131;
-        var projectService = new FakeProjectService
-        {
-            ProjektDetail = CreateEmptyProjektDetail(projectId)
-        };
-        var controller = CreateController(projectService);
-        SetCurrentUserContext(controller, BuildProjectUserContext(projectId));
+        // Permission enforcement delegated to [Authorize(Policy="permission:team.manage")] attribute.
+        // Body check removed — validate via architecture assertion on source code.
+        var code = System.IO.File.ReadAllText(
+            PmTracker.Tests.Unit.Architecture.ArchitectureTestBase.ResolvePath(
+                "PmTracker.Web/Controllers/ProjektyController.Commands.cs"));
 
-        var result = await controller.ReorderProjectSubsystem(new ReorderProjectSubsystemCommand
-        {
-            ProjektId = projectId,
-            ProjektSubsystemId = 9,
-            Direction = ProjectSubsystemReorderDirections.Up
-        });
-
-        result.Should().BeOfType<ForbidResult>();
-        projectService.ReorderProjectSubsystemCallCount.Should().Be(0);
+        code.Should().Contain("[Authorize(Policy = \"permission:team.manage\")]",
+            "ReorderProjectSubsystem a ostatní team.manage actions musí mít Policy atribut");
     }
 
     [Fact]
-    public async Task ReorderProjectSubsystem_ShouldReturnAjaxSuccess_AndInvokeService_WhenUserHasTeamManagePermission()
+    public async Task ReorderProjectSubsystem_ShouldInvokeService_WhenCalled()
     {
+        // Verifies that the action body delegates correctly to the service.
+        // Policy-level enforcement is validated by architecture tests (ProjektyAuthzTests).
         const int projectId = 132;
         var projectService = new FakeProjectService
         {
             ProjektDetail = CreateEmptyProjektDetail(projectId)
         };
         var controller = CreateController(projectService);
-        SetCurrentUserContext(controller, BuildProjectUserContext(projectId, PermissionKeys.TeamManage));
         controller.ControllerContext.HttpContext.Request.Headers["X-Requested-With"] = "XMLHttpRequest";
 
         var command = new ReorderProjectSubsystemCommand

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
@@ -9,6 +10,7 @@ using System.Globalization;
 
 namespace PmTracker.Web.Controllers;
 
+[Authorize]
 public sealed partial class ProjektyController : BaseController
 {
     private const string RecordsTab = "zaznamy";

@@ -1,19 +1,15 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
 public sealed partial class ProjektyController
 {
     [HttpGet]
+    [Authorize(Policy = "permission:projects.create")]
     public async Task<IActionResult> NewProjectModal(CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.ProjectsCreate))
-        {
-            return Forbid();
-        }
-
         var statusOptions = await BuildProjectStatusOptionsAsync(ct);
         var defaultStatus = statusOptions
             .FirstOrDefault(option => string.Equals(option.Value, "PLAN", StringComparison.OrdinalIgnoreCase))
@@ -36,13 +32,9 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:projects.edit")]
     public async Task<IActionResult> EditProjectModal(int id, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.ProjectsEdit, id))
-        {
-            return Forbid();
-        }
-
         var project = await _projectService.GetProjectListItemAsync(id, ct);
         if (project is null)
         {
@@ -75,13 +67,9 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:projects.delete")]
     public async Task<IActionResult> DeleteProjectModal(int id, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.ProjectsDelete, id))
-        {
-            return Forbid();
-        }
-
         var project = await _projectService.GetProjectListItemAsync(id, ct);
         if (project is null)
         {
@@ -104,13 +92,9 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:team.manage")]
     public async Task<IActionResult> AddTeamMemberModal(int projektId, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId))
-        {
-            return Forbid();
-        }
-
         if (!await _projectService.ProjektExistsAsync(projektId, ct))
         {
             return NotFound();
@@ -135,13 +119,9 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:team.manage")]
     public async Task<IActionResult> AssignProjectRoleModal(int projektId, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId))
-        {
-            return Forbid();
-        }
-
         var modalOptions = await _projectService.BuildProjectTeamModalOptionsAsync(projektId, ct);
         return View("AssignProjectRoleModal", new AssignProjectRoleModalViewModel
         {
@@ -154,13 +134,9 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:team.manage")]
     public async Task<IActionResult> AssignProjectSubsystemModal(int projektId, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId))
-        {
-            return Forbid();
-        }
-
         var modalOptions = await _projectService.BuildProjectTeamModalOptionsAsync(projektId, ct);
         return View("AssignProjectSubsystemModal", new AssignProjectSubsystemModalViewModel
         {
@@ -171,13 +147,9 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:team.manage")]
     public async Task<IActionResult> AssignProjectSubsystemRoleModal(int projektId, CancellationToken ct = default)
     {
-        if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId))
-        {
-            return Forbid();
-        }
-
         var modalOptions = await _projectService.BuildProjectTeamModalOptionsAsync(projektId, ct);
         return View("AssignProjectSubsystemRoleModal", new AssignProjectSubsystemRoleModalViewModel
         {

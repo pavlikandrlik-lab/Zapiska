@@ -1,6 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Security;
 using System.Globalization;
 
 namespace PmTracker.Web.Controllers;
@@ -38,16 +38,12 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:team.manage")]
     public async Task<IActionResult> SearchProjectMemberCandidates(int id, [FromQuery(Name = "q")] string? query, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(id))
         {
             return NotFound();
-        }
-
-        if (!CurrentUserContext.HasPermission(PermissionKeys.TeamManage, id))
-        {
-            return Forbid();
         }
 
         var results = await _projectService.SearchProjectMemberCandidatesAsync(query ?? string.Empty, ct);

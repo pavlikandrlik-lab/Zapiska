@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Security;
@@ -32,10 +33,11 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:projects.delete")]
     public Task<IActionResult> DeleteProject(SoftDeleteProjectCommand command, CancellationToken ct = default)
     {
         return ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.ProjectsDelete, command.ProjektId),
+            hasPermission: () => true,
             invalidAjaxMessage: "Projekt nelze smazat.",
             invalidFallbackMessage: "Potvrďte smazání projektu.",
             onInvalidRedirect: () => RedirectToAction(nameof(Index)),
@@ -93,6 +95,7 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:meetings.edit")]
     public Task<IActionResult> DeleteMeeting(DeleteMeetingCommand command, string? returnUrl, CancellationToken ct = default)
     {
         IActionResult RedirectAfterDelete()
@@ -106,7 +109,7 @@ public sealed partial class ProjektyController
         }
 
         return ExecuteCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId),
+            hasPermission: () => true,
             onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectAfterDelete()),
             onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "projekty-detail-jednani",
@@ -119,6 +122,7 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> SaveTeamMember(SaveTeamMemberCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -131,6 +135,7 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> RemoveTeamMember(RemoveTeamMemberCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamActionAsync(
@@ -140,6 +145,7 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> AssignProjectRole(AssignProjectRoleCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -152,6 +158,7 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> DeactivateProjectRole(DeactivateProjectRoleCommand command, int projektId, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -164,6 +171,7 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> AssignProjectSubsystem(AssignProjectSubsystemCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -176,6 +184,7 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> ReorderProjectSubsystem(ReorderProjectSubsystemCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -188,6 +197,7 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> DeactivateProjectSubsystem(DeactivateProjectSubsystemCommand command, int projektId, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -200,6 +210,7 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> AssignProjectSubsystemRole(AssignProjectSubsystemRoleCommand command, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -212,6 +223,7 @@ public sealed partial class ProjektyController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:team.manage")]
     public Task<IActionResult> DeactivateProjectSubsystemRole(DeactivateProjectSubsystemRoleCommand command, int projektId, CancellationToken ct = default)
     {
         return ExecuteTeamValidatedActionAsync(
@@ -251,7 +263,7 @@ public sealed partial class ProjektyController
         Func<Task> operation)
     {
         return ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
+            hasPermission: () => true,
             invalidAjaxMessage: invalidAjaxMessage,
             invalidFallbackMessage: invalidFallbackMessage,
             onInvalidRedirect: () => RedirectToTeamTab(projektId),
@@ -263,7 +275,7 @@ public sealed partial class ProjektyController
     private Task<IActionResult> ExecuteTeamActionAsync(int projektId, Func<Task> operation)
     {
         return ExecuteCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
+            hasPermission: () => true,
             onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToTeamTab(projektId)),
             onAjaxSuccess: null,
             operation: operation);
