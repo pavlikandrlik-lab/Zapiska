@@ -12,52 +12,56 @@ public sealed partial class ProjectService
     public async Task<int> SaveProjectAsync(SaveProjectCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
         var statusId = await ResolveProjectStatusIdAsync(command.Stav, ct);
-        await using var tx = await dbContext.Database.BeginTransactionAsync(ct);
-        if (command.Id.HasValue)
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var existing = await dbContext.Projekty.FirstOrDefaultAsync(x => x.Id == command.Id.Value, ct)
-                ?? throw new InvalidOperationException($"Projekt {command.Id.Value} nebyl nalezen.");
+            await using var tx = await dbContext.Database.BeginTransactionAsync(ct);
+            if (command.Id.HasValue)
+            {
+                var existing = await dbContext.Projekty.FirstOrDefaultAsync(x => x.Id == command.Id.Value, ct)
+                    ?? throw new InvalidOperationException($"Projekt {command.Id.Value} nebyl nalezen.");
 
-            var old = ProjectAuditSnapshot.FromEntity(existing);
-            existing.CelyNazev = command.Nazev.Trim();
-            existing.Zkratka = command.Zkratka.Trim();
-            existing.StavId = statusId;
-            existing.PouzivatIdentJednani = command.PouzivatIdentJednani;
-            existing.MistoPlneni = NormalizeOrNull(command.MistoPlneni);
-            existing.CisloRamcoveSmlouvy = NormalizeOrNull(command.CisloRamcoveSmlouvy);
+                var old = ProjectAuditSnapshot.FromEntity(existing);
+                existing.CelyNazev = command.Nazev.Trim();
+                existing.Zkratka = command.Zkratka.Trim();
+                existing.StavId = statusId;
+                existing.PouzivatIdentJednani = command.PouzivatIdentJednani;
+                existing.MistoPlneni = NormalizeOrNull(command.MistoPlneni);
+                existing.CisloRamcoveSmlouvy = NormalizeOrNull(command.CisloRamcoveSmlouvy);
+                await dbContext.SaveChangesAsync(ct);
+                auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                    AuditActionType.Update,
+                    AuditEntityType.Project,
+                    existing.Id.ToString(CultureInfo.InvariantCulture),
+                    old,
+                    ProjectAuditSnapshot.FromEntity(existing)));
+                await dbContext.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+                return existing.Id;
+            }
+
+            var created = new ProjektEntity
+            {
+                CelyNazev = command.Nazev.Trim(),
+                Zkratka = command.Zkratka.Trim(),
+                StavId = statusId,
+                PouzivatIdentJednani = command.PouzivatIdentJednani,
+                MistoPlneni = NormalizeOrNull(command.MistoPlneni),
+                CisloRamcoveSmlouvy = NormalizeOrNull(command.CisloRamcoveSmlouvy)
+            };
+            dbContext.Projekty.Add(created);
             await dbContext.SaveChangesAsync(ct);
+
             auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                AuditActionType.Update,
+                AuditActionType.Create,
                 AuditEntityType.Project,
-                existing.Id.ToString(CultureInfo.InvariantCulture),
-                old,
-                ProjectAuditSnapshot.FromEntity(existing)));
+                created.Id.ToString(CultureInfo.InvariantCulture),
+                null,
+                ProjectAuditSnapshot.FromEntity(created)));
             await dbContext.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
-            return existing.Id;
-        }
-
-        var created = new ProjektEntity
-        {
-            CelyNazev = command.Nazev.Trim(),
-            Zkratka = command.Zkratka.Trim(),
-            StavId = statusId,
-            PouzivatIdentJednani = command.PouzivatIdentJednani,
-            MistoPlneni = NormalizeOrNull(command.MistoPlneni),
-            CisloRamcoveSmlouvy = NormalizeOrNull(command.CisloRamcoveSmlouvy)
-        };
-        dbContext.Projekty.Add(created);
-        await dbContext.SaveChangesAsync(ct);
-
-        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Create,
-            AuditEntityType.Project,
-            created.Id.ToString(CultureInfo.InvariantCulture),
-            null,
-            ProjectAuditSnapshot.FromEntity(created)));
-        await dbContext.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return created.Id;
+            return created.Id;
+        });
     }
 
     public async Task SoftDeleteProjectAsync(SoftDeleteProjectCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)

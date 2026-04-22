@@ -107,92 +107,100 @@ public sealed partial class ProjectService
     public async Task AssignProjectSubsystemAsync(AssignProjectSubsystemCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
         var subsystemId = await ResolveSubsystemIdAsync(command.SubsystemKod, ct);
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-
-        var exists = await dbContext.ProjektSubsystemy
-            .AnyAsync(x => x.ProjektId == command.ProjektId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue, ct);
-        if (exists)
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            throw new InvalidOperationException("Subsystém je už projektu aktivně přiřazen.");
-        }
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
 
-        var entity = new ProjektSubsystemEntity
-        {
-            ProjektId = command.ProjektId,
-            SubsystemId = subsystemId,
-            Poradi = await ResolveNextProjectSubsystemOrderAsync(command.ProjektId, ct),
-            DatumPrirazeni = timeProvider.GetUtcNow().UtcDateTime
-        };
-        dbContext.ProjektSubsystemy.Add(entity);
-        await dbContext.SaveChangesAsync(ct);
-        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Create,
-            AuditEntityType.ProjectSubsystem,
-            entity.Id.ToString(CultureInfo.InvariantCulture),
-            null,
-            ProjectSubsystemAuditSnapshot.FromEntity(entity)));
-        await dbContext.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
+            var exists = await dbContext.ProjektSubsystemy
+                .AnyAsync(x => x.ProjektId == command.ProjektId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue, ct);
+            if (exists)
+            {
+                throw new InvalidOperationException("Subsystém je už projektu aktivně přiřazen.");
+            }
+
+            var entity = new ProjektSubsystemEntity
+            {
+                ProjektId = command.ProjektId,
+                SubsystemId = subsystemId,
+                Poradi = await ResolveNextProjectSubsystemOrderAsync(command.ProjektId, ct),
+                DatumPrirazeni = timeProvider.GetUtcNow().UtcDateTime
+            };
+            dbContext.ProjektSubsystemy.Add(entity);
+            await dbContext.SaveChangesAsync(ct);
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Create,
+                AuditEntityType.ProjectSubsystem,
+                entity.Id.ToString(CultureInfo.InvariantCulture),
+                null,
+                ProjectSubsystemAuditSnapshot.FromEntity(entity)));
+            await dbContext.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        });
     }
 
     public async Task ReorderProjectSubsystemAsync(ReorderProjectSubsystemCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
         var direction = NormalizeProjectSubsystemReorderDirection(command.Direction);
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var activeSubsystems = await dbContext.ProjektSubsystemy
-            .Where(x => x.ProjektId == command.ProjektId && !x.DatumOdebrani.HasValue)
-            .OrderBy(x => x.Poradi)
-            .ThenBy(x => x.Id)
-            .ToListAsync(ct);
-
-        var currentIndex = activeSubsystems.FindIndex(x => x.Id == command.ProjektSubsystemId);
-        if (currentIndex < 0)
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            throw new InvalidOperationException("Projektový subsystém nebyl nalezen.");
-        }
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            var activeSubsystems = await dbContext.ProjektSubsystemy
+                .Where(x => x.ProjektId == command.ProjektId && !x.DatumOdebrani.HasValue)
+                .OrderBy(x => x.Poradi)
+                .ThenBy(x => x.Id)
+                .ToListAsync(ct);
 
-        var targetIndex = string.Equals(direction, ProjectSubsystemReorderDirections.Up, StringComparison.Ordinal)
-            ? currentIndex - 1
-            : currentIndex + 1;
-        if (targetIndex < 0 || targetIndex >= activeSubsystems.Count)
-        {
+            var currentIndex = activeSubsystems.FindIndex(x => x.Id == command.ProjektSubsystemId);
+            if (currentIndex < 0)
+            {
+                throw new InvalidOperationException("Projektový subsystém nebyl nalezen.");
+            }
+
+            var targetIndex = string.Equals(direction, ProjectSubsystemReorderDirections.Up, StringComparison.Ordinal)
+                ? currentIndex - 1
+                : currentIndex + 1;
+            if (targetIndex < 0 || targetIndex >= activeSubsystems.Count)
+            {
+                await transaction.CommitAsync(ct);
+                return;
+            }
+
+            var current = activeSubsystems[currentIndex];
+            var target = activeSubsystems[targetIndex];
+            var currentOld = ProjectSubsystemAuditSnapshot.FromEntity(current, activeSubsystems);
+            var targetOld = ProjectSubsystemAuditSnapshot.FromEntity(target, activeSubsystems);
+            var currentOrder = current.Poradi;
+            var targetOrder = target.Poradi;
+            var temporaryOrder = activeSubsystems.Max(x => x.Poradi) + 1;
+
+            current.Poradi = temporaryOrder;
+            await dbContext.SaveChangesAsync(ct);
+
+            target.Poradi = currentOrder;
+            current.Poradi = targetOrder;
+            await dbContext.SaveChangesAsync(ct);
+            var reorderedSubsystems = activeSubsystems
+                .OrderBy(x => x.Poradi)
+                .ThenBy(x => x.Id)
+                .ToList();
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Reorder,
+                AuditEntityType.ProjectSubsystem,
+                current.Id.ToString(CultureInfo.InvariantCulture),
+                currentOld,
+                ProjectSubsystemAuditSnapshot.FromEntity(current, reorderedSubsystems)));
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                AuditActionType.Reorder,
+                AuditEntityType.ProjectSubsystem,
+                target.Id.ToString(CultureInfo.InvariantCulture),
+                targetOld,
+                ProjectSubsystemAuditSnapshot.FromEntity(target, reorderedSubsystems)));
+            await dbContext.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            return;
-        }
-
-        var current = activeSubsystems[currentIndex];
-        var target = activeSubsystems[targetIndex];
-        var currentOld = ProjectSubsystemAuditSnapshot.FromEntity(current, activeSubsystems);
-        var targetOld = ProjectSubsystemAuditSnapshot.FromEntity(target, activeSubsystems);
-        var currentOrder = current.Poradi;
-        var targetOrder = target.Poradi;
-        var temporaryOrder = activeSubsystems.Max(x => x.Poradi) + 1;
-
-        current.Poradi = temporaryOrder;
-        await dbContext.SaveChangesAsync(ct);
-
-        target.Poradi = currentOrder;
-        current.Poradi = targetOrder;
-        await dbContext.SaveChangesAsync(ct);
-        var reorderedSubsystems = activeSubsystems
-            .OrderBy(x => x.Poradi)
-            .ThenBy(x => x.Id)
-            .ToList();
-        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Reorder,
-            AuditEntityType.ProjectSubsystem,
-            current.Id.ToString(CultureInfo.InvariantCulture),
-            currentOld,
-            ProjectSubsystemAuditSnapshot.FromEntity(current, reorderedSubsystems)));
-        auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-            AuditActionType.Reorder,
-            AuditEntityType.ProjectSubsystem,
-            target.Id.ToString(CultureInfo.InvariantCulture),
-            targetOld,
-            ProjectSubsystemAuditSnapshot.FromEntity(target, reorderedSubsystems)));
-        await dbContext.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
+        });
     }
 
     public async Task DeactivateProjectSubsystemAsync(DeactivateProjectSubsystemCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
