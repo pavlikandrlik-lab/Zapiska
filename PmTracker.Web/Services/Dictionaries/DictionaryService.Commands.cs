@@ -404,7 +404,7 @@ public sealed partial class DictionaryService
 
     private async Task SaveVyzvaRowAsync(SaveCiselnikRowCommand command, CancellationToken ct)
     {
-        var year = DateTime.Today.Year;
+        var year = timeProvider.GetLocalNow().Year;
         var yearRaw = command.HodnotyNavic.FirstOrDefault();
         if (!string.IsNullOrWhiteSpace(yearRaw))
         {

@@ -43,7 +43,7 @@ public sealed partial class RecordService
             : null;
         var defaultStartDate = selectedMeetingForNumber?.Datum
             ?? contextMeeting?.Datum
-            ?? DateTime.Today;
+            ?? timeProvider.GetLocalNow().Date;
         var defaultOwnerBySubsystemId = await composition.BuildDefaultOwnerOsobaIdsByProjectSubsystemAsync(projektId, ct);
         var defaultSubsystemOwnerId = defaultSubsystem is null
             ? null
@@ -83,7 +83,7 @@ public sealed partial class RecordService
             Popis = string.Empty,
             VlastnikId = defaultOwnerId,
             DatumZalozeni = defaultStartDate.Date,
-            DatumUkonceni = DateTime.Today,
+            DatumUkonceni = timeProvider.GetLocalNow().Date,
             SubsystemId = defaultSubsystem?.SubsystemId ?? 0,
             HarmonogramSablonaVerze = activeSchemaVersion
         };
