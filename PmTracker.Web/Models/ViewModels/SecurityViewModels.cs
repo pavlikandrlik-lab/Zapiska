@@ -164,12 +164,9 @@ public sealed class CurrentUserContextViewModel
     public required IReadOnlyList<string> RoleKody { get; init; }
     public required IReadOnlyList<int> VisibleProjectIds { get; init; }
     public required IReadOnlyList<int> DeletedProjectIds { get; init; }
-    public required IReadOnlyList<PermissionGrantViewModel> PermissionGrants { get; init; }
-
     /// <summary>
-    /// Fáze D — kanonická in-memory autorizační projekce pro tento request.
-    /// Nahrazuje legacy <see cref="PermissionGrants"/> postupně (Fáze D6 refactoring). Obě koexistují.
-    /// Null, pokud rezolvér ještě nevyplnil (unauthenticated requests, tests).
+    /// Kanonická in-memory autorizační projekce pro tento request (Fáze D).
+    /// Null pouze pro unauthenticated requests; vždy vyplněno pro autentizované uživatele.
     /// </summary>
     public AuthorizationSnapshot? Authorization { get; init; }
 
@@ -180,27 +177,24 @@ public sealed class CurrentUserContextViewModel
 
     public bool CanAccessProject(int projektId)
     {
-        if (IsSuperAdmin)
+        if (IsSuperAdmin) return true;
+        if (projektId <= 0) return false;
+        if (VisibleProjectIds.Contains(projektId)) return true;
+
+        var authz = Authorization;
+        if (authz is null) return false;
+
+        // Any project-read key granted globally covers all projects.
+        if (authz.GlobalPermissions.Any(PermissionKeys.GrantsProjectRead)) return true;
+
+        // Project-read key granted specifically for this project.
+        if (authz.PerProjectPermissions.TryGetValue(projektId, out var projectKeys)
+            && projectKeys.Any(PermissionKeys.GrantsProjectRead))
         {
             return true;
         }
 
-        if (projektId <= 0)
-        {
-            return false;
-        }
-
-        if (VisibleProjectIds.Contains(projektId))
-        {
-            return true;
-        }
-
-        return PermissionGrants
-            .Where(g => g.IsAllowed && PermissionKeys.GrantsProjectRead(g.PermissionKey))
-            .Any(g =>
-                string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(g.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase) ||
-                (string.Equals(g.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase) && g.ProjectIds.Contains(projektId)));
+        return false;
     }
 
     public bool HasPermission(string permissionKey, int? projektId = null)
@@ -210,60 +204,33 @@ public sealed class CurrentUserContextViewModel
             return false;
         }
 
-        if (IsSuperAdmin)
-        {
-            return true;
-        }
+        var authz = Authorization ?? throw new InvalidOperationException(
+            "AuthorizationSnapshot musí být vyplněn pro tento request.");
 
-        if (projektId.HasValue && !CanAccessProject(projektId.Value))
-        {
-            return false;
-        }
-
-        var grants = PermissionGrants
-            .Where(g => g.IsAllowed && string.Equals(g.PermissionKey, permissionKey, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        if (grants.Count == 0)
-        {
-            return false;
-        }
-
-        if (projektId is null)
-        {
-            return grants.Any(g =>
-                string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(g.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase));
-        }
-
-        return grants.Any(g =>
-            string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(g.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase) ||
-            (string.Equals(g.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase) && g.ProjectIds.Contains(projektId.Value)));
+        return authz.HasPermission(permissionKey, projektId);
     }
 
     public bool HasPermissionPrefix(string permissionPrefix)
     {
-        if (IsSuperAdmin)
+        if (IsSuperAdmin) return true;
+        if (string.IsNullOrWhiteSpace(permissionPrefix)) return false;
+
+        var authz = Authorization ?? throw new InvalidOperationException(
+            "AuthorizationSnapshot musí být vyplněn pro tento request.");
+
+        var prefix = permissionPrefix.Trim();
+        if (!prefix.EndsWith(".", StringComparison.Ordinal))
         {
-            return true;
+            prefix += ".";
         }
 
-        if (string.IsNullOrWhiteSpace(permissionPrefix))
-        {
-            return false;
-        }
+        bool MatchesPrefix(string key) =>
+            key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
 
-        var normalizedPrefix = permissionPrefix.Trim();
-        if (!normalizedPrefix.EndsWith(".", StringComparison.Ordinal))
-        {
-            normalizedPrefix += ".";
-        }
-
-        return PermissionGrants.Any(g =>
-            g.IsAllowed &&
-            !string.IsNullOrWhiteSpace(g.PermissionKey) &&
-            g.PermissionKey.StartsWith(normalizedPrefix, StringComparison.OrdinalIgnoreCase));
+        if (authz.GlobalPermissions.Any(MatchesPrefix)) return true;
+        if (authz.PerProjectPermissions.Values.Any(set => set.Any(MatchesPrefix))) return true;
+        if (authz.PerSubsystemPermissions.Values.Any(set => set.Any(MatchesPrefix))) return true;
+        return false;
     }
 }
 

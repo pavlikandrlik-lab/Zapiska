@@ -28,8 +28,6 @@ public sealed class UserContextResolver : IUserContextResolver
     };
 
     private sealed record ActiveRoleRow(int RoleId, string RoleCode);
-    private sealed record PermissionGrantRaw(string Klic, PermissionScopeLevel ScopeLevel, ScopeMode ScopeMode, bool IsAllowed, int RolePermissionId);
-    private sealed record PermissionGrantProjectRow(string Klic, PermissionScopeLevel ScopeLevel, ScopeMode ScopeMode, bool IsAllowed, int RolePermissionId, int? ProjectId);
     private sealed record ResolvedPersonRow(
         int Id,
         string? Titul,
@@ -353,60 +351,8 @@ public sealed class UserContextResolver : IUserContextResolver
 
         var isSuperAdmin = osoba.IsSuperAdmin;
 
-        var grantProjectRows = activeRoleIds.Count == 0
-            ? new List<PermissionGrantProjectRow>()
-            : await (
-                    from rp in _dbContext.AuthzRolePermissions.AsNoTracking()
-                    join p in _dbContext.AuthzPermissions.AsNoTracking() on rp.PermissionId equals p.Id
-                    join includeProject in _dbContext.AuthzRolePermissionProjects.AsNoTracking()
-                        on rp.Id equals includeProject.RolePermissionId into includeProjectGroup
-                    from includeProject in includeProjectGroup.DefaultIfEmpty()
-                    where activeRoleIds.Contains(rp.RoleId) && p.IsActive
-                    select new PermissionGrantProjectRow(
-                        p.Klic,
-                        p.ScopeLevel,
-                        rp.ScopeMode,
-                        rp.IsAllowed,
-                        rp.Id,
-                        includeProject != null ? includeProject.ProjektId : null))
-                .ToListAsync(ct);
-
-        var grantsRaw = grantProjectRows
-            .GroupBy(row => new PermissionGrantRaw(
-                row.Klic,
-                row.ScopeLevel,
-                row.ScopeMode,
-                row.IsAllowed,
-                row.RolePermissionId))
-            .Select(group => new
-            {
-                Raw = group.Key,
-                ProjectIds = group
-                    .Where(item => item.ProjectId.HasValue)
-                    .Select(item => item.ProjectId!.Value)
-                    .Distinct()
-                    .ToList()
-            })
-            .ToList();
-
-        var grants = grantsRaw
-            .Select(item => new PermissionGrantViewModel
-            {
-                PermissionKey = item.Raw.Klic,
-                ScopeLevel = item.Raw.ScopeLevel.ToString().ToUpperInvariant(),
-                ScopeMode = item.Raw.ScopeMode.ToString().ToUpperInvariant(),
-                IsAllowed = item.Raw.IsAllowed,
-                ProjectIds = item.Raw.ScopeMode.ToString().ToUpperInvariant().Equals("INCLUDE", StringComparison.OrdinalIgnoreCase)
-                    ? item.ProjectIds
-                    : Array.Empty<int>()
-            })
-            .ToList();
-
         var dbDrivenProjectGrants = await LoadDbDrivenProjectRoleGrantsAsync(_dbContext, osoba.Id, ct);
-        grants.AddRange(dbDrivenProjectGrants);
-
         var dbDrivenSubsystemGrants = await LoadDbDrivenSubsystemRoleGrantsAsync(_dbContext, osoba.Id, ct);
-        grants.AddRange(dbDrivenSubsystemGrants);
 
         // Fáze B Task B3: visibleProjectIds z ProjectIds DB-driven grantů.
         var visibleProjectIds = dbDrivenProjectGrants
@@ -443,17 +389,15 @@ public sealed class UserContextResolver : IUserContextResolver
             RoleKody = roleCodes,
             VisibleProjectIds = visibleProjectIds,
             DeletedProjectIds = resolvedDeletedProjectIds,
-            PermissionGrants = grants,
             Authorization = authzSnapshot
         };
 
         _logger.LogInformation(
-            "User context resolved successfully. OsobaId={OsobaId} IsSuperAdmin={IsSuperAdmin} RoleCount={RoleCount} VisibleProjectCount={VisibleProjectCount} PermissionGrantCount={PermissionGrantCount}",
+            "User context resolved successfully. OsobaId={OsobaId} IsSuperAdmin={IsSuperAdmin} RoleCount={RoleCount} VisibleProjectCount={VisibleProjectCount}",
             context.OsobaId,
             context.IsSuperAdmin,
             context.RoleKody.Count,
-            context.VisibleProjectIds.Count,
-            context.PermissionGrants.Count);
+            context.VisibleProjectIds.Count);
 
         return UserContextResolutionResult.Success(context);
     }

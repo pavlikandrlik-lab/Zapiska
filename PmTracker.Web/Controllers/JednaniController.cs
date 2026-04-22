@@ -90,13 +90,17 @@ public sealed class JednaniController : BaseController
             return null;
         }
 
+        var authz = CurrentUserContext.Authorization;
+
+        // Per-project grants from the snapshot (INCLUDE scope).
+        var snapshotProjectIds = authz is not null
+            ? authz.PerProjectPermissions
+                .Where(kvp => kvp.Value.Any(PermissionKeys.GrantsProjectRead))
+                .Select(kvp => kvp.Key)
+            : [];
+
         return CurrentUserContext.VisibleProjectIds
-            .Concat(CurrentUserContext.PermissionGrants
-                .Where(grant =>
-                    grant.IsAllowed
-                    && PermissionKeys.GrantsProjectRead(grant.PermissionKey)
-                    && string.Equals(grant.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase))
-                .SelectMany(grant => grant.ProjectIds))
+            .Concat(snapshotProjectIds)
             .Distinct()
             .OrderBy(id => id)
             .ToArray();
@@ -104,11 +108,10 @@ public sealed class JednaniController : BaseController
 
     private bool HasGlobalMeetingOverviewAccess()
     {
-        return CurrentUserContext.PermissionGrants.Any(grant =>
-            grant.IsAllowed
-            && PermissionKeys.GrantsProjectRead(grant.PermissionKey)
-            && (string.Equals(grant.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(grant.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase)));
+        var authz = CurrentUserContext.Authorization;
+        if (authz is null) return false;
+
+        return authz.GlobalPermissions.Any(PermissionKeys.GrantsProjectRead);
     }
 
     [HttpGet]

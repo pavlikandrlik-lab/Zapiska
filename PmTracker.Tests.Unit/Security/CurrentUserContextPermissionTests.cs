@@ -1,5 +1,6 @@
 using FluentAssertions;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Security;
 
@@ -307,6 +308,42 @@ public sealed class CurrentUserContextPermissionTests
         user.HasPermissionPrefix("settings").Should().BeTrue();
     }
 
+    /// <summary>
+    /// Převede pole <see cref="PermissionGrantViewModel"/> na <see cref="AuthorizationSnapshot"/>
+    /// pro testy, které ověřují chování metod delegujících na snapshot.
+    /// Mapování:
+    ///   IsAllowed=false → klíč se do snapshotu nepromítne (snapshot ukládá jen povolená práva).
+    ///   ScopeLevel=GLOBAL nebo ScopeMode=ALL → GlobalPermissions.
+    ///   ScopeMode=INCLUDE + ProjectIds → PerProjectPermissions[projektId].
+    /// </summary>
+    private static AuthorizationSnapshot BuildSnapshot(bool isSuperAdmin, PermissionGrantViewModel[] grants)
+    {
+        var allowed = grants.Where(g => g.IsAllowed).ToList();
+
+        var globalKeys = allowed
+            .Where(g =>
+                string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(g.ScopeMode, "ALL", StringComparison.OrdinalIgnoreCase))
+            .Select(g => g.PermissionKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var perProject = allowed
+            .Where(g =>
+                string.Equals(g.ScopeMode, "INCLUDE", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(g.ScopeLevel, "GLOBAL", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(g => g.ProjectIds.Select(pid => (pid, g.PermissionKey)))
+            .GroupBy(x => x.pid)
+            .ToDictionary(
+                grp => grp.Key,
+                grp => (IReadOnlySet<string>)new HashSet<string>(grp.Select(x => x.PermissionKey), StringComparer.OrdinalIgnoreCase));
+
+        return new AuthorizationSnapshot(
+            IsSuperAdmin: isSuperAdmin,
+            GlobalPermissions: globalKeys,
+            PerProjectPermissions: perProject,
+            PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>());
+    }
+
     private static CurrentUserContextViewModel BuildUser(
         bool isSuperAdmin,
         IReadOnlyList<int>? visibleProjectIds = null,
@@ -326,7 +363,7 @@ public sealed class CurrentUserContextPermissionTests
             RoleKody = Array.Empty<string>(),
             VisibleProjectIds = visibleProjectIds ?? grants.SelectMany(x => x.ProjectIds).Distinct().ToArray(),
             DeletedProjectIds = deletedProjectIds ?? Array.Empty<int>(),
-            PermissionGrants = grants
+            Authorization = BuildSnapshot(isSuperAdmin, grants)
         };
     }
 }
