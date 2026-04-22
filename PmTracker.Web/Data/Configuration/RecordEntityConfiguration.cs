@@ -248,6 +248,15 @@ internal sealed class RecordExternalLinkEntityConfiguration : IEntityTypeConfigu
         builder.Property(x => x.VyzvaId).HasColumnName("vyzva_id");
         builder.Property(x => x.ZaradidDoVyzvy).HasColumnName("zaradid_do_vyzvy").HasDefaultValue(false);
         builder.Property(x => x.LastHarvestedAt).HasColumnName("last_harvested_at").IsRequired(false);
+        builder.Property(x => x.LastKnownHotZaznamDatum)
+            .HasColumnName("last_known_hot_zaznam_datum")
+            .IsRequired(false);
+        builder.Property(x => x.LastKnownMaxVyjadreniId)
+            .HasColumnName("last_known_max_vyjadreni_id")
+            .IsRequired(false);
+        builder.Property(x => x.LastKnownVyjadreniCount)
+            .HasColumnName("last_known_vyjadreni_count")
+            .IsRequired(false);
 
         builder.HasOne<VyzvaEntity>()
             .WithMany()

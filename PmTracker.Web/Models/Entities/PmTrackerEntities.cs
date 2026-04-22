@@ -310,6 +310,13 @@ public sealed class ZaznamExterniOdkazEntity
     public int? VyzvaId { get; set; }
     public bool ZaradidDoVyzvy { get; set; }
     public DateTime? LastHarvestedAt { get; set; }
+
+    // Fingerprint — spec §5.2. Primary = HOT_ZAZNAMY.datum (last-modified),
+    // secondary = MAX(HOT_VYJADRENI.id) + COUNT(*). Slouží pro fingerprint skip
+    // v SdHarvestService: když se od posledního harvestu nic nezměnilo, drill preskočit.
+    public DateTime? LastKnownHotZaznamDatum { get; set; }
+    public long? LastKnownMaxVyjadreniId { get; set; }
+    public int? LastKnownVyjadreniCount { get; set; }
 }
 
 public sealed class ZaznamSpolupraceEntity
