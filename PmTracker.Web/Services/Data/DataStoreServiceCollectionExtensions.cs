@@ -76,6 +76,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IAdSyncService, AdSyncService>();
         services.AddSingleton<AdPeriodicSyncHostedService>();
         services.AddHostedService(sp => sp.GetRequiredService<AdPeriodicSyncHostedService>());
+        services.AddHostedService<AdReactiveSyncConsumer>();
         services.AddScoped<ITextNormalizer, TextNormalizer>();
         services.AddScoped<IPersonIdentityMatcher, PersonIdentityMatcher>();
         services.AddScoped<ICommentAuthorizationPolicy, CommentAuthorizationPolicy>();
