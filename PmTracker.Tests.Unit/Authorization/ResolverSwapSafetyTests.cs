@@ -52,14 +52,17 @@ public sealed class ResolverSwapSafetyTests
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
 
         var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x).ToArray();
+        // Fáze C — Task C2: přidány dashboard/export/comments klíče (celkem 14)
         grantKeys.Should().BeEquivalentTo(new[]
         {
+            "comments.add", "comments.delete.own", "comments.edit.own",
+            "dashboard.view", "export.pdf", "export.word",
             "meetings.create", "meetings.edit",
             "projects.edit",
             "records.comment.subsystemlead",
             "records.edit", "records.schedule.add", "records.schedule.edit",
             "team.manage"
-        }, "VLASTNIK_PROJEKTU má dle seedu 8 permission keys — dřív builder nedal žádný");
+        }, "VLASTNIK_PROJEKTU má dle seedu 14 permission keys po Fázi C");
     }
 
     [Fact]
@@ -78,8 +81,14 @@ public sealed class ResolverSwapSafetyTests
 
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
 
-        grants.Should().ContainSingle();
-        grants[0].PermissionKey.Should().Be("records.comment.subsystemlead");
+        // Fáze C — Task C2: GEST dostává dashboard/export/comments klíče navíc
+        var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x).ToArray();
+        grantKeys.Should().BeEquivalentTo(new[]
+        {
+            "comments.add", "comments.delete.own", "comments.edit.own",
+            "dashboard.view", "export.pdf", "export.word",
+            "records.comment.subsystemlead"
+        }, "GEST má po Fázi C 7 permission keys");
     }
 
     [Fact]
@@ -98,7 +107,12 @@ public sealed class ResolverSwapSafetyTests
 
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
 
-        grants.Should().BeEmpty("HOST má read-only role — dashboard.view/export.* přijdou až ve Fázi C");
+        // Fáze C — Task C2: HOST dostává dashboard.view + export.* klíče
+        var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x).ToArray();
+        grantKeys.Should().BeEquivalentTo(new[]
+        {
+            "dashboard.view", "export.pdf", "export.word"
+        }, "HOST má po Fázi C 3 read-only permission keys");
     }
 
     [Fact]
@@ -118,12 +132,15 @@ public sealed class ResolverSwapSafetyTests
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
         var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x).ToArray();
 
+        // Fáze C — Task C2: přidány dashboard/export/comments klíče (celkem 13)
         grantKeys.Should().BeEquivalentTo(new[]
         {
+            "comments.add", "comments.delete.own", "comments.edit.own",
+            "dashboard.view", "export.pdf", "export.word",
             "meetings.create", "meetings.edit",
             "records.comment.subsystemlead",
             "records.edit", "records.schedule.add", "records.schedule.edit",
             "team.manage"
-        }, "ADM_PROJ má dle seedu 7 keys — builder dával jen 4");
+        }, "ADM_PROJ má dle seedu 13 keys po Fázi C");
     }
 }

@@ -71,6 +71,8 @@ public static class PermissionSeedConfiguration
         // Globální role
         new("SUPERADMIN", "Superadmin", "Pevná role s plnými oprávněními.", true, RoleScope.Global),
         new("APP_ADMIN", "Administrátor aplikace", "Správa aplikace a základních entit.", true, RoleScope.Global),
+        // Fáze C — Task C2: READ_ALL role pro management visibility
+        new("READ_ALL", "Read-all (management visibility)", "Read-only přístup ke všem projektům a jejich datům.", true, RoleScope.Global),
 
         // Projektové role (použité v ciselnik_roli_projektu)
         new("VLASTNIK_PROJEKTU", "Vlastník projektu", "Plný vlastník projektu.", true, RoleScope.Project),
@@ -128,6 +130,15 @@ public static class PermissionSeedConfiguration
         new("SUPERADMIN", "ciselniky.edit", ScopeMode.All, true),
         new("SUPERADMIN", "settings.view", ScopeMode.All, true),
         new("SUPERADMIN", "settings.manage", ScopeMode.All, true),
+        // Fáze C — Task C2: SUPERADMIN nové keys
+        new("SUPERADMIN", "dashboard.view", ScopeMode.All, true),
+        new("SUPERADMIN", "export.pdf", ScopeMode.All, true),
+        new("SUPERADMIN", "export.word", ScopeMode.All, true),
+        new("SUPERADMIN", "comments.add", ScopeMode.All, true),
+        new("SUPERADMIN", "comments.edit.own", ScopeMode.All, true),
+        new("SUPERADMIN", "comments.delete.own", ScopeMode.All, true),
+        new("SUPERADMIN", "search.reindex", ScopeMode.All, true),
+        new("SUPERADMIN", "projects.read.all", ScopeMode.All, true),
 
         new("APP_ADMIN", "projects.create", ScopeMode.All, true),
         new("APP_ADMIN", "projects.edit", ScopeMode.All, true),
@@ -141,6 +152,16 @@ public static class PermissionSeedConfiguration
         new("APP_ADMIN", "people.manage", ScopeMode.All, true),
         new("APP_ADMIN", "ciselniky.edit", ScopeMode.All, true),
         new("APP_ADMIN", "settings.view", ScopeMode.All, true),
+        // Fáze C — Task C2: APP_ADMIN administrativní nové keys
+        new("APP_ADMIN", "dashboard.view", ScopeMode.All, true),
+        new("APP_ADMIN", "search.reindex", ScopeMode.All, true),
+        new("APP_ADMIN", "projects.read.all", ScopeMode.All, true),
+
+        // Fáze C — Task C2: READ_ALL mappings
+        new("READ_ALL", "projects.read.all", ScopeMode.All, true),
+        new("READ_ALL", "dashboard.view", ScopeMode.All, true),
+        new("READ_ALL", "export.pdf", ScopeMode.All, true),
+        new("READ_ALL", "export.word", ScopeMode.All, true),
 
         // Authorization unification — Fáze A — Task A8
         // Projektové role mappings (jen existující permission keys;
@@ -153,6 +174,13 @@ public static class PermissionSeedConfiguration
         new("VLASTNIK_PROJEKTU", "meetings.create", ScopeMode.All, true),
         new("VLASTNIK_PROJEKTU", "meetings.edit", ScopeMode.All, true),
         new("VLASTNIK_PROJEKTU", "team.manage", ScopeMode.All, true),
+        // VLASTNIK_PROJEKTU — Fáze C keys:
+        new("VLASTNIK_PROJEKTU", "dashboard.view", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "export.pdf", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "export.word", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "comments.add", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "comments.edit.own", ScopeMode.All, true),
+        new("VLASTNIK_PROJEKTU", "comments.delete.own", ScopeMode.All, true),
 
         new("ADM_PROJ", "records.edit", ScopeMode.All, true),
         new("ADM_PROJ", "records.schedule.add", ScopeMode.All, true),
@@ -161,6 +189,13 @@ public static class PermissionSeedConfiguration
         new("ADM_PROJ", "meetings.create", ScopeMode.All, true),
         new("ADM_PROJ", "meetings.edit", ScopeMode.All, true),
         new("ADM_PROJ", "team.manage", ScopeMode.All, true),
+        // ADM_PROJ — Fáze C keys:
+        new("ADM_PROJ", "dashboard.view", ScopeMode.All, true),
+        new("ADM_PROJ", "export.pdf", ScopeMode.All, true),
+        new("ADM_PROJ", "export.word", ScopeMode.All, true),
+        new("ADM_PROJ", "comments.add", ScopeMode.All, true),
+        new("ADM_PROJ", "comments.edit.own", ScopeMode.All, true),
+        new("ADM_PROJ", "comments.delete.own", ScopeMode.All, true),
 
         new("PROJ_MAN", "records.edit", ScopeMode.All, true),
         new("PROJ_MAN", "records.schedule.add", ScopeMode.All, true),
@@ -169,16 +204,45 @@ public static class PermissionSeedConfiguration
         new("PROJ_MAN", "meetings.create", ScopeMode.All, true),
         new("PROJ_MAN", "meetings.edit", ScopeMode.All, true),
         new("PROJ_MAN", "team.manage", ScopeMode.All, true),
+        // PROJ_MAN — Fáze C keys:
+        new("PROJ_MAN", "dashboard.view", ScopeMode.All, true),
+        new("PROJ_MAN", "export.pdf", ScopeMode.All, true),
+        new("PROJ_MAN", "export.word", ScopeMode.All, true),
+        new("PROJ_MAN", "comments.add", ScopeMode.All, true),
+        new("PROJ_MAN", "comments.edit.own", ScopeMode.All, true),
+        new("PROJ_MAN", "comments.delete.own", ScopeMode.All, true),
 
         new("GEST", "records.comment.subsystemlead", ScopeMode.All, true),
+        // GEST — Fáze C (comments + read):
+        new("GEST", "dashboard.view", ScopeMode.All, true),
+        new("GEST", "export.pdf", ScopeMode.All, true),
+        new("GEST", "export.word", ScopeMode.All, true),
+        new("GEST", "comments.add", ScopeMode.All, true),
+        new("GEST", "comments.edit.own", ScopeMode.All, true),
+        new("GEST", "comments.delete.own", ScopeMode.All, true),
+
+        // HOST — Fáze C (read-only):
+        new("HOST", "dashboard.view", ScopeMode.All, true),
+        new("HOST", "export.pdf", ScopeMode.All, true),
+        new("HOST", "export.word", ScopeMode.All, true),
 
         // Authorization unification — Fáze A — Task A9
-        // Subsystémové role mappings (jen existující permission keys;
-        // comments.* se přidají ve Fázi C pro METODIK_SUBSYSTEMU)
+        // Subsystémové role mappings
         new("VEDOUCI_SUBSYSTEMU", "records.comment.subsystemlead", ScopeMode.All, true),
-        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "records.comment.subsystemlead", ScopeMode.All, true)
+        // VEDOUCI_SUBSYSTEMU — Fáze C (comments):
+        new("VEDOUCI_SUBSYSTEMU", "comments.add", ScopeMode.All, true),
+        new("VEDOUCI_SUBSYSTEMU", "comments.edit.own", ScopeMode.All, true),
+        new("VEDOUCI_SUBSYSTEMU", "comments.delete.own", ScopeMode.All, true),
 
-        // HOST — záměrně prázdný (read-only; dashboard/export přijdou ve Fázi C)
-        // METODIK_SUBSYSTEMU — záměrně prázdný (comments.* přijdou ve Fázi C)
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "records.comment.subsystemlead", ScopeMode.All, true),
+        // ZASTUPCE_VEDOUCIHO_SUBSYSTEMU — Fáze C:
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "comments.add", ScopeMode.All, true),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "comments.edit.own", ScopeMode.All, true),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "comments.delete.own", ScopeMode.All, true),
+
+        // METODIK_SUBSYSTEMU — Fáze C:
+        new("METODIK_SUBSYSTEMU", "comments.add", ScopeMode.All, true),
+        new("METODIK_SUBSYSTEMU", "comments.edit.own", ScopeMode.All, true),
+        new("METODIK_SUBSYSTEMU", "comments.delete.own", ScopeMode.All, true)
     ];
 }

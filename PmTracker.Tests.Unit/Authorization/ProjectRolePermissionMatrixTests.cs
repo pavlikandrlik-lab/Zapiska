@@ -15,10 +15,17 @@ public sealed class ProjectRolePermissionMatrixTests
     [Fact]
     public void VLASTNIK_PROJEKTU_ShouldHaveFullProjectPermissions()
     {
+        // Fáze C — Task C2: přidány dashboard/export/comments klíče
         var perms = PermissionsFor("VLASTNIK_PROJEKTU");
 
         perms.Should().BeEquivalentTo(new[]
         {
+            "comments.add",
+            "comments.delete.own",
+            "comments.edit.own",
+            "dashboard.view",
+            "export.pdf",
+            "export.word",
             "meetings.create",
             "meetings.edit",
             "projects.edit",
@@ -33,10 +40,17 @@ public sealed class ProjectRolePermissionMatrixTests
     [Fact]
     public void ADM_PROJ_ShouldHaveProjectAdminMinusProjectsEdit()
     {
+        // Fáze C — Task C2: přidány dashboard/export/comments klíče
         var perms = PermissionsFor("ADM_PROJ");
 
         perms.Should().BeEquivalentTo(new[]
         {
+            "comments.add",
+            "comments.delete.own",
+            "comments.edit.own",
+            "dashboard.view",
+            "export.pdf",
+            "export.word",
             "meetings.create",
             "meetings.edit",
             "records.comment.subsystemlead",
@@ -54,18 +68,29 @@ public sealed class ProjectRolePermissionMatrixTests
     }
 
     [Fact]
-    public void HOST_ShouldHaveNoWritePermissions()
+    public void HOST_ShouldHaveReadOnlyPermissions()
     {
-        // HOST is read-only; dashboard.view / export.* keys come in Phase C.
-        PermissionsFor("HOST").Should().BeEmpty();
+        // Fáze C — Task C2: HOST dostává dashboard.view + export klíče (read-only)
+        PermissionsFor("HOST").Should().BeEquivalentTo(new[]
+        {
+            "dashboard.view",
+            "export.pdf",
+            "export.word"
+        });
     }
 
     [Fact]
-    public void GEST_ShouldHaveCommentsOnly()
+    public void GEST_ShouldHaveCommentsAndReadOnly()
     {
-        // Comments.* keys arrive in Phase C. In Phase A we only have records.comment.subsystemlead.
+        // Fáze C — Task C2: GEST dostává comments.* + dashboard/export klíče
         PermissionsFor("GEST").Should().BeEquivalentTo(new[]
         {
+            "comments.add",
+            "comments.delete.own",
+            "comments.edit.own",
+            "dashboard.view",
+            "export.pdf",
+            "export.word",
             "records.comment.subsystemlead"
         });
     }

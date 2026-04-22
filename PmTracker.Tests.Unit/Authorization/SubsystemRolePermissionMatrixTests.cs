@@ -13,10 +13,14 @@ public sealed class SubsystemRolePermissionMatrixTests
             .ToArray();
 
     [Fact]
-    public void VEDOUCI_SUBSYSTEMU_ShouldHaveSubsystemLeadPermission()
+    public void VEDOUCI_SUBSYSTEMU_ShouldHaveSubsystemLeadAndCommentsPermissions()
     {
+        // Fáze C — Task C2: VEDOUCI dostává comments.* klíče
         PermissionsFor("VEDOUCI_SUBSYSTEMU").Should().BeEquivalentTo(new[]
         {
+            "comments.add",
+            "comments.delete.own",
+            "comments.edit.own",
             "records.comment.subsystemlead"
         });
     }
@@ -29,10 +33,14 @@ public sealed class SubsystemRolePermissionMatrixTests
     }
 
     [Fact]
-    public void METODIK_SUBSYSTEMU_ShouldBeEmpty_ForNow()
+    public void METODIK_SUBSYSTEMU_ShouldHaveComments()
     {
-        // Metodik má v Phase A žádný existing permission key.
-        // Po přidání comments.* ve Fázi C získá komentovací práva.
-        PermissionsFor("METODIK_SUBSYSTEMU").Should().BeEmpty();
+        // Fáze C — Task C2: METODIK_SUBSYSTEMU dostává komentovací práva
+        PermissionsFor("METODIK_SUBSYSTEMU").Should().BeEquivalentTo(new[]
+        {
+            "comments.add",
+            "comments.delete.own",
+            "comments.edit.own"
+        });
     }
 }
