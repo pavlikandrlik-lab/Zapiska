@@ -13,40 +13,45 @@
             @for (var i = 0; i < Model.ExterniVazby.Count; i++)
             {
                 var vazba = Model.ExterniVazby[i];
-                var showEstimatedPrice = string.Equals(vazba.Typ, "PMP", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(vazba.Typ, "PNF", StringComparison.OrdinalIgnoreCase);
+                var isPnf = string.Equals(vazba.Typ, "PNF", StringComparison.OrdinalIgnoreCase);
+                var showEstimatedPrice = isPnf
+                    || string.Equals(vazba.Typ, "PMP", StringComparison.OrdinalIgnoreCase);
                 var estimatedPriceValue = vazba.PredpokladanaCena?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty;
-                var datumObjednaniIso = vazba.DatumObjednani?.ToString("yyyy-MM-dd") ?? string.Empty;
-                var datumObjednaniDisplay = vazba.DatumObjednani?.ToString("dd.MM.yyyy") ?? string.Empty;
-                var planDodaniIso = vazba.PlanDodani?.ToString("yyyy-MM-dd") ?? string.Empty;
-                var planDodaniDisplay = vazba.PlanDodani?.ToString("dd.MM.yyyy") ?? string.Empty;
-                var datumDodaniIso = vazba.DatumDodani?.ToString("yyyy-MM-dd") ?? string.Empty;
-                var datumDodaniDisplay = vazba.DatumDodani?.ToString("dd.MM.yyyy") ?? string.Empty;
-                var datumPrevzetiIso = vazba.DatumPrevzeti?.ToString("yyyy-MM-dd") ?? string.Empty;
-                var datumPrevzetiDisplay = vazba.DatumPrevzeti?.ToString("dd.MM.yyyy") ?? string.Empty;
+                var statusText = vazba.VyzvaKod is not null
+                    ? $"Zařazeno do výzvy {vazba.VyzvaKod}"
+                    : vazba.ZaradidDoVyzvy ? "Čeká se (buffer projektu)" : null;
+                var datumObjednani = vazba.DatumObjednani?.ToString("dd.MM.yyyy") ?? "—";
+                var datumDodani = vazba.DatumDodani?.ToString("dd.MM.yyyy") ?? "—";
+                var datumPrevzeti = vazba.DatumPrevzeti?.ToString("dd.MM.yyyy");
+                var hasAnyDate = vazba.DatumObjednani.HasValue || vazba.DatumDodani.HasValue || vazba.DatumPrevzeti.HasValue;
+                var chatEnabled = !string.IsNullOrWhiteSpace(vazba.Typ);
+
                 <div class="external-row" data-external-row>
                     <input type="hidden" name="ExterniVazby[@i].Id" value="@vazba.Id" />
-                    <label>
-                        Typ odkazu
-                        <select name="ExterniVazby[@i].Typ" data-external-type-select>
-                            @foreach (var typ in Model.TypyExternichOdkazu)
-                            {
-                                if (typ == vazba.Typ)
-                                {
-                                    <option selected="selected">@typ</option>
-                                }
-                                else
-                                {
-                                    <option>@typ</option>
-                                }
-                            }
-                        </select>
-                    </label>
-                    <label>
+                    <input type="hidden" name="ExterniVazby[@i].Typ" value="@vazba.Typ" data-external-type-hidden />
+                    <input type="hidden" name="ExterniVazby[@i].DatumObjednani" value="@(vazba.DatumObjednani?.ToString("yyyy-MM-dd"))" data-external-datum-objednani />
+                    <input type="hidden" name="ExterniVazby[@i].PlanDodani" value="@(vazba.PlanDodani?.ToString("yyyy-MM-dd"))" />
+                    <input type="hidden" name="ExterniVazby[@i].DatumDodani" value="@(vazba.DatumDodani?.ToString("yyyy-MM-dd"))" data-external-datum-dodani />
+                    <input type="hidden" name="ExterniVazby[@i].DatumPrevzeti" value="@(vazba.DatumPrevzeti?.ToString("yyyy-MM-dd"))" data-external-datum-prevzeti />
+
+                    <label class="external-field-cislo">
                         Číslo
-                        <input type="text" name="ExterniVazby[@i].Cislo" value="@vazba.Cislo" />
+                        <input type="text"
+                               name="ExterniVazby[@i].Cislo"
+                               value="@vazba.Cislo"
+                               maxlength="6"
+                               pattern="[0-9]{6}"
+                               inputmode="numeric"
+                               data-external-cislo
+                               data-external-odkaz-id="@vazba.Id" />
                     </label>
-                    <label data-external-price-field hidden="@(showEstimatedPrice ? null : "hidden")">
+
+                    <label class="external-field-typ">
+                        Typ
+                        <span class="pm-readonly-text" data-external-type-display>@(vazba.Typ ?? "—")</span>
+                    </label>
+
+                    <label class="external-field-cena" data-external-price-field @(showEstimatedPrice ? null : "hidden=\"hidden\"")>
                         Předpokládaná cena
                         <input type="number"
                                name="ExterniVazby[@i].PredpokladanaCena"
@@ -57,15 +62,8 @@
                                data-external-price-input
                                disabled="@(showEstimatedPrice ? null : "disabled")" />
                     </label>
-                    @{
-                        var isPnf = string.Equals(vazba.Typ, "PNF", StringComparison.OrdinalIgnoreCase);
-                        var statusText = vazba.VyzvaKod is not null
-                            ? $"Zařazeno do výzvy {vazba.VyzvaKod}"
-                            : vazba.ZaradidDoVyzvy
-                                ? "Čeká se (buffer projektu)"
-                                : null;
-                    }
-                    <div class="vyzvy-switch-wrap" data-external-vyzvy-switch-wrap
+
+                    <div class="external-field-vyzva vyzvy-switch-wrap" data-external-vyzvy-switch-wrap
                          @(isPnf ? null : "hidden=\"hidden\"")>
                         <label class="pm-switch-label">
                             <input type="hidden" name="ExterniVazby[@i].VyzvaId" value="@vazba.VyzvaId" />
@@ -75,64 +73,46 @@
                                    data-vyzvy-switch
                                    data-externi-odkaz-id="@vazba.Id"
                                    @(vazba.ZaradidDoVyzvy ? "checked=\"checked\"" : null) />
-                            Zařadit do další výzvy
+                            <span>Výzva</span>
                         </label>
                         <span class="vyzvy-switch-status" data-vyzvy-switch-status>@statusText</span>
                     </div>
-                    <label>
-                        Datum objednání
-                        @await Html.PartialAsync(
-                            "_AppDateField",
-                            new AppDateFieldViewModel
-                            {
-                                Name = $"ExterniVazby[{i}].DatumObjednani",
-                                IsoValue = datumObjednaniIso,
-                                DisplayValue = datumObjednaniDisplay,
-                                Locked = false,
-                                AriaLabel = "Otevřít kalendář"
-                            })
-                    </label>
-                    <label>
-                        Plán dodání
-                        @await Html.PartialAsync(
-                            "_AppDateField",
-                            new AppDateFieldViewModel
-                            {
-                                Name = $"ExterniVazby[{i}].PlanDodani",
-                                IsoValue = planDodaniIso,
-                                DisplayValue = planDodaniDisplay,
-                                Locked = false,
-                                AriaLabel = "Otevřít kalendář"
-                            })
-                    </label>
-                    <label>
-                        Datum dodání
-                        @await Html.PartialAsync(
-                            "_AppDateField",
-                            new AppDateFieldViewModel
-                            {
-                                Name = $"ExterniVazby[{i}].DatumDodani",
-                                IsoValue = datumDodaniIso,
-                                DisplayValue = datumDodaniDisplay,
-                                Locked = false,
-                                AriaLabel = "Otevřít kalendář"
-                            })
-                    </label>
-                    <label>
-                        Datum převzetí
-                        @await Html.PartialAsync(
-                            "_AppDateField",
-                            new AppDateFieldViewModel
-                            {
-                                Name = $"ExterniVazby[{i}].DatumPrevzeti",
-                                IsoValue = datumPrevzetiIso,
-                                DisplayValue = datumPrevzetiDisplay,
-                                Locked = false,
-                                AriaLabel = "Otevřít kalendář"
-                            })
-                    </label>
+
                     <div class="external-actions">
-                        <pm-button variant="Ghost" size="Small" data-external-remove="true">Odebrat vazbu</pm-button>
+                        <pm-button variant="Ghost" size="Small" data-external-chat-open="true"
+                                   data-external-odkaz-id="@vazba.Id"
+                                   title="Vyjádření a termíny"
+                                   aria-label="Vyjádření a termíny"
+                                   disabled="@(!chatEnabled)">
+                            <gov-icon name="chat-dots" type="components" aria-hidden="true"></gov-icon>
+                        </pm-button>
+                        <pm-button variant="Ghost" size="Small" data-external-remove="true"
+                                   title="Odebrat vazbu"
+                                   aria-label="Odebrat vazbu">
+                            <gov-icon name="trash" type="components" aria-hidden="true"></gov-icon>
+                        </pm-button>
+                    </div>
+
+                    <div class="external-dates" @(hasAnyDate ? null : "hidden=\"hidden\"")>
+                        <div class="external-date-item">
+                            <span class="label">Datum objednání</span>
+                            <span class="value">@datumObjednani</span>
+                        </div>
+                        <div class="external-date-item">
+                            <span class="label">Datum dodání</span>
+                            <span class="value">@datumDodani</span>
+                        </div>
+                        <div class="external-date-item">
+                            <span class="label">Datum převzetí</span>
+                            @if (datumPrevzeti is not null)
+                            {
+                                <span class="value">@datumPrevzeti</span>
+                            }
+                            else
+                            {
+                                <span class="value muted">Záznam ještě nebyl převeden do archivu.</span>
+                            }
+                        </div>
                     </div>
                 </div>
             }
@@ -141,20 +121,30 @@
         <template data-external-template>
             <div class="external-row" data-external-row>
                 <input type="hidden" name="ExterniVazby[__index__].Id" value="0" />
-                <label>
-                    Typ odkazu
-                    <select name="ExterniVazby[__index__].Typ" data-external-type-select>
-                        @foreach (var typ in Model.TypyExternichOdkazu)
-                        {
-                            <option>@typ</option>
-                        }
-                    </select>
-                </label>
-                <label>
+                <input type="hidden" name="ExterniVazby[__index__].Typ" value="" data-external-type-hidden />
+                <input type="hidden" name="ExterniVazby[__index__].DatumObjednani" value="" data-external-datum-objednani />
+                <input type="hidden" name="ExterniVazby[__index__].PlanDodani" value="" />
+                <input type="hidden" name="ExterniVazby[__index__].DatumDodani" value="" data-external-datum-dodani />
+                <input type="hidden" name="ExterniVazby[__index__].DatumPrevzeti" value="" data-external-datum-prevzeti />
+
+                <label class="external-field-cislo">
                     Číslo
-                    <input type="text" name="ExterniVazby[__index__].Cislo" value="" />
+                    <input type="text"
+                           name="ExterniVazby[__index__].Cislo"
+                           value=""
+                           maxlength="6"
+                           pattern="[0-9]{6}"
+                           inputmode="numeric"
+                           data-external-cislo
+                           data-external-odkaz-id="0" />
                 </label>
-                <label data-external-price-field hidden="hidden">
+
+                <label class="external-field-typ">
+                    Typ
+                    <span class="pm-readonly-text" data-external-type-display>—</span>
+                </label>
+
+                <label class="external-field-cena" data-external-price-field hidden="hidden">
                     Předpokládaná cena
                     <input type="number"
                            name="ExterniVazby[__index__].PredpokladanaCena"
@@ -165,69 +155,36 @@
                            data-external-price-input
                            disabled="disabled" />
                 </label>
-                <div class="vyzvy-switch-wrap" data-external-vyzvy-switch-wrap hidden="hidden">
+
+                <div class="external-field-vyzva vyzvy-switch-wrap" data-external-vyzvy-switch-wrap hidden="hidden">
                     <label class="pm-switch-label">
                         <input type="hidden" name="ExterniVazby[__index__].VyzvaId" value="" />
                         <input type="hidden" name="ExterniVazby[__index__].ZaradidDoVyzvy" value="false" data-external-vyzvy-switch-state />
                         <input type="checkbox" class="pm-switch" data-vyzvy-switch data-externi-odkaz-id="" />
-                        Zařadit do další výzvy
+                        <span>Výzva</span>
                     </label>
                     <span class="vyzvy-switch-status" data-vyzvy-switch-status></span>
                 </div>
-                <label>
-                    Datum objednání
-                    @await Html.PartialAsync(
-                        "_AppDateField",
-                        new AppDateFieldViewModel
-                        {
-                            Name = "ExterniVazby[__index__].DatumObjednani",
-                            IsoValue = string.Empty,
-                            DisplayValue = string.Empty,
-                            Locked = false,
-                            AriaLabel = "Otevřít kalendář"
-                        })
-                </label>
-                <label>
-                    Plán dodání
-                    @await Html.PartialAsync(
-                        "_AppDateField",
-                        new AppDateFieldViewModel
-                        {
-                            Name = "ExterniVazby[__index__].PlanDodani",
-                            IsoValue = string.Empty,
-                            DisplayValue = string.Empty,
-                            Locked = false,
-                            AriaLabel = "Otevřít kalendář"
-                        })
-                </label>
-                <label>
-                    Datum dodání
-                    @await Html.PartialAsync(
-                        "_AppDateField",
-                        new AppDateFieldViewModel
-                        {
-                            Name = "ExterniVazby[__index__].DatumDodani",
-                            IsoValue = string.Empty,
-                            DisplayValue = string.Empty,
-                            Locked = false,
-                            AriaLabel = "Otevřít kalendář"
-                        })
-                </label>
-                <label>
-                    Datum převzetí
-                    @await Html.PartialAsync(
-                        "_AppDateField",
-                        new AppDateFieldViewModel
-                        {
-                            Name = "ExterniVazby[__index__].DatumPrevzeti",
-                            IsoValue = string.Empty,
-                            DisplayValue = string.Empty,
-                            Locked = false,
-                            AriaLabel = "Otevřít kalendář"
-                        })
-                </label>
+
                 <div class="external-actions">
-                    <pm-button variant="Ghost" size="Small" data-external-remove="true">Odebrat vazbu</pm-button>
+                    <pm-button variant="Ghost" size="Small" data-external-chat-open="true"
+                               data-external-odkaz-id="0"
+                               title="Vyjádření a termíny"
+                               aria-label="Vyjádření a termíny"
+                               disabled="true">
+                        <gov-icon name="chat-dots" type="components" aria-hidden="true"></gov-icon>
+                    </pm-button>
+                    <pm-button variant="Ghost" size="Small" data-external-remove="true"
+                               title="Odebrat vazbu"
+                               aria-label="Odebrat vazbu">
+                        <gov-icon name="trash" type="components" aria-hidden="true"></gov-icon>
+                    </pm-button>
+                </div>
+
+                <div class="external-dates" hidden="hidden">
+                    <div class="external-date-item"><span class="label">Datum objednání</span><span class="value">—</span></div>
+                    <div class="external-date-item"><span class="label">Datum dodání</span><span class="value">—</span></div>
+                    <div class="external-date-item"><span class="label">Datum převzetí</span><span class="value muted">Záznam ještě nebyl převeden do archivu.</span></div>
                 </div>
             </div>
         </template>
