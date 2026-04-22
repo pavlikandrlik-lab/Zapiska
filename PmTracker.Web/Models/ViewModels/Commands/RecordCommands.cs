@@ -46,6 +46,21 @@ public sealed class SaveRecordCommand
 
     public List<SaveRecordHarmonogramValueCommand> HarmonogramHodnoty { get; set; } = new();
 
+    /// <summary>
+    /// Plán D: ruční skutečnost pro kroky 2/5/8/9. Mimo návrhový workflow
+    /// (přímá editace, schéma 1) má tato kolekce prioritu nad
+    /// <see cref="HarmonogramHodnoty"/>, protože je vyjádřená absolutním
+    /// kalendářním datem, které server převádí na odchylku vůči plánu.
+    /// </summary>
+    public List<ManualActualKrokDto> ManualActualKroky { get; set; } = new();
+
+    /// <summary>
+    /// Plán D (schéma 3 — CREATE_RECORD): pre-bound vazby mezi bublinami
+    /// HOT_VYJADRENI a kroky harmonogramu nového záznamu. Aplikují se až při
+    /// schválení návrhu, kdy teprve vznikne cílový záznam.
+    /// </summary>
+    public List<HarmonogramVazbaDto> HarmonogramVazby { get; set; } = new();
+
     public string? EditorTab { get; set; }
 
     public string? Presentation { get; set; }

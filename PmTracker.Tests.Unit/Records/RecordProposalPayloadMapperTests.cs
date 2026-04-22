@@ -104,4 +104,74 @@ public sealed class RecordProposalPayloadMapperTests
         command.HarmonogramHodnoty.Should().ContainSingle().Which.TypId.Should().Be(21);
         command.JednaniIdProCislo.Should().Be(91);
     }
+
+    [Fact]
+    public void BuildCreatePayload_ShouldRoundTripManualActualKrokyAndVazby()
+    {
+        var krokKey1 = Guid.NewGuid();
+        var krokKey2 = Guid.NewGuid();
+        var command = new SaveRecordCommand
+        {
+            ProjektId = 1,
+            Kategorie = "Úkol",
+            Stav = "Nový",
+            Nazev = "N1",
+            VlastnikId = 10,
+            Subsystem = "SYS",
+            DatumZalozeni = new DateTime(2026, 1, 1),
+            TerminUkonceni = new DateTime(2026, 6, 1),
+            ManualActualKroky =
+            [
+                new ManualActualKrokDto { KrokKey = krokKey1, AbsolutniDatum = new DateOnly(2026, 3, 1) }
+            ],
+            HarmonogramVazby =
+            [
+                new HarmonogramVazbaDto
+                {
+                    KrokKey = krokKey2,
+                    ExterniOdkazIndex = 1,
+                    HotVyjadreniId = 555,
+                    DatumVyjadreni = new DateTimeOffset(2026, 3, 14, 10, 0, 0, TimeSpan.Zero)
+                }
+            ]
+        };
+
+        var payload = _sut.BuildCreatePayload(command);
+        var roundtripped = _sut.BuildSaveCommand(payload.CreateRecord!);
+
+        roundtripped.ManualActualKroky.Should().HaveCount(1);
+        roundtripped.ManualActualKroky[0].KrokKey.Should().Be(krokKey1);
+        roundtripped.ManualActualKroky[0].AbsolutniDatum.Should().Be(new DateOnly(2026, 3, 1));
+        roundtripped.HarmonogramVazby.Should().HaveCount(1);
+        roundtripped.HarmonogramVazby[0].KrokKey.Should().Be(krokKey2);
+        roundtripped.HarmonogramVazby[0].ExterniOdkazIndex.Should().Be(1);
+        roundtripped.HarmonogramVazby[0].HotVyjadreniId.Should().Be(555);
+    }
+
+    [Fact]
+    public void BuildSchedulePayload_ShouldRoundTripManualActualKroky()
+    {
+        var krokKey = Guid.NewGuid();
+        var command = new SaveRecordCommand
+        {
+            ProjektId = 1,
+            Id = 19,
+            TerminUkonceni = new DateTime(2026, 4, 30),
+            ManualActualKroky =
+            [
+                new ManualActualKrokDto { KrokKey = krokKey, AbsolutniDatum = new DateOnly(2026, 4, 10) }
+            ]
+        };
+
+        var payload = _sut.BuildSchedulePayload(
+            command,
+            plannedTypeIds: [101],
+            actualTypeIds: [102],
+            originalDeadline: new DateTime(2026, 4, 30),
+            existingValues: new Dictionary<int, int>());
+
+        payload.SchedulePlan!.ManualActualKroky.Should().HaveCount(1);
+        payload.SchedulePlan.ManualActualKroky[0].KrokKey.Should().Be(krokKey);
+        payload.SchedulePlan.ManualActualKroky[0].AbsolutniDatum.Should().Be(new DateOnly(2026, 4, 10));
+    }
 }

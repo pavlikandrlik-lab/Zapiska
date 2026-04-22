@@ -44,7 +44,23 @@ public sealed class RecordProposalPayloadMapper
                         Hodnota = value.Hodnota
                     })
                     .ToList(),
-                JednaniIdProCislo = command.JednaniIdProCislo
+                JednaniIdProCislo = command.JednaniIdProCislo,
+                ManualActualKroky = command.ManualActualKroky
+                    .Select(x => new ManualActualKrokDto
+                    {
+                        KrokKey = x.KrokKey,
+                        AbsolutniDatum = x.AbsolutniDatum
+                    })
+                    .ToList(),
+                HarmonogramVazby = command.HarmonogramVazby
+                    .Select(x => new HarmonogramVazbaDto
+                    {
+                        KrokKey = x.KrokKey,
+                        ExterniOdkazIndex = x.ExterniOdkazIndex,
+                        HotVyjadreniId = x.HotVyjadreniId,
+                        DatumVyjadreni = x.DatumVyjadreni
+                    })
+                    .ToList()
             }
         };
     }
@@ -93,7 +109,14 @@ public sealed class RecordProposalPayloadMapper
                     .ToList(),
                 ChangesTermDeadline = changesTermDeadline,
                 ChangesSchedulePlan = changesSchedulePlan,
-                ChangesScheduleActual = changesScheduleActual
+                ChangesScheduleActual = changesScheduleActual,
+                ManualActualKroky = command.ManualActualKroky
+                    .Select(x => new ManualActualKrokDto
+                    {
+                        KrokKey = x.KrokKey,
+                        AbsolutniDatum = x.AbsolutniDatum
+                    })
+                    .ToList()
             }
         };
     }
@@ -135,7 +158,23 @@ public sealed class RecordProposalPayloadMapper
                     Hodnota = value.Hodnota
                 })
                 .ToList(),
-            JednaniIdProCislo = payload.JednaniIdProCislo
+            JednaniIdProCislo = payload.JednaniIdProCislo,
+            ManualActualKroky = payload.ManualActualKroky
+                .Select(x => new ManualActualKrokDto
+                {
+                    KrokKey = x.KrokKey,
+                    AbsolutniDatum = x.AbsolutniDatum
+                })
+                .ToList(),
+            HarmonogramVazby = payload.HarmonogramVazby
+                .Select(x => new HarmonogramVazbaDto
+                {
+                    KrokKey = x.KrokKey,
+                    ExterniOdkazIndex = x.ExterniOdkazIndex,
+                    HotVyjadreniId = x.HotVyjadreniId,
+                    DatumVyjadreni = x.DatumVyjadreni
+                })
+                .ToList()
         };
     }
 
