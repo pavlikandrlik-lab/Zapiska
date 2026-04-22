@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
@@ -44,7 +45,8 @@ public sealed record HarmonogramVypocetKroku(
 internal sealed class HarmonogramService(
     PmTrackerDbContext dbContext,
     IAuditWriteService auditWriteService,
-    TimeProvider timeProvider) : IHarmonogramService
+    TimeProvider timeProvider,
+    ILogger<HarmonogramService> logger) : IHarmonogramService
 {
     private static readonly StringComparer Ci = StringComparer.OrdinalIgnoreCase;
     private const string DefaultDelayBarvaHex = "#DC2626";
@@ -196,7 +198,7 @@ internal sealed class HarmonogramService(
             if (schema is null)
             {
                 // F-06: Fallback to active schema when requested version not found
-                // TODO: Add logger.LogWarning when ILogger is injected
+                logger.LogWarning("Harmonogram fallback: schema version {SchemaVersion} not found in database, falling back to active schema.", schemaVersion);
                 return await LoadActiveHarmonogramSchemaAsync(ct);
             }
 
@@ -214,7 +216,7 @@ internal sealed class HarmonogramService(
         catch (Exception ex) when (IsMissingHarmonogramCatalogSchema(ex))
         {
             // F-06: Fallback due to missing schema
-            // TODO: Add logger.LogWarning when ILogger is injected
+            logger.LogWarning(ex, "Harmonogram fallback: catalog schema tables missing for version {SchemaVersion}, using built-in defaults.", schemaVersion);
             return BuildFallbackSchemaDefinition(schemaVersion);
         }
     }
@@ -258,9 +260,14 @@ internal sealed class HarmonogramService(
         foreach (var duration in durationRows)
         {
             // F-19: KrokKey párování - fallback na KrokPoradi pokud KrokKey selže
-            // TODO F-19: Přidat ILogger warning pro KrokKey fallback (logger není v constructor injektován)
-            var delayType = delayRows.FirstOrDefault(x => x.KrokKey == duration.KrokKey)
-                ?? delayRows.FirstOrDefault(x => x.KrokPoradi == duration.KrokPoradi);
+            var delayByKey = delayRows.FirstOrDefault(x => x.KrokKey == duration.KrokKey);
+            if (delayByKey is null)
+            {
+                logger.LogWarning(
+                    "Harmonogram fallback F-19: KrokKey match failed for duration row Id={DurationId} KrokKey={KrokKey} in schema version {SchemaVersion}, falling back to KrokPoradi={KrokPoradi} match.",
+                    duration.Id, duration.KrokKey, schemaVersion, duration.KrokPoradi);
+            }
+            var delayType = delayByKey ?? delayRows.FirstOrDefault(x => x.KrokPoradi == duration.KrokPoradi);
 
             result.Add(new HarmonogramTypPar(
                 krokIndex,
