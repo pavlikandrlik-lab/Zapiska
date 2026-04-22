@@ -57,6 +57,7 @@ public sealed class PmTrackerDbContext : DbContext
     public DbSet<AuthzUserRoleEntity> AuthzUserRoles => Set<AuthzUserRoleEntity>();
     public DbSet<AuthzAuditLogEntity> AuthzAuditLog => Set<AuthzAuditLogEntity>();
     public DbSet<SearchReindexCheckpointEntity> SearchReindexCheckpoint => Set<SearchReindexCheckpointEntity>();
+    public DbSet<AdSyncSettingsEntity> AdSyncSettings => Set<AdSyncSettingsEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
