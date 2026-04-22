@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using System.Globalization;
 using PmTracker.Web.Data;
 using PmTracker.Web.Services.ActiveDirectory;
+using PmTracker.Web.Services.Sync;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Dictionaries;
 using PmTracker.Web.Services.Export;
@@ -67,6 +68,14 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IUserContextResolver, UserContextResolver>();
         services.AddScoped<PermissionSeeder>();
         services.AddScoped<IActiveDirectoryService, ActiveDirectoryService>();
+        // Shared sync infrastructure — per-T singletony
+        services.AddSingleton(typeof(ISyncJobRunLock<>), typeof(SyncJobRunLock<>));
+        services.AddSingleton(typeof(IReactiveSyncQueue<>), typeof(ReactiveSyncQueue<>));
+        services.AddSingleton(typeof(ManualTriggerSignal<>));
+        // AD sync konzument
+        services.AddScoped<IAdSyncService, AdSyncService>();
+        services.AddSingleton<AdPeriodicSyncHostedService>();
+        services.AddHostedService(sp => sp.GetRequiredService<AdPeriodicSyncHostedService>());
         services.AddScoped<ITextNormalizer, TextNormalizer>();
         services.AddScoped<IPersonIdentityMatcher, PersonIdentityMatcher>();
         services.AddScoped<ICommentAuthorizationPolicy, CommentAuthorizationPolicy>();
