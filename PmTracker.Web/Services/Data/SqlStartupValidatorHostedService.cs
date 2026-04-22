@@ -169,6 +169,13 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             throw new InvalidOperationException("V DB chybí index IX_zaznam_priority_uzivatelu_osoba_score_zaznam. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_4_record_priority_matrix.sql.");
         }
 
+        // Authorization unification — Fáze A — migrace db_upgrade_1_2_0
+        if (!await HasColumnAsync(dbContext, "authz.roles", "scope", ct))
+        {
+            throw new InvalidOperationException(
+                "V DB chybí sloupec authz.roles.scope. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_2_0_authz_role_scope.sql.");
+        }
+
         _logger.LogInformation("SQL startup validace proběhla úspěšně.");
     }
 
