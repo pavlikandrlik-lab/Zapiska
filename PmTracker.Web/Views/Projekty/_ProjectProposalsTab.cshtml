@@ -4,7 +4,11 @@
     var isActive = ViewData["IsActive"] as bool? ?? false;
 }
 
-<section class="tab-panel @(isActive ? "active" : null)" data-tab-panel="navrhy">
+<section id="panel-navrhy"
+         class="tab-panel @(isActive ? "active" : null)"
+         role="tabpanel"
+         aria-labelledby="tab-navrhy"
+         data-tab-panel="navrhy">
     <div class="panel-header">
         <div class="panel-header-actions">
             @if (Model.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.CreateRecordProposalUrl))

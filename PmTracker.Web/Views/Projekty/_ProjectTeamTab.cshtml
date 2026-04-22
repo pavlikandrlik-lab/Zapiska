@@ -3,7 +3,12 @@
     var isActive = ViewData["IsActive"] as bool? ?? false;
 }
 
-<section class="tab-panel @(isActive ? "active" : null)" data-tab-panel="tym" data-table-tools-root>
+<section id="panel-tym"
+         class="tab-panel @(isActive ? "active" : null)"
+         role="tabpanel"
+         aria-labelledby="tab-tym"
+         data-tab-panel="tym"
+         data-table-tools-root>
     <div class="table-tools-toolbar">
         <label class="table-tools-search">
             <span>Hledat v týmu</span>

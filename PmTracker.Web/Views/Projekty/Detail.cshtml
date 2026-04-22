@@ -35,29 +35,49 @@
 
 <div class="tabs" role="tablist">
     <a class="tab @(Model.ActiveTab == "zaznamy" ? "active" : null)"
+       id="tab-zaznamy"
        href="@recordsTabUrl"
+       role="tab"
+       aria-selected="@(Model.ActiveTab == "zaznamy" ? "true" : "false")"
+       aria-controls="panel-zaznamy"
        data-tab="zaznamy">
         Záznamy
     </a>
     <a class="tab @(Model.ActiveTab == "harmonogram" ? "active" : null)"
+       id="tab-harmonogram"
        href="@scheduleTabUrl"
+       role="tab"
+       aria-selected="@(Model.ActiveTab == "harmonogram" ? "true" : "false")"
+       aria-controls="panel-harmonogram"
        data-tab="harmonogram">
         Harmonogram
     </a>
     <a class="tab @(Model.ActiveTab == "jednani" ? "active" : null)"
+       id="tab-jednani"
        href="@meetingsTabUrl"
+       role="tab"
+       aria-selected="@(Model.ActiveTab == "jednani" ? "true" : "false")"
+       aria-controls="panel-jednani"
        data-tab="jednani">
         Jednání
     </a>
     <a class="tab @(Model.ActiveTab == "tym" ? "active" : null)"
+       id="tab-tym"
        href="@teamTabUrl"
+       role="tab"
+       aria-selected="@(Model.ActiveTab == "tym" ? "true" : "false")"
+       aria-controls="panel-tym"
        data-tab="tym">
         Osoby (tým)
     </a>
     @if (Model.CanViewProposals)
     {
         <a class="tab @(Model.ActiveTab == "navrhy" ? "active" : null)"
+           id="tab-navrhy"
            href="@proposalsTabUrl"
+           role="tab"
+           aria-selected="@(Model.ActiveTab == "navrhy" ? "true" : "false")"
+           aria-controls="panel-navrhy"
            data-tab="navrhy">
             Návrhy
         </a>
@@ -65,6 +85,8 @@
     @if (Model.CanViewDashboard)
     {
         <a class="tab"
+           role="tab"
+           aria-selected="false"
            href="@Url.Action("Index", "ProjectDashboard", new { id = Model.Projekt.Id })">
             Dashboard
         </a>
@@ -93,7 +115,10 @@
 }
 else
 {
-    <section class="tab-panel @(Model.ActiveTab == "harmonogram" ? "active" : null)"
+    <section id="panel-harmonogram"
+             class="tab-panel @(Model.ActiveTab == "harmonogram" ? "active" : null)"
+             role="tabpanel"
+             aria-labelledby="tab-harmonogram"
              data-tab-panel="harmonogram"
              data-project-tab-lazy-url="@Model.HarmonogramTab.LoadUrl"
              data-project-tab-loaded="false">
@@ -123,7 +148,10 @@ else
     }
     else
     {
-        <section class="tab-panel @(Model.ActiveTab == "navrhy" ? "active" : null)"
+        <section id="panel-navrhy"
+                 class="tab-panel @(Model.ActiveTab == "navrhy" ? "active" : null)"
+                 role="tabpanel"
+                 aria-labelledby="tab-navrhy"
                  data-tab-panel="navrhy"
                  data-project-tab-lazy-url="@Model.NavrhyTab.LoadUrl"
                  data-project-tab-loaded="false">
@@ -152,7 +180,10 @@ else
 }
 else
 {
-    <section class="tab-panel @(Model.ActiveTab == "jednani" ? "active" : null)"
+    <section id="panel-jednani"
+             class="tab-panel @(Model.ActiveTab == "jednani" ? "active" : null)"
+             role="tabpanel"
+             aria-labelledby="tab-jednani"
              data-tab-panel="jednani"
              data-project-tab-lazy-url="@Model.JednaniTab.LoadUrl"
              data-project-tab-loaded="false">
@@ -179,7 +210,10 @@ else
 }
 else
 {
-    <section class="tab-panel @(Model.ActiveTab == "tym" ? "active" : null)"
+    <section id="panel-tym"
+             class="tab-panel @(Model.ActiveTab == "tym" ? "active" : null)"
+             role="tabpanel"
+             aria-labelledby="tab-tym"
              data-tab-panel="tym"
              data-project-tab-lazy-url="@Model.TymTab.LoadUrl"
              data-project-tab-loaded="false">

@@ -3,7 +3,11 @@
     var isActive = ViewData["IsActive"] as bool? ?? false;
 }
 
-<section class="tab-panel @(isActive ? "active" : null)" data-tab-panel="harmonogram">
+<section id="panel-harmonogram"
+         class="tab-panel @(isActive ? "active" : null)"
+         role="tabpanel"
+         aria-labelledby="tab-harmonogram"
+         data-tab-panel="harmonogram">
     <div class="filter-shell"
          data-project-filter-scope="schedule"
          data-project-id="@Model.ProjektId"

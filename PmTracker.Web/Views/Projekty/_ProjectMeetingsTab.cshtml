@@ -3,7 +3,11 @@
     var isActive = ViewData["IsActive"] as bool? ?? false;
 }
 
-<section class="tab-panel @(isActive ? "active" : null)" data-tab-panel="jednani">
+<section id="panel-jednani"
+         class="tab-panel @(isActive ? "active" : null)"
+         role="tabpanel"
+         aria-labelledby="tab-jednani"
+         data-tab-panel="jednani">
     @if (Model.CanCreateMeetings)
     {
         <div class="panel-header">

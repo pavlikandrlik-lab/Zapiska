@@ -5,7 +5,10 @@
     var targetRecordOpenComments = ViewData["TargetRecordOpenComments"] as bool? ?? false;
 }
 
-<section class="tab-panel @(isActive ? "active" : null)"
+<section id="panel-zaznamy"
+         class="tab-panel @(isActive ? "active" : null)"
+         role="tabpanel"
+         aria-labelledby="tab-zaznamy"
          data-tab-panel="zaznamy"
          data-project-detail-root
          data-project-id="@Model.ProjektId"
