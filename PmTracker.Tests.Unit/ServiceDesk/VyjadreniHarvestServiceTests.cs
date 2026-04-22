@@ -18,6 +18,7 @@ public sealed class VyjadreniHarvestServiceTests
             .Options);
 
     private static readonly Guid K3Key = Guid.Parse("11111111-1111-1111-1111-111111111103");
+    private static readonly Guid K4Key = Guid.Parse("11111111-1111-1111-1111-111111111104");
     private static readonly Guid K6Key = Guid.Parse("11111111-1111-1111-1111-111111111106");
     private static readonly Guid K7Key = Guid.Parse("11111111-1111-1111-1111-111111111107");
     private static readonly Guid K10Key = Guid.Parse("11111111-1111-1111-1111-111111111110");
@@ -27,6 +28,7 @@ public sealed class VyjadreniHarvestServiceTests
         var kroky = new[]
         {
             (poradi: 3, kod: "HS03_DURATION", key: K3Key),
+            (poradi: 4, kod: "HS04_DURATION", key: K4Key),
             (poradi: 6, kod: "HS06_DURATION", key: K6Key),
             (poradi: 7, kod: "HS07_DURATION", key: K7Key),
             (poradi: 10, kod: "HS10_DURATION", key: K10Key),
@@ -266,6 +268,78 @@ public sealed class VyjadreniHarvestServiceTests
         vq.Verify(x => x.GetVyjadreniForTicketAsync("111111", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
         vq.Verify(x => x.GetVyjadreniForTicketAsync("222222", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
         vq.Verify(x => x.GetVyjadreniForTicketAsync("999999", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Review finding Q-10: K4_K7_DodaniReseni predikát musí mapovat na pořadí 4
+    /// pokud HOT_ZAZNAMY.typ_zaznamu = "PMP", ne implicitně na 7. Dříve NormalizeTypZaznamu
+    /// vracel "" a všechny tickety padly do K7/PNF.
+    /// </summary>
+    [Fact]
+    public async Task HarvestTicketAsync_WhenPmpTicket_K4Predicate_MapsToPoradi4()
+    {
+        await using var db = NewDb();
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336865" });
+        await SeedSchemaAsync(db);
+
+        var vq = new Mock<IVyjadreniQueryService>();
+        // HOT_ZAZNAMY typ = PMP → K4_K7 musí jít do K4.
+        vq.Setup(x => x.GetHotZaznamFingerprintsAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, HotZaznamFingerprintDto>
+            {
+                ["336865"] = new HotZaznamFingerprintDto("336865", new DateTime(2026, 3, 14), "otevreno", "PMP")
+            });
+        vq.Setup(x => x.GetVyjadreniForTicketAsync("336865", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new HotVyjadreniDto(99, "25", "A400P023RVVP",
+                    new DateTime(2026, 3, 14, 10, 0, 0), "pm.user",
+                    "Dodavatel přidal řešení a čeká na akceptaci.",
+                    "FIS", 0)
+            });
+
+        var sut = BuildSut(db, vq.Object);
+        var result = await sut.HarvestTicketAsync(1, CancellationToken.None);
+
+        result.Created.Should().Be(1);
+        var bindings = await db.VyjadreniVazby.Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
+        bindings.Should().HaveCount(1);
+        bindings[0].KrokKey.Should().Be(K4Key, "PMP tiket + K4_K7 predikát = K4 (pořadí 4)");
+    }
+
+    /// <summary>
+    /// Kontrastní případ — stejný predikát ale typ_zaznamu = "PNF" → K7.
+    /// </summary>
+    [Fact]
+    public async Task HarvestTicketAsync_WhenPnfTicket_K4K7Predicate_MapsToPoradi7()
+    {
+        await using var db = NewDb();
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336866" });
+        await SeedSchemaAsync(db);
+
+        var vq = new Mock<IVyjadreniQueryService>();
+        vq.Setup(x => x.GetHotZaznamFingerprintsAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, HotZaznamFingerprintDto>
+            {
+                ["336866"] = new HotZaznamFingerprintDto("336866", new DateTime(2026, 3, 14), "otevreno", "PNF")
+            });
+        vq.Setup(x => x.GetVyjadreniForTicketAsync("336866", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new HotVyjadreniDto(99, "25", "A400P023RVVP",
+                    new DateTime(2026, 3, 14, 10, 0, 0), "pm.user",
+                    "Dodavatel přidal řešení a čeká na akceptaci.",
+                    "FIS", 0)
+            });
+
+        var sut = BuildSut(db, vq.Object);
+        var result = await sut.HarvestTicketAsync(1, CancellationToken.None);
+
+        result.Created.Should().Be(1);
+        var bindings = await db.VyjadreniVazby.Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
+        bindings[0].KrokKey.Should().Be(K7Key, "PNF tiket + K4_K7 predikát = K7 (pořadí 7)");
     }
 
     private sealed class FakeTimeProvider : TimeProvider

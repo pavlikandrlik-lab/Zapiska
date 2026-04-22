@@ -34,9 +34,11 @@ public interface IVyjadreniQueryService
 }
 
 /// <summary>
-/// Primary fingerprint z HOT_ZAZNAMY — spec §5.2.
+/// Primary fingerprint z HOT_ZAZNAMY — spec §5.2. TypZaznamu (PMP/PNF/NES/RU/…)
+/// je nutný pro mapování K4_K7_DodaniReseni predikátu na správné pořadí (PMP=4, PNF=7).
+/// Review finding Q-10.
 /// </summary>
-public sealed record HotZaznamFingerprintDto(string Cislo, DateTime Datum, string? Stav);
+public sealed record HotZaznamFingerprintDto(string Cislo, DateTime Datum, string? Stav, string? TypZaznamu = null);
 
 /// <summary>
 /// Secondary fingerprint z HOT_VYJADRENI — spec §5.2.

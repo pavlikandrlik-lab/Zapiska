@@ -59,7 +59,23 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             return VyjadreniHarvestResult.Empty("Externí odkaz nemá vyplněné 6místné číslo tiketu.");
         }
 
-        return await HarvestTicketCoreAsync(eo, updateFingerprint: true, ct).ConfigureAwait(false);
+        // Review finding Q-10: získej TypZaznamu z HOT_ZAZNAMY, aby se K4_K7_DodaniReseni
+        // predikát správně namapoval na PMP=4 / PNF=7 (jinak default 7 pro všechno).
+        string? typZaznamu = null;
+        try
+        {
+            var fp = await _vyjadreni.GetHotZaznamFingerprintsAsync(new[] { eo.Cislo! }, ct).ConfigureAwait(false);
+            if (fp.TryGetValue(eo.Cislo!, out var primary))
+            {
+                typZaznamu = primary.TypZaznamu;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "HarvestTicketAsync: TypZaznamu lookup failed for {Cislo}; fallback PNF mapping.", eo.Cislo);
+        }
+
+        return await HarvestTicketCoreAsync(eo, typZaznamu, updateFingerprint: true, ct).ConfigureAwait(false);
     }
 
     public async Task HarvestRecordAsync(int zaznamId, CancellationToken ct = default)
@@ -320,7 +336,8 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             eo.LastKnownHotZaznamDatum = primary.Datum;
             eo.LastKnownMaxVyjadreniId = secondary.MaxId;
             eo.LastKnownVyjadreniCount = secondary.Count;
-            return await HarvestTicketCoreAsync(eo, updateFingerprint: false, ct).ConfigureAwait(false);
+            // Q-10: TypZaznamu z primary fingerprintu pro správné K4/K7 mapování.
+            return await HarvestTicketCoreAsync(eo, primary.TypZaznamu, updateFingerprint: false, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -330,6 +347,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
 
     private async Task<VyjadreniHarvestResult> HarvestTicketCoreAsync(
         ZaznamExterniOdkazEntity eo,
+        string? typZaznamuHint,
         bool updateFingerprint,
         CancellationToken ct)
     {
@@ -349,7 +367,9 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         if (list.Count > 0)
         {
             var krokKeyByPoradi = await LoadKrokKeyByPoradiAsync(zaznam.HarmonogramSablonaVerze, ct).ConfigureAwait(false);
-            var typZaznamu = NormalizeTypZaznamu(zaznam, eo);
+            // Q-10: použij HOT_ZAZNAMY.typ_zaznamu pokud je k dispozici; fallback na legacy
+            // heuristiku (aktuálně "" = PNF/K7) pouze pokud typZaznamuHint je null.
+            var typZaznamu = typZaznamuHint ?? NormalizeTypZaznamu(zaznam, eo);
 
             foreach (var v in list)
             {
@@ -475,15 +495,12 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     }
 
     /// <summary>
-    /// Zjistí typ tiketu (PMP/PNF/NES), aby se K4_K7_DodaniReseni správně
-    /// zmapovalo na poradí 4 (PMP) nebo 7 (PNF). Prozatím nemáme v PM Tracker DB
-    /// spolehlivé metadata o typu tiketu ze ServiceDesku, takže typujeme přes
-    /// typ záznamu. Pokud typ není znám, vrací "".
+    /// Fallback heuristika pokud caller nepředal <c>typZaznamuHint</c> z HOT_ZAZNAMY —
+    /// vrací prázdný string, což v <see cref="MapKindToPoradi"/> vede k PNF (poradí 7).
+    /// Primární zdroj je <c>HotZaznamFingerprintDto.TypZaznamu</c> — review finding Q-10.
     /// </summary>
     private static string NormalizeTypZaznamu(ProjektovyZaznamEntity zaznam, ZaznamExterniOdkazEntity eo)
     {
-        // Fallback heuristika: "PNF" pokud externí odkaz nemá žádný speciální marker;
-        // implementace v rámci Fáze 2 (sd-sync-revise) přidá přesný dotaz na HOT_ZAZNAMY.typ_zaznamu.
         _ = zaznam;
         _ = eo;
         return string.Empty;
