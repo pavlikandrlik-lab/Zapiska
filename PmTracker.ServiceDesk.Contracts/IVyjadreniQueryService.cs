@@ -15,4 +15,30 @@ public interface IVyjadreniQueryService
         string cislo6,
         DateTime? sinceUtc,
         CancellationToken ct);
+
+    /// <summary>
+    /// Primary fingerprint per ticket: HOT_ZAZNAMY.datum (last-modified) + stav.
+    /// Spec §5.2. Vrací jen tickety, které v HOT_ZAZNAMY skutečně existují.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, HotZaznamFingerprintDto>> GetHotZaznamFingerprintsAsync(
+        IReadOnlyCollection<string> cisla6,
+        CancellationToken ct);
+
+    /// <summary>
+    /// Secondary fingerprint per ticket: MAX(HOT_VYJADRENI.id) + COUNT(*).
+    /// Spec §5.2. Klíč je cislo6 (HOT_ZAZNAMY.id). Chybějící tiket = žádný řádek v mapě.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, VyjadreniSecondaryFingerprintDto>> GetVyjadreniSecondaryFingerprintsAsync(
+        IReadOnlyCollection<string> cisla6,
+        CancellationToken ct);
 }
+
+/// <summary>
+/// Primary fingerprint z HOT_ZAZNAMY — spec §5.2.
+/// </summary>
+public sealed record HotZaznamFingerprintDto(string Cislo, DateTime Datum, string? Stav);
+
+/// <summary>
+/// Secondary fingerprint z HOT_VYJADRENI — spec §5.2.
+/// </summary>
+public sealed record VyjadreniSecondaryFingerprintDto(string Cislo, long MaxId, int Count);

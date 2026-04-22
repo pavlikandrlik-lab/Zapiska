@@ -1,9 +1,16 @@
+using PmTracker.Web.Services.Sync;
+
 namespace PmTracker.Web.Services.ServiceDesk;
 
 /// <summary>
 /// Core harvest logic — čte vyjádření z HOT_VYJADRENI (přes <see cref="PmTracker.ServiceDesk.Contracts.IVyjadreniQueryService"/>),
 /// aplikuje textové predikáty (<see cref="HarvestPredicates"/>) a upsertuje
 /// <see cref="PmTracker.Web.Models.Entities.ZaznamHarmonogramVyjadreniVazbaEntity"/> řádky.
+///
+/// Od sd-sync-revise plánu (Task 6) přidána fingerprint detekce (spec §5.2): před drillem
+/// harvest kontroluje HOT_ZAZNAMY.datum primary + (MAX(HOT_VYJADRENI.id), COUNT(*)) secondary
+/// fingerprint proti LastKnown* sloupcům na <c>ZaznamExterniOdkazEntity</c>. Pokud se nic
+/// nezměnilo, drill se přeskočí.
 /// </summary>
 public interface IVyjadreniHarvestService
 {
@@ -18,6 +25,27 @@ public interface IVyjadreniHarvestService
     /// Harvestuje všechny externí vazby daného projektového záznamu (T5 trigger).
     /// </summary>
     Task HarvestRecordAsync(int zaznamId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Harvestuje všechny externí vazby daného projektového záznamu (reaktivní triggery
+    /// T2/T5/T7/T8 volané z <see cref="SdReactiveSyncConsumer"/>).
+    /// Ekvivalentní s <see cref="HarvestRecordAsync"/> — zachováno pro jasnou sémantiku v
+    /// sd-sync-revise plánu (Task 5/7).
+    /// </summary>
+    Task HarvestForRecordAsync(int zaznamId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Direct sync — synchronní harvest jednoho externího odkazu. Volá se z T3 (open modal) a T6
+    /// (refresh button). Od <see cref="HarvestTicketAsync"/> se liší tím, že projde fingerprint
+    /// checkem; pokud fingerprint říká no-change, drill se přeskočí a výsledek je <c>Empty</c>.
+    /// </summary>
+    Task<VyjadreniHarvestResult> HarvestSingleTicketAsync(int externiOdkazId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Harvest celého scope (periodic tick — T4). Fingerprint batch check + drill pro changed
+    /// tickety. Vrátí summary pro <c>LastResultJson</c>.
+    /// </summary>
+    Task<SdHarvestResult> HarvestScopeAsync(HarvestScope scope, SyncTriggerKind trigger, CancellationToken ct = default);
 
     /// <summary>
     /// Re-harvest — supersedne všechny Active Auto vazby pro daný externí odkaz,
