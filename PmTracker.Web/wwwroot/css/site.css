@@ -1,4 +1,5 @@
 @import "components/vyzvy-panel.css";
+@import "components/externi-odkaz-card.css";
 
 :root {
     --schedule-step-1: #ef4444;
