@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using PmTracker.Web.Data;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Records;
@@ -25,6 +27,7 @@ public sealed partial class ZaznamyController : BaseController
     private readonly IRecordService _recordService;
     private readonly IRecordUiFlowResolver _recordUiFlowResolver;
     private readonly IHarvestScheduler _harvestScheduler;
+    private readonly PmTrackerDbContext _db;
 
     public ZaznamyController(
         IUserContextResolver userContextResolver,
@@ -32,30 +35,48 @@ public sealed partial class ZaznamyController : BaseController
         ILoggerFactory loggerFactory,
         IRecordService recordService,
         IRecordUiFlowResolver recordUiFlowResolver,
-        IHarvestScheduler harvestScheduler)
+        IHarvestScheduler harvestScheduler,
+        PmTrackerDbContext db)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _recordService = recordService;
         _recordUiFlowResolver = recordUiFlowResolver;
         _harvestScheduler = harvestScheduler;
+        _db = db;
     }
 
     public async Task<IActionResult> Edit(int id, string? presentation, string? returnUrl, CancellationToken ct = default)
     {
-        var model = await _recordService.BuildZaznamEditAsync(id, ct);
-        var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId);
-        var canManageSchedule = model.JeUkolKategorie
-            && (CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, model.ProjektId)
-                || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, model.ProjektId));
-        if (!canEditRecord && !canManageSchedule)
+        // Review finding S-2: autorizační check PŘED těžkou DB query a T5 harvest triggerem.
+        // Dříve BuildZaznamEditAsync načetl celý model pro record, který uživatel nesmí editovat
+        // (existence leak), a ScheduleHarvestForRecordAsync byl volán bez ohledu na autorizaci.
+        var projektId = await _db.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => (int?)x.ProjektId)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (projektId is null) return NotFound();
+
+        var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId.Value);
+        var canManageSchedulePermission = CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projektId.Value)
+            || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projektId.Value);
+        if (!canEditRecord && !canManageSchedulePermission)
         {
             return Forbid();
         }
 
+        var model = await _recordService.BuildZaznamEditAsync(id, ct);
+
+        // canManageSchedule je platný jen pro záznamy kategorie "úkol" (JeUkolKategorie).
+        var canManageSchedule = model.JeUkolKategorie && canManageSchedulePermission;
+
         // T5 trigger (Plán C, spec §8.2.1): otevření editoru spustí proaktivní
-        // harvest vyjádření pro všechny externí vazby záznamu. Fire-and-forget —
-        // scheduler implementace zajišťuje async execution a error isolation.
-        await _harvestScheduler.ScheduleHarvestForRecordAsync(id, ct).ConfigureAwait(false);
+        // harvest vyjádření pro všechny externí vazby záznamu. Jen pro uživatele,
+        // kteří mají records.edit (schedule-only role nemá business need otevírat
+        // harvest flow).
+        if (canEditRecord)
+        {
+            await _harvestScheduler.ScheduleHarvestForRecordAsync(id, ct).ConfigureAwait(false);
+        }
 
         PrepareRecordEditorModel(model, presentation, returnUrl, canEditRecord, canManageSchedule);
         return View(GetEditorViewPath(model.Presentation), model);
