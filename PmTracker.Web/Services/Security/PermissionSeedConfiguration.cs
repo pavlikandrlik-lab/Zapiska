@@ -81,6 +81,38 @@ public static class PermissionSeedConfiguration
         new("APP_ADMIN", "team.manage", "ALL", true),
         new("APP_ADMIN", "people.manage", "ALL", true),
         new("APP_ADMIN", "ciselniky.edit", "ALL", true),
-        new("APP_ADMIN", "settings.view", "ALL", true)
+        new("APP_ADMIN", "settings.view", "ALL", true),
+
+        // Authorization unification — Fáze A — Task A8
+        // Projektové role mappings (jen existující permission keys;
+        // dashboard/export/comments se přidají ve Fázi C)
+        new("VLASTNIK_PROJEKTU", "projects.edit", "ALL", true),
+        new("VLASTNIK_PROJEKTU", "records.edit", "ALL", true),
+        new("VLASTNIK_PROJEKTU", "records.schedule.add", "ALL", true),
+        new("VLASTNIK_PROJEKTU", "records.schedule.edit", "ALL", true),
+        new("VLASTNIK_PROJEKTU", "records.comment.subsystemlead", "ALL", true),
+        new("VLASTNIK_PROJEKTU", "meetings.create", "ALL", true),
+        new("VLASTNIK_PROJEKTU", "meetings.edit", "ALL", true),
+        new("VLASTNIK_PROJEKTU", "team.manage", "ALL", true),
+
+        new("ADM_PROJ", "records.edit", "ALL", true),
+        new("ADM_PROJ", "records.schedule.add", "ALL", true),
+        new("ADM_PROJ", "records.schedule.edit", "ALL", true),
+        new("ADM_PROJ", "records.comment.subsystemlead", "ALL", true),
+        new("ADM_PROJ", "meetings.create", "ALL", true),
+        new("ADM_PROJ", "meetings.edit", "ALL", true),
+        new("ADM_PROJ", "team.manage", "ALL", true),
+
+        new("PROJ_MAN", "records.edit", "ALL", true),
+        new("PROJ_MAN", "records.schedule.add", "ALL", true),
+        new("PROJ_MAN", "records.schedule.edit", "ALL", true),
+        new("PROJ_MAN", "records.comment.subsystemlead", "ALL", true),
+        new("PROJ_MAN", "meetings.create", "ALL", true),
+        new("PROJ_MAN", "meetings.edit", "ALL", true),
+        new("PROJ_MAN", "team.manage", "ALL", true),
+
+        new("GEST", "records.comment.subsystemlead", "ALL", true)
+
+        // HOST — záměrně prázdný (read-only; dashboard/export přijdou ve Fázi C)
     ];
 }
