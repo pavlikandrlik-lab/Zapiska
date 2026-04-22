@@ -100,6 +100,7 @@ public sealed class SDConnectorController : Controller
 
     [HttpPost("ReHarvest")]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:settings.manage")]
     public async Task<IActionResult> ReHarvest([FromForm] int externiOdkazId, CancellationToken ct)
     {
         if (externiOdkazId <= 0)

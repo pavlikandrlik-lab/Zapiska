@@ -157,6 +157,14 @@ public class AuthorizationPolicyEnforcementTests
             // [Authorize(Policy="permission:records.edit")] by degradoval na global-only check.
             // Body provádí: _authz.HasPermissionAsync(osobaId, RecordsEdit, projektId).
             "PmTracker.Web.Controllers.ExterniOdkazController.Sync",
+
+            // ---- VyjadreniModalController (Plán C) ----
+
+            // CreateVazba/DeleteVazba: projektId přichází z JSON body, ne z route.
+            // Manuální _authz.HasPermissionAsync(osobaId, RecordsEdit, projektId) — stejný
+            // vzor jako ExterniOdkazController.Sync.
+            "PmTracker.Web.Controllers.VyjadreniModalController.CreateVazba",
+            "PmTracker.Web.Controllers.VyjadreniModalController.DeleteVazba",
         };
 
         // Act
