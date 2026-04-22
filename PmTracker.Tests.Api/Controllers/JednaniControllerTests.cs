@@ -5,6 +5,7 @@ using PmTracker.Tests.Api.TestInfrastructure;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Api.Controllers;
 
@@ -844,7 +845,7 @@ public sealed class JednaniControllerTests
         {
             RoleId = role.Id,
             PermissionId = permissionId.Value,
-            ScopeMode = "INCLUDE",
+            ScopeMode = ScopeMode.Include,
             IsAllowed = true
         };
         dbContext.AuthzRolePermissions.Add(rolePermission);

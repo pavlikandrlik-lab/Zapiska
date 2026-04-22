@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Api.TestInfrastructure;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Api.Controllers;
 
@@ -204,7 +205,7 @@ public sealed class SettingsAuthzAdminControllerTests
     {
         var roleId = await CreateCustomRoleAsync("ApiRolePermDeniedRole");
         var permissionId = await CreateCustomPermissionAsync("ApiRolePermDeniedPermission");
-        var mappingId = await CreateRolePermissionMappingAsync(roleId, permissionId, "ALL", [], isAllowed: false);
+        var mappingId = await CreateRolePermissionMappingAsync(roleId, permissionId, ScopeMode.All, [], isAllowed: false);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Nastaveni/RolePermissionModal?id={mappingId}&asUser={_fixture.AdminOsobaId}");
@@ -633,7 +634,7 @@ public sealed class SettingsAuthzAdminControllerTests
             .SingleOrDefaultAsync(x => x.RoleId == roleId && x.PermissionId == permissionId);
 
         row.Should().NotBeNull();
-        row!.ScopeMode.Should().Be("INCLUDE");
+        row!.ScopeMode.Should().Be(ScopeMode.Include);
         row.IsAllowed.Should().BeTrue();
 
         var links = await dbContext.AuthzRolePermissionProjects
@@ -694,8 +695,8 @@ public sealed class SettingsAuthzAdminControllerTests
         var roleId = await CreateCustomRoleAsync("ApiSaveRolePermDuplicateRole");
         var permissionIdA = await CreateCustomPermissionAsync("ApiSaveRolePermDuplicatePermissionA");
         var permissionIdB = await CreateCustomPermissionAsync("ApiSaveRolePermDuplicatePermissionB");
-        var mappingIdA = await CreateRolePermissionMappingAsync(roleId, permissionIdA, "ALL", []);
-        _ = await CreateRolePermissionMappingAsync(roleId, permissionIdB, "ALL", []);
+        var mappingIdA = await CreateRolePermissionMappingAsync(roleId, permissionIdA, ScopeMode.All, []);
+        _ = await CreateRolePermissionMappingAsync(roleId, permissionIdB, ScopeMode.All, []);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.SendAsync(ApiTestHttpHelper.BuildAjaxPost(
@@ -764,8 +765,8 @@ public sealed class SettingsAuthzAdminControllerTests
         var roleId = await CreateCustomRoleAsync("ApiSaveRolePermRedirectDupRole");
         var permissionIdA = await CreateCustomPermissionAsync("ApiSaveRolePermRedirectDupPermissionA");
         var permissionIdB = await CreateCustomPermissionAsync("ApiSaveRolePermRedirectDupPermissionB");
-        var mappingIdA = await CreateRolePermissionMappingAsync(roleId, permissionIdA, "ALL", []);
-        _ = await CreateRolePermissionMappingAsync(roleId, permissionIdB, "ALL", []);
+        var mappingIdA = await CreateRolePermissionMappingAsync(roleId, permissionIdA, ScopeMode.All, []);
+        _ = await CreateRolePermissionMappingAsync(roleId, permissionIdB, ScopeMode.All, []);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var postResponse = await client.SendAsync(BuildPostRequest(
@@ -794,7 +795,7 @@ public sealed class SettingsAuthzAdminControllerTests
         var roleId = await CreateCustomRoleAsync("ApiDeleteRolePermRole");
         var permissionId = await CreateCustomPermissionAsync("ApiDeleteRolePermPerm");
         var projectId = await _fixture.EnsureProjectAsync("APIDELRP");
-        var mappingId = await CreateRolePermissionMappingAsync(roleId, permissionId, "INCLUDE", [projectId]);
+        var mappingId = await CreateRolePermissionMappingAsync(roleId, permissionId, ScopeMode.Include, [projectId]);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var request = ApiTestHttpHelper.BuildAjaxPost(
@@ -927,7 +928,7 @@ public sealed class SettingsAuthzAdminControllerTests
             Klic = $"settings.system.modal.{Guid.NewGuid():N}"[..60],
             Nazev = "System Modal Permission",
             CategoryId = categoryId,
-            ScopeLevel = "GLOBAL",
+            ScopeLevel = PermissionScopeLevel.Global,
             IsActive = true,
             IsSystem = true
         };
@@ -974,7 +975,7 @@ public sealed class SettingsAuthzAdminControllerTests
             Klic = $"settings.api.{marker.ToLowerInvariant()}.{Guid.NewGuid():N}"[..60],
             Nazev = marker,
             CategoryId = categoryId,
-            ScopeLevel = "PROJECT",
+            ScopeLevel = PermissionScopeLevel.Project,
             IsActive = true,
             IsSystem = false
         };
@@ -984,7 +985,7 @@ public sealed class SettingsAuthzAdminControllerTests
         return permission.Id;
     }
 
-    private async Task<int> CreateRolePermissionMappingAsync(int roleId, int permissionId, string scopeMode, IReadOnlyCollection<int> projectIds, bool isAllowed = true)
+    private async Task<int> CreateRolePermissionMappingAsync(int roleId, int permissionId, ScopeMode scopeMode, IReadOnlyCollection<int> projectIds, bool isAllowed = true)
     {
         await using var dbContext = _fixture.CreateDbContext();
 

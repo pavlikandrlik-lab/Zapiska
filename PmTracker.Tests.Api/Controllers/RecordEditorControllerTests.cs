@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Security;
 using PmTracker.Tests.Api.TestInfrastructure;
 
 namespace PmTracker.Tests.Api.Controllers;
@@ -1155,7 +1156,7 @@ public sealed class RecordEditorControllerTests
         {
             RoleId = role.Id,
             PermissionId = permissionId.Value,
-            ScopeMode = "INCLUDE",
+            ScopeMode = ScopeMode.Include,
             IsAllowed = true
         };
         dbContext.AuthzRolePermissions.Add(rolePermission);
