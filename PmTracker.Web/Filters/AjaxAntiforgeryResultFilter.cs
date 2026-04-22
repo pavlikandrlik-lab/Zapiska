@@ -9,7 +9,7 @@ using PmTracker.Web.Services.Data;
 
 namespace PmTracker.Web.Filters;
 
-public sealed class AjaxAntiforgeryResultFilter(ILogger<AjaxAntiforgeryResultFilter> logger) : IAsyncAlwaysRunResultFilter
+public sealed class AjaxAntiforgeryResultFilter(ILogger<AjaxAntiforgeryResultFilter> logger, TimeProvider timeProvider) : IAsyncAlwaysRunResultFilter
 {
     private const string AntiForgeryFieldKey = "__RequestVerificationToken";
     private const string AntiForgeryMessage = "Bezpečnostní token formuláře vypršel nebo je neplatný. Obnovte stránku a akci opakujte.";
@@ -68,12 +68,12 @@ public sealed class AjaxAntiforgeryResultFilter(ILogger<AjaxAntiforgeryResultFil
         return Activity.Current?.Id ?? Guid.NewGuid().ToString("N");
     }
 
-    private static string BuildDiagnosticLog(ResultExecutingContext context, string traceId)
+    private string BuildDiagnosticLog(ResultExecutingContext context, string traceId)
     {
         var request = context.HttpContext.Request;
         var builder = new StringBuilder(1024);
         builder.Append("TimestampUtc: ")
-            .AppendLine(DateTime.UtcNow.ToString("O"));
+            .AppendLine(timeProvider.GetUtcNow().UtcDateTime.ToString("O"));
         builder.Append("ErrorCode: ")
             .AppendLine(AjaxErrorCodes.RequestValidationFailed);
         builder.Append("TraceId: ")

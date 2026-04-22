@@ -126,7 +126,7 @@ public abstract partial class BaseController
     {
         var builder = new StringBuilder(2048);
         builder.Append("TimestampUtc: ")
-            .AppendLine(DateTime.UtcNow.ToString("O"));
+            .AppendLine(_timeProvider.GetUtcNow().UtcDateTime.ToString("O"));
         builder.Append("ErrorCode: ")
             .AppendLine(errorCode);
         builder.Append("TraceId: ")

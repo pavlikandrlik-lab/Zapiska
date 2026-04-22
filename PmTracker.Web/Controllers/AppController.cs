@@ -12,13 +12,16 @@ public sealed class AppController : Controller
 {
     private readonly IAntiforgery _antiforgery;
     private readonly IUserContextResolver _userContextResolver;
+    private readonly TimeProvider _timeProvider;
 
     public AppController(
         IAntiforgery antiforgery,
-        IUserContextResolver userContextResolver)
+        IUserContextResolver userContextResolver,
+        TimeProvider timeProvider)
     {
         _antiforgery = antiforgery;
         _userContextResolver = userContextResolver;
+        _timeProvider = timeProvider;
     }
 
     [HttpGet("KeepAlive")]
@@ -50,7 +53,7 @@ public sealed class AppController : Controller
         {
             Ok = true,
             TraceId = traceId,
-            ServerUtc = DateTime.UtcNow.ToString("O"),
+            ServerUtc = _timeProvider.GetUtcNow().UtcDateTime.ToString("O"),
             RequestVerificationToken = antiforgeryTokens.RequestToken
         });
     }
