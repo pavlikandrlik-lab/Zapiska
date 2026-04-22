@@ -243,7 +243,7 @@ public sealed partial class RecordService
 
             await dbContext.SaveChangesAsync(innerCt);
             await ReplaceRecordCollaborationAsync(entity.Id, normalizedCollaborationIds, innerCt);
-            await ReplaceRecordExternalLinksAsync(entity.Id, command.ExterniVazby, innerCt);
+            var addedExternalLinks = await ReplaceRecordExternalLinksAsync(entity.Id, command.ExterniVazby, innerCt);
 
             List<SaveRecordHarmonogramValueCommand>? normalizedScheduleValues = null;
             RecordScheduleAuditSnapshot? oldScheduleSnapshot = null;
@@ -291,6 +291,19 @@ public sealed partial class RecordService
             }
 
             await dbContext.SaveChangesAsync(innerCt);
+
+            // Plán B Task 10: po uložení externích vazeb (kdy mají Id) spustíme harvest.
+            // Awaitujeme — enqueue je rychlé a musí skončit před disposalem request scope,
+            // jinak by reactive adapter (Plán sd-sync-revise) ztratil DbContext. Používáme
+            // CancellationToken.None — harvest běží na pozadí a nesmí být zrušen request ct.
+            foreach (var link in addedExternalLinks)
+            {
+                if (link.Id > 0 && !string.IsNullOrWhiteSpace(link.Cislo))
+                {
+                    await harvestScheduler.ScheduleHarvestAsync(link.Id, CancellationToken.None);
+                }
+            }
+
             return entity.Id;
         }, ct);
     }
@@ -1065,11 +1078,12 @@ public sealed partial class RecordService
         }
     }
 
-    private async Task ReplaceRecordExternalLinksAsync(int zaznamId, IReadOnlyList<SaveRecordExterniVazbaCommand> externalLinks, CancellationToken ct)
+    private async Task<List<ZaznamExterniOdkazEntity>> ReplaceRecordExternalLinksAsync(int zaznamId, IReadOnlyList<SaveRecordExterniVazbaCommand> externalLinks, CancellationToken ct)
     {
         var existing = await dbContext.ZaznamExterniOdkazy.Where(x => x.ZaznamId == zaznamId).ToListAsync(ct);
         dbContext.ZaznamExterniOdkazy.RemoveRange(existing);
 
+        var added = new List<ZaznamExterniOdkazEntity>();
         foreach (var link in externalLinks)
         {
             if (string.IsNullOrWhiteSpace(link.Typ) || string.IsNullOrWhiteSpace(link.Cislo))
@@ -1078,7 +1092,7 @@ public sealed partial class RecordService
             }
 
             var typeId = await ResolveTypOdkazuIdAsync(link.Typ, ct);
-            dbContext.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
+            var entity = new ZaznamExterniOdkazEntity
             {
                 ZaznamId = zaznamId,
                 TypOdkazuId = typeId,
@@ -1089,8 +1103,11 @@ public sealed partial class RecordService
                 DatumDodani = link.DatumDodani,
                 DatumPrevzeti = link.DatumPrevzeti,
                 VyzvaId = await ResolveVyzvaIdAsync(link.Vyzva, ct)
-            });
+            };
+            dbContext.ZaznamExterniOdkazy.Add(entity);
+            added.Add(entity);
         }
+        return added;
     }
 
     private async Task<int> SaveRecordScheduleOnlyAsync(

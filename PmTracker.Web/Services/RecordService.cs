@@ -5,6 +5,7 @@ using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Dashboard;
+using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Web.Services;
 
@@ -19,6 +20,7 @@ public sealed partial class RecordService : IRecordService
     private readonly IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator;
     private readonly IPriorityMatrixRebuildService priorityMatrixRebuildService;
     private readonly IAuditWriteService auditWriteService;
+    private readonly IHarvestScheduler harvestScheduler;
     private readonly TimeProvider timeProvider;
 
     public RecordService(
@@ -31,6 +33,7 @@ public sealed partial class RecordService : IRecordService
         IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator,
         IPriorityMatrixRebuildService priorityMatrixRebuildService,
         IAuditWriteService auditWriteService,
+        IHarvestScheduler harvestScheduler,
         TimeProvider timeProvider)
     {
         this.dbContext = dbContext;
@@ -42,6 +45,7 @@ public sealed partial class RecordService : IRecordService
         this.pendingScheduleProposalLockEvaluator = pendingScheduleProposalLockEvaluator;
         this.priorityMatrixRebuildService = priorityMatrixRebuildService;
         this.auditWriteService = auditWriteService;
+        this.harvestScheduler = harvestScheduler;
         this.timeProvider = timeProvider;
     }
 

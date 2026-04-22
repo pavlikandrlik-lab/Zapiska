@@ -5,6 +5,7 @@ using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Dashboard;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Tests.Unit.Records;
 
@@ -14,7 +15,7 @@ public sealed class RecordServiceDelegationTests
     public async Task AddCommentAsync_ShouldDelegateToCommentService()
     {
         var commentService = new FakeCommentService();
-        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, new FakePendingScheduleProposalLockEvaluator(), new FakePriorityMatrixRebuildService(), new FakeAuditWriteService(), TimeProvider.System);
+        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, new FakePendingScheduleProposalLockEvaluator(), new FakePriorityMatrixRebuildService(), new FakeAuditWriteService(), new NoOpHarvestScheduler(), TimeProvider.System);
         var command = new AddCommentCommand
         {
             ZaznamId = 13,

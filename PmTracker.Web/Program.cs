@@ -50,6 +50,8 @@ builder.Services
     .AddPmTrackerDataStore(builder.Configuration);
 builder.Services.AddPmTrackerSearch(builder.Configuration);
 builder.Services.AddServiceDeskIntegration(builder.Configuration);
+// Plán B: IHarvestScheduler stub — Plán sd-sync-revise nahradí za ReactiveHarvestSchedulerAdapter.
+builder.Services.AddScoped<PmTracker.Web.Services.ServiceDesk.IHarvestScheduler, PmTracker.Web.Services.ServiceDesk.NoOpHarvestScheduler>();
 builder.Services.AddVyzvyServices();
 
 var app = builder.Build();
