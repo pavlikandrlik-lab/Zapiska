@@ -67,6 +67,8 @@ internal sealed class RecordTypeChangeHistoryEntityConfiguration : IEntityTypeCo
         builder.Property(x => x.NovyTypId).HasColumnName("novy_typ_id");
         builder.Property(x => x.DatumZmeny).HasColumnName("datum_zmeny");
         builder.Property(x => x.ZmenilOsobaId).HasColumnName("zmenil_osoba_id");
+        builder.HasIndex(x => x.ZaznamId)
+            .HasDatabaseName("IX_zaznam_historie_zmen_typu_zaznam_id");
     }
 }
 
@@ -159,6 +161,8 @@ internal sealed class RecordDeadlineHistoryEntityConfiguration : IEntityTypeConf
         builder.Property(x => x.NoveDatum).HasColumnName("nove_datum");
         builder.Property(x => x.DatumZmeny).HasColumnName("datum_zmeny");
         builder.Property(x => x.Duvod).HasColumnName("duvod");
+        builder.HasIndex(x => x.ZaznamId)
+            .HasDatabaseName("IX_zaznam_historie_terminu_zaznam_id");
     }
 }
 
@@ -173,6 +177,8 @@ internal sealed class RecordOwnerHistoryEntityConfiguration : IEntityTypeConfigu
         builder.Property(x => x.PuvodniVlastnik).HasColumnName("puvodni_vlastnik");
         builder.Property(x => x.NovyVlastnik).HasColumnName("novy_vlastnik");
         builder.Property(x => x.DatumZmeny).HasColumnName("datum_zmeny");
+        builder.HasIndex(x => x.ZaznamId)
+            .HasDatabaseName("IX_zaznam_historie_vlastnik_zaznam_id");
     }
 }
 
@@ -187,6 +193,8 @@ internal sealed class RecordSubsystemHistoryEntityConfiguration : IEntityTypeCon
         builder.Property(x => x.PuvodniSubsystem).HasColumnName("puvodni_subsystem");
         builder.Property(x => x.NovySubsystem).HasColumnName("novy_subsystem");
         builder.Property(x => x.DatumZmeny).HasColumnName("datum_zmeny");
+        builder.HasIndex(x => x.ZaznamId)
+            .HasDatabaseName("IX_zaznam_historie_subsystem_zaznam_id");
     }
 }
 
@@ -201,6 +209,8 @@ internal sealed class RecordStateHistoryEntityConfiguration : IEntityTypeConfigu
         builder.Property(x => x.PuvodniStav).HasColumnName("puvodni_stav");
         builder.Property(x => x.NovyStav).HasColumnName("novy_stav");
         builder.Property(x => x.DatumZmeny).HasColumnName("datum_zmeny");
+        builder.HasIndex(x => x.ZaznamId)
+            .HasDatabaseName("IX_zaznam_historie_stavu_zaznamu_zaznam_id");
     }
 }
 
@@ -215,6 +225,8 @@ internal sealed class RecordProjectStateHistoryEntityConfiguration : IEntityType
         builder.Property(x => x.PuvodniStav).HasColumnName("puvodni_stav");
         builder.Property(x => x.NovyStav).HasColumnName("novy_stav");
         builder.Property(x => x.DatumZmeny).HasColumnName("datum_zmeny");
+        builder.HasIndex(x => x.ZaznamId)
+            .HasDatabaseName("IX_zaznam_historie_stavu_projektu_zaznam_id");
     }
 }
 
@@ -245,6 +257,8 @@ internal sealed class RecordExternalLinkEntityConfiguration : IEntityTypeConfigu
             .HasDatabaseName("ux_zaznam_externi_odkazy_cislo_in_vyzve")
             .HasFilter("[vyzva_id] IS NOT NULL")
             .IsUnique();
+        builder.HasIndex(x => x.ZaznamId)
+            .HasDatabaseName("IX_zaznam_externi_odkazy_zaznam_id");
     }
 }
 

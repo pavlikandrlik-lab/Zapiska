@@ -135,5 +135,9 @@ internal sealed class AuthorizationAuditLogEntityConfiguration : IEntityTypeConf
         builder.Property(x => x.OldValue).HasColumnName("old_value");
         builder.Property(x => x.NewValue).HasColumnName("new_value");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
+        builder.HasIndex(x => new { x.EntityType, x.EntityId })
+            .HasDatabaseName("IX_authz_audit_log_entity_type_entity_id");
+        builder.HasIndex(x => x.CreatedAt)
+            .HasDatabaseName("IX_authz_audit_log_created_at");
     }
 }
