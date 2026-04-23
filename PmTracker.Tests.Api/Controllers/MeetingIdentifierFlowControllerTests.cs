@@ -91,11 +91,14 @@ public sealed class MeetingIdentifierFlowControllerTests
             "<select[^>]*name=\"JednaniId\"[^>]*\\bdisabled(?:=\"disabled\")?",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
             .Should().BeTrue("select musí být bez otevřených jednání deaktivovaný");
+        // _ModalFormActions.cshtml renderuje submit jako <pm-button>, PmButtonTagHelper
+        // ale v ProcessAsync přepíše tag name na <gov-button>. Emituje atributy v pořadí
+        // color/type/size/disabled?/href?/native-type, takže disabled předchází native-type.
         Regex.IsMatch(
             html,
-            "<button[^>]*type=\"submit\"[^>]*\\bdisabled(?:=\"disabled\")?",
+            "<gov-button[^>]*\\bdisabled=\"disabled\"[^>]*native-type=\"submit\"",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
-            .Should().BeTrue("submit musí být bez otevřených jednání deaktivovaný");
+            .Should().BeTrue("submit gov-button musí být bez otevřených jednání deaktivovaný");
     }
 
     [Fact]

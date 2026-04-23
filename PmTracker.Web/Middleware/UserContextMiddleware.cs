@@ -72,6 +72,16 @@ public sealed class UserContextMiddleware(RequestDelegate next)
             return true;
         }
 
+        // IIS scenario: principal má jméno (WindowsAccountName nebo Name claim), ale
+        // Identity.IsAuthenticated == false (např. anonymous auth v IIS, ale server zná
+        // AD login přes LOGON_USER hlavičku). UserContextResolver tento fallback pokrývá
+        // (ResolveAsync → ResolveOsobaIdFromLoginCandidatesAsync). Bez této větve by
+        // middleware resolve přeskočil a policy-check by selhal.
+        if (!string.IsNullOrWhiteSpace(context.User.Identity?.Name))
+        {
+            return true;
+        }
+
         // Dev-only: asUser=<id> query override (viz UserContextResolver dev fallback).
         // Nezávisí na IsAuthenticated, takže musíme middleware explicitně probudit.
         if (environment.IsDevelopment())

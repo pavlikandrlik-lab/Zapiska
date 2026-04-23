@@ -39,10 +39,12 @@ public sealed class GlobalSearchLayoutTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        // Fáze 2 migrace na gov-design-system: layout renderuje <gov-button slot="button">
+        // Web Component (ne HTML <button class="gov-button">). Shadow DOM a submit chování
+        // zařizuje gov-design-system na klientovi; server-side markup je tag + atributy.
         html.Should().Contain("slot=\"button\"", "submit je ve slotu button dle gov-form-search");
-        html.Should().Contain("class=\"gov-button\"", "tlačítko používá gov-button třídu");
-        html.Should().Contain("type=\"submit\"", "tlačítko musí být submit");
-        html.Should().Contain("aria-label=\"Vyhledat\"", "tlačítko má přístupný popis");
+        html.Should().Contain("<gov-button slot=\"button\"", "submit je gov-button web component");
+        html.Should().Contain("color=\"primary\"");
     }
 
     [Fact]
@@ -54,9 +56,10 @@ public sealed class GlobalSearchLayoutTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        // Fáze 2: <gov-form-input slot="input"> nahradil nativní <input> s BEM třídou
+        // gov-form-input__input. BEM třída existuje jen uvnitř shadow DOM komponenty.
         html.Should().Contain("slot=\"input\"", "input je ve slotu input dle gov-form-search");
-        html.Should().Contain("gov-form-input__input", "input musí mít BEM třídu gov-form-input__input");
-        html.Should().Contain("type=\"search\"", "input musí být typu search");
+        html.Should().Contain("<gov-form-input slot=\"input\"", "input je gov-form-input web component");
         html.Should().Contain("aria-label=\"Globální vyhledávání\"", "input musí mít přístupný popis");
     }
 

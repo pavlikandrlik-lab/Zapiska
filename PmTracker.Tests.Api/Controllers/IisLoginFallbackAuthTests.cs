@@ -31,6 +31,18 @@ public sealed class IisLoginFallbackAuthTests
     [Fact]
     public async Task BrowserRequest_ShouldResolveUserByIisLogin_WhenPrincipalNameExistsButIdentityIsNotAuthenticated()
     {
+        // Scenario: IIS pošle LOGON_USER hlavičku pro authentikovaného Windows uživatele.
+        // Real IIS s Windows auth vždy vrací IsAuthenticated=true pokud LOGON_USER existuje.
+        // Test historicky posílal X-PmTracker-Test-Authenticated=false a ověřoval, že
+        // UserContextResolver dokáže pracovat s unauthentikovaným principal (pre-authz
+        // éra, kdy BaseController řešil vše v action filtru). Po zavedení
+        // [Authorize] na ProjektyController je tento scénář nevalidní — [Authorize]
+        // challenguje dřív, než middleware/resolver dostane slovo.
+        //
+        // Zachováváme test pro IIS login resolution, ale posíláme ho s autentikovaným
+        // principalem (realistický IIS request). Pokrytí „principal name bez auth"
+        // kontextu se nyní řeší na úrovni UserContextMiddleware.ShouldResolve (viz
+        // implementace — resolve běží i bez IsAuthenticated, pokud je principal name).
         const string login = @"acr\pmtracker.iis.login";
         var originalLogin = await SetAdminLoginAsync(login);
 
@@ -40,7 +52,6 @@ public sealed class IisLoginFallbackAuthTests
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
             using var request = new HttpRequestMessage(HttpMethod.Get, "/Projekty");
             request.Headers.Add(HeaderDrivenTestAuthHandler.LoginHeaderName, login);
-            request.Headers.Add(HeaderDrivenTestAuthHandler.AuthenticatedHeaderName, "false");
 
             var response = await client.SendAsync(request);
             var html = await response.Content.ReadAsStringAsync();

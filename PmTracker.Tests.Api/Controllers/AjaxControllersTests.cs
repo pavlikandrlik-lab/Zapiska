@@ -278,28 +278,8 @@ public sealed class AjaxControllersTests
         payload.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[0].TypId");
     }
 
-    [Fact]
-    public async Task SavePermission_ShouldReturnAjaxError_ForUnsupportedKey()
-    {
-        await using var dbContext = _fixture.CreateDbContext();
-        var categoryId = await dbContext.AuthzPermissionCategories.Where(x => x.IsActive).Select(x => x.Id).FirstAsync();
-
-        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var request = ApiTestHttpHelper.BuildAjaxPost(
-            $"/Nastaveni/SavePermission?asUser={_fixture.AdminOsobaId}",
-            ApiTestHttpHelper.BuildForm(
-                ("Klic", "unsupported.key"),
-                ("Nazev", "Unsupported"),
-                ("CategoryId", categoryId.ToString()),
-                ("ScopeLevel", "PROJECT")));
-
-        var response = await client.SendAsync(request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
-        payload.Ok.Should().BeFalse();
-        payload.Message.Should().Contain("není v seznamu podporovaných akcí");
-        payload.ErrorCode.Should().Be("OPERATION_FAILED");
-        payload.TraceId.Should().NotBeNullOrWhiteSpace();
-    }
+    // SavePermission_ShouldReturnAjaxError_ForUnsupportedKey smazáno: endpoint
+    // /Nastaveni/SavePermission byl odstraněn v seed-only RBAC refactoru (commit f1bce3f
+    // / 96cd687, 2026-04-22). Role/akce/mapování se mění v PermissionSeedConfiguration.cs
+    // přes git/PR, ne přes UI.
 }
