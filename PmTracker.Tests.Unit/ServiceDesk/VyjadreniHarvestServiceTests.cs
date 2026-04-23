@@ -342,6 +342,60 @@ public sealed class VyjadreniHarvestServiceTests
         bindings[0].KrokKey.Should().Be(K7Key, "PNF tiket + K4_K7 predikát = K7 (pořadí 7)");
     }
 
+    [Fact]
+    public async Task HarvestTicketAsync_TwoExterniOdkazySameZaznam_DoNotTouchEachOthersBindings()
+    {
+        // H-2 regression: pre-load vazeb musí být per-ticket (scoped na ExterniOdkazId),
+        // ne per-zaznam. Jinak by druhý harvest stejného záznamu viděl vazby prvního
+        // v change trackeru a při UpsertBindingInMemory by se pletl.
+        await using var db = NewDb();
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "111111" });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 2, ZaznamId = 100, Cislo = "222222" });
+        await SeedSchemaAsync(db);
+        await db.SaveChangesAsync();
+
+        var vq = new Mock<IVyjadreniQueryService>();
+        // Ticket 1 → K6 (PNF default)
+        vq.Setup(x => x.GetVyjadreniForTicketAsync("111111", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new HotVyjadreniDto(1001, "25", "A400P023RVVP",
+                    new DateTime(2026, 3, 10, 10, 0, 0), "pm.user",
+                    "Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována.",
+                    "FIS", 0)
+            });
+        // Ticket 2 → K6 too (same krokKey, DIFFERENT externiOdkazId)
+        vq.Setup(x => x.GetVyjadreniForTicketAsync("222222", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new HotVyjadreniDto(2002, "25", "A400P023RVVP",
+                    new DateTime(2026, 3, 11, 10, 0, 0), "pm.user",
+                    "Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována.",
+                    "FIS", 0)
+            });
+
+        var sut = BuildSut(db, vq.Object);
+
+        var r1 = await sut.HarvestTicketAsync(1, CancellationToken.None);
+        var r2 = await sut.HarvestTicketAsync(2, CancellationToken.None);
+
+        r1.Created.Should().Be(1);
+        r2.Created.Should().Be(1);
+
+        // Obě vazby aktivní; druhý harvest NESMÍ supersedovat první, protože patří
+        // k jinému externímu odkazu (přestože mají stejný KrokKey/ZaznamId).
+        var bindings = await db.VyjadreniVazby.AsNoTracking()
+            .Where(x => x.Stav == (byte)VazbaStav.Active)
+            .OrderBy(x => x.ExterniOdkazId)
+            .ToListAsync();
+        bindings.Should().HaveCount(2);
+        bindings[0].ExterniOdkazId.Should().Be(1);
+        bindings[0].HotVyjadreniId.Should().Be(1001);
+        bindings[1].ExterniOdkazId.Should().Be(2);
+        bindings[1].HotVyjadreniId.Should().Be(2002);
+    }
+
     private sealed class FakeTimeProvider : TimeProvider
     {
         private readonly DateTimeOffset _now;

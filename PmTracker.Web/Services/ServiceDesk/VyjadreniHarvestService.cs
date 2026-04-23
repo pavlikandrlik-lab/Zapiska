@@ -75,7 +75,29 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             _logger.LogDebug(ex, "HarvestTicketAsync: TypZaznamu lookup failed for {Cislo}; fallback PNF mapping.", eo.Cislo);
         }
 
-        return await HarvestTicketCoreAsync(eo, typZaznamu, updateFingerprint: true, ct).ConfigureAwait(false);
+        // M-1: admin/standalone path (ReHarvestTicketAsync) musí jít přes stejný per-ticket
+        // lock jako reactive/periodic cesta, jinak race s reactive harvesty téhož tiketu.
+        return await ExecuteUnderTicketLockAsync(
+            eo,
+            ct2 => HarvestTicketCoreAsync(eo, typZaznamu, updateFingerprint: true, ct2),
+            ct).ConfigureAwait(false);
+    }
+
+    private async Task<VyjadreniHarvestResult> ExecuteUnderTicketLockAsync(
+        ZaznamExterniOdkazEntity eo,
+        Func<CancellationToken, Task<VyjadreniHarvestResult>> work,
+        CancellationToken ct)
+    {
+        var sem = PerTicketLocks.GetOrAdd(eo.Id, _ => new SemaphoreSlim(1, 1));
+        await sem.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await work(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            sem.Release();
+        }
     }
 
     public async Task HarvestRecordAsync(int zaznamId, CancellationToken ct = default)
@@ -298,12 +320,11 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         CancellationToken ct)
     {
         var sem = PerTicketLocks.GetOrAdd(eo.Id, _ => new SemaphoreSlim(1, 1));
-        var acquired = await sem.WaitAsync(TimeSpan.Zero, ct).ConfigureAwait(false);
-        if (!acquired)
-        {
-            _logger.LogDebug("Harvest pro externí odkaz {ExterniOdkazId} už běží, skip.", eo.Id);
-            return VyjadreniHarvestResult.Empty("Již probíhá paralelní harvest tohoto odkazu.");
-        }
+        // M-2: Blokující WaitAsync(ct) místo WaitAsync(Zero). ReactiveSyncQueue dedup
+        // brání pile-upu identických enqueue; legit re-drill pro stejný ticket musí
+        // pockat, než uvolní lock, nikoli tiše drop (jinak NEW data z periody mezi
+        // first a second požadavkem mizí do dalšího periodic ticku).
+        await sem.WaitAsync(ct).ConfigureAwait(false);
 
         try
         {
@@ -371,12 +392,16 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             // heuristiku (aktuálně "" = PNF/K7) pouze pokud typZaznamuHint je null.
             var typZaznamu = typZaznamuHint ?? NormalizeTypZaznamu(zaznam, eo);
 
-            // Review finding P-1: pre-load VŠECHNY aktivní vazby záznamu v 1 query,
-            // ať UpsertBindingAsync nemusí per-bublina dělat samostatný .Where(...).ToListAsync.
-            // Per-krokKey lookup je mutovatelný — když v UpsertBindingLocal supersedujeme,
-            // přepíšeme Stav, takže další volání pro stejný KrokKey už neuvidí původní řádky.
+            // Review finding P-1: pre-load aktivní vazby v 1 query, ať UpsertBindingInMemory
+            // nemusí per-bublina dělat samostatný .Where(...).ToListAsync.
+            // H-2 regression fix: scope pre-load na tento ticket (ExterniOdkazId == eo.Id),
+            // aby dvě paralelní harvesty pro různé externí odkazy téhož záznamu neracovaly na
+            // sdíleném change trackeru — per-ticket SemaphoreSlim je keyed by externiOdkazId,
+            // ne by zaznamId, takže scope musí zůstat per-ticket.
             var allActiveBindings = await _db.VyjadreniVazby
-                .Where(x => x.ZaznamId == zaznam.Id && x.Stav == (byte)VazbaStav.Active)
+                .Where(x => x.ZaznamId == zaznam.Id
+                         && x.ExterniOdkazId == eo.Id
+                         && x.Stav == (byte)VazbaStav.Active)
                 .ToListAsync(ct).ConfigureAwait(false);
             var bindingsByKey = allActiveBindings
                 .GroupBy(b => b.KrokKey)
