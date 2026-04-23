@@ -6,9 +6,8 @@ namespace PmTracker.Tests.Unit.Authorization;
 /// <summary>
 /// Cílová matice subsystémových rolí (per-action redesign 2026-04-23).
 /// Zdroj pravdy: docs/known-issues/authz-target-matrix.xlsx.
-///
-/// Deprecated klíč records.comment.subsystemlead je v seedu zachován během F1–F6
-/// pro kompatibilitu; smaže se v F7.
+/// F7: records.comment.subsystemlead smazán; subsystem lead nyní drží jen
+/// meetings.notes.subsystemlead (pro zápis jednání) + proposals.record.create.
 /// </summary>
 public sealed class SubsystemRolePermissionMatrixTests
 {
@@ -19,7 +18,7 @@ public sealed class SubsystemRolePermissionMatrixTests
             .OrderBy(x => x, StringComparer.Ordinal)
             .ToArray();
 
-    // VEDOUCI + ZASTUPCE mají identickou sadu (14 cílových klíčů + deprecated records.comment.subsystemlead).
+    // VEDOUCI + ZASTUPCE mají identickou sadu (14 cílových klíčů).
     private static readonly string[] SubsystemLeadTargetKeys =
     [
         "comments.add", "comments.delete.own", "comments.edit.own",
@@ -28,9 +27,7 @@ public sealed class SubsystemRolePermissionMatrixTests
         "meetings.notes.subsystemlead",
         "proposals.edit.own", "proposals.record.create", "proposals.schedule.create",
         "schedule.preview",
-        "search.index",
-        // Deprecated (kompat F1–F6):
-        "records.comment.subsystemlead"
+        "search.index"
     ];
 
     [Fact]

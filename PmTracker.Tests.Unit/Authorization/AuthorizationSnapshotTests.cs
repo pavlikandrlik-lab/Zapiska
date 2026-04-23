@@ -23,12 +23,13 @@ public sealed class AuthorizationSnapshotTests
     {
         var snapshot = new AuthorizationSnapshot(
             IsSuperAdmin: false,
-            GlobalPermissions: new HashSet<string>(new[] { "people.manage" }, StringComparer.OrdinalIgnoreCase),
+            GlobalPermissions: new HashSet<string>(new[] { "people.ad.sync" }, StringComparer.OrdinalIgnoreCase),
             PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
             PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>());
 
-        snapshot.HasPermission("people.manage").Should().BeTrue();
-        snapshot.HasPermission("People.Manage").Should().BeTrue();
+        snapshot.HasPermission("people.ad.sync").Should().BeTrue();
+        // Case-insensitní lookup: stejný klíč jinak psaný.
+        snapshot.HasPermission("People.Ad.Sync").Should().BeTrue();
     }
 
     [Fact]
@@ -55,7 +56,7 @@ public sealed class AuthorizationSnapshotTests
     {
         var perSubsystem = new Dictionary<int, IReadOnlySet<string>>
         {
-            [50] = new HashSet<string>(new[] { "records.comment.subsystemlead" }, StringComparer.OrdinalIgnoreCase)
+            [50] = new HashSet<string>(new[] { "meetings.notes.subsystemlead" }, StringComparer.OrdinalIgnoreCase)
         };
 
         var snapshot = new AuthorizationSnapshot(
@@ -64,8 +65,8 @@ public sealed class AuthorizationSnapshotTests
             PerProjectPermissions: new Dictionary<int, IReadOnlySet<string>>(),
             PerSubsystemPermissions: perSubsystem);
 
-        snapshot.HasPermission("records.comment.subsystemlead", subsystemId: 50).Should().BeTrue();
-        snapshot.HasPermission("records.comment.subsystemlead", subsystemId: 51).Should().BeFalse();
+        snapshot.HasPermission("meetings.notes.subsystemlead", subsystemId: 50).Should().BeTrue();
+        snapshot.HasPermission("meetings.notes.subsystemlead", subsystemId: 51).Should().BeFalse();
     }
 
     [Fact]
@@ -88,7 +89,7 @@ public sealed class AuthorizationSnapshotTests
             new Dictionary<int, IReadOnlySet<string>>());
 
         snapshot.HasPermission("records.edit", projektId: 1).Should().BeFalse();
-        snapshot.HasPermission("people.manage").Should().BeFalse();
+        snapshot.HasPermission("people.ad.sync").Should().BeFalse();
         snapshot.IsSuperAdmin.Should().BeFalse();
     }
 }

@@ -129,42 +129,11 @@ public static class PermissionKeys
     public const string SchedulePreview = "schedule.preview";
 
     // =========================================================================
-    // DEPRECATED — staré (pre-redesign) klíče. Ponechány pro kompatibilitu během
-    // Fází 1–6 redesignu (kód je stále používá v atributech; bude přepisován
-    // postupně per controller). Smazány v Fázi 7 + DB migrace.
-    // =========================================================================
-    [Obsolete("Redesign 2026-04-23: nahrazeno schedule proposals workflow (proposals.schedule.create).")]
-    public const string RecordsScheduleAdd = "records.schedule.add";
-
-    [Obsolete("Redesign 2026-04-23: nahrazeno proposals.record.create + meetings.notes.subsystemlead (per-doména).")]
-    public const string RecordsCommentSubsystemLead = "records.comment.subsystemlead";
-
-    [Obsolete("Redesign 2026-04-23: rozděleno na team.member.add / .remove / .role.assign / .subsystem.* atd.")]
-    public const string TeamManage = "team.manage";
-
-    [Obsolete("Redesign 2026-04-23: rozděleno na people.create / .edit / .delete / .ad.search / .ad.sync.")]
-    public const string PeopleManage = "people.manage";
-
-    [Obsolete("Redesign 2026-04-23: rozděleno na ciselniky.row.edit / .row.delete.")]
-    public const string CiselnikyEdit = "ciselniky.edit";
-
-    [Obsolete("Redesign 2026-04-23: rozděleno na settings.roles.assign / .sync.configure / .sync.run / .sd.view.")]
-    public const string SettingsManage = "settings.manage";
-
-    [Obsolete("Redesign 2026-04-23: rozděleno na export.pdf.projekt / .jednani / .ukol.")]
-    public const string ExportPdf = "export.pdf";
-
-    [Obsolete("Redesign 2026-04-23: rozděleno na export.word.projekt / .jednani / .ukol.")]
-    public const string ExportWord = "export.word";
-
-    // =========================================================================
     // Definitions: bijekce s PermissionSeedConfiguration.Actions.
+    // F7 2026-04-23: 8 deprecated klíčů smazáno (records.schedule.add,
+    // records.comment.subsystemlead, team.manage, people.manage, ciselniky.edit,
+    // settings.manage, export.pdf, export.word) — viz db_upgrade_1_3_8_authz_per_action_redesign.sql.
     // =========================================================================
-    //
-    // Pragma disable 618: Obsolete klíče jsou tu záměrně zahrnuty — v Definitions
-    // musí být vše, co je v seedu (SeedSourceOfTruthTests vynucuje bijekci).
-    // Smazání Obsolete konstant proběhne ve Fázi 7.
-#pragma warning disable CS0618 // Type or member is obsolete
     private static readonly PermissionKeyDefinition[] Definitions =
     [
         // 1. Projekty
@@ -277,14 +246,6 @@ public static class PermissionKeys
         // DEPRECATED (pre-redesign). Mapping test vynucuje existenci i v seedu
         // dokud F7 (DB migrace) staré klíče neodstraní.
         // =====================================================================
-        new(RecordsScheduleAdd, "Doplňovat harmonogram úkolu (deprecated)", "RECORDS", "PROJECT", "DEPRECATED: nahrazeno schedule proposals."),
-        new(RecordsCommentSubsystemLead, "Vyjádření vedoucího subsystému (deprecated)", "RECORDS", "PROJECT", "DEPRECATED: rozděleno na proposals + meetings.notes.subsystemlead."),
-        new(TeamManage, "Správa týmu (deprecated)", "TEAM", "PROJECT", "DEPRECATED: rozděleno na team.member.* / .role.* / .subsystem.*."),
-        new(PeopleManage, "Správa osob (deprecated)", "PEOPLE", "GLOBAL", "DEPRECATED: rozděleno na people.create / .edit / .delete / .ad.*."),
-        new(CiselnikyEdit, "Editace číselníků (deprecated)", "CISELNIKY", "GLOBAL", "DEPRECATED: rozděleno na ciselniky.row.edit / .row.delete."),
-        new(SettingsManage, "Správa nastavení (deprecated)", "SETTINGS", "GLOBAL", "DEPRECATED: rozděleno na settings.roles.assign / .sync.* / .sd.view."),
-        new(ExportPdf, "Export PDF (deprecated)", "EXPORT", "PROJECT", "DEPRECATED: rozděleno na export.pdf.projekt / .jednani / .ukol."),
-        new(ExportWord, "Export Word (deprecated)", "EXPORT", "PROJECT", "DEPRECATED: rozděleno na export.word.projekt / .jednani / .ukol.")
     ];
 
     private static readonly HashSet<string> SupportedKeys = new(
@@ -354,13 +315,7 @@ public static class PermissionKeys
         ExportWordProjekt,
         ExportWordJednani,
         ExportWordUkol,
-        SchedulePreview,
-        // Deprecated — kompatibilita během F1–F6
-        RecordsScheduleAdd,
-        RecordsCommentSubsystemLead,
-        TeamManage,
-        ExportPdf,
-        ExportWord
+        SchedulePreview
     ],
         StringComparer.OrdinalIgnoreCase);
 
@@ -411,14 +366,9 @@ public static class PermissionKeys
         VyzvyCreate,
         VyzvyStateChange,
         VyzvyPnfAssign,
-        VyzvyPnfReassign,
-        // Deprecated
-        RecordsScheduleAdd,
-        RecordsCommentSubsystemLead,
-        TeamManage
+        VyzvyPnfReassign
     ],
         StringComparer.OrdinalIgnoreCase);
-#pragma warning restore CS0618
 
     public static IReadOnlyList<LookupOptionViewModel> BuildLookupOptions()
     {

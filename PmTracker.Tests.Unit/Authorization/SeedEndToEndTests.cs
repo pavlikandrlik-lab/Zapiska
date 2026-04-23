@@ -78,7 +78,8 @@ public sealed class SeedEndToEndTests
             where rp.RoleId == admProjRole.Id && rp.IsAllowed
             select p.Klic).ToListAsync();
 
-        admProjPerms.Should().Contain(new[] { "records.edit", "meetings.edit", "team.manage" });
+        // F7 2026-04-23: team.manage smazán, nahrazeno per-action team.* klíči.
+        admProjPerms.Should().Contain(new[] { "records.edit", "meetings.edit", "team.member.add" });
         admProjPerms.Should().NotContain("projects.edit"); // ADM_PROJ úmyslně bez projects.edit
     }
 }

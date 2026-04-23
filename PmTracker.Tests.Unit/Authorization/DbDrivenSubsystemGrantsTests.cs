@@ -22,7 +22,7 @@ public sealed class DbDrivenSubsystemGrantsTests
         await using var db = CreateInMemoryDb();
 
         db.AuthzRoles.Add(new AuthzRoleEntity { Id = 100, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "Vedoucí", IsActive = true, Scope = RoleScope.Subsystem });
-        db.AuthzPermissions.Add(new AuthzPermissionEntity { Id = 200, Klic = "records.comment.subsystemlead", Nazev = "Komentář", CategoryId = 1, ScopeLevel = PermissionScopeLevel.Project, IsActive = true, IsSystem = true });
+        db.AuthzPermissions.Add(new AuthzPermissionEntity { Id = 200, Klic = "meetings.notes.subsystemlead", Nazev = "Komentář", CategoryId = 1, ScopeLevel = PermissionScopeLevel.Project, IsActive = true, IsSystem = true });
         db.AuthzRolePermissions.Add(new AuthzRolePermissionEntity { Id = 300, RoleId = 100, PermissionId = 200, ScopeMode = ScopeMode.All, IsAllowed = true });
         db.CiselnikRoliSubsystemu.Add(new CiselnikRoleSubsystemuEntity { Id = 1, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "Vedoucí", AuthzRoleId = 100 });
         db.ProjektSubsystemy.Add(new ProjektSubsystemEntity { Id = 50, ProjektId = 777, SubsystemId = 1, Poradi = 1 });
@@ -38,7 +38,7 @@ public sealed class DbDrivenSubsystemGrantsTests
         var grants = await UserContextResolver.LoadDbDrivenSubsystemRoleGrantsAsync(db, 42, CancellationToken.None);
 
         grants.Should().ContainSingle();
-        grants[0].PermissionKey.Should().Be("records.comment.subsystemlead");
+        grants[0].PermissionKey.Should().Be("meetings.notes.subsystemlead");
         grants[0].ScopeMode.Should().Be("INCLUDE");
         grants[0].ProjectIds.Should().ContainSingle().Which.Should().Be(777);
     }
@@ -49,7 +49,7 @@ public sealed class DbDrivenSubsystemGrantsTests
         await using var db = CreateInMemoryDb();
 
         db.AuthzRoles.Add(new AuthzRoleEntity { Id = 100, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "V", IsActive = true, Scope = RoleScope.Subsystem });
-        db.AuthzPermissions.Add(new AuthzPermissionEntity { Id = 200, Klic = "records.comment.subsystemlead", Nazev = "K", CategoryId = 1, ScopeLevel = PermissionScopeLevel.Project, IsActive = true, IsSystem = true });
+        db.AuthzPermissions.Add(new AuthzPermissionEntity { Id = 200, Klic = "meetings.notes.subsystemlead", Nazev = "K", CategoryId = 1, ScopeLevel = PermissionScopeLevel.Project, IsActive = true, IsSystem = true });
         db.AuthzRolePermissions.Add(new AuthzRolePermissionEntity { Id = 300, RoleId = 100, PermissionId = 200, ScopeMode = ScopeMode.All, IsAllowed = true });
         db.CiselnikRoliSubsystemu.Add(new CiselnikRoleSubsystemuEntity { Id = 1, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "V", AuthzRoleId = 100 });
         db.ProjektSubsystemy.Add(new ProjektSubsystemEntity { Id = 50, ProjektId = 777, SubsystemId = 1, Poradi = 1 });
@@ -73,7 +73,7 @@ public sealed class DbDrivenSubsystemGrantsTests
         await using var db = CreateInMemoryDb();
 
         db.AuthzRoles.Add(new AuthzRoleEntity { Id = 100, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "V", IsActive = true, Scope = RoleScope.Subsystem });
-        db.AuthzPermissions.Add(new AuthzPermissionEntity { Id = 200, Klic = "records.comment.subsystemlead", Nazev = "K", CategoryId = 1, ScopeLevel = PermissionScopeLevel.Project, IsActive = true, IsSystem = true });
+        db.AuthzPermissions.Add(new AuthzPermissionEntity { Id = 200, Klic = "meetings.notes.subsystemlead", Nazev = "K", CategoryId = 1, ScopeLevel = PermissionScopeLevel.Project, IsActive = true, IsSystem = true });
         db.AuthzRolePermissions.Add(new AuthzRolePermissionEntity { Id = 300, RoleId = 100, PermissionId = 200, ScopeMode = ScopeMode.All, IsAllowed = true });
         db.CiselnikRoliSubsystemu.Add(new CiselnikRoleSubsystemuEntity { Id = 1, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "V", AuthzRoleId = 100 });
         db.ProjektSubsystemy.Add(new ProjektSubsystemEntity
@@ -100,7 +100,7 @@ public sealed class DbDrivenSubsystemGrantsTests
         await using var db = CreateInMemoryDb();
 
         db.AuthzRoles.Add(new AuthzRoleEntity { Id = 100, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "V", IsActive = true, Scope = RoleScope.Subsystem });
-        db.AuthzPermissions.Add(new AuthzPermissionEntity { Id = 200, Klic = "records.comment.subsystemlead", Nazev = "K", CategoryId = 1, ScopeLevel = PermissionScopeLevel.Project, IsActive = true, IsSystem = true });
+        db.AuthzPermissions.Add(new AuthzPermissionEntity { Id = 200, Klic = "meetings.notes.subsystemlead", Nazev = "K", CategoryId = 1, ScopeLevel = PermissionScopeLevel.Project, IsActive = true, IsSystem = true });
         db.AuthzRolePermissions.Add(new AuthzRolePermissionEntity { Id = 300, RoleId = 100, PermissionId = 200, ScopeMode = ScopeMode.All, IsAllowed = false });  // denied
         db.CiselnikRoliSubsystemu.Add(new CiselnikRoleSubsystemuEntity { Id = 1, Kod = "VEDOUCI_SUBSYSTEMU", Nazev = "V", AuthzRoleId = 100 });
         db.ProjektSubsystemy.Add(new ProjektSubsystemEntity { Id = 50, ProjektId = 777, SubsystemId = 1, Poradi = 1 });

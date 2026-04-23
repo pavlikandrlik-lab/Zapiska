@@ -44,7 +44,8 @@ Dokument popisuje standardní databázový lifecycle: inicializaci baseline, apl
 19. `db_upgrade_1_3_5_external_link_harvested_at.sql`
 20. `db_upgrade_1_3_6_vyjadreni_vazba.sql`
 21. `db_upgrade_1_3_7_sd_sync_settings_and_fingerprint.sql`
-22. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
+22. `db_upgrade_1_3_8_authz_per_action_redesign.sql`
+23. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
 
 ### 5.2 Fresh install
 ```powershell

@@ -8,8 +8,8 @@ public sealed class NewPermissionKeysSeedTests
 {
     [Theory]
     [InlineData("dashboard.view")]
-    [InlineData("export.pdf")]
-    [InlineData("export.word")]
+    [InlineData("export.pdf.projekt")]
+    [InlineData("export.word.projekt")]
     [InlineData("comments.add")]
     [InlineData("comments.edit.own")]
     [InlineData("comments.delete.own")]
@@ -23,8 +23,8 @@ public sealed class NewPermissionKeysSeedTests
 
     [Theory]
     [InlineData("dashboard.view")]
-    [InlineData("export.pdf")]
-    [InlineData("export.word")]
+    [InlineData("export.pdf.projekt")]
+    [InlineData("export.word.projekt")]
     [InlineData("comments.add")]
     [InlineData("comments.edit.own")]
     [InlineData("comments.delete.own")]
@@ -41,7 +41,7 @@ public sealed class NewPermissionKeysSeedTests
     [Fact]
     public void ProjectScope_NewKeys_ShouldBeProjectScopeLevel()
     {
-        foreach (var key in new[] { "dashboard.view", "export.pdf", "export.word", "comments.add", "comments.edit.own", "comments.delete.own" })
+        foreach (var key in new[] { "dashboard.view", "export.pdf.projekt", "export.word.projekt", "comments.add", "comments.edit.own", "comments.delete.own" })
         {
             var action = PermissionSeedConfiguration.Actions.First(a => a.Klic == key);
             action.ScopeLevel.Should().Be(PermissionScopeLevel.Project,

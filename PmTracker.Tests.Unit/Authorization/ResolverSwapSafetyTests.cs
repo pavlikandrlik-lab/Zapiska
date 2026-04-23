@@ -73,7 +73,7 @@ public sealed class ResolverSwapSafetyTests
 
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
 
-        // Per-action redesign 2026-04-23: GEST má 15 cílových + 3 deprecated klíče.
+        // Per-action redesign (F7 2026-04-23): GEST má 15 cílových klíčů (deprecated smazány).
         var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         grantKeys.Should().BeEquivalentTo(new[]
         {
@@ -82,9 +82,7 @@ public sealed class ResolverSwapSafetyTests
             "dashboard.view", "dashboard.vyzvy.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "search.index",
-            // Deprecated (kompat F1–F6):
-            "records.comment.subsystemlead", "export.pdf", "export.word"
+            "search.index"
         }, "GEST má komentátorský balíček + read-only po per-action redesignu");
     }
 
@@ -104,7 +102,7 @@ public sealed class ResolverSwapSafetyTests
 
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
 
-        // Per-action redesign 2026-04-23: HOST má 12 cílových + 2 deprecated klíče.
+        // Per-action redesign (F7 2026-04-23): HOST má 12 cílových klíčů (deprecated smazány).
         var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         grantKeys.Should().BeEquivalentTo(new[]
         {
@@ -112,9 +110,7 @@ public sealed class ResolverSwapSafetyTests
             "dashboard.view", "dashboard.vyzvy.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "search.index",
-            // Deprecated (kompat F1–F6):
-            "export.pdf", "export.word"
+            "search.index"
         }, "HOST je read-only pozorovatel po per-action redesignu");
     }
 
@@ -141,12 +137,11 @@ public sealed class ResolverSwapSafetyTests
     }
 
     /// <summary>
-    /// Cílová sada klíčů pro VLASTNIK_PROJEKTU / ADM_PROJ / PROJ_MAN (= 59 cílových
-    /// klíčů per-action matice + 5 deprecated klíčů, které zůstanou v seedu do F7).
+    /// Cílová sada klíčů pro VLASTNIK_PROJEKTU / ADM_PROJ / PROJ_MAN (59 cílových
+    /// klíčů per-action matice; F7 2026-04-23 odstranil deprecated klíče).
     /// </summary>
     private static IEnumerable<string> ProjectExecutiveAllKeys() => new[]
     {
-        // 59 cílových klíčů z matice (target state):
         "comments.add", "comments.delete.any", "comments.delete.own",
         "comments.edit.any", "comments.edit.own",
         "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
@@ -171,9 +166,6 @@ public sealed class ResolverSwapSafetyTests
         "vyjadreni.modal.open", "vyjadreni.refresh", "vyjadreni.reharvest",
         "vyjadreni.vazba.create", "vyjadreni.vazba.delete",
         "vyzvy.create", "vyzvy.pnf.assign", "vyzvy.pnf.reassign",
-        "vyzvy.state.change", "vyzvy.word.export",
-        // 5 deprecated klíčů (kompat F1–F6):
-        "records.schedule.add", "records.comment.subsystemlead", "team.manage",
-        "export.pdf", "export.word"
+        "vyzvy.state.change", "vyzvy.word.export"
     };
 }

@@ -29,7 +29,7 @@ public sealed class ReadAllRoleSeedTests
             .OrderBy(x => x)
             .ToArray();
 
-        // Per-action redesign 2026-04-23: READ_ALL má 13 cílových klíčů + 2 deprecated (export.pdf/word).
+        // Per-action redesign (F7 2026-04-23): READ_ALL má 13 cílových klíčů, deprecated smazány.
         permissions.Should().BeEquivalentTo(new[]
         {
             "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
@@ -37,9 +37,7 @@ public sealed class ReadAllRoleSeedTests
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
             "projects.read.all",
-            "search.index",
-            // Deprecated (kompat F1–F6):
-            "export.pdf", "export.word"
+            "search.index"
         }, "READ_ALL má read + per-entita export + search.index + projects.read.all");
     }
 }

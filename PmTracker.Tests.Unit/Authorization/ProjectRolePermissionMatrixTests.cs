@@ -7,10 +7,7 @@ namespace PmTracker.Tests.Unit.Authorization;
 /// Cílová matice projektových rolí (per-action redesign 2026-04-23).
 /// Zdroj pravdy: docs/known-issues/authz-target-matrix.xlsx (sheet "Role × Permission (target)").
 /// Testy asertují, že seed přesně odpovídá schválené matici.
-///
-/// Deprecated klíče (records.schedule.add, records.comment.subsystemlead, team.manage,
-/// export.pdf, export.word) jsou zatím v seedu pro kompatibilitu během Fází 1–6
-/// (smažou se v Fázi 7 + DB migraci). Testy je zohledňují přes <see cref="AllWithDeprecated"/>.
+/// F7: deprecated klíče smazány, matrix nyní reprezentuje čistý per-action stav.
 /// </summary>
 public sealed class ProjectRolePermissionMatrixTests
 {
@@ -21,13 +18,8 @@ public sealed class ProjectRolePermissionMatrixTests
             .OrderBy(x => x, StringComparer.Ordinal)
             .ToArray();
 
-    private static IEnumerable<string> AllWithDeprecated(
-        IEnumerable<string> targetKeys,
-        params string[] deprecated) =>
-        targetKeys.Concat(deprecated).OrderBy(x => x, StringComparer.Ordinal);
-
     // -------------------------------------------------------------------------
-    // VLASTNIK_PROJEKTU = ADM_PROJ = PROJ_MAN (59 cílových + deprecated)
+    // VLASTNIK_PROJEKTU = ADM_PROJ = PROJ_MAN (59 cílových klíčů)
     // -------------------------------------------------------------------------
     private static readonly string[] ProjectExecutiveTargetKeys =
     [
@@ -58,30 +50,18 @@ public sealed class ProjectRolePermissionMatrixTests
         "vyzvy.state.change", "vyzvy.word.export"
     ];
 
-    // Deprecated klíče, které VP/ADM_PROJ/PROJ_MAN mají zachovány pro kompat (viz seed).
-    private static readonly string[] ProjectExecutiveDeprecatedKeys =
-    [
-        "records.schedule.add",
-        "records.comment.subsystemlead",
-        "team.manage",
-        "export.pdf",
-        "export.word"
-    ];
-
     [Fact]
     public void VLASTNIK_PROJEKTU_ShouldHaveFullProjectExecutiveMatrix()
     {
         var perms = PermissionsFor("VLASTNIK_PROJEKTU");
-        perms.Should().BeEquivalentTo(
-            AllWithDeprecated(ProjectExecutiveTargetKeys, ProjectExecutiveDeprecatedKeys));
+        perms.Should().BeEquivalentTo(ProjectExecutiveTargetKeys);
     }
 
     [Fact]
     public void ADM_PROJ_ShouldHaveFullProjectExecutiveMatrix()
     {
         var perms = PermissionsFor("ADM_PROJ");
-        perms.Should().BeEquivalentTo(
-            AllWithDeprecated(ProjectExecutiveTargetKeys, ProjectExecutiveDeprecatedKeys));
+        perms.Should().BeEquivalentTo(ProjectExecutiveTargetKeys);
     }
 
     [Fact]
@@ -93,24 +73,21 @@ public sealed class ProjectRolePermissionMatrixTests
     [Fact]
     public void HOST_ShouldHaveReadOnlyPermissions()
     {
-        // HOST = read-only pozorovatel: dashboard + export + search. Deprecated export.pdf/word
-        // ponechány během F1–F6.
+        // HOST = read-only pozorovatel: dashboard + export + search.
         PermissionsFor("HOST").Should().BeEquivalentTo(new[]
         {
             "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
             "dashboard.view", "dashboard.vyzvy.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "search.index",
-            // Deprecated (kompat F1–F6):
-            "export.pdf", "export.word"
+            "search.index"
         });
     }
 
     [Fact]
     public void GEST_ShouldHaveCommentsAndReadOnly()
     {
-        // GEST = komentátor + read-only. Deprecated: records.comment.subsystemlead + export.pdf/word.
+        // GEST = komentátor + read-only.
         PermissionsFor("GEST").Should().BeEquivalentTo(new[]
         {
             "comments.add", "comments.delete.own", "comments.edit.own",
@@ -118,9 +95,7 @@ public sealed class ProjectRolePermissionMatrixTests
             "dashboard.view", "dashboard.vyzvy.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "search.index",
-            // Deprecated (kompat F1–F6):
-            "records.comment.subsystemlead", "export.pdf", "export.word"
+            "search.index"
         });
     }
 }

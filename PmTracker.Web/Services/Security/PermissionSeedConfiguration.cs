@@ -220,17 +220,11 @@ public static class PermissionSeedConfiguration
         new("search.reindex", "Spustit reindex", "SEARCH", PermissionScopeLevel.Global),
 
         // ==== 15. Harmonogram preview ====
-        new("schedule.preview", "Náhledový přepočet harmonogramu", "SCHEDULE", PermissionScopeLevel.Project),
+        new("schedule.preview", "Náhledový přepočet harmonogramu", "SCHEDULE", PermissionScopeLevel.Project)
 
-        // ==== DEPRECATED — ponecháno pro kompatibilitu během Fází 1–6 ====
-        new("records.schedule.add", "Doplňovat harmonogram úkolu (deprecated)", "RECORDS", PermissionScopeLevel.Project),
-        new("records.comment.subsystemlead", "Vyjádření vedoucího subsystému (deprecated)", "RECORDS", PermissionScopeLevel.Project),
-        new("team.manage", "Správa týmu (deprecated)", "TEAM", PermissionScopeLevel.Project),
-        new("people.manage", "Správa osob (deprecated)", "PEOPLE", PermissionScopeLevel.Global),
-        new("ciselniky.edit", "Editace číselníků (deprecated)", "CISELNIKY", PermissionScopeLevel.Global),
-        new("settings.manage", "Správa nastavení (deprecated)", "SETTINGS", PermissionScopeLevel.Global),
-        new("export.pdf", "Export PDF (deprecated)", "EXPORT", PermissionScopeLevel.Project),
-        new("export.word", "Export Word (deprecated)", "EXPORT", PermissionScopeLevel.Project)
+        // F7 2026-04-23: 8 deprecated klíčů smazáno — viz
+        // db_upgrade_1_3_8_authz_per_action_redesign.sql (DELETE z authz.permissions +
+        // authz.role_permissions + authz.role_permission_projects POUZE pro tyto klíče).
     ];
 
     public static readonly IReadOnlyList<RoleActionSeedItem> RoleMappings = BuildRoleMappings();
@@ -239,7 +233,6 @@ public static class PermissionSeedConfiguration
     {
         var list = new List<RoleActionSeedItem>(capacity: 500);
         list.AddRange(BuildPerActionMappings());
-        list.AddRange(BuildDeprecatedCompatibilityMappings());
         return list;
     }
 
@@ -679,67 +672,7 @@ public static class PermissionSeedConfiguration
         new("METODIK_SUBSYSTEMU", "search.index", ScopeMode.All, true)
     ];
 
-    // =========================================================================
-    // DEPRECATED mappings — zachovány pro kompat. v kódu během F1–F6.
-    // V F7 (DB migrace) se smažou společně s Actions entries.
-    // Každý deprecated klíč má stejnou sadu rolí jako před redesignem.
-    // =========================================================================
-    private static IEnumerable<RoleActionSeedItem> BuildDeprecatedCompatibilityMappings() =>
-    [
-        // records.schedule.add
-        new("SUPERADMIN", "records.schedule.add", ScopeMode.All, true),
-        new("APP_ADMIN", "records.schedule.add", ScopeMode.All, true),
-        new("VLASTNIK_PROJEKTU", "records.schedule.add", ScopeMode.All, true),
-        new("ADM_PROJ", "records.schedule.add", ScopeMode.All, true),
-        new("PROJ_MAN", "records.schedule.add", ScopeMode.All, true),
-
-        // records.comment.subsystemlead
-        new("SUPERADMIN", "records.comment.subsystemlead", ScopeMode.All, true),
-        new("APP_ADMIN", "records.comment.subsystemlead", ScopeMode.All, true),
-        new("VLASTNIK_PROJEKTU", "records.comment.subsystemlead", ScopeMode.All, true),
-        new("ADM_PROJ", "records.comment.subsystemlead", ScopeMode.All, true),
-        new("PROJ_MAN", "records.comment.subsystemlead", ScopeMode.All, true),
-        new("GEST", "records.comment.subsystemlead", ScopeMode.All, true),
-        new("VEDOUCI_SUBSYSTEMU", "records.comment.subsystemlead", ScopeMode.All, true),
-        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "records.comment.subsystemlead", ScopeMode.All, true),
-
-        // team.manage
-        new("SUPERADMIN", "team.manage", ScopeMode.All, true),
-        new("APP_ADMIN", "team.manage", ScopeMode.All, true),
-        new("VLASTNIK_PROJEKTU", "team.manage", ScopeMode.All, true),
-        new("ADM_PROJ", "team.manage", ScopeMode.All, true),
-        new("PROJ_MAN", "team.manage", ScopeMode.All, true),
-
-        // people.manage
-        new("SUPERADMIN", "people.manage", ScopeMode.All, true),
-        new("APP_ADMIN", "people.manage", ScopeMode.All, true),
-
-        // ciselniky.edit
-        new("SUPERADMIN", "ciselniky.edit", ScopeMode.All, true),
-        new("APP_ADMIN", "ciselniky.edit", ScopeMode.All, true),
-
-        // settings.manage — APP_ADMIN = SUPERADMIN po per-action redesignu
-        new("SUPERADMIN", "settings.manage", ScopeMode.All, true),
-        new("APP_ADMIN", "settings.manage", ScopeMode.All, true),
-
-        // export.pdf — APP_ADMIN = SUPERADMIN (kompletní přístup k exportu)
-        new("SUPERADMIN", "export.pdf", ScopeMode.All, true),
-        new("APP_ADMIN", "export.pdf", ScopeMode.All, true),
-        new("READ_ALL", "export.pdf", ScopeMode.All, true),
-        new("VLASTNIK_PROJEKTU", "export.pdf", ScopeMode.All, true),
-        new("ADM_PROJ", "export.pdf", ScopeMode.All, true),
-        new("PROJ_MAN", "export.pdf", ScopeMode.All, true),
-        new("GEST", "export.pdf", ScopeMode.All, true),
-        new("HOST", "export.pdf", ScopeMode.All, true),
-
-        // export.word — APP_ADMIN = SUPERADMIN
-        new("SUPERADMIN", "export.word", ScopeMode.All, true),
-        new("APP_ADMIN", "export.word", ScopeMode.All, true),
-        new("READ_ALL", "export.word", ScopeMode.All, true),
-        new("VLASTNIK_PROJEKTU", "export.word", ScopeMode.All, true),
-        new("ADM_PROJ", "export.word", ScopeMode.All, true),
-        new("PROJ_MAN", "export.word", ScopeMode.All, true),
-        new("GEST", "export.word", ScopeMode.All, true),
-        new("HOST", "export.word", ScopeMode.All, true)
-    ];
+    // F7 2026-04-23: BuildDeprecatedCompatibilityMappings smazán;
+    // 8 deprecated klíčů je odstraněno z DB SQL migrací
+    // db_upgrade_1_3_8_authz_per_action_redesign.sql.
 }
