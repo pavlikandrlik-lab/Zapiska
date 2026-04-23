@@ -554,7 +554,9 @@ public sealed class PeopleControllerTests
 
         var indexResponse = await client.GetAsync($"/Osoby?asUser={_fixture.AdminOsobaId}");
         var html = await indexResponse.Content.ReadAsStringAsync();
-        html.Should().Contain("alert alert-error");
+        // _Layout.cshtml renderuje TempData["ErrorMessage"] přes <gov-message color="error">
+        // (původně `alert alert-error`). Fáze 2 gov-design-system migrace.
+        html.Should().Contain("<gov-message color=\"error\">");
         html.Should().Contain("AD osobu nelze ulo");
     }
 
@@ -575,7 +577,7 @@ public sealed class PeopleControllerTests
 
         var indexResponse = await client.GetAsync($"/Osoby?asUser={_fixture.AdminOsobaId}");
         var html = await indexResponse.Content.ReadAsStringAsync();
-        html.Should().Contain("alert alert-error");
+        html.Should().Contain("<gov-message color=\"error\">");
         html.Should().Contain("Osobu nelze odstranit.");
     }
 
@@ -665,15 +667,14 @@ public sealed class PeopleControllerTests
         return (person.Id, person.Jmeno, person.Prijmeni, person.Email ?? string.Empty, person.OrganizaceId, person.OrganizacniCelekId);
     }
 
-    private static async Task AssertForbiddenAjaxPayloadAsync(HttpResponseMessage response)
+    private static Task AssertForbiddenAjaxPayloadAsync(HttpResponseMessage response)
     {
+        // Po přechodu na [Authorize(Policy = "permission:people.manage")] se autorizace řeší
+        // framework-level a vrací plain 403 bez JSON payloadu. Dřívější AjaxForbiddenResult
+        // s JSON tělem přicházel jen když controller dělal in-controller `hasPermission` check
+        // (ExecuteCommand). Ten byl nahrazen policy attribute, takže test nyní kontroluje jen
+        // status code.
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
-
-        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
-        payload.Ok.Should().BeFalse();
-        payload.ErrorCode.Should().Be("OPERATION_FAILED");
-        payload.Message.Should().Contain("Nemáte oprávnění");
-        payload.TraceId.Should().NotBeNullOrWhiteSpace();
+        return Task.CompletedTask;
     }
 }

@@ -150,8 +150,11 @@ public sealed class ProjectsCommandsControllerTests
     }
 
     [Fact]
-    public async Task DeleteProject_ShouldReturnForbiddenPayload_WhenUserLacksPermission()
+    public async Task DeleteProject_ShouldReturnForbidden_WhenUserLacksPermission()
     {
+        // DeleteProject má framework-level [Authorize(Policy = "permission:projects.delete")]
+        // a vrací plain 403 bez JSON payloadu (na rozdíl od SaveProject, který kontroluje
+        // oprávnění in-controller a vrací AjaxForbiddenResult).
         var outsiderId = await _fixture.EnsurePersonAsync("ApiDeleteProjectNoPerm");
         var projectId = await _fixture.EnsureProjectAsync("APIDEL_DENY");
 
@@ -165,9 +168,6 @@ public sealed class ProjectsCommandsControllerTests
         var response = await client.SendAsync(request);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
-        payload.Ok.Should().BeFalse();
-        payload.ErrorCode.Should().Be(AjaxErrorCodes.OperationFailed);
     }
 
     [Fact]

@@ -131,7 +131,10 @@ public sealed class CiselnikyControllerTests
     [Fact]
     public async Task SaveRow_ShouldRedirectWithTempData_WhenModelIsInvalid_ForNonAjaxRequest()
     {
-        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = true });
+        // Test simuluje non-AJAX submit: POST → redirect → GET indexu. TestAuthHandler
+        // autentizuje na základě ?asUser=, takže follow-up GET musí ?asUser= nést explicitně
+        // (redirect jej nepřenáší). Používáme pattern jako v PeopleControllerTests.
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         using var request = new HttpRequestMessage(HttpMethod.Post, $"/Ciselniky/SaveRow?asUser={_fixture.AdminOsobaId}")
         {
             Content = ApiTestHttpHelper.BuildForm(
@@ -140,10 +143,14 @@ public sealed class CiselnikyControllerTests
         };
 
         var response = await client.SendAsync(request);
-        var html = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain("alert alert-error");
+        var indexResponse = await client.GetAsync($"/Ciselniky?id=typy-ukolu&asUser={_fixture.AdminOsobaId}");
+        var html = await indexResponse.Content.ReadAsStringAsync();
+
+        indexResponse.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        // _Layout.cshtml teď renderuje TempData["ErrorMessage"] přes <gov-message color="error">.
+        html.Should().Contain("<gov-message color=\"error\">");
         html.Should().Contain("The Kod field is required.");
     }
 
@@ -315,7 +322,9 @@ public sealed class CiselnikyControllerTests
     [Fact]
     public async Task DeleteRow_ShouldRedirectWithTempData_WhenRowDoesNotExist_ForNonAjaxRequest()
     {
-        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = true });
+        // Viz komentář u SaveRow_ShouldRedirectWithTempData… — AllowAutoRedirect=false +
+        // explicitní ?asUser= v follow-up GET (TestAuthHandler vyžaduje query/header).
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         using var request = new HttpRequestMessage(HttpMethod.Post, $"/Ciselniky/DeleteRow?asUser={_fixture.AdminOsobaId}")
         {
             Content = ApiTestHttpHelper.BuildForm(
@@ -324,10 +333,13 @@ public sealed class CiselnikyControllerTests
         };
 
         var response = await client.SendAsync(request);
-        var html = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain("alert alert-error");
+        var indexResponse = await client.GetAsync($"/Ciselniky?id=typy-ukolu&asUser={_fixture.AdminOsobaId}");
+        var html = await indexResponse.Content.ReadAsStringAsync();
+
+        indexResponse.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("<gov-message color=\"error\">");
         html.Should().Contain("nebyla nalezena");
     }
 

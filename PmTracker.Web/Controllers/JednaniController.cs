@@ -251,7 +251,7 @@ public sealed class JednaniController : BaseController
         {
             await _meetingService.SaveAttendanceBatchAsync(
                 jednaniId,
-                rows.Select(x => (x.OsobaId, x.StavUcasti)),
+                rows.Select(x => (x.OsobaId, x.StavUcasti ?? string.Empty)),
                 CurrentUserContext,
                 ct);
         }
@@ -318,7 +318,7 @@ public sealed class JednaniController : BaseController
         {
             await _meetingService.SaveMeetingNotesBatchAsync(
                 jednaniId,
-                rows.Select(x => (x.ZaznamId, x.Text)),
+                rows.Select(x => (x.ZaznamId, x.Text ?? string.Empty)),
                 CurrentUserContext,
                 ct);
         }
@@ -346,15 +346,20 @@ public sealed class JednaniController : BaseController
         return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
     }
 
+    // Text je nullable záměrně — viz poznámka u MeetingAttendanceRowInput.
     public sealed class MeetingNoteRowInput
     {
         public int ZaznamId { get; set; }
-        public string Text { get; set; } = string.Empty;
+        public string? Text { get; set; }
     }
 
+    // StavUcasti je nullable záměrně: prázdná hodnota v batch formuláři znamená
+    // „přeskočit tuto osobu", service (SaveAttendanceBatchAsync) tyto řádky filtruje.
+    // Non-nullable string by model binder automaticky flagoval jako Required a rozbíjel
+    // non-ajax submit s částečně vyplněným gridem.
     public sealed class MeetingAttendanceRowInput
     {
         public int OsobaId { get; set; }
-        public string StavUcasti { get; set; } = string.Empty;
+        public string? StavUcasti { get; set; }
     }
 }

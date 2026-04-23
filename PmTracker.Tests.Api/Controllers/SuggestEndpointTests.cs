@@ -68,7 +68,9 @@ public sealed class SuggestEndpointTests
         await _fixture.EnsureProjectTeamMemberAsync(projektId, adminId);
 
         var subsystemId = await _fixture.EnsureSubsystemAsync("SUGSUB", adminId);
-        await _fixture.EnsureRecordAsync(projektId, adminId, subsystemId, "REK", marker);
+        // Seedované kategorie záznamů: U, INFO, ROZHODNUTI (viz db_seed_dev_admin.sql).
+        // Původní "REK" neexistoval → EnsureRecordAsync padal na FirstAsync.
+        await _fixture.EnsureRecordAsync(projektId, adminId, subsystemId, "U", marker);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync(
@@ -101,7 +103,9 @@ public sealed class SuggestEndpointTests
         var projektId = await _fixture.EnsureProjectAsync("HITFLD");
         await _fixture.EnsureProjectTeamMemberAsync(projektId, adminId);
         var subsystemId = await _fixture.EnsureSubsystemAsync("HITSUB", adminId);
-        await _fixture.EnsureRecordAsync(projektId, adminId, subsystemId, "REK", marker);
+        // Seedované kategorie záznamů: U, INFO, ROZHODNUTI (viz db_seed_dev_admin.sql).
+        // Původní "REK" neexistoval → EnsureRecordAsync padal na FirstAsync.
+        await _fixture.EnsureRecordAsync(projektId, adminId, subsystemId, "U", marker);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync(
