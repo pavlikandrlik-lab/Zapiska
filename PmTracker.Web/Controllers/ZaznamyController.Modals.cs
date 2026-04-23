@@ -7,7 +7,7 @@ namespace PmTracker.Web.Controllers;
 public sealed partial class ZaznamyController
 {
     [HttpGet]
-    [Authorize(Policy = "permission:records.edit")]
+    [Authorize(Policy = "permission:records.delete")]
     public async Task<IActionResult> DeleteRecordModal(int projektId, int zaznamId, string? returnUrl, string? uiContext, string? tab, CancellationToken ct = default)
     {
         var model = await _recordService.BuildDeleteRecordModalAsync(projektId, zaznamId, ct);
@@ -18,7 +18,7 @@ public sealed partial class ZaznamyController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:records.edit")]
+    [Authorize(Policy = "permission:records.assign.meeting")]
     public async Task<IActionResult> AssignMeetingIdentifierModal(int projektId, int zaznamId, CancellationToken ct = default)
     {
         var model = await _projectEditQuery.GetEditModelAsync(zaznamId, ct);

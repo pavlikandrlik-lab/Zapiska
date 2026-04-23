@@ -15,12 +15,17 @@ public sealed partial class ZaznamyController
         var editorTab = NormalizeEditorTab(command.EditorTab);
         var projectTab = NormalizeProjectTab(editorTab);
         var presentation = NormalizePresentation(command.Presentation);
-        var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId);
+        // Per-action redesign 2026-04-23: Save větev podle isUpdate:
+        //   - nový záznam (Id == null):     records.create
+        //   - editace záznamu:               records.edit
+        //   - jen editace harmonogramu:      records.schedule.edit (oddělená větev, admin jen schedule slice)
+        var isCreate = !command.Id.HasValue;
+        var canCreateRecord = isCreate && CurrentUserContext.HasPermission(PermissionKeys.RecordsCreate, command.ProjektId);
+        var canEditRecord = !isCreate && CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId);
         var canEditSchedule = CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, command.ProjektId);
-        var canAddSchedule = CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, command.ProjektId);
-        var canSaveScheduleOnly = command.Id.HasValue
+        var canSaveScheduleOnly = !isCreate
             && string.Equals(editorTab, EditorTabSchedule, StringComparison.OrdinalIgnoreCase)
-            && (canEditSchedule || canAddSchedule);
+            && canEditSchedule;
         var normalizedUiContext = NormalizeRecordEditorUiContext(command.UiContext, command.MeetingId);
         var contextMeetingId = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
             ? command.MeetingId
@@ -29,7 +34,7 @@ public sealed partial class ZaznamyController
         var savedRecordId = 0;
 
         return await ExecuteValidatedCommandAsync(
-            hasPermission: () => canEditRecord || canSaveScheduleOnly,
+            hasPermission: () => canCreateRecord || canEditRecord || canSaveScheduleOnly,
             invalidAjaxMessage: "Záznam nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirectAfterSave,
@@ -53,7 +58,7 @@ public sealed partial class ZaznamyController
         var redirect = () => Redirect(redirectUrl);
 
         return await ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId),
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsDelete, command.ProjektId),
             invalidAjaxMessage: "Záznam nelze smazat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
@@ -67,7 +72,7 @@ public sealed partial class ZaznamyController
     public async Task<IActionResult> AssignMeetingIdentifier(AssignMeetingIdentifierCommand command, CancellationToken ct = default)
     {
         return await ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId),
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsAssignMeeting, command.ProjektId),
             invalidAjaxMessage: "Identifikátor z jednání nelze doplnit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction("Detail", "Projekty", new { id = command.ProjektId, tab = "zaznamy" }),

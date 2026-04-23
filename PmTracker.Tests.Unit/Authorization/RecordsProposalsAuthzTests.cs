@@ -7,10 +7,15 @@ namespace PmTracker.Tests.Unit.Authorization;
 public sealed class RecordsProposalsAuthzTests
 {
     [Fact]
-    public void ZaznamyModals_ShouldHaveRecordsEditPolicy()
+    public void ZaznamyModals_ShouldHavePerActionPolicy()
     {
+        // Per-action redesign 2026-04-23: DeleteRecordModal → records.delete,
+        // AssignMeetingIdentifierModal → records.assign.meeting (dříve oba records.edit).
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ZaznamyController.Modals.cs"));
-        code.Should().Contain("[Authorize(Policy = \"permission:records.edit\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:records.delete\")]",
+            "DeleteRecordModal má specifický klíč records.delete");
+        code.Should().Contain("[Authorize(Policy = \"permission:records.assign.meeting\")]",
+            "AssignMeetingIdentifierModal má specifický klíč records.assign.meeting");
     }
 
     [Fact]
