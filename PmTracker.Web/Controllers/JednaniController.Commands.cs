@@ -52,7 +52,7 @@ public sealed partial class JednaniController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:meetings.edit")]
+    [Authorize(Policy = "permission:meetings.delete")]
     public Task<IActionResult> Delete(DeleteMeetingCommand command, string? returnUrl, CancellationToken ct = default)
     {
         IActionResult RedirectAfterDelete()

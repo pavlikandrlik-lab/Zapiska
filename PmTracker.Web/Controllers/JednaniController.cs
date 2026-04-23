@@ -170,7 +170,7 @@ public sealed partial class JednaniController : BaseController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:meetings.edit")]
+    [Authorize(Policy = "permission:meetings.participant.add")]
     public async Task<IActionResult> AddMeetingParticipantModal(int projektId, int jednaniId, CancellationToken ct = default)
     {
         var actualProjectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
@@ -206,7 +206,7 @@ public sealed partial class JednaniController : BaseController
 
         var projektId = await _meetingService.GetMeetingProjectIdAsync(command.JednaniId, ct);
         if (!projektId.HasValue) return NotFound();
-        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId.Value)) return Forbid();
+        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsStatusChange, projektId.Value)) return Forbid();
 
         try
         {
@@ -247,7 +247,7 @@ public sealed partial class JednaniController : BaseController
             return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
         }
 
-        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projektId))
+        if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsAttendanceEdit, projektId))
             return Forbid();
 
         try
@@ -287,7 +287,7 @@ public sealed partial class JednaniController : BaseController
     public Task<IActionResult> AddMeetingParticipant(AddMeetingParticipantCommand command, CancellationToken ct = default)
     {
         return ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId),
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.MeetingsParticipantAdd, command.ProjektId),
             invalidAjaxMessage: "Osobu nelze přidat do účasti.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.JednaniId })!,
@@ -314,7 +314,12 @@ public sealed partial class JednaniController : BaseController
             return RedirectToAction(nameof(Detail), new { id = jednaniId })!;
         }
 
-        if (!CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId))
+        // Duální gate: meetings.notes.edit (primární) nebo meetings.notes.subsystemlead
+        // (subsystem lead smí přidat zápis za vedoucího — service filter restriktuje na
+        // jeho subsystém).
+        var canEditNotes = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesEdit, projektId)
+            || CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projektId);
+        if (!canEditNotes)
             return Forbid();
 
         try

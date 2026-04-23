@@ -24,10 +24,11 @@ public sealed class ProjektyAuthzTests
         code.Should().Contain("PermissionKeys.TeamSubsystemReorder",
             "ReorderProjectSubsystem musí delegovat na team.subsystem.reorder klíč");
 
-        // Meeting akce byly přesunuty do JednaniController — viz docs/known-issues/meetings-endpoints-split-between-controllers.md
+        // Per-action redesign 2026-04-23: JednaniController.Delete má meetings.delete
+        // (specifický klíč pro delete, nikoli sdílený meetings.edit).
         var jednaniCommands = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/JednaniController.Commands.cs"));
-        jednaniCommands.Should().Contain("[Authorize(Policy = \"permission:meetings.edit\")]",
-            "JednaniController.Delete musí mít meetings.edit (TODO F2.2: přepíše se na meetings.delete)");
+        jednaniCommands.Should().Contain("[Authorize(Policy = \"permission:meetings.delete\")]",
+            "JednaniController.Delete má per-action klíč meetings.delete");
     }
 
     [Fact]

@@ -26,21 +26,29 @@ public sealed class BatchB5AuthzTests
     }
 
     [Fact]
-    public void JednaniController_ShouldHaveMeetingsEditPolicy_OnAddParticipantModal()
+    public void JednaniController_ShouldHavePerActionPolicy_OnAddParticipantModal()
     {
+        // Per-action redesign 2026-04-23: AddMeetingParticipantModal má klíč
+        // meetings.participant.add (dříve meetings.edit).
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/JednaniController.cs"));
-        code.Should().Contain("[Authorize(Policy = \"permission:meetings.edit\")]",
-            "AddMeetingParticipantModal musí mít meetings.edit policy (projektId v route)");
+        code.Should().Contain("[Authorize(Policy = \"permission:meetings.participant.add\")]",
+            "AddMeetingParticipantModal má per-action klíč meetings.participant.add");
     }
 
     [Fact]
     public void JednaniController_ShouldRetainBodyChecks_ForFormProjektIdActions()
     {
+        // Per-action redesign 2026-04-23: SaveStatus/SaveAttendance/SaveNotes/AddMeetingParticipant
+        // mají per-action klíče v body check (projektId ve form body, ne v route).
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/JednaniController.cs"));
-        // SaveStatus/SaveAttendance/SaveNotes/AddMeetingParticipant nemají projektId v route,
-        // takže Policy handler by nemohl extrahovat kontext. Keep body checks.
-        code.Should().Contain("CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit",
-            "form-level projektId actions zachovávají body check (policy handler neumí číst z form body)");
+        code.Should().Contain("PermissionKeys.MeetingsStatusChange",
+            "SaveStatus má per-action klíč meetings.status.change");
+        code.Should().Contain("PermissionKeys.MeetingsAttendanceEdit",
+            "SaveAttendance má per-action klíč meetings.attendance.edit");
+        code.Should().Contain("PermissionKeys.MeetingsParticipantAdd",
+            "AddMeetingParticipant má per-action klíč meetings.participant.add");
+        code.Should().Contain("PermissionKeys.MeetingsNotesEdit",
+            "SaveNotes má per-action klíč meetings.notes.edit");
     }
 
     [Fact]
