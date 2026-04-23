@@ -306,7 +306,7 @@ public sealed class ApproveProposalAppliesManualKrokyTests
 
         var harvestSchedulerMock = new Mock<IHarvestScheduler>();
         harvestSchedulerMock
-            .Setup(x => x.ScheduleHarvestForRecordAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.ScheduleHarvestForRecordAsync(It.IsAny<int>(), It.IsAny<CancellationToken>(), It.IsAny<SdReactiveSource>()))
             .Returns(Task.CompletedTask);
 
         var k3Key = db.CiselnikHarmonogramTypu.Local.First(t => t.KrokPoradi == 3 && !t.JeZpozdeni).KrokKey;
@@ -373,7 +373,7 @@ public sealed class ApproveProposalAppliesManualKrokyTests
         vazby.Should().Contain(v => v.KrokKey == k3Key && v.ExterniOdkazId == 501 && v.HotVyjadreniId == 1001 && v.Source == (byte)VazbaSource.Manual);
         vazby.Should().Contain(v => v.KrokKey == k6Key && v.ExterniOdkazId == 502 && v.HotVyjadreniId == 1002 && v.Source == (byte)VazbaSource.Manual);
 
-        harvestSchedulerMock.Verify(x => x.ScheduleHarvestForRecordAsync(newRecordId, It.IsAny<CancellationToken>()), Times.Once);
+        harvestSchedulerMock.Verify(x => x.ScheduleHarvestForRecordAsync(newRecordId, It.IsAny<CancellationToken>(), It.IsAny<SdReactiveSource>()), Times.Once);
     }
 
     private static IHarmonogramService NewHarmonogramService(PmTrackerDbContext db)

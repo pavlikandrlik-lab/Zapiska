@@ -59,7 +59,7 @@ public sealed class ZaznamyControllerEditAuthzTests
         result.Should().BeOfType<ForbidResult>();
         recordService.Verify(x => x.BuildZaznamEditAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
             "při Forbid se nesmí volat BuildZaznamEditAsync (existence leak).");
-        harvestScheduler.Verify(x => x.ScheduleHarvestForRecordAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
+        harvestScheduler.Verify(x => x.ScheduleHarvestForRecordAsync(It.IsAny<int>(), It.IsAny<CancellationToken>(), It.IsAny<SdReactiveSource>()), Times.Never,
             "při Forbid se nesmí volat ScheduleHarvestForRecordAsync (T5 trigger amplifier).");
     }
 
@@ -95,7 +95,7 @@ public sealed class ZaznamyControllerEditAuthzTests
         var result = await controller.Edit(RecordId, presentation: null, returnUrl: null, CancellationToken.None);
 
         result.Should().BeOfType<ViewResult>();
-        harvestScheduler.Verify(x => x.ScheduleHarvestForRecordAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
+        harvestScheduler.Verify(x => x.ScheduleHarvestForRecordAsync(It.IsAny<int>(), It.IsAny<CancellationToken>(), It.IsAny<SdReactiveSource>()), Times.Never,
             "uživatel bez records.edit (pouze schedule.edit) nesmí triggerovat T5 harvest.");
     }
 

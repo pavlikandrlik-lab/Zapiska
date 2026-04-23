@@ -108,10 +108,10 @@ public sealed class RecordServiceDelegationTests
 
     private sealed class FakeHarvestScheduler : IHarvestScheduler
     {
-        public Task ScheduleHarvestAsync(int externiOdkazId, CancellationToken ct = default)
+        public Task ScheduleHarvestAsync(int externiOdkazId, CancellationToken ct = default, SdReactiveSource source = SdReactiveSource.RecordSave)
             => Task.CompletedTask;
 
-        public Task ScheduleHarvestForRecordAsync(int zaznamId, CancellationToken ct = default)
+        public Task ScheduleHarvestForRecordAsync(int zaznamId, CancellationToken ct = default, SdReactiveSource source = SdReactiveSource.EditorOpen)
             => Task.CompletedTask;
     }
 }
