@@ -61,6 +61,13 @@ internal static class IntegrationTestHelper
         services.AddSingleton<IWebHostEnvironment>(environment);
         services.AddSingleton<IHostEnvironment>(environment);
         services.AddPmTrackerDataStore(configuration);
+        // F8 A1 fix 2026-04-23: IAuthorizationService (per-action authz gate) je v produkci
+        // registrován v Program.cs, ne v AddPmTrackerDataStore. UserContextResolver ho má
+        // v konstruktoru, takže bez tohoto registrace by fixture DI container při resolve
+        // UserContextResolver exploduje („Unable to resolve service..."). Stejně tak
+        // IHttpContextAccessor potřebuje autorizační audit vrstva.
+        services.AddHttpContextAccessor();
+        services.AddScoped<IAuthorizationService, AuthorizationService>();
         services.AddSingleton(dbContext);
         services.AddSingleton(timeProvider ?? TimeProvider.System);
 
