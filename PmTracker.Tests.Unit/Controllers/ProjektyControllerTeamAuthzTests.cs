@@ -37,7 +37,7 @@ public sealed class ProjektyControllerTeamAuthzTests
             projectService,
             userContext: BuildProjectUserContext(
                 projectId: projectA,
-                permissionKeys: PermissionKeys.TeamManage));
+                permissionKeys: new[] { PermissionKeys.TeamRoleAssign, PermissionKeys.TeamRoleDeactivate, PermissionKeys.TeamMemberAdd, PermissionKeys.TeamMemberRemove }));
 
         // Act
         var result = await controller.DeactivateProjectRole(
@@ -61,7 +61,7 @@ public sealed class ProjektyControllerTeamAuthzTests
             projectService,
             userContext: BuildProjectUserContext(
                 projectId: projectA,
-                permissionKeys: PermissionKeys.TeamManage));
+                permissionKeys: new[] { PermissionKeys.TeamRoleAssign, PermissionKeys.TeamRoleDeactivate, PermissionKeys.TeamMemberAdd, PermissionKeys.TeamMemberRemove }));
 
         // Act
         var result = await controller.DeactivateProjectRole(
@@ -84,7 +84,7 @@ public sealed class ProjektyControllerTeamAuthzTests
             projectService,
             userContext: BuildProjectUserContext(
                 projectId: projectA,
-                permissionKeys: PermissionKeys.TeamManage));
+                permissionKeys: new[] { PermissionKeys.TeamRoleAssign, PermissionKeys.TeamRoleDeactivate, PermissionKeys.TeamMemberAdd, PermissionKeys.TeamMemberRemove }));
 
         // Act: útok přes IDOR — uživatel má team.manage na A, ale pokusí se zasáhnout B.
         var result = await controller.AssignProjectRole(
@@ -109,7 +109,7 @@ public sealed class ProjektyControllerTeamAuthzTests
             projectService,
             userContext: BuildProjectUserContext(
                 projectId: projectA,
-                permissionKeys: PermissionKeys.TeamManage));
+                permissionKeys: new[] { PermissionKeys.TeamRoleAssign, PermissionKeys.TeamRoleDeactivate, PermissionKeys.TeamMemberAdd, PermissionKeys.TeamMemberRemove }));
 
         var result = await controller.AssignProjectRole(
             new AssignProjectRoleCommand

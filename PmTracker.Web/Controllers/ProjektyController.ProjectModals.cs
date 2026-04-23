@@ -92,7 +92,7 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:team.manage")]
+    [Authorize(Policy = "permission:team.member.add")]
     public async Task<IActionResult> AddTeamMemberModal(int projektId, CancellationToken ct = default)
     {
         if (!await _projectService.ProjektExistsAsync(projektId, ct))
@@ -119,7 +119,7 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:team.manage")]
+    [Authorize(Policy = "permission:team.role.assign")]
     public async Task<IActionResult> AssignProjectRoleModal(int projektId, CancellationToken ct = default)
     {
         var modalOptions = await _projectService.BuildProjectTeamModalOptionsAsync(projektId, ct);
@@ -134,7 +134,7 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:team.manage")]
+    [Authorize(Policy = "permission:team.subsystem.create")]
     public async Task<IActionResult> AssignProjectSubsystemModal(int projektId, CancellationToken ct = default)
     {
         var modalOptions = await _projectService.BuildProjectTeamModalOptionsAsync(projektId, ct);
@@ -147,7 +147,7 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:team.manage")]
+    [Authorize(Policy = "permission:team.subsystem.role.assign")]
     public async Task<IActionResult> AssignProjectSubsystemRoleModal(int projektId, CancellationToken ct = default)
     {
         var modalOptions = await _projectService.BuildProjectTeamModalOptionsAsync(projektId, ct);

@@ -38,7 +38,7 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:team.manage")]
+    [Authorize(Policy = "permission:team.candidates.search")]
     public async Task<IActionResult> SearchProjectMemberCandidates(int id, [FromQuery(Name = "q")] string? query, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(id))

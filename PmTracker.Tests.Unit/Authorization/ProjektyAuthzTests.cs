@@ -9,34 +9,44 @@ public sealed class ProjektyAuthzTests
     [Fact]
     public void ProjektyCommands_ShouldUsePolicyForDeleteActions()
     {
-        // H-1 IDOR fix: team-management akce v ProjektyController.Commands.cs
-        // už NEMAJÍ [Authorize(Policy="permission:team.manage")] atribut.
-        // Důvod: projektId přichází z form body (command.ProjektId nebo query parametr),
-        // ne z route. PermissionAuthorizationHandler čte projektId z RouteValues →
-        // degradoval by na global-only check. Per-project kontrola probíhá v body
-        // přes ExecuteTeamValidatedActionAsync/ExecuteTeamActionAsync.
+        // Per-action redesign 2026-04-23: team.* akce mají per-action klíče
+        // (team.member.add / .role.assign / .subsystem.create / ...). Policy atribut
+        // nejde použít — projektId je ve form body, ne v route — takže se každý klíč
+        // kontroluje imperativně v body přes ExecuteTeamValidatedActionAsync.
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ProjektyController.Commands.cs"));
 
         code.Should().Contain("[Authorize(Policy = \"permission:projects.delete\")]",
             "DeleteProject musí mít projects.delete");
-        code.Should().Contain("CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId)",
-            "team.manage per-project check musí být proveden v body helperech (H-1 IDOR fix)");
+        code.Should().Contain("CurrentUserContext.HasPermission(permissionKey, projektId)",
+            "team.* akce provádějí per-project check v body (helper ExecuteTeamValidatedActionAsync / ExecuteTeamActionAsync)");
+        code.Should().Contain("PermissionKeys.TeamMemberAdd",
+            "SaveTeamMember musí delegovat na team.member.add klíč");
+        code.Should().Contain("PermissionKeys.TeamSubsystemReorder",
+            "ReorderProjectSubsystem musí delegovat na team.subsystem.reorder klíč");
 
         // Meeting akce byly přesunuty do JednaniController — viz docs/known-issues/meetings-endpoints-split-between-controllers.md
         var jednaniCommands = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/JednaniController.Commands.cs"));
         jednaniCommands.Should().Contain("[Authorize(Policy = \"permission:meetings.edit\")]",
-            "JednaniController.Delete musí mít meetings.edit");
+            "JednaniController.Delete musí mít meetings.edit (TODO F2.2: přepíše se na meetings.delete)");
     }
 
     [Fact]
     public void ProjektyProjectModals_ShouldUseCorrectPolicies()
     {
+        // Per-action redesign 2026-04-23: team.manage rozděleno na per-action klíče.
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ProjektyController.ProjectModals.cs"));
 
         code.Should().Contain("[Authorize(Policy = \"permission:projects.create\")]");
         code.Should().Contain("[Authorize(Policy = \"permission:projects.edit\")]");
         code.Should().Contain("[Authorize(Policy = \"permission:projects.delete\")]");
-        code.Should().Contain("[Authorize(Policy = \"permission:team.manage\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:team.member.add\")]",
+            "AddTeamMemberModal má per-action klíč team.member.add");
+        code.Should().Contain("[Authorize(Policy = \"permission:team.role.assign\")]",
+            "AssignProjectRoleModal má per-action klíč team.role.assign");
+        code.Should().Contain("[Authorize(Policy = \"permission:team.subsystem.create\")]",
+            "AssignProjectSubsystemModal má per-action klíč team.subsystem.create");
+        code.Should().Contain("[Authorize(Policy = \"permission:team.subsystem.role.assign\")]",
+            "AssignProjectSubsystemRoleModal má per-action klíč team.subsystem.role.assign");
     }
 
     [Fact]

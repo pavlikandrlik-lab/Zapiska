@@ -67,6 +67,7 @@ public sealed partial class ProjektyController
     {
         return ExecuteTeamValidatedActionAsync(
             projektId: command.ProjektId,
+            permissionKey: PermissionKeys.TeamMemberAdd,
             invalidAjaxMessage: "Člena týmu nelze uložit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Člen týmu byl uložen.",
@@ -79,6 +80,7 @@ public sealed partial class ProjektyController
     {
         return ExecuteTeamActionAsync(
             projektId: command.ProjektId,
+            permissionKey: PermissionKeys.TeamMemberRemove,
             operation: () => _projectService.RemoveTeamMemberAsync(command, CurrentUserContext, ct));
     }
 
@@ -88,6 +90,7 @@ public sealed partial class ProjektyController
     {
         return ExecuteTeamValidatedActionAsync(
             projektId: command.ProjektId,
+            permissionKey: PermissionKeys.TeamRoleAssign,
             invalidAjaxMessage: "Projektovou roli nelze přiřadit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Projektová role byla přiřazena.",
@@ -100,6 +103,7 @@ public sealed partial class ProjektyController
     {
         return ExecuteTeamValidatedActionAsync(
             projektId: projektId,
+            permissionKey: PermissionKeys.TeamRoleDeactivate,
             invalidAjaxMessage: "Projektovou roli nelze deaktivovat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Projektová role byla deaktivována.",
@@ -112,6 +116,7 @@ public sealed partial class ProjektyController
     {
         return ExecuteTeamValidatedActionAsync(
             projektId: command.ProjektId,
+            permissionKey: PermissionKeys.TeamSubsystemCreate,
             invalidAjaxMessage: "Subsystém nelze přiřadit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Subsystém byl přiřazen k projektu.",
@@ -124,6 +129,7 @@ public sealed partial class ProjektyController
     {
         return ExecuteTeamValidatedActionAsync(
             projektId: command.ProjektId,
+            permissionKey: PermissionKeys.TeamSubsystemReorder,
             invalidAjaxMessage: "Pořadí subsystému projektu nelze změnit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Pořadí subsystémů bylo upraveno.",
@@ -136,6 +142,7 @@ public sealed partial class ProjektyController
     {
         return ExecuteTeamValidatedActionAsync(
             projektId: projektId,
+            permissionKey: PermissionKeys.TeamSubsystemDeactivate,
             invalidAjaxMessage: "Subsystém projektu nelze deaktivovat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Subsystém projektu byl deaktivován.",
@@ -148,6 +155,7 @@ public sealed partial class ProjektyController
     {
         return ExecuteTeamValidatedActionAsync(
             projektId: command.ProjektId,
+            permissionKey: PermissionKeys.TeamSubsystemRoleAssign,
             invalidAjaxMessage: "Subsystemovou roli nelze přiřadit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Role v subsystému byla přiřazena.",
@@ -160,25 +168,27 @@ public sealed partial class ProjektyController
     {
         return ExecuteTeamValidatedActionAsync(
             projektId: projektId,
+            permissionKey: PermissionKeys.TeamSubsystemRoleDeactivate,
             invalidAjaxMessage: "Subsystemovou roli nelze deaktivovat.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Role v subsystému byla deaktivována.",
             operation: () => _projectService.DeactivateProjectSubsystemRoleAsync(command, CurrentUserContext, ct));
     }
 
-    // H-1 IDOR fix: per-project kontrola je provedena zde v body.
-    // PermissionAuthorizationHandler čte projektId z RouteValues — ale team-management
-    // akce dostávají projektId z form body (command.ProjektId) nebo query parametru.
-    // Bez této kontroly by uživatel s team.manage na projektu A mohl upravovat projekt B.
+    // H-1 IDOR fix: per-project kontrola je provedena zde v body (projektId pochází
+    // z form body, ne z route — PermissionAuthorizationHandler čte jen RouteValues).
+    // Per-action redesign 2026-04-23: každá team akce má vlastní permission klíč
+    // (team.member.add / .remove / .role.* / .subsystem.*), helper dostává klíč jako parametr.
     private Task<IActionResult> ExecuteTeamValidatedActionAsync(
         int projektId,
+        string permissionKey,
         string invalidAjaxMessage,
         string invalidFallbackMessage,
         string successMessage,
         Func<Task> operation)
     {
         return ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
+            hasPermission: () => CurrentUserContext.HasPermission(permissionKey, projektId),
             invalidAjaxMessage: invalidAjaxMessage,
             invalidFallbackMessage: invalidFallbackMessage,
             onInvalidRedirect: () => RedirectToTeamTab(projektId),
@@ -187,10 +197,10 @@ public sealed partial class ProjektyController
             operation: operation);
     }
 
-    private Task<IActionResult> ExecuteTeamActionAsync(int projektId, Func<Task> operation)
+    private Task<IActionResult> ExecuteTeamActionAsync(int projektId, string permissionKey, Func<Task> operation)
     {
         return ExecuteCommandAsync(
-            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId),
+            hasPermission: () => CurrentUserContext.HasPermission(permissionKey, projektId),
             onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToTeamTab(projektId)),
             onAjaxSuccess: null,
             operation: operation);

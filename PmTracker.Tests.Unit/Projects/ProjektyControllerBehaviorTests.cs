@@ -204,15 +204,17 @@ public sealed class ProjektyControllerBehaviorTests
     [Fact]
     public void TeamManage_Actions_ShouldDoPerProjectCheck_InBody()
     {
-        // H-1 IDOR fix: team.manage actions provádějí per-project kontrolu v body helperu
-        // ExecuteTeamValidatedActionAsync/ExecuteTeamActionAsync (ne přes [Authorize(Policy)]).
-        // Důvod: projektId z form body/query — handler by degradoval na global-only check.
+        // Per-action redesign 2026-04-23: team.* akce provádějí per-project kontrolu v body
+        // (ExecuteTeamValidatedActionAsync / ExecuteTeamActionAsync s permissionKey parametrem).
+        // Policy atribut nefunguje — projektId je ve form body, ne v route.
         var code = System.IO.File.ReadAllText(
             PmTracker.Tests.Unit.Architecture.ArchitectureTestBase.ResolvePath(
                 "PmTracker.Web/Controllers/ProjektyController.Commands.cs"));
 
-        code.Should().Contain("CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId)",
-            "ReorderProjectSubsystem a ostatní team.manage actions musí mít per-project check v body");
+        code.Should().Contain("CurrentUserContext.HasPermission(permissionKey, projektId)",
+            "team.* akce mají per-project check v helperu s per-action klíčem jako parametrem");
+        code.Should().Contain("PermissionKeys.TeamSubsystemReorder",
+            "ReorderProjectSubsystem musí použít specific klíč team.subsystem.reorder");
     }
 
     [Fact]
