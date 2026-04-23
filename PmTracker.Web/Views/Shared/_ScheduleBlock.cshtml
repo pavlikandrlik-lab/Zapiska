@@ -308,13 +308,24 @@
                                     // Plán D Task 8: Skutečnost sloupec — rozhodnutí mezi 4 scénáři:
                                     //  A) Manual krok {2,5,8,9} → date input (editable/read-only) přes _ScheduleBlockManualCell
                                     //  B) Auto krok s ZdrojSkutecnosti.FromVyjadreni → read-only odchylka + chat ikona
-                                    //  C) Auto krok s ZdrojSkutecnosti.None → warning ikona ("automat zatím nenašel vyjádření")
-                                    //  D) Ostatní (legacy / direct editor edge cases) → původní delay input UI
+                                    //  C) Auto krok s ZdrojSkutecnosti.None → warning ikona (jen u existujícího záznamu)
+                                    //  D) Ostatní (Create flow, legacy) → původní delay input UI
+                                    //
+                                    // U Create flow (RecordId = 0) ještě neexistuje žádná vazba / skutečnost,
+                                    // takže ani warning ani read-only zobrazení nedává smysl — padá to na legacy
+                                    // delay input, který umožní pre-fill. Manual kroky ale renderujeme vždy
+                                    // (i u Create — schéma 3 pre-bound vazby).
                                     var zdrojSkut = krok.ZdrojSkutecnosti;
                                     var isKrokLocked = krok.KrokKey != Guid.Empty && lockedManualKrokKeys.Contains(krok.KrokKey);
+                                    var hasExistingRecord = Model.RecordId > 0;
                                     var useManualCell = krok.IsManualKrok;
-                                    var useFromVyjadreniCell = !useManualCell && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.FromVyjadreni;
-                                    var useNoneCell = !useManualCell && !useFromVyjadreniCell && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.None;
+                                    var useFromVyjadreniCell = !useManualCell
+                                        && hasExistingRecord
+                                        && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.FromVyjadreni;
+                                    var useNoneCell = !useManualCell
+                                        && !useFromVyjadreniCell
+                                        && hasExistingRecord
+                                        && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.None;
                                     var assignedManualIndex = useManualCell ? manualInputIndex++ : -1;
                                 }
                                 @if (useManualCell)
