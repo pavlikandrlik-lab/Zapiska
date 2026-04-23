@@ -42,8 +42,11 @@ GO
 -- Seed singleton row (idempotentní)
 IF NOT EXISTS (SELECT 1 FROM dbo.ad_sync_settings WHERE id = 1)
 BEGIN
+    -- Pozn.: SYSUTCDATETIMEOFFSET() NENÍ vestavěná T-SQL funkce (ani v SQL Serveru,
+    -- ani v Azure SQL Edge). Ekvivalent „UTC now jako datetimeoffset" =
+    -- TODATETIMEOFFSET(SYSUTCDATETIME(), 0). Opraveno 2026-04-22.
     INSERT INTO dbo.ad_sync_settings (id, is_enabled, period_minutes, anchor_at)
-    VALUES (1, 0, 360, SYSUTCDATETIMEOFFSET());
+    VALUES (1, 0, 360, TODATETIMEOFFSET(SYSUTCDATETIME(), 0));
     PRINT N'Seed výchozího řádku ad_sync_settings id=1 vložen.';
 END
 ELSE

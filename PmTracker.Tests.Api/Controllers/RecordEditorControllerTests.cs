@@ -21,10 +21,12 @@ public sealed class RecordEditorControllerTests
     }
 
     [Theory]
-    [InlineData(null, true, "modal", "modal-overlay")]
+    // Fáze 2E: <gov-dialog data-modal-variant="record-editor"> nahradil custom .modal-overlay
+    // markup (viz Views/Shared/_ModalLayout.cshtml). Test teď kontroluje gov-dialog marker.
+    [InlineData(null, true, "modal", "data-modal-variant=\"record-editor\"")]
     [InlineData(null, false, "page", "record-editor-page-shell")]
     [InlineData("page", true, "page", "record-editor-page-shell")]
-    [InlineData("modal", false, "modal", "modal-overlay")]
+    [InlineData("modal", false, "modal", "data-modal-variant=\"record-editor\"")]
     public async Task Edit_ShouldRenderExpectedPresentation(
         string? presentation,
         bool ajaxRequest,
@@ -172,7 +174,9 @@ public sealed class RecordEditorControllerTests
         html.Should().NotContain("<p>Comment 1</p>");
         html.Should().Contain("data-record-comments-loaded-count=\"5\"");
         html.Should().Contain("data-record-comments-total-count=\"7\"");
-        html.Should().Contain("Zobrazit dalších 5");
+        // Load-more button: šablona renderuje title „Zobrazit N dalších vyjádření" +
+        // vlastní label „Další (N)" (viz _ZaznamCommentsPartial.cshtml).
+        html.Should().Contain("data-record-comments-load-more=\"true\"");
         html.Should().Contain("Zobrazit vše");
     }
 
@@ -204,7 +208,7 @@ public sealed class RecordEditorControllerTests
         html.Should().NotContain("<p>Limit comment 1</p>");
         html.Should().Contain("data-record-comments-loaded-count=\"10\"");
         html.Should().Contain("data-record-comments-total-count=\"12\"");
-        html.Should().Contain("Zobrazit dalších 5");
+        html.Should().Contain("data-record-comments-load-more=\"true\"");
         html.Should().Contain("Zobrazit vše");
     }
 
@@ -966,6 +970,12 @@ public sealed class RecordEditorControllerTests
                 .Select(x => x.StavUkoluId)
                 .FirstAsync()
                 ?? throw new InvalidOperationException("Test record is missing task state.");
+            // ZaznamHistorieStavuProjektu FKuje na ciselnik_stavu_projektu (NE na ciselnik_stavu_ukolu
+            // jako zbytek tohoto bloku). Dřívější použití statusId → FK violation.
+            var projectStatusId = await dbContext.CiselnikStavuProjektu
+                .OrderBy(x => x.Id)
+                .Select(x => x.Id)
+                .FirstAsync();
 
             dbContext.Vyjadreni.Add(new VyjadreniEntity
             {
@@ -1033,8 +1043,8 @@ public sealed class RecordEditorControllerTests
             dbContext.ZaznamHistorieStavuProjektu.Add(new ZaznamHistorieStavuProjektuEntity
             {
                 ZaznamId = recordId,
-                PuvodniStav = statusId,
-                NovyStav = statusId,
+                PuvodniStav = projectStatusId,
+                NovyStav = projectStatusId,
                 DatumZmeny = DateTime.UtcNow
             });
             await dbContext.SaveChangesAsync();
