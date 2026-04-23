@@ -29,7 +29,7 @@ public sealed class NastaveniSyncController : BaseController
 
     [HttpPost("{jobKey}/Save")]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
+    [Authorize(Policy = "permission:settings.sync.configure")]
     public async Task<IActionResult> Save(string jobKey, SyncJobSettingsInputModel input, CancellationToken ct)
     {
         var handler = FindHandler(jobKey);
@@ -54,7 +54,7 @@ public sealed class NastaveniSyncController : BaseController
 
     [HttpPost("{jobKey}/RunNow")]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
+    [Authorize(Policy = "permission:settings.sync.run")]
     public async Task<IActionResult> RunNow(string jobKey, CancellationToken ct)
     {
         var handler = FindHandler(jobKey);

@@ -39,6 +39,7 @@ public sealed class SearchController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:search.index")]
     public async Task<IActionResult> Index(string? q, CancellationToken cancellationToken)
     {
         var result = _options.Enabled && !string.IsNullOrWhiteSpace(q)
@@ -54,6 +55,7 @@ public sealed class SearchController : BaseController
     }
 
     [HttpGet]
+    [Authorize(Policy = "permission:search.index")]
     public async Task<IActionResult> Suggest(string? q, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)

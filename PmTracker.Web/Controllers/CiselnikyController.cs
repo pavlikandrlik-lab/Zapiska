@@ -45,7 +45,7 @@ public sealed class CiselnikyController : BaseController
         return PartialView("_CiselnikDetail", detail);
     }
 
-    [Authorize(Policy = "permission:ciselniky.edit")]
+    [Authorize(Policy = "permission:ciselniky.row.edit")]
     public async Task<IActionResult> EditRow(string key, int id, CancellationToken ct)
     {
         if (!DictionarySecurityPolicy.CanAccessDictionary(key, CurrentUserContext.IsSuperAdmin))
@@ -87,7 +87,7 @@ public sealed class CiselnikyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:ciselniky.edit")]
+    [Authorize(Policy = "permission:ciselniky.row.edit")]
     public async Task<IActionResult> SaveRow(SaveCiselnikRowCommand command, CancellationToken ct = default)
     {
         return await ExecuteValidatedCommandAsync(
@@ -124,7 +124,7 @@ public sealed class CiselnikyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:ciselniky.edit")]
+    [Authorize(Policy = "permission:ciselniky.row.delete")]
     public async Task<IActionResult> DeleteRow(DeleteCiselnikRowCommand command, CancellationToken ct = default)
     {
         return await ExecuteCommandAsync(

@@ -7,14 +7,16 @@ namespace PmTracker.Tests.Unit.Authorization;
 public sealed class OsobyNastaveniAuthzTests
 {
     [Fact]
-    public void OsobyController_ShouldUsePolicyForPeopleManageActions()
+    public void OsobyController_ShouldUsePerActionPeopleKeys()
     {
+        // Per-action redesign 2026-04-23: people.manage rozděleno.
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/OsobyController.cs"));
 
-        code.Should().Contain("[Authorize(Policy = \"permission:people.manage\")]",
-            "OsobyController musí mít [Authorize(Policy='permission:people.manage')] na people-manage actions");
-        code.Should().NotContain("CurrentUserContext.HasPermission(PermissionKeys.PeopleManage",
-            "body kontroly PeopleManage musí být nahrazené policy atributem");
+        code.Should().Contain("[Authorize(Policy = \"permission:people.ad.search\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:people.create\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:people.edit\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:people.delete\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:people.ad.sync\")]");
     }
 
     [Fact]
@@ -28,13 +30,12 @@ public sealed class OsobyNastaveniAuthzTests
     }
 
     [Fact]
-    public void NastaveniController_ShouldUseSettingsManagePolicyForMutatingActions()
+    public void NastaveniController_ShouldUsePerActionSettingsKeys()
     {
+        // Per-action redesign 2026-04-23: settings.manage rozděleno.
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/NastaveniController.cs"));
 
-        code.Should().Contain("[Authorize(Policy = \"permission:settings.manage\")]",
-            "NastaveniController mutating actions musí mít [Authorize(Policy='permission:settings.manage')]");
-        code.Should().NotContain("CurrentUserContext.HasPermission(PermissionKeys.SettingsManage",
-            "body kontroly SettingsManage musí být nahrazené policy atributem (s výjimkou efektivni-prava sekce)");
+        code.Should().Contain("[Authorize(Policy = \"permission:settings.roles.assign\")]",
+            "UserRolesModal/SaveUserRole/SaveUserRolesForUser mají per-action klíč settings.roles.assign");
     }
 }

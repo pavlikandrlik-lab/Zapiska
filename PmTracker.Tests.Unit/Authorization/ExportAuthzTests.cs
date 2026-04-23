@@ -7,21 +7,25 @@ namespace PmTracker.Tests.Unit.Authorization;
 public sealed class ExportAuthzTests
 {
     [Fact]
-    public void ExportController_Pdf_ShouldUseAuthorizePolicyAttribute()
+    public void ExportController_Pdf_ShouldUsePerEntityPolicyAttribute()
     {
+        // Per-action redesign 2026-04-23: export.pdf → per-entita (projekt / jednani / ukol).
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ExportController.cs"));
 
-        code.Should().Contain("[Authorize(Policy = \"permission:export.pdf\")]",
-            "ExportController PDF actions musí mít [Authorize(Policy)] atribut místo body HasPermission checku");
+        code.Should().Contain("[Authorize(Policy = \"permission:export.pdf.projekt\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:export.pdf.jednani\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:export.pdf.ukol\")]");
     }
 
     [Fact]
-    public void ExportController_Word_ShouldUseAuthorizePolicyAttribute()
+    public void ExportController_Word_ShouldUsePerEntityPolicyAttribute()
     {
+        // Per-action redesign 2026-04-23: export.word → per-entita (projekt / jednani / ukol).
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ExportController.cs"));
 
-        code.Should().Contain("[Authorize(Policy = \"permission:export.word\")]",
-            "ExportController Word actions musí mít [Authorize(Policy)] atribut místo body HasPermission checku");
+        code.Should().Contain("[Authorize(Policy = \"permission:export.word.projekt\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:export.word.jednani\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:export.word.ukol\")]");
     }
 
     [Fact]

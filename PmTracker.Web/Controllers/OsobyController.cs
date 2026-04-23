@@ -50,7 +50,7 @@ public sealed class OsobyController : BaseController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:people.manage")]
+    [Authorize(Policy = "permission:people.ad.search")]
     public async Task<IActionResult> AdPersonModal(CancellationToken ct)
     {
         var searchUrl = Url.Action(nameof(SearchAd), "Osoby") ?? "/Osoby/SearchAd";
@@ -67,7 +67,10 @@ public sealed class OsobyController : BaseController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:people.manage")]
+    // Per-action redesign 2026-04-23: ManualPersonModal slouží jak pro create (id=null)
+    // tak edit (id>0). Policy = people.edit (edit je silnější; admin s jen create klíčem
+    // modal nechce — může volat jen SaveManual).
+    [Authorize(Policy = "permission:people.edit")]
     public async Task<IActionResult> ManualPersonModal(int? id, CancellationToken ct)
     {
         var osobyModel = await _peopleService.BuildOsobyAsync(ct);
@@ -111,7 +114,7 @@ public sealed class OsobyController : BaseController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:people.manage")]
+    [Authorize(Policy = "permission:people.ad.search")]
     public async Task<IActionResult> SearchAd([FromQuery(Name = "q")] string? query, CancellationToken ct)
     {
         var response = await _activeDirectoryService.SearchUsersAsync(query, ct);
@@ -139,7 +142,11 @@ public sealed class OsobyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:people.manage")]
+    // Per-action redesign 2026-04-23: SaveManual větev podle Id:
+    //   command.Id == null → people.create, jinak → people.edit.
+    // Nejnižší společný jmenovatel pro policy gate: people.edit (který admini mají).
+    // Imperativní body check ve F3 refactoru service vrstvy rozliší create vs edit.
+    [Authorize(Policy = "permission:people.edit")]
     public async Task<IActionResult> SaveManual(SaveManualPersonCommand command, CancellationToken ct = default)
     {
         return await ExecuteValidatedCommandAsync(
@@ -157,7 +164,7 @@ public sealed class OsobyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:people.manage")]
+    [Authorize(Policy = "permission:people.create")]
     public async Task<IActionResult> SaveAd(SaveAdPersonCommand command, CancellationToken ct = default)
     {
         return await ExecuteValidatedCommandAsync(
@@ -175,7 +182,7 @@ public sealed class OsobyController : BaseController
 
     [HttpPost("/Osoby/{id:int}/SyncFromAd")]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:people.manage")]
+    [Authorize(Policy = "permission:people.ad.sync")]
     public async Task<IActionResult> SyncFromAd(int id, CancellationToken ct)
     {
         var osoba = await _db.Osoby.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -218,7 +225,7 @@ public sealed class OsobyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:people.manage")]
+    [Authorize(Policy = "permission:people.delete")]
     public async Task<IActionResult> Delete(DeletePersonCommand command, CancellationToken ct = default)
     {
         return await ExecuteValidatedCommandAsync(

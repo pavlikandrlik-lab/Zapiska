@@ -43,7 +43,7 @@ public sealed class ProjectDashboardController : BaseController
     }
 
     [HttpGet("records-panel")]
-    [Authorize(Policy = "permission:dashboard.view")]
+    [Authorize(Policy = "permission:dashboard.records.view")]
     public async Task<IActionResult> RecordsPanel(int id, CancellationToken ct = default)
     {
         if (!await EnsureDashboardAccessAsync(id, ct))
@@ -57,7 +57,7 @@ public sealed class ProjectDashboardController : BaseController
     }
 
     [HttpGet("statistics-panel")]
-    [Authorize(Policy = "permission:dashboard.view")]
+    [Authorize(Policy = "permission:dashboard.statistics.view")]
     public async Task<IActionResult> StatisticsPanel(int id, int? year = null, CancellationToken ct = default)
     {
         if (!await EnsureDashboardAccessAsync(id, ct))
@@ -71,7 +71,7 @@ public sealed class ProjectDashboardController : BaseController
     }
 
     [HttpGet("nes-panel")]
-    [Authorize(Policy = "permission:dashboard.view")]
+    [Authorize(Policy = "permission:dashboard.nes.view")]
     public async Task<IActionResult> NesPanel(int id, CancellationToken ct = default)
     {
         if (!await EnsureDashboardAccessAsync(id, ct))
@@ -84,7 +84,7 @@ public sealed class ProjectDashboardController : BaseController
     }
 
     [HttpGet("vyzvy-panel")]
-    [Authorize(Policy = "permission:dashboard.view")]
+    [Authorize(Policy = "permission:dashboard.vyzvy.view")]
     public async Task<IActionResult> VyzvyPanel(int id, CancellationToken ct = default)
     {
         if (!await EnsureDashboardAccessAsync(id, ct))

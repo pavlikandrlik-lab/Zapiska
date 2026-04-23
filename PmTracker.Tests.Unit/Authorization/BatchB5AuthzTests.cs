@@ -7,14 +7,15 @@ namespace PmTracker.Tests.Unit.Authorization;
 public sealed class BatchB5AuthzTests
 {
     [Fact]
-    public void CiselnikyController_ShouldHaveCiselnikyEditPolicy_OnRowEditActions()
+    public void CiselnikyController_ShouldHavePerActionPolicy_OnRowActions()
     {
+        // Per-action redesign 2026-04-23: ciselniky.edit → row.edit / row.delete.
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/CiselnikyController.cs"));
 
-        code.Should().Contain("[Authorize(Policy = \"permission:ciselniky.edit\")]",
-            "CiselnikyEdit body gate musí být nahrazeno Policy atributem");
-        code.Should().NotContain("CurrentUserContext.HasPermission(PermissionKeys.CiselnikyEdit",
-            "body check CiselnikyEdit musí být nahrazen Policy atributem (DictionarySecurityPolicy sub-checks mohou zůstat)");
+        code.Should().Contain("[Authorize(Policy = \"permission:ciselniky.row.edit\")]",
+            "EditRow + SaveRow mají per-action klíč ciselniky.row.edit");
+        code.Should().Contain("[Authorize(Policy = \"permission:ciselniky.row.delete\")]",
+            "DeleteRow má per-action klíč ciselniky.row.delete");
     }
 
     [Fact]

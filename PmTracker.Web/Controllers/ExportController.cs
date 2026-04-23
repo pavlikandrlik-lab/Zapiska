@@ -35,7 +35,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Projekt/{projektId:int}/Tisk")]
-    [Authorize(Policy = "permission:export.pdf")]
+    [Authorize(Policy = "permission:export.pdf.projekt")]
     public async Task<IActionResult> ProjektTisk(
         int projektId,
         bool autoPrint = true,
@@ -72,7 +72,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Projekt/{projektId:int}/Word")]
-    [Authorize(Policy = "permission:export.word")]
+    [Authorize(Policy = "permission:export.word.projekt")]
     public async Task<IActionResult> ProjektWord(
         int projektId,
         bool useCurrentFilters = false,
@@ -108,7 +108,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Tisk")]
-    [Authorize(Policy = "permission:export.pdf")]
+    [Authorize(Policy = "permission:export.pdf.jednani")]
     public async Task<IActionResult> JednaniTisk(int jednaniId, bool autoPrint = true, CancellationToken ct = default)
     {
         var projectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
@@ -128,7 +128,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Word")]
-    [Authorize(Policy = "permission:export.word")]
+    [Authorize(Policy = "permission:export.word.jednani")]
     public async Task<IActionResult> JednaniWord(int jednaniId, CancellationToken ct = default)
     {
         var projectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
@@ -148,7 +148,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Ukol/{zaznamId:int}/Tisk")]
-    [Authorize(Policy = "permission:export.pdf")]
+    [Authorize(Policy = "permission:export.pdf.ukol")]
     public async Task<IActionResult> UkolTisk(int zaznamId, int projektId, bool autoPrint = true, CancellationToken ct = default)
     {
         var accessCheck = await EnsureProjectReadableAsync(projektId, ct);
@@ -162,7 +162,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpGet("Ukol/{zaznamId:int}/Word")]
-    [Authorize(Policy = "permission:export.word")]
+    [Authorize(Policy = "permission:export.word.ukol")]
     public async Task<IActionResult> UkolWord(int zaznamId, int projektId, CancellationToken ct = default)
     {
         var accessCheck = await EnsureProjectReadableAsync(projektId, ct);
@@ -194,7 +194,7 @@ public sealed class ExportController : BaseController
 
     [HttpPost("Pdf")]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:export.pdf")]
+    [Authorize(Policy = "permission:export.pdf.projekt")]
     public IActionResult Pdf(PdfExportRequestViewModel request)
     {
         if (request.JednaniId.HasValue)

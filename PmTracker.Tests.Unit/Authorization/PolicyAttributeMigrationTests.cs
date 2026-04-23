@@ -11,15 +11,14 @@ namespace PmTracker.Tests.Unit.Authorization;
 public sealed class PolicyAttributeMigrationTests
 {
     [Fact]
-    public void ExportController_ShouldUseAuthorizePolicyAttributes()
+    public void ExportController_ShouldUsePerEntityAuthorizePolicyAttributes()
     {
+        // Per-action redesign 2026-04-23: export.{pdf,word} → per-entita suffix.
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ExportController.cs"));
 
-        code.Should().Contain("[Authorize(Policy = \"permission:export.pdf\")]");
-        code.Should().Contain("[Authorize(Policy = \"permission:export.word\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:export.pdf.projekt\")]");
+        code.Should().Contain("[Authorize(Policy = \"permission:export.word.projekt\")]");
         code.Should().NotContain("CurrentUserContext.HasPermission(PermissionKeys.ExportPdf",
-            "body check musí být nahrazen [Authorize(Policy)] atributem");
-        code.Should().NotContain("CurrentUserContext.HasPermission(PermissionKeys.ExportWord",
             "body check musí být nahrazen [Authorize(Policy)] atributem");
     }
 

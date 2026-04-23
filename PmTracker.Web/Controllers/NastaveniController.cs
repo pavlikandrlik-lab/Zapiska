@@ -53,7 +53,7 @@ public sealed class NastaveniController : BaseController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:settings.manage")]
+    [Authorize(Policy = "permission:settings.roles.assign")]
     public async Task<IActionResult> UserRolesModal(int osobaId, int? userId, int? projektId, CancellationToken ct)
     {
         var panel = await _settingsService.BuildNastaveniPanelAsync("uzivatele-role", CurrentUserContext, userId, projektId, ct);
@@ -68,7 +68,7 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
+    [Authorize(Policy = "permission:settings.roles.assign")]
     public Task<IActionResult> SaveUserRole(SaveUserRoleAssignmentCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
         return ExecuteSettingsValidatedActionAsync(
@@ -82,7 +82,7 @@ public sealed class NastaveniController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
+    [Authorize(Policy = "permission:settings.roles.assign")]
     public Task<IActionResult> SaveUserRolesForUser(SaveUserRolesForUserCommand command, int? userId, int? projektId, CancellationToken ct = default)
     {
         return ExecuteSettingsValidatedActionAsync(

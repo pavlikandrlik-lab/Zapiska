@@ -18,7 +18,7 @@ namespace PmTracker.Web.Controllers;
 /// Admin view stavu harvestu: počet externích odkazů, kolik je právě vytěženo,
 /// per-řádek odkaz na re-harvest (přes existující endpoint <c>POST /Vyjadreni/ReHarvest</c>).
 /// </summary>
-[Authorize(Policy = "permission:settings.manage")]
+[Authorize(Policy = "permission:settings.sd.view")]
 [Route("SDConnector")]
 public sealed class SDConnectorController : Controller
 {
@@ -112,7 +112,7 @@ public sealed class SDConnectorController : Controller
 
     [HttpPost("ReHarvest")]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
+    [Authorize(Policy = "permission:vyjadreni.reharvest")]
     public async Task<IActionResult> ReHarvest([FromForm] int externiOdkazId, CancellationToken ct)
     {
         if (externiOdkazId <= 0)

@@ -2,6 +2,11 @@ namespace PmTracker.Web.Services.Schedules;
 
 public sealed class SchedulePreviewRequest
 {
+    /// <summary>
+    /// Projekt, do kterého záznam patří. Required od per-action redesignu 2026-04-23 —
+    /// controller ověřuje HasPermission(schedule.preview, ProjektId).
+    /// </summary>
+    public int ProjektId { get; init; }
     public int RecordId { get; init; }
     public DateTime StartDate { get; init; }
     public DateTime DeadlineDate { get; init; }
