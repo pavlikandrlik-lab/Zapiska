@@ -22,17 +22,10 @@ public interface IVyjadreniHarvestService
     Task<VyjadreniHarvestResult> HarvestTicketAsync(int externiOdkazId, CancellationToken ct = default);
 
     /// <summary>
-    /// Harvestuje všechny externí vazby daného projektového záznamu (T5 trigger).
+    /// Harvestuje všechny externí vazby daného projektového záznamu (T5 trigger
+    /// i reaktivní T2/T5/T7/T8 z <see cref="SdReactiveSyncConsumer"/>).
     /// </summary>
     Task HarvestRecordAsync(int zaznamId, CancellationToken ct = default);
-
-    /// <summary>
-    /// Harvestuje všechny externí vazby daného projektového záznamu (reaktivní triggery
-    /// T2/T5/T7/T8 volané z <see cref="SdReactiveSyncConsumer"/>).
-    /// Ekvivalentní s <see cref="HarvestRecordAsync"/> — zachováno pro jasnou sémantiku v
-    /// sd-sync-revise plánu (Task 5/7).
-    /// </summary>
-    Task HarvestForRecordAsync(int zaznamId, CancellationToken ct = default);
 
     /// <summary>
     /// Direct sync — synchronní harvest jednoho externího odkazu. Volá se z T3 (open modal) a T6

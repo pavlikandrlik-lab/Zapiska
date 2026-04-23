@@ -79,7 +79,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         // lock jako reactive/periodic cesta, jinak race s reactive harvesty téhož tiketu.
         return await ExecuteUnderTicketLockAsync(
             eo,
-            ct2 => HarvestTicketCoreAsync(eo, typZaznamu, updateFingerprint: true, ct2),
+            ct2 => HarvestTicketCoreAsync(eo, typZaznamu, ct2),
             ct).ConfigureAwait(false);
     }
 
@@ -119,9 +119,6 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             }
         }
     }
-
-    public Task HarvestForRecordAsync(int zaznamId, CancellationToken ct = default)
-        => HarvestRecordAsync(zaznamId, ct);
 
     public async Task<VyjadreniHarvestResult> HarvestSingleTicketAsync(int externiOdkazId, CancellationToken ct = default)
     {
@@ -358,7 +355,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             eo.LastKnownMaxVyjadreniId = secondary.MaxId;
             eo.LastKnownVyjadreniCount = secondary.Count;
             // Q-10: TypZaznamu z primary fingerprintu pro správné K4/K7 mapování.
-            return await HarvestTicketCoreAsync(eo, primary.TypZaznamu, updateFingerprint: false, ct).ConfigureAwait(false);
+            return await HarvestTicketCoreAsync(eo, primary.TypZaznamu, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -369,7 +366,6 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     private async Task<VyjadreniHarvestResult> HarvestTicketCoreAsync(
         ZaznamExterniOdkazEntity eo,
         string? typZaznamuHint,
-        bool updateFingerprint,
         CancellationToken ct)
     {
         var zaznam = await _db.ProjektoveZaznamy.AsNoTracking().FirstOrDefaultAsync(x => x.Id == eo.ZaznamId, ct).ConfigureAwait(false);
@@ -443,12 +439,10 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         }
 
         eo.LastHarvestedAt = _time.GetUtcNow().UtcDateTime;
-        if (updateFingerprint)
-        {
-            // Standalone HarvestTicketAsync: nemáme fingerprint data k dispozici, necháme
-            // je NULL → další fingerprint check detekuje absenci → bude drillovat vždy.
-            // V reaktivním/periodic flow se fingerprint updatuje v HarvestTicketCoreWithLockAsync.
-        }
+        // Fingerprint update provádí HarvestTicketCoreWithLockAsync (reaktivní/periodic
+        // cesta). Standalone HarvestTicketAsync / ReHarvestTicketAsync fingerprint
+        // záměrně nenastavuje — následující fingerprint check detekuje NULL a vynutí
+        // další drill. Q-9: dead `if (updateFingerprint)` branch odstraněn.
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return new VyjadreniHarvestResult(list.Count, created, superseded, skipped);

@@ -18,7 +18,7 @@ namespace PmTracker.Tests.Unit.ServiceDesk;
 /// 1) Primary+secondary fingerprint match → skip drill.
 /// 2) Primary change, secondary match → skip drill, jen update primary hint.
 /// 3) Fingerprint mismatch → drill + persist nový fingerprint.
-/// 4) HarvestForRecordAsync = HarvestRecordAsync (enumeruje + harvestuje per odkaz).
+/// 4) HarvestRecordAsync enumeruje + harvestuje per odkaz.
 /// 5) HarvestScopeAsync(Active) filtruje tickety podle HOT_ZAZNAMY.stav.
 /// </summary>
 public sealed class FingerprintDetectionTests
@@ -185,7 +185,7 @@ public sealed class FingerprintDetectionTests
     }
 
     [Fact]
-    public async Task HarvestForRecordAsync_EnumeratesAllLinksForRecord_AndHarvestsEach()
+    public async Task HarvestRecordAsync_EnumeratesAllLinksForRecord_AndHarvestsEach()
     {
         using var db = InMemoryDb();
         db.ProjektoveZaznamy.AddRange(
@@ -205,7 +205,7 @@ public sealed class FingerprintDetectionTests
 
         var sut = BuildSut(db, vq.Object);
 
-        await sut.HarvestForRecordAsync(zaznamId: 99, CancellationToken.None);
+        await sut.HarvestRecordAsync(zaznamId: 99, CancellationToken.None);
 
         vq.Verify(q => q.GetVyjadreniForTicketAsync("100001", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
         vq.Verify(q => q.GetVyjadreniForTicketAsync("100002", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
