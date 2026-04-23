@@ -30,6 +30,7 @@ public sealed class AppSettingsCredentialLeakGuardTests
         "USER",
         "placeholder",
         "PLACEHOLDER",
+        "<READONLY_USER>", // SD integrace placeholder — viz docs/technical/13-servicedesk-connection-setup.md
     };
 
     private static readonly string[] AllowedPlaceholderPasswords =
@@ -39,6 +40,7 @@ public sealed class AppSettingsCredentialLeakGuardTests
         "PLACEHOLDER",
         "YOUR_PASSWORD_HERE",
         "CHANGEME",
+        "<PASSWORD>",      // SD integrace placeholder — viz docs/technical/13-servicedesk-connection-setup.md
     };
 
     [Fact]
