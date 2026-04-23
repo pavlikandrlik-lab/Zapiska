@@ -179,6 +179,103 @@ public sealed class VyjadreniModalControllerIdorTests
         result.Should().BeOfType<OkObjectResult>();
     }
 
+    /// <summary>
+    /// Review finding M-R2-1: Modal (GET) — attacker volá s cizím externiOdkazId.
+    /// Kontrola vlastnictví MUSÍ běžet PŘED _harvest.HarvestSingleTicketAsync,
+    /// jinak DoS amplifier + cross-project LastHarvestedAt mutation.
+    /// </summary>
+    [Fact]
+    public async Task Modal_AttackerTargetsCrossProjectExterniOdkaz_DoesNotTriggerHarvest()
+    {
+        await using var db = NewDb();
+        // Záznam+odkaz v projektu B
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
+        {
+            Id = 500, ProjektId = ProjektB, SubsystemId = 1, KategorieId = 1,
+            HarmonogramSablonaVerze = 1, Nazev = "target"
+        });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
+        {
+            Id = 9001, ZaznamId = 500, Cislo = "999999"
+        });
+        // A pomocný záznam v projektu A, který útočník legitimně vlastní —
+        // ale useruje ho jako ZaznamId, aby IDOR test zůstal symetrický s S-4.
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
+        {
+            Id = 501, ProjektId = ProjektA, SubsystemId = 1, KategorieId = 1,
+            HarmonogramSablonaVerze = 1, Nazev = "attacker-record"
+        });
+        await db.SaveChangesAsync();
+
+        var builder = new Mock<IVyjadreniModalViewModelBuilder>();
+        var harvest = new Mock<IVyjadreniHarvestService>();
+        var authz = new Mock<IPmAuthorizationService>();
+        authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.RecordsEdit, It.IsAny<int>(), null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int _, string __, int? projektId, int? ___, CancellationToken _____) => projektId == ProjektA);
+
+        var currentUser = new Mock<ICurrentUserAccessor>();
+        currentUser.SetupGet(x => x.OsobaId).Returns(AttackerOsobaId);
+
+        var ctrl = new VyjadreniModalController(
+            db, builder.Object, harvest.Object, authz.Object, currentUser.Object,
+            new FakeTimeProvider(new DateTimeOffset(2026, 4, 22, 12, 0, 0, TimeSpan.Zero)),
+            NullLogger<VyjadreniModalController>.Instance,
+            new Mock<IAuditWriteService>().Object);
+        ctrl.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        // Attacker pošle externiOdkazId projektu B, ale zaznamId projektu A.
+        // Ownership query join musí vrátit null (eo 9001 patří k záznamu 500, ne 501) → NotFound.
+        var result = await ctrl.Modal(externiOdkazId: 9001, zaznamId: 501, CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+        harvest.Verify(x => x.HarvestSingleTicketAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
+            "harvest nesmí být spuštěn před ownership checkem (DoS amplifier).");
+    }
+
+    /// <summary>
+    /// Review finding M-R2-1: Refresh (POST) — attacker volá s projektId = A,
+    /// ale externiOdkazId patří projektu B. Harvest nesmí být spuštěn, odpověď Forbid.
+    /// </summary>
+    [Fact]
+    public async Task Refresh_AttackerTargetsCrossProjectExterniOdkaz_DoesNotTriggerHarvest()
+    {
+        await using var db = NewDb();
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
+        {
+            Id = 500, ProjektId = ProjektB, SubsystemId = 1, KategorieId = 1,
+            HarmonogramSablonaVerze = 1, Nazev = "target"
+        });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
+        {
+            Id = 9001, ZaznamId = 500, Cislo = "999999"
+        });
+        await db.SaveChangesAsync();
+
+        var sut = BuildSut(db);
+        // Injectujeme znovu, ať máme odkaz na harvest mock i mimo BuildSut:
+        var harvest = new Mock<IVyjadreniHarvestService>();
+        var authz = new Mock<IPmAuthorizationService>();
+        authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.RecordsEdit, ProjektA, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var currentUser = new Mock<ICurrentUserAccessor>();
+        currentUser.SetupGet(x => x.OsobaId).Returns(AttackerOsobaId);
+
+        var ctrl = new VyjadreniModalController(
+            db, new Mock<IVyjadreniModalViewModelBuilder>().Object,
+            harvest.Object, authz.Object, currentUser.Object,
+            new FakeTimeProvider(new DateTimeOffset(2026, 4, 22, 12, 0, 0, TimeSpan.Zero)),
+            NullLogger<VyjadreniModalController>.Instance,
+            new Mock<IAuditWriteService>().Object);
+        ctrl.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        // Útočník: externiOdkazId = 9001 (projekt B), ale tvrdí projektId = A.
+        var result = await ctrl.Refresh(externiOdkazId: 9001, projektId: ProjektA, CancellationToken.None);
+
+        result.Should().BeOfType<ForbidResult>();
+        harvest.Verify(x => x.HarvestSingleTicketAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
+            "harvest nesmí být spuštěn před ověřením, že eo skutečně patří do deklarovaného projektu.");
+    }
+
     private sealed class FakeTimeProvider : TimeProvider
     {
         private readonly DateTimeOffset _now;

@@ -69,17 +69,20 @@ public sealed class VyjadreniModalController : Controller
         var osobaId = _currentUser.OsobaId;
         if (osobaId is null) return Forbid();
 
-        // Projekt dohledáme před autorizací (scope je per-project).
-        var projektId = await _db.ProjektoveZaznamy.AsNoTracking()
-            .Where(x => x.Id == zaznamId)
-            .Select(x => (int?)x.ProjektId)
-            .FirstOrDefaultAsync(ct);
-        if (projektId is null) return NotFound();
+        // Review finding M-R2-1: ověř, že externiOdkazId patří k zaznamId PŘED harvestem.
+        // Jinak attacker s records.edit na projekt A může vynucovat harvest tiketu projektu B
+        // (DoS amplifier + cross-project LastHarvestedAt mutace).
+        var target = await (from eo in _db.ZaznamExterniOdkazy.AsNoTracking()
+                            join z in _db.ProjektoveZaznamy.AsNoTracking() on eo.ZaznamId equals z.Id
+                            where eo.Id == externiOdkazId && eo.ZaznamId == zaznamId
+                            select new { ProjektId = z.ProjektId })
+                           .FirstOrDefaultAsync(ct);
+        if (target is null) return NotFound();
 
         // Read modal může kdokoli, kdo má na projekt records.edit (editor edituje záznam).
         // Pokud nemá edit, může stále číst jen když má obecný project read — zjednodušení:
         // required records.edit pro chat modal, protože z definice je modal editační UX.
-        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, projektId.Value, null, ct))
+        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, target.ProjektId, null, ct))
         {
             return Forbid();
         }
@@ -119,6 +122,17 @@ public sealed class VyjadreniModalController : Controller
 
         var osobaId = _currentUser.OsobaId;
         if (osobaId is null) return Forbid();
+
+        // Review finding M-R2-1: ověř, že externiOdkazId skutečně patří k projektId
+        // PŘED harvestem. Jinak attacker s records.edit na projekt A může přes cizí
+        // externiOdkazId vynucovat harvest jiného projektu (DoS + cross-project mutace).
+        var ownerProjektId = await (from eo in _db.ZaznamExterniOdkazy.AsNoTracking()
+                                    join z in _db.ProjektoveZaznamy.AsNoTracking() on eo.ZaznamId equals z.Id
+                                    where eo.Id == externiOdkazId
+                                    select (int?)z.ProjektId)
+                                   .FirstOrDefaultAsync(ct);
+        if (ownerProjektId is null) return NotFound();
+        if (ownerProjektId.Value != projektId) return Forbid();
 
         if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, projektId, null, ct))
         {
