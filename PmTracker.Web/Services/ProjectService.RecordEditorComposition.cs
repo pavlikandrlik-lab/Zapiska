@@ -143,17 +143,45 @@ public sealed partial class ProjectService
             : new Dictionary<int, int>();
         var harmonogramKroky = harmonogramService.BuildHarmonogramVypocetPublic(record.DatumZalozeni, harmonogramTypy, harmonogramValues);
         var harmonogramSouhrn = harmonogramService.BuildHarmonogramSouhrn(harmonogramKroky, record.DatumUkonceni);
-        var harmonogramBlokKroky = harmonogramKroky.Select(krok => new HarmonogramKrokEditViewModel
+
+        // Plán D Task 8/9 composition: pro každý krok zjistit KrokKey (stabilní GUID identifikátor),
+        // zdroj skutečnosti (FromVyjadreni / Manual / None) a označit ruční kroky {2, 5, 8, 9}.
+        // KrokKey pochází z CiselnikHarmonogramTypu, resolver dohledá aktivní vazbu nebo manuální
+        // HS0X_DELAY zápis.
+        var krokKeyByDurationTypId = allowedTypeIds.Count > 0
+            ? await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
+                .Where(x => !x.JeZpozdeni && allowedTypeIds.Contains(x.Id))
+                .Select(x => new { x.Id, x.KrokKey })
+                .ToDictionaryAsync(x => x.Id, x => x.KrokKey, ct)
+            : new Dictionary<int, Guid>();
+        var scheduleActualSources = (!isCreate && isTaskCategory && record.Id > 0)
+            ? await scheduleActualSourceResolver.ResolveForRecordAsync(record.Id, record.HarmonogramSablonaVerze, ct)
+            : new Dictionary<Guid, RecordScheduleActualSource>();
+
+        var harmonogramBlokKroky = harmonogramKroky.Select(krok =>
         {
-            KrokIndex = krok.KrokIndex,
-            Nazev = krok.Nazev,
-            BarvaHex = krok.BarvaHex,
-            TrvaniTypId = krok.TrvaniTypId,
-            ZpozdeniTypId = krok.ZpozdeniTypId,
-            TrvaniDni = krok.TrvaniDni,
-            OdchylkaDni = krok.ZpozdeniDni,
-            BaselineDatum = krok.BaselineDatum,
-            SkutecneDatum = krok.PosunuteDatum
+            var krokKey = krokKeyByDurationTypId.GetValueOrDefault(krok.TrvaniTypId);
+            var source = krokKey != Guid.Empty && scheduleActualSources.TryGetValue(krokKey, out var s)
+                ? s
+                : null;
+            return new HarmonogramKrokEditViewModel
+            {
+                KrokIndex = krok.KrokIndex,
+                Nazev = krok.Nazev,
+                BarvaHex = krok.BarvaHex,
+                TrvaniTypId = krok.TrvaniTypId,
+                ZpozdeniTypId = krok.ZpozdeniTypId,
+                TrvaniDni = krok.TrvaniDni,
+                OdchylkaDni = krok.ZpozdeniDni,
+                BaselineDatum = krok.BaselineDatum,
+                SkutecneDatum = krok.PosunuteDatum,
+                KrokKey = krokKey,
+                ZdrojSkutecnosti = source?.Zdroj ?? ZdrojSkutecnosti.None,
+                SourceVyjadreniId = source?.SourceVyjadreniId,
+                SourceVyjadreniDatum = source?.SourceVyjadreniDatum,
+                SourceExterniOdkazId = source?.SourceExterniOdkazId,
+                IsManualKrok = HarmonogramManualSteps.IsManual(krok.KrokIndex)
+            };
         }).ToList();
         var pendingScheduleProposalLock = !isCreate
             ? await pendingScheduleProposalLockEvaluator.EvaluateAsync(record.Id, ct)
@@ -222,7 +250,11 @@ public sealed partial class ProjectService
                 permissions: pendingScheduleProposalLock.LocksSchedule
                     ? ScheduleEditorPermissionSet.ForActiveScheduleProposal(isTaskCategory)
                     : ScheduleEditorPermissionSet.ForFullEdit(isTaskCategory),
-                scheduleVersion: scheduleVersion),
+                scheduleVersion: scheduleVersion,
+                // Plán D Task 8/9: lock manuálních kroků z pending návrhu + povolit editaci
+                // jen pokud harmonogram není v read-only režimu (full-edit permissions).
+                lockedManualKrokKeys: pendingScheduleProposalLock.LockedManualKrokKeys,
+                canEditManualActual: isTaskCategory && !pendingScheduleProposalLock.LocksSchedule),
             DostupniVlastnici = ownerCandidates,
             DostupniSpolupracovnici = collaborationCandidates,
             VybraniSpolupracovniciIds = selectedCollaborationIds,

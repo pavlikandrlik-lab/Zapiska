@@ -14,8 +14,11 @@ public sealed partial class ProjectService
         HarmonogramSouhrnViewModel souhrn,
         IReadOnlyList<HarmonogramKrokEditViewModel> kroky,
         ScheduleEditorPermissionSet? permissions = null,
-        string scheduleVersion = "")
+        string scheduleVersion = "",
+        IReadOnlySet<Guid>? lockedManualKrokKeys = null,
+        bool canEditManualActual = false)
     {
+        var effectivePermissions = permissions ?? ScheduleEditorPermissionSet.ForReadOnly();
         return new HarmonogramBlockViewModel
         {
             RecordId = recordId,
@@ -25,9 +28,11 @@ public sealed partial class ProjectService
             DelayBarvaHex = delayBarvaHex,
             Souhrn = souhrn,
             Kroky = kroky,
-            Permissions = permissions ?? ScheduleEditorPermissionSet.ForReadOnly(),
+            Permissions = effectivePermissions,
             EditorChangedTypeTooltips = new Dictionary<int, string>(),
-            ScheduleVersion = scheduleVersion
+            ScheduleVersion = scheduleVersion,
+            LockedManualKrokKeys = lockedManualKrokKeys ?? new HashSet<Guid>(),
+            CanEditManualActual = canEditManualActual
         };
     }
 }

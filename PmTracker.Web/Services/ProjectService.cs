@@ -25,6 +25,7 @@ public sealed partial class ProjectService :
     private readonly IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator;
     private readonly IPriorityMatrixRebuildService priorityMatrixRebuildService;
     private readonly IAuditWriteService auditWriteService;
+    private readonly IRecordScheduleActualSourceResolver scheduleActualSourceResolver;
     private readonly TimeProvider timeProvider;
 
     public ProjectService(
@@ -38,6 +39,7 @@ public sealed partial class ProjectService :
         IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator,
         IPriorityMatrixRebuildService priorityMatrixRebuildService,
         IAuditWriteService auditWriteService,
+        IRecordScheduleActualSourceResolver scheduleActualSourceResolver,
         TimeProvider timeProvider)
     {
         this.dbContext = dbContext;
@@ -50,6 +52,7 @@ public sealed partial class ProjectService :
         this.pendingScheduleProposalLockEvaluator = pendingScheduleProposalLockEvaluator;
         this.priorityMatrixRebuildService = priorityMatrixRebuildService;
         this.auditWriteService = auditWriteService;
+        this.scheduleActualSourceResolver = scheduleActualSourceResolver;
         this.timeProvider = timeProvider;
     }
 }
