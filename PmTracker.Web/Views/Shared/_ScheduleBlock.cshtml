@@ -20,6 +20,10 @@
         .OrderBy(krok => krok.KrokIndex)
         .ToList();
     var editorInputIndex = 0;
+    // Plán D Task 8: pořadí manual kroků v rámci ManualActualKroky[] binding.
+    // Počítá se jen pro kroky, u kterých opravdu renderujeme manual input/read-only.
+    var manualInputIndex = 0;
+    var lockedManualKrokKeys = Model.LockedManualKrokKeys ?? new HashSet<Guid>();
 }
 
 <div class="@rootCssClass schedule-block"
@@ -300,61 +304,116 @@
                                 </div>
                             </td>
                             <td>
-                                <div class="schedule-stacked-input @(delayChanged ? "proposal-field-changed" : null)"
-                                     title="@delayTooltip">
-                                    <input type="hidden" name="HarmonogramHodnoty[@delayInputIndex].TypId" value="@krok.ZpozdeniTypId" />
-                                    <div class="schedule-stacked-main">
-                                        <div class="schedule-stacked-part schedule-stacked-part-top">
-                                            <input class="schedule-days-input schedule-days-input-stacked"
-                                                   type="number"
-                                                   name="HarmonogramHodnoty[@delayInputIndex].Hodnota"
-                                                   value="@krok.OdchylkaDni"
-                                                   data-schedule-delay
-                                                   data-schedule-static-disabled="@(delayStaticDisabled ? "true" : "false")"
-                                                   @((delayDisabled) ? "disabled=\"disabled\"" : null) />
-                                        </div>
-                                        <div class="schedule-stacked-part schedule-stacked-part-bottom">
-                                            @await Html.PartialAsync(
-                                                "_AppDateField",
-                                                new AppDateFieldViewModel
-                                                {
-                                                    Name = $"UiHarmonogramPosunuteDatumy[{i}]",
-                                                    IsoValue = krok.SkutecneDatum.ToString("yyyy-MM-dd"),
-                                                    DisplayValue = krok.SkutecneDatum.ToString("dd.MM.yyyy"),
-                                                    Locked = delayDateDisabled,
-                                                    AriaLabel = "Otevřít kalendář skutečnosti kroku harmonogramu",
-                                                    ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(delayChanged ? " proposal-field-changed" : string.Empty)}",
-                                                    ExtraDataAttributes = new Dictionary<string, object?>
+                                @{
+                                    // Plán D Task 8: Skutečnost sloupec — rozhodnutí mezi 4 scénáři:
+                                    //  A) Manual krok {2,5,8,9} → date input (editable/read-only) přes _ScheduleBlockManualCell
+                                    //  B) Auto krok s ZdrojSkutecnosti.FromVyjadreni → read-only odchylka + chat ikona
+                                    //  C) Auto krok s ZdrojSkutecnosti.None → warning ikona ("automat zatím nenašel vyjádření")
+                                    //  D) Ostatní (legacy / direct editor edge cases) → původní delay input UI
+                                    var zdrojSkut = krok.ZdrojSkutecnosti;
+                                    var isKrokLocked = krok.KrokKey != Guid.Empty && lockedManualKrokKeys.Contains(krok.KrokKey);
+                                    var useManualCell = krok.IsManualKrok;
+                                    var useFromVyjadreniCell = !useManualCell && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.FromVyjadreni;
+                                    var useNoneCell = !useManualCell && !useFromVyjadreniCell && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.None;
+                                    var assignedManualIndex = useManualCell ? manualInputIndex++ : -1;
+                                }
+                                @if (useManualCell)
+                                {
+                                    @await Html.PartialAsync(
+                                        "_ScheduleBlockManualCell",
+                                        new ScheduleBlockManualCellViewModel
+                                        {
+                                            Krok = krok,
+                                            ManualInputIndex = assignedManualIndex,
+                                            ZaznamId = Model.RecordId,
+                                            CanEditManualActual = Model.CanEditManualActual,
+                                            IsLocked = isKrokLocked
+                                        })
+                                }
+                                else if (useFromVyjadreniCell)
+                                {
+                                    @await Html.PartialAsync(
+                                        "_ScheduleBlockManualCell",
+                                        new ScheduleBlockManualCellViewModel
+                                        {
+                                            Krok = krok,
+                                            ManualInputIndex = -1,
+                                            ZaznamId = Model.RecordId,
+                                            CanEditManualActual = false,
+                                            IsLocked = isKrokLocked
+                                        })
+                                }
+                                else if (useNoneCell)
+                                {
+                                    @await Html.PartialAsync(
+                                        "_ScheduleBlockManualCell",
+                                        new ScheduleBlockManualCellViewModel
+                                        {
+                                            Krok = krok,
+                                            ManualInputIndex = -1,
+                                            ZaznamId = Model.RecordId,
+                                            CanEditManualActual = false,
+                                            IsLocked = isKrokLocked
+                                        })
+                                }
+                                else
+                                {
+                                    <div class="schedule-stacked-input @(delayChanged ? "proposal-field-changed" : null)"
+                                         title="@delayTooltip">
+                                        <input type="hidden" name="HarmonogramHodnoty[@delayInputIndex].TypId" value="@krok.ZpozdeniTypId" />
+                                        <div class="schedule-stacked-main">
+                                            <div class="schedule-stacked-part schedule-stacked-part-top">
+                                                <input class="schedule-days-input schedule-days-input-stacked"
+                                                       type="number"
+                                                       name="HarmonogramHodnoty[@delayInputIndex].Hodnota"
+                                                       value="@krok.OdchylkaDni"
+                                                       data-schedule-delay
+                                                       data-schedule-static-disabled="@(delayStaticDisabled ? "true" : "false")"
+                                                       @((delayDisabled) ? "disabled=\"disabled\"" : null) />
+                                            </div>
+                                            <div class="schedule-stacked-part schedule-stacked-part-bottom">
+                                                @await Html.PartialAsync(
+                                                    "_AppDateField",
+                                                    new AppDateFieldViewModel
                                                     {
-                                                        ["data-schedule-delay-date"] = "true",
-                                                        ["data-schedule-static-disabled"] = delayStaticDisabled ? "true" : "false",
-                                                        ["title"] = delayTooltip
-                                                    }
-                                                })
+                                                        Name = $"UiHarmonogramPosunuteDatumy[{i}]",
+                                                        IsoValue = krok.SkutecneDatum.ToString("yyyy-MM-dd"),
+                                                        DisplayValue = krok.SkutecneDatum.ToString("dd.MM.yyyy"),
+                                                        Locked = delayDateDisabled,
+                                                        AriaLabel = "Otevřít kalendář skutečnosti kroku harmonogramu",
+                                                        ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(delayChanged ? " proposal-field-changed" : string.Empty)}",
+                                                        ExtraDataAttributes = new Dictionary<string, object?>
+                                                        {
+                                                            ["data-schedule-delay-date"] = "true",
+                                                            ["data-schedule-static-disabled"] = delayStaticDisabled ? "true" : "false",
+                                                            ["title"] = delayTooltip
+                                                        }
+                                                    })
+                                            </div>
+                                        </div>
+                                        <div class="schedule-stacked-stepper">
+                                            <button class="icon-btn schedule-step-btn"
+                                                    type="button"
+                                                    data-schedule-delay-inc
+                                                    aria-label="Přidat 1 den odchylky: @krok.Nazev"
+                                                    @((delayDisabled) ? "disabled=\"disabled\"" : null)>
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                </svg>
+                                            </button>
+                                            <button class="icon-btn schedule-step-btn"
+                                                    type="button"
+                                                    data-schedule-delay-dec
+                                                    aria-label="Odebrat 1 den odchylky: @krok.Nazev"
+                                                    @((delayDisabled) ? "disabled=\"disabled\"" : null)>
+                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                </svg>
+                                            </button>
                                         </div>
                                     </div>
-                                    <div class="schedule-stacked-stepper">
-                                        <button class="icon-btn schedule-step-btn"
-                                                type="button"
-                                                data-schedule-delay-inc
-                                                aria-label="Přidat 1 den odchylky: @krok.Nazev"
-                                                @((delayDisabled) ? "disabled=\"disabled\"" : null)>
-                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                                            </svg>
-                                        </button>
-                                        <button class="icon-btn schedule-step-btn"
-                                                type="button"
-                                                data-schedule-delay-dec
-                                                aria-label="Odebrat 1 den odchylky: @krok.Nazev"
-                                                @((delayDisabled) ? "disabled=\"disabled\"" : null)>
-                                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
+                                }
                             </td>
                         </tr>
                     }

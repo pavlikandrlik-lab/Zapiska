@@ -107,6 +107,25 @@ public sealed class HarmonogramKrokEditViewModel
     public bool IsManualKrok { get; init; }
 }
 
+/// <summary>
+/// Plán D Task 8: wrapper VM pro <c>_ScheduleBlockManualCell.cshtml</c>
+/// partial. Drží kontext, který partial potřebuje (krok + composition-level
+/// flagy), aby sám partial nemusel dělat žádné lookupy.
+/// </summary>
+public sealed class ScheduleBlockManualCellViewModel
+{
+    public required HarmonogramKrokEditViewModel Krok { get; init; }
+
+    /// <summary>Pořadí inputu v rámci <c>ManualActualKroky[i]</c> kolekce ve form POST.</summary>
+    public int ManualInputIndex { get; init; }
+
+    public int ZaznamId { get; init; }
+
+    public bool CanEditManualActual { get; init; }
+
+    public bool IsLocked { get; init; }
+}
+
 public sealed class HarmonogramSouhrnViewModel
 {
     public DateTime BaselineDokonceni { get; init; }

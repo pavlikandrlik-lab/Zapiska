@@ -1,0 +1,96 @@
+@model ScheduleBlockManualCellViewModel
+@{
+    var krok = Model.Krok;
+    var manualInputIndex = Model.ManualInputIndex;
+    var isLocked = Model.IsLocked;
+    var canEdit = Model.CanEditManualActual && !isLocked;
+    var isManualKrok = krok.IsManualKrok;
+    var zdroj = krok.ZdrojSkutecnosti;
+}
+
+@* Plán D Task 8 — render skutečnosti kroku na základě ZdrojSkutecnosti:
+   1) FromVyjadreni: read-only odchylka + chat ikona (otevře vyjádření)
+   2) Manual / None u manual kroku (2/5/8/9): editovatelný date input nebo read-only span
+   3) None u auto kroku (1/3/4/6/7/10): varovná ikona "automat zatím nenašel vyjádření"
+*@
+
+@if (zdroj == PmTracker.Web.Services.Records.ZdrojSkutecnosti.FromVyjadreni)
+{
+    var datumLabel = krok.SourceVyjadreniDatum?.ToString("dd.MM.yyyy") ?? string.Empty;
+    var tooltip = string.IsNullOrEmpty(datumLabel)
+        ? "Skutečnost pochází z navázaného vyjádření."
+        : $"Z vyjádření {datumLabel}";
+    <div class="schedule-actual-from-vyjadreni" data-schedule-actual-source="vyjadreni">
+        <span class="schedule-actual-datum" data-manual-krok-readonly>@krok.SkutecneDatum.ToString("dd.MM.yyyy")</span>
+        @if (krok.SourceExterniOdkazId.HasValue && Model.ZaznamId > 0)
+        {
+            <pm-button variant="Ghost"
+                       size="Small"
+                       data-external-chat-open="true"
+                       data-external-odkaz-id="@krok.SourceExterniOdkazId.Value"
+                       data-external-zaznam-id="@Model.ZaznamId"
+                       data-schedule-actual-from-vyjadreni
+                       title="@tooltip"
+                       aria-label="@tooltip">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                </svg>
+            </pm-button>
+        }
+    </div>
+}
+else if (isManualKrok)
+{
+    @* Manuální krok (2/5/8/9): editable date input nebo read-only span *@
+    if (canEdit)
+    {
+        var isoValue = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
+            ? krok.SkutecneDatum.ToString("yyyy-MM-dd")
+            : string.Empty;
+        <div class="schedule-actual-manual schedule-actual-manual-editable" data-schedule-actual-source="manual">
+            <input type="hidden"
+                   name="ManualActualKroky[@manualInputIndex].KrokKey"
+                   value="@krok.KrokKey"
+                   data-manual-krok-keyhidden />
+            <input type="date"
+                   class="schedule-actual-manual-date"
+                   name="ManualActualKroky[@manualInputIndex].AbsolutniDatum"
+                   value="@isoValue"
+                   data-manual-krok-input
+                   data-manual-krok-index="@krok.KrokIndex"
+                   data-manual-krok-key="@krok.KrokKey"
+                   aria-label="Skutečnost kroku @krok.Nazev" />
+        </div>
+    }
+    else
+    {
+        var readonlyLabel = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
+            ? krok.SkutecneDatum.ToString("dd.MM.yyyy")
+            : "—";
+        var lockedTooltip = isLocked
+            ? "Skutečnost tohoto kroku je uzamčená — čeká se na rozhodnutí návrhu."
+            : "Nemáte oprávnění editovat skutečnost.";
+        <div class="schedule-actual-manual schedule-actual-manual-readonly" data-schedule-actual-source="manual">
+            <span class="schedule-actual-datum"
+                  data-manual-krok-readonly
+                  data-manual-krok-locked="@(isLocked ? "true" : "false")"
+                  title="@lockedTooltip">@readonlyLabel</span>
+        </div>
+    }
+}
+else
+{
+    @* Auto krok bez vazby — varovná ikona *@
+    <div class="schedule-actual-pending" data-schedule-actual-source="none">
+        <span class="schedule-actual-datum" data-manual-krok-readonly>—</span>
+        <span class="schedule-actual-warning"
+              data-manual-krok-warning
+              title="Automat zatím nenašel vhodné vyjádření.">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+        </span>
+    </div>
+}
