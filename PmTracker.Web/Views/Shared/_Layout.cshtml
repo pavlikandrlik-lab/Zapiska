@@ -174,7 +174,10 @@
 
     <script type="module" src="~/lib/gov-design-system/dist/core/core.esm.min.js" asp-append-version="true"></script>
     <script src="~/lib/quill/quill.min.js" asp-append-version="true"></script>
-    <script src="~/js/site.bundle.js" asp-append-version="true"></script>
+    @* ES modules: browser si načte site.js, které přes imports natáhne všechny moduly.
+       Žádný bundling, žádný build step, žádná ruční synchronizace site.bundle.js. HTTP/2
+       multiplexing + per-file cache invalidation = srovnatelná rychlost pro interní admin app. *@
+    <script type="module" src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/global-search.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)
 </body>
