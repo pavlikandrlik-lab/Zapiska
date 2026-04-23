@@ -84,6 +84,98 @@ public sealed class CommentAuthorizationPolicyTests
         _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [21], commentAuthorOsobaId: 30, isDraftMeeting: false).Should().BeTrue();
     }
 
+    // -----------------------------------------------------------------------
+    // CanSaveMeetingNote — F3.8 duální gate pro zápis jednání
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void CanSaveMeetingNote_ShouldAllow_WhenUserHasMeetingsNotesEdit_Regardless_OfSubsystem()
+    {
+        // meetings.notes.edit = admin / PM → píše zápis kterémukoliv subsystému, i mimo DRAFT.
+        var user = BuildUser(
+            osobaId: 5,
+            visibleProjectIds: [2],
+            globalPermissions: [PermissionKeys.MeetingsNotesEdit]);
+
+        _sut.CanSaveMeetingNote(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [999], isDraftMeeting: false)
+            .Should().BeTrue();
+        _sut.CanSaveMeetingNote(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [999], isDraftMeeting: true)
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanSaveMeetingNote_ShouldAllow_WhenUserHasSubsystemLead_AndIsLeadEquivalent_InDraft()
+    {
+        var user = BuildUser(
+            osobaId: 12,
+            visibleProjectIds: [2],
+            perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
+            {
+                { 2, new HashSet<string> { PermissionKeys.MeetingsNotesSubsystemLead } }
+            });
+
+        _sut.CanSaveMeetingNote(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12, 14], isDraftMeeting: true)
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanSaveMeetingNote_ShouldDeny_SubsystemLead_ForForeignSubsystem()
+    {
+        // F3.8 service filter: vedoucí subsystému A NEsmí psát zápis pro subsystém B.
+        var user = BuildUser(
+            osobaId: 12,
+            visibleProjectIds: [2],
+            perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
+            {
+                { 2, new HashSet<string> { PermissionKeys.MeetingsNotesSubsystemLead } }
+            });
+
+        // Subsystém, kde NENÍ v lead-equivalent listu.
+        _sut.CanSaveMeetingNote(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [99], isDraftMeeting: true)
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanSaveMeetingNote_ShouldDeny_SubsystemLead_OutsideDraft()
+    {
+        var user = BuildUser(
+            osobaId: 12,
+            visibleProjectIds: [2],
+            perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
+            {
+                { 2, new HashSet<string> { PermissionKeys.MeetingsNotesSubsystemLead } }
+            });
+
+        _sut.CanSaveMeetingNote(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12], isDraftMeeting: false)
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanSaveMeetingNote_ShouldDeny_GenericCommentsAdd()
+    {
+        // comments.add (obecný klíč pro vyjádření) NEDÁVÁ právo psát zápis jednání.
+        var user = BuildUser(
+            osobaId: 7,
+            visibleProjectIds: [2],
+            globalPermissions: [PermissionKeys.CommentsAdd]);
+
+        _sut.CanSaveMeetingNote(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [7], isDraftMeeting: true)
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanSaveMeetingNote_ShouldDeny_InDeletedProject()
+    {
+        var user = BuildUser(
+            osobaId: 5,
+            visibleProjectIds: [2],
+            deletedProjectIds: [2],
+            globalPermissions: [PermissionKeys.MeetingsNotesEdit]);
+
+        _sut.CanSaveMeetingNote(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [], isDraftMeeting: true)
+            .Should().BeFalse();
+    }
+
     [Fact]
     public void CanCommentAsSubsystemLeader_ShouldReturnFalse_ForDeletedProject()
     {

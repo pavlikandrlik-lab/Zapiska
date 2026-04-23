@@ -67,4 +67,22 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
             && currentUser.OsobaId == commentAuthorOsobaId
             && currentUser.HasPermission(PermissionKeys.CommentsDeleteOwn, projektId);
     }
+
+    public bool CanSaveMeetingNote(
+        CurrentUserContextViewModel currentUser,
+        int projektId,
+        IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds,
+        bool isDraftMeeting)
+    {
+        // F3.8 duální gate pro zápis z jednání (record-level service filter).
+        // Plný přístup: meetings.notes.edit (APP_ADMIN, VLASTNIK_PROJEKTU, ADM_PROJ, PROJ_MAN).
+        if (currentUser.HasPermission(PermissionKeys.MeetingsNotesEdit, projektId))
+        {
+            return true;
+        }
+
+        // Subsystem lead — pouze v DRAFT jednání a jen pro vlastní subsystém (lead-equivalent list).
+        return isDraftMeeting
+            && CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
+    }
 }

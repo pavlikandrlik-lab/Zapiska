@@ -202,9 +202,11 @@ public sealed class CommentService(
 
             var normalizedText = NormalizeCommentText(row.Text);
             var subsystemLeadEquivalentOsobaIds = leadEquivalentOsobaIdsBySubsystem.GetValueOrDefault(record.SubsystemId, []);
-            if (!commentAuthorizationPolicy.CanAddComment(currentUser, record.ProjektId, subsystemLeadEquivalentOsobaIds, isDraftMeeting))
+            // F3.8: zápis z jednání používá meetings.notes.edit / .subsystemlead (record-level filter),
+            // ne obecný comments.add — vedoucí subsystému píše jen svůj subsystém v DRAFT.
+            if (!commentAuthorizationPolicy.CanSaveMeetingNote(currentUser, record.ProjektId, subsystemLeadEquivalentOsobaIds, isDraftMeeting))
             {
-                throw new InvalidOperationException("Nemáte oprávnění přidat vyjádření k tomuto záznamu.");
+                throw new InvalidOperationException("Nemáte oprávnění zapsat poznámku k tomuto záznamu v rámci jednání.");
             }
 
             notes.Add(new VyjadreniEntity
