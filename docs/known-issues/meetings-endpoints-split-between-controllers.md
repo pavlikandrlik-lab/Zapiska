@@ -137,3 +137,93 @@ Tato úloha **není blokér** pro žádnou jinou opravu ani bezpečnostní probl
 - Nebo po něm, až bude authz stabilizované.
 
 Pokud se `authz-redesign` dělá, je užitečné tuto úlohu **zařadit dovnitř** (společný PR se přesunutím endpointů a přepisem permission modelu) — revize proběhne najednou, méně přepracovávání odkazů ve Views.
+
+---
+
+# Úloha: Smazat legacy ObsazeniController a vyčistit reference
+
+## Kontext
+`PmTracker.Web/Controllers/ObsazeniController.cs` je legacy redirect — jediná akce
+`Index()` přesměruje na `Projekty.Index`. Žádná View složka neexistuje, žádný
+asp-controller="Obsazeni" odkaz v aktivních Views nenalezen. V UI už se na něj
+nikde neodkazuje — je to dead code, zachování kvůli backward-compat URL
+(staré bookmarky). Business potřebu zachovat redirect jsme ověřili — **neexistuje**.
+
+Pozor: tabulky `obsazeni_projektu` a `obsazeni_subsystemu_projektu` jsou úplně
+jiná věc (doménový koncept "obsazení týmu projektu"), NEMAZAT je, NESAHAT na
+ně v kódu, NESAHAT v docs/authorization.md.
+
+## Co smazat
+
+1. **Controller** — celý soubor:
+   - `PmTracker.Web/Controllers/ObsazeniController.cs`
+
+2. **Integrační testy** — celý soubor (testuje jen existenci redirect routes):
+   - `PmTracker.Tests.Api/Controllers/HomeObsazeniControllerTests.cs`
+   
+   Důvod: test pokrývá routy `/Obsazeni`, `/Obsazeni/Index`, `/Obsazeni?projektId=…`
+   které po smazání vrátí 404. HomeController testy si tam ponech, pokud jsou
+   oddělené — ale v tomhle souboru jsou spojené, takže ověř, jestli neobsahuje
+   testy pro HomeController, které bychom si měli zachovat. Pokud ano, zachovej je
+   a smaž jen sekci `ObsazeniRoutes_*`.
+
+3. **LeafControllerAuthorizeTests** — odebrat jeden řádek:
+   - `PmTracker.Tests.Unit/Authorization/LeafControllerAuthorizeTests.cs`
+   - řádek: `[InlineData("ObsazeniController.cs")]`
+
+## Co aktualizovat (nikoli smazat)
+
+1. **Dokumentační strom:**
+   - `docs/technical/00-documentation-tree.md` — odstranit řádek 
+     `| ObsazeniController | N2.9.1 |` (nebo celou jeho sekci, podle formátu).
+
+2. **Redesign dokument:**
+   - `docs/known-issues/authz-redesign-per-action-keys.md` — na řádku 479 v sekci
+     "ObsazeniController.cs / DashboardController.cs / ostatní read-only"
+     odebrat zmínku `ObsazeniController.cs`. Zbytek věty nech.
+
+## Co NESAHAT
+
+- `docs/authorization.md` — zmínka `obsazeni_projektu` je o DB tabulce, ne o controlleru.
+- `docs/superpowers/plans/**` — historické plány, nech be
+ze změny (referenční záznam).
+- `CODEX_REFACTOR_WORKLOG.md` — historický záznam.
+- Tabulky `obsazeni_projektu` / `obsazeni_subsystemu_projektu` v DB i kódu — NEMAZAT.
+  Jsou součástí doménového modelu (přiřazení osob do projektových rolí).
+
+## Ověření před commitem
+
+Spusť tyto příkazy a ujisti se, že nevrací nic kritického:
+
+```bash
+# Nesmí vracet žádný hit v aktivním kódu (jen historické docs):
+grep -rn --include='*.cs' --include='*.cshtml' 'ObsazeniController' PmTracker.Web PmTracker.Tests.Api PmTracker.Tests.Unit
+
+# Build + testy musí projít:
+dotnet build
+dotnet test
+```
+
+## Commit
+
+Jeden commit, zpráva:
+
+```
+chore(cleanup): smazat legacy ObsazeniController redirect
+
+ObsazeniController.Index() byl backward-compat redirect na Projekty.Index.
+V UI už se na něj nikde neodkazuje, žádná View složka neexistuje.
+Smazán controller + dedikovaný integrační test + reference v authz
+redesign dokumentu a tech doc stromu.
+
+DB tabulky obsazeni_projektu a obsazeni_subsystemu_projektu zůstávají
+beze změny — jsou součástí doménového modelu (přiřazení týmu projektu),
+nemají s tímto controllerem nic společného.
+```
+
+## Rizika
+
+Pokud má někdo externí bookmark `/Obsazeni`, po nasazení dostane 404. Pokud je to
+blokující, zachovat redirect přes middleware v Program.cs (5 řádků) místo
+controlleru — ale to je dodatečná práce, ne mazání. Rozhodnutí business:
+zatím nikdo o bookmark nehlásil, jdeme na čisté smazání.

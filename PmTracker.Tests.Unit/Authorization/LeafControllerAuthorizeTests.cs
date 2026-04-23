@@ -8,7 +8,6 @@ public sealed class LeafControllerAuthorizeTests
 {
     [Theory]
     [InlineData("HomeController.cs")]
-    [InlineData("ObsazeniController.cs")]
     [InlineData("ProfilController.cs")]
     [InlineData("DokumentaceController.cs")]
     [InlineData("DashboardController.cs")]

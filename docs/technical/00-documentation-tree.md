@@ -143,7 +143,6 @@ Uzel je list, pokud:
 | `ExportController` | N2.7.1, N2.7.2 |
 | `DokumentaceController` | N2.8.1 |
 | `ProfilController` | N2.8.2 |
-| `ObsazeniController` | N2.9.1 |
 | `HomeController` | N1.1.1 |
 
 ### 5.5 Mapa služeb -> uzly stromu

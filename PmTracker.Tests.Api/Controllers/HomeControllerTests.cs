@@ -5,11 +5,11 @@ using PmTracker.Tests.Api.TestInfrastructure;
 namespace PmTracker.Tests.Api.Controllers;
 
 [Collection(ApiSqlCollection.CollectionName)]
-public sealed class HomeObsazeniControllerTests
+public sealed class HomeControllerTests
 {
     private readonly ApiSqlFixture _fixture;
 
-    public HomeObsazeniControllerTests(ApiSqlFixture fixture)
+    public HomeControllerTests(ApiSqlFixture fixture)
     {
         _fixture = fixture;
     }
@@ -40,24 +40,9 @@ public sealed class HomeObsazeniControllerTests
     }
 
     [Theory]
-    [InlineData("/Obsazeni")]
-    [InlineData("/Obsazeni/Index")]
-    [InlineData("/Obsazeni?projektId=123")]
-    public async Task ObsazeniRoutes_ShouldRedirectToProjectsList_ForCompatibility(string route)
-    {
-        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync(AppendAsUser(route, _fixture.AdminOsobaId.ToString()));
-
-        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-        GetLocation(response).Should().Be("/Projekty");
-    }
-
-    [Theory]
     [InlineData("/Home")]
     [InlineData("/Home/Error")]
-    [InlineData("/Obsazeni")]
-    [InlineData("/Obsazeni/Index")]
-    public async Task HomeAndObsazeniRoutes_ShouldReturnForbiddenAccessPage_WhenUserContextCannotBeResolved(string route)
+    public async Task HomeRoutes_ShouldReturnForbiddenAccessPage_WhenUserContextCannotBeResolved(string route)
     {
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync(AppendAsUser(route, "99999999"));

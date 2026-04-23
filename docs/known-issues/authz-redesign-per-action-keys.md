@@ -476,7 +476,7 @@ Po sloučení (viz [meetings-endpoints-split](meetings-endpoints-split-between-c
 | `SaveRow` | `ciselniky.edit` | `ciselniky.row.edit` |
 | `DeleteRow` | `ciselniky.edit` | `ciselniky.row.delete` |
 
-### `ObsazeniController.cs` / `DashboardController.cs` / ostatní read-only
+### `DashboardController.cs` / ostatní read-only
 
 Beze změny v autorizaci (auth + scope filter). Dashboard (hlavní) je viditelný všem přihlášeným.
 
