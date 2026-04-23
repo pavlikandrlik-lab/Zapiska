@@ -38,6 +38,13 @@ public sealed class VyjadreniModalControllerIdorTests
     {
         var builder = new Mock<IVyjadreniModalViewModelBuilder>();
         var harvest = new Mock<IVyjadreniHarvestService>();
+        var rebalance = new Mock<IBindingRebalanceService>();
+        rebalance
+            .Setup(x => x.CreateBindingAsync(It.IsAny<BindingRebalanceRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BindingRebalanceResult(
+                BindingRebalanceOutcome.Success,
+                PrimaryVazbaId: 1,
+                CascadeUpdates: Array.Empty<BindingCascadeUpdate>()));
         var authz = new Mock<IPmAuthorizationService>();
         // Útočník MÁ records.edit v projektu A (attempt to escalate).
         authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.RecordsEdit, ProjektA, null, It.IsAny<CancellationToken>()))
@@ -54,6 +61,7 @@ public sealed class VyjadreniModalControllerIdorTests
             db,
             builder.Object,
             harvest.Object,
+            rebalance.Object,
             authz.Object,
             currentUser.Object,
             new FakeTimeProvider(new DateTimeOffset(2026, 4, 22, 12, 0, 0, TimeSpan.Zero)),
@@ -216,8 +224,9 @@ public sealed class VyjadreniModalControllerIdorTests
         var currentUser = new Mock<ICurrentUserAccessor>();
         currentUser.SetupGet(x => x.OsobaId).Returns(AttackerOsobaId);
 
+        var rebalance = new Mock<IBindingRebalanceService>();
         var ctrl = new VyjadreniModalController(
-            db, builder.Object, harvest.Object, authz.Object, currentUser.Object,
+            db, builder.Object, harvest.Object, rebalance.Object, authz.Object, currentUser.Object,
             new FakeTimeProvider(new DateTimeOffset(2026, 4, 22, 12, 0, 0, TimeSpan.Zero)),
             NullLogger<VyjadreniModalController>.Instance,
             new Mock<IAuditWriteService>().Object);
@@ -260,9 +269,10 @@ public sealed class VyjadreniModalControllerIdorTests
         var currentUser = new Mock<ICurrentUserAccessor>();
         currentUser.SetupGet(x => x.OsobaId).Returns(AttackerOsobaId);
 
+        var rebalance = new Mock<IBindingRebalanceService>();
         var ctrl = new VyjadreniModalController(
             db, new Mock<IVyjadreniModalViewModelBuilder>().Object,
-            harvest.Object, authz.Object, currentUser.Object,
+            harvest.Object, rebalance.Object, authz.Object, currentUser.Object,
             new FakeTimeProvider(new DateTimeOffset(2026, 4, 22, 12, 0, 0, TimeSpan.Zero)),
             NullLogger<VyjadreniModalController>.Instance,
             new Mock<IAuditWriteService>().Object);

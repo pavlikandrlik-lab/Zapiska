@@ -32,6 +32,7 @@ public sealed class VyjadreniModalController : Controller
     private readonly PmTrackerDbContext _db;
     private readonly IVyjadreniModalViewModelBuilder _builder;
     private readonly IVyjadreniHarvestService _harvest;
+    private readonly IBindingRebalanceService _rebalance;
     private readonly IPmAuthorizationService _authz;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly TimeProvider _time;
@@ -42,6 +43,7 @@ public sealed class VyjadreniModalController : Controller
         PmTrackerDbContext db,
         IVyjadreniModalViewModelBuilder builder,
         IVyjadreniHarvestService harvest,
+        IBindingRebalanceService rebalance,
         IPmAuthorizationService authz,
         ICurrentUserAccessor currentUser,
         TimeProvider time,
@@ -51,6 +53,7 @@ public sealed class VyjadreniModalController : Controller
         _db = db;
         _builder = builder;
         _harvest = harvest;
+        _rebalance = rebalance;
         _authz = authz;
         _currentUser = currentUser;
         _time = time;
@@ -182,35 +185,43 @@ public sealed class VyjadreniModalController : Controller
         if (eoRow is null) return NotFound(new { Error = "Externí odkaz nenalezen nebo nepatří k záznamu." });
         if (eoRow.OwnerProjektId != req.ProjektId) return Forbid();
 
-        // Superseduj Active binding pro (zaznamId, krokKey)
-        var existing = await _db.VyjadreniVazby
-            .Where(x => x.ZaznamId == req.ZaznamId
-                     && x.KrokKey == req.KrokKey
-                     && x.Stav == (byte)VazbaStav.Active)
-            .ToListAsync(ct);
+        // Vlastní drag-and-drop + chronologie cascade = čistě doménová logika v service.
+        // Controller zůstává thin (auth → delegate → map). Service interně:
+        //  - supersedne existující Active vazbu pro (ZaznamId, ExterniOdkazId, KrokKey)
+        //  - spočítá rebalance pro následující kroky (ChronologyRebalancer)
+        //  - cascade updaty označí Source = ChronologyCascade
+        //  - single SaveChanges pod Serializable tx + per-externiOdkaz semaforem
+        var rebalanceResult = await _rebalance.CreateBindingAsync(new BindingRebalanceRequest(
+            ZaznamId: req.ZaznamId,
+            ExterniOdkazId: req.ExterniOdkazId,
+            KrokKey: req.KrokKey,
+            HotVyjadreniId: req.HotVyjadreniId,
+            DatumVyjadreni: req.DatumVyjadreni,
+            OsobaId: osobaId), ct).ConfigureAwait(false);
 
-        var nowUtc = _time.GetUtcNow().UtcDateTime;
-        foreach (var e in existing)
+        switch (rebalanceResult.Outcome)
         {
-            e.Stav = (byte)VazbaStav.Superseded;
+            case BindingRebalanceOutcome.ExterniOdkazNotFound:
+                return NotFound(new { Error = "Externí odkaz nenalezen nebo nepatří k záznamu." });
+            case BindingRebalanceOutcome.InvalidKrokKey:
+                return BadRequest(new { Error = "Neznámý krok — KrokKey nepatří do schématu záznamu." });
         }
 
-        var entity = new ZaznamHarmonogramVyjadreniVazbaEntity
+        return Ok(new
         {
-            ZaznamId = req.ZaznamId,
-            KrokKey = req.KrokKey,
-            ExterniOdkazId = req.ExterniOdkazId,
-            HotVyjadreniId = req.HotVyjadreniId,
-            DatumVyjadreni = req.DatumVyjadreni,
-            Source = (byte)VazbaSource.Manual,
-            Stav = (byte)VazbaStav.Active,
-            CreatedAt = nowUtc,
-            CreatedByOsobaId = osobaId
-        };
-        _db.VyjadreniVazby.Add(entity);
-        await _db.SaveChangesAsync(ct);
-
-        return Ok(new { VazbaId = entity.Id, Superseded = existing.Count });
+            VazbaId = rebalanceResult.PrimaryVazbaId,
+            // Kompatibilita s předchozím API: klient četl Superseded jako count.
+            Superseded = rebalanceResult.CascadeUpdates
+                .SelectMany(c => c.SupersededVazbaIds).Count(),
+            CascadeUpdates = rebalanceResult.CascadeUpdates.Select(c => new
+            {
+                KrokKey = c.KrokKey,
+                KrokPoradi = c.KrokPoradi,
+                NewVazbaId = c.NewVazbaId,
+                NewHotVyjadreniId = c.NewHotVyjadreniId,
+                SupersededVazbaIds = c.SupersededVazbaIds
+            })
+        });
     }
 
     [HttpPost("HarmonogramVazba/Delete")]
