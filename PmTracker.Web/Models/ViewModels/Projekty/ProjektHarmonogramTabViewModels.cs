@@ -1,3 +1,4 @@
+using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Models.ViewModels;
@@ -42,6 +43,23 @@ public sealed class HarmonogramBlockViewModel
     public ScheduleEditorPermissionSet Permissions { get; set; } = ScheduleEditorPermissionSet.ForReadOnly();
     public IReadOnlyDictionary<int, string> EditorChangedTypeTooltips { get; set; } = new Dictionary<int, string>();
     public string ScheduleVersion { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Plán D Task 8: KrokKey kroků, u kterých je ruční skutečnost v pending
+    /// návrhu. UI je musí v režimu přímé editace (schéma 1) uzamknout, aby
+    /// přímý zápis nekolidoval s čekajícím návrhem.
+    /// Výchozí stav je prázdná množina — pro read-only / non-editor módy není
+    /// třeba lock řešit (input se stejně neinrenderuje).
+    /// </summary>
+    public IReadOnlySet<Guid> LockedManualKrokKeys { get; set; } = new HashSet<Guid>();
+
+    /// <summary>
+    /// Plán D Task 8: UI vlastník potřebuje vědět, zda uživatel smí editovat
+    /// ruční skutečnost přímo (mimo návrhový workflow). Odvozeno ze složení
+    /// <c>records.edit</c> oprávnění + absence schedule lock.
+    /// Default je <c>false</c> (read-only) — composition musí explicitně povolit.
+    /// </summary>
+    public bool CanEditManualActual { get; set; }
 }
 
 public sealed class HarmonogramKrokEditViewModel
@@ -57,6 +75,36 @@ public sealed class HarmonogramKrokEditViewModel
     public DateTime BaselineDatum { get; init; }
     public DateTime SkutecneDatum { get; init; }
     public DateTime PosunuteDatum => SkutecneDatum;
+
+    /// <summary>
+    /// Plán D Task 8: stabilní GUID identifikátor kroku schématu, kterým UI
+    /// form POST identifikuje ruční skutečnost (<c>ManualActualKroky[i].KrokKey</c>).
+    /// Default <see cref="Guid.Empty"/> pro zpětnou kompatibilitu s existujícími
+    /// call-sity, které KrokKey zatím neposkytují.
+    /// </summary>
+    public Guid KrokKey { get; init; }
+
+    /// <summary>
+    /// Plán D Task 8: odkud pochází skutečnost — <c>None</c> (nenavázáno),
+    /// <c>FromVyjadreni</c> (Active vazba HOT_VYJADRENI),
+    /// <c>Manual</c> (HS0X_DELAY vyplněn ručně).
+    /// </summary>
+    public ZdrojSkutecnosti ZdrojSkutecnosti { get; init; } = ZdrojSkutecnosti.None;
+
+    /// <summary>Plán D Task 8: pro <c>FromVyjadreni</c> HOT_VYJADRENI id pro chat modal routing.</summary>
+    public long? SourceVyjadreniId { get; init; }
+
+    /// <summary>Plán D Task 8: datum vyjádření pro tooltip „Z vyjádření {datum}".</summary>
+    public DateTime? SourceVyjadreniDatum { get; init; }
+
+    /// <summary>Plán D Task 8: externí odkaz ID, na který chat ikona míří (<c>data-external-odkaz-id</c>).</summary>
+    public int? SourceExterniOdkazId { get; init; }
+
+    /// <summary>
+    /// Plán D Task 8: zda krok patří do <see cref="HarmonogramManualSteps.KrokPoradi"/>
+    /// {2, 5, 8, 9} — UI podle toho rozhoduje, zda vůbec zvažovat render manual inputu.
+    /// </summary>
+    public bool IsManualKrok { get; init; }
 }
 
 public sealed class HarmonogramSouhrnViewModel
