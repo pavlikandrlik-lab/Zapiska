@@ -190,4 +190,46 @@ public sealed class SqlInformacniSystemQueryServiceTests
         var result = await svc.GetProdleneAsync(isId: 999, DateTime.UtcNow, CancellationToken.None);
         result.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task GetRozpocetAsync_VraciLimitACerpani()
+    {
+        using var db = CreateDb();
+        db.HotIs.Add(new HotIsEntity { Id = 1, Zkratka = "FIS", Aktivita = "Aktivní",
+                                        Limit = 1000m, Cerpani = 750m });
+        db.SaveChangesForTests();
+
+        var svc = new SqlInformacniSystemQueryService(db);
+        var result = await svc.GetRozpocetAsync(1, CancellationToken.None);
+
+        result.Should().NotBeNull();
+        result!.IsId.Should().Be(1);
+        result.IsZkratka.Should().Be("FIS");
+        result.Limit.Should().Be(1000m);
+        result.Cerpani.Should().Be(750m);
+        result.ProcentoCerpani.Should().Be(75.0m);
+    }
+
+    [Fact]
+    public async Task GetRozpocetAsync_BezLimitu_ProcentoNull()
+    {
+        using var db = CreateDb();
+        db.HotIs.Add(new HotIsEntity { Id = 1, Zkratka = "FIS", Aktivita = "Aktivní",
+                                        Limit = null, Cerpani = 500m });
+        db.SaveChangesForTests();
+
+        var svc = new SqlInformacniSystemQueryService(db);
+        var result = await svc.GetRozpocetAsync(1, CancellationToken.None);
+
+        result!.ProcentoCerpani.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetRozpocetAsync_NeznamyIs_VraciNull()
+    {
+        using var db = CreateDb();
+        var svc = new SqlInformacniSystemQueryService(db);
+        var result = await svc.GetRozpocetAsync(999, CancellationToken.None);
+        result.Should().BeNull();
+    }
 }

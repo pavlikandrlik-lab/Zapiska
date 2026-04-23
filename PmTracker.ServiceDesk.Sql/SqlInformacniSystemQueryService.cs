@@ -112,6 +112,15 @@ public sealed class SqlInformacniSystemQueryService : IInformacniSystemQueryServ
     }
 
     /// <inheritdoc />
-    public Task<IsRozpocetDto?> GetRozpocetAsync(int isId, CancellationToken ct)
-        => throw new NotImplementedException("Task 9");
+    public async Task<IsRozpocetDto?> GetRozpocetAsync(int isId, CancellationToken ct)
+    {
+        var i = await _db.HotIs.FirstOrDefaultAsync(x => x.Id == isId, ct);
+        if (i is null) return null;
+
+        return new IsRozpocetDto(
+            IsId: i.Id,
+            IsZkratka: (i.Zkratka ?? string.Empty).Trim(),
+            Limit: i.Limit,
+            Cerpani: i.Cerpani);
+    }
 }
