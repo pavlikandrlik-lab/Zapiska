@@ -363,17 +363,32 @@ public sealed partial class RecordProposalService
             .ToList();
         var vypocet = _harmonogramService.BuildHarmonogramVypocetPublic(model.DatumZalozeni, schema, valueByType);
         var souhrn = _harmonogramService.BuildHarmonogramSouhrn(vypocet, payload.TerminUkonceni);
-        var kroky = vypocet.Select(krok => new HarmonogramKrokEditViewModel
+        // Zachovat Plán D VM properties z originálního bloku, pokud je nová vypocet neposkytuje.
+        // Originál přišel z ProjectService.RecordEditorComposition a má KrokKey, ZdrojSkutecnosti
+        // a IsManualKrok naplněné; rebuild po přepočtu je ztratí, pokud je explicitně nepropáčeme.
+        var originalByKrokIndex = model.HarmonogramBlok.Kroky.ToDictionary(k => k.KrokIndex);
+        var kroky = vypocet.Select(krok =>
         {
-            KrokIndex = krok.KrokIndex,
-            Nazev = krok.Nazev,
-            BarvaHex = krok.BarvaHex,
-            TrvaniTypId = krok.TrvaniTypId,
-            ZpozdeniTypId = krok.ZpozdeniTypId,
-            TrvaniDni = krok.TrvaniDni,
-            OdchylkaDni = krok.ZpozdeniDni,
-            BaselineDatum = krok.BaselineDatum,
-            SkutecneDatum = krok.PosunuteDatum
+            var original = originalByKrokIndex.GetValueOrDefault(krok.KrokIndex);
+            return new HarmonogramKrokEditViewModel
+            {
+                KrokIndex = krok.KrokIndex,
+                Nazev = krok.Nazev,
+                BarvaHex = krok.BarvaHex,
+                TrvaniTypId = krok.TrvaniTypId,
+                ZpozdeniTypId = krok.ZpozdeniTypId,
+                TrvaniDni = krok.TrvaniDni,
+                OdchylkaDni = krok.ZpozdeniDni,
+                BaselineDatum = krok.BaselineDatum,
+                SkutecneDatum = krok.PosunuteDatum,
+                // Plán D Task 8/9 passthrough (M-1 fix).
+                KrokKey = original?.KrokKey ?? Guid.Empty,
+                ZdrojSkutecnosti = original?.ZdrojSkutecnosti ?? ZdrojSkutecnosti.None,
+                SourceVyjadreniId = original?.SourceVyjadreniId,
+                SourceVyjadreniDatum = original?.SourceVyjadreniDatum,
+                SourceExterniOdkazId = original?.SourceExterniOdkazId,
+                IsManualKrok = original?.IsManualKrok ?? HarmonogramManualSteps.IsManual(krok.KrokIndex)
+            };
         }).ToList();
 
         model.TerminUkonceni = payload.TerminUkonceni;
@@ -488,7 +503,11 @@ public sealed partial class RecordProposalService
             Souhrn = souhrn ?? source.Souhrn,
             Kroky = kroky ?? source.Kroky,
             Permissions = permissions ?? source.Permissions,
-            EditorChangedTypeTooltips = editorChangedTypeTooltips ?? source.EditorChangedTypeTooltips
+            EditorChangedTypeTooltips = editorChangedTypeTooltips ?? source.EditorChangedTypeTooltips,
+            ScheduleVersion = source.ScheduleVersion,
+            // Plán D Task 8/9 passthrough (M-1 fix) — lock state + edit capability zachovat.
+            LockedManualKrokKeys = source.LockedManualKrokKeys,
+            CanEditManualActual = source.CanEditManualActual
         };
     }
 

@@ -131,35 +131,40 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
             return Fail(BindingRebalanceOutcome.InvalidKrokKey);
         }
 
-        // Dostupné bubliny z HOT_VYJADRENI (cached v SQL/Sd-sync vrstvě — zde to stačí jako
-        // read-only fetch). Primární case: user drag-nul z bublinové timeline → bublina musí
-        // existovat v availableBubbles. Kdyby HOT byl offline a fetch vrátí prázdno, rebalance
-        // běží aspoň na aktuálním state-u a target binding se vytvoří (bez cascade).
-        IReadOnlyList<HotVyjadreniDto> hotList;
-        if (!string.IsNullOrWhiteSpace(eo.Cislo))
-        {
-            try
-            {
-                hotList = await _vyjadreni.GetVyjadreniForTicketAsync(eo.Cislo!, null, ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "BindingRebalanceService: HOT fetch pro tiket {Cislo} selhal; cascade poběží s prázdným availableBubbles.",
-                    eo.Cislo);
-                hotList = Array.Empty<HotVyjadreniDto>();
-            }
-        }
-        else
-        {
-            hotList = Array.Empty<HotVyjadreniDto>();
-        }
-
         // Lock + transakce. Per-externiOdkaz semafor zabraňuje race s auto-harvestem.
+        // HOT_VYJADRENI fetch se dělá AŽ UVNITŘ locku (M-S2-1 fix) — jinak by paralelní
+        // auto-harvest mohl v okně mezi fetchem a acquire-lockem přihodit nové bubliny,
+        // které by cascade rebalance neviděl (stale availableBubbles) a mohl by
+        // přepsat právě vytvořené Auto bindings.
         var sem = PerExterniOdkazLockRegistry.GetOrAdd(request.ExterniOdkazId);
         await sem.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            // Dostupné bubliny z HOT_VYJADRENI uvnitř locku — read-only fetch.
+            // Primární case: user drag-nul z bublinové timeline → bublina musí
+            // existovat v availableBubbles. Kdyby HOT byl offline a fetch vrátí prázdno,
+            // rebalance běží aspoň na aktuálním state-u a target binding se vytvoří
+            // (bez cascade).
+            IReadOnlyList<HotVyjadreniDto> hotList;
+            if (!string.IsNullOrWhiteSpace(eo.Cislo))
+            {
+                try
+                {
+                    hotList = await _vyjadreni.GetVyjadreniForTicketAsync(eo.Cislo!, null, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "BindingRebalanceService: HOT fetch pro tiket {Cislo} selhal; cascade poběží s prázdným availableBubbles.",
+                        eo.Cislo);
+                    hotList = Array.Empty<HotVyjadreniDto>();
+                }
+            }
+            else
+            {
+                hotList = Array.Empty<HotVyjadreniDto>();
+            }
+
             return await ExecuteUnderTransactionAsync(request, zaznam.HarmonogramSablonaVerze, schemaKroky.Select(k => (k.KrokKey, k.KrokPoradi)).ToArray(), targetKrok.KrokPoradi, hotList, ct)
                 .ConfigureAwait(false);
         }

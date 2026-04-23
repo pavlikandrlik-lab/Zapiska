@@ -230,7 +230,14 @@ public sealed class RecordProposalPayloadMapper
                 TrvaniDni = scheduleValuesByType.TryGetValue(step.TrvaniTypId, out var duration) ? Math.Max(0, duration) : step.TrvaniDni,
                 OdchylkaDni = scheduleValuesByType.TryGetValue(step.ZpozdeniTypId, out var delay) ? delay : step.OdchylkaDni,
                 BaselineDatum = step.BaselineDatum,
-                SkutecneDatum = step.SkutecneDatum
+                SkutecneDatum = step.SkutecneDatum,
+                // Plán D Task 8/9: zachovat VM properties při rebuildu (M-1 fix).
+                KrokKey = step.KrokKey,
+                ZdrojSkutecnosti = step.ZdrojSkutecnosti,
+                SourceVyjadreniId = step.SourceVyjadreniId,
+                SourceVyjadreniDatum = step.SourceVyjadreniDatum,
+                SourceExterniOdkazId = step.SourceExterniOdkazId,
+                IsManualKrok = step.IsManualKrok
             })
             .ToList();
 
