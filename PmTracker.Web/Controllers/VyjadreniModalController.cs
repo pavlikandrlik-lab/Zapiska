@@ -158,7 +158,7 @@ public sealed class VyjadreniModalController : Controller
         catch (Exception ex)
         {
             _logger.LogError(ex, "T6 refresh selhal pro externí odkaz {Id}.", externiOdkazId);
-            return StatusCode(500, new { Error = "Refresh selhal, viz log." });
+            return StatusCode(500, new { error = "Refresh selhal, viz log." });
         }
     }
 
@@ -182,7 +182,7 @@ public sealed class VyjadreniModalController : Controller
                            where eo.Id == req.ExterniOdkazId && eo.ZaznamId == req.ZaznamId
                            select new { OwnerProjektId = z.ProjektId })
                           .FirstOrDefaultAsync(ct);
-        if (eoRow is null) return NotFound(new { Error = "Externí odkaz nenalezen nebo nepatří k záznamu." });
+        if (eoRow is null) return NotFound(new { error = "Externí odkaz nenalezen nebo nepatří k záznamu." });
         if (eoRow.OwnerProjektId != req.ProjektId) return Forbid();
 
         // Vlastní drag-and-drop + chronologie cascade = čistě doménová logika v service.
@@ -202,9 +202,9 @@ public sealed class VyjadreniModalController : Controller
         switch (rebalanceResult.Outcome)
         {
             case BindingRebalanceOutcome.ExterniOdkazNotFound:
-                return NotFound(new { Error = "Externí odkaz nenalezen nebo nepatří k záznamu." });
+                return NotFound(new { error = "Externí odkaz nenalezen nebo nepatří k záznamu." });
             case BindingRebalanceOutcome.InvalidKrokKey:
-                return BadRequest(new { Error = "Neznámý krok — KrokKey nepatří do schématu záznamu." });
+                return BadRequest(new { error = "Neznámý krok — KrokKey nepatří do schématu záznamu." });
         }
 
         return Ok(new
@@ -307,7 +307,7 @@ public sealed class VyjadreniModalController : Controller
                 _logger.LogWarning(auditEx, "ReHarvest: zápis auditu selhání selhal pro {Id}.", externiOdkazId);
             }
             // Review finding S-3: nelogovat exception.Message do odpovědi, jen trace id.
-            return StatusCode(500, new { Error = $"Re-harvest selhal. TraceId: {HttpContext.TraceIdentifier}" });
+            return StatusCode(500, new { error = $"Re-harvest selhal. TraceId: {HttpContext.TraceIdentifier}" });
         }
     }
 }

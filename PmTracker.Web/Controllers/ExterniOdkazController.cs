@@ -49,7 +49,7 @@ public sealed class ExterniOdkazController : Controller
     {
         if (string.IsNullOrWhiteSpace(cislo) || !SixDigits.IsMatch(cislo))
         {
-            return BadRequest(new { Error = "Číslo tiketu musí být přesně 6 cifer." });
+            return BadRequest(new { error = "Číslo tiketu musí být přesně 6 cifer." });
         }
 
         var osobaId = _currentUser.OsobaId;
