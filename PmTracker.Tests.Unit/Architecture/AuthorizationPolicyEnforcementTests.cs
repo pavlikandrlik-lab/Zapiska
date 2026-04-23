@@ -73,11 +73,12 @@ public class AuthorizationPolicyEnforcementTests
             // Všechny následující team-management akce dostávají projektId z form body
             // (command.ProjektId) nebo z query parametru (projektId) — NIKDY z route.
             // PermissionAuthorizationHandler čte projektId pouze z RouteValues, takže
-            // [Authorize(Policy="permission:team.manage")] by degradoval na global-only
+            // [Authorize(Policy="permission:team.xxx")] by degradoval na global-only
             // check a zablokoval by oprávněné project-scoped uživatele (+ byl by to latent
-            // IDOR, kdyby byl team.manage grantován globálně).
+            // IDOR, kdyby byl team klíč grantován globálně).
             // Per-project check je proveden v body přes ExecuteTeamValidatedActionAsync /
-            // ExecuteTeamActionAsync, které volají CurrentUserContext.HasPermission(TeamManage, projektId).
+            // ExecuteTeamActionAsync, které volají CurrentUserContext.HasPermission(
+            // per-action team klíč, projektId) — per-action redesign 2026-04-23.
             "PmTracker.Web.Controllers.ProjektyController.SaveTeamMember",
             "PmTracker.Web.Controllers.ProjektyController.RemoveTeamMember",
             "PmTracker.Web.Controllers.ProjektyController.AssignProjectRole",
@@ -102,24 +103,28 @@ public class AuthorizationPolicyEnforcementTests
             // Body provádí: HasPermission(MeetingsEdit, command.ProjektId).
             "PmTracker.Web.Controllers.JednaniController.AddMeetingParticipant",
 
-            // SaveNotes: projektId z form body, ne z route.
-            // Body provádí: HasPermission(RecordsEdit, projektId).
+            // SaveNotes: projektId z form body, ne z route. Duální gate
+            // (meetings.notes.edit OR meetings.notes.subsystemlead) + service filter
+            // (CommentAuthorizationPolicy.CanSaveMeetingNote) — OR-composite nejde vyjádřit
+            // jednou policy. Per-action redesign 2026-04-23.
             "PmTracker.Web.Controllers.JednaniController.SaveNotes",
 
             // ---- NavrhyController ----
 
-            // ApproveProposal: schvalovat návrh může vedoucí subsystému i PM (CanAccessProject
-            // + service-level check). Jediná policy by zahrnovala jen records.comment.subsystemlead
-            // a vynechala by PM roli — OR-composite nelze zúžit na jednu policy.
+            // ApproveProposal / RejectProposal: per-action 2026-04-23 mají vlastní policy
+            // na atributu (proposals.accept / proposals.reject), ale projektId přichází
+            // z form body, ne z route → PermissionAuthorizationHandler nemůže provést
+            // per-project check. Body-level gate přes RecordProposalAuthorizationPolicy
+            // (IDOR admin bypass pro proposals.edit.any).
             "PmTracker.Web.Controllers.NavrhyController.ApproveProposal",
-
-            // RejectProposal: stejný důvod jako ApproveProposal.
             "PmTracker.Web.Controllers.NavrhyController.RejectProposal",
 
-            // RejectAndTakeOverCreateProposal: stejný důvod jako ApproveProposal.
+            // RejectAndTakeOverCreateProposal: proposals.takeover (per-action redesign)
+            // + projektId z body.
             "PmTracker.Web.Controllers.NavrhyController.RejectAndTakeOverCreateProposal",
 
-            // RejectAndEditProposal: stejný důvod jako ApproveProposal.
+            // RejectAndEditProposal: proposals.reject + records.edit — OR composite
+            // nelze vyjádřit jednou policy (body-level check).
             "PmTracker.Web.Controllers.NavrhyController.RejectAndEditProposal",
 
             // ---- VyzvyController ----
@@ -134,13 +139,14 @@ public class AuthorizationPolicyEnforcementTests
 
             // SetZaradid: pracuje s ExterniOdkazId — projektId není dostupný v route ani body.
             // projektId se resolvuje z ExterniOdkazId v service; service volá
-            // IAuthorizationService.HasPermissionAsync(RecordsEdit) — ověřeno VyzvaServiceAssignmentAuthzTests.
+            // IAuthorizationService.HasPermissionAsync(VyzvyPnfAssign, projektId) — per-action
+            // redesign 2026-04-23; ověřeno VyzvaServiceAssignmentAuthzTests.
             "PmTracker.Web.Controllers.VyzvyController.SetZaradid",
 
             // Prerdit: pracuje s ExterniOdkazId a CilovaVyzvaId — žádný projektId v route.
             // projektId se resolvuje z ExterniOdkazId/CilovaVyzvaId v service; service volá
-            // IAuthorizationService.HasPermissionAsync(RecordsEdit) na zdrojovém i cílovém projektu
-            // — ověřeno VyzvaServiceAssignmentAuthzTests.
+            // IAuthorizationService.HasPermissionAsync(VyzvyPnfReassign) na zdrojovém i cílovém
+            // projektu — per-action redesign 2026-04-23; ověřeno VyzvaServiceAssignmentAuthzTests.
             "PmTracker.Web.Controllers.VyzvyController.Prerdit",
 
             // ---- ScheduleController ----
