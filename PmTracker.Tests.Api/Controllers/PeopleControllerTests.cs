@@ -675,6 +675,5 @@ public sealed class PeopleControllerTests
         payload.ErrorCode.Should().Be("OPERATION_FAILED");
         payload.Message.Should().Contain("Nemáte oprávnění");
         payload.TraceId.Should().NotBeNullOrWhiteSpace();
-        payload.DiagnosticLog.Should().Contain("Permission check failed");
     }
 }

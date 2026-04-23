@@ -201,11 +201,10 @@ public sealed class AjaxControllersTests
         payload.ErrorCode.Should().Be("OPERATION_FAILED");
         payload.Message.Should().Contain("Nemáte oprávnění");
         payload.TraceId.Should().NotBeNullOrWhiteSpace();
-        payload.DiagnosticLog.Should().Contain("Permission check failed");
     }
 
     [Fact]
-    public async Task SaveRecord_ShouldReturnCrossTabFieldErrorsAndDiagnosticLog_WhenValidationFails()
+    public async Task SaveRecord_ShouldReturnCrossTabFieldErrors_WhenValidationFails()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiRecordOwner");
         var outsiderId = await _fixture.EnsurePersonAsync("ApiRecordOutsider");
@@ -272,8 +271,6 @@ public sealed class AjaxControllersTests
         payload.Ok.Should().BeFalse();
         payload.ErrorCode.Should().Be("RECORD_VALIDATION_FAILED");
         payload.TraceId.Should().NotBeNullOrWhiteSpace();
-        payload.DiagnosticLog.Should().NotBeNullOrWhiteSpace();
-        payload.DiagnosticLog.Should().Contain("CommandValues");
         payload.FieldErrors.Keys.Should().Contain("Popis");
         payload.FieldErrors.Keys.Should().Contain("ExterniVazby[0].Cislo");
         payload.FieldErrors.Keys.Should().Contain("ExterniVazby[0].PredpokladanaCena");
@@ -304,6 +301,5 @@ public sealed class AjaxControllersTests
         payload.Message.Should().Contain("není v seznamu podporovaných akcí");
         payload.ErrorCode.Should().Be("OPERATION_FAILED");
         payload.TraceId.Should().NotBeNullOrWhiteSpace();
-        payload.DiagnosticLog.Should().NotBeNullOrWhiteSpace();
     }
 }

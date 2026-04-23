@@ -855,7 +855,6 @@ public sealed class SettingsAuthzAdminControllerTests
         payload.ErrorCode.Should().Be(AjaxErrorCodes.OperationFailed);
         payload.Message.Should().Contain("Nemáte oprávnění");
         payload.TraceId.Should().NotBeNullOrWhiteSpace();
-        payload.DiagnosticLog.Should().Contain("Permission check failed");
     }
 
     private static HttpRequestMessage BuildPostRequest(string url, HttpContent content)

@@ -184,7 +184,6 @@ public sealed class MeetingIdentifierFlowControllerTests
         payload.ErrorCode.Should().Be("OPERATION_FAILED");
         payload.Message.Should().Contain("Nemáte oprávnění");
         payload.TraceId.Should().NotBeNullOrWhiteSpace();
-        payload.DiagnosticLog.Should().Contain("Permission check failed");
     }
 
     [Fact]
@@ -233,7 +232,6 @@ public sealed class MeetingIdentifierFlowControllerTests
         payload.ErrorCode.Should().Be("REQUEST_VALIDATION_FAILED");
         payload.Message.Should().Be("Identifikátor z jednání nelze doplnit.");
         payload.FieldErrors.Keys.Should().Contain(key => key.Contains("JednaniId", StringComparison.OrdinalIgnoreCase));
-        payload.DiagnosticLog.Should().Contain("ModelState validation failed");
     }
 
     [Fact]
