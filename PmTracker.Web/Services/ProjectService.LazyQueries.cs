@@ -42,38 +42,23 @@ public sealed partial class ProjectService
                 Label = string.IsNullOrWhiteSpace(x.Kod) ? x.Nazev : $"{x.Kod} - {x.Nazev}"
             })
             .ToList();
-        var categoryFilterOptions = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
-            .OrderBy(x => x.Id)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = x.Kod,
-                Label = x.Nazev
-            })
-            .ToListAsync(ct);
-        var taskStateFilterOptions = await dbContext.CiselnikStavuUkolu.AsNoTracking()
-            .OrderBy(x => x.Id)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = x.Kod,
-                Label = x.Nazev
-            })
-            .ToListAsync(ct);
-        var taskTypeFilterOptions = await dbContext.CiselnikTypuUkolu.AsNoTracking()
-            .OrderBy(x => x.Id)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = x.Kod,
-                Label = x.Nazev
-            })
-            .ToListAsync(ct);
-        var meetingStatusFilterOptions = await dbContext.CiselnikStavuJednani.AsNoTracking()
-            .OrderBy(x => x.Id)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = x.Id.ToString(CultureInfo.InvariantCulture),
-                Label = x.Nazev
-            })
-            .ToListAsync(ct);
+        // Perf: projekce do LookupOptionViewModel z cached ciselnik dictionary (OrderBy in-memory).
+        var categoryFilterOptions = (await lookupCache.GetCategoriesAsync(ct))
+            .Values.OrderBy(x => x.Id)
+            .Select(x => new LookupOptionViewModel { Value = x.Kod, Label = x.Nazev })
+            .ToList();
+        var taskStateFilterOptions = (await lookupCache.GetTaskStatesAsync(ct))
+            .Values.OrderBy(x => x.Id)
+            .Select(x => new LookupOptionViewModel { Value = x.Kod, Label = x.Nazev })
+            .ToList();
+        var taskTypeFilterOptions = (await lookupCache.GetTaskTypesAsync(ct))
+            .Values.OrderBy(x => x.Id)
+            .Select(x => new LookupOptionViewModel { Value = x.Kod, Label = x.Nazev })
+            .ToList();
+        var meetingStatusFilterOptions = (await lookupCache.GetMeetingStatesAsync(ct))
+            .Values.OrderBy(x => x.Id)
+            .Select(x => new LookupOptionViewModel { Value = x.Id.ToString(CultureInfo.InvariantCulture), Label = x.Nazev })
+            .ToList();
         var ownerFilterOptions = summaries
             .Where(x => x.Summary.AktualniVlastnikId > 0)
             .GroupBy(x => x.Summary.AktualniVlastnikId)
@@ -163,14 +148,10 @@ public sealed partial class ProjectService
     public async Task<ProjektJednaniTabViewModel> BuildProjectMeetingsTabAsync(int id, CancellationToken ct = default)
     {
         var meetings = await BuildJednaniListAsync(id, ct);
-        var meetingStatusOptions = await dbContext.CiselnikStavuJednani.AsNoTracking()
-            .OrderBy(x => x.Id)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = x.Kod,
-                Label = x.Nazev
-            })
-            .ToListAsync(ct);
+        var meetingStatusOptions = (await lookupCache.GetMeetingStatesAsync(ct))
+            .Values.OrderBy(x => x.Id)
+            .Select(x => new LookupOptionViewModel { Value = x.Kod, Label = x.Nazev })
+            .ToList();
 
         return new ProjektJednaniTabViewModel
         {
@@ -285,26 +266,26 @@ public sealed partial class ProjectService
             .Distinct()
             .ToArray();
 
+        // Perf: cache-backed lookups — filtered by IDs in-memory (O(1) dict lookups).
+        // Pokud už cache je naplněný (Projekty/Detail nejdřív zavolá BuildRecordCardsForProjectAsync),
+        // tyto řádky jsou free; jinak stáhnou celou tabulku, která se pak reusuje i dalšími call-sity.
+        var allSubsystems = await lookupCache.GetSubsystemsAsync(ct);
+        var allTaskTypes = await lookupCache.GetTaskTypesAsync(ct);
+        var allExtTypes = await lookupCache.GetExternalLinkTypesAsync(ct);
+        var allVyzvy = await lookupCache.GetVyzvyAsync(ct);
+
         var subsystems = subsystemIds.Length == 0
             ? new Dictionary<int, SubsystemEntity>()
-            : await dbContext.Subsystemy.AsNoTracking()
-                .Where(x => subsystemIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : subsystemIds.Where(id => allSubsystems.ContainsKey(id)).ToDictionary(id => id, id => allSubsystems[id]);
         var taskTypes = taskTypeIds.Length == 0
             ? new Dictionary<int, CiselnikTypuUkoluEntity>()
-            : await dbContext.CiselnikTypuUkolu.AsNoTracking()
-                .Where(x => taskTypeIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : taskTypeIds.Where(id => allTaskTypes.ContainsKey(id)).ToDictionary(id => id, id => allTaskTypes[id]);
         var extTypeById = externalTypeIds.Length == 0
             ? new Dictionary<int, CiselnikTypuExternichOdkazuEntity>()
-            : await dbContext.CiselnikTypuExternichOdkazu.AsNoTracking()
-                .Where(x => externalTypeIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : externalTypeIds.Where(id => allExtTypes.ContainsKey(id)).ToDictionary(id => id, id => allExtTypes[id]);
         var vyzvaById = vyzvaIds.Length == 0
             ? new Dictionary<int, VyzvaEntity>()
-            : await dbContext.Vyzvy.AsNoTracking()
-                .Where(x => vyzvaIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : vyzvaIds.Where(id => allVyzvy.ContainsKey(id)).ToDictionary(id => id, id => allVyzvy[id]);
 
         return new ZaznamCardDetailViewModel
         {
@@ -399,11 +380,10 @@ public sealed partial class ProjectService
                 .Where(x => meetingIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
         var meetingStateIds = meetings.Values.Select(x => x.StavJednaniId).Distinct().ToArray();
+        var allMeetingStates = await lookupCache.GetMeetingStatesAsync(ct);
         var meetingStates = meetingStateIds.Length == 0
             ? new Dictionary<int, CiselnikStavuJednaniEntity>()
-            : await dbContext.CiselnikStavuJednani.AsNoTracking()
-                .Where(x => meetingStateIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : meetingStateIds.Where(allMeetingStates.ContainsKey).ToDictionary(id => id, id => allMeetingStates[id]);
         var meetingOptions = await BuildOpenMeetingOptionsForProjectAsync(projectId, ct);
         var loadedCount = comments.Count;
         var isFullyLoaded = loadedCount >= totalCount;
@@ -546,26 +526,24 @@ public sealed partial class ProjectService
         var taskTypeIds = records.Where(x => x.AktualniTypUkoluId.HasValue).Select(x => x.AktualniTypUkoluId!.Value).Distinct().ToArray();
         var taskStateIds = records.Where(x => x.StavUkoluId.HasValue).Select(x => x.StavUkoluId!.Value).Distinct().ToArray();
         var subsystemIds = records.Select(x => x.SubsystemId).Distinct().ToArray();
+        // Perf: cache-backed lookups — viz LookupTableCache + ProjectQueryHelpers.
+        var allCategories = await lookupCache.GetCategoriesAsync(ct);
+        var allTaskTypes = await lookupCache.GetTaskTypesAsync(ct);
+        var allTaskStates = await lookupCache.GetTaskStatesAsync(ct);
+        var allSubsystems = await lookupCache.GetSubsystemsAsync(ct);
+
         var categories = categoryIds.Length == 0
             ? new Dictionary<int, CiselnikKategoriiZaznamuEntity>()
-            : await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
-                .Where(x => categoryIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : categoryIds.Where(allCategories.ContainsKey).ToDictionary(id => id, id => allCategories[id]);
         var taskTypes = taskTypeIds.Length == 0
             ? new Dictionary<int, CiselnikTypuUkoluEntity>()
-            : await dbContext.CiselnikTypuUkolu.AsNoTracking()
-                .Where(x => taskTypeIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : taskTypeIds.Where(allTaskTypes.ContainsKey).ToDictionary(id => id, id => allTaskTypes[id]);
         var taskStates = taskStateIds.Length == 0
             ? new Dictionary<int, CiselnikStavuUkoluEntity>()
-            : await dbContext.CiselnikStavuUkolu.AsNoTracking()
-                .Where(x => taskStateIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : taskStateIds.Where(allTaskStates.ContainsKey).ToDictionary(id => id, id => allTaskStates[id]);
         var subsystems = subsystemIds.Length == 0
             ? new Dictionary<int, SubsystemEntity>()
-            : await dbContext.Subsystemy.AsNoTracking()
-                .Where(x => subsystemIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : subsystemIds.Where(allSubsystems.ContainsKey).ToDictionary(id => id, id => allSubsystems[id]);
         var subsystemOrderById = await BuildActiveProjectSubsystemOrderBySubsystemIdAsync(projectId, subsystemIds, ct);
         var people = await LoadPeopleByIdsAsync(ownerIds, ct);
         var leadEquivalentOsobaIdsBySubsystem = await BuildLeadEquivalentOsobaIdsByProjectSubsystemAsync(projectId, ct);
@@ -675,26 +653,24 @@ public sealed partial class ProjectService
         var taskTypeIds = records.Where(x => x.AktualniTypUkoluId.HasValue).Select(x => x.AktualniTypUkoluId!.Value).Distinct().ToArray();
         var taskStateIds = records.Where(x => x.StavUkoluId.HasValue).Select(x => x.StavUkoluId!.Value).Distinct().ToArray();
         var subsystemIds = records.Select(x => x.SubsystemId).Distinct().ToArray();
+        // Perf: cache-backed lookups.
+        var allCategoriesB = await lookupCache.GetCategoriesAsync(ct);
+        var allTaskTypesB = await lookupCache.GetTaskTypesAsync(ct);
+        var allTaskStatesB = await lookupCache.GetTaskStatesAsync(ct);
+        var allSubsystemsB = await lookupCache.GetSubsystemsAsync(ct);
+
         var categories = categoryIds.Length == 0
             ? new Dictionary<int, CiselnikKategoriiZaznamuEntity>()
-            : await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
-                .Where(x => categoryIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : categoryIds.Where(allCategoriesB.ContainsKey).ToDictionary(id => id, id => allCategoriesB[id]);
         var taskTypes = taskTypeIds.Length == 0
             ? new Dictionary<int, CiselnikTypuUkoluEntity>()
-            : await dbContext.CiselnikTypuUkolu.AsNoTracking()
-                .Where(x => taskTypeIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : taskTypeIds.Where(allTaskTypesB.ContainsKey).ToDictionary(id => id, id => allTaskTypesB[id]);
         var taskStates = taskStateIds.Length == 0
             ? new Dictionary<int, CiselnikStavuUkoluEntity>()
-            : await dbContext.CiselnikStavuUkolu.AsNoTracking()
-                .Where(x => taskStateIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : taskStateIds.Where(allTaskStatesB.ContainsKey).ToDictionary(id => id, id => allTaskStatesB[id]);
         var subsystems = subsystemIds.Length == 0
             ? new Dictionary<int, SubsystemEntity>()
-            : await dbContext.Subsystemy.AsNoTracking()
-                .Where(x => subsystemIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : subsystemIds.Where(allSubsystemsB.ContainsKey).ToDictionary(id => id, id => allSubsystemsB[id]);
         var subsystemOrderById = await BuildActiveProjectSubsystemOrderBySubsystemIdAsync(projectId, subsystemIds, ct);
         var people = await LoadPeopleByIdsAsync(ownerIds, ct);
 

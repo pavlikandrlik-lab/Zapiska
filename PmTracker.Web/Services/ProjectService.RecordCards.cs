@@ -17,10 +17,11 @@ public sealed partial class ProjectService
         records = [.. OrderRecordsByVisibleNumber(records)];
         var recordIds = records.Select(record => record.Id).ToArray();
 
-        var categories = (await dbContext.CiselnikKategoriiZaznamu.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
-        var taskTypes = (await dbContext.CiselnikTypuUkolu.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
-        var taskStates = (await dbContext.CiselnikStavuUkolu.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
-        var subsystems = (await dbContext.Subsystemy.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
+        // Perf: číselníky přes scoped cache — brání duplicitnímu SELECT při více tabů (RecordCards + TeamComposition + RecordEditorComposition čtou stejné tabulky v rámci jedné Projekty/Detail stránky).
+        var categories = await lookupCache.GetCategoriesAsync(ct);
+        var taskTypes = await lookupCache.GetTaskTypesAsync(ct);
+        var taskStates = await lookupCache.GetTaskStatesAsync(ct);
+        var subsystems = await lookupCache.GetSubsystemsAsync(ct);
         var leadEquivalentOsobaIdsBySubsystem = await BuildLeadEquivalentOsobaIdsByProjectSubsystemAsync(projectId, ct);
 
         var ownerHistoryByRecord = (await dbContext.ZaznamHistorieVlastnik.AsNoTracking()
@@ -51,8 +52,8 @@ public sealed partial class ProjectService
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(group => group.Key, group => group.ToList());
 
-        var extTypeById = (await dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
-        var vyzvaById = (await dbContext.Vyzvy.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
+        var extTypeById = await lookupCache.GetExternalLinkTypesAsync(ct);
+        var vyzvaById = await lookupCache.GetVyzvyAsync(ct);
         var externalByRecord = (await dbContext.ZaznamExterniOdkazy.AsNoTracking()
                 .Where(x => recordIds.Contains(x.ZaznamId))
                 .OrderBy(x => x.Id)
@@ -91,7 +92,7 @@ public sealed partial class ProjectService
             : await dbContext.Jednani.AsNoTracking()
                 .Where(x => meetingIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
-        var meetingStates = (await dbContext.CiselnikStavuJednani.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
+        var meetingStates = await lookupCache.GetMeetingStatesAsync(ct);
 
         var commentByRecord = comments
             .GroupBy(x => x.ZaznamId)
@@ -270,18 +271,15 @@ public sealed partial class ProjectService
 
     private async Task<Dictionary<int, CiselnikOrganizaceEntity>> LoadOrganizationsByPeopleAsync(IEnumerable<OsobaEntity> people, CancellationToken ct)
     {
-        var organizationIds = people
-            .Select(person => person.OrganizaceId)
-            .Distinct()
-            .ToArray();
+        var organizationIds = people.Select(person => person.OrganizaceId).Distinct().ToArray();
         if (organizationIds.Length == 0)
         {
             return [];
         }
 
-        return await dbContext.CiselnikOrganizace.AsNoTracking()
-            .Where(x => organizationIds.Contains(x.Id))
-            .ToDictionaryAsync(x => x.Id, ct);
+        // Perf: cache celé tabulky číselníku (8-20 řádků) — první call = 1 query, další = zdarma.
+        var all = await lookupCache.GetOrganizationsAsync(ct);
+        return organizationIds.Where(all.ContainsKey).ToDictionary(id => id, id => all[id]);
     }
 
     private async Task<Dictionary<int, CiselnikOrganizacniCelekEntity>> LoadOrgUnitsByPeopleAsync(IEnumerable<OsobaEntity> people, CancellationToken ct)
@@ -296,9 +294,8 @@ public sealed partial class ProjectService
             return [];
         }
 
-        return await dbContext.CiselnikOrganizacniCelky.AsNoTracking()
-            .Where(x => orgUnitIds.Contains(x.Id))
-            .ToDictionaryAsync(x => x.Id, ct);
+        var all = await lookupCache.GetOrgUnitsAsync(ct);
+        return orgUnitIds.Where(all.ContainsKey).ToDictionary(id => id, id => all[id]);
     }
 
     private async Task<Dictionary<int, List<int>>> BuildLeadEquivalentOsobaIdsByProjectSubsystemAsync(int projectId, CancellationToken ct)

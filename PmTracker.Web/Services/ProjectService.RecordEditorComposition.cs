@@ -68,15 +68,16 @@ public sealed partial class ProjectService
         IReadOnlyList<JednaniOptionViewModel>? openMeetingOptions = null,
         CancellationToken ct = default)
     {
-        var categories = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking().OrderBy(x => x.Nazev).ToListAsync(ct);
-        var taskStates = await dbContext.CiselnikStavuUkolu.AsNoTracking().OrderBy(x => x.Nazev).ToListAsync(ct);
-        var taskTypes = await dbContext.CiselnikTypuUkolu.AsNoTracking().OrderBy(x => x.Nazev).ToListAsync(ct);
+        // Perf: číselníky přes scoped cache (OrderBy se dělá in-memory — tabulky mají <50 řádků, negligible).
+        var categories = (await lookupCache.GetCategoriesAsync(ct)).Values.OrderBy(x => x.Nazev).ToList();
+        var taskStates = (await lookupCache.GetTaskStatesAsync(ct)).Values.OrderBy(x => x.Nazev).ToList();
+        var taskTypes = (await lookupCache.GetTaskTypesAsync(ct)).Values.OrderBy(x => x.Nazev).ToList();
         var projectSubsystems = await BuildRecordEditorProjectSubsystemsAsync(record.ProjektId, record.SubsystemId, ct);
         var defaultOwnerBySubsystemId = await BuildDefaultOwnerOsobaIdsByProjectSubsystemAsync(record.ProjektId, ct);
         var ownerCandidates = await BuildRecordOwnerCandidatesAsync(record.ProjektId, record.VlastnikId, ct);
         var collaborationCandidates = await BuildRecordOwnerCandidatesAsync(record.ProjektId, null, ct);
 
-        var extTypes = await dbContext.CiselnikTypuExternichOdkazu.AsNoTracking().OrderBy(x => x.Kod).ToListAsync(ct);
+        var extTypes = (await lookupCache.GetExternalLinkTypesAsync(ct)).Values.OrderBy(x => x.Kod).ToList();
         var vyzvyById = (await dbContext.Vyzvy.AsNoTracking()
                 .OrderBy(x => x.Kod)
                 .Select(x => new

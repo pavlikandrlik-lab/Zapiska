@@ -26,6 +26,7 @@ public sealed partial class ProjectService :
     private readonly IPriorityMatrixRebuildService priorityMatrixRebuildService;
     private readonly IAuditWriteService auditWriteService;
     private readonly IRecordScheduleActualSourceResolver scheduleActualSourceResolver;
+    private readonly ILookupTableCache lookupCache;
     private readonly TimeProvider timeProvider;
 
     public ProjectService(
@@ -40,6 +41,7 @@ public sealed partial class ProjectService :
         IPriorityMatrixRebuildService priorityMatrixRebuildService,
         IAuditWriteService auditWriteService,
         IRecordScheduleActualSourceResolver scheduleActualSourceResolver,
+        ILookupTableCache lookupCache,
         TimeProvider timeProvider)
     {
         this.dbContext = dbContext;
@@ -53,6 +55,7 @@ public sealed partial class ProjectService :
         this.priorityMatrixRebuildService = priorityMatrixRebuildService;
         this.auditWriteService = auditWriteService;
         this.scheduleActualSourceResolver = scheduleActualSourceResolver;
+        this.lookupCache = lookupCache;
         this.timeProvider = timeProvider;
     }
 }

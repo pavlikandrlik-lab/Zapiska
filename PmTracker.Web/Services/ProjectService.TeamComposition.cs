@@ -257,11 +257,10 @@ public sealed partial class ProjectService
             .Where(x => x.ProjektId == projectId && !x.DatumOdebrani.HasValue)
             .ToListAsync(ct);
         var roleIds = assignments.Select(x => x.RoleId).Distinct().ToArray();
+        var allProjectRoles = await lookupCache.GetProjectRolesAsync(ct);
         var roles = roleIds.Length == 0
             ? new Dictionary<int, CiselnikRoliProjektuEntity>()
-            : await dbContext.CiselnikRoliProjektu.AsNoTracking()
-                .Where(x => roleIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : roleIds.Where(allProjectRoles.ContainsKey).ToDictionary(id => id, id => allProjectRoles[id]);
         var people = await LoadPeopleByIdsAsync(assignments.Select(x => x.OsobaId).Distinct(), ct);
         var organizations = await LoadOrganizationsByPeopleAsync(people.Values, ct);
         var orgUnits = await LoadOrgUnitsByPeopleAsync(people.Values, ct);
@@ -295,11 +294,10 @@ public sealed partial class ProjectService
             .Where(x => x.ProjektId == projectId)
             .ToListAsync(ct);
         var roleIds = assignments.Select(x => x.RoleId).Distinct().ToArray();
+        var allProjectRoles = await lookupCache.GetProjectRolesAsync(ct);
         var roles = roleIds.Length == 0
             ? new Dictionary<int, CiselnikRoliProjektuEntity>()
-            : await dbContext.CiselnikRoliProjektu.AsNoTracking()
-                .Where(x => roleIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : roleIds.Where(allProjectRoles.ContainsKey).ToDictionary(id => id, id => allProjectRoles[id]);
         var people = await LoadPeopleByIdsAsync(assignments.Select(x => x.OsobaId).Distinct(), ct);
 
         return assignments
@@ -373,11 +371,10 @@ public sealed partial class ProjectService
                 .Where(x => subsystemIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
         var roleIds = assignments.Select(x => x.RoleSubsystemuId).Distinct().ToArray();
+        var allSubsystemRoles = await lookupCache.GetSubsystemRolesAsync(ct);
         var roleById = roleIds.Length == 0
             ? new Dictionary<int, CiselnikRoleSubsystemuEntity>()
-            : await dbContext.CiselnikRoliSubsystemu.AsNoTracking()
-                .Where(x => roleIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : roleIds.Where(allSubsystemRoles.ContainsKey).ToDictionary(id => id, id => allSubsystemRoles[id]);
         var psById = projectSubsystems.ToDictionary(x => x.Id);
 
         return assignments
@@ -426,11 +423,10 @@ public sealed partial class ProjectService
                 .Where(x => subsystemIds.Contains(x.Id))
                 .ToDictionaryAsync(x => x.Id, ct);
         var roleIds = assignments.Select(x => x.RoleSubsystemuId).Distinct().ToArray();
+        var allSubsystemRoles = await lookupCache.GetSubsystemRolesAsync(ct);
         var roleById = roleIds.Length == 0
             ? new Dictionary<int, CiselnikRoleSubsystemuEntity>()
-            : await dbContext.CiselnikRoliSubsystemu.AsNoTracking()
-                .Where(x => roleIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : roleIds.Where(allSubsystemRoles.ContainsKey).ToDictionary(id => id, id => allSubsystemRoles[id]);
         var psById = projectSubsystems.ToDictionary(x => x.Id);
 
         return assignments
@@ -517,16 +513,14 @@ public sealed partial class ProjectService
             .Distinct()
             .ToArray();
 
+        var allOrgs = await lookupCache.GetOrganizationsAsync(ct);
+        var allOrgUnits = await lookupCache.GetOrgUnitsAsync(ct);
         var organizationsById = organizationIds.Length == 0
             ? new Dictionary<int, string>()
-            : await dbContext.CiselnikOrganizace.AsNoTracking()
-                .Where(x => organizationIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, x => x.Nazev, ct);
+            : organizationIds.Where(allOrgs.ContainsKey).ToDictionary(id => id, id => allOrgs[id].Nazev);
         var orgUnitsById = orgUnitIds.Length == 0
             ? new Dictionary<int, string>()
-            : await dbContext.CiselnikOrganizacniCelky.AsNoTracking()
-                .Where(x => orgUnitIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, x => x.Nazev, ct);
+            : orgUnitIds.Where(allOrgUnits.ContainsKey).ToDictionary(id => id, id => allOrgUnits[id].Nazev);
 
         return candidates
             .Select(candidate =>
@@ -577,8 +571,8 @@ public sealed partial class ProjectService
 
     private async Task<List<ProjectMemberCandidateViewModel>> BuildProjectMemberCandidatesAsync(CancellationToken ct)
     {
-        var organizations = (await dbContext.CiselnikOrganizace.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
-        var orgUnits = (await dbContext.CiselnikOrganizacniCelky.AsNoTracking().ToListAsync(ct)).ToDictionary(x => x.Id);
+        var organizations = await lookupCache.GetOrganizationsAsync(ct);
+        var orgUnits = await lookupCache.GetOrgUnitsAsync(ct);
         var people = await dbContext.Osoby.AsNoTracking()
             .OrderBy(x => x.Prijmeni)
             .ThenBy(x => x.Jmeno)
@@ -726,25 +720,21 @@ public sealed partial class ProjectService
             .ToList();
     }
 
-    private Task<List<LookupOptionViewModel>> BuildProjectRoleOptionsAsync(CancellationToken ct)
-        => dbContext.CiselnikRoliProjektu.AsNoTracking()
-            .OrderBy(x => x.Nazev)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = x.Kod,
-                Label = x.Nazev
-            })
-            .ToListAsync(ct);
+    private async Task<List<LookupOptionViewModel>> BuildProjectRoleOptionsAsync(CancellationToken ct)
+    {
+        var all = await lookupCache.GetProjectRolesAsync(ct);
+        return all.Values.OrderBy(x => x.Nazev)
+            .Select(x => new LookupOptionViewModel { Value = x.Kod, Label = x.Nazev })
+            .ToList();
+    }
 
-    private Task<List<LookupOptionViewModel>> BuildSubsystemRoleOptionsAsync(CancellationToken ct)
-        => dbContext.CiselnikRoliSubsystemu.AsNoTracking()
-            .OrderBy(x => x.Nazev)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = x.Kod,
-                Label = x.Nazev
-            })
-            .ToListAsync(ct);
+    private async Task<List<LookupOptionViewModel>> BuildSubsystemRoleOptionsAsync(CancellationToken ct)
+    {
+        var all = await lookupCache.GetSubsystemRolesAsync(ct);
+        return all.Values.OrderBy(x => x.Nazev)
+            .Select(x => new LookupOptionViewModel { Value = x.Kod, Label = x.Nazev })
+            .ToList();
+    }
 
     private Task<List<LookupOptionViewModel>> BuildAvailableSubsystemOptionsAsync(CancellationToken ct)
         => dbContext.Subsystemy.AsNoTracking()
