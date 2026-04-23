@@ -156,7 +156,11 @@ public sealed class CiselnikyController : BaseController
     {
         AttachCurrentUser(detail);
         detail.PageTitle = detail.Nazev;
-        detail.CanEditCiselnik = CurrentUserContext.HasPermission("ciselniky.edit");
+        // F7 fix 2026-04-23: "ciselniky.edit" smazán; UI-gate = user má alespoň jeden
+        // ciselniky.row.* klíč (edit / delete) — uvidí tlačítko Edit, protože reálnou
+        // autorizaci akce provádí [Authorize(Policy="permission:ciselniky.row.edit")].
+        detail.CanEditCiselnik = CurrentUserContext.HasPermission(PermissionKeys.CiselnikyRowEdit)
+            || CurrentUserContext.HasPermission(PermissionKeys.CiselnikyRowDelete);
         detail.IsArchitect = CurrentUserContext.IsSuperAdmin;
     }
 }

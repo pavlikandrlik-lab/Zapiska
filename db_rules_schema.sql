@@ -154,20 +154,19 @@ USING (
         s.nazev,
         c.id AS category_id,
         s.scope_level
+    -- Bootstrap baseline: minimální sada klíčů pro SUPERADMIN/APP_ADMIN. Aplikace
+    -- (PermissionSeeder při Program.cs startu) upsertne kompletní per-action katalog
+    -- (76 klíčů). Tenhle seznam musí obsahovat jen AKTUÁLNÍ (per-action) klíče —
+    -- NIKDY pre-redesign (viz db_upgrade_1_3_8_authz_per_action_redesign.sql).
     FROM (VALUES
-        (N'projects.create', N'Vytvářet projekty', N'PROJECTS', N'PROJECT'),
+        (N'projects.create', N'Vytvářet projekty', N'PROJECTS', N'GLOBAL'),
         (N'projects.edit', N'Upravovat projekty', N'PROJECTS', N'PROJECT'),
         (N'projects.delete', N'Mazat projekty (soft-delete)', N'PROJECTS', N'PROJECT'),
         (N'records.edit', N'Upravovat projektové záznamy', N'RECORDS', N'PROJECT'),
-        (N'records.schedule.add', N'Doplňovat harmonogram úkolu', N'RECORDS', N'PROJECT'),
         (N'records.schedule.edit', N'Upravovat harmonogram úkolu', N'RECORDS', N'PROJECT'),
         (N'meetings.create', N'Zakládat jednání', N'MEETINGS', N'PROJECT'),
         (N'meetings.edit', N'Upravovat jednání', N'MEETINGS', N'PROJECT'),
-        (N'team.manage', N'Správa týmu projektu', N'PROJECTS', N'PROJECT'),
-        (N'people.manage', N'Správa osob', N'MASTER', N'GLOBAL'),
-        (N'ciselniky.edit', N'Editace číselníků', N'MASTER', N'GLOBAL'),
-        (N'settings.view', N'Zobrazit nastavení', N'SETTINGS', N'GLOBAL'),
-        (N'settings.manage', N'Správa nastavení', N'SETTINGS', N'GLOBAL')
+        (N'settings.view', N'Zobrazit nastavení', N'SETTINGS', N'GLOBAL')
     ) AS s(klic, nazev, category_kod, scope_level)
     INNER JOIN authz.permission_categories c ON c.kod = s.category_kod
 ) AS source
@@ -202,6 +201,9 @@ WHEN MATCHED THEN
 GO
 
 /* ---- Seed: role -> permissions ---- */
+-- Bootstrap baseline role_permissions: minimální sada pro SUPERADMIN/APP_ADMIN,
+-- navazuje na baseline permission seznam výše. Plný katalog (76 klíčů) doseedová
+-- aplikační PermissionSeeder při Program.cs startu (idempotentní UPSERT).
 ;WITH role_perm_source AS (
     SELECT r.id AS role_id, p.id AS permission_id, CAST(N'ALL' AS NVARCHAR(20)) AS scope_mode
     FROM authz.roles r
@@ -210,15 +212,10 @@ GO
         N'projects.edit',
         N'projects.delete',
         N'records.edit',
-        N'records.schedule.add',
         N'records.schedule.edit',
         N'meetings.create',
         N'meetings.edit',
-        N'team.manage',
-        N'people.manage',
-        N'ciselniky.edit',
-        N'settings.view',
-        N'settings.manage'
+        N'settings.view'
     )
     WHERE r.kod = N'SUPERADMIN'
 
@@ -230,13 +227,9 @@ GO
         N'projects.create',
         N'projects.edit',
         N'records.edit',
-        N'records.schedule.add',
         N'records.schedule.edit',
         N'meetings.create',
         N'meetings.edit',
-        N'team.manage',
-        N'people.manage',
-        N'ciselniky.edit',
         N'settings.view'
     )
     WHERE r.kod = N'APP_ADMIN'

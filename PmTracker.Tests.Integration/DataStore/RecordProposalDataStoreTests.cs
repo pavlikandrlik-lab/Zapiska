@@ -68,9 +68,17 @@ public sealed class RecordProposalDataStoreTests
         await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, approverId, ProjectRoleCodes.ProjectManager);
 
         var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+        // F3.2 redesign 2026-04-23: rozhodování o návrzích gate = proposals.accept
+        // (per-action redesign; records.edit už samo rozhodovat nelze).
+        // records.create je potřeba, protože Approve interně volá SaveRecord pro
+        // materializaci návrhu na operativní záznam.
         var approver = IntegrationTestHelper.BuildUser(
             approverId,
-            grants: [IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsEdit, projectId)]);
+            grants: new[]
+            {
+                IntegrationTestHelper.AllowProjectPermission(PermissionKeys.ProposalsAccept, projectId),
+                IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsCreate, projectId)
+            });
         var editor = store.BuildCreateRecordProposalEditor(projectId, proposer);
         var command = BuildCreateProposalCommand(editor, projectId, approverId, name: "Schvalovaný návrh");
 

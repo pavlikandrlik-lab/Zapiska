@@ -180,7 +180,7 @@ public sealed partial class RecordProposalService
     {
         if (!await _authorizationPolicy.CanDecideProjectProposalAsync(command.ProjektId, currentUser, ct))
         {
-            throw new InvalidOperationException("O návrzích může rozhodovat jen projektový manažer nebo administrátor projektu.");
+            throw new InvalidOperationException("Pro rozhodnutí o návrhu je třeba oprávnění proposals.accept na projektu.");
         }
 
         var proposal = await LoadProposalAsync(command.ProjektId, command.ProposalId, ct);

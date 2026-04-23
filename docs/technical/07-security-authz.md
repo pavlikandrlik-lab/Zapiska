@@ -37,12 +37,25 @@ Dokument definuje bezpečnostní model aplikace: autentizaci, autorizaci, správ
   - `ALL` / `INCLUDE` na úrovni role->akce mapování.
 - Efektivní práva jsou výsledkem všech aktivních rolí uživatele.
 
-### 5.3 Podporované klíče (aktuální baseline)
-- `projects.create`, `projects.edit`, `projects.delete`
-- `records.edit`, `records.comment.subsystemlead`
-- `meetings.create`, `meetings.edit`
-- `team.manage`, `people.manage`, `ciselniky.edit`
-- `settings.view`, `settings.manage`
+### 5.3 Podporované klíče (per-action redesign 2026-04-23)
+Autoritativní zdroj: `PmTracker.Web/Services/Security/PermissionSeedConfiguration.cs` (76 klíčů + seed rolí). Kompletní roadmapa redesignu viz `docs/known-issues/authz-redesign-per-action-keys.md`.
+
+Hlavní kategorie (reprezentativní výběr):
+- **Projekty:** `projects.read.all`, `projects.create`, `projects.edit`, `projects.delete`
+- **Záznamy:** `records.create`, `records.edit`, `records.delete`, `records.schedule.edit`, `records.assign.meeting`
+- **Komentáře / vyjádření:** `comments.add`, `comments.edit.own`, `comments.edit.any`, `comments.delete.own`, `comments.delete.any`, `vyjadreni.modal.open`, `vyjadreni.refresh`, `vyjadreni.vazba.create/delete`, `vyjadreni.reharvest`
+- **Jednání:** `meetings.create`, `meetings.edit`, `meetings.delete`, `meetings.status.change`, `meetings.notes.edit`, `meetings.notes.subsystemlead`, `meetings.attendance.edit`, `meetings.participant.add`
+- **Návrhy:** `proposals.record.create`, `proposals.schedule.create`, `proposals.edit.own`, `proposals.edit.any`, `proposals.accept`, `proposals.reject`, `proposals.takeover`
+- **Tým:** `team.member.add/.remove`, `team.role.assign/.deactivate`, `team.subsystem.create/.deactivate/.reorder`, `team.subsystem.role.assign/.deactivate`, `team.candidates.search`
+- **Osoby:** `people.create`, `people.edit`, `people.delete`, `people.ad.search`, `people.ad.sync`
+- **Výzvy:** `vyzvy.create`, `vyzvy.state.change`, `vyzvy.pnf.assign`, `vyzvy.pnf.reassign`, `vyzvy.word.export`
+- **Dashboard:** `dashboard.view`, `dashboard.records.view`, `dashboard.nes.view`, `dashboard.statistics.view`, `dashboard.vyzvy.view`
+- **Export:** `export.pdf.projekt/.jednani/.ukol`, `export.word.projekt/.jednani/.ukol`
+- **Nastavení:** `settings.roles.assign`, `settings.sync.configure`, `settings.sync.run`, `settings.sd.view`
+- **Číselníky:** `ciselniky.row.edit`, `ciselniky.row.delete`
+- **Ostatní:** `search.index`, `search.reindex`, `schedule.preview`, `externiodkazy.sync`
+
+Pre-redesign klíče (`records.schedule.add`, `records.comment.subsystemlead`, `team.manage`, `people.manage`, `ciselniky.edit`, `settings.manage`, `export.pdf`, `export.word`) byly smazány migrací `db_upgrade_1_3_8_authz_per_action_redesign.sql`.
 
 ### 5.4 Provozní postup změny oprávnění
 1. Založ/aktualizuj akci v `Nastavení -> Akce`.
