@@ -33,7 +33,7 @@ public sealed class ReactiveHarvestSchedulerAdapter : IHarvestScheduler
     /// <summary>
     /// T2/T7 — harvest jedné externí vazby. Enqueue přímo podle ExterniOdkazId.
     /// </summary>
-    public async Task ScheduleHarvestAsync(int externiOdkazId, CancellationToken ct = default)
+    public async Task ScheduleHarvestAsync(int externiOdkazId, CancellationToken ct = default, SdReactiveSource source = SdReactiveSource.RecordSave)
     {
         // Sanity check — pokud záznam neexistuje, nemá smysl enqueuovat.
         var exists = await _db.ZaznamExterniOdkazy
@@ -47,7 +47,7 @@ public sealed class ReactiveHarvestSchedulerAdapter : IHarvestScheduler
         }
 
         await _queue.EnqueueAsync(
-            new SdReactiveHarvestRequest(externiOdkazId, SdReactiveSource.RecordSave),
+            new SdReactiveHarvestRequest(externiOdkazId, source),
             ct).ConfigureAwait(false);
     }
 
@@ -57,7 +57,7 @@ public sealed class ReactiveHarvestSchedulerAdapter : IHarvestScheduler
     /// request per záznam. DedupKey = ExterniOdkazId, takže každý odkaz má nezávislou slot-pozici
     /// v queue (stejný záznam s více odkazy vytvoří více requestů — korrektní).
     /// </summary>
-    public async Task ScheduleHarvestForRecordAsync(int zaznamId, CancellationToken ct = default)
+    public async Task ScheduleHarvestForRecordAsync(int zaznamId, CancellationToken ct = default, SdReactiveSource source = SdReactiveSource.EditorOpen)
     {
         var externiOdkazIds = await _db.ZaznamExterniOdkazy
             .AsNoTracking()
@@ -69,7 +69,7 @@ public sealed class ReactiveHarvestSchedulerAdapter : IHarvestScheduler
         foreach (var id in externiOdkazIds)
         {
             await _queue.EnqueueAsync(
-                new SdReactiveHarvestRequest(id, SdReactiveSource.EditorOpen),
+                new SdReactiveHarvestRequest(id, source),
                 ct).ConfigureAwait(false);
         }
     }

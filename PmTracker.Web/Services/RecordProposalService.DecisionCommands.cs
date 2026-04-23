@@ -81,9 +81,13 @@ public sealed partial class RecordProposalService
             });
 
             // Post-commit enqueue — bezpečné vůči retry i rollback.
+            // T7 — schválení CREATE_RECORD návrhu s externími vazbami (spec §8.2).
             if (harvestRecordIdToEnqueue.HasValue)
             {
-                await _harvestScheduler.ScheduleHarvestForRecordAsync(harvestRecordIdToEnqueue.Value, ct);
+                await _harvestScheduler.ScheduleHarvestForRecordAsync(
+                    harvestRecordIdToEnqueue.Value,
+                    ct,
+                    PmTracker.Web.Services.ServiceDesk.SdReactiveSource.ProposalApprove);
             }
 
             return approvedRecordId;
