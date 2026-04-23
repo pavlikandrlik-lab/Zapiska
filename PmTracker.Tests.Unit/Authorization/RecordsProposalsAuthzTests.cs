@@ -28,20 +28,39 @@ public sealed class RecordsProposalsAuthzTests
     }
 
     [Fact]
-    public void NavrhyController_ShouldHaveSubsystemLeadPolicyForProposalCommands()
+    public void NavrhyController_ShouldHavePerActionPolicyForProposalCommands()
     {
+        // Per-action redesign 2026-04-23: proposals.* per akce.
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/NavrhyController.cs"));
-        code.Should().Contain("[Authorize(Policy = \"permission:records.comment.subsystemlead\")]");
-        code.Should().NotContain("CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead",
-            "body check RecordsCommentSubsystemLead musí být nahrazen Policy atributem na čistých actions");
+        code.Should().Contain("[Authorize(Policy = \"permission:proposals.record.create\")]",
+            "CreateRecordProposal + SubmitCreateProposal má klíč proposals.record.create");
+        code.Should().Contain("[Authorize(Policy = \"permission:proposals.schedule.create\")]",
+            "CreateScheduleProposal + SubmitScheduleProposal má klíč proposals.schedule.create");
+        code.Should().Contain("[Authorize(Policy = \"permission:proposals.accept\")]",
+            "ApproveProposal má klíč proposals.accept");
+        code.Should().Contain("[Authorize(Policy = \"permission:proposals.reject\")]",
+            "RejectProposal (a RejectAndEditProposal) má klíč proposals.reject");
+        code.Should().Contain("[Authorize(Policy = \"permission:proposals.takeover\")]",
+            "RejectAndTakeOverCreateProposal má klíč proposals.takeover");
+        code.Should().Contain("[Authorize(Policy = \"permission:proposals.edit.own\")]",
+            "PrefillCreateProposal má klíč proposals.edit.own");
+    }
+
+    [Fact]
+    public void NavrhyController_ShouldNotContainEditFromProposal()
+    {
+        // Per-action redesign 2026-04-23: EditFromProposal byl smazán (bypass workflow).
+        var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/NavrhyController.cs"));
+        code.Should().NotContain("public async Task<IActionResult> EditFromProposal",
+            "EditFromProposal byl v redesignu smazán — bypass zrušen");
     }
 
     [Fact]
     public void NavrhyController_ComplexActions_ShouldKeepBodyCheck()
     {
         var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/NavrhyController.cs"));
-        // Composite OR checks stay in body — look for CanViewProposalTabAsync call
+        // Composite cases (ProposalDetail / PrefillCreateProposal) používají CanViewProposalTabAsync.
         code.Should().Contain("CanViewProposalTabAsync",
-            "Complex OR cases (ProposalDetail/EditFromProposal/PrefillCreateProposal) stále používají CanViewProposalTabAsync body check");
+            "ProposalDetail/PrefillCreateProposal zachovávají CanViewProposalTabAsync body check");
     }
 }

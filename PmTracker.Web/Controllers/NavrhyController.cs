@@ -28,7 +28,7 @@ public sealed class NavrhyController : BaseController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:records.comment.subsystemlead")]
+    [Authorize(Policy = "permission:proposals.record.create")]
     public async Task<IActionResult> CreateRecordProposal(int projektId, string? presentation, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
@@ -42,7 +42,7 @@ public sealed class NavrhyController : BaseController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:records.comment.subsystemlead")]
+    [Authorize(Policy = "permission:proposals.schedule.create")]
     public async Task<IActionResult> CreateScheduleProposal(int projektId, int zaznamId, string? presentation, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
@@ -73,25 +73,16 @@ public sealed class NavrhyController : BaseController
         return View(GetEditorViewPath(model.Presentation), model);
     }
 
-    [HttpGet]
-    public async Task<IActionResult> EditFromProposal(int projektId, int proposalId, string? presentation, string? returnUrl, CancellationToken ct = default)
-    {
-        if (!CurrentUserContext.CanAccessProject(projektId))
-        {
-            return NotFound();
-        }
-
-        if (!await _recordProposalService.CanViewProposalTabAsync(projektId, CurrentUserContext, ct))
-        {
-            return Forbid();
-        }
-
-        var model = await _recordProposalService.BuildEditableRecordEditorFromProposalAsync(projektId, proposalId, CurrentUserContext, ct);
-        PrepareProposalEditorModel(model, presentation, returnUrl);
-        return View(GetEditorViewPath(model.Presentation), model);
-    }
+    // EditFromProposal (GET) SMAZÁN v redesignu 2026-04-23.
+    // Důvod: bypass workflow — admin upravil záznam, ale návrh zůstal ve stavu „čeká
+    // na rozhodnutí". Správný postup pro „souhlasím většinou, upravím zbytek":
+    //   1. ApproveProposal (proposals.accept) — návrh explicitně schválen
+    //   2. ZaznamyController.Edit (records.edit) — standardní editace záznamu
+    // Pro „nesouhlasím, upravím jinak": RejectAndEditProposal (proposals.reject + records.edit).
+    // Service metoda BuildEditableRecordEditorFromProposalAsync bude smazána ve Fázi 3.
 
     [HttpGet]
+    [Authorize(Policy = "permission:proposals.edit.own")]
     public async Task<IActionResult> PrefillCreateProposal(int projektId, int proposalId, string? presentation, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
@@ -111,7 +102,7 @@ public sealed class NavrhyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:records.comment.subsystemlead")]
+    [Authorize(Policy = "permission:proposals.record.create")]
     public Task<IActionResult> SubmitCreateProposal(SaveRecordCommand command, CancellationToken ct = default)
     {
         return ExecuteValidatedCommandAsync(
@@ -126,7 +117,7 @@ public sealed class NavrhyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:records.comment.subsystemlead")]
+    [Authorize(Policy = "permission:proposals.schedule.create")]
     public Task<IActionResult> SubmitScheduleProposal(SaveRecordCommand command, CancellationToken ct = default)
     {
         return ExecuteValidatedCommandAsync(
@@ -141,6 +132,7 @@ public sealed class NavrhyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:proposals.accept")]
     public Task<IActionResult> ApproveProposal(ProposalDecisionCommand command, CancellationToken ct = default)
     {
         return ExecuteValidatedCommandAsync(
@@ -155,6 +147,7 @@ public sealed class NavrhyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:proposals.reject")]
     public Task<IActionResult> RejectProposal(ProposalDecisionCommand command, CancellationToken ct = default)
     {
         return ExecuteValidatedCommandAsync(
@@ -169,6 +162,7 @@ public sealed class NavrhyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:proposals.takeover")]
     public Task<IActionResult> RejectAndTakeOverCreateProposal(ProposalDecisionCommand command, CancellationToken ct = default)
     {
         var prefillUrl = Url.Action(nameof(PrefillCreateProposal), new { projektId = command.ProjektId, proposalId = command.ProposalId, presentation = PresentationPage })
@@ -191,23 +185,29 @@ public sealed class NavrhyController : BaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = "permission:proposals.reject")]
     public Task<IActionResult> RejectAndEditProposal(ProposalDecisionCommand command, CancellationToken ct = default)
     {
-        var editUrl = Url.Action(nameof(EditFromProposal), new { projektId = command.ProjektId, proposalId = command.ProposalId, presentation = PresentationPage })
-            ?? $"/Navrhy/EditFromProposal?projektId={command.ProjektId}&proposalId={command.ProposalId}&presentation=page";
+        // Policy = proposals.reject (zamítnutí). Následný redirect směřuje na existující
+        // záznam (ZaznamyController.Edit) — service metoda RejectAndEditProposalAsync
+        // zajistí vrácení ZaznamId (F3 refactor).
+        // Službou vytvářený editor už nenakrmuje data z návrhu (EditFromProposal bypass zrušen);
+        // admin návrh zamítne a standardní cestou upraví cílový záznam.
+        var fallbackEditUrl = Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = ProposalsTab })
+            ?? $"/Projekty/Detail/{command.ProjektId}?tab={ProposalsTab}";
 
         return ExecuteValidatedCommandAsync(
-            hasPermission: () => CurrentUserContext.CanAccessProject(command.ProjektId),
+            hasPermission: () => CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId),
             invalidAjaxMessage: "Návrh nelze zamítnout a převzít do formuláře.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToProposalTab(command.ProjektId),
-            onSuccessRedirect: () => Task.FromResult<IActionResult>(Redirect(editUrl)),
+            onSuccessRedirect: () => Task.FromResult<IActionResult>(Redirect(fallbackEditUrl)),
             onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
                 refreshScope: "page",
-                refreshUrl: editUrl,
+                refreshUrl: fallbackEditUrl,
                 projectId: command.ProjektId,
                 tab: ProposalsTab,
-                message: "Návrh byl zamítnut a data byla převzata do běžného formuláře.")),
+                message: "Návrh byl zamítnut. Pokračujte standardní editací záznamu.")),
             operation: () => _recordProposalService.RejectAndEditProposalAsync(command, CurrentUserContext, ct));
     }
 
