@@ -16,6 +16,7 @@ public sealed class TicketingReadOnlyDbContext : DbContext
     internal DbSet<HotKalkulaceEntity> HotKalkulace => Set<HotKalkulaceEntity>();
     internal DbSet<HotVyjadreniEntity> HotVyjadreni => Set<HotVyjadreniEntity>();
     internal DbSet<HotSubsystemEntity> HotSubsystemy => Set<HotSubsystemEntity>();
+    internal DbSet<HotModulyEntity> HotModuly => Set<HotModulyEntity>();
 
     public override int SaveChanges()
         => throw new InvalidOperationException("TicketingReadOnlyDbContext is strictly read-only.");
@@ -129,6 +130,20 @@ public sealed class TicketingReadOnlyDbContext : DbContext
             e.Property(x => x.Aktivita).HasColumnName("aktivita").HasMaxLength(10);
             e.Property(x => x.Dodavatel).HasColumnName("dodavatel").HasMaxLength(10);
             e.Property(x => x.PriznakGdprSub).HasColumnName("priznak_gdpr_sub");
+        });
+
+        mb.Entity<HotModulyEntity>(e =>
+        {
+            e.ToTable("HOT_MODULY", "dbo");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Modul).HasColumnName("modul").HasMaxLength(50);
+            e.Property(x => x.Zkratka).HasColumnName("zkratka").HasMaxLength(10).IsRequired();
+            e.Property(x => x.Subsystem).HasColumnName("subsystem").HasMaxLength(5);
+            e.Property(x => x.IdIS).HasColumnName("id_IS");
+            e.Property(x => x.Faze).HasColumnName("faze").HasMaxLength(8);
+            e.Property(x => x.Aktivita).HasColumnName("aktivita").HasMaxLength(10);
+            e.Property(x => x.Dodavatel).HasColumnName("dodavatel").HasMaxLength(50);
         });
     }
 }
