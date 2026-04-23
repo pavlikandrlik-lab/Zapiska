@@ -69,7 +69,7 @@ public sealed class SettingsModalModelFactoryTests
     {
         var command = new SaveAuthzPermissionCommand
         {
-            Klic = PermissionKeys.SettingsManage,
+            Klic = PermissionKeys.SettingsRolesAssign,
             CategoryId = 0,
             ScopeLevel = "PROJECT"
         };

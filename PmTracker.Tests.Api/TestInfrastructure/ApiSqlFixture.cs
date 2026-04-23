@@ -26,6 +26,13 @@ public sealed class ApiSqlFixture : IAsyncLifetime
         await _databaseManager.StartAsync();
         Database = await _databaseManager.CreateInitializedDatabaseAsync("api", includeSeed: true);
         Factory = new PmTrackerWebAppFactory(Database.ConnectionString);
+
+        // F4 fix 2026-04-23: warm-up klienta spustí host → PermissionSeeder.SeedAsync upsert
+        // všech klíčů (včetně nových per-action) před tím, než testy začnou hledat ID v DB.
+        // Bez warm-upu Grant* helpery selhaly na klíčích zavedených F1 redesignem, protože
+        // bootstrap SQL obsahuje jen pre-redesign permission sadu.
+        using var warmupClient = Factory.CreateClient();
+        _ = await warmupClient.GetAsync("/");
     }
 
     public async Task DisposeAsync()

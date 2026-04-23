@@ -36,7 +36,7 @@ public sealed class CommentCreateAuthorizationDataStoreTests
         var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "DRAFT", meetingNumber: 9501);
 
         var deputyContext = store.BuildCurrentUserContext(deputyId.ToString(CultureInfo.InvariantCulture));
-        deputyContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId).Should().BeTrue();
+        deputyContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId).Should().BeTrue();
 
         store.AddComment(new AddCommentCommand
         {
@@ -83,7 +83,7 @@ public sealed class CommentCreateAuthorizationDataStoreTests
         var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "DRAFT", meetingNumber: 9502);
 
         var leadContext = store.BuildCurrentUserContext(leadId.ToString(CultureInfo.InvariantCulture));
-        leadContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId).Should().BeTrue();
+        leadContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId).Should().BeTrue();
 
         store.AddComment(new AddCommentCommand
         {
@@ -160,7 +160,7 @@ public sealed class CommentCreateAuthorizationDataStoreTests
         var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9504);
 
         var leadContext = store.BuildCurrentUserContext(leadId.ToString(CultureInfo.InvariantCulture));
-        leadContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId).Should().BeTrue();
+        leadContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId).Should().BeTrue();
         leadContext.HasPermission(PermissionKeys.RecordsEdit, projectId).Should().BeFalse();
 
         var action = () => store.AddComment(new AddCommentCommand

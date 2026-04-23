@@ -36,7 +36,12 @@ public sealed class SettingsAuthzQueries(
         var authz = currentUser.Authorization ?? throw new InvalidOperationException(
             "AuthorizationSnapshot must be populated for this request; UserContextResolver did not set it.");
 
-        var canManage = authz.HasPermission(PermissionKeys.SettingsManage);
+        // F4 redesign 2026-04-23: settings.manage rozdělen; UI-gate = má uživatel jakýkoliv
+        // settings.* klíč (roles.assign / sync.configure / sync.run / sd.view).
+        var canManage = authz.HasPermission(PermissionKeys.SettingsRolesAssign)
+            || authz.HasPermission(PermissionKeys.SettingsSyncConfigure)
+            || authz.HasPermission(PermissionKeys.SettingsSyncRun)
+            || authz.HasPermission(PermissionKeys.SettingsSdView);
         var normalized = NormalizeSettingsSection(section, canManage);
 
         var categories = await dbContext.AuthzPermissionCategories.AsNoTracking()
@@ -216,7 +221,12 @@ public sealed class SettingsAuthzQueries(
         var authz = currentUser.Authorization ?? throw new InvalidOperationException(
             "AuthorizationSnapshot must be populated for this request; UserContextResolver did not set it.");
 
-        if (authz.HasPermission(PermissionKeys.SettingsManage))
+        // F4 redesign 2026-04-23: „Efektivní práva" zobraz, pokud uživatel má alespoň jeden
+        // settings.* klíč (může stav oprávnění smysluplně číst i bez přímého editačního práva).
+        if (authz.HasPermission(PermissionKeys.SettingsRolesAssign)
+            || authz.HasPermission(PermissionKeys.SettingsSyncConfigure)
+            || authz.HasPermission(PermissionKeys.SettingsSyncRun)
+            || authz.HasPermission(PermissionKeys.SettingsSdView))
         {
             sections.Add(new NastaveniSectionItemViewModel
             {

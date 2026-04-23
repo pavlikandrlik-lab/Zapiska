@@ -64,7 +64,7 @@ public sealed class JednaniControllerTests
         var leadUserId = await _fixture.EnsurePersonAsync("ApiMeetingTaskSubsystemLead");
         var subsystemId = await GetRecordSubsystemIdAsync(context.RecordId);
         await AssignSubsystemRoleAsync(context.ProjectId, subsystemId, leadUserId, SubsystemRoleCodes.Lead);
-        await GrantProjectPermissionAsync(context.ProjectId, leadUserId, PermissionKeys.RecordsCommentSubsystemLead, "ApiTaskLead");
+        await GrantProjectPermissionAsync(context.ProjectId, leadUserId, PermissionKeys.MeetingsNotesSubsystemLead, "ApiTaskLead");
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Jednani/TaskItemPartial?jednaniId={context.MeetingId}&zaznamId={context.RecordId}&asUser={leadUserId}");
@@ -82,7 +82,7 @@ public sealed class JednaniControllerTests
         var leadUserId = await _fixture.EnsurePersonAsync("ApiMeetingTaskSubsystemLeadOpen");
         var subsystemId = await GetRecordSubsystemIdAsync(context.RecordId);
         await AssignSubsystemRoleAsync(context.ProjectId, subsystemId, leadUserId, SubsystemRoleCodes.Lead);
-        await GrantProjectPermissionAsync(context.ProjectId, leadUserId, PermissionKeys.RecordsCommentSubsystemLead, "ApiTaskLeadOpen");
+        await GrantProjectPermissionAsync(context.ProjectId, leadUserId, PermissionKeys.MeetingsNotesSubsystemLead, "ApiTaskLeadOpen");
 
         await using (var dbContext = _fixture.CreateDbContext())
         {

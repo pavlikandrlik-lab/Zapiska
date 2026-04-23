@@ -103,13 +103,19 @@ public sealed partial class ProjektyController : BaseController
 
         var projectId = model.Projekt.Id;
         var canManageRecords = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projectId);
+        // F4 redesign 2026-04-23: records.schedule.add nahrazen proposals.schedule.create
+        // — uživatel bez schedule.edit musí přes návrhový workflow.
         var canManageSchedules = canManageRecords
             || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projectId)
-            || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projectId);
+            || CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, projectId);
 
         model.CanCreateMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, projectId);
         model.CanEditMeetings = CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, projectId);
-        model.CanManageTeam = CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projectId);
+        // F4 redesign 2026-04-23: team.manage rozdělen na per-action klíče; UI-gate pro tab
+        // managementu = má uživatel alespoň jeden z team.member.add / role.assign / subsystem.create.
+        model.CanManageTeam = CurrentUserContext.HasPermission(PermissionKeys.TeamMemberAdd, projectId)
+            || CurrentUserContext.HasPermission(PermissionKeys.TeamRoleAssign, projectId)
+            || CurrentUserContext.HasPermission(PermissionKeys.TeamSubsystemCreate, projectId);
         model.CanManageRecords = canManageRecords;
         model.CanManageSchedules = canManageSchedules;
         model.CanViewProposals = await _recordProposalService.CanViewProposalTabAsync(projectId, CurrentUserContext, ct);
@@ -189,7 +195,10 @@ public sealed partial class ProjektyController : BaseController
     {
         var projectId = model.ProjektId;
         var canManageRecords = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projectId);
-        var canCreateRecordProposal = !canManageRecords && CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId);
+        // F4 redesign 2026-04-23: records.comment.subsystemlead nahrazen proposals.record.create
+        // — samostatný per-action klíč pro tvorbu návrhů na záznam (nezávisle na komentářové doméně).
+        var canCreateRecordProposal = !canManageRecords
+            && CurrentUserContext.HasPermission(PermissionKeys.ProposalsRecordCreate, projectId);
 
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.CanManageRecords = canManageRecords;
@@ -220,12 +229,19 @@ public sealed partial class ProjektyController : BaseController
         var summary = record.Summary;
         summary.CanEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projectId);
         summary.CanEditSchedule = summary.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projectId);
-        summary.CanAddSchedule = summary.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projectId);
-        summary.CanManageSchedule = summary.CanEditSchedule || summary.CanAddSchedule;
-        summary.CanCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId)
+        // F4 redesign 2026-04-23: CanAddSchedule VM flag + records.schedule.add klíč smazán;
+        // schedule-only editace probíhá výhradně přes návrh (ProposalsScheduleCreate).
+        var canCreateScheduleProposal = summary.JeUkol
+            && CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, projectId);
+        summary.CanManageSchedule = summary.CanEditSchedule || canCreateScheduleProposal;
+        // F4 redesign: UI flag pro „přidat komentář za vedoucího subsystému" = meetings.notes.subsystemlead
+        // (per-action klíč pro zápis v jednání).
+        summary.CanCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId)
             && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
-        summary.CanAddComment = summary.CanEditRecord || summary.CanCommentAsSubsystemLeader;
-        summary.CanCreateScheduleProposal = summary.JeUkol && summary.CanCommentAsSubsystemLeader;
+        summary.CanAddComment = summary.CanEditRecord
+            || CurrentUserContext.HasPermission(PermissionKeys.CommentsAdd, projectId)
+            || summary.CanCommentAsSubsystemLeader;
+        summary.CanCreateScheduleProposal = canCreateScheduleProposal;
         summary.EditButtonLabel = summary.CanEditRecord ? "Upravit" : "GANTT";
         summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         record.DetailUrl = Url.Action("RecordDetailPartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordDetailPartial?projektId={projectId}&zaznamId={summary.Id}";
@@ -237,9 +253,10 @@ public sealed partial class ProjektyController : BaseController
     {
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
 
+        // F4 redesign 2026-04-23: records.schedule.add → proposals.schedule.create.
         var canManageSchedules = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId)
             || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, model.ProjektId)
-            || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, model.ProjektId);
+            || CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, model.ProjektId);
 
         foreach (var item in model.HarmonogramUkoly)
         {
@@ -259,7 +276,10 @@ public sealed partial class ProjektyController : BaseController
 
     private void PrepareProjectTeamTabPresentation(ProjektTymTabViewModel model)
     {
-        model.CanManageTeam = CurrentUserContext.HasPermission(PermissionKeys.TeamManage, model.ProjektId);
+        // F4 redesign 2026-04-23: team.manage rozdělen; UI-gate = alespoň jeden z team write keys.
+        model.CanManageTeam = CurrentUserContext.HasPermission(PermissionKeys.TeamMemberAdd, model.ProjektId)
+            || CurrentUserContext.HasPermission(PermissionKeys.TeamRoleAssign, model.ProjektId)
+            || CurrentUserContext.HasPermission(PermissionKeys.TeamSubsystemCreate, model.ProjektId);
     }
 
     private void PrepareProjectProposalsTabPresentation(ProjektNavrhyTabViewModel model)

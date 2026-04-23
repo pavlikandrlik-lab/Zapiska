@@ -66,7 +66,8 @@ public sealed class ZaznamCardSummaryViewModel
     public DateTime DatumZalozeni { get; init; }
     public bool CanEditRecord { get; set; }
     public bool CanEditSchedule { get; set; }
-    public bool CanAddSchedule { get; set; }
+    // F4 redesign 2026-04-23: CanAddSchedule smazáno — records.schedule.add obsolete,
+    // uživatelé bez RecordsScheduleEdit musí přes ProposalsScheduleCreate (viz CanCreateScheduleProposal).
     public bool CanManageSchedule { get; set; }
     public bool CanCommentAsSubsystemLeader { get; set; }
     public bool CanAddComment { get; set; }
@@ -152,7 +153,7 @@ public sealed class ZaznamCardViewModel
     public DateTime DatumZalozeni { get; init; }
     public bool CanEditRecord { get; set; }
     public bool CanEditSchedule { get; set; }
-    public bool CanAddSchedule { get; set; }
+    // F4 redesign 2026-04-23: CanAddSchedule smazáno (viz ZaznamCardSummaryViewModel).
     public bool CanManageSchedule { get; set; }
     public bool CanCommentAsSubsystemLeader { get; set; }
     public bool CanAddComment { get; set; }

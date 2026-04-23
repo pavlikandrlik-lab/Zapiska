@@ -40,16 +40,16 @@ public sealed class CurrentUserContextPermissionTests
             visibleProjectIds: [7],
             grants: new PermissionGrantViewModel
             {
-                PermissionKey = PermissionKeys.TeamManage,
+                PermissionKey = PermissionKeys.TeamMemberAdd,
                 ScopeLevel = "PROJECT",
                 ScopeMode = "INCLUDE",
                 IsAllowed = true,
                 ProjectIds = new[] { 7 }
             });
 
-        user.HasPermission(PermissionKeys.TeamManage).Should().BeFalse("INCLUDE bez konkrétního projektu se nepočítá");
-        user.HasPermission(PermissionKeys.TeamManage, 7).Should().BeTrue();
-        user.HasPermission(PermissionKeys.TeamManage, 8).Should().BeFalse();
+        user.HasPermission(PermissionKeys.TeamMemberAdd).Should().BeFalse("INCLUDE bez konkrétního projektu se nepočítá");
+        user.HasPermission(PermissionKeys.TeamMemberAdd, 7).Should().BeTrue();
+        user.HasPermission(PermissionKeys.TeamMemberAdd, 8).Should().BeFalse();
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public sealed class CurrentUserContextPermissionTests
             deletedProjectIds: [7],
             grants: new PermissionGrantViewModel
             {
-                PermissionKey = PermissionKeys.TeamManage,
+                PermissionKey = PermissionKeys.TeamMemberAdd,
                 ScopeLevel = "PROJECT",
                 ScopeMode = "INCLUDE",
                 IsAllowed = true,
@@ -192,7 +192,7 @@ public sealed class CurrentUserContextPermissionTests
             });
 
         user.CanAccessProject(7).Should().BeTrue();
-        user.HasPermission(PermissionKeys.TeamManage, 7).Should().BeFalse();
+        user.HasPermission(PermissionKeys.TeamMemberAdd, 7).Should().BeFalse();
     }
 
     [Fact]
@@ -264,7 +264,7 @@ public sealed class CurrentUserContextPermissionTests
             isSuperAdmin: false,
             grants: new PermissionGrantViewModel
             {
-                PermissionKey = PermissionKeys.SettingsManage,
+                PermissionKey = PermissionKeys.SettingsRolesAssign,
                 ScopeLevel = "GLOBAL",
                 ScopeMode = "ALL",
                 IsAllowed = false,
@@ -298,7 +298,7 @@ public sealed class CurrentUserContextPermissionTests
             isSuperAdmin: false,
             grants: new PermissionGrantViewModel
             {
-                PermissionKey = PermissionKeys.SettingsManage,
+                PermissionKey = PermissionKeys.SettingsRolesAssign,
                 ScopeLevel = "GLOBAL",
                 ScopeMode = "ALL",
                 IsAllowed = true,

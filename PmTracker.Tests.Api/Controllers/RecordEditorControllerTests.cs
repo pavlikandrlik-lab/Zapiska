@@ -255,7 +255,7 @@ public sealed class RecordEditorControllerTests
         var openMeetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 4205);
 
         await AssignSubsystemRoleAsync(projectId, subsystemId, leadUserId, SubsystemRoleCodes.Lead);
-        await GrantProjectPermissionAsync(projectId, leadUserId, PermissionKeys.RecordsCommentSubsystemLead, "ApiCommentsDraftOnly");
+        await GrantProjectPermissionAsync(projectId, leadUserId, PermissionKeys.MeetingsNotesSubsystemLead, "ApiCommentsDraftOnly");
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={recordId}&asUser={leadUserId}");
@@ -278,7 +278,7 @@ public sealed class RecordEditorControllerTests
         var openMeetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 4206);
 
         await AssignSubsystemRoleAsync(projectId, subsystemId, leadUserId, SubsystemRoleCodes.Lead);
-        await GrantProjectPermissionAsync(projectId, leadUserId, PermissionKeys.RecordsCommentSubsystemLead, "ApiCommentsOpenOnly");
+        await GrantProjectPermissionAsync(projectId, leadUserId, PermissionKeys.MeetingsNotesSubsystemLead, "ApiCommentsOpenOnly");
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={recordId}&asUser={leadUserId}");

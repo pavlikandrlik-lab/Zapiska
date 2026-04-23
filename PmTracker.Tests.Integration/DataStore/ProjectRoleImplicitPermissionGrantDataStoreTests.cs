@@ -30,7 +30,7 @@ public sealed class ProjectRoleImplicitPermissionGrantDataStoreTests
         var currentUser = store.BuildCurrentUserContext(osobaId.ToString(CultureInfo.InvariantCulture));
 
         currentUser.VisibleProjectIds.Should().Contain(projectId);
-        currentUser.HasPermission(PermissionKeys.TeamManage, projectId).Should().BeTrue();
+        currentUser.HasPermission(PermissionKeys.TeamMemberAdd, projectId).Should().BeTrue();
         currentUser.HasPermission(PermissionKeys.RecordsEdit, projectId).Should().BeTrue();
         currentUser.HasPermission(PermissionKeys.MeetingsCreate, projectId).Should().BeTrue();
         currentUser.HasPermission(PermissionKeys.MeetingsEdit, projectId).Should().BeTrue();
@@ -51,7 +51,7 @@ public sealed class ProjectRoleImplicitPermissionGrantDataStoreTests
         var currentUser = store.BuildCurrentUserContext(osobaId.ToString(CultureInfo.InvariantCulture));
 
         currentUser.VisibleProjectIds.Should().Contain(projectId);
-        currentUser.HasPermission(PermissionKeys.TeamManage, projectId).Should().BeTrue();
+        currentUser.HasPermission(PermissionKeys.TeamMemberAdd, projectId).Should().BeTrue();
         currentUser.HasPermission(PermissionKeys.RecordsEdit, projectId).Should().BeTrue();
         currentUser.HasPermission(PermissionKeys.MeetingsCreate, projectId).Should().BeTrue();
         currentUser.HasPermission(PermissionKeys.MeetingsEdit, projectId).Should().BeTrue();
@@ -76,10 +76,10 @@ public sealed class ProjectRoleImplicitPermissionGrantDataStoreTests
         var profile = store.BuildProfilPage(currentUser, projektId: projectId);
 
         currentUser.VisibleProjectIds.Should().Contain(projectId);
-        currentUser.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId).Should().BeTrue();
+        currentUser.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId).Should().BeTrue();
 
         profile.OdvozenaPrava.Should().Contain(x =>
-            x.PermissionKlic == PermissionKeys.RecordsCommentSubsystemLead &&
+            x.PermissionKlic == PermissionKeys.MeetingsNotesSubsystemLead &&
             x.IsAllowed &&
             x.SourceSummary.Contains("Subsystémová role", StringComparison.OrdinalIgnoreCase));
 

@@ -43,7 +43,7 @@ public sealed class ScheduleAddAuthorizationDataStoreTests
         var leadUser = IntegrationTestHelper.BuildUser(
             leadId,
             isSuperAdmin: false,
-            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsScheduleAdd, projectId) });
+            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.ProposalsScheduleCreate, projectId) });
 
         store.SaveRecord(BuildScheduleOnlyCommand(projectId, subsystemTaskA1Id, durationTypeId, 4), leadUser);
         store.SaveRecord(BuildScheduleOnlyCommand(projectId, subsystemTaskA2Id, durationTypeId, 6), leadUser);
@@ -81,7 +81,7 @@ public sealed class ScheduleAddAuthorizationDataStoreTests
         var deputyUser = IntegrationTestHelper.BuildUser(
             deputyId,
             isSuperAdmin: false,
-            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsScheduleAdd, projectId) });
+            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.ProposalsScheduleCreate, projectId) });
 
         store.SaveRecord(BuildScheduleOnlyCommand(projectId, subsystemTaskA1Id, durationTypeId, 3), deputyUser);
         store.SaveRecord(BuildScheduleOnlyCommand(projectId, subsystemTaskA2Id, durationTypeId, 5), deputyUser);
@@ -114,7 +114,7 @@ public sealed class ScheduleAddAuthorizationDataStoreTests
         var ownerUser = IntegrationTestHelper.BuildUser(
             ownerId,
             isSuperAdmin: false,
-            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsScheduleAdd, projectId) });
+            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.ProposalsScheduleCreate, projectId) });
 
         store.SaveRecord(BuildScheduleOnlyCommand(projectId, ownTaskId, durationTypeId, 9), ownerUser);
 

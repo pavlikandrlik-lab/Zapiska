@@ -410,8 +410,9 @@ public sealed class CiselnikyControllerTests
 
         await using var dbContext = _fixture.CreateDbContext();
 
+        // F4 redesign 2026-04-23: ciselniky.edit rozdělen na row.edit / row.delete.
         var permissionId = await dbContext.AuthzPermissions
-            .Where(x => x.IsActive && x.Klic == PermissionKeys.CiselnikyEdit)
+            .Where(x => x.IsActive && x.Klic == PermissionKeys.CiselnikyRowEdit)
             .Select(x => (int?)x.Id)
             .FirstOrDefaultAsync();
 

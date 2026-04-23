@@ -88,7 +88,7 @@ public sealed class MeetingAndCommentDataStoreTests
         var leaderContext = IntegrationTestHelper.BuildUser(
             leaderId,
             isSuperAdmin: false,
-            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId) });
+            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId) });
 
         store.AddComment(new AddCommentCommand
         {
@@ -107,7 +107,7 @@ public sealed class MeetingAndCommentDataStoreTests
         var outsiderContext = IntegrationTestHelper.BuildUser(
             outsiderId,
             isSuperAdmin: false,
-            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId) });
+            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId) });
 
         var outsiderUpdate = () => store.UpdateComment(new UpdateCommentCommand
         {
@@ -167,7 +167,7 @@ public sealed class MeetingAndCommentDataStoreTests
         var leaderContext = IntegrationTestHelper.BuildUser(
             leaderId,
             isSuperAdmin: false,
-            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId) });
+            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId) });
 
         store.AddComment(new AddCommentCommand
         {
@@ -224,7 +224,7 @@ public sealed class MeetingAndCommentDataStoreTests
         var ownerContext = IntegrationTestHelper.BuildUser(
             ownerId,
             isSuperAdmin: false,
-            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.RecordsCommentSubsystemLead, projectId) });
+            grants: new[] { IntegrationTestHelper.AllowProjectPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId) });
 
         store.AddComment(new AddCommentCommand
         {

@@ -28,7 +28,8 @@ public sealed class NastaveniController : BaseController
     public async Task<IActionResult> Index(string? section, int? userId, int? projektId, CancellationToken ct)
     {
         var normalizedSection = NormalizeSection(section);
-        if (normalizedSection == "efektivni-prava" && !CurrentUserContext.HasPermission(permissionKey: PermissionKeys.SettingsManage))
+        // F4 redesign 2026-04-23: settings.manage → alespoň jeden settings.* klíč.
+        if (normalizedSection == "efektivni-prava" && !HasAnySettingsPermission())
         {
             return RedirectToAction(nameof(Index), new { section = "role" });
         }
@@ -42,7 +43,8 @@ public sealed class NastaveniController : BaseController
     public async Task<IActionResult> Panel(string? section, int? userId, int? projektId, CancellationToken ct)
     {
         var normalizedSection = NormalizeSection(section);
-        if (normalizedSection == "efektivni-prava" && !CurrentUserContext.HasPermission(permissionKey: PermissionKeys.SettingsManage))
+        // F4 redesign 2026-04-23: settings.manage → alespoň jeden settings.* klíč.
+        if (normalizedSection == "efektivni-prava" && !HasAnySettingsPermission())
         {
             return Unauthorized();
         }
@@ -135,7 +137,14 @@ public sealed class NastaveniController : BaseController
     {
         AttachCurrentUser(panel);
         panel.PageTitle = panel.Nazev;
-        panel.CanManageSettings = CurrentUserContext.HasPermission(permissionKey: PermissionKeys.SettingsManage);
+        panel.CanManageSettings = HasAnySettingsPermission();
     }
 
+    private bool HasAnySettingsPermission()
+    {
+        return CurrentUserContext.HasPermission(PermissionKeys.SettingsRolesAssign)
+            || CurrentUserContext.HasPermission(PermissionKeys.SettingsSyncConfigure)
+            || CurrentUserContext.HasPermission(PermissionKeys.SettingsSyncRun)
+            || CurrentUserContext.HasPermission(PermissionKeys.SettingsSdView);
+    }
 }

@@ -8,7 +8,7 @@ public sealed class PermissionKeysTests
     [Fact]
     public void IsSupported_ShouldReturnTrue_ForKnownKey()
     {
-        PermissionKeys.IsSupported(PermissionKeys.RecordsCommentSubsystemLead).Should().BeTrue();
+        PermissionKeys.IsSupported(PermissionKeys.MeetingsNotesSubsystemLead).Should().BeTrue();
     }
 
     [Fact]
@@ -30,6 +30,6 @@ public sealed class PermissionKeysTests
             .OnlyHaveUniqueItems();
 
         options.Should().Contain(x => x.Value == PermissionKeys.ProjectsCreate && x.Label.Contains(PermissionKeys.ProjectsCreate, StringComparison.Ordinal));
-        options.Should().Contain(x => x.Value == PermissionKeys.RecordsCommentSubsystemLead && x.Label.Contains("vedouc", StringComparison.OrdinalIgnoreCase));
+        options.Should().Contain(x => x.Value == PermissionKeys.MeetingsNotesSubsystemLead && x.Label.Contains("vedouc", StringComparison.OrdinalIgnoreCase));
     }
 }

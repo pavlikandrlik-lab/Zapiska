@@ -70,16 +70,19 @@ public sealed partial class ZaznamyController
         var summary = record.Summary;
         var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId);
         var canEditSchedule = summary.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projektId);
-        var canAddSchedule = summary.JeUkol && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projektId);
-        var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId)
+        // F4 redesign 2026-04-23: records.schedule.add → proposals.schedule.create;
+        // records.comment.subsystemlead → meetings.notes.subsystemlead.
+        var canCreateScheduleProposal = summary.JeUkol
+            && CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, projektId);
+        var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projektId)
             && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
+        var canAddGeneralComment = CurrentUserContext.HasPermission(PermissionKeys.CommentsAdd, projektId);
 
         summary.CanEditRecord = canEditRecord;
         summary.CanEditSchedule = canEditSchedule;
-        summary.CanAddSchedule = canAddSchedule;
-        summary.CanManageSchedule = canEditSchedule || canAddSchedule;
+        summary.CanManageSchedule = canEditSchedule || canCreateScheduleProposal;
         summary.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
-        summary.CanAddComment = canEditRecord || canCommentAsSubsystemLead;
+        summary.CanAddComment = canEditRecord || canAddGeneralComment || canCommentAsSubsystemLead;
         summary.EditButtonLabel = canEditRecord ? "Upravit" : "GANTT";
         summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         record.DetailUrl ??= Url.Action(nameof(RecordDetailPartial), new { projektId, zaznamId = summary.Id });
@@ -89,8 +92,13 @@ public sealed partial class ZaznamyController
     private void PrepareRecordCommentsPresentation(ZaznamCommentsPanelViewModel model, ZaznamCardSummaryViewModel summary)
     {
         var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId);
-        var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, model.ProjektId)
+        var canAddGeneralComment = CurrentUserContext.HasPermission(PermissionKeys.CommentsAdd, model.ProjektId);
+        var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, model.ProjektId)
             && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
+        // F4 redesign 2026-04-23: „subsystem lead bez records.edit" = v comment formuláři vidí
+        // pouze DRAFT jednání (smí psát zápis jen tam). comments.add tento specifický invariant
+        // NEPRELEPÍ — generický komentář se váže na stejný subsystem-lead workflow a restrikce
+        // draft-only chrání proti zápisu v uzavřených jednáních.
         if (!canEditRecord && canCommentAsSubsystemLead)
         {
             model.OtevrenaJednani = model.OtevrenaJednani
@@ -101,6 +109,7 @@ public sealed partial class ZaznamyController
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.CanEditRecord = canEditRecord;
         model.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
-        model.CanAddComment = model.OtevrenaJednani.Count > 0 && (canEditRecord || canCommentAsSubsystemLead);
+        model.CanAddComment = model.OtevrenaJednani.Count > 0
+            && (canEditRecord || canAddGeneralComment || canCommentAsSubsystemLead);
     }
 }

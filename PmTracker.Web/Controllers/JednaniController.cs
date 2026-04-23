@@ -66,7 +66,8 @@ public sealed partial class JednaniController : BaseController
 
         model.CanEditMeeting = CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, model.ProjektId);
         model.CanEditRecords = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId);
-        model.HasSubsystemLeadPermission = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, model.ProjektId);
+        // F4 redesign 2026-04-23: records.comment.subsystemlead → meetings.notes.subsystemlead.
+        model.HasSubsystemLeadPermission = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, model.ProjektId);
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.PageTitle = $"Jednání č. {model.Jednani.CisloJednani}";
 
@@ -145,10 +146,12 @@ public sealed partial class JednaniController : BaseController
         }
 
         var isRelevantSubsystemLeader = ukol.SubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
-        var canEditRecordNotes = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId.Value)
+        // F4 redesign 2026-04-23: "editace zápisu" = meetings.notes.edit (per-action);
+        // subsystem lead = meetings.notes.subsystemlead + lead-equivalent + DRAFT.
+        var canEditRecordNotes = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesEdit, projektId.Value)
             && ukol.LzeUpravovatVyjadreni;
         var isDraftMeeting = string.Equals(meeting.StavKod, "DRAFT", StringComparison.OrdinalIgnoreCase);
-        var canCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.RecordsCommentSubsystemLead, projektId.Value)
+        var canCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projektId.Value)
             && isRelevantSubsystemLeader
             && isDraftMeeting
             && ukol.LzeUpravovatVyjadreni;

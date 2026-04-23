@@ -60,8 +60,10 @@ public sealed partial class ZaznamyController : BaseController
         if (projektId is null) return NotFound();
 
         var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projektId.Value);
-        var canManageSchedulePermission = CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projektId.Value)
-            || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, projektId.Value);
+        // F4 redesign 2026-04-23: records.schedule.add write cesta smazána (F3.7). Inline editor
+        // přístupný pouze uživatelům s records.edit nebo records.schedule.edit; návrhový workflow
+        // (proposals.schedule.create) má vlastní endpoint a nepoužívá tento editor.
+        var canManageSchedulePermission = CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projektId.Value);
         if (!canEditRecord && !canManageSchedulePermission)
         {
             return Forbid();
@@ -135,8 +137,10 @@ public sealed partial class ZaznamyController : BaseController
         model.BackLabel = normalizedMeetingId.HasValue ? "Zpět na jednání" : "Zpět do projektu";
         model.CanEditRecord = canEditRecord;
         model.CanEditScheduleFull = canEditRecord || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, model.ProjektId);
-        model.CanEditScheduleAddOnly = !model.CanEditScheduleFull
-            && CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleAdd, model.ProjektId);
+        // F4 redesign 2026-04-23: add-only režim v inline editoru deaktivován (F3.7 záznam
+        // save cestu pro schedule-only smazal). Propagujeme false — JS větev pro "add" režim
+        // zůstává jako defensive no-op (viz recordEditor/form.js schedulePermissionMode==="add").
+        model.CanEditScheduleAddOnly = false;
         var existingPermissions = model.HarmonogramBlok.Permissions;
         var schedulePermissions = existingPermissions.IsScheduleLocked || existingPermissions.IsPlanLocked
             ? existingPermissions with { IsTaskCategory = model.JeUkolKategorie }
