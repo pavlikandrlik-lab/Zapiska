@@ -133,6 +133,8 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IProjectRoleCache, ProjectRoleCache>();
         // Vertical-slice entry point pro sestavení ZaznamEditViewModel (SRP isolation).
         services.AddScoped<IProjectEditQuery, ProjectEditQuery>();
+        // Vertical-slice command handlers (proof pattern pro postupnou migraci z ProjectService).
+        services.AddScoped<PmTracker.Web.Services.Handlers.SaveProjectHandler>();
         services.AddSingleton<IPriorityMatrixRebuildQueue, PriorityMatrixRebuildQueue>();
         services.AddScoped<IHarmonogramService>(sp => sp.GetRequiredService<HarmonogramService>());
         services.AddScoped<IHarmonogramCatalogService>(sp => sp.GetRequiredService<HarmonogramCatalogService>());
