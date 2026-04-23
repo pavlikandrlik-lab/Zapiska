@@ -47,10 +47,10 @@ public sealed class VyjadreniModalControllerIdorTests
                 CascadeUpdates: Array.Empty<BindingCascadeUpdate>()));
         var authz = new Mock<IPmAuthorizationService>();
         // Útočník MÁ records.edit v projektu A (attempt to escalate).
-        authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.RecordsEdit, ProjektA, null, It.IsAny<CancellationToken>()))
+        authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.VyjadreniVazbaCreate, ProjektA, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         // Nemá v projektu B.
-        authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.RecordsEdit, ProjektB, null, It.IsAny<CancellationToken>()))
+        authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.VyjadreniVazbaCreate, ProjektB, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
         var currentUser = new Mock<ICurrentUserAccessor>();
@@ -218,7 +218,7 @@ public sealed class VyjadreniModalControllerIdorTests
         var builder = new Mock<IVyjadreniModalViewModelBuilder>();
         var harvest = new Mock<IVyjadreniHarvestService>();
         var authz = new Mock<IPmAuthorizationService>();
-        authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.RecordsEdit, It.IsAny<int>(), null, It.IsAny<CancellationToken>()))
+        authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.VyjadreniVazbaCreate, It.IsAny<int>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((int _, string __, int? projektId, int? ___, CancellationToken _____) => projektId == ProjektA);
 
         var currentUser = new Mock<ICurrentUserAccessor>();
@@ -264,7 +264,7 @@ public sealed class VyjadreniModalControllerIdorTests
         // Injectujeme znovu, ať máme odkaz na harvest mock i mimo BuildSut:
         var harvest = new Mock<IVyjadreniHarvestService>();
         var authz = new Mock<IPmAuthorizationService>();
-        authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.RecordsEdit, ProjektA, null, It.IsAny<CancellationToken>()))
+        authz.Setup(x => x.HasPermissionAsync(AttackerOsobaId, PermissionKeys.VyjadreniVazbaCreate, ProjektA, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         var currentUser = new Mock<ICurrentUserAccessor>();
         currentUser.SetupGet(x => x.OsobaId).Returns(AttackerOsobaId);

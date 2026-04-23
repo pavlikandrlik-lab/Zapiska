@@ -85,7 +85,7 @@ public sealed class VyjadreniModalController : Controller
         // Read modal může kdokoli, kdo má na projekt records.edit (editor edituje záznam).
         // Pokud nemá edit, může stále číst jen když má obecný project read — zjednodušení:
         // required records.edit pro chat modal, protože z definice je modal editační UX.
-        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, target.ProjektId, null, ct))
+        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.VyjadreniModalOpen, target.ProjektId, null, ct))
         {
             return Forbid();
         }
@@ -137,7 +137,7 @@ public sealed class VyjadreniModalController : Controller
         if (ownerProjektId is null) return NotFound();
         if (ownerProjektId.Value != projektId) return Forbid();
 
-        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, projektId, null, ct))
+        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.VyjadreniRefresh, projektId, null, ct))
         {
             return Forbid();
         }
@@ -168,7 +168,7 @@ public sealed class VyjadreniModalController : Controller
     {
         var osobaId = _currentUser.OsobaId;
         if (osobaId is null) return Forbid();
-        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, req.ProjektId, null, ct))
+        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.VyjadreniVazbaCreate, req.ProjektId, null, ct))
         {
             return Forbid();
         }
@@ -230,7 +230,7 @@ public sealed class VyjadreniModalController : Controller
     {
         var osobaId = _currentUser.OsobaId;
         if (osobaId is null) return Forbid();
-        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, req.ProjektId, null, ct))
+        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.VyjadreniVazbaDelete, req.ProjektId, null, ct))
         {
             return Forbid();
         }
@@ -255,9 +255,11 @@ public sealed class VyjadreniModalController : Controller
         return Ok();
     }
 
+    // Per-action redesign 2026-04-23: dříve settings.manage, nyní sjednoceno s
+    // SDConnector.ReHarvest pod vyjadreni.reharvest (stejná doménová akce per-ticket).
     [HttpPost("ReHarvest")]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:settings.manage")]
+    [Authorize(Policy = "permission:vyjadreni.reharvest")]
     public async Task<IActionResult> ReHarvest([FromForm] int externiOdkazId, CancellationToken ct)
     {
         if (externiOdkazId <= 0) return BadRequest();

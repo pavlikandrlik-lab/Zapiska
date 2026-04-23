@@ -61,7 +61,7 @@ public sealed class VyjadreniModalControllerCreateVazbaTests
         var builder = new Mock<IVyjadreniModalViewModelBuilder>();
         var harvest = new Mock<IVyjadreniHarvestService>();
         var authz = new Mock<IPmAuthorizationService>();
-        authz.Setup(x => x.HasPermissionAsync(OsobaId, PermissionKeys.RecordsEdit, ProjektId, null, It.IsAny<CancellationToken>()))
+        authz.Setup(x => x.HasPermissionAsync(OsobaId, PermissionKeys.VyjadreniVazbaCreate, ProjektId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         var currentUser = new Mock<ICurrentUserAccessor>();

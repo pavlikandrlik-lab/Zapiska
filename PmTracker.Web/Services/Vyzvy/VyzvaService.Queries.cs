@@ -7,6 +7,16 @@ namespace PmTracker.Web.Services.Vyzvy;
 
 public sealed partial class VyzvaService
 {
+    public async Task<int?> ResolveExterniOdkazProjektIdAsync(int externiOdkazId, CancellationToken ct)
+    {
+        // Resolve via ZaznamExterniOdkaz → ProjektovyZaznam → ProjektId.
+        return await (from eo in _db.ZaznamExterniOdkazy.AsNoTracking()
+                      join z in _db.ProjektoveZaznamy.AsNoTracking() on eo.ZaznamId equals z.Id
+                      where eo.Id == externiOdkazId
+                      select (int?)z.ProjektId)
+                     .FirstOrDefaultAsync(ct);
+    }
+
     public async Task<IReadOnlyList<VyzvaBufferItem>> GetBufferAsync(int projektId, CancellationToken ct)
     {
         var pnfTypId = await GetPnfTypIdAsync(ct);

@@ -57,7 +57,7 @@ public sealed class ExterniOdkazController : Controller
         {
             return Forbid();
         }
-        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, projektId, null, ct))
+        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.ExterniOdkazySync, projektId, null, ct))
         {
             return Forbid();
         }

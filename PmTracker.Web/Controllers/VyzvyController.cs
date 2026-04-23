@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.Entities;
+using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Vyzvy;
 using PmTracker.Web.Services.Vyzvy.Contracts;
@@ -38,7 +39,8 @@ public sealed class VyzvyController : BaseController
         if (!ModelState.IsValid)
             return BadRequest(new { success = false, errorCode = "ValidationError", message = "Chybí požadované údaje." });
 
-        if (!CurrentUserContext.CanAccessProject(request.ProjektId)) return Forbid();
+        // Per-action redesign 2026-04-23: vyzvy.create (dříve jen CanAccessProject).
+        if (!CurrentUserContext.HasPermission(PermissionKeys.VyzvyCreate, request.ProjektId)) return Forbid();
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var result = await _vyzvaService.ZaloztVyzvuZBufferuAsync(
@@ -64,7 +66,8 @@ public sealed class VyzvyController : BaseController
 
         var vyzva = await _vyzvaService.GetVyzvaAsync(request.VyzvaId, ct);
         if (vyzva == null) return NotFound();
-        if (!CurrentUserContext.CanAccessProject(vyzva.ProjektId)) return Forbid();
+        // Per-action redesign 2026-04-23: vyzvy.state.change (dříve jen CanAccessProject).
+        if (!CurrentUserContext.HasPermission(PermissionKeys.VyzvyStateChange, vyzva.ProjektId)) return Forbid();
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var result = await _vyzvaService.ZmenitStavAsync(
@@ -85,9 +88,13 @@ public sealed class VyzvyController : BaseController
         if (!ModelState.IsValid)
             return BadRequest(new { success = false, errorCode = "ValidationError", message = "Chybí požadované údaje." });
 
-        // ACL: služba sama odmítne non-PNF a uzamčené výzvy.
-        // Základní ACL přes CanAccessProject není triviální (vyžadovalo by načíst projektId přes vazbu),
-        // plný role check (proj_man/adm_proj) se provádí v UI (VM.MuzeEditovat) a na straně service.
+        // Per-action redesign 2026-04-23: vyzvy.pnf.assign. Projekt odvozený z externího
+        // odkazu (request.ExterniOdkazId má ZaznamId → ProjektId). Service vrstva v F3
+        // validuje specifický per-project check.
+        var projektId = await _vyzvaService.ResolveExterniOdkazProjektIdAsync(request.ExterniOdkazId, ct);
+        if (projektId is null) return NotFound();
+        if (!CurrentUserContext.HasPermission(PermissionKeys.VyzvyPnfAssign, projektId.Value)) return Forbid();
+
         var result = await _vyzvaService.NastavitZaradidAsync(
             request.ExterniOdkazId, request.Zaradit, ct);
 
@@ -106,6 +113,11 @@ public sealed class VyzvyController : BaseController
         if (!ModelState.IsValid)
             return BadRequest(new { success = false, errorCode = "ValidationError", message = "Chybí požadované údaje." });
 
+        // Per-action redesign 2026-04-23: vyzvy.pnf.reassign.
+        var projektId = await _vyzvaService.ResolveExterniOdkazProjektIdAsync(request.ExterniOdkazId, ct);
+        if (projektId is null) return NotFound();
+        if (!CurrentUserContext.HasPermission(PermissionKeys.VyzvyPnfReassign, projektId.Value)) return Forbid();
+
         var result = await _vyzvaService.PrerditPnfAsync(
             request.ExterniOdkazId, request.CilovaVyzvaId, ct);
 
@@ -120,7 +132,8 @@ public sealed class VyzvyController : BaseController
     [HttpGet("reassign-modal")]
     public async Task<IActionResult> ReassignModal(int projektId, CancellationToken ct)
     {
-        if (!CurrentUserContext.CanAccessProject(projektId)) return Forbid();
+        // Per-action redesign 2026-04-23: vyzvy.pnf.reassign (GET modalu).
+        if (!CurrentUserContext.HasPermission(PermissionKeys.VyzvyPnfReassign, projektId)) return Forbid();
 
         var buffer = await _vyzvaService.GetBufferAsync(projektId, ct);
         var vyzvy = await _vyzvaService.GetVyzvyAsync(projektId, ct);

@@ -21,7 +21,7 @@ public sealed class ExterniOdkazSyncControllerTests
     {
         var ticketing = new Mock<ITicketingQueryService>();
         var authz = new Mock<IPmAuthorizationService>();
-        authz.Setup(x => x.HasPermissionAsync(OsobaId, PermissionKeys.RecordsEdit, ProjektId, null, It.IsAny<CancellationToken>()))
+        authz.Setup(x => x.HasPermissionAsync(OsobaId, PermissionKeys.ExterniOdkazySync, ProjektId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(hasPermission);
 
         var currentUser = new Mock<ICurrentUserAccessor>();

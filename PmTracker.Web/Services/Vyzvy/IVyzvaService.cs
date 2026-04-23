@@ -20,4 +20,10 @@ public interface IVyzvaService
 
     Task<VyzvaResult<Unit>> PrerditPnfAsync(
         int externiOdkazId, int? cilovaVyzvaId, CancellationToken ct);
+
+    /// <summary>
+    /// Zjistí ProjektId externího odkazu. Používá se v controllerech k per-project
+    /// autorizačnímu checku (akce přijímá ExterniOdkazId, ne ProjektId přímo).
+    /// </summary>
+    Task<int?> ResolveExterniOdkazProjektIdAsync(int externiOdkazId, CancellationToken ct);
 }
