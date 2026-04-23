@@ -115,6 +115,7 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
                 Autor = autor,
                 AutorLogin = v.Zpracoval,
                 Popis = v.Popis,
+                PopisPlainText = VyjadreniHtmlText.ToPlainText(v.Popis),
                 Tym = v.Tym,
                 Typ = v.Typ,
                 Predikat = predikat == HarvestPredicateKind.None ? null : predikat.ToString(),

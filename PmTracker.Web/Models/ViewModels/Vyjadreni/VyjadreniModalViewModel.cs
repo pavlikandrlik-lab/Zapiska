@@ -31,6 +31,12 @@ public sealed class BublinaViewModel
     public string? Autor { get; set; }
     public string? AutorLogin { get; set; }
     public string? Popis { get; set; }
+    /// <summary>
+    /// HTML-sanitovaná plain text verze <see cref="Popis"/> pro render v chat bublině.
+    /// HOT_VYJADRENI.popis obsahuje HTML (legacy ASP), defaultní Razor escape by zobrazil
+    /// literal tagy. Sanitaci dělá <see cref="PmTracker.Web.Services.ServiceDesk.VyjadreniHtmlText"/>.
+    /// </summary>
+    public string? PopisPlainText { get; set; }
     public string? Tym { get; set; }
     public string? Typ { get; set; }
     /// <summary>Automaticky detekovaný druh vyjádření (K3/K4/K6/K7/K10) — podbarvení / ikonka.</summary>
