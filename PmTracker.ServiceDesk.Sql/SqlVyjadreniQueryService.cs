@@ -31,6 +31,7 @@ public sealed class SqlVyjadreniQueryService : IVyjadreniQueryService
 
         var rows = await query
             .OrderBy(v => v.Datum)
+            .ThenBy(v => v.Id)
             .ToListAsync(ct);
 
         return rows

@@ -110,6 +110,28 @@ public sealed class SqlVyjadreniQueryServiceTests
     }
 
     [Fact]
+    public async Task GetVyjadreniForTicketAsync_DeterministickeRazeni_StejneDatumRadiPodleId()
+    {
+        // Při bulk inserts na SD straně často vzniká více vyjádření se stejným datum;
+        // SQL Server default ordering je undefined → v chat modalu občas přehozené bubliny.
+        // Sekundární ThenBy(v.Id) musí garantovat stabilní výstup.
+        await using var db = NewInMemory();
+        var sameDatum = new DateTime(2026, 4, 23, 14, 29, 0);
+        await SeedAsync(db, new[]
+        {
+            NewZaznam("111111", "P1"),
+            NewVyjadreni(300L, "P1", sameDatum, "third"),
+            NewVyjadreni(100L, "P1", sameDatum, "first"),
+            NewVyjadreni(200L, "P1", sameDatum, "second"),
+        });
+
+        var sut = new SqlVyjadreniQueryService(db);
+        var result = await sut.GetVyjadreniForTicketAsync("111111", sinceUtc: null, CancellationToken.None);
+
+        result.Select(v => v.Id).Should().Equal(100L, 200L, 300L);
+    }
+
+    [Fact]
     public async Task GetVyjadreniForTicketAsync_SkipsRowsWithNullDatum()
     {
         await using var db = NewInMemory();
