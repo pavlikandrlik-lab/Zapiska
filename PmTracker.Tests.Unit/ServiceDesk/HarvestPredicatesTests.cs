@@ -62,4 +62,29 @@ public sealed class HarvestPredicatesTests
         var act = () => HarvestPredicates.GetSqlLikePattern(HarvestPredicateKind.None);
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
+
+    // Real-world shape: ServiceDesk popis texty obsahují HTML wrappery (<b>, <br>, <BR>,
+    // <li>, &nbsp; prefixy) a občas jsou roztažené přes několik řádků. Klasifikátor musí
+    // tyto varianty zvládnout — substring match + case-insensitive.
+    [Theory]
+    // K10 s &nbsp; prefixem a <BR> suffixem (typický Automat + PM tvar)
+    [InlineData("&nbsp;Záznam byl převeden do archivu. <BR><B>Záznam byl převzat k řešení dne : 07.04.2026 7:27:00</B>", HarvestPredicateKind.K10_NasazeniArchivace)]
+    // PlanDodani s <b> tagy kolem dodavatele + termínu (dvousložkový predikát)
+    [InlineData("<br>VS FIS předal záznam dodavateli : <b>DODAVATEL</b> s termínem plnění dodavatele <b>31.03.2026</b>", HarvestPredicateKind.PlanDodani)]
+    // K6: Automat-generovaný, bez HTML
+    [InlineData("Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována.", HarvestPredicateKind.K6_OdeslaniPozadavku)]
+    // K3: Automat-generovaný s ticketconnector značkou
+    [InlineData("Záznam byl založen a předán dodavateli k řešení pod značkou: PO99999.", HarvestPredicateKind.K3_OdeslaniZadaniPmp)]
+    // K4/K7: Dodavatel přidal řešení s <i> tagem + pokračování textu
+    [InlineData("<i>Dodavatel přidal řešení:</i><br>Úprava byla realizována do verze XYZ.", HarvestPredicateKind.K4_K7_DodaniReseni)]
+    // Automat „Záznam byl převeden u dodavatele do archivu." je jiná věta, NESMÍ chytit K10
+    [InlineData("Záznam byl převeden u dodavatele do archivu.", HarvestPredicateKind.None)]
+    // Automat „Záznam byl převzat od dodavatele k řešení." — žádný workflow event, NESMÍ chytit nic
+    [InlineData("Záznam byl převzat od dodavatele k řešení.", HarvestPredicateKind.None)]
+    // Čistá technická značka (id_kalk) — K typ bubliny, ale plain text bez workflow fráze
+    [InlineData("26050322003966", HarvestPredicateKind.None)]
+    public void ClassifyPopis_RealWorldHtmlShapes_MatchesExpectedPredicate(string popis, HarvestPredicateKind expected)
+    {
+        HarvestPredicates.ClassifyPopis(popis).Should().Be(expected);
+    }
 }
