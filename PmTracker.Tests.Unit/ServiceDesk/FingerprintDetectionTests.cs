@@ -37,6 +37,7 @@ public sealed class FingerprintDetectionTests
             db,
             vq,
             new FakeTimeProvider(new DateTimeOffset(2026, 4, 22, 12, 0, 0, TimeSpan.Zero)),
+            new PerExterniOdkazLockRegistry(),
             NullLogger<VyjadreniHarvestService>.Instance);
     }
 

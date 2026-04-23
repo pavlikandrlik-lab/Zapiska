@@ -58,6 +58,7 @@ public sealed class VyjadreniHarvestServiceTests
         return new VyjadreniHarvestService(
             db, v,
             new FakeTimeProvider(new DateTimeOffset(2026, 4, 21, 12, 0, 0, TimeSpan.Zero)),
+            new PerExterniOdkazLockRegistry(),
             NullLogger<VyjadreniHarvestService>.Instance);
     }
 

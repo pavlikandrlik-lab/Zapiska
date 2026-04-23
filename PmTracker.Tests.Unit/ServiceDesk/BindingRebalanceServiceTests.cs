@@ -83,10 +83,10 @@ public sealed class BindingRebalanceServiceTests
         IVyjadreniQueryService vq,
         DateTime? nowUtc = null)
     {
-        PerExterniOdkazLockRegistry.ClearForTests();
         var time = new FakeTimeProvider(
             new DateTimeOffset(nowUtc ?? new DateTime(2026, 4, 22, 12, 0, 0, DateTimeKind.Utc), TimeSpan.Zero));
         return new BindingRebalanceService(db, vq, time,
+            new PerExterniOdkazLockRegistry(),
             NullLogger<BindingRebalanceService>.Instance);
     }
 

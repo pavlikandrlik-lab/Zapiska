@@ -28,16 +28,10 @@ public sealed partial class ProjectService
             .Distinct()
             .ToList();
 
-        var subsystemRows = await dbContext.Subsystemy.AsNoTracking()
-            .Where(x => subsystemIds.Contains(x.Id))
-            .Select(x => new
-            {
-                x.Id,
-                x.Kod,
-                x.Nazev
-            })
-            .ToListAsync(ct);
-        var subsystemsById = subsystemRows.ToDictionary(x => x.Id);
+        var allSubsystems = await lookupCache.GetSubsystemsAsync(ct);
+        var subsystemsById = subsystemIds
+            .Where(allSubsystems.ContainsKey)
+            .ToDictionary(id => id, id => allSubsystems[id]);
 
         return subsystemIds
             .Select(subsystemId =>
@@ -78,15 +72,8 @@ public sealed partial class ProjectService
         var collaborationCandidates = await BuildRecordOwnerCandidatesAsync(record.ProjektId, null, ct);
 
         var extTypes = (await lookupCache.GetExternalLinkTypesAsync(ct)).Values.OrderBy(x => x.Kod).ToList();
-        var vyzvyById = (await dbContext.Vyzvy.AsNoTracking()
-                .OrderBy(x => x.Kod)
-                .Select(x => new
-                {
-                    x.Id,
-                    x.Kod
-                })
-                .ToListAsync(ct))
-            .ToDictionary(x => x.Id, x => x.Kod);
+        var vyzvyById = (await lookupCache.GetVyzvyAsync(ct))
+            .ToDictionary(x => x.Key, x => x.Value.Kod);
 
         var projectUsesMeetingNumbering = projectUsesMeetingIdentifier
             ?? await dbContext.Projekty.AsNoTracking()

@@ -81,17 +81,20 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
     private readonly PmTrackerDbContext _db;
     private readonly IVyjadreniQueryService _vyjadreni;
     private readonly TimeProvider _time;
+    private readonly IPerExterniOdkazLockRegistry _lockRegistry;
     private readonly ILogger<BindingRebalanceService> _logger;
 
     public BindingRebalanceService(
         PmTrackerDbContext db,
         IVyjadreniQueryService vyjadreni,
         TimeProvider time,
+        IPerExterniOdkazLockRegistry lockRegistry,
         ILogger<BindingRebalanceService> logger)
     {
         _db = db;
         _vyjadreni = vyjadreni;
         _time = time;
+        _lockRegistry = lockRegistry;
         _logger = logger;
     }
 
@@ -136,7 +139,7 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
         // auto-harvest mohl v okně mezi fetchem a acquire-lockem přihodit nové bubliny,
         // které by cascade rebalance neviděl (stale availableBubbles) a mohl by
         // přepsat právě vytvořené Auto bindings.
-        var sem = PerExterniOdkazLockRegistry.GetOrAdd(request.ExterniOdkazId);
+        var sem = _lockRegistry.GetOrAdd(request.ExterniOdkazId);
         await sem.WaitAsync(ct).ConfigureAwait(false);
         try
         {

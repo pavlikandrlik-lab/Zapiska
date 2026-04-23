@@ -15,6 +15,7 @@ public sealed class CommentService(
     IRichTextContentService richTextContentService,
     ICommentAuthorizationPolicy commentAuthorizationPolicy,
     IAuditWriteService auditWriteService,
+    IProjectRoleCache projectRoleCache,
     TimeProvider timeProvider) : ICommentService
 {
     public async Task AddCommentAsync(AddCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -280,65 +281,10 @@ public sealed class CommentService(
     private static bool IsDraftMeeting(CiselnikStavuJednaniEntity? status)
         => string.Equals(status?.Kod, "DRAFT", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<List<int>> ResolveLeadEquivalentOsobaIdsAsync(int projectId, int subsystemId, CancellationToken ct)
-    {
-        var leadRoleIds = await dbContext.CiselnikRoliSubsystemu.AsNoTracking()
-            .Where(x => x.Kod == SubsystemRoleCodes.Lead || x.Kod == SubsystemRoleCodes.DeputyLead)
-            .Select(x => x.Id)
-            .ToListAsync(ct);
-        if (leadRoleIds.Count == 0)
-        {
-            return [];
-        }
+    private Task<IReadOnlyList<int>> ResolveLeadEquivalentOsobaIdsAsync(int projectId, int subsystemId, CancellationToken ct)
+        => projectRoleCache.GetLeadEquivalentOsobaIdsAsync(projectId, subsystemId, ct);
 
-        var leadRoleIdSet = leadRoleIds.ToHashSet();
-        var activeProjectSubsystems = await dbContext.ProjektSubsystemy.AsNoTracking()
-            .Where(x => x.ProjektId == projectId && !x.DatumOdebrani.HasValue)
-            .ToListAsync(ct);
-        var activeProjectSubsystemIds = activeProjectSubsystems.Select(x => x.Id).ToHashSet();
-
-        var rows = await dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
-            .Where(x => activeProjectSubsystemIds.Contains(x.ProjektSubsystemId)
-                && !x.DatumOdebrani.HasValue
-                && leadRoleIdSet.Contains(x.RoleSubsystemuId))
-            .ToListAsync(ct);
-
-        return rows
-            .GroupBy(x => activeProjectSubsystems.First(ps => ps.Id == x.ProjektSubsystemId).SubsystemId)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(x => x.OsobaId).Distinct().OrderBy(x => x).ToList())
-            .GetValueOrDefault(subsystemId, []);
-    }
-
-    private async Task<Dictionary<int, List<int>>> ResolveLeadEquivalentOsobaIdsBySubsystemAsync(int projectId, CancellationToken ct)
-    {
-        var leadRoleIds = (await dbContext.CiselnikRoliSubsystemu.AsNoTracking()
-            .Where(x => x.Kod == SubsystemRoleCodes.Lead || x.Kod == SubsystemRoleCodes.DeputyLead)
-            .Select(x => x.Id)
-            .ToListAsync(ct))
-            .ToHashSet();
-        if (leadRoleIds.Count == 0)
-        {
-            return [];
-        }
-
-        var activeProjectSubsystems = await dbContext.ProjektSubsystemy.AsNoTracking()
-            .Where(x => x.ProjektId == projectId && !x.DatumOdebrani.HasValue)
-            .ToListAsync(ct);
-        var subsystemIdByProjectSubsystemId = activeProjectSubsystems.ToDictionary(x => x.Id, x => x.SubsystemId);
-        var activeProjectSubsystemIds = subsystemIdByProjectSubsystemId.Keys.ToHashSet();
-        var rows = await dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
-            .Where(x => activeProjectSubsystemIds.Contains(x.ProjektSubsystemId)
-                && !x.DatumOdebrani.HasValue
-                && leadRoleIds.Contains(x.RoleSubsystemuId))
-            .ToListAsync(ct);
-
-        return rows
-            .GroupBy(x => subsystemIdByProjectSubsystemId[x.ProjektSubsystemId])
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(x => x.OsobaId).Distinct().OrderBy(x => x).ToList());
-    }
+    private Task<IReadOnlyDictionary<int, IReadOnlyList<int>>> ResolveLeadEquivalentOsobaIdsBySubsystemAsync(int projectId, CancellationToken ct)
+        => projectRoleCache.GetLeadEquivalentOsobaIdsBySubsystemAsync(projectId, ct);
 
 }

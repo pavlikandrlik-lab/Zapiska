@@ -365,11 +365,10 @@ public sealed partial class ProjectService
         var organizations = await LoadOrganizationsByPeopleAsync(people.Values, ct);
         var orgUnits = await LoadOrgUnitsByPeopleAsync(people.Values, ct);
         var subsystemIds = projectSubsystems.Select(x => x.SubsystemId).Distinct().ToArray();
+        var allSubsystems = await lookupCache.GetSubsystemsAsync(ct);
         var subsystems = subsystemIds.Length == 0
             ? new Dictionary<int, SubsystemEntity>()
-            : await dbContext.Subsystemy.AsNoTracking()
-                .Where(x => subsystemIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : subsystemIds.Where(allSubsystems.ContainsKey).ToDictionary(id => id, id => allSubsystems[id]);
         var roleIds = assignments.Select(x => x.RoleSubsystemuId).Distinct().ToArray();
         var allSubsystemRoles = await lookupCache.GetSubsystemRolesAsync(ct);
         var roleById = roleIds.Length == 0
@@ -417,11 +416,10 @@ public sealed partial class ProjectService
             .ToListAsync(ct);
         var people = await LoadPeopleByIdsAsync(assignments.Select(x => x.OsobaId).Distinct(), ct);
         var subsystemIds = projectSubsystems.Select(x => x.SubsystemId).Distinct().ToArray();
+        var allSubsystems2 = await lookupCache.GetSubsystemsAsync(ct);
         var subsystems = subsystemIds.Length == 0
             ? new Dictionary<int, SubsystemEntity>()
-            : await dbContext.Subsystemy.AsNoTracking()
-                .Where(x => subsystemIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
+            : subsystemIds.Where(allSubsystems2.ContainsKey).ToDictionary(id => id, id => allSubsystems2[id]);
         var roleIds = assignments.Select(x => x.RoleSubsystemuId).Distinct().ToArray();
         var allSubsystemRoles = await lookupCache.GetSubsystemRolesAsync(ct);
         var roleById = roleIds.Length == 0
@@ -736,8 +734,10 @@ public sealed partial class ProjectService
             .ToList();
     }
 
-    private Task<List<LookupOptionViewModel>> BuildAvailableSubsystemOptionsAsync(CancellationToken ct)
-        => dbContext.Subsystemy.AsNoTracking()
+    private async Task<List<LookupOptionViewModel>> BuildAvailableSubsystemOptionsAsync(CancellationToken ct)
+    {
+        var all = await lookupCache.GetSubsystemsAsync(ct);
+        return all.Values
             .OrderBy(x => x.Kod)
             .ThenBy(x => x.Nazev)
             .Select(x => new LookupOptionViewModel
@@ -745,7 +745,8 @@ public sealed partial class ProjectService
                 Value = x.Kod,
                 Label = string.IsNullOrWhiteSpace(x.Kod) ? x.Nazev : $"{x.Kod} - {x.Nazev}"
             })
-            .ToListAsync(ct);
+            .ToList();
+    }
 
     private async Task<Dictionary<int, int>> BuildDefaultOwnerOsobaIdsByProjectSubsystemAsync(int projectId, CancellationToken ct)
     {

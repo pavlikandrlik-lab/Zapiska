@@ -31,17 +31,20 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     private readonly PmTrackerDbContext _db;
     private readonly IVyjadreniQueryService _vyjadreni;
     private readonly TimeProvider _time;
+    private readonly IPerExterniOdkazLockRegistry _lockRegistry;
     private readonly ILogger<VyjadreniHarvestService> _logger;
 
     public VyjadreniHarvestService(
         PmTrackerDbContext db,
         IVyjadreniQueryService vyjadreni,
         TimeProvider time,
+        IPerExterniOdkazLockRegistry lockRegistry,
         ILogger<VyjadreniHarvestService> logger)
     {
         _db = db;
         _vyjadreni = vyjadreni;
         _time = time;
+        _lockRegistry = lockRegistry;
         _logger = logger;
     }
 
@@ -86,7 +89,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         Func<CancellationToken, Task<VyjadreniHarvestResult>> work,
         CancellationToken ct)
     {
-        var sem = PerExterniOdkazLockRegistry.GetOrAdd(eo.Id);
+        var sem = _lockRegistry.GetOrAdd(eo.Id);
         await sem.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -314,7 +317,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         VyjadreniSecondaryFingerprintDto secondary,
         CancellationToken ct)
     {
-        var sem = PerExterniOdkazLockRegistry.GetOrAdd(eo.Id);
+        var sem = _lockRegistry.GetOrAdd(eo.Id);
         // M-2: Blokující WaitAsync(ct) místo WaitAsync(Zero). ReactiveSyncQueue dedup
         // brání pile-upu identických enqueue; legit re-drill pro stejný ticket musí
         // pockat, než uvolní lock, nikoli tiše drop (jinak NEW data z periody mezi

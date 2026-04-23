@@ -106,6 +106,9 @@ public static class DataStoreServiceCollectionExtensions
         services.AddSingleton<AdLoginCache>();
         // Plán C: core harvest logika — volaná z IHarvestScheduler (T2) i ze
         // synchronního ReHarvest endpointu (admin akce).
+        // Per-externiOdkaz lock registry je proces-scoped singleton — sdílený mezi
+        // auto-harvestem (VyjadreniHarvestService) a manuálním rebalance (BindingRebalanceService).
+        services.AddSingleton<IPerExterniOdkazLockRegistry, PerExterniOdkazLockRegistry>();
         services.AddScoped<IVyjadreniHarvestService, VyjadreniHarvestService>();
         services.AddScoped<IVyjadreniModalViewModelBuilder, VyjadreniModalViewModelBuilder>();
         // Plán C/D follow-up: manuální drag-and-drop rebalance přes ChronologyRebalancer.
@@ -126,6 +129,8 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<PeopleService>();
         services.AddScoped<ProfileService>();
         services.AddScoped<DictionaryService>();
+        services.AddScoped<ILookupTableCache, LookupTableCache>();
+        services.AddScoped<IProjectRoleCache, ProjectRoleCache>();
         services.AddSingleton<IPriorityMatrixRebuildQueue, PriorityMatrixRebuildQueue>();
         services.AddScoped<IHarmonogramService>(sp => sp.GetRequiredService<HarmonogramService>());
         services.AddScoped<IHarmonogramCatalogService>(sp => sp.GetRequiredService<HarmonogramCatalogService>());
