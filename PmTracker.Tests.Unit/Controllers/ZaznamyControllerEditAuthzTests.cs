@@ -111,6 +111,7 @@ public sealed class ZaznamyControllerEditAuthzTests
             timeProvider: TimeProvider.System,
             loggerFactory: NullLoggerFactory.Instance,
             recordService: recordService,
+            projectEditQuery: new ProjectEditQuery(recordService),
             recordUiFlowResolver: recordUiFlow,
             harvestScheduler: harvestScheduler,
             db: db)

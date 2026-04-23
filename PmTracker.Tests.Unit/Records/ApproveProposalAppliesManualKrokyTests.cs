@@ -115,9 +115,11 @@ public sealed class ApproveProposalAppliesManualKrokyTests
 
         var harmonogramService = NewHarmonogramService(db);
 
+        var rs = recordService ?? Mock.Of<IRecordService>();
         return new RecordProposalService(
             dbContext: db,
-            recordService: recordService ?? Mock.Of<IRecordService>(),
+            recordService: rs,
+            projectEditQuery: new ProjectEditQuery(rs),
             authorizationPolicy: authMock,
             pendingScheduleProposalLockEvaluator: lockEvaluator.Object,
             payloadMapper: new RecordProposalPayloadMapper(),

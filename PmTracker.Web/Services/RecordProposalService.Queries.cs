@@ -124,7 +124,7 @@ public sealed partial class RecordProposalService
             throw new InvalidOperationException(pendingLock.Message ?? "Pro tento záznam už existuje čekající návrh změny harmonogramu.");
         }
 
-        var model = await _recordService.BuildZaznamEditAsync(recordId, ct);
+        var model = await _projectEditQuery.GetEditModelAsync(recordId, ct);
         if (model.ProjektId != projectId)
         {
             throw new InvalidOperationException("Záznam nepatří do vybraného projektu.");
@@ -158,7 +158,7 @@ public sealed partial class RecordProposalService
                 throw new InvalidOperationException("Návrh změny termínu a harmonogramu není navázán na záznam.");
             }
 
-            var model = await _recordService.BuildZaznamEditAsync(proposal.ZaznamId.Value, ct);
+            var model = await _projectEditQuery.GetEditModelAsync(proposal.ZaznamId.Value, ct);
             var payload = DeserializePayload(proposal.PayloadJson);
             var schedulePayload = payload.SchedulePlan
                 ?? throw new InvalidOperationException("Payload návrhu harmonogramu je neplatný.");
@@ -205,7 +205,7 @@ public sealed partial class RecordProposalService
         var payload = DeserializePayload(proposal.PayloadJson);
         var schedulePayload = payload.SchedulePlan
             ?? throw new InvalidOperationException("Payload návrhu harmonogramu je neplatný.");
-        var model = await _recordService.BuildZaznamEditAsync(proposal.ZaznamId.Value, ct);
+        var model = await _projectEditQuery.GetEditModelAsync(proposal.ZaznamId.Value, ct);
         ApplySchedulePayloadToModel(model, schedulePayload);
         ConfigureStandardTakenOverScheduleEditor(model);
         return model;

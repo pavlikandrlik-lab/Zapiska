@@ -192,6 +192,32 @@ Tohle je přesně anti-pattern, který seed-only authz refactor (2026-04-22) mě
 
 [MeetingService.WriteCommands.cs:414](../../PmTracker.Web/Services/MeetingService.WriteCommands.cs) — při sestavení seznamu účastníků jednání se filtrují host-role osoby přímo přes `.Where(x => !Ci.Equals(x.Kod, ProjectRoleCodes.Host))`. Otázka: **má HOST být vyloučen z meeting attendance?** Pokud ano, je to byznysové pravidlo, které by mělo existovat buď jako permission key (`meetings.attend` seednutý bez HOST role), nebo explicitně dokumentované.
 
+### Nález 12 — Komentáře: chybí `comments.edit.any` / `comments.delete.any`, „any" chování je skryté pod `records.edit`
+
+[CommentAuthorizationPolicy.cs:32-43](../../PmTracker.Web/Services/Common/CommentAuthorizationPolicy.cs) realizuje úpravu a smazání komentáře dvouvrstvě:
+
+1. **Policy gate na endpointu** ([ZaznamyController.Commands.cs:104](../../PmTracker.Web/Controllers/ZaznamyController.Commands.cs)): `[Authorize(Policy = "permission:comments.edit.own")]` / `comments.delete.own`.
+2. **Service check** (`CommentAuthorizationPolicy.CanModifyComment`):
+   ```csharp
+   if (HasPermission(records.edit, projektId)) return true;   // ← implicitní "any"
+   // jinak jen autor + draft jednání + subsystem lead
+   ```
+
+Důsledky:
+
+- Klíč `comments.edit.any` / `comments.delete.any` v seedu **neexistuje**. „Any" oprávnění je implicitně navázané na `records.edit` — což je matoucí sémantika (klíč `records.edit` sémanticky znamená „upravit projektový záznam", ne „upravit cizí komentář").
+- Název `comments.edit.own` **lže o sémantice**: prochází policy atribut i pro cizí komentář. Vlastnictví se testuje až ve službě.
+- **Anomálie APP_ADMIN**: má `records.edit` (service ho pustí na úpravu čehokoliv), ale **nemá `comments.edit.own`** v seedu → policy gate ho zařízne dřív, než se service vůbec zavolá. Výsledek: APP_ADMIN nemůže upravit ani cizí, ani svůj komentář. Nebyla to evidentní záměrná volba.
+
+**Aktuální výsledná matice (kdo může upravit CIZÍ komentář):** SUPERADMIN, VLASTNIK_PROJEKTU, ADM_PROJ, PROJ_MAN.
+
+**Varianty fixu (k rozhodnutí):**
+
+- **Varianta A — přidat nové klíče** `comments.edit.any` / `comments.delete.any`. Service volá `HasPermission(comments.edit.any, projektId)` místo `records.edit`. Mapping v seedu: SUPERADMIN, APP_ADMIN, VLASTNIK_PROJEKTU, ADM_PROJ, PROJ_MAN. Čisté, jasná sémantika, ale přibudou 2 klíče.
+- **Varianta B — přejmenovat existující klíč** z `comments.edit.own` na neutrální `comments.modify` (policy-only gate, službě se ponechá existující logika vlastnictví + `records.edit` backdoor). Méně invazivní, ale zůstane implicitní vazba na `records.edit`.
+
+Doporučení: **Varianta A** kvůli čistotě modelu a správnosti principu single-source-of-truth (každý klíč přesně jedna sémantika).
+
 ## Analýza potřebuje (byznysové rozhodnutí uživatele)
 
 Před auditem / implementací musí uživatel rozhodnout role × permission matrix. Otázky k zodpovězení — seznam bude nutně rozšířen, až projdeme celou aplikaci:

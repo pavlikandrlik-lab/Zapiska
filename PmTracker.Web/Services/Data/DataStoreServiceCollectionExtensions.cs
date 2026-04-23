@@ -131,6 +131,8 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<DictionaryService>();
         services.AddScoped<ILookupTableCache, LookupTableCache>();
         services.AddScoped<IProjectRoleCache, ProjectRoleCache>();
+        // Vertical-slice entry point pro sestavení ZaznamEditViewModel (SRP isolation).
+        services.AddScoped<IProjectEditQuery, ProjectEditQuery>();
         services.AddSingleton<IPriorityMatrixRebuildQueue, PriorityMatrixRebuildQueue>();
         services.AddScoped<IHarmonogramService>(sp => sp.GetRequiredService<HarmonogramService>());
         services.AddScoped<IHarmonogramCatalogService>(sp => sp.GetRequiredService<HarmonogramCatalogService>());

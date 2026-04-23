@@ -38,6 +38,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
 
     private readonly PmTrackerDbContext _dbContext;
     private readonly IRecordService _recordService;
+    private readonly IProjectEditQuery _projectEditQuery;
     private readonly IRecordProposalAuthorizationPolicy _authorizationPolicy;
     private readonly IPendingScheduleProposalLockEvaluator _pendingScheduleProposalLockEvaluator;
     private readonly RecordProposalPayloadMapper _payloadMapper;
@@ -50,6 +51,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
     public RecordProposalService(
         PmTrackerDbContext dbContext,
         IRecordService recordService,
+        IProjectEditQuery projectEditQuery,
         IRecordProposalAuthorizationPolicy authorizationPolicy,
         IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator,
         RecordProposalPayloadMapper payloadMapper,
@@ -61,6 +63,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
     {
         _dbContext = dbContext;
         _recordService = recordService;
+        _projectEditQuery = projectEditQuery;
         _authorizationPolicy = authorizationPolicy;
         _pendingScheduleProposalLockEvaluator = pendingScheduleProposalLockEvaluator;
         _payloadMapper = payloadMapper;

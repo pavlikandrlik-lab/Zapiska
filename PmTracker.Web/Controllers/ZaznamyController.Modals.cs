@@ -21,7 +21,7 @@ public sealed partial class ZaznamyController
     [Authorize(Policy = "permission:records.edit")]
     public async Task<IActionResult> AssignMeetingIdentifierModal(int projektId, int zaznamId, CancellationToken ct = default)
     {
-        var model = await _recordService.BuildZaznamEditAsync(zaznamId, ct);
+        var model = await _projectEditQuery.GetEditModelAsync(zaznamId, ct);
         if (model.ProjektId != projektId)
         {
             return NotFound();

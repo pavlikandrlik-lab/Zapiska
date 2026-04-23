@@ -25,6 +25,7 @@ public sealed partial class ZaznamyController : BaseController
     private const string UiContextMeeting = "meeting";
 
     private readonly IRecordService _recordService;
+    private readonly IProjectEditQuery _projectEditQuery;
     private readonly IRecordUiFlowResolver _recordUiFlowResolver;
     private readonly IHarvestScheduler _harvestScheduler;
     private readonly PmTrackerDbContext _db;
@@ -34,12 +35,14 @@ public sealed partial class ZaznamyController : BaseController
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
         IRecordService recordService,
+        IProjectEditQuery projectEditQuery,
         IRecordUiFlowResolver recordUiFlowResolver,
         IHarvestScheduler harvestScheduler,
         PmTrackerDbContext db)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _recordService = recordService;
+        _projectEditQuery = projectEditQuery;
         _recordUiFlowResolver = recordUiFlowResolver;
         _harvestScheduler = harvestScheduler;
         _db = db;
@@ -64,7 +67,7 @@ public sealed partial class ZaznamyController : BaseController
             return Forbid();
         }
 
-        var model = await _recordService.BuildZaznamEditAsync(id, ct);
+        var model = await _projectEditQuery.GetEditModelAsync(id, ct);
 
         // canManageSchedule je platný jen pro záznamy kategorie "úkol" (JeUkolKategorie).
         var canManageSchedule = model.JeUkolKategorie && canManageSchedulePermission;

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Services;
@@ -7,15 +8,18 @@ using PmTracker.Web.Services;
 namespace PmTracker.Tests.Unit.Services;
 
 /// <summary>
-/// Perf fix: scoped cache pro číselník tabulky musí držet první výsledek
-/// po celou dobu requestu (zabránit 3-4× stejnému SELECT * FROM ciselnik_*
-/// při renderingu detailu projektu).
+/// Perf fix: lookup cache je tenká scoped fasáda nad sdíleným singleton
+/// <see cref="IMemoryCache"/> s TTL. Číselníky se načtou jednou a přežijí
+/// přes request boundaries — horká cesta (Projekty/Detail + BuildZaznamEditAsync)
+/// nevolá DB vůbec. Per-request memo navíc zajistí identity property
+/// (<c>BeSameAs</c>) uvnitř jednoho requestu.
 /// </summary>
 public sealed class LookupTableCacheTests
 {
     [Fact]
     public async Task GetCategoriesAsync_CachesFirstResult_SecondCallReturnsOriginalEvenAfterDbMutation()
     {
+        var memory = new MemoryCache(new MemoryCacheOptions());
         await using var db = CreateDb();
         db.CiselnikKategoriiZaznamu.Add(new CiselnikKategoriiZaznamuEntity
         {
@@ -25,7 +29,7 @@ public sealed class LookupTableCacheTests
         });
         await db.SaveChangesAsync();
 
-        var cache = new LookupTableCache(db);
+        var cache = new LookupTableCache(db, memory);
 
         // Prvotní načtení: cache si stáhne data.
         var first = await cache.GetCategoriesAsync(CancellationToken.None);
@@ -48,8 +52,12 @@ public sealed class LookupTableCacheTests
     }
 
     [Fact]
-    public async Task NewCacheInstance_StartsFresh_DoesNotShareStateWithPreviousInstance()
+    public async Task GetCategoriesAsync_PersistsAcrossCacheInstances_WhenSharedMemoryCache()
     {
+        // NEW CONTRACT: cache žije v singleton IMemoryCache s TTL, nikoli per-request.
+        // Druhá instance LookupTableCache (= další HTTP request) s tímtéž
+        // sdíleným memcache musí dostat tentýž snapshot bez nového DB dotazu.
+        var sharedMemory = new MemoryCache(new MemoryCacheOptions());
         await using var db = CreateDb();
         db.CiselnikKategoriiZaznamu.Add(new CiselnikKategoriiZaznamuEntity
         {
@@ -59,9 +67,10 @@ public sealed class LookupTableCacheTests
         });
         await db.SaveChangesAsync();
 
-        var cacheA = new LookupTableCache(db);
-        var firstA = await cacheA.GetCategoriesAsync(CancellationToken.None);
+        var cache1 = new LookupTableCache(db, sharedMemory);
+        var first = await cache1.GetCategoriesAsync(CancellationToken.None);
 
+        // Simulujeme mezi-requestovou DB mutaci:
         db.CiselnikKategoriiZaznamu.Add(new CiselnikKategoriiZaznamuEntity
         {
             Id = 2,
@@ -70,12 +79,35 @@ public sealed class LookupTableCacheTests
         });
         await db.SaveChangesAsync();
 
-        // Druhá instance cache = jiný request = čerstvé čtení.
-        var cacheB = new LookupTableCache(db);
+        // Další request = nová instance cache ale stejný singleton memcache:
+        var cache2 = new LookupTableCache(db, sharedMemory);
+        var second = await cache2.GetCategoriesAsync(CancellationToken.None);
+
+        second.Should().BeSameAs(first,
+            "shared IMemoryCache musí vrátit tentýž snapshot — nové DB řádky se projeví až po TTL expiraci");
+        second.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task SeparateMemoryCaches_IsolateState_NewInstanceReadsFresh()
+    {
+        // Sanity: když dva registry mají *různý* memcache (nereálné v praxi,
+        // ale důležité pro testovou izolaci), state se nesdílí.
+        await using var db = CreateDb();
+        db.CiselnikKategoriiZaznamu.Add(new CiselnikKategoriiZaznamuEntity { Id = 1, Kod = "U", Nazev = "Úkol" });
+        await db.SaveChangesAsync();
+
+        var cacheA = new LookupTableCache(db, new MemoryCache(new MemoryCacheOptions()));
+        var firstA = await cacheA.GetCategoriesAsync(CancellationToken.None);
+
+        db.CiselnikKategoriiZaznamu.Add(new CiselnikKategoriiZaznamuEntity { Id = 2, Kod = "P", Nazev = "Projekt" });
+        await db.SaveChangesAsync();
+
+        var cacheB = new LookupTableCache(db, new MemoryCache(new MemoryCacheOptions()));
         var firstB = await cacheB.GetCategoriesAsync(CancellationToken.None);
 
         firstA.Should().HaveCount(1);
-        firstB.Should().HaveCount(2, "nová instance musí znovu načíst aktuální data");
+        firstB.Should().HaveCount(2, "jiný memcache = čerstvé čtení z DB");
         firstA.Should().NotBeSameAs(firstB);
     }
 
@@ -88,7 +120,7 @@ public sealed class LookupTableCacheTests
         db.CiselnikTypuUkolu.Add(new CiselnikTypuUkoluEntity { Id = 1, Kod = "RU", Nazev = "Rozvoj" });
         await db.SaveChangesAsync();
 
-        var cache = new LookupTableCache(db);
+        var cache = new LookupTableCache(db, new MemoryCache(new MemoryCacheOptions()));
         var categories = await cache.GetCategoriesAsync(CancellationToken.None);
         var states = await cache.GetTaskStatesAsync(CancellationToken.None);
         var types = await cache.GetTaskTypesAsync(CancellationToken.None);
@@ -105,7 +137,7 @@ public sealed class LookupTableCacheTests
     public async Task EmptyTable_ReturnsEmptyDictionary_AndIsStillCached()
     {
         await using var db = CreateDb();
-        var cache = new LookupTableCache(db);
+        var cache = new LookupTableCache(db, new MemoryCache(new MemoryCacheOptions()));
 
         var first = await cache.GetCategoriesAsync(CancellationToken.None);
         first.Should().BeEmpty();

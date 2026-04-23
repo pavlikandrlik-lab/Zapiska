@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -40,6 +41,13 @@ public sealed class PmTrackerWebAppFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IAntiforgery>();
             services.AddSingleton<IAntiforgery, NoOpAntiforgery>();
+
+            // Integration testy sdílejí factory (CollectionFixture). Skutečný IMemoryCache
+            // by držel snapshoty číselníků i po DB mutacích v setup hookách, což vede k falešně
+            // prázdným výstupům (viz regression po zavedení LookupTableCache → IMemoryCache).
+            // Testy pojedou bez cache — každé volání je čerstvé z DB.
+            services.RemoveAll<IMemoryCache>();
+            services.AddSingleton<IMemoryCache, NullMemoryCache>();
             services
                 .AddAuthentication(options =>
                 {
