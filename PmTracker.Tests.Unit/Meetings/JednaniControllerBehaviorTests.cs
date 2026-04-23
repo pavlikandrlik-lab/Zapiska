@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using PmTracker.Web.Controllers;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
@@ -104,14 +105,73 @@ public sealed class JednaniControllerBehaviorTests
         meetingService.OverviewProjectIds.Should().Equal(42);
     }
 
-    private static JednaniController CreateController(FakeMeetingService meetingService)
+    [Fact]
+    public async Task NewMeetingModal_ShouldUseLocalNowFromTimeProvider_ForDefaultDateAndTime()
+    {
+        const int projectId = 55;
+        var fixedUtcNow = new DateTimeOffset(2026, 7, 9, 14, 45, 0, TimeSpan.Zero);
+        var expectedLocalNow = TimeZoneInfo.ConvertTime(fixedUtcNow, TimeZoneInfo.Local).DateTime;
+        var timeProvider = new FakeTimeProviderLocal(fixedUtcNow);
+        var meetingService = new FakeMeetingService
+        {
+            NewMeetingModalResult = new MeetingModalViewModel
+            {
+                Title = "Nové jednání",
+                Command = new SaveMeetingCommand
+                {
+                    ProjektId = projectId,
+                    CisloJednani = 8,
+                    DatumPlanovane = expectedLocalNow.Date,
+                    CasZacatek = TimeOnly.FromDateTime(expectedLocalNow),
+                    StavJednani = "OPEN"
+                },
+                ExistingMeetingNumbersCsv = "7",
+                StavyJednani =
+                [
+                    new LookupOptionViewModel
+                    {
+                        Value = "OPEN",
+                        Label = "Otevreno"
+                    }
+                ]
+            }
+        };
+        var projectService = Moq.Mock.Of<IProjectService>(x =>
+            x.ProjektExistsAsync(projectId, It.IsAny<CancellationToken>()) == Task.FromResult(true));
+        var controller = CreateController(meetingService, timeProvider, projectService);
+
+        var result = await controller.NewMeetingModal(projectId);
+
+        var view = result.Should().BeOfType<ViewResult>().Subject;
+        var model = view.Model.Should().BeOfType<MeetingModalViewModel>().Subject;
+        model.Command.DatumPlanovane.Should().Be(expectedLocalNow.Date);
+        model.Command.CasZacatek.Should().Be(TimeOnly.FromDateTime(expectedLocalNow));
+        model.Command.CisloJednani.Should().Be(8);
+        model.Command.StavJednani.Should().Be("OPEN");
+        meetingService.BuildNewMeetingModalCalls.Should().Be(1);
+    }
+
+    private sealed class FakeTimeProviderLocal : TimeProvider
+    {
+        private readonly DateTimeOffset _utcNow;
+        public FakeTimeProviderLocal(DateTimeOffset utcNow) { _utcNow = utcNow; }
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Local;
+    }
+
+    private static JednaniController CreateController(
+        FakeMeetingService meetingService,
+        TimeProvider? timeProvider = null,
+        IProjectService? projectService = null)
     {
         var httpContext = new DefaultHttpContext();
         var controller = new JednaniController(
             userContextResolver: null!,
-            timeProvider: TimeProvider.System,
+            timeProvider: timeProvider ?? TimeProvider.System,
             loggerFactory: NullLoggerFactory.Instance,
-            meetingService)
+            meetingService,
+            projectService ?? Moq.Mock.Of<IProjectService>(x =>
+                x.ProjektExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()) == Task.FromResult(true)))
         {
             ControllerContext = new ControllerContext
             {
@@ -157,10 +217,12 @@ public sealed class JednaniControllerBehaviorTests
         public IReadOnlyList<JednaniProjektListItemViewModel> Overview { get; set; } = [];
         public IReadOnlyList<int>? OverviewProjectIds { get; private set; }
         public IReadOnlyList<MeetingParticipantCandidateViewModel> ParticipantCandidates { get; set; } = [];
+        public MeetingModalViewModel? NewMeetingModalResult { get; set; }
         public int BuildJednaniDetailCalls { get; private set; }
         public int GetMeetingProjectIdCalls { get; private set; }
         public int GetSingleTaskCalls { get; private set; }
         public int BuildJednaniListAsyncCalls { get; private set; }
+        public int BuildNewMeetingModalCalls { get; private set; }
 
         public Task<IReadOnlyList<JednaniProjektListItemViewModel>> BuildJednaniOverviewAsync(CancellationToken ct = default)
             => Task.FromResult(Overview);
@@ -177,7 +239,11 @@ public sealed class JednaniControllerBehaviorTests
             return Task.FromResult(Meetings);
         }
 
-        public Task<MeetingModalViewModel> BuildNewMeetingModalAsync(int projectId, DateTime localNow, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<MeetingModalViewModel> BuildNewMeetingModalAsync(int projectId, DateTime localNow, CancellationToken ct = default)
+        {
+            BuildNewMeetingModalCalls += 1;
+            return Task.FromResult(NewMeetingModalResult ?? throw new NotSupportedException());
+        }
         public Task<MeetingModalViewModel?> BuildEditMeetingModalAsync(int projectId, int meetingId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool?> IsMeetingEditableAsync(int projectId, int meetingId, CancellationToken ct = default) => throw new NotSupportedException();
 
@@ -209,4 +275,5 @@ public sealed class JednaniControllerBehaviorTests
         public Task SaveAttendanceBatchAsync(int meetingId, IEnumerable<(int OsobaId, string StavUcasti)> rows, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();
         public Task SaveMeetingNotesBatchAsync(int meetingId, IEnumerable<(int ZaznamId, string Text)> rows, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();
     }
+
 }

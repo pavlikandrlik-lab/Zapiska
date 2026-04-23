@@ -23,7 +23,7 @@ public sealed class AjaxControllersTests
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
 
         var request = ApiTestHttpHelper.BuildAjaxPost(
-            $"/Projekty/SaveMeeting?asUser={_fixture.AdminOsobaId}",
+            $"/Jednani/Save?asUser={_fixture.AdminOsobaId}",
             ApiTestHttpHelper.BuildForm(
                 ("ProjektId", projectId.ToString()),
                 ("CisloJednani", "123"),
@@ -47,7 +47,7 @@ public sealed class AjaxControllersTests
         var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 126);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync($"/Projekty/EditMeetingModal?projektId={projectId}&meetingId={meetingId}&asUser={_fixture.AdminOsobaId}");
+        var response = await client.GetAsync($"/Jednani/EditMeetingModal?projektId={projectId}&meetingId={meetingId}&asUser={_fixture.AdminOsobaId}");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var html = await response.Content.ReadAsStringAsync();
@@ -65,7 +65,7 @@ public sealed class AjaxControllersTests
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var request = ApiTestHttpHelper.BuildAjaxPost(
-            $"/Projekty/SaveMeeting?asUser={_fixture.AdminOsobaId}",
+            $"/Jednani/Save?asUser={_fixture.AdminOsobaId}",
             ApiTestHttpHelper.BuildForm(
                 ("Id", meetingId.ToString()),
                 ("ProjektId", projectId.ToString()),
@@ -96,7 +96,7 @@ public sealed class AjaxControllersTests
         var meetingId = await _fixture.CreateMeetingAsync(projectId, "CLOSED", 129);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync($"/Projekty/EditMeetingModal?projektId={projectId}&meetingId={meetingId}&asUser={_fixture.AdminOsobaId}");
+        var response = await client.GetAsync($"/Jednani/EditMeetingModal?projektId={projectId}&meetingId={meetingId}&asUser={_fixture.AdminOsobaId}");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -109,7 +109,7 @@ public sealed class AjaxControllersTests
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var request = ApiTestHttpHelper.BuildAjaxPost(
-            $"/Projekty/DeleteMeeting?asUser={_fixture.AdminOsobaId}",
+            $"/Jednani/Delete?asUser={_fixture.AdminOsobaId}",
             ApiTestHttpHelper.BuildForm(
                 ("JednaniId", meetingId.ToString()),
                 ("ProjektId", projectId.ToString())));

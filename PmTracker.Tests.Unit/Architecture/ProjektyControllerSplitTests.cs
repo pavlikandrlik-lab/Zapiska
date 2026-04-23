@@ -17,7 +17,6 @@ public sealed class ProjektyControllerSplitTests
     [Theory]
     [InlineData("PmTracker.Web/Controllers/ProjektyController.TabPartials.cs")]
     [InlineData("PmTracker.Web/Controllers/ProjektyController.ProjectModals.cs")]
-    [InlineData("PmTracker.Web/Controllers/ProjektyController.MeetingModals.cs")]
     [InlineData("PmTracker.Web/Controllers/ProjektyController.Commands.cs")]
     public void NewPartial_ShouldExistAndBePartial(string relativePath)
     {
@@ -79,11 +78,29 @@ public sealed class ProjektyControllerSplitTests
     }
 
     [Fact]
-    public void MeetingModals_ShouldContainMeetingModals()
+    public void MeetingEndpoints_ShouldLiveInJednaniController_NotProjekty()
     {
-        var content = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ProjektyController.MeetingModals.cs"));
-        content.Should().Contain("NewMeetingModal", "MeetingModals musí obsahovat NewMeetingModal");
-        content.Should().Contain("EditMeetingModal", "MeetingModals musí obsahovat EditMeetingModal");
+        // Meeting modaly a commands přesunuty z ProjektyController do JednaniController
+        // 2026-04-23 (viz docs/known-issues/meetings-endpoints-split-between-controllers.md).
+        var modalsPath = ResolvePath("PmTracker.Web/Controllers/JednaniController.Modals.cs");
+        var commandsPath = ResolvePath("PmTracker.Web/Controllers/JednaniController.Commands.cs");
+        File.Exists(modalsPath).Should().BeTrue("JednaniController.Modals.cs musí existovat");
+        File.Exists(commandsPath).Should().BeTrue("JednaniController.Commands.cs musí existovat");
+
+        var modalsContent = File.ReadAllText(modalsPath);
+        modalsContent.Should().Contain("NewMeetingModal", "Modals musí obsahovat NewMeetingModal");
+        modalsContent.Should().Contain("EditMeetingModal", "Modals musí obsahovat EditMeetingModal");
+
+        var commandsContent = File.ReadAllText(commandsPath);
+        commandsContent.Should().Contain("IActionResult> Save(", "Commands musí obsahovat Save (dříve SaveMeeting)");
+        commandsContent.Should().Contain("IActionResult> Delete(", "Commands musí obsahovat Delete (dříve DeleteMeeting)");
+
+        // ProjektyController staré akce nesmí obsahovat
+        File.Exists(ResolvePath("PmTracker.Web/Controllers/ProjektyController.MeetingModals.cs"))
+            .Should().BeFalse("ProjektyController.MeetingModals.cs musí být smazán — přesunuto do JednaniController.Modals.cs");
+        var projektyCommands = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ProjektyController.Commands.cs"));
+        projektyCommands.Should().NotContain("SaveMeeting(", "ProjektyController.Commands.cs nesmí obsahovat SaveMeeting");
+        projektyCommands.Should().NotContain("DeleteMeeting(", "ProjektyController.Commands.cs nesmí obsahovat DeleteMeeting");
     }
 
     [Fact]
@@ -92,8 +109,6 @@ public sealed class ProjektyControllerSplitTests
         var content = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ProjektyController.Commands.cs"));
         content.Should().Contain("SaveProject", "Commands musí obsahovat SaveProject");
         content.Should().Contain("DeleteProject", "Commands musí obsahovat DeleteProject");
-        content.Should().Contain("SaveMeeting", "Commands musí obsahovat SaveMeeting");
-        content.Should().Contain("DeleteMeeting", "Commands musí obsahovat DeleteMeeting");
         content.Should().Contain("SaveTeamMember", "Commands musí obsahovat SaveTeamMember");
         content.Should().Contain("RemoveTeamMember", "Commands musí obsahovat RemoveTeamMember");
         content.Should().Contain("AssignProjectRole(", "Commands musí obsahovat AssignProjectRole");
@@ -111,7 +126,6 @@ public sealed class ProjektyControllerSplitTests
         var content = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ProjektyController.Commands.cs"));
         content.Should().NotContain("NewProjectModal", "Commands nesmí obsahovat modal endpoint NewProjectModal");
         content.Should().NotContain("EditProjectModal", "Commands nesmí obsahovat modal endpoint EditProjectModal");
-        content.Should().NotContain("NewMeetingModal", "Commands nesmí obsahovat modal endpoint NewMeetingModal");
         content.Should().NotContain("RecordsTabPartial", "Commands nesmí obsahovat tab endpoint RecordsTabPartial");
         content.Should().NotContain("HarmonogramTabPartial", "Commands nesmí obsahovat tab endpoint HarmonogramTabPartial");
     }

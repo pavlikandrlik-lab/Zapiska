@@ -26,7 +26,7 @@
             {
                 if (Model.UseAjaxDelete)
                 {
-                    <form class="table-action-inline-form" asp-controller="Projekty" asp-action="DeleteMeeting" method="post" data-stop-propagation="true" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
+                    <form class="table-action-inline-form" asp-controller="Jednani" asp-action="Delete" method="post" data-stop-propagation="true" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
                         <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
                         <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
                         <button class="icon-btn meeting-delete-btn" type="submit" aria-label="Smazat jednání č. @Model.Jednani.CisloJednani">
@@ -42,7 +42,7 @@
                 }
                 else
                 {
-                    <form class="table-action-inline-form" asp-controller="Projekty" asp-action="DeleteMeeting" method="post" data-stop-propagation="true" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
+                    <form class="table-action-inline-form" asp-controller="Jednani" asp-action="Delete" method="post" data-stop-propagation="true" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
                         <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
                         <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
                         <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />

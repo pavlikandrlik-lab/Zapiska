@@ -9,18 +9,21 @@ using PmTracker.Web.Services.Security;
 namespace PmTracker.Web.Controllers;
 
 [Authorize]
-public sealed class JednaniController : BaseController
+public sealed partial class JednaniController : BaseController
 {
     private readonly IMeetingService _meetingService;
+    private readonly IProjectService _projectService;
 
     public JednaniController(
         IUserContextResolver userContextResolver,
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
-        IMeetingService meetingService)
+        IMeetingService meetingService,
+        IProjectService projectService)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _meetingService = meetingService;
+        _projectService = projectService;
     }
 
     public async Task<IActionResult> Index(int? projektId, CancellationToken ct = default)

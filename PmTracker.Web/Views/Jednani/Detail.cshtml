@@ -58,13 +58,13 @@
         @if (canEditMeetingFields)
         {
             <pm-button variant="Secondary"
-                       data-modal-url="@Url.Action("EditMeetingModal", "Projekty", new { projektId = Model.ProjektId, meetingId = Model.Jednani.Id })">
+                       data-modal-url="@Url.Action("EditMeetingModal", "Jednani", new { projektId = Model.ProjektId, meetingId = Model.Jednani.Id })">
                 Upravit jednání
             </pm-button>
         }
         @if (Model.CanEditMeeting)
         {
-            <form asp-controller="Projekty" asp-action="DeleteMeeting" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
+            <form asp-controller="Jednani" asp-action="Delete" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
                 <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
                 <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
                 <pm-button variant="Ghost" native-type="submit">Smazat</pm-button>

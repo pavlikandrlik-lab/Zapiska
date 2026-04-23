@@ -19,10 +19,13 @@ public sealed class ProjektyAuthzTests
 
         code.Should().Contain("[Authorize(Policy = \"permission:projects.delete\")]",
             "DeleteProject musí mít projects.delete");
-        code.Should().Contain("[Authorize(Policy = \"permission:meetings.edit\")]",
-            "DeleteMeeting musí mít meetings.edit");
         code.Should().Contain("CurrentUserContext.HasPermission(PermissionKeys.TeamManage, projektId)",
             "team.manage per-project check musí být proveden v body helperech (H-1 IDOR fix)");
+
+        // Meeting akce byly přesunuty do JednaniController — viz docs/known-issues/meetings-endpoints-split-between-controllers.md
+        var jednaniCommands = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/JednaniController.Commands.cs"));
+        jednaniCommands.Should().Contain("[Authorize(Policy = \"permission:meetings.edit\")]",
+            "JednaniController.Delete musí mít meetings.edit");
     }
 
     [Fact]
@@ -37,9 +40,11 @@ public sealed class ProjektyAuthzTests
     }
 
     [Fact]
-    public void ProjektyMeetingModals_ShouldUseCorrectPolicies()
+    public void JednaniMeetingModals_ShouldUseCorrectPolicies()
     {
-        var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/ProjektyController.MeetingModals.cs"));
+        // Meeting modaly přesunuty z ProjektyController.MeetingModals.cs do
+        // JednaniController.Modals.cs 2026-04-23.
+        var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/JednaniController.Modals.cs"));
 
         code.Should().Contain("[Authorize(Policy = \"permission:meetings.create\")]");
         code.Should().Contain("[Authorize(Policy = \"permission:meetings.edit\")]");

@@ -75,7 +75,8 @@ public sealed class JednaniControllerExceptionHandlingTests
             userContextResolver: null!,
             timeProvider: TimeProvider.System,
             loggerFactory: NullLoggerFactory.Instance,
-            meetingService)
+            meetingService,
+            Moq.Mock.Of<IProjectService>())
         {
             ControllerContext = new ControllerContext
             {

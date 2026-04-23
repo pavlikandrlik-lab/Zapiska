@@ -4,7 +4,7 @@ using PmTracker.Web.Models.ViewModels;
 
 namespace PmTracker.Web.Controllers;
 
-public sealed partial class ProjektyController
+public sealed partial class JednaniController
 {
     [HttpGet]
     [Authorize(Policy = "permission:meetings.create")]

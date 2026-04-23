@@ -87,53 +87,8 @@ public sealed class ProjektyControllerBehaviorTests
         model.Command.Stav.Should().Be("RUN");
     }
 
-    [Fact]
-    public async Task NewMeetingModal_ShouldUseLocalNowFromTimeProvider_ForDefaultDateAndTime()
-    {
-        const int projectId = 55;
-        var fixedUtcNow = new DateTimeOffset(2026, 7, 9, 14, 45, 0, TimeSpan.Zero);
-        var expectedLocalNow = TimeZoneInfo.ConvertTime(fixedUtcNow, TimeZoneInfo.Local).DateTime;
-        var timeProvider = new FixedTimeProvider(fixedUtcNow);
-
-        var projectService = new FakeProjectService
-        {
-            ProjektDetail = CreateEmptyProjektDetail(projectId)
-        };
-        var meetingService = new FakeMeetingService
-        {
-            NewMeetingModalResult = new MeetingModalViewModel
-            {
-                Title = "Nové jednání",
-                Command = new SaveMeetingCommand
-                {
-                    ProjektId = projectId,
-                    CisloJednani = 8,
-                    DatumPlanovane = expectedLocalNow.Date,
-                    CasZacatek = TimeOnly.FromDateTime(expectedLocalNow),
-                    StavJednani = "OPEN"
-                },
-                ExistingMeetingNumbersCsv = "7",
-                StavyJednani =
-                [
-                    new LookupOptionViewModel
-                    {
-                        Value = "OPEN",
-                        Label = "Otevreno"
-                    }
-                ]
-            }
-        };
-        var controller = CreateController(projectService, timeProvider, meetingService);
-
-        var result = await controller.NewMeetingModal(projectId);
-
-        var view = result.Should().BeOfType<ViewResult>().Subject;
-        var model = view.Model.Should().BeOfType<MeetingModalViewModel>().Subject;
-        model.Command.DatumPlanovane.Should().Be(expectedLocalNow.Date);
-        model.Command.CasZacatek.Should().Be(TimeOnly.FromDateTime(expectedLocalNow));
-        model.Command.CisloJednani.Should().Be(8);
-        model.Command.StavJednani.Should().Be("OPEN");
-    }
+    // NewMeetingModal test přesunut do JednaniControllerBehaviorTests po reorg
+    // endpointů Jednání (viz docs/known-issues/meetings-endpoints-split-between-controllers.md, 2026-04-23).
 
     [Fact]
     public async Task RecordMeetingCommentStates_ShouldReturnJsonPayload_FromProjectService()

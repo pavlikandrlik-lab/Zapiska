@@ -51,74 +51,10 @@ public sealed partial class ProjektyController
             onExceptionRedirect: _ => Task.FromResult<IActionResult>(RedirectToAction(nameof(Index))!));
     }
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveMeeting(SaveMeetingCommand command, CancellationToken ct = default)
-    {
-        EnsureReadableMeetingTimeError();
-
-        if (command.Id.HasValue)
-        {
-            if (!CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId))
-            {
-                return Forbid();
-            }
-
-            var isEditable = await _meetingService.IsMeetingEditableAsync(command.ProjektId, command.Id.Value, ct);
-            if (!isEditable.HasValue)
-            {
-                return NotFound();
-            }
-
-            if (!isEditable.Value)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden);
-            }
-        }
-
-        return await ExecuteValidatedCommandAsync(
-            hasPermission: () => command.Id.HasValue
-                ? CurrentUserContext.HasPermission(PermissionKeys.MeetingsEdit, command.ProjektId)
-                : CurrentUserContext.HasPermission(PermissionKeys.MeetingsCreate, command.ProjektId),
-            invalidAjaxMessage: "Poradu nelze uložit.",
-            invalidFallbackMessage: InvalidFormFallbackMessage,
-            onInvalidRedirect: () => RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" }),
-            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" })!),
-            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
-                refreshScope: "projekty-detail-jednani",
-                refreshUrl: Url.Action(nameof(JednaniTabPartial), "Projekty", new { id = command.ProjektId }),
-                projectId: command.ProjektId,
-                tab: "jednani",
-                message: "Jednání bylo uloženo.")),
-            operation: () => _meetingService.SaveMeetingAsync(command, CurrentUserContext, ct));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    [Authorize(Policy = "permission:meetings.edit")]
-    public Task<IActionResult> DeleteMeeting(DeleteMeetingCommand command, string? returnUrl, CancellationToken ct = default)
-    {
-        IActionResult RedirectAfterDelete()
-        {
-            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
-            {
-                return Redirect(returnUrl);
-            }
-
-            return RedirectToAction(nameof(Detail), new { id = command.ProjektId, tab = "jednani" });
-        }
-
-        return ExecuteCommandAsync(
-            hasPermission: () => true,
-            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectAfterDelete()),
-            onAjaxSuccess: () => Task.FromResult<IActionResult>(AjaxSuccessResult(
-                refreshScope: "projekty-detail-jednani",
-                refreshUrl: Url.Action(nameof(JednaniTabPartial), "Projekty", new { id = command.ProjektId }),
-                projectId: command.ProjektId,
-                tab: "jednani",
-                message: "Jednání bylo smazáno.")),
-            operation: () => _meetingService.DeleteMeetingAsync(command, CurrentUserContext, ct));
-    }
+    // Meeting akce (Save, Delete, NewMeetingModal, EditMeetingModal) přesunuty do
+    // JednaniController.Commands/Modals 2026-04-23. URL namespace dříve /Projekty/SaveMeeting
+    // nyní /Jednani/Save atd. — změnou primárního endpointu. Žádná backward-compat route
+    // není potřebná (interní UI forms, ne public bookmarks).
 
     // H-1 IDOR: projektId pochází z form body (command.ProjektId nebo query parametr),
     // ne z route. PermissionAuthorizationHandler čte projektId z RouteValues → pro tyto
@@ -228,27 +164,6 @@ public sealed partial class ProjektyController
             invalidFallbackMessage: InvalidFormFallbackMessage,
             successMessage: "Role v subsystému byla deaktivována.",
             operation: () => _projectService.DeactivateProjectSubsystemRoleAsync(command, CurrentUserContext, ct));
-    }
-
-    private void EnsureReadableMeetingTimeError()
-    {
-        var keys = new[] { nameof(SaveMeetingCommand.CasZacatek), $"command.{nameof(SaveMeetingCommand.CasZacatek)}" };
-        var hasCasError = keys.Any(key => ModelState.TryGetValue(key, out var entry) && entry.Errors.Count > 0);
-        if (!hasCasError)
-        {
-            return;
-        }
-
-        var hasReadableError = keys
-            .Where(key => ModelState.TryGetValue(key, out _))
-            .SelectMany(key => ModelState[key]!.Errors)
-            .Any(error => !string.IsNullOrWhiteSpace(error.ErrorMessage)
-                          && error.ErrorMessage.Contains("HH:mm", StringComparison.OrdinalIgnoreCase));
-
-        if (!hasReadableError)
-        {
-            ModelState.AddModelError(nameof(SaveMeetingCommand.CasZacatek), "Vyberte čas začátku ve formátu HH:mm.");
-        }
     }
 
     // H-1 IDOR fix: per-project kontrola je provedena zde v body.

@@ -64,9 +64,9 @@ public class AuthorizationPolicyEnforcementTests
             // Nelze vyjádřit jedinou policy (create se provádí bez projektId v route).
             "PmTracker.Web.Controllers.ProjektyController.SaveProject",
 
-            // SaveMeeting: dynamická create/edit větev — meetings.create OR meetings.edit
+            // JednaniController.Save: dynamická create/edit větev — meetings.create OR meetings.edit
             // projektId je v command (form body), ne v route pro create branch.
-            "PmTracker.Web.Controllers.ProjektyController.SaveMeeting",
+            "PmTracker.Web.Controllers.JednaniController.Save",
 
             // ---- ProjektyController team-management (H-1 IDOR fix) ----
             //

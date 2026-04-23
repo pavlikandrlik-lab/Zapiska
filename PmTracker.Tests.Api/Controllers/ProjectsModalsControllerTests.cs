@@ -149,7 +149,7 @@ public sealed class ProjectsModalsControllerTests
         await _fixture.CreateMeetingAsync(projectId, "OPEN", 13);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync($"/Projekty/NewMeetingModal?projektId={projectId}&asUser={_fixture.AdminOsobaId}");
+        var response = await client.GetAsync($"/Jednani/NewMeetingModal?projektId={projectId}&asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
         var decodedHtml = WebUtility.HtmlDecode(html);
 
@@ -159,7 +159,7 @@ public sealed class ProjectsModalsControllerTests
         html.Should().Contain("name=\"CisloJednani\"");
         html.Should().Contain("value=\"14\"", "další číslo jednání se má odvodit jako max+1");
         html.Should().Contain("data-existing-meeting-numbers=\"11,13\"");
-        html.Should().Contain("action=\"/Projekty/SaveMeeting\"");
+        html.Should().Contain("action=\"/Jednani/Save\"");
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public sealed class ProjectsModalsControllerTests
         var projectId = await _fixture.EnsureProjectAsync("APIMODAL_MEET_DENY");
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
 
-        var response = await client.GetAsync($"/Projekty/NewMeetingModal?projektId={projectId}&asUser={outsiderId}");
+        var response = await client.GetAsync($"/Jednani/NewMeetingModal?projektId={projectId}&asUser={outsiderId}");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -179,7 +179,7 @@ public sealed class ProjectsModalsControllerTests
     {
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
 
-        var response = await client.GetAsync($"/Projekty/NewMeetingModal?projektId=999999&asUser={_fixture.AdminOsobaId}");
+        var response = await client.GetAsync($"/Jednani/NewMeetingModal?projektId=999999&asUser={_fixture.AdminOsobaId}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

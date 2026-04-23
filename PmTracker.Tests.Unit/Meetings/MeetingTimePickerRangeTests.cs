@@ -80,7 +80,7 @@ public sealed class MeetingTimePickerRangeTests
     [Fact]
     public void MeetingModal_ShouldUseAppTimeFieldContract()
     {
-        var modal = LoadText("PmTracker.Web/Views/Projekty/NewMeetingModal.cshtml");
+        var modal = LoadText("PmTracker.Web/Views/Jednani/NewMeetingModal.cshtml");
 
         modal.Should().Contain("data-app-time-field", "modal musí používat custom app-time-field picker");
         modal.Should().Contain("data-app-time-grid", "modal musí obsahovat grid placeholder pro časové volby");
