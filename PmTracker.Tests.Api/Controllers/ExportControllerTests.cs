@@ -31,8 +31,15 @@ public sealed class ExportControllerTests
     }
 
     [Fact]
-    public async Task ReadEndpoints_ShouldReturnNotFound_WhenUserCannotAccessProject()
+    public async Task ReadEndpoints_ShouldReturnForbidden_WhenUserLacksExportPermissionForProject()
     {
+        // Architectural shift: všechny Export read endpointy mají
+        // [Authorize(Policy = "permission:export.pdf")] s project-scope check
+        // (PermissionAuthorizationHandler čte projektId z route). Uživatel bez té
+        // permission (nebo bez scope match) dostane 403 od framework-level policy —
+        // nikoliv 404 z EnsureProjectReadableAsync, jak tomu bylo před zavedením policy.
+        // 404 jako „hide project existence" se uplatní jen až za policy barierou, tj.
+        // uživatel permission MÁ, ale EnsureProjectReadableAsync zjistí jiný project.
         var userId = await _fixture.EnsurePersonAsync("ApiExportNoRead");
         var data = await CreateExportScenarioAsync();
 
@@ -50,7 +57,7 @@ public sealed class ExportControllerTests
         foreach (var route in routes)
         {
             var response = await client.GetAsync(route);
-            response.StatusCode.Should().Be(HttpStatusCode.NotFound, $"route {route} musí skrývat nepřístupný projekt");
+            response.StatusCode.Should().Be(HttpStatusCode.Forbidden, $"route {route} — policy blokuje uživatele bez export.pdf");
         }
     }
 
@@ -149,7 +156,9 @@ public sealed class ExportControllerTests
         html.Should().Contain("<th>Záznamy a vyjádření</th>");
         html.Should().Contain("551 (17.02.2026) | Ing. ApiExportOwner Api | 18.02.2026");
         html.Should().Contain("class=\"comment-item\" style=\"color:#2563EB;\"");
-        html.Should().Contain("content: '\\2022';");
+        // pdf-export.css je teď linkovaný (nikoliv inline), takže HTML neobsahuje surové
+        // CSS pravidlo. Ověříme link místo toho — bullet (\2022) se stylizuje v externím CSS.
+        html.Should().Contain("<link rel=\"stylesheet\" href=\"/css/pdf-export.css\"");
         html.Should().NotContain("comment-item highlight");
         html.Should().NotContain("style=\"background:");
     }
@@ -243,8 +252,9 @@ public sealed class ExportControllerTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain(".task-row.paused td");
-        html.Should().Contain("background: #fdf4e8;");
+        // CSS stylizace paused řádku (.task-row.paused td { background: #fdf4e8; }) se
+        // teď nachází v externím pdf-export.css. Template obsahuje jen class marker.
+        html.Should().Contain("<link rel=\"stylesheet\" href=\"/css/pdf-export.css\"");
         html.Should().Contain("class=\"task-row paused\"");
         html.Should().NotContain("record-title paused");
         html.Should().NotContain("record-code-badge paused");
@@ -417,8 +427,12 @@ public sealed class ExportControllerTests
         GetLocation(response).ToLowerInvariant().Should().Be($"/export/projekt/{data.ProjectId}/tisk?autoprint=true");
     }
 
+    // Routes WITHOUT specific `permission:` policy → class-level [Authorize] passes pro
+    // autentizovaného testovacího uživatele (TestAuthHandler), request doteče do
+    // BaseController.OnActionExecutionAsync, UserContextResolver selže a vyrenderuje se
+    // friendly AccessDenied page. /Export/Dialog je redirect-shim bez policy, takže tento
+    // flow platí.
     [Theory]
-    [InlineData("/Export/Projekt/1/Tisk")]
     [InlineData("/Export/Dialog?projektId=1")]
     public async Task ExportGetRoutes_ShouldReturnForbiddenAccessPage_WhenUserContextCannotBeResolved(string route)
     {
@@ -431,8 +445,23 @@ public sealed class ExportControllerTests
         html.Should().Contain("access-card");
     }
 
+    // Routes S `[Authorize(Policy = "permission:…")]` (ProjektTisk, Pdf, …) — policy
+    // handler selže ještě před BaseController.OnActionExecutionAsync, pipeline vrátí
+    // plain 403 bez těla. To je architektonicky správné — autorizační selhání nemá
+    // leakovat branded UI. Pokud bychom chtěli friendly rendering, přidáme UseStatusCodePages
+    // s re-execute na /Home/StatusCode?code=403 (Program.cs level change, out of scope).
+    [Theory]
+    [InlineData("/Export/Projekt/1/Tisk")]
+    public async Task ExportGetRoutes_WithPolicy_ShouldReturnPlainForbidden_WhenUserLacksPermission(string route)
+    {
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync(AppendAsUser(route, "99999999"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     [Fact]
-    public async Task Pdf_ShouldReturnForbiddenAccessPage_WhenUserContextCannotBeResolved()
+    public async Task Pdf_ShouldReturnPlainForbidden_WhenUserLacksExportPolicyPermission()
     {
         var data = await CreateExportScenarioAsync();
 
@@ -440,11 +469,10 @@ public sealed class ExportControllerTests
         using var form = ApiTestHttpHelper.BuildForm(("ProjektId", data.ProjectId.ToString()));
 
         var response = await client.PostAsync("/Export/Pdf?asUser=99999999", form);
-        var html = await response.Content.ReadAsStringAsync();
 
+        // Framework-level [Authorize(Policy = "permission:export.pdf")] short-circuituje
+        // s plain 403. Viz komentář u ExportGetRoutes_WithPolicy_…
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("text/html");
-        html.Should().Contain("access-card");
     }
 
     private async Task<ExportScenarioData> CreateExportScenarioAsync()
