@@ -17,10 +17,12 @@ import {
 import { queueRainbowSegmentRender } from "../ui.js";
 import { renderTimelineAxis } from "./timeline.js";
 
-// F-07: New async function that calls the server-side /Schedule/Recalc endpoint.
-// Replaces the local buildSchedulePlanAndActual calculation for the recalcAll path.
-async function fetchSchedulePreview(startDate, deadlineDate, steps, antiForgeryToken) {
+// F-07: async funkce volající server-side /Schedule/Recalc endpoint.
+// Per-action redesign 2026-04-23: projektId je nyní required v payloadu —
+// ScheduleController ověřuje HasPermission(schedule.preview, projektId).
+async function fetchSchedulePreview(projektId, startDate, deadlineDate, steps, antiForgeryToken) {
     const payload = {
+        projektId: projektId,
         recordId: 0,
         startDate: formatIsoDate(startDate),
         deadlineDate: formatIsoDate(deadlineDate),
@@ -692,7 +694,15 @@ export class ScheduleBlockRenderer {
 
         if (token) {
             try {
-                const serverResult = await fetchSchedulePreview(startDate, deadlineDate, state, token);
+                // Per-action redesign 2026-04-23: ProjektId je required pro authz check
+                // v /Schedule/Recalc. Zdroj: hidden input v editor formu (name="ProjektId").
+                const projektIdInput = this.form instanceof HTMLFormElement
+                    ? this.form.querySelector('input[name="ProjektId"]')
+                    : null;
+                const projektId = projektIdInput instanceof HTMLInputElement
+                    ? parseInt(projektIdInput.value, 10) || 0
+                    : 0;
+                const serverResult = await fetchSchedulePreview(projektId, startDate, deadlineDate, state, token);
                 if (serverResult && Array.isArray(serverResult.steps)) {
                     // Build plan/actual arrays from server response for the renderers
                     const plan = serverResult.steps.map((s) => ({
