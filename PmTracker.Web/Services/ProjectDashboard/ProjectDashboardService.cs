@@ -333,35 +333,18 @@ public sealed class ProjectDashboardService : IProjectDashboardService
         return new ProjectDashboardNesPanelViewModel { IsServiceDeskIntegrated = false };
     }
 
-    public async Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
-        int projektId, int osobaId, bool isSuperOrAppAdmin, CancellationToken ct)
+    public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
+        int projektId, bool muzeEditovat, CancellationToken ct)
     {
-        var muzeEditovat = isSuperOrAppAdmin || await CanUserEditProjectVyzvyAsync(projektId, osobaId, ct);
-        return await _vyzvyPanelBuilder.BuildAsync(projektId, muzeEditovat, ct);
+        // Per-action redesign 2026-04-23: muzeEditovat rozhoduje caller přes
+        // HasPermission(VyzvyCreate). CanUserEditProjectVyzvyAsync (hardcoded role codes)
+        // byl smazán — nálezy 1, 3, 9 z authz-ui-serverside-mismatch.md uzavřené.
+        return _vyzvyPanelBuilder.BuildAsync(projektId, muzeEditovat, ct);
     }
 
-    private async Task<bool> CanUserEditProjectVyzvyAsync(int projektId, int osobaId, CancellationToken ct)
-    {
-        var povoleneRolyKody = new[] { "proj_man", "adm_proj" };
-        return await _dbContext.ObsazeniProjektu.AsNoTracking()
-            .Where(o => o.ProjektId == projektId && o.OsobaId == osobaId && o.DatumOdebrani == null)
-            .Join(_dbContext.CiselnikRoliProjektu, o => o.RoleId, r => r.Id, (o, r) => r.Kod)
-            .AnyAsync(kod => povoleneRolyKody.Contains(kod), ct);
-    }
-
-    public async Task<bool> CanAccessDashboardAsync(int projectId, int osobaId, CancellationToken ct = default)
-    {
-        var activeRoleCodes = await (
-                from assignment in _dbContext.ObsazeniProjektu.AsNoTracking()
-                join role in _dbContext.CiselnikRoliProjektu.AsNoTracking() on assignment.RoleId equals role.Id
-                where assignment.ProjektId == projectId
-                    && assignment.OsobaId == osobaId
-                    && !assignment.DatumOdebrani.HasValue
-                select role.Kod)
-            .ToListAsync(ct);
-
-        return ProjectDashboardAuthorizationPolicy.HasDashboardAccess(activeRoleCodes);
-    }
+    // CanAccessDashboardAsync smazáno 2026-04-23 — nahrazeno Policy atributem
+    // [Authorize(Policy = "permission:dashboard.view")] na endpointech ProjectDashboardController.
+    // Hardkódovaný whitelist rolí (ProjectDashboardAuthorizationPolicy) smazán.
 
     private static YearKpiSnapshot ComputeYearKpi(
         List<RecordStatRow> allRecords,

@@ -214,20 +214,17 @@ public sealed class ProjectDashboardControllerBehaviorTests
         }
 
         public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
-            int projektId, int osobaId, bool isSuperOrAppAdmin, CancellationToken ct)
+            int projektId, bool muzeEditovat, CancellationToken ct)
         {
             return Task.FromResult(new ProjectDashboardVyzvyPanelViewModel
             {
                 ProjektId = projektId,
-                MuzeEditovat = false,
+                MuzeEditovat = muzeEditovat,
                 ChybaProjektuMessage = "Panel výzev se připravuje.",
             });
         }
 
-        public Task<bool> CanAccessDashboardAsync(int projectId, int osobaId, CancellationToken ct)
-        {
-            return Task.FromResult(_canAccess);
-        }
+        // CanAccessDashboardAsync smazáno v redesignu 2026-04-23.
     }
 
     private sealed class FakeUserContextResolver : IUserContextResolver

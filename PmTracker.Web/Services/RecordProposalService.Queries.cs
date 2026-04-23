@@ -179,37 +179,12 @@ public sealed partial class RecordProposalService
         throw new InvalidOperationException("Neznámý typ návrhu.");
     }
 
-    public async Task<ZaznamEditViewModel> BuildEditableRecordEditorFromProposalAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
-    {
-        var proposal = await LoadProposalAsync(projectId, proposalId, ct);
-        if (!await _authorizationPolicy.CanDecideProjectProposalAsync(projectId, currentUser, ct))
-        {
-            throw new InvalidOperationException("Převzetí návrhu do formuláře je dostupné jen projektovému manažerovi nebo administrátorovi projektu.");
-        }
-
-        if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase))
-        {
-            return await BuildPrefilledCreateRecordEditorFromProposalAsync(projectId, proposalId, currentUser, ct);
-        }
-
-        if (!string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Převzetí návrhu do formuláře je dostupné jen pro podporované typy návrhů.");
-        }
-
-        if (!proposal.ZaznamId.HasValue)
-        {
-            throw new InvalidOperationException("Návrh změny harmonogramu není navázán na záznam.");
-        }
-
-        var payload = DeserializePayload(proposal.PayloadJson);
-        var schedulePayload = payload.SchedulePlan
-            ?? throw new InvalidOperationException("Payload návrhu harmonogramu je neplatný.");
-        var model = await _projectEditQuery.GetEditModelAsync(proposal.ZaznamId.Value, ct);
-        ApplySchedulePayloadToModel(model, schedulePayload);
-        ConfigureStandardTakenOverScheduleEditor(model);
-        return model;
-    }
+    // BuildEditableRecordEditorFromProposalAsync SMAZÁNO v redesignu 2026-04-23.
+    // Bylo to bypass workflow (GET /Navrhy/EditFromProposal) — návrh zůstal ve stavu
+    // „čeká na rozhodnutí", i když se dotčený záznam reálně upravil. Správný postup:
+    //   souhlas většinou:      ApproveProposal + standardní ZaznamyController.Edit
+    //   nesouhlas, upravím:    RejectAndEditProposal (service → reject + client redirect)
+    // Viz NavrhyController (bypass endpoint smazán ve Fázi 2.4).
 
     public async Task<ZaznamEditViewModel> BuildPrefilledCreateRecordEditorFromProposalAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
@@ -478,9 +453,7 @@ public sealed partial class RecordProposalService
         model.CanApproveProposal = canDecide && isPending;
         model.CanRejectProposal = canDecide && isPending;
         model.CanRejectAndEditProposal = canDecide && isPending;
-        model.CanPrefillProposalForm = canDecide
-            && !isPending
-            && isCreateProposal;
+        // CanPrefillProposalForm smazáno z VM 2026-04-23 — EditFromProposal bypass zrušen.
         model.ProposalChangedFieldTooltips = changedFieldTooltips ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         model.ProposalChangedScheduleTypeTooltips = changedScheduleTypeTooltips ?? new Dictionary<int, string>();
     }

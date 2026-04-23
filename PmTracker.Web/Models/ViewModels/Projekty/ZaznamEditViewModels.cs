@@ -58,7 +58,7 @@ public sealed class ZaznamEditViewModel
     public bool CanApproveProposal { get; set; }
     public bool CanRejectProposal { get; set; }
     public bool CanRejectAndEditProposal { get; set; }
-    public bool CanPrefillProposalForm { get; set; }
+    // CanPrefillProposalForm smazáno 2026-04-23 — EditFromProposal bypass zrušen.
     public string? ProposalSummaryNote { get; set; }
     public IReadOnlyDictionary<string, string> ProposalChangedFieldTooltips { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyDictionary<int, string> ProposalChangedScheduleTypeTooltips { get; set; } = new Dictionary<int, string>();

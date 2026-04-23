@@ -295,8 +295,8 @@ public sealed class ProjektyControllerTeamAuthzTests
         public Task<ProjectDashboardRecordsPanelViewModel> BuildRecordsPanelAsync(int projectId, DateTime referenceDate, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ProjectDashboardStatisticsPanelViewModel> BuildStatisticsPanelAsync(int projectId, int year, CancellationToken ct = default) => throw new NotSupportedException();
         public ProjectDashboardNesPanelViewModel BuildNesPanel() => throw new NotSupportedException();
-        public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(int projektId, int osobaId, bool isSuperOrAppAdmin, CancellationToken ct) => throw new NotSupportedException();
-        public Task<bool> CanAccessDashboardAsync(int projectId, int osobaId, CancellationToken ct = default) => Task.FromResult(false);
+        public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(int projektId, bool muzeEditovat, CancellationToken ct) => throw new NotSupportedException();
+        // CanAccessDashboardAsync smazáno v redesignu 2026-04-23
     }
 
     private sealed class StubTempDataProvider : ITempDataProvider

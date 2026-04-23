@@ -92,11 +92,11 @@ public sealed class ProjectDashboardController : BaseController
             return Forbid();
         }
 
-        var model = await _dashboardService.BuildVyzvyPanelAsync(
-            id,
-            CurrentUserContext.OsobaId,
-            CurrentUserContext.IsSuperAdmin,
-            ct);
+        // Per-action redesign 2026-04-23: muzeEditovat je nyní plynule HasPermission check
+        // (žádné hardcoded role codes v service). Klíč vyzvy.create pokrývá oprávnění
+        // spravovat výzvy projektu.
+        var muzeEditovat = CurrentUserContext.HasPermission(PermissionKeys.VyzvyCreate, id);
+        var model = await _dashboardService.BuildVyzvyPanelAsync(id, muzeEditovat, ct);
         return PartialView("~/Views/ProjectDashboard/_VyzvyPanel.cshtml", model);
     }
 

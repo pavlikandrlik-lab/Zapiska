@@ -1,7 +1,66 @@
 # Specifikace — integrace s ticketovacím systémem
 
-**Stav:** rozpracováno (fáze 3 implementace)
+**Stav:** ⚠️ **ZASTARALÝ** k 2026-04-23 — viz banner níže. Ponechán jako audit trail původního návrhu.
 **Závisí na:** fáze 1 (základy) dokončena
+**Nahrazuje / doplňuje:** [2026-04-22-sync-infra-and-ad-design.md](../superpowers/specs/2026-04-22-sync-infra-and-ad-design.md), [2026-04-21-servicedesk-vytezovani-vyjadreni-design.md](../superpowers/specs/2026-04-21-servicedesk-vytezovani-vyjadreni-design.md), [2026-04-22-sd-sync-revise.md](../superpowers/plans/2026-04-22-sd-sync-revise.md)
+
+> ## ⚠️ ZASTARALÝ — NEPOUŽÍVAT JAKO ZDROJ PRAVDY
+>
+> **Tento spec je z velké části neaktuální** (aktualizováno 2026-04-23 po auditu stavu kódu).
+> Značná část architektury je **již implementovaná v kódu**, jinde a jinak, než spec předpokládá.
+> Pro jakoukoli novou práci nejdřív viz **Source of truth** níže.
+>
+> ### Co je už v kódu hotové
+>
+> Projekty **`PmTracker.ServiceDesk.Sql/`** a **`PmTracker.ServiceDesk.Contracts/`** (ne `PmTracker.Data/` jak spec tvrdí):
+>
+> - `TicketingReadOnlyDbContext` — read-only DbContext s hard guardem na `SaveChanges*` a DI toggle `Ticketing:Enabled`
+> - `SqlTicketingQueryService`, `SqlVyjadreniQueryService` — EF Core queries nad `HOT_*` tabulkami
+> - `CachingTicketingQueryService` — in-memory dekorátor (ne Hangfire!)
+> - `DisabledTicketingQueryService`, `DisabledVyjadreniQueryService` — fallbacky když je integrace vypnutá
+> - Entity: `HotZaznamEntity` (10 z 39 sloupců), `HotVyjadreniEntity`, `HotKalkulaceEntity`
+> - DTO: `HotZaznamDto`, `HotVyjadreniDto`, `HotKalkulaceDto`
+> - DI registrace: `AddServiceDeskIntegration(IConfiguration)` v `ServiceDeskServiceCollectionExtensions`
+> - Konfigurace: `TicketingOptions` (pattern `Ticketing:ConnectionStringName`, default `TicketingReadOnly`)
+>
+> ### Které otevřené otázky jsou zodpovězené
+>
+> - **T1 (schéma ticketing DB)** — **zodpovězeno**. DB = `intranetNEW` (MS SQL), tabulky `dbo.HOT_*`. Kompletní inventář v [SD_servicedesk/hotline.txt](../../SD_servicedesk/hotline.txt). Referenční BusinessLayer implementace z původní aplikace v [SD_servicedesk/Hotline.cs](../../SD_servicedesk/Hotline.cs) (2089 řádků, penalizační logika, workflow eventy U1–U11).
+> - **T3 (zdroj SLA termínu)** — **zodpovězeno**. Žádná samostatná DB "zobrazovače" neexistuje. `sla_deadline` je sloupec přímo na `HOT_ZAZNAMY`. To mění doporučení v sekci "Datový zdroj" (Varianta A/B neplatí).
+>
+> ### Co ze specu **přestalo platit**
+>
+> - **Hangfire** — **NEPOUŽÍVAT**. Spec [2026-04-22-sync-infra-and-ad-design.md](../superpowers/specs/2026-04-22-sync-infra-and-ad-design.md) zavádí vlastní infrastrukturu `PmTracker.Web.Services.Sync` (`SyncHostedServiceBase<T>`, `IReactiveSyncQueue<T>`, `ReactiveSyncConsumerBase<T>`) nad `BackgroundService` + `Channel<T>` + `TimeProvider`. Všechny Hangfire zmínky v tomto specu (sekce "Recurring job", `TicketingDeltaSyncJob`, `TicketingArchivePurgeJob`, `TicketingMetricsSyncJob`, Hangfire dashboard `/hangfire`) jsou **nahrazeny** touto infrastrukturou.
+> - **Umístění v `PmTracker.Data`** — kód je v `PmTracker.ServiceDesk.Sql`, izolovaný od hlavní DB vrstvy (správné rozhodnutí).
+> - **Hangfire admin UI na `/hangfire`** — nahrazuje admin UI `/Nastaveni?section=synchronizace` ze sync-infra specu.
+>
+> ### Co ze specu **stále platí jako návrh**
+>
+> - Princip **read-only servisního účtu** s rolí `db_datareader`
+> - **Separátní DbContext** a izolace přes DTO (implementováno přesně takto)
+> - **DI toggle** `Ticketing:Enabled` (implementováno)
+> - **Datový model** `TicketVyjadreniTag` (tagování pro vytěžování) — platí jako koncept, ale implementace patří do specu [2026-04-21-servicedesk-vytezovani-vyjadreni-design.md](../superpowers/specs/2026-04-21-servicedesk-vytezovani-vyjadreni-design.md)
+> - **Bezpečnostní principy** (connection string v secret manageru, ACL přes mapování projekt→subsystém, audit log manuálních tagů)
+>
+> ### Co v kódu **stále chybí**
+>
+> Oblasti na které spec upozorňuje a kde je potřeba další práce:
+>
+> - Entity pro: `HOT_IS`, `HOT_SUBSYSTEM`, `HOT_MODULY`, `HOT_PID`, `HOT_DODAVATEL`, `HOT_VYJADRENI_TEXT`, `HOT_TYMY`, `HOT_IS_LIMIT`
+> - Většina sloupců `HOT_ZAZNAMY` (29 z 39): `subsystem`, `modul`, `term_pl`, `rok`, `dulezitost`, `zavaznost`, `dodavatel`, `dat_res_t`, `dat_dod`, `priznak_zamceni`, `priznak_gdpr`, `utvar`, `zpracoval`, `schvalil`, `uzivatel`, `email`, atd.
+> - Service metody pro IS hierarchii (IS → subsystémy → moduly) a NES filtraci pro dashboard
+> - Workflow/transfer event tabulka (U1–U11) — v inventáři [hotline.txt](../../SD_servicedesk/hotline.txt) není, existence a umístění se musí ověřit
+> - Sync job (bude postaven nad `SyncHostedServiceBase<T>` ze sync-infra specu)
+>
+> ### Source of truth
+>
+> - **Kód:** [`PmTracker.ServiceDesk.Sql/`](../../PmTracker.ServiceDesk.Sql/), [`PmTracker.ServiceDesk.Contracts/`](../../PmTracker.ServiceDesk.Contracts/)
+> - **DB schéma:** [SD_servicedesk/hotline.txt](../../SD_servicedesk/hotline.txt) + [SD_servicedesk/Hotline.cs](../../SD_servicedesk/Hotline.cs)
+> - **Nová sync architektura:** [docs/superpowers/specs/2026-04-22-sync-infra-and-ad-design.md](../superpowers/specs/2026-04-22-sync-infra-and-ad-design.md)
+> - **Vytěžování vyjádření:** [docs/superpowers/specs/2026-04-21-servicedesk-vytezovani-vyjadreni-design.md](../superpowers/specs/2026-04-21-servicedesk-vytezovani-vyjadreni-design.md)
+> - **Implementační plán SD sync:** [docs/superpowers/plans/2026-04-22-sd-sync-revise.md](../superpowers/plans/2026-04-22-sd-sync-revise.md)
+
+---
 
 ## Kontext
 

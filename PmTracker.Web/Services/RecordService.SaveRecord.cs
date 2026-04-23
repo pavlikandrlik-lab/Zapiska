@@ -57,12 +57,16 @@ public sealed partial class RecordService
         var authz = currentUser.Authorization ?? throw new InvalidOperationException(
             "AuthorizationSnapshot must be populated for this request; UserContextResolver did not set it.");
 
+        // Per-action redesign 2026-04-23: records.schedule.add byl smazán — nový model má
+        // jen records.schedule.edit (plná editace harmonogramu) a records.edit (editace záznamu).
+        // Bývalá "append-only" větev je pryč; slot-level write restriction zůstává jako service
+        // invariant (harmonogram proposals = doporučený workflow pro non-edit role).
         var canEditRecord = authz.HasPermission(PermissionKeys.RecordsEdit, command.ProjektId);
+        var canCreateRecord = authz.HasPermission(PermissionKeys.RecordsCreate, command.ProjektId);
         var canEditScheduleFull = authz.HasPermission(PermissionKeys.RecordsScheduleEdit, command.ProjektId);
-        var canAddSchedule = authz.HasPermission(PermissionKeys.RecordsScheduleAdd, command.ProjektId);
-        if (!canEditRecord)
+        if (!canEditRecord && !canCreateRecord)
         {
-            if (!canEditScheduleFull && !canAddSchedule)
+            if (!canEditScheduleFull)
             {
                 throw new InvalidOperationException("Nemáte oprávnění upravovat tento záznam.");
             }

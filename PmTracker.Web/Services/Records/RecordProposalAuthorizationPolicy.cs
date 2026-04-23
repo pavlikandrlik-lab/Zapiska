@@ -34,7 +34,7 @@ public sealed class RecordProposalAuthorizationPolicy : IRecordProposalAuthoriza
 
     public async Task<RecordProposalProjectAuthorizationResult> EvaluateProjectAccessAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
-        var creatableSubsystemIds = await ResolveCreatableSubsystemIdsAsync(projectId, currentUser.OsobaId, ct);
+        var creatableSubsystemIds = await ResolveCreatableSubsystemIdsAsync(projectId, currentUser, ct);
         var canDecide = await CanDecideProjectProposalAsync(projectId, currentUser, ct);
         return new RecordProposalProjectAuthorizationResult(
             CanViewTab: canDecide || creatableSubsystemIds.Count > 0,
@@ -61,34 +61,38 @@ public sealed class RecordProposalAuthorizationPolicy : IRecordProposalAuthoriza
             projectAccess.CreatableSubsystemIds);
     }
 
-    public async Task<bool> CanDecideProjectProposalAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+    public Task<bool> CanDecideProjectProposalAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
+        // Per-action redesign 2026-04-23: hardkódovaný role-code check byl odstraněn
+        // (Nález 9 v authz-ui-serverside-mismatch.md). Rozhodování o návrzích (accept)
+        // je nyní vázáno na per-action klíč proposals.accept — seed řídí, které role ho
+        // mají (dnes SUPERADMIN, APP_ADMIN, VP, ADM_PROJ, PROJ_MAN).
         if (currentUser.OsobaId <= 0)
         {
-            return false;
+            return Task.FromResult(false);
         }
 
-        var activeProjectRoleCodes = await (
-                from assignment in _dbContext.ObsazeniProjektu.AsNoTracking()
-                join role in _dbContext.CiselnikRoliProjektu.AsNoTracking() on assignment.RoleId equals role.Id
-                where assignment.ProjektId == projectId
-                    && assignment.OsobaId == currentUser.OsobaId
-                    && !assignment.DatumOdebrani.HasValue
-                select role.Kod)
-            .ToListAsync(ct);
-
-        return activeProjectRoleCodes.Any(code =>
-            string.Equals(code, ProjectRoleCodes.ProjectAdmin, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(code, ProjectRoleCodes.ProjectManager, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(currentUser.HasPermission(PermissionKeys.ProposalsAccept, projectId));
     }
 
-    private async Task<HashSet<int>> ResolveCreatableSubsystemIdsAsync(int projectId, int osobaId, CancellationToken ct)
+    private async Task<HashSet<int>> ResolveCreatableSubsystemIdsAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct)
     {
-        if (osobaId <= 0)
+        if (currentUser.OsobaId <= 0)
         {
             return [];
         }
 
+        // Per-action redesign 2026-04-23: admin bypass. Uživatel s proposals.edit.any
+        // smí navrhovat pro jakýkoli subsystém projektu (nebo pro záznamy bez subsystému).
+        if (currentUser.HasPermission(PermissionKeys.ProposalsEditAny, projectId))
+        {
+            return (await _dbContext.ProjektSubsystemy.AsNoTracking()
+                .Where(x => x.ProjektId == projectId && !x.DatumOdebrani.HasValue)
+                .Select(x => x.SubsystemId)
+                .ToListAsync(ct)).ToHashSet();
+        }
+
+        // Non-admin: VEDOUCI_SUBSYSTEMU / ZASTUPCE — jen subsystémy, kde má roli Lead/DeputyLead.
         var subsystemRoleIds = await _dbContext.CiselnikRoliSubsystemu.AsNoTracking()
             .Where(x => x.Kod == SubsystemRoleCodes.Lead || x.Kod == SubsystemRoleCodes.DeputyLead)
             .Select(x => x.Id)
@@ -104,7 +108,7 @@ public sealed class RecordProposalAuthorizationPolicy : IRecordProposalAuthoriza
                 join projectSubsystem in _dbContext.ProjektSubsystemy.AsNoTracking() on assignment.ProjektSubsystemId equals projectSubsystem.Id
                 where projectSubsystem.ProjektId == projectId
                     && !projectSubsystem.DatumOdebrani.HasValue
-                    && assignment.OsobaId == osobaId
+                    && assignment.OsobaId == currentUser.OsobaId
                     && !assignment.DatumOdebrani.HasValue
                     && roleIdSet.Contains(assignment.RoleSubsystemuId)
                 select projectSubsystem.SubsystemId)

@@ -113,8 +113,9 @@ public sealed partial class ProjektyController : BaseController
         model.CanManageRecords = canManageRecords;
         model.CanManageSchedules = canManageSchedules;
         model.CanViewProposals = await _recordProposalService.CanViewProposalTabAsync(projectId, CurrentUserContext, ct);
-        model.CanViewDashboard = CurrentUserContext.IsSuperAdmin
-            || await _projectDashboardService.CanAccessDashboardAsync(projectId, CurrentUserContext.OsobaId, ct);
+        // Per-action redesign 2026-04-23: dashboard.view klíč řídí viditelnost tlačítka
+        // (hardkódovaný whitelist rolí ProjectDashboardAuthorizationPolicy smazán).
+        model.CanViewDashboard = CurrentUserContext.HasPermission(PermissionKeys.DashboardView, projectId);
         model.PageTitle = model.Projekt.Nazev;
         model.BackUrl = Url.Action("Index", "Projekty") ?? "/Projekty";
         model.BackLabel = "Zpět na přehled";

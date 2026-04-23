@@ -17,14 +17,15 @@ public sealed partial class VyzvaService
         if (odkaz == null)
             return Fail<Unit>(VyzvaErrorCode.ExternalLinkNotFound, "Externí vazba nenalezena");
 
-        // ACL: resolve owning projektId and verify records.edit before any state checks
+        // Per-action redesign 2026-04-23: vyzvy.pnf.assign (specifický klíč pro buffer assignment).
+        // Controller už jeden check provedl; service má second layer pro nezávislé volání (např. z jiné cesty).
         var projektId = await _db.ProjektoveZaznamy
             .Where(z => z.Id == odkaz.ZaznamId)
             .Select(z => z.ProjektId)
             .FirstOrDefaultAsync(ct);
 
-        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, projektId, ct: ct))
-            return Fail<Unit>(VyzvaErrorCode.AccessDenied, "Nemáte oprávnění upravovat záznamy tohoto projektu");
+        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.VyzvyPnfAssign, projektId, ct: ct))
+            return Fail<Unit>(VyzvaErrorCode.AccessDenied, "Nemáte oprávnění měnit zařazení PNF do výzvy.");
 
         var pnfTypId = await GetPnfTypIdAsync(ct);
         if (odkaz.TypOdkazuId != pnfTypId)
@@ -78,8 +79,9 @@ public sealed partial class VyzvaService
             .Select(z => z.ProjektId)
             .FirstOrDefaultAsync(ct);
 
-        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, sourceProjektId, ct: ct))
-            return Fail<Unit>(VyzvaErrorCode.AccessDenied, "Nemáte oprávnění upravovat záznamy zdrojového projektu");
+        // Per-action redesign 2026-04-23: vyzvy.pnf.reassign (specifický klíč).
+        if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.VyzvyPnfReassign, sourceProjektId, ct: ct))
+            return Fail<Unit>(VyzvaErrorCode.AccessDenied, "Nemáte oprávnění přeřadit PNF ve zdrojovém projektu.");
 
         // ACL: target project check (only when cross-project)
         if (cilovaVyzvaId.HasValue)
@@ -91,8 +93,8 @@ public sealed partial class VyzvaService
 
             if (targetProjektId.HasValue && targetProjektId.Value != sourceProjektId)
             {
-                if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.RecordsEdit, targetProjektId.Value, ct: ct))
-                    return Fail<Unit>(VyzvaErrorCode.AccessDenied, "Nemáte oprávnění upravovat záznamy cílového projektu");
+                if (!await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.VyzvyPnfReassign, targetProjektId.Value, ct: ct))
+                    return Fail<Unit>(VyzvaErrorCode.AccessDenied, "Nemáte oprávnění přeřadit PNF do cílového projektu.");
             }
         }
 

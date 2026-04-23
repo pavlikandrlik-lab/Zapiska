@@ -188,15 +188,8 @@
                     Zamítnout a upravit
                 </pm-button>
             }
-            @if (Model.CanPrefillProposalForm)
-            {
-                <pm-button variant="Secondary"
-                           data-record-editor-url="@Url.Action("EditFromProposal", "Navrhy", new { projektId = Model.ProjektId, proposalId = Model.ProposalId })"
-                           data-record-editor-project-id="@Model.ProjektId"
-                           data-record-editor-label="@($"Předvyplnit formulář z návrhu #{Model.ProposalId}")">
-                    Předvyplnit formulář
-                </pm-button>
-            }
+            @* Tlačítko „Předvyplnit formulář" (→ EditFromProposal bypass) smazáno 2026-04-23.
+               Admin, který chce „přijmout s úpravou": ApproveProposal + standardní Edit záznamu. *@
         }
         else
         {

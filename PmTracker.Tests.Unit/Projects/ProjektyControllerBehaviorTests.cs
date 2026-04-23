@@ -623,10 +623,9 @@ public sealed class ProjektyControllerBehaviorTests
             => throw new NotSupportedException();
 
         public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
-            int projektId, int osobaId, bool isSuperOrAppAdmin, CancellationToken ct)
+            int projektId, bool muzeEditovat, CancellationToken ct)
             => throw new NotSupportedException();
 
-        public Task<bool> CanAccessDashboardAsync(int projectId, int osobaId, CancellationToken ct = default)
-            => Task.FromResult(false);
+        // CanAccessDashboardAsync smazáno v redesignu 2026-04-23 — dashboard.view policy na endpointech.
     }
 }

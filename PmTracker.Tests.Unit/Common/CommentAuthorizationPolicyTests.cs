@@ -10,12 +10,12 @@ public sealed class CommentAuthorizationPolicyTests
     private readonly CommentAuthorizationPolicy _sut = new();
 
     [Fact]
-    public void CanAddComment_ShouldAllow_WhenUserHasRecordsEdit()
+    public void CanAddComment_ShouldAllow_WhenUserHasCommentsAdd()
     {
         var user = BuildUser(
             osobaId: 5,
             visibleProjectIds: [2],
-            globalPermissions: [PermissionKeys.RecordsEdit]);
+            globalPermissions: [PermissionKeys.CommentsAdd]);
 
         _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [999], isDraftMeeting: false).Should().BeTrue();
     }
@@ -28,7 +28,7 @@ public sealed class CommentAuthorizationPolicyTests
             visibleProjectIds: [2],
             perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
             {
-                { 2, new HashSet<string> { PermissionKeys.RecordsCommentSubsystemLead } }
+                { 2, new HashSet<string> { PermissionKeys.MeetingsNotesSubsystemLead } }
             });
 
         _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12, 14]).Should().BeTrue();
@@ -42,7 +42,7 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 20,
             visibleProjectIds: [9],
-            globalPermissions: [PermissionKeys.RecordsCommentSubsystemLead]);
+            globalPermissions: [PermissionKeys.MeetingsNotesSubsystemLead, PermissionKeys.CommentsEditOwn]);
 
         _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 20, isDraftMeeting: true).Should().BeTrue();
         _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 30, isDraftMeeting: true).Should().BeFalse();
@@ -56,7 +56,7 @@ public sealed class CommentAuthorizationPolicyTests
             visibleProjectIds: [2],
             perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
             {
-                { 2, new HashSet<string> { PermissionKeys.RecordsCommentSubsystemLead } }
+                { 2, new HashSet<string> { PermissionKeys.MeetingsNotesSubsystemLead } }
             });
 
         _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12], isDraftMeeting: false).Should().BeFalse();
@@ -68,18 +68,18 @@ public sealed class CommentAuthorizationPolicyTests
         var user = BuildUser(
             osobaId: 20,
             visibleProjectIds: [9],
-            globalPermissions: [PermissionKeys.RecordsCommentSubsystemLead]);
+            globalPermissions: [PermissionKeys.MeetingsNotesSubsystemLead]);
 
         _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [20, 21], commentAuthorOsobaId: 20, isDraftMeeting: false).Should().BeFalse();
     }
 
     [Fact]
-    public void CanModifyComment_ShouldAllowForeignComment_WhenUserHasRecordsEdit()
+    public void CanModifyComment_ShouldAllowForeignComment_WhenUserHasCommentsEditAny()
     {
         var user = BuildUser(
             osobaId: 20,
             visibleProjectIds: [9],
-            globalPermissions: [PermissionKeys.RecordsEdit]);
+            globalPermissions: [PermissionKeys.CommentsEditAny]);
 
         _sut.CanModifyComment(user, projektId: 9, subsystemLeadEquivalentOsobaIds: [21], commentAuthorOsobaId: 30, isDraftMeeting: false).Should().BeTrue();
     }
@@ -93,7 +93,7 @@ public sealed class CommentAuthorizationPolicyTests
             deletedProjectIds: [2],
             perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
             {
-                { 2, new HashSet<string> { PermissionKeys.RecordsCommentSubsystemLead } }
+                { 2, new HashSet<string> { PermissionKeys.MeetingsNotesSubsystemLead } }
             });
 
         _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12]).Should().BeFalse();

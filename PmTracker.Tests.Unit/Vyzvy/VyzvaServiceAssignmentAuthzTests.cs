@@ -30,7 +30,7 @@ public sealed class VyzvaServiceAssignmentAuthzTests
 
         mock.Setup(a => a.HasPermissionAsync(
                 OsobaId,
-                PermissionKeys.RecordsEdit,
+                PermissionKeys.VyzvyPnfAssign,
                 ProjektId,
                 null,
                 It.IsAny<CancellationToken>()))
@@ -40,7 +40,7 @@ public sealed class VyzvaServiceAssignmentAuthzTests
         {
             mock.Setup(a => a.HasPermissionAsync(
                     OsobaId,
-                    PermissionKeys.RecordsEdit,
+                    PermissionKeys.VyzvyPnfAssign,
                     targetProjektId.Value,
                     null,
                     It.IsAny<CancellationToken>()))
@@ -189,9 +189,9 @@ public sealed class VyzvaServiceAssignmentAuthzTests
 
             // User has records.edit on source (1) but NOT on target (99)
             var authz = new Mock<IAuthorizationService>();
-            authz.Setup(a => a.HasPermissionAsync(OsobaId, PermissionKeys.RecordsEdit, ProjektId, null, It.IsAny<CancellationToken>()))
+            authz.Setup(a => a.HasPermissionAsync(OsobaId, PermissionKeys.VyzvyPnfReassign, ProjektId, null, It.IsAny<CancellationToken>()))
                  .ReturnsAsync(true);
-            authz.Setup(a => a.HasPermissionAsync(OsobaId, PermissionKeys.RecordsEdit, CiziProjektId, null, It.IsAny<CancellationToken>()))
+            authz.Setup(a => a.HasPermissionAsync(OsobaId, PermissionKeys.VyzvyPnfReassign, CiziProjektId, null, It.IsAny<CancellationToken>()))
                  .ReturnsAsync(false);
 
             var user = CreateUserMock();
@@ -224,9 +224,9 @@ public sealed class VyzvaServiceAssignmentAuthzTests
 
             // User has records.edit on BOTH projects
             var authz = new Mock<IAuthorizationService>();
-            authz.Setup(a => a.HasPermissionAsync(OsobaId, PermissionKeys.RecordsEdit, ProjektId, null, It.IsAny<CancellationToken>()))
+            authz.Setup(a => a.HasPermissionAsync(OsobaId, PermissionKeys.VyzvyPnfReassign, ProjektId, null, It.IsAny<CancellationToken>()))
                  .ReturnsAsync(true);
-            authz.Setup(a => a.HasPermissionAsync(OsobaId, PermissionKeys.RecordsEdit, CiziProjektId, null, It.IsAny<CancellationToken>()))
+            authz.Setup(a => a.HasPermissionAsync(OsobaId, PermissionKeys.VyzvyPnfReassign, CiziProjektId, null, It.IsAny<CancellationToken>()))
                  .ReturnsAsync(true);
 
             var user = CreateUserMock();
