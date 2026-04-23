@@ -148,6 +148,25 @@ public sealed class SDConnectorController : Controller
         {
             // Review finding S-3: full exception server-side, do UI jen TraceId.
             _logger.LogError(ex, "ReHarvest selhal pro externí odkaz {Id}.", externiOdkazId);
+            // Review finding M-R2-3: audit entry i při selhání, aby byla stopa pokusu.
+            try
+            {
+                await _auditWriteService.WriteAsync(_currentUser.OsobaId, new AuditWriteEntry(
+                    AuditActionType.Update,
+                    AuditEntityType.SdExterniOdkaz,
+                    externiOdkazId.ToString(CultureInfo.InvariantCulture),
+                    BeforeState: null,
+                    AfterState: new
+                    {
+                        Action = "reharvest.failed",
+                        Source = "SDConnectorController",
+                        TraceId = HttpContext.TraceIdentifier
+                    }), ct).ConfigureAwait(false);
+            }
+            catch (Exception auditEx)
+            {
+                _logger.LogWarning(auditEx, "ReHarvest: zápis auditu selhání selhal pro {Id}.", externiOdkazId);
+            }
             TempData["SDConnectorError"] = $"Re-harvest selhal. TraceId: {HttpContext.TraceIdentifier}";
         }
         return RedirectToAction(nameof(Index));

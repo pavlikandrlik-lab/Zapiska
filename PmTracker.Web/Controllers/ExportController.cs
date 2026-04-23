@@ -193,6 +193,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpPost("Pdf")]
+    [ValidateAntiForgeryToken]
     [Authorize(Policy = "permission:export.pdf")]
     public IActionResult Pdf(PdfExportRequestViewModel request)
     {

@@ -276,6 +276,25 @@ public sealed class VyjadreniModalController : Controller
         catch (Exception ex)
         {
             _logger.LogError(ex, "ReHarvest selhal pro externí odkaz {Id}.", externiOdkazId);
+            // Review finding M-R2-3: audit entry i při selhání, aby byla stopa pokusu.
+            try
+            {
+                await _auditWriteService.WriteAsync(_currentUser.OsobaId, new AuditWriteEntry(
+                    AuditActionType.Update,
+                    AuditEntityType.SdExterniOdkaz,
+                    externiOdkazId.ToString(CultureInfo.InvariantCulture),
+                    BeforeState: null,
+                    AfterState: new
+                    {
+                        Action = "reharvest.failed",
+                        Source = "VyjadreniModalController",
+                        TraceId = HttpContext.TraceIdentifier
+                    }), ct).ConfigureAwait(false);
+            }
+            catch (Exception auditEx)
+            {
+                _logger.LogWarning(auditEx, "ReHarvest: zápis auditu selhání selhal pro {Id}.", externiOdkazId);
+            }
             // Review finding S-3: nelogovat exception.Message do odpovědi, jen trace id.
             return StatusCode(500, new { Error = $"Re-harvest selhal. TraceId: {HttpContext.TraceIdentifier}" });
         }
