@@ -35,16 +35,35 @@ public sealed class TicketingReadOnlyDbContext : DbContext
         {
             e.ToTable("HOT_ZAZNAMY", "dbo");
             e.HasKey(x => x.Radek);
+
             e.Property(x => x.Radek).HasColumnName("radek");
             e.Property(x => x.Id).HasColumnName("id");
-            e.Property(x => x.TypZaznamu).HasColumnName("typ_zaznamu");
-            e.Property(x => x.Strucne).HasColumnName("strucne");
+            e.Property(x => x.TypZaznamu).HasColumnName("typ_zaznamu").HasMaxLength(5);
+            e.Property(x => x.Strucne).HasColumnName("strucne").HasMaxLength(250);
             e.Property(x => x.Popis).HasColumnName("popis");
             e.Property(x => x.Pid).HasColumnName("pid").HasMaxLength(50);
             e.Property(x => x.Stav).HasColumnName("stav").HasMaxLength(50);
-            e.Property(x => x.Splneno).HasColumnName("splneno");
-            e.Property(x => x.SlaDeadline).HasColumnName("sla_deadline");
-            e.Property(x => x.Datum).HasColumnName("datum");
+            e.Property(x => x.Splneno).HasColumnName("splneno").HasColumnType("smalldatetime");
+            e.Property(x => x.SlaDeadline).HasColumnName("sla_deadline").HasColumnType("datetime");
+            e.Property(x => x.Datum).HasColumnName("datum").HasColumnType("smalldatetime");
+
+            // nová pole
+            e.Property(x => x.Modul).HasColumnName("modul").HasMaxLength(50);
+            e.Property(x => x.Subsystem).HasColumnName("subsystem").HasMaxLength(5);
+            e.Property(x => x.TermPl).HasColumnName("term_pl").HasColumnType("smalldatetime");
+            e.Property(x => x.DatResT).HasColumnName("dat_res_t").HasColumnType("smalldatetime");
+            e.Property(x => x.DatDod).HasColumnName("dat_dod").HasColumnType("smalldatetime");
+            e.Property(x => x.Dulezitost).HasColumnName("dulezitost").HasMaxLength(10);
+            e.Property(x => x.Zavaznost).HasColumnName("zavaznost").HasMaxLength(50);
+            e.Property(x => x.Dodavatel).HasColumnName("dodavatel").HasMaxLength(50);
+            e.Property(x => x.ResTym).HasColumnName("res_tym").HasMaxLength(50);
+            e.Property(x => x.Zpracoval).HasColumnName("zpracoval").HasMaxLength(50);
+            e.Property(x => x.Uzivatel).HasColumnName("uzivatel").HasMaxLength(50);
+            e.Property(x => x.Email).HasColumnName("email").HasMaxLength(50);
+            e.Property(x => x.ZalHfu).HasColumnName("zal_HFU").HasMaxLength(50);
+            e.Property(x => x.PriznakZamceni).HasColumnName("priznak_zamceni");
+            e.Property(x => x.PriznakGdpr).HasColumnName("priznak_gdpr");
+            e.Property(x => x.Schvaleno).HasColumnName("schvaleno");
         });
 
         mb.Entity<HotKalkulaceEntity>(e =>
