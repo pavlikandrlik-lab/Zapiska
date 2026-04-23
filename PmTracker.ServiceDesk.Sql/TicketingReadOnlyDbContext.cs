@@ -17,6 +17,7 @@ public sealed class TicketingReadOnlyDbContext : DbContext
     internal DbSet<HotVyjadreniEntity> HotVyjadreni => Set<HotVyjadreniEntity>();
     internal DbSet<HotSubsystemEntity> HotSubsystemy => Set<HotSubsystemEntity>();
     internal DbSet<HotModulyEntity> HotModuly => Set<HotModulyEntity>();
+    internal DbSet<HotIsEntity> HotIs => Set<HotIsEntity>();
 
     public override int SaveChanges()
         => throw new InvalidOperationException("TicketingReadOnlyDbContext is strictly read-only.");
@@ -144,6 +145,19 @@ public sealed class TicketingReadOnlyDbContext : DbContext
             e.Property(x => x.Faze).HasColumnName("faze").HasMaxLength(8);
             e.Property(x => x.Aktivita).HasColumnName("aktivita").HasMaxLength(10);
             e.Property(x => x.Dodavatel).HasColumnName("dodavatel").HasMaxLength(50);
+        });
+
+        mb.Entity<HotIsEntity>(e =>
+        {
+            e.ToTable("HOT_IS", "dbo");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("ID");   // Pozor: v DB je 'ID' (velká písmena) — viz discovery
+            e.Property(x => x.Nazev).HasColumnName("nazev").HasMaxLength(50);
+            e.Property(x => x.Zkratka).HasColumnName("zkratka").HasMaxLength(10);
+            e.Property(x => x.Aktivita).HasColumnName("aktivita").HasMaxLength(10).IsFixedLength();
+            e.Property(x => x.Limit).HasColumnName("limit").HasColumnType("numeric(18,2)");
+            e.Property(x => x.Cerpani).HasColumnName("cerpani").HasColumnType("numeric(18,2)");
+            e.Property(x => x.Semafor).HasColumnName("semafor").HasMaxLength(5);
         });
     }
 }
