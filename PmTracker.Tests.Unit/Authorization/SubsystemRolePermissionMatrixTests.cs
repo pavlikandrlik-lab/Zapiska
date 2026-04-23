@@ -3,26 +3,41 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Authorization;
 
+/// <summary>
+/// Cílová matice subsystémových rolí (per-action redesign 2026-04-23).
+/// Zdroj pravdy: docs/known-issues/authz-target-matrix.xlsx.
+///
+/// Deprecated klíč records.comment.subsystemlead je v seedu zachován během F1–F6
+/// pro kompatibilitu; smaže se v F7.
+/// </summary>
 public sealed class SubsystemRolePermissionMatrixTests
 {
     private static string[] PermissionsFor(string roleKod) =>
         PermissionSeedConfiguration.RoleMappings
             .Where(m => m.RoleKod == roleKod && m.IsAllowed)
             .Select(m => m.ActionKlic)
-            .OrderBy(x => x)
+            .OrderBy(x => x, StringComparer.Ordinal)
             .ToArray();
+
+    // VEDOUCI + ZASTUPCE mají identickou sadu (14 cílových klíčů + deprecated records.comment.subsystemlead).
+    private static readonly string[] SubsystemLeadTargetKeys =
+    [
+        "comments.add", "comments.delete.own", "comments.edit.own",
+        "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
+        "dashboard.view", "dashboard.vyzvy.view",
+        "meetings.notes.subsystemlead",
+        "proposals.edit.own", "proposals.record.create", "proposals.schedule.create",
+        "schedule.preview",
+        "search.index",
+        // Deprecated (kompat F1–F6):
+        "records.comment.subsystemlead"
+    ];
 
     [Fact]
     public void VEDOUCI_SUBSYSTEMU_ShouldHaveSubsystemLeadAndCommentsPermissions()
     {
-        // Fáze C — Task C2: VEDOUCI dostává comments.* klíče
-        PermissionsFor("VEDOUCI_SUBSYSTEMU").Should().BeEquivalentTo(new[]
-        {
-            "comments.add",
-            "comments.delete.own",
-            "comments.edit.own",
-            "records.comment.subsystemlead"
-        });
+        PermissionsFor("VEDOUCI_SUBSYSTEMU")
+            .Should().BeEquivalentTo(SubsystemLeadTargetKeys.OrderBy(x => x, StringComparer.Ordinal));
     }
 
     [Fact]
@@ -35,12 +50,12 @@ public sealed class SubsystemRolePermissionMatrixTests
     [Fact]
     public void METODIK_SUBSYSTEMU_ShouldHaveComments()
     {
-        // Fáze C — Task C2: METODIK_SUBSYSTEMU dostává komentovací práva
         PermissionsFor("METODIK_SUBSYSTEMU").Should().BeEquivalentTo(new[]
         {
-            "comments.add",
-            "comments.delete.own",
-            "comments.edit.own"
+            "comments.add", "comments.delete.own", "comments.edit.own",
+            "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
+            "dashboard.view", "dashboard.vyzvy.view",
+            "search.index"
         });
     }
 }

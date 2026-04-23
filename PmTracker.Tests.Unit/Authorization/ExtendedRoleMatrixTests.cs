@@ -3,6 +3,14 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Authorization;
 
+/// <summary>
+/// Smoke testy nad seed matricí rolí — "role obsahuje aspoň očekávané klíče" (nikoli
+/// striktní ekvivalence, ta je v <see cref="ProjectRolePermissionMatrixTests"/>
+/// a <see cref="SubsystemRolePermissionMatrixTests"/>).
+///
+/// Po per-action redesignu 2026-04-23: admin role (SUPERADMIN, APP_ADMIN) mají
+/// kompletní matrix (76 klíčů), včetně export.* a comments.*.
+/// </summary>
 public sealed class ExtendedRoleMatrixTests
 {
     private static string[] PermissionsFor(string roleKod) =>
@@ -18,19 +26,17 @@ public sealed class ExtendedRoleMatrixTests
         var perms = PermissionsFor("SUPERADMIN");
         perms.Should().Contain(new[]
         {
-            "dashboard.view", "export.pdf", "export.word",
+            "dashboard.view", "export.pdf.projekt", "export.word.projekt",
             "comments.add", "comments.edit.own", "comments.delete.own",
             "search.reindex", "projects.read.all"
         });
     }
 
     [Fact]
-    public void APP_ADMIN_ShouldHaveSearchReindexAndReadAllAndDashboard()
+    public void APP_ADMIN_ShouldEqualSuperadminMatrix()
     {
-        var perms = PermissionsFor("APP_ADMIN");
-        perms.Should().Contain(new[] { "search.reindex", "projects.read.all", "dashboard.view" });
-        perms.Should().NotContain(new[] { "export.pdf", "export.word", "comments.add" },
-            "APP_ADMIN je administrativní role — neexportuje/nekomentuje projekty");
+        // Po per-action redesignu: APP_ADMIN = SUPERADMIN na úrovni permission modelu.
+        PermissionsFor("APP_ADMIN").Should().BeEquivalentTo(PermissionsFor("SUPERADMIN"));
     }
 
     [Fact]
@@ -39,7 +45,7 @@ public sealed class ExtendedRoleMatrixTests
         var perms = PermissionsFor("VLASTNIK_PROJEKTU");
         perms.Should().Contain(new[]
         {
-            "dashboard.view", "export.pdf", "export.word",
+            "dashboard.view", "export.pdf.projekt", "export.word.projekt",
             "comments.add", "comments.edit.own", "comments.delete.own"
         });
     }
@@ -52,7 +58,7 @@ public sealed class ExtendedRoleMatrixTests
         var perms = PermissionsFor(roleKod);
         perms.Should().Contain(new[]
         {
-            "dashboard.view", "export.pdf", "export.word",
+            "dashboard.view", "export.pdf.projekt", "export.word.projekt",
             "comments.add", "comments.edit.own", "comments.delete.own"
         });
         perms.Should().NotContain("projects.edit");
@@ -62,24 +68,25 @@ public sealed class ExtendedRoleMatrixTests
     public void HOST_ShouldHaveReadOnlyKeys_DashboardAndExport()
     {
         var perms = PermissionsFor("HOST");
-        perms.Should().BeEquivalentTo(new[]
+        perms.Should().Contain(new[]
         {
-            "dashboard.view",
-            "export.pdf",
-            "export.word"
-        }, "HOST je read-only — vidí dashboard a exportuje, nic nepíše");
+            "dashboard.view", "export.pdf.projekt", "export.word.projekt"
+        });
+        perms.Should().NotContain(new[] { "comments.add", "records.edit", "meetings.create" },
+            "HOST je read-only — nic nepíše");
     }
 
     [Fact]
     public void GEST_ShouldHaveCommentsAndReadOnly()
     {
         var perms = PermissionsFor("GEST");
-        perms.Should().BeEquivalentTo(new[]
+        perms.Should().Contain(new[]
         {
             "comments.add", "comments.edit.own", "comments.delete.own",
-            "dashboard.view", "export.pdf", "export.word",
-            "records.comment.subsystemlead"
-        }, "GEST smí komentovat + read-only");
+            "dashboard.view", "export.pdf.projekt", "export.word.projekt"
+        });
+        perms.Should().NotContain(new[] { "records.edit", "meetings.create", "proposals.accept" },
+            "GEST je komentátor, ne editor");
     }
 
     [Theory]

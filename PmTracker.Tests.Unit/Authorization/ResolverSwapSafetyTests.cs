@@ -51,18 +51,10 @@ public sealed class ResolverSwapSafetyTests
 
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
 
-        var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x).ToArray();
-        // Fáze C — Task C2: přidány dashboard/export/comments klíče (celkem 14)
-        grantKeys.Should().BeEquivalentTo(new[]
-        {
-            "comments.add", "comments.delete.own", "comments.edit.own",
-            "dashboard.view", "export.pdf", "export.word",
-            "meetings.create", "meetings.edit",
-            "projects.edit",
-            "records.comment.subsystemlead",
-            "records.edit", "records.schedule.add", "records.schedule.edit",
-            "team.manage"
-        }, "VLASTNIK_PROJEKTU má dle seedu 14 permission keys po Fázi C");
+        var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+        // Per-action redesign 2026-04-23: VLASTNIK_PROJEKTU má 59 cílových + 5 deprecated klíčů.
+        grantKeys.Should().BeEquivalentTo(ProjectExecutiveAllKeys(),
+            "VLASTNIK_PROJEKTU má kompletní project-executive matrix po per-action redesignu");
     }
 
     [Fact]
@@ -81,14 +73,19 @@ public sealed class ResolverSwapSafetyTests
 
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
 
-        // Fáze C — Task C2: GEST dostává dashboard/export/comments klíče navíc
-        var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x).ToArray();
+        // Per-action redesign 2026-04-23: GEST má 15 cílových + 3 deprecated klíče.
+        var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         grantKeys.Should().BeEquivalentTo(new[]
         {
             "comments.add", "comments.delete.own", "comments.edit.own",
-            "dashboard.view", "export.pdf", "export.word",
-            "records.comment.subsystemlead"
-        }, "GEST má po Fázi C 7 permission keys");
+            "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
+            "dashboard.view", "dashboard.vyzvy.view",
+            "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
+            "export.word.jednani", "export.word.projekt", "export.word.ukol",
+            "search.index",
+            // Deprecated (kompat F1–F6):
+            "records.comment.subsystemlead", "export.pdf", "export.word"
+        }, "GEST má komentátorský balíček + read-only po per-action redesignu");
     }
 
     [Fact]
@@ -107,12 +104,18 @@ public sealed class ResolverSwapSafetyTests
 
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
 
-        // Fáze C — Task C2: HOST dostává dashboard.view + export.* klíče
-        var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x).ToArray();
+        // Per-action redesign 2026-04-23: HOST má 12 cílových + 2 deprecated klíče.
+        var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         grantKeys.Should().BeEquivalentTo(new[]
         {
-            "dashboard.view", "export.pdf", "export.word"
-        }, "HOST má po Fázi C 3 read-only permission keys");
+            "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
+            "dashboard.view", "dashboard.vyzvy.view",
+            "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
+            "export.word.jednani", "export.word.projekt", "export.word.ukol",
+            "search.index",
+            // Deprecated (kompat F1–F6):
+            "export.pdf", "export.word"
+        }, "HOST je read-only pozorovatel po per-action redesignu");
     }
 
     [Fact]
@@ -130,17 +133,47 @@ public sealed class ResolverSwapSafetyTests
         await db.SaveChangesAsync();
 
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
-        var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x).ToArray();
+        var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x, StringComparer.Ordinal).ToArray();
 
-        // Fáze C — Task C2: přidány dashboard/export/comments klíče (celkem 13)
-        grantKeys.Should().BeEquivalentTo(new[]
-        {
-            "comments.add", "comments.delete.own", "comments.edit.own",
-            "dashboard.view", "export.pdf", "export.word",
-            "meetings.create", "meetings.edit",
-            "records.comment.subsystemlead",
-            "records.edit", "records.schedule.add", "records.schedule.edit",
-            "team.manage"
-        }, "ADM_PROJ má dle seedu 13 keys po Fázi C");
+        // Per-action redesign 2026-04-23: ADM_PROJ = project executive matrix.
+        grantKeys.Should().BeEquivalentTo(ProjectExecutiveAllKeys(),
+            "ADM_PROJ má kompletní project-executive matrix po per-action redesignu");
     }
+
+    /// <summary>
+    /// Cílová sada klíčů pro VLASTNIK_PROJEKTU / ADM_PROJ / PROJ_MAN (= 59 cílových
+    /// klíčů per-action matice + 5 deprecated klíčů, které zůstanou v seedu do F7).
+    /// </summary>
+    private static IEnumerable<string> ProjectExecutiveAllKeys() => new[]
+    {
+        // 59 cílových klíčů z matice (target state):
+        "comments.add", "comments.delete.any", "comments.delete.own",
+        "comments.edit.any", "comments.edit.own",
+        "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
+        "dashboard.view", "dashboard.vyzvy.view",
+        "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
+        "export.word.jednani", "export.word.projekt", "export.word.ukol",
+        "externiodkazy.sync",
+        "meetings.attendance.edit", "meetings.create", "meetings.delete", "meetings.edit",
+        "meetings.notes.edit", "meetings.notes.subsystemlead", "meetings.participant.add",
+        "meetings.status.change",
+        "proposals.accept", "proposals.edit.any", "proposals.edit.own",
+        "proposals.record.create", "proposals.reject", "proposals.schedule.create",
+        "proposals.takeover",
+        "records.assign.meeting", "records.create", "records.delete", "records.edit",
+        "records.schedule.edit",
+        "schedule.preview",
+        "search.index",
+        "team.candidates.search", "team.member.add", "team.member.remove",
+        "team.role.assign", "team.role.deactivate",
+        "team.subsystem.create", "team.subsystem.deactivate", "team.subsystem.reorder",
+        "team.subsystem.role.assign", "team.subsystem.role.deactivate",
+        "vyjadreni.modal.open", "vyjadreni.refresh", "vyjadreni.reharvest",
+        "vyjadreni.vazba.create", "vyjadreni.vazba.delete",
+        "vyzvy.create", "vyzvy.pnf.assign", "vyzvy.pnf.reassign",
+        "vyzvy.state.change", "vyzvy.word.export",
+        // 5 deprecated klíčů (kompat F1–F6):
+        "records.schedule.add", "records.comment.subsystemlead", "team.manage",
+        "export.pdf", "export.word"
+    };
 }

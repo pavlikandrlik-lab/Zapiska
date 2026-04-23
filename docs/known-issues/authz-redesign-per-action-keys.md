@@ -51,7 +51,7 @@ Sekce následuje pořadí domén. Každý klíč má:
 | `projects.read.all` | Číst všechny projekty (management visibility) | Global |
 | `projects.create` | Založit nový projekt | Global |
 | `projects.edit` | Upravit metadata projektu | Project |
-| `projects.delete` | Smazat projekt (soft-delete) | Project |
+| `projects.delete` | Smazat projekt — **soft-delete** (nastaví stav „DELETED" v číselníku; projekt zůstává v DB, lze obnovit přes `projects.edit`) | Project |
 
 ### 2. Záznamy (projektové)
 
@@ -94,14 +94,65 @@ Sekce následuje pořadí domén. Každý klíč má:
 
 | Klíč | Akce | Scope |
 |---|---|---|
-| `proposals.create` | Založit nový návrh (záznamu, harmonogramu) | Project |
-| `proposals.edit.own` | Upravit vlastní návrh před rozhodnutím | Project |
+| `proposals.record.create` | Navrhnout **nový záznam** | Project |
+| `proposals.schedule.create` | Navrhnout **úpravu harmonogramu** existujícího záznamu | Project |
+| `proposals.edit.own` | Upravit vlastní návrh (před rozhodnutím, typově obecné) | Project |
 | `proposals.edit.any` | Upravit cizí návrh před rozhodnutím (admin) | Project |
-| `proposals.accept` | Schválit návrh | Project |
-| `proposals.reject` | Zamítnout návrh | Project |
+| `proposals.accept` | Schválit návrh (obojí typy) | Project |
+| `proposals.reject` | Zamítnout návrh (obojí typy) | Project |
 | `proposals.takeover` | Zamítnout a převzít vytvoření | Project |
 
-> Akce `RejectAndEditProposal` = kombinace `proposals.reject` + následné `records.edit`; řeší se jako dvě policies (controller: `reject`, service check `records.edit`). `EditFromProposal` = admin bere návrh a edituje záznam → policy `records.edit` (záznam vlastní operace).
+> **Oddělení `record.create` vs `schedule.create`:** Proto že business rozlišuje, kdo smí navrhovat nové záznamy a kdo smí navrhovat úpravy harmonogramu — typicky subsystémové role (VEDOUCI, ZASTUPCE) mají oba, ale je možné v budoucnu rozdělit (např. METODIK smí navrhovat úpravu harmonogramu, ale ne nové záznamy). Role keys pak pokrývají oba pouze jejich přidáním do mappingu.
+>
+> **Rozhodovací a úpravové akce zůstávají typově obecné** (`accept`, `reject`, `takeover`, `edit.own`, `edit.any`) — admin rozhoduje o obou typech stejným postupem. Pokud business později bude chtít rozlišit „smí schválit schedule proposal, ne record proposal", přidá se další klíč, ale dnes není potřeba. Zvolený kompromis: **2 klíče pro create** (subsystémové role mají oba), **5 klíčů obecných** pro decisioning/edit workflow. Celkem 7 klíčů v doméně proposals.
+
+> Akce `RejectAndEditProposal` = kombinace `proposals.reject` + následné `records.edit`; řeší se jako dvě policies (controller: `reject`, service check `records.edit`). Návrh se **explicitně zamítne**, pak admin upraví záznam — workflow je čistě uzavřené (žádný otevřený návrh paralelně s upraveným záznamem).
+>
+> **Akce `EditFromProposal` se ruší — je to bypass workflow.** Důvod: admin, který upraví záznam přes `EditFromProposal`, **nedokončí** schvalování (návrh zůstane ve stavu „čeká na rozhodnutí") i když se dotčený záznam reálně upravil. Výsledek: v systému paralelně visí otevřený návrh a upravený záznam, který návrh de facto realizoval. Správná cesta pro „90% souhlasím, 10% upravím" je **přijmout návrh (`ApproveProposal`) a následně záznam upravit standardní cestou přes `records.edit`**. Alternativa „nesouhlasím, upravím jinak": `RejectAndEditProposal`, které návrh explicitně uzavře.
+
+> **Subsystémový scope pro návrh harmonogramu a záznamu — povinné pravidlo (IDOR fix):**
+>
+> Navrhovatel, který není admin (tj. má `proposals.record.create` nebo `proposals.schedule.create` ale **nemá** `proposals.edit.any`), musí být **vedoucí (Lead) nebo zástupce vedoucího (DeputyLead) subsystému**, kam daný záznam patří.
+>
+> **Implementační kontrakt pro `RecordProposalService.SubmitCreateRecordProposalAsync` a `SubmitScheduleProposalAsync`:**
+>
+> ```csharp
+> // Pseudokód — musí být v service VYDER POSTu, NE pouze v GET modalu.
+> var isAdmin = currentUser.HasPermission(PermissionKeys.ProposalsEditAny, projektId);
+> if (!isAdmin)
+> {
+>     // Non-admin (subsystémový navrhovatel): ověř, že je Lead nebo DeputyLead
+>     // subsystému, kam dotčený záznam patří.
+>     var recordSubsystemId = await _db.ProjektoveZaznamy.AsNoTracking()
+>         .Where(z => z.Id == command.ZaznamId && z.ProjektId == projektId)
+>         .Select(z => (int?)z.SubsystemId)
+>         .FirstOrDefaultAsync(ct);
+>
+>     if (recordSubsystemId is null) return Forbid(); // záznam neexistuje / cizí projekt
+>
+>     var isLeadOfRecordSubsystem = await _db.ObsazeniSubsystemuProjektu.AsNoTracking()
+>         .AnyAsync(o => o.OsobaId == currentUser.OsobaId
+>                     && !o.DatumOdebrani.HasValue
+>                     && o.ProjektSubsystem.ProjektId == projektId
+>                     && o.ProjektSubsystem.SubsystemId == recordSubsystemId.Value
+>                     && (o.RoleSubsystemu.Kod == SubsystemRoleCodes.Lead
+>                         || o.RoleSubsystemu.Kod == SubsystemRoleCodes.DeputyLead),
+>                   ct);
+>
+>     if (!isLeadOfRecordSubsystem) return Forbid();
+> }
+> // Admin (proposals.edit.any): validace se přeskočí, může navrhovat pro jakýkoli subsystém v projektu.
+> ```
+>
+> **Proč tato kontrola:**
+>
+> - **Dnes platí jen pro GET** (modaly `CreateRecordProposal`, `CreateScheduleProposal`) — service filtr `ResolveCreatableSubsystemIdsAsync` zkontroluje, zda subsystém záznamu patří navrhovateli.
+> - **POST endpointy** (`SubmitCreateProposal`, `SubmitScheduleProposal`) dnes **nedělají** subsystémovou validaci — jsou chráněné jen `records.comment.subsystemlead` (globální na projektu) + `CanAccessProject`. Útočník s vazbou na projekt (HOST, GEST, metodik cizího subsystému) může vytvořit požadavek s libovolným `zaznamId` a podat tak návrh pro subsystém, ke kterému nepatří.
+> - **Cílový stav:** validace **musí** běžet i v POST flow. Bez ní je to IDOR zranitelnost.
+>
+> **Kdo je admin (bypass subsystémového omezení):** SUPERADMIN, APP_ADMIN, PROJ_MAN, ADM_PROJ, VLASTNIK_PROJEKTU mají `proposals.edit.any` a mohou podat návrh pro libovolný subsystém v projektu (včetně záznamů, které zatím nemají přiřazený subsystém).
+>
+> **Kdo musí být Lead/DeputyLead:** VEDOUCI_SUBSYSTEMU, ZASTUPCE_VEDOUCIHO_SUBSYSTEMU (ostatní role `proposals.create` nemají — např. METODIK_SUBSYSTEMU ani GEST návrhy nepodávají).
 
 ### 6. Vyjádření a externí odkazy
 
@@ -199,10 +250,11 @@ Sekce následuje pořadí domén. Každý klíč má:
 | `settings.roles.assign` | Přiřadit globální roli uživateli | Global |
 | `settings.sync.configure` | Uložit nastavení synchronizačního jobu | Global |
 | `settings.sync.run` | Ručně spustit synchronizační job | Global |
-| `settings.sd.view` | Otevřít SD konektor | Global |
-| `settings.sd.reharvest` | SD ReHarvest (per-ticket admin) | Global |
+| `settings.sd.view` | Otevřít SD konektor — admin přehled | Global |
 
 > Dnes vše pod `settings.view` + `settings.manage`. Nově: `.view` zůstává jako tab gate, admin akce dostávají vlastní klíče.
+>
+> **Poznámka k SD ReHarvest:** Dnes je `SDConnector.ReHarvest` chráněný `settings.manage`, což je ale totožná akce jako `VyjadreniModal.ReHarvest` (oba volají `_harvest.ReHarvestTicketAsync(externiOdkazId)` — per-ticket). Proto po redesignu **obě sdílí klíč `vyjadreni.reharvest`** (viz §6). Bulk / global reharvest v aplikaci neexistuje — nemá cenu zavádět samostatný admin klíč jen pro jeden UI kontext.
 
 ### 14. Hledání
 
@@ -249,10 +301,13 @@ Matice 60 × 11 se nevejde do markdown tabulky čitelně, bude udržovaná v Exc
 Pro rychlou orientaci — níže jsou klíčové business rozhodnutí, která se v matici projeví. **Finální matici uživatel odsouhlasí v průběhu Fáze 2** (viz Plán implementace níže).
 
 **ADMIN balíček** (SUPERADMIN, APP_ADMIN):
-- Všech 60 klíčů = full access (modulo některé projektové akce, kde APP_ADMIN není „vlastník konkrétního projektu").
+- Všech ~77 klíčů = full access. **APP_ADMIN = SUPERADMIN** na úrovni permission modelu. Důvod: `projects.delete` je soft-delete (reverzibilní), žádná destruktivní akce neexistuje, takže není co oddělovat. Pokud někdy vznikne hard-delete nebo infrastrukturní akce, zavede se samostatný klíč (např. `system.emergency`) — dnes není.
 
 **PROJECT_EXECUTIVE balíček** (VLASTNIK_PROJEKTU, ADM_PROJ, PROJ_MAN):
-- `projects.*`, `records.*`, `comments.*`, `meetings.*`, `proposals.*`, `team.*`, `vyzvy.*`, `dashboard.*`, `export.*.projekt`, `schedule.preview`, `externiodkazy.sync`, `vyjadreni.*` (bez reharvest)
+- `projects.read.all` → **NE** (to je management visibility pro READ_ALL)
+- `projects.create`, `projects.edit`, `projects.delete` → **NE** (metadata projektu = admin sféra; projektové role spravují obsah, ne identifikaci projektu). Projekt zakládá / přejmenovává / archivuje jen admin.
+- `people.*` → **NE** (seznam osob aplikace = admin sféra; projektový tým se řeší přes `team.*`)
+- Ostatní: `records.*`, `comments.*`, `meetings.*`, `proposals.*`, `team.*`, `vyzvy.*`, `dashboard.*`, `export.*`, `schedule.preview`, `externiodkazy.sync`, `vyjadreni.*` včetně `vyjadreni.reharvest` (per-ticket)
 - Rozdíly mezi VP / ADM_PROJ / PROJ_MAN: dnes minimální, finální matice potvrdí, zda zachovat.
 
 **GEST balíček**:
@@ -261,22 +316,24 @@ Pro rychlou orientaci — níže jsou klíčové business rozhodnutí, která se
 - Čistě komentátor + read-only viewer.
 
 **HOST balíček**:
-- Read: `dashboard.view` + omezený subset panelů (např. bez `dashboard.statistics.view`)
-- Write: nic (ani `comments.add` — host nepřispívá?)
-- **Business rozhodnutí potřeba:** mají hosté přispívat komentáře? Dnes nemají.
+- Read: **plný dashboard balíček** — `dashboard.view` + všechny panely (`dashboard.records.view`, `.nes.view`, `.statistics.view`, `.vyzvy.view`)
+- Export: všechny (`export.pdf.*`, `export.word.*`)
+- Hledání: `search.index`
+- Write: nic (ani `comments.add` — host je čistě read-only pozorovatel)
 
 **READ_ALL balíček**:
 - `projects.read.all`, `dashboard.*.view`, `export.*`
 - Žádný write.
 
 **SUBSYSTEM_LEAD balíček** (VEDOUCI_SUBSYSTEMU, ZASTUPCE_VEDOUCIHO_SUBSYSTEMU):
-- Write: `comments.add`, `comments.edit.own`, `comments.delete.own`, `proposals.create`, `proposals.edit.own`, `meetings.notes.subsystemlead`
-- Read: bez projektového dashboardu (dnes nemají `dashboard.view`)
+- Write: `comments.add`, `comments.edit.own`, `comments.delete.own`, `proposals.record.create`, `proposals.schedule.create`, `proposals.edit.own`, `meetings.notes.subsystemlead`
+- Read: **plný dashboard balíček** (`dashboard.view` + všechny panely), `schedule.preview`, `search.index`
 - Subsystémový filtr v service: proposals jen pro svůj subsystém.
 
 **METODIK balíček** (METODIK_SUBSYSTEMU):
 - Write: `comments.add`, `comments.edit.own`, `comments.delete.own`
-- Nic dalšího — dnes stejná sada, budoucí business rozhodnutí může přidat `proposals.create`.
+- Read: **plný dashboard balíček** (`dashboard.view` + všechny panely), `search.index`
+- Budoucí business rozhodnutí může přidat `proposals.record.create` / `proposals.schedule.create`.
 
 ---
 
@@ -292,9 +349,9 @@ Pro každou controller akci je v následujících tabulkách uveden **cílový**
 | `Detail` | `CanAccessProject` | auth + `VisibleProjectIds` check |
 | `NewProjectModal` | `projects.create` | `projects.create` (beze změny) |
 | `SaveProject` | imperativní check | `projects.create` (POST nový) nebo `projects.edit` (POST update) — rozdělit na dvě akce? |
-| `EditProjectModal` | `projects.edit` | `projects.edit` |
-| `DeleteProjectModal` | `projects.delete` | `projects.delete` |
-| `DeleteProject` | `projects.delete` | `projects.delete` |
+| `EditProjectModal` | `projects.edit` | `projects.edit` (**jen admini** — SUPERADMIN, APP_ADMIN) |
+| `DeleteProjectModal` | `projects.delete` | `projects.delete` (**jen admini** — soft-delete) |
+| `DeleteProject` | `projects.delete` | `projects.delete` (**jen admini** — soft-delete) |
 | ~~`NewMeetingModal`~~ | `meetings.create` | **přesunuto do `JednaniController.NewMeetingModal`** |
 | ~~`EditMeetingModal`~~ | `meetings.edit` | **přesunuto do `JednaniController.EditMeetingModal`** |
 | ~~`SaveMeeting`~~ | imperativní | **přesunuto do `JednaniController.Save`** — policy `meetings.create` nebo `meetings.edit` |
@@ -353,12 +410,12 @@ Po sloučení (viz [meetings-endpoints-split](meetings-endpoints-split-between-c
 
 | Akce | Dnes | Nový policy klíč |
 |---|---|---|
-| `CreateRecordProposal` | `records.comment.subsystemlead` | `proposals.create` |
-| `CreateScheduleProposal` | `records.comment.subsystemlead` | `proposals.create` |
-| `SubmitCreateProposal` | `records.comment.subsystemlead` | `proposals.create` |
-| `SubmitScheduleProposal` | `records.comment.subsystemlead` | `proposals.create` |
+| `CreateRecordProposal` | `records.comment.subsystemlead` | `proposals.record.create` |
+| `CreateScheduleProposal` | `records.comment.subsystemlead` | `proposals.schedule.create` |
+| `SubmitCreateProposal` | `records.comment.subsystemlead` | `proposals.record.create` + subsystem check (service) |
+| `SubmitScheduleProposal` | `records.comment.subsystemlead` | `proposals.schedule.create` + subsystem check (service) |
 | `ProposalDetail` | auth | auth + project filter |
-| `EditFromProposal` | — | `records.edit` (sáhá na záznam) |
+| ~~`EditFromProposal`~~ | — | **ODSTRANIT** (bypass workflow — viz poznámka pod tabulkou §5) |
 | `PrefillCreateProposal` | — | `proposals.edit.own` |
 | `ApproveProposal` | — | `proposals.accept` |
 | `RejectProposal` | — | `proposals.reject` |
@@ -452,13 +509,13 @@ Po sloučení (viz [meetings-endpoints-split](meetings-endpoints-split-between-c
 | Akce | Dnes | Nový policy klíč |
 |---|---|---|
 | `Index` | `settings.manage` | `settings.sd.view` |
-| `ReHarvest` | `settings.manage` | `settings.sd.reharvest` |
+| `ReHarvest` | `settings.manage` | `vyjadreni.reharvest` (sdílený s `VyjadreniModal.ReHarvest` — stejná per-ticket akce) |
 
 ### `OsobyController.cs`
 
 | Akce | Dnes | Nový policy klíč |
 |---|---|---|
-| `Index` | auth | `people.create` OR `people.edit` (= „vidím správu osob") — alternativa: samostatný `people.view` |
+| `Index` | auth | **`people.edit`** — seznam osob není pro každého přihlášeného, jen pro role spravující osoby |
 | `AdPersonModal` | `people.manage` | `people.ad.search` |
 | `SearchAd` | `people.manage` | `people.ad.search` |
 | `SaveAd` | `people.manage` | `people.create` |
@@ -471,7 +528,7 @@ Po sloučení (viz [meetings-endpoints-split](meetings-endpoints-split-between-c
 
 | Akce | Dnes | Nový policy klíč |
 |---|---|---|
-| `Index` / `Detail` / `Panel` | auth | auth + `ciselniky.row.edit` OR `ciselniky.row.delete` pro UI gating |
+| `Index` / `Detail` / `Panel` | auth | **`ciselniky.row.edit`** — číselníky nejsou pro každého přihlášeného, jen pro role spravující číselníky |
 | `EditRow` | `ciselniky.edit` | `ciselniky.row.edit` |
 | `SaveRow` | `ciselniky.edit` | `ciselniky.row.edit` |
 | `DeleteRow` | `ciselniky.edit` | `ciselniky.row.delete` |
@@ -490,10 +547,15 @@ Beze změny v autorizaci (auth + scope filter). Dashboard (hlavní) je viditeln�
 
 ### Controllers
 - **Všechny** soubory v `PmTracker.Web/Controllers/` s mutating endpointy — každý endpoint dostane nový / přepsaný `[Authorize(Policy = "permission:…")]` atribut podle mapovací tabulky výše.
+- [NavrhyController.cs](../../PmTracker.Web/Controllers/NavrhyController.cs) — **smazat** akci `EditFromProposal` (GET) i všechny odkazy na ni (např. `Url.Action(nameof(EditFromProposal), …)` v `RejectAndTakeOverCreateProposal` / `PrepareProposalEditorModel`). UI workflow pro „90% souhlasím, 10% upravím" je: `ApproveProposal` + následně běžná editace záznamu přes `Zaznamy.Edit` (`records.edit`).
+- [_EditZaznamForm.cshtml:191-199](../../PmTracker.Web/Views/Projekty/_EditZaznamForm.cshtml) — **smazat** tlačítko „Předvyplnit formulář" (používá `EditFromProposal` URL). Flag `CanPrefillProposalForm` pokud se nikde jinde nepoužívá, odstranit i z ViewModelu.
+- [RecordProposalService.Queries.cs](../../PmTracker.Web/Services/RecordProposalService.Queries.cs) — vyčistit výpočet `model.CanPrefillProposalForm` (pokud existuje).
 
 ### Service vrstva
 - [CommentAuthorizationPolicy.cs](../../PmTracker.Web/Services/Common/CommentAuthorizationPolicy.cs) — nahradit `records.edit` za `comments.edit.any` / `comments.delete.any`.
 - [RecordProposalAuthorizationPolicy.cs](../../PmTracker.Web/Services/Records/RecordProposalAuthorizationPolicy.cs) — **odstranit** hardkódovaný whitelist role codes, nahradit za `HasPermission(proposals.accept, projektId)` pro rozhodování; subsystémový filtr pro navrhovatele zachovat.
+- [RecordProposalService.Queries.cs](../../PmTracker.Web/Services/RecordProposalService.Queries.cs) — **smazat** metodu `BuildEditableRecordEditorFromProposalAsync` (bypass `EditFromProposal`).
+- [RecordProposalService.SubmitCommands.cs](../../PmTracker.Web/Services/RecordProposalService.SubmitCommands.cs) — v metodách `SubmitCreateRecordProposalAsync` a `SubmitScheduleProposalAsync` **přidat** subsystémovou validaci (IDOR fix): ověřit, že `record.SubsystemId ∈ CreatableSubsystemIds(navrhovatele)` před uložením.
 - [ProjectDashboardService.cs](../../PmTracker.Web/Services/ProjectDashboard/ProjectDashboardService.cs) — **odstranit** `CanUserEditProjectVyzvyAsync` (hardkódované role), nahradit za `HasPermission(vyzvy.create, projektId)`. **Odstranit** `CanAccessDashboardAsync`, nahradit za `HasPermission(dashboard.view, projektId)`.
 - [ProjectDashboardAuthorizationPolicy.cs](../../PmTracker.Web/Services/ProjectDashboard/ProjectDashboardAuthorizationPolicy.cs) — **SMAZAT** celý soubor (hardkódovaný whitelist, Nález 1).
 - [RecordService.SaveRecord.cs](../../PmTracker.Web/Services/RecordService.SaveRecord.cs) — odstranit větev pro `records.schedule.add`, zachovat jen `records.schedule.edit`.

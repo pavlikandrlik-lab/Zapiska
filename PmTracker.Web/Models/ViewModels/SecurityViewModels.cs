@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using PmTracker.Web.Services.Security;
@@ -6,56 +7,284 @@ namespace PmTracker.Web.Models.ViewModels;
 
 public static class PermissionKeys
 {
+    // =============================================================================
+    // Per-action permission keys (redesign 2026-04-23)
+    // =============================================================================
+    // Katalog: docs/known-issues/authz-redesign-per-action-keys.md
+    // Matice role × klíč: docs/known-issues/authz-target-matrix.xlsx
+    //
+    // Konvence: <doména>.<entita>?.<akce>[.<scope>]
+    // Staré (pre-redesign) klíče jsou označené [Obsolete] — smazány v Fázi 7 (DB migrace).
+    // =============================================================================
+
+    // Prefix helpery (ponecháno — používá se pro HasPermissionPrefix).
     public const string PeoplePrefix = "people.";
     public const string CiselnikyPrefix = "ciselniky.";
     public const string SettingsPrefix = "settings.";
+
+    // --- 1. Projekty -----------------------------------------------------------
+    public const string ProjectsReadAll = "projects.read.all";
     public const string ProjectsCreate = "projects.create";
     public const string ProjectsEdit = "projects.edit";
     public const string ProjectsDelete = "projects.delete";
+
+    // --- 2. Záznamy ------------------------------------------------------------
+    public const string RecordsCreate = "records.create";
     public const string RecordsEdit = "records.edit";
-    public const string RecordsScheduleAdd = "records.schedule.add";
+    public const string RecordsDelete = "records.delete";
     public const string RecordsScheduleEdit = "records.schedule.edit";
-    public const string RecordsCommentSubsystemLead = "records.comment.subsystemlead";
-    public const string MeetingsCreate = "meetings.create";
-    public const string MeetingsEdit = "meetings.edit";
-    public const string TeamManage = "team.manage";
-    public const string PeopleManage = "people.manage";
-    public const string CiselnikyEdit = "ciselniky.edit";
-    public const string SettingsView = "settings.view";
-    public const string SettingsManage = "settings.manage";
-    public const string DashboardView = "dashboard.view";
-    public const string ExportPdf = "export.pdf";
-    public const string ExportWord = "export.word";
+    public const string RecordsAssignMeeting = "records.assign.meeting";
+
+    // --- 3. Komentáře ----------------------------------------------------------
     public const string CommentsAdd = "comments.add";
     public const string CommentsEditOwn = "comments.edit.own";
+    public const string CommentsEditAny = "comments.edit.any";
     public const string CommentsDeleteOwn = "comments.delete.own";
-    public const string SearchReindex = "search.reindex";
-    public const string ProjectsReadAll = "projects.read.all";
+    public const string CommentsDeleteAny = "comments.delete.any";
 
+    // --- 4. Jednání ------------------------------------------------------------
+    public const string MeetingsCreate = "meetings.create";
+    public const string MeetingsEdit = "meetings.edit";
+    public const string MeetingsDelete = "meetings.delete";
+    public const string MeetingsStatusChange = "meetings.status.change";
+    public const string MeetingsNotesEdit = "meetings.notes.edit";
+    public const string MeetingsNotesSubsystemLead = "meetings.notes.subsystemlead";
+    public const string MeetingsAttendanceEdit = "meetings.attendance.edit";
+    public const string MeetingsParticipantAdd = "meetings.participant.add";
+
+    // --- 5. Návrhy -------------------------------------------------------------
+    public const string ProposalsRecordCreate = "proposals.record.create";
+    public const string ProposalsScheduleCreate = "proposals.schedule.create";
+    public const string ProposalsEditOwn = "proposals.edit.own";
+    public const string ProposalsEditAny = "proposals.edit.any";
+    public const string ProposalsAccept = "proposals.accept";
+    public const string ProposalsReject = "proposals.reject";
+    public const string ProposalsTakeover = "proposals.takeover";
+
+    // --- 6. Vyjádření / externí odkazy ----------------------------------------
+    public const string ExterniOdkazySync = "externiodkazy.sync";
+    public const string VyjadreniModalOpen = "vyjadreni.modal.open";
+    public const string VyjadreniRefresh = "vyjadreni.refresh";
+    public const string VyjadreniVazbaCreate = "vyjadreni.vazba.create";
+    public const string VyjadreniVazbaDelete = "vyjadreni.vazba.delete";
+    public const string VyjadreniReharvest = "vyjadreni.reharvest";
+
+    // --- 7. Tým projektu -------------------------------------------------------
+    public const string TeamMemberAdd = "team.member.add";
+    public const string TeamMemberRemove = "team.member.remove";
+    public const string TeamRoleAssign = "team.role.assign";
+    public const string TeamRoleDeactivate = "team.role.deactivate";
+    public const string TeamSubsystemCreate = "team.subsystem.create";
+    public const string TeamSubsystemReorder = "team.subsystem.reorder";
+    public const string TeamSubsystemDeactivate = "team.subsystem.deactivate";
+    public const string TeamSubsystemRoleAssign = "team.subsystem.role.assign";
+    public const string TeamSubsystemRoleDeactivate = "team.subsystem.role.deactivate";
+    public const string TeamCandidatesSearch = "team.candidates.search";
+
+    // --- 8. Osoby --------------------------------------------------------------
+    public const string PeopleCreate = "people.create";
+    public const string PeopleEdit = "people.edit";
+    public const string PeopleDelete = "people.delete";
+    public const string PeopleAdSearch = "people.ad.search";
+    public const string PeopleAdSync = "people.ad.sync";
+
+    // --- 9. Číselníky ----------------------------------------------------------
+    public const string CiselnikyRowEdit = "ciselniky.row.edit";
+    public const string CiselnikyRowDelete = "ciselniky.row.delete";
+
+    // --- 10. Výzvy -------------------------------------------------------------
+    public const string VyzvyCreate = "vyzvy.create";
+    public const string VyzvyStateChange = "vyzvy.state.change";
+    public const string VyzvyPnfAssign = "vyzvy.pnf.assign";
+    public const string VyzvyPnfReassign = "vyzvy.pnf.reassign";
+    public const string VyzvyWordExport = "vyzvy.word.export";
+
+    // --- 11. Dashboard projektu -----------------------------------------------
+    public const string DashboardView = "dashboard.view";
+    public const string DashboardRecordsView = "dashboard.records.view";
+    public const string DashboardNesView = "dashboard.nes.view";
+    public const string DashboardStatisticsView = "dashboard.statistics.view";
+    public const string DashboardVyzvyView = "dashboard.vyzvy.view";
+
+    // --- 12. Export ------------------------------------------------------------
+    public const string ExportPdfProjekt = "export.pdf.projekt";
+    public const string ExportPdfJednani = "export.pdf.jednani";
+    public const string ExportPdfUkol = "export.pdf.ukol";
+    public const string ExportWordProjekt = "export.word.projekt";
+    public const string ExportWordJednani = "export.word.jednani";
+    public const string ExportWordUkol = "export.word.ukol";
+
+    // --- 13. Nastavení ---------------------------------------------------------
+    public const string SettingsView = "settings.view";
+    public const string SettingsRolesAssign = "settings.roles.assign";
+    public const string SettingsSyncConfigure = "settings.sync.configure";
+    public const string SettingsSyncRun = "settings.sync.run";
+    public const string SettingsSdView = "settings.sd.view";
+
+    // --- 14. Hledání -----------------------------------------------------------
+    public const string SearchIndex = "search.index";
+    public const string SearchReindex = "search.reindex";
+
+    // --- 15. Harmonogram preview ----------------------------------------------
+    public const string SchedulePreview = "schedule.preview";
+
+    // =========================================================================
+    // DEPRECATED — staré (pre-redesign) klíče. Ponechány pro kompatibilitu během
+    // Fází 1–6 redesignu (kód je stále používá v atributech; bude přepisován
+    // postupně per controller). Smazány v Fázi 7 + DB migrace.
+    // =========================================================================
+    [Obsolete("Redesign 2026-04-23: nahrazeno schedule proposals workflow (proposals.schedule.create).")]
+    public const string RecordsScheduleAdd = "records.schedule.add";
+
+    [Obsolete("Redesign 2026-04-23: nahrazeno proposals.record.create + meetings.notes.subsystemlead (per-doména).")]
+    public const string RecordsCommentSubsystemLead = "records.comment.subsystemlead";
+
+    [Obsolete("Redesign 2026-04-23: rozděleno na team.member.add / .remove / .role.assign / .subsystem.* atd.")]
+    public const string TeamManage = "team.manage";
+
+    [Obsolete("Redesign 2026-04-23: rozděleno na people.create / .edit / .delete / .ad.search / .ad.sync.")]
+    public const string PeopleManage = "people.manage";
+
+    [Obsolete("Redesign 2026-04-23: rozděleno na ciselniky.row.edit / .row.delete.")]
+    public const string CiselnikyEdit = "ciselniky.edit";
+
+    [Obsolete("Redesign 2026-04-23: rozděleno na settings.roles.assign / .sync.configure / .sync.run / .sd.view.")]
+    public const string SettingsManage = "settings.manage";
+
+    [Obsolete("Redesign 2026-04-23: rozděleno na export.pdf.projekt / .jednani / .ukol.")]
+    public const string ExportPdf = "export.pdf";
+
+    [Obsolete("Redesign 2026-04-23: rozděleno na export.word.projekt / .jednani / .ukol.")]
+    public const string ExportWord = "export.word";
+
+    // =========================================================================
+    // Definitions: bijekce s PermissionSeedConfiguration.Actions.
+    // =========================================================================
+    //
+    // Pragma disable 618: Obsolete klíče jsou tu záměrně zahrnuty — v Definitions
+    // musí být vše, co je v seedu (SeedSourceOfTruthTests vynucuje bijekci).
+    // Smazání Obsolete konstant proběhne ve Fázi 7.
+#pragma warning disable CS0618 // Type or member is obsolete
     private static readonly PermissionKeyDefinition[] Definitions =
     [
-        new(ProjectsCreate, "Vytvářet projekty", "PROJECTS", "PROJECT", "Zakládání nových projektů."),
+        // 1. Projekty
+        new(ProjectsReadAll, "Číst všechny projekty", "PROJECTS", "GLOBAL", "Management visibility — read-only přístup ke všem projektům."),
+        new(ProjectsCreate, "Vytvářet projekty", "PROJECTS", "GLOBAL", "Zakládání nových projektů."),
         new(ProjectsEdit, "Upravovat projekty", "PROJECTS", "PROJECT", "Úpravy metadat a konfigurace projektu."),
-        new(ProjectsDelete, "Mazat projekty", "PROJECTS", "PROJECT", "Soft-delete projektů."),
-        new(RecordsEdit, "Upravovat projektové záznamy", "RECORDS", "PROJECT", "Plná editace záznamů v projektu."),
-        new(RecordsScheduleAdd, "Doplňovat harmonogram úkolu", "RECORDS", "PROJECT", "Doplnění harmonogramu: trvání pouze do dosud nulových hodnot, skutečnost bez omezení."),
-        new(RecordsScheduleEdit, "Upravovat harmonogram úkolu", "RECORDS", "PROJECT", "Plná editace harmonogramu úkolu včetně dat, trvání a skutečnosti."),
-        new(RecordsCommentSubsystemLead, "Přidávat vyjádření jako vedoucí subsystému", "RECORDS", "PROJECT", "Komentáře vedoucího pouze k záznamům jeho subsystému."),
-        new(MeetingsCreate, "Zakládat jednání", "MEETINGS", "PROJECT", "Tvorba a úprava metadat jednání."),
-        new(MeetingsEdit, "Upravovat jednání", "MEETINGS", "PROJECT", "Změna stavu jednání, účasti a zápisu."),
-        new(TeamManage, "Spravovat tým projektu", "PROJECTS", "PROJECT", "Přidávání a odstraňování členů týmu."),
-        new(PeopleManage, "Spravovat osoby", "MASTER", "GLOBAL", "Ruční/AD správa osob."),
-        new(CiselnikyEdit, "Editovat číselníky", "MASTER", "GLOBAL", "Správa číselníků a referenčních dat."),
-        new(SettingsView, "Zobrazit nastavení", "SETTINGS", "GLOBAL", "Read-only přístup do modulu nastavení."),
-        new(SettingsManage, "Spravovat nastavení", "SETTINGS", "GLOBAL", "Správa rolí, akcí a mapování oprávnění."),
-        new(DashboardView, "Zobrazit projektový dashboard", "PROJECTS", "PROJECT", "Read-only přístup k projektovému dashboardu."),
-        new(ExportPdf, "Exportovat projekt do PDF", "PROJECTS", "PROJECT", "Generování PDF exportu projektu."),
-        new(ExportWord, "Exportovat projekt do Word", "PROJECTS", "PROJECT", "Generování Word exportu projektu."),
-        new(CommentsAdd, "Přidávat komentáře", "RECORDS", "PROJECT", "Vkládání nových komentářů k záznamům."),
-        new(CommentsEditOwn, "Upravovat vlastní komentáře", "RECORDS", "PROJECT", "Úprava komentářů, které osoba sama vložila."),
-        new(CommentsDeleteOwn, "Mazat vlastní komentáře", "RECORDS", "PROJECT", "Smazání komentářů, které osoba sama vložila."),
-        new(SearchReindex, "Spustit reindex vyhledávání", "SETTINGS", "GLOBAL", "Administrátorská akce: full reindex FTS."),
-        new(ProjectsReadAll, "Číst všechny projekty", "PROJECTS", "GLOBAL", "Read-only přístup ke všem projektům (management visibility).")
+        new(ProjectsDelete, "Mazat projekty (soft-delete)", "PROJECTS", "PROJECT", "Soft-delete projektu; reverzibilní."),
+
+        // 2. Záznamy
+        new(RecordsCreate, "Vytvářet záznamy", "RECORDS", "PROJECT", "Založit nový projektový záznam."),
+        new(RecordsEdit, "Upravovat záznamy", "RECORDS", "PROJECT", "Upravit metadata záznamu."),
+        new(RecordsDelete, "Mazat záznamy", "RECORDS", "PROJECT", "Smazat záznam."),
+        new(RecordsScheduleEdit, "Upravovat harmonogram úkolu", "RECORDS", "PROJECT", "Editace všech slotů harmonogramu úkolu."),
+        new(RecordsAssignMeeting, "Přiřadit identifikátor jednání", "RECORDS", "PROJECT", "Doplnit identifikátor jednání k záznamu."),
+
+        // 3. Komentáře
+        new(CommentsAdd, "Přidávat komentáře", "COMMENTS", "PROJECT", "Vkládání nových komentářů k záznamům."),
+        new(CommentsEditOwn, "Upravovat vlastní komentáře", "COMMENTS", "PROJECT", "Úprava komentářů, které osoba sama vložila."),
+        new(CommentsEditAny, "Upravovat cizí komentáře (admin)", "COMMENTS", "PROJECT", "Admin úprava libovolného komentáře."),
+        new(CommentsDeleteOwn, "Mazat vlastní komentáře", "COMMENTS", "PROJECT", "Smazání komentářů, které osoba sama vložila."),
+        new(CommentsDeleteAny, "Mazat cizí komentáře (admin)", "COMMENTS", "PROJECT", "Admin smazání libovolného komentáře."),
+
+        // 4. Jednání
+        new(MeetingsCreate, "Zakládat jednání", "MEETINGS", "PROJECT", "Nové jednání v projektu."),
+        new(MeetingsEdit, "Upravovat jednání", "MEETINGS", "PROJECT", "Změna metadat jednání."),
+        new(MeetingsDelete, "Mazat jednání", "MEETINGS", "PROJECT", "Smazat jednání."),
+        new(MeetingsStatusChange, "Měnit stav jednání", "MEETINGS", "PROJECT", "Změna stavu jednání (DRAFT/OPEN/CLOSED)."),
+        new(MeetingsNotesEdit, "Upravovat zápis jednání", "MEETINGS", "PROJECT", "Editace poznámek k jednání."),
+        new(MeetingsNotesSubsystemLead, "Zápis za vedoucího subsystému", "MEETINGS", "PROJECT", "Přidat zápis/vyjádření za vedoucího subsystému."),
+        new(MeetingsAttendanceEdit, "Upravovat docházku", "MEETINGS", "PROJECT", "Záznamy účasti na jednání."),
+        new(MeetingsParticipantAdd, "Přidat účastníka jednání", "MEETINGS", "PROJECT", "Registrace účastníka jednání."),
+
+        // 5. Návrhy
+        new(ProposalsRecordCreate, "Navrhnout nový záznam", "PROPOSALS", "PROJECT", "Vytvoření návrhu nového záznamu."),
+        new(ProposalsScheduleCreate, "Navrhnout úpravu harmonogramu", "PROPOSALS", "PROJECT", "Vytvoření návrhu úpravy harmonogramu."),
+        new(ProposalsEditOwn, "Upravit vlastní návrh", "PROPOSALS", "PROJECT", "Úprava návrhu před rozhodnutím (autor)."),
+        new(ProposalsEditAny, "Upravit cizí návrh (admin)", "PROPOSALS", "PROJECT", "Admin úprava libovolného otevřeného návrhu."),
+        new(ProposalsAccept, "Schválit návrh", "PROPOSALS", "PROJECT", "Schválení návrhu."),
+        new(ProposalsReject, "Zamítnout návrh", "PROPOSALS", "PROJECT", "Zamítnutí návrhu."),
+        new(ProposalsTakeover, "Převzít návrh", "PROPOSALS", "PROJECT", "Zamítnutí návrhu + převzetí vytvoření záznamu."),
+
+        // 6. Vyjádření / externí odkazy
+        new(ExterniOdkazySync, "Synchronizovat externí odkaz", "EXTERNI", "PROJECT", "Ruční synchronizace externího odkazu se ServiceDeskem."),
+        new(VyjadreniModalOpen, "Otevřít vyjádření (modal)", "EXTERNI", "PROJECT", "Otevření chat modalu s vyjádřeními."),
+        new(VyjadreniRefresh, "Obnovit vyjádření", "EXTERNI", "PROJECT", "Refresh vyjádření z externího zdroje."),
+        new(VyjadreniVazbaCreate, "Vytvořit vazbu vyjádření", "EXTERNI", "PROJECT", "Vytvoření vazby na krok harmonogramu."),
+        new(VyjadreniVazbaDelete, "Smazat vazbu vyjádření", "EXTERNI", "PROJECT", "Smazání vazby na krok harmonogramu."),
+        new(VyjadreniReharvest, "ReHarvest vyjádření (admin)", "EXTERNI", "PROJECT", "Admin akce — znovunačíst vyjádření per ticket."),
+
+        // 7. Tým
+        new(TeamMemberAdd, "Přidat člena týmu", "TEAM", "PROJECT", "Přidání osoby do týmu projektu."),
+        new(TeamMemberRemove, "Odebrat člena týmu", "TEAM", "PROJECT", "Odebrání osoby z týmu projektu."),
+        new(TeamRoleAssign, "Přiřadit projektovou roli", "TEAM", "PROJECT", "Přiřazení role na úrovni projektu."),
+        new(TeamRoleDeactivate, "Deaktivovat projektovou roli", "TEAM", "PROJECT", "Deaktivace role na úrovni projektu."),
+        new(TeamSubsystemCreate, "Vytvořit subsystém projektu", "TEAM", "PROJECT", "Přiřadit subsystém k projektu."),
+        new(TeamSubsystemReorder, "Přeřadit subsystémy", "TEAM", "PROJECT", "Změna pořadí subsystémů projektu."),
+        new(TeamSubsystemDeactivate, "Deaktivovat subsystém", "TEAM", "PROJECT", "Deaktivace subsystému projektu."),
+        new(TeamSubsystemRoleAssign, "Přiřadit roli subsystému", "TEAM", "PROJECT", "Přiřazení role na úrovni subsystému."),
+        new(TeamSubsystemRoleDeactivate, "Deaktivovat roli subsystému", "TEAM", "PROJECT", "Deaktivace role subsystému."),
+        new(TeamCandidatesSearch, "Hledat kandidáty do týmu", "TEAM", "PROJECT", "Fulltextové vyhledávání osob do týmu."),
+
+        // 8. Osoby
+        new(PeopleCreate, "Přidat osobu", "PEOPLE", "GLOBAL", "Založení nové osoby."),
+        new(PeopleEdit, "Upravit osobu", "PEOPLE", "GLOBAL", "Úprava osoby a jejích atributů."),
+        new(PeopleDelete, "Smazat osobu", "PEOPLE", "GLOBAL", "Odstranění osoby."),
+        new(PeopleAdSearch, "Hledat v Active Directory", "PEOPLE", "GLOBAL", "Vyhledávání osob v AD."),
+        new(PeopleAdSync, "Synchronizovat osobu z AD", "PEOPLE", "GLOBAL", "Synchronizace osoby ze záznamu v AD."),
+
+        // 9. Číselníky
+        new(CiselnikyRowEdit, "Upravit řádek číselníku", "CISELNIKY", "GLOBAL", "Úprava / uložení řádku číselníku."),
+        new(CiselnikyRowDelete, "Smazat řádek číselníku", "CISELNIKY", "GLOBAL", "Smazání řádku číselníku."),
+
+        // 10. Výzvy
+        new(VyzvyCreate, "Založit výzvu", "VYZVY", "PROJECT", "Založení výzvy z bufferu."),
+        new(VyzvyStateChange, "Změnit stav výzvy", "VYZVY", "PROJECT", "Změna stavu výzvy."),
+        new(VyzvyPnfAssign, "Zařadit PNF", "VYZVY", "PROJECT", "Zařadit / vyřadit PNF do bufferu."),
+        new(VyzvyPnfReassign, "Přeřadit PNF", "VYZVY", "PROJECT", "Přeřadit PNF mezi výzvami."),
+        new(VyzvyWordExport, "Word export výzvy", "VYZVY", "PROJECT", "Stáhnout Word export výzvy (budoucí feature)."),
+
+        // 11. Dashboard
+        new(DashboardView, "Otevřít projektový dashboard", "DASHBOARD", "PROJECT", "Vstup na dashboard projektu."),
+        new(DashboardRecordsView, "Záložka Záznamy", "DASHBOARD", "PROJECT", "Panel Záznamy v dashboardu."),
+        new(DashboardNesView, "Záložka NES v prodlení", "DASHBOARD", "PROJECT", "Panel NES v prodlení."),
+        new(DashboardStatisticsView, "Záložka Statistiky", "DASHBOARD", "PROJECT", "Panel Statistiky."),
+        new(DashboardVyzvyView, "Záložka Výzvy", "DASHBOARD", "PROJECT", "Panel Výzvy v dashboardu."),
+
+        // 12. Export
+        new(ExportPdfProjekt, "PDF export projektu", "EXPORT", "PROJECT", "Tisk projektu do PDF."),
+        new(ExportPdfJednani, "PDF export jednání", "EXPORT", "PROJECT", "Tisk jednání do PDF."),
+        new(ExportPdfUkol, "PDF export úkolu", "EXPORT", "PROJECT", "Tisk úkolu do PDF."),
+        new(ExportWordProjekt, "Word export projektu", "EXPORT", "PROJECT", "Word export projektu."),
+        new(ExportWordJednani, "Word export jednání", "EXPORT", "PROJECT", "Word export jednání."),
+        new(ExportWordUkol, "Word export úkolu", "EXPORT", "PROJECT", "Word export úkolu."),
+
+        // 13. Nastavení
+        new(SettingsView, "Zobrazit nastavení", "SETTINGS", "GLOBAL", "Vstup do sekce Nastavení."),
+        new(SettingsRolesAssign, "Přiřadit globální roli", "SETTINGS", "GLOBAL", "Přiřazení globální role uživateli."),
+        new(SettingsSyncConfigure, "Konfigurace sync jobu", "SETTINGS", "GLOBAL", "Úprava konfigurace synchronizačního jobu."),
+        new(SettingsSyncRun, "Spustit sync job", "SETTINGS", "GLOBAL", "Manuální spuštění synchronizačního jobu."),
+        new(SettingsSdView, "SD konektor (admin přehled)", "SETTINGS", "GLOBAL", "Otevřít SD konektor s admin přehledem."),
+
+        // 14. Hledání
+        new(SearchIndex, "Fulltext hledání", "SEARCH", "GLOBAL", "Globální fulltext hledání."),
+        new(SearchReindex, "Spustit reindex", "SEARCH", "GLOBAL", "Administrátorská akce: full reindex FTS."),
+
+        // 15. Harmonogram preview
+        new(SchedulePreview, "Náhledový přepočet harmonogramu", "SCHEDULE", "PROJECT", "Stateless kalkulace pro editor úkolu."),
+
+        // =====================================================================
+        // DEPRECATED (pre-redesign). Mapping test vynucuje existenci i v seedu
+        // dokud F7 (DB migrace) staré klíče neodstraní.
+        // =====================================================================
+        new(RecordsScheduleAdd, "Doplňovat harmonogram úkolu (deprecated)", "RECORDS", "PROJECT", "DEPRECATED: nahrazeno schedule proposals."),
+        new(RecordsCommentSubsystemLead, "Vyjádření vedoucího subsystému (deprecated)", "RECORDS", "PROJECT", "DEPRECATED: rozděleno na proposals + meetings.notes.subsystemlead."),
+        new(TeamManage, "Správa týmu (deprecated)", "TEAM", "PROJECT", "DEPRECATED: rozděleno na team.member.* / .role.* / .subsystem.*."),
+        new(PeopleManage, "Správa osob (deprecated)", "PEOPLE", "GLOBAL", "DEPRECATED: rozděleno na people.create / .edit / .delete / .ad.*."),
+        new(CiselnikyEdit, "Editace číselníků (deprecated)", "CISELNIKY", "GLOBAL", "DEPRECATED: rozděleno na ciselniky.row.edit / .row.delete."),
+        new(SettingsManage, "Správa nastavení (deprecated)", "SETTINGS", "GLOBAL", "DEPRECATED: rozděleno na settings.roles.assign / .sync.* / .sd.view."),
+        new(ExportPdf, "Export PDF (deprecated)", "EXPORT", "PROJECT", "DEPRECATED: rozděleno na export.pdf.projekt / .jednani / .ukol."),
+        new(ExportWord, "Export Word (deprecated)", "EXPORT", "PROJECT", "DEPRECATED: rozděleno na export.word.projekt / .jednani / .ukol.")
     ];
 
     private static readonly HashSet<string> SupportedKeys = new(
@@ -64,37 +293,132 @@ public static class PermissionKeys
 
     private static readonly HashSet<string> ProjectReadGrantKeys = new(
     [
+        // Nový model — read-grantující klíče (pokud osoba má kterýkoli z nich,
+        // smí vidět projekt).
         ProjectsEdit,
         ProjectsDelete,
+        RecordsCreate,
         RecordsEdit,
-        RecordsScheduleAdd,
+        RecordsDelete,
         RecordsScheduleEdit,
-        RecordsCommentSubsystemLead,
-        MeetingsCreate,
-        MeetingsEdit,
-        TeamManage,
-        DashboardView,
-        ExportPdf,
-        ExportWord,
+        RecordsAssignMeeting,
         CommentsAdd,
         CommentsEditOwn,
-        CommentsDeleteOwn
+        CommentsEditAny,
+        CommentsDeleteOwn,
+        CommentsDeleteAny,
+        MeetingsCreate,
+        MeetingsEdit,
+        MeetingsDelete,
+        MeetingsStatusChange,
+        MeetingsNotesEdit,
+        MeetingsNotesSubsystemLead,
+        MeetingsAttendanceEdit,
+        MeetingsParticipantAdd,
+        ProposalsRecordCreate,
+        ProposalsScheduleCreate,
+        ProposalsEditOwn,
+        ProposalsEditAny,
+        ProposalsAccept,
+        ProposalsReject,
+        ProposalsTakeover,
+        ExterniOdkazySync,
+        VyjadreniModalOpen,
+        VyjadreniRefresh,
+        VyjadreniVazbaCreate,
+        VyjadreniVazbaDelete,
+        VyjadreniReharvest,
+        TeamMemberAdd,
+        TeamMemberRemove,
+        TeamRoleAssign,
+        TeamRoleDeactivate,
+        TeamSubsystemCreate,
+        TeamSubsystemReorder,
+        TeamSubsystemDeactivate,
+        TeamSubsystemRoleAssign,
+        TeamSubsystemRoleDeactivate,
+        TeamCandidatesSearch,
+        VyzvyCreate,
+        VyzvyStateChange,
+        VyzvyPnfAssign,
+        VyzvyPnfReassign,
+        VyzvyWordExport,
+        DashboardView,
+        DashboardRecordsView,
+        DashboardNesView,
+        DashboardStatisticsView,
+        DashboardVyzvyView,
+        ExportPdfProjekt,
+        ExportPdfJednani,
+        ExportPdfUkol,
+        ExportWordProjekt,
+        ExportWordJednani,
+        ExportWordUkol,
+        SchedulePreview,
+        // Deprecated — kompatibilita během F1–F6
+        RecordsScheduleAdd,
+        RecordsCommentSubsystemLead,
+        TeamManage,
+        ExportPdf,
+        ExportWord
     ],
         StringComparer.OrdinalIgnoreCase);
 
     private static readonly HashSet<string> ProjectWriteKeysBlockedForDeletedProjects = new(
     [
+        // Nový model — všechny write klíče projektového scope
         ProjectsEdit,
         ProjectsDelete,
+        RecordsCreate,
         RecordsEdit,
-        RecordsScheduleAdd,
+        RecordsDelete,
         RecordsScheduleEdit,
-        RecordsCommentSubsystemLead,
+        RecordsAssignMeeting,
+        CommentsAdd,
+        CommentsEditOwn,
+        CommentsEditAny,
+        CommentsDeleteOwn,
+        CommentsDeleteAny,
         MeetingsCreate,
         MeetingsEdit,
+        MeetingsDelete,
+        MeetingsStatusChange,
+        MeetingsNotesEdit,
+        MeetingsNotesSubsystemLead,
+        MeetingsAttendanceEdit,
+        MeetingsParticipantAdd,
+        ProposalsRecordCreate,
+        ProposalsScheduleCreate,
+        ProposalsEditOwn,
+        ProposalsEditAny,
+        ProposalsAccept,
+        ProposalsReject,
+        ProposalsTakeover,
+        ExterniOdkazySync,
+        VyjadreniRefresh,
+        VyjadreniVazbaCreate,
+        VyjadreniVazbaDelete,
+        VyjadreniReharvest,
+        TeamMemberAdd,
+        TeamMemberRemove,
+        TeamRoleAssign,
+        TeamRoleDeactivate,
+        TeamSubsystemCreate,
+        TeamSubsystemReorder,
+        TeamSubsystemDeactivate,
+        TeamSubsystemRoleAssign,
+        TeamSubsystemRoleDeactivate,
+        VyzvyCreate,
+        VyzvyStateChange,
+        VyzvyPnfAssign,
+        VyzvyPnfReassign,
+        // Deprecated
+        RecordsScheduleAdd,
+        RecordsCommentSubsystemLead,
         TeamManage
     ],
         StringComparer.OrdinalIgnoreCase);
+#pragma warning restore CS0618
 
     public static IReadOnlyList<LookupOptionViewModel> BuildLookupOptions()
     {
