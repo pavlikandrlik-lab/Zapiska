@@ -47,9 +47,36 @@ iisreset
 
 ### 5.5 Authentication standard
 - `Windows Authentication = Enabled`
-- `Anonymous Authentication = Disabled`
+- `Anonymous Authentication = Disabled` — **MUSÍ zůstat vypnuté**.
 - AD identity sama o sobě nestačí; uživatel musí být založen v `dbo.osoby` (`Guid_AD`).
 - AD synchronizace do aplikace není automatická.
+
+#### 5.5.1 Trust boundary pro `LOGON_USER` header (bezpečnost)
+
+Aplikace odvozuje identitu uživatele z `HttpContext.User.Identity.Name`, kterou IIS
+plní z proměnné `LOGON_USER` poskytnuté Windows Authentication modulem. Tato hodnota
+je **autoritativní pouze pokud pochází přímo z IIS Windows Auth handshaku** (Kerberos/NTLM).
+
+**NIKDY nepovolit:**
+- `Anonymous Authentication = Enabled` v kombinaci s nasazením za reverse proxy
+  (ARR, nginx, HAProxy, IIS front-end) bez explicitního stripu `LOGON_USER` hlavičky.
+  Útočník by mohl poslat vlastní `LOGON_USER: admin@domena.cz` header → proxy by ho předal
+  k IIS back-endu → IIS by ho promoval na autoritativní identitu → aplikace by ho akceptovala.
+- `IIS Anonymous Auth` bez nastaveného `authentication/anonymousAuthentication` restrictu v `web.config`.
+- Forward `LOGON_USER` / `REMOTE_USER` / `HTTP_X-*-USER` z reverse proxy bez whitelistingu.
+
+**Pokud je aplikace za reverse proxy:**
+- Reverse proxy **musí stripovat** příchozí `LOGON_USER`, `REMOTE_USER`, `X-MS-CLIENT-*`, a všechny ostatní hlavičky,
+  které by mohly být promoted na identitu (whitelist principle, ne blacklist).
+- IIS na back-endu má mít stále `Windows Auth` enabled (aby handshake pokračoval normálně)
+  a `Anonymous Auth` disabled.
+- Reverse proxy nesmí propagovat hlavičky nedůvěryhodných prefixů (`X-Forwarded-*-User`).
+
+**Související middleware:**
+- `PmTracker.Web/Middleware/UserContextMiddleware.cs` resolvuje uživatele pokud je
+  `Identity.Name` neprázdný (IIS fallback scenario). Pokud je identita forgovaná přes
+  nestrípnutou hlavičku, middleware ji promoved bez dalšího auth checku — čistota
+  LOGON_USER je tedy _deployment-level guarantee_, kterou code nemůže zkontrolovat.
 
 ### 5.6 Referenční `web.config`
 ```xml
@@ -69,6 +96,28 @@ iisreset
 ### 5.7 File system oprávnění
 - App pool identita musí mít `Read & Execute` na deploy složce.
 - Pokud jsou aktivované stdout logy, musí mít i write právo do `logs`.
+
+### 5.8 Verifikace bezpečnostní konfigurace autentikace
+
+Po každé změně IIS konfigurace nebo přidání reverse proxy před aplikaci:
+
+```powershell
+# 1. Ověř, že Anonymous Auth je disabled
+Import-Module WebAdministration
+Get-WebConfigurationProperty -PSPath 'IIS:\Sites\PmTracker' `
+  -Filter 'system.webServer/security/authentication/anonymousAuthentication' `
+  -Name 'enabled'
+# Expected: Value = False
+```
+
+```bash
+# 2. Ověř, že proxy stripuje LOGON_USER (z external machine mimo trusted síť)
+curl -H "LOGON_USER: fake@domena.cz" https://pmtracker.intranet/Home/WhoAmI
+# Expected: 401 Unauthorized NEBO přihlášení jako anonymní attacker, NE jako fake@domena.cz
+```
+
+Pokud druhý test ukáže přihlášení jako `fake@domena.cz` → **KRITICKÁ CHYBA**, reverse proxy
+propaguje nedůvěryhodnou hlavičku a umožňuje identity forging. Okamžitě stripovat na proxy.
 
 ## 6. Verifikace
 - Ověř, že site startuje bez `HTTP Error 500.30`.
