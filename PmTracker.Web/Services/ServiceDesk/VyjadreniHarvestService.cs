@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PmTracker.ServiceDesk.Contracts;
@@ -25,10 +24,9 @@ namespace PmTracker.Web.Services.ServiceDesk;
 /// </summary>
 public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
 {
-    // Per-ticket semafor: zabraňuje race mezi (a) periodic tick, (b) direct sync T3/T6,
-    // (c) reactive consumer, (d) souběžné HTTP requesty. Velikost ~1000 tiketů × ~48 B = ~48 KB.
-    // Reset na restartu aplikace.
-    private static readonly ConcurrentDictionary<int, SemaphoreSlim> PerTicketLocks = new();
+    // Per-ticket semafor registry je sdílený s BindingRebalanceService (manual drag-and-drop
+    // rebalance), aby auto-harvest a manuální rebalance nemohly paralelně mutovat vazby
+    // stejného tiketu. Viz <see cref="PerExterniOdkazLockRegistry"/>.
 
     private readonly PmTrackerDbContext _db;
     private readonly IVyjadreniQueryService _vyjadreni;
@@ -88,7 +86,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         Func<CancellationToken, Task<VyjadreniHarvestResult>> work,
         CancellationToken ct)
     {
-        var sem = PerTicketLocks.GetOrAdd(eo.Id, _ => new SemaphoreSlim(1, 1));
+        var sem = PerExterniOdkazLockRegistry.GetOrAdd(eo.Id);
         await sem.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -316,7 +314,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         VyjadreniSecondaryFingerprintDto secondary,
         CancellationToken ct)
     {
-        var sem = PerTicketLocks.GetOrAdd(eo.Id, _ => new SemaphoreSlim(1, 1));
+        var sem = PerExterniOdkazLockRegistry.GetOrAdd(eo.Id);
         // M-2: Blokující WaitAsync(ct) místo WaitAsync(Zero). ReactiveSyncQueue dedup
         // brání pile-upu identických enqueue; legit re-drill pro stejný ticket musí
         // pockat, než uvolní lock, nikoli tiše drop (jinak NEW data z periody mezi

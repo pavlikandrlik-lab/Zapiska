@@ -44,6 +44,7 @@ public sealed class VyjadreniVazbaEntityTests
     {
         ((byte)VazbaSource.Auto).Should().Be(1);
         ((byte)VazbaSource.Manual).Should().Be(2);
+        ((byte)VazbaSource.ChronologyCascade).Should().Be(3);
     }
 
     [Fact]

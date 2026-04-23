@@ -108,6 +108,9 @@ public static class DataStoreServiceCollectionExtensions
         // synchronního ReHarvest endpointu (admin akce).
         services.AddScoped<IVyjadreniHarvestService, VyjadreniHarvestService>();
         services.AddScoped<IVyjadreniModalViewModelBuilder, VyjadreniModalViewModelBuilder>();
+        // Plán C/D follow-up: manuální drag-and-drop rebalance přes ChronologyRebalancer.
+        // Volaný z VyjadreniModalController.CreateVazba.
+        services.AddScoped<IBindingRebalanceService, BindingRebalanceService>();
         services.AddScoped<HarmonogramService>();
         services.AddScoped<HarmonogramCatalogService>();
         services.AddScoped<CommentService>();

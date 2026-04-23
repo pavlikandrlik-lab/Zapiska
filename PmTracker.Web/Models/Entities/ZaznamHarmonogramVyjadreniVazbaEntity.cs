@@ -3,7 +3,14 @@ namespace PmTracker.Web.Models.Entities;
 public enum VazbaSource : byte
 {
     Auto = 1,
-    Manual = 2
+    Manual = 2,
+    /// <summary>
+    /// Cascade update vytvořený <c>ChronologyRebalancer</c>-em při manual drag-and-drop,
+    /// kdy se musí posunout bublina následujícího kroku pro zachování chronologie.
+    /// Sémanticky je to "automaticky odvozená manuální změna" — odlišujeme pro audit/UX,
+    /// aby bylo jasné, že ji uživatel nevytvořil přímo.
+    /// </summary>
+    ChronologyCascade = 3
 }
 
 public enum VazbaStav : byte
