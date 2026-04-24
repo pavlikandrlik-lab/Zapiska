@@ -297,5 +297,17 @@ internal sealed class RecordScheduleValueEntityConfiguration : IEntityTypeConfig
         builder.Property(x => x.TypId).HasColumnName("typ_id");
         builder.Property(x => x.HodnotaInt).HasColumnName("hodnota_int");
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        // Plán 4 Feature C Task 1 — audit zdroje skutečnosti + switch Auto/Ručně + preferred kandidát.
+        // Sloupce přidává db_upgrade_1_3_10_harmonogram_skutecnost_zdroj.sql.
+        builder.Property(x => x.SkutecnostZdroj)
+            .HasColumnName("skutecnost_zdroj")
+            .HasConversion<byte>()
+            .HasDefaultValue(SkutecnostZdrojEnum.Neznamo);
+        builder.Property(x => x.SkutecnostRezim)
+            .HasColumnName("skutecnost_rezim")
+            .HasConversion<byte>()
+            .HasDefaultValue(SkutecnostRezimEnum.Auto);
+        builder.Property(x => x.PreferredExterniOdkazId)
+            .HasColumnName("preferred_externi_odkaz_id");
     }
 }

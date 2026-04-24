@@ -361,6 +361,26 @@ public sealed class ZaznamHarmonogramHodnotaEntity
     public int TypId { get; set; }
     public int HodnotaInt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Plán 4 Feature C Task 1 — zdroj datumu skutečnosti (Neznamo/Automat/Manual/Historicka).
+    /// Relevantní pouze pro řádky typu HS0X_DELAY (skutečnost); pro DURATION řádky zůstává Neznamo.
+    /// </summary>
+    public SkutecnostZdrojEnum SkutecnostZdroj { get; set; } = SkutecnostZdrojEnum.Neznamo;
+
+    /// <summary>
+    /// Plán 4 Feature C Task 1 — switch Auto/Ručně.
+    /// <c>Auto</c> (default): auto-fill ze SD bindingů přepisuje delay hodnotu.
+    /// <c>Manual</c>: user přepnul na ruční zápis, sync skipne.
+    /// </summary>
+    public SkutecnostRezimEnum SkutecnostRezim { get; set; } = SkutecnostRezimEnum.Auto;
+
+    /// <summary>
+    /// Plán 4 Feature C Task 1 — volitelný user-preferred binding (FK na zaznam_externi_odkazy.id)
+    /// pro případ 2+ kandidátů u stejného kroku. Pokud je set, resolver preferuje tento binding
+    /// místo default MAX. Pokud harvest binding odstranil, resolver fallbackuje na MAX a clear-uje flag.
+    /// </summary>
+    public int? PreferredExterniOdkazId { get; set; }
 }
 
 public sealed class AuthzSuperadminEntity
