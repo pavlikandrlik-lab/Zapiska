@@ -239,6 +239,75 @@ public sealed class HarmonogramSkutecnostSyncServiceTests
         row.PreferredExterniOdkazId.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Sync_AutoRezimSKandidatem_AktualizujeHodnotaInt_DelayOdBaseline()
+    {
+        // Plán 4 Feature C — HodnotaInt auto-propagation.
+        // Když sync označí krok jako Automat a najde kandidát s konkrétním datem,
+        // musí přepočítat HodnotaInt (delay ve dnech) proti baseline end datu.
+        // Baseline K3 end = DatumZalozeni + sum(Duration[1..3]).
+        // Pro náš seed je K3 Duration=5, K4 Duration=5, ostatní duration kroky chybí.
+        // → Baseline K3 end = 2026-01-01 + 5 dní (pouze K3 duration v seedu).
+        // Binding datum 2026-01-20 → delay = 19 dní.
+        await using var db = NewDb();
+        await SeedSchemaAsync(db);
+        AddExterniOdkaz(db, 500, "111111");
+        AddActiveBinding(db, 1, K3Key, 500, new DateTime(2026, 1, 20));
+        // DURATION row aby BuildHarmonogramVypocet uměl spočítat baseline
+        db.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+        {
+            Id = 100, ZaznamId = ZaznamId, TypId = 3 /*K3 duration*/, HodnotaInt = 5,
+            UpdatedAt = DateTime.UtcNow,
+            SkutecnostRezim = SkutecnostRezimEnum.Auto,
+            SkutecnostZdroj = SkutecnostZdrojEnum.Neznamo
+        });
+        db.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+        {
+            Id = 1, ZaznamId = ZaznamId, TypId = K3DelayTypId, HodnotaInt = 0,
+            UpdatedAt = DateTime.UtcNow,
+            SkutecnostRezim = SkutecnostRezimEnum.Auto,
+            SkutecnostZdroj = SkutecnostZdrojEnum.Neznamo
+        });
+        await db.SaveChangesAsync();
+
+        var sut = CreateSut(db, new StubVyjadreniQuery(("111111", "PMP")));
+        var result = await sut.SyncZaznamAsync(ZaznamId);
+
+        result.KrokuAktualizovano.Should().BeGreaterThan(0);
+        var row = await db.ZaznamHarmonogramHodnoty.AsNoTracking().SingleAsync(h => h.Id == 1);
+        row.SkutecnostZdroj.Should().Be(SkutecnostZdrojEnum.Automat);
+        row.HodnotaInt.Should().BeGreaterThan(0,
+            "delay musí být nenulový když skutečnost leží po baseline datumu.");
+    }
+
+    [Fact]
+    public async Task Sync_AutoRezimBezKandidatu_HodnotaIntSe_NemeniNeboRetractuje()
+    {
+        // Když sync přechází na Neznamo (binding zmizel, předtím Automat), HodnotaInt
+        // by neměla přepsat user-předtím-vyplněný manual datum (ale v tomto seed je
+        // předtím Automat, takže retract je legit — row zůstane v old stavu pokud nebyl Manual).
+        await using var db = NewDb();
+        await SeedSchemaAsync(db);
+        // NO active binding
+        db.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+        {
+            Id = 1, ZaznamId = ZaznamId, TypId = K3DelayTypId, HodnotaInt = 10,
+            UpdatedAt = DateTime.UtcNow,
+            SkutecnostRezim = SkutecnostRezimEnum.Auto,
+            SkutecnostZdroj = SkutecnostZdrojEnum.Automat,  // dřív byl naplněný
+        });
+        await db.SaveChangesAsync();
+
+        var sut = CreateSut(db, new StubVyjadreniQuery());
+        var result = await sut.SyncZaznamAsync(ZaznamId);
+
+        var row = await db.ZaznamHarmonogramHodnoty.AsNoTracking().SingleAsync(h => h.Id == 1);
+        row.SkutecnostZdroj.Should().Be(SkutecnostZdrojEnum.Neznamo,
+            "retract: binding zmizel, auto-řádek přešel na Neznamo.");
+        // HodnotaInt politika při retract: neměníme (user může chtít vidět předchozí hodnotu).
+        // Stačí kontrola, že sync neexplodoval.
+    }
+
     // --- test double ---
 
     private sealed class StubVyjadreniQuery : IVyjadreniQueryService

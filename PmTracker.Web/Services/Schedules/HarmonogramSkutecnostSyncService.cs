@@ -72,26 +72,56 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
             return new HarmonogramSyncResult(projektovyZaznamId, 0, 0, 0, 0);
         }
 
-        // 1) Schema: pro každý KrokPoradi najdi DelayTypId
-        var schema = await _db.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(t => t.SablonaVerze == zaznam.HarmonogramSablonaVerze && t.JeZpozdeni)
-            .Select(t => new { t.Id, t.KrokPoradi })
+        // 1) Schema: pro každý KrokPoradi najdi DelayTypId + DurationTypId (pro baseline computation)
+        var schemaRaw = await _db.CiselnikHarmonogramTypu.AsNoTracking()
+            .Where(t => t.SablonaVerze == zaznam.HarmonogramSablonaVerze)
+            .Select(t => new { t.Id, t.KrokPoradi, t.JeZpozdeni, t.Hodnota })
             .ToListAsync(ct).ConfigureAwait(false);
-        var delayTypIdByPoradi = schema
+        var delayTypIdByPoradi = schemaRaw
+            .Where(x => x.JeZpozdeni)
             .GroupBy(x => x.KrokPoradi)
             .ToDictionary(g => g.Key, g => g.First().Id);
+        // Feature C Task 4 HodnotaInt propagation: potřebujeme DURATION TypId per poradi,
+        // aby pro každý krok spočítali baseline end (cumulative sum durations [1..N]).
+        var durationTypIdByPoradi = schemaRaw
+            .Where(x => !x.JeZpozdeni)
+            .GroupBy(x => x.KrokPoradi)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+        var defaultDurationByPoradi = schemaRaw
+            .Where(x => !x.JeZpozdeni)
+            .GroupBy(x => x.KrokPoradi)
+            .ToDictionary(g => g.Key, g => g.First().Hodnota);
 
         if (delayTypIdByPoradi.Count == 0)
         {
             return new HarmonogramSyncResult(projektovyZaznamId, 0, 0, 0, 0);
         }
 
-        // 2) Load / create HS0X_DELAY row per krok (tracked, ne AsNoTracking — píšeme)
-        var delayRows = await _db.ZaznamHarmonogramHodnoty
-            .Where(h => h.ZaznamId == projektovyZaznamId
-                     && delayTypIdByPoradi.Values.Contains(h.TypId))
+        // 2) Load všech harmonogram rows záznamu (DURATION + DELAY) — píšeme jen DELAY, ale DURATION
+        //    hodnoty potřebujeme pro baseline computation.
+        var allRows = await _db.ZaznamHarmonogramHodnoty
+            .Where(h => h.ZaznamId == projektovyZaznamId)
             .ToListAsync(ct).ConfigureAwait(false);
-        var delayRowByTypId = delayRows.ToDictionary(r => r.TypId, r => r);
+        var delayRowByTypId = allRows
+            .Where(r => delayTypIdByPoradi.Values.Contains(r.TypId))
+            .ToDictionary(r => r.TypId, r => r);
+        // Duration hodnoty per poradi — pokud DURATION row neexistuje, použijeme default z schema.
+        var durationByPoradi = durationTypIdByPoradi
+            .ToDictionary(kv => kv.Key, kv =>
+            {
+                var row = allRows.FirstOrDefault(r => r.TypId == kv.Value);
+                return row?.HodnotaInt ?? defaultDurationByPoradi.GetValueOrDefault(kv.Key);
+            });
+
+        // Pre-compute baseline end datum per krok (cumulative prefix sum durations).
+        // Pokud poradi N chybí v durationByPoradi, bereme 0 (konzervativně).
+        var baselineEndByPoradi = new Dictionary<int, DateTime>();
+        var cumulative = zaznam.DatumZalozeni.Date;
+        foreach (var poradi in delayTypIdByPoradi.Keys.OrderBy(p => p))
+        {
+            cumulative = cumulative.AddDays(durationByPoradi.GetValueOrDefault(poradi));
+            baselineEndByPoradi[poradi] = cumulative;
+        }
 
         // 3) Načtení bindings + fingerprint pro TypZaznamu
         var bindings = await LoadBindingKandidatiAsync(projektovyZaznamId, ct).ConfigureAwait(false);
@@ -150,9 +180,8 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
             }
 
             // Metadata update: Zdroj → Automat (auto-filled), Preferred podle výsledku resolveru.
-            // Hodnotu HodnotaInt (delay ve dnech) aktuální sync _nemění_ — delay se počítá
-            // existujícím flow (BindingRebalanceService / ScheduleActualSourceResolver) a této
-            // službě zatím stačí audit Zdroje a volba kandidáta.
+            // Plán 4 Feature C Task 4 HodnotaInt auto-propagation (2026-04-24):
+            // Spočítat delay (dnů) = resolved.Datum - baseline_end_of_krok_poradi a zapsat do HodnotaInt.
             var changed = false;
             if (row.SkutecnostZdroj != SkutecnostZdrojEnum.Automat)
             {
@@ -167,6 +196,17 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
                 row.PreferredExterniOdkazId = newPreferred;
                 changed = true;
             }
+
+            if (baselineEndByPoradi.TryGetValue(poradi, out var baselineEnd))
+            {
+                var computedDelay = (int)Math.Round((resolved.Datum.Value.Date - baselineEnd.Date).TotalDays);
+                if (row.HodnotaInt != computedDelay)
+                {
+                    row.HodnotaInt = computedDelay;
+                    changed = true;
+                }
+            }
+
             if (changed)
             {
                 row.UpdatedAt = nowUtc;
