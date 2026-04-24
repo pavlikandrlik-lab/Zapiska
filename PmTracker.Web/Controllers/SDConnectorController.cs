@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,9 @@ namespace PmTracker.Web.Controllers;
 [Route("SDConnector")]
 public sealed class SDConnectorController : Controller
 {
+    // Regex kompilovaný jen jednou — používá se v Inspect i Load akcích pro validaci 6-ciferného čísla tiketu.
+    private static readonly Regex Cislo6Regex = new(@"^\d{6}$", RegexOptions.Compiled);
+
     private readonly PmTrackerDbContext _db;
     private readonly IVyjadreniHarvestService _harvest;
     private readonly TimeProvider _time;
@@ -29,6 +33,9 @@ public sealed class SDConnectorController : Controller
     private readonly ILogger<SDConnectorController> _logger;
     private readonly IAuditWriteService _auditWriteService;
     private readonly ICurrentUserAccessor _currentUser;
+    private readonly ITicketingQueryService _ticketing;
+    private readonly IVyjadreniQueryService _vyjadreni;
+    private readonly AdLoginCache _adCache;
 
     public SDConnectorController(
         PmTrackerDbContext db,
@@ -37,7 +44,10 @@ public sealed class SDConnectorController : Controller
         IOptions<TicketingOptions> ticketingOptions,
         ILogger<SDConnectorController> logger,
         IAuditWriteService auditWriteService,
-        ICurrentUserAccessor currentUser)
+        ICurrentUserAccessor currentUser,
+        ITicketingQueryService ticketing,
+        IVyjadreniQueryService vyjadreni,
+        AdLoginCache adCache)
     {
         _db = db;
         _harvest = harvest;
@@ -46,6 +56,9 @@ public sealed class SDConnectorController : Controller
         _logger = logger;
         _auditWriteService = auditWriteService;
         _currentUser = currentUser;
+        _ticketing = ticketing;
+        _vyjadreni = vyjadreni;
+        _adCache = adCache;
     }
 
     [HttpGet("")]
@@ -171,4 +184,127 @@ public sealed class SDConnectorController : Controller
         }
         return RedirectToAction(nameof(Index));
     }
+
+    /// <summary>
+    /// Plán 2 Feature A — admin diagnostická podstránka. Renderuje prázdný inspector;
+    /// pokud URL obsahuje validní <c>?cislo=XXXXXX</c>, předvyplníme input (JS pak auto-loadne data).
+    /// </summary>
+    [HttpGet("Inspect")]
+    public IActionResult Inspect(string? cislo = null)
+    {
+        var initial = !string.IsNullOrEmpty(cislo) && Cislo6Regex.IsMatch(cislo) ? cislo : null;
+        var vm = new SDConnectorInspectViewModel
+        {
+            TicketingEnabled = _ticketingOptions.Value.Enabled,
+            InitialCislo = initial
+        };
+        return View(vm);
+    }
+
+    /// <summary>
+    /// JSON endpoint pro inspector. Vrací raw HOT_ZAZNAMY hlavičku + seznam HOT_VYJADRENI
+    /// s plain textem a klasifikací přes <see cref="HarvestPredicates"/>.
+    /// </summary>
+    [HttpGet("Load")]
+    public async Task<IActionResult> Load(string? cislo, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(cislo) || !Cislo6Regex.IsMatch(cislo))
+        {
+            return BadRequest(new SDConnectorLoadResponse
+            {
+                Nalezeno = false,
+                Error = "Číslo musí být 6 cifer."
+            });
+        }
+
+        // 1) Fingerprint z HOT_ZAZNAMY — existence check + datum/stav/typ záznamu.
+        var fingerprints = await _vyjadreni
+            .GetHotZaznamFingerprintsAsync(new[] { cislo }, ct)
+            .ConfigureAwait(false);
+
+        if (!fingerprints.TryGetValue(cislo, out var fp))
+        {
+            return Ok(new SDConnectorLoadResponse
+            {
+                Nalezeno = false,
+                Error = $"Ticket #{cislo} v HOT_ZAZNAMY neexistuje."
+            });
+        }
+
+        // 2) Plný HOT_ZAZNAMY řádek (strucne + popis raw HTML).
+        var ticket = await _ticketing.GetZaznamAsync(cislo, ct).ConfigureAwait(false);
+
+        var header = new SDConnectorRawHeader
+        {
+            Cislo = cislo,
+            TypZaznamu = fp.TypZaznamu ?? ticket?.TypZaznamu,
+            Stav = fp.Stav,
+            Strucne = ticket?.Strucne,
+            PopisRaw = ticket?.Popis,
+            Datum = fp.Datum,
+            ExterniOdkazId = await LookupExterniOdkazIdAsync(cislo, ct).ConfigureAwait(false)
+        };
+
+        // 3) Všechna vyjádření — plain text + klasifikace.
+        var vyjadreni = await _vyjadreni
+            .GetVyjadreniForTicketAsync(cislo, sinceUtc: null, ct)
+            .ConfigureAwait(false);
+
+        var bubliny = new List<SDConnectorBublinaDto>(vyjadreni.Count);
+        foreach (var v in vyjadreni)
+        {
+            var display = !string.IsNullOrWhiteSpace(v.Zpracoval)
+                ? await _adCache.ResolveDisplayNameAsync(v.Zpracoval, ct).ConfigureAwait(false)
+                : null;
+            var plain = VyjadreniHtmlText.ToPlainText(v.Popis);
+            var kind = HarvestPredicates.ClassifyPopis(v.Popis);
+
+            bubliny.Add(new SDConnectorBublinaDto
+            {
+                HotId = v.Id,
+                Typ = v.Typ ?? string.Empty,
+                Datum = v.Datum,
+                LoginRaw = v.Zpracoval,
+                AutorDisplayName = display,
+                Tym = v.Tym,
+                PopisRaw = v.Popis,
+                PopisPlainText = plain,
+                ClassifiedAs = ClassificationKey(kind)
+            });
+        }
+
+        return Ok(new SDConnectorLoadResponse
+        {
+            Nalezeno = true,
+            Raw = header,
+            Bubliny = bubliny
+        });
+    }
+
+    /// <summary>
+    /// Vrátí Id <c>ZaznamExterniOdkaz</c> pro daný 6-ciferný ticket — pokud existuje vazba,
+    /// Inspect UI zobrazí button „Otevřít v chat modalu" (reuse existing modal komponenty).
+    /// </summary>
+    private async Task<int?> LookupExterniOdkazIdAsync(string cislo, CancellationToken ct)
+    {
+        return await _db.ZaznamExterniOdkazy.AsNoTracking()
+            .Where(x => x.Cislo == cislo)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Mapuje <see cref="HarvestPredicateKind"/> na krátký string key pro JSON/UI badge.
+    /// Klienti očekávají K3/K4K7/K6/K10/PlanDodani/None — keep stable pro JS konzumenty.
+    /// </summary>
+    private static string ClassificationKey(HarvestPredicateKind kind) => kind switch
+    {
+        HarvestPredicateKind.K3_OdeslaniZadaniPmp => "K3",
+        HarvestPredicateKind.K4_K7_DodaniReseni => "K4K7",
+        HarvestPredicateKind.K6_OdeslaniPozadavku => "K6",
+        HarvestPredicateKind.K10_NasazeniArchivace => "K10",
+        HarvestPredicateKind.PlanDodani => "PlanDodani",
+        _ => "None"
+    };
 }
