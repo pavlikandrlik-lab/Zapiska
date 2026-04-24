@@ -1,0 +1,67 @@
+@model PmTracker.Web.Models.ViewModels.SDConnector.SDConnectorInspectViewModel
+@{
+    ViewData["Title"] = "SD ticket inspector";
+}
+
+<section class="sdc-inspect">
+    <header class="sdc-inspect__header">
+        <h1>ServiceDesk ticket inspector</h1>
+        <p class="sdc-inspect__subtitle">
+            Zadej 6-ciferné ID ticketu (<code>HOT_ZAZNAMY.id</code>) a zobraz raw data + harvest klasifikaci.
+            Admin-only diagnostika.
+        </p>
+        <p class="sdc-inspect__back">
+            <a asp-action="@nameof(PmTracker.Web.Controllers.SDConnectorController.Index)">← Zpět na přehled harvestu</a>
+        </p>
+    </header>
+
+    @if (!Model.TicketingEnabled)
+    {
+        <gov-alert variant="warning" role="status">
+            ServiceDesk integrace je vypnutá (<code>Ticketing:Enabled=false</code>). Load bude vracet prázdné mapy.
+        </gov-alert>
+    }
+
+    <form class="sdc-inspect__form" data-sdc-form>
+        <label for="sdc-cislo-input">Číslo tiketu:</label>
+        <input id="sdc-cislo-input"
+               type="text"
+               inputmode="numeric"
+               pattern="\d{6}"
+               maxlength="6"
+               autocomplete="off"
+               value="@(Model.InitialCislo ?? "")"
+               placeholder="123456"
+               data-sdc-input />
+        <button type="submit" data-sdc-load-btn>Načíst</button>
+    </form>
+
+    <div class="sdc-inspect__status" data-sdc-status role="status" aria-live="polite"></div>
+
+    <div class="sdc-inspect__header-box" data-sdc-header hidden></div>
+
+    <section class="sdc-inspect__grid" data-sdc-grid hidden>
+        <div class="sdc-inspect__raw-col">
+            <h2>Raw data (ServiceDesk)</h2>
+            <pre data-sdc-raw></pre>
+        </div>
+        <div class="sdc-inspect__friendly-col">
+            <h2>Zpracované vyjádření</h2>
+            <div data-sdc-friendly></div>
+            <button type="button" class="sdc-inspect__modal-btn" data-sdc-open-modal hidden>
+                Otevřít v chat modalu
+            </button>
+        </div>
+    </section>
+</section>
+
+@section Scripts {
+    <script src="~/js/modules/sdconnector/inspect.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            if (window.pmSdcInspect && typeof window.pmSdcInspect.init === 'function') {
+                window.pmSdcInspect.init();
+            }
+        })();
+    </script>
+}

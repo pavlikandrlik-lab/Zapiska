@@ -2,6 +2,7 @@
 @import "components/externi-odkaz-card.css";
 @import "components/chat-modal.css";
 @import "components/sdconnector-page.css";
+@import "components/sdconnector-inspect.css";
 
 :root {
     --schedule-step-1: #ef4444;
