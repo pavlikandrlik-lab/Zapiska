@@ -1,0 +1,115 @@
+/* Plán 4 Feature C Task 6 — schedule actual cell s badge + toggle switch.
+   Design intent (decision brief A-Q3/C-Q1):
+   - Badge vpravo nahoře v každé buňce skutečnosti, vizuálně subtle
+   - Toggle button kompaktní inline, jen pokud CanToggleRezim + DelayHodnotaId
+   - Nepřekrývá existing Plán D content (schedule-actual-from-vyjadreni atd.)
+   Style match s gov design system (gov-color variables). */
+
+.schedule-actual-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.schedule-actual-cell__feature-c {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1;
+    /* Pokud toggle není viditelný, wrapper zůstane (kvůli badge) ale bez extra paddingu */
+}
+
+.schedule-actual-cell__feature-c[aria-hidden="true"] .schedule-actual-cell__toggle {
+    display: none;
+}
+
+.schedule-actual-cell__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.2rem;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    background: var(--gov-color-neutral-bg, #f2f4f7);
+    color: var(--gov-color-text-secondary, #475467);
+    user-select: none;
+    cursor: help;
+}
+
+.schedule-actual-cell__badge[data-zdroj="Automat"] {
+    background: var(--gov-color-primary-bg, #dbeafe);
+    color: var(--gov-color-primary, #1e40af);
+}
+
+.schedule-actual-cell__badge[data-zdroj="Manual"] {
+    background: var(--gov-color-warning-bg, #fef3c7);
+    color: var(--gov-color-warning-strong, #92400e);
+}
+
+.schedule-actual-cell__badge[data-zdroj="Historicka"] {
+    background: var(--gov-color-neutral-bg, #f2f4f7);
+    color: var(--gov-color-text-muted, #98a2b3);
+}
+
+.schedule-actual-cell__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--gov-color-neutral-border, #d0d5dd);
+    border-radius: 0.25rem;
+    background: #fff;
+    color: var(--gov-color-text, #1f2937);
+    font-size: 0.7rem;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s, box-shadow 0.1s;
+}
+
+.schedule-actual-cell__toggle:hover:not(:disabled) {
+    background: var(--gov-color-neutral-bg-hover, #f9fafb);
+    border-color: var(--gov-color-primary, #1e40af);
+}
+
+.schedule-actual-cell__toggle:focus-visible {
+    outline: 2px solid var(--gov-color-primary, #1e40af);
+    outline-offset: 1px;
+}
+
+.schedule-actual-cell__toggle:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.schedule-actual-cell__toggle[data-current-rezim="Auto"] {
+    background: var(--gov-color-primary-bg, #dbeafe);
+    border-color: var(--gov-color-primary, #1e40af);
+    color: var(--gov-color-primary-strong, #1e3a8a);
+}
+
+.schedule-actual-cell__toggle[data-current-rezim="Manual"] {
+    background: var(--gov-color-warning-bg, #fef3c7);
+    border-color: var(--gov-color-warning-strong, #92400e);
+    color: var(--gov-color-warning-strong, #92400e);
+}
+
+.schedule-actual-cell__main {
+    /* Zachovává existing Plán D layout beze změny */
+    min-height: 1.5rem;
+}
+
+.schedule-actual-cell__error {
+    font-size: 0.75rem;
+    color: var(--gov-color-danger, #dc2626);
+    padding: 0.25rem 0.5rem;
+    border-left: 2px solid currentColor;
+    background: var(--gov-color-danger-bg, #fee2e2);
+    border-radius: 0 0.25rem 0.25rem 0;
+}

@@ -1,3 +1,4 @@
+using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Schedules;
 
@@ -105,6 +106,40 @@ public sealed class HarmonogramKrokEditViewModel
     /// {2, 5, 8, 9} — UI podle toho rozhoduje, zda vůbec zvažovat render manual inputu.
     /// </summary>
     public bool IsManualKrok { get; init; }
+
+    /// <summary>
+    /// Plán 4 Feature C Task 6 — ID řádku <c>zaznam_harmonogram_hodnoty</c> pro HS0X_DELAY
+    /// sloupec tohoto kroku. UI ho použije v POST payloadu pro
+    /// <c>HarmonogramController.ToggleRezim</c> / <c>SelectCandidate</c>.
+    /// <c>null</c> znamená, že HS0X_DELAY řádek ještě neexistuje (krok je na plánové hodnotě,
+    /// není zapsaná skutečnost) — toggle / dropdown nelze volat, UI je skryje.
+    /// </summary>
+    public int? DelayHodnotaId { get; init; }
+
+    /// <summary>
+    /// Plán 4 Feature C Task 6 — režim zdroje skutečnosti pro UI switch Auto ⇄ Ručně.
+    /// Default <see cref="SkutecnostRezimEnum.Auto"/> pokud HS0X_DELAY řádek nexistuje.
+    /// </summary>
+    public SkutecnostRezimEnum SkutecnostRezim { get; init; } = SkutecnostRezimEnum.Auto;
+
+    /// <summary>
+    /// Plán 4 Feature C Task 6 — audit zdroj datumu (Neznamo/Automat/Manual/Historicka).
+    /// UI podle toho zobrazí badge ikonku (🤖/✍️/📜/—).
+    /// </summary>
+    public SkutecnostZdrojEnum SkutecnostZdroj { get; init; } = SkutecnostZdrojEnum.Neznamo;
+
+    /// <summary>
+    /// Plán 4 Feature C Task 6 — user-preferred binding ze dropdown výběru (pokud 2+ kandidáti).
+    /// <c>null</c> = použít default MAX.
+    /// </summary>
+    public int? PreferredExterniOdkazId { get; init; }
+
+    /// <summary>
+    /// Plán 4 Feature C Task 6 — zda user má oprávnění přepínat režim / vybírat kandidát.
+    /// Default <c>false</c> (read-only) — composition musí explicitně povolit dle
+    /// <see cref="PermissionKeys.RecordsScheduleEdit"/>.
+    /// </summary>
+    public bool CanToggleRezim { get; init; }
 }
 
 /// <summary>

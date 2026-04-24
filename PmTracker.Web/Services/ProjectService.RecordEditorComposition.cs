@@ -123,12 +123,15 @@ public sealed partial class ProjectService
             .Where(x => x > 0)
             .Distinct()
             .ToList();
-        var harmonogramValues = (!isCreate && isTaskCategory && allowedTypeIds.Count > 0)
-            ? (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-                    .Where(x => x.ZaznamId == record.Id && allowedTypeIds.Contains(x.TypId))
-                    .ToListAsync(ct))
-                .ToDictionary(x => x.TypId, x => x.HodnotaInt)
-            : new Dictionary<int, int>();
+        // Plán 4 Feature C Task 6: načti plný záznam včetně Feature C metadat (SkutecnostZdroj,
+        // SkutecnostRezim, PreferredExterniOdkazId) — VM je vystaví per krok pro UI toggle/badge.
+        var harmonogramRows = (!isCreate && isTaskCategory && allowedTypeIds.Count > 0)
+            ? await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
+                .Where(x => x.ZaznamId == record.Id && allowedTypeIds.Contains(x.TypId))
+                .ToListAsync(ct)
+            : new List<PmTracker.Web.Models.Entities.ZaznamHarmonogramHodnotaEntity>();
+        var harmonogramValues = harmonogramRows.ToDictionary(x => x.TypId, x => x.HodnotaInt);
+        var harmonogramRowsByTypId = harmonogramRows.ToDictionary(x => x.TypId);
         var harmonogramKroky = harmonogramService.BuildHarmonogramVypocetPublic(record.DatumZalozeni, harmonogramTypy, harmonogramValues);
         var harmonogramSouhrn = harmonogramService.BuildHarmonogramSouhrn(harmonogramKroky, record.DatumUkonceni);
 
@@ -146,12 +149,26 @@ public sealed partial class ProjectService
             ? await scheduleActualSourceResolver.ResolveForRecordAsync(record.Id, record.HarmonogramSablonaVerze, ct)
             : new Dictionary<Guid, RecordScheduleActualSource>();
 
+        // Plán 4 Feature C Task 6: načti pending proposal lock PŘED build Kroky, aby canToggleRezim
+        // mohl být použitý per krok (dříve bylo načteno až za Kroky — přesun je no-op pro existing code
+        // dole, ale umožňuje VM obohacení Feature C metadaty inline).
+        var pendingScheduleProposalLock = !isCreate
+            ? await pendingScheduleProposalLockEvaluator.EvaluateAsync(record.Id, ct)
+            : new PendingScheduleProposalLockState(false, null, null, false, false);
+
+        // CanToggleRezim derivujeme ze stejné compozice jako CanEditManualActual
+        // (isTaskCategory + schedule není zamčený pending návrhem) — sdílejí stejnou editability condition.
+        var canToggleRezim = isTaskCategory && !pendingScheduleProposalLock.LocksSchedule;
+
         var harmonogramBlokKroky = harmonogramKroky.Select(krok =>
         {
             var krokKey = krokKeyByDurationTypId.GetValueOrDefault(krok.TrvaniTypId);
             var source = krokKey != Guid.Empty && scheduleActualSources.TryGetValue(krokKey, out var s)
                 ? s
                 : null;
+            // Feature C metadata z HS0X_DELAY row (ZpozdeniTypId). Pokud řádek ještě neexistuje
+            // (krok má plánovou hodnotu, skutečnost není zapsaná), delayRow je null → defaulty.
+            harmonogramRowsByTypId.TryGetValue(krok.ZpozdeniTypId, out var delayRow);
             return new HarmonogramKrokEditViewModel
             {
                 KrokIndex = krok.KrokIndex,
@@ -168,12 +185,15 @@ public sealed partial class ProjectService
                 SourceVyjadreniId = source?.SourceVyjadreniId,
                 SourceVyjadreniDatum = source?.SourceVyjadreniDatum,
                 SourceExterniOdkazId = source?.SourceExterniOdkazId,
-                IsManualKrok = HarmonogramManualSteps.IsManual(krok.KrokIndex)
+                IsManualKrok = HarmonogramManualSteps.IsManual(krok.KrokIndex),
+                // Plán 4 Feature C Task 6 — UI metadata pro switch + badge
+                DelayHodnotaId = delayRow?.Id,
+                SkutecnostRezim = delayRow?.SkutecnostRezim ?? PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Auto,
+                SkutecnostZdroj = delayRow?.SkutecnostZdroj ?? PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Neznamo,
+                PreferredExterniOdkazId = delayRow?.PreferredExterniOdkazId,
+                CanToggleRezim = canToggleRezim
             };
         }).ToList();
-        var pendingScheduleProposalLock = !isCreate
-            ? await pendingScheduleProposalLockEvaluator.EvaluateAsync(record.Id, ct)
-            : new PendingScheduleProposalLockState(false, null, null, false, false);
 
         // F-11: Soft concurrency check — načti MAX(UpdatedAt) harmonogramových hodnot jako version stamp
         var scheduleVersion = string.Empty;
