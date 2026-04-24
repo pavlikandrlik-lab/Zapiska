@@ -11077,7 +11077,7 @@ bootstrapPmTrackerApp();
         }
     }
 
-    async function postSelectCandidate(hodnotaId, externiOdkazId) {
+    async function postSelectCandidate(payload) {
         const token = getAntiforgery();
         const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
         if (token) headers['RequestVerificationToken'] = token;
@@ -11085,7 +11085,7 @@ bootstrapPmTrackerApp();
             method: 'POST',
             headers: headers,
             credentials: 'same-origin',
-            body: JSON.stringify({ HodnotaId: hodnotaId, ExterniOdkazId: externiOdkazId })
+            body: JSON.stringify(payload)
         });
         if (!resp.ok) {
             const body = await resp.text().catch(function () { return ''; });
@@ -11099,17 +11099,32 @@ bootstrapPmTrackerApp();
         if (!btn) return;
         event.preventDefault();
 
-        const hodnotaId = parseInt(btn.getAttribute('data-hodnota-id'), 10);
+        // Feature C gap #3 (create-if-missing): klient posílá buď HodnotaId (row existuje),
+        // nebo ZaznamId + KrokPoradi (endpoint row vytvoří).
+        const hodnotaIdRaw = btn.getAttribute('data-hodnota-id');
+        const zaznamIdRaw = btn.getAttribute('data-zaznam-id');
+        const krokPoradiRaw = btn.getAttribute('data-krok-poradi');
         const externiOdkazIdRaw = btn.getAttribute('data-externi-odkaz-id');
+        const hodnotaId = hodnotaIdRaw ? parseInt(hodnotaIdRaw, 10) : 0;
+        const zaznamId = zaznamIdRaw ? parseInt(zaznamIdRaw, 10) : 0;
+        const krokPoradi = krokPoradiRaw ? parseInt(krokPoradiRaw, 10) : 0;
         const externiOdkazId = externiOdkazIdRaw ? parseInt(externiOdkazIdRaw, 10) : null;
-        if (!Number.isFinite(hodnotaId) || hodnotaId <= 0) return;
+
+        const hasHodnotaId = Number.isFinite(hodnotaId) && hodnotaId > 0;
+        const hasZaznamCoords = Number.isFinite(zaznamId) && zaznamId > 0
+            && Number.isFinite(krokPoradi) && krokPoradi > 0;
+        if (!hasHodnotaId && !hasZaznamCoords) return;
+
+        const payload = hasHodnotaId
+            ? { HodnotaId: hodnotaId, ExterniOdkazId: externiOdkazId }
+            : { HodnotaId: 0, ExterniOdkazId: externiOdkazId, ZaznamId: zaznamId, KrokPoradi: krokPoradi };
 
         const cell = btn.closest(CELL_SELECTOR);
         const details = btn.closest('[data-feature-c-dropdown]');
 
         btn.disabled = true;
         try {
-            await postSelectCandidate(hodnotaId, externiOdkazId);
+            await postSelectCandidate(payload);
             // Refresh UI — označ tento btn jako selected, ostatní od-select
             if (details) {
                 const allBtns = details.querySelectorAll('[data-feature-c-select-candidate]');

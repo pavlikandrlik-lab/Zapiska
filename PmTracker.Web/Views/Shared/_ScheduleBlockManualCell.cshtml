@@ -32,10 +32,11 @@
         ? $"Přepnout režim skutečnosti kroku {krok.Nazev} z Auto na Ručně"
         : $"Přepnout režim skutečnosti kroku {krok.Nazev} z Ručně na Auto";
 
-    // Plán 4 Feature C Task 6 UI dropdown — chevron ▼ viditelný jen pro ≥2 kandidáty
+    // Plán 4 Feature C Task 6 UI dropdown — chevron ▼ viditelný pro ≥2 kandidáty
     // + user má CanToggleRezim + není Manual režim (v Manual režimu je Preferred ignorován).
+    // Create-if-missing (gap #3 2026-04-24): dropdown je viditelný i když DelayHodnotaId ještě
+    // neexistuje — endpoint SelectCandidate umí create HS0X_DELAY row na první výběr.
     var featureCShowDropdown = krok.CanToggleRezim
-        && krok.DelayHodnotaId.HasValue
         && krok.SkutecnostRezim == SkutecnostRezimEnum.Auto
         && krok.Kandidati.Count >= 2;
 }
@@ -62,7 +63,9 @@
         {
             <details class="schedule-actual-cell__dropdown"
                      data-feature-c-dropdown
-                     data-hodnota-id="@krok.DelayHodnotaId!.Value">
+                     data-hodnota-id="@(krok.DelayHodnotaId?.ToString() ?? "")"
+                     data-zaznam-id="@Model.ZaznamId"
+                     data-krok-poradi="@krok.KrokIndex">
                 <summary class="schedule-actual-cell__dropdown-summary"
                          title="Zvolit jiný zdrojový ticket (@krok.Kandidati.Count kandidátů)"
                          aria-label="Zvolit jiný zdrojový ticket, @krok.Kandidati.Count kandidátů">
@@ -76,7 +79,9 @@
                                     role="menuitem"
                                     class="schedule-actual-cell__dropdown-btn"
                                     data-feature-c-select-candidate
-                                    data-hodnota-id="@krok.DelayHodnotaId!.Value"
+                                    data-hodnota-id="@(krok.DelayHodnotaId?.ToString() ?? "")"
+                                    data-zaznam-id="@Model.ZaznamId"
+                                    data-krok-poradi="@krok.KrokIndex"
                                     data-externi-odkaz-id="@kandidat.ExterniOdkazId"
                                     data-is-selected="@(kandidat.IsSelected ? "true" : "false")"
                                     aria-current="@(kandidat.IsSelected ? "true" : "false")">

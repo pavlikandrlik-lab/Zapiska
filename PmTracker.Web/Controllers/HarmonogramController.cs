@@ -139,27 +139,82 @@ public sealed class HarmonogramController : Controller
         return Ok(new { changed = true, row.SkutecnostRezim, row.SkutecnostZdroj });
     }
 
-    public sealed record SelectCandidateRequest(int HodnotaId, int? ExterniOdkazId);
+    /// <summary>
+    /// Výběr preferred kandidáta. Klient posílá buď <c>HodnotaId</c> (HS0X_DELAY row existuje)
+    /// NEBO <c>ZaznamId + KrokPoradi</c> (řádek neexistuje, endpoint ho vytvoří — Feature C gap #3
+    /// create-if-missing aby šlo dropdown použít i pro kroky bez dosud zapsané skutečnosti).
+    /// </summary>
+    public sealed record SelectCandidateRequest(
+        int HodnotaId,
+        int? ExterniOdkazId,
+        int? ZaznamId = null,
+        int? KrokPoradi = null);
 
     /// <summary>
     /// Nastaví (nebo clear-uje) <see cref="ZaznamHarmonogramHodnotaEntity.PreferredExterniOdkazId"/>.
-    /// Caller předá buď validní <c>ExterniOdkazId</c> z dropdown kandidátů, nebo <c>null</c> pro clear.
-    /// Po uložení spustí sync aby resolver aplikoval novou volbu.
+    /// Pokud HS0X_DELAY row pro krok neexistuje, vytvoří ho s default hodnotami
+    /// (HodnotaInt=0, Rezim=Auto, Zdroj=Neznamo) a pak na něj nastaví preferred.
+    /// Po uložení spustí sync aby resolver aplikoval novou volbu + spočítal HodnotaInt.
     /// </summary>
     [HttpPost("SelectCandidate")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SelectCandidate([FromBody] SelectCandidateRequest request, CancellationToken ct)
     {
-        if (request is null || request.HodnotaId <= 0)
-        {
-            return BadRequest();
-        }
+        if (request is null) return BadRequest();
 
-        var row = await _db.ZaznamHarmonogramHodnoty
-            .FirstOrDefaultAsync(h => h.Id == request.HodnotaId, ct).ConfigureAwait(false);
-        if (row is null)
+        ZaznamHarmonogramHodnotaEntity? row = null;
+        if (request.HodnotaId > 0)
         {
-            return NotFound();
+            row = await _db.ZaznamHarmonogramHodnoty
+                .FirstOrDefaultAsync(h => h.Id == request.HodnotaId, ct).ConfigureAwait(false);
+            if (row is null)
+            {
+                return NotFound();
+            }
+        }
+        else if (request.ZaznamId is int zaznamId && zaznamId > 0
+                 && request.KrokPoradi is int krokPoradi && krokPoradi > 0)
+        {
+            // Create-if-missing flow (Feature C gap #3):
+            // najdi HS0X_DELAY TypId pro daný krok + vytvoř row s defaults.
+            var zaznam = await _db.ProjektoveZaznamy.AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == zaznamId, ct).ConfigureAwait(false);
+            if (zaznam is null) return NotFound();
+
+            var delayTypId = await _db.CiselnikHarmonogramTypu.AsNoTracking()
+                .Where(t => t.SablonaVerze == zaznam.HarmonogramSablonaVerze
+                         && t.JeZpozdeni
+                         && t.KrokPoradi == krokPoradi)
+                .Select(t => (int?)t.Id)
+                .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (delayTypId is null)
+            {
+                return NotFound(new { error = $"Krok {krokPoradi} neexistuje v schématu záznamu." });
+            }
+
+            // Check existing row (concurrent create guard)
+            row = await _db.ZaznamHarmonogramHodnoty
+                .FirstOrDefaultAsync(h => h.ZaznamId == zaznamId && h.TypId == delayTypId.Value, ct)
+                .ConfigureAwait(false);
+            if (row is null)
+            {
+                row = new ZaznamHarmonogramHodnotaEntity
+                {
+                    ZaznamId = zaznamId,
+                    TypId = delayTypId.Value,
+                    HodnotaInt = 0,
+                    UpdatedAt = _time.GetUtcNow().UtcDateTime,
+                    SkutecnostRezim = SkutecnostRezimEnum.Auto,
+                    SkutecnostZdroj = SkutecnostZdrojEnum.Neznamo
+                };
+                _db.ZaznamHarmonogramHodnoty.Add(row);
+                // Save aby row dostal Id před dalším update (audit log používá row.Id)
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+        }
+        else
+        {
+            return BadRequest(new { error = "Musíš předat buď HodnotaId, nebo ZaznamId + KrokPoradi." });
         }
 
         var projektId = await GetProjektIdAsync(row.ZaznamId, ct).ConfigureAwait(false);
