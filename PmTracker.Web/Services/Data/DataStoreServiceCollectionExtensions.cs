@@ -114,6 +114,10 @@ public static class DataStoreServiceCollectionExtensions
         // Plán C/D follow-up: manuální drag-and-drop rebalance přes ChronologyRebalancer.
         // Volaný z VyjadreniModalController.CreateVazba.
         services.AddScoped<IBindingRebalanceService, BindingRebalanceService>();
+        // Plán 3 Feature D (2026-04-24, U10): hard constraint validator pro vytvoření
+        // nové externí vazby. Volaný ze RecordService.SaveRecordAsync přes
+        // ValidateExternalLinksAsync — PŘED SaveChangesAsync.
+        services.AddScoped<ExterniOdkazValidator>();
         services.AddScoped<HarmonogramService>();
         services.AddScoped<HarmonogramCatalogService>();
         services.AddScoped<CommentService>();
