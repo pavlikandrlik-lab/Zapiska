@@ -23,6 +23,10 @@ builder.Services.AddControllersWithViews(options =>
     options.Filters.Add<AjaxAntiforgeryResultFilter>();
 });
 builder.Services.AddScoped<PmTracker.Web.Services.Schedules.SchedulePreviewService>();
+// Plán 4 Feature C Task 4 — auto-fill skutečnosti harmonogramu z SD bindingů.
+builder.Services.AddScoped<
+    PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService,
+    PmTracker.Web.Services.Schedules.HarmonogramSkutecnostSyncService>();
 builder.Services.AddAuthentication(IISDefaults.AuthenticationScheme);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<PmTrackerAuthzService, PmTrackerAuthzServiceImpl>();
