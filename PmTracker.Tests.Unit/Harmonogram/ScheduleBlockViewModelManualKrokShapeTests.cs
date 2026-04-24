@@ -107,4 +107,58 @@ public sealed class ScheduleBlockViewModelManualKrokShapeTests
         vm.LockedManualKrokKeys.Should().BeEmpty();
         vm.CanEditManualActual.Should().BeFalse("default je read-only; composition musí explicitně nastavit true.");
     }
+
+    // ==========================================================================
+    // Plán 4 Feature C Task 6 — UI shape testy (switch Auto/Ručně + badge + dropdown)
+    // ==========================================================================
+
+    [Fact]
+    public void HarmonogramKrokEditViewModel_Exposes_FeatureC_Properties()
+    {
+        var t = typeof(HarmonogramKrokEditViewModel);
+        t.GetProperty(nameof(HarmonogramKrokEditViewModel.DelayHodnotaId)).Should().NotBeNull(
+            "Feature C: UI toggle POST potřebuje HS0X_DELAY HodnotaId.");
+        t.GetProperty(nameof(HarmonogramKrokEditViewModel.SkutecnostRezim)).Should().NotBeNull(
+            "Feature C: switch Auto/Ručně VM property.");
+        t.GetProperty(nameof(HarmonogramKrokEditViewModel.SkutecnostZdroj)).Should().NotBeNull(
+            "Feature C: audit badge zdroj (Neznamo/Automat/Manual/Historicka).");
+        t.GetProperty(nameof(HarmonogramKrokEditViewModel.PreferredExterniOdkazId)).Should().NotBeNull(
+            "Feature C: dropdown user-preferred binding (pokud 2+ kandidáti).");
+        t.GetProperty(nameof(HarmonogramKrokEditViewModel.CanToggleRezim)).Should().NotBeNull(
+            "Feature C: permission flag — Razor zobrazí toggle jen pokud true.");
+        t.GetProperty(nameof(HarmonogramKrokEditViewModel.Kandidati)).Should().NotBeNull(
+            "Feature C: list kandidátů pro dropdown — Razor zobrazí chevron jen pokud Count >= 2.");
+    }
+
+    [Fact]
+    public void HarmonogramKrokEditViewModel_FeatureC_Defaults_AreSafe()
+    {
+        var vm = new HarmonogramKrokEditViewModel
+        {
+            KrokIndex = 1,
+            Nazev = "test",
+            BarvaHex = "#fff"
+        };
+
+        vm.DelayHodnotaId.Should().BeNull("krok bez skutečnosti-zapisu nemá HS0X_DELAY řádek.");
+        vm.SkutecnostRezim.Should().Be(PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Auto,
+            "default je Auto dle decision brief C-Q1.");
+        vm.SkutecnostZdroj.Should().Be(PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Neznamo,
+            "default je Neznamo pokud není zapsaná skutečnost.");
+        vm.PreferredExterniOdkazId.Should().BeNull();
+        vm.CanToggleRezim.Should().BeFalse("default read-only — composition musí povolit.");
+        vm.Kandidati.Should().NotBeNull().And.BeEmpty("default prázdný list (žádné bindings).");
+    }
+
+    [Fact]
+    public void HarmonogramKrokKandidatViewModel_Exposes_DropdownFields()
+    {
+        var t = typeof(HarmonogramKrokKandidatViewModel);
+        t.GetProperty(nameof(HarmonogramKrokKandidatViewModel.ExterniOdkazId)).Should().NotBeNull();
+        t.GetProperty(nameof(HarmonogramKrokKandidatViewModel.Cislo6)).Should().NotBeNull();
+        t.GetProperty(nameof(HarmonogramKrokKandidatViewModel.TypZaznamu)).Should().NotBeNull();
+        t.GetProperty(nameof(HarmonogramKrokKandidatViewModel.Datum)).Should().NotBeNull();
+        t.GetProperty(nameof(HarmonogramKrokKandidatViewModel.IsSelected)).Should().NotBeNull(
+            "Razor potřebuje flag pro render ✓ u vybraného kandidáta.");
+    }
 }
