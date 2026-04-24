@@ -125,6 +125,18 @@ ELSE
     PRINT 'SkutecnostRezim column already exists, skipping.';
 GO
 
+-- C-Q2: User dropdown výběr alternativní kandidát → persistence přes PreferredExterniOdkazId
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.projektovy_zaznam_harmonogram') AND name = 'PreferredExterniOdkazId')
+BEGIN
+    ALTER TABLE dbo.projektovy_zaznam_harmonogram
+        ADD PreferredExterniOdkazId INT NULL;
+
+    PRINT 'Added PreferredExterniOdkazId — user dropdown choice persistence.';
+END
+ELSE
+    PRINT 'PreferredExterniOdkazId column already exists, skipping.';
+GO
+
 -- Sanity check
 SELECT
     COUNT(*) AS total_rows,
@@ -777,9 +789,10 @@ git commit -m "feat(harmonogram): UI switch Auto/Ručně + dropdown kandidátů 
 - Modify: harmonogram controller
 
 - [ ] POST `/Harmonogram/ToggleRezim` — body `{ zaznamId, rezim }` → update `SkutecnostRezim` + volá `SyncZaznamAsync` (v Auto mode)
-- [ ] POST `/Harmonogram/SelectCandidate` — body `{ krokId, externiOdkazId }` → override MAX default pro konkrétní krok; Zdroj zůstává Automat (je to volba z auto kandidátů, ne manual datum), ale zapíše se `PreferredExterniOdkazId` cache (nová column nebo ad-hoc logika — TODO zvolit)
+- [ ] POST `/Harmonogram/SelectCandidate` — body `{ krokId, externiOdkazId }` → override MAX default pro konkrétní krok. Implementace: **přidat column `PreferredExterniOdkazId INT NULL` na `projektovy_zaznam_harmonogram`** (rozšíření migrace 1_3_10 nebo nová 1_3_10b). Pokud Preferred je nastavený, `HarmonogramSkutecnostResolver.Resolve` ho respektuje jako priority před MAX default. Zdroj zůstává `Automat` (stále je to volba z auto kandidátů). Preferred se clear-uje při `ToggleRezim` a při Re-harvest batch.
 - [ ] Autorizace: `projects.edit` (existing)
 - [ ] Audit log obou akcí
+- [ ] **Resolver extension**: `HarmonogramSkutecnostResolver.Resolve` dostane navíc `int? preferredExterniOdkazId` parameter. Pokud set a existuje matching kandidát → ho preferuje; pokud set ale kandidát s tím ID neexistuje (např. harvest ho odstranil) → fallback na MAX a clear preferred.
 
 - [ ] **Commit**
 
