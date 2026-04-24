@@ -21,6 +21,12 @@ public sealed class FacadeResolutionSmokeTests
         // který potřebuje IVyjadreniQueryService z AddServiceDeskIntegration. Pořadí
         // registrací matches Program.cs.
         services.AddServiceDeskIntegration(configuration);
+        // Plán 4 Feature C Task 6 (2026-04-24): ProjectService injectuje
+        // IHarmonogramSkutecnostSyncService pro dropdown kandidátů. Registrace je
+        // v Program.cs přímo (mimo extensions), test musí replikovat.
+        services.AddScoped<
+            PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService,
+            PmTracker.Web.Services.Schedules.HarmonogramSkutecnostSyncService>();
         using var provider = services.BuildServiceProvider(validateScopes: true);
         using var scope = provider.CreateScope();
 
