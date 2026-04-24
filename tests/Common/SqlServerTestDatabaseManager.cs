@@ -7,19 +7,20 @@ namespace PmTracker.Tests.Common;
 
 public sealed class SqlServerTestDatabaseManager : IAsyncDisposable
 {
-    private readonly MsSqlContainer _container;
+    private MsSqlContainer? _container;
     private bool _started;
 
     public SqlServerTestDatabaseManager()
     {
-        _container = new MsSqlBuilder("mcr.microsoft.com/azure-sql-edge:latest")
-            .WithPassword("PmTracker!Test2026")
-            // MsSqlBuilder default readiness expects sqlcmd in image. Azure SQL Edge image does not include it.
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(1433))
-            .Build();
+        // 2026-04-24: container Build odložen do StartAsync, aby konstruktor nepadl
+        // s DockerUnavailableException, když vývojář nemá spuštěný Docker daemon.
+        // Předtím fixture ctor throwl při Build() a celá test collection skončila
+        // s 250 opakovanými Docker stack trace místo jedné čitelné zprávy.
     }
 
-    public string MasterConnectionString => _container.GetConnectionString();
+    public string MasterConnectionString => _container is null
+        ? throw new InvalidOperationException("Container není inicializován. Zavolej StartAsync nejdřív.")
+        : _container.GetConnectionString();
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
@@ -28,9 +29,50 @@ public sealed class SqlServerTestDatabaseManager : IAsyncDisposable
             return;
         }
 
+        _container ??= BuildContainerOrThrowFriendly();
         await _container.StartAsync(cancellationToken);
         await WaitForSqlReadyAsync(cancellationToken);
         _started = true;
+    }
+
+    private static MsSqlContainer BuildContainerOrThrowFriendly()
+    {
+        try
+        {
+            return new MsSqlBuilder("mcr.microsoft.com/azure-sql-edge:latest")
+                .WithPassword("PmTracker!Test2026")
+                // MsSqlBuilder default readiness expects sqlcmd in image. Azure SQL Edge image does not include it.
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(1433))
+                .Build();
+        }
+        catch (Exception ex) when (IsDockerUnavailableError(ex))
+        {
+            throw new InvalidOperationException(
+                "Integration testy vyžadují spuštěný Docker daemon (MS SQL Testcontainer). " +
+                "Docker není dostupný. " +
+                Environment.NewLine +
+                "  • macOS (Colima):       `colima start`" + Environment.NewLine +
+                "  • macOS (Docker app):   `open -a Docker`" + Environment.NewLine +
+                "  • Linux:                 `sudo systemctl start docker`" + Environment.NewLine +
+                "  • Windows:              spusť Docker Desktop" + Environment.NewLine +
+                "Pro běh bez Dockeru použij unit testy: `dotnet test PmTracker.Tests.Unit`. " +
+                $"Původní chyba: {ex.GetType().Name}: {ex.Message}",
+                ex);
+        }
+    }
+
+    private static bool IsDockerUnavailableError(Exception ex)
+    {
+        // DockerUnavailableException je uvnitř Testcontainers.Builders namespace — plná
+        // typová reference by si vynutila další using. Match přes name je dostatečný.
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (current.GetType().FullName?.Contains("DockerUnavailableException", StringComparison.Ordinal) == true)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     public async Task<TestDatabaseHandle> CreateInitializedDatabaseAsync(string databasePrefix, bool includeSeed, CancellationToken cancellationToken = default)
@@ -60,7 +102,10 @@ public sealed class SqlServerTestDatabaseManager : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _container.DisposeAsync();
+        if (_container is not null)
+        {
+            await _container.DisposeAsync();
+        }
     }
 
     private async Task CreateDatabaseAsync(string databaseName, CancellationToken cancellationToken)
