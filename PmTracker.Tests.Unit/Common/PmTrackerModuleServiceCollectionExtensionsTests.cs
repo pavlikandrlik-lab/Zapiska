@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PmTracker.ServiceDesk.Sql;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Dictionaries;
@@ -57,8 +58,15 @@ public sealed class PmTrackerModuleServiceCollectionExtensionsTests
     [Fact]
     public void AddPmTrackerDataStore_ShouldResolveFacadeAliasesToSameScopedInstances()
     {
+        var configuration = BuildConfiguration();
         var services = new ServiceCollection();
-        services.AddPmTrackerDataStore(BuildConfiguration());
+        services.AddPmTrackerDataStore(configuration);
+        // Plán 3 Feature D (2026-04-24): ExterniOdkazValidator registrovaný v
+        // AddPmTrackerDataStore závisí na IVyjadreniQueryService, který registruje
+        // až AddServiceDeskIntegration (v Program.cs volané hned za PmTrackerDataStore).
+        // Pro DI smoke test musíme proto i tady zavolat obě registrace v pořadí
+        // jako v Program.cs, jinak se RecordService neodvodí.
+        services.AddServiceDeskIntegration(configuration);
         using var provider = services.BuildServiceProvider(validateScopes: true);
         using var scope = provider.CreateScope();
 

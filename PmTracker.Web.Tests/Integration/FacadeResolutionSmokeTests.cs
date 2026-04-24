@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PmTracker.ServiceDesk.Sql;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Dictionaries;
@@ -13,8 +14,13 @@ public sealed class FacadeResolutionSmokeTests
     [Fact]
     public void AddPmTrackerDataStore_ShouldResolveFacadeAliasesPerRequest()
     {
+        var configuration = BuildConfiguration();
         var services = new ServiceCollection();
-        services.AddPmTrackerDataStore(BuildConfiguration());
+        services.AddPmTrackerDataStore(configuration);
+        // Plán 3 Feature D (2026-04-24): RecordService závisí na ExterniOdkazValidator,
+        // který potřebuje IVyjadreniQueryService z AddServiceDeskIntegration. Pořadí
+        // registrací matches Program.cs.
+        services.AddServiceDeskIntegration(configuration);
         using var provider = services.BuildServiceProvider(validateScopes: true);
         using var scope = provider.CreateScope();
 

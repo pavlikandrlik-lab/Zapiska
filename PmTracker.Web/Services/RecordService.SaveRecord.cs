@@ -517,7 +517,7 @@ public sealed partial class RecordService
             }
         }
 
-        await ValidateExternalLinksAsync(command.ExterniVazby, issues, ct);
+        await ValidateExternalLinksAsync(command.ExterniVazby, existingRecord, issues, ct);
         await ValidateScheduleValuesAsync(command, isTaskCategory, existingRecord, defaultSchemaVersion, composition, issues, ct);
 
         if (issues.Count > 0)
@@ -590,6 +590,7 @@ public sealed partial class RecordService
 
     private async Task ValidateExternalLinksAsync(
         IReadOnlyList<SaveRecordExterniVazbaCommand> links,
+        ProjektovyZaznamEntity? existingRecord,
         List<RecordValidationIssue> issues,
         CancellationToken ct)
     {
@@ -604,6 +605,22 @@ public sealed partial class RecordService
         var vyzvaRows = await dbContext.Vyzvy.AsNoTracking()
             .Select(x => new { x.Id, x.Kod })
             .ToListAsync(ct);
+
+        // Plán 3 Feature D (2026-04-24, U10): hard constraint — každá NOVĚ
+        // přidávaná externí vazba musí mít platné 6-místné HOT_ZAZNAMY.id,
+        // SD integrace musí být zapnutá a ticket musí existovat v HOT_ZAZNAMY.
+        // Stávající vazby (ty, jejichž Cislo už záznam má) migrace neruší.
+        // Memory: project_servicedesk_infosystem_binding.md § „Externí vazba
+        // hard constraint" + feedback_sd_ticket_id_required.md (ticket bez id
+        // je mimo scope — nikdy fallback na 0).
+        var existingCisla = existingRecord is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(
+                await dbContext.ZaznamExterniOdkazy.AsNoTracking()
+                    .Where(x => x.ZaznamId == existingRecord.Id)
+                    .Select(x => x.Cislo)
+                    .ToListAsync(ct),
+                StringComparer.Ordinal);
 
         for (var index = 0; index < links.Count; index++)
         {
@@ -723,6 +740,26 @@ public sealed partial class RecordService
                     "external",
                     "external_takeover_before_delivery",
                     link.DatumPrevzeti.Value.ToString("O", CultureInfo.InvariantCulture));
+            }
+
+            // Plán 3 Feature D: SD hard constraint — pouze pro NOVĚ přidávané
+            // vazby. Existing links (Cislo už v DB pro tento záznam) nevalidujeme,
+            // aby migrace nic nerušila. Format chyba (!hasCislo) už byla výše.
+            if (hasCislo && !existingCisla.Contains(cisloValue))
+            {
+                var sdValidation = await externiOdkazValidator
+                    .ValidateCreateAsync(cisloValue, ct)
+                    .ConfigureAwait(false);
+                if (!sdValidation.IsValid)
+                {
+                    AddRecordValidationIssue(
+                        issues,
+                        $"{rowPrefix}.Cislo",
+                        sdValidation.ErrorMessage ?? "Externí vazbu nelze ověřit.",
+                        "external",
+                        $"external_sd_{sdValidation.ErrorCode ?? "unknown"}",
+                        cisloValue);
+                }
             }
         }
     }

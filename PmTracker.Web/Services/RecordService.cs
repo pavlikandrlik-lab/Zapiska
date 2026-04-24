@@ -21,6 +21,7 @@ public sealed partial class RecordService : IRecordService
     private readonly IPriorityMatrixRebuildService priorityMatrixRebuildService;
     private readonly IAuditWriteService auditWriteService;
     private readonly IHarvestScheduler harvestScheduler;
+    private readonly ExterniOdkazValidator externiOdkazValidator;
     private readonly TimeProvider timeProvider;
 
     public RecordService(
@@ -34,6 +35,7 @@ public sealed partial class RecordService : IRecordService
         IPriorityMatrixRebuildService priorityMatrixRebuildService,
         IAuditWriteService auditWriteService,
         IHarvestScheduler harvestScheduler,
+        ExterniOdkazValidator externiOdkazValidator,
         TimeProvider timeProvider)
     {
         this.dbContext = dbContext;
@@ -46,6 +48,7 @@ public sealed partial class RecordService : IRecordService
         this.priorityMatrixRebuildService = priorityMatrixRebuildService;
         this.auditWriteService = auditWriteService;
         this.harvestScheduler = harvestScheduler;
+        this.externiOdkazValidator = externiOdkazValidator;
         this.timeProvider = timeProvider;
     }
 
