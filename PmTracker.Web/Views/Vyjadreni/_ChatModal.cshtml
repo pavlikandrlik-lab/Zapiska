@@ -104,7 +104,18 @@
         </section>
 
         <section class="pm-chat-modal__stepper" aria-label="Kroky harmonogramu">
-            <ol class="pm-chat-stepper" role="list">
+            @* Plán 1 Feature B — <pm-chat-stepper> custom element render.
+               Server předává stepper kroky přes JSON do `setKroky(...)`; buffer.js doplní
+               add-on sloty na 5 celkem (3 fixní + 2 add-on, permission-gated). *@
+            <pm-chat-stepper @(Model.CanAddAddon ? "can-add-addon" : "")
+                             data-pm-chat-stepper
+                             data-fixni-kroky-pocet="@Model.FixniKrokyPocet"
+                             data-slots-pocet="@Model.StepperSlotsPocet">
+            </pm-chat-stepper>
+
+            @* Server-side fallback + stabilní DOM pro existující chatModalDragDrop.js.
+               V DOM je skrytý; JS stepper element ho může při potřebě re-parse-ovat. *@
+            <ol class="pm-chat-stepper pm-chat-stepper--legacy" role="list" hidden aria-hidden="true">
                 @foreach (var krok in Model.Kroky.OrderBy(k => k.KrokPoradi))
                 {
                     var bindingDatum = krok.AktualniVyjadreniDatum;
@@ -151,6 +162,29 @@
                     </li>
                 }
             </ol>
+
+            @* Inline init skriptu — seriální inject kroků do custom elementu.
+               Bezpečné protože server už data sanitizuje a @Json.Serialize escapuje. *@
+            <script>
+                (function () {
+                    var root = document.currentScript && document.currentScript.parentElement;
+                    if (!root) return;
+                    var el = root.querySelector('[data-pm-chat-stepper]');
+                    if (!el || typeof el.setKroky !== 'function') return;
+                    var kroky = @Json.Serialize(Model.Kroky.OrderBy(k => k.KrokPoradi).Select(k => new {
+                        poradi = k.KrokPoradi,
+                        label = k.Nazev,
+                        bindingDatum = k.AktualniVyjadreniDatum.HasValue ? k.AktualniVyjadreniDatum.Value.ToUniversalTime().ToString("O") : null,
+                        fixni = true,
+                        barvaHex = k.BarvaHex,
+                        vazbaId = k.VazbaId,
+                        aktualniVyjadreniId = k.AktualniVyjadreniId
+                    }));
+                    // bindingDatum přetvoř na Date object pro chronology.js
+                    kroky.forEach(function (k) { if (k.bindingDatum) k.bindingDatum = new Date(k.bindingDatum); });
+                    el.setKroky(kroky);
+                })();
+            </script>
         </section>
     </div>
 

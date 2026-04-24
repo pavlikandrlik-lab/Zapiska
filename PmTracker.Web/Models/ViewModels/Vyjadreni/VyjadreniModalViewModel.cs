@@ -18,6 +18,22 @@ public sealed class VyjadreniModalViewModel
     public IReadOnlyList<StepperKrokViewModel> Kroky { get; set; } = Array.Empty<StepperKrokViewModel>();
 
     /// <summary>
+    /// Plán 1 Feature B — user má právo přidat nepovinný (add-on) krok do harmonogramu
+    /// (5-slot buffer pm-chat-stepperu: 3 fixní + 2 add-on).
+    /// Klíč <c>PermissionKeys.RecordsScheduleEdit</c> na úrovni projektu.
+    /// </summary>
+    public bool CanAddAddon { get; set; }
+
+    /// <summary>
+    /// Plán 1 Feature B — celkový počet renderovaných slotů stepperu.
+    /// 3 fixní chronologické + 2 add-on = 5 (viz buffer.js TOTAL_SLOTS).
+    /// </summary>
+    public int StepperSlotsPocet { get; init; } = 5;
+
+    /// <summary>Počet fixních chronologických kroků (dle typu ticketu).</summary>
+    public int FixniKrokyPocet { get; init; } = 3;
+
+    /// <summary>
     /// Zpráva, pokud je SD integrace vypnutá / tiket nenalezen / modal je prázdný.
     /// UI ji zobrazí jako gov-alert info banner.
     /// </summary>

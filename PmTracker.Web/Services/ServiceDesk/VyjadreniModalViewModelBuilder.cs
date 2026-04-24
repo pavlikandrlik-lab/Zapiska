@@ -15,7 +15,10 @@ namespace PmTracker.Web.Services.ServiceDesk;
 /// </summary>
 public interface IVyjadreniModalViewModelBuilder
 {
-    Task<VyjadreniModalViewModel?> BuildAsync(int externiOdkazId, int zaznamId, bool canEdit, CancellationToken ct);
+    Task<VyjadreniModalViewModel?> BuildAsync(int externiOdkazId, int zaznamId, bool canEdit, CancellationToken ct)
+        => BuildAsync(externiOdkazId, zaznamId, canEdit, canAddAddon: false, ct);
+
+    Task<VyjadreniModalViewModel?> BuildAsync(int externiOdkazId, int zaznamId, bool canEdit, bool canAddAddon, CancellationToken ct);
 }
 
 public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBuilder
@@ -37,7 +40,10 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
         _adLoginCache = adLoginCache;
     }
 
-    public async Task<VyjadreniModalViewModel?> BuildAsync(int externiOdkazId, int zaznamId, bool canEdit, CancellationToken ct)
+    public Task<VyjadreniModalViewModel?> BuildAsync(int externiOdkazId, int zaznamId, bool canEdit, CancellationToken ct)
+        => BuildAsync(externiOdkazId, zaznamId, canEdit, canAddAddon: false, ct);
+
+    public async Task<VyjadreniModalViewModel?> BuildAsync(int externiOdkazId, int zaznamId, bool canEdit, bool canAddAddon, CancellationToken ct)
     {
         var eo = await _db.ZaznamExterniOdkazy.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == externiOdkazId && x.ZaznamId == zaznamId, ct).ConfigureAwait(false);
@@ -56,7 +62,10 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
             ProjektId = zaznam.ProjektId,
             TiketCislo = eo.Cislo ?? string.Empty,
             LastHarvestedAt = eo.LastHarvestedAt,
-            CanEdit = canEdit
+            CanEdit = canEdit,
+            // Plán 1 Feature B — 5-slot buffer (3 fixní + 2 add-on).
+            // Add-on slot aktivní pouze když má user RecordsScheduleEdit na daném projektu.
+            CanAddAddon = canAddAddon
         };
 
         if (string.IsNullOrWhiteSpace(eo.Cislo))

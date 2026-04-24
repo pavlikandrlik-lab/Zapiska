@@ -105,7 +105,14 @@ public sealed class VyjadreniModalController : Controller
             // Nefail modal open — zobrazíme cached data.
         }
 
-        var vm = await _builder.BuildAsync(externiOdkazId, zaznamId, canEdit: true, ct).ConfigureAwait(false);
+        // Plán 1 Feature B — can-add-addon gating podle RecordsScheduleEdit na projektu.
+        // Add-on sloty ve stepperu se zobrazí jako aktivní pouze tehdy, když má user
+        // oprávnění editovat harmonogram (plná editace) na daném projektu.
+        var canAddAddon = await _authz.HasPermissionAsync(
+            osobaId.Value, PermissionKeys.RecordsScheduleEdit, target.ProjektId, null, ct)
+            .ConfigureAwait(false);
+
+        var vm = await _builder.BuildAsync(externiOdkazId, zaznamId, canEdit: true, canAddAddon: canAddAddon, ct).ConfigureAwait(false);
         if (vm is null) return NotFound();
         return PartialView("~/Views/Vyjadreni/_ChatModal.cshtml", vm);
     }
