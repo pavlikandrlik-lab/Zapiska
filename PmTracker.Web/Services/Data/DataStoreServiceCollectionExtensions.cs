@@ -173,6 +173,9 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IExportTemplateQueries, ExportTemplateQueries>();
         services.AddScoped<IExportTemplateUseCase, ExportTemplateUseCase>();
         services.AddScoped<IWordExportService, OpenXmlWordExportService>();
+        // Plán 4 Feature C gap #4 (2026-04-24) — NES panel Excel export
+        services.AddScoped<PmTracker.Web.Services.Export.INesPanelExcelExportService,
+                           PmTracker.Web.Services.Export.NesPanelExcelExportService>();
         services.AddScoped<IUserAuthorizationAuditSnapshotBuilder, UserAuthorizationAuditSnapshotBuilder>();
         services.AddScoped<ISettingsAuthzQueries, SettingsAuthzQueries>();
         services.AddScoped<ISettingsAuthzCommands, SettingsAuthzCommands>();

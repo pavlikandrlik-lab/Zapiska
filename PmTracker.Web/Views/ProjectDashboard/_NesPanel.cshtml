@@ -22,6 +22,22 @@ else
                 <span>V prodlení: <strong>@Model.PocetVProdleni</strong></span>
                 <span>Průměr dnů: <strong>@Model.PrumerneProdleniDni.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)</strong></span>
             </div>
+            @{
+                // Plán 4 Feature C gap #4 (2026-04-24) — Excel export button.
+                // ProjektId není ve VM přímo — řešíme přes ViewContext.RouteData (route /projekty/{id}/dashboard)
+                var projektIdFromRoute = ViewContext.RouteData.Values.TryGetValue("id", out var rid) ? rid?.ToString() : null;
+            }
+            @if (!string.IsNullOrEmpty(projektIdFromRoute) && Model.Items.Count > 0)
+            {
+                <a class="pm-nes-panel__export"
+                   asp-action="NesPanelExport"
+                   asp-route-id="@projektIdFromRoute"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   title="Stáhnout tabulku ve formátu XLSX">
+                    Export do Excelu
+                </a>
+            }
         </header>
 
         @if (Model.Items.Count == 0)

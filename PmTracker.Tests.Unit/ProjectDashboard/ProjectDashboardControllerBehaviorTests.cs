@@ -103,7 +103,8 @@ public sealed class ProjectDashboardControllerBehaviorTests
             new FakeUserContextResolver(),
             TimeProvider.System,
             NullLoggerFactory.Instance,
-            service)
+            service,
+            new PmTracker.Web.Services.Export.NesPanelExcelExportService())
         {
             ControllerContext = new ControllerContext
             {

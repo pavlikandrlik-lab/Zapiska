@@ -1,7 +1,9 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Export;
 using PmTracker.Web.Services.ProjectDashboard;
 using PmTracker.Web.Services.Security;
 
@@ -11,16 +13,19 @@ namespace PmTracker.Web.Controllers;
 public sealed class ProjectDashboardController : BaseController
 {
     private readonly IProjectDashboardService _dashboardService;
+    private readonly INesPanelExcelExportService _nesExcelExport;
     private readonly TimeProvider _timeProvider;
 
     public ProjectDashboardController(
         IUserContextResolver userContextResolver,
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
-        IProjectDashboardService dashboardService)
+        IProjectDashboardService dashboardService,
+        INesPanelExcelExportService nesExcelExport)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _dashboardService = dashboardService;
+        _nesExcelExport = nesExcelExport;
         _timeProvider = timeProvider;
     }
 
@@ -82,6 +87,33 @@ public sealed class ProjectDashboardController : BaseController
         var localNow = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).DateTime;
         var model = await _dashboardService.BuildNesPanelAsync(id, localNow, ct);
         return PartialView("~/Views/ProjectDashboard/_NesPanel.cshtml", model);
+    }
+
+    /// <summary>
+    /// Plán 4 Feature C gap #4 (2026-04-24) — Excel export NES panelu.
+    /// Stejný permission gate jako NesPanel. Filename: NES-projekt-{id}-{yyyyMMdd}.xlsx.
+    /// </summary>
+    [HttpGet("nes-panel/export")]
+    [Authorize(Policy = "permission:dashboard.nes.view")]
+    public async Task<IActionResult> NesPanelExport(int id, CancellationToken ct = default)
+    {
+        if (!await EnsureDashboardAccessAsync(id, ct))
+        {
+            return Forbid();
+        }
+
+        var localNow = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).DateTime;
+        var model = await _dashboardService.BuildNesPanelAsync(id, localNow, ct);
+        if (!model.IsServiceDeskIntegrated)
+        {
+            return NotFound(new { error = "Projekt nemá napojení na ServiceDesk, export není k dispozici." });
+        }
+
+        var bytes = _nesExcelExport.Build(model, localNow);
+        var filename = $"NES-projekt-{id}-{localNow:yyyyMMdd}.xlsx";
+        return File(bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename);
     }
 
     [HttpGet("vyzvy-panel")]
