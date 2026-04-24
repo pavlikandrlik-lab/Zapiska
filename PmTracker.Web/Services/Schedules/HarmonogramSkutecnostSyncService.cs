@@ -15,6 +15,13 @@ namespace PmTracker.Web.Services.Schedules;
 public interface IHarmonogramSkutecnostSyncService
 {
     Task<HarmonogramSyncResult> SyncZaznamAsync(int projektovyZaznamId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Plán 4 Feature C Task 6 UI — načte aktivní bindings záznamu se doplněným TypZaznamu +
+    /// PredikatKey, pro reuse v UI builderu (kandidáti pro dropdown výběr).
+    /// Interně používá stejný pattern jako <see cref="SyncZaznamAsync"/>.
+    /// </summary>
+    Task<IReadOnlyList<BindingKandidat>> GetKandidatiForZaznamAsync(int zaznamId, CancellationToken ct = default);
 }
 
 /// <summary>Souhrn výsledku sync operace pro jeden záznam.</summary>
@@ -178,6 +185,12 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
 
         return new HarmonogramSyncResult(projektovyZaznamId, updated, skipManual, noKandidat, preferredFallbacks);
     }
+
+    /// <summary>
+    /// Plán 4 Feature C Task 6 UI — veřejný entry point pro builder, deleguje na privátní helper.
+    /// </summary>
+    public Task<IReadOnlyList<BindingKandidat>> GetKandidatiForZaznamAsync(int zaznamId, CancellationToken ct = default)
+        => LoadBindingKandidatiAsync(zaznamId, ct);
 
     /// <summary>
     /// Načte aktivní bindings pro záznam a doplní <c>TypZaznamu</c> přes fingerprint lookup

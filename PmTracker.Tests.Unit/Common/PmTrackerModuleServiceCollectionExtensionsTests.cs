@@ -67,6 +67,12 @@ public sealed class PmTrackerModuleServiceCollectionExtensionsTests
         // Pro DI smoke test musíme proto i tady zavolat obě registrace v pořadí
         // jako v Program.cs, jinak se RecordService neodvodí.
         services.AddServiceDeskIntegration(configuration);
+        // Plán 4 Feature C Task 6 (2026-04-24): ProjectService injectuje
+        // IHarmonogramSkutecnostSyncService (pro load kandidátů dropdown).
+        // Registrováno v Program.cs přímo — test si to musí replikovat.
+        services.AddScoped<
+            PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService,
+            PmTracker.Web.Services.Schedules.HarmonogramSkutecnostSyncService>();
         using var provider = services.BuildServiceProvider(validateScopes: true);
         using var scope = provider.CreateScope();
 

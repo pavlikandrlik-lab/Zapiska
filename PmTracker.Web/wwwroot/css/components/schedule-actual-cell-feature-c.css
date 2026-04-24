@@ -113,3 +113,127 @@
     background: var(--gov-color-danger-bg, #fee2e2);
     border-radius: 0 0.25rem 0.25rem 0;
 }
+
+/* Dropdown popover (chevron + menu) pro výběr alternativního kandidáta (2+ kandidáti) */
+.schedule-actual-cell__dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.schedule-actual-cell__dropdown-summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 1px solid var(--gov-color-neutral-border, #d0d5dd);
+    border-radius: 0.25rem;
+    background: #fff;
+    color: var(--gov-color-text-secondary, #475467);
+    cursor: pointer;
+    list-style: none;
+    transition: background 0.1s, border-color 0.1s;
+}
+
+.schedule-actual-cell__dropdown-summary::-webkit-details-marker {
+    display: none; /* Schovat default disclosure triangle v Chrome/Safari */
+}
+
+.schedule-actual-cell__dropdown-summary:hover {
+    background: var(--gov-color-neutral-bg-hover, #f9fafb);
+    border-color: var(--gov-color-primary, #1e40af);
+}
+
+.schedule-actual-cell__dropdown[open] > .schedule-actual-cell__dropdown-summary {
+    background: var(--gov-color-primary-bg, #dbeafe);
+    border-color: var(--gov-color-primary, #1e40af);
+    color: var(--gov-color-primary-strong, #1e3a8a);
+}
+
+.schedule-actual-cell__dropdown-chevron {
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.schedule-actual-cell__dropdown-list {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    right: 0;
+    z-index: 100;
+    min-width: 14rem;
+    max-width: 20rem;
+    margin: 0;
+    padding: 0.25rem;
+    background: #fff;
+    border: 1px solid var(--gov-color-neutral-border, #d0d5dd);
+    border-radius: 0.375rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    list-style: none;
+}
+
+.schedule-actual-cell__dropdown-item {
+    display: block;
+}
+
+.schedule-actual-cell__dropdown-btn {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 0.5rem;
+    align-items: baseline;
+    padding: 0.35rem 0.5rem;
+    border: none;
+    background: transparent;
+    color: var(--gov-color-text, #1f2937);
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 0.25rem;
+    transition: background 0.1s;
+}
+
+.schedule-actual-cell__dropdown-btn:hover:not(:disabled) {
+    background: var(--gov-color-neutral-bg-hover, #f9fafb);
+}
+
+.schedule-actual-cell__dropdown-btn:focus-visible {
+    outline: 2px solid var(--gov-color-primary, #1e40af);
+    outline-offset: -2px;
+}
+
+.schedule-actual-cell__dropdown-item--selected .schedule-actual-cell__dropdown-btn {
+    background: var(--gov-color-primary-bg, #dbeafe);
+    color: var(--gov-color-primary-strong, #1e3a8a);
+    font-weight: 500;
+}
+
+.schedule-actual-cell__dropdown-item-type {
+    font-size: 0.7rem;
+    padding: 0.05rem 0.3rem;
+    border-radius: 0.2rem;
+    background: var(--gov-color-neutral-bg, #f2f4f7);
+    color: var(--gov-color-text-secondary, #475467);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+
+.schedule-actual-cell__dropdown-item-cislo {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+    color: var(--gov-color-text-secondary, #475467);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.schedule-actual-cell__dropdown-item-datum {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+    color: var(--gov-color-text, #1f2937);
+}
+
+.schedule-actual-cell__dropdown-item-check {
+    color: var(--gov-color-primary, #1e40af);
+    font-weight: 700;
+}

@@ -11077,8 +11077,75 @@ bootstrapPmTrackerApp();
         }
     }
 
+    async function postSelectCandidate(hodnotaId, externiOdkazId) {
+        const token = getAntiforgery();
+        const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+        if (token) headers['RequestVerificationToken'] = token;
+        const resp = await fetch('/Harmonogram/SelectCandidate', {
+            method: 'POST',
+            headers: headers,
+            credentials: 'same-origin',
+            body: JSON.stringify({ HodnotaId: hodnotaId, ExterniOdkazId: externiOdkazId })
+        });
+        if (!resp.ok) {
+            const body = await resp.text().catch(function () { return ''; });
+            throw new Error('HTTP ' + resp.status + ': ' + (body || resp.statusText));
+        }
+        return await resp.json();
+    }
+
+    async function handleSelectCandidateClick(event) {
+        const btn = event.target.closest('[data-feature-c-select-candidate]');
+        if (!btn) return;
+        event.preventDefault();
+
+        const hodnotaId = parseInt(btn.getAttribute('data-hodnota-id'), 10);
+        const externiOdkazIdRaw = btn.getAttribute('data-externi-odkaz-id');
+        const externiOdkazId = externiOdkazIdRaw ? parseInt(externiOdkazIdRaw, 10) : null;
+        if (!Number.isFinite(hodnotaId) || hodnotaId <= 0) return;
+
+        const cell = btn.closest(CELL_SELECTOR);
+        const details = btn.closest('[data-feature-c-dropdown]');
+
+        btn.disabled = true;
+        try {
+            await postSelectCandidate(hodnotaId, externiOdkazId);
+            // Refresh UI — označ tento btn jako selected, ostatní od-select
+            if (details) {
+                const allBtns = details.querySelectorAll('[data-feature-c-select-candidate]');
+                allBtns.forEach(function (b) {
+                    const isThis = b === btn;
+                    b.setAttribute('data-is-selected', isThis ? 'true' : 'false');
+                    b.setAttribute('aria-current', isThis ? 'true' : 'false');
+                    const li = b.closest('li');
+                    if (li) {
+                        li.classList.toggle('schedule-actual-cell__dropdown-item--selected', isThis);
+                    }
+                    // Odstranit / přidat checkmark
+                    const existingCheck = b.querySelector('.schedule-actual-cell__dropdown-item-check');
+                    if (isThis && !existingCheck) {
+                        const check = document.createElement('span');
+                        check.className = 'schedule-actual-cell__dropdown-item-check';
+                        check.setAttribute('aria-hidden', 'true');
+                        check.textContent = '✓';
+                        b.appendChild(check);
+                    } else if (!isThis && existingCheck) {
+                        existingCheck.remove();
+                    }
+                });
+                // Zavřít details popup
+                details.removeAttribute('open');
+            }
+        } catch (err) {
+            showToggleError(cell, 'Výběr kandidáta selhal: ' + err.message);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
     function init() {
         document.addEventListener('click', handleToggleClick);
+        document.addEventListener('click', handleSelectCandidateClick);
     }
 
     if (document.readyState === 'loading') {
@@ -11087,7 +11154,11 @@ bootstrapPmTrackerApp();
         init();
     }
 
-    global.pmScheduleFeatureC = { postToggleRezim: postToggleRezim, refreshCellUi: refreshCellUi };
+    global.pmScheduleFeatureC = {
+        postToggleRezim: postToggleRezim,
+        postSelectCandidate: postSelectCandidate,
+        refreshCellUi: refreshCellUi
+    };
 })(window);
 
 // =============================================================================

@@ -160,6 +160,12 @@ public sealed partial class ProjectService
         // (isTaskCategory + schedule není zamčený pending návrhem) — sdílejí stejnou editability condition.
         var canToggleRezim = isTaskCategory && !pendingScheduleProposalLock.LocksSchedule;
 
+        // Plán 4 Feature C Task 6 UI (dropdown) — jeden batch load bindings pro záznam.
+        // Resolver per krok potom filtruje přes predikát matici NES/PMP/PNF × KrokPoradi.
+        var bindingKandidati = (!isCreate && isTaskCategory && record.Id > 0)
+            ? await harmonogramSkutecnostSync.GetKandidatiForZaznamAsync(record.Id, ct).ConfigureAwait(false)
+            : Array.Empty<BindingKandidat>() as IReadOnlyList<BindingKandidat>;
+
         var harmonogramBlokKroky = harmonogramKroky.Select(krok =>
         {
             var krokKey = krokKeyByDurationTypId.GetValueOrDefault(krok.TrvaniTypId);
@@ -169,6 +175,23 @@ public sealed partial class ProjectService
             // Feature C metadata z HS0X_DELAY row (ZpozdeniTypId). Pokud řádek ještě neexistuje
             // (krok má plánovou hodnotu, skutečnost není zapsaná), delayRow je null → defaulty.
             harmonogramRowsByTypId.TryGetValue(krok.ZpozdeniTypId, out var delayRow);
+
+            // Plán 4 Feature C Task 6 UI (dropdown) — resolve kandidátní bindings pro tento krok.
+            // Resolver vrátí kandidáty seřazené MAX first + označí vybraný (preferred nebo MAX).
+            // Pokud kroků je víc než 1 v UI, chevron ▼ se zobrazí.
+            var resolved = PmTracker.Web.Services.Schedules.HarmonogramSkutecnostResolver.Resolve(
+                krok.KrokIndex, bindingKandidati, delayRow?.PreferredExterniOdkazId);
+            var kandidatiVm = resolved.Kandidati.Count == 0
+                ? (IReadOnlyList<HarmonogramKrokKandidatViewModel>)Array.Empty<HarmonogramKrokKandidatViewModel>()
+                : resolved.Kandidati.Select(k => new HarmonogramKrokKandidatViewModel
+                {
+                    ExterniOdkazId = k.ExterniOdkazId,
+                    Cislo6 = k.Cislo6,
+                    TypZaznamu = k.TypZaznamu,
+                    Datum = k.Datum,
+                    IsSelected = k.ExterniOdkazId == resolved.VybranyExterniOdkazId
+                }).ToList();
+
             return new HarmonogramKrokEditViewModel
             {
                 KrokIndex = krok.KrokIndex,
@@ -191,7 +214,8 @@ public sealed partial class ProjectService
                 SkutecnostRezim = delayRow?.SkutecnostRezim ?? PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Auto,
                 SkutecnostZdroj = delayRow?.SkutecnostZdroj ?? PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Neznamo,
                 PreferredExterniOdkazId = delayRow?.PreferredExterniOdkazId,
-                CanToggleRezim = canToggleRezim
+                CanToggleRezim = canToggleRezim,
+                Kandidati = kandidatiVm
             };
         }).ToList();
 

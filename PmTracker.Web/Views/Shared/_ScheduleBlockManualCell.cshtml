@@ -31,6 +31,13 @@
     var featureCToggleAriaLabel = krok.SkutecnostRezim == SkutecnostRezimEnum.Auto
         ? $"Přepnout režim skutečnosti kroku {krok.Nazev} z Auto na Ručně"
         : $"Přepnout režim skutečnosti kroku {krok.Nazev} z Ručně na Auto";
+
+    // Plán 4 Feature C Task 6 UI dropdown — chevron ▼ viditelný jen pro ≥2 kandidáty
+    // + user má CanToggleRezim + není Manual režim (v Manual režimu je Preferred ignorován).
+    var featureCShowDropdown = krok.CanToggleRezim
+        && krok.DelayHodnotaId.HasValue
+        && krok.SkutecnostRezim == SkutecnostRezimEnum.Auto
+        && krok.Kandidati.Count >= 2;
 }
 
 @* Plán D Task 8 — render skutečnosti kroku na základě ZdrojSkutecnosti:
@@ -51,6 +58,41 @@
               data-zdroj="@krok.SkutecnostZdroj"
               title="@featureCBadgeTooltip"
               aria-label="@featureCBadgeTooltip">@featureCBadgeIcon</span>
+        @if (featureCShowDropdown)
+        {
+            <details class="schedule-actual-cell__dropdown"
+                     data-feature-c-dropdown
+                     data-hodnota-id="@krok.DelayHodnotaId!.Value">
+                <summary class="schedule-actual-cell__dropdown-summary"
+                         title="Zvolit jiný zdrojový ticket (@krok.Kandidati.Count kandidátů)"
+                         aria-label="Zvolit jiný zdrojový ticket, @krok.Kandidati.Count kandidátů">
+                    <span class="schedule-actual-cell__dropdown-chevron" aria-hidden="true">▼</span>
+                </summary>
+                <ul class="schedule-actual-cell__dropdown-list" role="menu">
+                    @foreach (var kandidat in krok.Kandidati)
+                    {
+                        <li role="none" class="schedule-actual-cell__dropdown-item@(kandidat.IsSelected ? " schedule-actual-cell__dropdown-item--selected" : string.Empty)">
+                            <button type="button"
+                                    role="menuitem"
+                                    class="schedule-actual-cell__dropdown-btn"
+                                    data-feature-c-select-candidate
+                                    data-hodnota-id="@krok.DelayHodnotaId!.Value"
+                                    data-externi-odkaz-id="@kandidat.ExterniOdkazId"
+                                    data-is-selected="@(kandidat.IsSelected ? "true" : "false")"
+                                    aria-current="@(kandidat.IsSelected ? "true" : "false")">
+                                <span class="schedule-actual-cell__dropdown-item-type">@kandidat.TypZaznamu</span>
+                                <span class="schedule-actual-cell__dropdown-item-cislo">#@kandidat.Cislo6</span>
+                                <span class="schedule-actual-cell__dropdown-item-datum">@kandidat.Datum.ToString("dd.MM.yyyy")</span>
+                                @if (kandidat.IsSelected)
+                                {
+                                    <span class="schedule-actual-cell__dropdown-item-check" aria-hidden="true">✓</span>
+                                }
+                            </button>
+                        </li>
+                    }
+                </ul>
+            </details>
+        }
         @if (featureCShowToggle)
         {
             <button type="button"

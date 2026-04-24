@@ -29,6 +29,8 @@ public sealed partial class ProjectService :
     private readonly ILookupTableCache lookupCache;
     private readonly IProjectRoleCache projectRoleCache;
     private readonly TimeProvider timeProvider;
+    // Plán 4 Feature C Task 6 UI — pro load BindingKandidati per záznam (dropdown alternativ).
+    private readonly PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService harmonogramSkutecnostSync;
 
     public ProjectService(
         PmTrackerDbContext dbContext,
@@ -44,7 +46,8 @@ public sealed partial class ProjectService :
         IRecordScheduleActualSourceResolver scheduleActualSourceResolver,
         ILookupTableCache lookupCache,
         IProjectRoleCache projectRoleCache,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService harmonogramSkutecnostSync)
     {
         this.dbContext = dbContext;
         this.textNormalizer = textNormalizer;
@@ -60,5 +63,6 @@ public sealed partial class ProjectService :
         this.lookupCache = lookupCache;
         this.projectRoleCache = projectRoleCache;
         this.timeProvider = timeProvider;
+        this.harmonogramSkutecnostSync = harmonogramSkutecnostSync;
     }
 }

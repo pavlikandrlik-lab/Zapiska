@@ -140,6 +140,28 @@ public sealed class HarmonogramKrokEditViewModel
     /// <see cref="PermissionKeys.RecordsScheduleEdit"/>.
     /// </summary>
     public bool CanToggleRezim { get; init; }
+
+    /// <summary>
+    /// Plán 4 Feature C Task 6 — kandidátní bindings pro tento krok (predikát-match přes
+    /// matici NES/PMP/PNF × KrokPoradi). UI zobrazí chevron ▼ a dropdown pouze pokud
+    /// <c>Kandidati.Count &gt; 1</c>. Klik na kandidáta → POST <c>/Harmonogram/SelectCandidate</c>.
+    /// Prázdný list = MAX default (nebo žádný kandidát vůbec).
+    /// </summary>
+    public IReadOnlyList<HarmonogramKrokKandidatViewModel> Kandidati { get; init; }
+        = Array.Empty<HarmonogramKrokKandidatViewModel>();
+}
+
+/// <summary>
+/// Plán 4 Feature C Task 6 — jeden kandidátní binding pro dropdown výběr.
+/// </summary>
+public sealed class HarmonogramKrokKandidatViewModel
+{
+    public required int ExterniOdkazId { get; init; }
+    public required string Cislo6 { get; init; }
+    public required string TypZaznamu { get; init; }
+    public required DateTime Datum { get; init; }
+    /// <summary>True pokud je tento kandidát aktuálně vybraný (= PreferredExterniOdkazId nebo MAX default).</summary>
+    public bool IsSelected { get; init; }
 }
 
 /// <summary>
