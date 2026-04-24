@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
+using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Services.ServiceDesk;
 
@@ -82,6 +83,7 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
     private readonly IVyjadreniQueryService _vyjadreni;
     private readonly TimeProvider _time;
     private readonly IPerExterniOdkazLockRegistry _lockRegistry;
+    private readonly IHarmonogramSkutecnostSyncService? _skutecnostSync;
     private readonly ILogger<BindingRebalanceService> _logger;
 
     public BindingRebalanceService(
@@ -89,12 +91,14 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
         IVyjadreniQueryService vyjadreni,
         TimeProvider time,
         IPerExterniOdkazLockRegistry lockRegistry,
-        ILogger<BindingRebalanceService> logger)
+        ILogger<BindingRebalanceService> logger,
+        IHarmonogramSkutecnostSyncService? skutecnostSync = null)
     {
         _db = db;
         _vyjadreni = vyjadreni;
         _time = time;
         _lockRegistry = lockRegistry;
+        _skutecnostSync = skutecnostSync;
         _logger = logger;
     }
 
@@ -352,6 +356,23 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
                 }
             }
             await tx.CommitAsync(ct).ConfigureAwait(false);
+
+            // Plán 4 Feature C Task 5 — trigger SkutecnostSync po binding save (kaskádové volání).
+            // Běží po commit transaction; failure zalogujeme ale nevyhazujeme, aby rebalance
+            // neskončilo s úspěšným commitem ale chybou pro UI. Sync je „best effort" audit.
+            if (_skutecnostSync is not null)
+            {
+                try
+                {
+                    await _skutecnostSync.SyncZaznamAsync(request.ZaznamId, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "BindingRebalanceService: SkutecnostSync selhal pro záznam {ZaznamId} (binding commit už proběhl).",
+                        request.ZaznamId);
+                }
+            }
 
             return new BindingRebalanceResult(
                 BindingRebalanceOutcome.Success,

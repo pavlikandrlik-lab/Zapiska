@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
+using PmTracker.Web.Services.Schedules;
 using PmTracker.Web.Services.Sync;
 
 namespace PmTracker.Web.Services.ServiceDesk;
@@ -32,6 +33,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     private readonly IVyjadreniQueryService _vyjadreni;
     private readonly TimeProvider _time;
     private readonly IPerExterniOdkazLockRegistry _lockRegistry;
+    private readonly IHarmonogramSkutecnostSyncService? _skutecnostSync;
     private readonly ILogger<VyjadreniHarvestService> _logger;
 
     public VyjadreniHarvestService(
@@ -39,12 +41,14 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         IVyjadreniQueryService vyjadreni,
         TimeProvider time,
         IPerExterniOdkazLockRegistry lockRegistry,
-        ILogger<VyjadreniHarvestService> logger)
+        ILogger<VyjadreniHarvestService> logger,
+        IHarmonogramSkutecnostSyncService? skutecnostSync = null)
     {
         _db = db;
         _vyjadreni = vyjadreni;
         _time = time;
         _lockRegistry = lockRegistry;
+        _skutecnostSync = skutecnostSync;
         _logger = logger;
     }
 
@@ -445,6 +449,23 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         // záměrně nenastavuje — následující fingerprint check detekuje NULL a vynutí
         // další drill. Q-9: dead `if (updateFingerprint)` branch odstraněn.
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // Plán 4 Feature C Task 5 — po harvest batch commitu zavolej SkutecnostSync
+        // aby Zdroj/Preferred na HS0X_DELAY řádcích reflektoval nové / změněné bindings.
+        // Best-effort: chyby syncu nezasahují do výsledku harvestu (fingerprinty jsou commited).
+        if (_skutecnostSync is not null && (created > 0 || superseded > 0))
+        {
+            try
+            {
+                await _skutecnostSync.SyncZaznamAsync(zaznam.Id, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "VyjadreniHarvestService: SkutecnostSync selhal pro záznam {ZaznamId} po harvestu ticketu {Cislo}.",
+                    zaznam.Id, eo.Cislo);
+            }
+        }
 
         return new VyjadreniHarvestResult(list.Count, created, superseded, skipped);
     }
