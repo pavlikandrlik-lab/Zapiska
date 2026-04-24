@@ -175,6 +175,14 @@ public class AuthorizationPolicyEnforcementTests
             // Refresh (T6 direct sync, sd-sync-revise Task 14): projektId přichází z form body,
             // ne z route. Manuální _authz.HasPermissionAsync(osobaId, RecordsEdit, projektId).
             "PmTracker.Web.Controllers.VyjadreniModalController.Refresh",
+
+            // ---- HarmonogramController (Plán 4 Feature C) ----
+
+            // ToggleRezim / SelectCandidate: projektId se resolvuje z DB (ZaznamId → ZaznamHarmonogramHodnoty
+            // → ProjektovyZaznam.ProjektId). Není v route ani body, proto manuální
+            // _authz.HasPermissionAsync(osobaId, RecordsScheduleEdit, projektId).
+            "PmTracker.Web.Controllers.HarmonogramController.ToggleRezim",
+            "PmTracker.Web.Controllers.HarmonogramController.SelectCandidate",
         };
 
         // Act
