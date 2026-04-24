@@ -10823,13 +10823,18 @@ bootstrapPmTrackerApp();
     const slots = [...fixed, ...addon];
 
     while (slots.length < TOTAL_SLOTS) {
+      // Plán 4 Feature C gap #2 (2026-04-24): Add-on endpoint ještě neexistuje.
+      // Buffer slot je read-only placeholder s tooltipem.
       slots.push({
         poradi: slots.length + 1,
-        label: mozeAddonPridat ? '+ přidat nepovinný krok' : '—',
+        label: '—',
         bindingDatum: null,
         fixni: false,
         isBufferSlot: true,
-        canAdd: mozeAddonPridat
+        canAdd: false,
+        tooltip: mozeAddonPridat
+          ? 'Přidávání nepovinných kroků bude dostupné v budoucí verzi.'
+          : 'Pro přidání nepovinných kroků chybí oprávnění.'
       });
     }
 
@@ -10876,7 +10881,8 @@ bootstrapPmTrackerApp();
              data-krok-poradi="${slot.poradi}"
              data-is-buffer="${!!slot.isBufferSlot}"
              data-can-add="${!!slot.canAdd}"
-             aria-dropeffect="move">
+             ${slot.tooltip ? `title="${escapeHtml(slot.tooltip)}" aria-disabled="true"` : ''}
+             aria-dropeffect="${slot.canAdd || !slot.isBufferSlot ? 'move' : 'none'}">
           <span class="pm-chat-step__label">${escapeHtml(slot.label)}</span>
           ${slot.bindingDatum ? `<span class="pm-chat-step__datum">${formatDatum(slot.bindingDatum)}</span>` : ''}
         </div>
@@ -11158,9 +11164,45 @@ bootstrapPmTrackerApp();
         }
     }
 
+    /* Feature C gap #6: při open `<details data-feature-c-dropdown>` přepočítat
+       pozici popup listu tak, aby se vešel do viewportu (bránění ořezávání parent
+       containerem s overflow:hidden). */
+    function handleDropdownToggle(event) {
+        const details = event.target.closest('[data-feature-c-dropdown]');
+        if (!details) return;
+        if (event.type !== 'toggle') return;
+        const list = details.querySelector('.schedule-actual-cell__dropdown-list');
+        if (!list) return;
+
+        if (!details.open) {
+            details.removeAttribute('data-fc-positioned');
+            list.style.top = '';
+            list.style.left = '';
+            return;
+        }
+
+        const summary = details.querySelector('summary');
+        if (!summary) return;
+        const rect = summary.getBoundingClientRect();
+        const listWidth = Math.min(320, window.innerWidth - 16);
+        let left = rect.right - listWidth; // right-align k chevronu
+        if (left < 8) left = 8;
+        let top = rect.bottom + 4;
+        if (top + 240 > window.innerHeight && rect.top - 240 > 0) {
+            top = rect.top - 4 - Math.min(240, list.scrollHeight);
+        }
+        list.style.width = listWidth + 'px';
+        list.style.left = left + 'px';
+        list.style.top = top + 'px';
+        details.setAttribute('data-fc-positioned', 'true');
+    }
+
     function init() {
         document.addEventListener('click', handleToggleClick);
         document.addEventListener('click', handleSelectCandidateClick);
+        // `toggle` event bubbling funguje od Safari 17 / Firefox 131 / Chrome 128+.
+        // V starších bych přidal listener per details, ale pro PM Tracker target = intranet IE/Edge nezvládá.
+        document.addEventListener('toggle', handleDropdownToggle, true);
     }
 
     if (document.readyState === 'loading') {

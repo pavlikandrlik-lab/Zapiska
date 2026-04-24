@@ -21,15 +21,21 @@
     const addon = kroky.filter(k => !k.fixni).sort((a,b) => a.poradi - b.poradi);
     const slots = [...fixed, ...addon];
 
-    // Padding do TOTAL_SLOTS prázdnými add-on sloty
+    // Padding do TOTAL_SLOTS prázdnými add-on sloty.
+    // Plán 4 Feature C gap #2 (2026-04-24): backend endpoint pro přidání nepovinného
+    // kroku není implementovaný (vyžaduje schema rozšíření + DB migraci mimo Sprint A).
+    // Buffer slot renderujeme jako read-only placeholder s tooltipem vysvětlujícím stav.
     while (slots.length < TOTAL_SLOTS) {
       slots.push({
         poradi: slots.length + 1,
-        label: mozeAddonPridat ? '+ přidat nepovinný krok' : '—',
+        label: '—',
         bindingDatum: null,
         fixni: false,
         isBufferSlot: true,
-        canAdd: mozeAddonPridat
+        canAdd: false,
+        tooltip: mozeAddonPridat
+          ? 'Přidávání nepovinných kroků bude dostupné v budoucí verzi.'
+          : 'Pro přidání nepovinných kroků chybí oprávnění.'
       });
     }
 
