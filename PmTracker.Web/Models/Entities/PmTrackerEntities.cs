@@ -147,6 +147,14 @@ public sealed class ProjektEntity
     public bool PouzivatIdentJednani { get; set; }
     public string? MistoPlneni { get; set; }
     public string? CisloRamcoveSmlouvy { get; set; }
+
+    /// <summary>
+    /// Logická reference na <c>intranetNEW.dbo.HOT_IS.ID</c> (FIS / ISSP).
+    /// NULL = projekt není napojen na žádný Informační systém v ServiceDesku.
+    /// Povolené hodnoty řídí katalog <c>SdInfoSystemy</c> (aplikační validace,
+    /// ne DB FK — HOT_IS je v cizí DB). Memory: project_servicedesk_infosystem_binding.
+    /// </summary>
+    public int? ServiceDeskInfoSystemId { get; set; }
 }
 
 public sealed class ObsazeniProjektuEntity

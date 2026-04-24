@@ -17,6 +17,9 @@ internal sealed class ProjectEntityConfiguration : IEntityTypeConfiguration<Proj
         builder.Property(x => x.PouzivatIdentJednani).HasColumnName("pouzivat_ident_jednani");
         builder.Property(x => x.MistoPlneni).HasColumnName("misto_plneni").HasMaxLength(500);
         builder.Property(x => x.CisloRamcoveSmlouvy).HasColumnName("cislo_ramcove_smlouvy").HasMaxLength(100);
+        // Plán 5 Sprint B Task 1: logická reference na HOT_IS.ID v intranetNEW.
+        // Bez FK — cizí DB; validace přes SdInfoSystemy katalog (aplikační).
+        builder.Property(x => x.ServiceDeskInfoSystemId).HasColumnName("servicedesk_info_system_id");
     }
 }
 
