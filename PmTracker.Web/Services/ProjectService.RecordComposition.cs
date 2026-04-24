@@ -240,13 +240,8 @@ public sealed partial class ProjectService
         return string.IsNullOrWhiteSpace(digits) ? null : digits;
     }
 
+    // Kanonický URL builder je v PmTracker.Web.Services.ServiceDesk.ServiceDeskUrlBuilder.
+    // Delegujeme, aby existující volání ProjectService.BuildServiceDeskUrl dál fungovala.
     private static string? BuildServiceDeskUrl(string? ticketId)
-    {
-        if (string.IsNullOrWhiteSpace(ticketId))
-        {
-            return null;
-        }
-
-        return $"https://servicedesk.fis.acr/Hotline/Ticket/Details/{ticketId}";
-    }
+        => PmTracker.Web.Services.ServiceDesk.ServiceDeskUrlBuilder.ForTicket(ticketId);
 }

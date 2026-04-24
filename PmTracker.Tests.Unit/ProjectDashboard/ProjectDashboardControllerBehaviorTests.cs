@@ -205,12 +205,13 @@ public sealed class ProjectDashboardControllerBehaviorTests
             });
         }
 
-        public ProjectDashboardNesPanelViewModel BuildNesPanel()
+        public Task<ProjectDashboardNesPanelViewModel> BuildNesPanelAsync(
+            int projektId, DateTime reference, CancellationToken ct = default)
         {
-            return new ProjectDashboardNesPanelViewModel
+            return Task.FromResult(new ProjectDashboardNesPanelViewModel
             {
                 IsServiceDeskIntegrated = false
-            };
+            });
         }
 
         public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(

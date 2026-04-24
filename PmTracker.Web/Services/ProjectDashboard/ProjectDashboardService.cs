@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Schedules;
+using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Web.Services.ProjectDashboard;
 
@@ -12,15 +14,18 @@ public sealed class ProjectDashboardService : IProjectDashboardService
     private readonly PmTrackerDbContext _dbContext;
     private readonly IHarmonogramService _harmonogramService;
     private readonly VyzvyPanelBuilder _vyzvyPanelBuilder;
+    private readonly IInformacniSystemQueryService _isQueryService;
 
     public ProjectDashboardService(
         PmTrackerDbContext dbContext,
         IHarmonogramService harmonogramService,
-        VyzvyPanelBuilder vyzvyPanelBuilder)
+        VyzvyPanelBuilder vyzvyPanelBuilder,
+        IInformacniSystemQueryService isQueryService)
     {
         _dbContext = dbContext;
         _harmonogramService = harmonogramService;
         _vyzvyPanelBuilder = vyzvyPanelBuilder;
+        _isQueryService = isQueryService;
     }
 
     public async Task<ProjectDashboardPageViewModel> BuildDashboardPageAsync(int projectId, CancellationToken ct = default)
@@ -328,9 +333,50 @@ public sealed class ProjectDashboardService : IProjectDashboardService
         };
     }
 
-    public ProjectDashboardNesPanelViewModel BuildNesPanel()
+    public async Task<ProjectDashboardNesPanelViewModel> BuildNesPanelAsync(
+        int projektId, DateTime reference, CancellationToken ct = default)
     {
-        return new ProjectDashboardNesPanelViewModel { IsServiceDeskIntegrated = false };
+        // Plán 5 Sprint B Task 4: unhardcode — NES panel aktivován, pokud projekt
+        // má napojení na IS (projekty.servicedesk_info_system_id). Volá Sprint A
+        // query service pro tickety v prodlení (NES SLA / PMP+PNF DatResT).
+        var projekt = await _dbContext.Projekty.AsNoTracking()
+            .Where(p => p.Id == projektId)
+            .Select(p => new { p.ServiceDeskInfoSystemId })
+            .FirstOrDefaultAsync(ct);
+
+        if (projekt?.ServiceDeskInfoSystemId is not int isId)
+        {
+            // Bez napojení nebo projekt nenalezen — UI render placeholder s odkazem na edit.
+            return new ProjectDashboardNesPanelViewModel { IsServiceDeskIntegrated = false };
+        }
+
+        var infoSystem = SdInfoSystemy.ById(isId);
+        var prodlene = await _isQueryService.GetProdleneAsync(isId, reference, ct);
+
+        var items = prodlene
+            .Select(p => new NesPanelItemViewModel
+            {
+                TicketId = p.Id,
+                Pid = p.Pid,
+                TypZaznamu = p.TypZaznamu,
+                Strucne = p.Strucne,
+                Dodavatel = p.Dodavatel,
+                Termin = p.Termin,
+                DniProdleni = p.DniProdleni,
+                Stav = p.Stav,
+                ServiceDeskUrl = ServiceDeskUrlBuilder.ForTicket(p.Id)
+            })
+            .ToList();
+
+        return new ProjectDashboardNesPanelViewModel
+        {
+            IsServiceDeskIntegrated = true,
+            ServiceDeskInfoSystemId = isId,
+            IsZkratka = infoSystem?.Zkratka,
+            Items = items,
+            PocetVProdleni = items.Count,
+            PrumerneProdleniDni = items.Count > 0 ? items.Average(x => x.DniProdleni) : 0.0
+        };
     }
 
     public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(

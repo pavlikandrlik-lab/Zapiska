@@ -79,7 +79,8 @@ public sealed class ProjectDashboardController : BaseController
             return Forbid();
         }
 
-        var model = _dashboardService.BuildNesPanel();
+        var localNow = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).DateTime;
+        var model = await _dashboardService.BuildNesPanelAsync(id, localNow, ct);
         return PartialView("~/Views/ProjectDashboard/_NesPanel.cshtml", model);
     }
 

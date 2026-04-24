@@ -114,7 +114,9 @@ public sealed class ProjectDashboardStatisticsYearFilterTests
         var harmonogramMock = new Mock<IHarmonogramService>();
         var vyzvaServiceMock = new Mock<IVyzvaService>();
         var vyzvyPanelBuilder = new VyzvyPanelBuilder(vyzvaServiceMock.Object, db);
+        // Statistics panel nevolá query service, stačí inert mock (Plán 5 Sprint B Task 4).
+        var isQueryServiceMock = new Mock<PmTracker.ServiceDesk.Contracts.IInformacniSystemQueryService>();
 
-        return new ProjectDashboardService(db, harmonogramMock.Object, vyzvyPanelBuilder);
+        return new ProjectDashboardService(db, harmonogramMock.Object, vyzvyPanelBuilder, isQueryServiceMock.Object);
     }
 }

@@ -2,7 +2,70 @@
 
 @if (!Model.IsServiceDeskIntegrated)
 {
+    @* Plán 5 Sprint B Task 4: graceful state pro projekty bez napojení na IS.
+       Odkaz na projektový přehled — edit modal (dropdown IS) se řeší přes
+       ProjektyController.EditProjectModal v UI. *@
     <div class="dashboard-placeholder-message">
-        <p class="muted">@Model.PlaceholderMessage</p>
+        <p class="muted">
+            @Model.PlaceholderMessage
+            <a asp-controller="Projekty" asp-action="Index">Nastavte napojení na IS</a>
+            v přehledu projektů, aby se zde objevily tickety v prodlení.
+        </p>
     </div>
+}
+else
+{
+    <section class="pm-nes-panel" aria-labelledby="nes-panel-heading">
+        <header class="pm-nes-panel__header">
+            <h2 id="nes-panel-heading">NES v prodlení — @Model.IsZkratka</h2>
+            <div class="pm-nes-panel__kpi">
+                <span>V prodlení: <strong>@Model.PocetVProdleni</strong></span>
+                <span>Průměr dnů: <strong>@Model.PrumerneProdleniDni.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)</strong></span>
+            </div>
+        </header>
+
+        @if (Model.Items.Count == 0)
+        {
+            <p class="muted">Žádné tickety v prodlení.</p>
+        }
+        else
+        {
+            <table class="pm-nes-panel__table">
+                <thead>
+                    <tr>
+                        <th scope="col">Ticket</th>
+                        <th scope="col">Typ</th>
+                        <th scope="col">Stručně</th>
+                        <th scope="col">Dodavatel</th>
+                        <th scope="col">Termín</th>
+                        <th scope="col">Prodlení</th>
+                        <th scope="col">Stav</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(item.ServiceDeskUrl))
+                                {
+                                    <a href="@item.ServiceDeskUrl" target="_blank" rel="noopener noreferrer">#@item.TicketId</a>
+                                }
+                                else
+                                {
+                                    <span>#@item.TicketId</span>
+                                }
+                            </td>
+                            <td>@item.TypZaznamu</td>
+                            <td>@item.Strucne</td>
+                            <td>@item.Dodavatel</td>
+                            <td>@item.Termin.ToString("dd.MM.yyyy")</td>
+                            <td><strong>@item.DniProdleni</strong> dní</td>
+                            <td>@item.Stav</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
 }

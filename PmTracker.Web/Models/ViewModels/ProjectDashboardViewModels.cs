@@ -51,7 +51,25 @@ public sealed class ProjectDashboardStepDetailViewModel
 public sealed class ProjectDashboardNesPanelViewModel
 {
     public bool IsServiceDeskIntegrated { get; init; }
-    public string PlaceholderMessage { get; init; } = "Napojení na ServiceDesk není k dispozici.";
+    public int? ServiceDeskInfoSystemId { get; init; }
+    public string? IsZkratka { get; init; }
+    public IReadOnlyList<NesPanelItemViewModel> Items { get; init; } = Array.Empty<NesPanelItemViewModel>();
+    public int PocetVProdleni { get; init; }
+    public double PrumerneProdleniDni { get; init; }
+    public string PlaceholderMessage { get; init; } = "Projekt není napojen na žádný Informační systém v ServiceDesku.";
+}
+
+public sealed class NesPanelItemViewModel
+{
+    public required int TicketId { get; init; }
+    public required string Pid { get; init; }
+    public required string TypZaznamu { get; init; }
+    public string? Strucne { get; init; }
+    public string? Dodavatel { get; init; }
+    public required DateTime Termin { get; init; }
+    public required int DniProdleni { get; init; }
+    public string? Stav { get; init; }
+    public string? ServiceDeskUrl { get; init; }
 }
 
 public sealed class ProjectDashboardStatisticsPanelViewModel
