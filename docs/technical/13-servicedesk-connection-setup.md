@@ -112,6 +112,10 @@ Pokud se po nasazení objeví problémy (connectivity, perf, chyba v mapování)
 | `InvalidCastException` na sloupci `HOT_ZAZNAMY.splneno` | Někdo změnil DB schéma (smalldatetime → jiný typ) | Po opravě Bug #1 (commit `cd0442af`) je v entitě `DateTime?` + `HasColumnType("smalldatetime")`. Ověř, že DB skutečně má `smalldatetime`. |
 | Chat modal zobrazí literal `<b>` místo tučného textu | `PopisPlainText` nezavolán, nebo view používá `@bubble.Popis` (starý escape) | Po commit `98a020d` je view `_ChatModal.cshtml:98` opravený na `@bubble.PopisPlainText`. Pokud je to jiná view, aplikuj stejný pattern. |
 | Chat bubliny v různém pořadí mezi requesty | Pre-commit `52fee95` — `SqlVyjadreniQueryService` řazené jen dle `datum` | Po commit `52fee95` je `ThenBy(Id)` zajištěný tie-break. |
+| „Číslo ticketu musí být přesně 6 cifer (např. 123456)." | User zadal do pole `ExterniVazby[N].Cislo` neplatný formát (<6 cifer, >6, písmena) | ServiceDesk HOT_ZAZNAMY.id je vždy 6-místný integer. Zkontroluj typo ve formuláři editoru záznamu. Memory: `feedback_sd_ticket_id_required.md`. |
+| „Ticket #123456 v ServiceDesku neexistuje — externí vazbu nelze založit." | Zadané 6-ciferné číslo v HOT_ZAZNAMY skutečně není (typo, archivní tiket, chybné ID) | Ověř v SD UI (`https://servicedesk.fis.acr/Hotline/Ticket/Details/123456`), že ticket existuje. Pokud jde o archivní tiket, diskuze je mimo rozsah hard constraintu (viz Plán 3 Feature D). |
+| „SD integrace je vypnutá — novou externí vazbu nelze založit." | `Ticketing:Enabled=false` v `appsettings.json` | Přepni na `true` a restartuj app pool; případně pracuj offline bez založení nových SD vazeb (stávající záznamy migrace neruší). |
+| „ServiceDesk není dostupný — nelze ověřit existenci ticketu." | Network / SD SQL server down / timeout | Checkni connectivity (`telnet <HOST> 1433`) + SD SQL service status. Chyba je transientní; user zkusí save znovu za chvíli. Log obsahuje warning s kompletním exception stackem (viz `ExterniOdkazValidator`). |
 
 ## 7. Související dokumentace
 
