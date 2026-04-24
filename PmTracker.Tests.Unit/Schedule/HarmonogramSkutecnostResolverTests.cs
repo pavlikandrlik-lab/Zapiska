@@ -1,0 +1,156 @@
+using FluentAssertions;
+using PmTracker.Web.Services.Schedules;
+using Xunit;
+
+namespace PmTracker.Tests.Unit.Schedule;
+
+/// <summary>
+/// Plán 4 Feature C Task 3 — pure logic resolver.
+/// MAX default + seznam kandidátů + volitelný <c>PreferredExterniOdkazId</c>.
+/// </summary>
+public sealed class HarmonogramSkutecnostResolverTests
+{
+    private static readonly DateTime D1 = new(2026, 3, 1);
+    private static readonly DateTime D2 = new(2026, 3, 15);
+    private static readonly DateTime D3 = new(2026, 3, 28);
+
+    [Fact]
+    public void Resolve_ZadneKandidati_VraciDatumNull()
+    {
+        var r = HarmonogramSkutecnostResolver.Resolve(3, Array.Empty<BindingKandidat>(), preferredExterniOdkazId: null);
+
+        r.Datum.Should().BeNull();
+        r.VybranyExterniOdkazId.Should().BeNull();
+        r.Kandidati.Should().BeEmpty();
+        r.PreferredFallbackApplied.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Resolve_JedenKandidat_VraciJeho()
+    {
+        var b = new BindingKandidat(100, "111111", "PMP", "K4_K7", D2);
+
+        var r = HarmonogramSkutecnostResolver.Resolve(4, new[] { b }, preferredExterniOdkazId: null);
+
+        r.Datum.Should().Be(D2);
+        r.VybranyExterniOdkazId.Should().Be(100);
+        r.Kandidati.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Resolve_DvaKandidati_VraciMaxJakoDefault()
+    {
+        var b1 = new BindingKandidat(100, "111111", "PMP", "K4_K7", D2);
+        var b2 = new BindingKandidat(101, "222222", "PMP", "K4_K7", D3);
+
+        var r = HarmonogramSkutecnostResolver.Resolve(4, new[] { b1, b2 }, preferredExterniOdkazId: null);
+
+        r.Datum.Should().Be(D3); // MAX
+        r.VybranyExterniOdkazId.Should().Be(101);
+        r.Kandidati.Should().HaveCount(2);
+        r.Kandidati[0].ExterniOdkazId.Should().Be(101); // MAX first (OrderByDescending)
+        r.Kandidati[1].ExterniOdkazId.Should().Be(100);
+    }
+
+    [Fact]
+    public void Resolve_BindingSPredikatemNesedicimNaKrok_Ignoruje()
+    {
+        // PMP krok 4 = K4_K7. Binding s K10 je pro jiný krok → neměl by patřit do kandidátů K4.
+        var b = new BindingKandidat(100, "111111", "PMP", "K10", D1);
+
+        var r = HarmonogramSkutecnostResolver.Resolve(4, new[] { b }, preferredExterniOdkazId: null);
+
+        r.Datum.Should().BeNull();
+        r.Kandidati.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_NESKrok1_NemaMapovani_ZadnyKandidat()
+    {
+        // NES nemá žádné automatické kroky → matice vrátí null → žádné kandidáty pro žádný krok.
+        var b = new BindingKandidat(100, "111111", "NES", "K3", D1);
+
+        var r = HarmonogramSkutecnostResolver.Resolve(1, new[] { b }, preferredExterniOdkazId: null);
+
+        r.Datum.Should().BeNull();
+        r.Kandidati.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_MixTypu_PouzeMatchingPredikatProDanyKrok()
+    {
+        // Záznam má 2 externí vazby: 1× PMP (K3) + 1× PNF (K6).
+        // Pro PMP krok 3 by měl zůstat pouze PMP K3 binding (PNF nemá K3).
+        var pmpBinding = new BindingKandidat(100, "111111", "PMP", "K3", D1);
+        var pnfBinding = new BindingKandidat(101, "222222", "PNF", "K6", D2);
+
+        var r = HarmonogramSkutecnostResolver.Resolve(3, new[] { pmpBinding, pnfBinding }, preferredExterniOdkazId: null);
+
+        r.Kandidati.Should().HaveCount(1);
+        r.Kandidati[0].ExterniOdkazId.Should().Be(100);
+        r.Datum.Should().Be(D1);
+    }
+
+    [Fact]
+    public void Resolve_PreferredExterniOdkazExistuje_VraciPreferred()
+    {
+        // User dříve v UI vybral binding 100 (dřívější datum) jako preferred — musí se vrátit on, ne MAX.
+        var b1 = new BindingKandidat(100, "111111", "PMP", "K4_K7", D1);
+        var b2 = new BindingKandidat(101, "222222", "PMP", "K4_K7", D3);
+
+        var r = HarmonogramSkutecnostResolver.Resolve(4, new[] { b1, b2 }, preferredExterniOdkazId: 100);
+
+        r.Datum.Should().Be(D1);
+        r.VybranyExterniOdkazId.Should().Be(100);
+        r.Kandidati.Should().HaveCount(2);
+        r.PreferredFallbackApplied.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Resolve_PreferredNeexistujeAleJsouKandidati_FallbackNaMax()
+    {
+        // User vybral binding 999 jako preferred, ale harvest ho odstranil.
+        // Musí spadnout zpět na MAX a signalizovat fallback (caller pak clear-uje preferred).
+        var b1 = new BindingKandidat(100, "111111", "PMP", "K4_K7", D1);
+        var b2 = new BindingKandidat(101, "222222", "PMP", "K4_K7", D3);
+
+        var r = HarmonogramSkutecnostResolver.Resolve(4, new[] { b1, b2 }, preferredExterniOdkazId: 999);
+
+        r.Datum.Should().Be(D3); // MAX
+        r.VybranyExterniOdkazId.Should().Be(101);
+        r.PreferredFallbackApplied.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Resolve_PreferredNeexistujeAniKandidati_VraciNull()
+    {
+        var r = HarmonogramSkutecnostResolver.Resolve(4, Array.Empty<BindingKandidat>(), preferredExterniOdkazId: 999);
+
+        r.Datum.Should().BeNull();
+        r.VybranyExterniOdkazId.Should().BeNull();
+        // Žádní kandidáti → fallback se nezaznamenává, protože není kam fallbackovat.
+        r.PreferredFallbackApplied.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Resolve_NormalizujeTypZaznamuPriMatchingPredikatu()
+    {
+        // Input binding má typ "pmp" (lowercase) — matice normalizuje na upper case při lookupu.
+        var b = new BindingKandidat(100, "111111", "pmp", "K4_K7", D2);
+
+        var r = HarmonogramSkutecnostResolver.Resolve(4, new[] { b }, preferredExterniOdkazId: null);
+
+        r.Datum.Should().Be(D2);
+    }
+
+    [Fact]
+    public void Resolve_PrazdnyTypZaznamuVBindingu_Ignoruje()
+    {
+        var b = new BindingKandidat(100, "111111", "", "K4_K7", D2);
+
+        var r = HarmonogramSkutecnostResolver.Resolve(4, new[] { b }, preferredExterniOdkazId: null);
+
+        r.Kandidati.Should().BeEmpty();
+        r.Datum.Should().BeNull();
+    }
+}
