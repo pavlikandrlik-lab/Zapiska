@@ -88,7 +88,7 @@
       bubble.addEventListener('dragend', () => bubble.classList.remove('pm-chat-bubble--dragging'));
     });
 
-    // Drop targets
+    // Drop targets — legacy `<ol data-step>` flow (Plán C Task 16/17).
     root.querySelectorAll('[data-step]').forEach((step) => {
       step.addEventListener('dragover', (ev) => {
         ev.preventDefault();
@@ -112,21 +112,48 @@
           hotVyjadreniId: Number(parsed.id),
           datumVyjadreni: parsed.datum
         };
-        persistPending(root, { op: 'create', payload });
-        setStatus(root, 'Ukládám…', null);
-        try {
-          await createBinding(root, payload);
-          setStatus(root, 'Uloženo.', 'ok');
-          clearPending(root);
-          // A-5: po úspěšném uložení přenačti modal, ať UI zobrazí nové binding meta a VazbaId.
-          if (global.pmChatModal && typeof global.pmChatModal.refreshModal === 'function') {
-            await global.pmChatModal.refreshModal();
-          }
-        } catch (err) {
-          setStatus(root, 'Ukládání selhalo: ' + (err.message || err), 'error');
-        }
+        await dispatchCreateBinding(root, payload);
       });
     });
+
+    // Plán 4 Feature C gap #5 (2026-04-24): nový `<pm-chat-stepper>` custom element emituje
+    // `pm-chat-stepper-drop` event místo standardního drop. Listener přebírá event detail
+    // a volá stejný backend endpoint. Legacy `<ol hidden>` bude odstraněn až se potvrdí
+    // stability tohoto flow.
+    const stepperElements = root.querySelectorAll('pm-chat-stepper, [data-pm-chat-stepper]');
+    stepperElements.forEach((stepper) => {
+      stepper.addEventListener('pm-chat-stepper-drop', async (ev) => {
+        const detail = ev.detail || {};
+        if (!detail.bubbleId || !detail.krokKey) {
+          setStatus(root, 'Drop: chybí ID kroku nebo bubliny.', 'error');
+          return;
+        }
+        const payload = {
+          externiOdkazId: externiOdkazId,
+          zaznamId: zaznamId,
+          projektId: projektId,
+          krokKey: detail.krokKey,
+          hotVyjadreniId: Number(detail.bubbleId),
+          datumVyjadreni: detail.bubbleDatum || null
+        };
+        await dispatchCreateBinding(root, payload);
+      });
+    });
+
+    async function dispatchCreateBinding(rootEl, payload) {
+      persistPending(rootEl, { op: 'create', payload });
+      setStatus(rootEl, 'Ukládám…', null);
+      try {
+        await createBinding(rootEl, payload);
+        setStatus(rootEl, 'Uloženo.', 'ok');
+        clearPending(rootEl);
+        if (global.pmChatModal && typeof global.pmChatModal.refreshModal === 'function') {
+          await global.pmChatModal.refreshModal();
+        }
+      } catch (err) {
+        setStatus(rootEl, 'Ukládání selhalo: ' + (err.message || err), 'error');
+      }
+    }
 
     // A-5: „Odpojit" tlačítka — posílají POST Delete s data-vazba-id, pak refresh.
     root.querySelectorAll('[data-clear-binding]').forEach((btn) => {

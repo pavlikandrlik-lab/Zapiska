@@ -10551,20 +10551,46 @@ bootstrapPmTrackerApp();
           hotVyjadreniId: Number(parsed.id),
           datumVyjadreni: parsed.datum
         };
-        persistPending(root, { op: 'create', payload });
-        setStatus(root, 'Ukládám…', null);
-        try {
-          await createBinding(root, payload);
-          setStatus(root, 'Uloženo.', 'ok');
-          clearPending(root);
-          if (global.pmChatModal && typeof global.pmChatModal.refreshModal === 'function') {
-            await global.pmChatModal.refreshModal();
-          }
-        } catch (err) {
-          setStatus(root, 'Ukládání selhalo: ' + (err.message || err), 'error');
-        }
+        await dispatchCreateBinding(root, payload);
       });
     });
+
+    // Plán 4 Feature C gap #5 (2026-04-24): nový `<pm-chat-stepper>` custom element emituje
+    // `pm-chat-stepper-drop` event místo standardního drop. Listener přebírá event detail
+    // a volá stejný backend endpoint. Legacy `<ol hidden>` zůstává jako fallback/test.
+    root.querySelectorAll('pm-chat-stepper, [data-pm-chat-stepper]').forEach((stepper) => {
+      stepper.addEventListener('pm-chat-stepper-drop', async (ev) => {
+        const detail = ev.detail || {};
+        if (!detail.bubbleId || !detail.krokKey) {
+          setStatus(root, 'Drop: chybí ID kroku nebo bubliny.', 'error');
+          return;
+        }
+        const payload = {
+          externiOdkazId: externiOdkazId,
+          zaznamId: zaznamId,
+          projektId: projektId,
+          krokKey: detail.krokKey,
+          hotVyjadreniId: Number(detail.bubbleId),
+          datumVyjadreni: detail.bubbleDatum || null
+        };
+        await dispatchCreateBinding(root, payload);
+      });
+    });
+
+    async function dispatchCreateBinding(rootEl, payload) {
+      persistPending(rootEl, { op: 'create', payload });
+      setStatus(rootEl, 'Ukládám…', null);
+      try {
+        await createBinding(rootEl, payload);
+        setStatus(rootEl, 'Uloženo.', 'ok');
+        clearPending(rootEl);
+        if (global.pmChatModal && typeof global.pmChatModal.refreshModal === 'function') {
+          await global.pmChatModal.refreshModal();
+        }
+      } catch (err) {
+        setStatus(rootEl, 'Ukládání selhalo: ' + (err.message || err), 'error');
+      }
+    }
 
     // A-5: „Odpojit" tlačítka — posílají POST Delete s data-vazba-id, pak refresh.
     root.querySelectorAll('[data-clear-binding]').forEach((btn) => {
@@ -10879,6 +10905,7 @@ bootstrapPmTrackerApp();
         <div class="pm-chat-step${slot.isBufferSlot ? ' pm-chat-stepper__buffer-slot' : ''}"
              data-krok-key="${slot.poradi}"
              data-krok-poradi="${slot.poradi}"
+             ${slot.krokKey ? `data-krok-guid="${escapeHtml(String(slot.krokKey))}"` : ''}
              data-is-buffer="${!!slot.isBufferSlot}"
              data-can-add="${!!slot.canAdd}"
              ${slot.tooltip ? `title="${escapeHtml(slot.tooltip)}" aria-disabled="true"` : ''}
@@ -10945,6 +10972,7 @@ bootstrapPmTrackerApp();
 
       const detail = {
         krokPoradi: parseInt(target.dataset.krokPoradi || target.dataset.krokKey, 10),
+        krokKey: target.dataset.krokGuid || null, // Feature C gap #5: GUID pro POST backend
         bubbleId,
         bubbleDatum: e.dataTransfer.getData('application/x-bubble-datum'),
         isBufferSlot: target.dataset.isBuffer === 'true',

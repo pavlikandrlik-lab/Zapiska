@@ -173,6 +173,7 @@
                     if (!el || typeof el.setKroky !== 'function') return;
                     var kroky = @Json.Serialize(Model.Kroky.OrderBy(k => k.KrokPoradi).Select(k => new {
                         poradi = k.KrokPoradi,
+                        krokKey = k.KrokKey, // Feature C gap #5: GUID nutný pro POST /Vyjadreni/HarmonogramVazba/Create
                         label = k.Nazev,
                         bindingDatum = k.AktualniVyjadreniDatum.HasValue ? k.AktualniVyjadreniDatum.Value.ToUniversalTime().ToString("O") : null,
                         fixni = true,

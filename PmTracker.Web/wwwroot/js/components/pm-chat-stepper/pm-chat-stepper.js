@@ -36,9 +36,11 @@
         <div class="pm-chat-step${slot.isBufferSlot ? ' pm-chat-stepper__buffer-slot' : ''}"
              data-krok-key="${slot.poradi}"
              data-krok-poradi="${slot.poradi}"
+             ${slot.krokKey ? `data-krok-guid="${escapeHtml(String(slot.krokKey))}"` : ''}
              data-is-buffer="${!!slot.isBufferSlot}"
              data-can-add="${!!slot.canAdd}"
-             aria-dropeffect="move">
+             ${slot.tooltip ? `title="${escapeHtml(slot.tooltip)}" aria-disabled="true"` : ''}
+             aria-dropeffect="${slot.canAdd || !slot.isBufferSlot ? 'move' : 'none'}">
           <span class="pm-chat-step__label">${escapeHtml(slot.label)}</span>
           ${slot.bindingDatum ? `<span class="pm-chat-step__datum">${formatDatum(slot.bindingDatum)}</span>` : ''}
         </div>
@@ -104,6 +106,7 @@
 
       const detail = {
         krokPoradi: parseInt(target.dataset.krokPoradi || target.dataset.krokKey, 10),
+        krokKey: target.dataset.krokGuid || null, // Feature C gap #5: GUID pro POST backend
         bubbleId,
         bubbleDatum: e.dataTransfer.getData('application/x-bubble-datum'),
         isBufferSlot: target.dataset.isBuffer === 'true',
