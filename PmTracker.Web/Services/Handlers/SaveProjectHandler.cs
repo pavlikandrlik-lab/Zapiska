@@ -5,6 +5,7 @@ using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Web.Services.Handlers;
 
@@ -41,6 +42,15 @@ public sealed class SaveProjectHandler : IRequestHandler<SaveProjectRequest, int
         var command = request.Command;
         var statusId = await ResolveProjectStatusIdAsync(command.Stav, ct);
 
+        // Plán 5 Sprint B Task 3: validace vazby na IS proti hardkódovanému katalogu.
+        // NULL = bez napojení (povoleno); non-NULL musí být v SdInfoSystemy.
+        if (command.ServiceDeskInfoSystemId.HasValue
+            && !SdInfoSystemy.IsSupported(command.ServiceDeskInfoSystemId))
+        {
+            throw new InvalidOperationException(
+                $"Informační systém s ID {command.ServiceDeskInfoSystemId.Value} není v katalogu SdInfoSystemy.");
+        }
+
         var strategy = _db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
@@ -57,6 +67,7 @@ public sealed class SaveProjectHandler : IRequestHandler<SaveProjectRequest, int
                 existing.PouzivatIdentJednani = command.PouzivatIdentJednani;
                 existing.MistoPlneni = NormalizeOrNull(command.MistoPlneni);
                 existing.CisloRamcoveSmlouvy = NormalizeOrNull(command.CisloRamcoveSmlouvy);
+                existing.ServiceDeskInfoSystemId = command.ServiceDeskInfoSystemId;
                 await _db.SaveChangesAsync(ct);
                 _audit.Add(currentUser.OsobaId, new AuditWriteEntry(
                     AuditActionType.Update,
@@ -76,7 +87,8 @@ public sealed class SaveProjectHandler : IRequestHandler<SaveProjectRequest, int
                 StavId = statusId,
                 PouzivatIdentJednani = command.PouzivatIdentJednani,
                 MistoPlneni = NormalizeOrNull(command.MistoPlneni),
-                CisloRamcoveSmlouvy = NormalizeOrNull(command.CisloRamcoveSmlouvy)
+                CisloRamcoveSmlouvy = NormalizeOrNull(command.CisloRamcoveSmlouvy),
+                ServiceDeskInfoSystemId = command.ServiceDeskInfoSystemId
             };
             _db.Projekty.Add(created);
             await _db.SaveChangesAsync(ct);

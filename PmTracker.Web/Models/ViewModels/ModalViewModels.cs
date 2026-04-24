@@ -7,6 +7,14 @@ public sealed class ProjectModalViewModel
     public required string Title { get; init; }
     public required SaveProjectCommand Command { get; init; }
     public IReadOnlyList<LookupOptionViewModel> StavyProjektu { get; init; } = Array.Empty<LookupOptionViewModel>();
+
+    /// <summary>
+    /// Katalog Informačních systémů pro dropdown (Plán 5 Sprint B Task 3).
+    /// Prázdný = feature fallback (Ticketing:Enabled=false) — dropdown nebude renderovaný.
+    /// </summary>
+    public IReadOnlyList<PmTracker.Web.Services.ServiceDesk.SdInfoSystem> InfoSystemy { get; init; }
+        = Array.Empty<PmTracker.Web.Services.ServiceDesk.SdInfoSystem>();
+
     public bool IsEdit => Command.Id.HasValue;
 }
 

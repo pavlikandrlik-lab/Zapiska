@@ -21,6 +21,13 @@ public sealed class ProjektListItemViewModel
     public bool PouzivatIdentJednani { get; init; }
     public string? MistoPlneni { get; init; }
     public string? CisloRamcoveSmlouvy { get; init; }
+
+    /// <summary>
+    /// Napojení projektu na Informační systém v ServiceDesku (HOT_IS.ID; FIS / ISSP).
+    /// NULL = bez napojení. Plán 5 Sprint B Task 3.
+    /// </summary>
+    public int? ServiceDeskInfoSystemId { get; init; }
+
     public bool CanEdit { get; init; }
     public bool CanDelete { get; init; }
 }

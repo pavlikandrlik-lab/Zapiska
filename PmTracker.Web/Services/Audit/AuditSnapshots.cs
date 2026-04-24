@@ -7,14 +7,16 @@ internal sealed record ProjectAuditSnapshot(
     string Zkratka,
     string CelyNazev,
     int StavId,
-    bool PouzivatIdentJednani)
+    bool PouzivatIdentJednani,
+    int? ServiceDeskInfoSystemId)
 {
     public static ProjectAuditSnapshot FromEntity(ProjektEntity entity) => new(
         entity.Id,
         entity.Zkratka,
         entity.CelyNazev,
         entity.StavId,
-        entity.PouzivatIdentJednani);
+        entity.PouzivatIdentJednani,
+        entity.ServiceDeskInfoSystemId);
 }
 
 internal sealed record RecordAuditSnapshot(

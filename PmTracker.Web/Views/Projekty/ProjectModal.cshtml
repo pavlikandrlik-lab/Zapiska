@@ -50,6 +50,30 @@
         <input type="text" name="CisloRamcoveSmlouvy" maxlength="100"
                placeholder="např. 23106000271" value="@Model.Command.CisloRamcoveSmlouvy" />
     </label>
+    @* Plán 5 Sprint B Task 3: dropdown napojení projektu na IS ve ServiceDesku.
+       Ticketing:Enabled=false → InfoSystemy prázdný, celý blok se nerenderuje. *@
+    @if (Model.InfoSystemy.Count > 0)
+    {
+        <label>
+            Informační systém (ServiceDesk)
+            <select name="ServiceDeskInfoSystemId" aria-describedby="infosystem-help">
+                @{
+                    var selectedIs = Model.Command.ServiceDeskInfoSystemId;
+                    var emptySelected = !selectedIs.HasValue;
+                }
+                <option value="" selected="@emptySelected">— bez napojení —</option>
+                @foreach (var infoSystem in Model.InfoSystemy)
+                {
+                    var isSelected = selectedIs.HasValue && selectedIs.Value == infoSystem.Id;
+                    <option value="@infoSystem.Id" selected="@isSelected">@infoSystem.Zkratka — @infoSystem.Nazev</option>
+                }
+            </select>
+            <small id="infosystem-help" class="form-hint muted">
+                Napojení projektu na IS v ServiceDesku. Určuje, které tickety (NES/PMP/PNF)
+                se zobrazí v dashboardu jako v prodlení.
+            </small>
+        </label>
+    }
 
     @await Html.PartialAsync(
         "_ModalFormActions",

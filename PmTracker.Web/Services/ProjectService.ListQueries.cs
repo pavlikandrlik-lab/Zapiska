@@ -25,6 +25,7 @@ public sealed partial class ProjectService
                 PouzivatIdentJednani = project.PouzivatIdentJednani,
                 MistoPlneni = project.MistoPlneni,
                 CisloRamcoveSmlouvy = project.CisloRamcoveSmlouvy,
+                ServiceDeskInfoSystemId = project.ServiceDeskInfoSystemId,
                 CanEdit = true,
                 CanDelete = true
             })
@@ -43,7 +44,8 @@ public sealed partial class ProjectService
                 x.StavId,
                 x.PouzivatIdentJednani,
                 x.MistoPlneni,
-                x.CisloRamcoveSmlouvy
+                x.CisloRamcoveSmlouvy,
+                x.ServiceDeskInfoSystemId
             })
             .FirstOrDefaultAsync(ct);
         if (project is null)
@@ -66,6 +68,7 @@ public sealed partial class ProjectService
             PouzivatIdentJednani = project.PouzivatIdentJednani,
             MistoPlneni = project.MistoPlneni,
             CisloRamcoveSmlouvy = project.CisloRamcoveSmlouvy,
+            ServiceDeskInfoSystemId = project.ServiceDeskInfoSystemId,
             CanEdit = true,
             CanDelete = true
         };

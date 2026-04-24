@@ -24,6 +24,13 @@ public sealed class SaveProjectCommand
 
     [StringLength(100)]
     public string? CisloRamcoveSmlouvy { get; set; }
+
+    /// <summary>
+    /// Napojení projektu na Informační systém v ServiceDesku (FIS / ISSP).
+    /// NULL = bez napojení. Validováno proti katalogu <c>SdInfoSystemy</c>
+    /// v <c>SaveProjectHandler</c> (Plán 5 Sprint B Task 3).
+    /// </summary>
+    public int? ServiceDeskInfoSystemId { get; set; }
 }
 
 public sealed class SoftDeleteProjectCommand

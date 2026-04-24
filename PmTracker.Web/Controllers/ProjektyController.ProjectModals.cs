@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Web.Controllers;
 
@@ -25,7 +26,9 @@ public sealed partial class ProjektyController
                 Stav = defaultStatus,
                 PouzivatIdentJednani = false
             },
-            StavyProjektu = statusOptions
+            StavyProjektu = statusOptions,
+            // Plán 5 Sprint B Task 3: hardkódovaný katalog IS (FIS/ISSP) pro dropdown.
+            InfoSystemy = SdInfoSystemy.Vychozi
         };
 
         return View("ProjectModal", model);
@@ -58,9 +61,12 @@ public sealed partial class ProjektyController
                 Stav = selectedStatus,
                 PouzivatIdentJednani = project.PouzivatIdentJednani,
                 MistoPlneni = project.MistoPlneni,
-                CisloRamcoveSmlouvy = project.CisloRamcoveSmlouvy
+                CisloRamcoveSmlouvy = project.CisloRamcoveSmlouvy,
+                // Plán 5 Sprint B Task 3: načteme aktuální napojení na IS (NULL = bez napojení).
+                ServiceDeskInfoSystemId = project.ServiceDeskInfoSystemId
             },
-            StavyProjektu = statusOptions
+            StavyProjektu = statusOptions,
+            InfoSystemy = SdInfoSystemy.Vychozi
         };
 
         return View("ProjectModal", model);
