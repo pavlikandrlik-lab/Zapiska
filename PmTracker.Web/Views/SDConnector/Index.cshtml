@@ -7,6 +7,11 @@
     <header>
         <h1>Diagnostika ServiceDesk konektoru</h1>
         <p class="pm-sdconnector__subtitle">Přehled harvestu vyjádření z intranetNEW. Admin-only (permission: settings.manage).</p>
+        <p class="pm-sdconnector__actions">
+            <a asp-action="Inspect" class="pm-sdconnector__link">
+                Prozkoumat konkrétní ticket →
+            </a>
+        </p>
     </header>
 
     @if (TempData["SDConnectorMessage"] is string okMsg)
