@@ -78,7 +78,7 @@
                             data-vyjadreni-id="@bubble.VyjadreniId"
                             data-datum="@bubble.Datum.ToString("o")"
                             data-predikat="@bubble.Predikat"
-                            draggable="@(canEdit && !isNes ? "true" : "false")"
+                            draggable="false"
                             role="listitem"
                             tabindex="0">
                             <div class="pm-chat-bubble__meta">
@@ -108,89 +108,74 @@
 
         @if (!isNes)
         {
+            @* Spec 2026-04-28-modal-vyjadreni-redesign §2 + §3 — native <gov-stepper> + <gov-stepper-item>
+               (žádný custom element). Buffer pro nepřiřazené kroky vpravo nahoře, sticky aligned
+               kroky vedle bound bubliny. Drag&drop drive z kroku přes stepperDragSnap.js. *@
+            var prirazeneKroky = Model.Kroky.Where(k => k.AktualniVyjadreniId.HasValue).OrderBy(k => k.KrokPoradi).ToList();
+            var nepriarezeneKroky = Model.Kroky.Where(k => !k.AktualniVyjadreniId.HasValue).OrderBy(k => k.KrokPoradi).ToList();
+
         <section class="pm-chat-modal__stepper" aria-label="Kroky harmonogramu">
-            @* Plán 1 Feature B — <pm-chat-stepper> custom element render.
-               Server předává stepper kroky přes JSON do `setKroky(...)`; buffer.js doplní
-               add-on sloty na 5 celkem (3 fixní + 2 add-on, permission-gated). *@
-            <pm-chat-stepper @(Model.CanAddAddon ? "can-add-addon" : "")
-                             data-pm-chat-stepper
-                             data-fixni-kroky-pocet="@Model.FixniKrokyPocet"
-                             data-slots-pocet="@Model.StepperSlotsPocet">
-            </pm-chat-stepper>
+            @if (nepriarezeneKroky.Count > 0)
+            {
+                <div class="pm-chat-modal__buffer" data-stepper-buffer aria-label="Nepřiřazené kroky">
+                    <div class="pm-chat-modal__buffer-header">Nepřiřazené kroky</div>
+                    <gov-stepper size="m" data-buffer-stepper>
+                        @foreach (var krok in nepriarezeneKroky)
+                        {
+                            <gov-stepper-item color="error"
+                                              identifier="krok-@krok.KrokKey"
+                                              data-step
+                                              data-krok-key="@krok.KrokKey"
+                                              data-krok-poradi="@krok.KrokPoradi"
+                                              data-vazba-id="@krok.VazbaId"
+                                              data-source=""
+                                              data-current-vyjadreni-id=""
+                                              data-current-datum=""
+                                              data-in-buffer="true">
+                                <span slot="prefix">@krok.KrokPoradi</span>
+                                <span slot="headline">@krok.Nazev</span>
+                                <span slot="content">—</span>
+                            </gov-stepper-item>
+                        }
+                    </gov-stepper>
+                </div>
+            }
 
-            @* Server-side fallback + stabilní DOM pro existující chatModalDragDrop.js.
-               V DOM je skrytý; JS stepper element ho může při potřebě re-parse-ovat. *@
-            <ol class="pm-chat-stepper pm-chat-stepper--legacy" role="list" hidden aria-hidden="true">
-                @foreach (var krok in Model.Kroky.OrderBy(k => k.KrokPoradi))
+            <gov-stepper size="m" data-aligned-stepper>
+                @foreach (var krok in prirazeneKroky)
                 {
-                    var bindingDatum = krok.AktualniVyjadreniDatum;
-                    var sourceClass = krok.AktualniSource switch
+                    string color = krok.AktualniSource switch
                     {
-                        (byte)VazbaSource.Auto => "pm-chat-step--auto",
-                        (byte)VazbaSource.Manual => "pm-chat-step--manual",
-                        _ => string.Empty
+                        (byte)VazbaSource.Auto => "success",
+                        (byte)VazbaSource.Manual => "warning",
+                        _ => "neutral"
                     };
-                    <li class="pm-chat-step @sourceClass"
-                        data-step
-                        data-krok-key="@krok.KrokKey"
-                        data-krok-poradi="@krok.KrokPoradi"
-                        data-current-vyjadreni-id="@krok.AktualniVyjadreniId"
-                        data-current-datum="@bindingDatum?.ToString("o")"
-                        data-vazba-id="@krok.VazbaId"
-                        style="--pm-step-color:@krok.BarvaHex"
-                        aria-dropeffect="move"
-                        role="listitem">
-                        <div class="pm-chat-step__header">
-                            <span class="pm-chat-step__poradi">@krok.KrokPoradi</span>
-                            <span class="pm-chat-step__nazev">@krok.Nazev</span>
-                        </div>
-                        <div class="pm-chat-step__binding">
-                            @if (krok.AktualniVyjadreniId.HasValue)
+                    <gov-stepper-item color="@color"
+                                      identifier="krok-@krok.KrokKey"
+                                      data-step
+                                      data-krok-key="@krok.KrokKey"
+                                      data-krok-poradi="@krok.KrokPoradi"
+                                      data-vazba-id="@krok.VazbaId"
+                                      data-source="@color"
+                                      data-current-vyjadreni-id="@krok.AktualniVyjadreniId"
+                                      data-current-datum="@krok.AktualniVyjadreniDatum?.ToString("o")"
+                                      data-in-buffer="false">
+                        <span slot="prefix">@krok.KrokPoradi</span>
+                        <span slot="headline">@krok.Nazev</span>
+                        <span slot="content">
+                            @krok.AktualniVyjadreniDatum?.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                            @if (canEdit)
                             {
-                                <span class="pm-chat-step__datum">
-                                    @bindingDatum?.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
-                                </span>
-                                @if (canEdit)
-                                {
-                                    <button type="button" class="pm-chat-step__clear"
-                                            data-clear-binding
-                                            title="Odpojit bublinu od kroku">
-                                        Odpojit
-                                    </button>
-                                }
+                                <button type="button" class="pm-chat-step__clear"
+                                        data-clear-binding
+                                        title="Odpojit krok od bubliny — krok se vrátí do bufferu">
+                                    Odpojit
+                                </button>
                             }
-                            else
-                            {
-                                <span class="pm-chat-step__empty">—</span>
-                            }
-                        </div>
-                    </li>
+                        </span>
+                    </gov-stepper-item>
                 }
-            </ol>
-
-            @* Inline init skriptu — seriální inject kroků do custom elementu.
-               Bezpečné protože server už data sanitizuje a @Json.Serialize escapuje. *@
-            <script>
-                (function () {
-                    var root = document.currentScript && document.currentScript.parentElement;
-                    if (!root) return;
-                    var el = root.querySelector('[data-pm-chat-stepper]');
-                    if (!el || typeof el.setKroky !== 'function') return;
-                    var kroky = @Json.Serialize(Model.Kroky.OrderBy(k => k.KrokPoradi).Select(k => new {
-                        poradi = k.KrokPoradi,
-                        krokKey = k.KrokKey, // Feature C gap #5: GUID nutný pro POST /Vyjadreni/HarmonogramVazba/Create
-                        label = k.Nazev,
-                        bindingDatum = k.AktualniVyjadreniDatum.HasValue ? k.AktualniVyjadreniDatum.Value.ToUniversalTime().ToString("O") : null,
-                        fixni = true,
-                        barvaHex = k.BarvaHex,
-                        vazbaId = k.VazbaId,
-                        aktualniVyjadreniId = k.AktualniVyjadreniId
-                    }));
-                    // bindingDatum přetvoř na Date object pro chronology.js
-                    kroky.forEach(function (k) { if (k.bindingDatum) k.bindingDatum = new Date(k.bindingDatum); });
-                    el.setKroky(kroky);
-                })();
-            </script>
+            </gov-stepper>
         </section>
         }
     </div>
@@ -199,7 +184,7 @@
     {
         <footer class="pm-chat-modal__footer">
             <small class="pm-chat-modal__hint">
-                Přetáhněte bublinu na krok vpravo. Změny se ukládají automaticky.
+                Přetáhněte krok (vpravo) svisle na vyjádření (vlevo). Krok se přilepí k nejbližšímu vyjádření u kurzoru.
             </small>
             <div class="pm-chat-modal__status" data-chat-status aria-live="polite"></div>
         </footer>

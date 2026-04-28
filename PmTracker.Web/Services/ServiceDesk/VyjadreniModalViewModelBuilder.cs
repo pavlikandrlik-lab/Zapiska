@@ -23,6 +23,27 @@ public interface IVyjadreniModalViewModelBuilder
 
 public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBuilder
 {
+    /// <summary>
+    /// Spec 2026-04-28-modal-vyjadreni-redesign §3 — kroky harmonogramu zobrazené ve stepperu
+    /// per typ záznamu. NES = žádné (modal stepper úplně skrytý). PMP a PNF zahrnují
+    /// auto-fill kroky + dropdown ruční kroky.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, IReadOnlySet<int>> RelevantStepsByType =
+        new Dictionary<string, IReadOnlySet<int>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["NES"] = new HashSet<int>(),
+            ["PMP"] = new HashSet<int> { 1, 2, 3, 4, 5 },
+            ["PNF"] = new HashSet<int> { 1, 6, 7, 8, 9, 10 },
+        };
+
+    private static IReadOnlySet<int> RelevantStepsForType(string? typZaznamu)
+    {
+        if (string.IsNullOrWhiteSpace(typZaznamu)) return new HashSet<int>();
+        return RelevantStepsByType.TryGetValue(typZaznamu.Trim(), out var set)
+            ? set
+            : new HashSet<int>();
+    }
+
     private readonly PmTrackerDbContext _db;
     private readonly IVyjadreniQueryService _vyjadreni;
     private readonly ITicketingQueryService _ticketing;
@@ -91,22 +112,28 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
             .ToListAsync(ct).ConfigureAwait(false);
         var bindingByKey = activeBindings.ToDictionary(b => b.KrokKey);
 
-        vm.Kroky = kroky.Select(k =>
-        {
-            bindingByKey.TryGetValue(k.KrokKey, out var b);
-            return new StepperKrokViewModel
+        // Spec 2026-04-28-modal-vyjadreni-redesign §3 — filtrovat kroky per typ záznamu.
+        // PMP zobrazí {1,2,3,4,5}, PNF {1,6,7,8,9,10}, NES žádné (modal je tehdy bez stepperu).
+        var relevantSteps = RelevantStepsForType(vm.TiketTyp);
+        vm.Kroky = kroky
+            .Where(k => relevantSteps.Contains(k.KrokPoradi))
+            .Select(k =>
             {
-                KrokKey = k.KrokKey,
-                KrokPoradi = k.KrokPoradi,
-                Nazev = k.Nazev,
-                BarvaHex = k.BarvaHex,
-                AktualniVyjadreniId = b?.HotVyjadreniId,
-                AktualniVyjadreniDatum = b?.DatumVyjadreni,
-                AktualniSource = b?.Source,
-                // A-5: předáme reálné vazba-id do UI pro Delete endpoint.
-                VazbaId = b?.Id
-            };
-        }).ToList();
+                bindingByKey.TryGetValue(k.KrokKey, out var b);
+                return new StepperKrokViewModel
+                {
+                    KrokKey = k.KrokKey,
+                    KrokPoradi = k.KrokPoradi,
+                    Nazev = k.Nazev,
+                    BarvaHex = k.BarvaHex,
+                    AktualniVyjadreniId = b?.HotVyjadreniId,
+                    AktualniVyjadreniDatum = b?.DatumVyjadreni,
+                    AktualniSource = b?.Source,
+                    // A-5: předáme reálné vazba-id do UI pro Delete endpoint.
+                    VazbaId = b?.Id
+                };
+            })
+            .ToList();
 
         var list = await _vyjadreni.GetVyjadreniForTicketAsync(eo.Cislo, sinceUtc: null, ct).ConfigureAwait(false);
         var bindingByHotId = activeBindings.ToDictionary(b => b.HotVyjadreniId);

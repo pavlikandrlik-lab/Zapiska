@@ -59,10 +59,12 @@ public sealed class ChatModalNesSkipStepperTests
     }
 
     [Fact]
-    public void ChatModalPartial_BublinyNejsouDraggableProNes()
+    public void ChatModalPartial_BublinyNejsouDraggableUniverzalne()
     {
+        // 2026-04-28 redesign: bublinky už nejsou draggable pro žádný typ —
+        // drag drive z kroku přes stepperDragSnap.js. NES navíc nemá stepper vůbec.
         var html = LoadRepoText("PmTracker.Web/Views/Vyjadreni/_ChatModal.cshtml");
-        html.Should().Contain("draggable=\"@(canEdit && !isNes ? \"true\" : \"false\")\"",
-            "Bubliny pro NES nejsou draggable (žádný stepper drop target).");
+        html.Should().Contain("draggable=\"false\"",
+            "Bubliny už nejsou draggable (drag drive z kroku po redesignu 2026-04-28).");
     }
 }

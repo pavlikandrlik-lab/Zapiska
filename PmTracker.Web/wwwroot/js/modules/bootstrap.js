@@ -1,8 +1,33 @@
+// Side-effect imports: tyto moduly registrují globální listenery a/nebo
+// window.pm* objekty. Při migraci ze site.bundle.js (legacy IIFE bundle) na
+// modular site.js se import zapomněl — moduly se never načítaly a celé feature
+// (chat modal, externí odkaz sync, manual kroky validace, schedule Auto/Ručně toggle,
+// vyzvy panel) tiše nefungovaly.
+//
+// 2026-04-28 redesign: pm-chat-stepper custom element odstraněn, nahrazen native
+// gov-stepper. Stepper drag&drop teď přes chatModalDragDrop.js (importuje
+// stepperSticky.js / stepperDragSnap.js / stepperBuffer.js side-effect).
+//
+// eventBus.js MUSÍ být první: registruje gov-click → click adapter. Bez něj
+// všechna <gov-button> tlačítka zůstávají hluchá (gov-design-system 4.x emituje
+// 'gov-click' a stopuje nativní click).
+import "./eventBus.js";
+import "./externiOdkaz/sync.js";
+import "./vyjadreni/chatModal.js";
+import "./vyjadreni/chatModalDragDrop.js";
+import "./vyjadreni/chatModalReharvest.js";
+import "./harmonogram/manualKroky.js";
+import "./schedule-feature-c/toggle-rezim.js";
+import "./vyzvy/index.js";
+import "./vyzvy/panelController.js";
+import "./vyzvy/switchController.js";
+
 import { initCommentSortUi } from "./comments.js";
 import {
     configureNavigationRuntime,
     handleNavigationCardClick,
     handleNavigationCardKeydown,
+    applyProjectIndexFilters,
     initCiselnikAjaxSwitch,
     loadProjectTabPanel,
     loadRecordComments,
@@ -26,6 +51,8 @@ import {
     saveProjectFilterDefaults,
     setFilterPanelOpen
 } from "./filters.js";
+
+
 import {
     closeModal,
     configureModalRuntime,
@@ -35,20 +62,14 @@ import {
 } from "./modals.js";
 import { initModalAjaxSubmit } from "./ajax.js";
 import {
-    clearStoredRecordEditorPreference,
-    closeRecordEditorChooser,
     closeRecordEditorCloseGuard,
     initPermissionMetadataBindings,
     initRecordFormEnhancements,
     isRecordEditorFormDirty,
-    openRecordEditor,
     prepareRecordEditorFormNavigation,
     promptRecordEditorDiscard,
     recordEditorState,
-    refreshRecordEditorPreferenceUi,
-    requestRecordEditorModalClose,
     requestRecordEditorPageCancel,
-    restoreRecordEditorReturnStateFromUrl,
     updateTaskTypeVisibility
 } from "./recordEditor.js";
 import {
@@ -113,7 +134,8 @@ function handleProjectFilterInputChange(scope) {
 
 configureNavigationRuntime({
     initRecordFormEnhancements,
-    prepareRecordEditorFormNavigation
+    prepareRecordEditorFormNavigation,
+    refreshProjectIndexFilters: () => applyProjectIndexFilters(document, projectIndexFilterOptions)
 });
 
 configureModalRuntime({
@@ -146,17 +168,6 @@ function handleDocumentClick(event) {
         const status = document.querySelector("[data-project-filter-preferences-status]");
         if (status instanceof HTMLElement) {
             status.textContent = "Uložené projektové filtry byly odstraněny.";
-        }
-        return;
-    }
-
-    const resetRecordEditorPreference = target.closest("[data-record-editor-preference-reset]");
-    if (isButtonLike(resetRecordEditorPreference)) {
-        event.preventDefault();
-        clearStoredRecordEditorPreference();
-        const status = document.querySelector("[data-record-editor-preference-status]");
-        if (status instanceof HTMLElement) {
-            status.textContent = "Uložená výchozí volba byla odstraněna.";
         }
         return;
     }
@@ -263,23 +274,10 @@ function handleDocumentClick(event) {
         closePrintChooser({ restoreFocus: false });
     }
 
-    if (recordEditorState.chooser instanceof HTMLElement
-        && !target.closest("[data-record-editor-popover]")
-        && !target.closest("[data-record-editor-url]")) {
-        closeRecordEditorChooser({ restoreFocus: false });
-    }
-
     const recordEditorCancel = target.closest("[data-record-editor-cancel]");
     if (recordEditorCancel) {
         event.preventDefault();
         void requestRecordEditorPageCancel(recordEditorCancel instanceof HTMLElement ? recordEditorCancel : null);
-        return;
-    }
-
-    const recordEditorTrigger = target.closest("[data-record-editor-url]");
-    if (recordEditorTrigger) {
-        event.preventDefault();
-        openRecordEditor(recordEditorTrigger instanceof HTMLElement ? recordEditorTrigger : null);
         return;
     }
 
@@ -292,15 +290,14 @@ function handleDocumentClick(event) {
 
     if (target.matches("[data-modal-close]") || target.closest("[data-modal-close]")) {
         event.preventDefault();
-        const closeTarget = target.closest("[data-modal-close]");
-        void requestRecordEditorModalClose(closeTarget instanceof HTMLElement ? closeTarget : null);
+        closeModal();
         return;
     }
 
     // Fáze 2E: backdrop click — target je gov-dialog přímo (ne vnitřní element).
     if (target instanceof HTMLElement && target.tagName === "GOV-DIALOG" && target.hasAttribute("data-modal-container")) {
         event.preventDefault();
-        void requestRecordEditorModalClose(target);
+        closeModal();
         return;
     }
 
@@ -529,24 +526,33 @@ function handleDocumentOverlayKeydown(event) {
         return;
     }
 
-    if (event.key === "Escape" && recordEditorState.chooser instanceof HTMLElement && !isModalOpen()) {
-        event.preventDefault();
-        closeRecordEditorChooser({ restoreFocus: true });
-        return;
-    }
-
     if (!isModalOpen()) {
         return;
     }
 
     if (event.key === "Escape") {
         event.preventDefault();
-        void requestRecordEditorModalClose(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+        closeModal();
         return;
     }
 
     if (event.key === "Tab") {
         trapFocusInModal(event);
+    }
+}
+
+function isGovFormSwitchEl(el) {
+    return el instanceof HTMLElement && typeof el.tagName === "string" && el.tagName.toLowerCase() === "gov-form-switch";
+}
+
+function syncProjectPouzivatIdentJednaniHidden(target) {
+    const sw = target.closest("gov-form-switch[data-project-pouzivat-ident-jednani]");
+    if (!isGovFormSwitchEl(sw)) return;
+    const wrap = sw.closest(".project-form-switch-wrap");
+    if (!(wrap instanceof HTMLElement)) return;
+    const hidden = wrap.querySelector('[data-project-pouzivat-ident-jednani-state]');
+    if (hidden instanceof HTMLInputElement) {
+        hidden.value = sw.checked ? "true" : "false";
     }
 }
 
@@ -556,13 +562,15 @@ function handleDocumentChange(event) {
         return;
     }
 
+    syncProjectPouzivatIdentJednaniHidden(target);
+
     const filterInput = target.closest("[data-filter-key]");
-    if (filterInput instanceof HTMLInputElement || filterInput instanceof HTMLSelectElement) {
+    if (filterInput instanceof HTMLInputElement || filterInput instanceof HTMLSelectElement || isGovFormSwitchEl(filterInput)) {
         persistFilterState(filterInput);
     }
 
     const scheduleFilterInput = target.closest("[data-schedule-filter-key]");
-    if (scheduleFilterInput instanceof HTMLInputElement || scheduleFilterInput instanceof HTMLSelectElement) {
+    if (scheduleFilterInput instanceof HTMLInputElement || scheduleFilterInput instanceof HTMLSelectElement || isGovFormSwitchEl(scheduleFilterInput)) {
         persistScheduleFilterState(scheduleFilterInput);
     }
 
@@ -648,16 +656,6 @@ function handleGovCloseEvent(event) {
         return;
     }
 
-    // Record-editor má vlastní dirty-check flow — gov-close je žádost
-    // o zavření, kterou musí schválit promptRecordEditorDiscard.
-    if (dialog.matches('[data-modal-variant="record-editor"]') ||
-        document.querySelector("[data-record-editor-form][data-dirty='true']")) {
-        event.preventDefault();
-        event.stopPropagation();
-        void requestRecordEditorModalClose(dialog);
-        return;
-    }
-
     // Fallback pro všechny non-record-editor modaly (Přidat ručně, AD search,
     // Přidat projektovou roli, atd.) — gov-close je fire-and-close,
     // žádný dirty-check není potřeba.
@@ -709,6 +707,7 @@ export function bootstrapPmTrackerApp() {
         { type: "click", handler: handleDocumentClick },
         { type: "keydown", handler: handleDocumentOverlayKeydown },
         { type: "change", handler: handleDocumentChange },
+        { type: "gov-change", handler: handleDocumentChange },
         { type: "input", handler: handleDocumentInput },
         { type: "keydown", handler: handleDocumentCardKeydown },
         { type: "keydown", handler: handleProjectHistoryKeydown },
@@ -730,11 +729,9 @@ export function bootstrapPmTrackerApp() {
         () => initProjectScheduleUi(),
         () => initProjectRecordPageshowSync(),
         () => initCommentSortUi(document),
-        () => restoreRecordEditorReturnStateFromUrl(),
         () => initTheme(),
         () => initUserMenu(),
         () => initPrintFormatChooser(),
-        () => refreshRecordEditorPreferenceUi(),
         () => initPageSwitchers(),
         () => initRecordFormEnhancements(document),
         () => initPermissionMetadataBindings(document),
@@ -745,6 +742,14 @@ export function bootstrapPmTrackerApp() {
         () => initProjectDashboardShell(),
         () => initSessionCoordinator(),
         () => initModalAjaxSubmit(),
-        () => initSearchAdminCard()
+        () => initSearchAdminCard(),
+        // Legacy IIFE moduly registrují window.pm* + nabízejí init() volaný
+        // po DOMContentLoaded. Při importu side-effects už registrují globaly,
+        // ale init() volání jsou explicitní (legacy bundle pattern). Voláme
+        // optional chaining — modul se může v testovém prostředí nenahrát.
+        () => window.pmExterniOdkazSync?.init?.(),
+        () => window.pmChatModal?.init?.(),
+        () => window.pmManualKroky?.init?.(),
+        () => window.pmScheduleFeatureC?.init?.(),
     ]);
 }

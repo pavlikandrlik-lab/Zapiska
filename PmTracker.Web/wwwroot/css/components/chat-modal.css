@@ -1,10 +1,18 @@
-/* Plán C — chat modal: bubliny vlevo, stepper vpravo, drag & drop. */
+/* Modal Vyjádření a termíny — redesign 2026-04-28
+ * Spec: docs/superpowers/specs/2026-04-28-modal-vyjadreni-redesign-design.md
+ *
+ * Layout: width 1800max, grid 70:30 (≥1600px) / 60:40 (1100-1599px) / stack (<1100px)
+ * Stepper: native gov-stepper, color states success/warning/error
+ * Sticky kroky: kroky aligned na Y-pozici bound bubliny, body=single scrollbar
+ */
 
 .pm-chat-modal {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    max-height: 80vh;
+    width: 95vw;
+    max-width: min(95vw, 1800px);
+    max-height: 85vh;
     min-height: 400px;
 }
 
@@ -15,55 +23,40 @@
     gap: 1rem;
     border-bottom: 1px solid var(--gov-color-neutral-border, #d0d5dd);
     padding-bottom: 0.5rem;
+    flex: 0 0 auto;
 }
 
-.pm-chat-modal__title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.5rem;
-}
-
+.pm-chat-modal__title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
 .pm-chat-modal__cislo { font-weight: 700; font-size: 1.1rem; }
-.pm-chat-modal__typ {
-    padding: 0.15rem 0.4rem;
-    background: var(--gov-color-neutral-bg, #f2f4f7);
-    border-radius: 0.25rem;
-    font-size: 0.85rem;
-}
+.pm-chat-modal__typ { padding: 0.15rem 0.4rem; background: var(--gov-color-neutral-bg, #f2f4f7); border-radius: 0.25rem; font-size: 0.85rem; }
 .pm-chat-modal__strucne { color: var(--gov-color-text-secondary, #475467); font-size: 0.95rem; }
-
 .pm-chat-modal__meta { display: flex; gap: 0.75rem; align-items: center; }
 .pm-chat-modal__harvested-at { font-size: 0.8rem; color: var(--gov-color-text-secondary, #475467); }
 .pm-chat-modal__reharvest-form { margin: 0; }
 .pm-chat-modal__reharvest-btn {
-    background: transparent;
-    border: 1px solid currentColor;
-    color: inherit;
-    padding: 0.25rem 0.6rem;
-    border-radius: 0.25rem;
-    cursor: pointer;
-    font-size: 0.85rem;
+    background: transparent; border: 1px solid currentColor; color: inherit;
+    padding: 0.25rem 0.6rem; border-radius: 0.25rem; cursor: pointer; font-size: 0.85rem;
 }
 .pm-chat-modal__reharvest-btn:hover { background: var(--gov-color-neutral-bg, #f2f4f7); }
 .pm-chat-modal__reharvest-btn[disabled] { cursor: not-allowed; opacity: 0.6; }
 
+/* Body = jeden scrollovatelný container, grid 70:30 (default ≥ 1600px) */
 .pm-chat-modal__body {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    overflow: hidden;
+    grid-template-columns: 70fr 30fr;
+    gap: 1.5rem;
+    overflow-y: auto;
     flex: 1 1 auto;
     min-height: 0;
+    padding-right: 0.25rem;
 }
 
-.pm-chat-modal__timeline,
-.pm-chat-modal__stepper {
+/* Vyjadreni column — standard flow */
+.pm-chat-modal__timeline {
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    overflow-y: auto;
     padding: 0.25rem;
+    min-width: 0;
 }
 
 .pm-chat-modal__bubbles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -73,76 +66,61 @@
     border-radius: 0.5rem;
     padding: 0.5rem 0.75rem;
     background: #fff;
-    cursor: grab;
-    transition: box-shadow 0.15s;
+    transition: outline-color 0.15s, outline-width 0.15s;
 }
-.pm-chat-bubble[draggable="false"] { cursor: default; }
-.pm-chat-bubble:focus-visible {
-    outline: 2px solid var(--gov-color-primary, #0066cc);
+.pm-chat-bubble.drop-target {
+    outline: 2px solid var(--gov-color-warning, #F59E0B);
     outline-offset: 2px;
 }
-.pm-chat-bubble--assigned { opacity: 0.6; }
-.pm-chat-bubble--dragging { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
-
-.pm-chat-bubble--k3_odeslanizadanipmp { border-left: 4px solid #F59E0B; }
-.pm-chat-bubble--k4_k7_dodanireseni { border-left: 4px solid #84CC16; }
-.pm-chat-bubble--k6_odeslanipozadavku { border-left: 4px solid #14B8A6; }
-.pm-chat-bubble--k10_nasazeniarchivace { border-left: 4px solid #8B5CF6; }
-.pm-chat-bubble--plandodani { border-left: 4px solid #3B82F6; }
+.pm-chat-bubble--assigned { opacity: 0.85; }
 
 .pm-chat-bubble__meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8rem;
-    color: var(--gov-color-text-secondary, #475467);
-    margin-bottom: 0.25rem;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+    font-size: 0.8rem; color: var(--gov-color-text-secondary, #475467); margin-bottom: 0.25rem;
 }
 .pm-chat-bubble__autor { font-weight: 600; }
 .pm-chat-bubble__tym { padding: 0.1rem 0.35rem; background: var(--gov-color-neutral-bg, #f2f4f7); border-radius: 0.2rem; font-size: 0.7rem; }
 .pm-chat-bubble__pinned { margin-left: auto; padding: 0.1rem 0.35rem; background: #DBEAFE; border-radius: 0.2rem; color: #1e40af; }
 .pm-chat-bubble__popis { font-size: 0.9rem; line-height: 1.4; }
 
-.pm-chat-stepper { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.pm-chat-step {
-    border: 1px solid var(--gov-color-neutral-border, #d0d5dd);
-    border-left: 4px solid var(--pm-step-color, #94a3b8);
-    border-radius: 0.4rem;
-    padding: 0.5rem 0.75rem;
-    background: #fff;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    transition: background 0.15s, border-color 0.15s;
+/* Stepper column — kroky aligned na bound bubliny přes JS-driven inline style */
+.pm-chat-modal__stepper {
+    position: relative;
+    min-width: 0;
 }
-.pm-chat-step--drop-target { background: var(--gov-color-primary-bg, #e0ecff); border-color: var(--gov-color-primary, #0066cc); }
-.pm-chat-step--auto .pm-chat-step__binding { background: #F0FDF4; }
-.pm-chat-step--manual .pm-chat-step__binding { background: #FEF3C7; }
-.pm-chat-step__header { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.9rem; }
-.pm-chat-step__poradi {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 50%;
-    background: var(--pm-step-color, #94a3b8);
-    color: white;
-    font-weight: 700;
-    font-size: 0.8rem;
+
+.pm-chat-modal__buffer {
+    border: 1px dashed var(--gov-color-error, #DC2626);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    background: var(--gov-color-error-bg, #FEF2F2);
+    position: sticky;
+    top: 0;
+    z-index: 5;
 }
-.pm-chat-step__nazev { font-weight: 500; }
-.pm-chat-step__binding {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.8rem;
+.pm-chat-modal__buffer-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gov-color-error, #DC2626);
+    margin-bottom: 0.5rem;
 }
-.pm-chat-step__datum { color: var(--gov-color-text-secondary, #475467); }
-.pm-chat-step__empty { color: var(--gov-color-text-muted, #98a2b3); font-style: italic; }
+
+/* gov-stepper-item — drag handles */
+gov-stepper-item[data-step] {
+    cursor: grab;
+    user-select: none;
+    transition: transform 60ms ease-out, box-shadow 0.15s;
+}
+gov-stepper-item[data-step][data-dragging="true"] {
+    cursor: grabbing;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    z-index: 10;
+}
+gov-stepper-item[data-step][data-pinned="true"] {
+    cursor: not-allowed;
+}
+
 .pm-chat-step__clear {
     background: transparent;
     border: none;
@@ -150,21 +128,26 @@
     cursor: pointer;
     font-size: 0.75rem;
     text-decoration: underline;
+    margin-left: 0.5rem;
 }
 
 .pm-chat-modal__footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: flex; justify-content: space-between; align-items: center;
     border-top: 1px solid var(--gov-color-neutral-border, #d0d5dd);
-    padding-top: 0.5rem;
-    font-size: 0.8rem;
+    padding-top: 0.5rem; font-size: 0.8rem; flex: 0 0 auto;
 }
 .pm-chat-modal__hint { color: var(--gov-color-text-secondary, #475467); }
 .pm-chat-modal__status { min-height: 1.2rem; }
 .pm-chat-modal__status[data-status-state="ok"] { color: var(--gov-color-success, #059669); }
 .pm-chat-modal__status[data-status-state="error"] { color: var(--gov-color-danger, #dc2626); }
 
-@media (max-width: 900px) {
+/* Breakpoint 1100-1599px — grid 60:40 */
+@media (max-width: 1599px) {
+    .pm-chat-modal__body { grid-template-columns: 60fr 40fr; }
+}
+
+/* Breakpoint < 1100px — stack */
+@media (max-width: 1099px) {
     .pm-chat-modal__body { grid-template-columns: 1fr; }
+    .pm-chat-modal__buffer { position: static; }
 }
