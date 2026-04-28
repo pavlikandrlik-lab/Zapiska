@@ -101,29 +101,39 @@ public sealed class RecordDeleteCascadeFkTests
     }
 
     [Fact]
-    public void ExterniOdkazyHarvestFkMustBeCascadeForNormalDeleteOperation()
+    public void ExterniOdkazyHarvestFkMustRemainNoActionDueToMultiCascadePath()
     {
-        // 2026-04-28 reversal — design rozhodnutí:
-        // FK_zhvv_externi_odkaz REFERENCES zaznam_externi_odkazy ON DELETE CASCADE.
+        // 2026-04-28 lessons learned (SQL 1785 multi-cascade-path):
+        // FK_zhvv_externi_odkaz REFERENCES zaznam_externi_odkazy ON DELETE NO ACTION
+        // je úmyslně ZACHOVÁN. Pokus o změnu na CASCADE (db_upgrade_1_3_13) selhal s
+        // SQL Server error 1785 (CRTFKINVTOPO):
         //
-        // Důvod změny: User požadavek (2026-04-28) — delete externí vazby je běžná
-        // operace a nesmí selhávat kvůli existujícím bindings v vyjadreni_vazby.
-        // Audit hodnota bindings je nízká (HotVyjadreniId odkazuje na append-only
-        // HOT_VYJADRENI v legacy DB, která existuje navždy; binding row je jen user
-        // assignment). Při smazání externí vazby se její bindings stávají
-        // orphaned — nemají hodnotu — proto SQL CASCADE je správné chování.
+        //   "Introducing FOREIGN KEY constraint may cause cycles or multiple
+        //    cascade paths."
         //
-        // Migration db_upgrade_1_3_13_externi_odkaz_cascade.sql přepisuje původní
-        // NO ACTION FK z db_upgrade_1_3_6_vyjadreni_vazba.sql.
+        // Důvod: vyjadreni_vazby má DVA FK na projektove_zaznamy:
+        //   1) přímo přes FK_zhvv_zaznam (zaznam_id, CASCADE z 1_3_6)
+        //   2) přes zaznam_externi_odkazy.zaznam_id (CASCADE z 1_3_12)
+        //                  → FK_zhvv_externi_odkaz (externi_odkaz_id, NO ACTION = jediná možná)
+        //
+        // SQL Server vyžaduje single-path cascade graph. Druhá CASCADE cesta by porušila
+        // tento constraint. Migration 1_3_13 byla odstraněna 2026-04-28.
+        //
+        // User požadavek "delete externí vazby je běžná operace" se řeší
+        // application-side cleanup v ReplaceRecordExternalLinksAsync (EF Core
+        // RemoveRange vyjadreni_vazby PŘED RemoveRange externí vazby + SaveChanges
+        // respektuje FK ordering).
         var repoRoot = FindRepoRoot();
-        var migrationFile = Path.Combine(repoRoot, "db_upgrade_1_3_13_externi_odkaz_cascade.sql");
-        File.Exists(migrationFile).Should().BeTrue(
-            "migration db_upgrade_1_3_13_externi_odkaz_cascade.sql musí existovat — to je zdroj CASCADE definice na vyjadreni_vazby.externi_odkaz_id.");
+        var sourceFile = Path.Combine(repoRoot, "db_upgrade_1_3_6_vyjadreni_vazba.sql");
+        File.Exists(sourceFile).Should().BeTrue();
 
-        var text = File.ReadAllText(migrationFile);
-        text.Should().Contain("ON DELETE CASCADE",
-            "Migration musí obsahovat ON DELETE CASCADE pro FK_zhvv_externi_odkaz.");
-        text.Should().Contain("FK_zhvv_externi_odkaz",
-            "Migration musí explicitně přepsat FK_zhvv_externi_odkaz constraint.");
+        var text = File.ReadAllText(sourceFile);
+        text.Should().Contain("FK_zhvv_externi_odkaz REFERENCES dbo.zaznam_externi_odkazy(id) ON DELETE NO ACTION",
+            "FK z vyjadreni_vazby na zaznam_externi_odkazy musí být NO ACTION — multi-cascade-path constraint (SQL 1785). Pokud potřebuješ jiné chování, řeš v aplikaci, ne v SQL.");
+
+        // Migration 1_3_13 NESMÍ existovat (rolled back po SQL 1785).
+        var failedMigration = Path.Combine(repoRoot, "db_upgrade_1_3_13_externi_odkaz_cascade.sql");
+        File.Exists(failedMigration).Should().BeFalse(
+            "Migration db_upgrade_1_3_13_externi_odkaz_cascade.sql byla odstraněna — způsobila SQL 1785 multi-cascade-path violation.");
     }
 }

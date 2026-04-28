@@ -82,21 +82,41 @@ public sealed class RecordServiceExternalLinkUpsertTests
     [Fact]
     public void ReplaceRecordExternalLinksAsync_MustNotBlockDeletionOfHarvestedLinks()
     {
-        // 2026-04-28 reversal — design rozhodnutí:
-        // Delete externí vazby je běžná operace a nesmí být blokována pre-flight check.
-        // SQL CASCADE (FK_zhvv_externi_odkaz, db_upgrade_1_3_13_externi_odkaz_cascade.sql)
-        // automaticky čistí navázané vyjadreni_vazby rows.
-        //
-        // Pre-flight harvest_locked check byl ODSTRANĚN. RecordValidationException
-        // s rule "external_link_harvest_locked" se NESMÍ v této metodě vyskytovat.
+        // 2026-04-28: pre-flight harvest_locked check byl ODSTRANĚN. Delete externí vazby
+        // je běžná operace, aplikace cleanup-uje vyjadreni_vazby explicitně (viz následující test).
         var source = LoadServiceSource();
         var methodIndex = source.IndexOf("ReplaceRecordExternalLinksAsync(int zaznamId,", StringComparison.Ordinal);
         var methodSlice = source[methodIndex..Math.Min(methodIndex + 6000, source.Length)];
 
         methodSlice.Should().NotContain("external_link_harvest_locked",
-            "Pre-flight check 'external_link_harvest_locked' byl odstraněn (2026-04-28). " +
-            "Delete externí vazby je nyní běžná operace, SQL CASCADE čistí bindings automaticky.");
+            "Pre-flight check 'external_link_harvest_locked' byl odstraněn — delete je běžná operace.");
         methodSlice.Should().NotContain("harvestLockedIds",
             "Symbol 'harvestLockedIds' byl odstraněn společně s pre-flight checkem.");
+    }
+
+    [Fact]
+    public void ReplaceRecordExternalLinksAsync_MustCleanupVyjadreniVazbyBeforeExternalLinkDelete()
+    {
+        // 2026-04-28: FK_zhvv_externi_odkaz zůstává NO ACTION (multi-cascade-path constraint
+        // SQL 1785 — vyjadreni_vazby má dva FK na projektove_zaznamy). Aplikace musí
+        // explicitně cleanup-ovat navázané vyjadreni_vazby rows PŘED RemoveRange externí vazby.
+        // EF Core SaveChanges respektuje FK ordering.
+        var source = LoadServiceSource();
+        var methodIndex = source.IndexOf("ReplaceRecordExternalLinksAsync(int zaznamId,", StringComparison.Ordinal);
+        var methodSlice = source[methodIndex..Math.Min(methodIndex + 6000, source.Length)];
+
+        methodSlice.Should().Contain("VyjadreniVazby",
+            "Metoda musí dotázat VyjadreniVazby DbSet pro identifikaci bindings k cleanup.");
+        methodSlice.Should().Contain("bindingsToCleanup",
+            "Lokal 'bindingsToCleanup' identifikuje pattern explicit pre-cleanup před delete externí vazby.");
+        methodSlice.Should().Contain("VyjadreniVazby.RemoveRange(bindingsToCleanup)",
+            "Aplikace musí explicitně RemoveRange vyjadreni_vazby PŘED RemoveRange externí vazby.");
+
+        // Pořadí: VyjadreniVazby.RemoveRange MUSÍ předcházet ZaznamExterniOdkazy.RemoveRange(toDelete)
+        var indexOfBindingsCleanup = methodSlice.IndexOf("VyjadreniVazby.RemoveRange(bindingsToCleanup)", StringComparison.Ordinal);
+        var indexOfExterniOdkazyDelete = methodSlice.IndexOf("ZaznamExterniOdkazy.RemoveRange(toDelete)", StringComparison.Ordinal);
+        indexOfBindingsCleanup.Should().BeGreaterThan(0, "VyjadreniVazby cleanup musí v kódu existovat.");
+        indexOfExterniOdkazyDelete.Should().BeGreaterThan(indexOfBindingsCleanup,
+            "VyjadreniVazby.RemoveRange(bindingsToCleanup) musí být PŘED ZaznamExterniOdkazy.RemoveRange(toDelete).");
     }
 }

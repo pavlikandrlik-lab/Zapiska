@@ -1126,16 +1126,24 @@ public sealed partial class RecordService
     /// - 2026-04-27: Naivní DELETE+INSERT (původní impl) selhával FK violation, protože
     ///   <c>zaznam_harmonogram_vyjadreni_vazba.externi_odkaz_id</c> mělo
     ///   <c>FK ... ON DELETE NO ACTION</c>. Fix přidal pre-flight check + UPSERT.
-    /// - 2026-04-28: User požadavek — delete externí vazby je běžná operace.
-    ///   FK změněna na <c>ON DELETE CASCADE</c> (db_upgrade_1_3_13_externi_odkaz_cascade.sql),
-    ///   pre-flight harvest_locked check ODSTRANĚN. SQL CASCADE čistí navázané
-    ///   <c>vyjadreni_vazby</c> rows automaticky při delete externí vazby.
+    /// - 2026-04-28 (commit ca2f06c): NES odpojení + 4 datumy + synthetic K1 binding.
+    /// - 2026-04-28 (commit 68035e1): pokus o CASCADE FK_zhvv_externi_odkaz (1_3_13).
+    /// - 2026-04-28 (REVERTED): User při deploy narazil na SQL 1785 multi-cascade-path:
+    ///   <c>vyjadreni_vazby</c> má dva FK na <c>projektove_zaznamy</c> (přes
+    ///   <c>zaznam_id</c> direct + přes <c>zaznam_externi_odkazy.zaznam_id</c>),
+    ///   takže CASCADE na obou cestách porušil SQL Server constraint o single-path
+    ///   cascade graph. Migration 1_3_13 byla odstraněna, FK_zhvv_externi_odkaz
+    ///   zůstává <c>NO ACTION</c>. Aplikace explicitně cleanup-uje
+    ///   <c>vyjadreni_vazby</c> rows PŘED smazáním externí vazby — pre-flight
+    ///   harvest_locked check ODSTRANĚN, delete je nyní běžná operace.
     ///
     /// Logika:
     /// 1. UPDATE existing rows by Id (zachová Id → FK references v vyjadreni_vazby zůstanou platné
-    ///    pro PRESERVED vazby — kritické pro audit historii harvest bindings, které neměly být smazány)
-    /// 2. INSERT nové vazby (Id == 0)
-    /// 3. DELETE existing rows co NEJSOU v command — SQL CASCADE smaže navázané bindings.
+    ///    pro PRESERVED vazby).
+    /// 2. INSERT nové vazby (Id == 0).
+    /// 3. DELETE existing rows co NEJSOU v command — aplikace nejdřív RemoveRange
+    ///    navázaných vyjadreni_vazby rows, pak RemoveRange externí vazby
+    ///    (EF Core SaveChanges respektuje FK ordering).
     /// </summary>
     private async Task<List<ZaznamExterniOdkazEntity>> ReplaceRecordExternalLinksAsync(int zaznamId, IReadOnlyList<SaveRecordExterniVazbaCommand> externalLinks, CancellationToken ct)
     {
@@ -1155,8 +1163,20 @@ public sealed partial class RecordService
 
         if (toDelete.Count > 0)
         {
-            // SQL CASCADE (FK_zhvv_externi_odkaz, db_upgrade_1_3_13) čistí navázané
-            // vyjadreni_vazby rows automaticky. Žádný pre-flight check není potřeba.
+            // FK_zhvv_externi_odkaz je NO ACTION (db_upgrade_1_3_6) — multi-cascade-path
+            // brání použít CASCADE (SQL 1785 — vyjadreni_vazby má dva FK na projektove_zaznamy).
+            // Aplikace explicitně cleanup-uje navázané vyjadreni_vazby PŘED delete externí vazby.
+            // EF Core SaveChanges respektuje FK ordering: nejdřív DELETE z vyjadreni_vazby,
+            // pak DELETE z zaznam_externi_odkazy.
+            var deleteIds = toDelete.Select(e => e.Id).ToList();
+            var bindingsToCleanup = await dbContext.VyjadreniVazby
+                .Where(v => deleteIds.Contains(v.ExterniOdkazId))
+                .ToListAsync(ct);
+            if (bindingsToCleanup.Count > 0)
+            {
+                dbContext.VyjadreniVazby.RemoveRange(bindingsToCleanup);
+            }
+
             dbContext.ZaznamExterniOdkazy.RemoveRange(toDelete);
         }
 
