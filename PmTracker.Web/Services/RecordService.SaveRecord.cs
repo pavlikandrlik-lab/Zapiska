@@ -1119,36 +1119,88 @@ public sealed partial class RecordService
         }
     }
 
+    /// <summary>
+    /// UPSERT logika pro externí vazby.
+    ///
+    /// Historie:
+    /// - 2026-04-27: Naivní DELETE+INSERT (původní impl) selhával FK violation, protože
+    ///   <c>zaznam_harmonogram_vyjadreni_vazba.externi_odkaz_id</c> mělo
+    ///   <c>FK ... ON DELETE NO ACTION</c>. Fix přidal pre-flight check + UPSERT.
+    /// - 2026-04-28: User požadavek — delete externí vazby je běžná operace.
+    ///   FK změněna na <c>ON DELETE CASCADE</c> (db_upgrade_1_3_13_externi_odkaz_cascade.sql),
+    ///   pre-flight harvest_locked check ODSTRANĚN. SQL CASCADE čistí navázané
+    ///   <c>vyjadreni_vazby</c> rows automaticky při delete externí vazby.
+    ///
+    /// Logika:
+    /// 1. UPDATE existing rows by Id (zachová Id → FK references v vyjadreni_vazby zůstanou platné
+    ///    pro PRESERVED vazby — kritické pro audit historii harvest bindings, které neměly být smazány)
+    /// 2. INSERT nové vazby (Id == 0)
+    /// 3. DELETE existing rows co NEJSOU v command — SQL CASCADE smaže navázané bindings.
+    /// </summary>
     private async Task<List<ZaznamExterniOdkazEntity>> ReplaceRecordExternalLinksAsync(int zaznamId, IReadOnlyList<SaveRecordExterniVazbaCommand> externalLinks, CancellationToken ct)
     {
         var existing = await dbContext.ZaznamExterniOdkazy.Where(x => x.ZaznamId == zaznamId).ToListAsync(ct);
-        dbContext.ZaznamExterniOdkazy.RemoveRange(existing);
+        var existingById = existing.ToDictionary(e => e.Id);
 
-        var added = new List<ZaznamExterniOdkazEntity>();
-        foreach (var link in externalLinks)
+        var validLinks = externalLinks
+            .Where(l => !string.IsNullOrWhiteSpace(l.Typ) && !string.IsNullOrWhiteSpace(l.Cislo))
+            .ToList();
+
+        var commandKeptIds = validLinks
+            .Where(l => l.Id > 0)
+            .Select(l => l.Id)
+            .ToHashSet();
+
+        var toDelete = existing.Where(e => !commandKeptIds.Contains(e.Id)).ToList();
+
+        if (toDelete.Count > 0)
         {
-            if (string.IsNullOrWhiteSpace(link.Typ) || string.IsNullOrWhiteSpace(link.Cislo))
-            {
-                continue;
-            }
-
-            var typeId = await ResolveTypOdkazuIdAsync(link.Typ, ct);
-            var entity = new ZaznamExterniOdkazEntity
-            {
-                ZaznamId = zaznamId,
-                TypOdkazuId = typeId,
-                Cislo = link.Cislo.Trim(),
-                PredpokladanaCena = NormalizeEstimatedExternalLinkPrice(link.Typ, link.PredpokladanaCena),
-                DatumObjednani = link.DatumObjednani,
-                PlanDodani = link.PlanDodani,
-                DatumDodani = link.DatumDodani,
-                DatumPrevzeti = link.DatumPrevzeti,
-                VyzvaId = await ResolveVyzvaIdAsync(link.Vyzva, ct)
-            };
-            dbContext.ZaznamExterniOdkazy.Add(entity);
-            added.Add(entity);
+            // SQL CASCADE (FK_zhvv_externi_odkaz, db_upgrade_1_3_13) čistí navázané
+            // vyjadreni_vazby rows automaticky. Žádný pre-flight check není potřeba.
+            dbContext.ZaznamExterniOdkazy.RemoveRange(toDelete);
         }
-        return added;
+
+        var result = new List<ZaznamExterniOdkazEntity>();
+        foreach (var link in validLinks)
+        {
+            // validLinks už filtroval null/whitespace Typ a Cislo (! je tedy bezpečné)
+            var typeId = await ResolveTypOdkazuIdAsync(link.Typ!, ct);
+            var price = NormalizeEstimatedExternalLinkPrice(link.Typ, link.PredpokladanaCena);
+            var vyzvaId = await ResolveVyzvaIdAsync(link.Vyzva, ct);
+            var cislo = link.Cislo!.Trim();
+
+            if (link.Id > 0 && existingById.TryGetValue(link.Id, out var existingEntity))
+            {
+                // UPDATE in place — Id se nemění, FK references v vyjadreni_vazby zůstávají platné
+                existingEntity.TypOdkazuId = typeId;
+                existingEntity.Cislo = cislo;
+                existingEntity.PredpokladanaCena = price;
+                existingEntity.DatumObjednani = link.DatumObjednani;
+                existingEntity.PlanDodani = link.PlanDodani;
+                existingEntity.DatumDodani = link.DatumDodani;
+                existingEntity.DatumPrevzeti = link.DatumPrevzeti;
+                existingEntity.VyzvaId = vyzvaId;
+                result.Add(existingEntity);
+            }
+            else
+            {
+                var entity = new ZaznamExterniOdkazEntity
+                {
+                    ZaznamId = zaznamId,
+                    TypOdkazuId = typeId,
+                    Cislo = cislo,
+                    PredpokladanaCena = price,
+                    DatumObjednani = link.DatumObjednani,
+                    PlanDodani = link.PlanDodani,
+                    DatumDodani = link.DatumDodani,
+                    DatumPrevzeti = link.DatumPrevzeti,
+                    VyzvaId = vyzvaId
+                };
+                dbContext.ZaznamExterniOdkazy.Add(entity);
+                result.Add(entity);
+            }
+        }
+        return result;
     }
 
     private async Task<int> SaveRecordScheduleOnlyAsync(
