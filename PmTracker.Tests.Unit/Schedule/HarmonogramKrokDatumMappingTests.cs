@@ -23,15 +23,17 @@ namespace PmTracker.Tests.Unit.Schedule;
 public sealed class HarmonogramKrokDatumMappingTests
 {
     [Theory]
-    // NES — jen krok 1 (datum založení), nemá automatické vyjádření
+    // NES — odpojen od harmonogramu (2026-04-28 spec): žádné mapování ani pro krok 1
     [InlineData("NES", 1, null)]
     [InlineData("NES", 3, null)]
     [InlineData("NES", 6, null)]
     [InlineData("NES", 10, null)]
-    // PMP — K3 (odeslání dodavateli) a K4 (dodání řešení)
+    // PMP — K1 (datum založení), K3 (odeslání), K4 (dodání řešení)
+    [InlineData("PMP", 1, "K1")]
     [InlineData("PMP", 3, "K3")]
     [InlineData("PMP", 4, "K4_K7")]
-    // PNF — K6 (odeslání), K7 (dodání), K10 (archivace)
+    // PNF — K1 (datum založení), K6 (odeslání), K7 (dodání), K10 (archivace)
+    [InlineData("PNF", 1, "K1")]
     [InlineData("PNF", 6, "K6")]
     [InlineData("PNF", 7, "K4_K7")]
     [InlineData("PNF", 10, "K10")]
@@ -64,9 +66,10 @@ public sealed class HarmonogramKrokDatumMappingTests
     }
 
     [Theory]
-    [InlineData("nes", 1, null)]     // lowercase NES — také nic (stejně žádné mapování pro K1)
-    [InlineData("pmp", 3, "K3")]     // lowercase — normalizuje se na upper
-    [InlineData("  PNF  ", 6, "K6")] // trim
+    [InlineData("nes", 1, null)]      // lowercase NES — odpojen, žádné mapování ani pro K1
+    [InlineData("pmp", 1, "K1")]      // lowercase PMP — krok 1 K1 mapping
+    [InlineData("pmp", 3, "K3")]      // lowercase — normalizuje se na upper
+    [InlineData("  PNF  ", 6, "K6")]  // trim
     public void GetPredikatKey_NormalizujeTypZaznamu(string typ, int krok, string? expected)
     {
         HarmonogramKrokDatumMapping.GetPredikatKey(typ, krok).Should().Be(expected);
@@ -81,8 +84,10 @@ public sealed class HarmonogramKrokDatumMappingTests
     [Fact]
     public void IsAutomatickyKrok_VraciTruePropouzeKrokysMatchemMaticeTypu()
     {
+        HarmonogramKrokDatumMapping.IsAutomatickyKrok("PMP", 1).Should().BeTrue();   // K1 datum založení (NEW 2026-04-28)
         HarmonogramKrokDatumMapping.IsAutomatickyKrok("PMP", 3).Should().BeTrue();
         HarmonogramKrokDatumMapping.IsAutomatickyKrok("PMP", 2).Should().BeFalse();
-        HarmonogramKrokDatumMapping.IsAutomatickyKrok("NES", 1).Should().BeFalse();
+        HarmonogramKrokDatumMapping.IsAutomatickyKrok("PNF", 1).Should().BeTrue();   // K1 datum založení (NEW 2026-04-28)
+        HarmonogramKrokDatumMapping.IsAutomatickyKrok("NES", 1).Should().BeFalse();  // NES odpojen
     }
 }

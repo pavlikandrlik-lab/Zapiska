@@ -87,4 +87,59 @@ public sealed class HarvestPredicatesTests
     {
         HarvestPredicates.ClassifyPopis(popis).Should().Be(expected);
     }
+
+    // -------- ClassifyPopisForNes — NES-specific klasifikace --------
+
+    [Fact]
+    public void ClassifyPopisForNes_NesObjednaniFraze_VraciNesDatumObjednani()
+    {
+        var result = HarvestPredicates.ClassifyPopisForNes(
+            "Dnes 28.4.2026: Záznam byl předán dodavateli k řešení.");
+        result.Should().Be(HarvestPredicateKind.NES_DatumObjednani);
+    }
+
+    [Fact]
+    public void ClassifyPopisForNes_NesDodaniFraze_VraciNesDatumDodani()
+    {
+        var result = HarvestPredicates.ClassifyPopisForNes(
+            "Vazba na IMPLEMENTAČNÍ ZÁZNAM HOTLINE číslo 123456 byla vytvořena.");
+        result.Should().Be(HarvestPredicateKind.NES_DatumDodani);
+    }
+
+    [Fact]
+    public void ClassifyPopisForNes_K10Fraze_VraciK10()
+    {
+        var result = HarvestPredicates.ClassifyPopisForNes("Záznam byl převeden do archivu.");
+        result.Should().Be(HarvestPredicateKind.K10_NasazeniArchivace);
+    }
+
+    [Fact]
+    public void ClassifyPopisForNes_PrazdnyPopis_VraciNone()
+    {
+        HarvestPredicates.ClassifyPopisForNes("").Should().Be(HarvestPredicateKind.None);
+        HarvestPredicates.ClassifyPopisForNes(null).Should().Be(HarvestPredicateKind.None);
+        HarvestPredicates.ClassifyPopisForNes("Něco jiného.").Should().Be(HarvestPredicateKind.None);
+    }
+
+    [Fact]
+    public void ClassifyPopisForNes_K10ManaPredNesDodani()
+    {
+        // Pokud v popisu je K10 i NES dodání zároveň, K10 vyhrává (specifičtější).
+        var text = "Záznam byl převeden do archivu. Vazba na IMPLEMENTAČNÍ ZÁZNAM HOTLINE číslo 1.";
+        HarvestPredicates.ClassifyPopisForNes(text).Should().Be(HarvestPredicateKind.K10_NasazeniArchivace);
+    }
+
+    [Fact]
+    public void GetSqlLikePattern_NesDatumObjednani_ReturnsExpected()
+    {
+        HarvestPredicates.GetSqlLikePattern(HarvestPredicateKind.NES_DatumObjednani)
+            .Should().Be("%Záznam byl předán dodavateli k řešení.%");
+    }
+
+    [Fact]
+    public void GetSqlLikePattern_NesDatumDodani_ReturnsExpected()
+    {
+        HarvestPredicates.GetSqlLikePattern(HarvestPredicateKind.NES_DatumDodani)
+            .Should().Be("%Vazba na IMPLEMENTAČNÍ ZÁZNAM HOTLINE číslo%");
+    }
 }

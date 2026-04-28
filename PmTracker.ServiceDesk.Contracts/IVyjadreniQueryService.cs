@@ -37,8 +37,15 @@ public interface IVyjadreniQueryService
 /// Primary fingerprint z HOT_ZAZNAMY — spec §5.2. TypZaznamu (PMP/PNF/NES/RU/…)
 /// je nutný pro mapování K4_K7_DodaniReseni predikátu na správné pořadí (PMP=4, PNF=7).
 /// Review finding Q-10.
+/// SlaDeadline (sla_deadline z HOT_ZAZNAMY) se používá jako zdroj <c>PlanDodani</c>
+/// pro NES tickety (NES nemá textový predikát PlanDodani — bere se přímo DB sloupec).
 /// </summary>
-public sealed record HotZaznamFingerprintDto(string Cislo, DateTime Datum, string? Stav, string? TypZaznamu = null);
+public sealed record HotZaznamFingerprintDto(
+    string Cislo,
+    DateTime Datum,
+    string? Stav,
+    string? TypZaznamu = null,
+    DateTime? SlaDeadline = null);
 
 /// <summary>
 /// Secondary fingerprint z HOT_VYJADRENI — spec §5.2.

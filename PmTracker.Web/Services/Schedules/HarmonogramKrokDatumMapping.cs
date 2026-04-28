@@ -25,6 +25,13 @@ namespace PmTracker.Web.Services.Schedules;
 /// </summary>
 public static class HarmonogramKrokDatumMapping
 {
+    /// <summary>
+    /// PredikatKey <c>"K1"</c> — datum založení tiketu (z <c>HOT_ZAZNAMY.datum</c>, ne z popisu vyjádření).
+    /// Použito pro krok 1 „příprava zadání dodavateli" u PMP a PNF. Synthetic binding
+    /// vytváří <c>VyjadreniHarvestService</c> s <c>HotVyjadreniId = 0</c>.
+    /// </summary>
+    public const string PredikatK1 = "K1";
+
     /// <summary>PredikatKey <c>"K3"</c> — odeslání zadání dodavateli (PMP).</summary>
     public const string PredikatK3 = "K3";
     /// <summary>PredikatKey <c>"K4_K7"</c> — dodání řešení (PMP K4 / PNF K7).</summary>
@@ -40,11 +47,13 @@ public static class HarmonogramKrokDatumMapping
             ["NES"] = new Dictionary<int, string>(),
             ["PMP"] = new Dictionary<int, string>
             {
+                [1] = PredikatK1,
                 [3] = PredikatK3,
                 [4] = PredikatK4K7,
             },
             ["PNF"] = new Dictionary<int, string>
             {
+                [1] = PredikatK1,
                 [6] = PredikatK6,
                 [7] = PredikatK4K7,
                 [10] = PredikatK10,

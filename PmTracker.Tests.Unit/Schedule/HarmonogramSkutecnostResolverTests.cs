@@ -153,4 +153,62 @@ public sealed class HarmonogramSkutecnostResolverTests
         r.Kandidati.Should().BeEmpty();
         r.Datum.Should().BeNull();
     }
+
+    // -------- Krok 1 MIN výjimka (spec 2026-04-28 §2) --------
+
+    [Fact]
+    public void Resolve_Krok1_DvaKandidati_VraciMinNejdrivejsi()
+    {
+        // PMP záznam s 2 napojenými PMP tickety. Krok 1 = K1 (datum založení).
+        // Default chování: krok 1 = MIN agregace (nejdřívější datum napříč ticketu).
+        var b1 = new BindingKandidat(100, "111111", "PMP", "K1", new DateTime(2026, 1, 1));
+        var b2 = new BindingKandidat(101, "222222", "PMP", "K1", new DateTime(2026, 2, 15));
+
+        var r = HarmonogramSkutecnostResolver.Resolve(1, new[] { b1, b2 }, preferredExterniOdkazId: null);
+
+        r.Datum.Should().Be(new DateTime(2026, 1, 1));        // MIN
+        r.VybranyExterniOdkazId.Should().Be(100);             // První v ASC pořadí
+        r.Kandidati[0].ExterniOdkazId.Should().Be(100);       // MIN first
+        r.Kandidati[1].ExterniOdkazId.Should().Be(101);
+    }
+
+    [Fact]
+    public void Resolve_Krok1_MixPmpPnf_VraciMinNapricVsemiTypy()
+    {
+        // Záznam s PMP i PNF napojením. Oba mají K1 mapování. MIN přes všechny.
+        var pmp = new BindingKandidat(100, "111111", "PMP", "K1", new DateTime(2026, 3, 1));
+        var pnf = new BindingKandidat(101, "222222", "PNF", "K1", new DateTime(2026, 1, 15));
+
+        var r = HarmonogramSkutecnostResolver.Resolve(1, new[] { pmp, pnf }, preferredExterniOdkazId: null);
+
+        r.Datum.Should().Be(new DateTime(2026, 1, 15));       // PNF dřívější
+        r.VybranyExterniOdkazId.Should().Be(101);
+    }
+
+    [Fact]
+    public void Resolve_Krok3_DvaKandidati_VraciMaxJakoDefault()
+    {
+        // Sanity: ostatní kroky (3, 4, 6, 7, 10) zůstávají MAX.
+        var b1 = new BindingKandidat(100, "111111", "PMP", "K3", new DateTime(2026, 1, 1));
+        var b2 = new BindingKandidat(101, "222222", "PMP", "K3", new DateTime(2026, 2, 15));
+
+        var r = HarmonogramSkutecnostResolver.Resolve(3, new[] { b1, b2 }, preferredExterniOdkazId: null);
+
+        r.Datum.Should().Be(new DateTime(2026, 2, 15));       // MAX (default)
+        r.VybranyExterniOdkazId.Should().Be(101);
+    }
+
+    [Fact]
+    public void Resolve_Krok1_PreferredVybira_PrebijiDefaultMin()
+    {
+        // Pokud je preferred nastaven, vrátí ho (i když není MIN ani MAX).
+        var b1 = new BindingKandidat(100, "111111", "PMP", "K1", new DateTime(2026, 1, 1));
+        var b2 = new BindingKandidat(101, "222222", "PMP", "K1", new DateTime(2026, 2, 15));
+
+        var r = HarmonogramSkutecnostResolver.Resolve(1, new[] { b1, b2 }, preferredExterniOdkazId: 101);
+
+        r.Datum.Should().Be(new DateTime(2026, 2, 15));       // Preferred 101 vyhrává nad MIN default
+        r.VybranyExterniOdkazId.Should().Be(101);
+        r.PreferredFallbackApplied.Should().BeFalse();
+    }
 }

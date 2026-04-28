@@ -5,6 +5,9 @@
 @{
     var canEdit = Model.CanEdit;
     var autosaveKey = $"pmtracker.chatmodal.autosave.{Model.ZaznamId}.{Model.ExterniOdkazId}";
+    // Spec 2026-04-28: NES vazby jsou odpojené od harmonogramu — modal pro NES neukazuje
+    // stepper sekci ani drag-drop hint v footeru. Ostatní typy (PMP/PNF) zobrazují stepper.
+    var isNes = string.Equals(Model.TiketTyp, "NES", StringComparison.OrdinalIgnoreCase);
 }
 
 <div class="pm-chat-modal"
@@ -75,7 +78,7 @@
                             data-vyjadreni-id="@bubble.VyjadreniId"
                             data-datum="@bubble.Datum.ToString("o")"
                             data-predikat="@bubble.Predikat"
-                            draggable="@(canEdit ? "true" : "false")"
+                            draggable="@(canEdit && !isNes ? "true" : "false")"
                             role="listitem"
                             tabindex="0">
                             <div class="pm-chat-bubble__meta">
@@ -103,6 +106,8 @@
             }
         </section>
 
+        @if (!isNes)
+        {
         <section class="pm-chat-modal__stepper" aria-label="Kroky harmonogramu">
             @* Plán 1 Feature B — <pm-chat-stepper> custom element render.
                Server předává stepper kroky přes JSON do `setKroky(...)`; buffer.js doplní
@@ -187,9 +192,10 @@
                 })();
             </script>
         </section>
+        }
     </div>
 
-    @if (canEdit)
+    @if (canEdit && !isNes)
     {
         <footer class="pm-chat-modal__footer">
             <small class="pm-chat-modal__hint">

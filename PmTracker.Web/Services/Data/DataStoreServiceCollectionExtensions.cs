@@ -110,6 +110,9 @@ public static class DataStoreServiceCollectionExtensions
         // auto-harvestem (VyjadreniHarvestService) a manuálním rebalance (BindingRebalanceService).
         services.AddSingleton<IPerExterniOdkazLockRegistry, PerExterniOdkazLockRegistry>();
         services.AddScoped<IVyjadreniHarvestService, VyjadreniHarvestService>();
+        // 2026-04-28: Per-ticket metadata sync (4 datumy na kartě externí vazby).
+        // Volaný z VyjadreniHarvestService po commitu harvest batch.
+        services.AddScoped<IPerTicketMetadataSyncService, PerTicketMetadataSyncService>();
         services.AddScoped<IVyjadreniModalViewModelBuilder, VyjadreniModalViewModelBuilder>();
         // Plán C/D follow-up: manuální drag-and-drop rebalance přes ChronologyRebalancer.
         // Volaný z VyjadreniModalController.CreateVazba.

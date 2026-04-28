@@ -23,7 +23,13 @@ public enum HarvestPredicateKind
     K10_NasazeniArchivace,
 
     /// <summary>Plán dodání — „… předal záznam dodavateli : … s termínem plnění dodavatele …".</summary>
-    PlanDodani
+    PlanDodani,
+
+    /// <summary>NES Datum objednání — „Záznam byl předán dodavateli k řešení." (kratší než K6, jen pro NES tickety).</summary>
+    NES_DatumObjednani,
+
+    /// <summary>NES Datum dodání — „Vazba na IMPLEMENTAČNÍ ZÁZNAM HOTLINE číslo …" (jen pro NES tickety).</summary>
+    NES_DatumDodani
 }
 
 /// <summary>
@@ -38,6 +44,8 @@ public static class HarvestPredicates
     private const string PhraseK10 = "Záznam byl převeden do archivu.";
     private const string PhrasePlanPartA = "předal záznam dodavateli :";
     private const string PhrasePlanPartB = "s termínem plnění dodavatele";
+    private const string PhraseNesObjednani = "Záznam byl předán dodavateli k řešení.";
+    private const string PhraseNesDodani = "Vazba na IMPLEMENTAČNÍ ZÁZNAM HOTLINE číslo";
 
     /// <summary>
     /// Klasifikace jednoho vyjádření. Pořadí rozhoduje (specifičtější predikáty první),
@@ -61,6 +69,24 @@ public static class HarvestPredicates
         => text.Contains(phrase, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// NES-specific klasifikace HOT_VYJADRENI.popis. Vrací jeden z
+    /// NES_DatumObjednani / NES_DatumDodani / K10 / None. K10 fráze se sdílí s PMP/PNF
+    /// (archivace), zbývající dvě jsou výhradně NES.
+    /// PlanDodani pro NES jde z HOT_ZAZNAMY.sla_deadline (DB sloupec), ne z popisu —
+    /// proto tady predikát PlanDodani záměrně nedetekujeme.
+    /// </summary>
+    public static HarvestPredicateKind ClassifyPopisForNes(string? popis)
+    {
+        if (string.IsNullOrWhiteSpace(popis)) return HarvestPredicateKind.None;
+
+        if (Contains(popis, PhraseK10)) return HarvestPredicateKind.K10_NasazeniArchivace;
+        if (Contains(popis, PhraseNesDodani)) return HarvestPredicateKind.NES_DatumDodani;
+        if (Contains(popis, PhraseNesObjednani)) return HarvestPredicateKind.NES_DatumObjednani;
+
+        return HarvestPredicateKind.None;
+    }
+
+    /// <summary>
     /// SQL LIKE pattern pro konkrétní kind — použitelné v <c>WHERE popis LIKE @pattern</c>
     /// pro přímý DB-side filter místo memory scanu.
     /// </summary>
@@ -71,6 +97,8 @@ public static class HarvestPredicates
         HarvestPredicateKind.K6_OdeslaniPozadavku => $"%{PhraseK6}%",
         HarvestPredicateKind.K10_NasazeniArchivace => $"%{PhraseK10}%",
         HarvestPredicateKind.PlanDodani => $"%{PhrasePlanPartA}%{PhrasePlanPartB}%",
+        HarvestPredicateKind.NES_DatumObjednani => $"%{PhraseNesObjednani}%",
+        HarvestPredicateKind.NES_DatumDodani => $"%{PhraseNesDodani}%",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 }

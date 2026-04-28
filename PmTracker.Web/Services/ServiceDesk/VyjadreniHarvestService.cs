@@ -34,6 +34,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     private readonly TimeProvider _time;
     private readonly IPerExterniOdkazLockRegistry _lockRegistry;
     private readonly IHarmonogramSkutecnostSyncService? _skutecnostSync;
+    private readonly IPerTicketMetadataSyncService? _metadataSync;
     private readonly ILogger<VyjadreniHarvestService> _logger;
 
     public VyjadreniHarvestService(
@@ -42,13 +43,15 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         TimeProvider time,
         IPerExterniOdkazLockRegistry lockRegistry,
         ILogger<VyjadreniHarvestService> logger,
-        IHarmonogramSkutecnostSyncService? skutecnostSync = null)
+        IHarmonogramSkutecnostSyncService? skutecnostSync = null,
+        IPerTicketMetadataSyncService? metadataSync = null)
     {
         _db = db;
         _vyjadreni = vyjadreni;
         _time = time;
         _lockRegistry = lockRegistry;
         _skutecnostSync = skutecnostSync;
+        _metadataSync = metadataSync;
         _logger = logger;
     }
 
@@ -66,13 +69,16 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
 
         // Review finding Q-10: získej TypZaznamu z HOT_ZAZNAMY, aby se K4_K7_DodaniReseni
         // predikát správně namapoval na PMP=4 / PNF=7 (jinak default 7 pro všechno).
+        // Spec 2026-04-28: navíc získej HOT_ZAZNAMY.datum pro synthetic K1 binding (krok 1).
         string? typZaznamu = null;
+        DateTime? hotZaznamDatum = null;
         try
         {
             var fp = await _vyjadreni.GetHotZaznamFingerprintsAsync(new[] { eo.Cislo! }, ct).ConfigureAwait(false);
             if (fp.TryGetValue(eo.Cislo!, out var primary))
             {
                 typZaznamu = primary.TypZaznamu;
+                hotZaznamDatum = primary.Datum;
             }
         }
         catch (Exception ex)
@@ -84,7 +90,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         // lock jako reactive/periodic cesta, jinak race s reactive harvesty téhož tiketu.
         return await ExecuteUnderTicketLockAsync(
             eo,
-            ct2 => HarvestTicketCoreAsync(eo, typZaznamu, ct2),
+            ct2 => HarvestTicketCoreAsync(eo, typZaznamu, hotZaznamDatum, ct2),
             ct).ConfigureAwait(false);
     }
 
@@ -360,7 +366,8 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             eo.LastKnownMaxVyjadreniId = secondary.MaxId;
             eo.LastKnownVyjadreniCount = secondary.Count;
             // Q-10: TypZaznamu z primary fingerprintu pro správné K4/K7 mapování.
-            return await HarvestTicketCoreAsync(eo, primary.TypZaznamu, ct).ConfigureAwait(false);
+            // Spec 2026-04-28: primary.Datum se předává jako hint pro synthetic K1 binding.
+            return await HarvestTicketCoreAsync(eo, primary.TypZaznamu, primary.Datum, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -371,6 +378,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     private async Task<VyjadreniHarvestResult> HarvestTicketCoreAsync(
         ZaznamExterniOdkazEntity eo,
         string? typZaznamuHint,
+        DateTime? hotZaznamDatumHint,
         CancellationToken ct)
     {
         var zaznam = await _db.ProjektoveZaznamy.AsNoTracking().FirstOrDefaultAsync(x => x.Id == eo.ZaznamId, ct).ConfigureAwait(false);
@@ -379,19 +387,23 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             return VyjadreniHarvestResult.Empty($"Projektový záznam id={eo.ZaznamId} neexistuje.");
         }
 
+        // Spec 2026-04-28: NES vazby jsou odpojené od harmonogramu. Žádný harvest stepper
+        // bindings, žádná synthetic K1. Pouze metadata sync (4 datumy na kartě externí vazby).
+        var typZaznamu = typZaznamuHint ?? NormalizeTypZaznamu(zaznam, eo);
+        var isNes = string.Equals(typZaznamu, "NES", StringComparison.OrdinalIgnoreCase);
+
         var sinceUtc = eo.LastHarvestedAt;
-        var list = await _vyjadreni.GetVyjadreniForTicketAsync(eo.Cislo!, sinceUtc, ct).ConfigureAwait(false);
+        var list = isNes
+            ? Array.Empty<HotVyjadreniDto>()  // NES neharvestuje stepper bindings
+            : await _vyjadreni.GetVyjadreniForTicketAsync(eo.Cislo!, sinceUtc, ct).ConfigureAwait(false);
 
         int created = 0;
         int superseded = 0;
         int skipped = 0;
 
-        if (list.Count > 0)
+        if (!isNes)
         {
             var krokKeyByPoradi = await LoadKrokKeyByPoradiAsync(zaznam.HarmonogramSablonaVerze, ct).ConfigureAwait(false);
-            // Q-10: použij HOT_ZAZNAMY.typ_zaznamu pokud je k dispozici; fallback na legacy
-            // heuristiku (aktuálně "" = PNF/K7) pouze pokud typZaznamuHint je null.
-            var typZaznamu = typZaznamuHint ?? NormalizeTypZaznamu(zaznam, eo);
 
             // Review finding P-1: pre-load aktivní vazby v 1 query, ať UpsertBindingInMemory
             // nemusí per-bublina dělat samostatný .Where(...).ToListAsync.
@@ -408,37 +420,66 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
                 .GroupBy(b => b.KrokKey)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            foreach (var v in list)
+            if (list.Count > 0)
             {
-                var kind = HarvestPredicates.ClassifyPopis(v.Popis);
-                var poradi = MapKindToPoradi(kind, typZaznamu);
-                if (poradi is null)
+                foreach (var v in list)
                 {
-                    skipped++;
-                    continue;
+                    var kind = HarvestPredicates.ClassifyPopis(v.Popis);
+                    var poradi = MapKindToPoradi(kind, typZaznamu);
+                    if (poradi is null)
+                    {
+                        skipped++;
+                        continue;
+                    }
+                    if (!krokKeyByPoradi.TryGetValue(poradi.Value, out var krokKey))
+                    {
+                        _logger.LogDebug("Harvest {ExterniOdkazId}: pořadí {Poradi} není v schema verze {SchemaVerze}; preskakuji vyjadreni id={VyjadreniId}.",
+                            eo.Id, poradi, zaznam.HarmonogramSablonaVerze, v.Id);
+                        skipped++;
+                        continue;
+                    }
+
+                    if (!bindingsByKey.TryGetValue(krokKey, out var existingForKey))
+                    {
+                        existingForKey = new List<ZaznamHarmonogramVyjadreniVazbaEntity>();
+                        bindingsByKey[krokKey] = existingForKey;
+                    }
+
+                    var upsert = UpsertBindingInMemory(
+                        zaznam.Id, krokKey, eo.Id,
+                        v.Id, v.Datum, VazbaSource.Auto, existingForKey);
+                    switch (upsert)
+                    {
+                        case UpsertOutcome.Created: created++; break;
+                        case UpsertOutcome.Superseded: created++; superseded++; break;
+                        case UpsertOutcome.Skipped: skipped++; break;
+                    }
                 }
-                if (!krokKeyByPoradi.TryGetValue(poradi.Value, out var krokKey))
+            }
+
+            // Spec 2026-04-28: synthetic K1 binding pro PMP/PNF.
+            // Krok 1 „příprava zadání dodavateli" se plní z HOT_ZAZNAMY.datum (datum založení tiketu),
+            // ne z popisu vyjádření. HotVyjadreniId = 0 je rezervované pro synthetic bindings
+            // (žádná FK na HOT_VYJADRENI v PM Tracker DB).
+            if (hotZaznamDatumHint.HasValue
+                && krokKeyByPoradi.TryGetValue(1, out var k1KrokKey))
+            {
+                if (!bindingsByKey.TryGetValue(k1KrokKey, out var existingK1))
                 {
-                    _logger.LogDebug("Harvest {ExterniOdkazId}: pořadí {Poradi} není v schema verze {SchemaVerze}; preskakuji vyjadreni id={VyjadreniId}.",
-                        eo.Id, poradi, zaznam.HarmonogramSablonaVerze, v.Id);
-                    skipped++;
-                    continue;
+                    existingK1 = new List<ZaznamHarmonogramVyjadreniVazbaEntity>();
+                    bindingsByKey[k1KrokKey] = existingK1;
                 }
 
-                if (!bindingsByKey.TryGetValue(krokKey, out var existingForKey))
-                {
-                    existingForKey = new List<ZaznamHarmonogramVyjadreniVazbaEntity>();
-                    bindingsByKey[krokKey] = existingForKey;
-                }
-
-                var upsert = UpsertBindingInMemory(
-                    zaznam.Id, krokKey, eo.Id,
-                    v.Id, v.Datum, VazbaSource.Auto, existingForKey);
-                switch (upsert)
+                var k1Outcome = UpsertBindingInMemory(
+                    zaznam.Id, k1KrokKey, eo.Id,
+                    hotVyjadreniId: 0L, // synthetic
+                    datumVyjadreni: hotZaznamDatumHint.Value,
+                    VazbaSource.Auto, existingK1);
+                switch (k1Outcome)
                 {
                     case UpsertOutcome.Created: created++; break;
                     case UpsertOutcome.Superseded: created++; superseded++; break;
-                    case UpsertOutcome.Skipped: skipped++; break;
+                    case UpsertOutcome.Skipped: /* deduplikováno (datum se nezměnil) */ break;
                 }
             }
         }
@@ -464,6 +505,22 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
                 _logger.LogWarning(ex,
                     "VyjadreniHarvestService: SkutecnostSync selhal pro záznam {ZaznamId} po harvestu ticketu {Cislo}.",
                     zaznam.Id, eo.Cislo);
+            }
+        }
+
+        // Spec 2026-04-28: per-ticket metadata sync (4 datumy) — volá se pro VŠECHNY typy
+        // vč. NES. Best-effort: chyba neblokuje výsledek harvestu.
+        if (_metadataSync is not null)
+        {
+            try
+            {
+                await _metadataSync.SyncTicketAsync(eo.Id, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "VyjadreniHarvestService: PerTicketMetadataSync selhal pro externí odkaz {Id} (cislo={Cislo}).",
+                    eo.Id, eo.Cislo);
             }
         }
 

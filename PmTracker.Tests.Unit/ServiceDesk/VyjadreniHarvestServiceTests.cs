@@ -397,6 +397,218 @@ public sealed class VyjadreniHarvestServiceTests
         bindings[1].HotVyjadreniId.Should().Be(2002);
     }
 
+    // ---------- Spec 2026-04-28: NES skip stepper + synthetic K1 ----------
+
+    private static readonly Guid K1Key = Guid.Parse("11111111-1111-1111-1111-111111111101");
+
+    private static async Task SeedSchemaWithK1Async(PmTrackerDbContext db, int sablonaVerze = 1)
+    {
+        var kroky = new[]
+        {
+            (poradi: 1, kod: "HS01_DURATION", key: K1Key),
+            (poradi: 3, kod: "HS03_DURATION", key: K3Key),
+            (poradi: 4, kod: "HS04_DURATION", key: K4Key),
+            (poradi: 6, kod: "HS06_DURATION", key: K6Key),
+            (poradi: 7, kod: "HS07_DURATION", key: K7Key),
+            (poradi: 10, kod: "HS10_DURATION", key: K10Key),
+        };
+        var nextId = 1;
+        foreach (var k in kroky)
+        {
+            db.CiselnikHarmonogramTypu.Add(new HarmonogramTypEntity
+            {
+                Id = nextId++,
+                Kod = k.kod,
+                Nazev = k.kod,
+                Hodnota = 10,
+                IsLocked = false,
+                SablonaVerze = sablonaVerze,
+                KrokKey = k.key,
+                KrokPoradi = k.poradi,
+                JeZpozdeni = false,
+                BarvaHex = "#EF4444"
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task HarvestTicketAsync_NesTicket_NevytvariStepperBindings()
+    {
+        // Spec 2026-04-28 §1: NES je úplně odpojen od harmonogramu — žádné stepper bindings.
+        await using var db = NewDb();
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
+        {
+            Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1
+        });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "100001" });
+        await SeedSchemaWithK1Async(db);
+
+        var vq = new Mock<IVyjadreniQueryService>();
+        // Fingerprint vrátí typ NES.
+        vq.Setup(x => x.GetHotZaznamFingerprintsAsync(
+                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, HotZaznamFingerprintDto>
+            {
+                ["100001"] = new HotZaznamFingerprintDto("100001", new DateTime(2026, 1, 1),
+                    Stav: "novy", TypZaznamu: "NES", SlaDeadline: null),
+            });
+        // I když NES popis obsahuje K10 frázi, žádné binding by se NEMĚL vytvořit.
+        vq.Setup(x => x.GetVyjadreniForTicketAsync("100001", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new HotVyjadreniDto(99, "25", "PID-NES-1",
+                    new DateTime(2026, 3, 14, 10, 0, 0), "uzivatel",
+                    "Záznam byl převeden do archivu.", "Tym", 1)
+            });
+
+        var sut = BuildSut(db, vq.Object);
+        var result = await sut.HarvestTicketAsync(1, CancellationToken.None);
+
+        result.Created.Should().Be(0);
+        var bindings = await db.VyjadreniVazby.ToListAsync();
+        bindings.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task HarvestTicketAsync_PmpTicket_VytvoriSyntheticK1Binding()
+    {
+        // Spec 2026-04-28 §1: PMP/PNF dostávají synthetic K1 binding z HOT_ZAZNAMY.datum.
+        await using var db = NewDb();
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
+        {
+            Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1
+        });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "200001" });
+        await SeedSchemaWithK1Async(db);
+
+        var hotZaznamDatum = new DateTime(2026, 1, 15, 9, 30, 0);
+        var vq = new Mock<IVyjadreniQueryService>();
+        vq.Setup(x => x.GetHotZaznamFingerprintsAsync(
+                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, HotZaznamFingerprintDto>
+            {
+                ["200001"] = new HotZaznamFingerprintDto("200001", hotZaznamDatum,
+                    Stav: "novy", TypZaznamu: "PMP", SlaDeadline: null),
+            });
+        vq.Setup(x => x.GetVyjadreniForTicketAsync("200001", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<HotVyjadreniDto>());
+
+        var sut = BuildSut(db, vq.Object);
+        await sut.HarvestTicketAsync(1, CancellationToken.None);
+
+        var k1Bindings = await db.VyjadreniVazby
+            .Where(x => x.KrokKey == K1Key && x.Stav == (byte)VazbaStav.Active)
+            .ToListAsync();
+        k1Bindings.Should().HaveCount(1);
+        k1Bindings[0].HotVyjadreniId.Should().Be(0L);  // synthetic
+        k1Bindings[0].DatumVyjadreni.Should().Be(hotZaznamDatum);
+        k1Bindings[0].Source.Should().Be((byte)VazbaSource.Auto);
+        k1Bindings[0].ExterniOdkazId.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task HarvestTicketAsync_PnfTicket_VytvoriSyntheticK1Binding()
+    {
+        await using var db = NewDb();
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
+        {
+            Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1
+        });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "300001" });
+        await SeedSchemaWithK1Async(db);
+
+        var hotZaznamDatum = new DateTime(2026, 2, 1);
+        var vq = new Mock<IVyjadreniQueryService>();
+        vq.Setup(x => x.GetHotZaznamFingerprintsAsync(
+                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, HotZaznamFingerprintDto>
+            {
+                ["300001"] = new HotZaznamFingerprintDto("300001", hotZaznamDatum,
+                    Stav: "novy", TypZaznamu: "PNF", SlaDeadline: null),
+            });
+        vq.Setup(x => x.GetVyjadreniForTicketAsync("300001", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<HotVyjadreniDto>());
+
+        var sut = BuildSut(db, vq.Object);
+        await sut.HarvestTicketAsync(1, CancellationToken.None);
+
+        var k1Bindings = await db.VyjadreniVazby
+            .Where(x => x.KrokKey == K1Key && x.Stav == (byte)VazbaStav.Active)
+            .ToListAsync();
+        k1Bindings.Should().HaveCount(1);
+        k1Bindings[0].HotVyjadreniId.Should().Be(0L);
+        k1Bindings[0].DatumVyjadreni.Should().Be(hotZaznamDatum);
+    }
+
+    [Fact]
+    public async Task HarvestTicketAsync_PmpReHarvestSeStejnymDatem_NeduplikujeK1()
+    {
+        // 2× harvest se stejným HOT_ZAZNAMY.datum → druhý vrací Skipped (deduplikace).
+        await using var db = NewDb();
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
+        {
+            Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1
+        });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "400001" });
+        await SeedSchemaWithK1Async(db);
+
+        var hotZaznamDatum = new DateTime(2026, 1, 15);
+        var vq = new Mock<IVyjadreniQueryService>();
+        vq.Setup(x => x.GetHotZaznamFingerprintsAsync(
+                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, HotZaznamFingerprintDto>
+            {
+                ["400001"] = new HotZaznamFingerprintDto("400001", hotZaznamDatum,
+                    Stav: "novy", TypZaznamu: "PMP", SlaDeadline: null),
+            });
+        vq.Setup(x => x.GetVyjadreniForTicketAsync("400001", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<HotVyjadreniDto>());
+
+        var sut = BuildSut(db, vq.Object);
+        await sut.HarvestTicketAsync(1, CancellationToken.None);
+        await sut.HarvestTicketAsync(1, CancellationToken.None);
+
+        var k1All = await db.VyjadreniVazby
+            .Where(x => x.KrokKey == K1Key)
+            .ToListAsync();
+        k1All.Should().HaveCount(1);  // jen jeden binding (deduplikace)
+        k1All[0].Stav.Should().Be((byte)VazbaStav.Active);
+    }
+
+    [Fact]
+    public async Task HarvestTicketAsync_NeznamyTyp_NevytvariK1Binding()
+    {
+        // Pokud typ není PMP/PNF/NES (např. RU), žádný K1 binding (NES skip stejně, PMP/PNF
+        // vyžaduje, aby krokKeyByPoradi[1] existoval — pro neznámé typy by se mohlo stát,
+        // že schema verze nemá K1, ale to je už chráněno TryGetValue).
+        // Tento test ověří NES branch: typ NES → žádný K1.
+        await using var db = NewDb();
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
+        {
+            Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1
+        });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "500001" });
+        await SeedSchemaWithK1Async(db);
+
+        var vq = new Mock<IVyjadreniQueryService>();
+        vq.Setup(x => x.GetHotZaznamFingerprintsAsync(
+                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, HotZaznamFingerprintDto>
+            {
+                ["500001"] = new HotZaznamFingerprintDto("500001", new DateTime(2026, 1, 15),
+                    Stav: "novy", TypZaznamu: "NES", SlaDeadline: null),
+            });
+        vq.Setup(x => x.GetVyjadreniForTicketAsync("500001", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<HotVyjadreniDto>());
+
+        var sut = BuildSut(db, vq.Object);
+        await sut.HarvestTicketAsync(1, CancellationToken.None);
+
+        var allBindings = await db.VyjadreniVazby.ToListAsync();
+        allBindings.Should().BeEmpty();   // NES = žádné bindings (ani K1)
+    }
+
     private sealed class FakeTimeProvider : TimeProvider
     {
         private readonly DateTimeOffset _now;

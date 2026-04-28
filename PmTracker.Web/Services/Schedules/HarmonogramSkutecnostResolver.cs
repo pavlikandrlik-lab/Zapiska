@@ -55,9 +55,15 @@ public static class HarmonogramSkutecnostResolver
         IReadOnlyList<BindingKandidat> allBindingsForZaznam,
         int? preferredExterniOdkazId)
     {
-        var kandidati = allBindingsForZaznam
-            .Where(b => HarmonogramKrokDatumMapping.GetPredikatKey(b.TypZaznamu, krokPoradi) == b.PredikatKey)
-            .OrderByDescending(b => b.Datum)
+        var matched = allBindingsForZaznam
+            .Where(b => HarmonogramKrokDatumMapping.GetPredikatKey(b.TypZaznamu, krokPoradi) == b.PredikatKey);
+
+        // Spec 2026-04-28 §2: Krok 1 „příprava zadání" agreguje napříč externími vazbami
+        // jako MIN (nejdřívější datum založení tiketu). Ostatní kroky 3, 4, 6, 7, 10
+        // používají MAX (nejpozdější datum vyjádření) — výchozí stav z C-Q2.
+        var kandidati = (krokPoradi == 1
+                ? matched.OrderBy(b => b.Datum)
+                : matched.OrderByDescending(b => b.Datum))
             .ThenBy(b => b.ExterniOdkazId) // deterministické tie-break při shodném datu
             .ToList();
 

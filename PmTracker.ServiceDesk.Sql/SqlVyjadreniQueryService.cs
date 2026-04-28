@@ -64,12 +64,12 @@ public sealed class SqlVyjadreniQueryService : IVyjadreniQueryService
 
         var rows = await _db.HotZaznamy.AsNoTracking()
             .Where(z => distinct.Contains(z.Id) && z.Datum.HasValue)
-            .Select(z => new { z.Id, z.Datum, z.Stav, z.TypZaznamu })
+            .Select(z => new { z.Id, z.Datum, z.Stav, z.TypZaznamu, z.SlaDeadline })
             .ToListAsync(ct);
 
         return rows.ToDictionary(
             r => r.Id,
-            r => new HotZaznamFingerprintDto(r.Id, r.Datum!.Value, r.Stav, r.TypZaznamu));
+            r => new HotZaznamFingerprintDto(r.Id, r.Datum!.Value, r.Stav, r.TypZaznamu, r.SlaDeadline));
     }
 
     public async Task<IReadOnlyDictionary<string, VyjadreniSecondaryFingerprintDto>> GetVyjadreniSecondaryFingerprintsAsync(
