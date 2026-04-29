@@ -13,6 +13,13 @@
     if (dialogEl) return dialogEl;
     dialogEl = document.createElement('gov-dialog');
     dialogEl.setAttribute('size', 'l');
+    // Fix Bug 2026-04-29: bez data-modal-variant gov-dialog používal default ~832px
+    // → vnitřní obsah .pm-chat-modal s max-width 1800px přetékal a vznikal horizontální
+    // scroll. data-modal-variant="chat-modal" napíchne CSS rule v site.css která
+    // nastaví --max-width: min(95vw, 1800px) na gov-dialog wrapper, tj. okno
+    // se skutečně rozšíří, ne jen vnitřní obsah.
+    dialogEl.setAttribute('data-modal-container', '');
+    dialogEl.setAttribute('data-modal-variant', 'chat-modal');
     dialogEl.innerHTML = `
       <div slot="label">Vyjádření a termíny</div>
       <div class="pm-chat-modal__content" data-chat-modal-content></div>

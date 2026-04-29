@@ -93,8 +93,6 @@ public sealed class ChatModalRedesignTests
     public void ChatModalCss_MaSpravneBreakpointy()
     {
         var css = LoadRepoText("PmTracker.Web/wwwroot/css/components/chat-modal.css");
-        css.Should().Contain("max-width: min(95vw, 1800px)",
-            "Modal musí mít max-width 1800px.");
         css.Should().Contain("grid-template-columns: 70fr 30fr",
             "Default grid musí být 70:30 (≥ 1600px viewport).");
         css.Should().Contain("max-width: 1599px",
@@ -103,6 +101,37 @@ public sealed class ChatModalRedesignTests
             "Mid breakpoint má 60:40 grid.");
         css.Should().Contain("max-width: 1099px",
             "Stack breakpoint je při ≤ 1099px.");
+    }
+
+    [Fact]
+    public void SiteCss_ObsahujeChatModalVariantSWidthMin1800()
+    {
+        // Bug fix 2026-04-29: gov-dialog wrapper bez varianty zůstával na default
+        // ~832px, takže obsah uvnitř .pm-chat-modal s max-width 1800px přetékal
+        // a vznikal horizontální scroll uvnitř modalu. Width fix se musí
+        // aplikovat na gov-dialog[data-modal-container][data-modal-variant="chat-modal"]
+        // přes site.css, ne jen na vnitřní content.
+        var css = LoadRepoText("PmTracker.Web/wwwroot/css/site.css");
+        css.Should().Contain("data-modal-variant=\"chat-modal\"",
+            "site.css musí definovat chat-modal variantu pro gov-dialog wrapper.");
+        css.Should().Contain("min(95vw, 1800px)",
+            "chat-modal varianta musí nastavit --max-width na min(95vw, 1800px).");
+    }
+
+    [Fact]
+    public void ChatModalJs_NastavujeDataModalVariantNaGovDialog()
+    {
+        // Bug fix 2026-04-29: chat modal je vytvářen programaticky v chatModal.js
+        // (nepoužívá _ModalLayout.cshtml), takže ViewData["ModalVariant"] by se nikdy
+        // neaplikoval. Fix musí být v JS — gov-dialog dostane data-modal-container +
+        // data-modal-variant="chat-modal" atributy při vytvoření.
+        var js = LoadRepoText("PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModal.js");
+        js.Should().Contain("data-modal-variant",
+            "chatModal.js musí nastavit data-modal-variant na vytvořený gov-dialog.");
+        js.Should().Contain("'chat-modal'",
+            "chatModal.js musí použít chat-modal variantu (matches site.css rule).");
+        js.Should().Contain("data-modal-container",
+            "chatModal.js musí nastavit data-modal-container atribut (matches CSS selector).");
     }
 
     [Fact]

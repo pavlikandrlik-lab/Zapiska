@@ -279,76 +279,9 @@
 
 /* ── End global search ──────────────────────────────────────────────────── */
 
-/* gov-theme-switch CSS aproximace odstraněna — nahrazena gov-theme-switch Web Component */
-/* Stávající .gov-switch pravidla ponechána pro filtry v projektech (shadow DOM nezasahuje) */
-
-.gov-switch {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    user-select: none;
-    cursor: pointer;
-}
-
-.gov-switch input {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    opacity: 0;
-    pointer-events: auto;
-    cursor: pointer;
-    z-index: 2;
-}
-
-.gov-switch-track {
-    position: relative;
-    width: 52px;
-    height: 28px;
-    border-radius: 999px;
-    border: 1px solid var(--gov-color-border);
-    background: #dfe7f3;
-    box-shadow: inset 0 1px 1px rgba(15, 23, 42, 0.06);
-    transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
-    pointer-events: none;
-}
-
-.gov-switch-thumb {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: #ffffff;
-    display: block;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
-    transition: transform 0.14s ease, background-color 0.14s ease, box-shadow 0.14s ease;
-    pointer-events: none;
-}
-
-.gov-switch input:checked + .gov-switch-track {
-    background: var(--gov-color-primary);
-    border-color: var(--gov-color-primary);
-    box-shadow: inset 0 1px 1px rgba(5, 51, 117, 0.24);
-}
-
-.gov-switch input:checked + .gov-switch-track .gov-switch-thumb {
-    transform: translateX(24px);
-}
-
-.gov-switch input:focus-visible + .gov-switch-track {
-    outline: 2px solid var(--gov-color-primary);
-    outline-offset: 2px;
-}
-
-.gov-switch-label {
-    font-size: 14px;
-    color: var(--app-text-primary);
-    font-weight: 600;
-}
+/* gov-theme-switch + gov-form-switch CSS aproximace odstraněny — nahrazeny Web Components.
+   Filtry projektů (Index, _ProjectRecordsTab) i ProjectModal nyní používají
+   <gov-form-switch> s gov-change eventem. Externí vazba taktéž. */
 
 [data-theme-switch] {
     flex-shrink: 0;
@@ -3428,19 +3361,24 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: 42%;
 }
 
-.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"]:checked) [data-records-view="subsystem"] {
+/* Records view shell visibility řízené stavem toggle "Seskupit dle subsystému".
+   Element je <gov-form-switch> (custom element). CSS pseudo-třída :checked
+   matchuje jen native form controls — pro custom elementy je nutný atribut
+   selektor [checked]. Stencil 4 reflektuje property checked → atribut, takže
+   [checked] zůstává v sync s user toggle. */
+.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"][checked]) [data-records-view="subsystem"] {
     display: block !important;
 }
 
-.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"]:checked) [data-records-view="flat"] {
+.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"][checked]) [data-records-view="flat"] {
     display: none !important;
 }
 
-.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"]:not(:checked)) [data-records-view="subsystem"] {
+.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"]:not([checked])) [data-records-view="subsystem"] {
     display: none !important;
 }
 
-.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"]:not(:checked)) [data-records-view="flat"] {
+.tab-panel[data-tab-panel="zaznamy"]:has([data-filter-key="groupBySubsystem"]:not([checked])) [data-records-view="flat"] {
     display: block !important;
 }
 
@@ -4058,6 +3996,20 @@ gov-dialog[data-modal-container][data-modal-variant="record-editor"] .gov-dialog
     max-height: 92vh;
 }
 
+/* Spec 2026-04-28-modal-vyjadreni-redesign §1: chat-modal varianta pro
+   modal Vyjádření a termíny — širší layout (1800px max) pro grid 70:30 / 60:40.
+   Bug fix 2026-04-29: gov-dialog wrapper bez varianty zůstával na default ~832px,
+   takže obsah uvnitř (.pm-chat-modal max-width 1800px) přetékal a vznikl
+   horizontální scroll. Přidáním této varianty se okno modalu skutečně rozšíří. */
+gov-dialog[data-modal-container][data-modal-variant="chat-modal"] {
+    --max-width: min(95vw, 1800px);
+}
+
+gov-dialog[data-modal-container][data-modal-variant="chat-modal"] .gov-dialog__dialog {
+    /* Vyšší vertikál pro vyjadreni timeline — víc bublin viditelných najednou. */
+    max-height: 92vh;
+}
+
 gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .modal-content {
     overflow: visible;
 }
@@ -4491,7 +4443,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
-.filter-grid .gov-switch {
+.filter-grid gov-form-switch {
     padding-top: 22px;
 }
 
@@ -4509,7 +4461,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     padding-top: 4px;
 }
 
-.filter-grid .gov-switch.filter-inline-wide {
+.filter-grid gov-form-switch.filter-inline-wide {
     padding-top: 4px;
 }
 
@@ -5491,14 +5443,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     background: #16233a;
 }
 
-:root[data-theme="dark"] .gov-switch-track {
-    background: #2d3a53;
-    border-color: #405273;
-}
-
-:root[data-theme="dark"] .gov-switch-thumb {
-    background: #dce5ff;
-}
+/* dark-theme overrides pro .gov-switch* aproximaci odstraněny — komponenta gov-form-switch má vlastní theming přes shadow DOM. */
 
 :root[data-theme="dark"] .badge {
     background: #203552;
