@@ -28,6 +28,7 @@
     if (!/^\d{6}$/.test(cislo)) {
       setTypDisplay(row, null);
       setChatEnabled(row, false);
+      setDatesVisible(row, false);
       row.removeAttribute('data-not-found');
       return;
     }
@@ -54,23 +55,76 @@
       if (data.nalezeno) {
         setTypDisplay(row, data.typ);
         setTypHidden(row, data.typ);
+        setCenaVisible(row, isCenaTyp(data.typ));
+        setVyzvaVisible(row, isPnf(data.typ));
         setChatEnabled(row, true);
+        setDatesVisible(row, true);
         row.removeAttribute('data-not-found');
       } else {
         setTypDisplay(row, null);
         setTypHidden(row, '');
+        setCenaVisible(row, false);
+        setVyzvaVisible(row, false);
         setChatEnabled(row, false);
+        setDatesVisible(row, false);
         row.setAttribute('data-not-found', 'true');
       }
     } catch (err) {
       console.warn('ExterniOdkaz.Sync selhal:', err);
+      setDatesVisible(row, false);
       row.setAttribute('data-not-found', 'true');
     }
   }
 
   function setTypDisplay(row, typ) {
-    const span = row.querySelector('[data-external-type-display]');
-    if (span) span.textContent = typ || '—';
+    // <gov-tag data-external-type-display> — text content + color attribut.
+    const tag = row.querySelector('[data-external-type-display]');
+    if (!tag) return;
+    tag.textContent = typ || '—';
+    tag.setAttribute('color', typTagColor(typ));
+  }
+
+  function typTagColor(typ) {
+    const t = (typ || '').toUpperCase();
+    if (t === 'NES') return 'warning';
+    if (t === 'PMP') return 'primary';
+    if (t === 'PNF') return 'success';
+    return 'neutral';
+  }
+
+  function isCenaTyp(typ) {
+    const t = (typ || '').toUpperCase();
+    return t === 'PMP' || t === 'PNF';
+  }
+
+  function isPnf(typ) {
+    return (typ || '').toUpperCase() === 'PNF';
+  }
+
+  function setCenaVisible(row, visible) {
+    const cena = row.querySelector('.external-field-cena');
+    if (!cena) return;
+    // 2026-04-29: input je <gov-form-input> custom element — instanceof HTMLInputElement
+    // by nematchoval. setAttribute funguje univerzálně (gov-form-input má disabled
+    // jako reflected property → atribut → property).
+    const input = cena.querySelector('[data-external-price-input]');
+    if (visible) {
+      cena.removeAttribute('hidden');
+      if (input) input.removeAttribute('disabled');
+    } else {
+      cena.setAttribute('hidden', 'hidden');
+      if (input) input.setAttribute('disabled', '');
+    }
+  }
+
+  function setVyzvaVisible(row, visible) {
+    const vyzva = row.querySelector('[data-external-vyzvy-switch-wrap]');
+    if (!vyzva) return;
+    if (visible) {
+      vyzva.removeAttribute('hidden');
+    } else {
+      vyzva.setAttribute('hidden', 'hidden');
+    }
   }
 
   function setTypHidden(row, typ) {
@@ -88,9 +142,22 @@
     }
   }
 
+  function setDatesVisible(row, visible) {
+    const dates = row.querySelector('[data-external-dates]');
+    if (!dates) return;
+    if (visible) {
+      dates.removeAttribute('hidden');
+    } else {
+      dates.setAttribute('hidden', 'hidden');
+    }
+  }
+
   function onInput(event) {
+    // 2026-04-29: <gov-form-input> emituje 'gov-input' (interní `input` má
+    // stopPropagation), takže poslouchám obojí — native 'input' pro regulérní
+    // <input> (pokud někde zbyl) + 'gov-input' pro gov-form-input.
     const target = event.target;
-    if (!(target instanceof HTMLInputElement)) return;
+    if (!target || typeof target.hasAttribute !== 'function') return;
     if (!target.hasAttribute('data-external-cislo')) return;
 
     const existing = timers.get(target);
@@ -101,6 +168,7 @@
 
   function init() {
     document.addEventListener('input', onInput);
+    document.addEventListener('gov-input', onInput);
   }
 
   global.pmExterniOdkazSync = { init };

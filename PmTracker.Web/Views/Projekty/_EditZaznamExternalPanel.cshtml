@@ -20,11 +20,23 @@
                 var statusText = vazba.VyzvaKod is not null
                     ? $"Zařazeno do výzvy {vazba.VyzvaKod}"
                     : vazba.ZaradidDoVyzvy ? "Čeká se (buffer projektu)" : null;
-                var datumObjednani = vazba.DatumObjednani?.ToString("dd.MM.yyyy") ?? "—";
-                var datumDodani = vazba.DatumDodani?.ToString("dd.MM.yyyy") ?? "—";
+                var datumObjednani = vazba.DatumObjednani?.ToString("dd.MM.yyyy");
+                var planDodani = vazba.PlanDodani?.ToString("dd.MM.yyyy");
+                var datumDodani = vazba.DatumDodani?.ToString("dd.MM.yyyy");
                 var datumPrevzeti = vazba.DatumPrevzeti?.ToString("dd.MM.yyyy");
-                var hasAnyDate = vazba.DatumObjednani.HasValue || vazba.DatumDodani.HasValue || vazba.DatumPrevzeti.HasValue;
-                var chatEnabled = !string.IsNullOrWhiteSpace(vazba.Typ);
+                // ticketResolved = ticket byl už dohledán v SD při dřívější editaci
+                // (Typ v DB je naplněn). Pokud ano, datumy zobrazíme vždy — i prázdné
+                // s placeholder ikonou kalendáře. Pokud Typ není naplněn, datumy se
+                // odhalí až po pozitivní sync odpovědi (sync.js setDatesVisible).
+                var ticketResolved = !string.IsNullOrWhiteSpace(vazba.Typ);
+                var chatEnabled = ticketResolved;
+                var typTagColor = vazba.Typ?.ToUpperInvariant() switch
+                {
+                    "NES" => "warning",
+                    "PMP" => "primary",
+                    "PNF" => "success",
+                    _ => "neutral"
+                };
 
                 <div class="external-row" data-external-row>
                     <input type="hidden" name="ExterniVazby[@i].Id" value="@vazba.Id" />
@@ -35,73 +47,102 @@
                     <input type="hidden" name="ExterniVazby[@i].DatumPrevzeti" value="@(vazba.DatumPrevzeti?.ToString("yyyy-MM-dd"))" data-external-datum-prevzeti />
 
                     <label class="external-field-cislo">
-                        Číslo
-                        <input type="text"
-                               name="ExterniVazby[@i].Cislo"
-                               value="@vazba.Cislo"
-                               maxlength="6"
-                               pattern="[0-9]{6}"
-                               inputmode="numeric"
-                               data-external-cislo
-                               data-external-odkaz-id="@vazba.Id" />
+                        <span class="external-field-label">Číslo</span>
+                        <gov-form-input size="m"
+                                        name="ExterniVazby[@i].Cislo"
+                                        value="@vazba.Cislo"
+                                        maxlength="6"
+                                        pattern="[0-9]{6}"
+                                        inputmode="numeric"
+                                        data-external-cislo
+                                        data-external-odkaz-id="@vazba.Id"></gov-form-input>
                     </label>
 
-                    <label class="external-field-typ">
-                        Typ
-                        <span class="pm-readonly-text" data-external-type-display>@(vazba.Typ ?? "—")</span>
-                    </label>
+                    <div class="external-field-typ">
+                        <span class="external-field-label">Typ</span>
+                        <gov-tag size="s" type="subtle" color="@typTagColor" data-external-type-display>@(vazba.Typ ?? "—")</gov-tag>
+                    </div>
 
                     <label class="external-field-cena" data-external-price-field @(showEstimatedPrice ? null : "hidden=\"hidden\"")>
-                        Předpokládaná cena
-                        <input type="number"
-                               name="ExterniVazby[@i].PredpokladanaCena"
-                               value="@estimatedPriceValue"
-                               step="0.01"
-                               min="0"
-                               inputmode="decimal"
-                               data-external-price-input
-                               disabled="@(showEstimatedPrice ? null : "disabled")" />
+                        <span class="external-field-label">Předpokládaná cena</span>
+                        <gov-form-input size="m"
+                                        input-type="number"
+                                        name="ExterniVazby[@i].PredpokladanaCena"
+                                        value="@estimatedPriceValue"
+                                        step="0.01"
+                                        min="0"
+                                        inputmode="decimal"
+                                        data-external-price-input
+                                        @(showEstimatedPrice ? null : "disabled")></gov-form-input>
                     </label>
 
-                    <div class="external-field-vyzva vyzvy-switch-wrap" data-external-vyzvy-switch-wrap
+                    <div class="external-field-vyzva" data-external-vyzvy-switch-wrap
                          @(isPnf ? null : "hidden=\"hidden\"")>
-                        <label class="pm-switch-label">
-                            <input type="hidden" name="ExterniVazby[@i].VyzvaId" value="@vazba.VyzvaId" />
-                            <input type="hidden" name="ExterniVazby[@i].ZaradidDoVyzvy" value="@(vazba.ZaradidDoVyzvy ? "true" : "false")" data-external-vyzvy-switch-state />
-                            <input type="checkbox"
-                                   class="pm-switch"
-                                   data-vyzvy-switch
-                                   data-externi-odkaz-id="@vazba.Id"
-                                   @(vazba.ZaradidDoVyzvy ? "checked=\"checked\"" : null) />
-                            <span>Výzva</span>
-                        </label>
+                        <span class="external-field-label">Výzva</span>
+                        <input type="hidden" name="ExterniVazby[@i].VyzvaId" value="@vazba.VyzvaId" />
+                        <input type="hidden" name="ExterniVazby[@i].ZaradidDoVyzvy" value="@(vazba.ZaradidDoVyzvy ? "true" : "false")" data-external-vyzvy-switch-state />
+                        <gov-form-switch size="m"
+                                         data-vyzvy-switch
+                                         data-externi-odkaz-id="@vazba.Id"
+                                         @(vazba.ZaradidDoVyzvy ? "checked" : null)>
+                            <span slot="label"><label>Zařadit</label></span>
+                        </gov-form-switch>
                         <span class="vyzvy-switch-status" data-vyzvy-switch-status>@statusText</span>
                     </div>
 
-                    <div class="external-actions">
-                        <pm-button variant="Ghost" size="Small" data-external-chat-open="true"
+                    <div class="external-action-chat">
+                        <pm-button variant="Secondary" size="Small" data-external-chat-open="true"
                                    data-external-odkaz-id="@vazba.Id"
                                    data-external-zaznam-id="@Model.Id"
                                    title="Vyjádření a termíny"
                                    aria-label="Vyjádření a termíny"
                                    disabled="@(!chatEnabled)">
-                            <gov-icon name="chat-dots" type="components" aria-hidden="true"></gov-icon>
-                        </pm-button>
-                        <pm-button variant="Ghost" size="Small" data-external-remove="true"
-                                   title="Odebrat vazbu"
-                                   aria-label="Odebrat vazbu">
-                            <gov-icon name="trash" type="components" aria-hidden="true"></gov-icon>
+                            <gov-icon size="s" name="chat-left-text" type="components" aria-hidden="true"></gov-icon>
                         </pm-button>
                     </div>
 
-                    <div class="external-dates" @(hasAnyDate ? null : "hidden=\"hidden\"")>
+                    <div class="external-dates" data-external-dates @(ticketResolved ? null : "hidden=\"hidden\"")>
                         <div class="external-date-item">
                             <span class="label">Datum objednání</span>
-                            <span class="value">@datumObjednani</span>
+                            @if (datumObjednani is not null)
+                            {
+                                <span class="value">@datumObjednani</span>
+                            }
+                            else
+                            {
+                                <span class="value placeholder">
+                                    <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
+                                    <span>—</span>
+                                </span>
+                            }
+                        </div>
+                        <div class="external-date-item">
+                            <span class="label">Plán dodání</span>
+                            @if (planDodani is not null)
+                            {
+                                <span class="value">@planDodani</span>
+                            }
+                            else
+                            {
+                                <span class="value placeholder">
+                                    <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
+                                    <span>—</span>
+                                </span>
+                            }
                         </div>
                         <div class="external-date-item">
                             <span class="label">Datum dodání</span>
-                            <span class="value">@datumDodani</span>
+                            @if (datumDodani is not null)
+                            {
+                                <span class="value">@datumDodani</span>
+                            }
+                            else
+                            {
+                                <span class="value placeholder">
+                                    <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
+                                    <span>—</span>
+                                </span>
+                            }
                         </div>
                         <div class="external-date-item">
                             <span class="label">Datum převzetí</span>
@@ -111,9 +152,20 @@
                             }
                             else
                             {
-                                <span class="value muted">Záznam ještě nebyl převeden do archivu.</span>
+                                <span class="value placeholder">
+                                    <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
+                                    <span>—</span>
+                                </span>
                             }
                         </div>
+                    </div>
+
+                    <div class="external-action-trash">
+                        <pm-button variant="Secondary" size="Small" data-external-remove="true"
+                                   title="Odebrat vazbu"
+                                   aria-label="Odebrat vazbu">
+                            <gov-icon size="s" name="trash3" type="components" aria-hidden="true"></gov-icon>
+                        </pm-button>
                     </div>
                 </div>
             }
@@ -129,64 +181,93 @@
                 <input type="hidden" name="ExterniVazby[__index__].DatumPrevzeti" value="" data-external-datum-prevzeti />
 
                 <label class="external-field-cislo">
-                    Číslo
-                    <input type="text"
-                           name="ExterniVazby[__index__].Cislo"
-                           value=""
-                           maxlength="6"
-                           pattern="[0-9]{6}"
-                           inputmode="numeric"
-                           data-external-cislo
-                           data-external-odkaz-id="0" />
+                    <span class="external-field-label">Číslo</span>
+                    <gov-form-input size="m"
+                                    name="ExterniVazby[__index__].Cislo"
+                                    value=""
+                                    maxlength="6"
+                                    pattern="[0-9]{6}"
+                                    inputmode="numeric"
+                                    data-external-cislo
+                                    data-external-odkaz-id="0"></gov-form-input>
                 </label>
 
-                <label class="external-field-typ">
-                    Typ
-                    <span class="pm-readonly-text" data-external-type-display>—</span>
-                </label>
+                <div class="external-field-typ">
+                    <span class="external-field-label">Typ</span>
+                    <gov-tag size="s" type="subtle" color="neutral" data-external-type-display>—</gov-tag>
+                </div>
 
                 <label class="external-field-cena" data-external-price-field hidden="hidden">
-                    Předpokládaná cena
-                    <input type="number"
-                           name="ExterniVazby[__index__].PredpokladanaCena"
-                           value=""
-                           step="0.01"
-                           min="0"
-                           inputmode="decimal"
-                           data-external-price-input
-                           disabled="disabled" />
+                    <span class="external-field-label">Předpokládaná cena</span>
+                    <gov-form-input size="m"
+                                    input-type="number"
+                                    name="ExterniVazby[__index__].PredpokladanaCena"
+                                    value=""
+                                    step="0.01"
+                                    min="0"
+                                    inputmode="decimal"
+                                    data-external-price-input
+                                    disabled></gov-form-input>
                 </label>
 
-                <div class="external-field-vyzva vyzvy-switch-wrap" data-external-vyzvy-switch-wrap hidden="hidden">
-                    <label class="pm-switch-label">
-                        <input type="hidden" name="ExterniVazby[__index__].VyzvaId" value="" />
-                        <input type="hidden" name="ExterniVazby[__index__].ZaradidDoVyzvy" value="false" data-external-vyzvy-switch-state />
-                        <input type="checkbox" class="pm-switch" data-vyzvy-switch data-externi-odkaz-id="" />
-                        <span>Výzva</span>
-                    </label>
+                <div class="external-field-vyzva" data-external-vyzvy-switch-wrap hidden="hidden">
+                    <span class="external-field-label">Výzva</span>
+                    <input type="hidden" name="ExterniVazby[__index__].VyzvaId" value="" />
+                    <input type="hidden" name="ExterniVazby[__index__].ZaradidDoVyzvy" value="false" data-external-vyzvy-switch-state />
+                    <gov-form-switch size="m" data-vyzvy-switch data-externi-odkaz-id="">
+                        <span slot="label"><label>Zařadit</label></span>
+                    </gov-form-switch>
                     <span class="vyzvy-switch-status" data-vyzvy-switch-status></span>
                 </div>
 
-                <div class="external-actions">
-                    <pm-button variant="Ghost" size="Small" data-external-chat-open="true"
+                <div class="external-action-chat">
+                    <pm-button variant="Secondary" size="Small" data-external-chat-open="true"
                                data-external-odkaz-id="0"
                                data-external-zaznam-id="@Model.Id"
                                title="Vyjádření a termíny"
                                aria-label="Vyjádření a termíny"
                                disabled="true">
-                        <gov-icon name="chat-dots" type="components" aria-hidden="true"></gov-icon>
-                    </pm-button>
-                    <pm-button variant="Ghost" size="Small" data-external-remove="true"
-                               title="Odebrat vazbu"
-                               aria-label="Odebrat vazbu">
-                        <gov-icon name="trash" type="components" aria-hidden="true"></gov-icon>
+                        <gov-icon size="s" name="chat-left-text" type="components" aria-hidden="true"></gov-icon>
                     </pm-button>
                 </div>
 
-                <div class="external-dates" hidden="hidden">
-                    <div class="external-date-item"><span class="label">Datum objednání</span><span class="value">—</span></div>
-                    <div class="external-date-item"><span class="label">Datum dodání</span><span class="value">—</span></div>
-                    <div class="external-date-item"><span class="label">Datum převzetí</span><span class="value muted">Záznam ještě nebyl převeden do archivu.</span></div>
+                <div class="external-dates" data-external-dates hidden="hidden">
+                    <div class="external-date-item">
+                        <span class="label">Datum objednání</span>
+                        <span class="value placeholder">
+                            <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
+                            <span>—</span>
+                        </span>
+                    </div>
+                    <div class="external-date-item">
+                        <span class="label">Plán dodání</span>
+                        <span class="value placeholder">
+                            <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
+                            <span>—</span>
+                        </span>
+                    </div>
+                    <div class="external-date-item">
+                        <span class="label">Datum dodání</span>
+                        <span class="value placeholder">
+                            <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
+                            <span>—</span>
+                        </span>
+                    </div>
+                    <div class="external-date-item">
+                        <span class="label">Datum převzetí</span>
+                        <span class="value placeholder">
+                            <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
+                            <span>—</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="external-action-trash">
+                    <pm-button variant="Secondary" size="Small" data-external-remove="true"
+                               title="Odebrat vazbu"
+                               aria-label="Odebrat vazbu">
+                        <gov-icon size="s" name="trash3" type="components" aria-hidden="true"></gov-icon>
+                    </pm-button>
                 </div>
             </div>
         </template>
