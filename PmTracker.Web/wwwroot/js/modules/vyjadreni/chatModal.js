@@ -43,8 +43,50 @@
     await loadInto(container);
   }
 
-  async function loadInto(container) {
+  /**
+   * Spec 2026-04-29: scroll preservation — před refresh modalu (binding create/delete)
+   * najdi bublinu v centru viewportu a uchovej její vyjadreni-id. Po načtení nového
+   * partialu scroll na tuto bublinu. Bez toho user pokaždé skočí na začátek po každém
+   * vybrání kroku z dropdown.
+   */
+  function captureScrollAnchor(container) {
+    const body = container.querySelector('.pm-chat-modal__body');
+    if (!body) return null;
+    const bodyRect = body.getBoundingClientRect();
+    const targetY = bodyRect.top + bodyRect.height / 2;
+    const bubbles = container.querySelectorAll('[data-bubble][data-vyjadreni-id]');
+    let bestId = null;
+    let bestDist = Infinity;
+    bubbles.forEach((b) => {
+      const r = b.getBoundingClientRect();
+      const center = r.top + r.height / 2;
+      const dist = Math.abs(center - targetY);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestId = b.getAttribute('data-vyjadreni-id');
+      }
+    });
+    return bestId;
+  }
+
+  function restoreScrollAnchor(container, anchorVyjadreniId) {
+    if (!anchorVyjadreniId) return;
+    // Wait for layout — gov komponenty hydratují asynchronně, počkat 1 rAF.
+    requestAnimationFrame(() => {
+      const target = container.querySelector(
+        '[data-bubble][data-vyjadreni-id="' + anchorVyjadreniId + '"]'
+      );
+      if (target) {
+        target.scrollIntoView({ behavior: 'auto', block: 'center' });
+      }
+    });
+  }
+
+  async function loadInto(container, options) {
     if (!currentCtx) return;
+    const opts = options || {};
+    const preserveAnchor = opts.preserveAnchor === true;
+    const anchorId = preserveAnchor ? captureScrollAnchor(container) : null;
     try {
       const url = `/Vyjadreni/Modal?externiOdkazId=${encodeURIComponent(currentCtx.externiOdkazId)}&zaznamId=${encodeURIComponent(currentCtx.zaznamId)}`;
       const resp = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } });
@@ -63,6 +105,7 @@
           global.pmChatModalReharvest.attach(root);
         }
       }
+      if (preserveAnchor) restoreScrollAnchor(container, anchorId);
     } catch (err) {
       container.innerHTML = `<gov-alert variant="error">Chyba při načítání: ${err.message || err}</gov-alert>`;
     }
@@ -71,12 +114,16 @@
   /**
    * Review finding A-5: po úspěšné mutaci (create binding, delete binding) přenačti
    * partial a re-attach JS moduly. Volané z chatModalDragDrop po úspěšném Create/Delete.
+   *
+   * Spec 2026-04-29: refreshModal zachovává scroll position — po refresh se modal
+   * scrollne na bublinu, která byla v centru viewportu před refreshem. User nemusí
+   * po každém přiřazení kroku scrollovat zpět.
    */
   async function refreshModal() {
     if (!dialogEl) return;
     const container = dialogEl.querySelector('[data-chat-modal-content]');
     if (!container) return;
-    await loadInto(container);
+    await loadInto(container, { preserveAnchor: true });
   }
 
   function show(el) {
