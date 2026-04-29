@@ -143,6 +143,25 @@ public sealed class PerTicketMetadataExtractorTests
     }
 
     [Fact]
+    public void Extract_Pmp_PlanDodaniDateImmediatelyAfterDodavatele_NotLastDateInText()
+    {
+        // Bug 2026-04-29: real-world PlanDodani vyjádření může v dalších větách
+        // obsahovat další datum (např. "Záznam byl převzat dne 20.5.2026"). Regex
+        // musí vzít datum IHNED po slově "dodavatele" v "s termínem plnění dodavatele",
+        // NE poslední datum v textu (které by chytlo jiný kontext).
+        var all = new[]
+        {
+            V(1, "2026-01-01",
+                "PM předal záznam dodavateli : ABC s termínem plnění dodavatele 15.4.2026. " +
+                "Záznam byl převzat k řešení dne 20.5.2026."),
+            V(2, "2026-01-02", "Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována."),
+        };
+        var meta = PerTicketMetadataExtractor.Extract("PMP", null, all);
+        meta.PlanDodani.Should().Be(new DateTime(2026, 4, 15));   // datum těsně po "dodavatele"
+        // PŘED FIX: TryParseLastDateInText by vrátil 20.5.2026 (poslední match v textu)
+    }
+
+    [Fact]
     public void Extract_Pmp_HtmlWrappersOkolu_StaleParsuje()
     {
         var all = new[]

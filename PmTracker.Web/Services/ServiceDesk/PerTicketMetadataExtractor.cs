@@ -31,9 +31,15 @@ public sealed record PerTicketMetadata(
 /// </summary>
 public static class PerTicketMetadataExtractor
 {
-    private static readonly Regex DatumRegex = new(
-        @"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b",
-        RegexOptions.Compiled);
+    /// <summary>
+    /// Anchored regex pro PlanDodani — najde datum IHNED po frázi
+    /// „s termínem plnění dodavatele" (max 80 znaků toleranci na HTML wrappery
+    /// jako <c>&lt;b&gt;</c>/<c>&lt;br&gt;</c>). Bug fix 2026-04-29: bez anchoru
+    /// regex chytal i datumy z navazujících vět (např. „Záznam byl převzat dne ...").
+    /// </summary>
+    private static readonly Regex PlanDodaniDateRegex = new(
+        @"s\s+termínem\s+plnění\s+dodavatele[\s\S]{0,80}?\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
     /// Vytěží 4 datumy ze seznamu vyjádření tiketu.
@@ -108,12 +114,12 @@ public static class PerTicketMetadataExtractor
             }
         }
 
-        // PlanDodani — dvojfrázová validace + regex DD.MM.YYYY na konci textu.
+        // PlanDodani — dvojfrázová validace + anchored regex po slově "dodavatele".
         var validated = PlanDodaniDualPhraseValidator.FilterValidated(all);
         DateTime? planDodani = null;
         foreach (var v in validated)
         {
-            var datum = TryParseLastDateInText(v.Popis);
+            var datum = TryParsePlanDodaniDate(v.Popis);
             if (datum.HasValue)
             {
                 planDodani = datum.Value;                 // poslední validovaný v ASC pořadí vyhrává
@@ -123,15 +129,18 @@ public static class PerTicketMetadataExtractor
         return new PerTicketMetadata(datumObjednani, planDodani, datumDodani, datumPrevzeti);
     }
 
-    private static DateTime? TryParseLastDateInText(string? popis)
+    /// <summary>
+    /// Bug fix 2026-04-29: extrahuje datum IHNED po frázi „s termínem plnění dodavatele".
+    /// Předchozí impl brala POSLEDNÍ datum v textu, což chytalo nežádoucí datumy
+    /// z navazujících vět (např. „Záznam byl převzat dne 20.5.2026").
+    /// </summary>
+    private static DateTime? TryParsePlanDodaniDate(string? popis)
     {
         if (string.IsNullOrWhiteSpace(popis)) return null;
 
-        var matches = DatumRegex.Matches(popis);
-        if (matches.Count == 0) return null;
+        var match = PlanDodaniDateRegex.Match(popis);
+        if (!match.Success) return null;
 
-        // Poslední match v textu (typicky datum termínu na konci fráze).
-        var match = matches[matches.Count - 1];
         if (!int.TryParse(match.Groups[1].Value, out var d)) return null;
         if (!int.TryParse(match.Groups[2].Value, out var m)) return null;
         if (!int.TryParse(match.Groups[3].Value, out var y)) return null;
