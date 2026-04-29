@@ -90,12 +90,45 @@
                                 <time class="pm-chat-bubble__datum" datetime="@bubble.Datum.ToString("o")">
                                     @bubble.Datum.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
                                 </time>
-                                @if (isAssigned)
-                                {
-                                    <span class="pm-chat-bubble__pinned" title="Navázáno na krok @bubble.NavazanoNaKrokPoradi">
-                                        Krok @bubble.NavazanoNaKrokPoradi
-                                    </span>
-                                }
+                                @* Spec 2026-04-29-modal-vyjadreni-dropdown §1, §6 — krok selector
+                                   vpravo nahoře v meta line: badge (pokud assigned) nebo dropdown (pokud ne). *@
+                                <div class="pm-chat-bubble__krok">
+                                    @if (bubble.AssignedKrokKey.HasValue)
+                                    {
+                                        <gov-tag color="@bubble.AssignedKrokColor" size="s">
+                                            Krok @bubble.AssignedKrokPoradi
+                                        </gov-tag>
+                                        @if (canEdit && !bubble.AssignedKrokIsPinned)
+                                        {
+                                            <button type="button"
+                                                    class="pm-chat-bubble__krok-clear"
+                                                    data-clear-bubble-binding
+                                                    data-vyjadreni-id="@bubble.VyjadreniId"
+                                                    title="Odebrat krok">
+                                                ×
+                                            </button>
+                                        }
+                                    }
+                                    else if (canEdit && !isNes && bubble.StepOptions.Count > 0)
+                                    {
+                                        var dropdownOptions = bubble.StepOptions
+                                            .Select(o => new
+                                            {
+                                                value = o.KrokKey.ToString(),
+                                                label = $"Krok {o.KrokPoradi}: {o.Nazev}",
+                                                disabled = o.IsDisabled,
+                                                title = o.DisabledReason
+                                            })
+                                            .Cast<object>()
+                                            .Prepend(new { value = "", label = "— vyber krok —", disabled = false, title = (string?)null });
+                                        <gov-form-select size="s"
+                                                         data-bubble-step-selector
+                                                         data-vyjadreni-id="@bubble.VyjadreniId"
+                                                         data-vyjadreni-datum="@bubble.Datum.ToString("o")"
+                                                         options="@System.Text.Json.JsonSerializer.Serialize(dropdownOptions)">
+                                        </gov-form-select>
+                                    }
+                                </div>
                             </div>
                             <div class="pm-chat-bubble__popis" style="white-space: pre-wrap;">
                                 @bubble.PopisPlainText
@@ -108,39 +141,12 @@
 
         @if (!isNes)
         {
-            @* Spec 2026-04-28-modal-vyjadreni-redesign §2 + §3 — native <gov-stepper> + <gov-stepper-item>
-               (žádný custom element). Buffer pro nepřiřazené kroky vpravo nahoře, sticky aligned
-               kroky vedle bound bubliny. Drag&drop drive z kroku přes stepperDragSnap.js. *@
+            @* Spec 2026-04-29-modal-vyjadreni-dropdown §2 — stepper jako informational dashboard:
+               sticky aligned kroky vedle bound bublin, click-to-scroll na bublinu.
+               Buffer odstraněn — nepřiřazené kroky jsou implicit v dropdown options bublin. *@
             var prirazeneKroky = Model.Kroky.Where(k => k.AktualniVyjadreniId.HasValue).OrderBy(k => k.KrokPoradi).ToList();
-            var nepriarezeneKroky = Model.Kroky.Where(k => !k.AktualniVyjadreniId.HasValue).OrderBy(k => k.KrokPoradi).ToList();
 
         <section class="pm-chat-modal__stepper" aria-label="Kroky harmonogramu">
-            @if (nepriarezeneKroky.Count > 0)
-            {
-                <div class="pm-chat-modal__buffer" data-stepper-buffer aria-label="Nepřiřazené kroky">
-                    <div class="pm-chat-modal__buffer-header">Nepřiřazené kroky</div>
-                    <gov-stepper size="m" data-buffer-stepper>
-                        @foreach (var krok in nepriarezeneKroky)
-                        {
-                            <gov-stepper-item color="error"
-                                              identifier="krok-@krok.KrokKey"
-                                              data-step
-                                              data-krok-key="@krok.KrokKey"
-                                              data-krok-poradi="@krok.KrokPoradi"
-                                              data-vazba-id="@krok.VazbaId"
-                                              data-source=""
-                                              data-current-vyjadreni-id=""
-                                              data-current-datum=""
-                                              data-in-buffer="true">
-                                <span slot="prefix">@krok.KrokPoradi</span>
-                                <span slot="headline">@krok.Nazev</span>
-                                <span slot="content">—</span>
-                            </gov-stepper-item>
-                        }
-                    </gov-stepper>
-                </div>
-            }
-
             <gov-stepper size="m" data-aligned-stepper>
                 @foreach (var krok in prirazeneKroky)
                 {

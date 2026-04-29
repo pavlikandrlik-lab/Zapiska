@@ -69,10 +69,6 @@
     background: #fff;
     transition: outline-color 0.15s, outline-width 0.15s;
 }
-.pm-chat-bubble.drop-target {
-    outline: 2px solid var(--gov-color-warning, #F59E0B);
-    outline-offset: 2px;
-}
 .pm-chat-bubble--assigned { opacity: 0.85; }
 
 .pm-chat-bubble__meta {
@@ -90,36 +86,42 @@
     min-width: 0;
 }
 
-.pm-chat-modal__buffer {
-    border: 1px dashed var(--gov-color-error, #DC2626);
-    border-radius: 0.5rem;
-    padding: 0.5rem;
-    margin-bottom: 1rem;
-    background: var(--gov-color-error-bg, #FEF2F2);
-    position: sticky;
-    top: 0;
-    z-index: 5;
+/* Spec 2026-04-29-modal-vyjadreni-dropdown §2 — stepper items jsou clickable
+   pro scroll-to-bound-bubble. Žádné drag&drop interakce. */
+gov-stepper-item[data-step] {
+    cursor: pointer;
+    transition: opacity 0.15s;
 }
-.pm-chat-modal__buffer-header {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--gov-color-error, #DC2626);
-    margin-bottom: 0.5rem;
+gov-stepper-item[data-step]:hover {
+    opacity: 0.85;
 }
 
-/* gov-stepper-item — drag handles */
-gov-stepper-item[data-step] {
-    cursor: grab;
-    user-select: none;
-    transition: transform 60ms ease-out, box-shadow 0.15s;
+/* §1, §6 — bublina krok selector vpravo nahoře v meta line */
+.pm-chat-bubble__krok {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
 }
-gov-stepper-item[data-step][data-dragging="true"] {
-    cursor: grabbing;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-    z-index: 10;
+
+.pm-chat-bubble__krok-clear {
+    background: transparent;
+    border: 1px solid var(--gov-color-error, #DC2626);
+    color: var(--gov-color-error, #DC2626);
+    border-radius: 50%;
+    width: 1.25rem;
+    height: 1.25rem;
+    line-height: 1;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
-gov-stepper-item[data-step][data-pinned="true"] {
-    cursor: not-allowed;
+.pm-chat-bubble__krok-clear:hover {
+    background: var(--gov-color-error-bg, #FEF2F2);
 }
 
 .pm-chat-step__clear {
@@ -150,5 +152,4 @@ gov-stepper-item[data-step][data-pinned="true"] {
 /* Breakpoint < 1100px — stack */
 @media (max-width: 1099px) {
     .pm-chat-modal__body { grid-template-columns: 1fr; }
-    .pm-chat-modal__buffer { position: static; }
 }

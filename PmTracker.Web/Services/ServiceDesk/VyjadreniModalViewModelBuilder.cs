@@ -167,7 +167,139 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
         {
             vm.EmptyMessage = "Žádná vyjádření zatím nejsou dostupná (buď ještě nebyla vytěžena, nebo ServiceDesk je offline).";
         }
+        else
+        {
+            // Spec 2026-04-29-modal-vyjadreni-dropdown §3 — per-bubble option computation
+            // (1:1 + chronologie validation). Také Assigned* properties pro UI badge / dropdown.
+            ComputePerBubbleStepOptions(vm, activeBindings);
+        }
 
         return vm;
+    }
+
+    /// <summary>
+    /// Spec 2026-04-29-modal-vyjadreni-dropdown §3, §6 — pro každou bublinu:
+    /// (a) AssignedKrok* properties pokud je krok bound této bublině,
+    /// (b) StepOptions seznam s pre-computed disabled flag pro 1:1 / chronologie,
+    /// (c) special K10 PNF auto-pinned logika.
+    /// </summary>
+    private static void ComputePerBubbleStepOptions(
+        VyjadreniModalViewModel vm,
+        IReadOnlyList<ZaznamHarmonogramVyjadreniVazbaEntity> activeBindings)
+    {
+        // Mapa: HotVyjadreniId → binding (deterministická volba pokud více bindings na bublinu — DESC by CreatedAt).
+        var bindingByHotVyjadreniId = activeBindings
+            .Where(b => b.HotVyjadreniId > 0L)  // synthetic K1 bindings (HotVyjadreniId=0) nepatří k bublinám
+            .GroupBy(b => b.HotVyjadreniId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(b => b.CreatedAt).First());
+
+        // Mapa: KrokPoradi → datum bound bubliny — pro chronologie check.
+        var krokToBoundBubbleDatum = new Dictionary<int, DateTime>();
+        foreach (var b in activeBindings)
+        {
+            if (b.HotVyjadreniId == 0L) continue;  // skip synthetic K1
+            var krok = vm.Kroky.FirstOrDefault(k => k.KrokKey == b.KrokKey);
+            if (krok is null) continue;
+            krokToBoundBubbleDatum[krok.KrokPoradi] = b.DatumVyjadreni;
+        }
+
+        // K10 auto-pinned: pokud existuje bublina s K10 frází, K10 je pinned na ní.
+        var k10AutoPinnedHotVyjadreniId = vm.Bubliny
+            .FirstOrDefault(b => string.Equals(b.Predikat,
+                nameof(HarvestPredicateKind.K10_NasazeniArchivace),
+                StringComparison.OrdinalIgnoreCase))?.VyjadreniId;
+        var k10Krok = vm.Kroky.FirstOrDefault(k => k.KrokPoradi == 10);
+
+        foreach (var bubble in vm.Bubliny)
+        {
+            // Assigned* properties.
+            if (bindingByHotVyjadreniId.TryGetValue(bubble.VyjadreniId, out var binding))
+            {
+                var assignedKrok = vm.Kroky.FirstOrDefault(k => k.KrokKey == binding.KrokKey);
+                if (assignedKrok is not null)
+                {
+                    bubble.AssignedKrokKey = assignedKrok.KrokKey;
+                    bubble.AssignedKrokPoradi = assignedKrok.KrokPoradi;
+                    bubble.AssignedKrokColor = binding.Source switch
+                    {
+                        (byte)VazbaSource.Auto => "success",
+                        (byte)VazbaSource.Manual => "warning",
+                        _ => null
+                    };
+                    bubble.AssignedKrokIsPinned = k10Krok is not null
+                        && assignedKrok.KrokKey == k10Krok.KrokKey
+                        && k10AutoPinnedHotVyjadreniId == bubble.VyjadreniId;
+                }
+            }
+
+            // StepOptions jen pokud bublina nemá AssignedKrok (jinak zobrazí badge).
+            if (bubble.AssignedKrokKey.HasValue)
+            {
+                bubble.StepOptions = Array.Empty<KrokOptionViewModel>();
+                continue;
+            }
+
+            bubble.StepOptions = BuildStepOptionsForBubble(
+                bubble, vm.Kroky, activeBindings, krokToBoundBubbleDatum, k10AutoPinnedHotVyjadreniId);
+        }
+    }
+
+    /// <summary>
+    /// Spec 2026-04-29-modal-vyjadreni-dropdown §3 — pre-compute disabled options
+    /// per bublinu pro krok dropdown.
+    /// </summary>
+    private static IReadOnlyList<KrokOptionViewModel> BuildStepOptionsForBubble(
+        BublinaViewModel bubble,
+        IReadOnlyList<StepperKrokViewModel> kroky,
+        IReadOnlyList<ZaznamHarmonogramVyjadreniVazbaEntity> activeBindings,
+        IReadOnlyDictionary<int, DateTime> krokToBoundBubbleDatum,
+        long? k10AutoPinnedHotVyjadreniId)
+    {
+        var options = new List<KrokOptionViewModel>();
+        foreach (var krok in kroky.OrderBy(k => k.KrokPoradi))
+        {
+            // K10 auto-pinned (PNF archiv): NEzobrazujeme v dropdown options jiných bublin.
+            if (krok.KrokPoradi == 10 && k10AutoPinnedHotVyjadreniId.HasValue
+                && bubble.VyjadreniId != k10AutoPinnedHotVyjadreniId.Value)
+            {
+                continue;
+            }
+
+            bool isDisabled = false;
+            string? reason = null;
+
+            // 1:1 — krok bound jiné bublině?
+            var existingBinding = activeBindings.FirstOrDefault(b =>
+                b.KrokKey == krok.KrokKey && b.HotVyjadreniId > 0L);
+            if (existingBinding is not null && existingBinding.HotVyjadreniId != bubble.VyjadreniId)
+            {
+                isDisabled = true;
+                reason = $"Přiřazen bublině z {existingBinding.DatumVyjadreni:dd.MM.yyyy}";
+            }
+            else
+            {
+                // Chronologie validation.
+                foreach (var (otherPoradi, otherDatum) in krokToBoundBubbleDatum)
+                {
+                    if (otherPoradi == krok.KrokPoradi) continue;
+                    if (otherPoradi < krok.KrokPoradi && otherDatum > bubble.Datum)
+                    {
+                        isDisabled = true;
+                        reason = $"Porušila by se chronologie kroku {otherPoradi}";
+                        break;
+                    }
+                    if (otherPoradi > krok.KrokPoradi && otherDatum < bubble.Datum)
+                    {
+                        isDisabled = true;
+                        reason = $"Porušila by se chronologie kroku {otherPoradi}";
+                        break;
+                    }
+                }
+            }
+
+            options.Add(new KrokOptionViewModel(
+                krok.KrokKey, krok.KrokPoradi, krok.Nazev, isDisabled, reason));
+        }
+        return options;
     }
 }

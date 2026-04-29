@@ -60,29 +60,26 @@ public sealed class ChatModalRedesignTests
     public void ChatModalCshtml_BublinkyNejsouDraggable()
     {
         var html = LoadRepoText("PmTracker.Web/Views/Vyjadreni/_ChatModal.cshtml");
-        // Bubble li element musí mít draggable="false" (drag drive z kroku).
+        // Bubble li element musí mít draggable="false" — žádný drag&drop interaction
+        // (2026-04-29 dropdown redesign nahradil drag binding přes dropdown selector).
         html.Should().Contain("draggable=\"false\"",
-            "Bublinky už nejsou draggable — drag drive z kroku přes stepperDragSnap.js.");
+            "Bublinky nejsou draggable — binding přes dropdown selector v každé bublině.");
     }
 
     [Fact]
-    public void ChatModalCshtml_ObsahujeBufferProNeprirazeneKroky()
+    public void ChatModalCshtml_MaAlignedStepper()
     {
         var html = LoadRepoText("PmTracker.Web/Views/Vyjadreni/_ChatModal.cshtml");
-        html.Should().Contain("data-stepper-buffer",
-            "Razor musí renderovat buffer pro nepřiřazené kroky.");
-        html.Should().Contain("Nepřiřazené kroky",
-            "Buffer header musí mít srozumitelný text.");
         html.Should().Contain("data-aligned-stepper",
-            "Razor musí mít aligned-stepper pro přiřazené kroky.");
+            "Razor musí mít aligned-stepper pro přiřazené kroky (informational dashboard).");
     }
 
     [Fact]
     public void ChatModalCshtml_VyuzivaColorStateProGovStepperItem()
     {
         var html = LoadRepoText("PmTracker.Web/Views/Vyjadreni/_ChatModal.cshtml");
-        html.Should().Contain("color=\"error\"",
-            "Nepřiřazené kroky color=error (červená).");
+        // Per 2026-04-29 dropdown redesign: stepper jen aligned (přiřazené kroky)
+        // používá success/warning. error color (nepřiřazené) zmizela s bufferem.
         html.Should().Contain("\"success\"",
             "Auto kroky color=success (zelená).");
         html.Should().Contain("\"warning\"",
@@ -167,20 +164,9 @@ public sealed class ChatModalRedesignTests
     }
 
     [Fact]
-    public void StepperDragSnapModule_Existuje()
-    {
-        var js = LoadRepoText("PmTracker.Web/wwwroot/js/modules/vyjadreni/stepperDragSnap.js");
-        js.Should().Contain("findNearestBubble",
-            "Modul musí mít fci pro hledání nejbližší bubliny u kurzoru (magnetic snap).");
-        js.Should().Contain("export function initStepperDragSnap",
-            "Exportovaná init funkce musí existovat.");
-        js.Should().Contain("data-dragging",
-            "Modul musí používat data-dragging atribut na taženém kroku.");
-    }
-
-    [Fact]
     public void StepperStickyModule_Existuje()
     {
+        // Sticky modul zachován po 2026-04-29 redesignu — informational dashboard.
         var js = LoadRepoText("PmTracker.Web/wwwroot/js/modules/vyjadreni/stepperSticky.js");
         js.Should().Contain("export function initStepperSticky",
             "Exportovaná init funkce musí existovat.");
@@ -188,30 +174,6 @@ public sealed class ChatModalRedesignTests
             "Sticky logika musí reagovat na resize.");
         js.Should().Contain("data-aligned-stepper",
             "Sticky logika musí targetovat aligned-stepper.");
-    }
-
-    [Fact]
-    public void StepperBufferModule_Existuje()
-    {
-        var js = LoadRepoText("PmTracker.Web/wwwroot/js/modules/vyjadreni/stepperBuffer.js");
-        js.Should().Contain("export function moveStepFromBufferToAligned",
-            "Exportovaná funkce moveStepFromBufferToAligned musí existovat.");
-        js.Should().Contain("export function moveStepFromAlignedToBuffer",
-            "Exportovaná funkce moveStepFromAlignedToBuffer musí existovat.");
-    }
-
-    [Fact]
-    public void ChatModalDragDropModule_PouzivaNoveModuly()
-    {
-        var js = LoadRepoText("PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModalDragDrop.js");
-        js.Should().Contain("import { initStepperSticky }",
-            "chatModalDragDrop musí importovat initStepperSticky.");
-        js.Should().Contain("import { initStepperDragSnap }",
-            "chatModalDragDrop musí importovat initStepperDragSnap.");
-        js.Should().Contain("moveStepFromBufferToAligned",
-            "chatModalDragDrop musí integrovat buffer management.");
-        js.Should().Contain("window.pmChatModalDragDrop",
-            "Backward-compat global API musí být zachované.");
     }
 
     [Fact]
