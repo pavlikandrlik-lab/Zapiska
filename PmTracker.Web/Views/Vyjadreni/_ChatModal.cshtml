@@ -42,11 +42,13 @@
                 <form class="pm-chat-modal__reharvest-form" data-reharvest-form method="post" action="/Vyjadreni/ReHarvest">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="externiOdkazId" value="@Model.ExterniOdkazId" />
-                    <button type="submit" class="pm-chat-modal__reharvest-btn"
-                            data-reharvest-btn
-                            title="Znovu spustit automatické vytěžení vyjádření">
-                        Re-harvest
-                    </button>
+                    <pm-button variant="Secondary"
+                               size="Small"
+                               native-type="submit"
+                               data-reharvest-btn
+                               title="Znovu spustit automatické vytěžení vyjádření">
+                        Znovu vytěžit
+                    </pm-button>
                 </form>
             }
         </div>

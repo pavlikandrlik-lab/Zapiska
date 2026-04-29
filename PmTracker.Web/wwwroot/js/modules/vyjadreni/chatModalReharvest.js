@@ -23,7 +23,7 @@
       ev.preventDefault();
       const fd = new FormData(form);
       if (btn) btn.setAttribute('disabled', '');
-      setStatus(root, 'Re-harvest běží…', null);
+      setStatus(root, 'Vytěžování běží…', null);
       try {
         const resp = await fetch(form.action, {
           method: 'POST',
@@ -32,16 +32,16 @@
           headers: { 'Accept': 'application/json' }
         });
         if (!resp.ok) {
-          setStatus(root, 'Re-harvest selhal (HTTP ' + resp.status + ').', 'error');
+          setStatus(root, 'Vytěžování selhalo (HTTP ' + resp.status + ').', 'error');
           return;
         }
         const result = await resp.json();
         const msg = result
-          ? `Re-harvest dokončen: načteno ${result.fetched}, vytvořeno ${result.created}, preskočeno ${result.skipped}.`
-          : 'Re-harvest dokončen.';
+          ? `Vytěžování dokončeno: načteno ${result.fetched}, vytvořeno ${result.created}, preskočeno ${result.skipped}.`
+          : 'Vytěžování dokončeno.';
         setStatus(root, msg, 'ok');
       } catch (err) {
-        setStatus(root, 'Re-harvest selhal: ' + (err.message || err), 'error');
+        setStatus(root, 'Vytěžování selhalo: ' + (err.message || err), 'error');
       } finally {
         if (btn) btn.removeAttribute('disabled');
       }

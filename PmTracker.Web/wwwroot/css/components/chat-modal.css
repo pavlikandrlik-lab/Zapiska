@@ -34,12 +34,8 @@
 .pm-chat-modal__meta { display: flex; gap: 0.75rem; align-items: center; }
 .pm-chat-modal__harvested-at { font-size: 0.8rem; color: var(--gov-color-text-secondary, #475467); }
 .pm-chat-modal__reharvest-form { margin: 0; }
-.pm-chat-modal__reharvest-btn {
-    background: transparent; border: 1px solid currentColor; color: inherit;
-    padding: 0.25rem 0.6rem; border-radius: 0.25rem; cursor: pointer; font-size: 0.85rem;
-}
-.pm-chat-modal__reharvest-btn:hover { background: var(--gov-color-neutral-bg, #f2f4f7); }
-.pm-chat-modal__reharvest-btn[disabled] { cursor: not-allowed; opacity: 0.6; }
+/* Re-harvest tlačítko 2026-04-29: pm-button (TagHelper → gov-button) má vlastní styling.
+   Custom .pm-chat-modal__reharvest-btn rules odstraněny (plain <button> nahrazen). */
 
 /* Body = jeden scrollovatelný container, grid 70:30 (default ≥ 1600px) */
 .pm-chat-modal__body {
