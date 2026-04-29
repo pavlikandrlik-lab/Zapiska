@@ -29,8 +29,10 @@
 
 .pm-chat-modal__title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
 .pm-chat-modal__cislo { font-weight: 700; font-size: 1.1rem; }
-.pm-chat-modal__typ { padding: 0.15rem 0.4rem; background: var(--gov-color-neutral-bg, #f2f4f7); border-radius: 0.25rem; font-size: 0.85rem; }
-.pm-chat-modal__strucne { color: var(--gov-color-text-secondary, #475467); font-size: 0.95rem; }
+.pm-chat-modal__typ { padding: 0.15rem 0.4rem; background: var(--background-neutral-subtle, var(--gov-color-neutral-bg, #f2f4f7)); border-radius: 0.25rem; font-size: 0.85rem; }
+.pm-chat-modal__uzivatel { font-size: 0.85rem; color: var(--text-secondary, var(--gov-color-text-secondary, #475467)); font-weight: 500; }
+.pm-chat-modal__sub-mod { padding: 0.1rem 0.35rem; background: var(--background-neutral-subtle, var(--gov-color-neutral-bg, #f2f4f7)); border-radius: 0.2rem; font-size: 0.75rem; color: var(--text-secondary, var(--gov-color-text-secondary, #475467)); }
+.pm-chat-modal__strucne { color: var(--text-secondary, var(--gov-color-text-secondary, #475467)); font-size: 0.95rem; }
 .pm-chat-modal__meta { display: flex; gap: 0.75rem; align-items: center; }
 .pm-chat-modal__harvested-at { font-size: 0.8rem; color: var(--gov-color-text-secondary, #475467); }
 .pm-chat-modal__reharvest-form { margin: 0; }
@@ -56,27 +58,40 @@
     min-width: 0;
 }
 
-.pm-chat-modal__bubbles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.pm-chat-modal__bubbles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
 
 /* Bubble karta vyjádření — používá gov design tokens (z core.css) které
    automaticky přepínají v :root[data-theme=dark] na tmavé varianty.
-   2026-04-29: nahrazeny hardcoded bílá/světlá pozadí za gov tokens, aby
-   bubliny správně reagovaly na dark mode (memory rule: gov tokens > hardcoded). */
+   2026-04-29: kompaktnější padding + gap pro single-line bubliny. */
 .pm-chat-bubble {
     border: 1px solid var(--border-subtle, var(--gov-color-neutral-border, #d0d5dd));
     border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.35rem 0.6rem;
     background: var(--background-neutral-white, #fff);
     color: var(--text-primary, inherit);
     transition: outline-color 0.15s, outline-width 0.15s;
 }
 .pm-chat-bubble--assigned { opacity: 0.85; }
 
+/* Intro bublina — popis tiketu (HOT_ZAZNAMY.popis) jako první. Vizuálně odlišená
+   levým barevným akcentem, primary subtle pozadí. */
+.pm-chat-bubble--intro {
+    border-left: 4px solid var(--background-primary, var(--gov-color-primary, #0066cc));
+    background: var(--background-primary-subtlest, var(--gov-color-primary-bg, #eff6ff));
+}
+.pm-chat-bubble__intro-label {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    color: var(--background-primary, var(--gov-color-primary, #0066cc));
+}
+
 .pm-chat-bubble__meta {
     display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
     font-size: 0.8rem;
     color: var(--text-secondary, var(--gov-color-text-secondary, #475467));
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.15rem;
 }
 .pm-chat-bubble__autor { font-weight: 600; }
 .pm-chat-bubble__tym {
@@ -85,7 +100,7 @@
     border-radius: 0.2rem;
     font-size: 0.7rem;
 }
-.pm-chat-bubble__popis { font-size: 0.9rem; line-height: 1.4; }
+.pm-chat-bubble__popis { font-size: 0.9rem; line-height: 1.35; }
 
 /* Stepper column — kroky aligned na bound bubliny přes JS-driven inline style */
 .pm-chat-modal__stepper {

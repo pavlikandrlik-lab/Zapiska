@@ -57,7 +57,7 @@ public sealed class SqlTicketingQueryService : ITicketingQueryService
     }
 
     private static HotZaznamDto MapZaznam(HotZaznamEntity e)
-        => new(e.Id, e.TypZaznamu, e.Strucne, e.Popis);
+        => new(e.Id, e.TypZaznamu, e.Strucne, e.Popis, e.Uzivatel, e.Subsystem, e.Modul);
 
     private static HotKalkulaceDto MapKalkulace(HotKalkulaceEntity k)
         => new(

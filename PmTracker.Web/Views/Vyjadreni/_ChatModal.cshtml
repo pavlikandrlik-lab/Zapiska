@@ -25,6 +25,19 @@
             {
                 <span class="pm-chat-modal__typ">@Model.TiketTyp</span>
             }
+            @* Spec 2026-04-29: uzivatel + subsystem - modul mezi typem a popisem stručně. *@
+            @if (!string.IsNullOrWhiteSpace(Model.TiketUzivatel))
+            {
+                <span class="pm-chat-modal__uzivatel">@Model.TiketUzivatel</span>
+            }
+            @{
+                var hasSubsystem = !string.IsNullOrWhiteSpace(Model.TiketSubsystem);
+                var hasModul = !string.IsNullOrWhiteSpace(Model.TiketModul);
+            }
+            @if (hasSubsystem || hasModul)
+            {
+                <span class="pm-chat-modal__sub-mod">@(hasSubsystem ? Model.TiketSubsystem : "—") - @(hasModul ? Model.TiketModul : "—")</span>
+            }
             @if (!string.IsNullOrWhiteSpace(Model.TiketStrucne))
             {
                 <span class="pm-chat-modal__strucne">@Model.TiketStrucne</span>
@@ -70,12 +83,16 @@
             else
             {
                 <ul class="pm-chat-modal__bubbles" role="list">
-                    @foreach (var bubble in Model.Bubliny.OrderBy(b => b.Datum))
+                    @* Spec 2026-04-29: intro bublina (HOT_ZAZNAMY.popis) jako první, řazení
+                       reálných bublin DESC podle data. Intro nemá smysluplný datum (DateTime.MinValue)
+                       takže se přirozeně objeví jako poslední v ASC; explicitně ji řadíme první. *@
+                    @foreach (var bubble in Model.Bubliny.OrderByDescending(b => b.IsTicketIntro).ThenBy(b => b.Datum))
                     {
                         var autor = string.IsNullOrWhiteSpace(bubble.Autor) ? bubble.AutorLogin : bubble.Autor;
                         var klassP = string.IsNullOrWhiteSpace(bubble.Predikat) ? string.Empty : $"pm-chat-bubble--{bubble.Predikat.ToLowerInvariant()}";
                         var isAssigned = bubble.NavazanoNaKrokKey.HasValue;
-                        <li class="pm-chat-bubble @klassP @(isAssigned ? "pm-chat-bubble--assigned" : string.Empty)"
+                        var introClass = bubble.IsTicketIntro ? "pm-chat-bubble--intro" : string.Empty;
+                        <li class="pm-chat-bubble @klassP @introClass @(isAssigned ? "pm-chat-bubble--assigned" : string.Empty)"
                             data-bubble
                             data-vyjadreni-id="@bubble.VyjadreniId"
                             data-datum="@bubble.Datum.ToString("o")"
@@ -84,18 +101,34 @@
                             role="listitem"
                             tabindex="0">
                             <div class="pm-chat-bubble__meta">
-                                <span class="pm-chat-bubble__autor">@autor</span>
-                                @if (!string.IsNullOrWhiteSpace(bubble.Tym))
+                                @if (bubble.IsTicketIntro)
                                 {
-                                    <span class="pm-chat-bubble__tym">@bubble.Tym</span>
+                                    <span class="pm-chat-bubble__intro-label">Popis tiketu</span>
+                                    @if (!string.IsNullOrWhiteSpace(autor))
+                                    {
+                                        <span class="pm-chat-bubble__autor">@autor</span>
+                                    }
                                 }
-                                <time class="pm-chat-bubble__datum" datetime="@bubble.Datum.ToString("o")">
-                                    @bubble.Datum.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
-                                </time>
+                                else
+                                {
+                                    <span class="pm-chat-bubble__autor">@autor</span>
+                                    @if (!string.IsNullOrWhiteSpace(bubble.Tym))
+                                    {
+                                        <span class="pm-chat-bubble__tym">@bubble.Tym</span>
+                                    }
+                                    <time class="pm-chat-bubble__datum" datetime="@bubble.Datum.ToString("o")">
+                                        @bubble.Datum.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                    </time>
+                                }
                                 @* Spec 2026-04-29-modal-vyjadreni-dropdown §1, §6 — krok selector
-                                   vpravo nahoře v meta line: badge (pokud assigned) nebo dropdown (pokud ne). *@
+                                   vpravo nahoře v meta line: badge (pokud assigned) nebo dropdown (pokud ne).
+                                   Intro bublina nemá selector / badge. *@
                                 <div class="pm-chat-bubble__krok">
-                                    @if (bubble.AssignedKrokKey.HasValue)
+                                    @if (bubble.IsTicketIntro)
+                                    {
+                                        // No selector for intro
+                                    }
+                                    else if (bubble.AssignedKrokKey.HasValue)
                                     {
                                         <gov-tag color="@bubble.AssignedKrokColor" size="s">
                                             Krok @bubble.AssignedKrokPoradi

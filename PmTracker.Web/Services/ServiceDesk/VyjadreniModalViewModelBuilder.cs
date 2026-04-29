@@ -98,6 +98,9 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
         var tiket = await _ticketing.GetZaznamAsync(eo.Cislo, ct).ConfigureAwait(false);
         vm.TiketStrucne = tiket?.Strucne;
         vm.TiketTyp = tiket?.TypZaznamu;
+        vm.TiketUzivatel = tiket?.Uzivatel;
+        vm.TiketSubsystem = tiket?.Subsystem;
+        vm.TiketModul = tiket?.Modul;
 
         var kroky = await _db.CiselnikHarmonogramTypu.AsNoTracking()
             .Where(t => t.SablonaVerze == zaznam.HarmonogramSablonaVerze && !t.JeZpozdeni)
@@ -138,7 +141,27 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
         var list = await _vyjadreni.GetVyjadreniForTicketAsync(eo.Cislo, sinceUtc: null, ct).ConfigureAwait(false);
         var bindingByHotId = activeBindings.ToDictionary(b => b.HotVyjadreniId);
 
-        var bubliny = new List<BublinaViewModel>(list.Count);
+        var bubliny = new List<BublinaViewModel>(list.Count + 1);
+
+        // Spec 2026-04-29: synthetic „intro" bublina jako první — popis tiketu
+        // (HOT_ZAZNAMY.popis) zobrazený jako úvodní vyjádření. Bez bindingu / dropdownu.
+        if (!string.IsNullOrWhiteSpace(tiket?.Popis))
+        {
+            bubliny.Add(new BublinaViewModel
+            {
+                VyjadreniId = 0L,
+                Datum = DateTime.MinValue,  // intro bublina nemá relevantní datum
+                Autor = tiket.Uzivatel,
+                AutorLogin = tiket.Uzivatel,
+                Popis = tiket.Popis,
+                PopisPlainText = VyjadreniHtmlText.ToPlainText(tiket.Popis),
+                Tym = null,
+                Typ = "intro",
+                Predikat = null,
+                IsTicketIntro = true
+            });
+        }
+
         foreach (var v in list)
         {
             var autor = await _adLoginCache.ResolveDisplayNameAsync(v.Zpracoval, ct).ConfigureAwait(false);
@@ -163,7 +186,8 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
         }
         vm.Bubliny = bubliny;
 
-        if (bubliny.Count == 0)
+        // Reálná vyjádření (mimo synthetic intro) — pokud žádná, ukázat empty message.
+        if (bubliny.All(b => b.IsTicketIntro))
         {
             vm.EmptyMessage = "Žádná vyjádření zatím nejsou dostupná (buď ještě nebyla vytěžena, nebo ServiceDesk je offline).";
         }
@@ -212,6 +236,13 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
 
         foreach (var bubble in vm.Bubliny)
         {
+            // Spec 2026-04-29: intro bublina (HOT_ZAZNAMY.popis jako první) nemá binding
+            // ani dropdown — přeskočit.
+            if (bubble.IsTicketIntro)
+            {
+                continue;
+            }
+
             // Assigned* properties.
             if (bindingByHotVyjadreniId.TryGetValue(bubble.VyjadreniId, out var binding))
             {

@@ -11,6 +11,13 @@ public sealed class VyjadreniModalViewModel
     public string TiketCislo { get; set; } = string.Empty;
     public string? TiketStrucne { get; set; }
     public string? TiketTyp { get; set; }
+
+    /// <summary>HOT_ZAZNAMY.uzivatel — jméno uživatele, který tiket založil. Spec 2026-04-29.</summary>
+    public string? TiketUzivatel { get; set; }
+    /// <summary>HOT_ZAZNAMY.subsystem.</summary>
+    public string? TiketSubsystem { get; set; }
+    /// <summary>HOT_ZAZNAMY.modul.</summary>
+    public string? TiketModul { get; set; }
     public DateTime? LastHarvestedAt { get; set; }
     public bool CanEdit { get; set; }
 
@@ -83,6 +90,13 @@ public sealed class BublinaViewModel
     /// </summary>
     public IReadOnlyList<KrokOptionViewModel> StepOptions { get; set; } =
         Array.Empty<KrokOptionViewModel>();
+
+    /// <summary>
+    /// True pokud je tato bublina synthetic „intro" tiketu (popis z HOT_ZAZNAMY.popis,
+    /// renderuje se jako první v modalu, bez dropdown selektoru / clear button).
+    /// Spec 2026-04-29.
+    /// </summary>
+    public bool IsTicketIntro { get; set; }
 }
 
 public sealed class StepperKrokViewModel
