@@ -14,6 +14,7 @@
 
 import { initStepperSticky } from './stepperSticky.js';
 import { attachBubbleStepSelectors } from './bubbleStepSelector.js';
+import { initStepperOffscreenIndicator } from './stepperOffscreenIndicator.js';
 
 function attach(root) {
     if (!root) return null;
@@ -23,6 +24,10 @@ function attach(root) {
     // Sticky aligned kroky vedle bound bublin (informational dashboard).
     const sticky = initStepperSticky(root);
 
+    // Spec 2026-04-29: indikátor počtu off-screen kroků (↑ N / ↓ N)
+    // se uchytí na okraj místo aby kroky vyjely ven mimo modal.
+    const offscreen = initStepperOffscreenIndicator(root);
+
     // Dropdown handlers + ✕ clear na badge + click-to-scroll na stepper items
     // + paralelní „Odpojit" tlačítko v stepper item content slot.
     attachBubbleStepSelectors(root);
@@ -30,6 +35,7 @@ function attach(root) {
     return {
         destroy: function () {
             if (sticky) sticky.destroy();
+            if (offscreen) offscreen.destroy();
         }
     };
 }

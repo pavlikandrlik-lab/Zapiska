@@ -108,6 +108,30 @@
     min-width: 0;
 }
 
+/* Spec 2026-04-29: off-screen indicator — uchytí se na okraj viewportu modalu
+   když některé bound kroky jsou mimo viditelnou oblast (scroll). */
+.pm-chat-modal__offscreen-indicator {
+    position: sticky;
+    z-index: 8;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: var(--background-primary-subtle, var(--gov-color-primary-bg, #e0f2fe));
+    color: var(--text-primary, var(--gov-color-primary, #0066cc));
+    border: 1px solid var(--border-primary, var(--gov-color-primary, #0066cc));
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: default;
+    user-select: none;
+    width: max-content;
+    margin: 0 auto;
+}
+.pm-chat-modal__offscreen-indicator--top { top: 0; margin-bottom: 0.25rem; }
+.pm-chat-modal__offscreen-indicator--bottom { bottom: 0; margin-top: 0.25rem; }
+.pm-chat-modal__offscreen-indicator[hidden] { display: none; }
+
 /* Spec 2026-04-29-modal-vyjadreni-dropdown §2 — stepper items jsou clickable
    pro scroll-to-bound-bubble. Žádné drag&drop interakce. */
 gov-stepper-item[data-step] {

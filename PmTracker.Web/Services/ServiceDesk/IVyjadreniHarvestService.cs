@@ -57,8 +57,18 @@ public sealed record VyjadreniHarvestResult(
     int Created,
     int Superseded,
     int Skipped,
-    string? Message = null)
+    string? Message = null,
+    bool Throttled = false,
+    int RetryAfterSeconds = 0)
 {
     public static VyjadreniHarvestResult Empty(string? message = null)
         => new(0, 0, 0, 0, message);
+
+    /// <summary>
+    /// Spec 2026-04-29: ReHarvest má cooldown 60s per externí odkaz. Pokud user klikne
+    /// dříve, vrátí se Throttled=true s RetryAfterSeconds. UI zobrazí gov-infobar.
+    /// </summary>
+    public static VyjadreniHarvestResult ThrottledResult(int retryAfterSeconds)
+        => new(0, 0, 0, 0, $"Re-harvest je dostupný jednou za minutu. Zkuste znovu za {retryAfterSeconds} s.",
+            Throttled: true, RetryAfterSeconds: retryAfterSeconds);
 }

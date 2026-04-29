@@ -258,12 +258,32 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             Errors: stats.Errors);
     }
 
+    /// <summary>
+    /// Spec 2026-04-29: ReHarvest cooldown 60s per externí odkaz (in-memory, process-wide).
+    /// User-triggered re-harvest je destruktivní (maže Auto bindings + invaliduje fingerprint),
+    /// proto rate-limit chrání před spamming.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, DateTime> _lastReHarvestUtcByExterniOdkaz = new();
+    private static readonly TimeSpan _reHarvestCooldown = TimeSpan.FromMinutes(1);
+
     public async Task<VyjadreniHarvestResult> ReHarvestTicketAsync(int externiOdkazId, CancellationToken ct = default)
     {
         var eo = await _db.ZaznamExterniOdkazy.FirstOrDefaultAsync(x => x.Id == externiOdkazId, ct).ConfigureAwait(false);
         if (eo is null)
         {
             return VyjadreniHarvestResult.Empty($"Externí odkaz id={externiOdkazId} neexistuje.");
+        }
+
+        // Rate-limit check (60s cooldown).
+        var nowCheck = _time.GetUtcNow().UtcDateTime;
+        if (_lastReHarvestUtcByExterniOdkaz.TryGetValue(externiOdkazId, out var lastReHarvestAt))
+        {
+            var elapsed = nowCheck - lastReHarvestAt;
+            if (elapsed < _reHarvestCooldown)
+            {
+                var retryAfter = (int)Math.Ceiling((_reHarvestCooldown - elapsed).TotalSeconds);
+                return VyjadreniHarvestResult.ThrottledResult(retryAfter);
+            }
         }
 
         var activeAuto = await _db.VyjadreniVazby
@@ -285,6 +305,9 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         eo.LastKnownMaxVyjadreniId = null;
         eo.LastKnownVyjadreniCount = null;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // Spec 2026-04-29: zaznamenáme úspěšný start re-harvest pro cooldown tracking.
+        _lastReHarvestUtcByExterniOdkaz[externiOdkazId] = nowCheck;
 
         return await HarvestTicketAsync(externiOdkazId, ct).ConfigureAwait(false);
     }
