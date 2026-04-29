@@ -58,22 +58,33 @@
 
 .pm-chat-modal__bubbles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 
+/* Bubble karta vyjádření — používá gov design tokens (z core.css) které
+   automaticky přepínají v :root[data-theme=dark] na tmavé varianty.
+   2026-04-29: nahrazeny hardcoded bílá/světlá pozadí za gov tokens, aby
+   bubliny správně reagovaly na dark mode (memory rule: gov tokens > hardcoded). */
 .pm-chat-bubble {
-    border: 1px solid var(--gov-color-neutral-border, #d0d5dd);
+    border: 1px solid var(--border-subtle, var(--gov-color-neutral-border, #d0d5dd));
     border-radius: 0.5rem;
     padding: 0.5rem 0.75rem;
-    background: #fff;
+    background: var(--background-neutral-white, #fff);
+    color: var(--text-primary, inherit);
     transition: outline-color 0.15s, outline-width 0.15s;
 }
 .pm-chat-bubble--assigned { opacity: 0.85; }
 
 .pm-chat-bubble__meta {
     display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-    font-size: 0.8rem; color: var(--gov-color-text-secondary, #475467); margin-bottom: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary, var(--gov-color-text-secondary, #475467));
+    margin-bottom: 0.25rem;
 }
 .pm-chat-bubble__autor { font-weight: 600; }
-.pm-chat-bubble__tym { padding: 0.1rem 0.35rem; background: var(--gov-color-neutral-bg, #f2f4f7); border-radius: 0.2rem; font-size: 0.7rem; }
-.pm-chat-bubble__pinned { margin-left: auto; padding: 0.1rem 0.35rem; background: #DBEAFE; border-radius: 0.2rem; color: #1e40af; }
+.pm-chat-bubble__tym {
+    padding: 0.1rem 0.35rem;
+    background: var(--background-neutral-subtle, var(--gov-color-neutral-bg, #f2f4f7));
+    border-radius: 0.2rem;
+    font-size: 0.7rem;
+}
 .pm-chat-bubble__popis { font-size: 0.9rem; line-height: 1.4; }
 
 /* Stepper column — kroky aligned na bound bubliny přes JS-driven inline style */
