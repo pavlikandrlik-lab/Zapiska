@@ -64,7 +64,7 @@ internal sealed record RecordAuditSnapshot(
 
 internal sealed record RecordScheduleValueAuditSnapshot(
     int TypId,
-    int HodnotaInt,
+    int? HodnotaInt,  // DESIGN-10-A: nullable napříč auditem (NULL = krok nenastal)
     DateTime UpdatedAt);
 
 internal sealed record RecordScheduleAuditSnapshot(

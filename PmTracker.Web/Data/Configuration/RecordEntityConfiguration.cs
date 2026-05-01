@@ -299,7 +299,8 @@ internal sealed class RecordScheduleValueEntityConfiguration : IEntityTypeConfig
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.ZaznamId).HasColumnName("zaznam_id");
         builder.Property(x => x.TypId).HasColumnName("typ_id");
-        builder.Property(x => x.HodnotaInt).HasColumnName("hodnota_int");
+        // DESIGN-10-A (2026-05-01): nullable. NULL = "krok ještě nenastal".
+        builder.Property(x => x.HodnotaInt).HasColumnName("hodnota_int").IsRequired(false);
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         // Plán 4 Feature C Task 1 — audit zdroje skutečnosti + switch Auto/Ručně + preferred kandidát.
         // Sloupce přidává db_upgrade_1_3_10_harmonogram_skutecnost_zdroj.sql.

@@ -482,12 +482,13 @@ public sealed partial class RecordProposalService
             .Where(x => plannedTypeIds.Contains(x.TypId))
             .GroupBy(x => x.TypId)
             .ToDictionary(g => g.Key, g => Math.Max(0, g.Last().Hodnota));
+        // DESIGN-10-A (2026-05-01): DURATION řádky mohou mít NULL → fallback na 0 v dict (= žádné trvání).
         var existingDurations = _dbContext.ZaznamHarmonogramHodnoty
             .AsNoTracking()
             .Where(x => plannedTypeIds.Contains(x.TypId))
             .Select(x => new { x.TypId, x.HodnotaInt })
             .ToList()
-            .ToDictionary(x => x.TypId, x => x.HodnotaInt);
+            .ToDictionary(x => x.TypId, x => x.HodnotaInt ?? 0);
         foreach (var kv in submittedByType)
         {
             existingDurations[kv.Key] = kv.Value;

@@ -1358,14 +1358,17 @@ public sealed partial class RecordService
                     ? Math.Max(0, group.Last().Hodnota)
                     : group.Last().Hodnota);
 
+        // DESIGN-10-A (2026-05-01): NULL DELAY = "krok nenastal" → vyfiltrovat (klíč chybí v dict).
+        // NULL DURATION → fallback 0 v dict.
         var existingByType = (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
                 .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId))
                 .ToListAsync(ct))
+            .Where(x => durationTypeSet.Contains(x.TypId) || x.HodnotaInt.HasValue)
             .ToDictionary(
                 x => x.TypId,
                 x => durationTypeSet.Contains(x.TypId)
-                    ? Math.Max(0, x.HodnotaInt)
-                    : x.HodnotaInt);
+                    ? Math.Max(0, x.HodnotaInt ?? 0)
+                    : x.HodnotaInt!.Value);
 
         var desired = new Dictionary<int, int>();
 
@@ -1450,10 +1453,12 @@ public sealed partial class RecordService
                 .ToList();
         }
 
+        // DESIGN-10-A (2026-05-01): NULL HodnotaInt → vyfiltrovat z dict (caller interpretuje
+        // missing klíč jako "krok nenastal").
         var existingByType = (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-                .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId))
+                .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId) && x.HodnotaInt.HasValue)
                 .ToListAsync(ct))
-            .ToDictionary(x => x.TypId, x => x.HodnotaInt);
+            .ToDictionary(x => x.TypId, x => x.HodnotaInt!.Value);
         var submittedByType = submittedValues
             .Where(x => allowedTypeIds.Contains(x.TypId))
             .GroupBy(x => x.TypId)
@@ -1623,10 +1628,13 @@ public sealed partial class RecordService
             return [];
         }
 
-        return await dbContext.ZaznamHarmonogramHodnoty
+        // DESIGN-10-A: DURATION row s NULL HodnotaInt → fallback 0 (žádné trvání).
+        var rawList = await dbContext.ZaznamHarmonogramHodnoty
             .AsNoTracking()
             .Where(x => x.ZaznamId == recordId && durationTypeIds.Contains(x.TypId))
-            .ToDictionaryAsync(x => x.TypId, x => x.HodnotaInt, ct);
+            .Select(x => new { x.TypId, x.HodnotaInt })
+            .ToListAsync(ct);
+        return rawList.ToDictionary(x => x.TypId, x => x.HodnotaInt ?? 0);
     }
 
     private static bool ScheduleValueMapsEqual(

@@ -130,7 +130,11 @@ public sealed partial class ProjectService
                 .Where(x => x.ZaznamId == record.Id && allowedTypeIds.Contains(x.TypId))
                 .ToListAsync(ct)
             : new List<PmTracker.Web.Models.Entities.ZaznamHarmonogramHodnotaEntity>();
-        var harmonogramValues = harmonogramRows.ToDictionary(x => x.TypId, x => x.HodnotaInt);
+        // DESIGN-10-A (2026-05-01): NULL HodnotaInt → vyfiltrovat (calc interpretuje missing klíč
+        // jako "krok nenastal", offset = 0).
+        var harmonogramValues = harmonogramRows
+            .Where(x => x.HodnotaInt.HasValue)
+            .ToDictionary(x => x.TypId, x => x.HodnotaInt!.Value);
         var harmonogramRowsByTypId = harmonogramRows.ToDictionary(x => x.TypId);
         var harmonogramKroky = harmonogramService.BuildHarmonogramVypocetPublic(record.DatumZalozeni, harmonogramTypy, harmonogramValues);
         var harmonogramSouhrn = harmonogramService.BuildHarmonogramSouhrn(harmonogramKroky, record.DatumUkonceni);

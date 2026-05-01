@@ -268,9 +268,12 @@ public sealed partial class RecordProposalService
             return [];
         }
 
+        // DESIGN-10-A (2026-05-01): NULL HodnotaInt = "krok nenastal" → vyfiltrovat z dictionary,
+        // klíč chybí = caller (TimelineCalculator) interpretuje jako missing → offset = 0.
         return (await _dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-                .Where(x => x.ZaznamId == recordId && allowedTypeIds.Contains(x.TypId))
+                .Where(x => x.ZaznamId == recordId && allowedTypeIds.Contains(x.TypId) && x.HodnotaInt.HasValue)
+                .Select(x => new { x.TypId, Hodnota = x.HodnotaInt!.Value })
                 .ToListAsync(ct))
-            .ToDictionary(x => x.TypId, x => x.HodnotaInt);
+            .ToDictionary(x => x.TypId, x => x.Hodnota);
     }
 }

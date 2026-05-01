@@ -376,7 +376,17 @@ public sealed class ZaznamHarmonogramHodnotaEntity
     public int Id { get; set; }
     public int ZaznamId { get; set; }
     public int TypId { get; set; }
-    public int HodnotaInt { get; set; }
+
+    /// <summary>
+    /// Plán Harmonogram refactor 2026-05-01 (DESIGN-10-A) — nullable.
+    /// Sémantika napříč vrstvami:
+    ///   NULL    = "krok ještě nenastal / nebyl vyplněn" (default insert state, retract po sync)
+    ///   0       = "vše šlo dle plánu" (krok dokončen včas, legitimní hodnota)
+    ///   non-0   = OdchylkaDni (kladné = zpoždění, záporné = předstih)
+    /// Pro DURATION řádky (JeZpozdeni=false) zůstává sémantika: NULL → fallback na default duration ze schématu.
+    /// </summary>
+    public int? HodnotaInt { get; set; }
+
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
