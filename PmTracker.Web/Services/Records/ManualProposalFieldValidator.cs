@@ -55,6 +55,36 @@ public static class ManualProposalFieldValidator
     /// - <c>HotVyjadreniId</c> musí být kladné.
     /// - Jeden krok = max jedna bublina (žádné duplikáty KrokKey).
     /// </summary>
+    /// <summary>
+    /// Phase 6 (DESIGN-5-A + 7-A, 2026-05-01) — odmítne payload obsahující DELAY hodnoty
+    /// pro auto-fillované kroky. Auto kroky (1/3/4 PMP, 1/6/7/10 PNF) se plní automaticky
+    /// ze SD vyjádření a nelze je ani upravit napřímo, ani navrhnout úpravu.
+    /// Vynucuje invariant: Auto rezim ↔ návrh = mutuálně výlučné stavy.
+    ///
+    /// Submit + Approve obě volají tento validátor (defense-in-depth).
+    /// </summary>
+    /// <param name="actualHodnoty">payload.ActualHarmonogramHodnoty navrhovaného harmonogramu.</param>
+    /// <param name="autoFilledDelayTypIds">Set TypId DELAY řádků auto-fillovaných pro typ záznamu.</param>
+    public static void ValidateAutoStepNotInProposal(
+        IReadOnlyList<SaveRecordHarmonogramValueCommand> actualHodnoty,
+        IReadOnlySet<int> autoFilledDelayTypIds)
+    {
+        if (actualHodnoty.Count == 0 || autoFilledDelayTypIds.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var item in actualHodnoty)
+        {
+            if (autoFilledDelayTypIds.Contains(item.TypId))
+            {
+                throw new InvalidOperationException(
+                    $"Krok pro TypId {item.TypId} je v Auto rezimu — návrh úpravy skutečnosti není možný. " +
+                    "Použij přímou editaci s ToggleRezim=Manual mimo návrhový workflow, nebo edituj jen manuální kroky 2/5/8/9.");
+            }
+        }
+    }
+
     public static void ValidateHarmonogramVazby(IReadOnlyList<HarmonogramVazbaDto> vazby, int externiVazbyCount)
     {
         if (vazby.Count == 0)

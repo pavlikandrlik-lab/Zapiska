@@ -91,6 +91,11 @@ public sealed partial class RecordProposalService
             throw new InvalidOperationException(pendingLock.Message ?? "Pro tento záznam už existuje čekající návrh změny harmonogramu.");
         }
 
+        // Phase 6 (DESIGN-5-A + 7-A, 2026-05-01): odmítnout auto-fillované DELAY kroky.
+        // Auto rezim ↔ návrh = mutuálně výlučné stavy. Návrh smí obsahovat jen DURATION
+        // (planned) změny + manuální DELAY pro kroky 2/5/8/9.
+        await ValidateAutoStepsNotInScheduleProposalAsync(command, record, ct);
+
         var scheduleTypeDefinitions = await ResolveScheduleTypeDefinitionsAsync(record, ct);
         var existingScheduleValues = await LoadExistingScheduleValuesAsync(record.Id, scheduleTypeDefinitions, ct);
         var plannedTypeIds = scheduleTypeDefinitions
@@ -275,5 +280,35 @@ public sealed partial class RecordProposalService
                 .Select(x => new { x.TypId, Hodnota = x.HodnotaInt!.Value })
                 .ToListAsync(ct))
             .ToDictionary(x => x.TypId, x => x.Hodnota);
+    }
+
+    /// <summary>
+    /// Phase 6 (DESIGN-5-A + 7-A, 2026-05-01) — odmítne návrh obsahující DELAY hodnoty pro
+    /// auto-fillované kroky (= NENÍ v <see cref="HarmonogramManualSteps.KrokPoradi"/>).
+    ///
+    /// Konzervativní invariant: krok je auto-fillovatelný v některém typu PMP/PNF, takže
+    /// jeho DELAY nemůže být v návrhu. Manuální 2/5/8/9 jsou bezpečné.
+    /// </summary>
+    private async Task ValidateAutoStepsNotInScheduleProposalAsync(
+        SaveRecordCommand command,
+        ProjektovyZaznamEntity record,
+        CancellationToken ct)
+    {
+        if (command.HarmonogramHodnoty.Count == 0) return;
+
+        // Schema: TypId → KrokPoradi map pro DELAY řádky aktivního schématu.
+        var delayPoradiByTypId = await _dbContext.CiselnikHarmonogramTypu.AsNoTracking()
+            .Where(t => t.SablonaVerze == record.HarmonogramSablonaVerze && t.JeZpozdeni)
+            .Select(t => new { t.Id, t.KrokPoradi })
+            .ToDictionaryAsync(x => x.Id, x => x.KrokPoradi, ct);
+
+        // Auto-fillovatelné DelayTypIds = poradi NENÍ v {2, 5, 8, 9}.
+        var autoFilledDelayTypIds = delayPoradiByTypId
+            .Where(kv => !HarmonogramManualSteps.IsManual(kv.Value))
+            .Select(kv => kv.Key)
+            .ToHashSet();
+
+        ManualProposalFieldValidator.ValidateAutoStepNotInProposal(
+            command.HarmonogramHodnoty, autoFilledDelayTypIds);
     }
 }
