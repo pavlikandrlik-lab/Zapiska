@@ -176,4 +176,36 @@ public sealed class HarmonogramPhantomUiFixesTests
         var path = Path.Combine(LocateRepoRoot(), "db_upgrade_1_3_14_delay_nullable.sql");
         File.Exists(path).Should().BeTrue("Phase 1.5 migrace pro DESIGN-10-A.");
     }
+
+    [Fact]
+    public void ScheduleComposition_FiltrujeNullHodnotaInt_PredCastem()
+    {
+        // FIX 2026-05-01 (round 5 #2): cast Dictionary<int, int?> → IReadOnlyDictionary<int, int>
+        // by selhal runtime InvalidCastException (kovariance generik nepodporuje).
+        // Po DESIGN-10-A (Phase 1.5) je HodnotaInt nullable, takže ToDictionary value type
+        // se musí filtrovat (.Where(.HasValue)) + použít !.Value PŘED castem.
+        var src = Read("PmTracker.Web/Services/ProjectService.ScheduleComposition.cs");
+        src.Should().Contain("HodnotaInt.HasValue",
+            "ScheduleComposition musí filtrovat NULL HodnotaInt před castem na non-nullable IReadOnlyDictionary<int,int>.");
+        src.Should().NotMatchRegex(@"item\s*=>\s*item\.HodnotaInt\s*\)\s*\)",
+            "Bare `item => item.HodnotaInt` jako ToDictionary value bez .HasValue filtru způsobí runtime InvalidCastException.");
+    }
+
+    [Fact]
+    public void HarmonogramController_SelectCandidate_RespektujePendingLock()
+    {
+        // FIX 2026-05-01 (round 5 #1): SelectCandidate musí volat IPendingScheduleProposalLockEvaluator
+        // shodně s ToggleRezim. Auto-fill change během pending návrhu = bypass invariantu.
+        var src = Read("PmTracker.Web/Controllers/HarmonogramController.cs");
+        // Najdeme úsek SelectCandidate (od metody do konce před PreviewSyncRequest record)
+        var selectStart = src.IndexOf("public async Task<IActionResult> SelectCandidate", StringComparison.Ordinal);
+        var selectEnd = src.IndexOf("public sealed record PreviewSyncRequest", StringComparison.Ordinal);
+        selectStart.Should().BeGreaterThan(0, "metoda SelectCandidate musí existovat.");
+        selectEnd.Should().BeGreaterThan(selectStart);
+        var section = src[selectStart..selectEnd];
+        section.Should().Contain("_pendingLockEvaluator.EvaluateAsync",
+            "round 5 #1 — SelectCandidate musí provolat pending lock evaluator pro audit-aware blocking.");
+        section.Should().Contain("LockedManualKrokKeys",
+            "round 5 #1 — kontrola krok keys v locked set.");
+    }
 }

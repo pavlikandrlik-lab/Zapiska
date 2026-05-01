@@ -292,6 +292,27 @@ public sealed class HarmonogramController : Controller
             return Forbid();
         }
 
+        // FIX 2026-05-01 (round 5 #1): pending lock pre-check pro SelectCandidate.
+        // SelectCandidate změní PreferredExterniOdkazId + spustí SyncZaznamAsync, který přepíše
+        // HodnotaInt v DB. Pokud existuje pending návrh na schedule pro tento krok, výběr by
+        // byl skrytý bypass návrhu (user změní auto-fill data, která jsou v návrhu zamčená).
+        // Pending = univerzální guard — žádná auto-fill změna během pending návrhu.
+        var lockState = await _pendingLockEvaluator.EvaluateAsync(row.ZaznamId, ct).ConfigureAwait(false);
+        if (lockState.HasPendingProposal && lockState.LockedManualKrokKeys is not null)
+        {
+            var krokKey = await _db.CiselnikHarmonogramTypu.AsNoTracking()
+                .Where(t => t.Id == row.TypId)
+                .Select(t => (Guid?)t.KrokKey)
+                .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (krokKey.HasValue && lockState.LockedManualKrokKeys.Contains(krokKey.Value))
+            {
+                return BadRequest(new
+                {
+                    error = $"Pending návrh #{lockState.ProposalId} blokuje výběr kandidáta pro tento krok. Vyřeš návrh nejdříve."
+                });
+            }
+        }
+
         if (row.SkutecnostRezim == SkutecnostRezimEnum.Manual)
         {
             return BadRequest(new { error = "Řádek je v režimu Manual — preferred kandidát nemá efekt." });

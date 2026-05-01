@@ -21,11 +21,17 @@ public sealed partial class ProjectService
         var harmonogramRows = await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
             .Where(x => taskRecordIds.Contains(x.ZaznamId))
             .ToListAsync(ct);
+        // DESIGN-10-A (2026-05-01): HodnotaInt je nullable po Phase 1.5. NULL = "krok nenastal"
+        // → vyfiltrovat z mapy. BuildHarmonogramVypocetPublic očekává non-nullable IReadOnlyDictionary<int, int>.
+        // Bez .Where(.HasValue) by cast Dictionary<int,int?> → IReadOnlyDictionary<int,int> hodil
+        // runtime InvalidCastException (kovariance generik nepodporuje).
         var harmonogramByRecord = harmonogramRows
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(
                 group => group.Key,
-                group => (IReadOnlyDictionary<int, int>)group.ToDictionary(item => item.TypId, item => item.HodnotaInt));
+                group => (IReadOnlyDictionary<int, int>)group
+                    .Where(item => item.HodnotaInt.HasValue)
+                    .ToDictionary(item => item.TypId, item => item.HodnotaInt!.Value));
         var schemaCache = new Dictionary<int, HarmonogramSchemaDefinition>();
         var ownerIds = taskRecords.Select(x => x.AktualniVlastnikId).Distinct().ToList();
         var ownerRows = await dbContext.Osoby.AsNoTracking()

@@ -253,4 +253,54 @@ public sealed class HarmonogramControllerTests
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
+
+    [Fact]
+    public async Task SelectCandidate_PendingProposal_LockedKrok_Vraci_BadRequest()
+    {
+        // FIX 2026-05-01 (round 5 #1): SelectCandidate musí respektovat pending lock state
+        // shodně s ToggleRezim. Auto-fill changes během pending návrhu = bypass invariantu.
+        await using var db = await SeedAsync();
+
+        var sync = new Mock<IHarmonogramSkutecnostSyncService>();
+        sync.Setup(s => s.SyncZaznamAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int zid, CancellationToken _) => new HarmonogramSyncResult(zid, 0, 0, 0, 0));
+
+        var authz = new Mock<IPmAuthorizationService>();
+        authz.Setup(a => a.HasPermissionAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var currentUser = new Mock<ICurrentUserAccessor>();
+        currentUser.SetupGet(c => c.OsobaId).Returns(1);
+
+        var audit = new Mock<IAuditWriteService>();
+        audit.Setup(a => a.WriteAsync(It.IsAny<int?>(), It.IsAny<AuditWriteEntry>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Pending lock with K3Key locked → SelectCandidate na K3 row musí selhat.
+        var pendingLock = new Mock<PmTracker.Web.Services.Records.IPendingScheduleProposalLockEvaluator>();
+        pendingLock.Setup(p => p.EvaluateAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PmTracker.Web.Services.Records.PendingScheduleProposalLockState(
+                HasPendingProposal: true,
+                ProposalId: 999,
+                Message: "test",
+                LocksTermDeadline: false,
+                LocksSchedule: true,
+                LockedManualKrokKeys: new HashSet<Guid> { K3Key }));
+
+        var ctrl = new HarmonogramController(
+            db, sync.Object, authz.Object, currentUser.Object, TimeProvider.System,
+            audit.Object, NullLogger<HarmonogramController>.Instance, pendingLock.Object);
+        ctrl.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var result = await ctrl.SelectCandidate(
+            new HarmonogramController.SelectCandidateRequest(HodnotaId: 1, ExterniOdkazId: 500),
+            CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        // PreferredExterniOdkazId nesmí být změněno
+        var row = await db.ZaznamHarmonogramHodnoty.AsNoTracking().SingleAsync(h => h.Id == 1);
+        row.PreferredExterniOdkazId.Should().BeNull();
+        // Sync NEMÁ být spuštěn
+        sync.Verify(s => s.SyncZaznamAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }
