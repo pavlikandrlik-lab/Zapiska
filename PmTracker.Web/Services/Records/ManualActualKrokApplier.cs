@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using PmTracker.Web.Data;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
 
@@ -8,7 +10,8 @@ namespace PmTracker.Web.Services.Records;
 /// (<see cref="ManualActualKrokDto.AbsolutniDatum"/>) na odchylku v kalendářních
 /// dnech vůči plánovanému konci kroku (<see cref="HarmonogramVypocetKroku.BaselineDatum"/>).
 /// Uložení výsledku do <c>HS0X_DELAY.HodnotaInt</c> je v zodpovědnosti volajícího
-/// (approve command v <c>RecordProposalService.DecisionCommands</c>).
+/// (approve command v <c>RecordProposalService.DecisionCommands</c> nebo
+/// direct save v <c>RecordService.SaveRecord</c> po Phase 4 / DESIGN-6-A).
 /// </summary>
 public static class ManualActualKrokApplier
 {
@@ -100,5 +103,82 @@ public static class ManualActualKrokApplier
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// DESIGN-6-B (2026-05-01) — public method sdílená mezi approve flow
+    /// (<c>RecordProposalService.DecisionCommands.ApproveProposalAsync</c>) a direct save flow
+    /// (<c>RecordService.SaveRecord</c>, Phase 4 DESIGN-6-A).
+    ///
+    /// Resolves: schema KrokKey↔KrokPoradi a KrokKey↔DelayTypId, načte effective DURATION values
+    /// (existing rows + submitted overrides), spočítá baseline timeline, pak deleguje na pure
+    /// <see cref="Compute"/>. Žádný DB write — caller persistuje výsledek (UPSERT do
+    /// <c>zaznam_harmonogram_hodnoty</c>).
+    /// </summary>
+    public static async Task<IReadOnlyList<ManualActualKrokApplied>> ApplyAsync(
+        IReadOnlyList<ManualActualKrokDto> manualKroky,
+        HarmonogramSchemaDefinition schema,
+        DateTime datumZalozeni,
+        IReadOnlySet<int> plannedTypeIds,
+        IReadOnlyList<SaveRecordHarmonogramValueCommand> submittedValues,
+        PmTrackerDbContext dbContext,
+        IHarmonogramService harmonogramService,
+        CancellationToken ct)
+    {
+        if (manualKroky.Count == 0)
+        {
+            return Array.Empty<ManualActualKrokApplied>();
+        }
+
+        var krokKeyMeta = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
+            .Where(x => x.SablonaVerze == schema.Verze)
+            .Select(x => new { x.KrokKey, x.KrokPoradi, x.JeZpozdeni, x.Id })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var krokKeyToPoradi = krokKeyMeta
+            .GroupBy(x => x.KrokKey)
+            .ToDictionary(g => g.Key, g => g.First().KrokPoradi);
+        var delayTypIdByKrokKey = krokKeyMeta
+            .Where(x => x.JeZpozdeni)
+            .GroupBy(x => x.KrokKey)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+
+        // Fallback: pokud delay řádek má jiný KrokKey než duration (legacy data), spáruj přes KrokPoradi
+        var delayByPoradi = krokKeyMeta
+            .Where(x => x.JeZpozdeni)
+            .GroupBy(x => x.KrokPoradi)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+        foreach (var mk in manualKroky)
+        {
+            if (delayTypIdByKrokKey.ContainsKey(mk.KrokKey)) continue;
+            if (!krokKeyToPoradi.TryGetValue(mk.KrokKey, out var poradi)) continue;
+            if (delayByPoradi.TryGetValue(poradi, out var fallbackDelayId))
+            {
+                delayTypIdByKrokKey[mk.KrokKey] = fallbackDelayId;
+            }
+        }
+
+        // Sestavit efektivní hodnoty trvání pro timeline: výchozí schéma + submitted override
+        var submittedByType = submittedValues
+            .Where(x => plannedTypeIds.Contains(x.TypId))
+            .GroupBy(x => x.TypId)
+            .ToDictionary(g => g.Key, g => Math.Max(0, g.Last().Hodnota));
+        // DESIGN-10-A: NULL DURATION → fallback 0 v dict.
+        var existingDurations = (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
+            .Where(x => plannedTypeIds.Contains(x.TypId))
+            .Select(x => new { x.TypId, x.HodnotaInt })
+            .ToListAsync(ct).ConfigureAwait(false))
+            .ToDictionary(x => x.TypId, x => x.HodnotaInt ?? 0);
+        foreach (var kv in submittedByType)
+        {
+            existingDurations[kv.Key] = kv.Value;
+        }
+
+        var vypocet = harmonogramService.BuildHarmonogramVypocetPublic(
+            datumZalozeni,
+            schema.Kroky,
+            existingDurations);
+
+        return Compute(manualKroky, vypocet, krokKeyToPoradi, delayTypIdByKrokKey);
     }
 }

@@ -256,12 +256,13 @@ public sealed partial class RecordProposalService
         // změn trvání (submittedValues), takže ruční datum z návrhu ctí posun plánu.
         if (schedulePayload.ManualActualKroky.Count > 0)
         {
-            var manualOverrides = ComputeManualActualOverrides(
+            var manualOverrides = await ComputeManualActualOverridesAsync(
                 schedulePayload.ManualActualKroky,
                 schema,
                 record.DatumZalozeni,
                 plannedTypeIds,
-                submittedValues);
+                submittedValues,
+                ct);
             foreach (var ov in manualOverrides)
             {
                 // Přepiš přípravnou hodnotu (schedulePayload.ActualHarmonogramHodnoty) tím,
@@ -391,12 +392,13 @@ public sealed partial class RecordProposalService
                 .Where(x => x > 0)
                 .ToHashSet();
 
-            var overrides = ComputeManualActualOverrides(
+            var overrides = await ComputeManualActualOverridesAsync(
                 createPayload.ManualActualKroky,
                 schema,
                 record.DatumZalozeni,
                 plannedTypeIds,
-                Array.Empty<SaveRecordHarmonogramValueCommand>());
+                Array.Empty<SaveRecordHarmonogramValueCommand>(),
+                ct);
 
             var existingByTypId = await _dbContext.ZaznamHarmonogramHodnoty
                 .Where(x => x.ZaznamId == newRecordId && overrides.Select(o => o.DelayTypId).Contains(x.TypId))
@@ -436,73 +438,20 @@ public sealed partial class RecordProposalService
     /// trvání (<paramref name="submittedValues"/>), takže ruční datum respektuje plán
     /// PO schválení návrhu.
     /// </summary>
-    private IReadOnlyList<ManualActualKrokApplier.ManualActualKrokApplied> ComputeManualActualOverrides(
+    /// <summary>
+    /// DESIGN-6-B (2026-05-01) — delegace na shared <see cref="ManualActualKrokApplier.ApplyAsync"/>.
+    /// Zachovaná wrapper pro existing call sites uvnitř DecisionCommands.
+    /// </summary>
+    private async Task<IReadOnlyList<ManualActualKrokApplier.ManualActualKrokApplied>> ComputeManualActualOverridesAsync(
         IReadOnlyList<ManualActualKrokDto> manualKroky,
         HarmonogramSchemaDefinition schema,
         DateTime datumZalozeni,
         IReadOnlySet<int> plannedTypeIds,
-        IReadOnlyList<SaveRecordHarmonogramValueCommand> submittedValues)
+        IReadOnlyList<SaveRecordHarmonogramValueCommand> submittedValues,
+        CancellationToken ct)
     {
-        if (manualKroky.Count == 0)
-        {
-            return Array.Empty<ManualActualKrokApplier.ManualActualKrokApplied>();
-        }
-
-        var krokKeyMeta = _dbContext.CiselnikHarmonogramTypu
-            .AsNoTracking()
-            .Where(x => x.SablonaVerze == schema.Verze)
-            .Select(x => new { x.KrokKey, x.KrokPoradi, x.JeZpozdeni, x.Id })
-            .ToList();
-
-        var krokKeyToPoradi = krokKeyMeta
-            .GroupBy(x => x.KrokKey)
-            .ToDictionary(g => g.Key, g => g.First().KrokPoradi);
-        var delayTypIdByKrokKey = krokKeyMeta
-            .Where(x => x.JeZpozdeni)
-            .GroupBy(x => x.KrokKey)
-            .ToDictionary(g => g.Key, g => g.First().Id);
-
-        // Fallback: pokud delay řádek má jiný KrokKey než duration (legacy data), spáruj přes KrokPoradi
-        var delayByPoradi = krokKeyMeta
-            .Where(x => x.JeZpozdeni)
-            .GroupBy(x => x.KrokPoradi)
-            .ToDictionary(g => g.Key, g => g.First().Id);
-        foreach (var mk in manualKroky)
-        {
-            if (delayTypIdByKrokKey.ContainsKey(mk.KrokKey)) continue;
-            if (!krokKeyToPoradi.TryGetValue(mk.KrokKey, out var poradi)) continue;
-            if (delayByPoradi.TryGetValue(poradi, out var fallbackDelayId))
-            {
-                delayTypIdByKrokKey[mk.KrokKey] = fallbackDelayId;
-            }
-        }
-
-        // Sestavit efektivní hodnoty trvání pro timeline: výchozí schéma + submitted override
-        var submittedByType = submittedValues
-            .Where(x => plannedTypeIds.Contains(x.TypId))
-            .GroupBy(x => x.TypId)
-            .ToDictionary(g => g.Key, g => Math.Max(0, g.Last().Hodnota));
-        // DESIGN-10-A (2026-05-01): DURATION řádky mohou mít NULL → fallback na 0 v dict (= žádné trvání).
-        var existingDurations = _dbContext.ZaznamHarmonogramHodnoty
-            .AsNoTracking()
-            .Where(x => plannedTypeIds.Contains(x.TypId))
-            .Select(x => new { x.TypId, x.HodnotaInt })
-            .ToList()
-            .ToDictionary(x => x.TypId, x => x.HodnotaInt ?? 0);
-        foreach (var kv in submittedByType)
-        {
-            existingDurations[kv.Key] = kv.Value;
-        }
-
-        var vypocet = _harmonogramService.BuildHarmonogramVypocetPublic(
-            datumZalozeni,
-            schema.Kroky,
-            existingDurations);
-
-        return ManualActualKrokApplier.Compute(
-            manualKroky,
-            vypocet,
-            krokKeyToPoradi,
-            delayTypIdByKrokKey);
+        return await ManualActualKrokApplier.ApplyAsync(
+            manualKroky, schema, datumZalozeni, plannedTypeIds, submittedValues,
+            _dbContext, _harmonogramService, ct).ConfigureAwait(false);
     }
 }
