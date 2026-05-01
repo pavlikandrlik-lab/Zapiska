@@ -15,15 +15,17 @@
  * - prepareRecordEditorFormNavigation
  * - maybeRestoreRecordEditorDraft
  * - initRecordEditorDirtyTracking (init per form)
- * - requestRecordEditorModalClose / requestRecordEditorPageCancel
+ * - requestRecordEditorPageCancel
+ * - recordEditorState (close-guard tracking)
  */
 
-import { getActiveModalContainer } from "../modals.js";
-import { closeModal } from "../modals.js";
 import { setRecordEditorRichTextValue } from "./richtext.js";
-import { recordEditorState } from "./navigation.js";
 
-const modalRoot = document.getElementById("modal-root");
+export const recordEditorState = {
+    closeGuard: null,
+    closeGuardTrigger: null
+};
+
 const recordEditorDraftStoragePrefix = "pmtracker.recordEditor.draft.";
 const recordEditorDraftTtlMs = 12 * 60 * 60 * 1000;
 
@@ -444,15 +446,14 @@ export function promptRecordEditorDiscard(form, trigger) {
     closeRecordEditorCloseGuard({ restoreFocus: false });
 
     return new Promise((resolve) => {
-        const isModalForm = modalRoot instanceof HTMLElement && modalRoot.contains(form);
-        const host = isModalForm ? getActiveModalContainer() : document.body;
+        const host = document.body;
         if (!(host instanceof HTMLElement)) {
             resolve(window.confirm("Máte neuložené změny. Chcete je zahodit?"));
             return;
         }
 
         const overlay = document.createElement("div");
-        overlay.className = `record-editor-close-guard${isModalForm ? " record-editor-close-guard-modal" : ""}`;
+        overlay.className = "record-editor-close-guard";
         overlay.setAttribute("data-record-editor-close-guard", "true");
 
         const dialog = document.createElement("div");
@@ -516,21 +517,8 @@ export function promptRecordEditorDiscard(form, trigger) {
     });
 }
 
-export async function requestRecordEditorModalClose(trigger) {
-    const editorForm = modalRoot?.querySelector('form[data-record-editor-form="true"]');
-    if (!(editorForm instanceof HTMLFormElement)) {
-        closeModal();
-        return;
-    }
-
-    const canClose = await promptRecordEditorDiscard(editorForm, trigger);
-    if (canClose) {
-        closeModal();
-    }
-}
-
 export async function requestRecordEditorPageCancel(trigger) {
-    const editorForm = document.querySelector('form[data-record-editor-form="true"][data-record-editor-presentation="page"]');
+    const editorForm = document.querySelector('form[data-record-editor-form="true"]');
     if (!(editorForm instanceof HTMLFormElement)) {
         const fallbackUrl = trigger instanceof HTMLElement
             ? trigger.getAttribute("data-record-editor-back-url") || window.location.href

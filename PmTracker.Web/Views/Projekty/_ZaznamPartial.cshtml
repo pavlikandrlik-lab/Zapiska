@@ -63,36 +63,28 @@
                    data-print-pdf-url="@taskPrintPdfUrl"
                    data-print-word-url="@taskPrintWordUrl"
                    data-print-label="Tisk záznamu #@summary.CisloViditelne">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                        <rect x="6" y="14" width="12" height="8"></rect>
-                    </svg>
+                    <gov-icon size="s" name="printer" type="components" aria-hidden="true"></gov-icon>
                 </a>
                 @if (summary.CanEditRecord || summary.CanManageSchedule)
                 {
                     <pm-button variant="Secondary"
                                size="Small"
-                               data-record-editor-url="@editRecordUrl"
-                               data-record-editor-project-id="@projektId"
-                               data-record-editor-label="@($"{summary.EditButtonLabel} záznam #{summary.CisloViditelne}")"
+                               href="@editRecordUrl"
                                data-stop-propagation="true"
                                aria-label="@summary.EditButtonLabel"
                                title="@summary.EditButtonLabel">
-                        <gov-icon name="pencil" type="components" aria-hidden="true"></gov-icon>
+                        <gov-icon size="s" name="pencil" type="components" aria-hidden="true"></gov-icon>
                     </pm-button>
                 }
                 @if (summary.CanCreateScheduleProposal && !string.IsNullOrWhiteSpace(summary.ScheduleProposalUrl))
                 {
                     <pm-button variant="Secondary"
                                size="Small"
-                               data-record-editor-url="@summary.ScheduleProposalUrl"
-                               data-record-editor-project-id="@projektId"
-                               data-record-editor-label="@($"Navrhnout změnu termínu a harmonogramu záznamu #{summary.CisloViditelne}")"
+                               href="@summary.ScheduleProposalUrl"
                                data-stop-propagation="true"
                                aria-label="Navrhnout termín a harmonogram"
                                title="Navrhnout termín a harmonogram">
-                        <gov-icon name="plus" type="components" aria-hidden="true"></gov-icon>
+                        <gov-icon size="s" name="calendar-date" type="components" aria-hidden="true"></gov-icon>
                     </pm-button>
                 }
                 <span class="record-toggle-indicator" aria-hidden="true">›</span>

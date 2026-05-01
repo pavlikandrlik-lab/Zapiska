@@ -1,13 +1,14 @@
-/* Karta externí vazby — nový layout v2 (Plán B).
-   Horní řádek: Číslo | Typ (readonly) | Cena | Výzva switch | (pravý okraj) ikony 🗑 + 💬.
-   Dolní řádek: 3 read-only datumy (Objednání, Dodání, Převzetí). */
+/* Karta externí vazby — layout v4 (per Návrhy úprav.docx + user feedback 2026-04-25).
+   Horní řádek: Číslo | Typ chip (gov-tag) | Cena | Výzva switch | 💬 (vpravo).
+   Dolní řádek: 4 read-only datumy (Objednání, Plán dodání, Dodání, Převzetí) | 🗑 (vpravo). */
 
 .external-row {
   display: grid;
-  grid-template-columns: 140px 120px 160px 1fr auto;
+  grid-template-columns: 140px 110px 160px minmax(200px, 1fr) auto;
   grid-template-rows: auto auto;
-  gap: 0.5rem 1rem;
-  align-items: end;
+  column-gap: 1.25rem;
+  row-gap: 0.75rem;
+  align-items: stretch;
   padding: 1rem 1.25rem;
   background: var(--pm-surface, #ffffff);
   border: 1px solid var(--pm-border, #e2e8f0);
@@ -15,25 +16,97 @@
   margin-bottom: 0.75rem;
 }
 
-.external-row > .external-field-cislo { grid-column: 1; grid-row: 1; }
-.external-row > .external-field-typ { grid-column: 2; grid-row: 1; }
-.external-row > .external-field-cena { grid-column: 3; grid-row: 1; }
-.external-row > .external-field-vyzva { grid-column: 4; grid-row: 1; }
-
-.external-row > .external-actions {
-  grid-column: 5;
-  grid-row: 1 / span 2;
+.external-row > .external-field-cislo,
+.external-row > .external-field-typ,
+.external-row > .external-field-cena,
+.external-row > .external-field-vyzva {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  align-self: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.external-row > .external-field-cislo[hidden],
+.external-row > .external-field-typ[hidden],
+.external-row > .external-field-cena[hidden],
+.external-row > .external-field-vyzva[hidden] {
+  display: none;
+}
+
+.external-row > .external-field-cislo  { grid-column: 1; grid-row: 1; }
+.external-row > .external-field-typ    { grid-column: 2; grid-row: 1; }
+.external-row > .external-field-cena   { grid-column: 3; grid-row: 1; }
+.external-row > .external-field-vyzva  { grid-column: 4; grid-row: 1; }
+.external-row > .external-action-chat  { grid-column: 5; grid-row: 1; display: flex; align-items: flex-end; justify-content: flex-end; }
+.external-row > .external-action-trash { grid-column: 5; grid-row: 2; display: flex; align-items: flex-start; justify-content: flex-end; }
+
+.external-row .external-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--pm-text-muted, #64748b);
+  line-height: 1;
+}
+
+.external-row .external-field-cislo > input[type="text"],
+.external-row .external-field-cena > input[type="number"] {
+  height: 36px;
+  padding: 0 0.625rem;
+  font: inherit;
+  border: 1px solid var(--pm-border, #cbd5e1);
+  border-radius: 6px;
+  background: var(--pm-surface, #ffffff);
+  color: var(--pm-text, #0f172a);
+  box-shadow: inset 0 1px 0 rgba(15, 23, 42, 0.04);
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.external-row .external-field-cislo > input[type="text"]:focus,
+.external-row .external-field-cena > input[type="number"]:focus {
+  outline: none;
+  border-color: var(--gov-color-primary, #2362a2);
+  box-shadow: 0 0 0 3px rgba(35, 98, 162, 0.18);
+}
+
+.external-row .external-field-cena > input[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.external-row .external-field-typ > gov-tag {
+  /* gov-tag chip — width fits content, vertikálně zarovnaný s inputy. */
+  align-self: flex-start;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.external-row > .external-field-vyzva {
+  justify-content: flex-start;
+}
+
+.external-row gov-form-switch[data-vyzvy-switch] {
+  /* Web Component má vlastní shadow DOM styling (track/thumb/label).
+     Externě řídíme jen vertikální zarovnání s ostatními poli. */
+  display: inline-flex;
+  align-self: flex-start;
+  min-height: 36px;
+  align-items: center;
+}
+
+.external-row .vyzvy-switch-status {
+  font-size: 0.75rem;
+  color: var(--pm-text-muted, #64748b);
+  line-height: 1.3;
+  min-height: 1rem;
 }
 
 .external-row > .external-dates {
   grid-column: 1 / span 4;
   grid-row: 2;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--pm-border, #e2e8f0);
@@ -58,9 +131,18 @@
   font-variant-numeric: tabular-nums;
 }
 
-.external-date-item > .value.muted {
+/* Placeholder pro nevyplněné datum: calendar3 gov-icon + "—".
+   Vizuální signál „tady má být datum, zatím není" — uživatel požadavek 2026-04-27. */
+.external-date-item > .value.placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
   color: var(--pm-text-muted, #64748b);
-  font-style: italic;
+}
+
+.external-date-item > .value.placeholder gov-icon {
+  flex-shrink: 0;
+  --gov-icon-color: var(--pm-text-muted, #64748b);
 }
 
 .external-actions .pm-icon-button {

@@ -15,8 +15,6 @@ namespace PmTracker.Web.Controllers;
 [Authorize]
 public sealed partial class ZaznamyController : BaseController
 {
-    private const string PresentationModal = "modal";
-    private const string PresentationPage = "page";
     private const string EditorTabBasic = "basic";
     private const string EditorTabExternal = "external";
     private const string EditorTabCollaboration = "collaboration";
@@ -48,7 +46,7 @@ public sealed partial class ZaznamyController : BaseController
         _db = db;
     }
 
-    public async Task<IActionResult> Edit(int id, string? presentation, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> Edit(int id, string? returnUrl, CancellationToken ct = default)
     {
         // Review finding S-2: autorizační check PŘED těžkou DB query a T5 harvest triggerem.
         // Dříve BuildZaznamEditAsync načetl celý model pro record, který uživatel nesmí editovat
@@ -83,12 +81,12 @@ public sealed partial class ZaznamyController : BaseController
             await _harvestScheduler.ScheduleHarvestForRecordAsync(id, ct).ConfigureAwait(false);
         }
 
-        PrepareRecordEditorModel(model, presentation, returnUrl, canEditRecord, canManageSchedule);
-        return View(GetEditorViewPath(model.Presentation), model);
+        PrepareRecordEditorModel(model, returnUrl, canEditRecord, canManageSchedule);
+        return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
     [Authorize(Policy = "permission:records.edit")]
-    public async Task<IActionResult> Create(int projektId, int? jednaniId, string? uiContext, string? presentation, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> Create(int projektId, int? jednaniId, string? uiContext, string? returnUrl, CancellationToken ct = default)
     {
         if (!await _recordService.ProjektExistsAsync(projektId, ct))
         {
@@ -102,18 +100,16 @@ public sealed partial class ZaznamyController : BaseController
         var model = await _recordService.BuildZaznamCreateAsync(projektId, contextMeetingId, ct);
         PrepareRecordEditorModel(
             model,
-            presentation,
             returnUrl,
             canEditRecord: true,
             canManageSchedule: model.JeUkolKategorie,
             uiContext: normalizedUiContext,
             meetingId: contextMeetingId);
-        return View(GetEditorViewPath(model.Presentation), model);
+        return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
     private void PrepareRecordEditorModel(
         ZaznamEditViewModel model,
-        string? requestedPresentation,
         string? requestedReturnUrl,
         bool canEditRecord,
         bool canManageSchedule,
@@ -124,7 +120,6 @@ public sealed partial class ZaznamyController : BaseController
         var normalizedMeetingId = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
             ? meetingId
             : null;
-        model.Presentation = ResolvePresentation(requestedPresentation);
         model.ReturnUrl = NormalizeLocalReturnUrl(requestedReturnUrl);
         model.UiContext = normalizedUiContext;
         model.MeetingId = normalizedMeetingId;
@@ -166,37 +161,6 @@ public sealed partial class ZaznamyController : BaseController
             ? EditorTabSchedule
             : EditorTabBasic;
         model.UseAjaxSubmit = true;
-    }
-
-    private string GetEditorViewPath(string presentation)
-        => string.Equals(presentation, PresentationPage, StringComparison.OrdinalIgnoreCase)
-            ? "~/Views/Projekty/EditZaznamPage.cshtml"
-            : "~/Views/Projekty/EditZaznamModal.cshtml";
-
-    private string ResolvePresentation(string? requestedPresentation)
-    {
-        var normalized = NormalizePresentation(requestedPresentation);
-        if (!string.IsNullOrWhiteSpace(normalized))
-        {
-            return normalized;
-        }
-
-        return IsAjaxRequest() ? PresentationModal : PresentationPage;
-    }
-
-    private static string NormalizePresentation(string? requestedPresentation)
-    {
-        if (string.Equals(requestedPresentation, PresentationPage, StringComparison.OrdinalIgnoreCase))
-        {
-            return PresentationPage;
-        }
-
-        if (string.Equals(requestedPresentation, PresentationModal, StringComparison.OrdinalIgnoreCase))
-        {
-            return PresentationModal;
-        }
-
-        return string.Empty;
     }
 
     private static string NormalizeEditorTab(string? editorTab)

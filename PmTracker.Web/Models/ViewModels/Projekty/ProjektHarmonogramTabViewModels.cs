@@ -8,8 +8,13 @@ public sealed class ProjektHarmonogramTabViewModel
 {
     public int ProjektId { get; init; }
     public int CurrentUserOsobaId { get; set; }
-    public IReadOnlyList<LookupOptionViewModel> SubsystemyMoznosti { get; init; } = Array.Empty<LookupOptionViewModel>();
     public IReadOnlyList<ProjektHarmonogramUkolViewModel> HarmonogramUkoly { get; init; } = Array.Empty<ProjektHarmonogramUkolViewModel>();
+
+    /// <summary>
+    /// Sdílený filter shell — identický s <see cref="ProjektZaznamyTabViewModel.FilterShell"/>.
+    /// Render přes <c>_ProjectFilterShell.cshtml</c>. Spec 2026-04-30-project-filter-unification-design.
+    /// </summary>
+    public ProjectFilterShellViewModel FilterShell { get; init; } = new();
 }
 
 public sealed class ProjektHarmonogramUkolViewModel
@@ -18,12 +23,19 @@ public sealed class ProjektHarmonogramUkolViewModel
     public required string CisloViditelne { get; init; }
     public required string Nazev { get; init; }
     public string? TypUkolu { get; init; }
+    public string? TypUkoluKod { get; init; }
     public required string Stav { get; init; }
+    public string? StavKod { get; init; }
     public required string SubsystemKod { get; init; }
     public required string Subsystem { get; init; }
     public int SubsystemPoradi { get; init; }
     public bool SubsystemHasProjectOrder { get; init; }
     public required string Vlastnik { get; init; }
+    public int VlastnikOsobaId { get; init; }
+    public required string KategorieKod { get; init; }
+    public required string Kategorie { get; init; }
+    public bool JeAktivni { get; init; } = true;
+    public IReadOnlyList<string> JednaniVyjadreniStavyKody { get; init; } = Array.Empty<string>();
     public bool Stihame { get; init; }
     public HarmonogramBlockViewModel HarmonogramBlok { get; init; } = new();
     public bool CanManageSchedule { get; set; }

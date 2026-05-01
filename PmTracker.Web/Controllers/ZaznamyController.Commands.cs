@@ -14,7 +14,6 @@ public sealed partial class ZaznamyController
     {
         var editorTab = NormalizeEditorTab(command.EditorTab);
         var projectTab = NormalizeProjectTab(editorTab);
-        var presentation = NormalizePresentation(command.Presentation);
         // Per-action redesign 2026-04-23: Save větev podle isUpdate:
         //   - nový záznam (Id == null):     records.create
         //   - editace záznamu:               records.edit
@@ -43,7 +42,6 @@ public sealed partial class ZaznamyController
                 command,
                 savedRecordId,
                 projectTab,
-                presentation,
                 normalizedUiContext,
                 contextMeetingId)),
             operation: async () => savedRecordId = await _recordService.SaveRecordAsync(command, CurrentUserContext, ct));
@@ -159,60 +157,22 @@ public sealed partial class ZaznamyController
         SaveRecordCommand command,
         int savedRecordId,
         string projectTab,
-        string presentation,
         string normalizedUiContext,
         int? contextMeetingId)
     {
         var meetingDetailUrl = contextMeetingId.HasValue
             ? BuildMeetingDetailUrl(contextMeetingId.Value)
             : null;
-
-        if (string.Equals(presentation, PresentationPage, StringComparison.OrdinalIgnoreCase))
-        {
-            var refreshUrl = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(meetingDetailUrl)
-                ? meetingDetailUrl
-                : BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab);
-            return AjaxSuccessResult(
-                refreshScope: "page",
-                refreshUrl: refreshUrl,
-                projectId: command.ProjektId,
-                recordId: savedRecordId,
-                meetingId: contextMeetingId,
-                uiContext: normalizedUiContext,
-                tab: projectTab,
-                message: "Záznam byl uložen.");
-        }
-
-        if (command.Id.HasValue)
-        {
-            return AjaxSuccessResult(
-                refreshScope: "record-card-with-schedules",
-                refreshUrl: Url.Action(nameof(RecordCardPartial), new { projektId = command.ProjektId, zaznamId = savedRecordId }),
-                projectId: command.ProjektId,
-                recordId: savedRecordId,
-                uiContext: UiContextProject,
-                tab: projectTab,
-                message: "Záznam byl uložen.");
-        }
-
-        if (string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
-            && !string.IsNullOrWhiteSpace(meetingDetailUrl))
-        {
-            return AjaxSuccessResult(
-                refreshScope: "page",
-                refreshUrl: meetingDetailUrl,
-                projectId: command.ProjektId,
-                recordId: savedRecordId,
-                meetingId: contextMeetingId,
-                uiContext: UiContextMeeting,
-                message: "Záznam byl uložen.");
-        }
-
+        var refreshUrl = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(meetingDetailUrl)
+            ? meetingDetailUrl
+            : BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab);
         return AjaxSuccessResult(
-            refreshScope: "projekty-detail-zaznamy-preserve",
-            refreshUrl: Url.Action("RecordsTabPartial", "Projekty", new { id = command.ProjektId }),
+            refreshScope: "page",
+            refreshUrl: refreshUrl,
             projectId: command.ProjektId,
-            uiContext: UiContextProject,
+            recordId: savedRecordId,
+            meetingId: contextMeetingId,
+            uiContext: normalizedUiContext,
             tab: projectTab,
             message: "Záznam byl uložen.");
     }

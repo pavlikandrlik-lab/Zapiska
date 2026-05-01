@@ -10,16 +10,28 @@ namespace PmTracker.Tests.Unit.TagHelpers;
 
 public sealed class PmButtonTagHelperTests
 {
-    private static async Task<TagHelperOutput> RenderAsync(PmButtonTagHelper helper, string innerText = "Akce")
+    private static async Task<TagHelperOutput> RenderAsync(
+        PmButtonTagHelper helper,
+        string innerText = "Akce",
+        TagHelperAttributeList? extraAttributes = null)
     {
+        var attrs = extraAttributes ?? new TagHelperAttributeList();
         var ctx = new TagHelperContext(
-            new TagHelperAttributeList(),
+            attrs,
             new Dictionary<object, object>(),
             "test");
 
+        // Razor MVC v reálném runtimu propaguje "unknown" input attributy do output.Attributes
+        // PŘED voláním ProcessAsync. Reprodukujeme to v testovací helper, abychom ověřili
+        // že náš ProcessAsync je nezahodí.
+        var outputAttrs = new TagHelperAttributeList();
+        foreach (var a in attrs)
+        {
+            outputAttrs.Add(a);
+        }
         var output = new TagHelperOutput(
             "pm-button",
-            new TagHelperAttributeList(),
+            outputAttrs,
             (useCached, encoder) =>
             {
                 var content = new DefaultTagHelperContent();
@@ -29,6 +41,27 @@ public sealed class PmButtonTagHelperTests
 
         await helper.ProcessAsync(ctx, output);
         return output;
+    }
+
+    [Fact]
+    public async Task DataAtributy_NaInputu_SePropagujiNaGovButtonOutput()
+    {
+        // Regrese: <pm-button data-modal-url="..."> musí propagovat data-modal-url
+        // na výsledný <gov-button>, jinak JS delegated handler v site.bundle.js
+        // (target.closest("[data-modal-url]")) nikdy nematchuje a tlačítko "nedělá nic".
+        var helper = new PmButtonTagHelper { Variant = PmButtonVariant.Primary };
+        var extra = new TagHelperAttributeList
+        {
+            { "data-modal-url", "/Projekty/NewProjectModal" },
+            { "data-record-editor-url", "/Zaznamy/Editor?id=42" }
+        };
+
+        var output = await RenderAsync(helper, "Nový projekt", extra);
+
+        output.TagName.Should().Be("gov-button");
+        output.Attributes.ContainsName("data-modal-url").Should().BeTrue("data-modal-url musi byt na vystupu, jinak JS handler nematchuje");
+        output.Attributes["data-modal-url"].Value.Should().Be("/Projekty/NewProjectModal");
+        output.Attributes.ContainsName("data-record-editor-url").Should().BeTrue();
     }
 
     [Fact]

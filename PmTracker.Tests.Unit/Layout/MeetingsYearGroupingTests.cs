@@ -138,9 +138,11 @@ public sealed class MeetingsYearGroupingTests
 
         foreach (var view in new[] { projectView, globalView })
         {
-            view.Should().Contain(
-                "<gov-icon class=\"meeting-year-chevron\" name=\"chevron-down\"",
-                "oba views musí používat gov-icon (ne CSS border hack) pro chevron");
+            // gov-icon může mít atributy v libovolném pořadí (size="s", class, name) — kontrolujeme
+            // přítomnost <gov-icon> s class="meeting-year-chevron" a name="chevron-down" zvlášť.
+            view.Should().MatchRegex(
+                @"<gov-icon[^>]*\bclass=""meeting-year-chevron""[^>]*\bname=""chevron-down""|<gov-icon[^>]*\bname=""chevron-down""[^>]*\bclass=""meeting-year-chevron""",
+                "oba views musí používat <gov-icon class=\"meeting-year-chevron\" name=\"chevron-down\"> (ne CSS border hack)");
             view.Should().NotContain(
                 "<span class=\"meeting-year-chevron\"",
                 "starý span chevron nesmí zůstat — byl nahrazen gov-icon elementem");

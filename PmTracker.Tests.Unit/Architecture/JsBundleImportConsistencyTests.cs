@@ -37,23 +37,9 @@ public sealed class JsBundleImportConsistencyTests
         return File.ReadAllText(path);
     }
 
-    [Fact]
-    public void RecordEditorModule_MustImportGetActiveModalContainer()
-    {
-        // Fáze 3B Task 1: recordEditor.js je barrel — getActiveModalContainer
-        // je v submodulu draft.js (close-guard dialog flow)
-        var source = ReadModule("PmTracker.Web/wwwroot/js/modules/recordEditor/draft.js");
-
-        // Používá getActiveModalContainer v close-guard flow
-        source.Should().Contain(
-            "getActiveModalContainer()",
-            "recordEditor/draft.js potřebuje getActiveModalContainer() pro umístění close-guard dialogu uvnitř modálu");
-
-        // Musí ho importovat z modals.js (jinak ReferenceError za runtime)
-        var importRegex = new Regex(@"import\s*\{[^}]*\bgetActiveModalContainer\b[^}]*\}\s*from\s*[""']\.\.\/modals\.js[""']");
-        importRegex.IsMatch(source).Should().BeTrue(
-            "recordEditor/draft.js musí importovat getActiveModalContainer z ../modals.js (jinak silent regression – ReferenceError při zavírání dirty modalu)");
-    }
+    // RecordEditorModule_MustImportGetActiveModalContainer test smazán
+    // (refaktor 2026-04-25: modal pro úpravu/tvorbu záznamu odstraněn,
+    // close-guard host je vždy document.body — getActiveModalContainer se nepoužívá).
 
     [Fact]
     public void UiModule_MustNotReferenceRecordEditorStateWithoutImport()

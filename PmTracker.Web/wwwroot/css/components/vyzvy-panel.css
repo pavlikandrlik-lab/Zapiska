@@ -22,11 +22,8 @@
 
 .vyzvy-card-title { margin: 0; font-size: 1rem; font-weight: 600; }
 
-.vyzvy-card-badge { padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 500; }
-
-.badge-warning { background: #fef3c7; color: #92400e; }
-.badge-success { background: #d1fae5; color: #065f46; }
-.badge-muted   { background: #e2e8f0; color: #475569; }
+/* .vyzvy-card-badge / .badge-warning / .badge-success / .badge-muted —
+   nahrazeno za <gov-tag> v VyzvaCard.cshtml + BufferCard.cshtml (2026-04-29). */
 
 .vyzvy-card-meta { margin-left: auto; font-size: 0.8125rem; color: var(--pm-text-muted, #64748b); }
 
@@ -100,7 +97,7 @@
   background: var(--pm-surface-alt, #f8fafc); border-radius: 8px;
   padding: 0.75rem; min-height: 200px;
 }
-.vyzvy-reassign-column.drag-over { background: #fef3c7; outline: 2px dashed var(--token-warning, #f59e0b); }
+.vyzvy-reassign-column.drag-over { background: var(--background-warning-subtle, #fef3c7); outline: 2px dashed var(--token-warning, #f59e0b); }
 .vyzvy-reassign-item {
   background: var(--pm-surface, #ffffff); border: 1px solid var(--pm-border, #e2e8f0);
   border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;

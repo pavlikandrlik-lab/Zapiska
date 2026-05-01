@@ -34,15 +34,32 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-const projectRecordFilterPanelStorageKey = "pmtracker.filters.open";
+const projectFilterPanelStorageKey = "pmtracker.filters.open";
 
 // ---------------------------------------------------------------------------
 // Public exports — filter panel open/close
 // ---------------------------------------------------------------------------
 
-export function setFilterPanelOpen(open) {
-    const filterPanel = document.querySelector("[data-filter-panel]");
-    const filterToggle = document.querySelector("[data-filter-toggle]");
+/**
+ * Open/close filter shell pro daný scope. Hledá panel uvnitř scope-specific shell
+ * (data-project-filter-scope="<scope>"), aby v případě 2 mountovaných shellů
+ * (records + schedule) nezamnul panely ze sebe. Spec 2026-04-30.
+ *
+ * Backwards compat: pokud scope chybí (volání starým 1-arg signature `setFilterPanelOpen(open)`),
+ * fallback na `data-project-filter-scope="records"` (původní chování pre-refactor).
+ */
+export function setFilterPanelOpen(scopeOrOpen, openIfScopeProvided) {
+    const hasScope = typeof scopeOrOpen === "string";
+    const scope = hasScope ? scopeOrOpen : "records";
+    const open = hasScope ? Boolean(openIfScopeProvided) : Boolean(scopeOrOpen);
+
+    const shell = document.querySelector(`[data-project-filter-scope="${scope}"]`);
+    if (!(shell instanceof HTMLElement)) {
+        return;
+    }
+
+    const filterPanel = shell.querySelector("[data-filter-panel]");
+    const filterToggle = shell.querySelector("[data-filter-toggle]");
     if (!(filterPanel instanceof HTMLElement)) {
         return;
     }
@@ -52,7 +69,9 @@ export function setFilterPanelOpen(open) {
         filterToggle.setAttribute("aria-expanded", String(open));
     }
 
-    localStorage.setItem(projectRecordFilterPanelStorageKey, String(open));
+    // Storage je per-projekt sdílený — open/close stav je společný pro records i schedule
+    // (filter shell je sdílený DOM jen renderovaný 2× pro každý tab).
+    localStorage.setItem(projectFilterPanelStorageKey, String(open));
 }
 
 // ---------------------------------------------------------------------------
@@ -87,9 +106,40 @@ export function restoreFilterState() {
     return restoreProjectFilterScope("records");
 }
 
+/**
+ * Spec 2026-04-30: scope se detekuje z DOM (input's closest data-project-filter-scope).
+ * Records i schedule scope sdílejí jediný state, ale apply pipeline je scope-specific
+ * (records re-renderuje record cards, schedule re-applies na schedule list).
+ */
 export function persistFilterState(input, options = {}) {
-    void input;
-    handleProjectFilterInputChange("records", options);
+    const shell = input instanceof Element
+        ? input.closest("[data-project-filter-scope]")
+        : null;
+    const scope = shell instanceof HTMLElement
+        ? (shell.getAttribute("data-project-filter-scope") || "records")
+        : "records";
+    handleProjectFilterInputChange(scope, options);
+}
+
+/**
+ * Spec 2026-04-30: pm-tabs Web Component emituje "pm-tab-change" když user přepne
+ * mezi taby Záznamy ↔ Harmonogram (i pro ostatní taby). Sdílený filter state se
+ * znovu aplikuje na nově viditelný scope, aby filter aplikovaný v Records byl
+ * okamžitě platný i v Schedule cards (a naopak).
+ */
+export function initProjectFilterTabSync() {
+    const scopeMap = { zaznamy: "records", harmonogram: "schedule" };
+    document.addEventListener("pm-tab-change", (event) => {
+        const detail = event && event.detail;
+        const tabKey = detail && typeof detail.key === "string" ? detail.key : "";
+        const scope = scopeMap[tabKey];
+        if (!scope) {
+            return; // ostatní taby (jednání, tým, návrhy) nemají filter shell — no-op
+        }
+        // Znovu aplikuj uložený state na nově viditelný shell — restoreProjectFilterScope
+        // vyčte stejný localStorage klíč (sjednocený per projekt) a syncne inputy + chips.
+        restoreProjectFilterScope(scope);
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -97,12 +147,13 @@ export function persistFilterState(input, options = {}) {
 // ---------------------------------------------------------------------------
 
 export function initProjectRecordsUi(options = {}) {
-    setFilterPanelOpen(localStorage.getItem(projectRecordFilterPanelStorageKey) === "true");
+    setFilterPanelOpen("records", localStorage.getItem(projectFilterPanelStorageKey) === "true");
     restoreFilterState();
     const recordsPanel = document.querySelector('[data-tab-panel="zaznamy"]');
+    // groupBySubsystem: <gov-form-switch> (Web Component) i HTMLInputElement obojí mají `.checked`.
     const groupBySubsystemInput = getProjectFilterInput("records", "groupBySubsystem");
-    const showGroupedView = groupBySubsystemInput instanceof HTMLInputElement
-        ? groupBySubsystemInput.checked
+    const showGroupedView = groupBySubsystemInput instanceof HTMLElement
+        ? !!groupBySubsystemInput.checked
         : true;
     const hasServerRenderedGroups = recordsPanel instanceof HTMLElement
         && recordsPanel.querySelector("[data-record-grouped-list] [data-subsystem-group]") instanceof HTMLElement;

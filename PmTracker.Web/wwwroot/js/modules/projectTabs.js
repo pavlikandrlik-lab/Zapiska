@@ -138,9 +138,11 @@ class ProjectNavigationController {
         const preserveServerView = options && options.preserveServerView === true;
         this.options.restoreFilterState?.();
         const recordsPanel = document.querySelector('[data-tab-panel="zaznamy"]');
+        // groupBySubsystem může být HTMLInputElement (legacy) nebo <gov-form-switch> Web Component
+        // s reflektovaným atributem `checked`. Obě varianty mají property `.checked`.
         const groupBySubsystemInput = document.querySelector('[data-project-filter-scope="records"] [data-filter-key="groupBySubsystem"]');
-        const showGroupedView = groupBySubsystemInput instanceof HTMLInputElement
-            ? groupBySubsystemInput.checked
+        const showGroupedView = groupBySubsystemInput instanceof HTMLElement
+            ? !!groupBySubsystemInput.checked
             : true;
         const hasServerRenderedGroups = recordsPanel instanceof HTMLElement
             && recordsPanel.querySelector("[data-record-grouped-list] [data-subsystem-group]") instanceof HTMLElement;

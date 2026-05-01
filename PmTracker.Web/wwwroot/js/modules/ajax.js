@@ -193,8 +193,9 @@ export function renderModalFormErrors(form, payload) {
     const traceId = payload && typeof payload.traceId === "string" ? payload.traceId.trim() : "";
     const diagnosticLog = payload && typeof payload.diagnosticLog === "string" ? payload.diagnosticLog.trim() : "";
     if (topMessage || summaryMessages.size > 0 || errorCode || traceId || diagnosticLog) {
-        const summary = document.createElement("div");
-        summary.className = "alert alert-error modal-submit-summary";
+        const summary = document.createElement("gov-message");
+        summary.setAttribute("color", "error");
+        summary.className = "modal-submit-summary";
         summary.setAttribute("role", "alert");
 
         const merged = [];
@@ -231,7 +232,7 @@ export function renderModalFormErrors(form, payload) {
             recoveryActions.className = "modal-submit-diagnostics-actions";
             const reloadButton = document.createElement("button");
             reloadButton.type = "button";
-            reloadButton.className = "btn small";
+            reloadButton.className = "modal-submit-action-btn modal-submit-action-btn--primary";
             reloadButton.textContent = "Obnovit stránku";
             reloadButton.addEventListener("click", () => {
                 window.location.reload();
@@ -252,7 +253,7 @@ export function renderModalFormErrors(form, payload) {
             actions.className = "modal-submit-diagnostics-actions";
             const copyButton = document.createElement("button");
             copyButton.type = "button";
-            copyButton.className = "btn small ghost";
+            copyButton.className = "modal-submit-action-btn";
             copyButton.textContent = "Kopírovat log";
             copyButton.addEventListener("click", async () => {
                 const copied = await copyTextToClipboard(diagnosticLog);

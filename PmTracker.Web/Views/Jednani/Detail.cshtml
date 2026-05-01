@@ -227,9 +227,7 @@
                 <h2>Zápis úkolů</h2>
                 @if (Model.CanEditRecords)
                 {
-                    <pm-button variant="Primary"
-                               data-record-editor-url="@createRecordInMeetingUrl"
-                               data-record-editor-label="Nový záznam">
+                    <pm-button variant="Primary" href="@createRecordInMeetingUrl">
                         Nový záznam
                     </pm-button>
                 }

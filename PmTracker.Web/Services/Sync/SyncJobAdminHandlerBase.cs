@@ -68,8 +68,35 @@ public abstract class SyncJobAdminHandlerBase<TSettings> : ISyncJobAdminHandler
             LastResult = summary,
             IsRunning = s.IsRunning,
             RunStartedAt = s.RunStartedAt,
-            CanManage = canManage
+            CanManage = canManage,
+            UpcomingRuns = ComputeUpcomingRuns(s, count: 4)
         };
+    }
+
+    /// <summary>
+    /// Vypočítá nejbližší <paramref name="count"/> naplánovaných spuštění z AnchorAt + Period.
+    /// Vrací prázdný seznam pokud je job vypnutý nebo perioda nevalidní —
+    /// disabled job nemá příští plánovaný čas, dokud admin neaktivuje.
+    /// </summary>
+    private IReadOnlyList<DateTimeOffset> ComputeUpcomingRuns(TSettings s, int count)
+    {
+        if (!s.IsEnabled || s.PeriodMinutes <= 0)
+        {
+            return Array.Empty<DateTimeOffset>();
+        }
+
+        var period = TimeSpan.FromMinutes(s.PeriodMinutes);
+        var now = Time.GetUtcNow();
+        var result = new List<DateTimeOffset>(count);
+        var cursor = now;
+        for (int i = 0; i < count; i++)
+        {
+            var next = SyncScheduleCalculator.ComputeNext(cursor, s.AnchorAt, period);
+            result.Add(next);
+            // Posuneme cursor o tick za "next", aby další ComputeNext vrátil další slot.
+            cursor = next.AddTicks(1);
+        }
+        return result;
     }
 
     public async Task<bool> SaveAsync(SyncJobSettingsInputModel input, int? editorOsobaId, CancellationToken ct)

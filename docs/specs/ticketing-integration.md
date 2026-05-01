@@ -54,11 +54,13 @@
 >
 > ### Source of truth
 >
+> - **Schéma ticketing DB (referenční):** [docs/technical/12-servicedesk-schema-reference.md](../technical/12-servicedesk-schema-reference.md) ⭐ — datové typy, enumové kategorie, join řetězce, pasti, definice prodlení per typ, architektura PM Tracker strany
 > - **Kód:** [`PmTracker.ServiceDesk.Sql/`](../../PmTracker.ServiceDesk.Sql/), [`PmTracker.ServiceDesk.Contracts/`](../../PmTracker.ServiceDesk.Contracts/)
-> - **DB schéma:** [SD_servicedesk/hotline.txt](../../SD_servicedesk/hotline.txt) + [SD_servicedesk/Hotline.cs](../../SD_servicedesk/Hotline.cs)
+> - **DB schéma (inventář + reference app):** [SD_servicedesk/hotline.txt](../../SD_servicedesk/hotline.txt) + [SD_servicedesk/Hotline.cs](../../SD_servicedesk/Hotline.cs)
 > - **Nová sync architektura:** [docs/superpowers/specs/2026-04-22-sync-infra-and-ad-design.md](../superpowers/specs/2026-04-22-sync-infra-and-ad-design.md)
 > - **Vytěžování vyjádření:** [docs/superpowers/specs/2026-04-21-servicedesk-vytezovani-vyjadreni-design.md](../superpowers/specs/2026-04-21-servicedesk-vytezovani-vyjadreni-design.md)
 > - **Implementační plán SD sync:** [docs/superpowers/plans/2026-04-22-sd-sync-revise.md](../superpowers/plans/2026-04-22-sd-sync-revise.md)
+> - **Implementační plán Sprint A (backend pro dashboard):** [docs/superpowers/plans/2026-04-23-sd-integrace-sprint-a-backend.md](../superpowers/plans/2026-04-23-sd-integrace-sprint-a-backend.md)
 
 ---
 

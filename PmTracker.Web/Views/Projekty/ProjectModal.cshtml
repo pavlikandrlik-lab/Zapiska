@@ -33,13 +33,16 @@
             }
         </select>
     </label>
-    <label class="gov-switch">
-        <input type="checkbox" name="PouzivatIdentJednani" value="true" @((Model.Command.PouzivatIdentJednani) ? "checked=\"checked\"" : null) />
-        <span class="gov-switch-track" aria-hidden="true">
-            <span class="gov-switch-thumb"></span>
-        </span>
-        <span class="gov-switch-label">Používat identifikátor záznamů podle jednání (808-1)</span>
-    </label>
+    <div class="project-form-switch-wrap">
+        @* gov-form-switch je vizuální Web Component; její `checked` se nereflektuje do form-data,
+           proto nese hidden input "PouzivatIdentJednani" aktuální stav (sync přes gov-change). *@
+        <input type="hidden" name="PouzivatIdentJednani" value="@(Model.Command.PouzivatIdentJednani ? "true" : "false")" data-project-pouzivat-ident-jednani-state />
+        <gov-form-switch size="m"
+                         data-project-pouzivat-ident-jednani
+                         @(Model.Command.PouzivatIdentJednani ? "checked" : null)>
+            <span slot="label"><label>Používat identifikátor záznamů podle jednání (808-1)</label></span>
+        </gov-form-switch>
+    </div>
     <label>
         Místo plnění (pro generování výzev)
         <textarea name="MistoPlneni" rows="2" maxlength="500"

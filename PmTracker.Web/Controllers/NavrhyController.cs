@@ -10,8 +10,6 @@ namespace PmTracker.Web.Controllers;
 [Authorize]
 public sealed class NavrhyController : BaseController
 {
-    private const string PresentationModal = "modal";
-    private const string PresentationPage = "page";
     private const string ProposalsTab = "navrhy";
     private const string ProposalsRefreshScope = "projekty-detail-navrhy";
 
@@ -29,7 +27,7 @@ public sealed class NavrhyController : BaseController
 
     [HttpGet]
     [Authorize(Policy = "permission:proposals.record.create")]
-    public async Task<IActionResult> CreateRecordProposal(int projektId, string? presentation, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> CreateRecordProposal(int projektId, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
@@ -37,13 +35,13 @@ public sealed class NavrhyController : BaseController
         }
 
         var model = await _recordProposalService.BuildCreateRecordProposalEditorAsync(projektId, CurrentUserContext, ct: ct);
-        PrepareProposalEditorModel(model, presentation, returnUrl);
-        return View(GetEditorViewPath(model.Presentation), model);
+        PrepareProposalEditorModel(model, returnUrl);
+        return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
     [HttpGet]
     [Authorize(Policy = "permission:proposals.schedule.create")]
-    public async Task<IActionResult> CreateScheduleProposal(int projektId, int zaznamId, string? presentation, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> CreateScheduleProposal(int projektId, int zaznamId, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
@@ -51,12 +49,12 @@ public sealed class NavrhyController : BaseController
         }
 
         var model = await _recordProposalService.BuildScheduleProposalEditorAsync(projektId, zaznamId, CurrentUserContext, ct);
-        PrepareProposalEditorModel(model, presentation, returnUrl);
-        return View(GetEditorViewPath(model.Presentation), model);
+        PrepareProposalEditorModel(model, returnUrl);
+        return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
     [HttpGet]
-    public async Task<IActionResult> ProposalDetail(int projektId, int proposalId, string? presentation, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> ProposalDetail(int projektId, int proposalId, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
@@ -69,8 +67,8 @@ public sealed class NavrhyController : BaseController
         }
 
         var model = await _recordProposalService.BuildProposalDetailAsync(projektId, proposalId, CurrentUserContext, ct);
-        PrepareProposalEditorModel(model, presentation, returnUrl);
-        return View(GetEditorViewPath(model.Presentation), model);
+        PrepareProposalEditorModel(model, returnUrl);
+        return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
     // EditFromProposal (GET) SMAZÁN v redesignu 2026-04-23.
@@ -83,7 +81,7 @@ public sealed class NavrhyController : BaseController
 
     [HttpGet]
     [Authorize(Policy = "permission:proposals.edit.own")]
-    public async Task<IActionResult> PrefillCreateProposal(int projektId, int proposalId, string? presentation, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> PrefillCreateProposal(int projektId, int proposalId, string? returnUrl, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
@@ -96,8 +94,8 @@ public sealed class NavrhyController : BaseController
         }
 
         var model = await _recordProposalService.BuildPrefilledCreateRecordEditorFromProposalAsync(projektId, proposalId, CurrentUserContext, ct);
-        PrepareProposalEditorModel(model, presentation, returnUrl);
-        return View(GetEditorViewPath(model.Presentation), model);
+        PrepareProposalEditorModel(model, returnUrl);
+        return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
     [HttpPost]
@@ -165,8 +163,8 @@ public sealed class NavrhyController : BaseController
     [Authorize(Policy = "permission:proposals.takeover")]
     public Task<IActionResult> RejectAndTakeOverCreateProposal(ProposalDecisionCommand command, CancellationToken ct = default)
     {
-        var prefillUrl = Url.Action(nameof(PrefillCreateProposal), new { projektId = command.ProjektId, proposalId = command.ProposalId, presentation = PresentationPage })
-            ?? $"/Navrhy/PrefillCreateProposal?projektId={command.ProjektId}&proposalId={command.ProposalId}&presentation=page";
+        var prefillUrl = Url.Action(nameof(PrefillCreateProposal), new { projektId = command.ProjektId, proposalId = command.ProposalId })
+            ?? $"/Navrhy/PrefillCreateProposal?projektId={command.ProjektId}&proposalId={command.ProposalId}";
 
         return ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.CanAccessProject(command.ProjektId),
@@ -211,9 +209,8 @@ public sealed class NavrhyController : BaseController
             operation: () => _recordProposalService.RejectAndEditProposalAsync(command, CurrentUserContext, ct));
     }
 
-    private void PrepareProposalEditorModel(ZaznamEditViewModel model, string? requestedPresentation, string? requestedReturnUrl)
+    private void PrepareProposalEditorModel(ZaznamEditViewModel model, string? requestedReturnUrl)
     {
-        model.Presentation = ResolvePresentation(requestedPresentation);
         model.ReturnUrl = NormalizeLocalReturnUrl(requestedReturnUrl);
         model.UiContext = "project";
         model.MeetingId = null;
@@ -235,27 +232,17 @@ public sealed class NavrhyController : BaseController
 
     private IActionResult BuildProposalSubmitAjaxSuccess(SaveRecordCommand command, string message)
     {
-        if (string.Equals(command.Presentation, PresentationPage, StringComparison.OrdinalIgnoreCase))
-        {
-            var redirectUrl = Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = ProposalsTab }) ?? $"/Projekty/Detail/{command.ProjektId}?tab={ProposalsTab}";
-            return AjaxSuccessResult(
-                refreshScope: "page",
-                refreshUrl: redirectUrl,
-                projectId: command.ProjektId,
-                tab: ProposalsTab,
-                message: message);
-        }
-
-        return BuildProposalTabAjaxSuccess(command.ProjektId, message);
+        var redirectUrl = Url.Action("Detail", "Projekty", new { id = command.ProjektId, tab = ProposalsTab }) ?? $"/Projekty/Detail/{command.ProjektId}?tab={ProposalsTab}";
+        return AjaxSuccessResult(
+            refreshScope: "page",
+            refreshUrl: redirectUrl,
+            projectId: command.ProjektId,
+            tab: ProposalsTab,
+            message: message);
     }
 
     private RedirectToActionResult RedirectToProposalTab(int projektId)
         => RedirectToAction("Detail", "Projekty", new { id = projektId, tab = ProposalsTab })!;
-
-    private string GetEditorViewPath(string presentation)
-        => string.Equals(presentation, PresentationPage, StringComparison.OrdinalIgnoreCase)
-            ? "~/Views/Projekty/EditZaznamPage.cshtml"
-            : "~/Views/Projekty/EditZaznamModal.cshtml";
 
     private string? NormalizeLocalReturnUrl(string? returnUrl)
     {
@@ -265,20 +252,5 @@ public sealed class NavrhyController : BaseController
         }
 
         return Url.IsLocalUrl(returnUrl) ? returnUrl : null;
-    }
-
-    private string ResolvePresentation(string? requestedPresentation)
-    {
-        if (string.Equals(requestedPresentation, PresentationPage, StringComparison.OrdinalIgnoreCase))
-        {
-            return PresentationPage;
-        }
-
-        if (string.Equals(requestedPresentation, PresentationModal, StringComparison.OrdinalIgnoreCase))
-        {
-            return PresentationModal;
-        }
-
-        return IsAjaxRequest() ? PresentationModal : PresentationPage;
     }
 }

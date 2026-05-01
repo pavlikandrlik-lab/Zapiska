@@ -83,6 +83,10 @@ Tento dokument je kořenový strom dokumentace vytvořený rekurzivním postupem
 - `N4.1 SQL baseline bootstrap` (list)
 - `N4.2 Upgrade patching` (list)
 - `N4.3 Startup validator povinných číselníků` (list)
+- `N4.4 ServiceDesk integrace (read-only externí DB)`
+- `N4.4.1 Schéma ticketing DB (HOT_*), enum kategorie, join řetězec` (list)
+- `N4.4.2 Definice prodlení per typ_zaznamu (NES/PMP/PNF)` (list)
+- `N4.4.3 Architektura PM Tracker strany (read-only DbContext, DTO izolace, DI toggle)` (list)
 
 - `N5 Provoz, kvalita, recovery`
 - `N5.1 Instalace a deployment IIS` (list)
@@ -117,6 +121,7 @@ Tento dokument je kořenový strom dokumentace vytvořený rekurzivním postupem
 | N4.1 | Baseline | `docs/technical/06-database-bootstrap-migrations.md` |
 | N4.2 | Upgrade | `docs/technical/06-database-bootstrap-migrations.md` |
 | N4.3 | Startup validator | `docs/technical/06-database-bootstrap-migrations.md` |
+| N4.4.* | ServiceDesk integrace — referenční schéma | `docs/technical/12-servicedesk-schema-reference.md` |
 | N5.1 | Deployment | `docs/technical/04-installation-deployment-iis.md`, `docs/technical/05-web-server-iis-config.md` |
 | N5.2 | Runbooky | `docs/technical/08-operations-runbooks.md` |
 | N5.3 | Testy + docs gate | `docs/technical/09-testing-quality.md` |

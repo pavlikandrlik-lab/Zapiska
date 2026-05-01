@@ -8,47 +8,7 @@
          role="tabpanel"
          aria-labelledby="tab-harmonogram"
          data-tab-panel="harmonogram">
-    <div class="filter-shell"
-         data-project-filter-scope="schedule"
-         data-project-id="@Model.ProjektId"
-         data-current-user-id="@Model.CurrentUserOsobaId">
-        <button class="filter-toggle" type="button" data-schedule-filter-toggle>
-            Filtry
-            <span class="filter-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>
-                </svg>
-            </span>
-        </button>
-        <div class="active-filter-row" data-filter-chip-row="schedule" hidden="hidden"></div>
-        <div class="filter-panel collapsed" data-schedule-filter-panel>
-            <div class="filter-grid">
-                <label>
-                    Subsystém
-                    <select data-schedule-filter-key="subsystem">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.SubsystemyMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Řadit podle
-                    <select data-schedule-filter-key="sortBy">
-                        <option value="project-asc" selected="selected">podle pořadí projektu vzestupně</option>
-                        <option value="project-desc">podle pořadí projektu sestupně</option>
-                        <option value="alpha-asc">abecedně vzestupně (A-Z)</option>
-                        <option value="alpha-desc">abecedně sestupně (Z-A)</option>
-                    </select>
-                </label>
-            </div>
-            <div class="filter-actions">
-                <pm-button variant="Ghost" size="Small" data-filter-save-defaults="schedule">Uložit jako výchozí</pm-button>
-                <span class="filter-save-status" data-filter-save-status="schedule" aria-live="polite"></span>
-            </div>
-        </div>
-    </div>
+    @await Html.PartialAsync("_ProjectFilterShell", Model.FilterShell)
 
     <div class="schedule-project-list" data-project-schedule-list data-subsystem-grouped-shell>
         @if (Model.HarmonogramUkoly.Count == 0)
@@ -76,8 +36,18 @@
                         {
                             <article class="schedule-card"
                                      data-schedule-item
-                                     data-schedule-filter-subsystem="@item.Subsystem"
-                                     data-schedule-filter-subsystem-kod="@item.SubsystemKod"
+                                     data-filter-subsystem="@item.Subsystem"
+                                     data-filter-subsystem-kod="@item.SubsystemKod"
+                                     data-filter-kategorie="@item.Kategorie"
+                                     data-filter-kategorie-kod="@item.KategorieKod"
+                                     data-filter-stav="@item.Stav"
+                                     data-filter-stav-kod="@(item.StavKod ?? string.Empty)"
+                                     data-filter-typ="@(item.TypUkolu ?? string.Empty)"
+                                     data-filter-typ-kod="@(item.TypUkoluKod ?? string.Empty)"
+                                     data-filter-vlastnik="@item.Vlastnik"
+                                     data-filter-vlastnik-id="@item.VlastnikOsobaId"
+                                     data-filter-aktivni="@item.JeAktivni.ToString().ToLowerInvariant()"
+                                     data-filter-jednani-vyjadreni-stav="@string.Join(",", item.JednaniVyjadreniStavyKody)"
                                      data-schedule-subsystem-order="@item.SubsystemPoradi"
                                      data-schedule-subsystem-order-active="@item.SubsystemHasProjectOrder.ToString().ToLowerInvariant()">
                                 <div class="schedule-card-header">
@@ -101,9 +71,7 @@
                                         {
                                             <pm-button variant="Secondary"
                                                        size="Small"
-                                                       data-record-editor-url="@item.ScheduleEditUrl"
-                                                       data-record-editor-project-id="@Model.ProjektId"
-                                                       data-record-editor-label="@($"Upravit záznam #{item.CisloViditelne}")">
+                                                       href="@item.ScheduleEditUrl">
                                                 Upravit
                                             </pm-button>
                                         }

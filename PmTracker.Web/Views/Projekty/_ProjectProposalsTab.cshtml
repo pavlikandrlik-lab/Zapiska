@@ -13,10 +13,7 @@
         <div class="panel-header-actions">
             @if (Model.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.CreateRecordProposalUrl))
             {
-                <pm-button variant="Primary"
-                           data-record-editor-url="@Model.CreateRecordProposalUrl"
-                           data-record-editor-project-id="@Model.ProjektId"
-                           data-record-editor-label="Nový návrh založení záznamu">
+                <pm-button variant="Primary" href="@Model.CreateRecordProposalUrl">
                     Nový návrh záznamu
                 </pm-button>
             }
@@ -65,9 +62,7 @@
                                 {
                                     <pm-button variant="Secondary"
                                                size="Small"
-                                               data-record-editor-url="@item.DetailUrl"
-                                               data-record-editor-project-id="@item.ProjektId"
-                                               data-record-editor-label="@($"Detail návrhu #{item.Id}")">
+                                               href="@item.DetailUrl">
                                         Detail návrhu
                                     </pm-button>
                                 }
@@ -113,9 +108,7 @@
                                 {
                                     <pm-button variant="Secondary"
                                                size="Small"
-                                               data-record-editor-url="@item.PrefillCreateFormUrl"
-                                               data-record-editor-project-id="@item.ProjektId"
-                                               data-record-editor-label="@($"Předvyplnit formulář z návrhu #{item.Id}")">
+                                               href="@item.PrefillCreateFormUrl">
                                         Předvyplnit formulář
                                     </pm-button>
                                 }
@@ -170,9 +163,7 @@
                                 {
                                     <pm-button variant="Secondary"
                                                size="Small"
-                                               data-record-editor-url="@item.DetailUrl"
-                                               data-record-editor-project-id="@item.ProjektId"
-                                               data-record-editor-label="@($"Detail návrhu #{item.Id}")">
+                                               href="@item.DetailUrl">
                                         Detail návrhu
                                     </pm-button>
                                 }

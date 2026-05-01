@@ -31,12 +31,7 @@
     <input class="app-date-display-input" type="text" data-app-date-display value="@Model.DisplayValue" readonly />
     <input type="hidden" name="@Model.Name" value="@Model.IsoValue" data-app-date-value @Html.Raw(extraAttributeMarkup) />
     <button class="app-date-trigger" type="button" data-app-date-open aria-label="@Model.AriaLabel" @(Model.Locked ? "disabled=\"disabled\"" : null)>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="3" y="4.5" width="18" height="16.5" rx="2"></rect>
-            <line x1="8" y1="2.5" x2="8" y2="6.5"></line>
-            <line x1="16" y1="2.5" x2="16" y2="6.5"></line>
-            <line x1="3" y1="9" x2="21" y2="9"></line>
-        </svg>
+        <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
     </button>
     <div class="app-date-panel" data-app-date-panel data-floating-panel data-floating-kind="date" hidden>
         <div class="app-date-nav">

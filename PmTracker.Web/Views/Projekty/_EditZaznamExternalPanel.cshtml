@@ -1,12 +1,6 @@
 @using System.Globalization
 @model ZaznamEditViewModel
-@{
-    var isActive = ViewData["IsActive"] as bool? ?? false;
-}
-
-<div class="record-modal-panel"
-     data-record-modal-panel="external"
-     @(isActive ? null : "hidden=\"hidden\"")>
+<pm-tab-panel key="external" class="record-modal-panel" data-record-modal-panel="external">
     <div class="section-divider">Externí vazby</div>
     <div data-external-links-editor>
         <div class="external-links" data-external-links>
@@ -274,4 +268,4 @@
 
         <pm-button variant="Secondary" data-external-add="true">Přidat externí vazbu</pm-button>
     </div>
-</div>
+</pm-tab-panel>

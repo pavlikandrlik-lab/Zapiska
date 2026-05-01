@@ -38,7 +38,6 @@ public sealed class ZaznamEditViewModel
     public required IReadOnlyList<string> TypyExternichOdkazu { get; set; }
     public string UiContext { get; set; } = "project";
     public int? MeetingId { get; set; }
-    public string Presentation { get; set; } = "modal";
     public string? ReturnUrl { get; set; }
     public string BackUrl { get; set; } = string.Empty;
     public string ActiveEditorTab { get; set; } = "basic";

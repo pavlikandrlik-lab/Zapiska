@@ -7,9 +7,12 @@ using PmTracker.Web.Services.Audit;
 namespace PmTracker.Web.Services;
 
 /// <summary>
-/// Fáze 3C Task 1: RecordService.DeleteRecord.cs — DeleteRecordAsync + soft-delete
-/// policy + cascade audit + priority invalidation.
-/// Další operace (Save, MeetingIdentifier) v samostatných partials.
+/// Fáze 3C Task 1: RecordService.DeleteRecord.cs — DeleteRecordAsync.
+/// 2026-04-27: Refactor (varianta a) — manuální cleanup chain všech 13 child
+/// tabulek byl nahrazen SQL FK CASCADE (db_upgrade_1_3_12_record_delete_cascade.sql).
+/// Aplikace nyní jen načte audit snapshots, smaže parent record a SQL Server
+/// vykaskáduje cleanup. Pokud bude v budoucnu přidána nová child tabulka,
+/// stačí v migraci dát ON DELETE CASCADE — DeleteRecordAsync se nemusí měnit.
 /// </summary>
 public sealed partial class RecordService
 {
@@ -29,102 +32,47 @@ public sealed partial class RecordService
         {
             await using var tx = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
 
-            var historyTypeRows = await dbContext.ZaznamHistorieZmenTypu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-            var historyDeadlineRows = await dbContext.ZaznamHistorieTerminu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-            var historyOwnerRows = await dbContext.ZaznamHistorieVlastnik.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-            var historySubsystemRows = await dbContext.ZaznamHistorieSubsystem.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-            var historyStateRows = await dbContext.ZaznamHistorieStavuZaznamu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-            var historyProjectStateRows = await dbContext.ZaznamHistorieStavuProjektu.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-            var externalLinkRows = await dbContext.ZaznamExterniOdkazy.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-            var collaborationRows = await dbContext.ZaznamSpoluprace.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-            var scheduleRows = await dbContext.ZaznamHarmonogramHodnoty.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-            var commentRows = await dbContext.Vyjadreni.Where(x => x.ZaznamId == command.ZaznamId).ToListAsync(ct);
-            var oldRecord = RecordAuditSnapshot.FromEntity(record);
-            var oldScheduleSnapshot = RecordScheduleAuditSnapshot.FromEntities(command.ZaznamId, scheduleRows);
-            var oldCommentSnapshots = commentRows.Select(CommentAuditSnapshot.FromEntity).ToList();
-
-            if (historyTypeRows.Count > 0)
-            {
-                dbContext.ZaznamHistorieZmenTypu.RemoveRange(historyTypeRows);
-            }
-
-            if (historyDeadlineRows.Count > 0)
-            {
-                dbContext.ZaznamHistorieTerminu.RemoveRange(historyDeadlineRows);
-            }
-
-            if (historyOwnerRows.Count > 0)
-            {
-                dbContext.ZaznamHistorieVlastnik.RemoveRange(historyOwnerRows);
-            }
-
-            if (historySubsystemRows.Count > 0)
-            {
-                dbContext.ZaznamHistorieSubsystem.RemoveRange(historySubsystemRows);
-            }
-
-            if (historyStateRows.Count > 0)
-            {
-                dbContext.ZaznamHistorieStavuZaznamu.RemoveRange(historyStateRows);
-            }
-
-            if (historyProjectStateRows.Count > 0)
-            {
-                dbContext.ZaznamHistorieStavuProjektu.RemoveRange(historyProjectStateRows);
-            }
-
-            if (externalLinkRows.Count > 0)
-            {
-                dbContext.ZaznamExterniOdkazy.RemoveRange(externalLinkRows);
-            }
-
-            if (collaborationRows.Count > 0)
-            {
-                dbContext.ZaznamSpoluprace.RemoveRange(collaborationRows);
-            }
-
-            if (scheduleRows.Count > 0)
-            {
-                dbContext.ZaznamHarmonogramHodnoty.RemoveRange(scheduleRows);
-            }
-
-            if (commentRows.Count > 0)
-            {
-                dbContext.Vyjadreni.RemoveRange(commentRows);
-            }
-
-            var priorityRows = await dbContext.ZaznamPriorityUzivatelu
+            // Audit snapshots — fetch s AsNoTracking, protože entity jsou jen pro audit
+            // payload, ne pro modifikaci. Po SQL CASCADE budou tyto rows smazané;
+            // tracked stav by zůstal stale a způsoboval by potenciální concurrency
+            // exceptions při následných SaveChanges v tom samém DbContext.
+            var scheduleRowsForAudit = await dbContext.ZaznamHarmonogramHodnoty
+                .AsNoTracking()
                 .Where(x => x.ZaznamId == command.ZaznamId)
                 .ToListAsync(ct);
-            if (priorityRows.Count > 0)
-            {
-                dbContext.ZaznamPriorityUzivatelu.RemoveRange(priorityRows);
-            }
+            var commentRowsForAudit = await dbContext.Vyjadreni
+                .AsNoTracking()
+                .Where(x => x.ZaznamId == command.ZaznamId)
+                .ToListAsync(ct);
 
-            if (historyTypeRows.Count > 0
-                || historyDeadlineRows.Count > 0
-                || historyOwnerRows.Count > 0
-                || historySubsystemRows.Count > 0
-                || historyStateRows.Count > 0
-                || historyProjectStateRows.Count > 0
-                || externalLinkRows.Count > 0
-                || collaborationRows.Count > 0
-                || scheduleRows.Count > 0
-                || commentRows.Count > 0
-                || priorityRows.Count > 0)
-            {
-                await dbContext.SaveChangesAsync(ct);
-            }
+            var oldRecord = RecordAuditSnapshot.FromEntity(record);
+            var oldScheduleSnapshot = RecordScheduleAuditSnapshot.FromEntities(command.ZaznamId, scheduleRowsForAudit);
+            var oldCommentSnapshots = commentRowsForAudit.Select(CommentAuditSnapshot.FromEntity).ToList();
 
+            // SQL FK CASCADE (per db_upgrade_1_3_12) zajistí cleanup všech 13
+            // child tabulek. Aplikační logika nemusí explicitně mazat:
+            //   - 6× zaznam_historie_*           (CASCADE)
+            //   - zaznam_externi_odkazy          (CASCADE)
+            //   - zaznam_spoluprace              (CASCADE)
+            //   - vyjadreni                      (CASCADE)
+            //   - zaznam_priority_uzivatelu      (CASCADE)
+            //   - zaznam_harmonogram_hodnoty     (CASCADE — FK přidána v 1_3_12)
+            //   - zaznam_harmonogram_vyjadreni_vazba (CASCADE — od 1_3_6)
+            //   - zaznam_navrhy.zaznam_id        (CASCADE)
+            //   - zaznam_navrhy.approved_record_id (SET NULL — preserve audit
+            //                                        proposals které tento záznam
+            //                                        vytvořily)
             dbContext.ProjektoveZaznamy.Remove(record);
             await dbContext.SaveChangesAsync(ct);
+
             auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
                 AuditActionType.Delete,
                 AuditEntityType.Record,
                 command.ZaznamId.ToString(CultureInfo.InvariantCulture),
                 oldRecord,
                 null));
-            if (scheduleRows.Count > 0)
+
+            if (scheduleRowsForAudit.Count > 0)
             {
                 auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
                     AuditActionType.Delete,

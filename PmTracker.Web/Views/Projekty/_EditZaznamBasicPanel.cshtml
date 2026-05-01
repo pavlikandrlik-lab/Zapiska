@@ -2,7 +2,6 @@
 @model ZaznamEditViewModel
 @inject PmTracker.Web.Services.Common.IRichTextContentService RichTextContentService
 @{
-    var isActive = ViewData["IsActive"] as bool? ?? false;
     var selectedOwnerLabel = Model.Vlastnici
         .FirstOrDefault(x => string.Equals(x.Value, Model.VlastnikId.ToString(), StringComparison.Ordinal))?.Label ?? string.Empty;
     var metadataLocked = !Model.AllowBasicMetadataEdit;
@@ -18,9 +17,7 @@
     var safeDescriptionHtml = RichTextContentService.ToSafeHtml(Model.Popis);
 }
 
-<div class="record-modal-panel @(isActive ? "active" : null)"
-     data-record-modal-panel="basic"
-     @(isActive ? null : "hidden=\"hidden\"")>
+<pm-tab-panel key="basic" class="record-modal-panel" data-record-modal-panel="basic">
     <div class="record-form-row record-form-row-top" data-record-row-top data-has-type="@(showTaskType ? "true" : "false")">
         <label for="kategorie">
             Kategorie záznamu
@@ -266,4 +263,4 @@
             </div>
         </label>
     </div>
-</div>
+</pm-tab-panel>

@@ -12,12 +12,19 @@
     BackLabel = Model.BackLabel
 })
 
-<pm-alert variant="Info" role="status">
-    <strong>Read-only pohled.</strong>
-    Role a permission keys jsou definovány v kódu aplikace
-    (<code>PermissionSeedConfiguration.cs</code>) a aplikují se při nasazení.
-    Přidání nebo změna vyžaduje pull request a deploy.
-</pm-alert>
+@{
+    var seedOnlySections = new HashSet<string> { "role", "akce", "role-akce", "uzivatele-role", "efektivni-prava" };
+    var isSeedOnlySection = seedOnlySections.Contains(Model.AktivniPanel.SectionKey);
+}
+@if (isSeedOnlySection)
+{
+    <pm-alert variant="Info" role="status">
+        <strong>Read-only pohled.</strong>
+        Role a permission keys jsou definovány v kódu aplikace
+        (<code>PermissionSeedConfiguration.cs</code>) a aplikují se při nasazení.
+        Přidání nebo změna vyžaduje pull request a deploy.
+    </pm-alert>
+}
 
 <div class="settings-layout" data-settings-shell data-panel-url="@Url.Action("Panel", "Nastaveni")">
     <aside class="settings-sidebar card">

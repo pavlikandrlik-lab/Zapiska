@@ -20,18 +20,8 @@ public sealed class RecordEditorControllerTests
         _fixture = fixture;
     }
 
-    [Theory]
-    // Fáze 2E: <gov-dialog data-modal-variant="record-editor"> nahradil custom .modal-overlay
-    // markup (viz Views/Shared/_ModalLayout.cshtml). Test teď kontroluje gov-dialog marker.
-    [InlineData(null, true, "modal", "data-modal-variant=\"record-editor\"")]
-    [InlineData(null, false, "page", "record-editor-page-shell")]
-    [InlineData("page", true, "page", "record-editor-page-shell")]
-    [InlineData("modal", false, "modal", "data-modal-variant=\"record-editor\"")]
-    public async Task Edit_ShouldRenderExpectedPresentation(
-        string? presentation,
-        bool ajaxRequest,
-        string expectedPresentation,
-        string expectedMarker)
+    [Fact]
+    public async Task Edit_ShouldRenderPageEditor()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiEditPresenter");
         var projectId = await _fixture.EnsureProjectAsync("APIRED1");
@@ -39,24 +29,11 @@ public sealed class RecordEditorControllerTests
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API presentation record");
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var url = $"/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}";
-        if (!string.IsNullOrWhiteSpace(presentation))
-        {
-            url += $"&presentation={presentation}";
-        }
-
-        var request = new HttpRequestMessage(HttpMethod.Get, url);
-        if (ajaxRequest)
-        {
-            request.Headers.Add("X-Requested-With", "XMLHttpRequest");
-        }
-
-        var response = await client.SendAsync(request);
+        var response = await client.GetAsync($"/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain(expectedMarker);
-        html.Should().Contain($"data-record-editor-presentation=\"{expectedPresentation}\"");
+        html.Should().Contain("record-editor-page-shell");
         html.Should().Contain("data-record-owner-picker");
         html.Should().Contain("office-searchbox\" data-floating-anchor");
         Regex.IsMatch(
@@ -367,7 +344,6 @@ public sealed class RecordEditorControllerTests
                 ("Subsystem", subsystemCode),
                 ("CisloZaznamu", record.CisloZaznamu.ToString()),
                 ("EditorTab", "basic"),
-                ("Presentation", "page"),
                 ("ReturnUrl", returnUrl)));
 
         var response = await client.SendAsync(request);
@@ -437,8 +413,7 @@ public sealed class RecordEditorControllerTests
                 ("TerminUkonceni", record.DatumUkonceni.ToString("yyyy-MM-dd")),
                 ("Subsystem", subsystemCode),
                 ("CisloZaznamu", record.CisloZaznamu.ToString()),
-                ("EditorTab", "basic"),
-                ("Presentation", "modal")));
+                ("EditorTab", "basic")));
 
         var response = await client.SendAsync(request);
         var content = await response.Content.ReadAsStringAsync();
@@ -514,8 +489,7 @@ public sealed class RecordEditorControllerTests
                 ("TerminUkonceni", record.DatumUkonceni.ToString("yyyy-MM-dd")),
                 ("Subsystem", subsystemCode),
                 ("CisloZaznamu", record.CisloZaznamu.ToString()),
-                ("EditorTab", "basic"),
-                ("Presentation", "modal")));
+                ("EditorTab", "basic")));
 
         var response = await client.SendAsync(request);
         var content = await response.Content.ReadAsStringAsync();
@@ -603,7 +577,6 @@ public sealed class RecordEditorControllerTests
                 ("Subsystem", subsystemCode),
                 ("CisloZaznamu", record.CisloZaznamu.ToString()),
                 ("EditorTab", "schedule"),
-                ("Presentation", "modal"),
                 ("HarmonogramHodnoty[0].TypId", durationTypeId.ToString()),
                 ("HarmonogramHodnoty[0].Hodnota", "5"),
                 ("HarmonogramHodnoty[1].TypId", delayTypeId.ToString()),
@@ -639,7 +612,7 @@ public sealed class RecordEditorControllerTests
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API schedule layout record");
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync($"/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}&presentation=page");
+        var response = await client.GetAsync($"/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
@@ -710,7 +683,6 @@ public sealed class RecordEditorControllerTests
                 ("Subsystem", subsystemCode),
                 ("CisloZaznamu", record.CisloZaznamu.ToString()),
                 ("EditorTab", "external"),
-                ("Presentation", "modal"),
                 ("ExterniVazby[0].Typ", "PMP"),
                 ("ExterniVazby[0].Cislo", "PMP-123"),
                 ("ExterniVazby[0].PredpokladanaCena", "125000.50"),
@@ -745,7 +717,7 @@ public sealed class RecordEditorControllerTests
         await _fixture.EnsureSubsystemAsync("APIREDSUB4", ownerId);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync($"/Zaznamy/Create?projektId={projectId}&asUser={_fixture.AdminOsobaId}&presentation=page");
+        var response = await client.GetAsync($"/Zaznamy/Create?projektId={projectId}&asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
@@ -778,7 +750,7 @@ public sealed class RecordEditorControllerTests
         }
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync($"/Zaznamy/Create?projektId={projectId}&jednaniId={meetingId}&uiContext=meeting&asUser={_fixture.AdminOsobaId}&presentation=modal");
+        var response = await client.GetAsync($"/Zaznamy/Create?projektId={projectId}&jednaniId={meetingId}&uiContext=meeting&asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
@@ -848,7 +820,6 @@ public sealed class RecordEditorControllerTests
                 ("Subsystem", subsystemCode),
                 ("CisloZaznamu", "0"),
                 ("EditorTab", "basic"),
-                ("Presentation", "modal"),
                 ("UiContext", "meeting"),
                 ("MeetingId", meetingId.ToString())));
 

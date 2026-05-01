@@ -18,4 +18,11 @@ public sealed class SyncJobSettingsCardViewModel
     public DateTime? RunStartedAt { get; init; }
 
     public bool CanManage { get; init; }
+
+    /// <summary>
+    /// Read-only ukázka nejbližších naplánovaných spuštění (typicky 4) — vypočítáno
+    /// z AnchorAt + PeriodMinutes. Slouží jen jako vizuální feedback, mění se až
+    /// po uložení karty. Pokud job není IsEnabled, je seznam prázdný.
+    /// </summary>
+    public IReadOnlyList<DateTimeOffset> UpcomingRuns { get; init; } = Array.Empty<DateTimeOffset>();
 }

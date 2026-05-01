@@ -51,25 +51,87 @@ public sealed class GovComponentsReplacementTests
     }
 
     /// <summary>
-    /// Záznamy na Projekty/Index: switche skrýt hotové / skrýt smazané záměrně NEBYLY
-    /// nahrazeny za gov-form-switch. Důvod: JS vrstva (pageSwitchers.js) používá
-    /// querySelector('[data-project-status-hide]') a instanceof HTMLInputElement.
-    /// gov-form-switch renderuje interní input přes shadow DOM — querySelector by nenašel
-    /// HTMLInputElement a filtrace by přestala fungovat. Ponechány původní label+input.
+    /// Filtry projektů (Index a _ProjectRecordsTab) jsou nahrazeny za <gov-form-switch>
+    /// Web Component. JS vrstva čte property `checked` na komponentě (reflektovaná na atribut)
+    /// a poslouchá `gov-change` event místo native `change`. Aproximace `.gov-switch` (label+input
+    /// + track + thumb) byla z site.css odstraněna.
     /// </summary>
     [Fact]
-    public void ProjektyIndex_MaGovFormSwitch_ProSkrytHotove_A_SkrytSmazane()
+    public void ProjektyIndex_PouzivaGovFormSwitch_ProSkrytHotoveASkrytSmazane()
     {
         var content = ReadView("Projekty", "Index.cshtml");
 
-        // Záměrně ponechané — musí existovat původní input s data-project-status-hide
+        content.Should().Contain("<gov-form-switch",
+            "Index.cshtml musí používat <gov-form-switch> Web Component");
         content.Should().Contain("data-project-status-hide",
-            "Index.cshtml musí obsahovat data-project-status-hide pro JS filtraci (gov-form-switch nelze použít — shadow DOM)");
+            "Index.cshtml musí mít data-project-status-hide na komponentě (light DOM atribut)");
+        content.Should().NotContain("class=\"gov-switch\"",
+            "Index.cshtml nesmí obsahovat starou .gov-switch CSS aproximaci");
 
-        // Filtry v _ProjectRecordsTab jsou také záměrně ponechány
+        // 2026-04-30: filter shell extrahován do sdíleného partialu _ProjectFilterShell.cshtml
+        // (mountován v Records i Schedule tabech). Spec project-filter-unification-design.
+        var filterShell = ReadView("Projekty", "_ProjectFilterShell.cshtml");
+        filterShell.Should().Contain("<gov-form-switch",
+            "_ProjectFilterShell.cshtml (sdílený partial) musí používat <gov-form-switch>");
+        filterShell.Should().Contain("data-filter-key",
+            "_ProjectFilterShell.cshtml musí mít data-filter-key na komponentě");
+        filterShell.Should().NotContain("class=\"gov-switch",
+            "_ProjectFilterShell.cshtml nesmí obsahovat starou .gov-switch CSS aproximaci");
+
         var recordsTab = ReadView("Projekty", "_ProjectRecordsTab.cshtml");
-        recordsTab.Should().Contain("data-filter-key",
-            "_ProjectRecordsTab.cshtml musí obsahovat data-filter-key pro JS filtraci (gov-form-switch nelze použít — shadow DOM)");
+        recordsTab.Should().Contain("PartialAsync(\"_ProjectFilterShell\"",
+            "_ProjectRecordsTab.cshtml musí mountovat sdílený filter shell partial (DRY)");
+
+        var projectModal = ReadView("Projekty", "ProjectModal.cshtml");
+        projectModal.Should().Contain("<gov-form-switch",
+            "ProjectModal.cshtml musí používat <gov-form-switch>");
+        projectModal.Should().NotContain("class=\"gov-switch\"",
+            "ProjectModal.cshtml nesmí obsahovat starou .gov-switch CSS aproximaci");
+    }
+
+    /// <summary>
+    /// site.css nesmí obsahovat CSS aproximaci .gov-switch* — gov-form-switch
+    /// je Web Component s vlastním shadow DOM stylingem.
+    /// </summary>
+    [Fact]
+    public void SiteCss_NeobsahujeAproximaciGovSwitch()
+    {
+        var siteCssPath = Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "css", "site.css");
+        var content = File.ReadAllText(siteCssPath);
+
+        content.Should().NotMatchRegex(@"^\s*\.gov-switch\s*\{",
+            "site.css nesmí obsahovat .gov-switch CSS aproximaci");
+        content.Should().NotMatchRegex(@"^\s*\.gov-switch-track\s*\{",
+            "site.css nesmí obsahovat .gov-switch-track CSS aproximaci");
+        content.Should().NotMatchRegex(@"^\s*\.gov-switch-thumb\s*\{",
+            "site.css nesmí obsahovat .gov-switch-thumb CSS aproximaci");
+    }
+
+    /// <summary>
+    /// Pseudo-třída CSS `:checked` matchuje pouze native form controls
+    /// (input[type=checkbox/radio], option). Pro custom elementy jako
+    /// &lt;gov-form-switch&gt; nikdy nematchuje, i když má atribut `checked`.
+    /// Důsledek: pravidla typu `:has([data-filter-key]:checked)` na
+    /// gov-form-switch nikdy neaplikují grouped view, a `:not(:checked)`
+    /// se aplikuje VŽDY (custom element není :checked) → flat shell zůstává
+    /// viditelný i s zapnutým toggle a nikdo nevidí žádné záznamy.
+    /// Místo toho používat atribut selektor `[checked]`, který Stencil
+    /// reflektuje na custom elementech.
+    /// User report 2026-04-25: "při zapnuté možnosti seskupit dle subsystému
+    /// neukáže žádný záznam".
+    /// </summary>
+    [Fact]
+    public void SiteCss_NepouzivaCheckedPseudoClassuNaGovFormSwitchSelektorech()
+    {
+        var siteCssPath = Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "css", "site.css");
+        var content = File.ReadAllText(siteCssPath);
+
+        content.Should().NotMatchRegex(
+            @"\[data-filter-key=""groupBySubsystem""\]\s*:\s*(?:not\s*\(\s*)?:\s*checked",
+            "site.css nesmí používat :checked / :not(:checked) na "
+            + "[data-filter-key='groupBySubsystem'] — element je <gov-form-switch> "
+            + "(custom element), na který CSS pseudo-třída :checked nematchuje. "
+            + "Použij místo toho atribut selektor [checked] / :not([checked]).");
     }
 
     /// <summary>

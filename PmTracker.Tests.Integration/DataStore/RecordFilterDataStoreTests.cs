@@ -68,7 +68,7 @@ public sealed class RecordFilterDataStoreTests
         meetingCommentStates[decisionRecordId].Should().Contain(draftStateId);
         meetingCommentStates[decisionRecordId].Should().NotContain(openStateId);
 
-        recordsTab.Filtry.StavyJednaniVyjadreni.Select(x => x.Value)
+        recordsTab.FilterShell.StavyJednaniVyjadreni.Select(x => x.Value)
             .Should()
             .Contain([draftStateId, openStateId]);
     }

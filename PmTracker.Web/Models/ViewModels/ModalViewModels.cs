@@ -111,6 +111,31 @@ public sealed class DeleteRecordModalViewModel
     public int ExterniVazbyCount { get; init; }
     public int SpolupraceCount { get; init; }
     public int HarmonogramCount { get; init; }
+
+    /// <summary>
+    /// Počet harvestnutých vyjádření v <c>zaznam_harmonogram_vyjadreni_vazba</c>
+    /// (audit historie z ServiceDesk drill-down). Bývá řádově vyšší než <see cref="VyjadreniCount"/>.
+    /// </summary>
+    public int HarvestVyjadreniCount { get; init; }
+
+    /// <summary>
+    /// Počet návrhů úprav (proposals) cílených na tento záznam (zaznam_id).
+    /// Po smazání se cascade smažou (FK CASCADE od db_upgrade_1_3_12).
+    /// </summary>
+    public int NavrhyTargetCount { get; init; }
+
+    /// <summary>
+    /// Počet návrhů které tento záznam vytvořily (approved_record_id).
+    /// Po smazání se zachovají (FK SET NULL) — audit historie proposalu zůstává,
+    /// jen ztrácí link na (smazaný) výsledný záznam.
+    /// </summary>
+    public int NavrhyOriginCount { get; init; }
+
+    /// <summary>
+    /// Souhrnný počet záznamů ze 6 historie tabulek (zmen_typu, terminu, vlastnik,
+    /// subsystem, stavu_zaznamu, stavu_projektu). Po smazání cascade-deleted.
+    /// </summary>
+    public int HistorieCount { get; init; }
 }
 
 public sealed class AssignMeetingIdentifierModalViewModel

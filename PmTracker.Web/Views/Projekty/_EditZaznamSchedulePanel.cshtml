@@ -1,13 +1,10 @@
 @model ZaznamEditViewModel
-@{
-    var isActive = ViewData["IsActive"] as bool? ?? false;
-}
 
-<div class="record-modal-panel @(isActive ? "active" : null)"
-     data-record-modal-panel="schedule"
-     data-record-schedule-panel
-     @(isActive ? null : "hidden=\"hidden\"")
-     @(Model.JeUkolKategorie ? null : "data-schedule-disabled=\"true\"")>
+<pm-tab-panel key="schedule"
+              class="record-modal-panel"
+              data-record-modal-panel="schedule"
+              data-record-schedule-panel
+              @(Model.JeUkolKategorie ? null : "data-schedule-disabled=\"true\"")>
     <p class="muted" data-record-schedule-note @(Model.JeUkolKategorie ? "hidden=\"hidden\"" : null)>Harmonogram je dostupný pouze pro záznamy v kategorii úkol.</p>
     @await Html.PartialAsync("_ScheduleBlock", Model.HarmonogramBlok)
-</div>
+</pm-tab-panel>

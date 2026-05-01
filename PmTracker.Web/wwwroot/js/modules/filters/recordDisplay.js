@@ -423,8 +423,10 @@ export function applyRecordsView(view) {
         return;
     }
 
+    // groupBySubsystem je nyní <gov-form-switch> (Web Component); `.checked` property
+    // funguje stejně jako u HTMLInputElement (reflektovaný atribut).
     const groupBySubsystemInput = getProjectFilterInput("records", "groupBySubsystem");
-    const resolvedView = groupBySubsystemInput instanceof HTMLInputElement
+    const resolvedView = groupBySubsystemInput instanceof HTMLElement
         ? (groupBySubsystemInput.checked ? "subsystem" : "flat")
         : view;
 

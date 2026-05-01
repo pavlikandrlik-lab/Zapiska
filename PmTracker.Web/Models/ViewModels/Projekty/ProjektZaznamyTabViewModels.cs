@@ -6,7 +6,12 @@ public sealed class ProjektZaznamyTabViewModel
     public bool DleSubsystemu { get; init; }
     public IReadOnlyList<ProjektZaznamGroupViewModel> SkupinyZaznamu { get; init; } = Array.Empty<ProjektZaznamGroupViewModel>();
     public IReadOnlyList<ProjektZaznamCardShellViewModel> Zaznamy { get; init; } = Array.Empty<ProjektZaznamCardShellViewModel>();
-    public ProjektFiltryViewModel Filtry { get; init; } = new();
+
+    /// <summary>
+    /// Sdílený filter shell — identický s <see cref="ProjektHarmonogramTabViewModel.FilterShell"/>.
+    /// Render přes <c>_ProjectFilterShell.cshtml</c>. Spec 2026-04-30-project-filter-unification-design.
+    /// </summary>
+    public ProjectFilterShellViewModel FilterShell { get; init; } = new();
     public int CurrentUserOsobaId { get; set; }
     public bool CanManageRecords { get; set; }
     public bool CanCreateRecordProposal { get; set; }

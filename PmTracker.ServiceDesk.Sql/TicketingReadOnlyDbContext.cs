@@ -39,8 +39,23 @@ public sealed class TicketingReadOnlyDbContext : DbContext
             e.ToTable("HOT_ZAZNAMY", "dbo");
             e.HasKey(x => x.Radek);
 
-            e.Property(x => x.Radek).HasColumnName("radek");
-            e.Property(x => x.Id).HasColumnName("id");
+            // V reálné HOT_ZAZNAMY je `radek` typu INT, ale entita ho má jako long
+            // (defensivně proti přetečení). SqlBuffer.get_Int64 nedělá widening Int32→Int64,
+            // takže EF musí dostat HasConversion<int> aby četl GetInt32 a převedl na long.
+            // Bez něj: InvalidCastException při materializaci HotZaznamEntity.
+            e.Property(x => x.Radek).HasColumnName("radek").HasConversion<int>();
+            // V reálné intranetNEW.dbo.HOT_ZAZNAMY je sloupec `id` typu INT NULL,
+            // ale celá appka pracuje s 6-ciferným číslem tiketu jako stringem
+            // (regex v SDConnector, DTO HotZaznamDto.Id, fingerprint key).
+            // Custom converter: NULL/empty string ↔ NULL v DB, jinak int.Parse.
+            // Bez něj EF Core hodí InvalidCastException při materializaci HotZaznamEntity
+            // (DB hodnota INT, property string). Memory: "Ticket bez id = mimo scope" —
+            // testy seedují empty string Id pro tento edge-case, converter to musí honorovat.
+            e.Property(x => x.Id)
+                .HasColumnName("id")
+                .HasConversion(
+                    s => string.IsNullOrEmpty(s) ? (int?)null : int.Parse(s, System.Globalization.CultureInfo.InvariantCulture),
+                    i => i.HasValue ? i.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty);
             e.Property(x => x.TypZaznamu).HasColumnName("typ_zaznamu").HasMaxLength(5);
             e.Property(x => x.Strucne).HasColumnName("strucne").HasMaxLength(250);
             e.Property(x => x.Popis).HasColumnName("popis");
@@ -73,7 +88,9 @@ public sealed class TicketingReadOnlyDbContext : DbContext
         {
             e.ToTable("HOT_KALKULACE", "dbo");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("id");
+            // HOT_KALKULACE.id je INT v reálné DB; entita má long pro defensivní headroom.
+            // HasConversion<int>() nutné aby SqlDataReader nečetl GetInt64 (= InvalidCastException).
+            e.Property(x => x.Id).HasColumnName("id").HasConversion<int>();
             e.Property(x => x.Pid).HasColumnName("pid");
             e.Property(x => x.IdKalk).HasColumnName("id_kalk");
             e.Property(x => x.Verze).HasColumnName("verze");
@@ -108,14 +125,18 @@ public sealed class TicketingReadOnlyDbContext : DbContext
         {
             e.ToTable("HOT_VYJADRENI", "dbo");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("id");
+            // HOT_VYJADRENI.id je INT v reálné DB; entita má long.
+            // HasConversion<int>() — viz Radek/HotKalkulace komentář.
+            e.Property(x => x.Id).HasColumnName("id").HasConversion<int>();
             e.Property(x => x.Typ).HasColumnName("typ").HasMaxLength(10);
             e.Property(x => x.Pid).HasColumnName("pid").HasMaxLength(50);
             e.Property(x => x.Datum).HasColumnName("datum");
             e.Property(x => x.Zpracoval).HasColumnName("zpracoval").HasMaxLength(200);
             e.Property(x => x.Popis).HasColumnName("popis");
             e.Property(x => x.Tym).HasColumnName("tym").HasMaxLength(50);
-            e.Property(x => x.ViditelneDodavateli).HasColumnName("viditelne_dodavateli");
+            // viditelne_dodavateli je TINYINT v reálné DB; entita má int? pro DTO kontrakt.
+            // Bez HasConversion<byte?>() volá EF GetInt32 → InvalidCastException Byte → Int32.
+            e.Property(x => x.ViditelneDodavateli).HasColumnName("viditelne_dodavateli").HasConversion<byte?>();
 
             e.HasIndex(x => x.Pid).HasDatabaseName("ix_hot_vyjadreni_pid");
         });

@@ -54,7 +54,7 @@ public sealed class ZaznamyControllerEditAuthzTests
         var controller = BuildController(db, recordService.Object, harvestScheduler.Object, recordUiFlow.Object,
             BuildUserContext(globalKeys: Array.Empty<string>(), projectKeys: new Dictionary<int, IReadOnlySet<string>>()));
 
-        var result = await controller.Edit(RecordId, presentation: null, returnUrl: null, CancellationToken.None);
+        var result = await controller.Edit(RecordId, returnUrl: null, CancellationToken.None);
 
         result.Should().BeOfType<ForbidResult>();
         recordService.Verify(x => x.BuildZaznamEditAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
@@ -92,7 +92,7 @@ public sealed class ZaznamyControllerEditAuthzTests
         var controller = BuildController(db, recordService.Object, harvestScheduler.Object, recordUiFlow.Object,
             BuildUserContext(globalKeys: Array.Empty<string>(), projectKeys: projectKeys));
 
-        var result = await controller.Edit(RecordId, presentation: null, returnUrl: null, CancellationToken.None);
+        var result = await controller.Edit(RecordId, returnUrl: null, CancellationToken.None);
 
         result.Should().BeOfType<ViewResult>();
         harvestScheduler.Verify(x => x.ScheduleHarvestForRecordAsync(It.IsAny<int>(), It.IsAny<CancellationToken>(), It.IsAny<SdReactiveSource>()), Times.Never,

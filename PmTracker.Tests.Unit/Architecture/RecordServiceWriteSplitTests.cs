@@ -65,6 +65,11 @@ public sealed class RecordServiceWriteSplitTests
     {
         var file = ResolvePath("PmTracker.Web/Services/RecordService.SaveRecord.cs");
         var loc = File.ReadAllLines(file).Length;
-        loc.Should().BeLessThan(1600, "SaveRecord může být velký ale < 1600 LOC (obsahuje SaveRecordAsync + všechny validační a harmonogram helpery)");
+        // 2026-04-27: bump 1600 → 1700 po fix bugu UNEXPECTED_SERVER_ERROR
+        // pro smazání externí vazby s harvestnutými vyjádřeními. Replace přepsán
+        // z naivního RemoveRange+Add na UPSERT s pre-flight FK-lock detekcí
+        // (~54 řádků). Pokud LOC dále poroste, zvážit extrakci do partial
+        // RecordService.ExternalLinks.cs.
+        loc.Should().BeLessThan(1700, "SaveRecord může být velký ale < 1700 LOC (obsahuje SaveRecordAsync + všechny validační a harmonogram helpery + UPSERT pro externí vazby)");
     }
 }

@@ -367,19 +367,10 @@ public sealed class ProjektyControllerBehaviorTests
                 DleSubsystemu = true,
                 Zaznamy = [],
                 SkupinyZaznamu = [],
-                Filtry = new ProjektFiltryViewModel
+                FilterShell = new ProjectFilterShellViewModel
                 {
-                    Subsystemy = [],
-                    SubsystemyMoznosti = [],
-                    Kategorie = [],
-                    KategorieMoznosti = [],
-                    StavyUkolu = [],
-                    StavyUkoluMoznosti = [],
-                    TypyUkolu = [],
-                    TypyUkoluMoznosti = [],
-                    Vlastnici = [],
-                    VlastniciMoznosti = [],
-                    StavyJednaniVyjadreni = []
+                    ProjektId = projectId,
+                    Scope = "records"
                 }
             },
             HarmonogramTab = new ProjektLazyTabShellViewModel { TabKey = "harmonogram", LoadingText = "Načítání harmonogramu..." },
@@ -422,7 +413,7 @@ public sealed class ProjektyControllerBehaviorTests
                 DleSubsystemu = RecordsTab.DleSubsystemu,
                 Zaznamy = RecordsTab.Zaznamy,
                 SkupinyZaznamu = RecordsTab.SkupinyZaznamu,
-                Filtry = RecordsTab.Filtry,
+                FilterShell = RecordsTab.FilterShell,
                 CurrentUserOsobaId = RecordsTab.CurrentUserOsobaId,
                 CanManageRecords = RecordsTab.CanManageRecords,
                 CreateRecordEditorUrl = RecordsTab.CreateRecordEditorUrl,
@@ -440,7 +431,7 @@ public sealed class ProjektyControllerBehaviorTests
             {
                 ProjektId = id,
                 HarmonogramUkoly = ScheduleTab.HarmonogramUkoly,
-                SubsystemyMoznosti = ScheduleTab.SubsystemyMoznosti
+                FilterShell = ScheduleTab.FilterShell
             });
 
         public Task<ProjektJednaniTabViewModel> BuildProjectMeetingsTabAsync(int id, CancellationToken ct = default)

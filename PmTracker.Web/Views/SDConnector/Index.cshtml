@@ -8,19 +8,19 @@
         <h1>Diagnostika ServiceDesk konektoru</h1>
         <p class="pm-sdconnector__subtitle">Přehled harvestu vyjádření z intranetNEW. Admin-only (permission: settings.manage).</p>
         <p class="pm-sdconnector__actions">
-            <a asp-action="Inspect" class="pm-sdconnector__link">
+            <pm-button variant="Ghost" size="Small" href="@Url.Action("Inspect")">
                 Prozkoumat konkrétní ticket →
-            </a>
+            </pm-button>
         </p>
     </header>
 
     @if (TempData["SDConnectorMessage"] is string okMsg)
     {
-        <gov-alert variant="success" role="status">@okMsg</gov-alert>
+        <pm-alert variant="Success">@okMsg</pm-alert>
     }
     @if (TempData["SDConnectorError"] is string errMsg)
     {
-        <gov-alert variant="error" role="alert">@errMsg</gov-alert>
+        <pm-alert variant="Error">@errMsg</pm-alert>
     }
 
     <section class="pm-sdconnector__kpi">
@@ -93,7 +93,7 @@
                                 <form method="post" asp-action="ReHarvest" class="pm-sdconnector__action-form">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="externiOdkazId" value="@row.ExterniOdkazId" />
-                                    <button type="submit" class="pm-sdconnector__btn">Re-harvest</button>
+                                    <pm-button variant="Secondary" size="Small" native-type="submit">Re-harvest</pm-button>
                                 </form>
                             </td>
                         </tr>

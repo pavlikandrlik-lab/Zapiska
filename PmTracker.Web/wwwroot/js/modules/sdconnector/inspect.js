@@ -13,11 +13,17 @@
             headers: { 'Accept': 'application/json' },
             credentials: 'same-origin'
         });
-        // 400 BadRequest také obsahuje strukturovaný SDConnectorLoadResponse s Error field.
-        if (!resp.ok && resp.status !== 400) {
+        // 400 BadRequest a 500 InternalServerError obsahují strukturovaný SDConnectorLoadResponse
+        // s Error field — controller v něm posílá diagnostiku [stage=...] + exception details.
+        // Chceme ji propsat do UI místo generické "HTTP 500".
+        if (!resp.ok && resp.status !== 400 && resp.status !== 500) {
             throw new Error('HTTP ' + resp.status);
         }
         const data = await resp.json();
+        if (!resp.ok && data && data.error) {
+            // Surface server-side diagnostic message (typ exception + stage + stack trace).
+            throw new Error(data.error);
+        }
         try {
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ts: Date.now(), cislo: cislo, data: data }));
         } catch (_) {
@@ -144,6 +150,19 @@
             el.dataset.kind = kind;
         } else {
             delete el.dataset.kind;
+        }
+        // Pro error kind zachovej multi-line formátování (stack trace ze server-side
+        // diagnostiky obsahuje newlines). Bez pre-wrap by se vše zploštilo do jednoho řádku.
+        if (kind === 'error') {
+            el.style.whiteSpace = 'pre-wrap';
+            el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, monospace';
+            el.style.fontSize = '0.85em';
+            el.style.userSelect = 'text';
+        } else {
+            el.style.whiteSpace = '';
+            el.style.fontFamily = '';
+            el.style.fontSize = '';
+            el.style.userSelect = '';
         }
     }
 

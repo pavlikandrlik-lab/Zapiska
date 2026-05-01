@@ -141,6 +141,41 @@ public sealed class SyncHostedServiceBaseTests
     }
 
     [Fact]
+    public async Task ManualSignal_WakesUpDisabledLoop_AndRunsTickWithManualTrigger()
+    {
+        // Regression: před fixem 2026-04-29 disabled-branch volala SafeDelay(60s)
+        // a manual signal se spotřeboval pouze v WaitForNextTriggerAsync uvnitř
+        // enabled větve. User klikl "Spustit teď" na vypnutém jobu → signal se
+        // ztratil a job neběžel. Po fixu disabled-branch také poslouchá signal.
+        var fakeNow = new DateTimeOffset(2026, 4, 29, 14, 0, 0, TimeSpan.Zero);
+        var time = new FakeTimeProvider(fakeNow);
+        var settings = new FakeSettings
+        {
+            IsEnabled = false,
+            PeriodMinutes = 60,
+            AnchorAt = fakeNow,
+            LastRunAt = null
+        };
+        var signal = new ManualTriggerSignal<FakeSettings>();
+        var sut = BuildSut(settings, time, signal);
+
+        using var cts = new CancellationTokenSource();
+        await sut.StartAsync(cts.Token);
+
+        // Give the loop a tick to enter the disabled-branch wait.
+        await Task.Delay(100);
+
+        signal.Signal();
+
+        await sut.FirstRunComplete.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        sut.RunCount.Should().Be(1);
+        sut.TriggerLog.First().Should().Be(SyncTriggerKind.Manual);
+
+        cts.Cancel();
+        await sut.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task ManualSignal_WakesUpLoop_AndMarksTriggerManual()
     {
         var fakeNow = new DateTimeOffset(2026, 4, 22, 14, 0, 0, TimeSpan.Zero);

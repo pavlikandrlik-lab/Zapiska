@@ -111,10 +111,16 @@
                                 }
                                 else
                                 {
-                                    <span class="pm-chat-bubble__autor">@autor</span>
+                                    @* User feedback 2026-04-29: AD resolver v offline intranetu vrací
+                                       "Neznámý (login)" → ne smysluplné. Zobrazujeme přímo HOT_VYJADRENI.tym
+                                       (autor span) + HOT_VYJADRENI.zpracoval (raw login, tym span style). *@
                                     @if (!string.IsNullOrWhiteSpace(bubble.Tym))
                                     {
-                                        <span class="pm-chat-bubble__tym">@bubble.Tym</span>
+                                        <span class="pm-chat-bubble__autor">@bubble.Tym</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(bubble.AutorLogin))
+                                    {
+                                        <span class="pm-chat-bubble__tym">@bubble.AutorLogin</span>
                                     }
                                     <time class="pm-chat-bubble__datum" datetime="@bubble.Datum.ToString("o")">
                                         @bubble.Datum.ToLocalTime().ToString("dd.MM.yyyy HH:mm")

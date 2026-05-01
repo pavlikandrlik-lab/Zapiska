@@ -480,6 +480,7 @@ export async function refreshPageScope(payload) {
         {
             const nextDoc = await fetchHtmlDocument(refreshUrl);
             replaceSelectorFromDocument(nextDoc, "[data-project-list-shell]");
+            navigationRuntime.refreshProjectIndexFilters?.();
             break;
         }
         case "osoby-index":

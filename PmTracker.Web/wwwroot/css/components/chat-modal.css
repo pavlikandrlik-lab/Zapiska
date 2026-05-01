@@ -13,8 +13,13 @@
     /* Width nastavuje gov-dialog[data-modal-variant="chat-modal"] (site.css):
        --max-width: min(95vw, 1800px). Tady stačí 100% vyplnit wrapper. */
     width: 100%;
-    max-height: 85vh;
-    min-height: 400px;
+    /* Flex item pattern (2026-04-29): rodičovský chain (gov-dialog__content
+       a .pm-chat-modal__content) je flex column v site.css. Tady jako flex item
+       fill přesně dostupný prostor. body uvnitř (flex: 1 1 auto, min-height: 0,
+       overflow-y: auto) drží jediný scrollbar. */
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
 }
 
 .pm-chat-modal__header {
@@ -102,35 +107,102 @@
 }
 .pm-chat-bubble__popis { font-size: 0.9rem; line-height: 1.35; }
 
-/* Stepper column — kroky aligned na bound bubliny přes JS-driven inline style */
+/* Stepper column — kroky aligned na bound bubliny přes JS-driven inline style.
+   Flex column 2026-04-29: stepperSticky dělá items position:absolute, takže
+   gov-stepper má height ~0. Bez flexu by bottom-stack sat hned za top-stack
+   a sticky bottom:0 by nikdy neengagoval. Flex + margin-top:auto na bottom stack
+   ho pushne na konec sloupce (= height bubbles column), aby sticky bottom fungoval. */
 .pm-chat-modal__stepper {
     position: relative;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Spec 2026-04-29: off-screen indicator — uchytí se na okraj viewportu modalu
-   když některé bound kroky jsou mimo viditelnou oblast (scroll). */
-.pm-chat-modal__offscreen-indicator {
+.pm-chat-modal__stepper > .pm-chat-modal__offscreen-stack--bottom {
+    margin-top: auto;
+}
+
+/* Off-screen indicator stack — redesign 2026-04-29:
+   Místo jednoho pill s count zobrazujeme stack malých kruhů s konkrétními
+   čísly kroků (jako gov-stepper-item__prefix), klikací (scroll na bound bublinu).
+   Replikuje gov-stepper-item visuál (border-radius:50%, color states). */
+.pm-chat-modal__offscreen-stack {
     position: sticky;
     z-index: 8;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    padding: 0.4rem 0.25rem;
+    pointer-events: none;
+    background: linear-gradient(to bottom, var(--background-page, transparent) 60%, transparent);
+}
+/* Top + bottom stack — oba right-aligned (justify-content: flex-end).
+   Logika obou: krok closest-to-viewport vlevo, furthest-from-viewport vpravo.
+   - Top stack: krok 1 (scrolled out first, furthest scrolled away) je nejvíc vpravo.
+     Krok 2 (scrolled out později, closer to viewport top) je vlevo od něj.
+     Layout pro [1, 2] above viewport: [_][2][1] → JS sort DESCENDING.
+   - Bottom stack: krok 3 (closest below viewport) vlevo cluster, krok 5 (furthest below)
+     vpravo. Layout pro [3, 4, 5] below viewport: [_][3][4][5] → JS sort ASCENDING. */
+.pm-chat-modal__offscreen-stack--top {
+    top: 0;
+    justify-content: flex-end;
+}
+.pm-chat-modal__offscreen-stack--bottom {
+    bottom: 0;
+    justify-content: flex-end;
+    background: linear-gradient(to top, var(--background-page, transparent) 60%, transparent);
+}
+.pm-chat-modal__offscreen-stack[hidden] { display: none; }
+
+/* Mini číselný kruh — replikuje gov-stepper-item__prefix:
+   border-radius:50%, color tokens dle source state (Auto=success, Manual=warning,
+   bez vazby=neutral). Klikací — scroll na bound bublinu. */
+.pm-chat-modal__offscreen-step {
+    pointer-events: auto;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle, var(--gov-color-neutral-border, #d0d5dd));
+    background: var(--background-neutral-subtle, var(--gov-color-neutral-bg, #f2f4f7));
+    color: var(--text-primary, inherit);
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1;
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 999px;
-    background: var(--background-primary-subtle, var(--gov-color-primary-bg, #e0f2fe));
-    color: var(--text-primary, var(--gov-color-primary, #0066cc));
-    border: 1px solid var(--border-primary, var(--gov-color-primary, #0066cc));
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: default;
+    justify-content: center;
+    cursor: pointer;
     user-select: none;
-    width: max-content;
-    margin: 0 auto;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.pm-chat-modal__offscreen-indicator--top { top: 0; margin-bottom: 0.25rem; }
-.pm-chat-modal__offscreen-indicator--bottom { bottom: 0; margin-top: 0.25rem; }
-.pm-chat-modal__offscreen-indicator[hidden] { display: none; }
+.pm-chat-modal__offscreen-step:hover {
+    transform: scale(1.12);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.pm-chat-modal__offscreen-step:focus-visible {
+    outline: 2px solid var(--gov-color-primary, currentColor);
+    outline-offset: 2px;
+}
+/* Color states — sjednoceno s gov-stepper-item color="success/warning/neutral" */
+.pm-chat-modal__offscreen-step[data-color="success"] {
+    background: var(--background-status-success-subtle, #dcfce7);
+    color: var(--text-status-success, #15803d);
+    border-color: var(--text-status-success, #15803d);
+}
+.pm-chat-modal__offscreen-step[data-color="warning"] {
+    background: var(--background-status-warning-subtle, #fef3c7);
+    color: var(--text-status-warning, #b45309);
+    border-color: var(--text-status-warning, #b45309);
+}
+.pm-chat-modal__offscreen-step[data-color="neutral"] {
+    background: var(--background-neutral-subtle, #f2f4f7);
+    color: var(--text-primary, inherit);
+    border-color: var(--border-subtle, var(--gov-color-neutral-border, #d0d5dd));
+}
 
 /* Spec 2026-04-29-modal-vyjadreni-dropdown §2 — stepper items jsou clickable
    pro scroll-to-bound-bubble. Žádné drag&drop interakce. */
@@ -190,12 +262,11 @@ gov-stepper-item[data-step]:hover {
 .pm-chat-modal__status[data-status-state="ok"] { color: var(--gov-color-success, #059669); }
 .pm-chat-modal__status[data-status-state="error"] { color: var(--gov-color-danger, #dc2626); }
 
-/* Breakpoint 1100-1599px — grid 60:40 */
-@media (max-width: 1599px) {
-    .pm-chat-modal__body { grid-template-columns: 60fr 40fr; }
-}
+/* User feedback 2026-04-29: 60:40 na středních obrazovkách (MacBook Air 13" ≈ 1440px)
+   dělalo sloupeček kroků zbytečně velký. Sjednoceno na 70:30 ve všech non-stack
+   velikostech — vyjádření má vždy ~2/3 prostoru, kroky ~1/3. */
 
-/* Breakpoint < 1100px — stack */
+/* Breakpoint < 1100px — stack (true mobile / portrait tablet) */
 @media (max-width: 1099px) {
     .pm-chat-modal__body { grid-template-columns: 1fr; }
 }

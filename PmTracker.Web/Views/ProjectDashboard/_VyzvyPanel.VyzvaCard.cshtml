@@ -3,12 +3,12 @@
 @{
     var muzeEditovat = ViewData["MuzeEditovat"] as bool? ?? false;
     var projektId = ViewData["ProjektId"] as int? ?? 0;
-    var badgeClass = Model.Stav switch
+    var badgeColor = Model.Stav switch
     {
-        "Priprava" => "badge-warning",
-        "Odeslano" => "badge-success",
-        "Zruseno" => "badge-muted",
-        _ => "badge-muted",
+        "Priprava" => "warning",
+        "Odeslano" => "success",
+        "Zruseno" => "neutral",
+        _ => "neutral",
     };
     var defaultOpen = !Model.Kolapsovano;
 }
@@ -19,7 +19,7 @@
          data-stav="@Model.Stav">
     <header class="vyzvy-card-header" data-vyzvy-toggle>
         <h3 class="vyzvy-card-title">Výzva @Model.Kod</h3>
-        <span class="vyzvy-card-badge @badgeClass">@Model.Stav</span>
+        <gov-tag color="@badgeColor" size="s">@Model.Stav</gov-tag>
         <span class="vyzvy-card-meta">
             @Model.DatumZalozeni.ToString("dd.MM.yyyy")
             @if (!string.IsNullOrWhiteSpace(Model.ZalozilJmeno))

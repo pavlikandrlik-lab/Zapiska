@@ -289,12 +289,10 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
         var options = new List<KrokOptionViewModel>();
         foreach (var krok in kroky.OrderBy(k => k.KrokPoradi))
         {
-            // K10 auto-pinned (PNF archiv): NEzobrazujeme v dropdown options jiných bublin.
-            if (krok.KrokPoradi == 10 && k10AutoPinnedHotVyjadreniId.HasValue
-                && bubble.VyjadreniId != k10AutoPinnedHotVyjadreniId.Value)
-            {
-                continue;
-            }
+            // User feedback 2026-04-29: K10 auto-pinned už se NEschovává z dropdownů jiných
+            // bublin. Místo toho se zobrazí jako disabled s důvodem „Přiřazen bublině z DD.MM"
+            // (1:1 pravidlo v chronology check níže). User vidí kam je K10 přiřazen a může
+            // ho ručně přesunout. Předchozí impl `continue` block tu informaci skrývala.
 
             bool isDisabled = false;
             string? reason = null;

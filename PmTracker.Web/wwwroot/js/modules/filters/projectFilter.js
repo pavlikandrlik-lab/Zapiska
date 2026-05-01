@@ -32,37 +32,41 @@ const legacyGanttStoragePrefixes = [
     "pmtracker.gantt.expanded."
 ];
 
-const projectFilterConfigs = {
-    records: {
-        rootSelector: '[data-project-filter-scope="records"]',
+/**
+ * Sjednocený config pro oba scopes (records, schedule) — DRY refactor 2026-04-30.
+ * Spec: docs/superpowers/specs/2026-04-30-project-filter-unification-design.md.
+ *
+ * Po sjednocení používají oba scopes stejných 10 fields (records data parity nastavena
+ * v `_ProjectScheduleTab.cshtml` přes data-filter-* atributy na schedule cards).
+ * Rootselector se liší jen pro DOM disambiguation (jeden filter shell aktivní per visible tab).
+ */
+const projectFilterFields = [
+    { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+    { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true },
+    { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
+    { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
+    { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
+    { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
+    { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní úkoly" },
+    { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé záznamy" },
+    { inputKey: "jednani-vyjadreni-stav", stateKey: "jednaniVyjadreniStav", type: "select", chipLabel: "Jednání-vyjádření" },
+    { inputKey: "groupBySubsystem", stateKey: "groupBySubsystem", type: "checkbox", skipChip: true }
+];
+
+function buildProjectFilterConfig(scope) {
+    return {
+        rootSelector: `[data-project-filter-scope="${scope}"]`,
         inputSelector: "[data-filter-key]",
         keyAttribute: "data-filter-key",
-        chipRowSelector: '[data-filter-chip-row="records"]',
-        statusSelector: '[data-filter-save-status="records"]',
-        fields: [
-            { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
-            { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true },
-            { inputKey: "kategorie", stateKey: "kategorie", type: "select", chipLabel: "Kategorie" },
-            { inputKey: "stav", stateKey: "stav", type: "select", chipLabel: "Stav úkolu" },
-            { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
-            { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
-            { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní úkoly" },
-            { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé záznamy" },
-            { inputKey: "jednani-vyjadreni-stav", stateKey: "jednaniVyjadreniStav", type: "select", chipLabel: "Jednání-vyjádření" },
-            { inputKey: "groupBySubsystem", stateKey: "groupBySubsystem", type: "checkbox", skipChip: true }
-        ]
-    },
-    schedule: {
-        rootSelector: '[data-project-filter-scope="schedule"]',
-        inputSelector: "[data-schedule-filter-key]",
-        keyAttribute: "data-schedule-filter-key",
-        chipRowSelector: '[data-filter-chip-row="schedule"]',
-        statusSelector: '[data-filter-save-status="schedule"]',
-        fields: [
-            { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
-            { inputKey: "sortBy", stateKey: "sortBy", type: "select", skipChip: true }
-        ]
-    }
+        chipRowSelector: `[data-filter-chip-row="${scope}"]`,
+        statusSelector: `[data-filter-save-status="${scope}"]`,
+        fields: projectFilterFields
+    };
+}
+
+const projectFilterConfigs = {
+    records: buildProjectFilterConfig("records"),
+    schedule: buildProjectFilterConfig("schedule")
 };
 
 // ---------------------------------------------------------------------------
@@ -211,20 +215,79 @@ export function getProjectFilterInput(scope, inputKey) {
     }
 
     const input = root.querySelector(`${config.inputSelector}[${config.keyAttribute}="${inputKey}"]`);
-    return input instanceof HTMLInputElement || input instanceof HTMLSelectElement ? input : null;
+    if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+        return input;
+    }
+    // <gov-form-switch> je HTMLElement s reflektovanou `checked` property — chovej se jako checkbox.
+    if (input instanceof HTMLElement && input.tagName.toLowerCase() === "gov-form-switch") {
+        return input;
+    }
+    return null;
+}
+
+function isGovFormSwitch(el) {
+    return el instanceof HTMLElement && el.tagName && el.tagName.toLowerCase() === "gov-form-switch";
 }
 
 export function getProjectFilterCurrentUserId(scope) {
     return normalizeFilterToken(getProjectFilterRoot(scope)?.dataset.currentUserId || "");
 }
 
+/**
+ * Storage klíč pro filter state — sjednocený 2026-04-30 (bez scope segmentu).
+ * Klíč: ${prefix}${projectId}.${kind} (kind = "state" | "defaults").
+ * Filter state je per-projekt, ne per-tab — Records a Schedule sdílejí stejný
+ * objekt, propagace via pm-tab-change event.
+ */
 export function getProjectFilterStorageKey(scope, kind) {
     const projectId = getProjectFilterProjectId(scope);
     if (!projectId || projectId === "0") {
         return "";
     }
 
-    return `${projectFilterStoragePrefix}${projectId}.${scope}.${kind}`;
+    return `${projectFilterStoragePrefix}${projectId}.${kind}`;
+}
+
+/**
+ * Jednorázová migrace 2026-04-30: starý storage měl scope segment
+ * (`${prefix}${projectId}.records.${kind}` / `.schedule.${kind}`).
+ * Při prvním restore po deploy: pokud existuje legacy records klíč, jeho hodnotu
+ * uložíme pod nový klíč (bez scope) a smažeme oba scope-suffixed (records i
+ * schedule). Schedule legacy hodnoty se zahodí — records je primární zdroj.
+ */
+function migrateLegacyProjectFilterStorageKeys(projektId) {
+    if (!projektId || projektId === "0") return;
+
+    const newStateKey = `${projectFilterStoragePrefix}${projektId}.state`;
+    const newDefaultsKey = `${projectFilterStoragePrefix}${projektId}.defaults`;
+    const legacyStateRecords = `${projectFilterStoragePrefix}${projektId}.records.state`;
+    const legacyStateSchedule = `${projectFilterStoragePrefix}${projektId}.schedule.state`;
+    const legacyDefaultsRecords = `${projectFilterStoragePrefix}${projektId}.records.defaults`;
+    const legacyDefaultsSchedule = `${projectFilterStoragePrefix}${projektId}.schedule.defaults`;
+
+    try {
+        // Defaults (localStorage): records preference je primární, schedule preference se zahodí.
+        if (localStorage.getItem(newDefaultsKey) === null) {
+            const legacyValue = localStorage.getItem(legacyDefaultsRecords);
+            if (legacyValue !== null) {
+                localStorage.setItem(newDefaultsKey, legacyValue);
+            }
+        }
+        localStorage.removeItem(legacyDefaultsRecords);
+        localStorage.removeItem(legacyDefaultsSchedule);
+
+        // State (sessionStorage): stejný pattern.
+        if (sessionStorage.getItem(newStateKey) === null) {
+            const legacyValue = sessionStorage.getItem(legacyStateRecords);
+            if (legacyValue !== null) {
+                sessionStorage.setItem(newStateKey, legacyValue);
+            }
+        }
+        sessionStorage.removeItem(legacyStateRecords);
+        sessionStorage.removeItem(legacyStateSchedule);
+    } catch {
+        // localStorage / sessionStorage disabled or quota exceeded — silent (degrade gracefully).
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -282,15 +345,18 @@ function hasSelectOptionValue(input, value) {
 }
 
 function readProjectFilterInputValue(input, field) {
-    if (input instanceof HTMLInputElement && field.type === "checkbox") {
-        return input.checked;
+    if (field.type === "checkbox") {
+        if (input instanceof HTMLInputElement || isGovFormSwitch(input)) {
+            return !!input.checked;
+        }
+        return false;
     }
 
     if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
         return input.value;
     }
 
-    return field.type === "checkbox" ? false : "";
+    return "";
 }
 
 function applyProjectFilterStateToInputs(scope, state) {
@@ -301,13 +367,21 @@ function applyProjectFilterStateToInputs(scope, state) {
 
     config.fields.forEach((field) => {
         const input = getProjectFilterInput(scope, field.inputKey);
-        if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+        if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || isGovFormSwitch(input))) {
             return;
         }
 
         const value = state[field.stateKey];
-        if (field.type === "checkbox" && input instanceof HTMLInputElement) {
-            input.checked = Boolean(value);
+        if (field.type === "checkbox") {
+            if (input instanceof HTMLInputElement) {
+                input.checked = Boolean(value);
+            } else if (isGovFormSwitch(input)) {
+                if (Boolean(value)) {
+                    input.setAttribute("checked", "");
+                } else {
+                    input.removeAttribute("checked");
+                }
+            }
             return;
         }
 
@@ -492,6 +566,10 @@ export function renderProjectFilterChips(scope) {
 }
 
 export function restoreProjectFilterScope(scope) {
+    // 2026-04-30: migrace ze starých scope-suffixed storage klíčů (records + schedule
+    // měly oddělené state/defaults). Spec: project-filter-unification-design.
+    migrateLegacyProjectFilterStorageKeys(getProjectFilterProjectId(scope));
+
     const fallbackState = buildProjectFilterStateFromInputs(scope);
     const restoredState = readStoredProjectFilterState(scope, "state", fallbackState)
         || readStoredProjectFilterState(scope, "defaults", fallbackState)
@@ -512,12 +590,15 @@ export function saveProjectFilterDefaults(scope) {
 
 export function clearProjectFilterInput(scope, inputKey) {
     const input = getProjectFilterInput(scope, inputKey);
-    if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || isGovFormSwitch(input))) {
         return;
     }
 
     if (input instanceof HTMLInputElement && input.type === "checkbox") {
         input.checked = false;
+    }
+    else if (isGovFormSwitch(input)) {
+        input.removeAttribute("checked");
     }
     else {
         input.value = "";

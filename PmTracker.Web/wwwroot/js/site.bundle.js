@@ -1,32 +1,1083 @@
-// PmTracker.Web/wwwroot/js/modules/eventBus.js
-(function installPmTrackerGovClickAdapter() {
-  const dispatched = new WeakSet();
-  document.addEventListener("gov-click", (event) => {
+// modules/eventBus.js
+var dispatched = new WeakSet;
+function installGovClickAdapter(root = document) {
+  root.addEventListener("gov-click", (event) => {
     const target = event.target;
-    if (!(target instanceof Element)) return;
-    if (dispatched.has(event)) return;
+    if (!(target instanceof Element))
+      return;
+    if (dispatched.has(event))
+      return;
     dispatched.add(event);
-    const native = new MouseEvent("click", { bubbles: true, cancelable: true, composed: true, detail: 1 });
+    const native = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      detail: 1
+    });
     target.dispatchEvent(native);
   });
-})();
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => installGovClickAdapter());
+} else {
+  installGovClickAdapter();
+}
 
-// appEventBus — delegation helper (exposed na window pro legacy moduly)
-// API: window.appEventBus.on(selector, eventName, handler)
-// Viz docs/architecture/js-modules.md
-window.appEventBus = {
-  on(selector, eventName, handler) {
-    document.addEventListener(eventName, (event) => {
-      const target = event.target instanceof Element ? event.target.closest(selector) : null;
-      if (target) handler(event, target);
+// modules/externiOdkaz/sync.js
+(function(global) {
+  const DEBOUNCE_MS = 400;
+  const timers = new WeakMap;
+  function getCsrfToken() {
+    const input = document.querySelector('input[name="__RequestVerificationToken"]');
+    return input ? input.value : "";
+  }
+  function getProjektId(row) {
+    const form = row.closest("[data-record-editor-project-id]");
+    if (!form)
+      return "";
+    return form.getAttribute("data-record-editor-project-id") || "";
+  }
+  async function syncCislo(inputEl) {
+    const row = inputEl.closest("[data-external-row]");
+    if (!row)
+      return;
+    const cislo = (inputEl.value || "").trim();
+    if (!/^\d{6}$/.test(cislo)) {
+      setTypDisplay(row, null);
+      setChatEnabled(row, false);
+      setDatesVisible(row, false);
+      row.removeAttribute("data-not-found");
+      return;
+    }
+    const projektId = getProjektId(row);
+    if (!projektId) {
+      console.warn("ExterniOdkaz.Sync: chybí projektId na form wrapperu.");
+      return;
+    }
+    const form = new FormData;
+    form.append("cislo", cislo);
+    form.append("projektId", projektId);
+    form.append("__RequestVerificationToken", getCsrfToken());
+    try {
+      const resp = await fetch("/ExterniOdkaz/Sync", {
+        method: "POST",
+        body: form,
+        credentials: "same-origin"
+      });
+      if (!resp.ok)
+        throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      if (data.nalezeno) {
+        setTypDisplay(row, data.typ);
+        setTypHidden(row, data.typ);
+        setCenaVisible(row, isCenaTyp(data.typ));
+        setVyzvaVisible(row, isPnf(data.typ));
+        setChatEnabled(row, true);
+        setDatesVisible(row, true);
+        row.removeAttribute("data-not-found");
+      } else {
+        setTypDisplay(row, null);
+        setTypHidden(row, "");
+        setCenaVisible(row, false);
+        setVyzvaVisible(row, false);
+        setChatEnabled(row, false);
+        setDatesVisible(row, false);
+        row.setAttribute("data-not-found", "true");
+      }
+    } catch (err) {
+      console.warn("ExterniOdkaz.Sync selhal:", err);
+      setDatesVisible(row, false);
+      row.setAttribute("data-not-found", "true");
+    }
+  }
+  function setTypDisplay(row, typ) {
+    const tag = row.querySelector("[data-external-type-display]");
+    if (!tag)
+      return;
+    tag.textContent = typ || "—";
+    tag.setAttribute("color", typTagColor(typ));
+  }
+  function typTagColor(typ) {
+    const t = (typ || "").toUpperCase();
+    if (t === "NES")
+      return "warning";
+    if (t === "PMP")
+      return "primary";
+    if (t === "PNF")
+      return "success";
+    return "neutral";
+  }
+  function isCenaTyp(typ) {
+    const t = (typ || "").toUpperCase();
+    return t === "PMP" || t === "PNF";
+  }
+  function isPnf(typ) {
+    return (typ || "").toUpperCase() === "PNF";
+  }
+  function setCenaVisible(row, visible) {
+    const cena = row.querySelector(".external-field-cena");
+    if (!cena)
+      return;
+    if (visible) {
+      cena.removeAttribute("hidden");
+      const input = cena.querySelector("[data-external-price-input]");
+      if (input instanceof HTMLInputElement)
+        input.disabled = false;
+    } else {
+      cena.setAttribute("hidden", "hidden");
+      const input = cena.querySelector("[data-external-price-input]");
+      if (input instanceof HTMLInputElement)
+        input.disabled = true;
+    }
+  }
+  function setVyzvaVisible(row, visible) {
+    const vyzva = row.querySelector("[data-external-vyzvy-switch-wrap]");
+    if (!vyzva)
+      return;
+    if (visible) {
+      vyzva.removeAttribute("hidden");
+    } else {
+      vyzva.setAttribute("hidden", "hidden");
+    }
+  }
+  function setTypHidden(row, typ) {
+    const hidden = row.querySelector("[data-external-type-hidden]");
+    if (hidden)
+      hidden.value = typ || "";
+  }
+  function setChatEnabled(row, enabled) {
+    const btn = row.querySelector("[data-external-chat-open]");
+    if (!btn)
+      return;
+    if (enabled) {
+      btn.removeAttribute("disabled");
+    } else {
+      btn.setAttribute("disabled", "disabled");
+    }
+  }
+  function setDatesVisible(row, visible) {
+    const dates = row.querySelector("[data-external-dates]");
+    if (!dates)
+      return;
+    if (visible) {
+      dates.removeAttribute("hidden");
+    } else {
+      dates.setAttribute("hidden", "hidden");
+    }
+  }
+  function onInput(event) {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement))
+      return;
+    if (!target.hasAttribute("data-external-cislo"))
+      return;
+    const existing = timers.get(target);
+    if (existing)
+      clearTimeout(existing);
+    const timer = setTimeout(() => syncCislo(target), DEBOUNCE_MS);
+    timers.set(target, timer);
+  }
+  function init() {
+    document.addEventListener("input", onInput);
+  }
+  global.pmExterniOdkazSync = { init };
+})(window);
+
+// modules/vyjadreni/chatModal.js
+(function(global) {
+  let dialogEl = null;
+  let currentCtx = null;
+  function ensureDialog() {
+    if (dialogEl)
+      return dialogEl;
+    dialogEl = document.createElement("gov-dialog");
+    dialogEl.setAttribute("size", "l");
+    dialogEl.innerHTML = `
+      <div slot="label">Vyjádření a termíny</div>
+      <div class="pm-chat-modal__content" data-chat-modal-content></div>
+      <div slot="footer" style="display:flex; justify-content:flex-end">
+        <pm-button variant="Primary" data-chat-modal-close>Zavřít</pm-button>
+      </div>
+    `;
+    document.body.appendChild(dialogEl);
+    dialogEl.addEventListener("click", (event) => {
+      if (event.target.closest("[data-chat-modal-close]"))
+        close();
+    });
+    return dialogEl;
+  }
+  async function open(externiOdkazId, zaznamId) {
+    currentCtx = { externiOdkazId: String(externiOdkazId), zaznamId: String(zaznamId) };
+    const el = ensureDialog();
+    const container = el.querySelector("[data-chat-modal-content]");
+    container.innerHTML = '<p class="pm-chat-modal__loading">Načítám…</p>';
+    show(el);
+    await loadInto(container);
+  }
+  async function loadInto(container) {
+    if (!currentCtx)
+      return;
+    try {
+      const url = `/Vyjadreni/Modal?externiOdkazId=${encodeURIComponent(currentCtx.externiOdkazId)}&zaznamId=${encodeURIComponent(currentCtx.zaznamId)}`;
+      const resp = await fetch(url, { credentials: "same-origin", headers: { Accept: "text/html" } });
+      if (!resp.ok) {
+        container.innerHTML = `<gov-alert variant="error">Nepodařilo se načíst vyjádření (HTTP ${resp.status}).</gov-alert>`;
+        return;
+      }
+      const html = await resp.text();
+      container.innerHTML = html;
+      const root = container.querySelector("[data-chat-modal-root]");
+      if (root) {
+        if (global.pmChatModalDragDrop && typeof global.pmChatModalDragDrop.attach === "function") {
+          global.pmChatModalDragDrop.attach(root);
+        }
+        if (global.pmChatModalReharvest && typeof global.pmChatModalReharvest.attach === "function") {
+          global.pmChatModalReharvest.attach(root);
+        }
+      }
+    } catch (err) {
+      container.innerHTML = `<gov-alert variant="error">Chyba při načítání: ${err.message || err}</gov-alert>`;
+    }
+  }
+  async function refreshModal() {
+    if (!dialogEl)
+      return;
+    const container = dialogEl.querySelector("[data-chat-modal-content]");
+    if (!container)
+      return;
+    await loadInto(container);
+  }
+  function show(el) {
+    if (typeof el.show === "function")
+      el.show();
+    else
+      el.setAttribute("open", "");
+  }
+  function close() {
+    if (!dialogEl)
+      return;
+    if (typeof dialogEl.hide === "function")
+      dialogEl.hide();
+    else
+      dialogEl.removeAttribute("open");
+  }
+  function onClick(event) {
+    const btn = event.target.closest("[data-external-chat-open]");
+    if (!btn)
+      return;
+    if (btn.hasAttribute("disabled"))
+      return;
+    const externiOdkazId = btn.getAttribute("data-external-odkaz-id");
+    const zaznamId = btn.getAttribute("data-external-zaznam-id");
+    if (!externiOdkazId || !zaznamId) {
+      console.warn("Chat open: chybí data-external-odkaz-id nebo data-external-zaznam-id na", btn);
+      return;
+    }
+    event.preventDefault();
+    open(externiOdkazId, zaznamId);
+  }
+  function init() {
+    document.addEventListener("click", onClick);
+  }
+  global.pmChatModal = { init, open, close, refreshModal };
+})(window);
+
+// modules/vyjadreni/chatModalDragDrop.js
+(function(global) {
+  function getAntiForgeryToken(root) {
+    const input = root.querySelector('input[name="__RequestVerificationToken"]');
+    return input ? input.value : "";
+  }
+  function setStatus(root, text, state) {
+    const el = root.querySelector("[data-chat-status]");
+    if (!el)
+      return;
+    el.textContent = text || "";
+    if (state)
+      el.setAttribute("data-status-state", state);
+    else
+      el.removeAttribute("data-status-state");
+  }
+  function persistPending(root, entry) {
+    const key = root.getAttribute("data-autosave-key");
+    if (!key)
+      return;
+    try {
+      const raw = global.localStorage.getItem(key);
+      const list = raw ? JSON.parse(raw) : [];
+      list.push({ t: Date.now(), entry });
+      global.localStorage.setItem(key, JSON.stringify(list.slice(-20)));
+    } catch (e) {}
+  }
+  function clearPending(root) {
+    const key = root.getAttribute("data-autosave-key");
+    if (!key)
+      return;
+    try {
+      global.localStorage.removeItem(key);
+    } catch (e) {}
+  }
+  async function createBinding(root, payload) {
+    const token = getAntiForgeryToken(root);
+    const resp = await fetch("/Vyjadreni/HarmonogramVazba/Create", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        RequestVerificationToken: token
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!resp.ok)
+      throw new Error("HTTP " + resp.status);
+    return resp.json();
+  }
+  async function deleteBinding(root, payload) {
+    const token = getAntiForgeryToken(root);
+    const resp = await fetch("/Vyjadreni/HarmonogramVazba/Delete", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        RequestVerificationToken: token
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!resp.ok)
+      throw new Error("HTTP " + resp.status);
+    return resp.json();
+  }
+  function attach(root) {
+    const externiOdkazId = Number(root.getAttribute("data-externi-odkaz-id"));
+    const zaznamId = Number(root.getAttribute("data-zaznam-id"));
+    const projektId = Number(root.getAttribute("data-projekt-id"));
+    root.querySelectorAll('[data-bubble][draggable="true"]').forEach((bubble) => {
+      bubble.addEventListener("dragstart", (ev) => {
+        const id = bubble.getAttribute("data-vyjadreni-id");
+        const datum = bubble.getAttribute("data-datum");
+        ev.dataTransfer.setData("application/x-pm-bubble", JSON.stringify({ id, datum }));
+        ev.dataTransfer.effectAllowed = "move";
+        bubble.classList.add("pm-chat-bubble--dragging");
+      });
+      bubble.addEventListener("dragend", () => bubble.classList.remove("pm-chat-bubble--dragging"));
+    });
+    root.querySelectorAll("[data-step]").forEach((step) => {
+      step.addEventListener("dragover", (ev) => {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = "move";
+        step.classList.add("pm-chat-step--drop-target");
+      });
+      step.addEventListener("dragleave", () => step.classList.remove("pm-chat-step--drop-target"));
+      step.addEventListener("drop", async (ev) => {
+        ev.preventDefault();
+        step.classList.remove("pm-chat-step--drop-target");
+        const raw = ev.dataTransfer.getData("application/x-pm-bubble");
+        if (!raw)
+          return;
+        let parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch (e) {
+          return;
+        }
+        const krokKey = step.getAttribute("data-krok-key");
+        const payload = {
+          externiOdkazId,
+          zaznamId,
+          projektId,
+          krokKey,
+          hotVyjadreniId: Number(parsed.id),
+          datumVyjadreni: parsed.datum
+        };
+        await dispatchCreateBinding(root, payload);
+      });
+    });
+    const stepperElements = root.querySelectorAll("pm-chat-stepper, [data-pm-chat-stepper]");
+    stepperElements.forEach((stepper) => {
+      stepper.addEventListener("pm-chat-stepper-drop", async (ev) => {
+        const detail = ev.detail || {};
+        if (!detail.bubbleId || !detail.krokKey) {
+          setStatus(root, "Drop: chybí ID kroku nebo bubliny.", "error");
+          return;
+        }
+        const payload = {
+          externiOdkazId,
+          zaznamId,
+          projektId,
+          krokKey: detail.krokKey,
+          hotVyjadreniId: Number(detail.bubbleId),
+          datumVyjadreni: detail.bubbleDatum || null
+        };
+        await dispatchCreateBinding(root, payload);
+      });
+    });
+    async function dispatchCreateBinding(rootEl, payload) {
+      persistPending(rootEl, { op: "create", payload });
+      setStatus(rootEl, "Ukládám…", null);
+      try {
+        await createBinding(rootEl, payload);
+        setStatus(rootEl, "Uloženo.", "ok");
+        clearPending(rootEl);
+        if (global.pmChatModal && typeof global.pmChatModal.refreshModal === "function") {
+          await global.pmChatModal.refreshModal();
+        }
+      } catch (err) {
+        setStatus(rootEl, "Ukládání selhalo: " + (err.message || err), "error");
+      }
+    }
+    root.querySelectorAll("[data-clear-binding]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const step = btn.closest("[data-step]");
+        if (!step)
+          return;
+        const vazbaId = Number(step.getAttribute("data-vazba-id"));
+        if (!vazbaId) {
+          setStatus(root, "Chybí data-vazba-id — nelze odpojit.", "error");
+          return;
+        }
+        const payload = { vazbaId, projektId };
+        persistPending(root, { op: "delete", payload });
+        setStatus(root, "Odpojuji…", null);
+        try {
+          await deleteBinding(root, payload);
+          setStatus(root, "Odpojeno.", "ok");
+          clearPending(root);
+          if (global.pmChatModal && typeof global.pmChatModal.refreshModal === "function") {
+            await global.pmChatModal.refreshModal();
+          }
+        } catch (err) {
+          setStatus(root, "Odpojení selhalo: " + (err.message || err), "error");
+        }
+      });
     });
   }
-};
+  global.pmChatModalDragDrop = { attach };
+})(window);
 
-// PmTracker.Web/wwwroot/js/modules/navigationRuntime.js
+// modules/vyjadreni/chatModalReharvest.js
+(function(global) {
+  function setStatus(root, text, state) {
+    const el = root.querySelector("[data-chat-status]");
+    if (!el)
+      return;
+    el.textContent = text || "";
+    if (state)
+      el.setAttribute("data-status-state", state);
+    else
+      el.removeAttribute("data-status-state");
+  }
+  function attach(root) {
+    const form = root.querySelector("[data-reharvest-form]");
+    if (!form)
+      return;
+    const btn = form.querySelector("[data-reharvest-btn]");
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(form);
+      if (btn)
+        btn.setAttribute("disabled", "");
+      setStatus(root, "Re-harvest běží…", null);
+      try {
+        const resp = await fetch(form.action, {
+          method: "POST",
+          credentials: "same-origin",
+          body: fd,
+          headers: { Accept: "application/json" }
+        });
+        if (!resp.ok) {
+          setStatus(root, "Re-harvest selhal (HTTP " + resp.status + ").", "error");
+          return;
+        }
+        const result = await resp.json();
+        const msg = result ? `Re-harvest dokončen: načteno ${result.fetched}, vytvořeno ${result.created}, preskočeno ${result.skipped}.` : "Re-harvest dokončen.";
+        setStatus(root, msg, "ok");
+      } catch (err) {
+        setStatus(root, "Re-harvest selhal: " + (err.message || err), "error");
+      } finally {
+        if (btn)
+          btn.removeAttribute("disabled");
+      }
+    });
+  }
+  global.pmChatModalReharvest = { attach };
+})(window);
+
+// modules/harmonogram/manualKroky.js
+(function(global) {
+  const INPUT_SELECTOR = "[data-manual-krok-input]";
+  const WARNING_CLASS = "schedule-actual-manual-warning";
+  function parseIsoDate(value) {
+    if (!value)
+      return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match)
+      return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (Number.isNaN(date.getTime()))
+      return null;
+    return date;
+  }
+  function todayUtc() {
+    const now = new Date;
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  }
+  function clearMessages(input) {
+    const wrap = input.closest(".schedule-actual-manual");
+    if (!wrap)
+      return;
+    const existing = wrap.querySelector("." + WARNING_CLASS);
+    if (existing)
+      existing.remove();
+    input.removeAttribute("data-manual-krok-invalid");
+  }
+  function showError(input, message) {
+    const wrap = input.closest(".schedule-actual-manual");
+    if (!wrap)
+      return;
+    clearMessages(input);
+    const el = document.createElement("gov-message");
+    el.setAttribute("color", "danger");
+    el.className = WARNING_CLASS;
+    el.textContent = message;
+    wrap.appendChild(el);
+    input.setAttribute("data-manual-krok-invalid", "true");
+  }
+  function showWarning(input, message) {
+    const wrap = input.closest(".schedule-actual-manual");
+    if (!wrap)
+      return;
+    clearMessages(input);
+    const el = document.createElement("gov-message");
+    el.setAttribute("color", "warning");
+    el.className = WARNING_CLASS;
+    el.textContent = message;
+    wrap.appendChild(el);
+  }
+  function findSiblingManualInputs(input) {
+    const form = input.closest("form");
+    if (!form)
+      return [];
+    return Array.from(form.querySelectorAll(INPUT_SELECTOR));
+  }
+  function validateChronology(input) {
+    const value = parseIsoDate(input.value);
+    if (!value)
+      return;
+    const myIndex = Number(input.getAttribute("data-manual-krok-index") || "0");
+    const siblings = findSiblingManualInputs(input);
+    for (const sibling of siblings) {
+      if (sibling === input)
+        continue;
+      const sibIndex = Number(sibling.getAttribute("data-manual-krok-index") || "0");
+      const sibValue = parseIsoDate(sibling.value);
+      if (!sibValue)
+        continue;
+      if (sibIndex > myIndex && value > sibValue) {
+        showWarning(input, "Datum je pozdější než u následujícího kroku. Server při schválení návrhu datumy zřetězí.");
+        return;
+      }
+    }
+  }
+  function handleChange(event) {
+    const input = event.target;
+    if (!input || !input.matches || !input.matches(INPUT_SELECTOR))
+      return;
+    clearMessages(input);
+    if (!input.value) {
+      return;
+    }
+    const parsed = parseIsoDate(input.value);
+    if (!parsed) {
+      showError(input, "Neplatný formát data — očekává se YYYY-MM-DD.");
+      return;
+    }
+    if (parsed > todayUtc()) {
+      showError(input, "Datum skutečnosti nemůže být v budoucnu.");
+      return;
+    }
+    validateChronology(input);
+  }
+  function init() {
+    document.addEventListener("change", handleChange, true);
+  }
+  global.pmManualKroky = { init };
+})(window);
+
+// modules/schedule-feature-c/toggle-rezim.js
+(function(global) {
+  const TOGGLE_SELECTOR = "[data-feature-c-toggle]";
+  const CELL_SELECTOR = "[data-schedule-actual-cell]";
+  const BADGE_SELECTOR = "[data-feature-c-badge]";
+  const ZDROJ_META = {
+    Neznamo: { icon: "—", tooltip: "Skutečnost nebyla vyplněna." },
+    Automat: { icon: "\uD83E\uDD16", tooltip: "Skutečnost vyplněná automatem ze ServiceDesk vyjádření." },
+    Manual: { icon: "✍️", tooltip: "Skutečnost vyplněná ručně uživatelem." },
+    Historicka: { icon: "\uD83D\uDCDC", tooltip: "Skutečnost migrovaná před zavedením auto-fill (historická data)." }
+  };
+  function getAntiforgery() {
+    const input = document.querySelector('input[name="__RequestVerificationToken"]');
+    return input ? input.value : null;
+  }
+  async function postToggleRezim(hodnotaId, rezim) {
+    const token = getAntiforgery();
+    const headers = { "Content-Type": "application/json", Accept: "application/json" };
+    if (token)
+      headers["RequestVerificationToken"] = token;
+    const resp = await fetch("/Harmonogram/ToggleRezim", {
+      method: "POST",
+      headers,
+      credentials: "same-origin",
+      body: JSON.stringify({ HodnotaId: hodnotaId, Rezim: rezim })
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      throw new Error(`HTTP ${resp.status}: ${body || resp.statusText}`);
+    }
+    return await resp.json();
+  }
+  function refreshCellUi(cell, newRezim, newZdroj) {
+    if (!cell)
+      return;
+    cell.setAttribute("data-skutecnost-rezim", newRezim);
+    cell.setAttribute("data-skutecnost-zdroj", newZdroj);
+    const toggle = cell.querySelector(TOGGLE_SELECTOR);
+    if (toggle) {
+      toggle.setAttribute("data-current-rezim", newRezim);
+      const label = toggle.querySelector(".schedule-actual-cell__toggle-label");
+      if (label)
+        label.textContent = newRezim === "Auto" ? "Auto" : "Ručně";
+      const newAria = newRezim === "Auto" ? "Přepnout režim skutečnosti z Auto na Ručně" : "Přepnout režim skutečnosti z Ručně na Auto";
+      toggle.setAttribute("aria-label", newAria);
+      toggle.setAttribute("title", newAria);
+    }
+    const badge = cell.querySelector(BADGE_SELECTOR);
+    if (badge) {
+      const meta = ZDROJ_META[newZdroj] || ZDROJ_META.Neznamo;
+      badge.setAttribute("data-zdroj", newZdroj);
+      badge.setAttribute("title", meta.tooltip);
+      badge.setAttribute("aria-label", meta.tooltip);
+      badge.textContent = meta.icon;
+    }
+  }
+  function showToggleError(cell, message) {
+    if (!cell) {
+      alert(message);
+      return;
+    }
+    let errBox = cell.querySelector("[data-feature-c-error]");
+    if (!errBox) {
+      errBox = document.createElement("div");
+      errBox.setAttribute("data-feature-c-error", "");
+      errBox.className = "schedule-actual-cell__error";
+      cell.appendChild(errBox);
+    }
+    errBox.textContent = message;
+    setTimeout(() => {
+      errBox?.remove();
+    }, 5000);
+  }
+  async function handleToggleClick(event) {
+    const btn = event.target.closest(TOGGLE_SELECTOR);
+    if (!btn)
+      return;
+    event.preventDefault();
+    const hodnotaIdRaw = btn.getAttribute("data-hodnota-id");
+    const currentRezim = btn.getAttribute("data-current-rezim") || "Auto";
+    const hodnotaId = parseInt(hodnotaIdRaw, 10);
+    if (!Number.isFinite(hodnotaId) || hodnotaId <= 0) {
+      showToggleError(btn.closest(CELL_SELECTOR), "Chybí ID řádku skutečnosti.");
+      return;
+    }
+    const newRezim = currentRezim === "Auto" ? "Manual" : "Auto";
+    const cell = btn.closest(CELL_SELECTOR);
+    btn.disabled = true;
+    const originalText = btn.querySelector(".schedule-actual-cell__toggle-label")?.textContent || "";
+    try {
+      const result = await postToggleRezim(hodnotaId, newRezim);
+      if (result && result.changed === true) {
+        refreshCellUi(cell, result.skutecnostRezim || newRezim, result.skutecnostZdroj || "Neznamo");
+      } else {}
+    } catch (err) {
+      showToggleError(cell, `Přepnutí selhalo: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      const label = btn.querySelector(".schedule-actual-cell__toggle-label");
+      if (label && !label.textContent)
+        label.textContent = originalText;
+    }
+  }
+  function init() {
+    document.addEventListener("click", handleToggleClick);
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+  global.pmScheduleFeatureC = { postToggleRezim, refreshCellUi };
+})(window);
+
+// modules/vyzvy/index.js
+(function(global) {
+  function bootstrap(panelElement) {
+    if (!panelElement)
+      return;
+    if (panelElement.dataset.vyzvyBootstrapped === "true")
+      return;
+    panelElement.dataset.vyzvyBootstrapped = "true";
+    if (global.pmVyzvy && global.pmVyzvy.bindPanel) {
+      global.pmVyzvy.bindPanel(panelElement);
+    }
+  }
+  function initOnDomReady() {
+    document.querySelectorAll("[data-vyzvy-panel]").forEach(bootstrap);
+  }
+  global.pmVyzvy = global.pmVyzvy || {};
+  global.pmVyzvy.bootstrap = bootstrap;
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initOnDomReady);
+  } else {
+    initOnDomReady();
+  }
+  document.addEventListener("pm:panel-loaded", function(e) {
+    const root = e.target;
+    if (!root)
+      return;
+    if (root.matches && root.matches("[data-vyzvy-panel]")) {
+      bootstrap(root);
+      return;
+    }
+    if (root.querySelectorAll) {
+      root.querySelectorAll("[data-vyzvy-panel]").forEach(bootstrap);
+    }
+  });
+})(window);
+
+// modules/vyzvy/panelController.js
+(function(global) {
+  function getAntiForgeryToken() {
+    const el = document.querySelector('input[name="__RequestVerificationToken"]');
+    return el ? el.value : "";
+  }
+  async function postForm(url, data) {
+    const form = new FormData;
+    form.append("__RequestVerificationToken", getAntiForgeryToken());
+    for (const [k, v] of Object.entries(data)) {
+      if (v !== null && v !== undefined)
+        form.append(k, String(v));
+    }
+    const resp = await fetch(url, { method: "POST", body: form, credentials: "same-origin" });
+    if (!resp.ok) {
+      return { success: false, errorCode: "HttpError", message: "HTTP " + resp.status };
+    }
+    try {
+      return await resp.json();
+    } catch (_) {
+      return { success: true };
+    }
+  }
+  async function reloadPanel(panelElement) {
+    const projectId = panelElement.dataset.projectId;
+    const url = "/projekty/" + encodeURIComponent(projectId) + "/dashboard/vyzvy-panel";
+    const resp = await fetch(url, { credentials: "same-origin" });
+    if (!resp.ok) {
+      showToast("Načtení panelu selhalo.", true);
+      return;
+    }
+    const html = await resp.text();
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    const newEl = tmp.querySelector("[data-vyzvy-panel]");
+    if (newEl && panelElement.parentNode) {
+      panelElement.parentNode.replaceChild(newEl, panelElement);
+      if (global.pmVyzvy && global.pmVyzvy.bootstrap)
+        global.pmVyzvy.bootstrap(newEl);
+    }
+  }
+  function showToast(message, isError) {
+    if (global.pmToast && typeof global.pmToast.show === "function") {
+      global.pmToast.show(message, { type: isError ? "error" : "info" });
+    } else {
+      if (isError) {
+        console.error(message);
+        alert(message);
+      } else {
+        console.info(message);
+      }
+    }
+  }
+  async function handleZalozit(button, panelElement) {
+    const projektId = button.dataset.projektId;
+    button.disabled = true;
+    try {
+      const result = await postForm("/vyzvy/zalozit", { ProjektId: projektId });
+      if (result.success) {
+        showToast("Výzva založena.");
+        await reloadPanel(panelElement);
+      } else {
+        showToast(result.message || "Založení výzvy selhalo.", true);
+      }
+    } finally {
+      button.disabled = false;
+    }
+  }
+  async function handleZmenitStav(button, panelElement) {
+    const vyzvaId = button.dataset.vyzvaId;
+    const novyStav = button.dataset.novyStav;
+    const result = await postForm("/vyzvy/zmenit-stav", { VyzvaId: vyzvaId, NovyStav: novyStav });
+    if (result.success) {
+      showToast("Stav výzvy změněn na " + novyStav + ".");
+      await reloadPanel(panelElement);
+    } else {
+      showToast(result.message || "Změna stavu selhala.", true);
+    }
+  }
+  function handleToggleCollapse(headerElement) {
+    const card = headerElement.closest("[data-vyzvy-vyzva]");
+    if (!card)
+      return;
+    card.classList.toggle("open");
+    const btn = card.querySelector(".vyzvy-card-toggle-btn");
+    if (btn) {
+      const open = card.classList.contains("open");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      const icon = btn.querySelector(".vyzvy-card-toggle-icon");
+      if (icon)
+        icon.textContent = open ? "▼" : "▶";
+    }
+  }
+  function handleStavMenuToggle(toggleBtn) {
+    const menu = toggleBtn.closest("[data-vyzvy-stav-menu]");
+    if (menu)
+      menu.classList.toggle("open");
+  }
+  function bindPanel(panelElement) {
+    panelElement.addEventListener("click", async function(e) {
+      const stavToggle = e.target.closest("[data-vyzvy-stav-toggle]");
+      if (stavToggle) {
+        e.preventDefault();
+        handleStavMenuToggle(stavToggle);
+        return;
+      }
+      const actionBtn = e.target.closest("[data-vyzvy-action]");
+      if (actionBtn) {
+        const action = actionBtn.dataset.vyzvyAction;
+        if (action === "zalozit") {
+          await handleZalozit(actionBtn, panelElement);
+          return;
+        }
+        if (action === "zmenit-stav") {
+          await handleZmenitStav(actionBtn, panelElement);
+          return;
+        }
+        if (action === "otevrit-reassign") {
+          if (global.pmVyzvy && global.pmVyzvy.openReassignModal) {
+            global.pmVyzvy.openReassignModal(panelElement.dataset.projectId, function() {
+              reloadPanel(panelElement);
+            });
+          }
+          return;
+        }
+      }
+      const toggleHeader = e.target.closest("[data-vyzvy-toggle]");
+      if (toggleHeader && !e.target.closest("[data-vyzvy-action], [data-vyzvy-stav-toggle], .vyzvy-stav-menu-list")) {
+        handleToggleCollapse(toggleHeader);
+      }
+    });
+  }
+  global.pmVyzvy = global.pmVyzvy || {};
+  global.pmVyzvy.bindPanel = bindPanel;
+  global.pmVyzvy.reloadPanel = reloadPanel;
+  global.pmVyzvy.postForm = postForm;
+  global.pmVyzvy.showToast = showToast;
+})(window);
+
+// modules/vyzvy/switchController.js
+(function(global) {
+  async function handleSwitch(switchEl, isChecked) {
+    const externiOdkazId = switchEl.dataset.externiOdkazId;
+    if (!externiOdkazId)
+      return;
+    const wrap = switchEl.closest("[data-external-vyzvy-switch-wrap]");
+    const statusEl = wrap ? wrap.querySelector("[data-vyzvy-switch-status]") : null;
+    const hiddenState = wrap ? wrap.querySelector("[data-external-vyzvy-switch-state]") : null;
+    switchEl.setAttribute("disabled", "");
+    try {
+      const result = await global.pmVyzvy.postForm("/vyzvy/set-zaradid", {
+        ExterniOdkazId: externiOdkazId,
+        Zaradit: isChecked
+      });
+      if (result.success) {
+        if (hiddenState)
+          hiddenState.value = isChecked ? "true" : "false";
+        if (statusEl) {
+          statusEl.textContent = isChecked ? "Čeká se (buffer projektu)" : "";
+        }
+      } else {
+        if (isChecked) {
+          switchEl.removeAttribute("checked");
+        } else {
+          switchEl.setAttribute("checked", "");
+        }
+        global.pmVyzvy.showToast(result.message || "Operace selhala.", true);
+      }
+    } finally {
+      switchEl.removeAttribute("disabled");
+    }
+  }
+  function bindSwitches(root) {
+    const scope = root || document;
+    scope.querySelectorAll("gov-form-switch[data-vyzvy-switch]").forEach(function(sw) {
+      if (sw.dataset.vyzvyBound === "true")
+        return;
+      sw.dataset.vyzvyBound = "true";
+      sw.addEventListener("gov-change", function(e) {
+        const checked = e && e.detail ? !!e.detail.checked : !!sw.checked;
+        handleSwitch(sw, checked);
+      });
+    });
+  }
+  global.pmVyzvy = global.pmVyzvy || {};
+  global.pmVyzvy.bindSwitches = bindSwitches;
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function() {
+      bindSwitches();
+    });
+  } else {
+    bindSwitches();
+  }
+  document.addEventListener("pm:record-editor-loaded", function(e) {
+    bindSwitches(e.target || document);
+  });
+})(window);
+
+// components/pm-chat-stepper/pm-chat-stepper.js
+(function(global) {
+  class PmChatStepperElement extends HTMLElement {
+    constructor() {
+      super();
+      this._kroky = [];
+      this._canAddAddon = false;
+    }
+    connectedCallback() {
+      this._canAddAddon = this.hasAttribute("can-add-addon");
+      this._render();
+      this._bindDrops();
+    }
+    setKroky(kroky) {
+      this._kroky = Array.isArray(kroky) ? kroky : [];
+      if (this.isConnected)
+        this._render();
+    }
+    _render() {
+      const buffer = global.pmChatStepperBuffer;
+      if (!buffer || typeof buffer.computeStepperSlots !== "function") {
+        this.textContent = "";
+        return;
+      }
+      const slots = buffer.computeStepperSlots(this._kroky, this._canAddAddon);
+      this.innerHTML = slots.map((slot) => `
+        <div class="pm-chat-step${slot.isBufferSlot ? " pm-chat-stepper__buffer-slot" : ""}"
+             data-krok-key="${slot.poradi}"
+             data-krok-poradi="${slot.poradi}"
+             ${slot.krokKey ? `data-krok-guid="${escapeHtml(String(slot.krokKey))}"` : ""}
+             data-is-buffer="${!!slot.isBufferSlot}"
+             data-can-add="${!!slot.canAdd}"
+             ${slot.tooltip ? `title="${escapeHtml(slot.tooltip)}" aria-disabled="true"` : ""}
+             aria-dropeffect="${slot.canAdd || !slot.isBufferSlot ? "move" : "none"}">
+          <span class="pm-chat-step__label">${escapeHtml(slot.label)}</span>
+          ${slot.bindingDatum ? `<span class="pm-chat-step__datum">${formatDatum(slot.bindingDatum)}</span>` : ""}
+        </div>
+      `).join("");
+    }
+    _bindDrops() {
+      this.addEventListener("dragover", this._onDragOver.bind(this));
+      this.addEventListener("dragleave", this._onDragLeave.bind(this));
+      this.addEventListener("drop", this._onDrop.bind(this));
+    }
+    _onDragOver(e) {
+      const target = e.target.closest("[data-krok-key]");
+      if (!target)
+        return;
+      e.preventDefault();
+      const raw = e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes("application/x-bubble-datum") ? e.dataTransfer.getData("application/x-bubble-datum") : null;
+      const bubbleDatum = raw ? new Date(raw) : new Date(NaN);
+      if (isNaN(bubbleDatum.valueOf()))
+        return;
+      const bubbleId = e.dataTransfer.getData("application/x-bubble-id");
+      if (!bubbleId)
+        return;
+      const poradi = parseInt(target.dataset.krokPoradi || target.dataset.krokKey, 10);
+      const targetKrok = this._kroky.find((k) => k.poradi === poradi) || { poradi, bindingDatum: null };
+      const chrono = global.pmChatStepperChronology;
+      if (!chrono || typeof chrono.validateDrop !== "function")
+        return;
+      const v = chrono.validateDrop(bubbleDatum, targetKrok, this._kroky);
+      this.querySelectorAll("[data-krok-key]").forEach((el) => {
+        el.classList.remove("pm-chat-stepper__drop-valid", "pm-chat-stepper__drop-invalid");
+      });
+      target.classList.add(v.ok ? "pm-chat-stepper__drop-valid" : "pm-chat-stepper__drop-invalid");
+      if (!v.ok) {
+        target.title = v.reason || "";
+        e.dataTransfer.dropEffect = "none";
+      } else {
+        target.title = v.cascade ? `Cascade: posunou se kroky ${v.cascade.join(", ")}` : "";
+        e.dataTransfer.dropEffect = "move";
+      }
+    }
+    _onDragLeave(e) {
+      const target = e.target.closest("[data-krok-key]");
+      if (target)
+        target.classList.remove("pm-chat-stepper__drop-valid", "pm-chat-stepper__drop-invalid");
+    }
+    _onDrop(e) {
+      e.preventDefault();
+      const target = e.target.closest("[data-krok-key]");
+      if (!target)
+        return;
+      target.classList.remove("pm-chat-stepper__drop-valid", "pm-chat-stepper__drop-invalid");
+      const bubbleId = e.dataTransfer.getData("application/x-bubble-id");
+      if (!bubbleId)
+        return;
+      const detail = {
+        krokPoradi: parseInt(target.dataset.krokPoradi || target.dataset.krokKey, 10),
+        krokKey: target.dataset.krokGuid || null,
+        bubbleId,
+        bubbleDatum: e.dataTransfer.getData("application/x-bubble-datum"),
+        isBufferSlot: target.dataset.isBuffer === "true",
+        canAdd: target.dataset.canAdd === "true"
+      };
+      this.dispatchEvent(new CustomEvent("pm-chat-stepper-drop", { detail, bubbles: true }));
+    }
+  }
+  function escapeHtml(s) {
+    if (s == null)
+      return "";
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function formatDatum(d) {
+    try {
+      return (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10);
+    } catch {
+      return "";
+    }
+  }
+  if (!customElements.get("pm-chat-stepper")) {
+    customElements.define("pm-chat-stepper", PmChatStepperElement);
+  }
+  global.PmChatStepperElement = PmChatStepperElement;
+})(window);
+
+// modules/navigationRuntime.js
 var navigationRuntime = {
   initRecordFormEnhancements: null,
-  prepareRecordEditorFormNavigation: null
+  prepareRecordEditorFormNavigation: null,
+  refreshProjectIndexFilters: null
 };
 function configureNavigationRuntime(runtime = {}) {
   if (typeof runtime.initRecordFormEnhancements === "function") {
@@ -35,9 +1086,12 @@ function configureNavigationRuntime(runtime = {}) {
   if (typeof runtime.prepareRecordEditorFormNavigation === "function") {
     navigationRuntime.prepareRecordEditorFormNavigation = runtime.prepareRecordEditorFormNavigation;
   }
+  if (typeof runtime.refreshProjectIndexFilters === "function") {
+    navigationRuntime.refreshProjectIndexFilters = runtime.refreshProjectIndexFilters;
+  }
 }
 
-// PmTracker.Web/wwwroot/js/modules/navigationShared.js
+// modules/navigationShared.js
 function appendCurrentAsUser(url) {
   const currentUrl = new URL(window.location.href);
   const asUser = currentUrl.searchParams.get("asUser");
@@ -153,7 +1207,402 @@ function isElementInHiddenTree(element) {
   return false;
 }
 
-// PmTracker.Web/wwwroot/js/modules/comments.js
+// modules/utils.js
+var msPerDay = 24 * 60 * 60 * 1000;
+var dateMonths = [
+  "Leden",
+  "Únor",
+  "Březen",
+  "Duben",
+  "Květen",
+  "Červen",
+  "Červenec",
+  "Srpen",
+  "Září",
+  "Říjen",
+  "Listopad",
+  "Prosinec"
+];
+function normalizeFilterText(value) {
+  if (!value) {
+    return "";
+  }
+  return value.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+function normalizeFilterToken(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value).trim().toUpperCase();
+}
+function normalizeSearchText2(value) {
+  return normalizeFilterText(value);
+}
+function containsWordPrefix(text, token) {
+  if (!text || !token) {
+    return false;
+  }
+  const parts = text.split(/[\s@._,;:/\\-]+/g).filter(Boolean);
+  return parts.some((part) => part.startsWith(token));
+}
+function scoreSearchCandidate(query, haystack) {
+  const normalizedQuery = normalizeSearchText2(query);
+  const normalizedHaystack = normalizeSearchText2(haystack);
+  if (!normalizedQuery) {
+    return 1;
+  }
+  if (!normalizedHaystack) {
+    return 0;
+  }
+  const tokens = normalizedQuery.split(/\s+/g).filter(Boolean);
+  let score = 0;
+  if (normalizedHaystack === normalizedQuery) {
+    score += 1600;
+  }
+  if (normalizedHaystack.startsWith(normalizedQuery)) {
+    score += 1100;
+  }
+  if (normalizedHaystack.includes(normalizedQuery)) {
+    score += 700;
+  }
+  tokens.forEach((token) => {
+    if (containsWordPrefix(normalizedHaystack, token)) {
+      score += 180;
+    } else if (normalizedHaystack.includes(token)) {
+      score += 85;
+    }
+  });
+  return score;
+}
+function debounce(callback, waitMs) {
+  let timeoutId = 0;
+  return (...args) => {
+    window.clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(() => callback(...args), waitMs);
+  };
+}
+var rainbowMeasureCanvas = null;
+function measureTextWidth(text, fontSpec) {
+  const normalized = String(text || "").trim();
+  if (!normalized) {
+    return 0;
+  }
+  if (!(rainbowMeasureCanvas instanceof HTMLCanvasElement)) {
+    rainbowMeasureCanvas = document.createElement("canvas");
+  }
+  const context = rainbowMeasureCanvas.getContext("2d");
+  if (!context) {
+    return normalized.length * 7;
+  }
+  context.font = fontSpec || "600 11px sans-serif";
+  return context.measureText(normalized).width;
+}
+function parseColorChannels(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return null;
+  }
+  if (normalized.startsWith("#")) {
+    const hex = normalized.slice(1);
+    if (hex.length === 6) {
+      const r2 = Number.parseInt(hex.slice(0, 2), 16);
+      const g2 = Number.parseInt(hex.slice(2, 4), 16);
+      const b2 = Number.parseInt(hex.slice(4, 6), 16);
+      if (Number.isFinite(r2) && Number.isFinite(g2) && Number.isFinite(b2)) {
+        return { r: r2, g: g2, b: b2 };
+      }
+    }
+  }
+  const match = normalized.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+  if (!match) {
+    return null;
+  }
+  const r = Math.max(0, Math.min(255, Math.round(Number.parseFloat(match[1]))));
+  const g = Math.max(0, Math.min(255, Math.round(Number.parseFloat(match[2]))));
+  const b = Math.max(0, Math.min(255, Math.round(Number.parseFloat(match[3]))));
+  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) {
+    return null;
+  }
+  return { r, g, b };
+}
+function getContrastTextColor(backgroundColor) {
+  const channels = parseColorChannels(backgroundColor);
+  if (!channels) {
+    return "#0F172A";
+  }
+  const toLinear = (channel) => {
+    const normalized = channel / 255;
+    if (normalized <= 0.03928) {
+      return normalized / 12.92;
+    }
+    return ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = 0.2126 * toLinear(channels.r) + 0.7152 * toLinear(channels.g) + 0.0722 * toLinear(channels.b);
+  return luminance >= 0.45 ? "#0F172A" : "#F8FAFC";
+}
+function pickSegmentLabel(fullLabel, shortLabel, availableWidthPx, fontSpec) {
+  const available = Math.max(0, Number(availableWidthPx) || 0);
+  if (available < 14) {
+    return "";
+  }
+  const normalizedFull = String(fullLabel || "").trim();
+  const normalizedShort = String(shortLabel || "").trim();
+  const candidates = [normalizedFull, normalizedShort].filter(Boolean);
+  const horizontalPaddingPx = 8;
+  for (const candidate of candidates) {
+    if (measureTextWidth(candidate, fontSpec) + horizontalPaddingPx <= available) {
+      return candidate;
+    }
+  }
+  return "";
+}
+function parseIsoDate(value) {
+  if (!value) {
+    return null;
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  const year = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const day = Number.parseInt(match[3], 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+}
+function parseDisplayDate(value) {
+  if (!value) {
+    return null;
+  }
+  const match = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  const day = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const year = Number.parseInt(match[3], 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+}
+function formatIsoDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+function formatDisplayDate(date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}.${month}.${year}`;
+}
+function toUtcDayStamp(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return d.getTime();
+}
+function diffCalendarDays(a, b) {
+  return Math.round((toUtcDayStamp(a) - toUtcDayStamp(b)) / msPerDay);
+}
+function addCalendarDays(baseDate, dayCount) {
+  const days = Number.isFinite(dayCount) ? Math.trunc(dayCount) : 0;
+  const next = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+  next.setDate(next.getDate() + days);
+  return next;
+}
+function formatAxisDayMonth(date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.`;
+}
+function formatAxisMonthYear(date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${month}/${date.getFullYear()}`;
+}
+function parseIsoDateTime(value) {
+  if (!value) {
+    return null;
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?$/.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  const year = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const day = Number.parseInt(match[3], 10);
+  const hours = Number.parseInt(match[4], 10);
+  const minutes = Number.parseInt(match[5], 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day) || !Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day || date.getHours() !== hours || date.getMinutes() !== minutes) {
+    return null;
+  }
+  return date;
+}
+function parseTimeValue(value) {
+  if (!value) {
+    return null;
+  }
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  const hours = Number.parseInt(match[1], 10);
+  const minutes = Number.parseInt(match[2], 10);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+  return { hours, minutes };
+}
+function formatTime(hours, minutes) {
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+function isSameCalendarDate(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+function parseJsonPayload(rawText) {
+  const text = String(rawText || "").trim();
+  if (!text) {
+    return null;
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    return null;
+  }
+}
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function resolveAjaxResponseTraceId(response) {
+  if (!(response instanceof Response) || !(response.headers instanceof Headers)) {
+    return "";
+  }
+  return response.headers.get("x-trace-id") || response.headers.get("trace-id") || response.headers.get("request-id") || "";
+}
+function truncateDiagnosticBody(value, maxLength) {
+  const text = String(value || "");
+  const limit = Number.isFinite(maxLength) ? Math.max(256, Number(maxLength)) : 12000;
+  if (text.length <= limit) {
+    return text;
+  }
+  return `${text.slice(0, limit)}
+...[truncated ${text.length - limit} chars]`;
+}
+function reportClientDiagnostic(type, detail = {}) {
+  const name = String(type || "").trim();
+  if (!name) {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent("pmtracker:client-diagnostic", {
+    detail: {
+      type: name,
+      ...detail
+    }
+  }));
+}
+function buildResponseHeadersSnapshot(response, maxHeaders) {
+  if (!(response instanceof Response) || !(response.headers instanceof Headers)) {
+    return "<none>";
+  }
+  const limit = Number.isFinite(maxHeaders) ? Math.max(5, Number(maxHeaders)) : 80;
+  const entries = Array.from(response.headers.entries());
+  if (entries.length === 0) {
+    return "<none>";
+  }
+  return entries.slice(0, limit).map(([key, value]) => `${key}: ${value}`).join(`
+`);
+}
+function buildFormDataSnapshot(formData, maxFields) {
+  if (!(formData instanceof FormData)) {
+    return "<unavailable>";
+  }
+  const limit = Number.isFinite(maxFields) ? Math.max(5, Number(maxFields)) : 120;
+  const lines = [];
+  let count = 0;
+  for (const [key, rawValue] of formData.entries()) {
+    count += 1;
+    if (count > limit) {
+      break;
+    }
+    if (rawValue instanceof File) {
+      lines.push(`${key}=<file:${rawValue.name};size=${rawValue.size}>`);
+      continue;
+    }
+    const value = truncateDiagnosticBody(String(rawValue || ""), 300);
+    lines.push(`${key}=${value}`);
+  }
+  if (count === 0) {
+    return "<empty>";
+  }
+  if (count > limit) {
+    lines.push(`...[truncated ${count - limit} fields]`);
+  }
+  return lines.join(`
+`);
+}
+function isButtonLike(el) {
+  if (!(el instanceof HTMLElement))
+    return false;
+  if (el instanceof HTMLButtonElement)
+    return true;
+  if (el instanceof HTMLInputElement) {
+    const t = el.type;
+    return t === "submit" || t === "button" || t === "reset";
+  }
+  return el.tagName.toLowerCase() === "gov-button";
+}
+function setButtonDisabled(el, disabled) {
+  if (!(el instanceof HTMLElement))
+    return;
+  if (disabled) {
+    el.setAttribute("disabled", "disabled");
+    if ("disabled" in el)
+      el.disabled = true;
+  } else {
+    el.removeAttribute("disabled");
+    if ("disabled" in el)
+      el.disabled = false;
+  }
+}
+var SUBMIT_SELECTOR = 'button[type="submit"], input[type="submit"], gov-button[native-type="submit"]';
+async function copyTextToClipboard(text) {
+  const value = String(text || "");
+  if (!value) {
+    return false;
+  }
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch (error) {}
+  }
+  const helper = document.createElement("textarea");
+  helper.value = value;
+  helper.setAttribute("readonly", "readonly");
+  helper.style.position = "fixed";
+  helper.style.opacity = "0";
+  document.body.appendChild(helper);
+  helper.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(helper);
+  return copied;
+}
+
+// modules/comments.js
 var commentSortDirectionStorageKey = "pmtracker.comments.sortDirection";
 var defaultRecordCommentsLoadStep = 5;
 function normalizeCommentSortDirection(direction) {
@@ -231,8 +1680,6 @@ function applyCommentSort(section, direction) {
         list.after(paginationActions);
       }
     }
-    // Pagination labels swappují přes CSS (data-comment-pagination-label),
-    // ne přes textContent — gov-button hydratace duplikovala obsah.
   }
   section.setAttribute("data-comment-sort-direction", normalizedDirection);
 }
@@ -476,404 +1923,8 @@ function initCommentSortUi(scope = document) {
     }
   });
 }
-// PmTracker.Web/wwwroot/js/modules/utils.js
-var msPerDay = 24 * 60 * 60 * 1000;
-var dateMonths = [
-  "Leden",
-  "Únor",
-  "Březen",
-  "Duben",
-  "Květen",
-  "Červen",
-  "Červenec",
-  "Srpen",
-  "Září",
-  "Říjen",
-  "Listopad",
-  "Prosinec"
-];
-function normalizeFilterText(value) {
-  if (!value) {
-    return "";
-  }
-  return value.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-function normalizeFilterToken(value) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  return String(value).trim().toUpperCase();
-}
-function normalizeSearchText2(value) {
-  return normalizeFilterText(value);
-}
-function containsWordPrefix(text, token) {
-  if (!text || !token) {
-    return false;
-  }
-  const parts = text.split(/[\s@._,;:/\\-]+/g).filter(Boolean);
-  return parts.some((part) => part.startsWith(token));
-}
-function scoreSearchCandidate(query, haystack) {
-  const normalizedQuery = normalizeSearchText2(query);
-  const normalizedHaystack = normalizeSearchText2(haystack);
-  if (!normalizedQuery) {
-    return 1;
-  }
-  if (!normalizedHaystack) {
-    return 0;
-  }
-  const tokens = normalizedQuery.split(/\s+/g).filter(Boolean);
-  let score = 0;
-  if (normalizedHaystack === normalizedQuery) {
-    score += 1600;
-  }
-  if (normalizedHaystack.startsWith(normalizedQuery)) {
-    score += 1100;
-  }
-  if (normalizedHaystack.includes(normalizedQuery)) {
-    score += 700;
-  }
-  tokens.forEach((token) => {
-    if (containsWordPrefix(normalizedHaystack, token)) {
-      score += 180;
-    } else if (normalizedHaystack.includes(token)) {
-      score += 85;
-    }
-  });
-  return score;
-}
-function debounce(callback, waitMs) {
-  let timeoutId = 0;
-  return (...args) => {
-    window.clearTimeout(timeoutId);
-    timeoutId = window.setTimeout(() => callback(...args), waitMs);
-  };
-}
-var rainbowMeasureCanvas = null;
-function measureTextWidth(text, fontSpec) {
-  const normalized = String(text || "").trim();
-  if (!normalized) {
-    return 0;
-  }
-  if (!(rainbowMeasureCanvas instanceof HTMLCanvasElement)) {
-    rainbowMeasureCanvas = document.createElement("canvas");
-  }
-  const context = rainbowMeasureCanvas.getContext("2d");
-  if (!context) {
-    return normalized.length * 7;
-  }
-  context.font = fontSpec || "600 11px sans-serif";
-  return context.measureText(normalized).width;
-}
-function parseColorChannels(value) {
-  const normalized = String(value || "").trim();
-  if (!normalized) {
-    return null;
-  }
-  if (normalized.startsWith("#")) {
-    const hex = normalized.slice(1);
-    if (hex.length === 6) {
-      const r2 = Number.parseInt(hex.slice(0, 2), 16);
-      const g2 = Number.parseInt(hex.slice(2, 4), 16);
-      const b2 = Number.parseInt(hex.slice(4, 6), 16);
-      if (Number.isFinite(r2) && Number.isFinite(g2) && Number.isFinite(b2)) {
-        return { r: r2, g: g2, b: b2 };
-      }
-    }
-  }
-  const match = normalized.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
-  if (!match) {
-    return null;
-  }
-  const r = Math.max(0, Math.min(255, Math.round(Number.parseFloat(match[1]))));
-  const g = Math.max(0, Math.min(255, Math.round(Number.parseFloat(match[2]))));
-  const b = Math.max(0, Math.min(255, Math.round(Number.parseFloat(match[3]))));
-  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) {
-    return null;
-  }
-  return { r, g, b };
-}
-function getContrastTextColor(backgroundColor) {
-  const channels = parseColorChannels(backgroundColor);
-  if (!channels) {
-    return "#0F172A";
-  }
-  const toLinear = (channel) => {
-    const normalized = channel / 255;
-    if (normalized <= 0.03928) {
-      return normalized / 12.92;
-    }
-    return ((normalized + 0.055) / 1.055) ** 2.4;
-  };
-  const luminance = 0.2126 * toLinear(channels.r) + 0.7152 * toLinear(channels.g) + 0.0722 * toLinear(channels.b);
-  return luminance >= 0.45 ? "#0F172A" : "#F8FAFC";
-}
-function pickSegmentLabel(fullLabel, shortLabel, availableWidthPx, fontSpec) {
-  const available = Math.max(0, Number(availableWidthPx) || 0);
-  if (available < 14) {
-    return "";
-  }
-  const normalizedFull = String(fullLabel || "").trim();
-  const normalizedShort = String(shortLabel || "").trim();
-  const candidates = [normalizedFull, normalizedShort].filter(Boolean);
-  const horizontalPaddingPx = 8;
-  for (const candidate of candidates) {
-    if (measureTextWidth(candidate, fontSpec) + horizontalPaddingPx <= available) {
-      return candidate;
-    }
-  }
-  return "";
-}
-function parseIsoDate(value) {
-  if (!value) {
-    return null;
-  }
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!match) {
-    return null;
-  }
-  const year = Number.parseInt(match[1], 10);
-  const month = Number.parseInt(match[2], 10);
-  const day = Number.parseInt(match[3], 10);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return null;
-  }
-  const date = new Date(year, month - 1, day);
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
-    return null;
-  }
-  return date;
-}
-function parseDisplayDate(value) {
-  if (!value) {
-    return null;
-  }
-  const match = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(value.trim());
-  if (!match) {
-    return null;
-  }
-  const day = Number.parseInt(match[1], 10);
-  const month = Number.parseInt(match[2], 10);
-  const year = Number.parseInt(match[3], 10);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return null;
-  }
-  const date = new Date(year, month - 1, day);
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
-    return null;
-  }
-  return date;
-}
-function formatIsoDate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-function formatDisplayDate(date) {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}.${month}.${year}`;
-}
-function toUtcDayStamp(date) {
-  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
-}
-function diffCalendarDays(a, b) {
-  return Math.round((toUtcDayStamp(a) - toUtcDayStamp(b)) / msPerDay);
-}
-function addCalendarDays(baseDate, dayCount) {
-  const days = Number.isFinite(dayCount) ? Math.trunc(dayCount) : 0;
-  const next = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
-  next.setDate(next.getDate() + days);
-  return next;
-}
-function formatAxisDayMonth(date) {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}.${month}.`;
-}
-function formatAxisMonthYear(date) {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${month}/${date.getFullYear()}`;
-}
-function parseIsoDateTime(value) {
-  if (!value) {
-    return null;
-  }
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?$/.exec(value.trim());
-  if (!match) {
-    return null;
-  }
-  const year = Number.parseInt(match[1], 10);
-  const month = Number.parseInt(match[2], 10);
-  const day = Number.parseInt(match[3], 10);
-  const hours = Number.parseInt(match[4], 10);
-  const minutes = Number.parseInt(match[5], 10);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day) || !Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-    return null;
-  }
-  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day || date.getHours() !== hours || date.getMinutes() !== minutes) {
-    return null;
-  }
-  return date;
-}
-function parseTimeValue(value) {
-  if (!value) {
-    return null;
-  }
-  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
-  if (!match) {
-    return null;
-  }
-  const hours = Number.parseInt(match[1], 10);
-  const minutes = Number.parseInt(match[2], 10);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-    return null;
-  }
-  return { hours, minutes };
-}
-function formatTime(hours, minutes) {
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-}
-function isSameCalendarDate(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-function parseJsonPayload(rawText) {
-  const text = String(rawText || "").trim();
-  if (!text) {
-    return null;
-  }
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    return null;
-  }
-}
-function isPlainObject(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-function resolveAjaxResponseTraceId(response) {
-  if (!(response instanceof Response) || !(response.headers instanceof Headers)) {
-    return "";
-  }
-  return response.headers.get("x-trace-id") || response.headers.get("trace-id") || response.headers.get("request-id") || "";
-}
-function truncateDiagnosticBody(value, maxLength) {
-  const text = String(value || "");
-  const limit = Number.isFinite(maxLength) ? Math.max(256, Number(maxLength)) : 12000;
-  if (text.length <= limit) {
-    return text;
-  }
-  return `${text.slice(0, limit)}
-...[truncated ${text.length - limit} chars]`;
-}
-function reportClientDiagnostic(type, detail = {}) {
-  const name = String(type || "").trim();
-  if (!name) {
-    return;
-  }
-  window.dispatchEvent(new CustomEvent("pmtracker:client-diagnostic", {
-    detail: {
-      type: name,
-      ...detail
-    }
-  }));
-}
-function buildResponseHeadersSnapshot(response, maxHeaders) {
-  if (!(response instanceof Response) || !(response.headers instanceof Headers)) {
-    return "<none>";
-  }
-  const limit = Number.isFinite(maxHeaders) ? Math.max(5, Number(maxHeaders)) : 80;
-  const entries = Array.from(response.headers.entries());
-  if (entries.length === 0) {
-    return "<none>";
-  }
-  return entries.slice(0, limit).map(([key, value]) => `${key}: ${value}`).join(`
-`);
-}
-function buildFormDataSnapshot(formData, maxFields) {
-  if (!(formData instanceof FormData)) {
-    return "<unavailable>";
-  }
-  const limit = Number.isFinite(maxFields) ? Math.max(5, Number(maxFields)) : 120;
-  const lines = [];
-  let count = 0;
-  for (const [key, rawValue] of formData.entries()) {
-    count += 1;
-    if (count > limit) {
-      break;
-    }
-    if (rawValue instanceof File) {
-      lines.push(`${key}=<file:${rawValue.name};size=${rawValue.size}>`);
-      continue;
-    }
-    const value = truncateDiagnosticBody(String(rawValue || ""), 300);
-    lines.push(`${key}=${value}`);
-  }
-  if (count === 0) {
-    return "<empty>";
-  }
-  if (count > limit) {
-    lines.push(`...[truncated ${count - limit} fields]`);
-  }
-  return lines.join(`
-`);
-}
-
-// ===== Fáze 2D helpers — gov-button compatibility =====
-// Synchronizováno s PmTracker.Web/wwwroot/js/modules/utils.js
-function isButtonLike(el) {
-    if (!(el instanceof HTMLElement)) return false;
-    if (el instanceof HTMLButtonElement) return true;
-    if (el instanceof HTMLInputElement) {
-        const t = el.type;
-        return t === "submit" || t === "button" || t === "reset";
-    }
-    return el.tagName.toLowerCase() === "gov-button";
-}
-
-function setButtonDisabled(el, disabled) {
-    if (!(el instanceof HTMLElement)) return;
-    if (disabled) {
-        el.setAttribute("disabled", "disabled");
-        if ("disabled" in el) el.disabled = true;
-    } else {
-        el.removeAttribute("disabled");
-        if ("disabled" in el) el.disabled = false;
-    }
-}
-
-const SUBMIT_SELECTOR = 'button[type="submit"], input[type="submit"], gov-button[native-type="submit"]';
-
-async function copyTextToClipboard(text) {
-  const value = String(text || "");
-  if (!value) {
-    return false;
-  }
-  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-    try {
-      await navigator.clipboard.writeText(value);
-      return true;
-    } catch (error) {}
-  }
-  const helper = document.createElement("textarea");
-  helper.value = value;
-  helper.setAttribute("readonly", "readonly");
-  helper.style.position = "fixed";
-  helper.style.opacity = "0";
-  document.body.appendChild(helper);
-  helper.select();
-  const copied = document.execCommand("copy");
-  document.body.removeChild(helper);
-  return copied;
-}
-
-// PmTracker.Web/wwwroot/js/modules/filters/ (Fáze 3B Task 4: projectFilter.js + recordDisplay.js + printFilter.js + index.js)
+// modules/filters/projectFilter.js
 var projectFilterStoragePrefix = "pmtracker.projectFilters.v1.project.";
-var projectRecordFilterPanelStorageKey = "pmtracker.filters.open";
 var legacyProjectFilterPrefixes = [
   "pmtracker.filter.",
   "pmtracker.schedule.filter.",
@@ -887,10 +1938,6 @@ var legacyGanttStoragePrefixes = [
   "pmtracker.gantt.pinned.",
   "pmtracker.gantt.expanded."
 ];
-var recordMeetingCommentStateCache = new Map;
-var recordMeetingCommentStateRequests = new Map;
-var recordMeetingCommentStateLoadingMessage = "Načítání dat pro filtr jednání-vyjádření...";
-var recordMeetingCommentStateErrorMessage = "Nepodařilo se načíst data pro filtr jednání-vyjádření.";
 var projectFilterConfigs = {
   records: {
     rootSelector: '[data-project-filter-scope="records"]',
@@ -923,16 +1970,6 @@ var projectFilterConfigs = {
     ]
   }
 };
-var projectPrintRelevantRecordStateKeys = [
-  "subsystem",
-  "kategorie",
-  "stav",
-  "typ",
-  "vlastnik",
-  "aktivni",
-  "mine",
-  "jednaniVyjadreniStav"
-];
 function normalizeFilterText2(value) {
   if (!value) {
     return "";
@@ -1008,56 +2045,8 @@ function sortSubsystemGroupsInContainer(container, sortMode) {
   groups.sort((left, right) => compareSubsystemSortMeta(readSubsystemGroupSortMeta(left), readSubsystemGroupSortMeta(right), sortMode)).forEach((group) => container.appendChild(group));
   return groups;
 }
-function buildProjectPrintFilterSnapshot() {
-  const state = buildProjectFilterStateFromInputs("records");
-  const snapshot = {
-    subsystem: typeof state.subsystem === "string" ? state.subsystem.trim() : "",
-    kategorie: typeof state.kategorie === "string" ? state.kategorie.trim() : "",
-    stav: typeof state.stav === "string" ? state.stav.trim() : "",
-    typ: typeof state.typ === "string" ? state.typ.trim() : "",
-    vlastnik: typeof state.vlastnik === "string" ? state.vlastnik.trim() : "",
-    aktivni: Boolean(state.aktivni),
-    mine: Boolean(state.mine),
-    jednaniVyjadreniStav: typeof state.jednaniVyjadreniStav === "string" ? state.jednaniVyjadreniStav.trim() : ""
-  };
-  return {
-    ...snapshot,
-    hasRelevantFilters: projectPrintRelevantRecordStateKeys.some((key) => Boolean(snapshot[key]))
-  };
-}
-function buildProjectPrintFilterQueryParams(useCurrentFilters) {
-  const snapshot = buildProjectPrintFilterSnapshot();
-  const params = new URLSearchParams;
-  if (!useCurrentFilters) {
-    params.set("useCurrentFilters", "false");
-    return { snapshot, params };
-  }
-  params.set("useCurrentFilters", "true");
-  if (snapshot.subsystem) {
-    params.set("subsystem", snapshot.subsystem);
-  }
-  if (snapshot.kategorie) {
-    params.set("kategorie", snapshot.kategorie);
-  }
-  if (snapshot.stav) {
-    params.set("stav", snapshot.stav);
-  }
-  if (snapshot.typ) {
-    params.set("typ", snapshot.typ);
-  }
-  if (snapshot.vlastnik) {
-    params.set("vlastnik", snapshot.vlastnik);
-  }
-  if (snapshot.aktivni) {
-    params.set("aktivni", "true");
-  }
-  if (snapshot.mine) {
-    params.set("mine", "true");
-  }
-  if (snapshot.jednaniVyjadreniStav) {
-    params.set("jednaniVyjadreniStav", snapshot.jednaniVyjadreniStav);
-  }
-  return { snapshot, params };
+function getProjectFilterConfig(scope) {
+  return projectFilterConfigs[scope] || null;
 }
 function getProjectFilterRoot(scope) {
   const config = getProjectFilterConfig(scope);
@@ -1072,92 +2061,33 @@ function getProjectFilterProjectId(scope) {
   const projectId = (root?.dataset.projectId || "").trim();
   return projectId || "0";
 }
-function getProjectDetailRoot() {
-  const root = document.querySelector("[data-project-detail-root]");
-  return root instanceof HTMLElement ? root : null;
+function getProjectFilterInput(scope, inputKey) {
+  const config = getProjectFilterConfig(scope);
+  const root = getProjectFilterRoot(scope);
+  if (!config || !(root instanceof HTMLElement)) {
+    return null;
+  }
+  const input = root.querySelector(`${config.inputSelector}[${config.keyAttribute}="${inputKey}"]`);
+  if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+    return input;
+  }
+  if (input instanceof HTMLElement && input.tagName.toLowerCase() === "gov-form-switch") {
+    return input;
+  }
+  return null;
 }
-function getProjectRecordsPanel() {
-  const panel = document.querySelector('[data-tab-panel="zaznamy"]');
-  return panel instanceof HTMLElement ? panel : null;
+function isGovFormSwitch(el) {
+  return el instanceof HTMLElement && el.tagName && el.tagName.toLowerCase() === "gov-form-switch";
 }
-function normalizeRecordMeetingCommentStatesPayload(payload) {
-  if (!payload || typeof payload !== "object") {
-    return {};
-  }
-  const rawStates = payload.statesByRecordId && typeof payload.statesByRecordId === "object" ? payload.statesByRecordId : payload;
-  const normalized = {};
-  Object.entries(rawStates).forEach(([recordId, values]) => {
-    const normalizedRecordId = String(recordId || "").trim();
-    if (!normalizedRecordId) {
-      return;
-    }
-    const normalizedValues = Array.isArray(values) ? values.map((value) => normalizeFilterToken2(value)).filter(Boolean) : [];
-    normalized[normalizedRecordId] = Array.from(new Set(normalizedValues));
-  });
-  return normalized;
+function getProjectFilterCurrentUserId(scope) {
+  return normalizeFilterToken2(getProjectFilterRoot(scope)?.dataset.currentUserId || "");
 }
-function applyCachedRecordMeetingCommentStates(projectId) {
-  const normalizedProjectId = String(projectId || "").trim();
-  if (!normalizedProjectId || !recordMeetingCommentStateCache.has(normalizedProjectId)) {
-    return false;
+function getProjectFilterStorageKey(scope, kind) {
+  const projectId = getProjectFilterProjectId(scope);
+  if (!projectId || projectId === "0") {
+    return "";
   }
-  const statesByRecordId = recordMeetingCommentStateCache.get(normalizedProjectId) || {};
-  const recordsPanel = getProjectRecordsPanel();
-  if (!(recordsPanel instanceof HTMLElement)) {
-    return false;
-  }
-  recordsPanel.querySelectorAll(".record-card[data-record-id]").forEach((card) => {
-    if (!(card instanceof HTMLElement)) {
-      return;
-    }
-    const recordId = (card.dataset.recordId || "").trim();
-    const values = Array.isArray(statesByRecordId[recordId]) ? statesByRecordId[recordId] : [];
-    card.dataset.filterVyjadreniJednaniStavy = values.join("|");
-  });
-  return true;
-}
-async function ensureRecordMeetingCommentStatesLoaded() {
-  const projectRoot = getProjectDetailRoot();
-  const projectId = getProjectFilterProjectId("records");
-  const loadUrl = (projectRoot?.dataset.recordMeetingCommentStatesUrl || "").trim();
-  if (!projectId || projectId === "0" || !loadUrl) {
-    return false;
-  }
-  if (applyCachedRecordMeetingCommentStates(projectId)) {
-    return true;
-  }
-  const existingRequest = recordMeetingCommentStateRequests.get(projectId);
-  if (existingRequest instanceof Promise) {
-    return existingRequest;
-  }
-  setProjectFilterSaveStatus("records", recordMeetingCommentStateLoadingMessage);
-  const request = (async () => {
-    try {
-      const response = await fetch(loadUrl, {
-        headers: {
-          Accept: "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        },
-        credentials: "same-origin"
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = await response.json();
-      recordMeetingCommentStateCache.set(projectId, normalizeRecordMeetingCommentStatesPayload(payload));
-      applyCachedRecordMeetingCommentStates(projectId);
-      setProjectFilterSaveStatus("records", "");
-      applyProjectRecordFilters();
-      return true;
-    } catch (error) {
-      setProjectFilterSaveStatus("records", recordMeetingCommentStateErrorMessage);
-      return false;
-    } finally {
-      recordMeetingCommentStateRequests.delete(projectId);
-    }
-  })();
-  recordMeetingCommentStateRequests.set(projectId, request);
-  return request;
+  return `${projectFilterStoragePrefix}${projectId}.${scope}.${kind}`;
 }
 function readJsonStorage(storage, key) {
   if (!key) {
@@ -1180,6 +2110,16 @@ function writeJsonStorage(storage, key, value) {
   }
   storage.setItem(key, JSON.stringify(value));
 }
+function removeMatchingStorageKeys(storage, predicate) {
+  const keys = [];
+  for (let i = 0;i < storage.length; i += 1) {
+    const key = storage.key(i);
+    if (key && predicate(key)) {
+      keys.push(key);
+    }
+  }
+  keys.forEach((key) => storage.removeItem(key));
+}
 function hasSelectOptionValue(input, value) {
   if (!(input instanceof HTMLSelectElement)) {
     return false;
@@ -1187,13 +2127,16 @@ function hasSelectOptionValue(input, value) {
   return Array.from(input.options).some((option) => option.value === value);
 }
 function readProjectFilterInputValue(input, field) {
-  if (input instanceof HTMLInputElement && field.type === "checkbox") {
-    return input.checked;
+  if (field.type === "checkbox") {
+    if (input instanceof HTMLInputElement || isGovFormSwitch(input)) {
+      return !!input.checked;
+    }
+    return false;
   }
   if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
     return input.value;
   }
-  return field.type === "checkbox" ? false : "";
+  return "";
 }
 function applyProjectFilterStateToInputs(scope, state) {
   const config = getProjectFilterConfig(scope);
@@ -1202,12 +2145,20 @@ function applyProjectFilterStateToInputs(scope, state) {
   }
   config.fields.forEach((field) => {
     const input = getProjectFilterInput(scope, field.inputKey);
-    if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || isGovFormSwitch(input))) {
       return;
     }
     const value = state[field.stateKey];
-    if (field.type === "checkbox" && input instanceof HTMLInputElement) {
-      input.checked = Boolean(value);
+    if (field.type === "checkbox") {
+      if (input instanceof HTMLInputElement) {
+        input.checked = Boolean(value);
+      } else if (isGovFormSwitch(input)) {
+        if (Boolean(value)) {
+          input.setAttribute("checked", "");
+        } else {
+          input.removeAttribute("checked");
+        }
+      }
       return;
     }
     input.value = typeof value === "string" ? value : "";
@@ -1222,13 +2173,6 @@ function readStoredProjectFilterState(scope, kind, fallbackState) {
   }
   return normalizeProjectFilterState(scope, rawState, fallbackState);
 }
-function persistProjectFilterSessionState(scope) {
-  const currentState = buildProjectFilterStateFromInputs(scope);
-  const normalizedState = normalizeProjectFilterState(scope, currentState, currentState);
-  const key = getProjectFilterStorageKey(scope, "state");
-  writeJsonStorage(sessionStorage, key, normalizedState);
-  return normalizedState;
-}
 function buildProjectFilterChipLabel(field, input) {
   if (field.type === "checkbox") {
     return field.chipLabel || "";
@@ -1242,48 +2186,6 @@ function buildProjectFilterChipLabel(field, input) {
     return "";
   }
   return `${field.chipLabel}: ${optionText}`;
-}
-function applyProjectFilterScope(scope, options = {}) {
-  if (scope === "records") {
-    const state = buildProjectFilterStateFromInputs(scope);
-    applyRecordsView(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
-    return;
-  }
-  if (typeof options.applyScope === "function") {
-    options.applyScope(scope, buildProjectFilterStateFromInputs(scope));
-  }
-}
-function removeMatchingStorageKeys(storage, predicate) {
-  const keys = [];
-  for (let i = 0;i < storage.length; i += 1) {
-    const key = storage.key(i);
-    if (key && predicate(key)) {
-      keys.push(key);
-    }
-  }
-  keys.forEach((key) => storage.removeItem(key));
-}
-function getProjectFilterConfig(scope) {
-  return projectFilterConfigs[scope] || null;
-}
-function getProjectFilterInput(scope, inputKey) {
-  const config = getProjectFilterConfig(scope);
-  const root = getProjectFilterRoot(scope);
-  if (!config || !(root instanceof HTMLElement)) {
-    return null;
-  }
-  const input = root.querySelector(`${config.inputSelector}[${config.keyAttribute}="${inputKey}"]`);
-  return input instanceof HTMLInputElement || input instanceof HTMLSelectElement ? input : null;
-}
-function getProjectFilterCurrentUserId(scope) {
-  return normalizeFilterToken2(getProjectFilterRoot(scope)?.dataset.currentUserId || "");
-}
-function getProjectFilterStorageKey(scope, kind) {
-  const projectId = getProjectFilterProjectId(scope);
-  if (!projectId || projectId === "0") {
-    return "";
-  }
-  return `${projectFilterStoragePrefix}${projectId}.${scope}.${kind}`;
 }
 function normalizeProjectFilterState(scope, rawState, fallbackState) {
   const config = getProjectFilterConfig(scope);
@@ -1342,6 +2244,13 @@ function setProjectFilterSaveStatus(scope, message) {
     status.textContent = message || "";
   }
 }
+function persistProjectFilterSessionState(scope) {
+  const currentState = buildProjectFilterStateFromInputs(scope);
+  const normalizedState = normalizeProjectFilterState(scope, currentState, currentState);
+  const key = getProjectFilterStorageKey(scope, "state");
+  writeJsonStorage(sessionStorage, key, normalizedState);
+  return normalizedState;
+}
 function renderProjectFilterChips(scope) {
   const config = getProjectFilterConfig(scope);
   const root = getProjectFilterRoot(scope);
@@ -1387,12 +2296,6 @@ function renderProjectFilterChips(scope) {
   chipRow.hidden = chips.length === 0;
   chips.forEach((chip) => chipRow.appendChild(chip));
 }
-function handleProjectFilterInputChange(scope, options = {}) {
-  persistProjectFilterSessionState(scope);
-  renderProjectFilterChips(scope);
-  setProjectFilterSaveStatus(scope, "");
-  applyProjectFilterScope(scope, options);
-}
 function restoreProjectFilterScope(scope) {
   const fallbackState = buildProjectFilterStateFromInputs(scope);
   const restoredState = readStoredProjectFilterState(scope, "state", fallbackState) || readStoredProjectFilterState(scope, "defaults", fallbackState) || fallbackState;
@@ -1409,11 +2312,13 @@ function saveProjectFilterDefaults(scope) {
 }
 function clearProjectFilterInput(scope, inputKey) {
   const input = getProjectFilterInput(scope, inputKey);
-  if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+  if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement || isGovFormSwitch(input))) {
     return;
   }
   if (input instanceof HTMLInputElement && input.type === "checkbox") {
     input.checked = false;
+  } else if (isGovFormSwitch(input)) {
+    input.removeAttribute("checked");
   } else {
     input.value = "";
   }
@@ -1422,17 +2327,123 @@ function clearProjectFilterPreferenceStorage() {
   removeMatchingStorageKeys(localStorage, (key) => key.startsWith(projectFilterStoragePrefix) || legacyProjectFilterKeys.includes(key) || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix)) || legacyGanttStoragePrefixes.some((prefix) => key.startsWith(prefix)));
   removeMatchingStorageKeys(sessionStorage, (key) => key.startsWith(projectFilterStoragePrefix) || legacyProjectFilterKeys.includes(key) || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix)) || legacyGanttStoragePrefixes.some((prefix) => key.startsWith(prefix)));
 }
-function setFilterPanelOpen(open) {
-  const filterPanel = document.querySelector("[data-filter-panel]");
-  const filterToggle = document.querySelector("[data-filter-toggle]");
-  if (!(filterPanel instanceof HTMLElement)) {
+// modules/filters/recordDisplay.js
+var recordMeetingCommentStateLoadingMessage = "Načítání dat pro filtr jednání-vyjádření...";
+var recordMeetingCommentStateErrorMessage = "Nepodařilo se načíst data pro filtr jednání-vyjádření.";
+var recordMeetingCommentStateCache = new Map;
+var recordMeetingCommentStateRequests = new Map;
+function getProjectDetailRoot() {
+  const root = document.querySelector("[data-project-detail-root]");
+  return root instanceof HTMLElement ? root : null;
+}
+function getProjectRecordsPanel() {
+  const panel = document.querySelector('[data-tab-panel="zaznamy"]');
+  return panel instanceof HTMLElement ? panel : null;
+}
+function getProjectFilterProjectId2(scope) {
+  const config = getProjectFilterConfig(scope);
+  if (!config) {
+    return "0";
+  }
+  const root = document.querySelector(config.rootSelector);
+  if (!(root instanceof HTMLElement)) {
+    return "0";
+  }
+  const projectId = (root.dataset.projectId || "").trim();
+  return projectId || "0";
+}
+function normalizeFilterToken3(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value).trim().toUpperCase();
+}
+function normalizeRecordMeetingCommentStatesPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+  const rawStates = payload.statesByRecordId && typeof payload.statesByRecordId === "object" ? payload.statesByRecordId : payload;
+  const normalized = {};
+  Object.entries(rawStates).forEach(([recordId, values]) => {
+    const normalizedRecordId = String(recordId || "").trim();
+    if (!normalizedRecordId) {
+      return;
+    }
+    const normalizedValues = Array.isArray(values) ? values.map((value) => normalizeFilterToken3(value)).filter(Boolean) : [];
+    normalized[normalizedRecordId] = Array.from(new Set(normalizedValues));
+  });
+  return normalized;
+}
+function applyCachedRecordMeetingCommentStates(projectId) {
+  const normalizedProjectId = String(projectId || "").trim();
+  if (!normalizedProjectId || !recordMeetingCommentStateCache.has(normalizedProjectId)) {
+    return false;
+  }
+  const statesByRecordId = recordMeetingCommentStateCache.get(normalizedProjectId) || {};
+  const recordsPanel = getProjectRecordsPanel();
+  if (!(recordsPanel instanceof HTMLElement)) {
+    return false;
+  }
+  recordsPanel.querySelectorAll(".record-card[data-record-id]").forEach((card) => {
+    if (!(card instanceof HTMLElement)) {
+      return;
+    }
+    const recordId = (card.dataset.recordId || "").trim();
+    const values = Array.isArray(statesByRecordId[recordId]) ? statesByRecordId[recordId] : [];
+    card.dataset.filterVyjadreniJednaniStavy = values.join("|");
+  });
+  return true;
+}
+async function ensureRecordMeetingCommentStatesLoaded() {
+  const projectRoot = getProjectDetailRoot();
+  const projectId = getProjectFilterProjectId2("records");
+  const loadUrl = (projectRoot?.dataset.recordMeetingCommentStatesUrl || "").trim();
+  if (!projectId || projectId === "0" || !loadUrl) {
+    return false;
+  }
+  if (applyCachedRecordMeetingCommentStates(projectId)) {
+    return true;
+  }
+  const existingRequest = recordMeetingCommentStateRequests.get(projectId);
+  if (existingRequest instanceof Promise) {
+    return existingRequest;
+  }
+  setProjectFilterSaveStatus("records", recordMeetingCommentStateLoadingMessage);
+  const request = (async () => {
+    try {
+      const response = await fetch(loadUrl, {
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "same-origin"
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      recordMeetingCommentStateCache.set(projectId, normalizeRecordMeetingCommentStatesPayload(payload));
+      applyCachedRecordMeetingCommentStates(projectId);
+      setProjectFilterSaveStatus("records", "");
+      applyProjectRecordFilters();
+      return true;
+    } catch (error) {
+      setProjectFilterSaveStatus("records", recordMeetingCommentStateErrorMessage);
+      return false;
+    } finally {
+      recordMeetingCommentStateRequests.delete(projectId);
+    }
+  })();
+  recordMeetingCommentStateRequests.set(projectId, request);
+  return request;
+}
+function invalidateRecordMeetingCommentStates(projectId) {
+  const normalizedProjectId = String(projectId || "").trim();
+  if (!normalizedProjectId) {
     return;
   }
-  filterPanel.classList.toggle("collapsed", !open);
-  if (filterToggle instanceof HTMLElement) {
-    filterToggle.setAttribute("aria-expanded", String(open));
-  }
-  localStorage.setItem(projectRecordFilterPanelStorageKey, String(open));
+  recordMeetingCommentStateCache.delete(normalizedProjectId);
+  recordMeetingCommentStateRequests.delete(normalizedProjectId);
 }
 function setRecordFilterVisibility(element, isVisible) {
   if (!(element instanceof HTMLElement)) {
@@ -1454,16 +2465,16 @@ function applyProjectRecordFilters() {
   const currentUserId = getProjectFilterCurrentUserId("records");
   const hasCurrentUser = currentUserId && currentUserId !== "0";
   const filters = {
-    subsystem: normalizeFilterToken2(state.subsystem),
-    kategorie: normalizeFilterToken2(state.kategorie),
-    stav: normalizeFilterToken2(state.stav),
-    typ: normalizeFilterToken2(state.typ),
-    vlastnik: normalizeFilterToken2(state.vlastnik),
+    subsystem: normalizeFilterToken3(state.subsystem),
+    kategorie: normalizeFilterToken3(state.kategorie),
+    stav: normalizeFilterToken3(state.stav),
+    typ: normalizeFilterToken3(state.typ),
+    vlastnik: normalizeFilterToken3(state.vlastnik),
     onlyActive: Boolean(state.aktivni),
     mine: Boolean(state.mine),
-    meetingCommentState: normalizeFilterToken2(state.jednaniVyjadreniStav)
+    meetingCommentState: normalizeFilterToken3(state.jednaniVyjadreniStav)
   };
-  const projectId = getProjectFilterProjectId("records");
+  const projectId = getProjectFilterProjectId2("records");
   const hasMeetingCommentStateCache = applyCachedRecordMeetingCommentStates(projectId);
   if (filters.meetingCommentState && !hasMeetingCommentStateCache) {
     ensureRecordMeetingCommentStatesLoaded();
@@ -1472,14 +2483,14 @@ function applyProjectRecordFilters() {
     if (!(item instanceof HTMLElement)) {
       return;
     }
-    const subsystem = normalizeFilterToken2(item.dataset.filterSubsystemKod || item.dataset.filterSubsystem);
-    const kategorie = normalizeFilterToken2(item.dataset.filterKategorieKod || item.dataset.filterKategorie);
-    const stav = normalizeFilterToken2(item.dataset.filterStavKod || item.dataset.filterStav);
-    const typ = normalizeFilterToken2(item.dataset.filterTypKod || item.dataset.filterTyp);
-    const vlastnik = normalizeFilterToken2(item.dataset.filterVlastnikId || item.dataset.filterVlastnik);
+    const subsystem = normalizeFilterToken3(item.dataset.filterSubsystemKod || item.dataset.filterSubsystem);
+    const kategorie = normalizeFilterToken3(item.dataset.filterKategorieKod || item.dataset.filterKategorie);
+    const stav = normalizeFilterToken3(item.dataset.filterStavKod || item.dataset.filterStav);
+    const typ = normalizeFilterToken3(item.dataset.filterTypKod || item.dataset.filterTyp);
+    const vlastnik = normalizeFilterToken3(item.dataset.filterVlastnikId || item.dataset.filterVlastnik);
     const isActive = item.dataset.filterAktivni === "true";
     const isTask = item.dataset.filterJeUkol === "true";
-    const commentMeetingStates = (item.dataset.filterVyjadreniJednaniStavy || "").split(/[|,]/g).map((value) => normalizeFilterToken2(value)).filter(Boolean);
+    const commentMeetingStates = (item.dataset.filterVyjadreniJednaniStavy || "").split(/[|,]/g).map((value) => normalizeFilterToken3(value)).filter(Boolean);
     const matchesMeetingCommentState = !filters.meetingCommentState || !hasMeetingCommentStateCache || isTask && commentMeetingStates.includes(filters.meetingCommentState);
     const matchesMine = !filters.mine || hasCurrentUser && vlastnik === currentUserId;
     const matches = (!filters.subsystem || subsystem === filters.subsystem) && (!filters.kategorie || kategorie === filters.kategorie) && (!filters.stav || stav === filters.stav) && (!filters.typ || typ === filters.typ) && (!filters.vlastnik || vlastnik === filters.vlastnik) && (!filters.onlyActive || isActive) && matchesMine && matchesMeetingCommentState;
@@ -1599,7 +2610,7 @@ function applyRecordsView(view) {
     return;
   }
   const groupBySubsystemInput = getProjectFilterInput("records", "groupBySubsystem");
-  const resolvedView = groupBySubsystemInput instanceof HTMLInputElement ? groupBySubsystemInput.checked ? "subsystem" : "flat" : view;
+  const resolvedView = groupBySubsystemInput instanceof HTMLElement ? groupBySubsystemInput.checked ? "subsystem" : "flat" : view;
   const shells = recordsPanel.querySelectorAll("[data-records-view]");
   if (shells.length === 0) {
     return;
@@ -1667,47 +2678,112 @@ function applyRecordsView(view) {
   applyProjectRecordFilters();
   scheduleSubsystemIndicatorSync();
 }
+// modules/filters/printFilter.js
+var projectPrintRelevantRecordStateKeys = [
+  "subsystem",
+  "kategorie",
+  "stav",
+  "typ",
+  "vlastnik",
+  "aktivni",
+  "mine",
+  "jednaniVyjadreniStav"
+];
+function buildProjectPrintFilterSnapshot() {
+  const state = buildProjectFilterStateFromInputs("records");
+  const snapshot = {
+    subsystem: typeof state.subsystem === "string" ? state.subsystem.trim() : "",
+    kategorie: typeof state.kategorie === "string" ? state.kategorie.trim() : "",
+    stav: typeof state.stav === "string" ? state.stav.trim() : "",
+    typ: typeof state.typ === "string" ? state.typ.trim() : "",
+    vlastnik: typeof state.vlastnik === "string" ? state.vlastnik.trim() : "",
+    aktivni: Boolean(state.aktivni),
+    mine: Boolean(state.mine),
+    jednaniVyjadreniStav: typeof state.jednaniVyjadreniStav === "string" ? state.jednaniVyjadreniStav.trim() : ""
+  };
+  return {
+    ...snapshot,
+    hasRelevantFilters: projectPrintRelevantRecordStateKeys.some((key) => Boolean(snapshot[key]))
+  };
+}
+function buildProjectPrintFilterQueryParams(useCurrentFilters) {
+  const snapshot = buildProjectPrintFilterSnapshot();
+  const params = new URLSearchParams;
+  if (!useCurrentFilters) {
+    params.set("useCurrentFilters", "false");
+    return { snapshot, params };
+  }
+  params.set("useCurrentFilters", "true");
+  if (snapshot.subsystem) {
+    params.set("subsystem", snapshot.subsystem);
+  }
+  if (snapshot.kategorie) {
+    params.set("kategorie", snapshot.kategorie);
+  }
+  if (snapshot.stav) {
+    params.set("stav", snapshot.stav);
+  }
+  if (snapshot.typ) {
+    params.set("typ", snapshot.typ);
+  }
+  if (snapshot.vlastnik) {
+    params.set("vlastnik", snapshot.vlastnik);
+  }
+  if (snapshot.aktivni) {
+    params.set("aktivni", "true");
+  }
+  if (snapshot.mine) {
+    params.set("mine", "true");
+  }
+  if (snapshot.jednaniVyjadreniStav) {
+    params.set("jednaniVyjadreniStav", snapshot.jednaniVyjadreniStav);
+  }
+  return { snapshot, params };
+}
+// modules/filters/index.js
+var projectRecordFilterPanelStorageKey = "pmtracker.filters.open";
+function setFilterPanelOpen(open) {
+  const filterPanel = document.querySelector("[data-filter-panel]");
+  const filterToggle = document.querySelector("[data-filter-toggle]");
+  if (!(filterPanel instanceof HTMLElement)) {
+    return;
+  }
+  filterPanel.classList.toggle("collapsed", !open);
+  if (filterToggle instanceof HTMLElement) {
+    filterToggle.setAttribute("aria-expanded", String(open));
+  }
+  localStorage.setItem(projectRecordFilterPanelStorageKey, String(open));
+}
+function applyProjectFilterScope(scope, options = {}) {
+  if (scope === "records") {
+    const state = buildProjectFilterStateFromInputs(scope);
+    applyRecordsView(Boolean(state.groupBySubsystem) ? "subsystem" : "flat");
+    return;
+  }
+  if (typeof options.applyScope === "function") {
+    options.applyScope(scope, buildProjectFilterStateFromInputs(scope));
+  }
+}
+function handleProjectFilterInputChange(scope, options = {}) {
+  persistProjectFilterSessionState(scope);
+  renderProjectFilterChips(scope);
+  setProjectFilterSaveStatus(scope, "");
+  applyProjectFilterScope(scope, options);
+}
 function restoreFilterState() {
   return restoreProjectFilterScope("records");
 }
 function persistFilterState(input, options = {}) {
   handleProjectFilterInputChange("records", options);
 }
-function invalidateRecordMeetingCommentStates(projectId) {
-  const normalizedProjectId = String(projectId || "").trim();
-  if (!normalizedProjectId) {
-    return;
-  }
-  recordMeetingCommentStateCache.delete(normalizedProjectId);
-  recordMeetingCommentStateRequests.delete(normalizedProjectId);
-}
-
-// PmTracker.Web/wwwroot/js/modules/ui.js
+// modules/ui/print.js
 var printFormatStorageKey = "pmtracker.print.preferredFormat";
 var printState = {
   popover: null,
   trigger: null,
   hoverTimerId: 0
 };
-var auxFloatingChoosers = new Set();
-function registerFloatingChooser(popover, trigger) {
-  if (!(popover instanceof HTMLElement) || !(trigger instanceof HTMLElement)) {
-    return;
-  }
-  auxFloatingChoosers.add({ popover, trigger });
-}
-function unregisterFloatingChooser(popover) {
-  if (!(popover instanceof HTMLElement)) {
-    return;
-  }
-  for (const entry of auxFloatingChoosers) {
-    if (entry.popover === popover) {
-      auxFloatingChoosers.delete(entry);
-    }
-  }
-}
-var floatingPanelRegistry = new Set;
-var globalFloatingRoot = null;
+var auxFloatingChoosers = new Set;
 function getStoredPrintFormat() {
   const value = localStorage.getItem(printFormatStorageKey);
   if (value === "pdf" || value === "word") {
@@ -2099,10 +3175,7 @@ function initPrintFormatChooser() {
   });
   const repositionAuxChoosers = () => {
     for (const entry of auxFloatingChoosers) {
-      if (entry.popover instanceof HTMLElement
-          && entry.popover.isConnected
-          && entry.trigger instanceof HTMLElement
-          && entry.trigger.isConnected) {
+      if (entry.popover instanceof HTMLElement && entry.popover.isConnected && entry.trigger instanceof HTMLElement && entry.trigger.isConnected) {
         positionPrintChooser(entry.popover, entry.trigger);
       } else {
         auxFloatingChoosers.delete(entry);
@@ -2122,40 +3195,13 @@ function initPrintFormatChooser() {
     repositionAuxChoosers();
   });
 }
-function renderRainbowSegmentLabel(segment) {
-  if (!(segment instanceof HTMLElement)) {
-    return;
-  }
-  const fullLabel = segment.dataset.rainbowSegmentLabelFull || "";
-  const shortLabel = segment.dataset.rainbowSegmentLabelShort || "";
-  if (!fullLabel && !shortLabel) {
-    return;
-  }
-  const width = segment.getBoundingClientRect().width;
-  const computed = window.getComputedStyle(segment);
-  const fontSpec = `${computed.fontWeight} ${computed.fontSize} ${computed.fontFamily}`;
-  const selected = pickSegmentLabel(fullLabel, shortLabel, width, fontSpec);
-  segment.textContent = selected;
-  if (!selected) {
-    segment.style.removeProperty("color");
-    return;
-  }
-  segment.style.color = getContrastTextColor(computed.backgroundColor);
-}
-function renderAllRainbowSegmentLabels(scope) {
-  const root = scope instanceof HTMLElement || scope instanceof Document ? scope : document;
-  root.querySelectorAll(".schedule-overview-segment[data-rainbow-segment-label-short], " + ".schedule-layered-segment[data-rainbow-segment-label-short], " + ".schedule-mini-gantt-segment[data-rainbow-segment-label-short]").forEach((segment) => {
-    renderRainbowSegmentLabel(segment);
-  });
-}
-function queueRainbowSegmentRender(scope) {
-  window.requestAnimationFrame(() => renderAllRainbowSegmentLabels(scope));
-}
+// modules/ui/floating.js
+var floatingPanelRegistry = new Set;
+var globalFloatingRoot = null;
 function getGlobalFloatingLayerRoot() {
   if (globalFloatingRoot instanceof HTMLElement && globalFloatingRoot.isConnected) {
     return globalFloatingRoot;
   }
-  // Fáze 2E: prefer statický element z _Layout.cshtml (výkon + prediktabilita)
   const existing = document.getElementById("floating-panel-root");
   if (existing instanceof HTMLElement) {
     globalFloatingRoot = existing;
@@ -2170,10 +3216,6 @@ function getGlobalFloatingLayerRoot() {
   return root;
 }
 function getFloatingLayerRoot(container) {
-  // Fáze 2E: floating pickery (person, datetime) nejsou mountovány uvnitř
-  // gov-dialog (shadow DOM vs. floating positioning kolize). Vždy vrátíme
-  // globální root #floating-panel-root v _Layout.cshtml. Parametr `container`
-  // je tu pro zpětnou kompatibilitu API, ale ignorovaný.
   return getGlobalFloatingLayerRoot();
 }
 function getFloatingPanelAnchor(panel) {
@@ -2435,7 +3477,37 @@ function isInteractionInsideFloatingControl(target, anchor, panel) {
   return anchor instanceof HTMLElement && anchor.contains(target) || panel instanceof HTMLElement && panel.contains(target);
 }
 
-// PmTracker.Web/wwwroot/js/modules/recordLazyLoading.js
+// modules/ui/index.js
+function renderRainbowSegmentLabel(segment) {
+  if (!(segment instanceof HTMLElement)) {
+    return;
+  }
+  const fullLabel = segment.dataset.rainbowSegmentLabelFull || "";
+  const shortLabel = segment.dataset.rainbowSegmentLabelShort || "";
+  if (!fullLabel && !shortLabel) {
+    return;
+  }
+  const width = segment.getBoundingClientRect().width;
+  const computed = window.getComputedStyle(segment);
+  const fontSpec = `${computed.fontWeight} ${computed.fontSize} ${computed.fontFamily}`;
+  const selected = pickSegmentLabel(fullLabel, shortLabel, width, fontSpec);
+  segment.textContent = selected;
+  if (!selected) {
+    segment.style.removeProperty("color");
+    return;
+  }
+  segment.style.color = getContrastTextColor(computed.backgroundColor);
+}
+function renderAllRainbowSegmentLabels(scope) {
+  const root = scope instanceof HTMLElement || scope instanceof Document ? scope : document;
+  root.querySelectorAll(".schedule-overview-segment[data-rainbow-segment-label-short], " + ".schedule-layered-segment[data-rainbow-segment-label-short], " + ".schedule-mini-gantt-segment[data-rainbow-segment-label-short]").forEach((segment) => {
+    renderRainbowSegmentLabel(segment);
+  });
+}
+function queueRainbowSegmentRender(scope) {
+  window.requestAnimationFrame(() => renderAllRainbowSegmentLabels(scope));
+}
+// modules/recordLazyLoading.js
 var cardInteractiveSelector = [
   "button",
   "a",
@@ -2620,7 +3692,7 @@ function handleNavigationCardKeydown(event, target) {
   return true;
 }
 
-// PmTracker.Web/wwwroot/js/modules/meetingOverview.js
+// modules/meetingOverview.js
 var FIRST_ROW_TOLERANCE_PX = 2;
 function getMeetingYearGroups(scope) {
   return Array.from(scope.querySelectorAll("[data-meeting-year-group]")).filter((group) => group instanceof HTMLElement);
@@ -2732,15 +3804,6 @@ function initMeetingOverview(scope = document) {
     syncYearGroupedMeetingOverview(root);
   });
 }
-function toggleMeetingYearGroup(toggle) {
-  const group = toggle instanceof HTMLElement ? toggle.closest("[data-meeting-year-group]") : null;
-  if (!(group instanceof HTMLElement)) {
-    return;
-  }
-  const currentState = group.dataset.meetingYearState || "collapsed";
-  group.dataset.meetingYearState = currentState === "preview" ? "open" : currentState === "open" ? "collapsed" : "open";
-  applyMeetingYearState(group);
-}
 function toggleProjectHistory(toggleEl) {
   if (!(toggleEl instanceof HTMLElement)) {
     return;
@@ -2766,312 +3829,24 @@ function toggleProjectHistory(toggleEl) {
     chevron.setAttribute("name", nextExpanded ? "chevron-up" : "chevron-down");
   }
 }
+function toggleMeetingYearGroup(toggle) {
+  const group = toggle instanceof HTMLElement ? toggle.closest("[data-meeting-year-group]") : null;
+  if (!(group instanceof HTMLElement)) {
+    return;
+  }
+  const currentState = group.dataset.meetingYearState || "collapsed";
+  const hasHidden = group.dataset.meetingYearHasHidden === "true";
+  if (currentState === "open") {
+    group.dataset.meetingYearState = "collapsed";
+  } else if (currentState === "preview") {
+    group.dataset.meetingYearState = hasHidden ? "open" : "collapsed";
+  } else {
+    group.dataset.meetingYearState = "open";
+  }
+  applyMeetingYearState(group);
+}
 
-// PmTracker.Web/wwwroot/js/modules/schedule.js
-function syncScheduleExpandButton(button, details) {
-  if (!isButtonLike(button) || !(details instanceof HTMLElement)) {
-    return;
-  }
-  const expanded = !details.hidden;
-  button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
-  button.setAttribute("aria-expanded", String(expanded));
-}
-function toggleScheduleBreakdown(toggleOrTarget) {
-  const button = isButtonLike(toggleOrTarget) ? toggleOrTarget : toggleOrTarget instanceof Element ? toggleOrTarget.closest("[data-schedule-expand-toggle]") : null;
-  if (!isButtonLike(button)) {
-    return false;
-  }
-  const owningCard = button.closest("[data-schedule-item]");
-  if (!(owningCard instanceof HTMLElement)) {
-    return false;
-  }
-  const details = owningCard.querySelector("[data-schedule-steps]");
-  if (!(details instanceof HTMLElement)) {
-    return false;
-  }
-  const expanded = details.hidden;
-  details.hidden = !expanded;
-  syncScheduleExpandButton(button, details);
-  if (expanded) {
-    renderStaticTimelineAxes(details);
-    queueRainbowSegmentRender(details);
-    window.requestAnimationFrame(() => {
-      renderStaticTimelineAxes(details);
-      queueRainbowSegmentRender(details);
-    });
-  }
-  return true;
-}
-function initScheduleExpandUi(scope) {
-  const root = scope instanceof Element ? scope : document;
-  root.querySelectorAll("[data-schedule-expand-toggle]").forEach((button) => {
-    if (!isButtonLike(button)) {
-      return;
-    }
-    const card = button.closest("[data-schedule-item]");
-    const details = card instanceof HTMLElement ? card.querySelector("[data-schedule-steps]") : null;
-    if (details instanceof HTMLElement) {
-      syncScheduleExpandButton(button, details);
-    }
-  });
-}
-function setScheduleFilterPanelOpen(open) {
-  const panel = document.querySelector("[data-schedule-filter-panel]");
-  const toggle = document.querySelector("[data-schedule-filter-toggle]");
-  const key = "pmtracker.schedule.filters.open";
-  if (!(panel instanceof HTMLElement)) {
-    return;
-  }
-  panel.classList.toggle("collapsed", !open);
-  if (toggle instanceof HTMLElement) {
-    toggle.setAttribute("aria-expanded", String(open));
-  }
-  localStorage.setItem(key, String(open));
-}
-function restoreScheduleFilterState() {
-  return restoreProjectFilterScope("schedule");
-}
-function persistScheduleFilterState() {
-  handleProjectFilterInputChange("schedule", {
-    applyScope: (resolvedScope) => {
-      if (resolvedScope === "schedule") {
-        applyProjectScheduleFilters();
-      } else if (resolvedScope === "gantt") {
-        applyProjectGanttFilters();
-      }
-    }
-  });
-}
-function applyProjectScheduleFilters() {
-  const cards = document.querySelectorAll("[data-schedule-item]");
-  if (cards.length === 0) {
-    return;
-  }
-  const state = buildProjectFilterStateFromInputs("schedule");
-  const filters = {
-    subsystem: normalizeFilterToken(state.subsystem)
-  };
-  cards.forEach((item) => {
-    if (!(item instanceof HTMLElement)) {
-      return;
-    }
-    const subsystem = normalizeFilterToken(item.dataset.scheduleFilterSubsystemKod || item.dataset.scheduleFilterSubsystem);
-    const matches = !filters.subsystem || subsystem === filters.subsystem;
-    setRecordFilterVisibility(item, matches);
-  });
-  document.querySelectorAll("[data-project-schedule-list] [data-subsystem-group]").forEach((group) => {
-    if (!(group instanceof HTMLElement)) {
-      return;
-    }
-    const hasVisibleItems = Array.from(group.querySelectorAll("[data-schedule-item]")).some((item) => item instanceof HTMLElement && !item.hidden);
-    group.hidden = !hasVisibleItems;
-  });
-  const scheduleList = document.querySelector("[data-project-schedule-list]");
-  if (scheduleList instanceof HTMLElement) {
-    const sortMode = normalizeSubsystemSortMode(state.sortBy);
-    sortSubsystemGroupsInContainer(scheduleList, sortMode);
-  }
-  renderStaticTimelineAxes(document.querySelector('[data-tab-panel="harmonogram"]'));
-  queueRainbowSegmentRender(document.querySelector('[data-tab-panel="harmonogram"]'));
-  scheduleSubsystemIndicatorSync();
-}
-function getGanttFilterValue(key) {
-  const input = getProjectFilterInput("gantt", key);
-  if (input instanceof HTMLInputElement && input.type === "checkbox") {
-    return input.checked;
-  }
-  if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
-    return input.value;
-  }
-  return "";
-}
-class ProjectGanttBoard {
-  constructor(panel) {
-    this.panel = panel;
-    this.projectId = String(panel.dataset.projectId || "0");
-    this.pickerItems = Array.from(panel.querySelectorAll("[data-gantt-picker-item]")).filter((node) => node instanceof HTMLElement);
-    this.boardItems = Array.from(panel.querySelectorAll("[data-gantt-item]")).filter((node) => node instanceof HTMLElement);
-    this.pinInputs = Array.from(panel.querySelectorAll("[data-gantt-pin-input]")).filter((node) => node instanceof HTMLInputElement);
-    this.pinnedKey = `pmtracker.gantt.pinned.${this.projectId}`;
-    this.expandedKey = `pmtracker.gantt.expanded.${this.projectId}`;
-    const fallbackPinned = this.pinInputs.map((input) => String(input.dataset.ganttRecordId || "").trim()).filter(Boolean);
-    this.pinnedIds = this.readIdSet(this.pinnedKey, fallbackPinned);
-    this.expandedIds = this.readIdSet(this.expandedKey, []);
-  }
-  readIdSet(storageKey, fallbackValues) {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) {
-      return new Set(fallbackValues);
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) {
-        return new Set(fallbackValues);
-      }
-      return new Set(parsed.map((value) => String(value || "").trim()).filter(Boolean));
-    } catch (error) {
-      return new Set(fallbackValues);
-    }
-  }
-  writeIdSet(storageKey, set) {
-    localStorage.setItem(storageKey, JSON.stringify(Array.from(set)));
-  }
-  getFilters() {
-    const currentUserId = getProjectFilterCurrentUserId("gantt");
-    const hasCurrentUser = currentUserId && currentUserId !== "0";
-    return {
-      subsystem: normalizeFilterToken(getGanttFilterValue("subsystem")),
-      kategorie: normalizeFilterToken(getGanttFilterValue("kategorie")),
-      stav: normalizeFilterToken(getGanttFilterValue("stav")),
-      typ: normalizeFilterToken(getGanttFilterValue("typ")),
-      vlastnik: normalizeFilterToken(getGanttFilterValue("vlastnik")),
-      onlyActive: Boolean(getGanttFilterValue("aktivni")),
-      mine: Boolean(getGanttFilterValue("mine")),
-      currentUserId,
-      hasCurrentUser,
-      stihani: normalizeFilterToken(getGanttFilterValue("stihani"))
-    };
-  }
-  matchesFilters(node, filters) {
-    if (!(node instanceof HTMLElement)) {
-      return false;
-    }
-    const subsystem = normalizeFilterToken(node.dataset.ganttFilterSubsystemKod || node.dataset.ganttFilterSubsystem);
-    const kategorie = normalizeFilterToken(node.dataset.ganttFilterKategorieKod || node.dataset.ganttFilterKategorie);
-    const stav = normalizeFilterToken(node.dataset.ganttFilterStavKod || node.dataset.ganttFilterStav);
-    const typ = normalizeFilterToken(node.dataset.ganttFilterTypKod || node.dataset.ganttFilterTyp);
-    const vlastnik = normalizeFilterToken(node.dataset.ganttFilterVlastnikId || node.dataset.ganttFilterVlastnik);
-    const isActive = node.dataset.ganttFilterAktivni === "true";
-    const stihani = normalizeFilterToken(node.dataset.ganttFilterStihani);
-    const matchesMine = !filters.mine || filters.hasCurrentUser && vlastnik === filters.currentUserId;
-    return (!filters.subsystem || subsystem === filters.subsystem) && (!filters.kategorie || kategorie === filters.kategorie) && (!filters.stav || stav === filters.stav) && (!filters.typ || typ === filters.typ) && (!filters.vlastnik || vlastnik === filters.vlastnik) && (!filters.onlyActive || isActive) && matchesMine && (!filters.stihani || stihani === filters.stihani);
-  }
-  setExpanded(recordId, expanded) {
-    const normalized = String(recordId || "").trim();
-    if (!normalized) {
-      return;
-    }
-    if (expanded) {
-      this.expandedIds.add(normalized);
-    } else {
-      this.expandedIds.delete(normalized);
-    }
-    this.writeIdSet(this.expandedKey, this.expandedIds);
-    this.syncExpandedState();
-  }
-  setPinned(recordId, pinned) {
-    const normalized = String(recordId || "").trim();
-    if (!normalized) {
-      return;
-    }
-    if (pinned) {
-      this.pinnedIds.add(normalized);
-    } else {
-      this.pinnedIds.delete(normalized);
-      this.expandedIds.delete(normalized);
-      this.writeIdSet(this.expandedKey, this.expandedIds);
-    }
-    this.writeIdSet(this.pinnedKey, this.pinnedIds);
-    this.apply();
-  }
-  syncPinnedInputs() {
-    this.pinInputs.forEach((input) => {
-      const recordId = String(input.dataset.ganttRecordId || "").trim();
-      input.checked = this.pinnedIds.has(recordId);
-    });
-  }
-  syncExpandedState() {
-    this.boardItems.forEach((item) => {
-      if (!(item instanceof HTMLElement)) {
-        return;
-      }
-      const recordId = String(item.dataset.ganttRecordId || "").trim();
-      const expanded = this.expandedIds.has(recordId);
-      const details = item.querySelector("[data-gantt-steps]");
-      if (details instanceof HTMLElement) {
-        details.hidden = !expanded;
-      }
-      const button = item.querySelector("[data-gantt-expand-toggle]");
-      if (button instanceof HTMLButtonElement) {
-        button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
-        button.setAttribute("aria-expanded", String(expanded));
-      }
-    });
-  }
-  apply() {
-    const filters = this.getFilters();
-    this.pickerItems.forEach((item) => {
-      const visible = this.matchesFilters(item, filters);
-      setRecordFilterVisibility(item, visible);
-    });
-    this.boardItems.forEach((item) => {
-      if (!(item instanceof HTMLElement)) {
-        return;
-      }
-      const recordId = String(item.dataset.ganttRecordId || "").trim();
-      const visibleByFilter = this.matchesFilters(item, filters);
-      const visible = visibleByFilter && this.pinnedIds.has(recordId);
-      setRecordFilterVisibility(item, visible);
-      item.dataset.ganttPinned = visible ? "true" : "false";
-    });
-    this.syncPinnedInputs();
-    this.syncExpandedState();
-    updateProjectGanttAxis(this.panel);
-    queueRainbowSegmentRender(this.panel);
-  }
-  bind() {
-    this.pinInputs.forEach((input) => {
-      input.addEventListener("change", () => {
-        this.setPinned(input.dataset.ganttRecordId, input.checked);
-      });
-    });
-    this.panel.querySelectorAll("[data-gantt-expand-toggle]").forEach((button) => {
-      if (!(button instanceof HTMLButtonElement)) {
-        return;
-      }
-      button.addEventListener("click", () => {
-        const recordId = String(button.dataset.ganttRecordId || "").trim();
-        const expanded = this.expandedIds.has(recordId);
-        this.setExpanded(recordId, !expanded);
-      });
-    });
-  }
-}
-function applyProjectGanttFilters() {
-  const panel = document.querySelector("[data-gantt-panel]");
-  if (!(panel instanceof HTMLElement) || !(panel._ganttBoard instanceof ProjectGanttBoard)) {
-    return;
-  }
-  panel._ganttBoard.apply();
-}
-function updateProjectGanttAxis(panel) {
-  if (!(panel instanceof HTMLElement)) {
-    return;
-  }
-  const axis = panel.querySelector("[data-gantt-axis]");
-  if (!(axis instanceof HTMLElement)) {
-    return;
-  }
-  const visibleItems = Array.from(panel.querySelectorAll("[data-gantt-item]")).filter((node) => node instanceof HTMLElement && !node.hidden);
-  if (visibleItems.length === 0) {
-    axis.hidden = true;
-    axis.replaceChildren();
-    return;
-  }
-  const dates = visibleItems.flatMap((item) => {
-    const startDate = parseIsoDate(item.dataset.ganttAxisStart);
-    const endDate = parseIsoDate(item.dataset.ganttAxisEnd);
-    return [startDate, endDate];
-  }).filter((value) => value instanceof Date);
-  if (dates.length === 0) {
-    axis.hidden = true;
-    axis.replaceChildren();
-    return;
-  }
-  const ordered = dates.slice().sort((a, b) => a.getTime() - b.getTime());
-  axis.hidden = false;
-  renderTimelineAxis(axis, ordered[0], ordered[ordered.length - 1]);
-}
+// modules/schedule/timeline.js
 function resolveTimelineAxisTickTargetCount(containerWidth) {
   if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
     return 2;
@@ -3288,6 +4063,287 @@ function renderStaticTimelineAxes(scope) {
     renderTimelineAxis(container, startDate, endDate);
   });
 }
+
+// modules/schedule/filters.js
+function setScheduleFilterPanelOpen(open) {
+  const panel = document.querySelector("[data-schedule-filter-panel]");
+  const toggle = document.querySelector("[data-schedule-filter-toggle]");
+  const key = "pmtracker.schedule.filters.open";
+  if (!(panel instanceof HTMLElement)) {
+    return;
+  }
+  panel.classList.toggle("collapsed", !open);
+  if (toggle instanceof HTMLElement) {
+    toggle.setAttribute("aria-expanded", String(open));
+  }
+  localStorage.setItem(key, String(open));
+}
+function restoreScheduleFilterState() {
+  return restoreProjectFilterScope("schedule");
+}
+function applyProjectScheduleFilters() {
+  const cards = document.querySelectorAll("[data-schedule-item]");
+  if (cards.length === 0) {
+    return;
+  }
+  const state = buildProjectFilterStateFromInputs("schedule");
+  const filters2 = {
+    subsystem: normalizeFilterToken(state.subsystem)
+  };
+  cards.forEach((item) => {
+    if (!(item instanceof HTMLElement)) {
+      return;
+    }
+    const subsystem = normalizeFilterToken(item.dataset.scheduleFilterSubsystemKod || item.dataset.scheduleFilterSubsystem);
+    const matches = !filters2.subsystem || subsystem === filters2.subsystem;
+    setRecordFilterVisibility(item, matches);
+  });
+  document.querySelectorAll("[data-project-schedule-list] [data-subsystem-group]").forEach((group) => {
+    if (!(group instanceof HTMLElement)) {
+      return;
+    }
+    const hasVisibleItems = Array.from(group.querySelectorAll("[data-schedule-item]")).some((item) => item instanceof HTMLElement && !item.hidden);
+    group.hidden = !hasVisibleItems;
+  });
+  const scheduleList = document.querySelector("[data-project-schedule-list]");
+  if (scheduleList instanceof HTMLElement) {
+    const sortMode = normalizeSubsystemSortMode(state.sortBy);
+    sortSubsystemGroupsInContainer(scheduleList, sortMode);
+  }
+  renderStaticTimelineAxes(document.querySelector('[data-tab-panel="harmonogram"]'));
+  queueRainbowSegmentRender(document.querySelector('[data-tab-panel="harmonogram"]'));
+  scheduleSubsystemIndicatorSync();
+}
+
+// modules/schedule/gantt.js
+function getGanttFilterValue(key) {
+  const input = getProjectFilterInput("gantt", key);
+  if (input instanceof HTMLInputElement && input.type === "checkbox") {
+    return input.checked;
+  }
+  if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+    return input.value;
+  }
+  return "";
+}
+
+class ProjectGanttBoard {
+  constructor(panel) {
+    this.panel = panel;
+    this.projectId = String(panel.dataset.projectId || "0");
+    this.pickerItems = Array.from(panel.querySelectorAll("[data-gantt-picker-item]")).filter((node) => node instanceof HTMLElement);
+    this.boardItems = Array.from(panel.querySelectorAll("[data-gantt-item]")).filter((node) => node instanceof HTMLElement);
+    this.pinInputs = Array.from(panel.querySelectorAll("[data-gantt-pin-input]")).filter((node) => node instanceof HTMLInputElement);
+    this.pinnedKey = `pmtracker.gantt.pinned.${this.projectId}`;
+    this.expandedKey = `pmtracker.gantt.expanded.${this.projectId}`;
+    const fallbackPinned = this.pinInputs.map((input) => String(input.dataset.ganttRecordId || "").trim()).filter(Boolean);
+    this.pinnedIds = this.readIdSet(this.pinnedKey, fallbackPinned);
+    this.expandedIds = this.readIdSet(this.expandedKey, []);
+  }
+  readIdSet(storageKey, fallbackValues) {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) {
+      return new Set(fallbackValues);
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return new Set(fallbackValues);
+      }
+      return new Set(parsed.map((value) => String(value || "").trim()).filter(Boolean));
+    } catch (error) {
+      return new Set(fallbackValues);
+    }
+  }
+  writeIdSet(storageKey, set) {
+    localStorage.setItem(storageKey, JSON.stringify(Array.from(set)));
+  }
+  getFilters() {
+    const currentUserId = getProjectFilterCurrentUserId("gantt");
+    const hasCurrentUser = currentUserId && currentUserId !== "0";
+    return {
+      subsystem: normalizeFilterToken(getGanttFilterValue("subsystem")),
+      kategorie: normalizeFilterToken(getGanttFilterValue("kategorie")),
+      stav: normalizeFilterToken(getGanttFilterValue("stav")),
+      typ: normalizeFilterToken(getGanttFilterValue("typ")),
+      vlastnik: normalizeFilterToken(getGanttFilterValue("vlastnik")),
+      onlyActive: Boolean(getGanttFilterValue("aktivni")),
+      mine: Boolean(getGanttFilterValue("mine")),
+      currentUserId,
+      hasCurrentUser,
+      stihani: normalizeFilterToken(getGanttFilterValue("stihani"))
+    };
+  }
+  matchesFilters(node, filters2) {
+    if (!(node instanceof HTMLElement)) {
+      return false;
+    }
+    const subsystem = normalizeFilterToken(node.dataset.ganttFilterSubsystemKod || node.dataset.ganttFilterSubsystem);
+    const kategorie = normalizeFilterToken(node.dataset.ganttFilterKategorieKod || node.dataset.ganttFilterKategorie);
+    const stav = normalizeFilterToken(node.dataset.ganttFilterStavKod || node.dataset.ganttFilterStav);
+    const typ = normalizeFilterToken(node.dataset.ganttFilterTypKod || node.dataset.ganttFilterTyp);
+    const vlastnik = normalizeFilterToken(node.dataset.ganttFilterVlastnikId || node.dataset.ganttFilterVlastnik);
+    const isActive = node.dataset.ganttFilterAktivni === "true";
+    const stihani = normalizeFilterToken(node.dataset.ganttFilterStihani);
+    const matchesMine = !filters2.mine || filters2.hasCurrentUser && vlastnik === filters2.currentUserId;
+    return (!filters2.subsystem || subsystem === filters2.subsystem) && (!filters2.kategorie || kategorie === filters2.kategorie) && (!filters2.stav || stav === filters2.stav) && (!filters2.typ || typ === filters2.typ) && (!filters2.vlastnik || vlastnik === filters2.vlastnik) && (!filters2.onlyActive || isActive) && matchesMine && (!filters2.stihani || stihani === filters2.stihani);
+  }
+  setExpanded(recordId, expanded) {
+    const normalized = String(recordId || "").trim();
+    if (!normalized) {
+      return;
+    }
+    if (expanded) {
+      this.expandedIds.add(normalized);
+    } else {
+      this.expandedIds.delete(normalized);
+    }
+    this.writeIdSet(this.expandedKey, this.expandedIds);
+    this.syncExpandedState();
+  }
+  setPinned(recordId, pinned) {
+    const normalized = String(recordId || "").trim();
+    if (!normalized) {
+      return;
+    }
+    if (pinned) {
+      this.pinnedIds.add(normalized);
+    } else {
+      this.pinnedIds.delete(normalized);
+      this.expandedIds.delete(normalized);
+      this.writeIdSet(this.expandedKey, this.expandedIds);
+    }
+    this.writeIdSet(this.pinnedKey, this.pinnedIds);
+    this.apply();
+  }
+  syncPinnedInputs() {
+    this.pinInputs.forEach((input) => {
+      const recordId = String(input.dataset.ganttRecordId || "").trim();
+      input.checked = this.pinnedIds.has(recordId);
+    });
+  }
+  syncExpandedState() {
+    this.boardItems.forEach((item) => {
+      if (!(item instanceof HTMLElement)) {
+        return;
+      }
+      const recordId = String(item.dataset.ganttRecordId || "").trim();
+      const expanded = this.expandedIds.has(recordId);
+      const details = item.querySelector("[data-gantt-steps]");
+      if (details instanceof HTMLElement) {
+        details.hidden = !expanded;
+      }
+      const button = item.querySelector("[data-gantt-expand-toggle]");
+      if (button instanceof HTMLButtonElement) {
+        button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
+        button.setAttribute("aria-expanded", String(expanded));
+      }
+    });
+  }
+  apply() {
+    const filters2 = this.getFilters();
+    this.pickerItems.forEach((item) => {
+      const visible = this.matchesFilters(item, filters2);
+      setRecordFilterVisibility(item, visible);
+    });
+    this.boardItems.forEach((item) => {
+      if (!(item instanceof HTMLElement)) {
+        return;
+      }
+      const recordId = String(item.dataset.ganttRecordId || "").trim();
+      const visibleByFilter = this.matchesFilters(item, filters2);
+      const visible = visibleByFilter && this.pinnedIds.has(recordId);
+      setRecordFilterVisibility(item, visible);
+      item.dataset.ganttPinned = visible ? "true" : "false";
+    });
+    this.syncPinnedInputs();
+    this.syncExpandedState();
+    updateProjectGanttAxis(this.panel);
+    queueRainbowSegmentRender(this.panel);
+  }
+  bind() {
+    this.pinInputs.forEach((input) => {
+      input.addEventListener("change", () => {
+        this.setPinned(input.dataset.ganttRecordId, input.checked);
+      });
+    });
+    this.panel.querySelectorAll("[data-gantt-expand-toggle]").forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      button.addEventListener("click", () => {
+        const recordId = String(button.dataset.ganttRecordId || "").trim();
+        const expanded = this.expandedIds.has(recordId);
+        this.setExpanded(recordId, !expanded);
+      });
+    });
+  }
+}
+function applyProjectGanttFilters() {
+  const panel = document.querySelector("[data-gantt-panel]");
+  if (!(panel instanceof HTMLElement) || !(panel._ganttBoard instanceof ProjectGanttBoard)) {
+    return;
+  }
+  panel._ganttBoard.apply();
+}
+function updateProjectGanttAxis(panel) {
+  if (!(panel instanceof HTMLElement)) {
+    return;
+  }
+  const axis = panel.querySelector("[data-gantt-axis]");
+  if (!(axis instanceof HTMLElement)) {
+    return;
+  }
+  const visibleItems = Array.from(panel.querySelectorAll("[data-gantt-item]")).filter((node) => node instanceof HTMLElement && !node.hidden);
+  if (visibleItems.length === 0) {
+    axis.hidden = true;
+    axis.replaceChildren();
+    return;
+  }
+  const dates = visibleItems.flatMap((item) => {
+    const startDate = parseIsoDate(item.dataset.ganttAxisStart);
+    const endDate = parseIsoDate(item.dataset.ganttAxisEnd);
+    return [startDate, endDate];
+  }).filter((value) => value instanceof Date);
+  if (dates.length === 0) {
+    axis.hidden = true;
+    axis.replaceChildren();
+    return;
+  }
+  const ordered = dates.slice().sort((a, b) => a.getTime() - b.getTime());
+  axis.hidden = false;
+  renderTimelineAxis(axis, ordered[0], ordered[ordered.length - 1]);
+}
+
+// modules/schedule/block.js
+async function fetchSchedulePreview(projektId, startDate, deadlineDate, steps, antiForgeryToken) {
+  const payload = {
+    projektId,
+    recordId: 0,
+    startDate: formatIsoDate(startDate),
+    deadlineDate: formatIsoDate(deadlineDate),
+    steps: steps.map((s) => ({
+      stepIndex: s.stepIndex,
+      durationTypeId: s.durationTypeId || 0,
+      delayTypeId: s.delayTypeId || 0,
+      durationDays: s.duration,
+      delayDays: s.delay
+    }))
+  };
+  const response = await fetch("/Schedule/Recalc", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      RequestVerificationToken: antiForgeryToken
+    },
+    body: JSON.stringify(payload),
+    credentials: "same-origin"
+  });
+  if (!response.ok) {
+    return null;
+  }
+  return await response.json();
+}
 function buildSchedulePlanAndActual(state, startDate) {
   const plan = [];
   const actual = [];
@@ -3333,27 +4389,6 @@ function formatScheduleSegmentWidth(value) {
 }
 function formatScheduleOffsetLabel(delay) {
   return delay > 0 ? `+${delay} dnů` : `${delay} dnů`;
-}
-function queueRecordSchedulePlannerRecalc(form, attempt) {
-  if (!(form instanceof HTMLFormElement) || !form.isConnected) {
-    return;
-  }
-  const retryAttempt = Number.isFinite(attempt) ? Math.max(0, Math.trunc(attempt)) : 0;
-  const schedulePanel = form.querySelector('[data-record-modal-panel="schedule"]');
-  if (schedulePanel instanceof HTMLElement && schedulePanel.hidden) {
-    return;
-  }
-  const planner = form._recordSchedulePlanner;
-  if (planner && typeof planner.recalcAll === "function") {
-    planner.recalcAll();
-    return;
-  }
-  if (retryAttempt >= 6) {
-    return;
-  }
-  window.requestAnimationFrame(() => {
-    queueRecordSchedulePlannerRecalc(form, retryAttempt + 1);
-  });
 }
 
 class ScheduleBlockRenderer {
@@ -3481,6 +4516,20 @@ class ScheduleBlockRenderer {
     }
     return parseIsoDate(this.root.dataset.scheduleDeadline) || startDate;
   }
+  readTypeId(input) {
+    if (!(input instanceof HTMLInputElement)) {
+      return 0;
+    }
+    const stacked = input.closest(".schedule-stacked-input");
+    if (!(stacked instanceof HTMLElement)) {
+      return 0;
+    }
+    const hidden = stacked.querySelector("input[type='hidden']");
+    if (!(hidden instanceof HTMLInputElement)) {
+      return 0;
+    }
+    return Number.parseInt(hidden.value || "0", 10) || 0;
+  }
   readState() {
     if (this.editorRows.length > 0) {
       return this.editorRows.map((entry) => ({
@@ -3488,7 +4537,9 @@ class ScheduleBlockRenderer {
         name: String(entry.row.dataset.stepName || "").trim(),
         color: String(entry.row.dataset.stepColor || "").trim(),
         duration: this.normalizeInt(entry.durationInput),
-        delay: this.normalizeSignedInt(entry.delayInput)
+        delay: this.normalizeSignedInt(entry.delayInput),
+        durationTypeId: this.readTypeId(entry.durationInput),
+        delayTypeId: this.readTypeId(entry.delayInput)
       }));
     }
     return this.breakdownRows.map((entry) => ({
@@ -3496,7 +4547,9 @@ class ScheduleBlockRenderer {
       name: String(entry.row.dataset.stepName || "").trim(),
       color: String(entry.row.dataset.stepColor || "").trim(),
       duration: Math.max(0, Number.parseInt(entry.row.dataset.stepDuration || "0", 10) || 0),
-      delay: Number.parseInt(entry.row.dataset.stepDelay || "0", 10) || 0
+      delay: Number.parseInt(entry.row.dataset.stepDelay || "0", 10) || 0,
+      durationTypeId: 0,
+      delayTypeId: 0
     }));
   }
   writeState(state) {
@@ -3565,6 +4618,7 @@ class ScheduleBlockRenderer {
     }
     segment.style.left = formatSchedulePercent(leftPercent);
     segment.style.width = formatScheduleSegmentWidth(widthPercent);
+    segment.style.display = widthPercent > 0 ? "" : "none";
     if (title) {
       segment.title = title;
     }
@@ -3575,6 +4629,7 @@ class ScheduleBlockRenderer {
     }
     segment.style.left = "0%";
     segment.style.width = "0%";
+    segment.style.display = "none";
   }
   renderSummary(plan, actual, state, startDate, deadlineDate) {
     const baselineEnd = plan.length > 0 ? plan[plan.length - 1].end : startDate;
@@ -3643,6 +4698,7 @@ class ScheduleBlockRenderer {
       const rawActualLeft = toSchedulePercent(actualItem.start, startDate, totalDays);
       const rawActualRight = toSchedulePercent(actualItem.end, startDate, totalDays);
       if (item.duration > 0) {
+        skippedCompactActualWidth = 0;
         const planLeft = Math.max(previousPlanRight, rawPlanLeft);
         const planRight = Math.max(planLeft, rawPlanRight);
         const planWidth = Math.max(0, planRight - planLeft);
@@ -3653,7 +4709,11 @@ class ScheduleBlockRenderer {
         const actualLeft = Math.max(previousActualRight, adjustedActualLeft);
         const actualRight = Math.max(actualLeft, adjustedActualRight);
         const actualWidth = Math.max(0, actualRight - actualLeft);
-        this.applySegmentLayout(actualSegment, actualLeft, actualWidth, `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)} - ${formatDisplayDate(actualItem.end)}`);
+        if (actualWidth <= 0) {
+          this.resetSegmentLayout(actualSegment);
+        } else {
+          this.applySegmentLayout(actualSegment, actualLeft, actualWidth, `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)} - ${formatDisplayDate(actualItem.end)}`);
+        }
         previousActualRight = actualRight;
       } else {
         skippedCompactActualWidth += Math.max(0, rawActualRight - rawActualLeft);
@@ -3739,21 +4799,75 @@ class ScheduleBlockRenderer {
       }
       entry.row.dataset.stepDuration = String(this.normalizeInt(entry.durationInput));
       entry.row.dataset.stepDelay = String(this.normalizeSignedInt(entry.delayInput));
+      if (entry.durationInput instanceof HTMLInputElement && entry.delayInput instanceof HTMLInputElement) {
+        const currentDuration = parseInt(entry.durationInput.value, 10) || 0;
+        entry.delayInput.min = -currentDuration;
+      }
     });
   }
-  recalcAll() {
+  getAntiForgeryToken() {
+    if (this.form instanceof HTMLFormElement) {
+      const tokenInput = this.form.querySelector('input[name="__RequestVerificationToken"]');
+      if (tokenInput instanceof HTMLInputElement && tokenInput.value) {
+        return tokenInput.value;
+      }
+    }
+    const dedicated = this.root.querySelector("[data-schedule-antiforgery]");
+    if (dedicated instanceof HTMLInputElement && dedicated.value) {
+      return dedicated.value;
+    }
+    const global = document.querySelector('input[name="__RequestVerificationToken"]');
+    if (global instanceof HTMLInputElement && global.value) {
+      return global.value;
+    }
+    return "";
+  }
+  async recalcAll() {
     const state = this.readState();
     if (state.length === 0) {
       return;
     }
     const startDate = this.getStartDate();
     const deadlineDate = this.getDeadlineDate(startDate);
-    const { plan, actual } = buildSchedulePlanAndActual(state, startDate);
-    this.renderEditorRows(plan, actual);
-    this.renderSummary(plan, actual, state, startDate, deadlineDate);
-    this.renderOverview(plan, actual, state, startDate, deadlineDate);
-    this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
-    queueRainbowSegmentRender(this.root);
+    if (this._recalcDebounceTimer !== undefined) {
+      clearTimeout(this._recalcDebounceTimer);
+    }
+    await new Promise((resolve) => {
+      this._recalcDebounceTimer = setTimeout(resolve, 150);
+    });
+    const token = this.getAntiForgeryToken();
+    let usedServerData = false;
+    if (token) {
+      try {
+        const projektIdInput = this.form instanceof HTMLFormElement ? this.form.querySelector('input[name="ProjektId"]') : null;
+        const projektId = projektIdInput instanceof HTMLInputElement ? parseInt(projektIdInput.value, 10) || 0 : 0;
+        const serverResult = await fetchSchedulePreview(projektId, startDate, deadlineDate, state, token);
+        if (serverResult && Array.isArray(serverResult.steps)) {
+          const plan = serverResult.steps.map((s) => ({
+            start: parseIsoDate(s.planStart) || startDate,
+            end: parseIsoDate(s.planEnd) || startDate
+          }));
+          const actual = serverResult.steps.map((s) => ({
+            start: parseIsoDate(s.actualStart) || startDate,
+            end: parseIsoDate(s.actualEnd) || startDate
+          }));
+          this.renderEditorRows(plan, actual);
+          this.renderSummary(plan, actual, state, startDate, deadlineDate);
+          this.renderOverview(plan, actual, state, startDate, deadlineDate);
+          this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
+          queueRainbowSegmentRender(this.root);
+          usedServerData = true;
+        }
+      } catch (_err) {}
+    }
+    if (!usedServerData) {
+      const { plan, actual } = buildSchedulePlanAndActual(state, startDate);
+      this.renderEditorRows(plan, actual);
+      this.renderSummary(plan, actual, state, startDate, deadlineDate);
+      this.renderOverview(plan, actual, state, startDate, deadlineDate);
+      this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
+      queueRainbowSegmentRender(this.root);
+    }
   }
   bindNumericStepper(button, input, delta, onChange) {
     if (!(button instanceof HTMLButtonElement) || !(input instanceof HTMLInputElement)) {
@@ -3786,11 +4900,7 @@ class ScheduleBlockRenderer {
         onChange();
       }
     };
-    button.addEventListener("mousedown", (event) => {
-      if (!(event instanceof MouseEvent) || event.button !== 0) {
-        return;
-      }
-      event.preventDefault();
+    const startRepeat = () => {
       suppressClickOnce = true;
       stepOnce();
       stopRepeat();
@@ -3799,7 +4909,18 @@ class ScheduleBlockRenderer {
           stepOnce();
         }, repeatIntervalMs);
       }, repeatDelayMs);
+    };
+    button.addEventListener("mousedown", (event) => {
+      if (!(event instanceof MouseEvent) || event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      startRepeat();
     });
+    button.addEventListener("touchstart", (event) => {
+      event.preventDefault();
+      startRepeat();
+    }, { passive: false });
     button.addEventListener("click", () => {
       if (suppressClickOnce) {
         suppressClickOnce = false;
@@ -3809,6 +4930,8 @@ class ScheduleBlockRenderer {
     });
     button.addEventListener("mouseup", stopRepeat);
     button.addEventListener("mouseleave", stopRepeat);
+    button.addEventListener("touchend", stopRepeat);
+    button.addEventListener("touchcancel", stopRepeat);
     button.addEventListener("blur", () => {
       stopRepeat();
       suppressClickOnce = false;
@@ -3826,14 +4949,26 @@ class ScheduleBlockRenderer {
     }
     this.editorRows.forEach((entry, index) => {
       if (entry.durationInput instanceof HTMLInputElement) {
-        entry.durationInput.addEventListener("input", () => this.recalcFromDuration(index));
+        let durationDebounceTimer = null;
+        entry.durationInput.addEventListener("input", () => {
+          clearTimeout(durationDebounceTimer);
+          durationDebounceTimer = setTimeout(() => {
+            this.recalcFromDuration(index);
+          }, 150);
+        });
         entry.durationInput.addEventListener("change", () => {
           entry.durationInput.value = String(this.normalizeInt(entry.durationInput));
           this.recalcFromDuration(index);
         });
       }
       if (entry.delayInput instanceof HTMLInputElement) {
-        entry.delayInput.addEventListener("input", () => this.recalcFromDelay(index));
+        let delayDebounceTimer = null;
+        entry.delayInput.addEventListener("input", () => {
+          clearTimeout(delayDebounceTimer);
+          delayDebounceTimer = setTimeout(() => {
+            this.recalcFromDelay(index);
+          }, 150);
+        });
         entry.delayInput.addEventListener("change", () => {
           entry.delayInput.value = String(this.normalizeSignedInt(entry.delayInput));
           this.recalcFromDelay(index);
@@ -3858,33 +4993,114 @@ class ScheduleBlockRenderer {
     }
   }
 }
+
+// modules/schedule/index.js
+function persistScheduleFilterState() {
+  handleProjectFilterInputChange("schedule", {
+    applyScope: (resolvedScope) => {
+      if (resolvedScope === "schedule") {
+        applyProjectScheduleFilters();
+      } else if (resolvedScope === "gantt") {
+        applyProjectGanttFilters();
+      }
+    }
+  });
+}
+function syncScheduleExpandButton(button, details) {
+  if (!isButtonLike(button) || !(details instanceof HTMLElement)) {
+    return;
+  }
+  const expanded = !details.hidden;
+  button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
+  button.setAttribute("aria-expanded", String(expanded));
+}
+function toggleScheduleBreakdown(toggleOrTarget) {
+  const button = isButtonLike(toggleOrTarget) ? toggleOrTarget : toggleOrTarget instanceof Element ? toggleOrTarget.closest("[data-schedule-expand-toggle]") : null;
+  if (!isButtonLike(button)) {
+    return false;
+  }
+  const owningCard = button.closest("[data-schedule-item]");
+  if (!(owningCard instanceof HTMLElement)) {
+    return false;
+  }
+  const details = owningCard.querySelector("[data-schedule-steps]");
+  if (!(details instanceof HTMLElement)) {
+    return false;
+  }
+  const expanded = details.hidden;
+  details.hidden = !expanded;
+  syncScheduleExpandButton(button, details);
+  if (expanded) {
+    renderStaticTimelineAxes(details);
+    queueRainbowSegmentRender(details);
+    window.requestAnimationFrame(() => {
+      renderStaticTimelineAxes(details);
+      queueRainbowSegmentRender(details);
+    });
+  }
+  return true;
+}
+function initScheduleExpandUi(scope) {
+  const root = scope instanceof Element ? scope : document;
+  root.querySelectorAll("[data-schedule-expand-toggle]").forEach((button) => {
+    if (!isButtonLike(button)) {
+      return;
+    }
+    const card = button.closest("[data-schedule-item]");
+    const details = card instanceof HTMLElement ? card.querySelector("[data-schedule-steps]") : null;
+    if (details instanceof HTMLElement) {
+      syncScheduleExpandButton(button, details);
+    }
+  });
+}
+function queueRecordSchedulePlannerRecalc(form, attempt) {
+  if (!(form instanceof HTMLFormElement) || !form.isConnected) {
+    return;
+  }
+  const retryAttempt = Number.isFinite(attempt) ? Math.max(0, Math.trunc(attempt)) : 0;
+  const schedulePanel = form.querySelector('[data-record-modal-panel="schedule"]');
+  if (schedulePanel instanceof HTMLElement && schedulePanel.hidden) {
+    return;
+  }
+  const planner = form._recordSchedulePlanner;
+  if (planner && typeof planner.recalcAll === "function") {
+    planner.recalcAll();
+    return;
+  }
+  if (retryAttempt >= 6) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    queueRecordSchedulePlannerRecalc(form, retryAttempt + 1);
+  });
+}
 function initScheduleBlockRenderers(scope) {
   const root = scope instanceof HTMLElement || scope instanceof Document ? scope : document;
   const blocks = [];
   if (scope instanceof HTMLElement && scope.matches("[data-schedule-block]")) {
     blocks.push(scope);
   }
-  root.querySelectorAll("[data-schedule-block]").forEach((block) => {
-    if (block instanceof HTMLElement) {
-      blocks.push(block);
+  root.querySelectorAll("[data-schedule-block]").forEach((block2) => {
+    if (block2 instanceof HTMLElement) {
+      blocks.push(block2);
     }
   });
-  blocks.forEach((block) => {
-    if (!(block instanceof HTMLElement)) {
+  blocks.forEach((block2) => {
+    if (!(block2 instanceof HTMLElement)) {
       return;
     }
-    if (block._scheduleRenderer instanceof ScheduleBlockRenderer) {
-      block._scheduleRenderer.recalcAll();
+    if (block2._scheduleRenderer instanceof ScheduleBlockRenderer) {
+      block2._scheduleRenderer.recalcAll();
       return;
     }
-    const form = block.closest('form[data-record-editor-form="true"]');
-    const renderer = new ScheduleBlockRenderer(block, { form });
+    const form = block2.closest('form[data-record-editor-form="true"]');
+    const renderer = new ScheduleBlockRenderer(block2, { form });
     if (!renderer.isReady()) {
       return;
     }
     renderer.bind();
     renderer.recalcAll();
-    block._scheduleRenderer = renderer;
+    block2._scheduleRenderer = renderer;
     if (form instanceof HTMLFormElement && renderer.mode === "record-editor") {
       form._recordSchedulePlanner = renderer;
       form.dataset.recordScheduleReady = "true";
@@ -3935,8 +5151,7 @@ function initProjectScheduleUi() {
   queueRainbowSegmentRender(schedulePanel);
   initScheduleExpandUi(schedulePanel);
 }
-
-// PmTracker.Web/wwwroot/js/modules/tableTools.js
+// modules/tableTools.js
 function parseCzechDateTime(value) {
   const text = (value || "").trim();
   if (!text || text === "-") {
@@ -4163,7 +5378,7 @@ function initTableTools(scope = document) {
   });
 }
 
-// PmTracker.Web/wwwroot/js/modules/projectTabs.js
+// modules/projectTabs.js
 var projectTabStorageKey = "pmtracker.tab.active";
 var projectRecordFilterPanelStorageKey2 = "pmtracker.filters.open";
 
@@ -4257,7 +5472,7 @@ class ProjectNavigationController {
     this.options.restoreFilterState?.();
     const recordsPanel = document.querySelector('[data-tab-panel="zaznamy"]');
     const groupBySubsystemInput = document.querySelector('[data-project-filter-scope="records"] [data-filter-key="groupBySubsystem"]');
-    const showGroupedView = groupBySubsystemInput instanceof HTMLInputElement ? groupBySubsystemInput.checked : true;
+    const showGroupedView = groupBySubsystemInput instanceof HTMLElement ? !!groupBySubsystemInput.checked : true;
     const hasServerRenderedGroups = recordsPanel instanceof HTMLElement && recordsPanel.querySelector("[data-record-grouped-list] [data-subsystem-group]") instanceof HTMLElement;
     this.options.setProjectFilterSaveStatus?.("records", "");
     if (preserveServerView && recordsPanel instanceof HTMLElement) {
@@ -4379,7 +5594,7 @@ async function ensureProjectTabLoaded(tabName, options = {}) {
   }
   return loadProjectTabPanel(normalizedTabName, options);
 }
-// PmTracker.Web/wwwroot/js/modules/recordRefresh.js
+// modules/recordRefresh.js
 function invalidateRecordMeetingCommentStateCacheForPayload(payload) {
   const projectId = payload?.projectId != null ? String(payload.projectId) : "";
   if (!projectId) {
@@ -4742,6 +5957,7 @@ async function refreshPageScope(payload) {
     case "projekty-index": {
       const nextDoc = await fetchHtmlDocument(refreshUrl);
       replaceSelectorFromDocument(nextDoc, "[data-project-list-shell]");
+      navigationRuntime.refreshProjectIndexFilters?.();
       break;
     }
     case "osoby-index": {
@@ -4819,7 +6035,7 @@ function initProjectRecordPageshowSync() {
     }
   });
 }
-// PmTracker.Web/wwwroot/js/modules/pageSwitchers.js
+// modules/pageSwitchers.js
 function readBooleanStorageDefaultTrue(key) {
   const rawValue = window.localStorage.getItem(key);
   if (rawValue === null) {
@@ -4841,15 +6057,15 @@ function readProjectListStatusFilterState(doneKey, deletedKey) {
 }
 function syncProjectListStatusFilterInputs(root, doneKey, deletedKey) {
   const state = readProjectListStatusFilterState(doneKey, deletedKey);
-  root.querySelectorAll("[data-project-status-hide]").forEach((input) => {
-    if (!(input instanceof HTMLInputElement)) {
+  root.querySelectorAll("gov-form-switch[data-project-status-hide]").forEach((el) => {
+    const statusCode = (el.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
+    const desired = statusCode === "DONE" ? state.hideDone : statusCode === "DELETED" ? state.hideDeleted : null;
+    if (desired === null)
       return;
-    }
-    const statusCode = (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
-    if (statusCode === "DONE") {
-      input.checked = state.hideDone;
-    } else if (statusCode === "DELETED") {
-      input.checked = state.hideDeleted;
+    if (desired) {
+      el.setAttribute("checked", "");
+    } else {
+      el.removeAttribute("checked");
     }
   });
 }
@@ -4880,7 +6096,7 @@ function applyProjectIndexFilters(scope, options = {}) {
     return;
   }
   syncProjectListStatusFilterInputs(root, options.hideDoneStorageKey, options.hideDeletedStorageKey);
-  const hiddenStatusCodes = Array.from(root.querySelectorAll("[data-project-status-hide]")).filter((input) => input instanceof HTMLInputElement && input.checked).map((input) => (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase()).filter(Boolean);
+  const hiddenStatusCodes = Array.from(root.querySelectorAll("gov-form-switch[data-project-status-hide]")).filter((el) => !!el.checked).map((el) => (el.getAttribute("data-project-status-hide") || "").trim().toUpperCase()).filter(Boolean);
   shell.querySelectorAll("[data-project-list-row]").forEach((row) => {
     if (!(row instanceof HTMLElement)) {
       return;
@@ -4901,15 +6117,16 @@ function toggleProjectStatusFilterPanel(button) {
   panel.hidden = !shouldOpen;
   button.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
 }
-function handleProjectStatusFilterInput(input, options = {}) {
-  if (!(input instanceof HTMLInputElement)) {
+function handleProjectStatusFilterInput(el, options = {}) {
+  if (!(el instanceof HTMLElement)) {
     return;
   }
-  const statusCode = (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
+  const statusCode = (el.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
+  const checked = !!el.checked;
   if (statusCode === "DONE") {
-    writeBooleanStorage(options.hideDoneStorageKey, input.checked);
+    writeBooleanStorage(options.hideDoneStorageKey, checked);
   } else if (statusCode === "DELETED") {
-    writeBooleanStorage(options.hideDeletedStorageKey, input.checked);
+    writeBooleanStorage(options.hideDeletedStorageKey, checked);
   }
   applyProjectIndexFilters(document, options);
 }
@@ -4926,11 +6143,11 @@ function initProjectIndexStatusFilters(scope, options = {}) {
       toggleProjectStatusFilterPanel(toggleButton);
     });
   }
-  document.querySelectorAll("[data-project-status-hide]").forEach((input) => {
-    if (input instanceof HTMLInputElement && input.dataset.boundProjectStatusFilter !== "true") {
-      input.dataset.boundProjectStatusFilter = "true";
-      input.addEventListener("change", () => {
-        handleProjectStatusFilterInput(input, options);
+  document.querySelectorAll("gov-form-switch[data-project-status-hide]").forEach((el) => {
+    if (el.dataset.boundProjectStatusFilter !== "true") {
+      el.dataset.boundProjectStatusFilter = "true";
+      el.addEventListener("gov-change", () => {
+        handleProjectStatusFilterInput(el, options);
       });
     }
   });
@@ -5216,7 +6433,7 @@ function initUserMenu() {
     }
   });
 }
-// PmTracker.Web/wwwroot/js/modules/modals.js
+// modules/modals.js
 var modalRoot = document.getElementById("modal-root");
 var modalFocusableSelector = [
   "a[href]",
@@ -5235,43 +6452,6 @@ var modalRuntime = {
 var modalState = {
   lastTrigger: null
 };
-// Úprava #7 (2026-04-20): Floating portal (#floating-panel-root) je light DOM
-// element v _Layout.cshtml. Gov-dialog má vlastní shadow DOM stacking context →
-// picker panely render-ují za modalem. Řešení: při openModal přesun root DO
-// aktivního gov-dialogu, při closeModal vrátit zpět (původní parent + position).
-var floatingRootOriginalParent = null;
-var floatingRootOriginalNextSibling = null;
-function reparentFloatingRootIntoModal(dialog) {
-  if (!(dialog instanceof HTMLElement)) {
-    return;
-  }
-  const root = document.getElementById("floating-panel-root");
-  if (!(root instanceof HTMLElement)) {
-    return;
-  }
-  // Už uvnitř modalu? (idempotent guard)
-  if (root.parentElement === dialog) {
-    return;
-  }
-  if (floatingRootOriginalParent === null) {
-    floatingRootOriginalParent = root.parentElement;
-    floatingRootOriginalNextSibling = root.nextSibling;
-  }
-  dialog.prepend(root);
-}
-function restoreFloatingRoot() {
-  const root = document.getElementById("floating-panel-root");
-  if (!(root instanceof HTMLElement) || floatingRootOriginalParent === null) {
-    return;
-  }
-  if (floatingRootOriginalNextSibling && floatingRootOriginalNextSibling.parentNode === floatingRootOriginalParent) {
-    floatingRootOriginalParent.insertBefore(root, floatingRootOriginalNextSibling);
-  } else {
-    floatingRootOriginalParent.appendChild(root);
-  }
-  floatingRootOriginalParent = null;
-  floatingRootOriginalNextSibling = null;
-}
 function configureModalRuntime(runtime = {}) {
   if (typeof runtime.closeAllFloatingPanels === "function") {
     modalRuntime.closeAllFloatingPanels = runtime.closeAllFloatingPanels;
@@ -5287,17 +6467,29 @@ function getActiveModalOverlay() {
   if (!(modalRoot instanceof HTMLElement)) {
     return null;
   }
-  // Fáze 2E: modal root je gov-dialog (ne .modal-overlay div)
   return modalRoot.querySelector("gov-dialog");
 }
-function getActiveModalContainer2() {
-  // Fáze 2E: data-modal-container je na gov-dialog samotném (v _ModalLayout),
-  // ne na vnitřním .modal-container divu.
+function getActiveModalContainer() {
   const dialog = getActiveModalOverlay();
   return dialog instanceof HTMLElement ? dialog : null;
 }
 function isModalOpen() {
   return modalRoot instanceof HTMLElement && modalRoot.getAttribute("aria-hidden") !== "true" && modalRoot.childElementCount > 0;
+}
+function activateInsertedGovDialog() {
+  if (!(modalRoot instanceof HTMLElement)) {
+    return;
+  }
+  const dialog = modalRoot.querySelector("gov-dialog");
+  if (!(dialog instanceof HTMLElement)) {
+    return;
+  }
+  dialog.setAttribute("open", "true");
+  if (typeof dialog.show === "function") {
+    try {
+      dialog.show();
+    } catch {}
+  }
 }
 function getFocusableElementsWithinModal(container) {
   if (!(container instanceof HTMLElement)) {
@@ -5313,23 +6505,8 @@ function getFocusableElementsWithinModal(container) {
     return element.getClientRects().length > 0;
   });
 }
-function activateInsertedGovDialog() {
-  if (!(modalRoot instanceof HTMLElement)) {
-    return;
-  }
-  const dialog = modalRoot.querySelector("gov-dialog");
-  if (!(dialog instanceof HTMLElement)) {
-    return;
-  }
-  // Explicitní `open="true"` pro případ, že Razor renderoval atribut ale
-  // gov-dialog se ještě neupgradoval (custom element se upgraduje asynchronně).
-  dialog.setAttribute("open", "true");
-  if (typeof dialog.show === "function") {
-    try { dialog.show(); } catch { /* .show() může throw při duplicitním volání nebo pre-hydration */ }
-  }
-}
 function focusInitialModalElement() {
-  const modal = getActiveModalContainer2();
+  const modal = getActiveModalContainer();
   if (!(modal instanceof HTMLElement)) {
     return;
   }
@@ -5352,16 +6529,14 @@ function setModalContent(content, trigger) {
   modalRuntime.closeAllFloatingPanels?.();
   modalRoot.innerHTML = "";
   modalRoot.appendChild(content);
-  // Vestigial z .modal-overlay éry — ponecháváme defensivně (neovlivňuje gov-dialog).
   modalRoot.style.pointerEvents = "auto";
   modalRoot.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
   modalState.lastTrigger = trigger instanceof HTMLElement ? trigger : null;
   activateInsertedGovDialog();
-  const activeDialog2 = modalRoot.querySelector("gov-dialog[data-modal-container]");
-  if (activeDialog2 instanceof HTMLElement) {
-    // Čekej tick na custom element upgrade
-    requestAnimationFrame(() => reparentFloatingRootIntoModal(activeDialog2));
+  const activeDialog = modalRoot.querySelector("gov-dialog[data-modal-container]");
+  if (activeDialog instanceof HTMLElement) {
+    requestAnimationFrame(() => reparentFloatingRootIntoModal(activeDialog));
   }
   modalRuntime.initRecordFormEnhancements?.(modalRoot);
   modalRuntime.initPermissionMetadataBindings?.(modalRoot);
@@ -5369,26 +6544,55 @@ function setModalContent(content, trigger) {
     focusInitialModalElement();
   });
 }
+var floatingRootOriginalParent = null;
+var floatingRootOriginalNextSibling = null;
+function reparentFloatingRootIntoModal(dialog) {
+  if (!(dialog instanceof HTMLElement)) {
+    return;
+  }
+  const root = document.getElementById("floating-panel-root");
+  if (!(root instanceof HTMLElement)) {
+    return;
+  }
+  if (root.parentElement === dialog) {
+    return;
+  }
+  if (floatingRootOriginalParent === null) {
+    floatingRootOriginalParent = root.parentElement;
+    floatingRootOriginalNextSibling = root.nextSibling;
+  }
+  dialog.prepend(root);
+}
+function restoreFloatingRoot() {
+  const root = document.getElementById("floating-panel-root");
+  if (!(root instanceof HTMLElement) || floatingRootOriginalParent === null) {
+    return;
+  }
+  if (floatingRootOriginalNextSibling && floatingRootOriginalNextSibling.parentNode === floatingRootOriginalParent) {
+    floatingRootOriginalParent.insertBefore(root, floatingRootOriginalNextSibling);
+  } else {
+    floatingRootOriginalParent.appendChild(root);
+  }
+  floatingRootOriginalParent = null;
+  floatingRootOriginalNextSibling = null;
+}
 function closeModal() {
   if (!(modalRoot instanceof HTMLElement)) {
     return;
   }
   const focusTarget = modalState.lastTrigger;
   modalRuntime.closeAllFloatingPanels?.();
-  // Fáze 2E: gov-dialog musí dostat removeAttribute("open") (a volitelně
-  // .close()) před unmountem, aby proběhl její cleanup (focus restore,
-  // backdrop teardown). Try/catch kolem .close() kvůli defensivnímu volání
-  // před hydratací.
-  const dialog3 = modalRoot.querySelector("gov-dialog");
-  if (dialog3 instanceof HTMLElement) {
-    dialog3.removeAttribute("open");
-    if (typeof dialog3.close === "function") {
-      try { dialog3.close(); } catch { /* ignorovat — už může být zavřený */ }
+  const dialog = modalRoot.querySelector("gov-dialog");
+  if (dialog instanceof HTMLElement) {
+    dialog.removeAttribute("open");
+    if (typeof dialog.close === "function") {
+      try {
+        dialog.close();
+      } catch {}
     }
   }
   restoreFloatingRoot();
   modalRoot.innerHTML = "";
-  // Vestigial z .modal-overlay éry — ponecháváme defensivně (neovlivňuje gov-dialog).
   modalRoot.style.pointerEvents = "none";
   modalRoot.setAttribute("aria-hidden", "true");
   document.body.classList.remove("modal-open");
@@ -5421,7 +6625,6 @@ async function openUrlModal(url, trigger) {
                         <button type="button" class="btn btn-secondary" data-modal-close>Zavřít</button>
                     </div>
                 </gov-dialog>`;
-      // Vestigial z .modal-overlay éry — ponecháváme defensivně (neovlivňuje gov-dialog).
       modalRoot.style.pointerEvents = "auto";
       modalRoot.setAttribute("aria-hidden", "false");
       document.body.classList.add("modal-open");
@@ -5432,7 +6635,7 @@ async function openUrlModal(url, trigger) {
   }
 }
 function trapFocusInModal(event) {
-  const modal = getActiveModalContainer2();
+  const modal = getActiveModalContainer();
   if (!(modal instanceof HTMLElement)) {
     return;
   }
@@ -5459,7 +6662,7 @@ function trapFocusInModal(event) {
   }
 }
 
-// PmTracker.Web/wwwroot/js/modules/session.js
+// modules/session.js
 var sessionStaleErrorCode = "SESSION_STALE_CLIENT_BLOCK";
 var keepAliveEndpointPath = "/App/KeepAlive";
 var keepAliveIntervalMs = 5 * 60 * 1000;
@@ -5605,7 +6808,142 @@ function initSessionCoordinator() {
   window.setTimeout(scheduleKeepAlive, 3000);
 }
 
-// PmTracker.Web/wwwroot/js/modules/pickers.js
+// modules/pickers/time.js
+function closeAllTimePanels(exceptField) {
+  document.querySelectorAll("[data-app-time-field]").forEach((candidate) => {
+    if (!(candidate instanceof HTMLElement)) {
+      return;
+    }
+    if (exceptField && candidate === exceptField) {
+      return;
+    }
+    const panel = candidate.querySelector("[data-app-time-panel]");
+    if (panel instanceof HTMLElement) {
+      panel.hidden = true;
+      unmountFloatingPanel(panel);
+    }
+  });
+}
+function initCustomTimePickers(scope) {
+  scope.querySelectorAll("[data-app-time-field]").forEach((field) => {
+    if (!(field instanceof HTMLElement) || field.dataset.appTimeReady === "true") {
+      return;
+    }
+    const displayInput = field.querySelector("[data-app-time-display]");
+    const valueInput = field.querySelector("[data-app-time-value]");
+    const openButton = field.querySelector("[data-app-time-open]");
+    const panel = field.querySelector("[data-app-time-panel]");
+    const grid = field.querySelector("[data-app-time-grid]");
+    if (!(displayInput instanceof HTMLInputElement) || !(valueInput instanceof HTMLInputElement) || !(openButton instanceof HTMLButtonElement) || !(panel instanceof HTMLElement) || !(grid instanceof HTMLElement)) {
+      return;
+    }
+    field.dataset.appTimeReady = "true";
+    const isLocked = field.dataset.appTimeLocked === "true" || openButton.disabled;
+    const form = field.closest("form");
+    const initialDateTime = parseIsoDateTime(valueInput.value);
+    const initialTime = parseTimeValue(displayInput.value) || parseTimeValue(valueInput.value) || (initialDateTime ? { hours: initialDateTime.getHours(), minutes: initialDateTime.getMinutes() } : null);
+    let selected = initialTime || { hours: new Date().getHours(), minutes: new Date().getMinutes() };
+    const syncValue = () => {
+      const normalizedTime = formatTime(selected.hours, selected.minutes);
+      displayInput.value = normalizedTime;
+      valueInput.value = normalizedTime;
+    };
+    const closePanel = () => {
+      panel.hidden = true;
+      unmountFloatingPanel(panel);
+    };
+    const render = () => {
+      grid.innerHTML = "";
+      for (let hour = 6;hour <= 22; hour += 1) {
+        for (let minute = 0;minute < 60; minute += 15) {
+          const timeText = formatTime(hour, minute);
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "app-time-option";
+          button.textContent = timeText;
+          button.dataset.time = timeText;
+          button.setAttribute("role", "option");
+          button.setAttribute("aria-selected", String(selected.hours === hour && selected.minutes === minute));
+          if (selected.hours === hour && selected.minutes === minute) {
+            button.classList.add("selected");
+          }
+          button.addEventListener("click", () => {
+            selected = { hours: hour, minutes: minute };
+            syncValue();
+            closePanel();
+          });
+          grid.appendChild(button);
+        }
+      }
+      if (!panel.hidden) {
+        positionFloatingPanel(panel, field, panel._pmtrackerFloatingOptions || {
+          gap: 8,
+          flipVertical: true,
+          kind: "time"
+        });
+      }
+    };
+    const openPanel = () => {
+      if (isLocked) {
+        return;
+      }
+      closeAllDatePanels();
+      closeAllTimePanels(field);
+      render();
+      panel.hidden = false;
+      mountFloatingPanel(panel, field, { gap: 8, flipVertical: true, kind: "time" });
+    };
+    syncValue();
+    openButton.addEventListener("click", () => {
+      if (panel.hidden) {
+        openPanel();
+      } else {
+        closePanel();
+      }
+    });
+    displayInput.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      openPanel();
+    });
+    displayInput.addEventListener("click", () => {
+      openPanel();
+    });
+    displayInput.addEventListener("focus", () => {
+      openPanel();
+    });
+    displayInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === "ArrowDown") {
+        event.preventDefault();
+        openPanel();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        closePanel();
+      }
+    });
+    if (form instanceof HTMLFormElement) {
+      form.addEventListener("submit", () => {
+        syncValue();
+      });
+    }
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (!isInteractionInsideFloatingControl(target, field, panel)) {
+        closePanel();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closePanel();
+      }
+    });
+  });
+}
+
+// modules/pickers/date.js
 function setAppDateFieldValue(valueInput, isoValue) {
   if (!(valueInput instanceof HTMLInputElement)) {
     return false;
@@ -5636,21 +6974,6 @@ function closeAllDatePanels(exceptField) {
       return;
     }
     const panel = candidate.querySelector("[data-app-date-panel]");
-    if (panel instanceof HTMLElement) {
-      panel.hidden = true;
-      unmountFloatingPanel(panel);
-    }
-  });
-}
-function closeAllTimePanels(exceptField) {
-  document.querySelectorAll("[data-app-time-field]").forEach((candidate) => {
-    if (!(candidate instanceof HTMLElement)) {
-      return;
-    }
-    if (exceptField && candidate === exceptField) {
-      return;
-    }
-    const panel = candidate.querySelector("[data-app-time-panel]");
     if (panel instanceof HTMLElement) {
       panel.hidden = true;
       unmountFloatingPanel(panel);
@@ -5842,124 +7165,7 @@ function initCustomDatePickers(scope) {
     });
   });
 }
-function initCustomTimePickers(scope) {
-  scope.querySelectorAll("[data-app-time-field]").forEach((field) => {
-    if (!(field instanceof HTMLElement) || field.dataset.appTimeReady === "true") {
-      return;
-    }
-    const displayInput = field.querySelector("[data-app-time-display]");
-    const valueInput = field.querySelector("[data-app-time-value]");
-    const openButton = field.querySelector("[data-app-time-open]");
-    const panel = field.querySelector("[data-app-time-panel]");
-    const grid = field.querySelector("[data-app-time-grid]");
-    if (!(displayInput instanceof HTMLInputElement) || !(valueInput instanceof HTMLInputElement) || !(openButton instanceof HTMLButtonElement) || !(panel instanceof HTMLElement) || !(grid instanceof HTMLElement)) {
-      return;
-    }
-    field.dataset.appTimeReady = "true";
-    const isLocked = field.dataset.appTimeLocked === "true" || openButton.disabled;
-    const form = field.closest("form");
-    const initialDateTime = parseIsoDateTime(valueInput.value);
-    const initialTime = parseTimeValue(displayInput.value) || parseTimeValue(valueInput.value) || (initialDateTime ? { hours: initialDateTime.getHours(), minutes: initialDateTime.getMinutes() } : null);
-    let selected = initialTime || { hours: new Date().getHours(), minutes: new Date().getMinutes() };
-    const syncValue = () => {
-      const normalizedTime = formatTime(selected.hours, selected.minutes);
-      displayInput.value = normalizedTime;
-      valueInput.value = normalizedTime;
-    };
-    const closePanel = () => {
-      panel.hidden = true;
-      unmountFloatingPanel(panel);
-    };
-    const render = () => {
-      grid.innerHTML = "";
-      for (let hour = 6;hour <= 22; hour += 1) {
-        for (let minute = 0;minute < 60; minute += 15) {
-          const timeText = formatTime(hour, minute);
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "app-time-option";
-          button.textContent = timeText;
-          button.dataset.time = timeText;
-          button.setAttribute("role", "option");
-          button.setAttribute("aria-selected", String(selected.hours === hour && selected.minutes === minute));
-          if (selected.hours === hour && selected.minutes === minute) {
-            button.classList.add("selected");
-          }
-          button.addEventListener("click", () => {
-            selected = { hours: hour, minutes: minute };
-            syncValue();
-            closePanel();
-          });
-          grid.appendChild(button);
-        }
-      }
-      if (!panel.hidden) {
-        positionFloatingPanel(panel, field, panel._pmtrackerFloatingOptions || {
-          gap: 8,
-          flipVertical: true,
-          kind: "time"
-        });
-      }
-    };
-    const openPanel = () => {
-      if (isLocked) {
-        return;
-      }
-      closeAllDatePanels();
-      closeAllTimePanels(field);
-      render();
-      panel.hidden = false;
-      mountFloatingPanel(panel, field, { gap: 8, flipVertical: true, kind: "time" });
-    };
-    syncValue();
-    openButton.addEventListener("click", () => {
-      if (panel.hidden) {
-        openPanel();
-      } else {
-        closePanel();
-      }
-    });
-    displayInput.addEventListener("mousedown", (event) => {
-      event.preventDefault();
-      openPanel();
-    });
-    displayInput.addEventListener("click", () => {
-      openPanel();
-    });
-    displayInput.addEventListener("focus", () => {
-      openPanel();
-    });
-    displayInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === "ArrowDown") {
-        event.preventDefault();
-        openPanel();
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        closePanel();
-      }
-    });
-    if (form instanceof HTMLFormElement) {
-      form.addEventListener("submit", () => {
-        syncValue();
-      });
-    }
-    document.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) {
-        return;
-      }
-      if (!isInteractionInsideFloatingControl(target, field, panel)) {
-        closePanel();
-      }
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        closePanel();
-      }
-    });
-  });
-}
+// modules/pickers/person.js
 function formatPersonEntryLabel(entry) {
   if (entry.email) {
     return `${entry.label} <${entry.email}>`;
@@ -6348,6 +7554,48 @@ function initSinglePersonPickers(scope) {
     });
   });
 }
+function initCollabPickers(scope) {
+  scope.querySelectorAll(".collab-picker").forEach((wrapper) => {
+    if (!(wrapper instanceof HTMLElement) || wrapper.dataset.collabPickerReady === "true") {
+      return;
+    }
+    const search = wrapper.querySelector("[data-collab-search]");
+    const optionsContainer = wrapper.querySelector("[data-collab-options]");
+    if (!(search instanceof HTMLInputElement) || !(optionsContainer instanceof HTMLElement)) {
+      return;
+    }
+    wrapper.dataset.collabPickerReady = "true";
+    const options = Array.from(optionsContainer.querySelectorAll("[data-collab-option]")).filter((item) => item instanceof HTMLElement);
+    options.forEach((item, index) => {
+      item.dataset.collabOrder = String(index);
+    });
+    const applySearch = () => {
+      const query = search.value || "";
+      const normalizedQuery = normalizeSearchText2(query);
+      const scored = options.map((option) => {
+        const label = option.dataset.collabLabel || option.textContent || "";
+        const score = normalizedQuery ? scoreSearchCandidate(normalizedQuery, label) : 1;
+        const order = Number.parseInt(option.dataset.collabOrder || "0", 10);
+        return { option, score, order };
+      }).sort((a, b) => {
+        if (!normalizedQuery) {
+          return a.order - b.order;
+        }
+        return b.score - a.score || a.order - b.order;
+      });
+      scored.forEach((row) => {
+        row.option.hidden = normalizedQuery.length > 0 && row.score <= 0;
+        optionsContainer.appendChild(row.option);
+      });
+    };
+    const debouncedApply = debounce(applySearch, 120);
+    search.addEventListener("input", () => {
+      debouncedApply();
+    });
+    applySearch();
+  });
+}
+// modules/pickers/adPerson.js
 function initAdPersonPickers(scope) {
   scope.querySelectorAll("[data-ad-picker]").forEach((wrapper) => {
     if (!(wrapper instanceof HTMLElement) || wrapper.dataset.adPickerReady === "true") {
@@ -6387,6 +7635,10 @@ function initAdPersonPickers(scope) {
       activeIndex = -1;
       unmountFloatingPanel(panel);
     };
+    const clearGeneratedOption = (select, hint) => {
+      Array.from(select.options).filter((option) => option.dataset.generated === "true").forEach((option) => option.remove());
+      hint.hidden = true;
+    };
     const clearSelection = () => {
       guidInput.value = "";
       adLoginInput.value = "";
@@ -6401,10 +7653,6 @@ function initAdPersonPickers(scope) {
       setButtonDisabled(submitButton, true);
     };
     const normalizeText = (value) => (value || "").toString().trim().toLowerCase();
-    const clearGeneratedOption = (select, hint) => {
-      Array.from(select.options).filter((option) => option.dataset.generated === "true").forEach((option) => option.remove());
-      hint.hidden = true;
-    };
     const ensureGeneratedOption = (select, hint, rawValue) => {
       clearGeneratedOption(select, hint);
       const normalized = (rawValue || "").toString().trim();
@@ -6794,314 +8042,577 @@ function initAdPersonPickers(scope) {
     });
   });
 }
-function initCollabPickers(scope) {
-  scope.querySelectorAll(".collab-picker").forEach((wrapper) => {
-    if (!(wrapper instanceof HTMLElement) || wrapper.dataset.collabPickerReady === "true") {
+// modules/recordEditor/richtext.js
+function looksLikeHtml(value) {
+  return /<\s*\/?\s*[a-z][^>]*>/i.test(value || "");
+}
+function getOrCreateRichTextSourceContainer(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return null;
+  }
+  const existing = form.querySelector("[data-rich-text-source-container]");
+  if (existing instanceof HTMLElement) {
+    return existing;
+  }
+  const container = document.createElement("div");
+  container.className = "richtext-source-container";
+  container.setAttribute("data-rich-text-source-container", "true");
+  container.setAttribute("aria-hidden", "true");
+  form.appendChild(container);
+  return container;
+}
+function initRichTextEditors(scope) {
+  if (!(scope instanceof HTMLElement || scope instanceof Document)) {
+    return;
+  }
+  if (typeof window.Quill !== "function") {
+    return;
+  }
+  const quillCtor = window.Quill;
+  scope.querySelectorAll("textarea[data-rich-text='true']").forEach((textarea) => {
+    if (!(textarea instanceof HTMLTextAreaElement) || textarea.disabled || textarea.dataset.richTextReady === "true") {
       return;
     }
-    const search = wrapper.querySelector("[data-collab-search]");
-    const optionsContainer = wrapper.querySelector("[data-collab-options]");
-    if (!(search instanceof HTMLInputElement) || !(optionsContainer instanceof HTMLElement)) {
-      return;
+    const host = document.createElement("div");
+    host.className = "richtext-host";
+    textarea.insertAdjacentElement("beforebegin", host);
+    const form = textarea.closest("form");
+    const labelParent = textarea.closest("label");
+    if (labelParent instanceof HTMLLabelElement && form instanceof HTMLFormElement) {
+      const sourceContainer = getOrCreateRichTextSourceContainer(form);
+      if (sourceContainer instanceof HTMLElement) {
+        sourceContainer.appendChild(textarea);
+      } else {
+        host.appendChild(textarea);
+      }
+    } else {
+      host.appendChild(textarea);
     }
-    wrapper.dataset.collabPickerReady = "true";
-    const options = Array.from(optionsContainer.querySelectorAll("[data-collab-option]")).filter((item) => item instanceof HTMLElement);
-    options.forEach((item, index) => {
-      item.dataset.collabOrder = String(index);
+    textarea.classList.add("richtext-source-hidden");
+    textarea.setAttribute("aria-hidden", "true");
+    textarea.setAttribute("tabindex", "-1");
+    const editorShell = document.createElement("div");
+    editorShell.className = "richtext-editor-shell";
+    host.appendChild(editorShell);
+    const placeholder = (textarea.getAttribute("placeholder") || "").trim();
+    const quill = new quillCtor(editorShell, {
+      theme: "snow",
+      placeholder,
+      modules: {
+        toolbar: [
+          ["bold", "italic", "underline"],
+          ["link"],
+          [{ list: "ordered" }, { list: "bullet" }],
+          [{ indent: "-1" }, { indent: "+1" }]
+        ]
+      }
     });
-    const applySearch = () => {
-      const query = search.value || "";
-      const normalizedQuery = normalizeSearchText2(query);
-      const scored = options.map((option) => {
-        const label = option.dataset.collabLabel || option.textContent || "";
-        const score = normalizedQuery ? scoreSearchCandidate(normalizedQuery, label) : 1;
-        const order = Number.parseInt(option.dataset.collabOrder || "0", 10);
-        return { option, score, order };
-      }).sort((a, b) => {
-        if (!normalizedQuery) {
-          return a.order - b.order;
-        }
-        return b.score - a.score || a.order - b.order;
-      });
-      scored.forEach((row) => {
-        row.option.hidden = normalizedQuery.length > 0 && row.score <= 0;
-        optionsContainer.appendChild(row.option);
-      });
+    textarea.dataset.richTextReady = "true";
+    textarea._richTextEditor = quill;
+    const editorNode = editorShell.querySelector(".ql-editor");
+    const configuredMinHeight = Number.parseFloat((textarea.dataset.richTextMinHeight || "").trim());
+    const minHeight = Number.isFinite(configuredMinHeight) ? configuredMinHeight : Math.max(88, Number.parseInt(textarea.getAttribute("rows") || "4", 10) * 22);
+    if (editorNode instanceof HTMLElement) {
+      editorNode.style.minHeight = `${Math.round(minHeight)}px`;
+    }
+    const syncTextarea = () => {
+      const text = (quill.getText() || "").replace(/\u00a0/g, " ").trim();
+      if (!text) {
+        textarea.value = "";
+        return;
+      }
+      const html = (quill.root?.innerHTML || "").trim();
+      textarea.value = html && html !== "<p><br></p>" ? html : "";
     };
-    const debouncedApply = debounce(applySearch, 120);
-    search.addEventListener("input", () => {
-      debouncedApply();
+    const resize = () => {
+      if (!(editorNode instanceof HTMLElement)) {
+        return;
+      }
+      editorNode.style.height = "auto";
+      const nextHeight = Math.max(editorNode.scrollHeight, minHeight);
+      editorNode.style.height = `${Math.round(nextHeight)}px`;
+    };
+    const initialValue = textarea.value || "";
+    if (initialValue.trim().length > 0) {
+      if (looksLikeHtml(initialValue)) {
+        quill.clipboard.dangerouslyPasteHTML(initialValue);
+      } else {
+        quill.setText(initialValue);
+      }
+    } else {
+      quill.setText("");
+    }
+    if (form instanceof HTMLFormElement) {
+      form.addEventListener("submit", syncTextarea);
+    }
+    quill.on("text-change", () => {
+      syncTextarea();
+      resize();
     });
-    applySearch();
+    quill.on("editor-change", () => {
+      resize();
+    });
+    syncTextarea();
+    window.requestAnimationFrame(resize);
   });
 }
+function setRecordEditorRichTextValue(textarea, nextValue) {
+  if (!(textarea instanceof HTMLTextAreaElement)) {
+    return;
+  }
+  const normalized = String(nextValue ?? "");
+  textarea.value = normalized;
+  const editor = textarea._richTextEditor;
+  if (!editor) {
+    return;
+  }
+  if (!normalized.trim()) {
+    if (typeof editor.setText === "function") {
+      editor.setText("");
+    }
+    return;
+  }
+  if (looksLikeHtml(normalized) && editor.clipboard && typeof editor.clipboard.dangerouslyPasteHTML === "function") {
+    editor.clipboard.dangerouslyPasteHTML(normalized);
+    return;
+  }
+  if (typeof editor.setText === "function") {
+    editor.setText(normalized);
+  }
+}
 
-// PmTracker.Web/wwwroot/js/modules/recordEditor.js
-var modalRoot2 = document.getElementById("modal-root");
-var recordEditorPreferenceStorageKey = "pmtracker.recordEditor.preference";
-var recordEditorReturnStateStoragePrefix = "pmtracker.recordEditor.returnState.project.";
-var recordEditorDraftStoragePrefix = "pmtracker.recordEditor.draft.";
-var recordEditorDraftTtlMs = 12 * 60 * 60 * 1000;
-var recordEditorState2 = {
-  chooser: null,
-  chooserTrigger: null,
+// modules/recordEditor/draft.js
+var recordEditorState = {
   closeGuard: null,
   closeGuardTrigger: null
 };
-function getRecordEditorPreferenceLabel(mode) {
-  if (mode === "modal") {
-    return "Otevřít v modalu";
+var recordEditorDraftStoragePrefix = "pmtracker.recordEditor.draft.";
+var recordEditorDraftTtlMs = 12 * 60 * 60 * 1000;
+function shouldIgnoreRecordEditorField(name) {
+  if (!name) {
+    return true;
   }
-  if (mode === "page") {
-    return "Otevřít na stránce";
+  const normalized = String(name).trim().toLowerCase();
+  if (!normalized) {
+    return true;
   }
-  return "není nastaveno";
+  if (normalized.startsWith("uiharmonogramdatumy")) {
+    return true;
+  }
+  return normalized === "__requestverificationtoken" || normalized === "presentation" || normalized === "returnurl" || normalized === "editortab";
 }
-function getStoredRecordEditorPreference() {
-  const value = localStorage.getItem(recordEditorPreferenceStorageKey);
-  if (value === "modal" || value === "page") {
-    return value;
+function buildRecordEditorFormSnapshot(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return "";
   }
-  return null;
+  const entries = [];
+  const formData = new FormData(form);
+  formData.forEach((value, key) => {
+    if (shouldIgnoreRecordEditorField(key)) {
+      return;
+    }
+    const normalizedValue = value instanceof File ? value.name : String(value ?? "");
+    entries.push(`${key}=${normalizedValue}`);
+  });
+  entries.sort();
+  return entries.join("&");
 }
-function setStoredRecordEditorPreference(mode) {
-  if (mode !== "modal" && mode !== "page") {
+function getRecordEditorDraftStorageKey(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return "";
+  }
+  const projectId = Number.parseInt(form.dataset.recordEditorProjectId || "", 10);
+  if (!Number.isInteger(projectId) || projectId <= 0) {
+    return "";
+  }
+  const idInput = form.querySelector('input[name="Id"]');
+  const rawRecordId = idInput instanceof HTMLInputElement ? idInput.value.trim() : "";
+  const recordId = rawRecordId || "new";
+  const presentation = (form.dataset.recordEditorPresentation || "modal").trim().toLowerCase();
+  return `${recordEditorDraftStoragePrefix}${projectId}.${recordId}.${presentation}`;
+}
+function buildRecordEditorDraftValues(form) {
+  const values = {};
+  if (!(form instanceof HTMLFormElement)) {
+    return values;
+  }
+  const formData = new FormData(form);
+  formData.forEach((value, key) => {
+    if (shouldIgnoreRecordEditorField(key) || value instanceof File) {
+      return;
+    }
+    const normalized = String(value ?? "");
+    if (!Array.isArray(values[key])) {
+      values[key] = [];
+    }
+    values[key].push(normalized);
+  });
+  return values;
+}
+function buildRecordEditorDraftSnapshotFromValues(values) {
+  if (!values || typeof values !== "object") {
+    return "";
+  }
+  const entries = [];
+  Object.entries(values).forEach(([key, list]) => {
+    if (shouldIgnoreRecordEditorField(key) || !Array.isArray(list)) {
+      return;
+    }
+    list.forEach((value) => {
+      entries.push(`${key}=${String(value ?? "")}`);
+    });
+  });
+  entries.sort();
+  return entries.join("&");
+}
+function normalizeRecordEditorDraftValues(rawValues) {
+  if (!rawValues || typeof rawValues !== "object") {
+    return {};
+  }
+  const normalized = {};
+  Object.entries(rawValues).forEach(([key, list]) => {
+    if (shouldIgnoreRecordEditorField(key)) {
+      return;
+    }
+    if (Array.isArray(list)) {
+      const values = list.map((item) => String(item ?? ""));
+      normalized[key] = values;
+      return;
+    }
+    normalized[key] = [String(list ?? "")];
+  });
+  return normalized;
+}
+function clearRecordEditorDraftSaveTimer(form) {
+  if (!(form instanceof HTMLFormElement)) {
     return;
   }
-  localStorage.setItem(recordEditorPreferenceStorageKey, mode);
-  refreshRecordEditorPreferenceUi();
+  const timerId = Number.parseInt(form.dataset.recordEditorDraftTimerId || "", 10);
+  if (Number.isFinite(timerId) && timerId > 0) {
+    window.clearTimeout(timerId);
+  }
+  delete form.dataset.recordEditorDraftTimerId;
 }
-function clearStoredRecordEditorPreference() {
-  localStorage.removeItem(recordEditorPreferenceStorageKey);
-  refreshRecordEditorPreferenceUi();
+function clearRecordEditorDraft(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  clearRecordEditorDraftSaveTimer(form);
+  const storageKey = getRecordEditorDraftStorageKey(form);
+  if (!storageKey) {
+    return;
+  }
+  sessionStorage.removeItem(storageKey);
 }
-function refreshRecordEditorPreferenceUi() {
-  const preferred = getStoredRecordEditorPreference();
-  document.querySelectorAll("[data-record-editor-preference-current]").forEach((element) => {
-    element.textContent = getRecordEditorPreferenceLabel(preferred);
-  });
-  document.querySelectorAll("[data-record-editor-preference-reset]").forEach((element) => {
-    if (isButtonLike(element)) {
-      setButtonDisabled(element, preferred === null);
+function isRecordEditorFormDirty(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return false;
+  }
+  return buildRecordEditorFormSnapshot(form) !== (form.dataset.recordEditorSnapshot || "");
+}
+function saveRecordEditorDraft(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  if (form.dataset.recordEditorNavigating === "true") {
+    return;
+  }
+  const storageKey = getRecordEditorDraftStorageKey(form);
+  if (!storageKey) {
+    return;
+  }
+  if (!isRecordEditorFormDirty(form)) {
+    sessionStorage.removeItem(storageKey);
+    return;
+  }
+  const values = buildRecordEditorDraftValues(form);
+  const snapshot = buildRecordEditorDraftSnapshotFromValues(values);
+  if (!snapshot) {
+    sessionStorage.removeItem(storageKey);
+    return;
+  }
+  const payload = {
+    version: 1,
+    savedAtUtc: new Date().toISOString(),
+    values
+  };
+  sessionStorage.setItem(storageKey, JSON.stringify(payload));
+}
+function scheduleRecordEditorDraftSave(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  clearRecordEditorDraftSaveTimer(form);
+  const timerId = window.setTimeout(() => {
+    delete form.dataset.recordEditorDraftTimerId;
+    saveRecordEditorDraft(form);
+  }, 1500);
+  form.dataset.recordEditorDraftTimerId = String(timerId);
+}
+function readRecordEditorDraft(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return null;
+  }
+  const storageKey = getRecordEditorDraftStorageKey(form);
+  if (!storageKey) {
+    return null;
+  }
+  const raw = sessionStorage.getItem(storageKey);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    const savedAtUtc = typeof parsed.savedAtUtc === "string" ? parsed.savedAtUtc : "";
+    const savedAtMs = savedAtUtc ? Date.parse(savedAtUtc) : NaN;
+    if (!Number.isFinite(savedAtMs) || Date.now() - savedAtMs > recordEditorDraftTtlMs) {
+      sessionStorage.removeItem(storageKey);
+      return null;
     }
+    const values = normalizeRecordEditorDraftValues(parsed.values);
+    const snapshot = buildRecordEditorDraftSnapshotFromValues(values);
+    if (!snapshot) {
+      sessionStorage.removeItem(storageKey);
+      return null;
+    }
+    return {
+      key: storageKey,
+      values,
+      snapshot
+    };
+  } catch (error) {
+    sessionStorage.removeItem(storageKey);
+    return null;
+  }
+}
+function applyRecordEditorDraft(form, values) {
+  if (!(form instanceof HTMLFormElement) || !values || typeof values !== "object") {
+    return false;
+  }
+  const controls = Array.from(form.querySelectorAll("[name]")).filter((control) => control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement);
+  if (controls.length === 0) {
+    return false;
+  }
+  const groupedControls = new Map;
+  controls.forEach((control) => {
+    const name = control.getAttribute("name") || "";
+    if (!name || shouldIgnoreRecordEditorField(name)) {
+      return;
+    }
+    if (!groupedControls.has(name)) {
+      groupedControls.set(name, []);
+    }
+    groupedControls.get(name).push(control);
   });
+  groupedControls.forEach((group, name) => {
+    const incoming = Array.isArray(values[name]) ? values[name].map((item) => String(item ?? "")) : [];
+    if (group.length === 0) {
+      return;
+    }
+    const first = group[0];
+    if (first instanceof HTMLInputElement && first.type === "radio") {
+      group.forEach((radio) => {
+        if (radio instanceof HTMLInputElement) {
+          radio.checked = incoming.includes(radio.value);
+        }
+      });
+      return;
+    }
+    if (first instanceof HTMLInputElement && first.type === "checkbox") {
+      group.forEach((checkbox) => {
+        if (checkbox instanceof HTMLInputElement) {
+          checkbox.checked = incoming.includes(checkbox.value);
+        }
+      });
+      return;
+    }
+    if (first instanceof HTMLSelectElement && first.multiple) {
+      const selected = new Set(incoming);
+      group.forEach((selectControl) => {
+        if (!(selectControl instanceof HTMLSelectElement)) {
+          return;
+        }
+        Array.from(selectControl.options).forEach((option) => {
+          option.selected = selected.has(option.value);
+        });
+      });
+      return;
+    }
+    const nextValue = incoming.length > 0 ? incoming[0] : "";
+    group.forEach((control) => {
+      if (control instanceof HTMLTextAreaElement && control.dataset.richText === "true") {
+        setRecordEditorRichTextValue(control, nextValue);
+        return;
+      }
+      if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement) {
+        control.value = nextValue;
+      }
+    });
+  });
+  controls.forEach((control) => {
+    if (!(control instanceof HTMLElement)) {
+      return;
+    }
+    control.dispatchEvent(new Event("input", { bubbles: true }));
+    control.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  return true;
 }
-function getCurrentLocalUrl() {
-  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+function maybeRestoreRecordEditorDraft(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const draft = readRecordEditorDraft(form);
+  if (!draft) {
+    return;
+  }
+  const initialSnapshot = form.dataset.recordEditorSnapshot || "";
+  if (!draft.snapshot || draft.snapshot === initialSnapshot) {
+    clearRecordEditorDraft(form);
+    return;
+  }
+  const shouldRestore = window.confirm("Byla nalezena rozpracovaná verze záznamu. Chcete ji obnovit?");
+  if (!shouldRestore) {
+    clearRecordEditorDraft(form);
+    return;
+  }
+  applyRecordEditorDraft(form, draft.values);
 }
-function getRecordEditorReturnStateKey(projectId) {
-  return `${recordEditorReturnStateStoragePrefix}${projectId}`;
+function markRecordEditorFormClean(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
 }
-function closeRecordEditorChooser(options) {
+function prepareRecordEditorFormNavigation(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  form.dataset.recordEditorNavigating = "true";
+  clearRecordEditorDraft(form);
+  markRecordEditorFormClean(form);
+}
+function closeRecordEditorCloseGuard(options) {
   const settings = options || {};
   const restoreFocus = Boolean(settings.restoreFocus);
-  const trigger = recordEditorState2.chooserTrigger;
-  if (recordEditorState2.chooser instanceof HTMLElement) {
-    unregisterFloatingChooser(recordEditorState2.chooser);
-    recordEditorState2.chooser.remove();
+  const trigger = recordEditorState.closeGuardTrigger;
+  if (recordEditorState.closeGuard instanceof HTMLElement) {
+    recordEditorState.closeGuard.remove();
   }
-  recordEditorState2.chooser = null;
-  recordEditorState2.chooserTrigger = null;
+  recordEditorState.closeGuard = null;
+  recordEditorState.closeGuardTrigger = null;
   if (restoreFocus && trigger instanceof HTMLElement && trigger.isConnected) {
     trigger.focus({ preventScroll: true });
   }
 }
-function buildRecordEditorUrl(trigger, mode) {
-  if (!(trigger instanceof HTMLElement)) {
-    return "";
+function promptRecordEditorDiscard(form, trigger) {
+  if (!(form instanceof HTMLFormElement) || !isRecordEditorFormDirty(form)) {
+    return Promise.resolve(true);
   }
-  const rawUrl = trigger.getAttribute("data-record-editor-url") || "";
-  if (!rawUrl) {
-    return "";
-  }
-  const editorUrl = new URL(rawUrl, window.location.origin);
-  editorUrl.searchParams.set("presentation", mode === "page" ? "page" : "modal");
-  editorUrl.searchParams.set("returnUrl", getCurrentLocalUrl());
-  return `${editorUrl.pathname}${editorUrl.search}${editorUrl.hash}`;
+  closeRecordEditorCloseGuard({ restoreFocus: false });
+  return new Promise((resolve) => {
+    const host = document.body;
+    if (!(host instanceof HTMLElement)) {
+      resolve(window.confirm("Máte neuložené změny. Chcete je zahodit?"));
+      return;
+    }
+    const overlay = document.createElement("div");
+    overlay.className = "record-editor-close-guard";
+    overlay.setAttribute("data-record-editor-close-guard", "true");
+    const dialog = document.createElement("div");
+    dialog.className = "record-editor-close-guard-dialog";
+    dialog.setAttribute("role", "alertdialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("tabindex", "-1");
+    const title = document.createElement("h3");
+    title.className = "record-editor-close-guard-title";
+    title.textContent = "Máte neuložené změny.";
+    dialog.appendChild(title);
+    const text = document.createElement("p");
+    text.className = "record-editor-close-guard-text";
+    text.textContent = "Chcete pokračovat v úpravách, nebo změny zahodit?";
+    dialog.appendChild(text);
+    const actions = document.createElement("div");
+    actions.className = "record-editor-close-guard-actions";
+    const keepEditingButton = document.createElement("button");
+    keepEditingButton.type = "button";
+    keepEditingButton.className = "btn";
+    keepEditingButton.textContent = "Pokračovat v úpravách";
+    actions.appendChild(keepEditingButton);
+    const discardButton = document.createElement("button");
+    discardButton.type = "button";
+    discardButton.className = "btn danger";
+    discardButton.textContent = "Zahodit změny";
+    actions.appendChild(discardButton);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+    const finish = (shouldDiscard, restoreFocus) => {
+      closeRecordEditorCloseGuard({ restoreFocus });
+      if (shouldDiscard) {
+        prepareRecordEditorFormNavigation(form);
+      }
+      resolve(shouldDiscard);
+    };
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) {
+        finish(false, true);
+      }
+    });
+    keepEditingButton.addEventListener("click", () => finish(false, true));
+    discardButton.addEventListener("click", () => finish(true, false));
+    host.appendChild(overlay);
+    recordEditorState.closeGuard = overlay;
+    recordEditorState.closeGuardTrigger = trigger instanceof HTMLElement ? trigger : null;
+    window.requestAnimationFrame(() => {
+      keepEditingButton.focus({ preventScroll: true });
+    });
+  });
 }
-function captureRecordEditorReturnState(trigger) {
-  if (!(trigger instanceof HTMLElement)) {
+async function requestRecordEditorPageCancel(trigger) {
+  const editorForm = document.querySelector('form[data-record-editor-form="true"]');
+  if (!(editorForm instanceof HTMLFormElement)) {
+    const fallbackUrl = trigger instanceof HTMLElement ? trigger.getAttribute("data-record-editor-back-url") || window.location.href : window.location.href;
+    window.location.assign(fallbackUrl);
     return;
   }
-  const projectId = Number.parseInt(trigger.getAttribute("data-record-editor-project-id") || "", 10);
-  if (!Number.isInteger(projectId) || projectId <= 0) {
+  const canClose = await promptRecordEditorDiscard(editorForm, trigger);
+  if (!canClose) {
     return;
   }
-  const scopeRoot = document.querySelector(`[data-project-detail-root][data-project-id="${CSS.escape(String(projectId))}"]`) || document.querySelector("[data-project-detail-root]");
-  const baseState = buildRecordUiState(scopeRoot instanceof HTMLElement ? scopeRoot : document);
-  const state = {
-    projectId,
-    returnUrl: getCurrentLocalUrl(),
-    activeTab: baseState.activeTab,
-    scrollY: baseState.scrollY,
-    expandedRecordIds: Array.isArray(baseState.expandedRecordIds) ? baseState.expandedRecordIds : [],
-    commentSortDirectionByRecordId: baseState.commentSortDirectionByRecordId || {},
-    capturedAt: new Date().toISOString()
-  };
-  sessionStorage.setItem(getRecordEditorReturnStateKey(projectId), JSON.stringify(state));
-}
-function navigateToRecordEditorPage(trigger) {
-  const targetUrl = buildRecordEditorUrl(trigger, "page");
-  if (!targetUrl) {
-    return;
-  }
-  captureRecordEditorReturnState(trigger);
+  const targetUrl = editorForm.dataset.recordEditorBackUrl || (trigger instanceof HTMLElement ? trigger.getAttribute("data-record-editor-back-url") : "") || window.location.href;
   window.location.assign(targetUrl);
 }
-function handleRecordEditorChoice(trigger, mode, shouldSkipRemember) {
-  if (!(trigger instanceof HTMLElement)) {
+function initRecordEditorDirtyTracking(scope) {
+  if (!(scope instanceof HTMLElement || scope instanceof Document)) {
     return;
   }
-  if (!shouldSkipRemember) {
-    setStoredRecordEditorPreference(mode);
-  }
-  if (mode === "page") {
-    navigateToRecordEditorPage(trigger);
-    return;
-  }
-  openUrlModal(buildRecordEditorUrl(trigger, "modal"), trigger);
-}
-function createRecordEditorChooser(trigger) {
-  const label = trigger.getAttribute("data-record-editor-label") || "Editor záznamu";
-  const popover = document.createElement("div");
-  popover.className = "record-editor-popover";
-  popover.setAttribute("role", "dialog");
-  popover.setAttribute("aria-modal", "false");
-  popover.setAttribute("data-record-editor-popover", "true");
-  popover.setAttribute("tabindex", "-1");
-  const title = document.createElement("h3");
-  title.className = "record-editor-popover-title";
-  title.textContent = "Vyberte způsob otevření";
-  popover.appendChild(title);
-  const subtitle = document.createElement("p");
-  subtitle.className = "record-editor-popover-subtitle";
-  subtitle.textContent = label;
-  popover.appendChild(subtitle);
-  const actions = document.createElement("div");
-  actions.className = "record-editor-popover-actions";
-  const modalButton = document.createElement("button");
-  modalButton.type = "button";
-  modalButton.className = "btn small";
-  modalButton.textContent = "Otevřít v modalu";
-  modalButton.setAttribute("data-record-editor-mode", "modal");
-  actions.appendChild(modalButton);
-  const pageButton = document.createElement("button");
-  pageButton.type = "button";
-  pageButton.className = "btn small";
-  pageButton.textContent = "Otevřít na stránce";
-  pageButton.setAttribute("data-record-editor-mode", "page");
-  actions.appendChild(pageButton);
-  popover.appendChild(actions);
-  const rememberLabel = document.createElement("label");
-  rememberLabel.className = "record-editor-popover-remember";
-  const rememberCheckbox = document.createElement("input");
-  rememberCheckbox.type = "checkbox";
-  rememberCheckbox.setAttribute("data-record-editor-remember", "true");
-  rememberLabel.appendChild(rememberCheckbox);
-  rememberLabel.append(" Neukládat pro tentokrát jako výchozí volbu");
-  popover.appendChild(rememberLabel);
-  const note = document.createElement("p");
-  note.className = "record-editor-popover-note";
-  note.textContent = "Pokud volbu neuložíte, systém se při dalším otevření zeptá znovu.";
-  popover.appendChild(note);
-  const closeButton = document.createElement("button");
-  closeButton.type = "button";
-  closeButton.className = "record-editor-popover-close";
-  closeButton.setAttribute("aria-label", "Zavřít výběr způsobu otevření editoru");
-  closeButton.textContent = "×";
-  popover.appendChild(closeButton);
-  popover.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) {
+  scope.querySelectorAll('form[data-record-editor-form="true"]').forEach((form) => {
+    if (!(form instanceof HTMLFormElement) || form.dataset.recordEditorDirtyReady === "true") {
       return;
     }
-    if (target.closest(".record-editor-popover-close")) {
-      event.preventDefault();
-      closeRecordEditorChooser({ restoreFocus: true });
-      return;
-    }
-    const choice = target.closest("[data-record-editor-mode]");
-    if (!choice) {
-      return;
-    }
-    event.preventDefault();
-    const mode = choice.getAttribute("data-record-editor-mode");
-    if (mode !== "modal" && mode !== "page") {
-      return;
-    }
-    const skipRemember = rememberCheckbox.checked;
-    closeRecordEditorChooser({ restoreFocus: false });
-    handleRecordEditorChoice(trigger, mode, skipRemember);
+    form.dataset.recordEditorDirtyReady = "true";
+    form.dataset.recordEditorNavigating = "false";
+    form.addEventListener("submit", () => {
+      form.dataset.recordEditorNavigating = "true";
+      clearRecordEditorDraftSaveTimer(form);
+    });
+    form.addEventListener("input", () => {
+      scheduleRecordEditorDraftSave(form);
+    });
+    form.addEventListener("change", () => {
+      scheduleRecordEditorDraftSave(form);
+    });
+    window.requestAnimationFrame(() => {
+      if (form.isConnected) {
+        form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
+        maybeRestoreRecordEditorDraft(form);
+        form.dataset.recordEditorNavigating = "false";
+      }
+    });
   });
-  return popover;
 }
-function showRecordEditorChooser(trigger) {
-  if (!(trigger instanceof HTMLElement)) {
-    return;
-  }
-  closeRecordEditorChooser({ restoreFocus: false });
-  const popover = createRecordEditorChooser(trigger);
-  document.body.appendChild(popover);
-  positionPrintChooser(popover, trigger);
-  registerFloatingChooser(popover, trigger);
-  recordEditorState2.chooser = popover;
-  recordEditorState2.chooserTrigger = trigger;
-  const firstAction = popover.querySelector("[data-record-editor-mode]");
-  if (firstAction instanceof HTMLElement) {
-    firstAction.focus({ preventScroll: true });
-  } else {
-    popover.focus({ preventScroll: true });
-  }
-}
-function openRecordEditor(trigger, forcedMode) {
-  if (!(trigger instanceof HTMLElement)) {
-    return;
-  }
-  const mode = forcedMode || getStoredRecordEditorPreference();
-  if (mode === "modal") {
-    openUrlModal(buildRecordEditorUrl(trigger, "modal"), trigger);
-    return;
-  }
-  if (mode === "page") {
-    navigateToRecordEditorPage(trigger);
-    return;
-  }
-  showRecordEditorChooser(trigger);
-}
-function restoreRecordEditorReturnStateFromUrl() {
-  const projectRoot = document.querySelector("[data-project-detail-root]");
-  if (!(projectRoot instanceof HTMLElement)) {
-    return;
-  }
-  const currentUrl = new URL(window.location.href);
-  if (currentUrl.searchParams.get("restoreRecordEditorState") !== "1") {
-    return;
-  }
-  const cleanupUrl = () => {
-    currentUrl.searchParams.delete("restoreRecordEditorState");
-    history.replaceState(history.state || {}, "", `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
-  };
-  const projectId = Number.parseInt(projectRoot.dataset.projectId || "", 10);
-  if (!Number.isInteger(projectId) || projectId <= 0) {
-    cleanupUrl();
-    return;
-  }
-  const storageKey = getRecordEditorReturnStateKey(projectId);
-  const rawState = sessionStorage.getItem(storageKey);
-  if (!rawState) {
-    cleanupUrl();
-    return;
-  }
-  try {
-    const state = JSON.parse(rawState);
-    restoreRecordUiState(state);
-  } catch {
-    reportClientDiagnostic("record-editor-return-state-invalid", { projectId });
-  } finally {
-    sessionStorage.removeItem(storageKey);
-    cleanupUrl();
-  }
-}
+
+// modules/recordEditor/form.js
 function initPermissionMetadataBindings(scope) {
   const root = scope instanceof Element ? scope : document;
   const forms = root.querySelectorAll("form");
@@ -7175,7 +8686,6 @@ function updateTaskTypeVisibility(categorySelect) {
   const scheduleTab = form.querySelector("[data-record-schedule-tab]");
   const schedulePanel = form.querySelector("[data-record-schedule-panel]");
   const scheduleNote = form.querySelector("[data-record-schedule-note]");
-  // Proposal editor — TypUkolu nesmí být měnitelný v žádném návrhovém módu.
   const metadataLocked = form.dataset.metadataLocked === "true";
   const isProposalEditor = form.dataset.isProposalEditor === "true";
   if (topRow instanceof HTMLElement) {
@@ -7333,10 +8843,6 @@ function setRecordFormTab2(form, tabKey) {
     if (harmonogramPanel instanceof HTMLElement) {
       queueRainbowSegmentRender(harmonogramPanel);
     }
-    // Schedule planner přepsal hodnoty UiHarmonogramDatumy[*] a normalizoval
-    // duration/delay inputy. Toto není uživatelská změna — obnovíme snapshot,
-    // aby se po přepnutí na schedule tab nespouštěl close guard a modal šel zavřít.
-    // Viz docs/specs/record-proposal-editor.md / modal-close-guard.
     window.requestAnimationFrame(() => {
       if (form.isConnected) {
         form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
@@ -7634,603 +9140,19 @@ function initRecordMeetingDateSync(scope) {
     syncToSelectedMeeting();
   });
 }
-function looksLikeHtml(value) {
-  return /<\s*\/?\s*[a-z][^>]*>/i.test(value || "");
-}
-function getOrCreateRichTextSourceContainer(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return null;
-  }
-  const existing = form.querySelector("[data-rich-text-source-container]");
-  if (existing instanceof HTMLElement) {
-    return existing;
-  }
-  const container = document.createElement("div");
-  container.className = "richtext-source-container";
-  container.setAttribute("data-rich-text-source-container", "true");
-  container.setAttribute("aria-hidden", "true");
-  form.appendChild(container);
-  return container;
-}
-function initRichTextEditors(scope) {
-  if (!(scope instanceof HTMLElement || scope instanceof Document)) {
-    return;
-  }
-  if (typeof window.Quill !== "function") {
-    return;
-  }
-  const quillCtor = window.Quill;
-  scope.querySelectorAll("textarea[data-rich-text='true']").forEach((textarea) => {
-    if (!(textarea instanceof HTMLTextAreaElement) || textarea.disabled || textarea.dataset.richTextReady === "true") {
-      return;
-    }
-    const host = document.createElement("div");
-    host.className = "richtext-host";
-    textarea.insertAdjacentElement("beforebegin", host);
-    const form = textarea.closest("form");
-    const labelParent = textarea.closest("label");
-    if (labelParent instanceof HTMLLabelElement && form instanceof HTMLFormElement) {
-      const sourceContainer = getOrCreateRichTextSourceContainer(form);
-      if (sourceContainer instanceof HTMLElement) {
-        sourceContainer.appendChild(textarea);
-      } else {
-        host.appendChild(textarea);
-      }
-    } else {
-      host.appendChild(textarea);
-    }
-    textarea.classList.add("richtext-source-hidden");
-    textarea.setAttribute("aria-hidden", "true");
-    textarea.setAttribute("tabindex", "-1");
-    const editorShell = document.createElement("div");
-    editorShell.className = "richtext-editor-shell";
-    host.appendChild(editorShell);
-    const placeholder = (textarea.getAttribute("placeholder") || "").trim();
-    const quill = new quillCtor(editorShell, {
-      theme: "snow",
-      placeholder,
-      modules: {
-        toolbar: [
-          ["bold", "italic", "underline"],
-          ["link"],
-          [{ list: "ordered" }, { list: "bullet" }],
-          [{ indent: "-1" }, { indent: "+1" }]
-        ]
-      }
-    });
-    textarea.dataset.richTextReady = "true";
-    textarea._richTextEditor = quill;
-    const editorNode = editorShell.querySelector(".ql-editor");
-    const configuredMinHeight = Number.parseFloat((textarea.dataset.richTextMinHeight || "").trim());
-    const minHeight = Number.isFinite(configuredMinHeight) ? configuredMinHeight : Math.max(88, Number.parseInt(textarea.getAttribute("rows") || "4", 10) * 22);
-    if (editorNode instanceof HTMLElement) {
-      editorNode.style.minHeight = `${Math.round(minHeight)}px`;
-    }
-    const syncTextarea = () => {
-      const text = (quill.getText() || "").replace(/\u00a0/g, " ").trim();
-      if (!text) {
-        textarea.value = "";
-        return;
-      }
-      const html = (quill.root?.innerHTML || "").trim();
-      textarea.value = html && html !== "<p><br></p>" ? html : "";
-    };
-    const resize = () => {
-      if (!(editorNode instanceof HTMLElement)) {
-        return;
-      }
-      editorNode.style.height = "auto";
-      const nextHeight = Math.max(editorNode.scrollHeight, minHeight);
-      editorNode.style.height = `${Math.round(nextHeight)}px`;
-    };
-    const initialValue = textarea.value || "";
-    if (initialValue.trim().length > 0) {
-      if (looksLikeHtml(initialValue)) {
-        quill.clipboard.dangerouslyPasteHTML(initialValue);
-      } else {
-        quill.setText(initialValue);
-      }
-    } else {
-      quill.setText("");
-    }
-    if (form instanceof HTMLFormElement) {
-      form.addEventListener("submit", syncTextarea);
-    }
-    quill.on("text-change", () => {
-      syncTextarea();
-      resize();
-    });
-    quill.on("editor-change", () => {
-      resize();
-    });
-    syncTextarea();
-    window.requestAnimationFrame(resize);
-  });
-}
-function initRecordFormEnhancements(scope) {
-  if (!(scope instanceof HTMLElement || scope instanceof Document)) {
-    return;
-  }
-  initCustomDatePickers(scope);
-  initCustomTimePickers(scope);
-  scope.querySelectorAll("[data-kategorie-select]").forEach((element) => {
-    if (element instanceof HTMLSelectElement) {
-      updateTaskTypeVisibility(element);
-    }
-  });
-  initSinglePersonPickers(scope);
-  initRecordOwnerAutofill(scope);
-  initAdPersonPickers(scope);
-  initExternalLinksEditors(scope);
-  initCollabPickers(scope);
-  initMeetingNumberValidation(scope);
-  initConfirmSubmitToggles(scope);
-  initRecordFormTabs(scope);
-  initRecordGoalAutoGrow(scope);
-  initRecordMeetingDateSync(scope);
-  initRichTextEditors(scope);
-  initRecordSchedulePlanner(scope);
-  initRecordEditorDirtyTracking(scope);
-}
-function shouldIgnoreRecordEditorField(name) {
-  if (!name) {
-    return true;
-  }
-  const normalized = String(name).trim().toLowerCase();
-  if (!normalized) {
-    return true;
-  }
-  // UiHarmonogramDatumy jsou vypočítaná datumy, nikoli uživatelský vstup — viz modules/recordEditor.js
-  if (normalized.startsWith("uiharmonogramdatumy")) {
-    return true;
-  }
-  return normalized === "__requestverificationtoken" || normalized === "presentation" || normalized === "returnurl" || normalized === "editortab";
-}
-function buildRecordEditorFormSnapshot(form) {
-  if (!(form instanceof HTMLFormElement)) {
+function normalizeServerFieldKey(rawKey) {
+  if (!rawKey) {
     return "";
   }
-  const entries = [];
-  const formData = new FormData(form);
-  formData.forEach((value, key) => {
-    if (shouldIgnoreRecordEditorField(key)) {
-      return;
+  const key = String(rawKey).trim();
+  const dotIndex = key.indexOf(".");
+  if (dotIndex > 0) {
+    const prefix = key.slice(0, dotIndex);
+    if (/^[a-zA-Z][a-zA-Z0-9]*$/.test(prefix) && (prefix.toLowerCase() === "command" || prefix.toLowerCase().endsWith("command"))) {
+      return key.slice(dotIndex + 1);
     }
-    const normalizedValue = value instanceof File ? value.name : String(value ?? "");
-    entries.push(`${key}=${normalizedValue}`);
-  });
-  entries.sort();
-  return entries.join("&");
-}
-function getRecordEditorDraftStorageKey(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return "";
   }
-  const projectId = Number.parseInt(form.dataset.recordEditorProjectId || "", 10);
-  if (!Number.isInteger(projectId) || projectId <= 0) {
-    return "";
-  }
-  const idInput = form.querySelector('input[name="Id"]');
-  const rawRecordId = idInput instanceof HTMLInputElement ? idInput.value.trim() : "";
-  const recordId = rawRecordId || "new";
-  const presentation = (form.dataset.recordEditorPresentation || "modal").trim().toLowerCase();
-  return `${recordEditorDraftStoragePrefix}${projectId}.${recordId}.${presentation}`;
-}
-function buildRecordEditorDraftValues(form) {
-  const values = {};
-  if (!(form instanceof HTMLFormElement)) {
-    return values;
-  }
-  const formData = new FormData(form);
-  formData.forEach((value, key) => {
-    if (shouldIgnoreRecordEditorField(key) || value instanceof File) {
-      return;
-    }
-    const normalized = String(value ?? "");
-    if (!Array.isArray(values[key])) {
-      values[key] = [];
-    }
-    values[key].push(normalized);
-  });
-  return values;
-}
-function buildRecordEditorDraftSnapshotFromValues(values) {
-  if (!values || typeof values !== "object") {
-    return "";
-  }
-  const entries = [];
-  Object.entries(values).forEach(([key, list]) => {
-    if (shouldIgnoreRecordEditorField(key) || !Array.isArray(list)) {
-      return;
-    }
-    list.forEach((value) => {
-      entries.push(`${key}=${String(value ?? "")}`);
-    });
-  });
-  entries.sort();
-  return entries.join("&");
-}
-function normalizeRecordEditorDraftValues(rawValues) {
-  if (!rawValues || typeof rawValues !== "object") {
-    return {};
-  }
-  const normalized = {};
-  Object.entries(rawValues).forEach(([key, list]) => {
-    if (shouldIgnoreRecordEditorField(key)) {
-      return;
-    }
-    if (Array.isArray(list)) {
-      const values = list.map((item) => String(item ?? ""));
-      normalized[key] = values;
-      return;
-    }
-    normalized[key] = [String(list ?? "")];
-  });
-  return normalized;
-}
-function clearRecordEditorDraftSaveTimer(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return;
-  }
-  const timerId = Number.parseInt(form.dataset.recordEditorDraftTimerId || "", 10);
-  if (Number.isFinite(timerId) && timerId > 0) {
-    window.clearTimeout(timerId);
-  }
-  delete form.dataset.recordEditorDraftTimerId;
-}
-function clearRecordEditorDraft(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return;
-  }
-  clearRecordEditorDraftSaveTimer(form);
-  const storageKey = getRecordEditorDraftStorageKey(form);
-  if (!storageKey) {
-    return;
-  }
-  sessionStorage.removeItem(storageKey);
-}
-function saveRecordEditorDraft(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return;
-  }
-  if (form.dataset.recordEditorNavigating === "true") {
-    return;
-  }
-  const storageKey = getRecordEditorDraftStorageKey(form);
-  if (!storageKey) {
-    return;
-  }
-  if (!isRecordEditorFormDirty(form)) {
-    sessionStorage.removeItem(storageKey);
-    return;
-  }
-  const values = buildRecordEditorDraftValues(form);
-  const snapshot = buildRecordEditorDraftSnapshotFromValues(values);
-  if (!snapshot) {
-    sessionStorage.removeItem(storageKey);
-    return;
-  }
-  const payload = {
-    version: 1,
-    savedAtUtc: new Date().toISOString(),
-    values
-  };
-  sessionStorage.setItem(storageKey, JSON.stringify(payload));
-}
-function scheduleRecordEditorDraftSave(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return;
-  }
-  clearRecordEditorDraftSaveTimer(form);
-  const timerId = window.setTimeout(() => {
-    delete form.dataset.recordEditorDraftTimerId;
-    saveRecordEditorDraft(form);
-  }, 1500);
-  form.dataset.recordEditorDraftTimerId = String(timerId);
-}
-function readRecordEditorDraft(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return null;
-  }
-  const storageKey = getRecordEditorDraftStorageKey(form);
-  if (!storageKey) {
-    return null;
-  }
-  const raw = sessionStorage.getItem(storageKey);
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    const savedAtUtc = typeof parsed.savedAtUtc === "string" ? parsed.savedAtUtc : "";
-    const savedAtMs = savedAtUtc ? Date.parse(savedAtUtc) : NaN;
-    if (!Number.isFinite(savedAtMs) || Date.now() - savedAtMs > recordEditorDraftTtlMs) {
-      sessionStorage.removeItem(storageKey);
-      return null;
-    }
-    const values = normalizeRecordEditorDraftValues(parsed.values);
-    const snapshot = buildRecordEditorDraftSnapshotFromValues(values);
-    if (!snapshot) {
-      sessionStorage.removeItem(storageKey);
-      return null;
-    }
-    return {
-      key: storageKey,
-      values,
-      snapshot
-    };
-  } catch (error) {
-    sessionStorage.removeItem(storageKey);
-    return null;
-  }
-}
-function setRecordEditorRichTextValue(textarea, nextValue) {
-  if (!(textarea instanceof HTMLTextAreaElement)) {
-    return;
-  }
-  const normalized = String(nextValue ?? "");
-  textarea.value = normalized;
-  const editor = textarea._richTextEditor;
-  if (!editor) {
-    return;
-  }
-  if (!normalized.trim()) {
-    if (typeof editor.setText === "function") {
-      editor.setText("");
-    }
-    return;
-  }
-  if (looksLikeHtml(normalized) && editor.clipboard && typeof editor.clipboard.dangerouslyPasteHTML === "function") {
-    editor.clipboard.dangerouslyPasteHTML(normalized);
-    return;
-  }
-  if (typeof editor.setText === "function") {
-    editor.setText(normalized);
-  }
-}
-function applyRecordEditorDraft(form, values) {
-  if (!(form instanceof HTMLFormElement) || !values || typeof values !== "object") {
-    return false;
-  }
-  const controls = Array.from(form.querySelectorAll("[name]")).filter((control) => control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement);
-  if (controls.length === 0) {
-    return false;
-  }
-  const groupedControls = new Map;
-  controls.forEach((control) => {
-    const name = control.getAttribute("name") || "";
-    if (!name || shouldIgnoreRecordEditorField(name)) {
-      return;
-    }
-    if (!groupedControls.has(name)) {
-      groupedControls.set(name, []);
-    }
-    groupedControls.get(name).push(control);
-  });
-  groupedControls.forEach((group, name) => {
-    const incoming = Array.isArray(values[name]) ? values[name].map((item) => String(item ?? "")) : [];
-    if (group.length === 0) {
-      return;
-    }
-    const first = group[0];
-    if (first instanceof HTMLInputElement && first.type === "radio") {
-      group.forEach((radio) => {
-        if (radio instanceof HTMLInputElement) {
-          radio.checked = incoming.includes(radio.value);
-        }
-      });
-      return;
-    }
-    if (first instanceof HTMLInputElement && first.type === "checkbox") {
-      group.forEach((checkbox) => {
-        if (checkbox instanceof HTMLInputElement) {
-          checkbox.checked = incoming.includes(checkbox.value);
-        }
-      });
-      return;
-    }
-    if (first instanceof HTMLSelectElement && first.multiple) {
-      const selected = new Set(incoming);
-      group.forEach((selectControl) => {
-        if (!(selectControl instanceof HTMLSelectElement)) {
-          return;
-        }
-        Array.from(selectControl.options).forEach((option) => {
-          option.selected = selected.has(option.value);
-        });
-      });
-      return;
-    }
-    const nextValue = incoming.length > 0 ? incoming[0] : "";
-    group.forEach((control) => {
-      if (control instanceof HTMLTextAreaElement && control.dataset.richText === "true") {
-        setRecordEditorRichTextValue(control, nextValue);
-        return;
-      }
-      if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement) {
-        control.value = nextValue;
-      }
-    });
-  });
-  controls.forEach((control) => {
-    if (!(control instanceof HTMLElement)) {
-      return;
-    }
-    control.dispatchEvent(new Event("input", { bubbles: true }));
-    control.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  return true;
-}
-function maybeRestoreRecordEditorDraft(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return;
-  }
-  const draft = readRecordEditorDraft(form);
-  if (!draft) {
-    return;
-  }
-  const initialSnapshot = form.dataset.recordEditorSnapshot || "";
-  if (!draft.snapshot || draft.snapshot === initialSnapshot) {
-    clearRecordEditorDraft(form);
-    return;
-  }
-  const shouldRestore = window.confirm("Byla nalezena rozpracovaná verze záznamu. Chcete ji obnovit?");
-  if (!shouldRestore) {
-    clearRecordEditorDraft(form);
-    return;
-  }
-  applyRecordEditorDraft(form, draft.values);
-}
-function markRecordEditorFormClean(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return;
-  }
-  form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
-}
-function isRecordEditorFormDirty(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return false;
-  }
-  return buildRecordEditorFormSnapshot(form) !== (form.dataset.recordEditorSnapshot || "");
-}
-function prepareRecordEditorFormNavigation(form) {
-  if (!(form instanceof HTMLFormElement)) {
-    return;
-  }
-  form.dataset.recordEditorNavigating = "true";
-  clearRecordEditorDraft(form);
-  markRecordEditorFormClean(form);
-}
-function closeRecordEditorCloseGuard(options) {
-  const settings = options || {};
-  const restoreFocus = Boolean(settings.restoreFocus);
-  const trigger = recordEditorState2.closeGuardTrigger;
-  if (recordEditorState2.closeGuard instanceof HTMLElement) {
-    recordEditorState2.closeGuard.remove();
-  }
-  recordEditorState2.closeGuard = null;
-  recordEditorState2.closeGuardTrigger = null;
-  if (restoreFocus && trigger instanceof HTMLElement && trigger.isConnected) {
-    trigger.focus({ preventScroll: true });
-  }
-}
-function promptRecordEditorDiscard(form, trigger) {
-  if (!(form instanceof HTMLFormElement) || !isRecordEditorFormDirty(form)) {
-    return Promise.resolve(true);
-  }
-  closeRecordEditorCloseGuard({ restoreFocus: false });
-  return new Promise((resolve) => {
-    const isModalForm = modalRoot2 instanceof HTMLElement && modalRoot2.contains(form);
-    const host = isModalForm ? getActiveModalContainer2() : document.body;
-    if (!(host instanceof HTMLElement)) {
-      resolve(window.confirm("Máte neuložené změny. Chcete je zahodit?"));
-      return;
-    }
-    const overlay = document.createElement("div");
-    overlay.className = `record-editor-close-guard${isModalForm ? " record-editor-close-guard-modal" : ""}`;
-    overlay.setAttribute("data-record-editor-close-guard", "true");
-    const dialog = document.createElement("div");
-    dialog.className = "record-editor-close-guard-dialog";
-    dialog.setAttribute("role", "alertdialog");
-    dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("tabindex", "-1");
-    const title = document.createElement("h3");
-    title.className = "record-editor-close-guard-title";
-    title.textContent = "Máte neuložené změny.";
-    dialog.appendChild(title);
-    const text = document.createElement("p");
-    text.className = "record-editor-close-guard-text";
-    text.textContent = "Chcete pokračovat v úpravách, nebo změny zahodit?";
-    dialog.appendChild(text);
-    const actions = document.createElement("div");
-    actions.className = "record-editor-close-guard-actions";
-    const keepEditingButton = document.createElement("button");
-    keepEditingButton.type = "button";
-    keepEditingButton.className = "btn";
-    keepEditingButton.textContent = "Pokračovat v úpravách";
-    actions.appendChild(keepEditingButton);
-    const discardButton = document.createElement("button");
-    discardButton.type = "button";
-    discardButton.className = "btn danger";
-    discardButton.textContent = "Zahodit změny";
-    actions.appendChild(discardButton);
-    dialog.appendChild(actions);
-    overlay.appendChild(dialog);
-    const finish = (shouldDiscard, restoreFocus) => {
-      closeRecordEditorCloseGuard({ restoreFocus });
-      if (shouldDiscard) {
-        prepareRecordEditorFormNavigation(form);
-      }
-      resolve(shouldDiscard);
-    };
-    overlay.addEventListener("click", (event) => {
-      if (event.target === overlay) {
-        finish(false, true);
-      }
-    });
-    keepEditingButton.addEventListener("click", () => finish(false, true));
-    discardButton.addEventListener("click", () => finish(true, false));
-    host.appendChild(overlay);
-    recordEditorState2.closeGuard = overlay;
-    recordEditorState2.closeGuardTrigger = trigger instanceof HTMLElement ? trigger : null;
-    window.requestAnimationFrame(() => {
-      keepEditingButton.focus({ preventScroll: true });
-    });
-  });
-}
-async function requestRecordEditorModalClose(trigger) {
-  const editorForm = modalRoot2?.querySelector('form[data-record-editor-form="true"]');
-  if (!(editorForm instanceof HTMLFormElement)) {
-    closeModal();
-    return;
-  }
-  const canClose = await promptRecordEditorDiscard(editorForm, trigger);
-  if (canClose) {
-    closeModal();
-  }
-}
-async function requestRecordEditorPageCancel(trigger) {
-  const editorForm = document.querySelector('form[data-record-editor-form="true"][data-record-editor-presentation="page"]');
-  if (!(editorForm instanceof HTMLFormElement)) {
-    const fallbackUrl = trigger instanceof HTMLElement ? trigger.getAttribute("data-record-editor-back-url") || window.location.href : window.location.href;
-    window.location.assign(fallbackUrl);
-    return;
-  }
-  const canClose = await promptRecordEditorDiscard(editorForm, trigger);
-  if (!canClose) {
-    return;
-  }
-  const targetUrl = editorForm.dataset.recordEditorBackUrl || (trigger instanceof HTMLElement ? trigger.getAttribute("data-record-editor-back-url") : "") || window.location.href;
-  window.location.assign(targetUrl);
-}
-function initRecordEditorDirtyTracking(scope) {
-  if (!(scope instanceof HTMLElement || scope instanceof Document)) {
-    return;
-  }
-  scope.querySelectorAll('form[data-record-editor-form="true"]').forEach((form) => {
-    if (!(form instanceof HTMLFormElement) || form.dataset.recordEditorDirtyReady === "true") {
-      return;
-    }
-    form.dataset.recordEditorDirtyReady = "true";
-    form.dataset.recordEditorNavigating = "false";
-    form.addEventListener("submit", () => {
-      form.dataset.recordEditorNavigating = "true";
-      clearRecordEditorDraftSaveTimer(form);
-    });
-    form.addEventListener("input", () => {
-      scheduleRecordEditorDraftSave(form);
-    });
-    form.addEventListener("change", () => {
-      scheduleRecordEditorDraftSave(form);
-    });
-    window.requestAnimationFrame(() => {
-      if (form.isConnected) {
-        form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
-        maybeRestoreRecordEditorDraft(form);
-        form.dataset.recordEditorNavigating = "false";
-      }
-    });
-  });
+  return key;
 }
 function resolveRecordEditorTabForFieldKey(rawKey) {
   const normalizedKey = normalizeServerFieldKey(rawKey).toLowerCase();
@@ -8340,24 +9262,35 @@ function buildContextualSummaryMessage(rawKey, message) {
   const context = [tabLabel, fieldLabel].filter(Boolean).join(" / ");
   return context ? `[${context}] ${trimmedMessage}` : trimmedMessage;
 }
-function normalizeServerFieldKey(rawKey) {
-  if (!rawKey) {
-    return "";
+// modules/recordEditor/index.js
+function initRecordFormEnhancements(scope) {
+  if (!(scope instanceof HTMLElement || scope instanceof Document)) {
+    return;
   }
-  const key = String(rawKey).trim();
-  const dotIndex = key.indexOf(".");
-  if (dotIndex > 0) {
-    const prefix = key.slice(0, dotIndex);
-    if (/^[a-zA-Z][a-zA-Z0-9]*$/.test(prefix) && (prefix.toLowerCase() === "command" || prefix.toLowerCase().endsWith("command"))) {
-      return key.slice(dotIndex + 1);
+  initCustomDatePickers(scope);
+  initCustomTimePickers(scope);
+  scope.querySelectorAll("[data-kategorie-select]").forEach((element) => {
+    if (element instanceof HTMLSelectElement) {
+      updateTaskTypeVisibility(element);
     }
-  }
-  return key;
+  });
+  initSinglePersonPickers(scope);
+  initRecordOwnerAutofill(scope);
+  initAdPersonPickers(scope);
+  initExternalLinksEditors(scope);
+  initCollabPickers(scope);
+  initMeetingNumberValidation(scope);
+  initConfirmSubmitToggles(scope);
+  initRecordFormTabs(scope);
+  initRecordGoalAutoGrow(scope);
+  initRecordMeetingDateSync(scope);
+  initRichTextEditors(scope);
+  initRecordSchedulePlanner(scope);
+  initRecordEditorDirtyTracking(scope);
 }
-
-// PmTracker.Web/wwwroot/js/modules/ajax.js
+// modules/ajax.js
 var sessionExpiredErrorCode = "SESSION_EXPIRED";
-function resolveErrorTarget(field, form) {
+function resolveErrorTarget(field, form2) {
   if (!(field instanceof HTMLElement)) {
     return null;
   }
@@ -8369,7 +9302,7 @@ function resolveErrorTarget(field, form) {
       }
     }
     if (field.matches("[data-ad-guid], [data-ad-query-hidden]")) {
-      const adInput = form.querySelector("[data-ad-query-input]");
+      const adInput = form2.querySelector("[data-ad-query-input]");
       if (adInput instanceof HTMLElement) {
         return adInput;
       }
@@ -8389,28 +9322,28 @@ function resolveErrorTarget(field, form) {
   }
   return field;
 }
-function clearModalFormErrors(form) {
-  if (!(form instanceof HTMLFormElement)) {
+function clearModalFormErrors(form2) {
+  if (!(form2 instanceof HTMLFormElement)) {
     return;
   }
-  form.querySelectorAll(".modal-submit-summary").forEach((node) => node.remove());
-  form.querySelectorAll(".field-error-message").forEach((node) => node.remove());
-  form.querySelectorAll(".field-invalid").forEach((node) => {
+  form2.querySelectorAll(".modal-submit-summary").forEach((node) => node.remove());
+  form2.querySelectorAll(".field-error-message").forEach((node) => node.remove());
+  form2.querySelectorAll(".field-invalid").forEach((node) => {
     if (node instanceof HTMLElement) {
       node.classList.remove("field-invalid");
       node.removeAttribute("aria-invalid");
     }
   });
 }
-function findFieldByName(form, rawKey) {
-  if (!(form instanceof HTMLFormElement)) {
+function findFieldByName(form2, rawKey) {
+  if (!(form2 instanceof HTMLFormElement)) {
     return null;
   }
   const normalizedKey = normalizeServerFieldKey(rawKey);
   if (!normalizedKey) {
     return null;
   }
-  const controls = Array.from(form.querySelectorAll("[name]")).filter((candidate) => candidate instanceof HTMLInputElement || candidate instanceof HTMLSelectElement || candidate instanceof HTMLTextAreaElement);
+  const controls = Array.from(form2.querySelectorAll("[name]")).filter((candidate) => candidate instanceof HTMLInputElement || candidate instanceof HTMLSelectElement || candidate instanceof HTMLTextAreaElement);
   const normalizedLower = normalizedKey.toLowerCase();
   const exactMatch = controls.find((candidate) => {
     const fieldName = candidate.getAttribute("name");
@@ -8425,11 +9358,11 @@ function findFieldByName(form, rawKey) {
   });
   return suffixMatch instanceof HTMLElement ? suffixMatch : null;
 }
-function renderModalFormErrors(form, payload) {
-  if (!(form instanceof HTMLFormElement)) {
+function renderModalFormErrors(form2, payload) {
+  if (!(form2 instanceof HTMLFormElement)) {
     return;
   }
-  clearModalFormErrors(form);
+  clearModalFormErrors(form2);
   const fieldErrors = payload && typeof payload === "object" && payload.fieldErrors && typeof payload.fieldErrors === "object" ? payload.fieldErrors : {};
   const summaryMessages = new Set;
   const invalidTargets = [];
@@ -8442,7 +9375,7 @@ function renderModalFormErrors(form, payload) {
     if (normalizedMessages.length === 0) {
       return;
     }
-    const field = findFieldByName(form, rawKey);
+    const field = findFieldByName(form2, rawKey);
     if (!(field instanceof HTMLElement)) {
       if (!firstInvalidTab) {
         firstInvalidTab = resolveRecordEditorTabForFieldKey(rawKey);
@@ -8458,11 +9391,11 @@ function renderModalFormErrors(form, payload) {
     if (!firstInvalidTab) {
       firstInvalidTab = resolveRecordEditorTabForFieldKey(rawKey);
     }
-    const target = resolveErrorTarget(field, form) || field;
+    const target = resolveErrorTarget(field, form2) || field;
     target.classList.add("field-invalid");
     target.setAttribute("aria-invalid", "true");
     invalidTargets.push(target);
-    const errorHost = target.closest("label") || target.closest(".office-picker") || target.parentElement || form;
+    const errorHost = target.closest("label") || target.closest(".office-picker") || target.parentElement || form2;
     if (!(errorHost instanceof HTMLElement)) {
       normalizedMessages.forEach((message) => {
         const contextual = buildContextualSummaryMessage(rawKey, message);
@@ -8557,18 +9490,18 @@ function renderModalFormErrors(form, payload) {
       diagnosticBlock.appendChild(logPre);
       summary.appendChild(diagnosticBlock);
     }
-    form.insertBefore(summary, form.firstElementChild);
+    form2.insertBefore(summary, form2.firstElementChild);
     summary.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
   if (firstInvalidTab) {
-    setRecordFormTab(form, firstInvalidTab);
+    setRecordFormTab(form2, firstInvalidTab);
   }
   if (invalidTargets.length > 0 && invalidTargets[0] instanceof HTMLElement) {
     invalidTargets[0].focus();
   }
 }
-function syncSinglePersonPickerInForm(form, wrapper) {
-  if (!(form instanceof HTMLFormElement) || !(wrapper instanceof HTMLElement)) {
+function syncSinglePersonPickerInForm(form2, wrapper) {
+  if (!(form2 instanceof HTMLFormElement) || !(wrapper instanceof HTMLElement)) {
     return;
   }
   const hiddenInput = wrapper.querySelector("[data-person-picker-hidden]");
@@ -8608,16 +9541,16 @@ function syncSinglePersonPickerInForm(form, wrapper) {
     queryInput.setCustomValidity("");
   }
 }
-function validateRequiredPersonPickers(form) {
-  if (!(form instanceof HTMLFormElement)) {
+function validateRequiredPersonPickers(form2) {
+  if (!(form2 instanceof HTMLFormElement)) {
     return true;
   }
   let firstInvalidInput = null;
-  form.querySelectorAll('[data-person-picker="single"]').forEach((wrapper) => {
+  form2.querySelectorAll('[data-person-picker="single"]').forEach((wrapper) => {
     if (!(wrapper instanceof HTMLElement)) {
       return;
     }
-    syncSinglePersonPickerInForm(form, wrapper);
+    syncSinglePersonPickerInForm(form2, wrapper);
     const hiddenInput = wrapper.querySelector("[data-person-picker-hidden]");
     const queryInput = wrapper.querySelector("[data-person-picker-input]");
     if (!(hiddenInput instanceof HTMLInputElement) || !(queryInput instanceof HTMLInputElement)) {
@@ -8648,12 +9581,12 @@ function initConfirmSubmitToggles(scope) {
   if (!(scope instanceof HTMLElement || scope instanceof Document)) {
     return;
   }
-  scope.querySelectorAll('form[data-confirm-submit-toggle="true"]').forEach((form) => {
-    if (!(form instanceof HTMLFormElement) || form.dataset.confirmSubmitReady === "true") {
+  scope.querySelectorAll('form[data-confirm-submit-toggle="true"]').forEach((form2) => {
+    if (!(form2 instanceof HTMLFormElement) || form2.dataset.confirmSubmitReady === "true") {
       return;
     }
-    const checkbox = form.querySelector("[data-confirm-submit-checkbox]");
-    const submit = form.querySelector(`[data-confirm-submit-button], ${SUBMIT_SELECTOR}`);
+    const checkbox = form2.querySelector("[data-confirm-submit-checkbox]");
+    const submit = form2.querySelector(`[data-confirm-submit-button], ${SUBMIT_SELECTOR}`);
     if (!(checkbox instanceof HTMLInputElement) || checkbox.type !== "checkbox" || !isButtonLike(submit)) {
       return;
     }
@@ -8662,16 +9595,16 @@ function initConfirmSubmitToggles(scope) {
     };
     checkbox.addEventListener("change", sync);
     sync();
-    form.dataset.confirmSubmitReady = "true";
+    form2.dataset.confirmSubmitReady = "true";
   });
 }
-function setFormSubmitting(form, submitting) {
-  if (!(form instanceof HTMLFormElement)) {
+function setFormSubmitting(form2, submitting) {
+  if (!(form2 instanceof HTMLFormElement)) {
     return;
   }
-  const confirmationCheckbox = form.querySelector("[data-confirm-submit-checkbox]");
-  const hasConfirmationGate = form.dataset.confirmSubmitToggle === "true" && confirmationCheckbox instanceof HTMLInputElement && confirmationCheckbox.type === "checkbox";
-  form.querySelectorAll(SUBMIT_SELECTOR).forEach((element) => {
+  const confirmationCheckbox = form2.querySelector("[data-confirm-submit-checkbox]");
+  const hasConfirmationGate = form2.dataset.confirmSubmitToggle === "true" && confirmationCheckbox instanceof HTMLInputElement && confirmationCheckbox.type === "checkbox";
+  form2.querySelectorAll(SUBMIT_SELECTOR).forEach((element) => {
     if (isButtonLike(element)) {
       if (submitting) {
         setButtonDisabled(element, true);
@@ -8971,7 +9904,7 @@ function initModalAjaxSubmit() {
   });
 }
 
-// PmTracker.Web/wwwroot/js/modules/theme.js
+// modules/theme.js
 var themeStorageKey = "pmtracker.theme.mode";
 var themeSwitchSelector = "[data-theme-switch]";
 var govThemeSwitchTag = "gov-theme-switch";
@@ -9035,13 +9968,11 @@ function syncThemeSwitches(effectiveTheme) {
   });
 }
 function syncThemeSwitchElement(element, effectiveTheme) {
-  // Synchronizace gov-theme-switch Web Component
   const govSwitch = element.querySelector(govThemeSwitchTag);
   if (govSwitch instanceof HTMLElement) {
     govSwitch.setAttribute("theme", effectiveTheme);
     return;
   }
-  // Fallback: původní custom input
   const input = element.querySelector("[data-theme-switch-input]");
   const label = element.querySelector("[data-theme-switch-label]");
   if (!(input instanceof HTMLInputElement) || !(label instanceof HTMLElement)) {
@@ -9116,11 +10047,9 @@ function initTheme() {
     if (element.dataset.themeSwitchBound === "true") {
       return;
     }
-    // Pokus o binding gov-theme-switch Web Component
     if (bindGovThemeSwitch(element)) {
       return;
     }
-    // Fallback: původní custom input
     const input = element.querySelector("[data-theme-switch-input]");
     if (input instanceof HTMLInputElement) {
       input.addEventListener("change", () => {
@@ -9131,7 +10060,7 @@ function initTheme() {
   });
 }
 
-// PmTracker.Web/wwwroot/js/modules/dashboard.js
+// modules/dashboard.js
 function resolvePanelShell(panelOrKey) {
   if (panelOrKey instanceof HTMLElement && panelOrKey.matches("[data-dashboard-panel]")) {
     return panelOrKey;
@@ -9199,59 +10128,79 @@ function handleDashboardClick(target) {
   return false;
 }
 
-// PmTracker.Web/wwwroot/js/modules/projectDashboard.js
+// modules/projectDashboard.js
 var projectDashboardTabStorageKeyPrefix = "pmtracker.projectDashboard.tab.";
 function resolveProjectDashboardShell() {
   const shell = document.querySelector("[data-project-dashboard-shell]");
   return shell instanceof HTMLElement ? shell : null;
 }
-function resolveProjectDashboardTabButtons(shell) {
+function resolveTabButtons(shell) {
   return Array.from(shell.querySelectorAll(".dashboard-tab[data-dashboard-tab]"));
 }
-function resolveProjectDashboardTabPanels(shell) {
+function resolveTabPanels(shell) {
   return Array.from(shell.querySelectorAll(".dashboard-tab-panel[data-dashboard-tab-panel]"));
 }
-function resolveProjectDashboardTabPanel(shell, tabKey) {
-  if (!tabKey) return null;
+function resolveTabPanel(shell, tabKey) {
+  if (!tabKey) {
+    return null;
+  }
   const panel = shell.querySelector(`.dashboard-tab-panel[data-dashboard-tab-panel="${CSS.escape(tabKey)}"]`);
   return panel instanceof HTMLElement ? panel : null;
 }
-function resolveActiveProjectDashboardTabKey(shell) {
+function resolveActiveTabKey(shell) {
   const projectId = (shell.dataset.projectId || "").trim();
-  if (!projectId) return null;
+  if (!projectId) {
+    return null;
+  }
   return localStorage.getItem(`${projectDashboardTabStorageKeyPrefix}${projectId}`) || null;
 }
-function persistActiveProjectDashboardTabKey(shell, tabKey) {
+function persistActiveTabKey(shell, tabKey) {
   const projectId = (shell.dataset.projectId || "").trim();
-  if (!projectId || !tabKey) return;
+  if (!projectId || !tabKey) {
+    return;
+  }
   localStorage.setItem(`${projectDashboardTabStorageKeyPrefix}${projectId}`, tabKey);
 }
 function setActiveProjectDashboardTab(shell, tabKey) {
-  resolveProjectDashboardTabButtons(shell).forEach((tab) => {
+  const tabs = resolveTabButtons(shell);
+  const panels = resolveTabPanels(shell);
+  tabs.forEach((tab) => {
     tab.classList.toggle("active", tab.getAttribute("data-dashboard-tab") === tabKey);
   });
-  resolveProjectDashboardTabPanels(shell).forEach((panel) => {
+  panels.forEach((panel) => {
     panel.classList.toggle("active", panel.getAttribute("data-dashboard-tab-panel") === tabKey);
   });
-  persistActiveProjectDashboardTabKey(shell, tabKey);
+  persistActiveTabKey(shell, tabKey);
 }
 async function ensureProjectDashboardTabPanelLoaded(shell, tabKey) {
-  const tabPanel = resolveProjectDashboardTabPanel(shell, tabKey);
-  if (!(tabPanel instanceof HTMLElement)) return false;
-  if (!tabPanel.hasAttribute("data-dashboard-panel")) return false;
-  if (tabPanel.dataset.dashboardPanelLoaded === "true") return true;
+  const tabPanel = resolveTabPanel(shell, tabKey);
+  if (!(tabPanel instanceof HTMLElement)) {
+    return false;
+  }
+  if (!tabPanel.hasAttribute("data-dashboard-panel")) {
+    return false;
+  }
+  if (tabPanel.dataset.dashboardPanelLoaded === "true") {
+    return true;
+  }
   const ok = await loadDashboardPanel(tabPanel);
-  if (ok) tabPanel.dataset.dashboardPanelLoaded = "true";
+  if (ok) {
+    tabPanel.dataset.dashboardPanelLoaded = "true";
+  }
   return ok;
 }
-function applyProjectDashboardCategoryFilter(shell, category) {
+function applyCategoryFilter(shell, category) {
   shell.querySelectorAll("[data-dashboard-category-filter]").forEach((btn) => {
-    if (!(btn instanceof HTMLElement)) return;
+    if (!(btn instanceof HTMLElement)) {
+      return;
+    }
     const btnCategory = btn.getAttribute("data-dashboard-category-filter") ?? "";
     btn.classList.toggle("active", btnCategory === category);
   });
   shell.querySelectorAll("[data-dashboard-expandable-row]").forEach((row) => {
-    if (!(row instanceof HTMLElement)) return;
+    if (!(row instanceof HTMLElement)) {
+      return;
+    }
     const rowCategory = row.dataset.category || "";
     const visible = !category || rowCategory === category;
     row.hidden = !visible;
@@ -9265,29 +10214,43 @@ function applyProjectDashboardCategoryFilter(shell, category) {
     }
   });
 }
-function toggleProjectDashboardExpandableRow(row) {
-  if (!(row instanceof HTMLElement)) return;
+function toggleExpandableRow(row) {
+  if (!(row instanceof HTMLElement)) {
+    return;
+  }
   const recordId = row.dataset.recordId || "";
-  if (!recordId) return;
+  if (!recordId) {
+    return;
+  }
   const shell = row.closest("[data-project-dashboard-shell]");
-  if (!(shell instanceof HTMLElement)) return;
+  if (!(shell instanceof HTMLElement)) {
+    return;
+  }
   const detail = shell.querySelector(`[data-dashboard-expandable-detail="${CSS.escape(recordId)}"]`);
-  if (!(detail instanceof HTMLElement)) return;
+  if (!(detail instanceof HTMLElement)) {
+    return;
+  }
   const isExpanded = !detail.hidden;
   detail.hidden = isExpanded;
   row.classList.toggle("expanded", !isExpanded);
 }
-async function reloadProjectDashboardStatisticsPanel(shell, year) {
+async function reloadStatisticsPanel(shell, year) {
   const panel = shell.querySelector('[data-dashboard-tab-panel="statistiky"]');
-  if (!(panel instanceof HTMLElement)) return;
+  if (!(panel instanceof HTMLElement)) {
+    return;
+  }
   const baseUrl = (panel.dataset.dashboardPanelUrl || "").trim();
-  if (!baseUrl) return;
+  if (!baseUrl) {
+    return;
+  }
   const url = new URL(baseUrl, window.location.origin);
   url.searchParams.set("year", String(year));
   const content = panel.querySelector("[data-dashboard-panel-content]");
   const placeholder = panel.querySelector("[data-dashboard-panel-placeholder]");
   const errorContainer = resolveOrCreateErrorContainer(panel, "data-dashboard-panel-error");
-  if (!(content instanceof HTMLElement)) return;
+  if (!(content instanceof HTMLElement)) {
+    return;
+  }
   setLazyLoadingState(panel, placeholder, errorContainer, true);
   try {
     content.innerHTML = await fetchHtmlFragment(url.href);
@@ -9302,61 +10265,79 @@ async function reloadProjectDashboardStatisticsPanel(shell, year) {
 }
 function initProjectDashboardShell() {
   const shell = resolveProjectDashboardShell();
-  if (!(shell instanceof HTMLElement) || shell.dataset.projectDashboardReady === "true") return;
+  if (!(shell instanceof HTMLElement) || shell.dataset.projectDashboardReady === "true") {
+    return;
+  }
   shell.dataset.projectDashboardReady = "true";
-  const tabs = resolveProjectDashboardTabButtons(shell);
-  if (tabs.length === 0) return;
+  const tabs = resolveTabButtons(shell);
+  if (tabs.length === 0) {
+    return;
+  }
   const firstTabKey = tabs[0].getAttribute("data-dashboard-tab") || "";
-  const persistedTabKey = resolveActiveProjectDashboardTabKey(shell);
+  const persistedTabKey = resolveActiveTabKey(shell);
   const availableKeys = new Set(tabs.map((t) => t.getAttribute("data-dashboard-tab")));
   const tabToActivate = persistedTabKey && availableKeys.has(persistedTabKey) ? persistedTabKey : firstTabKey;
   setActiveProjectDashboardTab(shell, tabToActivate);
-  void ensureProjectDashboardTabPanelLoaded(shell, tabToActivate);
+  ensureProjectDashboardTabPanelLoaded(shell, tabToActivate);
   tabs.forEach((tab) => {
-    if (!(tab instanceof HTMLElement) || tab.dataset.projectDashboardTabReady === "true") return;
+    if (!(tab instanceof HTMLElement) || tab.dataset.projectDashboardTabReady === "true") {
+      return;
+    }
     tab.dataset.projectDashboardTabReady = "true";
     tab.addEventListener("click", () => {
       const key = tab.getAttribute("data-dashboard-tab") || "";
-      if (!key) return;
+      if (!key) {
+        return;
+      }
       setActiveProjectDashboardTab(shell, key);
-      void ensureProjectDashboardTabPanelLoaded(shell, key);
+      ensureProjectDashboardTabPanelLoaded(shell, key);
     });
   });
 }
 function handleProjectDashboardClick(target) {
-  if (!(target instanceof Element)) return false;
+  if (!(target instanceof Element)) {
+    return false;
+  }
   const shell = target.closest("[data-project-dashboard-shell]");
-  if (!(shell instanceof HTMLElement)) return false;
+  if (!(shell instanceof HTMLElement)) {
+    return false;
+  }
   const categoryFilterBtn = target.closest("[data-dashboard-category-filter]");
   if (categoryFilterBtn instanceof HTMLElement) {
     const category = categoryFilterBtn.getAttribute("data-dashboard-category-filter") ?? "";
-    applyProjectDashboardCategoryFilter(shell, category);
+    applyCategoryFilter(shell, category);
     return true;
   }
   const expandableRow = target.closest("[data-dashboard-expandable-row]");
   if (expandableRow instanceof HTMLElement) {
-    if (target.closest("a, button")) return false;
-    toggleProjectDashboardExpandableRow(expandableRow);
+    if (target.closest("a, button")) {
+      return false;
+    }
+    toggleExpandableRow(expandableRow);
     return true;
   }
   return false;
 }
 function handleProjectDashboardChange(target) {
-  if (!(target instanceof Element)) return false;
+  if (!(target instanceof Element)) {
+    return false;
+  }
   const shell = target.closest("[data-project-dashboard-shell]");
-  if (!(shell instanceof HTMLElement)) return false;
+  if (!(shell instanceof HTMLElement)) {
+    return false;
+  }
   const yearSelect = target.closest("[data-dashboard-year-select]");
   if (yearSelect instanceof HTMLSelectElement) {
     const year = parseInt(yearSelect.value, 10);
     if (year > 0) {
-      void reloadProjectDashboardStatisticsPanel(shell, year);
+      reloadStatisticsPanel(shell, year);
     }
     return true;
   }
   return false;
 }
 
-// PmTracker.Web/wwwroot/js/modules/bootstrap.js
+// modules/bootstrap.js
 var projectIndexFilterOptions = {
   hideDoneStorageKey: "pmtracker.projects.hideDone",
   hideDeletedStorageKey: "pmtracker.projects.hideDeleted"
@@ -9382,7 +10363,8 @@ function handleProjectFilterInputChange2(scope) {
 }
 configureNavigationRuntime({
   initRecordFormEnhancements,
-  prepareRecordEditorFormNavigation
+  prepareRecordEditorFormNavigation,
+  refreshProjectIndexFilters: () => applyProjectIndexFilters(document, projectIndexFilterOptions)
 });
 configureModalRuntime({
   closeAllFloatingPanels,
@@ -9410,16 +10392,6 @@ function handleDocumentClick(event) {
     }
     return;
   }
-  const resetRecordEditorPreference = target.closest("[data-record-editor-preference-reset]");
-  if (isButtonLike(resetRecordEditorPreference)) {
-    event.preventDefault();
-    clearStoredRecordEditorPreference();
-    const status = document.querySelector("[data-record-editor-preference-status]");
-    if (status instanceof HTMLElement) {
-      status.textContent = "Uložená výchozí volba byla odstraněna.";
-    }
-    return;
-  }
   const reindexTrigger = target.closest("[data-search-reindex-trigger]");
   if (isButtonLike(reindexTrigger)) {
     event.preventDefault();
@@ -9436,13 +10408,13 @@ function handleDocumentClick(event) {
   if (isButtonLike(commentEditToggle)) {
     event.preventDefault();
     const comment = commentEditToggle.closest("[data-comment-item]");
-    const form = comment?.querySelector("[data-comment-edit-form]");
-    if (form instanceof HTMLFormElement) {
-      form.hidden = false;
+    const form2 = comment?.querySelector("[data-comment-edit-form]");
+    if (form2 instanceof HTMLFormElement) {
+      form2.hidden = false;
       if (comment instanceof HTMLElement) {
         comment.dataset.editing = "true";
       }
-      form.querySelector("textarea")?.focus();
+      form2.querySelector("textarea")?.focus();
     }
     return;
   }
@@ -9450,9 +10422,9 @@ function handleDocumentClick(event) {
   if (isButtonLike(commentEditCancel)) {
     event.preventDefault();
     const comment = commentEditCancel.closest("[data-comment-item]");
-    const form = comment?.querySelector("[data-comment-edit-form]");
-    if (form instanceof HTMLFormElement) {
-      form.hidden = true;
+    const form2 = comment?.querySelector("[data-comment-edit-form]");
+    if (form2 instanceof HTMLFormElement) {
+      form2.hidden = true;
       if (comment instanceof HTMLElement) {
         comment.removeAttribute("data-editing");
       }
@@ -9506,19 +10478,10 @@ function handleDocumentClick(event) {
   if (printState.popover instanceof HTMLElement && !target.closest("[data-print-popover]") && !target.closest("[data-print-trigger]")) {
     closePrintChooser({ restoreFocus: false });
   }
-  if (recordEditorState2.chooser instanceof HTMLElement && !target.closest("[data-record-editor-popover]") && !target.closest("[data-record-editor-url]")) {
-    closeRecordEditorChooser({ restoreFocus: false });
-  }
   const recordEditorCancel = target.closest("[data-record-editor-cancel]");
   if (recordEditorCancel) {
     event.preventDefault();
     requestRecordEditorPageCancel(recordEditorCancel instanceof HTMLElement ? recordEditorCancel : null);
-    return;
-  }
-  const recordEditorTrigger = target.closest("[data-record-editor-url]");
-  if (recordEditorTrigger) {
-    event.preventDefault();
-    openRecordEditor(recordEditorTrigger instanceof HTMLElement ? recordEditorTrigger : null);
     return;
   }
   const openUrl = target.closest("[data-modal-url]");
@@ -9529,14 +10492,12 @@ function handleDocumentClick(event) {
   }
   if (target.matches("[data-modal-close]") || target.closest("[data-modal-close]")) {
     event.preventDefault();
-    const closeTarget = target.closest("[data-modal-close]");
-    requestRecordEditorModalClose(closeTarget instanceof HTMLElement ? closeTarget : null);
+    closeModal();
     return;
   }
-  // Fáze 2E: backdrop click — target je gov-dialog přímo (ne vnitřní element).
   if (target instanceof HTMLElement && target.tagName === "GOV-DIALOG" && target.hasAttribute("data-modal-container")) {
     event.preventDefault();
-    requestRecordEditorModalClose(target);
+    closeModal();
     return;
   }
   const filterToggle = target.closest("[data-filter-toggle]");
@@ -9625,52 +10586,63 @@ async function handleSearchReindexClick(trigger) {
   const status = card.querySelector("[data-search-reindex-status]");
   const token = card.querySelector('input[name="__RequestVerificationToken"]');
   if (!(token instanceof HTMLInputElement)) {
-    if (status) status.textContent = "Chybí anti-forgery token.";
+    if (status)
+      status.textContent = "Chybí anti-forgery token.";
     return;
   }
-  if (status) status.textContent = "Reindexuji…";
+  if (status)
+    status.textContent = "Reindexuji…";
   trigger.setAttribute("disabled", "disabled");
   try {
     const response = await fetch(reindexUrl, {
       method: "POST",
-      headers: { "RequestVerificationToken": token.value, "Accept": "application/json" },
+      headers: { RequestVerificationToken: token.value, Accept: "application/json" },
       credentials: "same-origin"
     });
     if (!response.ok) {
       const text = await response.text();
-      if (status) status.textContent = `Reindex selhal: HTTP ${response.status} ${text.slice(0, 120)}`;
+      if (status)
+        status.textContent = `Reindex selhal: HTTP ${response.status} ${text.slice(0, 120)}`;
       return;
     }
     const payload = await response.json().catch(() => ({}));
-    if (status) status.textContent = `Reindex dokončen. Indexováno dokumentů: ${payload.indexed ?? "?"}`;
+    if (status)
+      status.textContent = `Reindex dokončen. Indexováno dokumentů: ${payload.indexed ?? "?"}`;
     loadSearchAdminStatus(card).catch(() => {});
   } catch (err) {
-    if (status) status.textContent = `Reindex selhal: ${err && err.message ? err.message : err}`;
+    if (status)
+      status.textContent = `Reindex selhal: ${err && err.message ? err.message : err}`;
   } finally {
     trigger.removeAttribute("disabled");
   }
 }
 async function loadSearchAdminStatus(card) {
   const statusUrl = card.dataset.statusUrl;
-  if (!statusUrl) return;
+  if (!statusUrl)
+    return;
   try {
     const response = await fetch(statusUrl, {
       method: "GET",
-      headers: { "Accept": "application/json" },
+      headers: { Accept: "application/json" },
       credentials: "same-origin"
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      return;
+    }
     const data = await response.json();
     const provider = card.querySelector("[data-search-provider]");
     const enabled = card.querySelector("[data-search-enabled]");
     const fts = card.querySelector("[data-search-fts]");
     const count = card.querySelector("[data-search-count]");
-    if (provider) provider.textContent = data.provider ?? "–";
-    if (enabled) enabled.textContent = data.enabled ? "ano" : "ne";
-    if (fts) fts.textContent = data.isSearchable ? "připraven" : "NENÍ nakonfigurovaný";
-    if (count) count.textContent = typeof data.documentCount === "number" ? data.documentCount.toLocaleString("cs-CZ") : "–";
-  } catch {
-  }
+    if (provider)
+      provider.textContent = data.provider ?? "–";
+    if (enabled)
+      enabled.textContent = data.enabled ? "ano" : "ne";
+    if (fts)
+      fts.textContent = data.isSearchable ? "připraven" : "NENÍ nakonfigurovaný";
+    if (count)
+      count.textContent = typeof data.documentCount === "number" ? data.documentCount.toLocaleString("cs-CZ") : "–";
+  } catch {}
 }
 function initSearchAdminCard() {
   document.querySelectorAll("[data-search-admin-card]").forEach((card) => {
@@ -9712,7 +10684,7 @@ function maybeGuardOutboundNavigation(target, event) {
   return true;
 }
 function handleDocumentOverlayKeydown(event) {
-  if (event.key === "Escape" && recordEditorState2.closeGuard instanceof HTMLElement) {
+  if (event.key === "Escape" && recordEditorState.closeGuard instanceof HTMLElement) {
     event.preventDefault();
     closeRecordEditorCloseGuard({ restoreFocus: true });
     return;
@@ -9722,21 +10694,31 @@ function handleDocumentOverlayKeydown(event) {
     closePrintChooser({ restoreFocus: true });
     return;
   }
-  if (event.key === "Escape" && recordEditorState2.chooser instanceof HTMLElement && !isModalOpen()) {
-    event.preventDefault();
-    closeRecordEditorChooser({ restoreFocus: true });
-    return;
-  }
   if (!isModalOpen()) {
     return;
   }
   if (event.key === "Escape") {
     event.preventDefault();
-    requestRecordEditorModalClose(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    closeModal();
     return;
   }
   if (event.key === "Tab") {
     trapFocusInModal(event);
+  }
+}
+function isGovFormSwitchEl(el) {
+  return el instanceof HTMLElement && typeof el.tagName === "string" && el.tagName.toLowerCase() === "gov-form-switch";
+}
+function syncProjectPouzivatIdentJednaniHidden(target) {
+  const sw = target.closest("gov-form-switch[data-project-pouzivat-ident-jednani]");
+  if (!isGovFormSwitchEl(sw))
+    return;
+  const wrap = sw.closest(".project-form-switch-wrap");
+  if (!(wrap instanceof HTMLElement))
+    return;
+  const hidden = wrap.querySelector("[data-project-pouzivat-ident-jednani-state]");
+  if (hidden instanceof HTMLInputElement) {
+    hidden.value = sw.checked ? "true" : "false";
   }
 }
 function handleDocumentChange(event) {
@@ -9744,20 +10726,21 @@ function handleDocumentChange(event) {
   if (!(target instanceof Element)) {
     return;
   }
+  syncProjectPouzivatIdentJednaniHidden(target);
   const filterInput = target.closest("[data-filter-key]");
-  if (filterInput instanceof HTMLInputElement || filterInput instanceof HTMLSelectElement) {
+  if (filterInput instanceof HTMLInputElement || filterInput instanceof HTMLSelectElement || isGovFormSwitchEl(filterInput)) {
     persistFilterState(filterInput);
   }
   const scheduleFilterInput = target.closest("[data-schedule-filter-key]");
-  if (scheduleFilterInput instanceof HTMLInputElement || scheduleFilterInput instanceof HTMLSelectElement) {
+  if (scheduleFilterInput instanceof HTMLInputElement || scheduleFilterInput instanceof HTMLSelectElement || isGovFormSwitchEl(scheduleFilterInput)) {
     persistScheduleFilterState(scheduleFilterInput);
   }
   const categorySelect = target.closest("[data-kategorie-select]");
   if (categorySelect instanceof HTMLSelectElement) {
     updateTaskTypeVisibility(categorySelect);
-    const form = categorySelect.closest("form");
-    if (form instanceof HTMLFormElement) {
-      initRecordSchedulePlanner(form);
+    const form2 = categorySelect.closest("form");
+    if (form2 instanceof HTMLFormElement) {
+      initRecordSchedulePlanner(form2);
     }
   }
   if (handleProjectDashboardChange(target)) {
@@ -9805,32 +10788,12 @@ function handleProjectHistoryKeydown(event) {
     toggleProjectHistory(projectHistoryToggle);
   }
 }
-function handleWindowBeforeUnload(_event) {
-  // Nativní browser dialog odstraněn — user 2026-04-19 noc: "vyskočí windows
-  // edge dialogové okno, problikne i dialog aplikace, je to chybné chování".
-  // App-level prompt (promptRecordEditorDiscard) řeší in-app navigace.
-}
+function handleWindowBeforeUnload(_event) {}
 function handleGovCloseEvent(event) {
-  // gov-dialog emituje gov-close při kliknutí na vestavěný X button.
-  // block-close="true" + block-backdrop-close="true" na dialogu zabraňují
-  // self-close; event je čistě "žádost o zavření" kterou musí schválit
-  // náš flow (dirty-check nebo přímé zavření).
   const dialog = event.target;
   if (!(dialog instanceof HTMLElement) || dialog.tagName !== "GOV-DIALOG") {
     return;
   }
-  // Record-editor má vlastní dirty-check flow — gov-close je žádost
-  // o zavření, kterou musí schválit promptRecordEditorDiscard.
-  if (dialog.matches('[data-modal-variant="record-editor"]') ||
-    document.querySelector("[data-record-editor-form][data-dirty='true']")) {
-    event.preventDefault();
-    event.stopPropagation();
-    void requestRecordEditorModalClose(dialog);
-    return;
-  }
-  // Fallback pro všechny non-record-editor modaly (Přidat ručně, AD search,
-  // Přidat projektovou roli, atd.) — gov-close je fire-and-close,
-  // žádný dirty-check není potřeba.
   event.preventDefault();
   closeModal();
 }
@@ -9839,9 +10802,9 @@ var rerenderRainbowLabelsOnResize = debounce(() => {
 }, 120);
 var rerenderTimelineAxesOnResize = debounce(() => {
   renderStaticTimelineAxes(document.querySelector(".tab-panel.active"));
-  document.querySelectorAll('form[data-record-schedule-form="true"]').forEach((form) => {
-    if (form instanceof HTMLFormElement) {
-      queueRecordSchedulePlannerRecalc(form, 0);
+  document.querySelectorAll('form[data-record-schedule-form="true"]').forEach((form2) => {
+    if (form2 instanceof HTMLFormElement) {
+      queueRecordSchedulePlannerRecalc(form2, 0);
     }
   });
 }, 140);
@@ -9871,6 +10834,7 @@ function bootstrapPmTrackerApp() {
     { type: "click", handler: handleDocumentClick },
     { type: "keydown", handler: handleDocumentOverlayKeydown },
     { type: "change", handler: handleDocumentChange },
+    { type: "gov-change", handler: handleDocumentChange },
     { type: "input", handler: handleDocumentInput },
     { type: "keydown", handler: handleDocumentCardKeydown },
     { type: "keydown", handler: handleProjectHistoryKeydown },
@@ -9890,11 +10854,9 @@ function bootstrapPmTrackerApp() {
     () => initProjectScheduleUi(),
     () => initProjectRecordPageshowSync(),
     () => initCommentSortUi(document),
-    () => restoreRecordEditorReturnStateFromUrl(),
     () => initTheme(),
     () => initUserMenu(),
     () => initPrintFormatChooser(),
-    () => refreshRecordEditorPreferenceUi(),
     () => initPageSwitchers(),
     () => initRecordFormEnhancements(document),
     () => initPermissionMetadataBindings(document),
@@ -9905,1358 +10867,13 @@ function bootstrapPmTrackerApp() {
     () => initProjectDashboardShell(),
     () => initSessionCoordinator(),
     () => initModalAjaxSubmit(),
-    () => initSearchAdminCard()
+    () => initSearchAdminCard(),
+    () => window.pmExterniOdkazSync?.init?.(),
+    () => window.pmChatModal?.init?.(),
+    () => window.pmManualKroky?.init?.(),
+    () => window.pmScheduleFeatureC?.init?.()
   ]);
 }
 
-// PmTracker.Web/wwwroot/js/site.js
+// site.js
 bootstrapPmTrackerApp();
-
-// ==========================================================================
-// PmTracker.Web/wwwroot/js/modules/vyzvy/panelController.js
-// ==========================================================================
-(function (global) {
-  'use strict';
-
-  function getAntiForgeryToken() {
-    const el = document.querySelector('input[name="__RequestVerificationToken"]');
-    return el ? el.value : '';
-  }
-
-  async function postForm(url, data) {
-    const form = new FormData();
-    form.append('__RequestVerificationToken', getAntiForgeryToken());
-    for (const [k, v] of Object.entries(data)) {
-      if (v !== null && v !== undefined) form.append(k, String(v));
-    }
-    const resp = await fetch(url, { method: 'POST', body: form, credentials: 'same-origin' });
-    if (!resp.ok) {
-      return { success: false, errorCode: 'HttpError', message: 'HTTP ' + resp.status };
-    }
-    try { return await resp.json(); } catch (_) { return { success: true }; }
-  }
-
-  async function reloadPanel(panelElement) {
-    const projectId = panelElement.dataset.projectId;
-    const url = '/projekty/' + encodeURIComponent(projectId) + '/dashboard/vyzvy-panel';
-    const resp = await fetch(url, { credentials: 'same-origin' });
-    if (!resp.ok) { showToast('Načtení panelu selhalo.', true); return; }
-    const html = await resp.text();
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    const newEl = tmp.querySelector('[data-vyzvy-panel]');
-    if (newEl && panelElement.parentNode) {
-      panelElement.parentNode.replaceChild(newEl, panelElement);
-      if (global.pmVyzvy && global.pmVyzvy.bootstrap) global.pmVyzvy.bootstrap(newEl);
-    }
-  }
-
-  function showToast(message, isError) {
-    if (global.pmToast && typeof global.pmToast.show === 'function') {
-      global.pmToast.show(message, { type: isError ? 'error' : 'info' });
-    } else {
-      // Fallback
-      if (isError) { console.error(message); alert(message); }
-      else { console.info(message); }
-    }
-  }
-
-  async function handleZalozit(button, panelElement) {
-    const projektId = button.dataset.projektId;
-    button.disabled = true;
-    try {
-      const result = await postForm('/vyzvy/zalozit', { ProjektId: projektId });
-      if (result.success) {
-        showToast('Výzva založena.');
-        await reloadPanel(panelElement);
-      } else {
-        showToast(result.message || 'Založení výzvy selhalo.', true);
-      }
-    } finally {
-      button.disabled = false;
-    }
-  }
-
-  async function handleZmenitStav(button, panelElement) {
-    const vyzvaId = button.dataset.vyzvaId;
-    const novyStav = button.dataset.novyStav;
-    const result = await postForm('/vyzvy/zmenit-stav', { VyzvaId: vyzvaId, NovyStav: novyStav });
-    if (result.success) {
-      showToast('Stav výzvy změněn na ' + novyStav + '.');
-      await reloadPanel(panelElement);
-    } else {
-      showToast(result.message || 'Změna stavu selhala.', true);
-    }
-  }
-
-  function handleToggleCollapse(headerElement) {
-    const card = headerElement.closest('[data-vyzvy-vyzva]');
-    if (!card) return;
-    card.classList.toggle('open');
-    const btn = card.querySelector('.vyzvy-card-toggle-btn');
-    if (btn) {
-      const open = card.classList.contains('open');
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      const icon = btn.querySelector('.vyzvy-card-toggle-icon');
-      if (icon) icon.textContent = open ? '▼' : '▶';
-    }
-  }
-
-  function handleStavMenuToggle(toggleBtn) {
-    const menu = toggleBtn.closest('[data-vyzvy-stav-menu]');
-    if (menu) menu.classList.toggle('open');
-  }
-
-  function bindPanel(panelElement) {
-    panelElement.addEventListener('click', async function (e) {
-      const stavToggle = e.target.closest('[data-vyzvy-stav-toggle]');
-      if (stavToggle) {
-        e.preventDefault();
-        handleStavMenuToggle(stavToggle);
-        return;
-      }
-      const actionBtn = e.target.closest('[data-vyzvy-action]');
-      if (actionBtn) {
-        const action = actionBtn.dataset.vyzvyAction;
-        if (action === 'zalozit') { await handleZalozit(actionBtn, panelElement); return; }
-        if (action === 'zmenit-stav') { await handleZmenitStav(actionBtn, panelElement); return; }
-        if (action === 'otevrit-reassign') {
-          if (global.pmVyzvy && global.pmVyzvy.openReassignModal) {
-            global.pmVyzvy.openReassignModal(panelElement.dataset.projectId, function () { reloadPanel(panelElement); });
-          }
-          return;
-        }
-      }
-      const toggleHeader = e.target.closest('[data-vyzvy-toggle]');
-      if (toggleHeader && !e.target.closest('[data-vyzvy-action], [data-vyzvy-stav-toggle], .vyzvy-stav-menu-list')) {
-        handleToggleCollapse(toggleHeader);
-      }
-    });
-  }
-
-  global.pmVyzvy = global.pmVyzvy || {};
-  global.pmVyzvy.bindPanel = bindPanel;
-  global.pmVyzvy.reloadPanel = reloadPanel;
-  global.pmVyzvy.postForm = postForm;
-  global.pmVyzvy.showToast = showToast;
-})(window);
-
-// ==========================================================================
-// PmTracker.Web/wwwroot/js/modules/vyzvy/switchController.js
-// ==========================================================================
-(function (global) {
-  'use strict';
-
-  async function handleSwitch(checkbox) {
-    const externiOdkazId = checkbox.dataset.externiOdkazId;
-    if (!externiOdkazId) return;
-
-    const wrap = checkbox.closest('[data-external-vyzvy-switch-wrap]');
-    const statusEl = wrap ? wrap.querySelector('[data-vyzvy-switch-status]') : null;
-    const hiddenState = wrap ? wrap.querySelector('[data-external-vyzvy-switch-state]') : null;
-    const zaradit = checkbox.checked;
-
-    checkbox.disabled = true;
-    try {
-      const result = await global.pmVyzvy.postForm('/vyzvy/set-zaradid', {
-        ExterniOdkazId: externiOdkazId,
-        Zaradit: zaradit,
-      });
-      if (result.success) {
-        if (hiddenState) hiddenState.value = zaradit ? 'true' : 'false';
-        if (statusEl) {
-          statusEl.textContent = zaradit ? 'Čeká se (buffer projektu)' : '';
-        }
-      } else {
-        checkbox.checked = !zaradit;
-        global.pmVyzvy.showToast(result.message || 'Operace selhala.', true);
-      }
-    } finally {
-      checkbox.disabled = false;
-    }
-  }
-
-  function bindSwitches(root) {
-    const scope = root || document;
-    scope.querySelectorAll('[data-vyzvy-switch]').forEach(function (cb) {
-      if (cb.dataset.vyzvyBound === 'true') return;
-      cb.dataset.vyzvyBound = 'true';
-      cb.addEventListener('change', function () { handleSwitch(cb); });
-    });
-  }
-
-  global.pmVyzvy = global.pmVyzvy || {};
-  global.pmVyzvy.bindSwitches = bindSwitches;
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { bindSwitches(); });
-  } else {
-    bindSwitches();
-  }
-  document.addEventListener('pm:record-editor-loaded', function (e) { bindSwitches(e.target || document); });
-})(window);
-
-// ==========================================================================
-// PmTracker.Web/wwwroot/js/modules/vyzvy/reassignModal.js
-// ==========================================================================
-(function (global) {
-  'use strict';
-
-  let modalElement = null;
-  let onCloseCallback = null;
-
-  function ensureModalContainer() {
-    let el = document.getElementById('pm-vyzvy-reassign-modal');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'pm-vyzvy-reassign-modal';
-      el.className = 'pm-modal';
-      el.hidden = true;
-      document.body.appendChild(el);
-    }
-    modalElement = el;
-    return el;
-  }
-
-  async function loadModal(projektId) {
-    const el = ensureModalContainer();
-    const resp = await fetch('/vyzvy/reassign-modal?projektId=' + encodeURIComponent(projektId), {
-      credentials: 'same-origin',
-    });
-    if (!resp.ok) {
-      global.pmVyzvy.showToast('Nepodařilo se načíst modal.', true);
-      return;
-    }
-    const html = await resp.text();
-    el.innerHTML = html;
-    el.hidden = false;
-    bindDnd(el);
-    bindClose(el);
-  }
-
-  function bindClose(el) {
-    el.querySelectorAll('[data-vyzvy-reassign-close]').forEach(function (btn) {
-      btn.addEventListener('click', function () { close(); });
-    });
-    el.addEventListener('click', function (e) { if (e.target === el) close(); });
-  }
-
-  function close() {
-    if (modalElement) {
-      modalElement.hidden = true;
-      modalElement.innerHTML = '';
-    }
-    if (onCloseCallback) {
-      try { onCloseCallback(); } catch (_) {}
-    }
-    onCloseCallback = null;
-  }
-
-  function bindDnd(rootEl) {
-    const items = rootEl.querySelectorAll('[data-vyzvy-reassign-item]');
-    const targets = rootEl.querySelectorAll('[data-vyzvy-reassign-target]');
-
-    items.forEach(function (item) {
-      item.addEventListener('dragstart', function (e) {
-        item.classList.add('dragging');
-        e.dataTransfer.setData('text/plain', item.dataset.externiOdkazId);
-        e.dataTransfer.effectAllowed = 'move';
-      });
-      item.addEventListener('dragend', function () { item.classList.remove('dragging'); });
-    });
-
-    targets.forEach(function (target) {
-      target.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        target.classList.add('drag-over');
-      });
-      target.addEventListener('dragleave', function () { target.classList.remove('drag-over'); });
-      target.addEventListener('drop', async function (e) {
-        e.preventDefault();
-        target.classList.remove('drag-over');
-        const externiOdkazId = e.dataTransfer.getData('text/plain');
-        const cilovaVyzvaId = target.dataset.cilovaVyzvaId || '';
-        const columnsEl = rootEl.querySelector('[data-vyzvy-reassign-columns]');
-        const projektId = columnsEl ? columnsEl.dataset.projektId : '';
-
-        const result = await global.pmVyzvy.postForm('/vyzvy/prerdit', {
-          ExterniOdkazId: externiOdkazId,
-          CilovaVyzvaId: cilovaVyzvaId,
-        });
-        if (result.success) {
-          await loadModal(projektId);
-        } else {
-          global.pmVyzvy.showToast(result.message || 'Přeřazení selhalo.', true);
-        }
-      });
-    });
-  }
-
-  async function openReassignModal(projektId, onClose) {
-    onCloseCallback = onClose || null;
-    await loadModal(projektId);
-  }
-
-  global.pmVyzvy = global.pmVyzvy || {};
-  global.pmVyzvy.openReassignModal = openReassignModal;
-})(window);
-
-// ==========================================================================
-// PmTracker.Web/wwwroot/js/modules/vyzvy/index.js
-// ==========================================================================
-(function (global) {
-  'use strict';
-
-  function bootstrap(panelElement) {
-    if (!panelElement) return;
-    if (panelElement.dataset.vyzvyBootstrapped === 'true') return;
-    panelElement.dataset.vyzvyBootstrapped = 'true';
-    if (global.pmVyzvy && global.pmVyzvy.bindPanel) {
-      global.pmVyzvy.bindPanel(panelElement);
-    }
-  }
-
-  function initOnDomReady() {
-    document.querySelectorAll('[data-vyzvy-panel]').forEach(bootstrap);
-  }
-
-  global.pmVyzvy = global.pmVyzvy || {};
-  global.pmVyzvy.bootstrap = bootstrap;
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initOnDomReady);
-  } else {
-    initOnDomReady();
-  }
-
-  document.addEventListener('pm:panel-loaded', function (e) {
-    const root = e.target;
-    if (!root) return;
-    if (root.matches && root.matches('[data-vyzvy-panel]')) { bootstrap(root); return; }
-    if (root.querySelectorAll) {
-      root.querySelectorAll('[data-vyzvy-panel]').forEach(bootstrap);
-    }
-  });
-})(window);
-
-// =============================================================================
-// PmTracker.Web/wwwroot/js/modules/externiOdkaz/sync.js
-// =============================================================================
-(function (global) {
-  'use strict';
-
-  const DEBOUNCE_MS = 400;
-  const timers = new WeakMap();
-
-  function getCsrfToken() {
-    const input = document.querySelector('input[name="__RequestVerificationToken"]');
-    return input ? input.value : '';
-  }
-
-  function getProjektId(row) {
-    const form = row.closest('[data-record-editor-project-id]');
-    if (!form) return '';
-    return form.getAttribute('data-record-editor-project-id') || '';
-  }
-
-  async function syncCislo(inputEl) {
-    const row = inputEl.closest('[data-external-row]');
-    if (!row) return;
-    const cislo = (inputEl.value || '').trim();
-    if (!/^\d{6}$/.test(cislo)) {
-      setTypDisplay(row, null);
-      setChatEnabled(row, false);
-      row.removeAttribute('data-not-found');
-      return;
-    }
-
-    const projektId = getProjektId(row);
-    if (!projektId) {
-      console.warn('ExterniOdkaz.Sync: chybí projektId na form wrapperu.');
-      return;
-    }
-
-    const form = new FormData();
-    form.append('cislo', cislo);
-    form.append('projektId', projektId);
-    form.append('__RequestVerificationToken', getCsrfToken());
-
-    try {
-      const resp = await fetch('/ExterniOdkaz/Sync', {
-        method: 'POST',
-        body: form,
-        credentials: 'same-origin',
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const data = await resp.json();
-      if (data.nalezeno) {
-        setTypDisplay(row, data.typ);
-        setTypHidden(row, data.typ);
-        setChatEnabled(row, true);
-        row.removeAttribute('data-not-found');
-      } else {
-        setTypDisplay(row, null);
-        setTypHidden(row, '');
-        setChatEnabled(row, false);
-        row.setAttribute('data-not-found', 'true');
-      }
-    } catch (err) {
-      console.warn('ExterniOdkaz.Sync selhal:', err);
-      row.setAttribute('data-not-found', 'true');
-    }
-  }
-
-  function setTypDisplay(row, typ) {
-    const span = row.querySelector('[data-external-type-display]');
-    if (span) span.textContent = typ || '—';
-  }
-
-  function setTypHidden(row, typ) {
-    const hidden = row.querySelector('[data-external-type-hidden]');
-    if (hidden) hidden.value = typ || '';
-  }
-
-  function setChatEnabled(row, enabled) {
-    const btn = row.querySelector('[data-external-chat-open]');
-    if (!btn) return;
-    if (enabled) {
-      btn.removeAttribute('disabled');
-    } else {
-      btn.setAttribute('disabled', 'disabled');
-    }
-  }
-
-  function onInput(event) {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement)) return;
-    if (!target.hasAttribute('data-external-cislo')) return;
-
-    const existing = timers.get(target);
-    if (existing) clearTimeout(existing);
-    const timer = setTimeout(() => syncCislo(target), DEBOUNCE_MS);
-    timers.set(target, timer);
-  }
-
-  function init() {
-    document.addEventListener('input', onInput);
-  }
-
-  global.pmExterniOdkazSync = { init };
-})(window);
-
-// =============================================================================
-// PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModal.js (Plán C Task 15 + A-5 refresh)
-// =============================================================================
-(function (global) {
-  'use strict';
-
-  let dialogEl = null;
-  let currentCtx = null;
-
-  function ensureDialog() {
-    if (dialogEl) return dialogEl;
-    dialogEl = document.createElement('gov-dialog');
-    dialogEl.setAttribute('size', 'l');
-    dialogEl.innerHTML = `
-      <div slot="label">Vyjádření a termíny</div>
-      <div class="pm-chat-modal__content" data-chat-modal-content></div>
-      <div slot="footer" style="display:flex; justify-content:flex-end">
-        <pm-button variant="Primary" data-chat-modal-close>Zavřít</pm-button>
-      </div>
-    `;
-    document.body.appendChild(dialogEl);
-    dialogEl.addEventListener('click', (event) => {
-      if (event.target.closest('[data-chat-modal-close]')) close();
-    });
-    return dialogEl;
-  }
-
-  async function open(externiOdkazId, zaznamId) {
-    currentCtx = { externiOdkazId: String(externiOdkazId), zaznamId: String(zaznamId) };
-    const el = ensureDialog();
-    const container = el.querySelector('[data-chat-modal-content]');
-    container.innerHTML = '<p class="pm-chat-modal__loading">Načítám…</p>';
-    show(el);
-    await loadInto(container);
-  }
-
-  async function loadInto(container) {
-    if (!currentCtx) return;
-    try {
-      const url = `/Vyjadreni/Modal?externiOdkazId=${encodeURIComponent(currentCtx.externiOdkazId)}&zaznamId=${encodeURIComponent(currentCtx.zaznamId)}`;
-      const resp = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } });
-      if (!resp.ok) {
-        container.innerHTML = `<gov-alert variant="error">Nepodařilo se načíst vyjádření (HTTP ${resp.status}).</gov-alert>`;
-        return;
-      }
-      const html = await resp.text();
-      container.innerHTML = html;
-      const root = container.querySelector('[data-chat-modal-root]');
-      if (root) {
-        if (global.pmChatModalDragDrop && typeof global.pmChatModalDragDrop.attach === 'function') {
-          global.pmChatModalDragDrop.attach(root);
-        }
-        if (global.pmChatModalReharvest && typeof global.pmChatModalReharvest.attach === 'function') {
-          global.pmChatModalReharvest.attach(root);
-        }
-      }
-    } catch (err) {
-      container.innerHTML = `<gov-alert variant="error">Chyba při načítání: ${err.message || err}</gov-alert>`;
-    }
-  }
-
-  async function refreshModal() {
-    if (!dialogEl) return;
-    const container = dialogEl.querySelector('[data-chat-modal-content]');
-    if (!container) return;
-    await loadInto(container);
-  }
-
-  function show(el) {
-    if (typeof el.show === 'function') el.show();
-    else el.setAttribute('open', '');
-  }
-
-  function close() {
-    if (!dialogEl) return;
-    if (typeof dialogEl.hide === 'function') dialogEl.hide();
-    else dialogEl.removeAttribute('open');
-  }
-
-  function onClick(event) {
-    const btn = event.target.closest('[data-external-chat-open]');
-    if (!btn) return;
-    if (btn.hasAttribute('disabled')) return;
-    const externiOdkazId = btn.getAttribute('data-external-odkaz-id');
-    const zaznamId = btn.getAttribute('data-external-zaznam-id');
-    if (!externiOdkazId || !zaznamId) {
-      console.warn('Chat open: chybí data-external-odkaz-id nebo data-external-zaznam-id na', btn);
-      return;
-    }
-    event.preventDefault();
-    open(externiOdkazId, zaznamId);
-  }
-
-  function init() {
-    document.addEventListener('click', onClick);
-  }
-
-  global.pmChatModal = { init, open, close, refreshModal };
-})(window);
-
-// =============================================================================
-// PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModalDragDrop.js (Tasks 16+17 + A-5 Delete/Refresh)
-// =============================================================================
-(function (global) {
-  'use strict';
-
-  function getAntiForgeryToken(root) {
-    const input = root.querySelector('input[name="__RequestVerificationToken"]');
-    return input ? input.value : '';
-  }
-
-  function setStatus(root, text, state) {
-    const el = root.querySelector('[data-chat-status]');
-    if (!el) return;
-    el.textContent = text || '';
-    if (state) el.setAttribute('data-status-state', state);
-    else el.removeAttribute('data-status-state');
-  }
-
-  function persistPending(root, entry) {
-    const key = root.getAttribute('data-autosave-key');
-    if (!key) return;
-    try {
-      const raw = global.localStorage.getItem(key);
-      const list = raw ? JSON.parse(raw) : [];
-      list.push({ t: Date.now(), entry });
-      global.localStorage.setItem(key, JSON.stringify(list.slice(-20)));
-    } catch (e) { /* quota / storage disabled */ }
-  }
-
-  function clearPending(root) {
-    const key = root.getAttribute('data-autosave-key');
-    if (!key) return;
-    try { global.localStorage.removeItem(key); } catch (e) { /* ignore */ }
-  }
-
-  async function createBinding(root, payload) {
-    const token = getAntiForgeryToken(root);
-    const resp = await fetch('/Vyjadreni/HarmonogramVazba/Create', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'RequestVerificationToken': token
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return resp.json();
-  }
-
-  async function deleteBinding(root, payload) {
-    const token = getAntiForgeryToken(root);
-    const resp = await fetch('/Vyjadreni/HarmonogramVazba/Delete', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'RequestVerificationToken': token
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return resp.json();
-  }
-
-  function attach(root) {
-    const externiOdkazId = Number(root.getAttribute('data-externi-odkaz-id'));
-    const zaznamId = Number(root.getAttribute('data-zaznam-id'));
-    const projektId = Number(root.getAttribute('data-projekt-id'));
-
-    root.querySelectorAll('[data-bubble][draggable="true"]').forEach((bubble) => {
-      bubble.addEventListener('dragstart', (ev) => {
-        const id = bubble.getAttribute('data-vyjadreni-id');
-        const datum = bubble.getAttribute('data-datum');
-        ev.dataTransfer.setData('application/x-pm-bubble', JSON.stringify({ id, datum }));
-        ev.dataTransfer.effectAllowed = 'move';
-        bubble.classList.add('pm-chat-bubble--dragging');
-      });
-      bubble.addEventListener('dragend', () => bubble.classList.remove('pm-chat-bubble--dragging'));
-    });
-
-    root.querySelectorAll('[data-step]').forEach((step) => {
-      step.addEventListener('dragover', (ev) => {
-        ev.preventDefault();
-        ev.dataTransfer.dropEffect = 'move';
-        step.classList.add('pm-chat-step--drop-target');
-      });
-      step.addEventListener('dragleave', () => step.classList.remove('pm-chat-step--drop-target'));
-      step.addEventListener('drop', async (ev) => {
-        ev.preventDefault();
-        step.classList.remove('pm-chat-step--drop-target');
-        const raw = ev.dataTransfer.getData('application/x-pm-bubble');
-        if (!raw) return;
-        let parsed;
-        try { parsed = JSON.parse(raw); } catch (e) { return; }
-        const krokKey = step.getAttribute('data-krok-key');
-        const payload = {
-          externiOdkazId: externiOdkazId,
-          zaznamId: zaznamId,
-          projektId: projektId,
-          krokKey: krokKey,
-          hotVyjadreniId: Number(parsed.id),
-          datumVyjadreni: parsed.datum
-        };
-        await dispatchCreateBinding(root, payload);
-      });
-    });
-
-    // Plán 4 Feature C gap #5 (2026-04-24): nový `<pm-chat-stepper>` custom element emituje
-    // `pm-chat-stepper-drop` event místo standardního drop. Listener přebírá event detail
-    // a volá stejný backend endpoint. Legacy `<ol hidden>` zůstává jako fallback/test.
-    root.querySelectorAll('pm-chat-stepper, [data-pm-chat-stepper]').forEach((stepper) => {
-      stepper.addEventListener('pm-chat-stepper-drop', async (ev) => {
-        const detail = ev.detail || {};
-        if (!detail.bubbleId || !detail.krokKey) {
-          setStatus(root, 'Drop: chybí ID kroku nebo bubliny.', 'error');
-          return;
-        }
-        const payload = {
-          externiOdkazId: externiOdkazId,
-          zaznamId: zaznamId,
-          projektId: projektId,
-          krokKey: detail.krokKey,
-          hotVyjadreniId: Number(detail.bubbleId),
-          datumVyjadreni: detail.bubbleDatum || null
-        };
-        await dispatchCreateBinding(root, payload);
-      });
-    });
-
-    async function dispatchCreateBinding(rootEl, payload) {
-      persistPending(rootEl, { op: 'create', payload });
-      setStatus(rootEl, 'Ukládám…', null);
-      try {
-        await createBinding(rootEl, payload);
-        setStatus(rootEl, 'Uloženo.', 'ok');
-        clearPending(rootEl);
-        if (global.pmChatModal && typeof global.pmChatModal.refreshModal === 'function') {
-          await global.pmChatModal.refreshModal();
-        }
-      } catch (err) {
-        setStatus(rootEl, 'Ukládání selhalo: ' + (err.message || err), 'error');
-      }
-    }
-
-    // A-5: „Odpojit" tlačítka — posílají POST Delete s data-vazba-id, pak refresh.
-    root.querySelectorAll('[data-clear-binding]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const step = btn.closest('[data-step]');
-        if (!step) return;
-        const vazbaId = Number(step.getAttribute('data-vazba-id'));
-        if (!vazbaId) {
-          setStatus(root, 'Chybí data-vazba-id — nelze odpojit.', 'error');
-          return;
-        }
-        const payload = { vazbaId: vazbaId, projektId: projektId };
-        persistPending(root, { op: 'delete', payload });
-        setStatus(root, 'Odpojuji…', null);
-        try {
-          await deleteBinding(root, payload);
-          setStatus(root, 'Odpojeno.', 'ok');
-          clearPending(root);
-          if (global.pmChatModal && typeof global.pmChatModal.refreshModal === 'function') {
-            await global.pmChatModal.refreshModal();
-          }
-        } catch (err) {
-          setStatus(root, 'Odpojení selhalo: ' + (err.message || err), 'error');
-        }
-      });
-    });
-  }
-
-  global.pmChatModalDragDrop = { attach };
-})(window);
-
-// =============================================================================
-// PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModalReharvest.js (Task 18)
-// =============================================================================
-(function (global) {
-  'use strict';
-
-  function setStatus(root, text, state) {
-    const el = root.querySelector('[data-chat-status]');
-    if (!el) return;
-    el.textContent = text || '';
-    if (state) el.setAttribute('data-status-state', state);
-    else el.removeAttribute('data-status-state');
-  }
-
-  function attach(root) {
-    const form = root.querySelector('[data-reharvest-form]');
-    if (!form) return;
-    const btn = form.querySelector('[data-reharvest-btn]');
-
-    form.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const fd = new FormData(form);
-      if (btn) btn.setAttribute('disabled', '');
-      setStatus(root, 'Re-harvest běží…', null);
-      try {
-        const resp = await fetch(form.action, {
-          method: 'POST',
-          credentials: 'same-origin',
-          body: fd,
-          headers: { 'Accept': 'application/json' }
-        });
-        if (!resp.ok) {
-          setStatus(root, 'Re-harvest selhal (HTTP ' + resp.status + ').', 'error');
-          return;
-        }
-        const result = await resp.json();
-        const msg = result
-          ? `Re-harvest dokončen: načteno ${result.fetched}, vytvořeno ${result.created}, preskočeno ${result.skipped}.`
-          : 'Re-harvest dokončen.';
-        setStatus(root, msg, 'ok');
-      } catch (err) {
-        setStatus(root, 'Re-harvest selhal: ' + (err.message || err), 'error');
-      } finally {
-        if (btn) btn.removeAttribute('disabled');
-      }
-    });
-  }
-
-  global.pmChatModalReharvest = { attach };
-})(window);
-
-// =============================================================================
-// PmTracker.Web/wwwroot/js/modules/harmonogram/manualKroky.js (Plán D Task 9)
-// =============================================================================
-/**
- * Plán D Task 9 — client-side validace ručního data skutečnosti kroku (2/5/8/9).
- *
- * Kontrakt s Razor:
- *  - Input má atribut data-manual-krok-input
- *  - Vedle něj je hidden s name="ManualActualKroky[i].KrokKey" a
- *    vlastním name="ManualActualKroky[i].AbsolutniDatum"
- *  - Form parent je standardní record editor form, tzn. POST /Zaznamy/Save
- *
- * Validační pravidla (zrcadlí server ManualProposalFieldValidator):
- *  - Budoucí datum → odmítnuto lokálně (server by vrátil 400, radši UX first)
- *  - Chronologie: pokud nové datum > datum dalšího kroku, zobrazí se warning
- *    přes gov-message (inline), ale submit se nezamyká — server si poradí
- *    přes ManualActualKrokApplier cascade logikou
- *
- * Na rozdíl od externiOdkaz/sync.js neposíláme POST sami — data jsou součástí
- * record editor form POST do /Zaznamy/Save. Tento modul pouze validuje.
- */
-(function (global) {
-  'use strict';
-
-  const INPUT_SELECTOR = '[data-manual-krok-input]';
-  const WARNING_CLASS = 'schedule-actual-manual-warning';
-
-  function parseIsoDate(value) {
-    if (!value) return null;
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    if (!match) return null;
-    const year = Number(match[1]);
-    const month = Number(match[2]);
-    const day = Number(match[3]);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    if (Number.isNaN(date.getTime())) return null;
-    return date;
-  }
-
-  function todayUtc() {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  }
-
-  function clearMessages(input) {
-    const wrap = input.closest('.schedule-actual-manual');
-    if (!wrap) return;
-    const existing = wrap.querySelector('.' + WARNING_CLASS);
-    if (existing) existing.remove();
-    input.removeAttribute('data-manual-krok-invalid');
-  }
-
-  function showError(input, message) {
-    const wrap = input.closest('.schedule-actual-manual');
-    if (!wrap) return;
-    clearMessages(input);
-    const el = document.createElement('gov-message');
-    el.setAttribute('color', 'danger');
-    el.className = WARNING_CLASS;
-    el.textContent = message;
-    wrap.appendChild(el);
-    input.setAttribute('data-manual-krok-invalid', 'true');
-  }
-
-  function showWarning(input, message) {
-    const wrap = input.closest('.schedule-actual-manual');
-    if (!wrap) return;
-    clearMessages(input);
-    const el = document.createElement('gov-message');
-    el.setAttribute('color', 'warning');
-    el.className = WARNING_CLASS;
-    el.textContent = message;
-    wrap.appendChild(el);
-  }
-
-  function findSiblingManualInputs(input) {
-    const form = input.closest('form');
-    if (!form) return [];
-    return Array.from(form.querySelectorAll(INPUT_SELECTOR));
-  }
-
-  function validateChronology(input) {
-    const value = parseIsoDate(input.value);
-    if (!value) return;
-    const myIndex = Number(input.getAttribute('data-manual-krok-index') || '0');
-    const siblings = findSiblingManualInputs(input);
-    for (const sibling of siblings) {
-      if (sibling === input) continue;
-      const sibIndex = Number(sibling.getAttribute('data-manual-krok-index') || '0');
-      const sibValue = parseIsoDate(sibling.value);
-      if (!sibValue) continue;
-      if (sibIndex > myIndex && value > sibValue) {
-        showWarning(input,
-          'Datum je pozdější než u následujícího kroku. Server při schválení návrhu datumy zřetězí.');
-        return;
-      }
-    }
-  }
-
-  function handleChange(event) {
-    const input = event.target;
-    if (!input || !input.matches || !input.matches(INPUT_SELECTOR)) return;
-
-    clearMessages(input);
-
-    if (!input.value) {
-      // Prázdné pole je validní — server buď vynechá krok, nebo smaže skutečnost.
-      return;
-    }
-
-    const parsed = parseIsoDate(input.value);
-    if (!parsed) {
-      showError(input, 'Neplatný formát data — očekává se YYYY-MM-DD.');
-      return;
-    }
-
-    if (parsed > todayUtc()) {
-      showError(input, 'Datum skutečnosti nemůže být v budoucnu.');
-      return;
-    }
-
-    validateChronology(input);
-  }
-
-  function init() {
-    document.addEventListener('change', handleChange, true);
-  }
-
-  global.pmManualKroky = { init };
-})(window);
-
-// =============================================================================
-// PmTracker.Web/wwwroot/js/components/pm-chat-stepper/chronology.js (Plán 1 Feature B)
-// =============================================================================
-(function(global){
-  'use strict';
-
-  function validateDrop(bubbleDatum, targetKrok, allKroky) {
-    for (const krok of allKroky) {
-      if (krok.poradi >= targetKrok.poradi) continue;
-      if (krok.bindingDatum && krok.bindingDatum > bubbleDatum) {
-        return {
-          ok: false,
-          reason: `Krok #${krok.poradi} má binding z ${krok.bindingDatum.toISOString().slice(0,10)} — nelze vložit dříve datovanou bublinu.`
-        };
-      }
-    }
-    const cascade = [];
-    for (const krok of allKroky) {
-      if (krok.poradi <= targetKrok.poradi) continue;
-      if (krok.bindingDatum && krok.bindingDatum < bubbleDatum) {
-        cascade.push(krok.poradi);
-      }
-    }
-    return { ok: true, cascade: cascade.length > 0 ? cascade : undefined };
-  }
-
-  global.pmChatStepperChronology = { validateDrop };
-})(window);
-
-// =============================================================================
-// PmTracker.Web/wwwroot/js/components/pm-chat-stepper/buffer.js (Plán 1 Feature B)
-// =============================================================================
-(function(global){
-  'use strict';
-
-  const FIXED_SLOTS = 3;
-  const ADDON_SLOTS = 2;
-  const TOTAL_SLOTS = FIXED_SLOTS + ADDON_SLOTS;
-
-  function computeStepperSlots(kroky, mozeAddonPridat) {
-    const fixed = kroky.filter(k => k.fixni).sort((a,b) => a.poradi - b.poradi);
-    const addon = kroky.filter(k => !k.fixni).sort((a,b) => a.poradi - b.poradi);
-    const slots = [...fixed, ...addon];
-
-    while (slots.length < TOTAL_SLOTS) {
-      // Plán 4 Feature C gap #2 (2026-04-24): Add-on endpoint ještě neexistuje.
-      // Buffer slot je read-only placeholder s tooltipem.
-      slots.push({
-        poradi: slots.length + 1,
-        label: '—',
-        bindingDatum: null,
-        fixni: false,
-        isBufferSlot: true,
-        canAdd: false,
-        tooltip: mozeAddonPridat
-          ? 'Přidávání nepovinných kroků bude dostupné v budoucí verzi.'
-          : 'Pro přidání nepovinných kroků chybí oprávnění.'
-      });
-    }
-
-    return slots;
-  }
-
-  global.pmChatStepperBuffer = { computeStepperSlots, FIXED_SLOTS, ADDON_SLOTS, TOTAL_SLOTS };
-})(window);
-
-// =============================================================================
-// PmTracker.Web/wwwroot/js/components/pm-chat-stepper/pm-chat-stepper.js (Plán 1 Feature B)
-// =============================================================================
-(function(global){
-  'use strict';
-
-  class PmChatStepperElement extends HTMLElement {
-    constructor() {
-      super();
-      this._kroky = [];
-      this._canAddAddon = false;
-    }
-
-    connectedCallback() {
-      this._canAddAddon = this.hasAttribute('can-add-addon');
-      this._render();
-      this._bindDrops();
-    }
-
-    setKroky(kroky) {
-      this._kroky = Array.isArray(kroky) ? kroky : [];
-      if (this.isConnected) this._render();
-    }
-
-    _render() {
-      const buffer = global.pmChatStepperBuffer;
-      if (!buffer || typeof buffer.computeStepperSlots !== 'function') {
-        this.textContent = '';
-        return;
-      }
-      const slots = buffer.computeStepperSlots(this._kroky, this._canAddAddon);
-      this.innerHTML = slots.map(slot => `
-        <div class="pm-chat-step${slot.isBufferSlot ? ' pm-chat-stepper__buffer-slot' : ''}"
-             data-krok-key="${slot.poradi}"
-             data-krok-poradi="${slot.poradi}"
-             ${slot.krokKey ? `data-krok-guid="${escapeHtml(String(slot.krokKey))}"` : ''}
-             data-is-buffer="${!!slot.isBufferSlot}"
-             data-can-add="${!!slot.canAdd}"
-             ${slot.tooltip ? `title="${escapeHtml(slot.tooltip)}" aria-disabled="true"` : ''}
-             aria-dropeffect="${slot.canAdd || !slot.isBufferSlot ? 'move' : 'none'}">
-          <span class="pm-chat-step__label">${escapeHtml(slot.label)}</span>
-          ${slot.bindingDatum ? `<span class="pm-chat-step__datum">${formatDatum(slot.bindingDatum)}</span>` : ''}
-        </div>
-      `).join('');
-    }
-
-    _bindDrops() {
-      this.addEventListener('dragover', this._onDragOver.bind(this));
-      this.addEventListener('dragleave', this._onDragLeave.bind(this));
-      this.addEventListener('drop', this._onDrop.bind(this));
-    }
-
-    _onDragOver(e) {
-      const target = e.target.closest('[data-krok-key]');
-      if (!target) return;
-      e.preventDefault();
-
-      const raw = e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('application/x-bubble-datum')
-        ? e.dataTransfer.getData('application/x-bubble-datum')
-        : null;
-      const bubbleDatum = raw ? new Date(raw) : new Date(NaN);
-      if (isNaN(bubbleDatum.valueOf())) return;
-
-      const bubbleId = e.dataTransfer.getData('application/x-bubble-id');
-      if (!bubbleId) return;
-
-      const poradi = parseInt(target.dataset.krokPoradi || target.dataset.krokKey, 10);
-      const targetKrok = this._kroky.find(k => k.poradi === poradi) || { poradi, bindingDatum: null };
-      const chrono = global.pmChatStepperChronology;
-      if (!chrono || typeof chrono.validateDrop !== 'function') return;
-      const v = chrono.validateDrop(bubbleDatum, targetKrok, this._kroky);
-
-      this.querySelectorAll('[data-krok-key]').forEach(el => {
-        el.classList.remove('pm-chat-stepper__drop-valid', 'pm-chat-stepper__drop-invalid');
-      });
-      target.classList.add(v.ok ? 'pm-chat-stepper__drop-valid' : 'pm-chat-stepper__drop-invalid');
-
-      if (!v.ok) {
-        target.title = v.reason || '';
-        e.dataTransfer.dropEffect = 'none';
-      } else {
-        target.title = v.cascade ? `Cascade: posunou se kroky ${v.cascade.join(', ')}` : '';
-        e.dataTransfer.dropEffect = 'move';
-      }
-    }
-
-    _onDragLeave(e) {
-      const target = e.target.closest('[data-krok-key]');
-      if (target) target.classList.remove('pm-chat-stepper__drop-valid', 'pm-chat-stepper__drop-invalid');
-    }
-
-    _onDrop(e) {
-      e.preventDefault();
-      const target = e.target.closest('[data-krok-key]');
-      if (!target) return;
-      target.classList.remove('pm-chat-stepper__drop-valid', 'pm-chat-stepper__drop-invalid');
-
-      const bubbleId = e.dataTransfer.getData('application/x-bubble-id');
-      if (!bubbleId) return;
-
-      const detail = {
-        krokPoradi: parseInt(target.dataset.krokPoradi || target.dataset.krokKey, 10),
-        krokKey: target.dataset.krokGuid || null, // Feature C gap #5: GUID pro POST backend
-        bubbleId,
-        bubbleDatum: e.dataTransfer.getData('application/x-bubble-datum'),
-        isBufferSlot: target.dataset.isBuffer === 'true',
-        canAdd: target.dataset.canAdd === 'true'
-      };
-      this.dispatchEvent(new CustomEvent('pm-chat-stepper-drop', { detail, bubbles: true }));
-    }
-  }
-
-  function escapeHtml(s) {
-    if (s == null) return '';
-    return String(s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
-
-  function formatDatum(d) {
-    try {
-      return (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10);
-    } catch { return ''; }
-  }
-
-  if (!customElements.get('pm-chat-stepper')) {
-    customElements.define('pm-chat-stepper', PmChatStepperElement);
-  }
-
-  global.PmChatStepperElement = PmChatStepperElement;
-})(window);
-
-// =============================================================================
-// Plán 4 Feature C Task 6 — schedule-feature-c/toggle-rezim.js
-// POST /Harmonogram/ToggleRezim pro switch Auto ⇄ Ručně v _ScheduleBlockManualCell.
-// Modul si sám ready-state handling řeší (delegace na document click).
-// =============================================================================
-(function (global) {
-    'use strict';
-
-    const TOGGLE_SELECTOR = '[data-feature-c-toggle]';
-    const CELL_SELECTOR = '[data-schedule-actual-cell]';
-    const BADGE_SELECTOR = '[data-feature-c-badge]';
-
-    const ZDROJ_META = {
-        Neznamo:    { icon: '—',                     tooltip: 'Skutečnost nebyla vyplněna.' },
-        Automat:    { icon: '🤖',               tooltip: 'Skutečnost vyplněná automatem ze ServiceDesk vyjádření.' },
-        Manual:     { icon: '✍️',               tooltip: 'Skutečnost vyplněná ručně uživatelem.' },
-        Historicka: { icon: '📜',               tooltip: 'Skutečnost migrovaná před zavedením auto-fill (historická data).' }
-    };
-
-    function getAntiforgery() {
-        const input = document.querySelector('input[name="__RequestVerificationToken"]');
-        return input ? input.value : null;
-    }
-
-    async function postToggleRezim(hodnotaId, rezim) {
-        const token = getAntiforgery();
-        const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (token) headers['RequestVerificationToken'] = token;
-        const resp = await fetch('/Harmonogram/ToggleRezim', {
-            method: 'POST',
-            headers: headers,
-            credentials: 'same-origin',
-            body: JSON.stringify({ HodnotaId: hodnotaId, Rezim: rezim })
-        });
-        if (!resp.ok) {
-            const body = await resp.text().catch(function () { return ''; });
-            throw new Error('HTTP ' + resp.status + ': ' + (body || resp.statusText));
-        }
-        return await resp.json();
-    }
-
-    function refreshCellUi(cell, newRezim, newZdroj) {
-        if (!cell) return;
-        cell.setAttribute('data-skutecnost-rezim', newRezim);
-        cell.setAttribute('data-skutecnost-zdroj', newZdroj);
-
-        const toggle = cell.querySelector(TOGGLE_SELECTOR);
-        if (toggle) {
-            toggle.setAttribute('data-current-rezim', newRezim);
-            const label = toggle.querySelector('.schedule-actual-cell__toggle-label');
-            if (label) label.textContent = newRezim === 'Auto' ? 'Auto' : 'Ručně';
-            const newAria = newRezim === 'Auto'
-                ? 'Přepnout režim skutečnosti z Auto na Ručně'
-                : 'Přepnout režim skutečnosti z Ručně na Auto';
-            toggle.setAttribute('aria-label', newAria);
-            toggle.setAttribute('title', newAria);
-        }
-
-        const badge = cell.querySelector(BADGE_SELECTOR);
-        if (badge) {
-            const meta = ZDROJ_META[newZdroj] || ZDROJ_META.Neznamo;
-            badge.setAttribute('data-zdroj', newZdroj);
-            badge.setAttribute('title', meta.tooltip);
-            badge.setAttribute('aria-label', meta.tooltip);
-            badge.textContent = meta.icon;
-        }
-    }
-
-    function showToggleError(cell, message) {
-        if (!cell) { if (typeof global.alert === 'function') global.alert(message); return; }
-        let errBox = cell.querySelector('[data-feature-c-error]');
-        if (!errBox) {
-            errBox = document.createElement('div');
-            errBox.setAttribute('data-feature-c-error', '');
-            errBox.className = 'schedule-actual-cell__error';
-            cell.appendChild(errBox);
-        }
-        errBox.textContent = message;
-        setTimeout(function () { if (errBox && errBox.parentNode) errBox.remove(); }, 5000);
-    }
-
-    async function handleToggleClick(event) {
-        const btn = event.target.closest(TOGGLE_SELECTOR);
-        if (!btn) return;
-        event.preventDefault();
-
-        const hodnotaIdRaw = btn.getAttribute('data-hodnota-id');
-        const currentRezim = btn.getAttribute('data-current-rezim') || 'Auto';
-        const hodnotaId = parseInt(hodnotaIdRaw, 10);
-        if (!Number.isFinite(hodnotaId) || hodnotaId <= 0) {
-            showToggleError(btn.closest(CELL_SELECTOR), 'Chybí ID řádku skutečnosti.');
-            return;
-        }
-        const newRezim = currentRezim === 'Auto' ? 'Manual' : 'Auto';
-        const cell = btn.closest(CELL_SELECTOR);
-
-        btn.disabled = true;
-        try {
-            const result = await postToggleRezim(hodnotaId, newRezim);
-            if (result && result.changed === true) {
-                refreshCellUi(cell, result.skutecnostRezim || newRezim, result.skutecnostZdroj || 'Neznamo');
-            }
-        } catch (err) {
-            showToggleError(cell, 'Přepnutí selhalo: ' + err.message);
-        } finally {
-            btn.disabled = false;
-        }
-    }
-
-    async function postSelectCandidate(payload) {
-        const token = getAntiforgery();
-        const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (token) headers['RequestVerificationToken'] = token;
-        const resp = await fetch('/Harmonogram/SelectCandidate', {
-            method: 'POST',
-            headers: headers,
-            credentials: 'same-origin',
-            body: JSON.stringify(payload)
-        });
-        if (!resp.ok) {
-            const body = await resp.text().catch(function () { return ''; });
-            throw new Error('HTTP ' + resp.status + ': ' + (body || resp.statusText));
-        }
-        return await resp.json();
-    }
-
-    async function handleSelectCandidateClick(event) {
-        const btn = event.target.closest('[data-feature-c-select-candidate]');
-        if (!btn) return;
-        event.preventDefault();
-
-        // Feature C gap #3 (create-if-missing): klient posílá buď HodnotaId (row existuje),
-        // nebo ZaznamId + KrokPoradi (endpoint row vytvoří).
-        const hodnotaIdRaw = btn.getAttribute('data-hodnota-id');
-        const zaznamIdRaw = btn.getAttribute('data-zaznam-id');
-        const krokPoradiRaw = btn.getAttribute('data-krok-poradi');
-        const externiOdkazIdRaw = btn.getAttribute('data-externi-odkaz-id');
-        const hodnotaId = hodnotaIdRaw ? parseInt(hodnotaIdRaw, 10) : 0;
-        const zaznamId = zaznamIdRaw ? parseInt(zaznamIdRaw, 10) : 0;
-        const krokPoradi = krokPoradiRaw ? parseInt(krokPoradiRaw, 10) : 0;
-        const externiOdkazId = externiOdkazIdRaw ? parseInt(externiOdkazIdRaw, 10) : null;
-
-        const hasHodnotaId = Number.isFinite(hodnotaId) && hodnotaId > 0;
-        const hasZaznamCoords = Number.isFinite(zaznamId) && zaznamId > 0
-            && Number.isFinite(krokPoradi) && krokPoradi > 0;
-        if (!hasHodnotaId && !hasZaznamCoords) return;
-
-        const payload = hasHodnotaId
-            ? { HodnotaId: hodnotaId, ExterniOdkazId: externiOdkazId }
-            : { HodnotaId: 0, ExterniOdkazId: externiOdkazId, ZaznamId: zaznamId, KrokPoradi: krokPoradi };
-
-        const cell = btn.closest(CELL_SELECTOR);
-        const details = btn.closest('[data-feature-c-dropdown]');
-
-        btn.disabled = true;
-        try {
-            await postSelectCandidate(payload);
-            // Refresh UI — označ tento btn jako selected, ostatní od-select
-            if (details) {
-                const allBtns = details.querySelectorAll('[data-feature-c-select-candidate]');
-                allBtns.forEach(function (b) {
-                    const isThis = b === btn;
-                    b.setAttribute('data-is-selected', isThis ? 'true' : 'false');
-                    b.setAttribute('aria-current', isThis ? 'true' : 'false');
-                    const li = b.closest('li');
-                    if (li) {
-                        li.classList.toggle('schedule-actual-cell__dropdown-item--selected', isThis);
-                    }
-                    // Odstranit / přidat checkmark
-                    const existingCheck = b.querySelector('.schedule-actual-cell__dropdown-item-check');
-                    if (isThis && !existingCheck) {
-                        const check = document.createElement('span');
-                        check.className = 'schedule-actual-cell__dropdown-item-check';
-                        check.setAttribute('aria-hidden', 'true');
-                        check.textContent = '✓';
-                        b.appendChild(check);
-                    } else if (!isThis && existingCheck) {
-                        existingCheck.remove();
-                    }
-                });
-                // Zavřít details popup
-                details.removeAttribute('open');
-            }
-        } catch (err) {
-            showToggleError(cell, 'Výběr kandidáta selhal: ' + err.message);
-        } finally {
-            btn.disabled = false;
-        }
-    }
-
-    /* Feature C gap #6: při open `<details data-feature-c-dropdown>` přepočítat
-       pozici popup listu tak, aby se vešel do viewportu (bránění ořezávání parent
-       containerem s overflow:hidden). */
-    function handleDropdownToggle(event) {
-        const details = event.target.closest('[data-feature-c-dropdown]');
-        if (!details) return;
-        if (event.type !== 'toggle') return;
-        const list = details.querySelector('.schedule-actual-cell__dropdown-list');
-        if (!list) return;
-
-        if (!details.open) {
-            details.removeAttribute('data-fc-positioned');
-            list.style.top = '';
-            list.style.left = '';
-            return;
-        }
-
-        const summary = details.querySelector('summary');
-        if (!summary) return;
-        const rect = summary.getBoundingClientRect();
-        const listWidth = Math.min(320, window.innerWidth - 16);
-        let left = rect.right - listWidth; // right-align k chevronu
-        if (left < 8) left = 8;
-        let top = rect.bottom + 4;
-        if (top + 240 > window.innerHeight && rect.top - 240 > 0) {
-            top = rect.top - 4 - Math.min(240, list.scrollHeight);
-        }
-        list.style.width = listWidth + 'px';
-        list.style.left = left + 'px';
-        list.style.top = top + 'px';
-        details.setAttribute('data-fc-positioned', 'true');
-    }
-
-    function init() {
-        document.addEventListener('click', handleToggleClick);
-        document.addEventListener('click', handleSelectCandidateClick);
-        // `toggle` event bubbling funguje od Safari 17 / Firefox 131 / Chrome 128+.
-        // V starších bych přidal listener per details, ale pro PM Tracker target = intranet IE/Edge nezvládá.
-        document.addEventListener('toggle', handleDropdownToggle, true);
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-
-    global.pmScheduleFeatureC = {
-        postToggleRezim: postToggleRezim,
-        postSelectCandidate: postSelectCandidate,
-        refreshCellUi: refreshCellUi
-    };
-})(window);
-
-// =============================================================================
-// Init chat modal + externí odkaz + harmonogram manual kroky po DOMContentLoaded
-// =============================================================================
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function () {
-    if (window.pmExterniOdkazSync) window.pmExterniOdkazSync.init();
-    if (window.pmChatModal) window.pmChatModal.init();
-    if (window.pmManualKroky) window.pmManualKroky.init();
-  });
-} else {
-  if (window.pmExterniOdkazSync) window.pmExterniOdkazSync.init();
-  if (window.pmChatModal) window.pmChatModal.init();
-  if (window.pmManualKroky) window.pmManualKroky.init();
-}

@@ -69,18 +69,21 @@ public sealed class SqlTicketingQueryServiceTests
     [Fact]
     public async Task GetZaznamy_Batch_VraciExistujiciIgnorujeNeznama()
     {
+        // Reálná intranetNEW.dbo.HOT_ZAZNAMY.id je INT — testovací Id musí být číselný
+        // string (parsovatelný int.Parse), jinak ValueConverter v TicketingReadOnlyDbContext
+        // hodí FormatException. Memory: SD ticket bez id = mimo scope.
         using var db = CreateDb();
         db.HotZaznamy.AddRange(
-            new HotZaznamEntity { Radek = 1, Id = "A", Strucne = "foo" },
-            new HotZaznamEntity { Radek = 2, Id = "B", Strucne = "bar" });
+            new HotZaznamEntity { Radek = 1, Id = "111111", Strucne = "foo" },
+            new HotZaznamEntity { Radek = 2, Id = "222222", Strucne = "bar" });
         db.SaveChangesForTests();
 
         var svc = new SqlTicketingQueryService(db);
-        var result = await svc.GetZaznamyAsync(new[] { "A", "B", "C" }, CancellationToken.None);
+        var result = await svc.GetZaznamyAsync(new[] { "111111", "222222", "999999" }, CancellationToken.None);
 
         result.Should().HaveCount(2);
-        result["A"].Strucne.Should().Be("foo");
-        result.ContainsKey("C").Should().BeFalse();
+        result["111111"].Strucne.Should().Be("foo");
+        result.ContainsKey("999999").Should().BeFalse();
     }
 
     [Fact]

@@ -1,11 +1,6 @@
 @model ZaznamEditViewModel
-@{
-    var isActive = ViewData["IsActive"] as bool? ?? false;
-}
 
-<div class="record-modal-panel"
-     data-record-modal-panel="collaboration"
-     @(isActive ? null : "hidden=\"hidden\"")>
+<pm-tab-panel key="collaboration" class="record-modal-panel" data-record-modal-panel="collaboration">
     <div class="section-divider">Spolupráce</div>
     <div class="collab-picker">
         <label>
@@ -33,4 +28,4 @@
             }
         </div>
     </div>
-</div>
+</pm-tab-panel>

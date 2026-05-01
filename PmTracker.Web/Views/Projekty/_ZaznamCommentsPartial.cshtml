@@ -72,7 +72,7 @@
                             {
                                 <div class="comment-actions">
                                     <pm-button variant="Secondary" size="Small" data-comment-edit-toggle="true" aria-label="Upravit vyjádření" title="Upravit vyjádření">
-                                        <gov-icon name="pencil" type="components" aria-hidden="true"></gov-icon>
+                                        <gov-icon size="s" name="pencil" type="components" aria-hidden="true"></gov-icon>
                                     </pm-button>
                                     <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
                                         <input type="hidden" name="projektId" value="@Model.ProjektId" />
@@ -80,7 +80,7 @@
                                         <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
                                         <input type="hidden" name="Id" value="@vyjadreni.Id" />
                                         <pm-button variant="Destructive" size="Small" native-type="submit" aria-label="Smazat vyjádření" title="Smazat vyjádření">
-                                            <gov-icon name="trash" type="components" aria-hidden="true"></gov-icon>
+                                            <gov-icon size="s" name="trash3" type="components" aria-hidden="true"></gov-icon>
                                         </pm-button>
                                     </form>
                                 </div>

@@ -1,5 +1,39 @@
 @model IReadOnlyList<PmTracker.Web.Models.ViewModels.Sync.SyncJobSettingsCardViewModel>
 
+@{
+    @* Tab partition podle JobKey prefixu — backend má 3 hosted services s různými
+       lifecycle (AD periodic, SD active, SD archive). User feedback 2026-04-29:
+       sloučená sekce byla nepřehledná. Použito systémové pm-tabs. *@
+    string ResolveTabKey(string jobKey) => jobKey switch
+    {
+        var k when k.StartsWith("ad.", StringComparison.OrdinalIgnoreCase) => "ad",
+        var k when string.Equals(k, "sd.archive", StringComparison.OrdinalIgnoreCase) => "sd-archive",
+        var k when string.Equals(k, "sd.active", StringComparison.OrdinalIgnoreCase) => "sd-active",
+        _ => "other"
+    };
+
+    var tabs = new[]
+    {
+        new { Key = "ad", Label = "Active Directory" },
+        new { Key = "sd-active", Label = "ServiceDesk — aktivní tickety" },
+        new { Key = "sd-archive", Label = "ServiceDesk — archiv" }
+    };
+
+    var grouped = Model.GroupBy(c => ResolveTabKey(c.JobKey)).ToDictionary(g => g.Key, g => g.ToList());
+
+    // Lego architecture: žádné disabled taby v markupu (per user feedback 2026-04-29 —
+    // disabled tab znemožňoval správné vykreslení outer rohů sousedů). Filtrujeme jen
+    // taby s alespoň 1 kartou a per-pozice volíme tag (left/middle/right).
+    var visibleTabs = tabs.Where(t => grouped.ContainsKey(t.Key)).ToList();
+    var firstWithCards = visibleTabs.FirstOrDefault()?.Key ?? "ad";
+
+    string TabTagFor(int index, int total) =>
+        total == 1 ? "pm-tab-left"
+        : index == 0 ? "pm-tab-left"
+        : index == total - 1 ? "pm-tab-right"
+        : "pm-tab";
+}
+
 <div class="sync-panel">
     @if (TempData["SyncSaveSuccess"] is string ok)
     {
@@ -20,9 +54,26 @@
     }
     else
     {
-        foreach (var card in Model)
-        {
-            @await Html.PartialAsync("_SyncJobSettingsCard", card)
-        }
+        <pm-tabs persist="hash" persist-key="nastaveni-sync" initial="@firstWithCards">
+            <pm-tab-list>
+                @for (int i = 0; i < visibleTabs.Count; i++)
+                {
+                    var tab = visibleTabs[i];
+                    var tagName = TabTagFor(i, visibleTabs.Count);
+                    @Html.Raw($"<{tagName} key=\"{tab.Key}\">{tab.Label}</{tagName}>")
+                }
+            </pm-tab-list>
+
+            @foreach (var tab in visibleTabs)
+            {
+                var cards = grouped[tab.Key];
+                <pm-tab-panel key="@tab.Key" class="sync-tab-panel-content">
+                    @foreach (var card in cards)
+                    {
+                        @await Html.PartialAsync("_SyncJobSettingsCard", card)
+                    }
+                </pm-tab-panel>
+            }
+        </pm-tabs>
     }
 </div>

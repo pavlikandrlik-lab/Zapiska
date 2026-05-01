@@ -25,9 +25,10 @@ BEGIN
 
     -- Existující řádky s nenulovým delay jsou „Historicka" (migrovaná ruční skutečnost
     -- před zavedením auto-fill ze SD vyjádření).
-    UPDATE dbo.zaznam_harmonogram_hodnoty
-       SET skutecnost_zdroj = 3 -- Historicka
-     WHERE hodnota_int <> 0;
+    -- Pozn.: UPDATE je v EXEC(N'...'), protože SQL Server validuje názvy sloupců
+    -- při kompilaci celé batch (ad-hoc batch = bez deferred name resolution),
+    -- a sloupec skutecnost_zdroj je vytvořen až výše v této batch.
+    EXEC(N'UPDATE dbo.zaznam_harmonogram_hodnoty SET skutecnost_zdroj = 3 WHERE hodnota_int <> 0;');
 
     PRINT 'Added zaznam_harmonogram_hodnoty.skutecnost_zdroj (default Neznamo=0; existing delays = Historicka=3).';
 END

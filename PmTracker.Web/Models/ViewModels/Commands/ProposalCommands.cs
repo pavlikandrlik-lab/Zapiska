@@ -19,7 +19,5 @@ public sealed class PrefillCreateProposalCommand
     [Required]
     public int ProposalId { get; set; }
 
-    public string? Presentation { get; set; }
-
     public string? ReturnUrl { get; set; }
 }

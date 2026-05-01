@@ -9,18 +9,25 @@
 
 <h2 id="record-delete-modal-title">@Model.Title</h2>
 
-<div class="alert alert-error">
-    Chystáte se natrvalo smazat záznam <strong>#@Model.CisloViditelne - @Model.Nazev</strong>.
-</div>
-<p class="muted">Budou smazána i navázaná vyjádření, externí vazby, spolupráce, harmonogram a historie změn. Tato akce je nevratná.</p>
+<pm-alert variant="Error">
+    Chystáte se <strong>natrvalo smazat</strong> záznam <strong>#@Model.CisloViditelne - @Model.Nazev</strong>.
+</pm-alert>
+<p class="muted">Společně se záznamem se trvale odstraní i všechny navázané položky uvedené níže. Tato akce je <strong>nevratná</strong>.</p>
 
 <div class="record-delete-summary">
     <div><span class="label">Kategorie:</span> @Model.Kategorie</div>
     <div><span class="label">Stav:</span> @Model.Stav</div>
-    <div><span class="label">Vyjádření:</span> @Model.VyjadreniCount</div>
+    <div><span class="label">Vyjádření (komentáře):</span> @Model.VyjadreniCount</div>
+    <div><span class="label">Harvestnutá vyjádření ze ServiceDesku:</span> @Model.HarvestVyjadreniCount</div>
     <div><span class="label">Externí vazby:</span> @Model.ExterniVazbyCount</div>
-    <div><span class="label">Spolupráce:</span> @Model.SpolupraceCount</div>
-    <div><span class="label">Harmonogram:</span> @Model.HarmonogramCount</div>
+    <div><span class="label">Návrhy úprav (cílené na záznam):</span> @Model.NavrhyTargetCount</div>
+    <div><span class="label">Spolupracovníci:</span> @Model.SpolupraceCount</div>
+    <div><span class="label">Hodnoty harmonogramu:</span> @Model.HarmonogramCount</div>
+    <div><span class="label">Záznamy historie změn:</span> @Model.HistorieCount</div>
+    @if (Model.NavrhyOriginCount > 0)
+    {
+        <div class="muted"><span class="label">Návrhy které tento záznam vytvořily:</span> @Model.NavrhyOriginCount <em>(zachovají se v historii bez vazby na záznam)</em></div>
+    }
 </div>
 
 <form class="form-grid"

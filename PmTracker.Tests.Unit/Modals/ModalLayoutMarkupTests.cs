@@ -83,8 +83,5 @@ public sealed class ModalLayoutMarkupTests
         js.Should().Contain(
             "handleGovCloseEvent",
             "musí existovat handler pro gov-close");
-        js.Should().Contain(
-            "requestRecordEditorModalClose",
-            "gov-close handler musí volat app-level dirty-check flow");
     }
 }

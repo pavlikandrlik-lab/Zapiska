@@ -1,14 +1,20 @@
 /**
- * stepperOffscreenIndicator.js — sticky indikátor počtu kroků mimo viewport.
+ * stepperOffscreenIndicator.js — sticky stack mini číselných kruhů s konkrétními
+ * čísly off-screen kroků.
  *
- * Spec 2026-04-29: když user scrolluje v modalu vyjadreni a některé bound kroky
- * (vedle vyjadreni) jsou mimo viditelnou plochu, zobrazí se na horní/dolní hraně
- * stepperu indikátor "↑ N" / "↓ N" — uchytí se na okraj místo aby se vytrácel ven.
+ * Spec 2026-04-29 redesign: místo jednoho pill s count zobrazujeme stack malých
+ * kruhů (replikuje gov-stepper-item__prefix vizuál) — každý kruh = konkrétní číslo
+ * kroku který je mimo viewport. Klikací — scroll na bound bublinu (rychloposun).
  *
- * Strategy:
- *   - Track all gov-stepper-item[data-step][data-in-buffer="false"] s navázaným vyjadřením.
- *   - On scroll: zjisti, kolik z nich má y-pozici nad / pod viditelnou částí body containeru.
- *   - Update top/bottom indicator s počtem.
+ * Layout:
+ *   - Top stack: sticky top:0 v .pm-chat-modal__stepper, horizontální řada kruhů
+ *     řazená od pravé strany. Zobrazí kroky jejichž bound bublina je nad viewportem.
+ *   - Bottom stack: sticky bottom:0, totéž pro kroky pod viewportem.
+ *
+ * Color states (dle data-source na gov-stepper-item):
+ *   - Auto / harvested      → success (zelená)
+ *   - Manual                → warning (žlutá/oranžová)
+ *   - bez vazby / neutral   → neutral (šedá)
  */
 
 export function initStepperOffscreenIndicator(modalRoot) {
@@ -18,40 +24,67 @@ export function initStepperOffscreenIndicator(modalRoot) {
     const stepperSection = modalRoot.querySelector('.pm-chat-modal__stepper');
     if (!body || !stepperSection) return null;
 
-    // Vytvořit indikátory (pokud ještě neexistují)
-    let topIndicator = stepperSection.querySelector('[data-offscreen-top]');
-    if (!topIndicator) {
-        topIndicator = document.createElement('div');
-        topIndicator.className = 'pm-chat-modal__offscreen-indicator pm-chat-modal__offscreen-indicator--top';
-        topIndicator.setAttribute('data-offscreen-top', '');
-        topIndicator.setAttribute('hidden', 'hidden');
-        topIndicator.setAttribute('aria-hidden', 'true');
-        topIndicator.innerHTML =
-            '<gov-icon size="s" name="chevron-up" type="components" aria-hidden="true"></gov-icon>' +
-            '<span data-offscreen-count>0</span>';
-        stepperSection.insertBefore(topIndicator, stepperSection.firstChild);
+    let topStack = stepperSection.querySelector('[data-offscreen-stack-top]');
+    if (!topStack) {
+        topStack = document.createElement('div');
+        topStack.className = 'pm-chat-modal__offscreen-stack pm-chat-modal__offscreen-stack--top';
+        topStack.setAttribute('data-offscreen-stack-top', '');
+        topStack.setAttribute('hidden', 'hidden');
+        topStack.setAttribute('aria-label', 'Kroky nad viditelnou oblastí');
+        stepperSection.insertBefore(topStack, stepperSection.firstChild);
+    }
+    let bottomStack = stepperSection.querySelector('[data-offscreen-stack-bottom]');
+    if (!bottomStack) {
+        bottomStack = document.createElement('div');
+        bottomStack.className = 'pm-chat-modal__offscreen-stack pm-chat-modal__offscreen-stack--bottom';
+        bottomStack.setAttribute('data-offscreen-stack-bottom', '');
+        bottomStack.setAttribute('hidden', 'hidden');
+        bottomStack.setAttribute('aria-label', 'Kroky pod viditelnou oblastí');
+        stepperSection.appendChild(bottomStack);
     }
 
-    let bottomIndicator = stepperSection.querySelector('[data-offscreen-bottom]');
-    if (!bottomIndicator) {
-        bottomIndicator = document.createElement('div');
-        bottomIndicator.className = 'pm-chat-modal__offscreen-indicator pm-chat-modal__offscreen-indicator--bottom';
-        bottomIndicator.setAttribute('data-offscreen-bottom', '');
-        bottomIndicator.setAttribute('hidden', 'hidden');
-        bottomIndicator.setAttribute('aria-hidden', 'true');
-        bottomIndicator.innerHTML =
-            '<gov-icon size="s" name="chevron-down" type="components" aria-hidden="true"></gov-icon>' +
-            '<span data-offscreen-count>0</span>';
-        stepperSection.appendChild(bottomIndicator);
+    function scrollToBubble(vyjadreniId) {
+        if (!vyjadreniId) return;
+        const bubble = modalRoot.querySelector(
+            '[data-bubble][data-vyjadreni-id="' + vyjadreniId + '"]'
+        );
+        if (bubble) {
+            bubble.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function createCircle(item) {
+        const krokPoradi = item.getAttribute('data-krok-poradi') ||
+                          item.getAttribute('data-krok-key') || '?';
+        const vyjadreniId = item.getAttribute('data-current-vyjadreni-id') || '';
+        const color = item.getAttribute('data-source') || 'neutral';
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'pm-chat-modal__offscreen-step';
+        btn.setAttribute('data-krok-poradi', krokPoradi);
+        btn.setAttribute('data-vyjadreni-id', vyjadreniId);
+        btn.setAttribute('data-color', color);
+        btn.setAttribute('title', 'Krok ' + krokPoradi + ' — kliknutím přejít na bublinu');
+        btn.setAttribute('aria-label', 'Krok ' + krokPoradi + ', kliknutím přejít na bublinu');
+        btn.textContent = krokPoradi;
+        btn.addEventListener('click', function () {
+            scrollToBubble(vyjadreniId);
+        });
+        return btn;
     }
 
     function recompute() {
         const items = modalRoot.querySelectorAll(
             'gov-stepper-item[data-step][data-in-buffer="false"][data-current-vyjadreni-id]'
         );
+
+        topStack.innerHTML = '';
+        bottomStack.innerHTML = '';
+
         if (items.length === 0) {
-            topIndicator.setAttribute('hidden', 'hidden');
-            bottomIndicator.setAttribute('hidden', 'hidden');
+            topStack.setAttribute('hidden', 'hidden');
+            bottomStack.setAttribute('hidden', 'hidden');
             return;
         }
 
@@ -59,10 +92,9 @@ export function initStepperOffscreenIndicator(modalRoot) {
         const visibleTop = bodyRect.top;
         const visibleBottom = bodyRect.bottom;
 
-        let aboveCount = 0;
-        let belowCount = 0;
+        const above = [];
+        const below = [];
         items.forEach(function (item) {
-            // Najdi bound bublinu — sticky alignment ukazuje krok vedle ní.
             const vyjadreniId = item.getAttribute('data-current-vyjadreni-id');
             if (!vyjadreniId) return;
             const bubble = modalRoot.querySelector(
@@ -71,23 +103,38 @@ export function initStepperOffscreenIndicator(modalRoot) {
             if (!bubble) return;
             const bubbleRect = bubble.getBoundingClientRect();
             const bubbleCenter = bubbleRect.top + bubbleRect.height / 2;
-            if (bubbleCenter < visibleTop) aboveCount++;
-            else if (bubbleCenter > visibleBottom) belowCount++;
+            if (bubbleCenter < visibleTop) above.push(item);
+            else if (bubbleCenter > visibleBottom) below.push(item);
         });
 
-        if (aboveCount > 0) {
-            topIndicator.removeAttribute('hidden');
-            const c = topIndicator.querySelector('[data-offscreen-count]');
-            if (c) c.textContent = String(aboveCount);
+        // User logika 2026-04-29: closest-to-viewport step vlevo, furthest vpravo.
+        //   - Top (above viewport): krok 1 scrolled out first (furthest) → vpravo;
+        //     krok 2 scrolled out later (closer to viewport) → vlevo. Sort DESCENDING.
+        //     Layout: [_][2][1] (right-aligned via justify-content: flex-end).
+        //   - Bottom (below viewport): krok 3 closest below → vlevo; krok 5 furthest →
+        //     vpravo. Sort ASCENDING. Layout: [_][3][4][5].
+        const stepNum = function (item) {
+            return parseInt(item.getAttribute('data-krok-poradi') || '0', 10);
+        };
+        above.sort(function (a, b) { return stepNum(b) - stepNum(a); }); // DESC
+        below.sort(function (a, b) { return stepNum(a) - stepNum(b); }); // ASC
+
+        if (above.length > 0) {
+            topStack.removeAttribute('hidden');
+            above.forEach(function (item) {
+                topStack.appendChild(createCircle(item));
+            });
         } else {
-            topIndicator.setAttribute('hidden', 'hidden');
+            topStack.setAttribute('hidden', 'hidden');
         }
-        if (belowCount > 0) {
-            bottomIndicator.removeAttribute('hidden');
-            const c = bottomIndicator.querySelector('[data-offscreen-count]');
-            if (c) c.textContent = String(belowCount);
+
+        if (below.length > 0) {
+            bottomStack.removeAttribute('hidden');
+            below.forEach(function (item) {
+                bottomStack.appendChild(createCircle(item));
+            });
         } else {
-            bottomIndicator.setAttribute('hidden', 'hidden');
+            bottomStack.setAttribute('hidden', 'hidden');
         }
     }
 

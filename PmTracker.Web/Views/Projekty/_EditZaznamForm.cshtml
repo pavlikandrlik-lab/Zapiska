@@ -10,7 +10,6 @@
         : "basic";
     var requiresMeetingForNumber = Model.IsCreate && Model.PouzivatIdentJednani;
     var createBlockedByMissingMeeting = requiresMeetingForNumber && !Model.MaDostupneJednaniProCislo;
-    var isPagePresentation = string.Equals(Model.Presentation, "page", StringComparison.OrdinalIgnoreCase);
     var deleteFallbackTab = string.Equals(defaultEditorTab, "schedule", StringComparison.OrdinalIgnoreCase)
         ? "harmonogram"
         : "zaznamy";
@@ -22,14 +21,36 @@
             zaznamId = Model.Id,
             returnUrl = Model.ReturnUrl,
             tab = deleteFallbackTab,
-            uiContext = isPagePresentation ? "page" : "project"
+            uiContext = "page"
         })
         : null;
-}
 
-@if (!isPagePresentation)
-{
-    <h2 id="record-modal-title">@(!string.IsNullOrWhiteSpace(Model.ModalTitle) ? Model.ModalTitle : (Model.IsCreate ? "Nový projektový záznam" : "Upravit záznam"))</h2>
+    // Lego pm-tabs architecture: filtrujeme jen viditelné taby a per-pozice volíme tag
+    // (pm-tab-left | pm-tab | pm-tab-right). Skryté taby v markupu vůbec nejsou —
+    // disabled/hidden tab znemožňoval správné vykreslení outer rohů sousedů.
+    var editorTabs = new List<(string Key, string Label, string DataAttrs)>();
+    if (canUseBasicTabs)
+    {
+        editorTabs.Add(("basic", "Základní údaje", "data-record-modal-tab=\"basic\""));
+        if (Model.ShowExternalTab)
+        {
+            editorTabs.Add(("external", "Externí vazby", "data-record-modal-tab=\"external\""));
+        }
+        if (Model.ShowCollaborationTab)
+        {
+            editorTabs.Add(("collaboration", "Spolupráce", "data-record-modal-tab=\"collaboration\""));
+        }
+    }
+    if (Model.JeUkolKategorie)
+    {
+        editorTabs.Add(("schedule", "Harmonogram", "data-record-modal-tab=\"schedule\" data-record-schedule-tab"));
+    }
+
+    string EditorTabTagFor(int index, int total) =>
+        total == 1 ? "pm-tab-left"
+        : index == 0 ? "pm-tab-left"
+        : index == total - 1 ? "pm-tab-right"
+        : "pm-tab";
 }
 
 <form class="form-grid record-editor-form @(isProposalDetail ? "proposal-detail-form" : null)"
@@ -38,7 +59,6 @@
       method="post"
       data-ajax-submit="@(Model.UseAjaxSubmit ? "true" : "false")"
       data-record-editor-form="true"
-      data-record-editor-presentation="@Model.Presentation"
       data-record-editor-back-url="@Model.BackUrl"
       data-record-editor-project-id="@Model.ProjektId"
       data-record-owner-autofill="true"
@@ -52,7 +72,6 @@
     <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
     <input type="hidden" name="CisloZaznamu" value="@Model.CisloZaznamu" />
     <input type="hidden" name="EditorTab" value="@defaultEditorTab" data-record-active-tab-input />
-    <input type="hidden" name="Presentation" value="@Model.Presentation" />
     <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
     <input type="hidden" name="UiContext" value="@Model.UiContext" />
     <input type="hidden" name="MeetingId" value="@(Model.MeetingId?.ToString(CultureInfo.InvariantCulture))" />
@@ -61,73 +80,47 @@
         <input type="hidden" name="ProposalId" value="@Model.ProposalId.Value" />
     }
 
-    <div class="record-modal-tabs" data-record-modal-tabs>
-        <button class="record-modal-tab @(defaultEditorTab == "basic" ? "active" : null)"
-                type="button"
-                data-record-modal-tab="basic"
-                @(canUseBasicTabs ? null : "hidden=\"hidden\"")>
-            Základní údaje
-        </button>
-        <button class="record-modal-tab"
-                type="button"
-                data-record-modal-tab="external"
-                @(canUseBasicTabs && Model.ShowExternalTab ? null : "hidden=\"hidden\"")>
-            Externí vazby
-        </button>
-        <button class="record-modal-tab"
-                type="button"
-                data-record-modal-tab="collaboration"
-                @(canUseBasicTabs && Model.ShowCollaborationTab ? null : "hidden=\"hidden\"")>
-            Spolupráce
-        </button>
-        <button class="record-modal-tab @(defaultEditorTab == "schedule" ? "active" : null)"
-                type="button"
-                data-record-modal-tab="schedule"
-                data-record-schedule-tab
-                @(Model.JeUkolKategorie ? null : "hidden=\"hidden\"")>
-            Harmonogram
-        </button>
-    </div>
+    @* pm-tabs Web Component — system-wide tabs (defined in /js/components/pmTabs.js).
+       Aktivní tab je inicializován z defaultEditorTab (server-side); JS následně
+       respektuje URL hash (#pmtab-record-edit=schedule) pro persistenci přes reload.
+       sync-input="EditorTab" zrcadlí active key do skrytého inputu pro form binding.
+       Schedule-specific behaviors (planner recalc) jsou navázané na pm-tab-change event
+       v recordEditor/form.js.
 
-    @await Html.PartialAsync(
-        "~/Views/Projekty/_EditZaznamBasicPanel.cshtml",
-        Model,
-        new ViewDataDictionary(ViewData)
-        {
-            ["IsActive"] = defaultEditorTab == "basic"
-        })
-
-    @if (Model.ShowExternalTab)
-    {
-        @await Html.PartialAsync(
-            "~/Views/Projekty/_EditZaznamExternalPanel.cshtml",
-            Model,
-            new ViewDataDictionary(ViewData)
+       Backward-compat data atributy (data-record-modal-tab, data-record-modal-panel)
+       zůstávají zachované pro JS, který panely vyhledává přímo (např. schedule planner). *@
+    <pm-tabs persist="hash"
+             persist-key="record-edit"
+             sync-input="EditorTab"
+             initial="@defaultEditorTab">
+        <pm-tab-list data-record-modal-tabs>
+            @for (int i = 0; i < editorTabs.Count; i++)
             {
-                ["IsActive"] = false
-            })
-    }
+                var et = editorTabs[i];
+                var tagName = EditorTabTagFor(i, editorTabs.Count);
+                @Html.Raw($"<{tagName} key=\"{et.Key}\" {et.DataAttrs}>{et.Label}</{tagName}>")
+            }
+        </pm-tab-list>
 
-    @if (Model.ShowCollaborationTab)
-    {
-        @await Html.PartialAsync(
-            "~/Views/Projekty/_EditZaznamCollaborationPanel.cshtml",
-            Model,
-            new ViewDataDictionary(ViewData)
-            {
-                ["IsActive"] = false
-            })
-    }
+        @await Html.PartialAsync("~/Views/Projekty/_EditZaznamBasicPanel.cshtml", Model)
 
-    @await Html.PartialAsync(
-        "~/Views/Projekty/_EditZaznamSchedulePanel.cshtml",
-        Model,
-        new ViewDataDictionary(ViewData)
+        @if (Model.ShowExternalTab)
         {
-            ["IsActive"] = defaultEditorTab == "schedule"
-        })
+            @await Html.PartialAsync("~/Views/Projekty/_EditZaznamExternalPanel.cshtml", Model)
+        }
 
-    <div class="record-editor-actions @(isPagePresentation ? "record-editor-actions-page" : "record-editor-actions-modal")">
+        @if (Model.ShowCollaborationTab)
+        {
+            @await Html.PartialAsync("~/Views/Projekty/_EditZaznamCollaborationPanel.cshtml", Model)
+        }
+
+        @if (Model.JeUkolKategorie)
+        {
+            @await Html.PartialAsync("~/Views/Projekty/_EditZaznamSchedulePanel.cshtml", Model)
+        }
+    </pm-tabs>
+
+    <div class="record-editor-actions record-editor-actions-page">
         @if (!Model.IsProposalEditor && !Model.IsProposalDecisionDetail && !Model.IsCreate && !string.IsNullOrWhiteSpace(deleteRecordModalUrl))
         {
             <pm-button variant="Destructive"
@@ -135,22 +128,11 @@
                 Smazat natrvalo
             </pm-button>
         }
-        @if (isPagePresentation)
-        {
-            <pm-button variant="Secondary"
-                       data-record-editor-cancel="true"
-                       data-record-editor-back-url="@Model.BackUrl">
-                Zrušit a vrátit se
-            </pm-button>
-        }
-        else
-        {
-            <pm-button variant="Secondary"
-                       data-modal-close="true"
-                       data-record-editor-back-url="@Model.BackUrl">
-                Zrušit
-            </pm-button>
-        }
+        <pm-button variant="Secondary"
+                   data-record-editor-cancel="true"
+                   data-record-editor-back-url="@Model.BackUrl">
+            Zrušit a vrátit se
+        </pm-button>
         @if (!string.IsNullOrWhiteSpace(Model.SecondaryNote))
         {
             <p class="muted record-editor-secondary-note">@Model.SecondaryNote</p>
@@ -198,9 +180,7 @@
                        disabled="@createBlockedByMissingMeeting">
                 @(!string.IsNullOrWhiteSpace(Model.PrimaryActionLabel)
                     ? Model.PrimaryActionLabel
-                    : (isPagePresentation
-                        ? (Model.IsCreate ? "Založit a vrátit se do projektu" : "Uložit a vrátit se do projektu")
-                        : (Model.IsCreate ? "Založit záznam" : "Uložit")))
+                    : (Model.IsCreate ? "Založit a vrátit se do projektu" : "Uložit a vrátit se do projektu"))
             </pm-button>
         }
     </div>

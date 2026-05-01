@@ -28,17 +28,17 @@ function readProjectListStatusFilterState(doneKey, deletedKey) {
 
 function syncProjectListStatusFilterInputs(root, doneKey, deletedKey) {
     const state = readProjectListStatusFilterState(doneKey, deletedKey);
-    root.querySelectorAll("[data-project-status-hide]").forEach((input) => {
-        if (!(input instanceof HTMLInputElement)) {
-            return;
-        }
-
-        const statusCode = (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
-        if (statusCode === "DONE") {
-            input.checked = state.hideDone;
-        }
-        else if (statusCode === "DELETED") {
-            input.checked = state.hideDeleted;
+    // Komponenta <gov-form-switch> má reflektovaný `checked` atribut.
+    root.querySelectorAll("gov-form-switch[data-project-status-hide]").forEach((el) => {
+        const statusCode = (el.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
+        const desired = statusCode === "DONE" ? state.hideDone
+                      : statusCode === "DELETED" ? state.hideDeleted
+                      : null;
+        if (desired === null) return;
+        if (desired) {
+            el.setAttribute("checked", "");
+        } else {
+            el.removeAttribute("checked");
         }
     });
 }
@@ -77,9 +77,9 @@ export function applyProjectIndexFilters(scope, options = {}) {
 
     syncProjectListStatusFilterInputs(root, options.hideDoneStorageKey, options.hideDeletedStorageKey);
 
-    const hiddenStatusCodes = Array.from(root.querySelectorAll("[data-project-status-hide]"))
-        .filter((input) => input instanceof HTMLInputElement && input.checked)
-        .map((input) => (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase())
+    const hiddenStatusCodes = Array.from(root.querySelectorAll("gov-form-switch[data-project-status-hide]"))
+        .filter((el) => !!el.checked)
+        .map((el) => (el.getAttribute("data-project-status-hide") || "").trim().toUpperCase())
         .filter(Boolean);
 
     shell.querySelectorAll("[data-project-list-row]").forEach((row) => {
@@ -107,17 +107,18 @@ export function toggleProjectStatusFilterPanel(button) {
     button.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
 }
 
-export function handleProjectStatusFilterInput(input, options = {}) {
-    if (!(input instanceof HTMLInputElement)) {
+export function handleProjectStatusFilterInput(el, options = {}) {
+    if (!(el instanceof HTMLElement)) {
         return;
     }
 
-    const statusCode = (input.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
+    const statusCode = (el.getAttribute("data-project-status-hide") || "").trim().toUpperCase();
+    const checked = !!el.checked;
     if (statusCode === "DONE") {
-        writeBooleanStorage(options.hideDoneStorageKey, input.checked);
+        writeBooleanStorage(options.hideDoneStorageKey, checked);
     }
     else if (statusCode === "DELETED") {
-        writeBooleanStorage(options.hideDeletedStorageKey, input.checked);
+        writeBooleanStorage(options.hideDeletedStorageKey, checked);
     }
 
     applyProjectIndexFilters(document, options);
@@ -138,11 +139,11 @@ export function initProjectIndexStatusFilters(scope, options = {}) {
         });
     }
 
-    document.querySelectorAll("[data-project-status-hide]").forEach((input) => {
-        if (input instanceof HTMLInputElement && input.dataset.boundProjectStatusFilter !== "true") {
-            input.dataset.boundProjectStatusFilter = "true";
-            input.addEventListener("change", () => {
-                handleProjectStatusFilterInput(input, options);
+    document.querySelectorAll("gov-form-switch[data-project-status-hide]").forEach((el) => {
+        if (el.dataset.boundProjectStatusFilter !== "true") {
+            el.dataset.boundProjectStatusFilter = "true";
+            el.addEventListener("gov-change", () => {
+                handleProjectStatusFilterInput(el, options);
             });
         }
     });

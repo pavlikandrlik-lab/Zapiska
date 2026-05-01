@@ -253,9 +253,7 @@ public sealed partial class RecordProposalService
     {
         model.PageTitle = "Navrhnout založení záznamu";
         model.ModalTitle = "Nový návrh založení záznamu";
-        model.PrimaryActionLabel = model.Presentation.Equals("page", StringComparison.OrdinalIgnoreCase)
-            ? "Odeslat návrh a vrátit se do projektu"
-            : "Odeslat návrh";
+        model.PrimaryActionLabel = "Odeslat návrh a vrátit se do projektu";
         model.FormController = "Navrhy";
         model.FormAction = "SubmitCreateProposal";
         model.ProposalEditorMode = RecordProposalEditorModes.CreateProposal;
@@ -266,9 +264,7 @@ public sealed partial class RecordProposalService
     {
         model.PageTitle = $"Navrhnout změnu termínu a harmonogramu záznamu {model.CisloViditelne}";
         model.ModalTitle = $"Navrhnout změnu termínu a harmonogramu #{model.CisloViditelne}";
-        model.PrimaryActionLabel = model.Presentation.Equals("page", StringComparison.OrdinalIgnoreCase)
-            ? "Odeslat návrh a vrátit se do projektu"
-            : "Odeslat návrh";
+        model.PrimaryActionLabel = "Odeslat návrh a vrátit se do projektu";
         model.FormController = "Navrhy";
         model.FormAction = "SubmitScheduleProposal";
         model.ProposalEditorMode = RecordProposalEditorModes.SchedulePlanProposal;
@@ -290,9 +286,7 @@ public sealed partial class RecordProposalService
     {
         model.PageTitle = "Nový projektový záznam";
         model.ModalTitle = "Nový projektový záznam";
-        model.PrimaryActionLabel = model.Presentation.Equals("page", StringComparison.OrdinalIgnoreCase)
-            ? "Založit a vrátit se do projektu"
-            : "Založit záznam";
+        model.PrimaryActionLabel = "Založit a vrátit se do projektu";
         model.FormController = "Zaznamy";
         model.FormAction = "Save";
         model.ProposalEditorMode = RecordProposalEditorModes.None;
@@ -303,9 +297,7 @@ public sealed partial class RecordProposalService
     {
         model.PageTitle = $"Upravit záznam {model.CisloViditelne}";
         model.ModalTitle = $"Upravit záznam #{model.CisloViditelne}";
-        model.PrimaryActionLabel = model.Presentation.Equals("page", StringComparison.OrdinalIgnoreCase)
-            ? "Uložit a vrátit se do projektu"
-            : "Uložit";
+        model.PrimaryActionLabel = "Uložit a vrátit se do projektu";
         model.FormController = "Zaznamy";
         model.FormAction = "Save";
         model.ProposalEditorMode = RecordProposalEditorModes.None;

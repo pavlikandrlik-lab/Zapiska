@@ -31,137 +31,20 @@
             </pm-button>
             @if (Model.CanManageRecords)
             {
-                <pm-button variant="Primary"
-                           data-record-editor-url="@Model.CreateRecordEditorUrl"
-                           data-record-editor-project-id="@Model.ProjektId"
-                           data-record-editor-label="Nový záznam">
+                <pm-button variant="Primary" href="@Model.CreateRecordEditorUrl">
                     Nový záznam
                 </pm-button>
             }
             @if (Model.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.CreateRecordProposalUrl))
             {
-                <pm-button variant="Secondary"
-                           data-record-editor-url="@Model.CreateRecordProposalUrl"
-                           data-record-editor-project-id="@Model.ProjektId"
-                           data-record-editor-label="Nový návrh založení záznamu">
+                <pm-button variant="Secondary" href="@Model.CreateRecordProposalUrl">
                     Nový návrh záznamu
                 </pm-button>
             }
         </div>
     </div>
 
-    <div class="filter-shell"
-         data-project-filter-scope="records"
-         data-project-id="@Model.ProjektId"
-         data-current-user-id="@Model.CurrentUserOsobaId">
-        <button class="filter-toggle" type="button" data-filter-toggle>
-            Filtry
-            <span class="filter-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>
-                </svg>
-            </span>
-        </button>
-        <div class="active-filter-row" data-filter-chip-row="records" hidden="hidden"></div>
-        <div class="filter-panel collapsed" data-filter-panel>
-            <div class="filter-grid">
-                <label class="gov-switch filter-inline-wide">
-                    <input type="checkbox" checked="checked" data-filter-key="groupBySubsystem" />
-                    <span class="gov-switch-track" aria-hidden="true">
-                        <span class="gov-switch-thumb"></span>
-                    </span>
-                    <span class="gov-switch-label">Seskupit dle subsystému</span>
-                </label>
-                <label>
-                    Subsystém
-                    <select data-filter-key="subsystem">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.SubsystemyMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Řadit podle
-                    <select data-filter-key="sortBy">
-                        <option value="project-asc" selected="selected">podle pořadí projektu vzestupně</option>
-                        <option value="project-desc">podle pořadí projektu sestupně</option>
-                        <option value="alpha-asc">abecedně vzestupně (A-Z)</option>
-                        <option value="alpha-desc">abecedně sestupně (Z-A)</option>
-                    </select>
-                </label>
-                <label>
-                    Kategorie
-                    <select data-filter-key="kategorie">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.KategorieMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Stav úkolu
-                    <select data-filter-key="stav">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.StavyUkoluMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Typ úkolu
-                    <select data-filter-key="typ">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.TypyUkoluMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    Vlastník
-                    <select data-filter-key="vlastnik">
-                        <option value="">Všichni</option>
-                        @foreach (var item in Model.Filtry.VlastniciMoznosti)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-                <label class="gov-switch">
-                    <input type="checkbox" checked="checked" data-filter-key="aktivni" />
-                    <span class="gov-switch-track" aria-hidden="true">
-                        <span class="gov-switch-thumb"></span>
-                    </span>
-                    <span class="gov-switch-label">Pouze aktivní záznamy</span>
-                </label>
-                <label class="gov-switch">
-                    <input type="checkbox" data-filter-key="mine" />
-                    <span class="gov-switch-track" aria-hidden="true">
-                        <span class="gov-switch-thumb"></span>
-                    </span>
-                    <span class="gov-switch-label">Jen mé záznamy</span>
-                </label>
-                <label>
-                    Jednání-vyjádření
-                    <select data-filter-key="jednani-vyjadreni-stav">
-                        <option value="">Vše</option>
-                        @foreach (var item in Model.Filtry.StavyJednaniVyjadreni)
-                        {
-                            <option value="@item.Value">@item.Label</option>
-                        }
-                    </select>
-                </label>
-            </div>
-            <div class="filter-actions">
-                <pm-button variant="Ghost" size="Small" data-filter-save-defaults="records">Uložit jako výchozí</pm-button>
-                <span class="filter-save-status" data-filter-save-status="records" aria-live="polite"></span>
-            </div>
-        </div>
-    </div>
+    @await Html.PartialAsync("_ProjectFilterShell", Model.FilterShell)
 
     <div class="records-shell" data-records-view="subsystem" data-subsystem-grouped-shell>
         <aside class="subsystem-scroll-indicator" data-subsystem-scroll-indicator hidden aria-live="polite">

@@ -11,6 +11,7 @@
 // eventBus.js MUSÍ být první: registruje gov-click → click adapter. Bez něj
 // všechna <gov-button> tlačítka zůstávají hluchá (gov-design-system 4.x emituje
 // 'gov-click' a stopuje nativní click).
+import "../components/pmTabs.js";
 import "./eventBus.js";
 import "./externiOdkaz/sync.js";
 import "./vyjadreni/chatModal.js";
@@ -47,6 +48,7 @@ import {
     clearProjectFilterInput,
     clearProjectFilterPreferenceStorage,
     handleProjectFilterInputChange as handleProjectFilterModuleInputChange,
+    initProjectFilterTabSync,
     persistFilterState,
     saveProjectFilterDefaults,
     setFilterPanelOpen
@@ -77,10 +79,8 @@ import {
     applyProjectScheduleFilters,
     initProjectScheduleUi,
     initRecordSchedulePlanner,
-    persistScheduleFilterState,
     queueRecordSchedulePlannerRecalc,
     renderStaticTimelineAxes,
-    setScheduleFilterPanelOpen,
     toggleScheduleBreakdown
 } from "./schedule.js";
 import {
@@ -301,22 +301,17 @@ function handleDocumentClick(event) {
         return;
     }
 
+    // Sjednocený filter toggle handler 2026-04-30: scope se detekuje z DOM (closest shell),
+    // panel se hledá uvnitř shell aby v případě dvou mountovaných shellů (records + schedule)
+    // nedošlo k záměně. Spec project-filter-unification-design.
     const filterToggle = target.closest("[data-filter-toggle]");
     if (filterToggle) {
-        const filterPanel = document.querySelector("[data-filter-panel]");
-        if (filterPanel) {
+        const shell = filterToggle.closest("[data-project-filter-scope]");
+        const scope = shell?.getAttribute("data-project-filter-scope");
+        const filterPanel = shell?.querySelector("[data-filter-panel]");
+        if (scope && filterPanel instanceof HTMLElement) {
             const isCollapsed = filterPanel.classList.contains("collapsed");
-            setFilterPanelOpen(isCollapsed);
-        }
-        return;
-    }
-
-    const scheduleFilterToggle = target.closest("[data-schedule-filter-toggle]");
-    if (scheduleFilterToggle) {
-        const filterPanel = document.querySelector("[data-schedule-filter-panel]");
-        if (filterPanel instanceof HTMLElement) {
-            const isCollapsed = filterPanel.classList.contains("collapsed");
-            setScheduleFilterPanelOpen(isCollapsed);
+            setFilterPanelOpen(scope, isCollapsed);
         }
         return;
     }
@@ -556,6 +551,19 @@ function syncProjectPouzivatIdentJednaniHidden(target) {
     }
 }
 
+function syncSyncCardSwitchHidden(target) {
+    const sw = target.closest("gov-form-switch[data-sync-card-switch]");
+    if (!isGovFormSwitchEl(sw)) return;
+    const row = sw.closest(".sync-job-card__row--switch");
+    if (!(row instanceof HTMLElement)) return;
+    const hidden = row.querySelector('[data-sync-card-switch-state]');
+    if (hidden instanceof HTMLInputElement) {
+        hidden.value = sw.checked ? "true" : "false";
+    }
+}
+
+// (legacy handleSyncTabClick removed — sync settings nyní používá pm-tabs Web Component)
+
 function handleDocumentChange(event) {
     const target = event.target;
     if (!(target instanceof Element)) {
@@ -563,15 +571,14 @@ function handleDocumentChange(event) {
     }
 
     syncProjectPouzivatIdentJednaniHidden(target);
+    syncSyncCardSwitchHidden(target);
 
+    // Sjednocený filter input handler 2026-04-30: persistFilterState detekuje scope
+    // z DOM (closest shell) — funguje pro records i schedule shell. Spec
+    // project-filter-unification-design.
     const filterInput = target.closest("[data-filter-key]");
     if (filterInput instanceof HTMLInputElement || filterInput instanceof HTMLSelectElement || isGovFormSwitchEl(filterInput)) {
         persistFilterState(filterInput);
-    }
-
-    const scheduleFilterInput = target.closest("[data-schedule-filter-key]");
-    if (scheduleFilterInput instanceof HTMLInputElement || scheduleFilterInput instanceof HTMLSelectElement || isGovFormSwitchEl(scheduleFilterInput)) {
-        persistScheduleFilterState(scheduleFilterInput);
     }
 
     const categorySelect = target.closest("[data-kategorie-select]");
@@ -594,20 +601,14 @@ function handleDocumentInput(event) {
         return;
     }
 
+    // Sjednocený filter input change handler — sdílí persistFilterState s gov-change handler
+    // (handleDocumentChange). Spec 2026-04-30 project-filter-unification-design.
     const filterInput = target.closest("[data-filter-key]");
     if (filterInput instanceof HTMLInputElement || filterInput instanceof HTMLSelectElement) {
         if (filterInput instanceof HTMLInputElement && filterInput.type === "checkbox") {
             return;
         }
         persistFilterState(filterInput);
-    }
-
-    const scheduleFilterInput = target.closest("[data-schedule-filter-key]");
-    if (scheduleFilterInput instanceof HTMLInputElement || scheduleFilterInput instanceof HTMLSelectElement) {
-        if (scheduleFilterInput instanceof HTMLInputElement && scheduleFilterInput.type === "checkbox") {
-            return;
-        }
-        persistScheduleFilterState(scheduleFilterInput);
     }
 }
 
@@ -727,6 +728,7 @@ export function bootstrapPmTrackerApp() {
         () => initProjectTabs(),
         () => initProjectRecordsUi({ preserveServerView: true }),
         () => initProjectScheduleUi(),
+        () => initProjectFilterTabSync(),
         () => initProjectRecordPageshowSync(),
         () => initCommentSortUi(document),
         () => initTheme(),

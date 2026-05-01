@@ -265,72 +265,52 @@ export function updateTaskTypeVisibility(categorySelect) {
     }
 }
 
+/**
+ * setRecordFormTab je nyní tenká wrapper-vrstva nad pm-tabs Web Component.
+ * Tab switching, panel visibility a sync hidden inputu řeší pm-tabs (definovaný
+ * v /js/components/pmTabs.js); schedule-specific behaviors (planner recalc,
+ * rainbow render, snapshot rebuild) jsou navázané na pm-tab-change event
+ * v initRecordFormTabs níže.
+ */
 export function setRecordFormTab(form, tabKey) {
-    if (!(form instanceof HTMLFormElement)) {
-        return;
-    }
-
-    const tabs = form.querySelectorAll("[data-record-modal-tab]");
-    const panels = form.querySelectorAll("[data-record-modal-panel]");
-    if (tabs.length === 0 || panels.length === 0) {
-        return;
-    }
-
+    if (!(form instanceof HTMLFormElement)) return;
+    const tabs = form.querySelector("pm-tabs");
+    if (!tabs || typeof tabs.setActive !== "function") return;
     const requestedTab = typeof tabKey === "string" ? tabKey : "basic";
-    const requestedButton = form.querySelector(`[data-record-modal-tab="${requestedTab}"]`);
-    const normalizedTab = requestedButton instanceof HTMLElement && !requestedButton.hidden
+    // Lego variants: tab může být pm-tab-left/pm-tab/pm-tab-right/pm-tab-last-in-row
+    // podle pozice v řadě. Sdílejí key= atribut, jen tag se liší.
+    const tabSelector = `pm-tab[key="${requestedTab}"], pm-tab-left[key="${requestedTab}"], pm-tab-right[key="${requestedTab}"], pm-tab-last-in-row[key="${requestedTab}"]`;
+    const requestedButton = form.querySelector(tabSelector);
+    const normalized = requestedButton instanceof HTMLElement && !requestedButton.hidden
         ? requestedTab
         : "basic";
+    tabs.setActive(normalized);
+}
 
-    tabs.forEach((tab) => {
-        if (!(tab instanceof HTMLElement)) {
-            return;
-        }
+/** Schedule-specific reakce na přepnutí na schedule tab. */
+function onScheduleTabActivated(form) {
+    if (!form._recordSchedulePlanner) {
+        initRecordSchedulePlanner(form);
+    }
+    if (form._recordSchedulePlanner && typeof form._recordSchedulePlanner.recalcAll === "function") {
+        form._recordSchedulePlanner.recalcAll();
+    }
+    queueRecordSchedulePlannerRecalc(form, 0);
 
-        tab.classList.toggle("active", tab.dataset.recordModalTab === normalizedTab);
-    });
-
-    panels.forEach((panel) => {
-        if (!(panel instanceof HTMLElement)) {
-            return;
-        }
-
-        const active = panel.dataset.recordModalPanel === normalizedTab;
-        panel.hidden = !active;
-        panel.classList.toggle("active", active);
-    });
-
-    const activeTabInput = form.querySelector("[data-record-active-tab-input]");
-    if (activeTabInput instanceof HTMLInputElement) {
-        activeTabInput.value = normalizedTab;
+    const harmonogramPanel = form.querySelector('[data-record-modal-panel="schedule"]');
+    if (harmonogramPanel instanceof HTMLElement) {
+        queueRainbowSegmentRender(harmonogramPanel);
     }
 
-    if (normalizedTab === "schedule") {
-        if (!form._recordSchedulePlanner) {
-            initRecordSchedulePlanner(form);
+    // Schedule planner přepsal hodnoty UiHarmonogramDatumy[*] a normalizoval
+    // duration/delay inputy. Toto není uživatelská změna — obnovíme snapshot,
+    // aby se po přepnutí na schedule tab nespouštěl close guard a modal šel
+    // zavřít. Viz docs/specs/modal-close-guard.md.
+    window.requestAnimationFrame(() => {
+        if (form.isConnected) {
+            form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
         }
-
-        if (form._recordSchedulePlanner && typeof form._recordSchedulePlanner.recalcAll === "function") {
-            form._recordSchedulePlanner.recalcAll();
-        }
-
-        queueRecordSchedulePlannerRecalc(form, 0);
-
-        const harmonogramPanel = form.querySelector('[data-record-modal-panel="schedule"]');
-        if (harmonogramPanel instanceof HTMLElement) {
-            queueRainbowSegmentRender(harmonogramPanel);
-        }
-
-        // Schedule planner přepsal hodnoty UiHarmonogramDatumy[*] a normalizoval
-        // duration/delay inputy. Toto není uživatelská změna — obnovíme snapshot,
-        // aby se po přepnutí na schedule tab nespouštěl close guard a modal šel
-        // zavřít. Viz docs/specs/modal-close-guard.md.
-        window.requestAnimationFrame(() => {
-            if (form.isConnected) {
-                form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
-            }
-        });
-    }
+    });
 }
 
 export function initExternalLinksEditors(scope) {
@@ -626,27 +606,33 @@ export function initMeetingNumberValidation(scope) {
     });
 }
 
+/**
+ * Naváže pm-tab-change event listener na každý record editor form. Tab switching
+ * + panel visibility + hidden input sync řeší pm-tabs sám; tady reagujeme jen
+ * na schedule tab aktivaci (planner recalc, rainbow render, snapshot rebuild).
+ */
 export function initRecordFormTabs(scope) {
     scope.querySelectorAll('form[data-record-form-tabs="true"]').forEach((form) => {
         if (!(form instanceof HTMLFormElement) || form.dataset.recordFormTabsReady === "true") {
             return;
         }
-
         form.dataset.recordFormTabsReady = "true";
-        const activeTabInput = form.querySelector("[data-record-active-tab-input]");
-        const initialTab = activeTabInput instanceof HTMLInputElement ? activeTabInput.value : "basic";
-        setRecordFormTab(form, initialTab);
 
-        form.querySelectorAll("[data-record-modal-tab]").forEach((tabButton) => {
-            if (!(tabButton instanceof HTMLButtonElement)) {
-                return;
+        form.addEventListener("pm-tab-change", (event) => {
+            if (!(event instanceof CustomEvent)) return;
+            const key = event.detail && event.detail.key;
+            if (key === "schedule") {
+                onScheduleTabActivated(form);
             }
-
-            tabButton.addEventListener("click", () => {
-                const tabKey = tabButton.dataset.recordModalTab || "basic";
-                setRecordFormTab(form, tabKey);
-            });
         });
+
+        // Pokud pm-tabs už při init zvolil schedule (initial atribut nebo URL hash),
+        // schedule-specific logiku odpálíme proaktivně — pm-tabs samotný
+        // _applyState nevolá pm-tab-change event (silent initial).
+        const tabs = form.querySelector("pm-tabs");
+        if (tabs && tabs.activeKey === "schedule") {
+            onScheduleTabActivated(form);
+        }
     });
 }
 

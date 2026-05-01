@@ -49,14 +49,6 @@
         <p class="profile-preference-status" data-project-filter-preferences-status aria-live="polite"></p>
     </section>
 
-    <section class="card profile-preferences-card">
-        <h2>Výchozí otevření editoru záznamu</h2>
-        <p class="muted">Volba se ukládá pouze v tomto prohlížeči na tomto počítači.</p>
-        <p><strong>Aktuálně:</strong> <span data-record-editor-preference-current>není nastaveno</span></p>
-        <pm-button variant="Secondary" data-record-editor-preference-reset="true">Zrušit uloženou volbu</pm-button>
-        <p class="profile-preference-status" data-record-editor-preference-status aria-live="polite"></p>
-    </section>
-
     @* Inbox #16 (2026-04-21): Reindex vyhledávání — viditelné jen pro super-admina.
        Status + tlačítko se načítají AJAXem z /Search/Status a /Search/Reindex. *@
     @if (Model.Uzivatel.IsSuperAdmin)

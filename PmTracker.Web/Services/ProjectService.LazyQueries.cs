@@ -32,43 +32,7 @@ public sealed partial class ProjectService
     public async Task<ProjektZaznamyTabViewModel> BuildProjectRecordsTabAsync(int id, CancellationToken ct = default)
     {
         var summaries = await BuildRecordCardSummariesForProjectAsync(id, ct);
-        var activeProjectSubsystems = await BuildActiveProjectSubsystemsAsync(id, ct);
-        var subsystemFilterOptions = activeProjectSubsystems
-            .OrderBy(x => x.Kod)
-            .ThenBy(x => x.Nazev)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = string.IsNullOrWhiteSpace(x.Kod) ? x.Nazev : x.Kod,
-                Label = string.IsNullOrWhiteSpace(x.Kod) ? x.Nazev : $"{x.Kod} - {x.Nazev}"
-            })
-            .ToList();
-        // Perf: projekce do LookupOptionViewModel z cached ciselnik dictionary (OrderBy in-memory).
-        var categoryFilterOptions = (await lookupCache.GetCategoriesAsync(ct))
-            .Values.OrderBy(x => x.Id)
-            .Select(x => new LookupOptionViewModel { Value = x.Kod, Label = x.Nazev })
-            .ToList();
-        var taskStateFilterOptions = (await lookupCache.GetTaskStatesAsync(ct))
-            .Values.OrderBy(x => x.Id)
-            .Select(x => new LookupOptionViewModel { Value = x.Kod, Label = x.Nazev })
-            .ToList();
-        var taskTypeFilterOptions = (await lookupCache.GetTaskTypesAsync(ct))
-            .Values.OrderBy(x => x.Id)
-            .Select(x => new LookupOptionViewModel { Value = x.Kod, Label = x.Nazev })
-            .ToList();
-        var meetingStatusFilterOptions = (await lookupCache.GetMeetingStatesAsync(ct))
-            .Values.OrderBy(x => x.Id)
-            .Select(x => new LookupOptionViewModel { Value = x.Id.ToString(CultureInfo.InvariantCulture), Label = x.Nazev })
-            .ToList();
-        var ownerFilterOptions = summaries
-            .Where(x => x.Summary.AktualniVlastnikId > 0)
-            .GroupBy(x => x.Summary.AktualniVlastnikId)
-            .Select(group => new LookupOptionViewModel
-            {
-                Value = group.Key.ToString(CultureInfo.InvariantCulture),
-                Label = group.First().Summary.AktualniVlastnik
-            })
-            .OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+        var filterShell = await BuildProjectFilterShellAsync(id, "records", ct);
 
         return new ProjektZaznamyTabViewModel
         {
@@ -95,20 +59,7 @@ public sealed partial class ProjectService
                 })
                 .ToList(),
             Zaznamy = summaries,
-            Filtry = new ProjektFiltryViewModel
-            {
-                Subsystemy = summaries.Select(x => x.Summary.AktualniSubsystem).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList(),
-                SubsystemyMoznosti = subsystemFilterOptions,
-                Kategorie = summaries.Select(x => x.Summary.KategorieNazev).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList(),
-                KategorieMoznosti = categoryFilterOptions,
-                StavyUkolu = summaries.Select(x => x.Summary.Stav).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList(),
-                StavyUkoluMoznosti = taskStateFilterOptions,
-                TypyUkolu = summaries.Where(x => !string.IsNullOrWhiteSpace(x.Summary.TypUkolu)).Select(x => x.Summary.TypUkolu!).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList(),
-                TypyUkoluMoznosti = taskTypeFilterOptions,
-                Vlastnici = summaries.Select(x => x.Summary.AktualniVlastnik).Distinct(Ci).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList(),
-                VlastniciMoznosti = ownerFilterOptions,
-                StavyJednaniVyjadreni = meetingStatusFilterOptions
-            }
+            FilterShell = filterShell
         };
     }
 
@@ -126,22 +77,13 @@ public sealed partial class ProjectService
     {
         var scheduleRecords = await BuildScheduleRecordCardsForProjectAsync(id, ct);
         var harmonogramUkoly = await BuildProjectScheduleRowsAsync(scheduleRecords, ct);
-        var activeProjectSubsystems = await BuildActiveProjectSubsystemsAsync(id, ct);
-        var subsystemOptions = activeProjectSubsystems
-            .OrderBy(x => x.Kod)
-            .ThenBy(x => x.Nazev)
-            .Select(x => new LookupOptionViewModel
-            {
-                Value = string.IsNullOrWhiteSpace(x.Kod) ? x.Nazev : x.Kod,
-                Label = string.IsNullOrWhiteSpace(x.Kod) ? x.Nazev : $"{x.Kod} - {x.Nazev}"
-            })
-            .ToList();
+        var filterShell = await BuildProjectFilterShellAsync(id, "schedule", ct);
 
         return new ProjektHarmonogramTabViewModel
         {
             ProjektId = id,
-            SubsystemyMoznosti = subsystemOptions,
-            HarmonogramUkoly = harmonogramUkoly
+            HarmonogramUkoly = harmonogramUkoly,
+            FilterShell = filterShell
         };
     }
 

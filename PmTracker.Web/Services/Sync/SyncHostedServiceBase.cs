@@ -58,7 +58,15 @@ public abstract class SyncHostedServiceBase<TSettings> : BackgroundService
 
             if (!settings.IsEnabled)
             {
-                await SafeDelay(DisabledCheckInterval, stoppingToken).ConfigureAwait(false);
+                // Disabled job stále poslouchá manual signal → user může "Spustit teď"
+                // i když je periodický plánovač vypnutý. Po manual runu se vracíme do
+                // disabled smyčky, dokud admin neaktivuje IsEnabled.
+                var manualWhileDisabled = await WaitForNextTriggerAsync(DisabledCheckInterval, stoppingToken).ConfigureAwait(false);
+                if (stoppingToken.IsCancellationRequested) break;
+                if (manualWhileDisabled == SyncTriggerKind.Manual)
+                {
+                    await ExecuteTickAsync(SyncTriggerKind.Manual, stoppingToken).ConfigureAwait(false);
+                }
                 continue;
             }
 

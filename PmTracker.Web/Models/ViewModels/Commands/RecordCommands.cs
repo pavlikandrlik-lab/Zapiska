@@ -63,8 +63,6 @@ public sealed class SaveRecordCommand
 
     public string? EditorTab { get; set; }
 
-    public string? Presentation { get; set; }
-
     public string? ReturnUrl { get; set; }
 
     public int? JednaniIdProCislo { get; set; }

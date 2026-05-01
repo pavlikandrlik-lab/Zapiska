@@ -130,6 +130,25 @@ public sealed partial class RecordService
                 .FirstOrDefaultAsync(ct) ?? "-"
             : "-";
 
+        // Counts paralelně přes paralelní queries by byly rychlejší, ale dbContext
+        // není thread-safe pro souběžné enumerace. Sekvenčně je to ~9 round-tripů na DB,
+        // pro intranet acceptable. Při potřebě perf optimalizace lze přepsat na single
+        // SELECT s 9 sub-counts.
+        var vyjadreniCount = await dbContext.Vyjadreni.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
+        var externiVazbyCount = await dbContext.ZaznamExterniOdkazy.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
+        var spolupraceCount = await dbContext.ZaznamSpoluprace.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
+        var harmonogramCount = await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
+        var harvestCount = await dbContext.VyjadreniVazby.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
+        var navrhyTargetCount = await dbContext.ZaznamNavrhy.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
+        var navrhyOriginCount = await dbContext.ZaznamNavrhy.AsNoTracking().CountAsync(x => x.ApprovedRecordId == zaznamId, ct);
+        var historieCount =
+            await dbContext.ZaznamHistorieZmenTypu.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct)
+            + await dbContext.ZaznamHistorieTerminu.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct)
+            + await dbContext.ZaznamHistorieVlastnik.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct)
+            + await dbContext.ZaznamHistorieSubsystem.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct)
+            + await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct)
+            + await dbContext.ZaznamHistorieStavuProjektu.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
+
         return new DeleteRecordModalViewModel
         {
             Title = "Smazat záznam natrvalo",
@@ -144,10 +163,14 @@ public sealed partial class RecordService
             Nazev = record.Nazev,
             Kategorie = categoryName,
             Stav = stateName,
-            VyjadreniCount = await dbContext.Vyjadreni.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct),
-            ExterniVazbyCount = await dbContext.ZaznamExterniOdkazy.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct),
-            SpolupraceCount = await dbContext.ZaznamSpoluprace.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct),
-            HarmonogramCount = await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct)
+            VyjadreniCount = vyjadreniCount,
+            ExterniVazbyCount = externiVazbyCount,
+            SpolupraceCount = spolupraceCount,
+            HarmonogramCount = harmonogramCount,
+            HarvestVyjadreniCount = harvestCount,
+            NavrhyTargetCount = navrhyTargetCount,
+            NavrhyOriginCount = navrhyOriginCount,
+            HistorieCount = historieCount
         };
     }
 }

@@ -217,68 +217,194 @@ public sealed class SDConnectorController : Controller
             });
         }
 
-        // 1) Fingerprint z HOT_ZAZNAMY — existence check + datum/stav/typ záznamu.
-        var fingerprints = await _vyjadreni
-            .GetHotZaznamFingerprintsAsync(new[] { cislo }, ct)
-            .ConfigureAwait(false);
-
-        if (!fingerprints.TryGetValue(cislo, out var fp))
+        // DIAGNOSTIC: stage tracker pro debug HTTP 500 — odstranit po stabilizaci.
+        var stage = "init";
+        try
         {
+            // 1) Fingerprint z HOT_ZAZNAMY — existence check + datum/stav/typ záznamu.
+            stage = "fingerprint";
+            var fingerprints = await _vyjadreni
+                .GetHotZaznamFingerprintsAsync(new[] { cislo }, ct)
+                .ConfigureAwait(false);
+
+            if (!fingerprints.TryGetValue(cislo, out var fp))
+            {
+                return Ok(new SDConnectorLoadResponse
+                {
+                    Nalezeno = false,
+                    Error = $"Ticket #{cislo} v HOT_ZAZNAMY neexistuje."
+                });
+            }
+
+            // 2) Plný HOT_ZAZNAMY řádek (strucne + popis raw HTML).
+            stage = "ticket-full";
+            var ticket = await _ticketing.GetZaznamAsync(cislo, ct).ConfigureAwait(false);
+
+            stage = "externi-odkaz-lookup";
+            var externiOdkazId = await LookupExterniOdkazIdAsync(cislo, ct).ConfigureAwait(false);
+
+            var header = new SDConnectorRawHeader
+            {
+                Cislo = cislo,
+                TypZaznamu = fp.TypZaznamu ?? ticket?.TypZaznamu,
+                Stav = fp.Stav,
+                Strucne = ticket?.Strucne,
+                PopisRaw = ticket?.Popis,
+                Datum = fp.Datum,
+                ExterniOdkazId = externiOdkazId
+            };
+
+            // 3) Všechna vyjádření — plain text + klasifikace.
+            stage = "vyjadreni-fetch";
+            var vyjadreni = await _vyjadreni
+                .GetVyjadreniForTicketAsync(cislo, sinceUtc: null, ct)
+                .ConfigureAwait(false);
+
+            stage = "vyjadreni-classify";
+            var bubliny = new List<SDConnectorBublinaDto>(vyjadreni.Count);
+            foreach (var v in vyjadreni)
+            {
+                var display = !string.IsNullOrWhiteSpace(v.Zpracoval)
+                    ? await _adCache.ResolveDisplayNameAsync(v.Zpracoval, ct).ConfigureAwait(false)
+                    : null;
+                var plain = VyjadreniHtmlText.ToPlainText(v.Popis);
+                var kind = HarvestPredicates.ClassifyPopis(v.Popis);
+
+                bubliny.Add(new SDConnectorBublinaDto
+                {
+                    HotId = v.Id,
+                    Typ = v.Typ ?? string.Empty,
+                    Datum = v.Datum,
+                    LoginRaw = v.Zpracoval,
+                    AutorDisplayName = display,
+                    Tym = v.Tym,
+                    PopisRaw = v.Popis,
+                    PopisPlainText = plain,
+                    ClassifiedAs = ClassificationKey(kind)
+                });
+            }
+
             return Ok(new SDConnectorLoadResponse
             {
-                Nalezeno = false,
-                Error = $"Ticket #{cislo} v HOT_ZAZNAMY neexistuje."
+                Nalezeno = true,
+                Raw = header,
+                Bubliny = bubliny
             });
         }
-
-        // 2) Plný HOT_ZAZNAMY řádek (strucne + popis raw HTML).
-        var ticket = await _ticketing.GetZaznamAsync(cislo, ct).ConfigureAwait(false);
-
-        var header = new SDConnectorRawHeader
+        catch (Exception ex)
         {
-            Cislo = cislo,
-            TypZaznamu = fp.TypZaznamu ?? ticket?.TypZaznamu,
-            Stav = fp.Stav,
-            Strucne = ticket?.Strucne,
-            PopisRaw = ticket?.Popis,
-            Datum = fp.Datum,
-            ExterniOdkazId = await LookupExterniOdkazIdAsync(cislo, ct).ConfigureAwait(false)
-        };
-
-        // 3) Všechna vyjádření — plain text + klasifikace.
-        var vyjadreni = await _vyjadreni
-            .GetVyjadreniForTicketAsync(cislo, sinceUtc: null, ct)
-            .ConfigureAwait(false);
-
-        var bubliny = new List<SDConnectorBublinaDto>(vyjadreni.Count);
-        foreach (var v in vyjadreni)
-        {
-            var display = !string.IsNullOrWhiteSpace(v.Zpracoval)
-                ? await _adCache.ResolveDisplayNameAsync(v.Zpracoval, ct).ConfigureAwait(false)
-                : null;
-            var plain = VyjadreniHtmlText.ToPlainText(v.Popis);
-            var kind = HarvestPredicates.ClassifyPopis(v.Popis);
-
-            bubliny.Add(new SDConnectorBublinaDto
+            _logger.LogError(ex, "[Diag] Inspect/Load selhal ve fázi {Stage} pro ticket {Cislo}.", stage, cislo);
+            // DIAGNOSTIC: surface plnou exception do JSON response, aby user mohl
+            // poslat stack trace bez chození do logů (production logs jsou off).
+            // Bezpečnostní compromise: vystavuje internal stack trace, ale endpoint
+            // je za [Authorize(Policy = "permission:settings.sd.view")] = jen admin.
+            // Po vyřešení root cause TENTO try/catch + logger.LogError nech, ALE
+            // odstraň ex.StackTrace z Error stringu (zachovej typ+message).
+            var diag = $"[stage={stage}] {ex.GetType().FullName}: {ex.Message}";
+            if (ex.InnerException is not null)
             {
-                HotId = v.Id,
-                Typ = v.Typ ?? string.Empty,
-                Datum = v.Datum,
-                LoginRaw = v.Zpracoval,
-                AutorDisplayName = display,
-                Tym = v.Tym,
-                PopisRaw = v.Popis,
-                PopisPlainText = plain,
-                ClassifiedAs = ClassificationKey(kind)
+                diag += $"\n  inner: {ex.InnerException.GetType().FullName}: {ex.InnerException.Message}";
+            }
+            diag += $"\n{ex.StackTrace}";
+            return StatusCode(500, new SDConnectorLoadResponse
+            {
+                Nalezeno = false,
+                Error = diag
             });
         }
+    }
 
-        return Ok(new SDConnectorLoadResponse
+    /// <summary>
+    /// DIAGNOSTIC plain-text endpoint pro debug HTTP 500 v Load. Otevři přímo v URL liště:
+    ///   /SDConnector/Diag?cislo=363139
+    /// Vrací text/plain — žádný JS, žádný JSON, žádný middleware exception handler nepřepíše.
+    /// Spouští stejnou pipeline jako Load, na exception zachytí plný stack trace a inner
+    /// exceptions a vypíše je do response.
+    /// Po vyřešení root cause smazat (i s try/catch v Load).
+    /// </summary>
+    [HttpGet("Diag")]
+    public async Task<IActionResult> Diag(string? cislo, CancellationToken ct)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("=== /SDConnector/Diag — plain-text diagnostic ===");
+        sb.AppendLine($"Time:    {DateTime.UtcNow:O} (UTC)");
+        sb.AppendLine($"Cislo:   {cislo ?? "(null)"}");
+        sb.AppendLine($"User:    {(User.Identity?.IsAuthenticated == true ? User.Identity.Name : "(anonymous)")}");
+        sb.AppendLine($"Ticketing.Enabled: {_ticketingOptions.Value.Enabled}");
+        sb.AppendLine($"Ticketing.ConnectionStringName: {_ticketingOptions.Value.ConnectionStringName}");
+        sb.AppendLine();
+
+        if (string.IsNullOrEmpty(cislo) || !Cislo6Regex.IsMatch(cislo))
         {
-            Nalezeno = true,
-            Raw = header,
-            Bubliny = bubliny
-        });
+            sb.AppendLine("ERROR: Cislo musi byt 6 cifer. Pridej do URL ?cislo=XXXXXX.");
+            return Content(sb.ToString(), "text/plain; charset=utf-8");
+        }
+
+        var stage = "init";
+        try
+        {
+            stage = "fingerprint";
+            sb.AppendLine($"[{stage}] start...");
+            var fingerprints = await _vyjadreni.GetHotZaznamFingerprintsAsync(new[] { cislo }, ct).ConfigureAwait(false);
+            sb.AppendLine($"[{stage}] OK, fingerprints count={fingerprints.Count}");
+
+            if (!fingerprints.TryGetValue(cislo, out var fp))
+            {
+                sb.AppendLine($"INFO: Ticket #{cislo} v HOT_ZAZNAMY neexistuje (fingerprint vratil prazdne).");
+                return Content(sb.ToString(), "text/plain; charset=utf-8");
+            }
+            sb.AppendLine($"[{stage}] fp.Datum={fp.Datum:O}, fp.Stav={fp.Stav}, fp.TypZaznamu={fp.TypZaznamu}");
+
+            stage = "ticket-full";
+            sb.AppendLine($"[{stage}] start (full HotZaznamEntity materialization)...");
+            var ticket = await _ticketing.GetZaznamAsync(cislo, ct).ConfigureAwait(false);
+            sb.AppendLine($"[{stage}] OK, ticket={(ticket == null ? "(null)" : $"Id={ticket.Id}, TypZaznamu={ticket.TypZaznamu}, len(strucne)={ticket.Strucne?.Length ?? 0}")}");
+
+            stage = "externi-odkaz";
+            sb.AppendLine($"[{stage}] start...");
+            var externiOdkazId = await LookupExterniOdkazIdAsync(cislo, ct).ConfigureAwait(false);
+            sb.AppendLine($"[{stage}] OK, externiOdkazId={externiOdkazId}");
+
+            stage = "vyjadreni-fetch";
+            sb.AppendLine($"[{stage}] start (HotVyjadreniEntity materialization)...");
+            var vyjadreni = await _vyjadreni.GetVyjadreniForTicketAsync(cislo, sinceUtc: null, ct).ConfigureAwait(false);
+            sb.AppendLine($"[{stage}] OK, count={vyjadreni.Count}");
+
+            stage = "vyjadreni-classify";
+            sb.AppendLine($"[{stage}] start...");
+            int classified = 0;
+            foreach (var v in vyjadreni)
+            {
+                _ = VyjadreniHtmlText.ToPlainText(v.Popis);
+                _ = HarvestPredicates.ClassifyPopis(v.Popis);
+                classified++;
+            }
+            sb.AppendLine($"[{stage}] OK, classified={classified}");
+
+            sb.AppendLine();
+            sb.AppendLine("=== ALL STAGES PASSED ===");
+            return Content(sb.ToString(), "text/plain; charset=utf-8");
+        }
+        catch (Exception ex)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"!!! EXCEPTION at stage [{stage}] !!!");
+            var current = (Exception?)ex;
+            int depth = 0;
+            while (current is not null)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"-- Level {depth} --");
+                sb.AppendLine($"Type:    {current.GetType().FullName}");
+                sb.AppendLine($"Message: {current.Message}");
+                sb.AppendLine("Stack:");
+                sb.AppendLine(current.StackTrace ?? "(no stack trace)");
+                current = current.InnerException;
+                depth++;
+            }
+            _logger.LogError(ex, "[Diag] /SDConnector/Diag selhal ve fazi {Stage} pro ticket {Cislo}.", stage, cislo);
+            return Content(sb.ToString(), "text/plain; charset=utf-8");
+        }
     }
 
     /// <summary>

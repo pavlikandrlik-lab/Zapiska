@@ -1,7 +1,8 @@
 # Specifikace — dashboard projektu: prodlení NES / PMP / PNF
 
 **Stav:** rozpracováno (fáze 5 implementace)
-**Závisí na:** [ticketing-integration.md](ticketing-integration.md)
+**Závisí na:** [ticketing-integration.md](ticketing-integration.md) (zastaralý — viz banner)
+**Reálné schéma ticketing DB:** [docs/technical/12-servicedesk-schema-reference.md](../technical/12-servicedesk-schema-reference.md) (zdroj pravdy pro datové typy, enumy a join řetězce)
 
 ## Kontext
 
@@ -39,18 +40,20 @@ Nová dlaždice v `ProjectDashboard/Index`:
 
 ## Definice prodlení
 
-**Otevřená otázka** — viz níže D2.
+**Rozhodnuto 2026-04-23** (uzavírá D2 níže):
 
-Pracovní hypotéza (k validaci):
+| Typ ticketu | Termín pro "v prodlení" | Filtr |
+|---|---|---|
+| `NES` | `sla_deadline` | `stav != 'archiv' AND sla_deadline < @reference` |
+| `PMP` | `dat_res_t` | `stav != 'archiv' AND dat_res_t < @reference` |
+| `PNF` | `dat_res_t` | `stav != 'archiv' AND dat_res_t < @reference` |
 
-| Stav ticketu | Co znamená „prodlení"? |
-|---|---|
-| Ticket **aktivní** (není v archivu) | SLA termín ze zobrazovače < dnešek AND ticket nemá finální stav |
-| Ticket **v archivu** | Neukazuje se (je vyřešen / uzavřen) |
+**Klíčová fakta:**
+- Pouze `NES` mají v DB vyplněné `sla_deadline`. Pro PMP a PNF je `sla_deadline` systematicky `NULL`.
+- Sloupec `term_pl` obsahuje v praxi placeholder v budoucnosti (typicky ~2050-12-30) — **nepoužívat pro detekci prodlení**.
+- Metrika "dní v prodlení" = `DATEDIFF(DAY, @termin, @reference)`. Žádná složitější penalizační logika (pracovní dny, svátky, U1–U11 transfery) — ta je **trvale mimo scope PM Trackeru**.
 
-Alternativní hypotéza: **plánovaný termín harmonogramu < dnešek AND krok nemá skutečnost**.
-
-Před implementací potřebujeme rozhodnutí D2.
+Detaily typů a reality checks viz [docs/technical/12-servicedesk-schema-reference.md §5.5](../technical/12-servicedesk-schema-reference.md#55-definice-prodlení-per-typ-ticketu).
 
 ## Datový zdroj
 
@@ -104,10 +107,10 @@ Index: `(ProjektId, Typ, DniProdleni DESC)` pro rychlé top-N dotazy.
 
 | # | Otázka | Kdo rozhodne | Deadline |
 |---|---|---|---|
-| D1 | Typů ticketů je jen 3 (NES/PMP/PNF)? | Zodpovězeno: ano, další typy nejsou | — |
-| D2 | **Přesná definice prodlení** — SLA ze zobrazovače vs. plán harmonogramu vs. datum založení + default lhůta? | Vedení | Před fází 5 |
-| D3 | Zdroj SLA termínu — zobrazovač API/DB, nebo PM Tracker počítá? | Claude doporučení: A (zobrazovač), pokud dostupné | Před fází 5 |
-| D4 | Chová se panel při >20 ticketů odlišně? (paginace, stránkování v detailu) | Claude doporučení: detail tabulka s paginace 25/stránka | Při implementaci |
+| D1 | Typů ticketů je jen 3 (NES/PMP/PNF)? | ✅ Zodpovězeno: ano, další typy nejsou | — |
+| D2 | **Přesná definice prodlení** — SLA ze zobrazovače vs. plán harmonogramu vs. datum založení + default lhůta? | ✅ Zodpovězeno 2026-04-23: NES přes `sla_deadline`, PMP/PNF přes `dat_res_t`. `term_pl` placeholder, nepoužívat. Viz sekce "Definice prodlení" výše. | — |
+| D3 | Zdroj SLA termínu — zobrazovač API/DB, nebo PM Tracker počítá? | ✅ Zodpovězeno: žádný samostatný "zobrazovač" neexistuje. `sla_deadline` je sloupec přímo na `HOT_ZAZNAMY`. | — |
+| D4 | Chová se panel při >20 ticketů odlišně? (paginace, stránkování v detailu) | Claude doporučení: detail tabulka s paginací 25/stránka | Při implementaci |
 | D5 | Vývoj v čase — historie prodlení (mini-graf dnů)? | Claude doporučení: ano, sparkline za posledních 30 dní | Při implementaci nebo později |
 | D6 | Export — lze prodlení vyexportovat do CSV/Excel? | Claude doporučení: ano, standardní export tlačítko | Při implementaci |
 

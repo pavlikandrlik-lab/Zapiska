@@ -1,6 +1,7 @@
 export const navigationRuntime = {
     initRecordFormEnhancements: null,
-    prepareRecordEditorFormNavigation: null
+    prepareRecordEditorFormNavigation: null,
+    refreshProjectIndexFilters: null
 };
 
 export function configureNavigationRuntime(runtime = {}) {
@@ -9,5 +10,8 @@ export function configureNavigationRuntime(runtime = {}) {
     }
     if (typeof runtime.prepareRecordEditorFormNavigation === "function") {
         navigationRuntime.prepareRecordEditorFormNavigation = runtime.prepareRecordEditorFormNavigation;
+    }
+    if (typeof runtime.refreshProjectIndexFilters === "function") {
+        navigationRuntime.refreshProjectIndexFilters = runtime.refreshProjectIndexFilters;
     }
 }

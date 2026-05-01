@@ -19,6 +19,29 @@
     --schedule-step-11: #d946ef;
     --schedule-delay: #dc2626;
     --app-picker-panel-width: 250px;
+
+    /* --pm-* aliasy na gov design tokens (2026-04-29). Tyto proměnné se používají
+       v 91 místech napříč site.css, externi-odkaz-card.css, vyzvy-panel.css.
+       Aliasování na gov tokens (--background-neutral-white, --border-subtle, atd.)
+       zajistí, že karty + bordery reagují na :root[data-theme="dark"] override
+       z gov-design-system core.css. Bez tohoto bloku karta externí vazby a další
+       komponenty zůstávaly bílé i v dark mode (fallback hex se aktivoval, protože
+       --pm-* nikde nebyly definovány). */
+    /* Light mode: bílá / off-white. Dark mode override níže (:root[data-theme="dark"])
+       sjednocuje na #111b2d s native input/select v site.css:5620.
+       Důležité: gov design tokens v dark dávají neutral šedou (color-neutral-950 = #262626),
+       ale projekt používá custom blue-tinted dark surface #111b2d (definováno historicky
+       v site.css :root[data-theme="dark"] overrides pro inputy). User chce sjednocení
+       na #111b2d, ne na neutral šedou. */
+    --pm-surface: #ffffff;
+    --pm-surface-alt: #f8fafc;
+    --pm-border: var(--border-subtle, var(--gov-color-neutral-border, #e2e8f0));
+    --pm-text: var(--text-primary, #0f172a);
+    --pm-text-muted: var(--text-secondary, var(--gov-color-text-secondary, #64748b));
+    --pm-warning: var(--gov-color-warning, #f59e0b);
+    --pm-warning-subtle: var(--background-warning-subtle, #fef3c7);
+    --pm-warning-strong: var(--text-warning-strong, #92400e);
+    --pm-font-mono: ui-monospace, SFMono-Regular, Menlo, "IBM Plex Mono", Consolas, monospace;
 }
 
 .app-body {
@@ -84,7 +107,8 @@
 .app-logo {
     width: 38px;
     height: 38px;
-    border-radius: 4px;
+    /* SVG má outer rect rx=30 (na 128px viewBoxu = ~23.4%); frame 38px = ~9px */
+    border-radius: 9px;
     overflow: hidden;
     flex-shrink: 0;
     border: 1px solid var(--gov-color-border);
@@ -255,6 +279,17 @@
     color: var(--gov-color-muted);
     margin-top: 2px;
     opacity: 0.75;
+}
+
+/* Dark mode override pro --pm-* tokens — sjednoceno s native input/select v dark
+   (background-color: #111b2d, border #31415e — viz site.css ~5620). Karty externí
+   vazby, vyzvy, reassign modal teď v dark mode mají stejnou tmavě modrou jako inputy. */
+:root[data-theme="dark"] {
+    --pm-surface: #111b2d;
+    --pm-surface-alt: #16233a;
+    --pm-border: #31415e;
+    --pm-text: #e6edfa;
+    --pm-text-muted: #8b9bb8;
 }
 
 /* dark mode overrides pro suggest dlaždice */
@@ -588,13 +623,9 @@
     grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 
-.dashboard-panel {
-    border: 1px solid rgba(0, 43, 73, 0.12);
-    border-radius: 1rem;
-    background: linear-gradient(180deg, rgba(238, 244, 249, 0.92), #fff);
-    box-shadow: 0 14px 30px rgba(0, 43, 73, 0.08);
-    min-height: 100%;
-}
+/* .dashboard-panel selektor se v žádném cshtml nepoužívá (jen *-body / -header /
+   -footer / -count / -placeholder) — definice odstraněna jako dead code 2026-04-29.
+   Druhá .dashboard-panel definice na řádku ~6420 (taktéž nepoužívaná) odstraněna. */
 
 .dashboard-panel-body {
     display: flex;
@@ -620,17 +651,8 @@
     font-size: 1.3rem;
 }
 
-.dashboard-panel-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 2.5rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    background: rgba(0, 43, 73, 0.08);
-    color: #002b49;
-    font-weight: 700;
-}
+/* .dashboard-panel-count → nahrazeno za <gov-tag> v _DashboardMeetingsPanel.cshtml
+   (2026-04-29). CSS rule odstraněn. */
 
 .dashboard-panel-footer,
 .dashboard-page-actions {
@@ -651,9 +673,10 @@
 .dashboard-meeting-item,
 .dashboard-news-item {
     display: block;
-    border: 1px solid rgba(0, 43, 73, 0.1);
+    /* gov tokens s fallbackem na původní rgba — dark mode reaguje přes design tokens */
+    border: 1px solid var(--gov-color-border, rgba(0, 43, 73, 0.1));
     border-radius: 0.85rem;
-    background: rgba(255, 255, 255, 0.92);
+    background: var(--background-neutral-white, rgba(255, 255, 255, 0.92));
     padding: 1rem 1rem 0.95rem;
     color: inherit;
     text-decoration: none;
@@ -814,19 +837,8 @@
     flex: 1;
 }
 
-.alert {
-    border-radius: 0;
-    padding: 12px 16px;
-    margin-bottom: 12px;
-    border: 1px solid transparent;
-    border-left-width: 4px;
-}
-
-.alert-error {
-    background: #fff1f0;
-    border-color: #f4b6b0;
-    color: #8a1c16;
-}
+/* .alert + .alert-error → nahrazeno za pm-alert (= gov-message) v cshtml a
+   gov-message v ajax.js (2026-04-29). CSS rules odstraněny. */
 
 .modal-submit-summary {
     margin-bottom: 14px;
@@ -840,43 +852,113 @@
     margin-top: 8px;
     font-size: 12px;
     font-family: "IBM Plex Mono", "Menlo", "Consolas", monospace;
-    color: #9a3412;
+    /* gov error-strong text — fallback orange-brown pro light mode */
+    color: var(--text-error-strong, var(--gov-color-error, #9a3412));
+    opacity: 0.85;
 }
 
 .modal-submit-diagnostics {
     margin-top: 10px;
-    border-top: 1px solid #f4b6b0;
+    border-top: 1px solid var(--border-subtle, var(--gov-color-neutral-border, #f4b6b0));
     padding-top: 8px;
 }
 
 .modal-submit-diagnostics > summary {
     cursor: pointer;
     font-weight: 700;
+    list-style: none;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.modal-submit-diagnostics > summary::-webkit-details-marker { display: none; }
+.modal-submit-diagnostics > summary::marker { content: ""; }
+
+.modal-submit-diagnostics > summary::before {
+    content: "▶";
+    font-size: 0.7em;
+    transition: transform 0.15s ease;
+    display: inline-block;
+}
+
+.modal-submit-diagnostics[open] > summary::before {
+    transform: rotate(90deg);
 }
 
 .modal-submit-diagnostics-actions {
     margin-top: 8px;
     margin-bottom: 8px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
+/* Diagnostický log — bubble-style box uvnitř gov-message error wrapperu */
 .modal-submit-diagnostics-log {
     margin: 0;
     max-height: 220px;
     overflow: auto;
     white-space: pre-wrap;
     word-break: break-word;
-    background: #fff;
-    border: 1px solid #f4b6b0;
-    padding: 8px;
-    color: #6b211b;
+    background: var(--background-neutral-white, #fff);
+    border: 1px solid var(--border-subtle, var(--gov-color-neutral-border, #d0d5dd));
+    border-radius: 0.35rem;
+    padding: 8px 10px;
+    color: var(--text-primary, #6b211b);
     font-family: "IBM Plex Mono", "Menlo", "Consolas", monospace;
     font-size: 12px;
-    line-height: 1.35;
+    line-height: 1.4;
+}
+
+/* Action chip pro diagnostické tlačítka v error error logu (Obnovit stránku,
+   Kopírovat log). Gov tokens, dark mode safe — sjednoceno s .comment-action-chip. */
+.modal-submit-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    min-height: 30px;
+    border: 1px solid var(--gov-color-border, var(--border-subtle, #d0d5dd));
+    border-radius: var(--gov-radius-sm, 0.25rem);
+    background: transparent;
+    color: var(--gov-color-primary, var(--text-primary, inherit));
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.2;
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.modal-submit-action-btn:hover {
+    border-color: var(--gov-color-primary, currentColor);
+    background: var(--background-neutral-subtle, transparent);
+}
+
+.modal-submit-action-btn:focus-visible {
+    outline: 2px solid var(--gov-color-primary);
+    outline-offset: 1px;
+}
+
+.modal-submit-action-btn--primary {
+    background: var(--gov-color-primary, currentColor);
+    border-color: var(--gov-color-primary, currentColor);
+    color: #fff;
+}
+
+.modal-submit-action-btn--primary:hover {
+    background: var(--gov-color-primary-strong, var(--gov-color-primary));
+    border-color: var(--gov-color-primary-strong, var(--gov-color-primary));
+    color: #fff;
 }
 
 .field-error-message {
     margin-top: 6px;
-    color: #b42318;
+    /* gov error text token — fallback red pro light mode */
+    color: var(--text-error, var(--gov-color-error, #b42318));
     font-size: 13px;
     font-weight: 600;
     line-height: 1.3;
@@ -1623,70 +1705,43 @@
     font-style: italic;
 }
 
-.btn {
+/* .btn / .btn.primary / .btn.ghost / .btn.danger / .btn.small / .btn:hover /
+   .btn:disabled — legacy button styly odstraněny 2026-04-29. Všechna použití
+   nahrazena za pm-button (= gov-button), kromě <summary class="comment-action-chip">
+   v _TaskItemPartial.cshtml — ten má vlastní pravidlo níže. */
+
+.comment-action-chip {
     border: 1px solid var(--gov-color-border);
-    background: var(--gov-color-surface);
-    color: var(--app-text-primary);
+    background: transparent;
+    color: var(--gov-color-primary);
     text-decoration: none;
-    padding: 10px 16px;
+    padding: 7px 12px;
     border-radius: var(--gov-radius-sm);
     font-weight: 500;
-    font-size: 14px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    min-height: 40px;
+    font-size: 13px;
     line-height: 1.2;
+    min-height: 34px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+    list-style: none;
 }
 
-.btn:hover {
+.comment-action-chip::-webkit-details-marker { display: none; }
+.comment-action-chip::marker { content: ""; }
+
+.comment-action-chip:hover {
     border-color: var(--gov-color-primary);
-    color: var(--gov-color-primary);
-    background: #fafafa;
+    background: var(--background-neutral-subtle, transparent);
 }
 
-.btn.primary {
-    background: var(--gov-color-primary);
-    color: #fff;
-    border-color: var(--gov-color-primary);
-}
-
-.btn.primary:hover {
-    background: var(--gov-color-primary-strong);
-    border-color: var(--gov-color-primary-strong);
-    color: #fff;
-}
-
-.btn.ghost {
-    background: transparent;
-    color: var(--gov-color-primary);
-}
-
-.btn.danger {
-    border-color: #dc2626;
-    color: #dc2626;
-}
-
-.btn.danger:hover {
-    border-color: #b91c1c;
-    color: #b91c1c;
-    background: rgba(220, 38, 38, 0.08);
-}
-
-.btn.small {
-    padding: 7px 12px;
-    font-size: 13px;
-    min-height: 34px;
-}
-
-.btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.comment-action-chip:focus-visible {
+    outline: 2px solid var(--gov-color-primary);
+    outline-offset: 1px;
 }
 
 .icon-btn {
@@ -2051,7 +2106,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     color: var(--gov-color-primary);
 }
 
-.btn:focus-visible,
 .project-card:focus-visible,
 .meeting-card:focus-visible,
 .ciselnik-tile:focus-visible {
@@ -2149,33 +2203,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: block;
 }
 
-/* Record modal tabs */
-.record-modal-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-
-.record-modal-tab {
-    padding: 8px 14px;
-    border-radius: 6px 6px 0 0;
-    border: 1px solid var(--gov-color-border);
-    background: var(--gov-color-surface);
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.record-modal-tab.active {
-    background: var(--gov-color-surface);
-    color: var(--gov-color-primary);
-    border-color: var(--gov-color-border);
-    box-shadow: inset 0 -3px 0 var(--gov-color-primary);
-}
-
-.record-modal-panel[hidden] {
-    display: none !important;
-}
+/* Record modal tabs/panels nyní rendrujeme přes pm-tabs Web Component (viz
+   pm-tabs CSS níže). .record-modal-panel třída zůstala jako semantický
+   class wrapper na pm-tab-panel pro existující JS, který panely vyhledává
+   přímo (např. schedule planner querySelector('[data-record-modal-panel]')). */
 
 .record-editor-split {
     display: inline-flex;
@@ -2812,7 +2843,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     position: relative;
     height: 18px;
     border-radius: 999px;
-    background: #dce6f5;
+    /* gantt track pozadí — gov primary-subtle s fallbackem; user může override
+       přes --schedule-track-color nebo na úrovni :root[data-theme="dark"] */
+    background: var(--schedule-track-color, var(--background-primary-subtle, #dce6f5));
     overflow: hidden;
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
 }
@@ -2865,11 +2898,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-overview-marker.deadline {
-    background: #1e293b;
+    /* deadline marker — používá text-primary (slate dark v light, světlá v dark) */
+    background: var(--schedule-marker-deadline-color, var(--app-text-primary, #1e293b));
 }
 
 .schedule-overview-marker.today {
-    background: #111111;
+    /* today marker — používá strongest contrast (black v light, white v dark) */
+    background: var(--schedule-marker-today-color, var(--gov-color-text, #111111));
 }
 
 .schedule-overview-axis-row {
@@ -2900,7 +2935,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     position: relative;
     height: 18px;
     border-radius: 999px;
-    background: #dce6f5;
+    /* layered track pozadí — sdílí token s overview track */
+    background: var(--schedule-track-color, var(--background-primary-subtle, #dce6f5));
     overflow: hidden;
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
 }
@@ -2963,13 +2999,14 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     bottom: -3px;
     width: 2px;
     left: 0;
-    background: #1e293b;
+    /* layered deadline marker — sdílí token s overview marker */
+    background: var(--schedule-marker-deadline-color, var(--app-text-primary, #1e293b));
     opacity: 0.9;
     z-index: 6;
 }
 
 .schedule-layered-marker.today {
-    background: #111111;
+    background: var(--schedule-marker-today-color, var(--gov-color-text, #111111));
 }
 
 .schedule-layered-legend {
@@ -3020,14 +3057,14 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: 2px;
     height: 16px;
     border-radius: 999px;
-    background: #1e293b;
+    background: var(--schedule-marker-deadline-color, var(--app-text-primary, #1e293b));
 }
 
 .schedule-layered-legend-swatch.today {
     width: 2px;
     height: 16px;
     border-radius: 999px;
-    background: #111111;
+    background: var(--schedule-marker-today-color, var(--gov-color-text, #111111));
 }
 
 .schedule-layered-summary {
@@ -4006,8 +4043,34 @@ gov-dialog[data-modal-container][data-modal-variant="chat-modal"] {
 }
 
 gov-dialog[data-modal-container][data-modal-variant="chat-modal"] .gov-dialog__dialog {
-    /* Vyšší vertikál pro vyjadreni timeline — víc bublin viditelných najednou. */
-    max-height: 92vh;
+    /* Vyšší vertikál pro vyjadreni timeline — víc bublin viditelných najednou.
+       2026-04-29: min() s calc(100vh - 2rem) zaručuje fit do viewportu i na
+       menších obrazovkách (13" MacBook), předchází dvojitému rolování. */
+    max-height: min(92vh, calc(100vh - 2rem));
+}
+
+/* Bug fix 2026-04-29: gov-dialog__content má defaultně overflow:auto, takže
+   když .pm-chat-modal byl vyšší než content area, vznikl VNĚJŠÍ scrollbar.
+   Inner .pm-chat-modal__body má svůj overflow-y:auto pro bubliny → dvojité rolování.
+   Fix: gov-dialog__content + .pm-chat-modal__content + .pm-chat-modal jako flex
+   column chain. Tím .pm-chat-modal__body (flex: 1 1 auto, min-height: 0) skrolu
+   uvnitř, gov-dialog__content overflow:hidden zabrání outer scroll. */
+gov-dialog[data-modal-container][data-modal-variant="chat-modal"] .gov-dialog__content {
+    overflow: hidden;
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Intermediate div vytvořený chatModal.js — fill flex parent + flex column pro
+   svůj child .pm-chat-modal. Bez tohohle by height: 100% na .pm-chat-modal
+   selhalo (parent neměl explicit height). */
+gov-dialog[data-modal-container][data-modal-variant="chat-modal"] .pm-chat-modal__content {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .modal-content {
@@ -4044,15 +4107,11 @@ gov-dialog[data-modal-container][data-modal-scrollable="true"] .modal-content {
     gap: 16px;
 }
 
-.external-row {
-    border: 1px solid var(--gov-color-border);
-    border-radius: var(--gov-radius);
-    padding: 12px;
-    display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    background: #fafafa;
-}
+/* .external-row — duplicitní hardcoded #fafafa definice odstraněna 2026-04-29.
+   Authoritative pravidlo žije v externi-odkaz-card.css (používá var(--pm-surface)
+   s gov design tokens fallback chain → reaguje na dark mode přes :root[data-theme=dark]
+   override v core.css). Tahle site.css verze přebíjela jen kvůli pozdějšímu load order
+   → karta v dark mode vždy bílá. */
 
 .external-actions {
     display: flex;
@@ -5334,6 +5393,473 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     font-size: 14px;
 }
 
+.sync-panel {
+    display: grid;
+    gap: 14px;
+}
+
+/* ============================================================
+ * pm-tabs — system-wide tabs Web Component (LEGO architecture)
+ * ─────────────────────────────────────────────────────────────
+ * Lego varianty (per pozice v řadě):
+ *   pm-tab          — middle/default (no edge round-outs unless active)
+ *   pm-tab-left     — first from left (always LEFT outer round-out)
+ *   pm-tab-right    — first from right (always RIGHT outer round-out)
+ *   pm-tab-last-in-row — alias k pm-tab-right (wrapped rows)
+ *
+ * Technika: CSS-tricks „Tabs With Round Out Borders" by Lea Verou.
+ * 4 pseudo-elementy per active tab:
+ *   - SQUARES (10x10) na pm-tab[variant]::before/::after — tab color extender
+ *   - CIRCLES (20x20 round) na > span[data-pm-tab-inner]::before/::after — round-out
+ *
+ * Barvy (3 vrstvy, ovládané přes CSS proměnné v :root):
+ *   --pm-tab-page-bg      — pozadí ZA tabama (parent container, mizí outer round-out)
+ *   --pm-tab-inactive-bg  — barva inactive tabu (a active circles k sousedům)
+ *   --pm-tab-active-bg    — barva aktivního tabu = panel bg
+ * ============================================================ */
+
+pm-tabs {
+    display: block;
+}
+
+pm-tab-list {
+    display: block;
+    padding: 0;
+    margin: 0;
+    overflow: hidden; /* contain floats + clip pseudos co utíkají vlevo přes okraj panelu */
+}
+
+pm-tab,
+pm-tab-left,
+pm-tab-right,
+pm-tab-last-in-row {
+    float: left;
+    position: relative;
+    display: block;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+pm-tab > span[data-pm-tab-inner],
+pm-tab-left > span[data-pm-tab-inner],
+pm-tab-right > span[data-pm-tab-inner],
+pm-tab-last-in-row > span[data-pm-tab-inner] {
+    float: left;
+    display: block;
+    padding: 10px 22px;
+    color: var(--text-secondary, var(--pm-text-muted, #64748b));
+    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    border-top-left-radius: var(--pm-tab-radius, 10px);
+    border-top-right-radius: var(--pm-tab-radius, 10px);
+    cursor: pointer;
+    user-select: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: color 120ms ease, background-color 120ms ease;
+}
+
+pm-tab[active],
+pm-tab-left[active],
+pm-tab-right[active],
+pm-tab-last-in-row[active] {
+    z-index: 3;
+}
+
+pm-tab[active] > span[data-pm-tab-inner],
+pm-tab-left[active] > span[data-pm-tab-inner],
+pm-tab-right[active] > span[data-pm-tab-inner],
+pm-tab-last-in-row[active] > span[data-pm-tab-inner] {
+    background: var(--pm-tab-active-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    color: var(--text-primary, var(--app-text-primary, #0f172a));
+    font-weight: 700;
+    /* Aktivní tab vizuálně označen modrým podtržením textu (gov primary token).
+       text-decoration místo border-bottom — podtržení sedí pod text, ne pod celý tab. */
+    text-decoration: underline;
+    text-decoration-color: var(--gov-color-primary, #005ea5);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 4px;
+}
+
+pm-tab[disabled] > span[data-pm-tab-inner],
+pm-tab-left[disabled] > span[data-pm-tab-inner],
+pm-tab-right[disabled] > span[data-pm-tab-inner],
+pm-tab-last-in-row[disabled] > span[data-pm-tab-inner] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+pm-tab:focus-visible,
+pm-tab-left:focus-visible,
+pm-tab-right:focus-visible,
+pm-tab-last-in-row:focus-visible {
+    outline: 2px solid var(--color-focus, var(--gov-color-primary, #2563eb));
+    outline-offset: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Default state SQUARES — only edge variants
+ * ───────────────────────────────────────────────────────────── */
+pm-tab-left::before {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: -10px;
+    width: 10px;
+    height: 10px;
+    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    z-index: 1;
+}
+
+pm-tab-right::after,
+pm-tab-last-in-row::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    right: -10px;
+    width: 10px;
+    height: 10px;
+    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    z-index: 1;
+}
+
+/* Default state CIRCLES — only edge variants, page-bg eats outer corners */
+pm-tab-left > span[data-pm-tab-inner]::before {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: -20px;
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--pm-tab-page-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    z-index: 2;
+}
+
+pm-tab-right > span[data-pm-tab-inner]::after,
+pm-tab-last-in-row > span[data-pm-tab-inner]::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    right: -20px;
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--pm-tab-page-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    z-index: 2;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * ACTIVE state SQUARES — všechny varianty mají oba squares (active-bg)
+ * ───────────────────────────────────────────────────────────── */
+pm-tab[active]::before,
+pm-tab-left[active]::before,
+pm-tab-right[active]::before,
+pm-tab-last-in-row[active]::before {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: -10px;
+    width: 10px;
+    height: 10px;
+    background: var(--pm-tab-active-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    z-index: 1;
+}
+
+pm-tab[active]::after,
+pm-tab-left[active]::after,
+pm-tab-right[active]::after,
+pm-tab-last-in-row[active]::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    right: -10px;
+    width: 10px;
+    height: 10px;
+    background: var(--pm-tab-active-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    z-index: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * ACTIVE state CIRCLES — middle = inactive (matches neighbors), edges asymmetric
+ * ───────────────────────────────────────────────────────────── */
+
+/* Middle tab active: oba kruhy = inactive-bg (oba sousedi jsou inactive) */
+pm-tab[active] > span[data-pm-tab-inner]::before {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: -20px;
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    z-index: 2;
+}
+
+pm-tab[active] > span[data-pm-tab-inner]::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    right: -20px;
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    z-index: 2;
+}
+
+/* pm-tab-left active: levý kruh = page-bg (žádný soused vlevo), pravý kruh = inactive-bg */
+pm-tab-left[active] > span[data-pm-tab-inner]::before {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: -20px;
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--pm-tab-page-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    z-index: 2;
+}
+
+pm-tab-left[active] > span[data-pm-tab-inner]::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    right: -20px;
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    z-index: 2;
+}
+
+/* pm-tab-right (a alias) active: levý kruh = inactive-bg, pravý kruh = page-bg */
+pm-tab-right[active] > span[data-pm-tab-inner]::before,
+pm-tab-last-in-row[active] > span[data-pm-tab-inner]::before {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: -20px;
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    z-index: 2;
+}
+
+pm-tab-right[active] > span[data-pm-tab-inner]::after,
+pm-tab-last-in-row[active] > span[data-pm-tab-inner]::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    right: -20px;
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--pm-tab-page-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    z-index: 2;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * pm-tab-panel — všechny 4 rohy zaoblené, top corners conditional
+ * podle pozice aktivního tabu (lego edge cases)
+ * ───────────────────────────────────────────────────────────── */
+pm-tab-panel {
+    display: block;
+    padding: 16px;
+    background: var(--pm-tab-active-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    color: var(--text-primary, var(--app-text-primary, #0f172a));
+    clear: both;
+    position: relative;
+    z-index: 0;
+    border-radius: var(--pm-tab-radius, 10px);
+}
+
+pm-tab-panel:not([active]) {
+    display: none;
+}
+
+/* Edge case: pm-tab-left active → panel top-left = 0 (tab navazuje na panel zleva) */
+pm-tabs:has(pm-tab-left[active]) pm-tab-panel {
+    border-top-left-radius: 0;
+}
+
+/* Edge case: pm-tab-right (resp. pm-tab-last-in-row) active → panel top-right = 0 */
+pm-tabs:has(pm-tab-right[active]) pm-tab-panel,
+pm-tabs:has(pm-tab-last-in-row[active]) pm-tab-panel {
+    border-top-right-radius: 0;
+}
+
+/* Single visible tab edge case: pm-tab-left je zároveň first AND last in row.
+ * Když je active, jeho pravý kruh musí být page-bg (žádný soused vpravo)
+ * a panel top-right musí být 0. Detekce přes :only-child v rodičovi. */
+pm-tab-list:has(pm-tab-left:only-child) pm-tab-left::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    right: -10px;
+    width: 10px;
+    height: 10px;
+    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    z-index: 1;
+}
+
+pm-tab-list:has(pm-tab-left:only-child) pm-tab-left[active]::after {
+    background: var(--pm-tab-active-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+}
+
+pm-tab-list:has(pm-tab-left:only-child) pm-tab-left > span[data-pm-tab-inner]::after,
+pm-tab-list:has(pm-tab-left:only-child) pm-tab-left[active] > span[data-pm-tab-inner]::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    right: -20px;
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--pm-tab-page-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    z-index: 2;
+}
+
+pm-tabs:has(pm-tab-left:only-child[active]) pm-tab-panel {
+    border-top-right-radius: 0;
+}
+
+/* ============================================================
+ * sync-tab-panel-content — sync settings specific
+ * Karta uvnitř pm-tab-panel: vnitřní layout pro sync-job-card[]
+ *
+ * POZOR: [active] qualifier je nutný! Bez něj má `pm-tab-panel.sync-tab-panel-content`
+ * stejnou specificitu (0,1,1) jako `pm-tab-panel:not([active])`, source order vyhrává
+ * a `display: grid` přebíjí `display: none` → inactive panely zůstanou viditelné.
+ * S [active] qualifierem je specificita 0,2,1 (vyšší) a rule matchuje JEN aktivní panel.
+ * ============================================================ */
+
+pm-tab-panel.sync-tab-panel-content[active] {
+    display: grid;
+    gap: 14px;
+}
+
+.sync-job-card__upcoming {
+    border-top: 1px dashed var(--border-subtle, #e5e7eb);
+    padding-top: 12px;
+    display: grid;
+    gap: 6px;
+}
+
+.sync-job-card__upcoming-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.sync-job-card__upcoming-list {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 13px;
+    display: grid;
+    gap: 2px;
+    color: var(--text-primary, var(--app-text-primary));
+}
+
+.sync-job-card__upcoming-hint {
+    margin: 4px 0 0;
+    font-size: 12px;
+    font-style: italic;
+}
+
+.sync-job-card {
+    display: grid;
+    gap: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--border-subtle, #d1d5db);
+    border-radius: 10px;
+    background: var(--background-block-primary, var(--pm-surface, #ffffff));
+}
+
+.sync-job-card__head {
+    display: grid;
+    gap: 4px;
+}
+
+.sync-job-card__title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.sync-job-card__desc {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-secondary, var(--pm-text-muted, #64748b));
+}
+
+.sync-job-card__form {
+    display: grid;
+    gap: 12px;
+}
+
+.sync-job-card__row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr);
+    align-items: center;
+    gap: 12px;
+}
+
+.sync-job-card__row--switch {
+    align-items: center;
+}
+
+.sync-job-card__label {
+    font-weight: 600;
+    color: var(--text-primary, var(--app-text-primary));
+}
+
+.sync-job-card__actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+.sync-job-card__status {
+    border-top: 1px solid var(--border-subtle, #e5e7eb);
+    padding-top: 12px;
+    display: grid;
+    gap: 8px;
+}
+
+.sync-job-card__status-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.sync-job-card__status-dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(110px, max-content) minmax(0, 1fr);
+    gap: 4px 12px;
+    font-size: 13px;
+}
+
+.sync-job-card__status-dl dt {
+    font-weight: 600;
+    color: var(--text-secondary, var(--pm-text-muted, #64748b));
+}
+
+.sync-job-card__status-dl dd {
+    margin: 0;
+}
+
+@media (max-width: 720px) {
+    .sync-job-card__row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+}
+
 .profile-rights-card {
     margin-top: 4px;
 }
@@ -5570,9 +6096,19 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 :root[data-theme="dark"] input[type="search"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
 :root[data-theme="dark"] select:not(gov-form-select select):not(pm-select select),
 :root[data-theme="dark"] textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
-    background: #111b2d;
+    /* Bug fix 2026-04-29: musí být `background-color`, ne `background` shorthand!
+       Shorthand by přepsal background-image (chevron na native <select> je vyrobený
+       přes 2× linear-gradient v řádku ~1787) a chevron by zmizel v dark mode. */
+    background-color: #111b2d;
     border-color: #31415e;
     color: #e6edfa;
+}
+
+/* Native <select> chevron — v dark mode použít světlejší barvu, gradient by jinak
+   slyl s tmavým pozadím. Bez tohoto override by gradient color #64748b zůstal,
+   což je sice viditelné, ale subtilní. Lehčí color = lepší čitelnost. */
+:root[data-theme="dark"] select:not(gov-form-select select):not(pm-select select) {
+    background-image: linear-gradient(45deg, transparent 50%, #93c5fd 50%), linear-gradient(135deg, #93c5fd 50%, transparent 50%);
 }
 
 :root[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
@@ -6253,40 +6789,8 @@ html {
     color: #dc2626;
 }
 
-/* Category badges */
-
-.badge-danger {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: #dc2626;
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.badge-warning {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: #f97316;
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.badge-caution {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: #f59e0b;
-    color: #1c1917;
-    font-size: 12px;
-    font-weight: 600;
-}
+/* Category badges (.badge-danger / .badge-warning / .badge-caution) odstraněny
+   2026-04-29 — žádné Razor view je nepoužívalo (po nahrazení vyzvy-card za gov-tag). */
 
 /* Expandable rows */
 
@@ -6416,15 +6920,8 @@ html {
     padding: 12px 24px 24px;
 }
 
-.dashboard-panel {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
-    background: var(--gov-color-surface);
-    border: 1px solid var(--gov-color-border);
-    border-radius: var(--gov-radius-lg);
-}
+/* .dashboard-panel — duplicate definice odstraněna 2026-04-29; selektor se nikde
+   v cshtml nepoužívá. Aktivní jsou jen *-body / -header / -footer / -placeholder. */
 
 .dashboard-section--focus {
     grid-column: 1;
