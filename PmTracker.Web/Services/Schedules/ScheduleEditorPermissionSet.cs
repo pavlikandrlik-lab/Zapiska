@@ -21,6 +21,27 @@ public sealed record ScheduleEditorPermissionSet
     /// <summary>Pouze přidávání — editovat lze jen kroky s TrvaniDni == 0.</summary>
     public bool IsAddOnlyMode { get; init; }
 
+    /// <summary>
+    /// Phase 5 (DESIGN-9-B, 2026-05-01): uživatel má klíč records.schedule.edit pro daný projekt.
+    /// Composition: <c>HasPermission("records.schedule.edit", projektId)</c>.
+    /// Řídí přímou editaci skutečnosti (toggle, dropdown, manual cell input pro 2/5/8/9).
+    /// </summary>
+    public bool CanEditScheduleDirect { get; init; }
+
+    /// <summary>
+    /// Phase 5 (DESIGN-9-B, 2026-05-01): uživatel má klíč proposals.schedule.create pro daný projekt.
+    /// Composition: <c>HasPermission("proposals.schedule.create", projektId)</c>.
+    /// Řídí možnost otevřít proposal editor a submitnout návrh.
+    /// </summary>
+    public bool CanProposeSchedule { get; init; }
+
+    /// <summary>
+    /// Phase 5 (DESIGN-6-C, 2026-05-01): composite flag řídící zobrazení manual input pro kroky 2/5/8/9.
+    /// Logic: <c>IsTaskCategory &amp;&amp; !pendingLock.LocksSchedule &amp;&amp; CanEditScheduleDirect</c>.
+    /// Bez klíče <c>records.schedule.edit</c> se input nezobrazí (UI gate primary, server defense).
+    /// </summary>
+    public bool CanEditManualActual { get; init; }
+
     /// <summary>Pouze pro čtení — žádné editace nejsou možné.</summary>
     public static ScheduleEditorPermissionSet ForReadOnly() => new()
     {

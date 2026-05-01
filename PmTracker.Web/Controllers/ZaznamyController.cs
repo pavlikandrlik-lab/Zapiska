@@ -144,6 +144,20 @@ public sealed partial class ZaznamyController : BaseController
                 : model.CanEditScheduleAddOnly
                     ? ScheduleEditorPermissionSet.ForAddOnly(model.JeUkolKategorie)
                     : existingPermissions with { IsTaskCategory = model.JeUkolKategorie };
+
+        // Phase 5 (DESIGN-9-B + 6-C, 2026-05-01): obohatit Permissions o klíče řízené flagy.
+        // CanEditManualActual = task category + ne-locked schedule + má records.schedule.edit klíč.
+        var canEditScheduleDirect = CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, model.ProjektId);
+        var canProposeSchedule = CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, model.ProjektId);
+        schedulePermissions = schedulePermissions with
+        {
+            CanEditScheduleDirect = canEditScheduleDirect,
+            CanProposeSchedule = canProposeSchedule,
+            CanEditManualActual = model.JeUkolKategorie
+                && !schedulePermissions.IsScheduleLocked
+                && canEditScheduleDirect
+        };
+
         model.HarmonogramBlok = new HarmonogramBlockViewModel
         {
             RecordId = model.HarmonogramBlok.RecordId,
@@ -155,7 +169,9 @@ public sealed partial class ZaznamyController : BaseController
             Kroky = model.HarmonogramBlok.Kroky,
             Permissions = schedulePermissions,
             EditorChangedTypeTooltips = model.HarmonogramBlok.EditorChangedTypeTooltips,
-            ScheduleVersion = model.HarmonogramBlok.ScheduleVersion
+            ScheduleVersion = model.HarmonogramBlok.ScheduleVersion,
+            LockedManualKrokKeys = model.HarmonogramBlok.LockedManualKrokKeys,
+            CanEditManualActual = schedulePermissions.CanEditManualActual
         };
         model.ActiveEditorTab = !canEditRecord && canManageSchedule && model.JeUkolKategorie
             ? EditorTabSchedule
