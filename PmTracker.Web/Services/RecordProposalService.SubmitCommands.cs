@@ -101,6 +101,17 @@ public sealed partial class RecordProposalService
 
         if (existingPending is not null)
         {
+            // FIX 2026-05-01 (round 2 #10): cycle detection — Pending návrh nesmí mít SupersededByProposalId
+            // (defense-in-depth proti DB pollution / manuálním zásahům, kdy by se mohl vytvořit cykl
+            // A.Stav=Pending + A.SupersededByProposalId=B → audit chain inconsistency).
+            if (existingPending.SupersededByProposalId.HasValue)
+            {
+                throw new InvalidOperationException(
+                    $"Inconsistent state: Pending návrh #{existingPending.Id} má SupersededByProposalId=" +
+                    $"#{existingPending.SupersededByProposalId.Value}. Stav je porušený, " +
+                    "vyžádej manuální opravu před novým submitem.");
+            }
+
             var isOwn = existingPending.CreatedByOsobaId == currentUser.OsobaId;
             var canEditOwn = currentUser.Authorization?.HasPermission(PermissionKeys.ProposalsEditOwn, command.ProjektId) ?? false;
             var canEditAny = currentUser.Authorization?.HasPermission(PermissionKeys.ProposalsEditAny, command.ProjektId) ?? false;

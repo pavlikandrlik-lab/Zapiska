@@ -84,6 +84,9 @@ public sealed class HarmonogramController : Controller
         ZaznamHarmonogramHodnotaEntity? row = null;
 
         // Phase 7 (DESIGN-7-B + phantom bug 2 fix): create-if-missing analog SelectCandidate.
+        // FIX 2026-05-01 (round 2 #11): auth-first ordering. Před EnsureDelayRowAsync
+        // (= insert nového řádku) MUSÍ proběhnout authorization check, jinak může
+        // unauthorized user pollute DB s prázdnými řádky v cizích projektech (data poisoning IDOR).
         if (request.HodnotaId > 0)
         {
             row = await _db.ZaznamHarmonogramHodnoty
@@ -97,6 +100,12 @@ public sealed class HarmonogramController : Controller
                 .FirstOrDefaultAsync(z => z.Id == zaznamId, ct).ConfigureAwait(false);
             if (zaznam is null) return NotFound();
 
+            // AUTH GUARD před create — prevent data poisoning IDOR.
+            if (!await HasSchedulePermissionAsync(zaznam.ProjektId, ct).ConfigureAwait(false))
+            {
+                return Forbid();
+            }
+
             var delayTypId = await _db.CiselnikHarmonogramTypu.AsNoTracking()
                 .Where(t => t.SablonaVerze == zaznam.HarmonogramSablonaVerze
                          && t.JeZpozdeni
@@ -108,9 +117,7 @@ public sealed class HarmonogramController : Controller
                 return NotFound(new { error = $"Krok {krokPoradi} neexistuje v schématu záznamu." });
             }
 
-            // FIX 2026-05-01 race condition: TOCTOU bug mezi FirstOrDefaultAsync check a Add+SaveChanges.
-            // Concurrent request může insertovat stejný (ZaznamId, TypId) → unique constraint violation.
-            // Pattern: try insert, on DbUpdateException re-load existing row.
+            // Race-safe insert (TOCTOU bug fix).
             row = await EnsureDelayRowAsync(zaznamId, delayTypId.Value, ct).ConfigureAwait(false);
         }
         else
@@ -184,6 +191,11 @@ public sealed class HarmonogramController : Controller
             ct).ConfigureAwait(false);
 
         // Při přepnutí na Auto spustíme sync (preferred zachováme, resolver si ho vezme).
+        // FIX 2026-05-01 (round 2 #13): sync exception propagation — místo silently log+200 OK
+        // vrátíme partial-success indikátor (changed=true, syncFailed=true). UI zobrazí warning,
+        // user vidí, že rezim přepnut, ale auto-fill data nejsou refresh.
+        bool syncFailed = false;
+        string? syncFailReason = null;
         if (request.Rezim == SkutecnostRezimEnum.Auto)
         {
             try
@@ -192,12 +204,14 @@ public sealed class HarmonogramController : Controller
             }
             catch (Exception ex)
             {
+                syncFailed = true;
+                syncFailReason = ex.Message;
                 _logger.LogWarning(ex,
                     "HarmonogramController.ToggleRezim: sync selhal pro záznam {ZaznamId}.", row.ZaznamId);
             }
         }
 
-        return Ok(new { changed = true, row.SkutecnostRezim, row.SkutecnostZdroj });
+        return Ok(new { changed = true, row.SkutecnostRezim, row.SkutecnostZdroj, syncFailed, syncFailReason });
     }
 
     /// <summary>
@@ -242,6 +256,12 @@ public sealed class HarmonogramController : Controller
                 .FirstOrDefaultAsync(z => z.Id == zaznamId, ct).ConfigureAwait(false);
             if (zaznam is null) return NotFound();
 
+            // FIX 2026-05-01 (round 2 #11): auth-first ordering. Prevent data poisoning IDOR.
+            if (!await HasSchedulePermissionAsync(zaznam.ProjektId, ct).ConfigureAwait(false))
+            {
+                return Forbid();
+            }
+
             var delayTypId = await _db.CiselnikHarmonogramTypu.AsNoTracking()
                 .Where(t => t.SablonaVerze == zaznam.HarmonogramSablonaVerze
                          && t.JeZpozdeni
@@ -253,8 +273,7 @@ public sealed class HarmonogramController : Controller
                 return NotFound(new { error = $"Krok {krokPoradi} neexistuje v schématu záznamu." });
             }
 
-            // FIX 2026-05-01 race condition: TOCTOU bug — sjednoceno přes EnsureDelayRowAsync.
-            // FIX 2026-05-01 (#8): HodnotaInt = NULL místo 0 (DESIGN-10-A semantic consistency).
+            // Race-safe insert (TOCTOU bug fix) + DESIGN-10-A NULL semantika.
             row = await EnsureDelayRowAsync(zaznamId, delayTypId.Value, ct).ConfigureAwait(false);
         }
         else
@@ -291,17 +310,22 @@ public sealed class HarmonogramController : Controller
             AfterState: new { row.PreferredExterniOdkazId, Action = "select-candidate" }),
             ct).ConfigureAwait(false);
 
+        // FIX 2026-05-01 (round 2 #13): sync exception propagation — UI signal partial success.
+        bool syncFailed = false;
+        string? syncFailReason = null;
         try
         {
             await _sync.SyncZaznamAsync(row.ZaznamId, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
+            syncFailed = true;
+            syncFailReason = ex.Message;
             _logger.LogWarning(ex,
                 "HarmonogramController.SelectCandidate: sync selhal pro záznam {ZaznamId}.", row.ZaznamId);
         }
 
-        return Ok(new { row.PreferredExterniOdkazId });
+        return Ok(new { row.PreferredExterniOdkazId, syncFailed, syncFailReason });
     }
 
     public sealed record PreviewSyncRequest(int ZaznamId);

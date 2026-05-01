@@ -42,12 +42,14 @@ public interface IHarmonogramSkutecnostSyncService
 }
 
 /// <summary>Souhrn výsledku sync operace pro jeden záznam.</summary>
+/// <param name="StaleSkipped">FIX 2026-05-01 (round 2): počet rows přeskočených kvůli stale optimistic concurrency token (caller může retry).</param>
 public sealed record HarmonogramSyncResult(
     int ProjektovyZaznamId,
     int KrokuAktualizovano,
     int KrokuPreskoceno_Manual,
     int KrokuBezKandidatu,
-    int PreferredFallbackPouzito);
+    int PreferredFallbackPouzito,
+    int StaleSkipped = 0);
 
 /// <summary>
 /// Impl. Načte schema + active bindings s fingerprint-cached TypZaznamu,
@@ -237,11 +239,23 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
             .ToListAsync(ct).ConfigureAwait(false);
         var rowById = trackedRows.ToDictionary(r => r.Id);
 
-        int updated = 0, skipManual = 0, noKandidat = 0, preferredFallbacks = 0, staleSkipped = 0;
+        int updated = 0, skipManual = 0, preferredFallbacks = 0, staleSkipped = 0;
+        // FIX 2026-05-01 (round 2 #14): "noKandidat" se v ApplyPlan vůbec nepočítal (counter
+        // existoval jen v ComputePlan, kde se rozhodovalo o vynechání). Reportujeme rozdíl
+        // mezi total kroků a změnami v plánu — ale tato info patří do ComputePlan, ne sem.
         var nowUtc = _time.GetUtcNow().UtcDateTime;
 
         foreach (var change in plan.Changes)
         {
+            // FIX 2026-05-01 (round 2 #A from concurrency review): SkippedManualRezim check
+            // PŘED stale check — Manual rezim se identifikuje z plánu a stale check ho jinak
+            // schoval do staleSkipped. Manual rezim je sémantický skip, ne race condition.
+            if (change.Reason == HarmonogramRowChangeReason.SkippedManualRezim)
+            {
+                skipManual++;
+                continue;
+            }
+
             if (!rowById.TryGetValue(change.RowId, out var row))
             {
                 staleSkipped++; // row deleted between Compute and Apply
@@ -255,12 +269,6 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
                 _logger.LogWarning(
                     "ApplyPlan: row {RowId} stale token (expected {Exp:o}, actual {Act:o}) — skipped.",
                     change.RowId, change.ExpectedUpdatedAt, row.UpdatedAt);
-                continue;
-            }
-
-            if (change.Reason == HarmonogramRowChangeReason.SkippedManualRezim)
-            {
-                skipManual++;
                 continue;
             }
 
@@ -281,12 +289,14 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
+        // FIX 2026-05-01 (round 2 #14): noKandidat se v ApplyPlan nepočítá (counter žil v ComputePlan).
+        // Reportujeme jen mainstream counters + staleSkipped pro retry signaling.
         _logger.LogInformation(
-            "ApplyPlan #{Id}: updated={U} skipManual={SM} noKandidat={NK} preferredFallback={PF} stale={ST}",
-            plan.ProjektovyZaznamId, updated, skipManual, noKandidat, preferredFallbacks, staleSkipped);
+            "ApplyPlan #{Id}: updated={U} skipManual={SM} preferredFallback={PF} stale={ST}",
+            plan.ProjektovyZaznamId, updated, skipManual, preferredFallbacks, staleSkipped);
 
         return new HarmonogramSyncResult(
-            plan.ProjektovyZaznamId, updated, skipManual, noKandidat, preferredFallbacks);
+            plan.ProjektovyZaznamId, updated, skipManual, KrokuBezKandidatu: 0, preferredFallbacks, staleSkipped);
     }
 
     /// <summary>

@@ -34,6 +34,19 @@ ALTER TABLE dbo.zaznam_navrhy
 PRINT 'Created new CK_zaznam_navrhy_stav with SUPERSEDED.';
 GO
 
+-- FIX 2026-05-01 (round 2 #10): cycle detection guard.
+-- Návrh nesmí ukazovat SupersededByProposalId na sám sebe (= self-reference cycle).
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_zaznam_navrhy_no_self_supersede' AND parent_object_id = OBJECT_ID('dbo.zaznam_navrhy'))
+BEGIN
+    ALTER TABLE dbo.zaznam_navrhy
+        ADD CONSTRAINT CK_zaznam_navrhy_no_self_supersede
+        CHECK (superseded_by_proposal_id IS NULL OR superseded_by_proposal_id <> id);
+    PRINT 'Created CK_zaznam_navrhy_no_self_supersede (defense proti self-reference cycle).';
+END
+ELSE
+    PRINT 'CK_zaznam_navrhy_no_self_supersede already exists, skipping.';
+GO
+
 -- 3) Index pro non-schedule pending lookups (UX_zaznam_navrhy_pending_schedule_per_record
 --    už existuje pro SCHEDULE_PLAN_CHANGE max-1-pending invariant; tento index pokryje
 --    obecnější queries za Pending napříč všemi typy).

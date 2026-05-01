@@ -57,9 +57,15 @@ public sealed class HarmonogramPhantomUiFixesTests
     [Fact]
     public void RecordService_SaveRecord_PersistujeManualActualKroky()
     {
+        // FIX 2026-05-01 (round 2): metoda byla přejmenována Apply→Stage v post-review fix #3
+        // (transakce semantics — caller ovládá SaveChanges, ne metoda samotná).
         var src = Read("PmTracker.Web/Services/RecordService.SaveRecord.cs");
-        src.Should().Contain("ApplyManualActualKrokyAsync",
-            "DESIGN-6-A — phantom UI bug 1 fix: ManualActualKroky persistence v save flow.");
+        src.Should().Contain("StageManualActualKrokyAsync",
+            "DESIGN-6-A + post-review fix #3 — phantom UI bug 1 fix: ManualActualKroky stage do change trackeru, caller commit + audit v outer transakci.");
+        src.Should().Contain("command.ManualActualKroky",
+            "Persistence flow musí číst command.ManualActualKroky z input commandu.");
+        src.Should().Contain("SkutecnostZdrojEnum.Manual",
+            "User-staged manual values musí dostat Zdroj=Manual.");
     }
 
     [Fact]

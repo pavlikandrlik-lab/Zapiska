@@ -62,6 +62,36 @@ public static class ManualProposalFieldValidator
     }
 
     /// <summary>
+    /// FIX 2026-05-01 (round 2 #12) — pre-check že KrokKey patří mezi manuální {2,5,8,9}.
+    /// Volitelná validace pro callers, kteří mají schema mapu KrokKey→KrokPoradi.
+    /// Defense-in-depth: <see cref="ManualActualKrokApplier.Compute"/> také checkuje,
+    /// ale errorová hláška z Compute je generic. Tady pre-check vyhodí user-friendly RVE.
+    /// </summary>
+    public static void ValidateManualKrokKeysAreManualOnly(
+        IReadOnlyList<ManualActualKrokDto> manualKroky,
+        IReadOnlyDictionary<Guid, int> krokKeyToPoradi)
+    {
+        foreach (var mk in manualKroky)
+        {
+            if (!krokKeyToPoradi.TryGetValue(mk.KrokKey, out var poradi))
+            {
+                throw new RecordValidationException(
+                    "Krok harmonogramu pro zadaný identifikátor neexistuje ve schématu záznamu.",
+                    new[] { new RecordValidationIssue("ManualActualKroky", "Neznámý krok ve schématu záznamu.", "schedule", "manual.unknown-krok", mk.KrokKey.ToString()) },
+                    $"ValidateManualKrokKeysAreManualOnly: KrokKey={mk.KrokKey} nenalezen ve schématu");
+            }
+
+            if (!HarmonogramManualSteps.IsManual(poradi))
+            {
+                throw new RecordValidationException(
+                    $"Krok {poradi} je v Auto rezimu — ručně vyplnit lze jen kroky 2, 5, 8 a 9.",
+                    new[] { new RecordValidationIssue("ManualActualKroky", $"Krok {poradi} není manuální (jen 2/5/8/9 jsou manuální).", "schedule", "manual.auto-step", poradi.ToString()) },
+                    $"ValidateManualKrokKeysAreManualOnly: KrokPoradi={poradi} není v HarmonogramManualSteps");
+            }
+        }
+    }
+
+    /// <summary>
     /// Pre-bound vazby bublina-&gt;krok (schéma 3 — CREATE_RECORD):
     /// - <c>KrokKey</c> nesmí být <see cref="Guid.Empty"/>.
     /// - <c>ExterniOdkazIndex</c> musí být v rozsahu [0, externiVazbyCount).
