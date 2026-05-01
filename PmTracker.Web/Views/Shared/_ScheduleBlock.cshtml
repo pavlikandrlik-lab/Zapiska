@@ -14,9 +14,9 @@
     // aby je JS mohl zobrazit, když uživatel zadá kladné trvání. Segmenty s width=0
     // se schovávají přes display:none ve schedule.js (applySegmentLayout/resetSegmentLayout).
     // V readonly (card) variantě filtrujeme zero-duration, abychom se vyhnuli artefaktům.
-    var visibleCompactSteps = (isEditor
-            ? Model.Kroky
-            : Model.Kroky.Where(krok => krok.TrvaniDni > 0))
+    // Phase 9 (DESIGN-9-D, 2026-05-01): žádné skrývání kroků — všechny vždy v DOMu.
+    // Per-row visibility (planned vs actual) řešená inline níže přes display:none style.
+    var visibleCompactSteps = Model.Kroky
         .OrderBy(krok => krok.KrokIndex)
         .ToList();
     var editorInputIndex = 0;
@@ -98,15 +98,18 @@
                          @(isEditor ? "data-schedule-gantt-deadline" : null)></div>
                     @foreach (var krok in visibleCompactSteps)
                     {
+                        // Phase 9 (DESIGN-9-D + 10-A, 2026-05-01): per-row segment visibility.
+                        //   planned row: hidden pokud TrvaniDni == 0
+                        //   actual row: hidden pokud OdchylkaDni == NULL (krok ještě nenastal)
                         var segmentTitle = row.Item1 == "planned"
                             ? $"{krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
-                            : $"{krok.Nazev}: skutečnost {krok.SkutecneDatum:dd.MM.yyyy}";
+                            : $"{krok.Nazev}: skutečnost {(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum.ToString("dd.MM.yyyy") : "—")}";
                         var ariaLabel = row.Item1 == "planned"
                             ? $"Krok {krok.KrokIndex} {krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
-                            : $"Krok {krok.KrokIndex} {krok.Nazev}: skutečnost {krok.SkutecneDatum:dd.MM.yyyy}";
-                        // Zero-duration kroky: schováme hned při SSR, JS je zobrazí po applySegmentLayout,
-                        // když uživatel zadá kladné trvání v editoru.
-                        var initialHidden = krok.TrvaniDni <= 0 ? "display:none;" : string.Empty;
+                            : $"Krok {krok.KrokIndex} {krok.Nazev}: skutečnost {(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum.ToString("dd.MM.yyyy") : "krok ještě nenastal")}";
+                        var isPlannedHidden = row.Item1 == "planned" && krok.TrvaniDni <= 0;
+                        var isActualHidden = row.Item1 == "actual" && !krok.OdchylkaDni.HasValue;
+                        var initialHidden = (isPlannedHidden || isActualHidden) ? "display:none;" : string.Empty;
                         <span class="@overviewSegmentCssClass"
                               role="img"
                               aria-label="@ariaLabel"
@@ -114,6 +117,7 @@
                               data-rainbow-segment-label-short="@krok.KrokIndex"
                               data-schedule-segment-kind="@row.Item1"
                               data-step-index="@krok.KrokIndex"
+                              data-step-has-actual="@(krok.OdchylkaDni.HasValue ? "true" : "false")"
                               style="background:@krok.BarvaHex;@initialHidden"
                               title="@segmentTitle"></span>
                     }
@@ -161,20 +165,35 @@
                      data-axis-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
                      data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"></div>
             </div>
-            @foreach (var krok in Model.Kroky.Where(k => k.TrvaniDni > 0).OrderBy(k => k.KrokIndex))
+            @* Phase 9 (DESIGN-9-D + 10-A, 2026-05-01): žádný filter, render každý krok plně.
+               Tolerance hodnot:
+                 hasPlan = TrvaniDni > 0
+                 hasActual = OdchylkaDni.HasValue (NULL = krok nenastal, žádný actual segment) *@
+            @foreach (var krok in Model.Kroky.OrderBy(k => k.KrokIndex))
             {
-                var offsetLabel = krok.OdchylkaDni > 0 ? $"+{krok.OdchylkaDni} dnů" : $"{krok.OdchylkaDni} dnů";
-                var offsetCssClass = krok.OdchylkaDni > 0 ? "late" : krok.OdchylkaDni < 0 ? "ahead" : null;
+                var hasPlan = krok.TrvaniDni > 0;
+                var hasActual = krok.OdchylkaDni.HasValue;
+                var odchylka = krok.OdchylkaDni ?? 0;
+                var offsetLabel = odchylka > 0 ? $"+{odchylka} dnů"
+                                : odchylka < 0 ? $"{odchylka} dnů"
+                                : "0 dnů";
+                var offsetCssClass = odchylka > 0 ? "late" : odchylka < 0 ? "ahead" : null;
+                var plannedHiddenStyle = hasPlan ? string.Empty : "width:0;visibility:hidden;";
                 <div class="gantt-step-row"
                      data-schedule-step-row
                      data-step-index="@krok.KrokIndex"
                      data-step-name="@krok.Nazev"
                      data-step-color="@krok.BarvaHex"
                      data-step-duration="@krok.TrvaniDni"
-                     data-step-delay="@krok.OdchylkaDni">
+                     data-step-delay="@(krok.OdchylkaDni?.ToString() ?? "")"
+                     data-step-has-plan="@(hasPlan ? "true" : "false")"
+                     data-step-has-actual="@(hasActual ? "true" : "false")">
                     <div class="gantt-step-name">
                         <span>@krok.Nazev</span>
-                        <span class="gantt-step-offset @offsetCssClass" data-schedule-offset>@offsetLabel</span>
+                        @if (hasActual)
+                        {
+                            <span class="gantt-step-offset @offsetCssClass" data-schedule-offset>@offsetLabel</span>
+                        }
                     </div>
                     <div class="schedule-layered-track schedule-layered-track--step" data-schedule-breakdown-track>
                         <div class="schedule-layered-marker today"
@@ -188,13 +207,16 @@
                               data-rainbow-segment-label-short="@krok.KrokIndex"
                               data-schedule-breakdown-segment="planned"
                               data-step-index="@krok.KrokIndex"
-                              style="background:@krok.BarvaHex;"></span>
-                        <span class="schedule-layered-segment actual"
-                              role="img"
-                              aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
-                              data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
-                              data-schedule-breakdown-segment="actual"
-                              data-step-index="@krok.KrokIndex"></span>
+                              data-step-zero-plan="@(hasPlan ? "false" : "true")"
+                              style="background:@krok.BarvaHex;@plannedHiddenStyle"></span>
+                        @if (hasActual)
+                        {
+                            <span class="schedule-layered-segment actual"
+                                  role="img"
+                                  aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
+                                  data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
+                                  data-schedule-breakdown-segment="actual"
+                                  data-step-index="@krok.KrokIndex"></span>
                         }
                     </div>
                 </div>

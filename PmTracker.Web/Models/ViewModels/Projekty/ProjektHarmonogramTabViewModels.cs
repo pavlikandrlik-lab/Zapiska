@@ -83,8 +83,14 @@ public sealed class HarmonogramKrokEditViewModel
     public int TrvaniTypId { get; init; }
     public int ZpozdeniTypId { get; init; }
     public int TrvaniDni { get; init; }
-    public int OdchylkaDni { get; init; }
-    public int ZpozdeniDni => OdchylkaDni;
+    /// <summary>
+    /// Phase 9 (DESIGN-10-A, 2026-05-01): nullable.
+    /// NULL = "krok ještě nenastal / nebyl vyplněn".
+    /// 0 = "vše šlo dle plánu" (krok dokončen včas).
+    /// non-0 = OdchylkaDni dnů (kladné = zpoždění, záporné = předstih).
+    /// </summary>
+    public int? OdchylkaDni { get; init; }
+    public int? ZpozdeniDni => OdchylkaDni;
     public DateTime BaselineDatum { get; init; }
     public DateTime SkutecneDatum { get; init; }
     public DateTime PosunuteDatum => SkutecneDatum;
