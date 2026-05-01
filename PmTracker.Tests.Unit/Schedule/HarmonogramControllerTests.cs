@@ -82,6 +82,10 @@ public sealed class HarmonogramControllerTests
         audit.Setup(a => a.WriteAsync(It.IsAny<int?>(), It.IsAny<AuditWriteEntry>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
+        var pendingLock = new Mock<PmTracker.Web.Services.Records.IPendingScheduleProposalLockEvaluator>();
+        pendingLock.Setup(p => p.EvaluateAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PmTracker.Web.Services.Records.PendingScheduleProposalLockState(false, null, null, false, false));
+
         var ctrl = new HarmonogramController(
             db,
             sync.Object,
@@ -89,7 +93,8 @@ public sealed class HarmonogramControllerTests
             currentUser.Object,
             TimeProvider.System,
             audit.Object,
-            NullLogger<HarmonogramController>.Instance);
+            NullLogger<HarmonogramController>.Instance,
+            pendingLock.Object);
 
         // HttpContext pro TraceIdentifier / User fallback
         ctrl.ControllerContext = new ControllerContext

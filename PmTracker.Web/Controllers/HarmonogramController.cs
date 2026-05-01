@@ -6,6 +6,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Audit;
+using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Schedules;
 using PmTracker.Web.Services.Security;
 using IPmAuthorizationService = PmTracker.Web.Services.Security.IAuthorizationService;
@@ -35,6 +36,8 @@ public sealed class HarmonogramController : Controller
     private readonly TimeProvider _time;
     private readonly IAuditWriteService _audit;
     private readonly ILogger<HarmonogramController> _logger;
+    // Phase 7 (DESIGN-7-B): pending lock pre-check pro Manual→Auto toggle.
+    private readonly IPendingScheduleProposalLockEvaluator _pendingLockEvaluator;
 
     public HarmonogramController(
         PmTrackerDbContext db,
@@ -43,7 +46,8 @@ public sealed class HarmonogramController : Controller
         ICurrentUserAccessor currentUser,
         TimeProvider time,
         IAuditWriteService audit,
-        ILogger<HarmonogramController> logger)
+        ILogger<HarmonogramController> logger,
+        IPendingScheduleProposalLockEvaluator pendingLockEvaluator)
     {
         _db = db;
         _sync = sync;
@@ -52,9 +56,19 @@ public sealed class HarmonogramController : Controller
         _time = time;
         _audit = audit;
         _logger = logger;
+        _pendingLockEvaluator = pendingLockEvaluator;
     }
 
-    public sealed record ToggleRezimRequest(int HodnotaId, SkutecnostRezimEnum Rezim);
+    /// <summary>
+    /// Phase 7 (DESIGN-7-B): podporuje create-if-missing flow analog SelectCandidate.
+    /// HodnotaId &gt; 0: classical (load existing row).
+    /// ZaznamId + KrokPoradi: pokud HodnotaId nedostupný, server vytvoří DELAY row.
+    /// </summary>
+    public sealed record ToggleRezimRequest(
+        int HodnotaId,
+        SkutecnostRezimEnum Rezim,
+        int? ZaznamId = null,
+        int? KrokPoradi = null);
 
     /// <summary>
     /// Přepne <see cref="ZaznamHarmonogramHodnotaEntity.SkutecnostRezim"/> mezi Auto a Manual.
@@ -65,27 +79,85 @@ public sealed class HarmonogramController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleRezim([FromBody] ToggleRezimRequest request, CancellationToken ct)
     {
-        if (request is null || request.HodnotaId <= 0)
-        {
-            return BadRequest();
-        }
+        if (request is null) return BadRequest();
 
-        var row = await _db.ZaznamHarmonogramHodnoty
-            .FirstOrDefaultAsync(h => h.Id == request.HodnotaId, ct).ConfigureAwait(false);
-        if (row is null)
+        ZaznamHarmonogramHodnotaEntity? row = null;
+
+        // Phase 7 (DESIGN-7-B + phantom bug 2 fix): create-if-missing analog SelectCandidate.
+        if (request.HodnotaId > 0)
         {
-            return NotFound();
+            row = await _db.ZaznamHarmonogramHodnoty
+                .FirstOrDefaultAsync(h => h.Id == request.HodnotaId, ct).ConfigureAwait(false);
+            if (row is null) return NotFound();
+        }
+        else if (request.ZaznamId is int zaznamId && zaznamId > 0
+                 && request.KrokPoradi is int krokPoradi && krokPoradi > 0)
+        {
+            var zaznam = await _db.ProjektoveZaznamy.AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == zaznamId, ct).ConfigureAwait(false);
+            if (zaznam is null) return NotFound();
+
+            var delayTypId = await _db.CiselnikHarmonogramTypu.AsNoTracking()
+                .Where(t => t.SablonaVerze == zaznam.HarmonogramSablonaVerze
+                         && t.JeZpozdeni
+                         && t.KrokPoradi == krokPoradi)
+                .Select(t => (int?)t.Id)
+                .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (delayTypId is null)
+            {
+                return NotFound(new { error = $"Krok {krokPoradi} neexistuje v schématu záznamu." });
+            }
+
+            row = await _db.ZaznamHarmonogramHodnoty
+                .FirstOrDefaultAsync(h => h.ZaznamId == zaznamId && h.TypId == delayTypId.Value, ct)
+                .ConfigureAwait(false);
+            if (row is null)
+            {
+                row = new ZaznamHarmonogramHodnotaEntity
+                {
+                    ZaznamId = zaznamId,
+                    TypId = delayTypId.Value,
+                    HodnotaInt = null, // DESIGN-10-A: NULL = krok nenastal (default insert)
+                    UpdatedAt = _time.GetUtcNow().UtcDateTime,
+                    SkutecnostRezim = SkutecnostRezimEnum.Auto,
+                    SkutecnostZdroj = SkutecnostZdrojEnum.Neznamo
+                };
+                _db.ZaznamHarmonogramHodnoty.Add(row);
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+        }
+        else
+        {
+            return BadRequest(new { error = "Předej HodnotaId nebo ZaznamId+KrokPoradi." });
         }
 
         var projektId = await GetProjektIdAsync(row.ZaznamId, ct).ConfigureAwait(false);
-        if (projektId is null)
-        {
-            return NotFound();
-        }
+        if (projektId is null) return NotFound();
 
         if (!await HasSchedulePermissionAsync(projektId.Value, ct).ConfigureAwait(false))
         {
             return Forbid();
+        }
+
+        // Phase 7 (DESIGN-7-B): pending lock pre-check pro Manual→Auto cestu.
+        // Pokud existuje pending návrh na ten krok, nelze přepnout do Auto.
+        if (request.Rezim == SkutecnostRezimEnum.Auto && row.SkutecnostRezim == SkutecnostRezimEnum.Manual)
+        {
+            var lockState = await _pendingLockEvaluator.EvaluateAsync(row.ZaznamId, ct).ConfigureAwait(false);
+            if (lockState.HasPendingProposal && lockState.LockedManualKrokKeys is not null)
+            {
+                var krokKey = await _db.CiselnikHarmonogramTypu.AsNoTracking()
+                    .Where(t => t.Id == row.TypId)
+                    .Select(t => (Guid?)t.KrokKey)
+                    .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                if (krokKey.HasValue && lockState.LockedManualKrokKeys.Contains(krokKey.Value))
+                {
+                    return BadRequest(new
+                    {
+                        error = $"Pending návrh #{lockState.ProposalId} blokuje přepnutí kroku do Auto rezimu. Vyřeš návrh nejdříve."
+                    });
+                }
+            }
         }
 
         if (row.SkutecnostRezim == request.Rezim)
