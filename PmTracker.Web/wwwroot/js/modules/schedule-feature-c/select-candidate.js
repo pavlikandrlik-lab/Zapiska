@@ -24,7 +24,7 @@
         return input ? input.value : null;
     }
 
-    async function postSelectCandidate(payload) {
+    async function postSelectCandidate(payload, signal) {
         const token = getAntiforgery();
         const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
         if (token) headers['RequestVerificationToken'] = token;
@@ -32,7 +32,8 @@
             method: 'POST',
             headers: headers,
             credentials: 'same-origin',
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal: signal
         });
         if (!resp.ok) {
             const body = await resp.text().catch(() => '');
@@ -40,6 +41,11 @@
         }
         return await resp.json();
     }
+
+    // FIX 2026-05-01 (round 3 #21): race condition guard — multiple rapid clicks na různé
+    // kandidáty by mohly aplikovat odpovědi out-of-order. Per cell tracker abort předchozí
+    // request při novém kliku.
+    const pendingByCell = new WeakMap(); // cell DOM node → AbortController
 
     function refreshSelectionInUi(cell, selectedExterniOdkazId) {
         const items = cell.querySelectorAll('[data-feature-c-select-candidate]');
@@ -107,16 +113,36 @@
             KrokPoradi: krokPoradi > 0 ? krokPoradi : null
         };
 
+        // FIX 2026-05-01 (round 3 #21): abort předchozí pending request pro tutéž cell.
+        const previousController = pendingByCell.get(cell);
+        if (previousController) {
+            try { previousController.abort(); } catch { /* ignore */ }
+        }
+        const controller = new AbortController();
+        pendingByCell.set(cell, controller);
+
         btn.disabled = true;
         try {
-            const result = await postSelectCandidate(payload);
+            const result = await postSelectCandidate(payload, controller.signal);
+            // Pokud byl tento request abortován novějším klikem, výsledek ignoruj.
+            if (pendingByCell.get(cell) !== controller) return;
+
             const newPreferred = (result && typeof result.preferredExterniOdkazId === 'number')
                 ? result.preferredExterniOdkazId
                 : externiOdkazId;
             refreshSelectionInUi(cell, newPreferred);
+            if (result && result.syncFailed) {
+                showError(cell,
+                    `Kandidát uložen, ale auto-sync selhal: ${result.syncFailReason || 'neznámá chyba'}`);
+            }
         } catch (err) {
+            // AbortError se může objevit při novém kliku — silently ignore.
+            if (err?.name === 'AbortError') return;
             showError(cell, `Výběr kandidáta selhal: ${err.message}`);
         } finally {
+            if (pendingByCell.get(cell) === controller) {
+                pendingByCell.delete(cell);
+            }
             btn.disabled = false;
         }
     }

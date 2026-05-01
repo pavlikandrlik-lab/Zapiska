@@ -100,11 +100,14 @@
         }
         @if (featureCShowToggle)
         {
+            @* FIX 2026-05-01 (round 3 #22): aria-pressed pro standard toggle a11y pattern.
+               Auto rezim = pressed=false (default), Manual rezim = pressed=true (= user override). *@
             <button type="button"
                     class="schedule-actual-cell__toggle"
                     data-feature-c-toggle
                     data-hodnota-id="@krok.DelayHodnotaId!.Value"
                     data-current-rezim="@krok.SkutecnostRezim"
+                    aria-pressed="@(krok.SkutecnostRezim == SkutecnostRezimEnum.Manual ? "true" : "false")"
                     aria-label="@featureCToggleAriaLabel"
                     title="@featureCToggleAriaLabel">
                 <span class="schedule-actual-cell__toggle-label">@featureCRezimLabel</span>

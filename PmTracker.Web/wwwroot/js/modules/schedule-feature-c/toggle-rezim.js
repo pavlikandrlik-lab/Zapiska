@@ -56,6 +56,8 @@
                 : 'Přepnout režim skutečnosti z Ručně na Auto';
             toggle.setAttribute('aria-label', newAria);
             toggle.setAttribute('title', newAria);
+            // FIX 2026-05-01 (round 3 #22): aria-pressed v sync s rezimem (a11y).
+            toggle.setAttribute('aria-pressed', newRezim === 'Manual' ? 'true' : 'false');
         }
 
         const badge = cell.querySelector(BADGE_SELECTOR);
@@ -102,8 +104,16 @@
             const result = await postToggleRezim(hodnotaId, newRezim);
             if (result && result.changed === true) {
                 refreshCellUi(cell, result.skutecnostRezim || newRezim, result.skutecnostZdroj || 'Neznamo');
+                // FIX 2026-05-01 (round 3 #15): zobrazit warning při syncFailed
+                // (round 2 #13 byl serverside-only — klient ho ignoroval).
+                if (result.syncFailed) {
+                    showToggleError(cell,
+                        `Režim přepnut, ale auto-sync selhal: ${result.syncFailReason || 'neznámá chyba'}`);
+                }
+            } else if (result && result.changed === false) {
+                // server řekl no-op (rezim už je požadovaný) — UI je už správně
             } else {
-                // server vrátil changed=false (rezim se nezměnil) — UI zůstane
+                showToggleError(cell, 'Neočekávaná odpověď serveru.');
             }
         } catch (err) {
             showToggleError(cell, `Přepnutí selhalo: ${err.message}`);

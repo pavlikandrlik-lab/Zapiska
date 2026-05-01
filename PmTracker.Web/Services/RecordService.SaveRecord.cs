@@ -298,9 +298,17 @@ public sealed partial class RecordService
 
             // Phase 4 (DESIGN-6-A, 2026-05-01) + FIX 2026-05-01 transaction semantics:
             // Před fixem ApplyManualActualKrokyAsync dělalo vlastní SaveChanges → partial-commit risk.
-            // Nyní: snapshot before + StageManualActualKrokyAsync + SaveChanges + audit po stage.
-            // Vše v rámci téže outer transakce (ExecuteInSerializableTransactionAsync).
-            var manualBeforeSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt).ConfigureAwait(false);
+            // Nyní: stage do change trackeru → SaveChanges + audit. Vše v outer transakci.
+            // FIX 2026-05-01 (round 3 #17): before snapshot loaduj AŽ KDYŽ něco staged
+            // (pre-staged check by jinak loadoval snapshot zbytečně pro každý SaveRecord call).
+            //
+            // StageManualActualKrokyAsync vrací false pokud:
+            //   - !isTaskCategory nebo command.ManualActualKroky.Count == 0 (no work)
+            //   - overrides.Count == 0 (žádné platné kroky 2/5/8/9 v inputu)
+            // Pre-stage check zachycuje validation exceptions (RVE) v rámci StageAsync.
+            var manualBeforeSnapshot = command.ManualActualKroky.Count > 0 && isTaskCategory
+                ? await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt).ConfigureAwait(false)
+                : null;
             var manualStaged = await StageManualActualKrokyAsync(
                 command, entity.Id, entity.DatumZalozeni, entity.HarmonogramSablonaVerze,
                 isTaskCategory, innerCt).ConfigureAwait(false);

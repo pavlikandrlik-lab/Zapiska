@@ -51,9 +51,27 @@ public sealed class PendingScheduleProposalLockEvaluator : IPendingSchedulePropo
             return new PendingScheduleProposalLockState(false, null, null, false, false);
         }
 
-        var payload = string.IsNullOrWhiteSpace(proposal.PayloadJson)
-            ? null
-            : JsonSerializer.Deserialize<RecordProposalPayload>(proposal.PayloadJson);
+        // FIX 2026-05-01 (round 3 #18): safe deserialize. Pokud payload je malformed (DB
+        // pollution, admin SQL edit, schema migration broken), vrátíme defensive lock state
+        // místo unhandled JsonException → user dostane meaningful error v UI místo 500.
+        RecordProposalPayload? payload = null;
+        if (!string.IsNullOrWhiteSpace(proposal.PayloadJson))
+        {
+            try
+            {
+                payload = JsonSerializer.Deserialize<RecordProposalPayload>(proposal.PayloadJson);
+            }
+            catch (JsonException)
+            {
+                // Malformed payload → návrh je v inconsistent stavu, full lock + user-friendly message.
+                return new PendingScheduleProposalLockState(
+                    HasPendingProposal: true,
+                    ProposalId: proposal.Id,
+                    Message: $"Návrh #{proposal.Id} je v neplatném stavu (malformed payload). Kontaktuj správce.",
+                    LocksTermDeadline: true,
+                    LocksSchedule: true);
+            }
+        }
         var schedulePayload = payload?.SchedulePlan;
         var locksTermDeadline = schedulePayload?.ChangesTermDeadline ?? true;
         var locksSchedule = (schedulePayload?.ChangesSchedulePlan ?? false)

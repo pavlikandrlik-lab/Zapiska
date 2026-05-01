@@ -90,7 +90,9 @@ public sealed partial class RecordProposalService
         //   - Vlastní Pending + user má proposals.edit.own → auto-supersede starého (Stav=SUPERSEDED)
         //   - Cizí Pending + user má proposals.edit.any → admin override supersede + audit
         //   - Jinak → throw (pending má prioritu, vyžaduj rozhodnutí)
-        var existingPending = await _dbContext.ZaznamNavrhy
+        // FIX 2026-05-01 (round 3 #20): AsNoTracking() — read-only validation, žádný tracker pollution.
+        // Tracked entity by později kolidovala s následným re-load (line 173) v supersede branch.
+        var existingPending = await _dbContext.ZaznamNavrhy.AsNoTracking()
             .Where(n => n.ZaznamId == record.Id
                      && n.TypNavrhu == RecordProposalTypeCodes.SchedulePlanChange
                      && n.Stav == RecordProposalStateCodes.Pending)

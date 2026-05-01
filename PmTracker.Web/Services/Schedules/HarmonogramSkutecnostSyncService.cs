@@ -233,6 +233,15 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
             return new HarmonogramSyncResult(plan.ProjektovyZaznamId, 0, 0, 0, 0);
         }
 
+        // FIX 2026-05-01 (round 3 #19): warn pokud batch > 500 změn (SQL Server parameter limit ~2100,
+        // a zároveň signál že něco je divné — typicky max 10 kroků per záznam).
+        if (plan.Changes.Count > 500)
+        {
+            _logger.LogWarning(
+                "ApplyPlan #{Id}: unusually large plan with {Count} changes — possible bug or mass operation.",
+                plan.ProjektovyZaznamId, plan.Changes.Count);
+        }
+
         var rowIds = plan.Changes.Select(c => c.RowId).Distinct().ToList();
         var trackedRows = await _db.ZaznamHarmonogramHodnoty
             .Where(h => rowIds.Contains(h.Id))
