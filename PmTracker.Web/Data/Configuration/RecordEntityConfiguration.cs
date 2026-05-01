@@ -79,7 +79,8 @@ internal sealed class RecordProposalEntityConfiguration : IEntityTypeConfigurati
         builder.ToTable("zaznam_navrhy", table =>
         {
             table.HasCheckConstraint("CK_zaznam_navrhy_typ", "typ_navrhu IN ('CREATE_RECORD', 'SCHEDULE_PLAN_CHANGE')");
-            table.HasCheckConstraint("CK_zaznam_navrhy_stav", "stav IN ('PENDING', 'APPROVED', 'REJECTED')");
+            // DESIGN-7-D (2026-05-01): SUPERSEDED přidán pro auto-supersede vlastního starého návrhu.
+            table.HasCheckConstraint("CK_zaznam_navrhy_stav", "stav IN ('PENDING', 'APPROVED', 'REJECTED', 'SUPERSEDED')");
         });
 
         builder.HasKey(x => x.Id);
@@ -95,6 +96,9 @@ internal sealed class RecordProposalEntityConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.DecidedByOsobaId).HasColumnName("decided_by_osoba_id");
         builder.Property(x => x.DecidedAt).HasColumnName("decided_at");
         builder.Property(x => x.ApprovedRecordId).HasColumnName("approved_record_id");
+        // DESIGN-7-D (2026-05-01): nullable FK na zaznam_navrhy.id pro auto-supersede chain.
+        // Bez DB FK constraint aby self-reference history nezpůsobila cyklický cascade.
+        builder.Property(x => x.SupersededByProposalId).HasColumnName("superseded_by_proposal_id").IsRequired(false);
         builder.Property(x => x.RowVersion).HasColumnName("row_version").IsRowVersion();
 
         builder.HasIndex(x => new { x.ProjektId, x.CreatedAt })

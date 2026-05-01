@@ -31,6 +31,14 @@ public static class RecordProposalStateCodes
     public const string Pending = "PENDING";
     public const string Approved = "APPROVED";
     public const string Rejected = "REJECTED";
+
+    /// <summary>
+    /// Plán Harmonogram refactor 2026-05-01 (DESIGN-7-D) — auto-supersede vlastního
+    /// starého návrhu při novém submitu. UI ho zobrazuje read-only s linkem na nový návrh.
+    /// PendingScheduleProposalLockEvaluator filtruje pouze Stav=Pending — Superseded se na
+    /// lock check nepodílí.
+    /// </summary>
+    public const string Superseded = "SUPERSEDED";
 }
 
 public static class RecordProposalEditorModes

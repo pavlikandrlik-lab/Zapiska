@@ -224,6 +224,15 @@ public sealed class ZaznamNavrhEntity
     public int? DecidedByOsobaId { get; set; }
     public DateTime? DecidedAt { get; set; }
     public int? ApprovedRecordId { get; set; }
+
+    /// <summary>
+    /// Plán Harmonogram refactor 2026-05-01 (DESIGN-7-D) — auto-supersede vlastního
+    /// starého návrhu při novém submitu. NULL = aktivní návrh (Pending/Approved/Rejected).
+    /// Non-null = Stav=Superseded, FK na <see cref="Id"/> nového návrhu, který tento nahradil.
+    /// FK constraint není v DB (self-reference history) — řízeno aplikační logikou.
+    /// </summary>
+    public int? SupersededByProposalId { get; set; }
+
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 }
 
