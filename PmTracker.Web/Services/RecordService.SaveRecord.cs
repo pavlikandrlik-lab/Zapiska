@@ -296,6 +296,13 @@ public sealed partial class RecordService
 
             await dbContext.SaveChangesAsync(innerCt);
 
+            // Phase 4 (DESIGN-6-A, 2026-05-01): persistence ManualActualKroky pro kroky 2/5/8/9.
+            // Phantom UI bug 1 fix — před tímto fixem UI form pole posílalo data, ale RecordService
+            // ho silently ignoroval. Pending lock pre-check + audit log.
+            await ApplyManualActualKrokyAsync(
+                command, entity.Id, entity.DatumZalozeni, entity.HarmonogramSablonaVerze,
+                isTaskCategory, currentUser, innerCt).ConfigureAwait(false);
+
             // Plán B Task 10: po uložení externích vazeb (kdy mají Id) spustíme harvest.
             // Awaitujeme — enqueue je rychlé a musí skončit před disposalem request scope,
             // jinak by reactive adapter (Plán sd-sync-revise) ztratil DbContext. Používáme
@@ -1289,6 +1296,12 @@ public sealed partial class RecordService
                 oldScheduleSnapshot,
                 newScheduleSnapshot));
             await dbContext.SaveChangesAsync(innerCt);
+
+            // Phase 4 (DESIGN-6-A): persistence ManualActualKroky i v schedule-only flow.
+            await ApplyManualActualKrokyAsync(
+                command, entity.Id, entity.DatumZalozeni, entity.HarmonogramSablonaVerze,
+                isTaskCategory: true, currentUser, innerCt).ConfigureAwait(false);
+
             return entity.Id;
         }, ct);
     }
@@ -1655,5 +1668,122 @@ public sealed partial class RecordService
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Phase 4 (DESIGN-6-A, 2026-05-01) — persistence ManualActualKroky[] z command pro
+    /// manuální kroky 2/5/8/9. Phantom UI bug 1 fix: před tímto fixem UI input form pole
+    /// posílalo data, ale RecordService.SaveRecord ho silently ignoroval.
+    ///
+    /// Flow:
+    /// 1. Validace (KrokKey ≠ Empty, žádné duplikáty, datum ≤ today) přes ManualProposalFieldValidator.
+    /// 2. Pending lock pre-check — pokud existuje Pending návrh, který obsahuje krok v
+    ///    LockedManualKrokKeys, throw RecordValidationException.
+    /// 3. Compute overrides přes shared ManualActualKrokApplier.ApplyAsync.
+    /// 4. UPSERT do zaznam_harmonogram_hodnoty: existing row update nebo insert nový s
+    ///    Zdroj=Manual + Rezim=Manual (= user explicit input, sync nesmí přepsat).
+    /// 5. Audit log RecordSchedule Update s before/after snapshot.
+    /// </summary>
+    private async Task ApplyManualActualKrokyAsync(
+        SaveRecordCommand command,
+        int recordId,
+        DateTime datumZalozeni,
+        int harmonogramSablonaVerze,
+        bool isTaskCategory,
+        CurrentUserContextViewModel currentUser,
+        CancellationToken ct)
+    {
+        if (!isTaskCategory || command.ManualActualKroky.Count == 0)
+        {
+            return;
+        }
+
+        // 1) Validace strukturální (KrokKey, duplikáty, datum ≤ today)
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        Records.ManualProposalFieldValidator.ValidateManualActualKroky(command.ManualActualKroky, today);
+
+        // 2) Pending lock pre-check — žádné překrývání s pending návrhem (univerzální guard).
+        var lockState = await pendingScheduleProposalLockEvaluator.EvaluateAsync(recordId, ct).ConfigureAwait(false);
+        if (lockState.HasPendingProposal && lockState.LockedManualKrokKeys is not null
+            && lockState.LockedManualKrokKeys.Count > 0)
+        {
+            var conflicting = command.ManualActualKroky
+                .Where(m => lockState.LockedManualKrokKeys.Contains(m.KrokKey))
+                .ToList();
+            if (conflicting.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Krok harmonogramu je uzamčený pending návrhem #{lockState.ProposalId}, vyřeš návrh nejdříve.");
+            }
+        }
+
+        // 3) Načíst schema + plánované DURATION typeIds + spočítat overrides přes shared helper.
+        var schema = await harmonogramService.GetSchemaForRecordAsync(
+            new Models.Entities.ProjektovyZaznamEntity
+            {
+                Id = recordId,
+                HarmonogramSablonaVerze = harmonogramSablonaVerze,
+                DatumZalozeni = datumZalozeni
+            },
+            ct).ConfigureAwait(false);
+        var plannedTypeIds = schema.Kroky.Select(k => k.TrvaniTypId).Where(x => x > 0).ToHashSet();
+
+        var overrides = await Records.ManualActualKrokApplier.ApplyAsync(
+            command.ManualActualKroky, schema, datumZalozeni, plannedTypeIds,
+            command.HarmonogramHodnoty, dbContext, harmonogramService, ct).ConfigureAwait(false);
+
+        if (overrides.Count == 0)
+        {
+            return;
+        }
+
+        // 4) UPSERT do zaznam_harmonogram_hodnoty: existing row update nebo insert nový.
+        // Zdroj=Manual + Rezim=Manual (= user explicit input, sync nesmí přepsat).
+        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var existingDelayRows = await dbContext.ZaznamHarmonogramHodnoty
+            .Where(h => h.ZaznamId == recordId && overrides.Select(o => o.DelayTypId).Contains(h.TypId))
+            .ToListAsync(ct).ConfigureAwait(false);
+        var existingByTypId = existingDelayRows.ToDictionary(r => r.TypId);
+
+        // Audit before snapshot — všechny DELAY rows pro daný záznam
+        var beforeSnapshot = await LoadRecordScheduleAuditSnapshotAsync(recordId, ct).ConfigureAwait(false);
+
+        foreach (var ov in overrides)
+        {
+            if (existingByTypId.TryGetValue(ov.DelayTypId, out var row))
+            {
+                row.HodnotaInt = ov.OdchylkaDni;
+                row.SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Manual;
+                row.SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Manual;
+                row.UpdatedAt = nowUtc;
+            }
+            else
+            {
+                dbContext.ZaznamHarmonogramHodnoty.Add(new Models.Entities.ZaznamHarmonogramHodnotaEntity
+                {
+                    ZaznamId = recordId,
+                    TypId = ov.DelayTypId,
+                    HodnotaInt = ov.OdchylkaDni,
+                    SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Manual,
+                    SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Manual,
+                    UpdatedAt = nowUtc
+                });
+            }
+        }
+
+        await dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // 5) Audit log
+        var afterSnapshot = await LoadRecordScheduleAuditSnapshotAsync(recordId, ct).ConfigureAwait(false);
+        if (afterSnapshot is not null)
+        {
+            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                beforeSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
+                AuditEntityType.RecordSchedule,
+                recordId.ToString(CultureInfo.InvariantCulture),
+                beforeSnapshot,
+                afterSnapshot));
+            await dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
     }
 }

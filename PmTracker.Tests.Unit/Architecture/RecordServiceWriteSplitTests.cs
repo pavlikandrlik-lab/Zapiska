@@ -68,8 +68,11 @@ public sealed class RecordServiceWriteSplitTests
         // 2026-04-27: bump 1600 → 1700 po fix bugu UNEXPECTED_SERVER_ERROR
         // pro smazání externí vazby s harvestnutými vyjádřeními. Replace přepsán
         // z naivního RemoveRange+Add na UPSERT s pre-flight FK-lock detekcí
-        // (~54 řádků). Pokud LOC dále poroste, zvážit extrakci do partial
-        // RecordService.ExternalLinks.cs.
-        loc.Should().BeLessThan(1700, "SaveRecord může být velký ale < 1700 LOC (obsahuje SaveRecordAsync + všechny validační a harmonogram helpery + UPSERT pro externí vazby)");
+        // (~54 řádků).
+        // 2026-05-01 (Phase 4, DESIGN-6-A): bump 1700 → 1850 po phantom UI bug 1 fix —
+        // ApplyManualActualKrokyAsync helper ~110 řádků (validace + pending lock pre-check
+        // + UPSERT do zaznam_harmonogram_hodnoty pro manuální kroky 2/5/8/9 + audit log).
+        // Pokud LOC dále poroste, zvážit extrakci do partial RecordService.ManualActualKroky.cs.
+        loc.Should().BeLessThan(1850, "SaveRecord může být velký ale < 1850 LOC (SaveRecordAsync + harmonogram helpery + UPSERT externích vazeb + ApplyManualActualKrokyAsync)");
     }
 }

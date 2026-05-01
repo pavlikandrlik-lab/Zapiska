@@ -34,8 +34,8 @@
 ### Nové soubory
 | Soubor | Odpovědnost |
 |---|---|
-| `db_upgrade_1_3_11_proposal_supersede.sql` | DB migrace — Stav=Superseded enum + SupersededByProposalId FK na zaznam_navrhy |
-| `db_upgrade_1_3_12_delay_nullable.sql` | DB migrace — hodnota_int NOT NULL → NULL + backfill (Zdroj=Neznamo + 0 → NULL) |
+| `db_upgrade_1_3_13_proposal_supersede.sql` | DB migrace — Stav=Superseded enum + SupersededByProposalId FK na zaznam_navrhy |
+| `db_upgrade_1_3_14_delay_nullable.sql` | DB migrace — hodnota_int NOT NULL → NULL + backfill (Zdroj=Neznamo + 0 → NULL) |
 | `PmTracker.Web/Services/Schedules/HarmonogramSyncPlan.cs` | DTO popisující plánované změny (delta) — výstup `ComputePlanAsync`, vstup `ApplyPlanAsync` |
 | `PmTracker.Web/wwwroot/js/modules/schedule-feature-c/select-candidate.js` | JS handler pro dropdown výběr preferred kandidáta (chybějící phantom UI bug) |
 | `PmTracker.Web/wwwroot/js/modules/schedule-feature-c/preview-sync.js` | JS staging flow — pre-fetch sync při blur na Cislo6, sessionStorage cache |
@@ -198,17 +198,17 @@ Expected: výstup obsahuje "PASS"/"CONFIRMED" pro každý bod. Pokud kterýkoli 
 ### Task 1.1: Migrace + entity + EF mapping pro ZaznamNavrhEntity Superseded
 
 **Files:**
-- Create: `db_upgrade_1_3_11_proposal_supersede.sql`
+- Create: `db_upgrade_1_3_13_proposal_supersede.sql`
 - Modify: `PmTracker.Web/Models/Entities/PmTrackerEntities.cs`
 - Modify: `PmTracker.Web/Models/ViewModels/RecordProposalViewModels.cs`
 - Modify: `PmTracker.Web/Data/Configuration/RecordProposalEntityConfiguration.cs` (nebo equivalent — ověř název v Step 2)
 
 - [ ] **Step 1: Vytvořit DB migraci**
 
-Vytvořit soubor `db_upgrade_1_3_11_proposal_supersede.sql`:
+Vytvořit soubor `db_upgrade_1_3_13_proposal_supersede.sql`:
 
 ```sql
--- db_upgrade_1_3_11_proposal_supersede.sql
+-- db_upgrade_1_3_13_proposal_supersede.sql
 --
 -- Plán Harmonogram refactor 2026-05-01 — DESIGN-7-D.
 -- Přidává sloupec SupersededByProposalId na zaznam_navrhy pro auto-supersede vlastního
@@ -264,7 +264,7 @@ Expected: soubor s konfigurací (např. `RecordProposalEntityConfiguration.cs` n
 - [ ] **Step 3: Aplikovat migraci na lokální DB**
 
 ```bash
-sqlcmd -S localhost -d PM_Tracker_VYVOJ -i db_upgrade_1_3_11_proposal_supersede.sql
+sqlcmd -S localhost -d PM_Tracker_VYVOJ -i db_upgrade_1_3_13_proposal_supersede.sql
 ```
 
 Expected: `Added zaznam_navrhy.superseded_by_proposal_id...` + `Created index IX_zaznam_navrhy_zaznam_typ_stav_active...` + sanity SELECT result.
@@ -327,7 +327,7 @@ Expected: `Build succeeded. 0 Error(s)`. Pokud chyba, opravit (typicky chybějí
 - [ ] **Step 8: Commit**
 
 ```bash
-git add db_upgrade_1_3_11_proposal_supersede.sql \
+git add db_upgrade_1_3_13_proposal_supersede.sql \
         PmTracker.Web/Models/Entities/PmTrackerEntities.cs \
         PmTracker.Web/Models/ViewModels/RecordProposalViewModels.cs \
         PmTracker.Web/Data/Configuration/
@@ -339,7 +339,7 @@ Plán Harmonogram refactor 2026-05-01, DESIGN-7-D.
 Připravuje schema pro max 1 Pending per (zaznamId, typNavrhu) invariant
 s auto-supersede vlastního starého návrhu při novém submitu.
 
-- Migrace db_upgrade_1_3_11 — sloupec superseded_by_proposal_id + index
+- Migrace db_upgrade_1_3_13 — sloupec superseded_by_proposal_id + index
 - Entity ZaznamNavrhEntity.SupersededByProposalId (int?)
 - RecordProposalStateCodes.Superseded const
 - EF mapping nového sloupce
@@ -360,12 +360,12 @@ EOF
 ### Task 1.5.1: DB migrace + backfill
 
 **Files:**
-- Create: `db_upgrade_1_3_12_delay_nullable.sql`
+- Create: `db_upgrade_1_3_14_delay_nullable.sql`
 
 - [ ] **Step 1: Vytvořit migraci**
 
 ```sql
--- db_upgrade_1_3_12_delay_nullable.sql
+-- db_upgrade_1_3_14_delay_nullable.sql
 --
 -- Plán Harmonogram refactor 2026-05-01 — DESIGN-10-A.
 -- ALTER zaznam_harmonogram_hodnoty.hodnota_int z NOT NULL na NULL.
@@ -431,7 +431,7 @@ GO
 - [ ] **Step 2: Aplikovat migraci na lokální DB**
 
 ```bash
-sqlcmd -S localhost -d PM_Tracker_VYVOJ -i db_upgrade_1_3_12_delay_nullable.sql
+sqlcmd -S localhost -d PM_Tracker_VYVOJ -i db_upgrade_1_3_14_delay_nullable.sql
 ```
 
 Expected: `Altered hodnota_int to nullable.` + `Backfilled X DELAY rows from 0 → NULL` + sanity SELECT.
@@ -439,7 +439,7 @@ Expected: `Altered hodnota_int to nullable.` + `Backfilled X DELAY rows from 0 �
 - [ ] **Step 3: Commit migrace**
 
 ```bash
-git add db_upgrade_1_3_12_delay_nullable.sql
+git add db_upgrade_1_3_14_delay_nullable.sql
 git commit -m "$(cat <<'EOF'
 feat(harmonogram): hodnota_int nullable + backfill (DESIGN-10-A)
 
@@ -3445,7 +3445,7 @@ UI / JS:
   - ScheduleEditorPermissionSet sjednocené flagy CanEditScheduleDirect / CanProposeSchedule / CanEditManualActual
 
 DB:
-  - db_upgrade_1_3_11_proposal_supersede.sql — Stav=Superseded + SupersededByProposalId
+  - db_upgrade_1_3_13_proposal_supersede.sql — Stav=Superseded + SupersededByProposalId
 
 Tests:
   - HarmonogramSyncPlanTests, HarmonogramAutoStepProposalRejectionTests,
