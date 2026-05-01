@@ -14,12 +14,29 @@ namespace PmTracker.Web.Services.Schedules;
 /// </summary>
 public interface IHarmonogramSkutecnostSyncService
 {
+    /// <summary>
+    /// DESIGN-4-A (2026-05-01) — pure compute, vrátí plán zamýšlených změn, NIC nezapisuje do DB.
+    /// Použití: UI staging (PreviewSync endpoint), testy, manual review před commitem.
+    /// </summary>
+    Task<HarmonogramSyncPlan> ComputePlanAsync(int projektovyZaznamId, CancellationToken ct = default);
+
+    /// <summary>
+    /// DESIGN-4-A (2026-05-01) — aplikuje plán na DB s optimistic concurrency.
+    /// Před zápisem ověří, že každý dotčený řádek má UpdatedAt odpovídající plánu.
+    /// Pokud ne, skip rowu + log (stale token).
+    /// </summary>
+    Task<HarmonogramSyncResult> ApplyPlanAsync(HarmonogramSyncPlan plan, CancellationToken ct = default);
+
+    /// <summary>
+    /// Convenience wrapper: ComputePlanAsync + ApplyPlanAsync v sekvenci.
+    /// Existující call sites (HarmonogramController, BindingRebalanceService, VyjadreniHarvestService)
+    /// volají tuto metodu a fungují beze změny.
+    /// </summary>
     Task<HarmonogramSyncResult> SyncZaznamAsync(int projektovyZaznamId, CancellationToken ct = default);
 
     /// <summary>
     /// Plán 4 Feature C Task 6 UI — načte aktivní bindings záznamu se doplněným TypZaznamu +
     /// PredikatKey, pro reuse v UI builderu (kandidáti pro dropdown výběr).
-    /// Interně používá stejný pattern jako <see cref="SyncZaznamAsync"/>.
     /// </summary>
     Task<IReadOnlyList<BindingKandidat>> GetKandidatiForZaznamAsync(int zaznamId, CancellationToken ct = default);
 }
@@ -57,11 +74,17 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
         _logger = logger;
     }
 
-    public async Task<HarmonogramSyncResult> SyncZaznamAsync(int projektovyZaznamId, CancellationToken ct = default)
+    /// <summary>
+    /// DESIGN-4-A (2026-05-01) — pure read+compute, NIC nezapisuje do DB.
+    /// Načte schéma + bindings + existing rows, spočítá zamýšlené změny per krok přes resolver,
+    /// vrátí <see cref="HarmonogramSyncPlan"/> s detailem každé změny + ExpectedUpdatedAt token.
+    /// </summary>
+    public async Task<HarmonogramSyncPlan> ComputePlanAsync(int projektovyZaznamId, CancellationToken ct = default)
     {
+        var nowUtc = _time.GetUtcNow().UtcDateTime;
         if (projektovyZaznamId <= 0)
         {
-            return new HarmonogramSyncResult(projektovyZaznamId, 0, 0, 0, 0);
+            return new HarmonogramSyncPlan(projektovyZaznamId, nowUtc, Array.Empty<HarmonogramRowChange>());
         }
 
         var zaznam = await _db.ProjektoveZaznamy.AsNoTracking()
@@ -69,10 +92,9 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
             .ConfigureAwait(false);
         if (zaznam is null)
         {
-            return new HarmonogramSyncResult(projektovyZaznamId, 0, 0, 0, 0);
+            return new HarmonogramSyncPlan(projektovyZaznamId, nowUtc, Array.Empty<HarmonogramRowChange>());
         }
 
-        // 1) Schema: pro každý KrokPoradi najdi DelayTypId + DurationTypId (pro baseline computation)
         var schemaRaw = await _db.CiselnikHarmonogramTypu.AsNoTracking()
             .Where(t => t.SablonaVerze == zaznam.HarmonogramSablonaVerze)
             .Select(t => new { t.Id, t.KrokPoradi, t.JeZpozdeni, t.Hodnota })
@@ -81,8 +103,6 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
             .Where(x => x.JeZpozdeni)
             .GroupBy(x => x.KrokPoradi)
             .ToDictionary(g => g.Key, g => g.First().Id);
-        // Feature C Task 4 HodnotaInt propagation: potřebujeme DURATION TypId per poradi,
-        // aby pro každý krok spočítali baseline end (cumulative sum durations [1..N]).
         var durationTypIdByPoradi = schemaRaw
             .Where(x => !x.JeZpozdeni)
             .GroupBy(x => x.KrokPoradi)
@@ -94,18 +114,16 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
 
         if (delayTypIdByPoradi.Count == 0)
         {
-            return new HarmonogramSyncResult(projektovyZaznamId, 0, 0, 0, 0);
+            return new HarmonogramSyncPlan(projektovyZaznamId, nowUtc, Array.Empty<HarmonogramRowChange>());
         }
 
-        // 2) Load všech harmonogram rows záznamu (DURATION + DELAY) — píšeme jen DELAY, ale DURATION
-        //    hodnoty potřebujeme pro baseline computation.
-        var allRows = await _db.ZaznamHarmonogramHodnoty
+        var allRows = await _db.ZaznamHarmonogramHodnoty.AsNoTracking()
             .Where(h => h.ZaznamId == projektovyZaznamId)
             .ToListAsync(ct).ConfigureAwait(false);
         var delayRowByTypId = allRows
             .Where(r => delayTypIdByPoradi.Values.Contains(r.TypId))
             .ToDictionary(r => r.TypId, r => r);
-        // Duration hodnoty per poradi — pokud DURATION row neexistuje, použijeme default z schema.
+        // DESIGN-10-A: NULL DURATION → fallback default ze schématu, NULL HodnotaInt → 0.
         var durationByPoradi = durationTypIdByPoradi
             .ToDictionary(kv => kv.Key, kv =>
             {
@@ -114,7 +132,6 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
             });
 
         // Pre-compute baseline end datum per krok (cumulative prefix sum durations).
-        // Pokud poradi N chybí v durationByPoradi, bereme 0 (konzervativně).
         var baselineEndByPoradi = new Dictionary<int, DateTime>();
         var cumulative = zaznam.DatumZalozeni.Date;
         foreach (var poradi in delayTypIdByPoradi.Keys.OrderBy(p => p))
@@ -123,95 +140,140 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
             baselineEndByPoradi[poradi] = cumulative;
         }
 
-        // 3) Načtení bindings + fingerprint pro TypZaznamu
         var bindings = await LoadBindingKandidatiAsync(projektovyZaznamId, ct).ConfigureAwait(false);
 
-        // 4) Per krok: resolve + update metadata
-        int updated = 0, skipManual = 0, noKandidat = 0, preferredFallbacks = 0;
-        var nowUtc = _time.GetUtcNow().UtcDateTime;
-
+        var changes = new List<HarmonogramRowChange>();
         foreach (var (poradi, delayTypId) in delayTypIdByPoradi)
         {
             if (!delayRowByTypId.TryGetValue(delayTypId, out var row))
             {
-                // Delay row pro tento krok neexistuje (ještě nikdo nevyplnil skutečnost).
-                // Sync metadata se nevytváří „do zásoby" — resolver si sáhne až když hodnota dorazí.
-                if (HarmonogramSkutecnostResolver.Resolve(poradi, bindings, preferredExterniOdkazId: null)
-                        .Datum is null)
-                {
-                    noKandidat++;
-                    continue;
-                }
-                // Kandidát existuje, ale delay row zatím neleží — caller (harvester / UI save flow)
-                // založí row s aktuální hodnotou a příští sync už bude mít co aktualizovat.
-                noKandidat++;
+                // Delay row pro tento krok neexistuje. Sync metadata se nevytváří "do zásoby" —
+                // resolver si sáhne až když hodnota dorazí (existing chování zachováno).
                 continue;
             }
 
             if (row.SkutecnostRezim == SkutecnostRezimEnum.Manual)
             {
+                changes.Add(new HarmonogramRowChange(
+                    row.Id, row.TypId, poradi,
+                    OldHodnotaInt: row.HodnotaInt,
+                    NewHodnotaInt: row.HodnotaInt,
+                    OldZdroj: row.SkutecnostZdroj,
+                    NewZdroj: row.SkutecnostZdroj,
+                    OldPreferredExterniOdkazId: row.PreferredExterniOdkazId,
+                    NewPreferredExterniOdkazId: row.PreferredExterniOdkazId,
+                    ExpectedUpdatedAt: row.UpdatedAt,
+                    Reason: HarmonogramRowChangeReason.SkippedManualRezim));
+                continue;
+            }
+
+            var resolved = HarmonogramSkutecnostResolver.Resolve(poradi, bindings, row.PreferredExterniOdkazId);
+
+            if (resolved.Datum is null)
+            {
+                // Nenašel se žádný kandidát. Pokud byl řádek dříve Automat, retract → Neznamo + NULL.
+                if (row.SkutecnostZdroj == SkutecnostZdrojEnum.Automat)
+                {
+                    changes.Add(new HarmonogramRowChange(
+                        row.Id, row.TypId, poradi,
+                        OldHodnotaInt: row.HodnotaInt,
+                        NewHodnotaInt: null, // DESIGN-10-A: retract na NULL
+                        OldZdroj: row.SkutecnostZdroj,
+                        NewZdroj: SkutecnostZdrojEnum.Neznamo,
+                        OldPreferredExterniOdkazId: row.PreferredExterniOdkazId,
+                        NewPreferredExterniOdkazId: null,
+                        ExpectedUpdatedAt: row.UpdatedAt,
+                        Reason: HarmonogramRowChangeReason.RetractAutomat_NoCandidates));
+                }
+                continue;
+            }
+
+            // Auto-fill: spočítat delay z resolved.Datum + zapsat metadata.
+            var newPreferred = resolved.PreferredFallbackApplied ? null : row.PreferredExterniOdkazId;
+            int? computedDelay = baselineEndByPoradi.TryGetValue(poradi, out var baselineEnd)
+                ? (int)Math.Round((resolved.Datum.Value.Date - baselineEnd.Date).TotalDays)
+                : row.HodnotaInt;
+
+            var hasChange = row.HodnotaInt != computedDelay
+                || row.SkutecnostZdroj != SkutecnostZdrojEnum.Automat
+                || row.PreferredExterniOdkazId != newPreferred;
+
+            if (!hasChange) continue;
+
+            var reason = resolved.PreferredFallbackApplied ? HarmonogramRowChangeReason.PreferredFallback
+                : row.SkutecnostZdroj != SkutecnostZdrojEnum.Automat ? HarmonogramRowChangeReason.NewAutomatValue
+                : HarmonogramRowChangeReason.UpdatedAutomatValue;
+
+            changes.Add(new HarmonogramRowChange(
+                row.Id, row.TypId, poradi,
+                OldHodnotaInt: row.HodnotaInt,
+                NewHodnotaInt: computedDelay,
+                OldZdroj: row.SkutecnostZdroj,
+                NewZdroj: SkutecnostZdrojEnum.Automat,
+                OldPreferredExterniOdkazId: row.PreferredExterniOdkazId,
+                NewPreferredExterniOdkazId: newPreferred,
+                ExpectedUpdatedAt: row.UpdatedAt,
+                Reason: reason));
+        }
+
+        return new HarmonogramSyncPlan(projektovyZaznamId, nowUtc, changes);
+    }
+
+    /// <summary>
+    /// DESIGN-4-A (2026-05-01) — aplikace plánu na DB s optimistic concurrency token.
+    /// Před zápisem ověří, že každý dotčený řádek má UpdatedAt odpovídající plánu.
+    /// Pokud ne, skip rowu + log (stale token = race condition s jiným syncem).
+    /// </summary>
+    public async Task<HarmonogramSyncResult> ApplyPlanAsync(HarmonogramSyncPlan plan, CancellationToken ct = default)
+    {
+        if (plan.Changes.Count == 0)
+        {
+            return new HarmonogramSyncResult(plan.ProjektovyZaznamId, 0, 0, 0, 0);
+        }
+
+        var rowIds = plan.Changes.Select(c => c.RowId).Distinct().ToList();
+        var trackedRows = await _db.ZaznamHarmonogramHodnoty
+            .Where(h => rowIds.Contains(h.Id))
+            .ToListAsync(ct).ConfigureAwait(false);
+        var rowById = trackedRows.ToDictionary(r => r.Id);
+
+        int updated = 0, skipManual = 0, noKandidat = 0, preferredFallbacks = 0, staleSkipped = 0;
+        var nowUtc = _time.GetUtcNow().UtcDateTime;
+
+        foreach (var change in plan.Changes)
+        {
+            if (!rowById.TryGetValue(change.RowId, out var row))
+            {
+                staleSkipped++; // row deleted between Compute and Apply
+                continue;
+            }
+
+            // Optimistic concurrency: row UpdatedAt musí matchovat plan ExpectedUpdatedAt.
+            if (row.UpdatedAt != change.ExpectedUpdatedAt)
+            {
+                staleSkipped++;
+                _logger.LogWarning(
+                    "ApplyPlan: row {RowId} stale token (expected {Exp:o}, actual {Act:o}) — skipped.",
+                    change.RowId, change.ExpectedUpdatedAt, row.UpdatedAt);
+                continue;
+            }
+
+            if (change.Reason == HarmonogramRowChangeReason.SkippedManualRezim)
+            {
                 skipManual++;
                 continue;
             }
 
-            var resolved = HarmonogramSkutecnostResolver.Resolve(
-                poradi, bindings, row.PreferredExterniOdkazId);
-
-            if (resolved.Datum is null)
-            {
-                // Nenašel se žádný kandidát. Pokud byl řádek dříve Automat, „retract" → Neznamo.
-                if (row.SkutecnostZdroj == SkutecnostZdrojEnum.Automat)
-                {
-                    row.SkutecnostZdroj = SkutecnostZdrojEnum.Neznamo;
-                    row.PreferredExterniOdkazId = null;
-                    row.UpdatedAt = nowUtc;
-                    updated++;
-                }
-                else
-                {
-                    noKandidat++;
-                }
-                continue;
-            }
-
-            if (resolved.PreferredFallbackApplied)
+            if (change.Reason == HarmonogramRowChangeReason.PreferredFallback)
             {
                 preferredFallbacks++;
             }
 
-            // Metadata update: Zdroj → Automat (auto-filled), Preferred podle výsledku resolveru.
-            // Plán 4 Feature C Task 4 HodnotaInt auto-propagation (2026-04-24):
-            // Spočítat delay (dnů) = resolved.Datum - baseline_end_of_krok_poradi a zapsat do HodnotaInt.
-            var changed = false;
-            if (row.SkutecnostZdroj != SkutecnostZdrojEnum.Automat)
-            {
-                row.SkutecnostZdroj = SkutecnostZdrojEnum.Automat;
-                changed = true;
-            }
-            var newPreferred = resolved.PreferredFallbackApplied
-                ? null
-                : row.PreferredExterniOdkazId; // zachováme user volbu pokud zůstala platná
-            if (row.PreferredExterniOdkazId != newPreferred)
-            {
-                row.PreferredExterniOdkazId = newPreferred;
-                changed = true;
-            }
-
-            if (baselineEndByPoradi.TryGetValue(poradi, out var baselineEnd))
-            {
-                var computedDelay = (int)Math.Round((resolved.Datum.Value.Date - baselineEnd.Date).TotalDays);
-                if (row.HodnotaInt != computedDelay)
-                {
-                    row.HodnotaInt = computedDelay;
-                    changed = true;
-                }
-            }
-
-            if (changed)
-            {
-                row.UpdatedAt = nowUtc;
-                updated++;
-            }
+            row.HodnotaInt = change.NewHodnotaInt;
+            row.SkutecnostZdroj = change.NewZdroj;
+            row.PreferredExterniOdkazId = change.NewPreferredExterniOdkazId;
+            row.UpdatedAt = nowUtc;
+            updated++;
         }
 
         if (updated > 0)
@@ -220,10 +282,22 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
         }
 
         _logger.LogInformation(
-            "Harmonogram sync záznam #{Id}: updated={U} skipManual={SM} noKandidat={NK} preferredFallbacks={PF}",
-            projektovyZaznamId, updated, skipManual, noKandidat, preferredFallbacks);
+            "ApplyPlan #{Id}: updated={U} skipManual={SM} noKandidat={NK} preferredFallback={PF} stale={ST}",
+            plan.ProjektovyZaznamId, updated, skipManual, noKandidat, preferredFallbacks, staleSkipped);
 
-        return new HarmonogramSyncResult(projektovyZaznamId, updated, skipManual, noKandidat, preferredFallbacks);
+        return new HarmonogramSyncResult(
+            plan.ProjektovyZaznamId, updated, skipManual, noKandidat, preferredFallbacks);
+    }
+
+    /// <summary>
+    /// Convenience wrapper: ComputePlanAsync + ApplyPlanAsync v sekvenci.
+    /// Existující call sites (HarmonogramController, BindingRebalanceService, VyjadreniHarvestService)
+    /// volají tuto metodu a fungují beze změny.
+    /// </summary>
+    public async Task<HarmonogramSyncResult> SyncZaznamAsync(int projektovyZaznamId, CancellationToken ct = default)
+    {
+        var plan = await ComputePlanAsync(projektovyZaznamId, ct).ConfigureAwait(false);
+        return await ApplyPlanAsync(plan, ct).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -259,6 +259,38 @@ public sealed class HarmonogramController : Controller
         return Ok(new { row.PreferredExterniOdkazId });
     }
 
+    public sealed record PreviewSyncRequest(int ZaznamId);
+
+    /// <summary>
+    /// DESIGN-9-C (2026-05-01) — staging endpoint pro UI pre-fetch flow.
+    /// Vrací plán zamýšlených změn pro daný záznam (ComputePlanAsync), NIC nezapisuje do DB.
+    /// JS strana drží plán v sessionStorage; commit přes Save form (RecordService) nebo
+    /// existing Toggle/SelectCandidate triggery.
+    /// </summary>
+    [HttpPost("PreviewSync")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PreviewSync([FromBody] PreviewSyncRequest request, CancellationToken ct)
+    {
+        if (request is null || request.ZaznamId <= 0)
+        {
+            return BadRequest();
+        }
+
+        var projektId = await GetProjektIdAsync(request.ZaznamId, ct).ConfigureAwait(false);
+        if (projektId is null)
+        {
+            return NotFound();
+        }
+
+        if (!await HasSchedulePermissionAsync(projektId.Value, ct).ConfigureAwait(false))
+        {
+            return Forbid();
+        }
+
+        var plan = await _sync.ComputePlanAsync(request.ZaznamId, ct).ConfigureAwait(false);
+        return Ok(plan);
+    }
+
     // ---------- helpers ----------
 
     private async Task<int?> GetProjektIdAsync(int zaznamId, CancellationToken ct)

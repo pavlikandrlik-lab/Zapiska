@@ -178,11 +178,13 @@ public class AuthorizationPolicyEnforcementTests
 
             // ---- HarmonogramController (Plán 4 Feature C) ----
 
-            // ToggleRezim / SelectCandidate: projektId se resolvuje z DB (ZaznamId → ZaznamHarmonogramHodnoty
+            // ToggleRezim / SelectCandidate / PreviewSync: projektId se resolvuje z DB (ZaznamId → ZaznamHarmonogramHodnoty
             // → ProjektovyZaznam.ProjektId). Není v route ani body, proto manuální
             // _authz.HasPermissionAsync(osobaId, RecordsScheduleEdit, projektId).
+            // PreviewSync (DESIGN-9-C, 2026-05-01) — staging endpoint s ComputePlan, žádný DB write.
             "PmTracker.Web.Controllers.HarmonogramController.ToggleRezim",
             "PmTracker.Web.Controllers.HarmonogramController.SelectCandidate",
+            "PmTracker.Web.Controllers.HarmonogramController.PreviewSync",
         };
 
         // Act
