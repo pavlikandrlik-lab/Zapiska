@@ -400,13 +400,24 @@
                                                        @((delayDisabled) ? "disabled=\"disabled\"" : null) />
                                             </div>
                                             <div class="schedule-stacked-part schedule-stacked-part-bottom">
+                                                @{
+                                                    // FIX 2026-05-02: DESIGN-10-A NULL semantika pro skutečnost.
+                                                    // Pokud OdchylkaDni je null (krok nenastal — žádný delay row),
+                                                    // calculator vrací fallback SkutecneDatum=BaselineDatum, což by
+                                                    // v políčku skutečnost zobrazilo plan datum (typicky DatumZalozeni
+                                                    // pro krok 1 PMP/PNF). Tj. bez tohoto guardu user vidí "datum
+                                                    // založení" místo prázdné = bug. Empty = "krok ještě nenastal".
+                                                    var hasActualDate = krok.OdchylkaDni.HasValue;
+                                                    var skutecnostIso = hasActualDate ? krok.SkutecneDatum.ToString("yyyy-MM-dd") : string.Empty;
+                                                    var skutecnostDisplay = hasActualDate ? krok.SkutecneDatum.ToString("dd.MM.yyyy") : string.Empty;
+                                                }
                                                 @await Html.PartialAsync(
                                                     "_AppDateField",
                                                     new AppDateFieldViewModel
                                                     {
                                                         Name = $"UiHarmonogramPosunuteDatumy[{i}]",
-                                                        IsoValue = krok.SkutecneDatum.ToString("yyyy-MM-dd"),
-                                                        DisplayValue = krok.SkutecneDatum.ToString("dd.MM.yyyy"),
+                                                        IsoValue = skutecnostIso,
+                                                        DisplayValue = skutecnostDisplay,
                                                         Locked = delayDateDisabled,
                                                         AriaLabel = "Otevřít kalendář skutečnosti kroku harmonogramu",
                                                         ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(delayChanged ? " proposal-field-changed" : string.Empty)}",

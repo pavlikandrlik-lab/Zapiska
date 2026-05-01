@@ -206,6 +206,20 @@ public sealed class HarmonogramPhantomUiFixesTests
     }
 
     [Fact]
+    public void ScheduleBlock_DelayDateField_RespektujeNullOdchylka()
+    {
+        // FIX 2026-05-02: scenario D (auto krok + Zdroj=Manual / Create flow) renderuje DELAY date
+        // field přes _AppDateField. Před fixem IsoValue=krok.SkutecneDatum.ToString(...) bez kontroly
+        // OdchylkaDni.HasValue → calculator pro krok bez delay rowu vrátil SkutecneDatum=BaselineDatum
+        // (= DatumZalozeni pro krok 1) → user viděl "datum založení" v prázdném políčku skutečnost.
+        var src = Read("PmTracker.Web/Views/Shared/_ScheduleBlock.cshtml");
+        src.Should().Contain("OdchylkaDni.HasValue",
+            "DELAY date field musí mít NULL guard pro krok bez záznamu (DESIGN-10-A NULL semantika).");
+        src.Should().NotMatchRegex(@"IsoValue\s*=\s*krok\.SkutecneDatum\.ToString",
+            "Bare krok.SkutecneDatum.ToString jako IsoValue bez null guardu zobrazí computed plan datum místo prázdné políčko.");
+    }
+
+    [Fact]
     public void HarmonogramController_SelectCandidate_RespektujePendingLock()
     {
         // FIX 2026-05-01 (round 5 #1): SelectCandidate musí volat IPendingScheduleProposalLockEvaluator
