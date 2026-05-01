@@ -431,6 +431,9 @@ public sealed class HarmonogramController : Controller
         catch (DbUpdateException)
         {
             // Concurrent insert vyhrál — odstaníme tracked entity + reload winner.
+            // FIX 2026-05-01 (round 6 #2): reload jako tracked aby caller mohl modifikovat
+            // (volající nastaví SkutecnostRezim/PreferredExterniOdkazId a opět SaveChangesAsync).
+            // Záměr: detach loser, reload winner v čistém tracking stavu.
             _db.Entry(row).State = EntityState.Detached;
             var winner = await _db.ZaznamHarmonogramHodnoty
                 .FirstOrDefaultAsync(h => h.ZaznamId == zaznamId && h.TypId == delayTypId, ct)

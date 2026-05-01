@@ -192,6 +192,20 @@ public sealed class HarmonogramPhantomUiFixesTests
     }
 
     [Fact]
+    public void ProjectDashboardService_FiltrujeNullHodnotaInt_PredCastem()
+    {
+        // FIX 2026-05-01 (round 6 #1): identický pattern jako ScheduleComposition (round 5 #2).
+        // ProjectDashboardService.cs měl Dictionary<int, int?> → IReadOnlyDictionary<int, int>
+        // cast → runtime InvalidCastException při dashboard load. Stejně musí filtrovat
+        // .Where(.HasValue) + !.Value před castem.
+        var src = Read("PmTracker.Web/Services/ProjectDashboard/ProjectDashboardService.cs");
+        src.Should().Contain("HodnotaInt.HasValue",
+            "ProjectDashboardService musí filtrovat NULL HodnotaInt před castem na non-nullable IReadOnlyDictionary<int,int>.");
+        src.Should().NotMatchRegex(@"v\s*=>\s*v\.HodnotaInt\s*\)\s*\)",
+            "Bare `v => v.HodnotaInt` jako ToDictionary value bez .HasValue filtru způsobí runtime InvalidCastException.");
+    }
+
+    [Fact]
     public void HarmonogramController_SelectCandidate_RespektujePendingLock()
     {
         // FIX 2026-05-01 (round 5 #1): SelectCandidate musí volat IPendingScheduleProposalLockEvaluator

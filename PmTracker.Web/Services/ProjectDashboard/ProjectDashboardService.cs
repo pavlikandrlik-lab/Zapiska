@@ -108,9 +108,15 @@ public sealed class ProjectDashboardService : IProjectDashboardService
             .Where(h => recordIds.Contains(h.ZaznamId))
             .ToListAsync(ct);
 
+        // DESIGN-10-A (2026-05-01): HodnotaInt je nullable po Phase 1.5. NULL = "krok nenastal"
+        // → vyfiltrovat z mapy. ScheduleTimelineCalculator.Compute očekává non-nullable hodnoty.
+        // Bez .Where(.HasValue) by cast Dictionary<int,int?> → IReadOnlyDictionary<int,int> hodil
+        // runtime InvalidCastException (kovariance generik nepodporuje).
         var valuesByRecord = harmonogramValues
             .GroupBy(v => v.ZaznamId)
-            .ToDictionary(g => g.Key, g => (IReadOnlyDictionary<int, int>)g.ToDictionary(v => v.TypId, v => v.HodnotaInt));
+            .ToDictionary(g => g.Key, g => (IReadOnlyDictionary<int, int>)g
+                .Where(v => v.HodnotaInt.HasValue)
+                .ToDictionary(v => v.TypId, v => v.HodnotaInt!.Value));
 
         // Cache schemas by version to avoid repeated DB calls
         var schemaCache = new Dictionary<int, HarmonogramSchemaDefinition>();
