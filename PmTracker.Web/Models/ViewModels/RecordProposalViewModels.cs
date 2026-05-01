@@ -116,8 +116,12 @@ public sealed class ManualActualKrokDto
     /// <c>DateOnly</c> = bez časové zóny + bez času = žádný DST / Kind / ±1 den shift.
     /// Posílá se z JS jako "yyyy-MM-dd" ISO string; default ASP.NET Core binder
     /// <c>DateOnly</c> přijímá právě tento formát.
+    ///
+    /// FIX 2026-05-02: nullable (DESIGN-10-A NULL semantika) — empty string z formuláře
+    /// (krok ještě nenastal) by jinak ASP.NET binder odmítl s "The value '' is invalid."
+    /// NULL = "krok nenastal" → caller (ManualActualKrokApplier / SaveRecord) skipne.
     /// </summary>
-    public DateOnly AbsolutniDatum { get; set; }
+    public DateOnly? AbsolutniDatum { get; set; }
 }
 
 public sealed class HarmonogramVazbaDto

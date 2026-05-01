@@ -67,6 +67,13 @@ public static class ManualActualKrokApplier
 
         foreach (var mk in manualKroky)
         {
+            // FIX 2026-05-02: AbsolutniDatum je nullable. NULL = "krok nenastal" → skip
+            // (žádná DELAY hodnota se neaplikuje, krok zůstane v default stavu).
+            if (!mk.AbsolutniDatum.HasValue)
+            {
+                continue;
+            }
+
             if (!krokKeyToPoradi.TryGetValue(mk.KrokKey, out var poradi))
             {
                 throw new InvalidOperationException(
@@ -92,14 +99,15 @@ public static class ManualActualKrokApplier
             }
 
             var planEnd = DateOnly.FromDateTime(krokVypocet.BaselineDatum);
-            var odchylka = mk.AbsolutniDatum.DayNumber - planEnd.DayNumber;
+            var absolutniDatum = mk.AbsolutniDatum!.Value; // null filtered above
+            var odchylka = absolutniDatum.DayNumber - planEnd.DayNumber;
 
             result.Add(new ManualActualKrokApplied(
                 mk.KrokKey,
                 poradi,
                 delayTypId,
                 odchylka,
-                mk.AbsolutniDatum));
+                absolutniDatum));
         }
 
         return result;

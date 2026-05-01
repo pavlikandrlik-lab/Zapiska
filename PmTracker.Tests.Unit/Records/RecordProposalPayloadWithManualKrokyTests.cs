@@ -80,9 +80,13 @@ public sealed class RecordProposalPayloadWithManualKrokyTests
     }
 
     [Fact]
-    public void ManualActualKrokDto_Default_ShouldBeMinDate()
+    public void ManualActualKrokDto_Default_ShouldBeNull()
     {
+        // FIX 2026-05-02: AbsolutniDatum je nullable (DESIGN-10-A NULL semantika).
+        // NULL = "krok nenastal" — default DTO bez AbsolutniDatum musí být null,
+        // ne DateOnly.MinValue (= 0001-01-01) která by pak ManualActualKrokApplier
+        // mishandled jako "krok nastal v roce 1 n.l." místo skip.
         var dto = new ManualActualKrokDto();
-        dto.AbsolutniDatum.Should().Be(default(DateOnly));
+        dto.AbsolutniDatum.Should().BeNull();
     }
 }

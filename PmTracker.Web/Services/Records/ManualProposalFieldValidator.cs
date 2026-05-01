@@ -51,11 +51,13 @@ public static class ManualProposalFieldValidator
                     "ManualProposalFieldValidator.ValidateManualActualKroky: duplicate KrokKey");
             }
 
-            if (krok.AbsolutniDatum > today)
+            // FIX 2026-05-02: AbsolutniDatum je nullable. NULL = "krok nenastal" → validace
+            // se neaplikuje (caller skipne celý krok). Future-date check jen pro vyplněné kroky.
+            if (krok.AbsolutniDatum.HasValue && krok.AbsolutniDatum.Value > today)
             {
                 throw new RecordValidationException(
                     "Datum skutečnosti kroku nesmí být v budoucnosti.",
-                    new[] { new RecordValidationIssue("ManualActualKroky", "Datum skutečnosti kroku nesmí být v budoucnosti.", "schedule", "manual.future-date", krok.AbsolutniDatum.ToString("yyyy-MM-dd")) },
+                    new[] { new RecordValidationIssue("ManualActualKroky", "Datum skutečnosti kroku nesmí být v budoucnosti.", "schedule", "manual.future-date", krok.AbsolutniDatum.Value.ToString("yyyy-MM-dd")) },
                     "ManualProposalFieldValidator.ValidateManualActualKroky: future date");
             }
         }
