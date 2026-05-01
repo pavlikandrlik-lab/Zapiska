@@ -5,6 +5,7 @@ using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Models.ViewModels.ExterniOdkaz;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.ServiceDesk;
 using IPmAuthorizationService = PmTracker.Web.Services.Security.IAuthorizationService;
 
 namespace PmTracker.Web.Controllers;
@@ -27,15 +28,18 @@ public sealed class ExterniOdkazController : Controller
     private static readonly Regex SixDigits = new(@"^\d{6}$", RegexOptions.Compiled);
 
     private readonly ITicketingQueryService _ticketing;
+    private readonly IVyjadreniQueryService _vyjadreni;
     private readonly IPmAuthorizationService _authz;
     private readonly ICurrentUserAccessor _currentUser;
 
     public ExterniOdkazController(
         ITicketingQueryService ticketing,
+        IVyjadreniQueryService vyjadreni,
         IPmAuthorizationService authz,
         ICurrentUserAccessor currentUser)
     {
         _ticketing = ticketing;
+        _vyjadreni = vyjadreni;
         _authz = authz;
         _currentUser = currentUser;
     }
@@ -66,13 +70,39 @@ public sealed class ExterniOdkazController : Controller
         if (dto is null)
         {
             return Ok(new ExterniOdkazSyncResponse(
-                Nalezeno: false, Cislo: cislo, Typ: null, Strucne: null));
+                Nalezeno: false, Cislo: cislo, Typ: null, Strucne: null,
+                DatumObjednani: null, PlanDodani: null, DatumDodani: null, DatumPrevzeti: null,
+                Vyjadreni: Array.Empty<ExterniOdkazVyjadreniPreviewDto>()));
         }
+
+        // FIX 2026-05-02: auto-harvest payload pro pre-Save buffer flow.
+        // Server přečte vyjádření tiketu + spočítá 4 datumy přes shared
+        // PerTicketMetadataExtractor (= zrcadlí PerTicketMetadataSyncService.SyncTicketAsync,
+        // ale bez DB persistence — výsledek dostane klient do localStorage bufferu).
+        var fingerprints = await _vyjadreni.GetHotZaznamFingerprintsAsync(new[] { cislo }, ct);
+        DateTime? slaDeadline = null;
+        if (fingerprints.TryGetValue(cislo, out var fp))
+        {
+            slaDeadline = fp.SlaDeadline;
+        }
+
+        var vyjadreniList = await _vyjadreni.GetVyjadreniForTicketAsync(cislo, sinceUtc: null, ct);
+        var metadata = PerTicketMetadataExtractor.Extract(dto.TypZaznamu, slaDeadline, vyjadreniList);
+
+        var preview = vyjadreniList
+            .Select(v => new ExterniOdkazVyjadreniPreviewDto(
+                v.Id, v.Datum, v.Typ, v.Zpracoval, v.Popis))
+            .ToList();
 
         return Ok(new ExterniOdkazSyncResponse(
             Nalezeno: true,
             Cislo: cislo,
             Typ: dto.TypZaznamu,
-            Strucne: dto.Strucne));
+            Strucne: dto.Strucne,
+            DatumObjednani: metadata.DatumObjednani,
+            PlanDodani: metadata.PlanDodani,
+            DatumDodani: metadata.DatumDodani,
+            DatumPrevzeti: metadata.DatumPrevzeti,
+            Vyjadreni: preview));
     }
 }

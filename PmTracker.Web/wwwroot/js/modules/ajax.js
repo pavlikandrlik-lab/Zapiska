@@ -817,6 +817,14 @@ export function initModalAjaxSubmit() {
             if (isRecordEditorForm) {
                 clearRecordEditorDraft(target);
                 markRecordEditorFormClean(target);
+                // FIX 2026-05-02: clear externí vazba pre-Save buffer entries pro tento projekt.
+                // Po úspěšném Save je DB autoritativní zdroj — buffer už není potřeba.
+                const projektIdEl = target.querySelector('[data-record-editor-project-id]')
+                    || target.closest('[data-record-editor-project-id]');
+                const projektId = projektIdEl ? projektIdEl.getAttribute('data-record-editor-project-id') : null;
+                if (projektId && window.pmExterniOdkazSync?.clearAllBuffersForProject) {
+                    window.pmExterniOdkazSync.clearAllBuffersForProject(projektId);
+                }
                 target.dataset.recordEditorNavigating = "true";
             }
 

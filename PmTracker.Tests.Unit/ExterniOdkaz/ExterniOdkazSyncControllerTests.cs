@@ -16,10 +16,17 @@ public sealed class ExterniOdkazSyncControllerTests
     private static readonly int OsobaId = 42;
     private static readonly int ProjektId = 7;
 
-    private static (ExterniOdkazController sut, Mock<ITicketingQueryService> ticketing, Mock<IPmAuthorizationService> authz)
+    private static (ExterniOdkazController sut, Mock<ITicketingQueryService> ticketing, Mock<IPmAuthorizationService> authz, Mock<IVyjadreniQueryService> vyjadreni)
         CreateSut(bool hasPermission = true)
     {
         var ticketing = new Mock<ITicketingQueryService>();
+        var vyjadreni = new Mock<IVyjadreniQueryService>();
+        // Default: žádné vyjádření, žádný fingerprint → harvest vrací 4 NULL datumy + prázdný list
+        vyjadreni.Setup(x => x.GetVyjadreniForTicketAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(System.Array.Empty<HotVyjadreniDto>());
+        vyjadreni.Setup(x => x.GetHotZaznamFingerprintsAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Collections.Generic.Dictionary<string, HotZaznamFingerprintDto>());
+
         var authz = new Mock<IPmAuthorizationService>();
         authz.Setup(x => x.HasPermissionAsync(OsobaId, PermissionKeys.ExterniOdkazySync, ProjektId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(hasPermission);
@@ -27,14 +34,14 @@ public sealed class ExterniOdkazSyncControllerTests
         var currentUser = new Mock<ICurrentUserAccessor>();
         currentUser.SetupGet(x => x.OsobaId).Returns(OsobaId);
 
-        var sut = new ExterniOdkazController(ticketing.Object, authz.Object, currentUser.Object);
-        return (sut, ticketing, authz);
+        var sut = new ExterniOdkazController(ticketing.Object, vyjadreni.Object, authz.Object, currentUser.Object);
+        return (sut, ticketing, authz, vyjadreni);
     }
 
     [Fact]
     public async Task Sync_WithInvalidCislo_ReturnsBadRequest()
     {
-        var (sut, _, _) = CreateSut();
+        var (sut, _, _, _) = CreateSut();
 
         var result = await sut.Sync("abc", ProjektId, CancellationToken.None);
 
@@ -44,7 +51,7 @@ public sealed class ExterniOdkazSyncControllerTests
     [Fact]
     public async Task Sync_WithoutPermission_ReturnsForbid()
     {
-        var (sut, _, _) = CreateSut(hasPermission: false);
+        var (sut, _, _, _) = CreateSut(hasPermission: false);
 
         var result = await sut.Sync("123456", ProjektId, CancellationToken.None);
 
@@ -54,7 +61,7 @@ public sealed class ExterniOdkazSyncControllerTests
     [Fact]
     public async Task Sync_WithSixDigitCisloNotFound_ReturnsNotFoundResponse()
     {
-        var (sut, ticketing, _) = CreateSut();
+        var (sut, ticketing, _, _) = CreateSut();
         ticketing.Setup(x => x.GetZaznamAsync("999999", It.IsAny<CancellationToken>()))
             .ReturnsAsync((HotZaznamDto?)null);
 
@@ -70,7 +77,7 @@ public sealed class ExterniOdkazSyncControllerTests
     [Fact]
     public async Task Sync_WithSixDigitCisloFound_ReturnsTypAndStrucne()
     {
-        var (sut, ticketing, _) = CreateSut();
+        var (sut, ticketing, _, _) = CreateSut();
         ticketing.Setup(x => x.GetZaznamAsync("336865", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HotZaznamDto("336865", "PNF", "Oprava přihlášení", null));
 

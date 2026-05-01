@@ -1,13 +1,22 @@
 /**
  * Externí odkaz sync — debouncovaný input handler pro 6místné číslo tiketu.
- * Po naplnění 6 cifer volá POST /ExterniOdkaz/Sync a vyplní Typ + řeší vzhled karty.
- * Chat tlačítko se povolí jen pokud je tiket nalezen.
+ * Po naplnění 6 cifer volá POST /ExterniOdkaz/Sync a vyplní Typ + 4 datumy +
+ * uloží auto-harvest payload do localStorage pro pre-Save buffer flow.
+ *
+ * Buffer pattern (FIX 2026-05-02):
+ *  - Klíč: `pm.externiOdkaz.buffer.{projektId}.{cislo}`
+ *  - Hodnota: full server response (Typ, Strucne, 4 datumy, vyjadreni preview)
+ *  - Životnost: dokud uživatel záznam neuloží
+ *  - Use case: chat modal pro pre-Save vazbu (ExterniOdkazId=0) načte z bufferu;
+ *    Save flow pre-fill datumů pro nový externí odkaz; refresh stránky obnoví
+ *    rozpracovanou editaci.
  */
 (function (global) {
   'use strict';
 
   const DEBOUNCE_MS = 400;
   const timers = new WeakMap();
+  const STORAGE_PREFIX = 'pm.externiOdkaz.buffer.';
 
   function getCsrfToken() {
     const input = document.querySelector('input[name="__RequestVerificationToken"]');
@@ -19,6 +28,74 @@
     const form = row.closest('[data-record-editor-project-id]');
     if (!form) return '';
     return form.getAttribute('data-record-editor-project-id') || '';
+  }
+
+  function bufferKey(projektId, cislo) {
+    return `${STORAGE_PREFIX}${projektId}.${cislo}`;
+  }
+
+  function saveToBuffer(projektId, cislo, payload) {
+    try {
+      localStorage.setItem(bufferKey(projektId, cislo), JSON.stringify({
+        ...payload,
+        savedAt: new Date().toISOString()
+      }));
+    } catch (err) {
+      console.warn('ExterniOdkaz.Sync: localStorage save selhal', err);
+    }
+  }
+
+  function readFromBuffer(projektId, cislo) {
+    try {
+      const raw = localStorage.getItem(bufferKey(projektId, cislo));
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function clearBuffer(projektId, cislo) {
+    try {
+      localStorage.removeItem(bufferKey(projektId, cislo));
+    } catch {
+      // ignore
+    }
+  }
+
+  function clearAllBuffersForProject(projektId) {
+    try {
+      const prefix = `${STORAGE_PREFIX}${projektId}.`;
+      const toRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix)) toRemove.push(key);
+      }
+      toRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // ignore
+    }
+  }
+
+  function setHiddenDateValue(row, selector, dateIso) {
+    const el = row.querySelector(selector);
+    if (!el) return;
+    // Server vrací DateTime ISO ("2026-04-13T00:00:00Z"). Hidden input očekává yyyy-MM-dd.
+    if (typeof dateIso === 'string' && dateIso.length >= 10) {
+      el.value = dateIso.substring(0, 10);
+    } else {
+      el.value = '';
+    }
+  }
+
+  function applyHarvestedDates(row, data) {
+    setHiddenDateValue(row, '[data-external-datum-objednani]', data.datumObjednani);
+    setHiddenDateValue(row, '[data-external-datum-dodani]', data.datumDodani);
+    setHiddenDateValue(row, '[data-external-datum-prevzeti]', data.datumPrevzeti);
+    // PlanDodani hidden input nemá data-* hook v existujícím markupu — najdi přes name.
+    const planDodaniInput = row.querySelector('input[name$=".PlanDodani"]');
+    if (planDodaniInput && data.planDodani) {
+      planDodaniInput.value = data.planDodani.substring(0, 10);
+    }
   }
 
   async function syncCislo(inputEl) {
@@ -59,6 +136,11 @@
         setVyzvaVisible(row, isPnf(data.typ));
         setChatEnabled(row, true);
         setDatesVisible(row, true);
+        applyHarvestedDates(row, data);
+        // FIX 2026-05-02: localStorage buffer — dokud user neuloží záznam,
+        // chat modal a Save flow čte z bufferu (řeší ExterniOdkazId=0 pre-Save case).
+        saveToBuffer(projektId, cislo, data);
+        row.setAttribute('data-buffered', cislo);
         row.removeAttribute('data-not-found');
       } else {
         setTypDisplay(row, null);
@@ -67,6 +149,8 @@
         setVyzvaVisible(row, false);
         setChatEnabled(row, false);
         setDatesVisible(row, false);
+        clearBuffer(projektId, cislo);
+        row.removeAttribute('data-buffered');
         row.setAttribute('data-not-found', 'true');
       }
     } catch (err) {
@@ -171,5 +255,11 @@
     document.addEventListener('gov-input', onInput);
   }
 
-  global.pmExterniOdkazSync = { init };
+  global.pmExterniOdkazSync = {
+    init,
+    readFromBuffer,
+    clearBuffer,
+    clearAllBuffersForProject,
+    bufferKey
+  };
 })(window);

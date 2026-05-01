@@ -148,7 +148,82 @@
       return;
     }
     event.preventDefault();
+
+    // FIX 2026-05-02: pre-Save buffer flow — pokud externí vazba ještě nebyla
+    // uložena (Id=0), nahled vyjádření čte z localStorage bufferu (sync.js).
+    // Server endpoint /Vyjadreni/Modal vyžaduje real DB Id, takže read-only fallback.
+    const numericId = parseInt(externiOdkazId, 10);
+    if (!Number.isFinite(numericId) || numericId <= 0) {
+      const row = btn.closest('[data-external-row]');
+      const projektId = row ? row.closest('[data-record-editor-project-id]')?.getAttribute('data-record-editor-project-id') : null;
+      const cislo = row ? row.querySelector('[data-external-cislo]')?.value : null;
+      if (projektId && cislo && global.pmExterniOdkazSync?.readFromBuffer) {
+        const buffered = global.pmExterniOdkazSync.readFromBuffer(projektId, cislo);
+        if (buffered) {
+          openFromBuffer(buffered);
+          return;
+        }
+      }
+      console.warn('Chat open: vazba ještě nemá Id a buffer není dostupný — uložte záznam.');
+      return;
+    }
     open(externiOdkazId, zaznamId);
+  }
+
+  /**
+   * Pre-Save fallback: render bublin přímo z localStorage bufferu (sync.js
+   * uloží vyjadreni preview po /ExterniOdkaz/Sync). Read-only — bez drag/drop
+   * (chybí real ExterniOdkazId pro vazbu HOT_VYJADRENI ↔ krok).
+   */
+  function openFromBuffer(buffered) {
+    const el = ensureDialog();
+    const container = el.querySelector('[data-chat-modal-content]');
+    const vyjadreni = Array.isArray(buffered.vyjadreni) ? buffered.vyjadreni : [];
+    const headerHtml = `
+      <div class="pm-chat-modal__header">
+        <div class="pm-chat-modal__intro">
+          <strong>${escapeHtml(buffered.typ || '—')} #${escapeHtml(buffered.cislo || '')}</strong>
+          ${buffered.strucne ? `<div class="pm-chat-modal__strucne">${escapeHtml(buffered.strucne)}</div>` : ''}
+          <gov-message color="info" class="pm-chat-modal__buffer-notice">
+            Vazba ještě není uložená — náhled vyjádření z lokálního bufferu (read-only). Po uložení záznamu se aktivuje plný režim.
+          </gov-message>
+        </div>
+      </div>`;
+    const bubblesHtml = vyjadreni.length === 0
+      ? '<p class="pm-chat-modal__empty">Žádná vyjádření k zobrazení.</p>'
+      : vyjadreni.map((v) => `
+        <div class="pm-chat-bubble" data-bubble data-vyjadreni-id="${escapeHtml(String(v.id))}">
+          <div class="pm-chat-bubble__meta">
+            <span class="pm-chat-bubble__datum">${formatBubbleDate(v.datum)}</span>
+            ${v.zpracoval ? `<span class="pm-chat-bubble__autor">${escapeHtml(v.zpracoval)}</span>` : ''}
+            ${v.typ ? `<gov-tag size="s" type="subtle" color="neutral">${escapeHtml(v.typ)}</gov-tag>` : ''}
+          </div>
+          <div class="pm-chat-bubble__popis">${escapeHtml(v.popis || '')}</div>
+        </div>`).join('');
+
+    container.innerHTML = `
+      <div data-chat-modal-root data-chat-modal-buffered="true">
+        ${headerHtml}
+        <div class="pm-chat-modal__body">${bubblesHtml}</div>
+      </div>`;
+    show(el);
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatBubbleDate(iso) {
+    if (typeof iso !== 'string' || iso.length < 10) return '';
+    const d = iso.substring(0, 10);
+    const parts = d.split('-');
+    return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : d;
   }
 
   function init() {
