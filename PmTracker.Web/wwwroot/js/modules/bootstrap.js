@@ -20,6 +20,7 @@ import "./vyjadreni/chatModalReharvest.js";
 import "./harmonogram/manualKroky.js";
 import "./schedule-feature-c/toggle-rezim.js";
 import "./schedule-feature-c/select-candidate.js"; // Phase 11 (DESIGN-9-A) — phantom UI bug 3 fix
+import "./schedule-feature-c/preview-sync.js";    // Phase 12 (DESIGN-9-C) — pre-fetch staging
 import "./vyzvy/index.js";
 import "./vyzvy/panelController.js";
 import "./vyzvy/switchController.js";
