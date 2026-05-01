@@ -39,7 +39,7 @@ public sealed class ManualKrokValidationTests
             },
             Today);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<PmTracker.Web.Services.Data.RecordValidationException>()
             .WithMessage("*identifikátor*");
     }
 
@@ -55,7 +55,7 @@ public sealed class ManualKrokValidationTests
             },
             Today);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<PmTracker.Web.Services.Data.RecordValidationException>()
             .WithMessage("*jen jedno*");
     }
 
@@ -69,7 +69,7 @@ public sealed class ManualKrokValidationTests
             },
             Today);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<PmTracker.Web.Services.Data.RecordValidationException>()
             .WithMessage("*v budoucnosti*");
     }
 
@@ -134,7 +134,7 @@ public sealed class ManualKrokValidationTests
             },
             externiVazbyCount: 2);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<PmTracker.Web.Services.Data.RecordValidationException>()
             .WithMessage("*mimo rozsah*");
     }
 
@@ -153,7 +153,7 @@ public sealed class ManualKrokValidationTests
             },
             externiVazbyCount: 1);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<PmTracker.Web.Services.Data.RecordValidationException>()
             .WithMessage("*kladné*");
     }
 
@@ -169,7 +169,7 @@ public sealed class ManualKrokValidationTests
             },
             externiVazbyCount: 1);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<PmTracker.Web.Services.Data.RecordValidationException>()
             .WithMessage("*jen jednu bublinu*");
     }
 

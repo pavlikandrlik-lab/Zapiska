@@ -101,9 +101,14 @@ public sealed class RecordScheduleActualSourceResolver : IRecordScheduleActualSo
                 continue;
             }
 
+            // FIX 2026-05-01 (DESIGN-10-A): hodnota je int? (nullable). Po Phase 1.5 refaktoru
+            // může být NULL = "krok nenastal" → NESMÍ se interpretovat jako Manual source.
+            // Před fixem: `hodnota != 0` vrátilo TRUE i pro NULL (null != 0 == true v C#),
+            // takže krok bez záznamu se chybně označil jako Manual.
             if (delayTypIdByKrokKey.TryGetValue(krokKey, out var delayTypId)
                 && delayByTypId.TryGetValue(delayTypId, out var hodnota)
-                && hodnota != 0)
+                && hodnota.HasValue
+                && hodnota.Value != 0)
             {
                 result[krokKey] = new RecordScheduleActualSource(
                     krokKey,

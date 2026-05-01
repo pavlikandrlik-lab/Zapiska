@@ -204,7 +204,11 @@ public sealed partial class ProjectService
                 TrvaniTypId = krok.TrvaniTypId,
                 ZpozdeniTypId = krok.ZpozdeniTypId,
                 TrvaniDni = krok.TrvaniDni,
-                OdchylkaDni = krok.ZpozdeniDni,
+                // FIX 2026-05-01: OdchylkaDni nullable. Krok bez DELAY row → NULL = "krok nenastal".
+                // TimelineCalculator vrací offset=0 pro missing klíč (default int), ale to nesmíme
+                // promítnout do VM jako legitimní 0 (= "vše dle plánu") — UI by zobrazilo actual
+                // segment shodný s baseline pro VŠECHNY kroky bez záznamu, což je broken.
+                OdchylkaDni = delayRow is null ? null : krok.ZpozdeniDni,
                 BaselineDatum = krok.BaselineDatum,
                 SkutecneDatum = krok.PosunuteDatum,
                 KrokKey = krokKey,

@@ -296,12 +296,29 @@ public sealed partial class RecordService
 
             await dbContext.SaveChangesAsync(innerCt);
 
-            // Phase 4 (DESIGN-6-A, 2026-05-01): persistence ManualActualKroky pro kroky 2/5/8/9.
-            // Phantom UI bug 1 fix — před tímto fixem UI form pole posílalo data, ale RecordService
-            // ho silently ignoroval. Pending lock pre-check + audit log.
-            await ApplyManualActualKrokyAsync(
+            // Phase 4 (DESIGN-6-A, 2026-05-01) + FIX 2026-05-01 transaction semantics:
+            // Před fixem ApplyManualActualKrokyAsync dělalo vlastní SaveChanges → partial-commit risk.
+            // Nyní: snapshot before + StageManualActualKrokyAsync + SaveChanges + audit po stage.
+            // Vše v rámci téže outer transakce (ExecuteInSerializableTransactionAsync).
+            var manualBeforeSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt).ConfigureAwait(false);
+            var manualStaged = await StageManualActualKrokyAsync(
                 command, entity.Id, entity.DatumZalozeni, entity.HarmonogramSablonaVerze,
-                isTaskCategory, currentUser, innerCt).ConfigureAwait(false);
+                isTaskCategory, innerCt).ConfigureAwait(false);
+            if (manualStaged)
+            {
+                await dbContext.SaveChangesAsync(innerCt);
+                var manualAfterSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt).ConfigureAwait(false);
+                if (manualAfterSnapshot is not null)
+                {
+                    auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                        manualBeforeSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
+                        AuditEntityType.RecordSchedule,
+                        entity.Id.ToString(CultureInfo.InvariantCulture),
+                        manualBeforeSnapshot,
+                        manualAfterSnapshot));
+                    await dbContext.SaveChangesAsync(innerCt);
+                }
+            }
 
             // Plán B Task 10: po uložení externích vazeb (kdy mají Id) spustíme harvest.
             // Awaitujeme — enqueue je rychlé a musí skončit před disposalem request scope,
@@ -1297,10 +1314,26 @@ public sealed partial class RecordService
                 newScheduleSnapshot));
             await dbContext.SaveChangesAsync(innerCt);
 
-            // Phase 4 (DESIGN-6-A): persistence ManualActualKroky i v schedule-only flow.
-            await ApplyManualActualKrokyAsync(
+            // Phase 4 (DESIGN-6-A) + FIX 2026-05-01: stage + caller-controlled SaveChanges.
+            var manualBeforeSnapshotSched = newScheduleSnapshot;
+            var manualStagedSched = await StageManualActualKrokyAsync(
                 command, entity.Id, entity.DatumZalozeni, entity.HarmonogramSablonaVerze,
-                isTaskCategory: true, currentUser, innerCt).ConfigureAwait(false);
+                isTaskCategory: true, innerCt).ConfigureAwait(false);
+            if (manualStagedSched)
+            {
+                await dbContext.SaveChangesAsync(innerCt);
+                var manualAfterSnapshotSched = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt);
+                if (manualAfterSnapshotSched is not null)
+                {
+                    auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                        AuditActionType.Update,
+                        AuditEntityType.RecordSchedule,
+                        entity.Id.ToString(CultureInfo.InvariantCulture),
+                        manualBeforeSnapshotSched,
+                        manualAfterSnapshotSched));
+                    await dbContext.SaveChangesAsync(innerCt);
+                }
+            }
 
             return entity.Id;
         }, ct);
@@ -1671,38 +1704,39 @@ public sealed partial class RecordService
     }
 
     /// <summary>
-    /// Phase 4 (DESIGN-6-A, 2026-05-01) — persistence ManualActualKroky[] z command pro
-    /// manuální kroky 2/5/8/9. Phantom UI bug 1 fix: před tímto fixem UI input form pole
-    /// posílalo data, ale RecordService.SaveRecord ho silently ignoroval.
+    /// Phase 4 (DESIGN-6-A, 2026-05-01) + FIX 2026-05-01 transaction semantics —
+    /// stage ManualActualKroky changes do change tracker BEZ SaveChanges. Caller
+    /// (SaveRecordAsync nebo SaveRecordScheduleOnlyAsync) volá SaveChangesAsync sám
+    /// v rámci své outer transakce (předejde partial-commit semantice).
+    ///
+    /// Phantom UI bug 1 fix: před tímto fixem UI input form pole posílalo data,
+    /// ale RecordService.SaveRecord ho silently ignoroval.
     ///
     /// Flow:
-    /// 1. Validace (KrokKey ≠ Empty, žádné duplikáty, datum ≤ today) přes ManualProposalFieldValidator.
-    /// 2. Pending lock pre-check — pokud existuje Pending návrh, který obsahuje krok v
-    ///    LockedManualKrokKeys, throw RecordValidationException.
-    /// 3. Compute overrides přes shared ManualActualKrokApplier.ApplyAsync.
-    /// 4. UPSERT do zaznam_harmonogram_hodnoty: existing row update nebo insert nový s
-    ///    Zdroj=Manual + Rezim=Manual (= user explicit input, sync nesmí přepsat).
-    /// 5. Audit log RecordSchedule Update s before/after snapshot.
+    /// 1. Validace (KrokKey ≠ Empty, žádné duplikáty, datum ≤ today)
+    /// 2. Pending lock pre-check (univerzální guard)
+    /// 3. Compute overrides přes shared ManualActualKrokApplier.ApplyAsync
+    /// 4. Stage UPSERT (Add nebo modify properties tracked entity)
+    /// 5. Vrátí true pokud něco staged → caller poté volá SaveChangesAsync + audit
     /// </summary>
-    private async Task ApplyManualActualKrokyAsync(
+    private async Task<bool> StageManualActualKrokyAsync(
         SaveRecordCommand command,
         int recordId,
         DateTime datumZalozeni,
         int harmonogramSablonaVerze,
         bool isTaskCategory,
-        CurrentUserContextViewModel currentUser,
         CancellationToken ct)
     {
         if (!isTaskCategory || command.ManualActualKroky.Count == 0)
         {
-            return;
+            return false;
         }
 
-        // 1) Validace strukturální (KrokKey, duplikáty, datum ≤ today)
+        // 1) Validace strukturální
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
         Records.ManualProposalFieldValidator.ValidateManualActualKroky(command.ManualActualKroky, today);
 
-        // 2) Pending lock pre-check — žádné překrývání s pending návrhem (univerzální guard).
+        // 2) Pending lock pre-check
         var lockState = await pendingScheduleProposalLockEvaluator.EvaluateAsync(recordId, ct).ConfigureAwait(false);
         if (lockState.HasPendingProposal && lockState.LockedManualKrokKeys is not null
             && lockState.LockedManualKrokKeys.Count > 0)
@@ -1712,12 +1746,15 @@ public sealed partial class RecordService
                 .ToList();
             if (conflicting.Count > 0)
             {
-                throw new InvalidOperationException(
-                    $"Krok harmonogramu je uzamčený pending návrhem #{lockState.ProposalId}, vyřeš návrh nejdříve.");
+                var msg = $"Krok harmonogramu je uzamčený pending návrhem #{lockState.ProposalId}, vyřeš návrh nejdříve.";
+                throw new RecordValidationException(
+                    msg,
+                    new[] { new RecordValidationIssue("ManualActualKroky", msg, "schedule", "schedule.pending-lock", lockState.ProposalId?.ToString()) },
+                    $"StageManualActualKrokyAsync: pending lock #{lockState.ProposalId} blokuje konflikt na {conflicting.Count} kroku/kroků");
             }
         }
 
-        // 3) Načíst schema + plánované DURATION typeIds + spočítat overrides přes shared helper.
+        // 3) Compute overrides
         var schema = await harmonogramService.GetSchemaForRecordAsync(
             new Models.Entities.ProjektovyZaznamEntity
             {
@@ -1734,19 +1771,15 @@ public sealed partial class RecordService
 
         if (overrides.Count == 0)
         {
-            return;
+            return false;
         }
 
-        // 4) UPSERT do zaznam_harmonogram_hodnoty: existing row update nebo insert nový.
-        // Zdroj=Manual + Rezim=Manual (= user explicit input, sync nesmí přepsat).
+        // 4) Stage UPSERT — žádný SaveChangesAsync, jen change tracker.
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
         var existingDelayRows = await dbContext.ZaznamHarmonogramHodnoty
             .Where(h => h.ZaznamId == recordId && overrides.Select(o => o.DelayTypId).Contains(h.TypId))
             .ToListAsync(ct).ConfigureAwait(false);
         var existingByTypId = existingDelayRows.ToDictionary(r => r.TypId);
-
-        // Audit before snapshot — všechny DELAY rows pro daný záznam
-        var beforeSnapshot = await LoadRecordScheduleAuditSnapshotAsync(recordId, ct).ConfigureAwait(false);
 
         foreach (var ov in overrides)
         {
@@ -1771,19 +1804,6 @@ public sealed partial class RecordService
             }
         }
 
-        await dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-
-        // 5) Audit log
-        var afterSnapshot = await LoadRecordScheduleAuditSnapshotAsync(recordId, ct).ConfigureAwait(false);
-        if (afterSnapshot is not null)
-        {
-            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                beforeSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
-                AuditEntityType.RecordSchedule,
-                recordId.ToString(CultureInfo.InvariantCulture),
-                beforeSnapshot,
-                afterSnapshot));
-            await dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-        }
+        return true;
     }
 }

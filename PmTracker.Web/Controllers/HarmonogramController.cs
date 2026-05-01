@@ -108,23 +108,10 @@ public sealed class HarmonogramController : Controller
                 return NotFound(new { error = $"Krok {krokPoradi} neexistuje v schématu záznamu." });
             }
 
-            row = await _db.ZaznamHarmonogramHodnoty
-                .FirstOrDefaultAsync(h => h.ZaznamId == zaznamId && h.TypId == delayTypId.Value, ct)
-                .ConfigureAwait(false);
-            if (row is null)
-            {
-                row = new ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = zaznamId,
-                    TypId = delayTypId.Value,
-                    HodnotaInt = null, // DESIGN-10-A: NULL = krok nenastal (default insert)
-                    UpdatedAt = _time.GetUtcNow().UtcDateTime,
-                    SkutecnostRezim = SkutecnostRezimEnum.Auto,
-                    SkutecnostZdroj = SkutecnostZdrojEnum.Neznamo
-                };
-                _db.ZaznamHarmonogramHodnoty.Add(row);
-                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-            }
+            // FIX 2026-05-01 race condition: TOCTOU bug mezi FirstOrDefaultAsync check a Add+SaveChanges.
+            // Concurrent request může insertovat stejný (ZaznamId, TypId) → unique constraint violation.
+            // Pattern: try insert, on DbUpdateException re-load existing row.
+            row = await EnsureDelayRowAsync(zaznamId, delayTypId.Value, ct).ConfigureAwait(false);
         }
         else
         {
@@ -139,9 +126,11 @@ public sealed class HarmonogramController : Controller
             return Forbid();
         }
 
-        // Phase 7 (DESIGN-7-B): pending lock pre-check pro Manual→Auto cestu.
-        // Pokud existuje pending návrh na ten krok, nelze přepnout do Auto.
-        if (request.Rezim == SkutecnostRezimEnum.Auto && row.SkutecnostRezim == SkutecnostRezimEnum.Manual)
+        // Phase 7 (DESIGN-7-B) + FIX 2026-05-01 (#6): pending lock pre-check pro JAKÝKOLI toggle.
+        // Předtím check pouze pro Manual→Auto. Ale Auto→Manual při existujícím pending na ten krok
+        // znamená, že user "obchází" návrh (změna rezimu při čekajícím návrhu = race / bypass).
+        // Pending = univerzální guard — žádný toggle během pendingu.
+        if (row.SkutecnostRezim != request.Rezim)
         {
             var lockState = await _pendingLockEvaluator.EvaluateAsync(row.ZaznamId, ct).ConfigureAwait(false);
             if (lockState.HasPendingProposal && lockState.LockedManualKrokKeys is not null)
@@ -154,7 +143,7 @@ public sealed class HarmonogramController : Controller
                 {
                     return BadRequest(new
                     {
-                        error = $"Pending návrh #{lockState.ProposalId} blokuje přepnutí kroku do Auto rezimu. Vyřeš návrh nejdříve."
+                        error = $"Pending návrh #{lockState.ProposalId} blokuje přepnutí rezimu kroku. Vyřeš návrh nejdříve."
                     });
                 }
             }
@@ -264,25 +253,9 @@ public sealed class HarmonogramController : Controller
                 return NotFound(new { error = $"Krok {krokPoradi} neexistuje v schématu záznamu." });
             }
 
-            // Check existing row (concurrent create guard)
-            row = await _db.ZaznamHarmonogramHodnoty
-                .FirstOrDefaultAsync(h => h.ZaznamId == zaznamId && h.TypId == delayTypId.Value, ct)
-                .ConfigureAwait(false);
-            if (row is null)
-            {
-                row = new ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = zaznamId,
-                    TypId = delayTypId.Value,
-                    HodnotaInt = 0,
-                    UpdatedAt = _time.GetUtcNow().UtcDateTime,
-                    SkutecnostRezim = SkutecnostRezimEnum.Auto,
-                    SkutecnostZdroj = SkutecnostZdrojEnum.Neznamo
-                };
-                _db.ZaznamHarmonogramHodnoty.Add(row);
-                // Save aby row dostal Id před dalším update (audit log používá row.Id)
-                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-            }
+            // FIX 2026-05-01 race condition: TOCTOU bug — sjednoceno přes EnsureDelayRowAsync.
+            // FIX 2026-05-01 (#8): HodnotaInt = NULL místo 0 (DESIGN-10-A semantic consistency).
+            row = await EnsureDelayRowAsync(zaznamId, delayTypId.Value, ct).ConfigureAwait(false);
         }
         else
         {
@@ -379,5 +352,46 @@ public sealed class HarmonogramController : Controller
         if (!osobaId.HasValue) return false;
         return await _authz.HasPermissionAsync(
             osobaId.Value, PermissionKeys.RecordsScheduleEdit, projektId, null, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// FIX 2026-05-01 — race-safe create-if-missing pro DELAY row.
+    /// Pattern: try-load existing, if missing try-insert s catch DbUpdateException
+    /// (TOCTOU window between check and insert mezi paralelními requesty). Pokud insert selže
+    /// kvůli unique violation, re-load existing — concurrent caller už insert provedl.
+    /// </summary>
+    private async Task<ZaznamHarmonogramHodnotaEntity> EnsureDelayRowAsync(
+        int zaznamId, int delayTypId, CancellationToken ct)
+    {
+        var existing = await _db.ZaznamHarmonogramHodnoty
+            .FirstOrDefaultAsync(h => h.ZaznamId == zaznamId && h.TypId == delayTypId, ct)
+            .ConfigureAwait(false);
+        if (existing is not null) return existing;
+
+        var row = new ZaznamHarmonogramHodnotaEntity
+        {
+            ZaznamId = zaznamId,
+            TypId = delayTypId,
+            HodnotaInt = null, // DESIGN-10-A: NULL = "krok nenastal" (default insert state).
+            UpdatedAt = _time.GetUtcNow().UtcDateTime,
+            SkutecnostRezim = SkutecnostRezimEnum.Auto,
+            SkutecnostZdroj = SkutecnostZdrojEnum.Neznamo
+        };
+        _db.ZaznamHarmonogramHodnoty.Add(row);
+        try
+        {
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return row;
+        }
+        catch (DbUpdateException)
+        {
+            // Concurrent insert vyhrál — odstaníme tracked entity + reload winner.
+            _db.Entry(row).State = EntityState.Detached;
+            var winner = await _db.ZaznamHarmonogramHodnoty
+                .FirstOrDefaultAsync(h => h.ZaznamId == zaznamId && h.TypId == delayTypId, ct)
+                .ConfigureAwait(false);
+            return winner ?? throw new InvalidOperationException(
+                $"EnsureDelayRowAsync race resolution selhala — řádek pro (zaznamId={zaznamId}, typId={delayTypId}) nenalezen.");
+        }
     }
 }

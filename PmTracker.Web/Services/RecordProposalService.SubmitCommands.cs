@@ -153,6 +153,22 @@ public sealed partial class RecordProposalService
         await strategy.ExecuteAsync(async () =>
         {
             await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+
+            // FIX 2026-05-01 (#5): supersede starého Pending PŘED inserted nového, aby
+            // filtered unique index UX_zaznam_navrhy_pending_schedule_per_record nevybuchl.
+            // V Serializable TX je atomické pořadí: UPDATE old.Stav='SUPERSEDED' → INSERT new.
+            // Mezi tím není window kde by existovaly 2 Pending records.
+            ProposalAuditSnapshot? oldSnapshotBefore = null;
+            ZaznamNavrhEntity? oldProposal = null;
+            if (supersededByPlaceholderProposalId is int oldId)
+            {
+                oldProposal = await _dbContext.ZaznamNavrhy.FirstAsync(n => n.Id == oldId, ct);
+                oldSnapshotBefore = ProposalAuditSnapshot.FromEntity(oldProposal);
+                oldProposal.Stav = RecordProposalStateCodes.Superseded;
+                // SupersededByProposalId zůstane null pro tento moment, doplní se po insertu nového
+                await _dbContext.SaveChangesAsync(ct);
+            }
+
             var entity = new ZaznamNavrhEntity
             {
                 ProjektId = command.ProjektId,
@@ -167,12 +183,9 @@ public sealed partial class RecordProposalService
             _dbContext.ZaznamNavrhy.Add(entity);
             await _dbContext.SaveChangesAsync(ct);
 
-            // Phase 8 (DESIGN-7-D, 2026-05-01): auto-supersede starého Pending návrhu po vytvoření nového.
-            if (supersededByPlaceholderProposalId is int oldId)
+            // Po vytvoření nového dohrát SupersededByProposalId pro oldProposal + audit.
+            if (oldProposal is not null)
             {
-                var oldProposal = await _dbContext.ZaznamNavrhy.FirstAsync(n => n.Id == oldId, ct);
-                var oldSnapshotBefore = ProposalAuditSnapshot.FromEntity(oldProposal);
-                oldProposal.Stav = RecordProposalStateCodes.Superseded;
                 oldProposal.SupersededByProposalId = entity.Id;
                 await _dbContext.SaveChangesAsync(ct);
                 _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(

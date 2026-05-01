@@ -1,4 +1,5 @@
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Data;
 
 namespace PmTracker.Web.Services.Records;
 
@@ -28,22 +29,34 @@ public static class ManualProposalFieldValidator
             return;
         }
 
+        // FIX 2026-05-01 (#7): RecordValidationException místo InvalidOperationException —
+        // user vidí UNEXPECTED_SERVER_ERROR pro IOE, RVE má dedicated handling
+        // (controller AjaxResultMiddleware ho mapuje na 400 s message).
         var seen = new HashSet<Guid>();
         foreach (var krok in manualKroky)
         {
             if (krok.KrokKey == Guid.Empty)
             {
-                throw new InvalidOperationException("Ruční skutečnost kroku musí mít vyplněný identifikátor kroku.");
+                throw new RecordValidationException(
+                    "Ruční skutečnost kroku musí mít vyplněný identifikátor kroku.",
+                    new[] { new RecordValidationIssue("ManualActualKroky", "Ruční skutečnost kroku musí mít vyplněný identifikátor kroku.", "schedule", "manual.krokkey", null) },
+                    "ManualProposalFieldValidator.ValidateManualActualKroky: KrokKey == Empty");
             }
 
             if (!seen.Add(krok.KrokKey))
             {
-                throw new InvalidOperationException("Pro jeden krok harmonogramu lze zadat jen jedno ruční datum.");
+                throw new RecordValidationException(
+                    "Pro jeden krok harmonogramu lze zadat jen jedno ruční datum.",
+                    new[] { new RecordValidationIssue("ManualActualKroky", "Pro jeden krok harmonogramu lze zadat jen jedno ruční datum.", "schedule", "manual.duplicate", krok.KrokKey.ToString()) },
+                    "ManualProposalFieldValidator.ValidateManualActualKroky: duplicate KrokKey");
             }
 
             if (krok.AbsolutniDatum > today)
             {
-                throw new InvalidOperationException("Datum skutečnosti kroku nesmí být v budoucnosti.");
+                throw new RecordValidationException(
+                    "Datum skutečnosti kroku nesmí být v budoucnosti.",
+                    new[] { new RecordValidationIssue("ManualActualKroky", "Datum skutečnosti kroku nesmí být v budoucnosti.", "schedule", "manual.future-date", krok.AbsolutniDatum.ToString("yyyy-MM-dd")) },
+                    "ManualProposalFieldValidator.ValidateManualActualKroky: future date");
             }
         }
     }
@@ -78,9 +91,13 @@ public static class ManualProposalFieldValidator
         {
             if (autoFilledDelayTypIds.Contains(item.TypId))
             {
-                throw new InvalidOperationException(
-                    $"Krok pro TypId {item.TypId} je v Auto rezimu — návrh úpravy skutečnosti není možný. " +
-                    "Použij přímou editaci s ToggleRezim=Manual mimo návrhový workflow, nebo edituj jen manuální kroky 2/5/8/9.");
+                // FIX 2026-05-01 (#7): RecordValidationException pro user-friendly message.
+                var msg = $"Krok pro TypId {item.TypId} je v Auto rezimu — návrh úpravy skutečnosti není možný. " +
+                          "Použij přímou editaci s ToggleRezim=Manual mimo návrhový workflow, nebo edituj jen manuální kroky 2/5/8/9.";
+                throw new RecordValidationException(
+                    msg,
+                    new[] { new RecordValidationIssue("HarmonogramHodnoty", msg, "schedule", "schedule.auto-step-rejected", item.TypId.ToString()) },
+                    $"ValidateAutoStepNotInProposal: auto step TypId={item.TypId} v payloadu");
             }
         }
     }
@@ -92,27 +109,41 @@ public static class ManualProposalFieldValidator
             return;
         }
 
+        // FIX 2026-05-01 (#7): RecordValidationException pro user-friendly message (sjednoceno
+        // s ValidateManualActualKroky stejným patternem).
         var seen = new HashSet<Guid>();
         foreach (var v in vazby)
         {
             if (v.KrokKey == Guid.Empty)
             {
-                throw new InvalidOperationException("Vazba vyjádření na krok musí mít vyplněný identifikátor kroku.");
+                throw new RecordValidationException(
+                    "Vazba vyjádření na krok musí mít vyplněný identifikátor kroku.",
+                    new[] { new RecordValidationIssue("HarmonogramVazby", "Vazba vyjádření na krok musí mít vyplněný identifikátor kroku.", "schedule", "vazba.krokkey", null) },
+                    "ValidateHarmonogramVazby: KrokKey == Empty");
             }
 
             if (!seen.Add(v.KrokKey))
             {
-                throw new InvalidOperationException("Pro jeden krok harmonogramu lze navést jen jednu bublinu.");
+                throw new RecordValidationException(
+                    "Pro jeden krok harmonogramu lze navést jen jednu bublinu.",
+                    new[] { new RecordValidationIssue("HarmonogramVazby", "Pro jeden krok harmonogramu lze navést jen jednu bublinu.", "schedule", "vazba.duplicate", v.KrokKey.ToString()) },
+                    "ValidateHarmonogramVazby: duplicate KrokKey");
             }
 
             if (v.ExterniOdkazIndex < 0 || v.ExterniOdkazIndex >= externiVazbyCount)
             {
-                throw new InvalidOperationException("Index externí vazby v návrhu je mimo rozsah.");
+                throw new RecordValidationException(
+                    "Index externí vazby v návrhu je mimo rozsah.",
+                    new[] { new RecordValidationIssue("HarmonogramVazby", "Index externí vazby v návrhu je mimo rozsah.", "schedule", "vazba.invalid-index", v.ExterniOdkazIndex.ToString()) },
+                    $"ValidateHarmonogramVazby: invalid ExterniOdkazIndex={v.ExterniOdkazIndex}");
             }
 
             if (v.HotVyjadreniId <= 0)
             {
-                throw new InvalidOperationException("Identifikátor vyjádření musí být kladné číslo.");
+                throw new RecordValidationException(
+                    "Identifikátor vyjádření musí být kladné číslo.",
+                    new[] { new RecordValidationIssue("HarmonogramVazby", "Identifikátor vyjádření musí být kladné číslo.", "schedule", "vazba.invalid-hot-vyjadreni-id", v.HotVyjadreniId.ToString()) },
+                    $"ValidateHarmonogramVazby: invalid HotVyjadreniId={v.HotVyjadreniId}");
             }
         }
     }
