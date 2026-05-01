@@ -34,17 +34,16 @@ public sealed class ScheduleBlockMarkupTests
     {
         var source = LoadScheduleBlockSource();
 
-        // V editoru se musí renderovat segmenty pro VŠECHNY kroky (i zero-duration),
-        // aby je JS mohl zobrazit, když uživatel zadá kladné trvání.
-        source.Should().Contain(
-            "isEditor",
-            "musí existovat větvení podle editor režimu");
-        source.Should().Contain(
+        // Phase 9 (DESIGN-9-D, 2026-05-01): žádné skrývání kroků z žádného důvodu.
+        // visibleCompactSteps používá kompletní Model.Kroky bez filteru
+        // (memory project_harmonogram_visibility_rules: žádné skrývání kroků
+        // podle typu napojeného ticketu nebo nulového trvání).
+        source.Should().NotContain(
             "Model.Kroky.Where(krok => krok.TrvaniDni > 0)",
-            "readonly varianta musí filtrovat zero-duration kroky");
-        source.Should().MatchRegex(
-            "isEditor\\s*\\?\\s*Model\\.Kroky\\s*:\\s*Model\\.Kroky\\.Where",
-            "v editoru se musí použít kompletní Model.Kroky bez filtru zero-duration");
+            "compact rainbow strip nesmí filtrovat zero-duration (DESIGN-9-D)");
+        source.Should().Contain(
+            "var visibleCompactSteps = Model.Kroky",
+            "compact rainbow musí použít všechny kroky bez Where filtru");
     }
 
     [Fact]
@@ -63,14 +62,21 @@ public sealed class ScheduleBlockMarkupTests
     }
 
     [Fact]
-    public void BreakdownSteps_ShouldFilterZeroDurationRows()
+    public void BreakdownSteps_ShouldRenderAllSteps_NoFilter()
     {
         var source = LoadScheduleBlockSource();
 
-        // Breakdown panel (readonly, rozbalený detail karty) nesmí renderovat řádky
-        // pro zero-duration kroky — jinak vznikají prázdné mezery.
-        source.Should().MatchRegex(
-            "Model\\.Kroky\\.Where\\(k => k\\.TrvaniDni > 0\\)\\.OrderBy\\(k => k\\.KrokIndex\\)",
-            "gantt-steps breakdown musí filtrovat kroky s kladným trváním");
+        // Phase 9 (DESIGN-9-D, 2026-05-01): breakdown nesmí filtrovat. Render všech
+        // kroků včetně zero-duration / NULL OdchylkaDni — řízení viditelnosti přes
+        // CSS (width:0 / visibility:hidden pro zero plan, žádný actual segment pro NULL).
+        source.Should().NotContain(
+            "Model.Kroky.Where(k => k.TrvaniDni > 0)",
+            "breakdown nesmí filtrovat zero-duration řádky (DESIGN-9-D — žádné skrývání)");
+        source.Should().Contain(
+            "data-step-has-plan",
+            "breakdown vystavuje data-step-has-plan attribute pro JS layout");
+        source.Should().Contain(
+            "data-step-has-actual",
+            "breakdown vystavuje data-step-has-actual attribute (NULL OdchylkaDni → false)");
     }
 }
