@@ -1,5 +1,6 @@
 @model ScheduleBlockManualCellViewModel
 @using PmTracker.Web.Models.Entities
+@using PmTracker.Web.Models.ViewModels
 @{
     var krok = Model.Krok;
     var manualInputIndex = Model.ManualInputIndex;
@@ -147,19 +148,34 @@ else if (isManualKrok)
         var isoValue = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
             ? krok.SkutecneDatum.ToString("yyyy-MM-dd")
             : string.Empty;
+        var displayValue = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
+            ? krok.SkutecneDatum.ToString("dd.MM.yyyy")
+            : string.Empty;
         <div class="schedule-actual-manual schedule-actual-manual-editable" data-schedule-actual-source="manual">
             <input type="hidden"
                    name="ManualActualKroky[@manualInputIndex].KrokKey"
                    value="@krok.KrokKey"
                    data-manual-krok-keyhidden />
-            <input type="date"
-                   class="schedule-actual-manual-date"
-                   name="ManualActualKroky[@manualInputIndex].AbsolutniDatum"
-                   value="@isoValue"
-                   data-manual-krok-input
-                   data-manual-krok-index="@krok.KrokIndex"
-                   data-manual-krok-key="@krok.KrokKey"
-                   aria-label="Skutečnost kroku @krok.Nazev" />
+            @* 2026-05-02: migrace z native <input type="date"> na _AppDateField (Czech kalendář
+               + display dd.MM.yyyy + ISO yyyy-MM-dd hidden value). Sjednocuje datum input napříč
+               formuláři (základní karta + harmonogram plán + harmonogram skutečnost). *@
+            @await Html.PartialAsync(
+                "_AppDateField",
+                new AppDateFieldViewModel
+                {
+                    Name = $"ManualActualKroky[{manualInputIndex}].AbsolutniDatum",
+                    IsoValue = isoValue,
+                    DisplayValue = displayValue,
+                    Locked = false,
+                    AriaLabel = $"Skutečnost kroku {krok.Nazev}",
+                    ContainerCssClass = "schedule-actual-manual-date",
+                    ExtraDataAttributes = new Dictionary<string, object?>
+                    {
+                        ["data-manual-krok-input"] = "true",
+                        ["data-manual-krok-index"] = krok.KrokIndex.ToString(),
+                        ["data-manual-krok-key"] = krok.KrokKey.ToString()
+                    }
+                })
         </div>
     }
     else
