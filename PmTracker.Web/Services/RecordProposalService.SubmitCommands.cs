@@ -85,10 +85,36 @@ public sealed partial class RecordProposalService
 
         ValidateScheduleProposalInput(command, record);
 
-        var pendingLock = await _pendingScheduleProposalLockEvaluator.EvaluateAsync(record.Id, ct);
-        if (pendingLock.HasPendingProposal)
+        // Phase 8 (DESIGN-7-C + 7-D, 2026-05-01): max 1 Pending invariant + auto-supersede.
+        // Pre-check existing Pending SCHEDULE_PLAN_CHANGE pro tento záznam. Při novém submitu:
+        //   - Vlastní Pending + user má proposals.edit.own → auto-supersede starého (Stav=SUPERSEDED)
+        //   - Cizí Pending + user má proposals.edit.any → admin override supersede + audit
+        //   - Jinak → throw (pending má prioritu, vyžaduj rozhodnutí)
+        var existingPending = await _dbContext.ZaznamNavrhy
+            .Where(n => n.ZaznamId == record.Id
+                     && n.TypNavrhu == RecordProposalTypeCodes.SchedulePlanChange
+                     && n.Stav == RecordProposalStateCodes.Pending)
+            .OrderByDescending(n => n.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        int? supersededByPlaceholderProposalId = null;
+
+        if (existingPending is not null)
         {
-            throw new InvalidOperationException(pendingLock.Message ?? "Pro tento záznam už existuje čekající návrh změny harmonogramu.");
+            var isOwn = existingPending.CreatedByOsobaId == currentUser.OsobaId;
+            var canEditOwn = currentUser.Authorization?.HasPermission(PermissionKeys.ProposalsEditOwn, command.ProjektId) ?? false;
+            var canEditAny = currentUser.Authorization?.HasPermission(PermissionKeys.ProposalsEditAny, command.ProjektId) ?? false;
+
+            if ((isOwn && canEditOwn) || canEditAny)
+            {
+                // Mark for auto-supersede (commit po vytvoření newProposal.Id níže).
+                supersededByPlaceholderProposalId = existingPending.Id;
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Záznam má pending návrh #{existingPending.Id}. Vyžádej zamítnutí, nebo počkej na rozhodnutí.");
+            }
         }
 
         // Phase 6 (DESIGN-5-A + 7-A, 2026-05-01): odmítnout auto-fillované DELAY kroky.
@@ -140,6 +166,23 @@ public sealed partial class RecordProposalService
             };
             _dbContext.ZaznamNavrhy.Add(entity);
             await _dbContext.SaveChangesAsync(ct);
+
+            // Phase 8 (DESIGN-7-D, 2026-05-01): auto-supersede starého Pending návrhu po vytvoření nového.
+            if (supersededByPlaceholderProposalId is int oldId)
+            {
+                var oldProposal = await _dbContext.ZaznamNavrhy.FirstAsync(n => n.Id == oldId, ct);
+                var oldSnapshotBefore = ProposalAuditSnapshot.FromEntity(oldProposal);
+                oldProposal.Stav = RecordProposalStateCodes.Superseded;
+                oldProposal.SupersededByProposalId = entity.Id;
+                await _dbContext.SaveChangesAsync(ct);
+                _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                    AuditActionType.Update,
+                    AuditEntityType.RecordProposal,
+                    oldProposal.Id.ToString(CultureInfo.InvariantCulture),
+                    oldSnapshotBefore,
+                    ProposalAuditSnapshot.FromEntity(oldProposal)));
+            }
+
             _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
                 AuditActionType.Create,
                 AuditEntityType.RecordProposal,
