@@ -124,6 +124,7 @@ public static class ManualActualKrokApplier
     /// <c>zaznam_harmonogram_hodnoty</c>).
     /// </summary>
     public static async Task<IReadOnlyList<ManualActualKrokApplied>> ApplyAsync(
+        int zaznamId,
         IReadOnlyList<ManualActualKrokDto> manualKroky,
         HarmonogramSchemaDefinition schema,
         DateTime datumZalozeni,
@@ -171,9 +172,13 @@ public static class ManualActualKrokApplier
             .Where(x => plannedTypeIds.Contains(x.TypId))
             .GroupBy(x => x.TypId)
             .ToDictionary(g => g.Key, g => Math.Max(0, g.Last().Hodnota));
+        // FIX 2026-05-02: filter ZaznamId — bez něj query načte rows napříč všemi
+        // záznamy se shodným TypId (TypId je sdílený PK ciselnik_harmonogram_typu, ne
+        // per-record), ToDictionary by failnula s duplicate key. Tj. critical bug
+        // způsoboval Save fail u CREATE i EDIT flow ve VŠECH tenant scenarios s 2+ records.
         // DESIGN-10-A: NULL DURATION → fallback 0 v dict.
         var existingDurations = (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-            .Where(x => plannedTypeIds.Contains(x.TypId))
+            .Where(x => x.ZaznamId == zaznamId && plannedTypeIds.Contains(x.TypId))
             .Select(x => new { x.TypId, x.HodnotaInt })
             .ToListAsync(ct).ConfigureAwait(false))
             .ToDictionary(x => x.TypId, x => x.HodnotaInt ?? 0);

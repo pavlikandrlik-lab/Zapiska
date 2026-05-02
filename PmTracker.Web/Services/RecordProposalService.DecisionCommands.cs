@@ -257,6 +257,7 @@ public sealed partial class RecordProposalService
         if (schedulePayload.ManualActualKroky.Count > 0)
         {
             var manualOverrides = await ComputeManualActualOverridesAsync(
+                record.Id,
                 schedulePayload.ManualActualKroky,
                 schema,
                 record.DatumZalozeni,
@@ -393,6 +394,7 @@ public sealed partial class RecordProposalService
                 .ToHashSet();
 
             var overrides = await ComputeManualActualOverridesAsync(
+                record.Id,
                 createPayload.ManualActualKroky,
                 schema,
                 record.DatumZalozeni,
@@ -443,6 +445,7 @@ public sealed partial class RecordProposalService
     /// Zachovaná wrapper pro existing call sites uvnitř DecisionCommands.
     /// </summary>
     private async Task<IReadOnlyList<ManualActualKrokApplier.ManualActualKrokApplied>> ComputeManualActualOverridesAsync(
+        int zaznamId,
         IReadOnlyList<ManualActualKrokDto> manualKroky,
         HarmonogramSchemaDefinition schema,
         DateTime datumZalozeni,
@@ -451,7 +454,7 @@ public sealed partial class RecordProposalService
         CancellationToken ct)
     {
         return await ManualActualKrokApplier.ApplyAsync(
-            manualKroky, schema, datumZalozeni, plannedTypeIds, submittedValues,
+            zaznamId, manualKroky, schema, datumZalozeni, plannedTypeIds, submittedValues,
             _dbContext, _harmonogramService, ct).ConfigureAwait(false);
     }
 }

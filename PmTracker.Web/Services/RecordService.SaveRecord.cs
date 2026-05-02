@@ -1774,7 +1774,7 @@ public sealed partial class RecordService
         var plannedTypeIds = schema.Kroky.Select(k => k.TrvaniTypId).Where(x => x > 0).ToHashSet();
 
         var overrides = await Records.ManualActualKrokApplier.ApplyAsync(
-            command.ManualActualKroky, schema, datumZalozeni, plannedTypeIds,
+            recordId, command.ManualActualKroky, schema, datumZalozeni, plannedTypeIds,
             command.HarmonogramHodnoty, dbContext, harmonogramService, ct).ConfigureAwait(false);
 
         if (overrides.Count == 0)
