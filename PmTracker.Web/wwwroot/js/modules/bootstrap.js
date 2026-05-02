@@ -19,6 +19,7 @@ import "./vyjadreni/chatModal.js";
 import "./vyjadreni/chatModalDragDrop.js";
 import "./vyjadreni/chatModalReharvest.js";
 import "./harmonogram/manualKroky.js";
+import "./harmonogram/duration-calendar-binding.js"; // DESIGN-9-F (2026-05-02) — kalendář ⇄ readonly dny.
 import "./schedule-feature-c/toggle-rezim.js";
 import "./schedule-feature-c/select-candidate.js"; // Phase 11 (DESIGN-9-A) — phantom UI bug 3 fix
 import "./schedule-feature-c/preview-sync.js";    // Phase 12 (DESIGN-9-C) — pre-fetch staging

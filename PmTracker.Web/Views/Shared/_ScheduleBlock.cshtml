@@ -266,57 +266,44 @@
                             data-step-delay="@krok.OdchylkaDni">
                             <td>@krok.Nazev</td>
                             <td>
+                                @* DESIGN-9-F (2026-05-02): DURATION input redesign — primární editor je
+                                   kalendář (datum konce kroku). Trvání ve dnech se vypočte JS-em z rozdílu
+                                   (datum konce - datum začátku) a propíše do hidden input pro form POST.
+                                   Stepper +/− odstraněn — datum-driven flow je sjednocený se skutečností. *@
                                 <div class="schedule-stacked-input @(durationChanged ? "proposal-field-changed" : null)"
                                      title="@durationTooltip">
                                     <input type="hidden" name="HarmonogramHodnoty[@durationInputIndex].TypId" value="@krok.TrvaniTypId" />
-                                    <div class="schedule-stacked-main">
-                                        <div class="schedule-stacked-part schedule-stacked-part-top">
-                                            <input class="schedule-days-input schedule-days-input-stacked"
-                                                   type="number"
-                                                   min="0"
-                                                   name="HarmonogramHodnoty[@durationInputIndex].Hodnota"
-                                                   value="@krok.TrvaniDni"
-                                                   data-schedule-duration
-                                                   data-schedule-static-disabled="@(durationStaticDisabled ? "true" : "false")"
-                                                   data-schedule-original-duration="@krok.TrvaniDni"
-                                                   @((durationDisabled) ? "disabled=\"disabled\"" : null) />
-                                        </div>
-                                        <div class="schedule-stacked-part schedule-stacked-part-bottom">
-                                            @await Html.PartialAsync(
-                                                "_AppDateField",
-                                                new AppDateFieldViewModel
+                                    <input type="hidden"
+                                           name="HarmonogramHodnoty[@durationInputIndex].Hodnota"
+                                           value="@krok.TrvaniDni"
+                                           data-schedule-duration-hidden
+                                           data-schedule-static-disabled="@(durationStaticDisabled ? "true" : "false")"
+                                           data-schedule-original-duration="@krok.TrvaniDni" />
+                                    <div class="schedule-duration-row">
+                                        @await Html.PartialAsync(
+                                            "_AppDateField",
+                                            new AppDateFieldViewModel
+                                            {
+                                                Name = $"UiHarmonogramDatumy[{i}]",
+                                                IsoValue = krok.BaselineDatum.ToString("yyyy-MM-dd"),
+                                                DisplayValue = krok.BaselineDatum.ToString("dd.MM.yyyy"),
+                                                Locked = dateDisabled,
+                                                AriaLabel = $"Datum konce kroku {krok.Nazev}",
+                                                ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(durationChanged ? " proposal-field-changed" : string.Empty)}",
+                                                ExtraDataAttributes = new Dictionary<string, object?>
                                                 {
-                                                    Name = $"UiHarmonogramDatumy[{i}]",
-                                                    IsoValue = krok.BaselineDatum.ToString("yyyy-MM-dd"),
-                                                    DisplayValue = krok.BaselineDatum.ToString("dd.MM.yyyy"),
-                                                    Locked = dateDisabled,
-                                                    AriaLabel = "Otevřít kalendář kroku harmonogramu",
-                                                    ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(durationChanged ? " proposal-field-changed" : string.Empty)}",
-                                                    ExtraDataAttributes = new Dictionary<string, object?>
-                                                    {
-                                                        ["data-schedule-date"] = "true",
-                                                        ["data-schedule-static-disabled"] = stepStaticDisabled ? "true" : "false",
-                                                        ["data-schedule-original-duration"] = krok.TrvaniDni.ToString(),
-                                                        ["title"] = durationTooltip
-                                                    }
-                                                })
-                                        </div>
-                                    </div>
-                                    <div class="schedule-stacked-stepper">
-                                        <button class="icon-btn schedule-step-btn"
-                                                type="button"
-                                                data-schedule-duration-inc
-                                                aria-label="Přidat 1 den trvání: @krok.Nazev"
-                                                @((durationDisabled) ? "disabled=\"disabled\"" : null)>
-                                            <gov-icon size="s" name="plus" type="components" aria-hidden="true"></gov-icon>
-                                        </button>
-                                        <button class="icon-btn schedule-step-btn"
-                                                type="button"
-                                                data-schedule-duration-dec
-                                                aria-label="Odebrat 1 den trvání: @krok.Nazev"
-                                                @((durationDisabled) ? "disabled=\"disabled\"" : null)>
-                                            <gov-icon size="s" name="dash" type="components" aria-hidden="true"></gov-icon>
-                                        </button>
+                                                    ["data-schedule-duration-calendar"] = "true",
+                                                    ["data-schedule-static-disabled"] = stepStaticDisabled ? "true" : "false",
+                                                    ["data-schedule-original-duration"] = krok.TrvaniDni.ToString(),
+                                                    ["title"] = durationTooltip
+                                                }
+                                            })
+                                        <span class="schedule-duration-days-readonly"
+                                              data-schedule-duration-readonly
+                                              aria-label="Trvání ve dnech"
+                                              title="Trvání kroku v kalendářních dnech (vypočteno z datumu konce a začátku kroku)">
+                                            @krok.TrvaniDni dnů
+                                        </span>
                                     </div>
                                 </div>
                             </td>
