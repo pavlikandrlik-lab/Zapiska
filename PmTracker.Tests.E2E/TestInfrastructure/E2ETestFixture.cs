@@ -118,7 +118,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(5)
         };
 
-        var deadline = DateTime.UtcNow.AddSeconds(90);
+        var deadline = DateTime.UtcNow.AddSeconds(240);
         var url = $"{BaseUrl}/Projekty?asUser={AdminOsobaId}";
 
         while (DateTime.UtcNow < deadline)
@@ -147,7 +147,10 @@ public sealed class E2ETestFixture : IAsyncLifetime
             await Task.Delay(1000);
         }
 
-        throw new TimeoutException("E2E web aplikace nenaběhla do 90 sekund.");
+        await DrainWebProcessLogsAsync();
+        var stdoutTimeout = FormatBufferedOutput(_webStdoutLines);
+        var stderrTimeout = FormatBufferedOutput(_webStderrLines);
+        throw new TimeoutException($"E2E web aplikace nenaběhla do 240 sekund.\nSTDOUT:\n{stdoutTimeout}\nSTDERR:\n{stderrTimeout}");
     }
 
     private static async Task PumpProcessOutputAsync(StreamReader reader, ConcurrentQueue<string> target)

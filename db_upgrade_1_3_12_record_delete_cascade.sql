@@ -373,12 +373,22 @@ BEGIN
     EXEC sp_executesql @sql;
 END
 
+-- FIX 2026-05-02: SET NULL na approved_record_id koliduje s CASCADE z zaznam_id
+-- (oba FK na same projektove_zaznamy = "multiple cascade paths" SQL 1785 error).
+-- TRY/CATCH wrapper — pokud ALTER selže, FK se vůbec nepřidá a aplikační logika
+-- v RecordService.DeleteRecord setne approved_record_id na NULL pre-delete.
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_zaznam_navrhy_approved_record' AND parent_object_id = OBJECT_ID(N'dbo.zaznam_navrhy'))
 BEGIN
-    ALTER TABLE dbo.zaznam_navrhy
-        ADD CONSTRAINT FK_zaznam_navrhy_approved_record
-        FOREIGN KEY (approved_record_id) REFERENCES dbo.projektove_zaznamy(id) ON DELETE SET NULL;
-    PRINT '  + FK_zaznam_navrhy_approved_record → SET NULL';
+    BEGIN TRY
+        ALTER TABLE dbo.zaznam_navrhy
+            ADD CONSTRAINT FK_zaznam_navrhy_approved_record
+            FOREIGN KEY (approved_record_id) REFERENCES dbo.projektove_zaznamy(id) ON DELETE SET NULL;
+        PRINT '  + FK_zaznam_navrhy_approved_record → SET NULL';
+    END TRY
+    BEGIN CATCH
+        PRINT '  ! FK_zaznam_navrhy_approved_record SET NULL skipped: ' + ERROR_MESSAGE();
+        PRINT '    App-level cleanup v RecordService.DeleteRecord nuluje approved_record_id před DELETE.';
+    END CATCH
 END
 ELSE
     PRINT '  = FK_zaznam_navrhy_approved_record already SET NULL';

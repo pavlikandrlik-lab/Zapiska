@@ -62,6 +62,19 @@ public sealed partial class RecordService
             //   - zaznam_navrhy.approved_record_id (SET NULL — preserve audit
             //                                        proposals které tento záznam
             //                                        vytvořily)
+            // FIX 2026-05-02: zaznam_navrhy.approved_record_id NEMÁ FK constraint
+            // (ON DELETE SET NULL nelze kvůli multi-cascade-path s zaznam_id CASCADE).
+            // App-level cleanup — vynulovat reference před DELETE, aby orphan ID
+            // nezůstaly v audit historii proposals (proposals samé zůstanou — zaznam_id
+            // CASCADE je vykaskáduje, pokud byly cílem; ostatní jsou audit history).
+            var navrhyToCleanup = await dbContext.ZaznamNavrhy
+                .Where(n => n.ApprovedRecordId == command.ZaznamId)
+                .ToListAsync(ct);
+            foreach (var navrh in navrhyToCleanup)
+            {
+                navrh.ApprovedRecordId = null;
+            }
+
             dbContext.ProjektoveZaznamy.Remove(record);
             await dbContext.SaveChangesAsync(ct);
 

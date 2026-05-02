@@ -115,6 +115,11 @@
   }
 
   function init() {
+    // FIX 2026-05-02: capture phase + setTimeout 0 — block.js (legacy schedule preview)
+    // poslouchá stejný change event a fetchne /Schedule/Recalc, který by přepsal naši
+    // hodnotu hidden_duration. Capture phase nezaručí pořadí spolehlivě napříč prohlížeči,
+    // tak setTimeout 0 odloží náš recalc na konec event loop tick — duration-calendar-binding
+    // má poslední slovo o hidden_duration value pro form POST.
     document.addEventListener('change', (event) => {
       const target = event.target;
       if (!(target instanceof HTMLInputElement)) return;
@@ -126,8 +131,10 @@
       const stepIndex = parseInt(row.getAttribute('data-step-index') || '0', 10);
       const recordStartDate = getRecordStartDate(block);
       const allRows = getSortedRows(block);
-      recalcChainFrom(stepIndex, recordStartDate, allRows);
-    });
+      // Defer recalc to end of microtask queue — runs po block.js synchronous handler
+      // i případném server preview fetch resolution.
+      setTimeout(() => recalcChainFrom(stepIndex, recordStartDate, allRows), 0);
+    }, true);
   }
 
   if (document.readyState === 'loading') {

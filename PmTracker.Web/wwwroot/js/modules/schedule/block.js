@@ -34,7 +34,15 @@ async function fetchSchedulePreview(projektId, startDate, deadlineDate, steps, a
             delayDays: s.delay
         }))
     };
-    const response = await fetch('/Schedule/Recalc', {
+    // FIX 2026-05-02: dev override propagace — pokud aktuální URL obsahuje asUser=N
+    // query, propisni do POST URL aby UserContextMiddleware mohl resolvnout principal.
+    // Production (žádný asUser query) → standardní cookie/AD auth.
+    const currentUrl = new URL(window.location.href);
+    const asUserParam = currentUrl.searchParams.get('asUser');
+    const recalcUrl = asUserParam
+        ? `/Schedule/Recalc?asUser=${encodeURIComponent(asUserParam)}`
+        : '/Schedule/Recalc';
+    const response = await fetch(recalcUrl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -190,9 +198,9 @@ export class ScheduleBlockRenderer {
                 return {
                     row,
                     stepIndex,
-                    durationInput: row.querySelector("[data-schedule-duration]"),
+                    durationInput: row.querySelector("[data-schedule-duration-hidden]") || row.querySelector("[data-schedule-duration]"),
                     delayInput: row.querySelector("[data-schedule-delay]"),
-                    dateInput: row.querySelector("[data-schedule-date]"),
+                    dateInput: row.querySelector("[data-schedule-duration-calendar]") || row.querySelector("[data-schedule-date]"),
                     delayDateInput: row.querySelector("[data-schedule-delay-date]"),
                     durationInc: row.querySelector("[data-schedule-duration-inc]"),
                     durationDec: row.querySelector("[data-schedule-duration-dec]"),

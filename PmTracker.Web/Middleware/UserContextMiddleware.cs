@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Middleware;
@@ -45,6 +46,25 @@ public sealed class UserContextMiddleware(RequestDelegate next)
         IUserContextResolver resolver,
         IWebHostEnvironment environment)
     {
+        // FIX 2026-05-02: dev-only — pokud asUser=N query, setni authenticated principal
+        // PŘED resolverem. Bez toho [Authorize] middleware na controllers selže s
+        // "No DefaultChallengeScheme" (IIS auth scheme registered, ale handler není
+        // dostupný mimo IIS hosting). UserContextResolver pak normálně zresolvuje
+        // osobu z asUser query a permission check běží přes ICurrentUserAccessor.
+        if (environment.IsDevelopment()
+            && context.User.Identity?.IsAuthenticated != true
+            && !string.IsNullOrWhiteSpace(context.Request.Query["asUser"].ToString()))
+        {
+            var asUser = context.Request.Query["asUser"].ToString();
+            var devClaims = new[]
+            {
+                new Claim(ClaimTypes.Name, $"dev-asUser:{asUser}"),
+                new Claim(ClaimTypes.NameIdentifier, asUser)
+            };
+            var devIdentity = new ClaimsIdentity(devClaims, "DevAsUser");
+            context.User = new ClaimsPrincipal(devIdentity);
+        }
+
         if (ShouldResolve(context, environment))
         {
             var result = await resolver.ResolveAsync(context, context.RequestAborted);

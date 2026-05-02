@@ -347,21 +347,20 @@ public sealed class HarmonogramUnifiedScenariosTests
 
             await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
 
-            var firstDurationInput = form.Locator("[data-schedule-duration]").First;
-            var firstDurationInc = form.Locator("[data-schedule-duration-inc]").First;
+            // DESIGN-9-F (2026-05-02): DURATION input redesign — kalendář (datum konce kroku)
+            // je primární editor, počet dnů je readonly text. Stepper +/- a number input smazány.
+            // Hidden input drží vypočtený integer (form POST nezměněn).
+            var firstDurationHidden = form.Locator("[data-schedule-duration-hidden]").First;
+            var firstDurationCalendar = form.Locator("[data-schedule-duration-calendar]").First;
+            var firstDurationReadonly = form.Locator("[data-schedule-duration-readonly]").First;
 
-            await Expect(firstDurationInput).ToBeEnabledAsync();
-            await Expect(firstDurationInc).ToBeEnabledAsync();
+            await Expect(firstDurationCalendar).ToBeVisibleAsync();
+            await Expect(firstDurationReadonly).ToBeVisibleAsync();
 
-            var initialDurationValue = await firstDurationInput.InputValueAsync();
+            var initialDurationValue = await firstDurationHidden.InputValueAsync();
             var initialDuration = int.TryParse(initialDurationValue, out var parsedDuration) ? parsedDuration : 0;
 
-            await firstDurationInc.ClickAsync();
-            await Expect(firstDurationInput).ToHaveValueAsync((initialDuration + 1).ToString());
-
-            var durationAfterStepper = await firstDurationInput.InputValueAsync();
-            var firstDateInput = form.Locator("[data-schedule-date]").First;
-            await firstDateInput.EvaluateAsync(
+            await firstDurationCalendar.EvaluateAsync(
                 @"input => {
                     const parseIso = (value) => {
                         const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((value || '').trim());
@@ -384,7 +383,13 @@ public sealed class HarmonogramUnifiedScenariosTests
                     input.dispatchEvent(new Event('change', { bubbles: true }));
                 }");
 
-            (await firstDurationInput.InputValueAsync()).Should().NotBe(durationAfterStepper);
+            // Po změně datumu konce o +3 dny musí být hidden hodnota >= initialDuration + 3
+            // (cumulative chain — duration-calendar-binding.js přepočítal trvání).
+            var durationAfterDateChange = int.TryParse(await firstDurationHidden.InputValueAsync(), out var p2) ? p2 : 0;
+            durationAfterDateChange.Should().BeGreaterThanOrEqualTo(initialDuration + 3,
+                $"DESIGN-9-F: změna datumu konce o +3 dny musí navýšit hidden duration. initial={initialDuration} after={durationAfterDateChange}");
+            (await firstDurationReadonly.TextContentAsync()).Should().Contain(durationAfterDateChange.ToString(),
+                "readonly text musí zobrazovat aktualizovaný počet dnů.");
 
             var saveResponseTask = page.WaitForResponseAsync(response =>
                 response.Request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase)
@@ -410,6 +415,81 @@ public sealed class HarmonogramUnifiedScenariosTests
             await page.Context.CloseAsync();
         }
     }
+
+    [Fact]
+    public async Task Design9F_DurationCell_ShouldShowReadonlyDaysToTheRightOfCalendar()
+    {
+        // DESIGN-9-F (2026-05-02): user explicit požadavek — počet dnů vpravo vedle kalendáře.
+        // Verifikuje: kalendář a readonly text jsou v plán sloupečku, readonly text je vpravo
+        // (rect.left readonly > rect.right kalendář).
+        var page = await _fixture.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=zaznamy&asUser={_fixture.AdminOsobaId}");
+
+            await page.GetByRole(AriaRole.Button, new() { Name = "Nový záznam" }).First.ClickAsync();
+            var modal = page.Locator(".modal-overlay").First;
+            await Expect(modal).ToBeVisibleAsync(new() { Timeout = 8000 });
+
+            var form = modal.Locator("form").First;
+
+            // Vyplnit povinná pole + nastavit Úkol kategorii (jinak se harmonogram nevyrenderuje).
+            await form.Locator("[name='Nazev']").FillAsync("DESIGN-9-F-LAYOUT-TEST");
+            await form.Locator("[data-vlastnik-display]").EvaluateAsync(
+                @"input => { input.value = 'Pavel Admin'; input.setCustomValidity(''); }");
+            var categorySelect = form.Locator("select[name='Kategorie']");
+            var taskCategoryValue = await categorySelect.EvaluateAsync<string>(
+                @"select => { const o = Array.from(select.options).find(i => /ukol|úkol/i.test((i.textContent||'').trim())); return o ? o.value : ''; }");
+            taskCategoryValue.Should().NotBeNullOrWhiteSpace();
+            await categorySelect.SelectOptionAsync(new SelectOptionValue { Value = taskCategoryValue });
+
+            await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
+
+            var firstRow = form.Locator("[data-schedule-step-row]").First;
+            await Expect(firstRow).ToBeVisibleAsync();
+
+            // Layout assertion: kalendář vlevo, readonly počet dnů vpravo, oba ve stejné cell (PLAN sloupek).
+            var layout = await firstRow.EvaluateAsync<DurationLayoutResult>(
+                @"row => {
+                    const cell = row.querySelector('td:nth-child(2)'); // PLAN sloupec
+                    const cal = cell?.querySelector('[data-schedule-duration-calendar]');
+                    const readonlyEl = cell?.querySelector('[data-schedule-duration-readonly]');
+                    if (!cal || !readonlyEl) {
+                        return { hasCalendar: !!cal, hasReadonly: !!readonlyEl, calRight: 0, readonlyLeft: 0, sameRow: false, readonlyText: '' };
+                    }
+                    const cr = cal.getBoundingClientRect();
+                    const rr = readonlyEl.getBoundingClientRect();
+                    return {
+                        hasCalendar: true,
+                        hasReadonly: true,
+                        calRight: cr.right,
+                        readonlyLeft: rr.left,
+                        sameRow: Math.abs(cr.top - rr.top) < 30,
+                        readonlyText: (readonlyEl.textContent || '').trim()
+                    };
+                }");
+
+            layout.HasCalendar.Should().BeTrue("kalendář musí být v PLAN cell");
+            layout.HasReadonly.Should().BeTrue("readonly počet dnů musí být v PLAN cell");
+            layout.SameRow.Should().BeTrue($"kalendář a readonly mají být na stejném horizontálním řádku (gap < 30px). cal.top vs readonly.top");
+            layout.ReadonlyLeft.Should().BeGreaterThan(layout.CalRight - 5,
+                $"readonly počet dnů musí být VPRAVO od kalendáře. calRight={layout.CalRight} readonlyLeft={layout.ReadonlyLeft}");
+            layout.ReadonlyText.Should().MatchRegex(@"\d+\s+(den|dny|dnů)",
+                $"readonly text musí být '{{N}} den/dny/dnů'. Actual: '{layout.ReadonlyText}'");
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+        }
+    }
+
+    private sealed record DurationLayoutResult(
+        bool HasCalendar,
+        bool HasReadonly,
+        double CalRight,
+        double ReadonlyLeft,
+        bool SameRow,
+        string ReadonlyText);
 
     private static ILocatorAssertions Expect(ILocator locator)
     {
