@@ -178,6 +178,41 @@ public sealed class HarmonogramPhantomUiFixesTests
     }
 
     [Fact]
+    public void PmDateField_CustomElement_Existuje()
+    {
+        // FIX 2026-05-02: <pm-date-field> je native Custom Element (customElements.define),
+        // sjednocený datumový vstup pro celou aplikaci (memory: feedback_web_component_means_custom_element).
+        var path = Path.Combine(LocateRepoRoot(), "PmTracker.Web/wwwroot/js/components/pm-date-field.js");
+        File.Exists(path).Should().BeTrue("pm-date-field.js Custom Element musí existovat.");
+        var src = Read("PmTracker.Web/wwwroot/js/components/pm-date-field.js");
+        src.Should().Contain("customElements.define(\"pm-date-field\"",
+            "musí registrovat <pm-date-field> jako Custom Element.");
+        src.Should().Contain("class PmDateFieldElement extends HTMLElement",
+            "musí být regulérní HTMLElement subclass (ne Razor partial / JS modul).");
+    }
+
+    [Fact]
+    public void Bootstrap_ImportujePmDateField()
+    {
+        var src = Read("PmTracker.Web/wwwroot/js/modules/bootstrap.js");
+        src.Should().Contain("components/pm-date-field",
+            "bootstrap.js musí importovat pm-date-field.js side-effect (memory: project_bundle_sync).");
+    }
+
+    [Fact]
+    public void AppDateField_Partial_RenderujePmDateFieldElement()
+    {
+        // _AppDateField partial je teď thin wrapper kolem Custom Elementu — všechny callsity
+        // (základní údaje, harmonogram plán + skutečnost, NewMeetingModal) tím transitivně
+        // používají <pm-date-field> bez nutnosti měnit jejich Razor.
+        var src = Read("PmTracker.Web/Views/Shared/_AppDateField.cshtml");
+        src.Should().Contain("<pm-date-field",
+            "_AppDateField partial musí renderovat <pm-date-field> Custom Element.");
+        src.Should().NotContain("data-app-date-field",
+            "Razor partial nesmí duplikovat HTML strukturu Custom Elementu — markup je teď v JS.");
+    }
+
+    [Fact]
     public void ScheduleComposition_FiltrujeNullHodnotaInt_PredCastem()
     {
         // FIX 2026-05-01 (round 5 #2): cast Dictionary<int, int?> → IReadOnlyDictionary<int, int>

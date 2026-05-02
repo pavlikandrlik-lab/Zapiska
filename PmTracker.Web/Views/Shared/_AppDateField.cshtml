@@ -1,9 +1,19 @@
 @model AppDateFieldViewModel
 @using System.Text.Encodings.Web
+@*
+    Razor wrapper kolem <pm-date-field> Custom Elementu (PmTracker.Web/wwwroot/js/components/pm-date-field.js).
+    Existující call sites (ZaznamEdit basic, _ScheduleBlock plán + skutečnost, _ScheduleBlockManualCell, NewMeetingModal)
+    používají typovaný AppDateFieldViewModel — wrapper rendere atributy elementu, samotná HTML struktura
+    a kalendářní logika jsou v Custom Elementu.
+*@
 @{
-    var containerClass = string.IsNullOrWhiteSpace(Model.ContainerCssClass)
-        ? "app-date-field"
-        : $"app-date-field {Model.ContainerCssClass}";
+    var lockedAttr = Model.Locked ? "true" : "false";
+    var containerClassAttr = HtmlEncoder.Default.Encode(Model.ContainerCssClass ?? string.Empty);
+    var nameAttr = HtmlEncoder.Default.Encode(Model.Name ?? string.Empty);
+    var isoAttr = HtmlEncoder.Default.Encode(Model.IsoValue ?? string.Empty);
+    var displayAttr = HtmlEncoder.Default.Encode(Model.DisplayValue ?? string.Empty);
+    var ariaAttr = HtmlEncoder.Default.Encode(Model.AriaLabel ?? "Otevřít kalendář");
+
     var extraAttributeMarkup = string.Empty;
     if (Model.ExtraDataAttributes.Count > 0)
     {
@@ -14,35 +24,20 @@
             {
                 continue;
             }
-
             var value = attribute.Value?.ToString();
             if (string.IsNullOrWhiteSpace(value))
             {
                 continue;
             }
-
             parts.Add($"{attribute.Key}=\"{HtmlEncoder.Default.Encode(value)}\"");
         }
-
         extraAttributeMarkup = string.Join(" ", parts);
     }
 }
-<div class="@containerClass" data-app-date-field data-app-date-locked="@(Model.Locked ? "true" : "false")" data-floating-anchor>
-    <input class="app-date-display-input" type="text" data-app-date-display value="@Model.DisplayValue" readonly />
-    <input type="hidden" name="@Model.Name" value="@Model.IsoValue" data-app-date-value @Html.Raw(extraAttributeMarkup) />
-    <button class="app-date-trigger" type="button" data-app-date-open aria-label="@Model.AriaLabel" @(Model.Locked ? "disabled=\"disabled\"" : null)>
-        <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
-    </button>
-    <div class="app-date-panel" data-app-date-panel data-floating-panel data-floating-kind="date" hidden>
-        <div class="app-date-nav">
-            <button class="app-date-nav-btn" type="button" data-app-date-prev aria-label="Předchozí měsíc">‹</button>
-            <select class="app-date-select app-date-month" data-app-date-month aria-label="Měsíc"></select>
-            <select class="app-date-select app-date-year" data-app-date-year aria-label="Rok"></select>
-            <button class="app-date-nav-btn" type="button" data-app-date-next aria-label="Další měsíc">›</button>
-        </div>
-        <div class="app-date-weekdays" aria-hidden="true">
-            <span>Po</span><span>Út</span><span>St</span><span>Čt</span><span>Pá</span><span>So</span><span>Ne</span>
-        </div>
-        <div class="app-date-grid" data-app-date-grid role="grid"></div>
-    </div>
-</div>
+<pm-date-field name="@nameAttr"
+               iso-value="@isoAttr"
+               display-value="@displayAttr"
+               locked="@lockedAttr"
+               aria-label="@ariaAttr"
+               container-css-class="@containerClassAttr"
+               @Html.Raw(extraAttributeMarkup)></pm-date-field>
