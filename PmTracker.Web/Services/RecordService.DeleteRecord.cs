@@ -27,6 +27,9 @@ public sealed partial class RecordService
             throw new InvalidOperationException("Záznam nepatří do vybraného projektu.");
         }
 
+        // FIX 2026-05-03: app-level cleanup approved_record_id (žádný FK = robust).
+        await PreflightCleanupChildRowsAsync(command.ZaznamId, ct);
+
         var strategy = dbContext.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
@@ -49,32 +52,8 @@ public sealed partial class RecordService
             var oldScheduleSnapshot = RecordScheduleAuditSnapshot.FromEntities(command.ZaznamId, scheduleRowsForAudit);
             var oldCommentSnapshots = commentRowsForAudit.Select(CommentAuditSnapshot.FromEntity).ToList();
 
-            // SQL FK CASCADE (per db_upgrade_1_3_12) zajistí cleanup všech 13
-            // child tabulek. Aplikační logika nemusí explicitně mazat:
-            //   - 6× zaznam_historie_*           (CASCADE)
-            //   - zaznam_externi_odkazy          (CASCADE)
-            //   - zaznam_spoluprace              (CASCADE)
-            //   - vyjadreni                      (CASCADE)
-            //   - zaznam_priority_uzivatelu      (CASCADE)
-            //   - zaznam_harmonogram_hodnoty     (CASCADE — FK přidána v 1_3_12)
-            //   - zaznam_harmonogram_vyjadreni_vazba (CASCADE — od 1_3_6)
-            //   - zaznam_navrhy.zaznam_id        (CASCADE)
-            //   - zaznam_navrhy.approved_record_id (SET NULL — preserve audit
-            //                                        proposals které tento záznam
-            //                                        vytvořily)
-            // FIX 2026-05-02: zaznam_navrhy.approved_record_id NEMÁ FK constraint
-            // (ON DELETE SET NULL nelze kvůli multi-cascade-path s zaznam_id CASCADE).
-            // App-level cleanup — vynulovat reference před DELETE, aby orphan ID
-            // nezůstaly v audit historii proposals (proposals samé zůstanou — zaznam_id
-            // CASCADE je vykaskáduje, pokud byly cílem; ostatní jsou audit history).
-            var navrhyToCleanup = await dbContext.ZaznamNavrhy
-                .Where(n => n.ApprovedRecordId == command.ZaznamId)
-                .ToListAsync(ct);
-            foreach (var navrh in navrhyToCleanup)
-            {
-                navrh.ApprovedRecordId = null;
-            }
-
+            // SQL FK CASCADE (1_3_12 + 1_3_16) vyřeší všechny child tabulky.
+            // approved_record_id cleanup proběhl v PreflightCleanupChildRowsAsync.
             dbContext.ProjektoveZaznamy.Remove(record);
             await dbContext.SaveChangesAsync(ct);
 
@@ -108,5 +87,17 @@ public sealed partial class RecordService
             await dbContext.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
         });
+    }
+
+    /// <summary>
+    /// app-level cleanup approved_record_id (NEMÁ FK; ostatní child rows = SQL CASCADE).
+    /// </summary>
+    private async Task PreflightCleanupChildRowsAsync(int zaznamId, CancellationToken ct)
+    {
+        var navrhyToCleanup = await dbContext.ZaznamNavrhy
+            .Where(n => n.ApprovedRecordId == zaznamId)
+            .ToListAsync(ct);
+        foreach (var n in navrhyToCleanup) n.ApprovedRecordId = null;
+        if (navrhyToCleanup.Count > 0) await dbContext.SaveChangesAsync(ct);
     }
 }
