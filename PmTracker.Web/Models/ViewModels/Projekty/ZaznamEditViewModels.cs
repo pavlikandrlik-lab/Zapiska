@@ -30,6 +30,13 @@ public sealed class ZaznamEditViewModel
     public required IReadOnlyList<LookupOptionViewModel> Vlastnici { get; set; }
     public int VlastnikId { get; set; }
     public bool JeUkolKategorie { get; set; }
+    /// <summary>
+    /// FIX 2026-05-03 — initial state pro master switch "Automatické vyplňování harmonogramu"
+    /// v tab strip řádku. ON = všechny existující DELAY řádky v Auto rezimu (= classic
+    /// auto-fill flow). OFF = aspoň jeden krok v Manual rezimu (= mix nebo všechny ručně).
+    /// Pro nový záznam (IsCreate) defaultně true.
+    /// </summary>
+    public bool HarmonogramAutoFillSwitchOn { get; set; } = true;
     public HarmonogramBlockViewModel HarmonogramBlok { get; set; } = new();
     public required IReadOnlyList<SpolupracovnikOptionViewModel> DostupniVlastnici { get; set; }
     public required IReadOnlyList<SpolupracovnikOptionViewModel> DostupniSpolupracovnici { get; set; }

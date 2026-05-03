@@ -279,6 +279,12 @@ public sealed partial class ProjectService
             }).ToList(),
             VlastnikId = record.VlastnikId,
             JeUkolKategorie = isTaskCategory,
+            // FIX 2026-05-03: master switch initial state — true (Auto) pokud žádný existující
+            // DELAY řádek (= ten, jehož TypId odpovídá kroku.ZpozdeniTypId) není v Manual rezimu.
+            // Pro nový záznam bez DELAY řádků default true (auto-fill je standardní flow).
+            HarmonogramAutoFillSwitchOn = !harmonogramRows
+                .Any(h => harmonogramTypy.Any(t => t.ZpozdeniTypId == h.TypId)
+                       && h.SkutecnostRezim == Models.Entities.SkutecnostRezimEnum.Manual),
             HarmonogramBlok = BuildScheduleBlockViewModel(
                 record.Id,
                 "record-editor",

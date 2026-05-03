@@ -89,6 +89,12 @@
 
        Backward-compat data atributy (data-record-modal-tab, data-record-modal-panel)
        zůstávají zachované pro JS, který panely vyhledává přímo (např. schedule planner). *@
+    @* FIX 2026-05-03: master switch "Automatické vyplňování harmonogramu" napravo v tab řádku.
+       ON = všechny kroky harmonogramu v Auto rezimu (sync ze ServiceDesk).
+       OFF = všechny kroky v Manual rezimu (uživatel vyplňuje datumy ručně).
+       JS handler bulk-volá POST /Harmonogram/BulkSetRezim pro saved záznam,
+       pro Create flow nastaví form data atribut a SaveRecord respektuje. *@
+    <div class="record-editor-tabs-row" data-record-editor-tabs-row>
     <pm-tabs persist="hash"
              persist-key="record-edit"
              sync-input="EditorTab"
@@ -119,6 +125,21 @@
             @await Html.PartialAsync("~/Views/Projekty/_EditZaznamSchedulePanel.cshtml", Model)
         }
     </pm-tabs>
+    @if (Model.JeUkolKategorie)
+    {
+        @* Master switch — automatické vs ruční vyplňování harmonogramu pro celý záznam.
+           Initial state: ON pokud existují DELAY řádky a všechny v Auto rezimu, OFF jinak.
+           Pro nový záznam (IsCreate) defaultně ON (auto-fill je standardní flow). *@
+        <gov-form-switch size="m"
+                         class="record-editor-tabs-rezim-switch"
+                         data-record-rezim-switch
+                         data-record-zaznam-id="@Model.Id"
+                         data-record-projekt-id="@Model.ProjektId"
+                         @(Model.HarmonogramAutoFillSwitchOn ? "checked" : null)>
+            <span slot="label"><label>Automatické vyplňování harmonogramu</label></span>
+        </gov-form-switch>
+    }
+    </div>
 
     <div class="record-editor-actions record-editor-actions-page">
         @if (!Model.IsProposalEditor && !Model.IsProposalDecisionDetail && !Model.IsCreate && !string.IsNullOrWhiteSpace(deleteRecordModalUrl))

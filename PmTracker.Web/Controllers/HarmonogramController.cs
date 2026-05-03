@@ -349,6 +349,123 @@ public sealed class HarmonogramController : Controller
         return Ok(new { row.PreferredExterniOdkazId, syncFailed, syncFailReason });
     }
 
+    public sealed record BulkSetRezimRequest(int ZaznamId, string Rezim);
+
+    /// <summary>
+    /// FIX 2026-05-03: master switch v tab strip "Automatické vs ruční vyplňování harmonogramu".
+    /// Bulk-přepne <see cref="ZaznamHarmonogramHodnotaEntity.SkutecnostRezim"/> všech existujících
+    /// DELAY řádků daného záznamu na požadovaný rezim. Pokud DELAY řádky neexistují (nový záznam
+    /// nebo bez sync), no-op s changed=0. Po bulk update spustí Sync pro Auto rezim (re-fill ze
+    /// ServiceDesk vyjádření). Manual rezim ponechá hodnoty intact.
+    /// </summary>
+    [HttpPost("BulkSetRezim")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BulkSetRezim([FromBody] BulkSetRezimRequest request, CancellationToken ct)
+    {
+        if (request is null || request.ZaznamId <= 0)
+        {
+            return BadRequest(new { error = "Chybí ZaznamId v requestu." });
+        }
+        if (!Enum.TryParse<SkutecnostRezimEnum>(request.Rezim, ignoreCase: true, out var targetRezim))
+        {
+            return BadRequest(new { error = $"Neplatný rezim '{request.Rezim}'. Povoleno: Auto, Manual." });
+        }
+
+        var projektId = await GetProjektIdAsync(request.ZaznamId, ct).ConfigureAwait(false);
+        if (projektId is null)
+        {
+            return NotFound();
+        }
+
+        if (!await HasSchedulePermissionAsync(projektId.Value, ct).ConfigureAwait(false))
+        {
+            return Forbid();
+        }
+
+        // Pending lock — během pendingu se rezim nesmí měnit (audit-aware).
+        var lockState = await _pendingLockEvaluator.EvaluateAsync(request.ZaznamId, ct).ConfigureAwait(false);
+        if (lockState.HasPendingProposal && lockState.LocksSchedule)
+        {
+            return BadRequest(new { error = $"Pending návrh #{lockState.ProposalId} blokuje bulk přepnutí rezimu." });
+        }
+
+        // FIX 2026-05-03: filter — bulk přepínání jen auto-eligible kroky.
+        // Manuální kroky 2/5/8/9 (HarmonogramManualSteps.IsManual) se vyplňují vždy ručně,
+        // nemají automatický binding na vyjádření, takže Auto rezim na nich nemá smysl.
+        // Bulk respektuje user instrukci "kroky které nejsou napojeny na vyjádření zůstávají vždy ručně".
+        // EF Core neumí translate IReadOnlySet<int>.Contains → load v paměti a filter clientside.
+        var manualKrokyPoradi = PmTracker.Web.Models.ViewModels.HarmonogramManualSteps.KrokPoradi;
+        var delayTypIds = (await _db.CiselnikHarmonogramTypu.AsNoTracking()
+            .Where(t => t.JeZpozdeni)
+            .Select(t => new { t.Id, t.KrokPoradi })
+            .ToListAsync(ct).ConfigureAwait(false))
+            .Where(t => !manualKrokyPoradi.Contains(t.KrokPoradi))
+            .Select(t => t.Id)
+            .ToList();
+
+        var rows = await _db.ZaznamHarmonogramHodnoty
+            .Where(h => h.ZaznamId == request.ZaznamId && delayTypIds.Contains(h.TypId))
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        if (rows.Count == 0)
+        {
+            return Ok(new { changed = 0, message = "Žádné DELAY řádky k přepnutí (záznam nemá zaznamenanou skutečnost)." });
+        }
+
+        var nowUtc = _time.GetUtcNow().UtcDateTime;
+        int changed = 0;
+        foreach (var row in rows)
+        {
+            if (row.SkutecnostRezim == targetRezim)
+            {
+                continue;
+            }
+            row.SkutecnostRezim = targetRezim;
+            // Při přepnutí na Manual zachováme stávající Zdroj (Automat → Manual značí user override).
+            if (targetRezim == SkutecnostRezimEnum.Manual && row.SkutecnostZdroj == SkutecnostZdrojEnum.Automat)
+            {
+                row.SkutecnostZdroj = SkutecnostZdrojEnum.Manual;
+            }
+            row.UpdatedAt = nowUtc;
+            changed++;
+        }
+
+        if (changed == 0)
+        {
+            return Ok(new { changed, message = "Všechny DELAY řádky už jsou v požadovaném rezimu." });
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        await _audit.WriteAsync(_currentUser.OsobaId, new AuditWriteEntry(
+            AuditActionType.Update,
+            AuditEntityType.RecordSchedule,
+            request.ZaznamId.ToString(CultureInfo.InvariantCulture),
+            BeforeState: new { Action = "bulk-set-rezim-before" },
+            AfterState: new { Rezim = targetRezim, ChangedRows = changed }),
+            ct).ConfigureAwait(false);
+
+        // Pokud Auto, spustíme sync (re-fetch z ServiceDesk vyjádření).
+        bool syncFailed = false;
+        string? syncFailReason = null;
+        if (targetRezim == SkutecnostRezimEnum.Auto)
+        {
+            try
+            {
+                await _sync.SyncZaznamAsync(request.ZaznamId, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                syncFailed = true;
+                syncFailReason = ex.Message;
+                _logger.LogWarning(ex,
+                    "HarmonogramController.BulkSetRezim: sync selhal pro záznam {ZaznamId}.", request.ZaznamId);
+            }
+        }
+
+        return Ok(new { changed, Rezim = targetRezim, syncFailed, syncFailReason });
+    }
+
     public sealed record PreviewSyncRequest(int ZaznamId);
 
     /// <summary>

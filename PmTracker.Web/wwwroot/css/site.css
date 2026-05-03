@@ -2787,6 +2787,21 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border-bottom-right-radius: 10px;
 }
 
+/* FIX 2026-05-03: tab strip s master switch absolutně napravo nahoře.
+   pm-tabs obsahuje tab-panels (vysoký kontejner), takže klasický flex by switch
+   posadil pod panely. Absolute positioning fixuje switch na úroveň tab-list bar. */
+.record-editor-tabs-row {
+    position: relative;
+}
+
+.record-editor-tabs-rezim-switch {
+    position: absolute;
+    top: 6px;
+    right: 0;
+    z-index: 2;
+    user-select: none;
+}
+
 /* DESIGN-9-F (2026-05-02): DURATION cell — kalendář + readonly počet dnů side-by-side. */
 .schedule-duration-row {
     display: flex;

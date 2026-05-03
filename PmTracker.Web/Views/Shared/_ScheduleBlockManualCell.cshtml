@@ -99,21 +99,11 @@
                 </ul>
             </details>
         }
-        @if (featureCShowToggle)
-        {
-            @* FIX 2026-05-01 (round 3 #22): aria-pressed pro standard toggle a11y pattern.
-               Auto rezim = pressed=false (default), Manual rezim = pressed=true (= user override). *@
-            <button type="button"
-                    class="schedule-actual-cell__toggle"
-                    data-feature-c-toggle
-                    data-hodnota-id="@krok.DelayHodnotaId!.Value"
-                    data-current-rezim="@krok.SkutecnostRezim"
-                    aria-pressed="@(krok.SkutecnostRezim == SkutecnostRezimEnum.Manual ? "true" : "false")"
-                    aria-label="@featureCToggleAriaLabel"
-                    title="@featureCToggleAriaLabel">
-                <span class="schedule-actual-cell__toggle-label">@featureCRezimLabel</span>
-            </button>
-        }
+        @* FIX 2026-05-03: per-krok Auto/Manual toggle nahrazen master switchem v tab strip
+           ("Automatické vyplňování harmonogramu" — _EditZaznamForm.cshtml). Per-krok toggle
+           byl duplicate UX a user explicitně řekl "chci aby se všechny kroky přepínaly buď
+           auto nebo všechny kroky manuální". Bulk endpoint /Harmonogram/BulkSetRezim ignoruje
+           manuální kroky 2/5/8/9 (= ty nejsou auto-fillable, vyplňují se vždy ručně). *@
     </div>
 
     <div class="schedule-actual-cell__main">
