@@ -121,29 +121,45 @@ public sealed class CommentService(
         var comment = await dbContext.Vyjadreni.FirstOrDefaultAsync(x => x.Id == command.Id, ct)
             ?? throw new InvalidOperationException($"Vyjádření {command.Id} nebylo nalezeno.");
 
+        // FIX 2026-05-04: orphan-tolerant cleanup. Pokud meeting/record byly smazané (cascade
+        // race nebo manual DB cleanup), comment zůstal orphan v DB. Před fixem throw
+        // "Jednání X neexistuje" / "Záznam X neexistuje" → user nemohl smazat orphan vyjádření.
+        // Per user feedback "logiku bych očekával robustní": pokud parent chybí, comment je
+        // bezpochyby smazatelný (= orphan cleanup), authorization fallback na SuperAdmin only.
         var meeting = await dbContext.Jednani
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == comment.JednaniId, ct)
-            ?? throw new InvalidOperationException($"Jednání {comment.JednaniId} neexistuje.");
-
+            .FirstOrDefaultAsync(x => x.Id == comment.JednaniId, ct);
         var record = await dbContext.ProjektoveZaznamy
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == comment.ZaznamId, ct)
-            ?? throw new InvalidOperationException($"Záznam {comment.ZaznamId} neexistuje.");
+            .FirstOrDefaultAsync(x => x.Id == comment.ZaznamId, ct);
 
-        if (meeting.ProjektId != record.ProjektId)
+        if (meeting is not null && record is not null)
         {
-            throw new InvalidOperationException("Vyjádření je navázáno na neplatnou kombinaci záznamu a jednání.");
+            // Standardní path — oba parent existují, plná authorization check.
+            if (meeting.ProjektId != record.ProjektId)
+            {
+                throw new InvalidOperationException("Vyjádření je navázáno na neplatnou kombinaci záznamu a jednání.");
+            }
+
+            await EnsureMeetingAllowsCommentChangesAsync(meeting, ct);
+
+            var meetingState = await dbContext.CiselnikStavuJednani
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
+            if (!await CanModifyCommentAsync(comment, record, meetingState, currentUser, ct))
+            {
+                throw new InvalidOperationException("Nemáte oprávnění smazat toto vyjádření.");
+            }
         }
-
-        await EnsureMeetingAllowsCommentChangesAsync(meeting, ct);
-
-        var meetingState = await dbContext.CiselnikStavuJednani
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
-        if (!await CanModifyCommentAsync(comment, record, meetingState, currentUser, ct))
+        else
         {
-            throw new InvalidOperationException("Nemáte oprávnění smazat toto vyjádření.");
+            // Orphan path — meeting nebo record neexistuje. Jen SuperAdmin může cleanup.
+            if (!currentUser.IsSuperAdmin)
+            {
+                throw new InvalidOperationException(
+                    $"Vyjádření #{comment.Id} je orphan (parent jednání/záznam neexistuje). " +
+                    "Cleanup může provést pouze SuperAdmin.");
+            }
         }
 
         var old = CommentAuditSnapshot.FromEntity(comment);
