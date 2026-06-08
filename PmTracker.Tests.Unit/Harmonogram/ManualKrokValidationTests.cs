@@ -59,8 +59,13 @@ public sealed class ManualKrokValidationTests
             .WithMessage("*jen jedno*");
     }
 
+    /// <summary>
+    /// FIX 2026-05-04: per user instruction "v harmonogramu neměl být plán a skutečnost nijak
+    /// vzájemně propojeny omezeními" — future-date validace v <c>ManualProposalFieldValidator</c>
+    /// byla odstraněna. Test změněn na opačnou polaritu: future datum NEhází (decoupling plán↔skutečnost).
+    /// </summary>
     [Fact]
-    public void ValidateManualActualKroky_FutureDate_ShouldThrow()
+    public void ValidateManualActualKroky_FutureDate_IsAllowed()
     {
         var act = () => ManualProposalFieldValidator.ValidateManualActualKroky(
             new[]
@@ -69,8 +74,7 @@ public sealed class ManualKrokValidationTests
             },
             Today);
 
-        act.Should().Throw<PmTracker.Web.Services.Data.RecordValidationException>()
-            .WithMessage("*v budoucnosti*");
+        act.Should().NotThrow("future datum skutečnosti je povolené po odstranění plán↔skutečnost validací");
     }
 
     [Fact]

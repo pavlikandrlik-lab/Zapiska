@@ -83,14 +83,63 @@
       hidden.value = '0';
       readonly.textContent = '0 dnů';
       row.setAttribute('data-step-duration', '0');
+      markRowInvalid(row, false, '');
       return;
     }
 
     const startDate = getStartDateForStepRow(allRows, stepIndex, recordStartDate);
-    const days = Math.max(0, diffDays(startDate, endDate));
+    const rawDays = diffDays(startDate, endDate);
+    const days = Math.max(0, rawDays);
     hidden.value = String(days);
     readonly.textContent = `${days} ${days === 1 ? 'den' : (days >= 2 && days <= 4 ? 'dny' : 'dnů')}`;
     row.setAttribute('data-step-duration', String(days));
+
+    // FIX 2026-05-05: chronologie guard. Pokud user zadal datum konce dříve než datum začátku
+    // (= dříve než datum konce předchozího kroku), Trvání by bylo záporné. Současný clamp na 0
+    // server-side OK uloží, ale user nedostal žádný feedback že jeho zadání nedává smysl.
+    // UI marker `data-schedule-duration-invalid` triggeruje red border (CSS) + tooltip.
+    // Form submit listener (initSubmitGuard) blokuje uložení pokud existují invalid kroky.
+    if (rawDays < 0) {
+      const startLabel = formatDisplayDate(startDate);
+      markRowInvalid(row, true,
+        `Datum konce kroku nesmí být dříve než ${startLabel} (datum začátku tohoto kroku).`);
+    } else {
+      markRowInvalid(row, false, '');
+    }
+  }
+
+  function formatDisplayDate(date) {
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const y = date.getUTCFullYear();
+    return `${d}.${m}.${y}`;
+  }
+
+  function markRowInvalid(row, invalid, message) {
+    if (invalid) {
+      row.setAttribute('data-schedule-duration-invalid', 'true');
+    } else {
+      row.removeAttribute('data-schedule-duration-invalid');
+    }
+    // Tooltip + aria — set na pm-date-field i na inner display input.
+    const cal = row.querySelector(CALENDAR_SELECTOR);
+    if (cal instanceof HTMLElement) {
+      if (invalid) {
+        cal.setAttribute('title', message);
+        cal.setAttribute('aria-invalid', 'true');
+      } else {
+        cal.removeAttribute('title');
+        cal.removeAttribute('aria-invalid');
+      }
+      const display = cal.querySelector('input[data-app-date-display]');
+      if (display instanceof HTMLInputElement) {
+        if (invalid) {
+          display.setAttribute('title', message);
+        } else {
+          display.removeAttribute('title');
+        }
+      }
+    }
   }
 
   function recalcChainFrom(stepIndex, recordStartDate, allRows) {
@@ -103,8 +152,18 @@
   }
 
   function getRecordStartDate(scope) {
-    const block = (scope || document).querySelector(SCHEDULE_BLOCK_SELECTOR);
-    const iso = block?.getAttribute('data-schedule-start');
+    // FIX 2026-05-04: scope může být sám schedule-block element (= row.closest vrátí ten)
+    // nebo document. querySelector hledá DESCENDANTS, takže když scope je sám block,
+    // vrací null → fallback new Date() (today) → diff je záporný → days=0 (bug Plán
+    // datum se neuloží). Fix: detekovat self-match přes matches() první.
+    if (!scope) return new Date();
+    let iso = null;
+    if (scope instanceof HTMLElement && scope.matches(SCHEDULE_BLOCK_SELECTOR)) {
+      iso = scope.getAttribute('data-schedule-start');
+    } else {
+      const block = scope.querySelector ? scope.querySelector(SCHEDULE_BLOCK_SELECTOR) : null;
+      iso = block?.getAttribute('data-schedule-start') || null;
+    }
     return parseIso(iso) || new Date();
   }
 
@@ -134,6 +193,29 @@
       // Defer recalc to end of microtask queue — runs po block.js synchronous handler
       // i případném server preview fetch resolution.
       setTimeout(() => recalcChainFrom(stepIndex, recordStartDate, allRows), 0);
+    }, true);
+
+    // FIX 2026-05-05: form submit guard — pokud existuje řádek s data-schedule-duration-invalid,
+    // blokujeme Save a zobrazíme chybu. User chce real-time UI feedback "tohle neprojde",
+    // tak to vynucuje i na Save buttonu (jinak by user kliknul Save a vidět nic — clamp by
+    // tichý uložil 0 dnů, což ne odpovídá tomu co user zadal).
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      const invalidRow = form.querySelector(`${ROW_SELECTOR}[data-schedule-duration-invalid="true"]`);
+      if (!invalidRow) return;
+      event.preventDefault();
+      // Scroll do pole + focus pro UX. Display input je readonly, ale focus stačí pro screen-reader hint.
+      const cal = invalidRow.querySelector(CALENDAR_SELECTOR);
+      const display = cal?.querySelector('input[data-app-date-display]');
+      if (display instanceof HTMLInputElement) {
+        display.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        display.focus({ preventScroll: true });
+      }
+      // Globální alert toast pokud existuje. Fallback alert() pro definitivní viditelnost.
+      const message = cal?.getAttribute('title')
+        || 'Některý krok harmonogramu má datum konce dříve než datum začátku.';
+      window.alert(message);
     }, true);
   }
 

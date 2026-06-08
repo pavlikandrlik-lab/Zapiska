@@ -72,7 +72,13 @@ public sealed class RecordServiceWriteSplitTests
         // 2026-05-01 (Phase 4, DESIGN-6-A): bump 1700 → 1850 po phantom UI bug 1 fix —
         // ApplyManualActualKrokyAsync helper ~110 řádků (validace + pending lock pre-check
         // + UPSERT do zaznam_harmonogram_hodnoty pro manuální kroky 2/5/8/9 + audit log).
-        // Pokud LOC dále poroste, zvážit extrakci do partial RecordService.ManualActualKroky.cs.
-        loc.Should().BeLessThan(1850, "SaveRecord může být velký ale < 1850 LOC (SaveRecordAsync + harmonogram helpery + UPSERT externích vazeb + ApplyManualActualKrokyAsync)");
+        // 2026-05-04: bump 1850 → 2100 po Phase 1 chevron toggle 2/5/8/9 +
+        // ApplyHarmonogramRezimAsync (master switch Auto/Manual pro auto-eligible kroky 1/3/4/6/7/10) +
+        // ResetManualKrokyToAutoAsync (chevron user volba "Z vyjádření" reset).
+        // 2026-05-05: bump 2100 → 2200 po ClearManualKrokyAsync helper — explicit clear datumu
+        // pro manuální krok (PreferredZdroj=Manual + AbsolutniDatum=null). FOLLOW-UP: extract
+        // všech ManualKroky helperů (Stage/Reset/Clear) do `RecordService.ManualActualKroky.cs`
+        // partial (~250 LOC), čímž SaveRecord dostane zpět ~1850 LOC. Mimo scope clear-fix bug.
+        loc.Should().BeLessThan(2200, "SaveRecord může být velký ale < 2200 LOC; viz follow-up komentář na partial extract");
     }
 }

@@ -639,20 +639,8 @@
     padding: 1.5rem;
 }
 
-.dashboard-panel-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
-.dashboard-panel-header h2 {
-    margin: 0 0 0.35rem;
-    font-size: 1.3rem;
-}
-
-/* .dashboard-panel-count → nahrazeno za <gov-tag> v _DashboardMeetingsPanel.cshtml
-   (2026-04-29). CSS rule odstraněn. */
+/* .dashboard-panel-header (+ h2) a .dashboard-panel-count → odstraněno 2026-06-08;
+   hlavičky panelů (nadpis + popis + počet) smazány z dashboard partialů kvůli úspoře místa. */
 
 .dashboard-panel-footer,
 .dashboard-page-actions {
@@ -1961,6 +1949,57 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     cursor: default;
 }
 
+/* FIX 2026-05-05: clear button (✕) pro pm-date-field s clearable="true". Zobrazuje se vlevo
+   od kalendářového triggeru, viditelný jen když má pole hodnotu (data-app-date-has-value="true"). */
+.app-date-clear {
+    position: absolute;
+    right: 38px; /* trigger je na 8px right + 28px wide → clear je za ním */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    padding: 0;
+    display: none; /* default skryté, zobrazení řízeno data-app-date-has-value (níže) */
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 50%;
+}
+
+.app-date-clear:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.app-date-clear:disabled {
+    color: #cbd5e1;
+    cursor: default;
+}
+
+/* Zobrazit clear button jen když pole má hodnotu (jinak by bylo matoucí). */
+[data-app-date-field][data-app-date-clearable="true"][data-app-date-has-value="true"] .app-date-clear {
+    display: inline-flex;
+}
+
+/* Pokud je clear button viditelný, posuneme padding display inputu, aby se text nepřekrýval. */
+[data-app-date-field][data-app-date-clearable="true"][data-app-date-has-value="true"] .app-date-display-input {
+    padding-right: 70px;
+}
+
+:root[data-theme="dark"] .app-date-clear {
+    color: #94a3b8;
+}
+
+:root[data-theme="dark"] .app-date-clear:hover {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.12);
+}
+
 .app-date-panel {
     position: absolute;
     top: calc(100% + 8px);
@@ -2703,6 +2742,37 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border-color: #3568be;
     box-shadow: inset 0 0 0 1px rgba(53, 104, 190, 0.35);
     z-index: 12;
+}
+
+/* FIX 2026-05-05: chronologie guard — řádek s data-schedule-duration-invalid="true" má červené
+   ohraničení. Triggeruje se z duration-calendar-binding.js když user zadá datum konce kroku
+   dříve než datum začátku (= datum konce předchozího kroku). Form submit guard blokuje Save. */
+[data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input,
+[data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input:focus-within {
+    border-color: #dc2626;
+    box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.4);
+    background: rgba(220, 38, 38, 0.04);
+}
+
+[data-schedule-step-row][data-schedule-duration-invalid="true"] .app-date-display-input {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+[data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-duration-days-readonly {
+    color: #b91c1c;
+}
+
+:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input,
+:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input:focus-within {
+    border-color: #f87171;
+    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.5);
+    background: rgba(248, 113, 113, 0.08);
+}
+
+:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .app-date-display-input,
+:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-duration-days-readonly {
+    color: #fca5a5;
 }
 
 .schedule-stacked-part-top {
@@ -6931,16 +7001,8 @@ html {
     overflow: hidden;
 }
 
-.dashboard-shell-header {
-    padding: 16px 24px;
-    border-bottom: 1px solid var(--gov-color-border);
-    flex: 0 0 auto;
-}
-
-.dashboard-shell-header h1 {
-    margin: 0 0 4px;
-    font-size: 22px;
-}
+/* .dashboard-shell-header (+ h1) → odstraněno 2026-06-08; horní hlavička dashboardu
+   (název stránky + podtitulek) smazána kvůli úspoře místa. */
 
 .dashboard-body {
     display: grid;
@@ -6976,14 +7038,7 @@ html {
     height: 100%;
 }
 
-.dashboard-panel-header {
-    flex: 0 0 auto;
-    padding: 16px 16px 12px;
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-}
+/* .dashboard-panel-header → odstraněno 2026-06-08 (viz výše). */
 
 .dashboard-panel-footer {
     flex: 0 0 auto;

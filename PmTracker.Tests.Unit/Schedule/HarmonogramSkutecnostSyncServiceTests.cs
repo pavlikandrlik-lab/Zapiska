@@ -160,6 +160,56 @@ public sealed class HarmonogramSkutecnostSyncServiceTests
         row.PreferredExterniOdkazId.Should().BeNull();
     }
 
+    /// <summary>
+    /// FIX 2026-05-04: fresh harvest scénář — DELAY row pro krok ještě neexistuje (čerstvý
+    /// záznam, žádný předchozí toggle/select-candidate). Sync resolver má kandidáta z bindings,
+    /// ale ComputePlan dříve řádek `continue`-l a UI zobrazila pomlčku ("Skutečnost nebyla
+    /// vyplněná") místo robota. Po fixu sync vytvoří DELAY row jako Automat + HodnotaInt.
+    /// </summary>
+    [Fact]
+    public async Task Sync_AutoRezim_DELAYRowNeexistuje_CreateAutomatRow_VytvoriRow()
+    {
+        await using var db = NewDb();
+        await SeedSchemaAsync(db);
+        AddExterniOdkaz(db, 500, "111111");
+        AddActiveBinding(db, 1, K3Key, 500, new DateTime(2026, 3, 10));
+        // ZÁMĚRNĚ NEPŘIDÁVÁME ZaznamHarmonogramHodnoty row pro K3 — fresh harvest scenario.
+        await db.SaveChangesAsync();
+
+        var sut = CreateSut(db, new StubVyjadreniQuery(("111111", "PMP")));
+        var result = await sut.SyncZaznamAsync(ZaznamId);
+
+        result.KrokuAktualizovano.Should().Be(1, "sync má vytvořit chybějící DELAY row");
+        var row = await db.ZaznamHarmonogramHodnoty.AsNoTracking()
+            .SingleAsync(h => h.ZaznamId == ZaznamId && h.TypId == K3DelayTypId);
+        row.SkutecnostZdroj.Should().Be(SkutecnostZdrojEnum.Automat);
+        row.SkutecnostRezim.Should().Be(SkutecnostRezimEnum.Auto);
+        row.PreferredExterniOdkazId.Should().BeNull(
+            "preferred je null protože sync neměl explicitní výběr kandidáta od usera");
+    }
+
+    /// <summary>
+    /// Negativní case k CreateAutomatRow: pokud fresh záznam nemá kandidáta (žádné bindings),
+    /// sync NESMÍ vytvořit prázdné DELAY rows "do zásoby". Chování zůstává no-op pro krok bez kandidáta.
+    /// </summary>
+    [Fact]
+    public async Task Sync_AutoRezim_DELAYRowNeexistuje_BezKandidatu_NicNevytvori()
+    {
+        await using var db = NewDb();
+        await SeedSchemaAsync(db);
+        AddExterniOdkaz(db, 500, "111111");
+        // ŽÁDNÝ AddActiveBinding — záznam má externí odkaz ale žádné aktivní vazby na kroky.
+        await db.SaveChangesAsync();
+
+        var sut = CreateSut(db, new StubVyjadreniQuery(("111111", "PMP")));
+        var result = await sut.SyncZaznamAsync(ZaznamId);
+
+        result.KrokuAktualizovano.Should().Be(0, "bez kandidáta sync nesmí vytvořit DELAY row");
+        var rows = await db.ZaznamHarmonogramHodnoty.AsNoTracking()
+            .Where(h => h.ZaznamId == ZaznamId).ToListAsync();
+        rows.Should().BeEmpty("žádné DELAY rows se nevytvoří 'do zásoby'");
+    }
+
     [Fact]
     public async Task Sync_PreferredZachovanPokudJeMeziKandidaty()
     {

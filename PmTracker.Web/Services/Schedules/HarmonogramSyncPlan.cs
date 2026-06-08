@@ -46,5 +46,12 @@ public enum HarmonogramRowChangeReason
     UpdatedAutomatValue,
     RetractAutomat_NoCandidates,
     PreferredFallback,
-    SkippedManualRezim
+    SkippedManualRezim,
+    /// <summary>
+    /// FIX 2026-05-04: DELAY row pro krok ještě neexistuje, ale resolver má kandidáta z bindings.
+    /// ApplyPlan vytvoří nový row (race-safe insert) s Auto rezim + Automat zdroj + computedDelay.
+    /// Bez tohoto fixu UI zobrazila pomlčku ("Skutečnost nebyla vyplněna") pro všechny harvested
+    /// kroky, dokud user neudělal explicit dropdown akci (která trigger EnsureDelayRowAsync).
+    /// </summary>
+    CreateAutomatRow
 }

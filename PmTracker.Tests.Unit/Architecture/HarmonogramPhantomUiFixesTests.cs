@@ -68,6 +68,34 @@ public sealed class HarmonogramPhantomUiFixesTests
             "User-staged manual values musí dostat Zdroj=Manual.");
     }
 
+    /// <summary>
+    /// FIX 2026-05-05: explicit clear datumu pro manuální krok 2/5/8/9. User vyprázdní pm-date-field
+    /// (clearable="true" → ✕ button), form pošle AbsolutniDatum=null + PreferredZdroj="Manual".
+    /// SaveRecord MUSÍ rozeznat tuto kombinaci a clear DELAY row (HodnotaInt=null, Zdroj=Neznamo).
+    /// Před fixem ManualActualKrokApplier.Compute null silently skipnul → datum přetrvalo v DB.
+    /// </summary>
+    [Fact]
+    public void RecordService_SaveRecord_ClearManualKrokyHelper_Existuje()
+    {
+        var src = Read("PmTracker.Web/Services/RecordService.SaveRecord.cs");
+        src.Should().Contain("ClearManualKrokyAsync",
+            "FIX 2026-05-05: helper pro explicit clear datumu (PreferredZdroj=Manual + AbsolutniDatum=null).");
+        src.Should().Contain("clearKeys",
+            "Save flow musí filtrovat command.ManualActualKroky kde PreferredZdroj=Manual && !AbsolutniDatum.HasValue.");
+    }
+
+    /// <summary>
+    /// pm-date-field clear button (✕) je opt-in přes clearable="true". Manuální krok 2/5/8/9
+    /// musí v _ScheduleBlockManualCell.cshtml předat Clearable=true do _AppDateField partialu.
+    /// </summary>
+    [Fact]
+    public void ScheduleBlockManualCell_ManualKrokInput_MaClearable()
+    {
+        var src = Read("PmTracker.Web/Views/Shared/_ScheduleBlockManualCell.cshtml");
+        src.Should().Contain("Clearable = true",
+            "FIX 2026-05-05: manuální krok 2/5/8/9 musí mít clearable date field (jiný způsob smazat datum neexistuje).");
+    }
+
     [Fact]
     public void HarmonogramController_ToggleRezim_MaCreateIfMissing()
     {

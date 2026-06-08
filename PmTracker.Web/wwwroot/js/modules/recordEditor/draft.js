@@ -452,67 +452,81 @@ export function promptRecordEditorDiscard(form, trigger) {
             return;
         }
 
-        const overlay = document.createElement("div");
-        overlay.className = "record-editor-close-guard";
-        overlay.setAttribute("data-record-editor-close-guard", "true");
-
-        const dialog = document.createElement("div");
-        dialog.className = "record-editor-close-guard-dialog";
+        // FIX 2026-05-04: <gov-dialog> Web Component (gov-design-system 4.x) místo vlastního
+        // overlay+CSS. Atributy: role=alertdialog, label-tag, block-backdrop-close (zabrání
+        // tichému dismissu). Tlačítka přes <gov-button> komponenty (gov-shipped). Dialog se
+        // odstraní z DOM po `gov-close` event aby čisticí stav nezůstal v paměti.
+        const dialog = document.createElement("gov-dialog");
         dialog.setAttribute("role", "alertdialog");
-        dialog.setAttribute("aria-modal", "true");
-        dialog.setAttribute("tabindex", "-1");
+        dialog.setAttribute("label-tag", "h3");
+        dialog.setAttribute("accessible-close-label", "Zavřít dialog");
+        dialog.setAttribute("data-record-editor-close-guard", "true");
 
-        const title = document.createElement("h3");
-        title.className = "record-editor-close-guard-title";
-        title.textContent = "Máte neuložené změny.";
-        dialog.appendChild(title);
+        const titleSlot = document.createElement("span");
+        titleSlot.setAttribute("slot", "label");
+        titleSlot.textContent = "Máte neuložené změny.";
+        dialog.appendChild(titleSlot);
 
         const text = document.createElement("p");
-        text.className = "record-editor-close-guard-text";
         text.textContent = "Chcete pokračovat v úpravách, nebo změny zahodit?";
+        text.style.margin = "0";
         dialog.appendChild(text);
 
-        const actions = document.createElement("div");
-        actions.className = "record-editor-close-guard-actions";
+        const footer = document.createElement("div");
+        footer.setAttribute("slot", "footer");
+        footer.style.display = "flex";
+        footer.style.gap = "0.75rem";
+        footer.style.justifyContent = "flex-end";
 
-        const keepEditingButton = document.createElement("button");
-        keepEditingButton.type = "button";
-        keepEditingButton.className = "btn";
+        const keepEditingButton = document.createElement("gov-button");
+        keepEditingButton.setAttribute("variant", "primary");
+        keepEditingButton.setAttribute("type", "solid");
+        keepEditingButton.setAttribute("size", "m");
         keepEditingButton.textContent = "Pokračovat v úpravách";
-        actions.appendChild(keepEditingButton);
+        footer.appendChild(keepEditingButton);
 
-        const discardButton = document.createElement("button");
-        discardButton.type = "button";
-        discardButton.className = "btn danger";
+        const discardButton = document.createElement("gov-button");
+        discardButton.setAttribute("variant", "error");
+        discardButton.setAttribute("type", "outlined");
+        discardButton.setAttribute("size", "m");
         discardButton.textContent = "Zahodit změny";
-        actions.appendChild(discardButton);
+        footer.appendChild(discardButton);
 
-        dialog.appendChild(actions);
-        overlay.appendChild(dialog);
+        dialog.appendChild(footer);
 
+        let resolved = false;
         const finish = (shouldDiscard, restoreFocus) => {
-            closeRecordEditorCloseGuard({ restoreFocus });
+            if (resolved) return;
+            resolved = true;
+            // gov-dialog watch open=false → spustí close animation a vyčistí body-fixed.
+            dialog.open = false;
+            // 400ms je dostatečné pro gov-dialog close transition (delší než typický CSS transform).
+            window.setTimeout(() => {
+                if (dialog.isConnected) dialog.remove();
+                closeRecordEditorCloseGuard({ restoreFocus });
+            }, 400);
             if (shouldDiscard) {
                 prepareRecordEditorFormNavigation(form);
             }
             resolve(shouldDiscard);
         };
 
-        overlay.addEventListener("click", (event) => {
-            if (event.target === overlay) {
-                finish(false, true);
-            }
-        });
-
         keepEditingButton.addEventListener("click", () => finish(false, true));
         discardButton.addEventListener("click", () => finish(true, false));
+        // gov-dialog emituje 'gov-close' když user klikne na X nebo na backdrop.
+        dialog.addEventListener("gov-close", () => finish(false, true));
 
-        host.appendChild(overlay);
-        recordEditorState.closeGuard = overlay;
+        host.appendChild(dialog);
+        recordEditorState.closeGuard = dialog;
         recordEditorState.closeGuardTrigger = trigger instanceof HTMLElement ? trigger : null;
 
+        // open=true otevírá gov-dialog (watchOpen handler).
         window.requestAnimationFrame(() => {
-            keepEditingButton.focus({ preventScroll: true });
+            dialog.open = true;
+            // Focus na primary action po animaci (gov-dialog hostuje obsah v light DOM).
+            window.setTimeout(() => {
+                if (keepEditingButton.isConnected) keepEditingButton.focus({ preventScroll: true });
+            }, 80);
         });
     });
 }

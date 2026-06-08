@@ -1,14 +1,19 @@
 /**
- * FIX 2026-05-03 — JS handler pro master switch "Automatické vyplňování harmonogramu".
+ * FIX 2026-05-04 — JS handler pro master switch "Automatické vyplňování harmonogramu".
  *
- * Switch (gov-form-switch s data-record-rezim-switch) v tab strip řádku ovládá bulk
- * SkutecnostRezim všech DELAY řádků daného záznamu:
- *   ON  = Auto (auto-fill ze ServiceDesk vyjádření)
- *   OFF = Manual (uživatel vyplňuje datumy ručně, žádný auto sync)
+ * Architektura: switch je čistě klient-side. Při toggle:
+ *   1. Update hidden form input [data-record-rezim-form] na "Auto" / "Manual"
+ *   2. Iterace přes všechny [data-schedule-actual-cell][data-krok-poradi ∈ {1,3,4,6,7,10}]
+ *      → update atributu data-skutecnost-rezim
+ *      → CSS pravidla v site.css/components/schedule-actual-cell-feature-c.css automaticky
+ *        skryjí/zobrazí auto bubble vs manual editable input (data-rezim-show-on="Auto"|"Manual")
+ *   3. Manual→Auto: clear values v manual input cells (user explicit požadavek
+ *      "auto→manual+vyplň→auto = data se ztratí, žádné dotazy")
  *
- * Pro saved záznam (ZaznamId > 0): POST /Harmonogram/BulkSetRezim → bulk update DELAY rows.
- * Pro Create flow (ZaznamId == 0): no server call, switch state se persistuje až s Save
- * (form data atribut data-record-rezim-pending = "Auto" / "Manual" čte SaveRecord).
+ * Žádný server call. Persistence rezimu + datumů proběhne až při form submit (Save tlačítko)
+ * v jednom POST /Zaznamy/Save (transactional). Server (RecordService.SaveRecord
+ * + ApplyHarmonogramRezimAsync) aplikuje rezim na auto-eligible HS0X_DELAY rows
+ * a v Auto rezimu spustí re-fill ze ServiceDesk vyjádření.
  *
  * Side-effect import v bootstrap.js (memory: project_bundle_sync).
  */
@@ -16,100 +21,68 @@
   'use strict';
 
   const SWITCH_SELECTOR = '[data-record-rezim-switch]';
+  const REZIM_FORM_SELECTOR = '[data-record-rezim-form]';
+  const ACTUAL_CELL_SELECTOR = '[data-schedule-actual-cell]';
+  // Auto-eligible kroky (mimo manuální 2/5/8/9). Master switch řídí jen tyto.
+  const AUTO_ELIGIBLE_KROKY = new Set([1, 3, 4, 6, 7, 10]);
 
-  function getCsrfToken() {
-    const input = document.querySelector('input[name="__RequestVerificationToken"]');
-    return input ? input.value : '';
+  function findAutoEligibleCells(form) {
+    const root = form || document;
+    return Array.from(root.querySelectorAll(ACTUAL_CELL_SELECTOR))
+      .filter((cell) => {
+        const poradi = parseInt(cell.getAttribute('data-krok-poradi') || '0', 10);
+        return AUTO_ELIGIBLE_KROKY.has(poradi);
+      });
   }
 
-  function getAsUserParam() {
-    try {
-      const u = new URL(window.location.href);
-      return u.searchParams.get('asUser') || '';
-    } catch {
-      return '';
-    }
-  }
-
-  async function bulkSetRezim(zaznamId, rezim) {
-    const token = getCsrfToken();
-    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-    if (token) headers['RequestVerificationToken'] = token;
-    // Dev: forward asUser query do POST URL aby UserContextMiddleware mohl resolvnout principal.
-    const asUser = getAsUserParam();
-    const url = asUser
-      ? `/Harmonogram/BulkSetRezim?asUser=${encodeURIComponent(asUser)}`
-      : '/Harmonogram/BulkSetRezim';
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: headers,
-      credentials: 'same-origin',
-      body: JSON.stringify({ ZaznamId: zaznamId, Rezim: rezim })
+  function clearManualInputsInCell(cell) {
+    // Manual→Auto: vyčistit hidden ISO + display value v _AppDateField partial
+    // i (defensivně) hidden input KrokKey v auto-eligible variant (ten zůstává — server
+    // ho potřebuje pro form binding, ale AbsolutniDatum=empty znamená "krok nenastal").
+    const dateFields = cell.querySelectorAll('pm-date-field[data-manual-krok-auto-eligible]');
+    dateFields.forEach((df) => {
+      const isoHidden = df.querySelector('input[data-app-date-value]');
+      const displayInput = df.querySelector('input[data-app-date-display]');
+      if (isoHidden) isoHidden.value = '';
+      if (displayInput) displayInput.value = '';
+      // pm-date-field má observed attribute iso-value/display-value — synchronizace vnitřního stavu
+      df.setAttribute('iso-value', '');
+      df.setAttribute('display-value', '');
     });
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => '');
-      throw new Error(`HTTP ${resp.status}: ${body || resp.statusText}`);
-    }
-    return await resp.json();
   }
 
-  function showStatus(switchEl, message, color) {
-    let banner = switchEl.parentElement?.querySelector('[data-record-rezim-banner]');
-    if (!banner) {
-      banner = document.createElement('gov-message');
-      banner.setAttribute('data-record-rezim-banner', '');
-      switchEl.insertAdjacentElement('afterend', banner);
-    }
-    banner.setAttribute('color', color || 'info');
-    banner.textContent = message;
-    if (color !== 'danger') {
-      setTimeout(() => banner?.remove(), 5000);
-    }
+  function applyRezimToCells(form, rezim) {
+    const cells = findAutoEligibleCells(form);
+    cells.forEach((cell) => {
+      cell.setAttribute('data-skutecnost-rezim', rezim);
+      if (rezim === 'Auto') {
+        clearManualInputsInCell(cell);
+      }
+    });
   }
 
-  async function handleChange(event) {
+  function handleChange(event) {
     const sw = event.target?.closest?.(SWITCH_SELECTOR);
     if (!sw) return;
 
-    const isChecked = sw.hasAttribute('checked')
-      || sw.getAttribute('aria-checked') === 'true';
+    // gov-form-switch CustomEvent: event.detail.checked je authoritative.
+    const isChecked = (event && event.detail && typeof event.detail.checked === 'boolean')
+      ? event.detail.checked
+      : !!sw.checked;
     const rezim = isChecked ? 'Auto' : 'Manual';
 
-    const zaznamIdRaw = sw.getAttribute('data-record-zaznam-id') || '0';
-    const zaznamId = parseInt(zaznamIdRaw, 10);
+    const form = sw.closest('form[data-record-editor-form]');
+    if (!form) return;
 
-    // Create flow (Id=0) — jen lokální state pro Save POST.
-    if (!Number.isFinite(zaznamId) || zaznamId <= 0) {
-      const form = sw.closest('form[data-record-editor-form]');
-      if (form) form.setAttribute('data-record-rezim-pending', rezim);
-      return;
-    }
+    // 1) Update hidden form field (Save POST ho pošle)
+    const hidden = form.querySelector(REZIM_FORM_SELECTOR);
+    if (hidden) hidden.value = rezim;
 
-    // Saved záznam — bulk endpoint.
-    sw.setAttribute('disabled', 'true');
-    try {
-      const result = await bulkSetRezim(zaznamId, rezim);
-      const changed = result?.changed ?? 0;
-      if (result?.syncFailed) {
-        showStatus(sw, `Rezim přepnut, ale auto-sync selhal: ${result.syncFailReason || 'neznámá chyba'}`, 'warning');
-      } else if (changed === 0 && result?.message) {
-        showStatus(sw, result.message, 'info');
-      } else {
-        showStatus(sw, `Rezim přepnut na ${rezim} (${changed} řádek změněno).`, 'success');
-      }
-    } catch (err) {
-      console.warn('BulkSetRezim selhal:', err);
-      showStatus(sw, `Přepnutí selhalo: ${err.message}`, 'danger');
-      // Revert switch state
-      if (isChecked) sw.removeAttribute('checked');
-      else sw.setAttribute('checked', '');
-    } finally {
-      sw.removeAttribute('disabled');
-    }
+    // 2) Update všechny auto-eligible cells (data-skutecnost-rezim → CSS visibility)
+    applyRezimToCells(form, rezim);
   }
 
   function init() {
-    // gov-form-switch emituje 'gov-change' i nativní 'change'.
     document.addEventListener('change', handleChange);
     document.addEventListener('gov-change', handleChange);
   }
@@ -120,5 +93,5 @@
     init();
   }
 
-  global.pmRezimMasterSwitch = { bulkSetRezim };
+  global.pmRezimMasterSwitch = { applyRezimToCells, findAutoEligibleCells };
 })(window);

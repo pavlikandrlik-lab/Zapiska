@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
@@ -152,9 +154,109 @@ public abstract partial class BaseController
         {
             builder.AppendLine("Exception:");
             builder.AppendLine(exception.ToString());
+            AppendSqlAndEfDetails(builder, exception);
         }
 
         return builder.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// FIX 2026-05-04: <see cref="Exception.ToString"/> sice projde InnerException řetězec, ale
+    /// <see cref="SqlException"/> má bohatou diagnostiku (Number, State, Class, Server, Procedure,
+    /// LineNumber + <see cref="SqlException.Errors"/> kolekci) která se v default ToString nevypisuje.
+    /// EF Core <see cref="DbUpdateException"/> navíc drží <see cref="DbUpdateException.Entries"/>
+    /// s entitami které selhaly při SaveChanges. Tato pomocná metoda projde celý řetězec a vypíše
+    /// vše co user potřebuje pro debugging "UNEXPECTED_SERVER_ERROR" pádů (typicky FK violation,
+    /// unique constraint, NOT NULL, deadlock, schema drift).
+    /// </summary>
+    private static void AppendSqlAndEfDetails(StringBuilder builder, Exception rootException)
+    {
+        var sectionHeaderEmitted = false;
+        var current = rootException;
+        var depth = 0;
+        while (current is not null && depth < 10)
+        {
+            if (current is SqlException sqlEx)
+            {
+                if (!sectionHeaderEmitted)
+                {
+                    builder.AppendLine("SqlServer/EFCore details:");
+                    sectionHeaderEmitted = true;
+                }
+                builder.Append("  [SqlException @ depth=")
+                    .Append(depth)
+                    .Append("] Number=")
+                    .Append(sqlEx.Number)
+                    .Append(" State=")
+                    .Append(sqlEx.State)
+                    .Append(" Class=")
+                    .Append(sqlEx.Class)
+                    .Append(" Server=")
+                    .Append(sqlEx.Server ?? "(null)")
+                    .Append(" Procedure=")
+                    .Append(string.IsNullOrEmpty(sqlEx.Procedure) ? "(none)" : sqlEx.Procedure)
+                    .Append(" LineNumber=")
+                    .AppendLine(sqlEx.LineNumber.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                builder.Append("    Message: ").AppendLine(sqlEx.Message);
+                if (sqlEx.Errors is { Count: > 0 } errs)
+                {
+                    for (var i = 0; i < errs.Count; i++)
+                    {
+                        var err = errs[i];
+                        builder.Append("    Errors[").Append(i).Append("]: Number=")
+                            .Append(err.Number).Append(" State=").Append(err.State)
+                            .Append(" Class=").Append(err.Class)
+                            .Append(" Line=").Append(err.LineNumber)
+                            .Append(" Procedure=")
+                            .Append(string.IsNullOrEmpty(err.Procedure) ? "(none)" : err.Procedure)
+                            .Append(" | ").AppendLine(err.Message);
+                    }
+                }
+            }
+
+            if (current is DbUpdateException efEx)
+            {
+                if (!sectionHeaderEmitted)
+                {
+                    builder.AppendLine("SqlServer/EFCore details:");
+                    sectionHeaderEmitted = true;
+                }
+                builder.Append("  [DbUpdateException @ depth=")
+                    .Append(depth)
+                    .Append("] EntryCount=")
+                    .AppendLine(efEx.Entries.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                var entryIndex = 0;
+                foreach (var entry in efEx.Entries)
+                {
+                    if (entryIndex >= 5)
+                    {
+                        builder.AppendLine("    … (truncated, additional entries omitted)");
+                        break;
+                    }
+                    string keyDescription;
+                    try
+                    {
+                        var key = entry.Metadata.FindPrimaryKey();
+                        keyDescription = key is null
+                            ? "(no PK metadata)"
+                            : string.Join(",", key.Properties.Select(p =>
+                                $"{p.Name}={entry.Property(p.Name).CurrentValue ?? "(null)"}"));
+                    }
+                    catch (Exception readEx)
+                    {
+                        keyDescription = $"(key read failed: {readEx.GetType().Name})";
+                    }
+                    builder.Append("    Entry[").Append(entryIndex).Append("] ")
+                        .Append(entry.Metadata.ClrType.Name)
+                        .Append(" State=").Append(entry.State)
+                        .Append(" PK=").AppendLine(keyDescription);
+                    entryIndex++;
+                }
+            }
+
+            current = current.InnerException;
+            depth++;
+        }
     }
 
     private ModalSubmitResultViewModel BuildAjaxFailurePayload(
@@ -188,6 +290,7 @@ public abstract partial class BaseController
             Message = message,
             ErrorCode = errorCode,
             TraceId = traceId,
+            DiagnosticLog = diagnosticLog,
             FieldErrors = fieldErrors
         };
     }

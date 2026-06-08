@@ -1,14 +1,6 @@
 @model DashboardFocusPanelViewModel
 
 <div class="dashboard-panel-body">
-    <div class="dashboard-panel-header">
-        <div>
-            <h2>Na co se soustředit</h2>
-            <p class="muted">Relevantní neukončené záznamy přes všechny projekty.</p>
-        </div>
-        <span class="dashboard-panel-count">@Model.TotalCount</span>
-    </div>
-
     @await Html.PartialAsync("_DashboardFocusList", Model.Items)
 
     <div class="dashboard-panel-footer">

@@ -64,7 +64,6 @@
             <div><span class="label">Plán dokončení:</span> <strong data-schedule-summary-baseline>@Model.Souhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></div>
             <div><span class="label">Skutečné dokončení:</span> <strong data-schedule-summary-shifted>@Model.Souhrn.SkutecneDokonceni.ToString("dd.MM.yyyy")</strong></div>
             <div><span class="label">Trvání:</span> <strong data-schedule-summary-duration>@Model.Souhrn.CelkoveTrvaniDni</strong> dnů</div>
-            <div><span class="label">Suma odchylek kroků:</span> <strong data-schedule-summary-delay>@Model.Souhrn.CelkovaOdchylkaDni</strong> dnů</div>
             <div class="schedule-status-line @(Model.Souhrn.Stihame ? "ok" : "late")">
                 <span class="label">Stav:</span>
                 <strong data-schedule-summary-state>@(Model.Souhrn.Stihame ? "Stíháme" : "Nestíháme")</strong>
@@ -330,7 +329,26 @@
                                         && !useFromVyjadreniCell
                                         && hasExistingRecord
                                         && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.None;
-                                    var assignedManualIndex = useManualCell ? manualInputIndex++ : -1;
+                                    // FIX 2026-05-04: master switch Manual rezim podporuje ruční datum i pro auto-eligible
+                                    // kroky 1/3/4/6/7/10. Tj. assignedManualIndex se přiděluje VŠEM task-eligible cells
+                                    // (ne jen 2/5/8/9). Cell partial render obě varianty (auto bubble + manual input)
+                                    // a CSS pravidlo na data-skutecnost-rezim řídí výchozí viditelnost.
+                                    var allowManualForAutoEligible = !useManualCell && hasExistingRecord && Model.CanEditManualActual;
+                                    var canShowManualForRezim = useManualCell || allowManualForAutoEligible;
+                                    var assignedManualIndex = canShowManualForRezim ? manualInputIndex++ : -1;
+                                }
+                                @* FIX 2026-05-04: hidden DELAY input pro VŠECHNY non-legacy cells (manual/FromVyjadreni/None)
+                                   aby HarmonogramHodnoty[i] indexy zůstaly continuous. ASP.NET model binder pro List<T>
+                                   čeká [0], [1], [2]... bez mezer — pokud chybí [1], binder zastaví na [0] a command.HarmonogramHodnoty.Count=1.
+                                   Hodnota = krok.OdchylkaDni (pre-existing) nebo 0 (nový/krok nenastal). *@
+                                @if (useManualCell || useFromVyjadreniCell || useNoneCell)
+                                {
+                                    <input type="hidden"
+                                           name="HarmonogramHodnoty[@delayInputIndex].TypId"
+                                           value="@krok.ZpozdeniTypId" />
+                                    <input type="hidden"
+                                           name="HarmonogramHodnoty[@delayInputIndex].Hodnota"
+                                           value="@(krok.OdchylkaDni ?? 0)" />
                                 }
                                 @if (useManualCell)
                                 {
@@ -352,9 +370,9 @@
                                         new ScheduleBlockManualCellViewModel
                                         {
                                             Krok = krok,
-                                            ManualInputIndex = -1,
+                                            ManualInputIndex = assignedManualIndex,
                                             ZaznamId = Model.RecordId,
-                                            CanEditManualActual = false,
+                                            CanEditManualActual = Model.CanEditManualActual,
                                             IsLocked = isKrokLocked
                                         })
                                 }
@@ -365,9 +383,9 @@
                                         new ScheduleBlockManualCellViewModel
                                         {
                                             Krok = krok,
-                                            ManualInputIndex = -1,
+                                            ManualInputIndex = assignedManualIndex,
                                             ZaznamId = Model.RecordId,
-                                            CanEditManualActual = false,
+                                            CanEditManualActual = Model.CanEditManualActual,
                                             IsLocked = isKrokLocked
                                         })
                                 }

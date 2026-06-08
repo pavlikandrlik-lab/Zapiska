@@ -76,26 +76,45 @@
     }
   }
 
-  function setHiddenDateValue(row, selector, dateIso) {
+  function isoToDisplay(iso) {
+    // "2026-04-13T00:00:00Z" / "2026-04-13" → "13.04.2026"
+    if (typeof iso !== 'string' || iso.length < 10) return '';
+    const ymd = iso.substring(0, 10);
+    const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
+  }
+
+  function setDateFieldValue(row, selector, dateIso) {
+    // FIX 2026-05-05 (revert 2026-05-04): 4 datumy jsou READ-ONLY span (user needituje).
+    // Setujeme jen display; harvest server-side přes PerTicketMetadataSyncService při Save
+    // flow → ScheduleHarvestAsync. Klient zde jen udržuje display in-sync s preview odpovědí
+    // /ExterniOdkaz/Sync. Prázdná hodnota → placeholder (calendar3 ikona, user požadavek 2026-04-27).
     const el = row.querySelector(selector);
     if (!el) return;
-    // Server vrací DateTime ISO ("2026-04-13T00:00:00Z"). Hidden input očekává yyyy-MM-dd.
-    if (typeof dateIso === 'string' && dateIso.length >= 10) {
-      el.value = dateIso.substring(0, 10);
-    } else {
-      el.value = '';
+    const iso = (typeof dateIso === 'string' && dateIso.length >= 10) ? dateIso.substring(0, 10) : '';
+    const display = iso ? isoToDisplay(iso) : '';
+    if (el instanceof HTMLElement && el.tagName.toLowerCase() === 'span') {
+      if (display) {
+        el.classList.remove('placeholder');
+        el.textContent = display;
+      } else {
+        el.classList.add('placeholder');
+        el.innerHTML = '<gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>';
+      }
+    } else if (typeof el.tagName === 'string' && el.tagName.toLowerCase() === 'pm-date-field') {
+      // Defensive fallback: pokud by někde zbylo legacy pm-date-field.
+      el.setAttribute('iso-value', iso);
+      el.setAttribute('display-value', display);
+    } else if (el instanceof HTMLInputElement) {
+      el.value = iso;
     }
   }
 
   function applyHarvestedDates(row, data) {
-    setHiddenDateValue(row, '[data-external-datum-objednani]', data.datumObjednani);
-    setHiddenDateValue(row, '[data-external-datum-dodani]', data.datumDodani);
-    setHiddenDateValue(row, '[data-external-datum-prevzeti]', data.datumPrevzeti);
-    // PlanDodani hidden input nemá data-* hook v existujícím markupu — najdi přes name.
-    const planDodaniInput = row.querySelector('input[name$=".PlanDodani"]');
-    if (planDodaniInput && data.planDodani) {
-      planDodaniInput.value = data.planDodani.substring(0, 10);
-    }
+    setDateFieldValue(row, '[data-external-datum-objednani]', data.datumObjednani);
+    setDateFieldValue(row, '[data-external-datum-plan-dodani]', data.planDodani);
+    setDateFieldValue(row, '[data-external-datum-dodani]', data.datumDodani);
+    setDateFieldValue(row, '[data-external-datum-prevzeti]', data.datumPrevzeti);
   }
 
   async function syncCislo(inputEl) {

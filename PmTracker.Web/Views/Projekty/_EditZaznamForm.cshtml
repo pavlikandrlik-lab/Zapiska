@@ -129,7 +129,9 @@
     {
         @* Master switch — automatické vs ruční vyplňování harmonogramu pro celý záznam.
            Initial state: ON pokud existují DELAY řádky a všechny v Auto rezimu, OFF jinak.
-           Pro nový záznam (IsCreate) defaultně ON (auto-fill je standardní flow). *@
+           Pro nový záznam (IsCreate) defaultně ON (auto-fill je standardní flow).
+           FIX 2026-05-04: switch je čistě klient-side. Server-side persistence přes hidden
+           input HarmonogramRezim při Save form submitu (transactional s datumy v jednom POST). *@
         <gov-form-switch size="m"
                          class="record-editor-tabs-rezim-switch"
                          data-record-rezim-switch
@@ -138,6 +140,10 @@
                          @(Model.HarmonogramAutoFillSwitchOn ? "checked" : null)>
             <span slot="label"><label>Automatické vyplňování harmonogramu</label></span>
         </gov-form-switch>
+        <input type="hidden"
+               name="HarmonogramRezim"
+               value="@(Model.HarmonogramAutoFillSwitchOn ? "Auto" : "Manual")"
+               data-record-rezim-form />
     }
     </div>
 
@@ -150,6 +156,7 @@
             </pm-button>
         }
         <pm-button variant="Secondary"
+                   native-type="button"
                    data-record-editor-cancel="true"
                    data-record-editor-back-url="@Model.BackUrl">
             Zrušit a vrátit se

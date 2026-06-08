@@ -1,14 +1,6 @@
 @model DashboardMeetingsPanelViewModel
 
 <div class="dashboard-panel-body">
-    <div class="dashboard-panel-header">
-        <div>
-            <h2>Nejbližší jednání</h2>
-            <p class="muted">Budoucí jednání v projektech, kde jste aktivně zapojený.</p>
-        </div>
-        <gov-tag color="primary" size="m">@Model.TotalCount</gov-tag>
-    </div>
-
     @await Html.PartialAsync("_DashboardMeetingsList", Model.Items)
 
     <div class="dashboard-panel-footer">

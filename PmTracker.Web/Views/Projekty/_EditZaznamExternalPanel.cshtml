@@ -35,10 +35,6 @@
                 <div class="external-row" data-external-row>
                     <input type="hidden" name="ExterniVazby[@i].Id" value="@vazba.Id" />
                     <input type="hidden" name="ExterniVazby[@i].Typ" value="@vazba.Typ" data-external-type-hidden />
-                    <input type="hidden" name="ExterniVazby[@i].DatumObjednani" value="@(vazba.DatumObjednani?.ToString("yyyy-MM-dd"))" data-external-datum-objednani />
-                    <input type="hidden" name="ExterniVazby[@i].PlanDodani" value="@(vazba.PlanDodani?.ToString("yyyy-MM-dd"))" />
-                    <input type="hidden" name="ExterniVazby[@i].DatumDodani" value="@(vazba.DatumDodani?.ToString("yyyy-MM-dd"))" data-external-datum-dodani />
-                    <input type="hidden" name="ExterniVazby[@i].DatumPrevzeti" value="@(vazba.DatumPrevzeti?.ToString("yyyy-MM-dd"))" data-external-datum-prevzeti />
 
                     <label class="external-field-cislo">
                         <span class="external-field-label">Číslo</span>
@@ -95,18 +91,25 @@
                         </pm-button>
                     </div>
 
-                    <div class="external-dates" data-external-dates @(ticketResolved ? null : "hidden=\"hidden\"")>
+                    @* FIX 2026-05-05 (revert 2026-05-04): 4 datumy jsou READ-ONLY display.
+                       User je needituje — auto-fill harvest (PerTicketMetadataSyncService) je
+                       jediný zdroj pravdy. Save flow nesmí 4 datumy přepsat z form (žádný hidden
+                       input → form binder posílá null → SaveRecord respektuje pattern "preserve
+                       existing values, pokud nic ze SD harvestu, zůstává null").
+                       sync.js po user zadání čísla tiketu fetchne preview 4 datumů z HOT_ZAZNAMY
+                       a updatuje text těchto spanů (ne form input).
+                       Prázdné datumy ukazují ikonu kalendáře (placeholder, user požadavek 2026-04-27). *@
+                    <div class="external-dates external-dates-readonly" data-external-dates @(ticketResolved ? null : "hidden=\"hidden\"")>
                         <div class="external-date-item">
                             <span class="label">Datum objednání</span>
                             @if (datumObjednani is not null)
                             {
-                                <span class="value">@datumObjednani</span>
+                                <span class="value" data-external-datum-objednani>@datumObjednani</span>
                             }
                             else
                             {
-                                <span class="value placeholder">
+                                <span class="value placeholder" data-external-datum-objednani>
                                     <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
-                                    <span>—</span>
                                 </span>
                             }
                         </div>
@@ -114,13 +117,12 @@
                             <span class="label">Plán dodání</span>
                             @if (planDodani is not null)
                             {
-                                <span class="value">@planDodani</span>
+                                <span class="value" data-external-datum-plan-dodani>@planDodani</span>
                             }
                             else
                             {
-                                <span class="value placeholder">
+                                <span class="value placeholder" data-external-datum-plan-dodani>
                                     <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
-                                    <span>—</span>
                                 </span>
                             }
                         </div>
@@ -128,13 +130,12 @@
                             <span class="label">Datum dodání</span>
                             @if (datumDodani is not null)
                             {
-                                <span class="value">@datumDodani</span>
+                                <span class="value" data-external-datum-dodani>@datumDodani</span>
                             }
                             else
                             {
-                                <span class="value placeholder">
+                                <span class="value placeholder" data-external-datum-dodani>
                                     <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
-                                    <span>—</span>
                                 </span>
                             }
                         </div>
@@ -142,13 +143,12 @@
                             <span class="label">Datum převzetí</span>
                             @if (datumPrevzeti is not null)
                             {
-                                <span class="value">@datumPrevzeti</span>
+                                <span class="value" data-external-datum-prevzeti>@datumPrevzeti</span>
                             }
                             else
                             {
-                                <span class="value placeholder">
+                                <span class="value placeholder" data-external-datum-prevzeti>
                                     <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
-                                    <span>—</span>
                                 </span>
                             }
                         </div>
@@ -169,10 +169,6 @@
             <div class="external-row" data-external-row>
                 <input type="hidden" name="ExterniVazby[__index__].Id" value="0" />
                 <input type="hidden" name="ExterniVazby[__index__].Typ" value="" data-external-type-hidden />
-                <input type="hidden" name="ExterniVazby[__index__].DatumObjednani" value="" data-external-datum-objednani />
-                <input type="hidden" name="ExterniVazby[__index__].PlanDodani" value="" />
-                <input type="hidden" name="ExterniVazby[__index__].DatumDodani" value="" data-external-datum-dodani />
-                <input type="hidden" name="ExterniVazby[__index__].DatumPrevzeti" value="" data-external-datum-prevzeti />
 
                 <label class="external-field-cislo">
                     <span class="external-field-label">Číslo</span>
@@ -225,33 +221,31 @@
                     </pm-button>
                 </div>
 
-                <div class="external-dates" data-external-dates hidden="hidden">
+                @* FIX 2026-05-05: read-only 4 datumy. Klient template; sync.js po sync response
+                   nahradí placeholder span s ikonou za span s textem datumu (přes setDateFieldValue). *@
+                <div class="external-dates external-dates-readonly" data-external-dates hidden="hidden">
                     <div class="external-date-item">
                         <span class="label">Datum objednání</span>
-                        <span class="value placeholder">
+                        <span class="value placeholder" data-external-datum-objednani>
                             <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
-                            <span>—</span>
                         </span>
                     </div>
                     <div class="external-date-item">
                         <span class="label">Plán dodání</span>
-                        <span class="value placeholder">
+                        <span class="value placeholder" data-external-datum-plan-dodani>
                             <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
-                            <span>—</span>
                         </span>
                     </div>
                     <div class="external-date-item">
                         <span class="label">Datum dodání</span>
-                        <span class="value placeholder">
+                        <span class="value placeholder" data-external-datum-dodani>
                             <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
-                            <span>—</span>
                         </span>
                     </div>
                     <div class="external-date-item">
                         <span class="label">Datum převzetí</span>
-                        <span class="value placeholder">
+                        <span class="value placeholder" data-external-datum-prevzeti>
                             <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
-                            <span>—</span>
                         </span>
                     </div>
                 </div>

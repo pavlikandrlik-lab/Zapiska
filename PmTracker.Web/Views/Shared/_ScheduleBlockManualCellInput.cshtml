@@ -1,0 +1,61 @@
+@model ScheduleBlockManualCellViewModel
+@*
+    FIX 2026-05-04: Manual rezim variant cell pro auto-eligible kroky 1/3/4/6/7/10.
+    Renderuje se vedle existujícího auto-fill cell-u (FromVyjadreni bubble nebo "—" warning).
+    CSS pravidla v site.css na atributu data-skutecnost-rezim výchozí viditelnost:
+      data-skutecnost-rezim="Auto"   → tento cell display:none, auto bubble visible
+      data-skutecnost-rezim="Manual" → tento cell visible, auto bubble display:none
+    Master switch v JS (rezim-master-switch.js) přepíná atribut bez reload.
+
+    Form binding: hidden KrokKey + AbsolutniDatum (přes _AppDateField). V Auto rezimu klient
+    AbsolutniDatum vyčistí (Manual→Auto), takže Save flow neaplikuje žádný manual override.
+    Server (RecordService.SaveRecord.ApplyHarmonogramRezimAsync) v Auto rezimu navíc clear
+    existujících odchylek a spustí auto-sync ze SD vyjádření.
+*@
+@{
+    var krok = Model.Krok;
+    var manualInputIndex = Model.ManualInputIndex;
+    var canEdit = Model.CanEditManualActual && !Model.IsLocked;
+    var isoValue = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
+        ? krok.SkutecneDatum.ToString("yyyy-MM-dd")
+        : string.Empty;
+    var displayValue = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
+        ? krok.SkutecneDatum.ToString("dd.MM.yyyy")
+        : string.Empty;
+}
+@if (canEdit)
+{
+    <div class="schedule-actual-manual schedule-actual-manual-editable schedule-actual-manual-auto-eligible"
+         data-schedule-actual-source="manual"
+         data-rezim-show-on="Manual">
+        <input type="hidden"
+               name="ManualActualKroky[@manualInputIndex].KrokKey"
+               value="@krok.KrokKey"
+               data-manual-krok-keyhidden />
+        @* FIX 2026-05-05: PreferredZdroj="Manual" sjednoceno s _ScheduleBlockManualCell.cshtml manual branche
+           pro 2/5/8/9. Bez tohoto hidden by clearKeys filter v RecordService.SaveRecord nematchnul a smazat
+           datum z auto-eligible kroku v Manual rezimu by silent-skipnul (= UI ✕ by neměl efekt). *@
+        <input type="hidden"
+               name="ManualActualKroky[@manualInputIndex].PreferredZdroj"
+               value="Manual" />
+        @await Html.PartialAsync(
+            "_AppDateField",
+            new AppDateFieldViewModel
+            {
+                Name = $"ManualActualKroky[{manualInputIndex}].AbsolutniDatum",
+                IsoValue = isoValue,
+                DisplayValue = displayValue,
+                Locked = false,
+                Clearable = true,  // FIX 2026-05-05: konzistentní s 2/5/8/9 manual cell — user může smazat datum
+                AriaLabel = $"Skutečnost kroku {krok.Nazev}",
+                ContainerCssClass = "schedule-actual-manual-date",
+                ExtraDataAttributes = new Dictionary<string, object?>
+                {
+                    ["data-manual-krok-input"] = "true",
+                    ["data-manual-krok-index"] = krok.KrokIndex.ToString(),
+                    ["data-manual-krok-key"] = krok.KrokKey.ToString(),
+                    ["data-manual-krok-auto-eligible"] = "true"
+                }
+            })
+    </div>
+}

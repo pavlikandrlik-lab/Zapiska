@@ -198,17 +198,39 @@ public sealed class HarmonogramSkutecnostResolverTests
         r.VybranyExterniOdkazId.Should().Be(101);
     }
 
+    /// <summary>
+    /// FIX 2026-05-04: krok 1 = MIN agregace, preferred koncepce neplatí.
+    /// Spec 2026-04-28 §2 — „nejdřívější datum založení tiketu" je deterministická agregace
+    /// napříč externími vazbami, nikoli volba uživatele. Předchozí chování (preferred přebil
+    /// MIN) způsobovalo bug: user původně měl jen PMP → sync uložil preferred=PMP. Po přidání
+    /// PNF s dřívějším HOT_ZAZNAMY.datum resolver stále vracel PMP datum místo PNF (= MIN).
+    /// </summary>
     [Fact]
-    public void Resolve_Krok1_PreferredVybira_PrebijiDefaultMin()
+    public void Resolve_Krok1_PreferredJeIgnorovan_VzdyVraciMin()
     {
-        // Pokud je preferred nastaven, vrátí ho (i když není MIN ani MAX).
         var b1 = new BindingKandidat(100, "111111", "PMP", "K1", new DateTime(2026, 1, 1));
         var b2 = new BindingKandidat(101, "222222", "PMP", "K1", new DateTime(2026, 2, 15));
 
+        // Preferred=101 (MAX), ale resolver pro krok 1 ho ignoruje.
         var r = HarmonogramSkutecnostResolver.Resolve(1, new[] { b1, b2 }, preferredExterniOdkazId: 101);
 
-        r.Datum.Should().Be(new DateTime(2026, 2, 15));       // Preferred 101 vyhrává nad MIN default
-        r.VybranyExterniOdkazId.Should().Be(101);
+        r.Datum.Should().Be(new DateTime(2026, 1, 1));        // MIN, preferred ignorován
+        r.VybranyExterniOdkazId.Should().Be(100);
+        r.PreferredFallbackApplied.Should().BeTrue(
+            "preferred=101 ≠ MIN winner=100 — sync má clear-nout stale preferred z DELAY row");
+    }
+
+    [Fact]
+    public void Resolve_Krok1_PreferredEqualsMin_NoFallbackSignal()
+    {
+        // Když je preferred = MIN (např. po předchozím sync clear), žádný fallback signál.
+        var b1 = new BindingKandidat(100, "111111", "PMP", "K1", new DateTime(2026, 1, 1));
+        var b2 = new BindingKandidat(101, "222222", "PMP", "K1", new DateTime(2026, 2, 15));
+
+        var r = HarmonogramSkutecnostResolver.Resolve(1, new[] { b1, b2 }, preferredExterniOdkazId: 100);
+
+        r.Datum.Should().Be(new DateTime(2026, 1, 1));
+        r.VybranyExterniOdkazId.Should().Be(100);
         r.PreferredFallbackApplied.Should().BeFalse();
     }
 }

@@ -107,6 +107,17 @@ public sealed class SchedulePlanProposalPayload
     public List<ManualActualKrokDto> ManualActualKroky { get; set; } = [];
 }
 
+/// <summary>
+/// FIX 2026-05-04: per-krok preference user-vybraného zdroje skutečnosti pro 2/5/8/9.
+/// Manual = user zadal datum ručně (AbsolutniDatum); Auto = user zvolil "z vyjádření"
+/// (= reset DELAY row, sync z navázaného HOT_VYJADRENI). Null = legacy behavior.
+/// </summary>
+public sealed class ManualActualKrokDtoExtensions
+{
+    public const string PreferredZdrojManual = "Manual";
+    public const string PreferredZdrojAuto = "Auto";
+}
+
 public sealed class ManualActualKrokDto
 {
     public Guid KrokKey { get; set; }
@@ -122,6 +133,15 @@ public sealed class ManualActualKrokDto
     /// NULL = "krok nenastal" → caller (ManualActualKrokApplier / SaveRecord) skipne.
     /// </summary>
     public DateOnly? AbsolutniDatum { get; set; }
+
+    /// <summary>
+    /// FIX 2026-05-04: per-krok 2/5/8/9 preference (chevron dropdown):
+    ///   "Manual" = uložit AbsolutniDatum jako ruční skutečnost (Zdroj=Manual)
+    ///   "Auto"   = preferovat datum z vyjádření (server resetne DELAY row na Rezim=Auto,
+    ///              Zdroj=Neznamo, HodnotaInt=null → auto-sync ze ServiceDesk)
+    ///   null     = legacy (proposal flow, žádný UI toggle) → existing semantika podle AbsolutniDatum
+    /// </summary>
+    public string? PreferredZdroj { get; set; }
 }
 
 public sealed class HarmonogramVazbaDto

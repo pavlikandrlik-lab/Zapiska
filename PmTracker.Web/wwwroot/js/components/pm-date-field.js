@@ -34,6 +34,7 @@ const ATTR_DISPLAY = "display-value";
 const ATTR_LOCKED = "locked";
 const ATTR_ARIA = "aria-label";
 const ATTR_CONTAINER_CLASS = "container-css-class";
+const ATTR_CLEARABLE = "clearable";
 
 function escapeHtml(value) {
     if (value === null || value === undefined) return "";
@@ -47,7 +48,7 @@ function escapeHtml(value) {
 
 class PmDateFieldElement extends HTMLElement {
     static get observedAttributes() {
-        return [ATTR_NAME, ATTR_ISO, ATTR_DISPLAY, ATTR_LOCKED, ATTR_ARIA, ATTR_CONTAINER_CLASS];
+        return [ATTR_NAME, ATTR_ISO, ATTR_DISPLAY, ATTR_LOCKED, ATTR_ARIA, ATTR_CONTAINER_CLASS, ATTR_CLEARABLE];
     }
 
     connectedCallback() {
@@ -111,6 +112,7 @@ class PmDateFieldElement extends HTMLElement {
         const locked = this.getAttribute(ATTR_LOCKED) === "true";
         const ariaLabel = this.getAttribute(ATTR_ARIA) || "Otevřít kalendář";
         const containerClass = this.getAttribute(ATTR_CONTAINER_CLASS) || "";
+        const clearable = this.getAttribute(ATTR_CLEARABLE) === "true";
         const fullContainerClass = ("app-date-field " + containerClass).trim();
 
         // Forward data-* atributy z elementu na hidden input (= dříve ExtraDataAttributes).
@@ -119,10 +121,19 @@ class PmDateFieldElement extends HTMLElement {
             .map((a) => `${a.name}="${escapeHtml(a.value)}"`)
             .join(" ");
 
+        // FIX 2026-05-05: clear button (✕) opt-in přes clearable="true". Viditelný jen když
+        // hidden input má hodnotu (CSS rule na data-has-value="true" wrapper). Klik handler je
+        // v pickers/date.js (data-app-date-clear).
+        const hasValue = isoValue.length > 0 ? "true" : "false";
+        const clearButtonMarkup = clearable
+            ? `<button class="app-date-clear" type="button" data-app-date-clear aria-label="Smazat datum"${locked ? " disabled=\"disabled\"" : ""}>✕</button>`
+            : "";
+
         this.innerHTML = `
-<div class="${escapeHtml(fullContainerClass)}" data-app-date-field data-app-date-locked="${locked ? "true" : "false"}" data-floating-anchor>
+<div class="${escapeHtml(fullContainerClass)}" data-app-date-field data-app-date-locked="${locked ? "true" : "false"}" data-app-date-clearable="${clearable ? "true" : "false"}" data-app-date-has-value="${hasValue}" data-floating-anchor>
     <input class="app-date-display-input" type="text" data-app-date-display value="${escapeHtml(displayValue)}" readonly />
     <input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(isoValue)}" data-app-date-value ${forwardedDataAttrs} />
+    ${clearButtonMarkup}
     <button class="app-date-trigger" type="button" data-app-date-open aria-label="${escapeHtml(ariaLabel)}"${locked ? " disabled=\"disabled\"" : ""}>
         <gov-icon size="s" name="calendar3" type="components" aria-hidden="true"></gov-icon>
     </button>

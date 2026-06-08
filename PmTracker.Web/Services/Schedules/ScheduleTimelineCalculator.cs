@@ -61,14 +61,42 @@ public static class ScheduleTimelineCalculator
     }
 
     public static ScheduleTimelineSummary Summarize(ScheduleTimelineComputation computation, DateTime deadline)
+        => Summarize(computation, deadline, today: null, lastStepHasActual: true);
+
+    /// <summary>
+    /// FIX 2026-05-05: rozšířená Summarize s projekcí uplynulého času. Pokud poslední krok schématu
+    /// (= krok 10) NEMÁ vyplněnou skutečnost (<paramref name="lastStepHasActual"/> = false) a
+    /// <paramref name="today"/> je dál než cumulative ActualEnd_10, projekce se posouvá na today.
+    /// Důvod: současný calc kumuluje jen offsety z vyplněných kroků; pro nevyplněné kroky přidá
+    /// jen plánované trvání (= +0 offset). User scenario: poslední vyplněný krok = krok 3 z 5.4.
+    /// Krok 4-10 nevyplněno, dnes 5.5. Bez fixu projekce konce projektu = baseline_10 + offset_3
+    /// (= ignoruje uplynulý měsíc, kdy nikdo nikam nepokročil). Po fixu: pokud baseline_10 + offset_3
+    /// &lt; today, projekce = today (= projekt minimálně tolik, kolik už uplynulo).
+    ///
+    /// Backward compat: default <paramref name="today"/> = null + <paramref name="lastStepHasActual"/>
+    /// = true zachová původní chování. Změnu používá jen <c>HarmonogramService.BuildHarmonogramSouhrn</c>
+    /// pro souhrn pole v edit modalu.
+    /// </summary>
+    public static ScheduleTimelineSummary Summarize(
+        ScheduleTimelineComputation computation,
+        DateTime deadline,
+        DateTime? today,
+        bool lastStepHasActual)
     {
         var normalizedDeadline = deadline.Date;
         var baselineEnd = computation.Steps.Count == 0
             ? normalizedDeadline
             : computation.Steps[^1].PlanEndDate.Date;
-        var actualEnd = computation.Steps.Count == 0
+        var rawActualEnd = computation.Steps.Count == 0
             ? normalizedDeadline
             : computation.Steps[^1].ActualEndDate.Date;
+
+        // Promítnutí uplynulého času: pokud poslední krok nemá actual a today > cumulative ActualEnd,
+        // projekt je reálně zpožděný oproti dnešnímu dni (kroky 4-10 nikdo nedokončil).
+        var actualEnd = (lastStepHasActual || today is null)
+            ? rawActualEnd
+            : (rawActualEnd >= today.Value.Date ? rawActualEnd : today.Value.Date);
+
         var isOnTrack = actualEnd <= normalizedDeadline;
 
         return new ScheduleTimelineSummary

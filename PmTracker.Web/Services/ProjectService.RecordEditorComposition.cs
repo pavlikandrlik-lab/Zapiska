@@ -137,7 +137,22 @@ public sealed partial class ProjectService
             .ToDictionary(x => x.TypId, x => x.HodnotaInt!.Value);
         var harmonogramRowsByTypId = harmonogramRows.ToDictionary(x => x.TypId);
         var harmonogramKroky = harmonogramService.BuildHarmonogramVypocetPublic(record.DatumZalozeni, harmonogramTypy, harmonogramValues);
-        var harmonogramSouhrn = harmonogramService.BuildHarmonogramSouhrn(harmonogramKroky, record.DatumUkonceni);
+
+        // FIX 2026-05-05: Stav: Nestíháme má reflectovat uplynulý čas. Pokud poslední krok schématu
+        // (= krok 10) NEMÁ vyplněnou skutečnost, projekce dokončení projektu zohlední dnešní datum
+        // (= projekt minimálně tak pozadu, kolik už uplynulo od posledního completed kroku).
+        // Bez tohoto fixu kroky bez skutečnosti přidávaly jen plánované trvání → calc neviděl
+        // uplynulý čas → projekt se jevil "stíháme" i když měsíc nikdo nikam nepokročil.
+        var lastStepTypId = harmonogramKroky.Count > 0
+            ? harmonogramKroky[^1].ZpozdeniTypId
+            : 0;
+        var lastStepHasActual = lastStepTypId > 0 && harmonogramValues.ContainsKey(lastStepTypId);
+        var todayDate = timeProvider.GetUtcNow().UtcDateTime.Date;
+        var harmonogramSouhrn = harmonogramService.BuildHarmonogramSouhrn(
+            harmonogramKroky,
+            record.DatumUkonceni,
+            todayDate,
+            lastStepHasActual);
 
         // Plán D Task 8/9 composition: pro každý krok zjistit KrokKey (stabilní GUID identifikátor),
         // zdroj skutečnosti (FromVyjadreni / Manual / None) a označit ruční kroky {2, 5, 8, 9}.
@@ -196,6 +211,27 @@ public sealed partial class ProjectService
                     IsSelected = k.ExterniOdkazId == resolved.VybranyExterniOdkazId
                 }).ToList();
 
+            // FIX 2026-05-04 (round 2): Source* pole pro UI (chat ikonka + viditelný datum)
+            // MUSÍ pocházet VÝHRADNĚ z typ-aware sync resolveru (HarmonogramSkutecnostResolver).
+            // Předchozí fix měl fallback `winner?.ExterniOdkazId ?? source?.SourceExterniOdkazId`
+            // — tím se v případě, že sync resolver odfiltroval všechny bindings (např. PNF K3
+            // binding pro PMP-only krok 3), vrátil typ-ignorant `source` z RecordScheduleActualSourceResolver,
+            // který bral MAX(datum) bez ohledu na (TypZaznamu × KrokPoradi) predikát. Důsledek:
+            // chat ikonka stále odkazovala na PNF.
+            //
+            // Single source of truth: pokud sync resolver nemá kandidáta, UI source je null
+            // (žádná chat ikonka, visible datum padne na fallback SkutecneDatum z PosunuteDatum).
+            // ZdrojSkutecnosti (FromVyjadreni / Manual / None) zůstává z `source` — ten kontroluje
+            // přítomnost bindingu v DB, ne typ-aware match.
+            BindingKandidat? winner = resolved.VybranyExterniOdkazId.HasValue
+                ? resolved.Kandidati.FirstOrDefault(k => k.ExterniOdkazId == resolved.VybranyExterniOdkazId.Value)
+                : null;
+            int? typeAwareSourceExterniOdkazId = winner?.ExterniOdkazId;
+            DateTime? typeAwareSourceDatum = winner?.Datum;
+            long? typeAwareSourceVyjadreniId = winner is not null && winner.HotVyjadreniId > 0
+                ? winner.HotVyjadreniId
+                : null;
+
             return new HarmonogramKrokEditViewModel
             {
                 KrokIndex = krok.KrokIndex,
@@ -213,9 +249,9 @@ public sealed partial class ProjectService
                 SkutecneDatum = krok.PosunuteDatum,
                 KrokKey = krokKey,
                 ZdrojSkutecnosti = source?.Zdroj ?? ZdrojSkutecnosti.None,
-                SourceVyjadreniId = source?.SourceVyjadreniId,
-                SourceVyjadreniDatum = source?.SourceVyjadreniDatum,
-                SourceExterniOdkazId = source?.SourceExterniOdkazId,
+                SourceVyjadreniId = typeAwareSourceVyjadreniId,
+                SourceVyjadreniDatum = typeAwareSourceDatum,
+                SourceExterniOdkazId = typeAwareSourceExterniOdkazId,
                 IsManualKrok = HarmonogramManualSteps.IsManual(krok.KrokIndex),
                 // Plán 4 Feature C Task 6 — UI metadata pro switch + badge
                 DelayHodnotaId = delayRow?.Id,
@@ -279,11 +315,15 @@ public sealed partial class ProjectService
             }).ToList(),
             VlastnikId = record.VlastnikId,
             JeUkolKategorie = isTaskCategory,
-            // FIX 2026-05-03: master switch initial state — true (Auto) pokud žádný existující
-            // DELAY řádek (= ten, jehož TypId odpovídá kroku.ZpozdeniTypId) není v Manual rezimu.
-            // Pro nový záznam bez DELAY řádků default true (auto-fill je standardní flow).
+            // FIX 2026-05-04: master switch reflektuje JEN auto-eligible kroky (1/3/4/6/7/10).
+            // Manuální kroky 2/5/8/9 mají skutečnost vždy Manual (HarmonogramManualSteps),
+            // jejich rezim na Manual NESMÍ flipnout master switch — switch řídí jen
+            // auto-fill chování pro kroky napojené na ServiceDesk vyjádření. Bez tohoto filtru
+            // user editující datum kroku 2 by viděl po reload switch=OFF (= Manual rezim
+            // pro celý harmonogram), což je nesprávně.
             HarmonogramAutoFillSwitchOn = !harmonogramRows
-                .Any(h => harmonogramTypy.Any(t => t.ZpozdeniTypId == h.TypId)
+                .Any(h => harmonogramTypy.Any(t => t.ZpozdeniTypId == h.TypId
+                                                && !HarmonogramManualSteps.IsManual(t.KrokIndex))
                        && h.SkutecnostRezim == Models.Entities.SkutecnostRezimEnum.Manual),
             HarmonogramBlok = BuildScheduleBlockViewModel(
                 record.Id,

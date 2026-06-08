@@ -328,6 +328,55 @@ public sealed partial class RecordService
                 }
             }
 
+            // FIX 2026-05-04: Phase 1 — chevron toggle pro 2/5/8/9 kroky. Když user zvolí
+            // PreferredZdroj=Auto (= "Z vyjádření"), reset DELAY row daného kroku na Rezim=Auto,
+            // Zdroj=Neznamo, HodnotaInt=null. Composition při reload vrátí FromVyjadreni datum
+            // pokud existuje navázané vyjádření, jinak placeholder.
+            var autoPreferredKeys = command.ManualActualKroky
+                .Where(m => string.Equals(m.PreferredZdroj, "Auto", StringComparison.OrdinalIgnoreCase))
+                .Select(m => m.KrokKey)
+                .ToHashSet();
+            if (autoPreferredKeys.Count > 0 && isTaskCategory)
+            {
+                var resetCount = await ResetManualKrokyToAutoAsync(entity.Id, autoPreferredKeys, innerCt).ConfigureAwait(false);
+                if (resetCount > 0)
+                {
+                    await dbContext.SaveChangesAsync(innerCt);
+                }
+            }
+
+            // FIX 2026-05-05: explicit clear manuálního datumu (user vyprázdní pm-date-field
+            // a chce krok zpět do "nenastalého" stavu, ale zůstat v Manual modu). Kombinace
+            // PreferredZdroj="Manual" + AbsolutniDatum=null je signál pro clear (jinak by
+            // ManualActualKrokApplier.Compute null silently skipnul a stará hodnota by
+            // přetrvala v DB). Distinct od PreferredZdroj=null (legacy proposal flow, žádné UI).
+            var clearKeys = command.ManualActualKroky
+                .Where(m => string.Equals(m.PreferredZdroj, "Manual", StringComparison.OrdinalIgnoreCase)
+                            && !m.AbsolutniDatum.HasValue)
+                .Select(m => m.KrokKey)
+                .ToHashSet();
+            if (clearKeys.Count > 0 && isTaskCategory)
+            {
+                var clearedCount = await ClearManualKrokyAsync(entity.Id, clearKeys, innerCt).ConfigureAwait(false);
+                if (clearedCount > 0)
+                {
+                    await dbContext.SaveChangesAsync(innerCt);
+                }
+            }
+
+            // FIX 2026-05-04: aplikace HarmonogramRezim (master switch Auto/Manual) na auto-eligible
+            // HS0X_DELAY rows (kroky 1/3/4/6/7/10). Manual rezim: nastaví SkutecnostRezim=Manual
+            // (manual datumy už zapsal StageManualActualKrokyAsync přes overrides s acceptAutoEligibleKroky=true).
+            // Auto rezim: SkutecnostRezim=Auto + clear hodnot (HodnotaInt=null, Zdroj=Neznamo) — odpovídá user
+            // požadavku "scénář auto→manual+vyplň→auto = data se ztratí, žádné dotazy". Po commit transakce
+            // se v Auto rezimu spouští SD sync (re-fill ze ServiceDesk vyjádření).
+            var rezimApplied = await ApplyHarmonogramRezimAsync(
+                command, entity.Id, isTaskCategory, currentUser.OsobaId, innerCt).ConfigureAwait(false);
+            if (rezimApplied)
+            {
+                await dbContext.SaveChangesAsync(innerCt);
+            }
+
             // Plán B Task 10: po uložení externích vazeb (kdy mají Id) spustíme harvest.
             // Awaitujeme — enqueue je rychlé a musí skončit před disposalem request scope,
             // jinak by reactive adapter (Plán sd-sync-revise) ztratil DbContext. Používáme
@@ -665,8 +714,8 @@ public sealed partial class RecordService
 
             var hasType = !string.IsNullOrWhiteSpace(typeValue);
             var hasCislo = !string.IsNullOrWhiteSpace(cisloValue);
-            if (!hasType && !hasCislo && string.IsNullOrWhiteSpace(priceValue) && string.IsNullOrWhiteSpace(vyzvaValue)
-                && !link.DatumObjednani.HasValue && !link.PlanDodani.HasValue && !link.DatumDodani.HasValue && !link.DatumPrevzeti.HasValue)
+            // FIX 2026-05-05: 4 datumy odstraněny z empty-row check (form je needituje, harvest spravuje).
+            if (!hasType && !hasCislo && string.IsNullOrWhiteSpace(priceValue) && string.IsNullOrWhiteSpace(vyzvaValue))
             {
                 continue;
             }
@@ -741,38 +790,9 @@ public sealed partial class RecordService
                 }
             }
 
-            if (link.PlanDodani.HasValue && link.DatumObjednani.HasValue && link.PlanDodani.Value.Date < link.DatumObjednani.Value.Date)
-            {
-                AddRecordValidationIssue(
-                    issues,
-                    $"{rowPrefix}.PlanDodani",
-                    "Plán dodání nesmí být dříve než datum objednání.",
-                    "external",
-                    "external_plan_before_order",
-                    link.PlanDodani.Value.ToString("O", CultureInfo.InvariantCulture));
-            }
-
-            if (link.DatumDodani.HasValue && link.DatumObjednani.HasValue && link.DatumDodani.Value.Date < link.DatumObjednani.Value.Date)
-            {
-                AddRecordValidationIssue(
-                    issues,
-                    $"{rowPrefix}.DatumDodani",
-                    "Datum dodání nesmí být dříve než datum objednání.",
-                    "external",
-                    "external_delivery_before_order",
-                    link.DatumDodani.Value.ToString("O", CultureInfo.InvariantCulture));
-            }
-
-            if (link.DatumPrevzeti.HasValue && link.DatumDodani.HasValue && link.DatumPrevzeti.Value.Date < link.DatumDodani.Value.Date)
-            {
-                AddRecordValidationIssue(
-                    issues,
-                    $"{rowPrefix}.DatumPrevzeti",
-                    "Datum převzetí nesmí být dříve než datum dodání.",
-                    "external",
-                    "external_takeover_before_delivery",
-                    link.DatumPrevzeti.Value.ToString("O", CultureInfo.InvariantCulture));
-            }
+            // FIX 2026-05-05: validace ordering 4 datumů odstraněna — datumy jsou READ-ONLY,
+            // user je needituje, harvest jediný píše do DB. Pokud SD vrátí "inconsistent" data
+            // (plán dodání < datum objednání), je to data z HOT_ZAZNAMY a my jen zobrazujeme.
 
             // Plán 3 Feature D: SD hard constraint — pouze pro NOVĚ přidávané
             // vazby. Existing links (Cislo už v DB pro tento záznam) nevalidujeme,
@@ -934,31 +954,11 @@ public sealed partial class RecordService
             }
         }
 
-        // Bug 3: validace že duration + delay >= 0 pro každý krok
-        var valueByTypeId = command.HarmonogramHodnoty
-            .Where(x => x.TypId > 0)
-            .GroupBy(x => x.TypId)
-            .ToDictionary(g => g.Key, g => g.First().Hodnota);
-
-        foreach (var typDef in typeDefinitions)
-        {
-            if (typDef.DelayTypeId <= 0 || typDef.DurationTypeId <= 0) continue;
-
-            if (!valueByTypeId.TryGetValue(typDef.DelayTypeId, out var delayValue)) continue;
-            if (!valueByTypeId.TryGetValue(typDef.DurationTypeId, out var durationValue)) continue;
-
-            if (durationValue + delayValue < 0)
-            {
-                var delayIndex = firstIndexByType.TryGetValue(typDef.DelayTypeId, out var di) ? di : 0;
-                AddRecordValidationIssue(
-                    issues,
-                    $"HarmonogramHodnoty[{delayIndex}].Hodnota",
-                    "Skutečná délka kroku nesmí být záporná (trvání + odchylka < 0).",
-                    "schedule",
-                    "schedule_actual_negative",
-                    delayValue.ToString(CultureInfo.InvariantCulture));
-            }
-        }
+        // FIX 2026-05-04: cross-validation duration + delay >= 0 odstraněna po dohodě
+        // s product ownerem. Důvod: plán a skutečnost nemají být v harmonogramu vzájemně
+        // omezeny — datový nepořádek v plánu by jinak blokoval zadávání skutečnosti.
+        // Vyhodnocení (zpoždění, on-track) probíhá v dashboard/priority matrix, které
+        // tolerují i záporné nebo nekonzistentní hodnoty (clamped přes ScheduleTimelineCalculator).
     }
 
     private static void AddRecordValidationIssue(
@@ -1223,29 +1223,27 @@ public sealed partial class RecordService
 
             if (link.Id > 0 && existingById.TryGetValue(link.Id, out var existingEntity))
             {
-                // UPDATE in place — Id se nemění, FK references v vyjadreni_vazby zůstávají platné
+                // UPDATE in place — Id se nemění, FK references v vyjadreni_vazby zůstávají platné.
+                // FIX 2026-05-05: 4 datumy (DatumObjednani/PlanDodani/DatumDodani/DatumPrevzeti)
+                // jsou READ-ONLY z perspektivy formuláře. Auto-fill harvest (PerTicketMetadataSyncService)
+                // je single source of truth — Save flow je nesmí přepsat z form payloadu, jinak by
+                // null z form (žádný input v UI) zničil hodnoty napsané harvesterem.
                 existingEntity.TypOdkazuId = typeId;
                 existingEntity.Cislo = cislo;
                 existingEntity.PredpokladanaCena = price;
-                existingEntity.DatumObjednani = link.DatumObjednani;
-                existingEntity.PlanDodani = link.PlanDodani;
-                existingEntity.DatumDodani = link.DatumDodani;
-                existingEntity.DatumPrevzeti = link.DatumPrevzeti;
                 existingEntity.VyzvaId = vyzvaId;
                 result.Add(existingEntity);
             }
             else
             {
+                // FIX 2026-05-05: nová vazba — 4 datumy zůstanou null. Harvest scheduler
+                // (volaný na konci SaveRecord) je dotáhne ze ServiceDesku po commit.
                 var entity = new ZaznamExterniOdkazEntity
                 {
                     ZaznamId = zaznamId,
                     TypOdkazuId = typeId,
                     Cislo = cislo,
                     PredpokladanaCena = price,
-                    DatumObjednani = link.DatumObjednani,
-                    PlanDodani = link.PlanDodani,
-                    DatumDodani = link.DatumDodani,
-                    DatumPrevzeti = link.DatumPrevzeti,
                     VyzvaId = vyzvaId
                 };
                 dbContext.ZaznamExterniOdkazy.Add(entity);
@@ -1773,9 +1771,15 @@ public sealed partial class RecordService
             ct).ConfigureAwait(false);
         var plannedTypeIds = schema.Kroky.Select(k => k.TrvaniTypId).Where(x => x > 0).ToHashSet();
 
+        // FIX 2026-05-04: v Manual rezimu (HarmonogramRezim=Manual) povoleno
+        // ruční datum i pro auto-eligible kroky 1/3/4/6/7/10. Defensivní filter:
+        // pokud je rezim Auto, klient by manual datumy pro auto-eligible neměl posílat,
+        // ale server přesto akceptuje jen kroky 2/5/8/9 (= legacy guard).
+        var rezimManual = string.Equals(command.HarmonogramRezim, "Manual", StringComparison.OrdinalIgnoreCase);
         var overrides = await Records.ManualActualKrokApplier.ApplyAsync(
             recordId, command.ManualActualKroky, schema, datumZalozeni, plannedTypeIds,
-            command.HarmonogramHodnoty, dbContext, harmonogramService, ct).ConfigureAwait(false);
+            command.HarmonogramHodnoty, dbContext, harmonogramService, ct,
+            acceptAutoEligibleKroky: rezimManual).ConfigureAwait(false);
 
         if (overrides.Count == 0)
         {
@@ -1811,6 +1815,235 @@ public sealed partial class RecordService
                 });
             }
         }
+
+        return true;
+    }
+
+    /// <summary>
+    /// FIX 2026-05-04 (Phase 1): chevron toggle 2/5/8/9 → "Z vyjádření" — reset příslušných DELAY
+    /// rows na Rezim=Auto, Zdroj=Neznamo, HodnotaInt=null. Composition při reload vrátí FromVyjadreni
+    /// datum pokud existuje vazba na vyjádření v ServiceDesk. Vrací počet upravených rows.
+    /// </summary>
+    private async Task<int> ResetManualKrokyToAutoAsync(
+        int recordId,
+        IReadOnlySet<Guid> krokKeys,
+        CancellationToken ct)
+    {
+        if (krokKeys.Count == 0) return 0;
+
+        // Resolve KrokKey → DelayTypId přes schema (defensive: jen zpozdeni rows + manual kroky 2/5/8/9)
+        var delayTypIds = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
+            .Where(t => t.JeZpozdeni && krokKeys.Contains(t.KrokKey))
+            .Select(t => new { t.Id, t.KrokPoradi })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var allowedTypIds = delayTypIds
+            .Where(t => HarmonogramManualSteps.IsManual(t.KrokPoradi))
+            .Select(t => t.Id)
+            .ToHashSet();
+        if (allowedTypIds.Count == 0) return 0;
+
+        var rows = await dbContext.ZaznamHarmonogramHodnoty
+            .Where(h => h.ZaznamId == recordId && allowedTypIds.Contains(h.TypId))
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var changed = 0;
+        foreach (var row in rows)
+        {
+            if (row.SkutecnostRezim == Models.Entities.SkutecnostRezimEnum.Auto
+                && row.SkutecnostZdroj == Models.Entities.SkutecnostZdrojEnum.Neznamo
+                && row.HodnotaInt is null)
+            {
+                continue;
+            }
+            row.SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Auto;
+            row.SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Neznamo;
+            row.HodnotaInt = null;
+            row.UpdatedAt = nowUtc;
+            changed++;
+        }
+        return changed;
+    }
+
+    /// <summary>
+    /// FIX 2026-05-05: explicit clear datumu pro manuální krok 2/5/8/9. Triggered když user
+    /// vyprázdní pm-date-field (`AbsolutniDatum=null`) a `PreferredZdroj="Manual"` (zachovává
+    /// manual mode flag, jen ruší hodnotu). Před fixem `ManualActualKrokApplier.Compute`
+    /// silent-skipnul null AbsolutniDatum, takže staré HodnotaInt zůstávalo v DB.
+    ///
+    /// Distinct od <see cref="ResetManualKrokyToAutoAsync"/>: tam user explicitně volí Auto
+    /// (= flipne Rezim na Auto, krok přejde pod sync resolver). Tady user zůstává v Manual,
+    /// jen krok znovu "nenastal" (HodnotaInt=null, Zdroj=Neznamo, Rezim=Manual zachován).
+    /// </summary>
+    private async Task<int> ClearManualKrokyAsync(
+        int recordId,
+        IReadOnlySet<Guid> krokKeys,
+        CancellationToken ct)
+    {
+        if (krokKeys.Count == 0) return 0;
+
+        var delayTypIds = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
+            .Where(t => t.JeZpozdeni && krokKeys.Contains(t.KrokKey))
+            .Select(t => new { t.Id, t.KrokPoradi })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var allowedTypIds = delayTypIds
+            .Where(t => HarmonogramManualSteps.IsManual(t.KrokPoradi))
+            .Select(t => t.Id)
+            .ToHashSet();
+        if (allowedTypIds.Count == 0) return 0;
+
+        var rows = await dbContext.ZaznamHarmonogramHodnoty
+            .Where(h => h.ZaznamId == recordId && allowedTypIds.Contains(h.TypId))
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var changed = 0;
+        foreach (var row in rows)
+        {
+            // No-op pokud už je čistý (HodnotaInt=null, Zdroj=Neznamo).
+            if (row.HodnotaInt is null
+                && row.SkutecnostZdroj == Models.Entities.SkutecnostZdrojEnum.Neznamo)
+            {
+                continue;
+            }
+            row.HodnotaInt = null;
+            row.SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Neznamo;
+            // Rezim NEPŘEPÍNÁME — user zůstává v Manual modu, jen krok "nenastal".
+            row.UpdatedAt = nowUtc;
+            changed++;
+        }
+        return changed;
+    }
+
+    /// <summary>
+    /// FIX 2026-05-04: aplikuje master switch "Automatické vyplňování harmonogramu" na auto-eligible
+    /// HS0X_DELAY rows (kroky 1/3/4/6/7/10) v rámci Save transakce. Vrací true pokud něco staged
+    /// (caller volá SaveChanges). Manuální kroky 2/5/8/9 zde NEjsou nikdy dotčené — řídí je samostatný
+    /// flow přes <see cref="StageManualActualKrokyAsync"/>.
+    ///
+    /// Manual rezim: SkutecnostRezim=Manual (manual datumy zapsal Stage v acceptAutoEligibleKroky=true režimu).
+    /// Auto rezim:   SkutecnostRezim=Auto + clear (HodnotaInt=null, Zdroj=Neznamo) — odpovídá UX kontraktu
+    ///                "auto→manual+vyplň→auto = data se ztratí". Re-fill ze SD vyjádření spustí auto-sync
+    ///                po commit transakce (volaný v outer scope).
+    /// </summary>
+    private async Task<bool> ApplyHarmonogramRezimAsync(
+        SaveRecordCommand command,
+        int recordId,
+        bool isTaskCategory,
+        int actorOsobaId,
+        CancellationToken ct)
+    {
+        if (!isTaskCategory || string.IsNullOrWhiteSpace(command.HarmonogramRezim))
+        {
+            return false;
+        }
+
+        if (!Enum.TryParse<Models.Entities.SkutecnostRezimEnum>(
+                command.HarmonogramRezim, ignoreCase: true, out var targetRezim))
+        {
+            return false;
+        }
+
+        var manualKrokyPoradi = HarmonogramManualSteps.KrokPoradi;
+        var autoEligibleDelayTypIds = (await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
+            .Where(t => t.JeZpozdeni)
+            .Select(t => new { t.Id, t.KrokPoradi })
+            .ToListAsync(ct).ConfigureAwait(false))
+            .Where(t => !manualKrokyPoradi.Contains(t.KrokPoradi))
+            .Select(t => t.Id)
+            .ToHashSet();
+
+        if (autoEligibleDelayTypIds.Count == 0)
+        {
+            return false;
+        }
+
+        var rows = await dbContext.ZaznamHarmonogramHodnoty
+            .Where(h => h.ZaznamId == recordId && autoEligibleDelayTypIds.Contains(h.TypId))
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        // FIX 2026-05-04: pokud uživatel přepne switch na Manual u záznamu BEZ existujících
+        // auto-eligible DELAY rows (čerstvý záznam, žádný auto-fill ještě neproběhl), musíme
+        // vytvořit placeholder rows s SkutecnostRezim=Manual aby composition při reload spočítala
+        // HarmonogramAutoFillSwitchOn=false (jinak by se rezim nepersistoval). HodnotaInt=NULL
+        // = "krok nenastal" semantika (DESIGN-10-A).
+        if (rows.Count == 0 && targetRezim == Models.Entities.SkutecnostRezimEnum.Manual)
+        {
+            var nowUtcInsert = timeProvider.GetUtcNow().UtcDateTime;
+            foreach (var typId in autoEligibleDelayTypIds)
+            {
+                dbContext.ZaznamHarmonogramHodnoty.Add(new Models.Entities.ZaznamHarmonogramHodnotaEntity
+                {
+                    ZaznamId = recordId,
+                    TypId = typId,
+                    HodnotaInt = null,
+                    SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Manual,
+                    SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Neznamo,
+                    UpdatedAt = nowUtcInsert
+                });
+            }
+            auditWriteService.Add(actorOsobaId, new AuditWriteEntry(
+                AuditActionType.Update,
+                AuditEntityType.RecordSchedule,
+                recordId.ToString(CultureInfo.InvariantCulture),
+                BeforeState: new { Action = "apply-harmonogram-rezim-insert-manual-placeholders" },
+                AfterState: new { Rezim = targetRezim, InsertedRows = autoEligibleDelayTypIds.Count }));
+            return true;
+        }
+
+        if (rows.Count == 0)
+        {
+            return false;
+        }
+
+        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var changed = 0;
+
+        foreach (var row in rows)
+        {
+            if (targetRezim == Models.Entities.SkutecnostRezimEnum.Auto)
+            {
+                // Auto: clear ruční overrides — krok se znovu naplní auto-syncem ze SD.
+                if (row.SkutecnostRezim != targetRezim
+                    || row.HodnotaInt != null
+                    || row.SkutecnostZdroj != Models.Entities.SkutecnostZdrojEnum.Neznamo)
+                {
+                    row.SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Auto;
+                    row.HodnotaInt = null;
+                    row.SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Neznamo;
+                    row.UpdatedAt = nowUtc;
+                    changed++;
+                }
+            }
+            else // Manual
+            {
+                // Manual rezim: SkutecnostRezim=Manual. HodnotaInt zachováme — pokud Stage manual
+                // krokyzapsal nový datum (overrides), tak se přepsalo tam; pokud user neposlal datum,
+                // existing hodnota zůstane (legitimní — user vidí prázdné UI ale historická data zůstávají).
+                if (row.SkutecnostRezim != targetRezim)
+                {
+                    row.SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Manual;
+                    if (row.SkutecnostZdroj == Models.Entities.SkutecnostZdrojEnum.Automat)
+                    {
+                        row.SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Manual;
+                    }
+                    row.UpdatedAt = nowUtc;
+                    changed++;
+                }
+            }
+        }
+
+        if (changed == 0)
+        {
+            return false;
+        }
+
+        auditWriteService.Add(actorOsobaId, new AuditWriteEntry(
+            AuditActionType.Update,
+            AuditEntityType.RecordSchedule,
+            recordId.ToString(CultureInfo.InvariantCulture),
+            BeforeState: new { Action = "apply-harmonogram-rezim-before" },
+            AfterState: new { Rezim = targetRezim, ChangedRows = changed }));
 
         return true;
     }

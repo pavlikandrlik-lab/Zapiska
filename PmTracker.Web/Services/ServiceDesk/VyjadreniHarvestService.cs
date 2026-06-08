@@ -412,8 +412,9 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
 
         // Spec 2026-04-28: NES vazby jsou odpojené od harmonogramu. Žádný harvest stepper
         // bindings, žádná synthetic K1. Pouze metadata sync (4 datumy na kartě externí vazby).
-        var typZaznamu = typZaznamuHint ?? NormalizeTypZaznamu(zaznam, eo);
-        var isNes = string.Equals(typZaznamu, "NES", StringComparison.OrdinalIgnoreCase);
+        // FIX 2026-05-04: NormalizeTypZaznamu trim+ToUpper — viz <see cref="NormalizeTypZaznamu"/>.
+        var typZaznamu = NormalizeTypZaznamu(typZaznamuHint);
+        var isNes = string.Equals(typZaznamu, "NES", StringComparison.Ordinal);
 
         var sinceUtc = eo.LastHarvestedAt;
         var list = isNes
@@ -639,16 +640,17 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     }
 
     /// <summary>
-    /// Fallback heuristika pokud caller nepředal <c>typZaznamuHint</c> z HOT_ZAZNAMY —
-    /// vrací prázdný string, což v <see cref="MapKindToPoradi"/> vede k PNF (poradí 7).
-    /// Primární zdroj je <c>HotZaznamFingerprintDto.TypZaznamu</c> — review finding Q-10.
+    /// FIX 2026-05-04: HOT_ZAZNAMY.typ_zaznamu může být CHAR(5) sloupec s trailing whitespace
+    /// padding ("PMP  "). Bez normalizace `string.Equals(raw, "PMP", OrdinalIgnoreCase)` v
+    /// <see cref="MapKindToPoradi"/> selhal a PMP K4 vyjádření se ukládalo jako
+    /// <c>KrokPoradi=7</c> (PNF behavior). Pak resolver krok 4 nenašel kandidáta a po přidání
+    /// PNF tiketu jako jediný binding s <c>KrokPoradi=7</c> "přebil" PMP datum.
+    ///
+    /// Centralizovaná normalizace: <c>Trim().ToUpperInvariant()</c>. Aplikovat VŽDY před
+    /// jakýmkoli compare proti literálům "PMP" / "PNF" / "NES" v harvest cestě.
     /// </summary>
-    private static string NormalizeTypZaznamu(ProjektovyZaznamEntity zaznam, ZaznamExterniOdkazEntity eo)
-    {
-        _ = zaznam;
-        _ = eo;
-        return string.Empty;
-    }
+    internal static string NormalizeTypZaznamu(string? raw)
+        => string.IsNullOrWhiteSpace(raw) ? string.Empty : raw.Trim().ToUpperInvariant();
 
     private static int? MapKindToPoradi(HarvestPredicateKind kind, string typZaznamu)
         => kind switch
@@ -656,8 +658,10 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             HarvestPredicateKind.K3_OdeslaniZadaniPmp => 3,
             HarvestPredicateKind.K6_OdeslaniPozadavku => 6,
             HarvestPredicateKind.K10_NasazeniArchivace => 10,
+            // typZaznamu sem MUSÍ přijít už znormalizovaný (caller volá NormalizeTypZaznamu).
+            // Ordinal compare bez IgnoreCase — předpokládáme upper-case po normalizaci.
             HarvestPredicateKind.K4_K7_DodaniReseni =>
-                string.Equals(typZaznamu, "PMP", StringComparison.OrdinalIgnoreCase) ? 4 : 7,
+                string.Equals(typZaznamu, "PMP", StringComparison.Ordinal) ? 4 : 7,
             _ => null
         };
 }

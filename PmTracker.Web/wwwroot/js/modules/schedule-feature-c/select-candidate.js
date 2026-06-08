@@ -48,10 +48,12 @@
     const pendingByCell = new WeakMap(); // cell DOM node → AbortController
 
     function refreshSelectionInUi(cell, selectedExterniOdkazId) {
+        let selectedButton = null;
         const items = cell.querySelectorAll('[data-feature-c-select-candidate]');
         items.forEach((btn) => {
             const id = parseInt(btn.getAttribute('data-externi-odkaz-id') || '0', 10);
             const isSelected = id === selectedExterniOdkazId;
+            if (isSelected) selectedButton = btn;
             btn.setAttribute('data-is-selected', isSelected ? 'true' : 'false');
             btn.setAttribute('aria-current', isSelected ? 'true' : 'false');
 
@@ -69,6 +71,50 @@
                 check.remove();
             }
         });
+
+        // FIX 2026-05-04: aktualizuj viditelný datum span. Před fixem `refreshSelectionInUi`
+        // updatovala jen data-is-selected/aria-current/checkmark, ale nezměnila viditelný
+        // <span class="schedule-actual-datum"> v cell.main. User klikl jiný kandidát ale
+        // pole zobrazovalo stále původní datum (bez page reload). Datum vytáhneme z
+        // dropdown item buttonu (.schedule-actual-cell__dropdown-item-datum) — render
+        // už ho tam má v Czech formátu dd.MM.yyyy.
+        if (selectedButton) {
+            const datumNode = selectedButton.querySelector('.schedule-actual-cell__dropdown-item-datum');
+            const newDatumText = datumNode ? datumNode.textContent.trim() : '';
+            if (newDatumText) {
+                const visibleDatumSpan = cell.querySelector(
+                    '[data-schedule-actual-source="vyjadreni"] .schedule-actual-datum[data-manual-krok-readonly]'
+                );
+                if (visibleDatumSpan) {
+                    visibleDatumSpan.textContent = newDatumText;
+                }
+                // Update tooltip na pm-button (ikonka chatu) tak, aby odpovídal novému datu.
+                const chatButton = cell.querySelector(
+                    '[data-schedule-actual-source="vyjadreni"] [data-schedule-actual-from-vyjadreni]'
+                );
+                if (chatButton) {
+                    const tooltip = `Z vyjádření ${newDatumText}`;
+                    chatButton.setAttribute('title', tooltip);
+                    chatButton.setAttribute('aria-label', tooltip);
+                }
+
+                // FIX 2026-05-05: pokud je tato cell krok 10 (poslední krok = "Skutečné dokončení"
+                // celého záznamu), aktualizuj globální souhrn pole `[data-schedule-summary-shifted]`.
+                // Server-side render je ze ScheduleTimelineCalculator.Summarize → Steps[^1].ActualEndDate
+                // (= krok 10), tedy bez page reload by user viděl stale hodnotu po chevron změně.
+                // User explicit požadavek: "vždy tahané z hodnoty kroku 10 skutečnosti".
+                const krokPoradi = parseInt(cell.getAttribute('data-krok-poradi') || '0', 10);
+                if (krokPoradi === 10) {
+                    const block = cell.closest('[data-schedule-block]')
+                        || cell.closest('form')
+                        || document;
+                    const summarySpan = block.querySelector('[data-schedule-summary-shifted]');
+                    if (summarySpan instanceof HTMLElement) {
+                        summarySpan.textContent = newDatumText;
+                    }
+                }
+            }
+        }
 
         // Close <details> dropdown
         const details = cell.querySelector(DROPDOWN_SELECTOR);

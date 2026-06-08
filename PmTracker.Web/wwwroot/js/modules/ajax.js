@@ -263,6 +263,67 @@ export function renderModalFormErrors(form, payload) {
                 }, 1800);
             });
             actions.appendChild(copyButton);
+
+            // FIX 2026-05-04: tlačítko "Uložit log chyby" — otevře native Save As dialog
+            // (File System Access API showSaveFilePicker, Chromium 86+) a uloží UTF-8 .txt
+            // s názvem podle traceId. Fallback pro Firefox/Safari: anchor download s blob URL
+            // (browser zobrazí standardní Save dialog dle nastavení uživatele).
+            const saveButton = document.createElement("button");
+            saveButton.type = "button";
+            saveButton.className = "modal-submit-action-btn";
+            saveButton.textContent = "Uložit log chyby";
+            saveButton.addEventListener("click", async () => {
+                const safeTraceId = (traceId || "diagnostic-log").replace(/[\\/:*?"<>|\s]+/g, "_");
+                const fileName = `${safeTraceId}.txt`;
+                // BOM ﻿ aby Notepad otevřel UTF-8 bez "ANSI" misdetection.
+                const fileBody = "﻿" + diagnosticLog;
+                const blob = new Blob([fileBody], { type: "text/plain;charset=utf-8" });
+                let saved = false;
+                try {
+                    if (typeof window.showSaveFilePicker === "function") {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: fileName,
+                            types: [{
+                                description: "Textový soubor (UTF-8)",
+                                accept: { "text/plain": [".txt"] }
+                            }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        saved = true;
+                    } else {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = fileName;
+                        a.style.display = "none";
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+                        saved = true;
+                    }
+                } catch (err) {
+                    if (err && err.name === "AbortError") {
+                        // user zavřel Save dialog — žádné UI zobrazení chyby
+                        return;
+                    }
+                    saveButton.textContent = "Uložení selhalo";
+                    window.setTimeout(() => {
+                        saveButton.textContent = "Uložit log chyby";
+                    }, 1800);
+                    return;
+                }
+                if (saved) {
+                    saveButton.textContent = "Uloženo";
+                    window.setTimeout(() => {
+                        saveButton.textContent = "Uložit log chyby";
+                    }, 1800);
+                }
+            });
+            actions.appendChild(saveButton);
+
             diagnosticBlock.appendChild(actions);
 
             const logPre = document.createElement("pre");

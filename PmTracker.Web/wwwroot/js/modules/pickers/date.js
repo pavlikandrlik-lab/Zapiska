@@ -78,6 +78,8 @@ export function initCustomDatePickers(scope) {
         const monthSelect = field.querySelector("[data-app-date-month]");
         const yearSelect = field.querySelector("[data-app-date-year]");
         const grid = field.querySelector("[data-app-date-grid]");
+        // FIX 2026-05-05: optional clear button (✕). Renderuje se jen když pm-date-field má clearable="true".
+        const clearButton = field.querySelector("[data-app-date-clear]");
 
         if (!(displayInput instanceof HTMLInputElement)
             || !(valueInput instanceof HTMLInputElement)
@@ -97,14 +99,41 @@ export function initCustomDatePickers(scope) {
         let selectedDate = parseIsoDate(valueInput.value) || parseDisplayDate(displayInput.value) || null;
         let viewDate = selectedDate ? new Date(selectedDate.getTime()) : new Date();
 
+        // FIX 2026-05-05: udržuj data-app-date-has-value v sync s hidden input value, aby CSS
+        // (a případně budoucí JS) mohlo reagovat (např. show/hide clear button).
+        const updateHasValueFlag = () => {
+            field.dataset.appDateHasValue = (valueInput.value && valueInput.value.length > 0) ? "true" : "false";
+        };
+        updateHasValueFlag();
+
         const syncValue = () => {
             const previous = valueInput.value;
             valueInput.value = selectedDate ? formatIsoDate(selectedDate) : "";
             displayInput.value = selectedDate ? formatDisplayDate(selectedDate) : "";
+            updateHasValueFlag();
             if (previous !== valueInput.value) {
                 valueInput.dispatchEvent(new Event("change", { bubbles: true }));
             }
         };
+
+        // FIX 2026-05-05: clear button — vyprázdní hidden + display + dispatch change event,
+        // takže form binder dostane "" → nullable DateOnly? = null. Server-side
+        // RecordService.SaveRecord.ClearManualKrokyAsync to interpretuje jako explicit clear
+        // pro manuální kroky 2/5/8/9 (PreferredZdroj=Manual + AbsolutniDatum=null).
+        if (clearButton instanceof HTMLButtonElement) {
+            clearButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                if (isFieldLocked()) return;
+                if (!valueInput.value && !displayInput.value) return;
+                selectedDate = null;
+                syncValue();
+                // Zavři kalendářový panel pokud byl otevřený.
+                if (!panel.hidden) {
+                    panel.hidden = true;
+                    unmountFloatingPanel(panel);
+                }
+            });
+        }
 
         const ensureMonthOptions = () => {
             if (monthSelect.options.length > 0) {

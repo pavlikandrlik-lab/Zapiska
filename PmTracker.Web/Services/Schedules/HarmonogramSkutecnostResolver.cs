@@ -8,12 +8,19 @@ namespace PmTracker.Web.Services.Schedules;
 /// <param name="TypZaznamu">NES / PMP / PNF (potřebné pro match predikátu dle matice).</param>
 /// <param name="PredikatKey">K3 / K4_K7 / K6 / K10 — viz <see cref="HarmonogramKrokDatumMapping"/>.</param>
 /// <param name="Datum">Datum vyjádření = kandidát pro SkutecnostDatum kroku.</param>
+/// <param name="HotVyjadreniId">
+/// FIX 2026-05-04: ID HOT_VYJADRENI bubliny (0 = synthetic K1 binding z HOT_ZAZNAMY.datum).
+/// Přidáno aby UI composition mohla převzít celé source-of-truth z typ-aware resolveru
+/// (chat ikonka i datum) a nemusela se spoléhat na typ-ignorant `RecordScheduleActualSourceResolver`,
+/// který bral MAX(datum) napříč všemi bindings.
+/// </param>
 public sealed record BindingKandidat(
     int ExterniOdkazId,
     string Cislo6,
     string TypZaznamu,
     string PredikatKey,
-    DateTime Datum);
+    DateTime Datum,
+    long HotVyjadreniId = 0L);
 
 /// <summary>
 /// Výsledek resolveru pro jeden krok harmonogramu.
@@ -74,6 +81,25 @@ public static class HarmonogramSkutecnostResolver
                 VybranyExterniOdkazId: null,
                 Kandidati: kandidati,
                 PreferredFallbackApplied: false);
+        }
+
+        // FIX 2026-05-04: Krok 1 = MIN agregace přes všechny synthetic K1 bindings (spec
+        // 2026-04-28 §2 „nejdřívější datum založení tiketu"). Preferred koncepce neplatí —
+        // agregace je deterministická a bere nejstarší datum napříč externími vazbami.
+        // Bez tohoto fixu user, který dříve měl jen PMP tikét, dostal preferred=PMP. Po přidání
+        // PNF tiketu s dřívějším HOT_ZAZNAMY.datum resolver stále vracel PMP datum (preferred),
+        // místo PNF (= MIN). Signalizujeme PreferredFallbackApplied když preferred ≠ MIN, aby
+        // sync clear-nul stale preferred z DELAY row a další iterace byla čistá.
+        if (krokPoradi == 1)
+        {
+            var min = kandidati[0]; // OrderBy(Datum) ASC výše → kandidati[0] = nejstarší
+            return new ResolvedSkutecnost(
+                Datum: min.Datum,
+                VybranyExterniOdkazId: min.ExterniOdkazId,
+                Kandidati: kandidati,
+                PreferredFallbackApplied:
+                    preferredExterniOdkazId.HasValue
+                    && preferredExterniOdkazId.Value != min.ExterniOdkazId);
         }
 
         if (preferredExterniOdkazId.HasValue)

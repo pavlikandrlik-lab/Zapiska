@@ -9,17 +9,19 @@ using PmTracker.Web.Services.Security;
 namespace PmTracker.Tests.Unit.Controllers;
 
 /// <summary>
-/// QW-7: Verifies that the AJAX failure payload never leaks PII (form field values)
-/// to the client. Form values may appear in the server-side diagnostic log, but
-/// the <see cref="ModalSubmitResultViewModel"/> returned to the caller must not
-/// include them.
+/// QW-7 (revised 2026-05-04): The AJAX failure payload now exposes a sanitized
+/// <c>DiagnosticLog</c> on <see cref="ModalSubmitResultViewModel"/> so that users
+/// can save full SQL/EFCore error details from the UI for debugging. The sanitization
+/// invariant is preserved at the source (BuildDiagnosticLog): the log must contain
+/// only TimestampUtc, ErrorCode, TraceId, Request method+path+query, Message,
+/// FieldErrors (localized labels — no values), Details, and Exception/SQL details.
+/// It must NOT serialize <c>HttpContext.Request.Form</c> body values.
 /// </summary>
 public sealed class BaseControllerAjaxPrivacyTests
 {
     /// <summary>
-    /// When the HTTP request carries form data with PII (e.g. an email address),
-    /// the AJAX failure payload returned to the client must not contain that data
-    /// and DiagnosticLog must be null (property was removed from the VM).
+    /// When the HTTP request carries form data with PII, the diagnostic log must
+    /// not echo any submitted form values back to the client.
     /// </summary>
     [Fact]
     public void BuildAjaxFailurePayload_DoesNotIncludeFormValues_WhenRequestHasFormContent()
@@ -36,7 +38,6 @@ public sealed class BaseControllerAjaxPrivacyTests
 
         var httpContext = new DefaultHttpContext();
         httpContext.Request.ContentType = "application/x-www-form-urlencoded";
-        // Provide a readable Form directly via the feature
         httpContext.Request.Form = formCollection;
 
         var controller = CreateController(httpContext);
@@ -44,18 +45,21 @@ public sealed class BaseControllerAjaxPrivacyTests
         // Act
         var result = controller.InvokeAjaxErrorResult("Operace selhala.", details: "test-details");
 
-        // Assert — VM must not carry any PII from form values
+        // Assert
         var vm = result.Value.Should().BeOfType<ModalSubmitResultViewModel>().Subject;
 
-        // DiagnosticLog property was removed from ModalSubmitResultViewModel as part of QW-7
-        // Verify the property does not exist on the type at all
+        // DiagnosticLog is now exposed (QW-7 revised) but MUST NOT contain form values.
         typeof(ModalSubmitResultViewModel)
             .GetProperty("DiagnosticLog")
-            .Should().BeNull(
-                because: "DiagnosticLog was removed from ModalSubmitResultViewModel (QW-7 PII fix)");
+            .Should().NotBeNull(
+                because: "DiagnosticLog je vystaven klientovi pro UI ukládání chyb (QW-7 revised 2026-05-04)");
 
-        // The Message should be present but must not contain PII
         vm.Message.Should().NotContain(piiEmail);
+        vm.DiagnosticLog.Should().NotBeNullOrWhiteSpace();
+        vm.DiagnosticLog.Should().NotContain(piiEmail,
+            because: "BuildDiagnosticLog nesmí obsahovat hodnoty form polí (QW-7 invariant zachován u zdroje)");
+        vm.DiagnosticLog.Should().NotContain("Jan Novak",
+            because: "BuildDiagnosticLog nesmí obsahovat hodnoty form polí (QW-7 invariant zachován u zdroje)");
         vm.Ok.Should().BeFalse();
     }
 

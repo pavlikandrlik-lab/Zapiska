@@ -72,6 +72,17 @@ public sealed class SaveRecordCommand
     public int? MeetingId { get; set; }
 
     public string? ScheduleVersion { get; set; }
+
+    /// <summary>
+    /// FIX 2026-05-04: master switch "Automatické vyplňování harmonogramu" (Auto/Manual).
+    /// Hodnota přijatá z form pole <c>HarmonogramRezim</c> kontroluje SkutecnostRezim
+    /// pro auto-eligible HS0X_DELAY rows (kroky 1/3/4/6/7/10). V Manual rezimu navíc
+    /// <see cref="ManualActualKroky"/> může obsahovat ruční datumy i pro tyto kroky.
+    /// V Auto rezimu se serverside spustí sync (re-fill ze ServiceDesk vyjádření) a
+    /// jakékoli odeslané manual datumy pro auto-eligible kroky se ignorují (klient
+    /// je nepošle, ale server defensivně filtruje).
+    /// </summary>
+    public string? HarmonogramRezim { get; set; }
 }
 
 public sealed class DeleteRecordCommand

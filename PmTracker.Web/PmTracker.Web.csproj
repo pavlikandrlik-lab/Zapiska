@@ -28,6 +28,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- FIX 2026-05-04: appsettings.json + appsettings.Development.json se nedistribuují publish
+         outputem (oba obsahují secrets — produkce Integrated Security, dev SQL Auth pro Colima).
+         Production server (IIS) si admin nakopíruje vlastní appsettings.json podle šablony
+         appsettings.example.json. Lokální dev používá appsettings.Development.json přes
+         dotnet run / IIS Express, ale do Release publish output ho nezahrnujeme.
+         CopyToPublishDirectory=Never u publish itemu, Content Remove ho vyhodí z dependencies. -->
+    <Content Remove="appsettings.json" />
+    <None Remove="appsettings.json" />
+    <Content Update="appsettings.Development.json">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="..\docs\technical\*.md">
       <Link>DocsContent\technical\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

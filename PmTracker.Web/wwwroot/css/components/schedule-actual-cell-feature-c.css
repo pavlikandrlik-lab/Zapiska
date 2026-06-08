@@ -248,3 +248,14 @@
     color: var(--gov-color-primary, #1e40af);
     font-weight: 700;
 }
+
+/* FIX 2026-05-04: master switch Auto/Manual visibility per cell.
+   Cell má atribut data-skutecnost-rezim="Auto"|"Manual". Children s data-rezim-show-on="X"
+   jsou viditelní jen když cell má rezim X. Master switch v JS přepíná atribut bez reload —
+   visibility je CSS-only, žádný re-render serveru. */
+[data-schedule-actual-cell][data-skutecnost-rezim="Auto"] [data-rezim-show-on="Manual"] {
+    display: none !important;
+}
+[data-schedule-actual-cell][data-skutecnost-rezim="Manual"] [data-rezim-show-on="Auto"] {
+    display: none !important;
+}

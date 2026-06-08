@@ -50,7 +50,8 @@ public static class ManualActualKrokApplier
         IReadOnlyList<ManualActualKrokDto> manualKroky,
         IReadOnlyList<HarmonogramVypocetKroku> vypocet,
         IReadOnlyDictionary<Guid, int> krokKeyToPoradi,
-        IReadOnlyDictionary<Guid, int> krokKeyToDelayTypId)
+        IReadOnlyDictionary<Guid, int> krokKeyToDelayTypId,
+        bool acceptAutoEligibleKroky = false)
     {
         ArgumentNullException.ThrowIfNull(manualKroky);
         ArgumentNullException.ThrowIfNull(vypocet);
@@ -80,7 +81,7 @@ public static class ManualActualKrokApplier
                     $"Ruční skutečnost míří na krok (KrokKey={mk.KrokKey}), který není ve schématu harmonogramu tohoto záznamu.");
             }
 
-            if (!HarmonogramManualSteps.IsManual(poradi))
+            if (!HarmonogramManualSteps.IsManual(poradi) && !acceptAutoEligibleKroky)
             {
                 throw new InvalidOperationException(
                     $"Krok {poradi} není mezi kroky s ruční skutečností (povoleny jsou 2, 5, 8, 9).");
@@ -132,7 +133,8 @@ public static class ManualActualKrokApplier
         IReadOnlyList<SaveRecordHarmonogramValueCommand> submittedValues,
         PmTrackerDbContext dbContext,
         IHarmonogramService harmonogramService,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool acceptAutoEligibleKroky = false)
     {
         if (manualKroky.Count == 0)
         {
@@ -192,6 +194,6 @@ public static class ManualActualKrokApplier
             schema.Kroky,
             existingDurations);
 
-        return Compute(manualKroky, vypocet, krokKeyToPoradi, delayTypIdByKrokKey);
+        return Compute(manualKroky, vypocet, krokKeyToPoradi, delayTypIdByKrokKey, acceptAutoEligibleKroky);
     }
 }

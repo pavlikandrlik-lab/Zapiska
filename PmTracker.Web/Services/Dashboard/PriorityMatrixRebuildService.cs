@@ -396,11 +396,19 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
             .Where(x => recordIds.Contains(x.ZaznamId))
             .ToListAsync(ct);
 
+        // FIX 2026-05-04: regrese po DESIGN-10-A (commit 5661655) — HodnotaInt je nyní int? (nullable).
+        // Vnitřní ToDictionary produkuje Dictionary<int, int?>, který nelze upcastovat na
+        // IReadOnlyDictionary<int, int> (generika nejsou kovariantní v TValue) → InvalidCastException
+        // při každém Save flow (RebuildForRecordAsync). Fix: vyfiltrovat NULL HodnotaInt
+        // (krok nenastal — caller ResolveNearestFutureMilestoneDate interpretuje missing klíč
+        // jako "nevyhodnocovat") a použít non-nullable .Value v hodnotě dict.
         return rows
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(
                 group => group.Key,
-                group => (IReadOnlyDictionary<int, int>)group.ToDictionary(x => x.TypId, x => x.HodnotaInt));
+                group => (IReadOnlyDictionary<int, int>)group
+                    .Where(x => x.HodnotaInt.HasValue)
+                    .ToDictionary(x => x.TypId, x => x.HodnotaInt!.Value));
     }
 
     private async Task<Dictionary<int, HarmonogramSchemaDefinition>> LoadSchemaByVersionAsync(

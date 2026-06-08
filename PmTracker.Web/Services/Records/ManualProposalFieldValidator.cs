@@ -51,15 +51,13 @@ public static class ManualProposalFieldValidator
                     "ManualProposalFieldValidator.ValidateManualActualKroky: duplicate KrokKey");
             }
 
-            // FIX 2026-05-02: AbsolutniDatum je nullable. NULL = "krok nenastal" → validace
-            // se neaplikuje (caller skipne celý krok). Future-date check jen pro vyplněné kroky.
-            if (krok.AbsolutniDatum.HasValue && krok.AbsolutniDatum.Value > today)
-            {
-                throw new RecordValidationException(
-                    "Datum skutečnosti kroku nesmí být v budoucnosti.",
-                    new[] { new RecordValidationIssue("ManualActualKroky", "Datum skutečnosti kroku nesmí být v budoucnosti.", "schedule", "manual.future-date", krok.AbsolutniDatum.Value.ToString("yyyy-MM-dd")) },
-                    "ManualProposalFieldValidator.ValidateManualActualKroky: future date");
-            }
+            // FIX 2026-05-04: future-date check odstraněn po dohodě s product ownerem.
+            // Důvod: plán a skutečnost nemají být v harmonogramu vzájemně omezeny —
+            // datový nepořádek v plánu by jinak blokoval zadávání skutečnosti, což
+            // působí víc problémů než to řeší. Vyhodnocení (zpoždění, on-track status)
+            // probíhá v dashboard / priority matrix, které tolerují i budoucí datumy.
+            // Zachováno: NULL AbsolutniDatum = "krok nenastal" (skip), KrokKey != Empty,
+            // unique KrokKey per Save.
         }
     }
 

@@ -310,6 +310,48 @@ public sealed class VyjadreniHarvestServiceTests
     }
 
     /// <summary>
+    /// FIX 2026-05-04 regression: real intranetNEW může mít sloupec typ_zaznamu jako CHAR(5)
+    /// s trailing whitespace ("PMP  "). Před fixem `string.Equals(raw, "PMP", OrdinalIgnoreCase)`
+    /// v MapKindToPoradi vrátil false a PMP K4_K7 vyjádření se ukládalo s KrokPoradi=7
+    /// (PNF behavior). Resolver pak pro krok 4 nenašel kandidáta → po přidání PNF tiketu
+    /// PNF datum „přebilo" PMP datum. Fix: NormalizeTypZaznamu(Trim+ToUpperInvariant) v
+    /// HarvestTicketCoreAsync. Test ověří, že padded "PMP  " stále mapuje K4_K7 → K4.
+    /// </summary>
+    [Fact]
+    public async Task HarvestTicketAsync_WhenPmpTicketWithPaddedTypZaznamu_MapsToPoradi4()
+    {
+        await using var db = NewDb();
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336865" });
+        await SeedSchemaAsync(db);
+
+        var vq = new Mock<IVyjadreniQueryService>();
+        // Simulujeme CHAR(5) padding — TypZaznamu = "PMP  " (s 2 trailing spaces).
+        vq.Setup(x => x.GetHotZaznamFingerprintsAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, HotZaznamFingerprintDto>
+            {
+                ["336865"] = new HotZaznamFingerprintDto("336865", new DateTime(2026, 3, 14), "otevreno", "PMP  ")
+            });
+        vq.Setup(x => x.GetVyjadreniForTicketAsync("336865", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new HotVyjadreniDto(99, "25", "A400P023RVVP",
+                    new DateTime(2026, 3, 14, 10, 0, 0), "pm.user",
+                    "Dodavatel přidal řešení a čeká na akceptaci.",
+                    "FIS", 0)
+            });
+
+        var sut = BuildSut(db, vq.Object);
+        var result = await sut.HarvestTicketAsync(1, CancellationToken.None);
+
+        result.Created.Should().Be(1);
+        var bindings = await db.VyjadreniVazby.Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
+        bindings.Should().HaveCount(1);
+        bindings[0].KrokKey.Should().Be(K4Key,
+            "padded \"PMP  \" musí po normalizaci stále mapovat K4_K7 → K4 (ne fallback K7)");
+    }
+
+    /// <summary>
     /// Kontrastní případ — stejný predikát ale typ_zaznamu = "PNF" → K7.
     /// </summary>
     [Fact]

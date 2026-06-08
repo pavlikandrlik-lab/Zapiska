@@ -83,7 +83,14 @@ internal sealed class HarmonogramService(
         => BuildHarmonogramVypocetCore(datumZalozeni, typy, hodnoty);
 
     public HarmonogramSouhrnViewModel BuildHarmonogramSouhrn(IReadOnlyList<HarmonogramVypocetKroku> kroky, DateTime terminUkolu)
-        => BuildHarmonogramSouhrnCore(kroky, terminUkolu);
+        => BuildHarmonogramSouhrnCore(kroky, terminUkolu, today: null, lastStepHasActual: true);
+
+    public HarmonogramSouhrnViewModel BuildHarmonogramSouhrn(
+        IReadOnlyList<HarmonogramVypocetKroku> kroky,
+        DateTime terminUkolu,
+        DateTime today,
+        bool lastStepHasActual)
+        => BuildHarmonogramSouhrnCore(kroky, terminUkolu, today, lastStepHasActual);
 
     public async Task<int> EnsurePersistedActiveHarmonogramSchemaVersionAsync(CancellationToken ct = default)
     {
@@ -330,7 +337,9 @@ internal sealed class HarmonogramService(
 
     private static HarmonogramSouhrnViewModel BuildHarmonogramSouhrnCore(
         IReadOnlyList<HarmonogramVypocetKroku> kroky,
-        DateTime terminUkolu)
+        DateTime terminUkolu,
+        DateTime? today,
+        bool lastStepHasActual)
     {
         var summary = ScheduleTimelineCalculator.Summarize(
             new ScheduleTimelineComputation
@@ -355,7 +364,9 @@ internal sealed class HarmonogramService(
                 TotalDurationDays = kroky.Sum(x => x.TrvaniDni),
                 TotalOffsetDays = kroky.Sum(x => x.ZpozdeniDni)
             },
-            terminUkolu);
+            terminUkolu,
+            today,
+            lastStepHasActual);
 
         return new HarmonogramSouhrnViewModel
         {

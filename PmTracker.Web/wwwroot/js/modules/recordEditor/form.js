@@ -202,8 +202,17 @@ export function updateTaskTypeVisibility(categorySelect) {
                 const isDelayDate = valueInput instanceof HTMLInputElement
                     && valueInput.hasAttribute("data-schedule-delay-date");
                 const row = dateField.closest("[data-schedule-step-row]");
-                const linkedInput = row?.querySelector(isDelayDate ? "[data-schedule-delay]" : "[data-schedule-duration]");
-                const linkedLocked = linkedInput instanceof HTMLInputElement ? linkedInput.disabled : true;
+                // FIX 2026-05-04: po DESIGN-9-F (calendar-primary DURATION redesign) má hidden
+                // input přejmenovaný `data-schedule-duration-hidden` (ne `-duration`). Předtím
+                // se selektor neshodal → linkedInput=null → linkedLocked=true (defensive) →
+                // všechny PLAN datum-pole zamčená i s plnými právy. Fallback změněný na false:
+                // pokud linked input chybí, server-side `locked` na pm-date-field je autoritativní.
+                const linkedInput = row?.querySelector(
+                    isDelayDate
+                        ? "[data-schedule-delay]"
+                        : "[data-schedule-duration-hidden], [data-schedule-duration]"
+                );
+                const linkedLocked = linkedInput instanceof HTMLInputElement ? linkedInput.disabled : false;
                 const shouldDisable = !canScheduleAny || staticDisabled || linkedLocked;
                 dateField.dataset.appDateLocked = shouldDisable ? "true" : "false";
 
@@ -306,9 +315,19 @@ function onScheduleTabActivated(form) {
     // duration/delay inputy. Toto není uživatelská změna — obnovíme snapshot,
     // aby se po přepnutí na schedule tab nespouštěl close guard a modal šel
     // zavřít. Viz docs/specs/modal-close-guard.md.
+    //
+    // FIX 2026-05-05: snapshot rebuild VÝHRADNĚ při PRVNÍ aktivaci. Předchozí impl
+    // resetla snapshot při každém vstupu do tabu, čímž "absorbla" user-induced změny
+    // udělané mezi tab switches → form se po re-aktivaci tabu jevil clean → close
+    // guard ("opravdu zavřít?") se přeskočil. Re-aktivace planneru je idempotentní,
+    // takže rebuild po prvním vstupu není potřebný.
+    if (form.dataset.recordEditorScheduleSnapshotRebuilt === "true") {
+        return;
+    }
     window.requestAnimationFrame(() => {
         if (form.isConnected) {
             form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
+            form.dataset.recordEditorScheduleSnapshotRebuilt = "true";
         }
     });
 }
