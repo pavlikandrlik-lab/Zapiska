@@ -627,34 +627,21 @@
    -footer / -count / -placeholder) — definice odstraněna jako dead code 2026-04-29.
    Druhá .dashboard-panel definice na řádku ~6420 (taktéž nepoužívaná) odstraněna. */
 
-.dashboard-panel-body {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    height: 100%;
-    padding: 1.5rem;
-}
+/* .dashboard-panel-body, .dashboard-panel-footer a listy (focus/meeting/news)
+   → konsolidováno do bloku „DASHBOARD PŘEHLED" (2026-06-09) níže v souboru.
+   Zde zůstává jen styling jednotlivých KARET (sdílený i s list-page Focus/Profil). */
 
 .dashboard-panel-placeholder {
-    padding: 1.5rem;
+    padding: var(--d-pad-card, 1.5rem);
 }
 
-/* .dashboard-panel-header (+ h2) a .dashboard-panel-count → odstraněno 2026-06-08;
-   hlavičky panelů (nadpis + popis + počet) smazány z dashboard partialů kvůli úspoře místa. */
+/* .dashboard-panel-header (+ h2) a .dashboard-panel-count → odstraněno 2026-06-08
+   (hlavičky panelů smazány kvůli úspoře místa). */
 
-.dashboard-panel-footer,
 .dashboard-page-actions {
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
-}
-
-.dashboard-focus-list,
-.dashboard-meeting-list,
-.dashboard-news-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.9rem;
 }
 
 .dashboard-focus-item,
@@ -663,21 +650,21 @@
     display: block;
     /* gov tokens s fallbackem na původní rgba — dark mode reaguje přes design tokens */
     border: 1px solid var(--gov-color-border, rgba(0, 43, 73, 0.1));
-    border-radius: 0.85rem;
+    border-radius: var(--d-radius, 0.85rem);
     background: var(--background-neutral-white, rgba(255, 255, 255, 0.92));
-    padding: 1rem 1rem 0.95rem;
+    padding: var(--d-pad-card, 1rem);
     color: inherit;
     text-decoration: none;
     transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
 
-/* Focus karty (2026-04-21): 3-col grid (identity | content | meta) pro lepší
-   využití horizontálního prostoru na FHD/4K. Viz spec:
-   docs/superpowers/specs/2026-04-21-focus-profil-layout.md */
+/* Focus karty (2026-04-21, fluid 2026-06-09): 3-col grid (identity | content |
+   meta) — bohatá varianta pro široký panel. Na úzkém panelu se sbalí přes
+   @container (viz níže). Třídy sdílené i s list-page Focus/Profil. */
 .dashboard-focus-item {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) minmax(180px, 260px);
-    gap: 1.1rem;
+    grid-template-columns: auto minmax(0, 1fr) clamp(150px, 14vw, 240px);
+    gap: var(--d-gap-item, 1.1rem);
     align-items: start;
 }
 
@@ -696,16 +683,16 @@
 .dashboard-meeting-item-top,
 .dashboard-news-item-top {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
 }
 
 .dashboard-focus-identity {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.35rem;
     align-items: flex-start;
-    min-width: 88px;
+    min-width: 72px;
 }
 
 .dashboard-focus-content {
@@ -715,22 +702,22 @@
 .dashboard-focus-meta {
     margin: 0;
     display: grid;
-    gap: 0.35rem 0.75rem;
+    gap: 0.3rem 0.7rem;
     color: #5d7483;
-    font-size: 0.88rem;
+    font-size: var(--d-fs-label, 0.88rem);
 }
 
 .dashboard-focus-meta > div {
     display: grid;
-    grid-template-columns: 88px 1fr;
-    gap: 0.4rem;
+    grid-template-columns: 84px 1fr;
+    gap: 0.35rem;
     align-items: baseline;
 }
 
 .dashboard-focus-meta dt {
     color: #6b7d8c;
     text-transform: uppercase;
-    font-size: 0.72rem;
+    font-size: var(--d-fs-label, 0.72rem);
     letter-spacing: 0.04em;
     font-weight: 600;
 }
@@ -744,51 +731,85 @@
 
 .dashboard-item-meta {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
-    margin-top: 0.6rem;
+    margin-top: 0.45rem;
     color: #5d7483;
-    font-size: 0.92rem;
+    font-size: var(--d-fs-base, 0.92rem);
 }
 
 .dashboard-item-project,
 .dashboard-news-label {
     color: #005b8f;
-    font-size: 0.92rem;
+    font-size: var(--d-fs-base, 0.92rem);
     font-weight: 700;
 }
 
 .dashboard-focus-title,
 .dashboard-meeting-title,
 .dashboard-news-title {
-    margin: 0.35rem 0;
-    font-size: 1.05rem;
+    margin: 0.25rem 0;
+    font-size: var(--d-fs-title, 1.05rem);
     font-weight: 700;
     color: #0f1720;
 }
 
 .dashboard-item-description {
-    margin: 0.35rem 0 0;
+    margin: 0.3rem 0 0;
     color: #2f4555;
+    font-size: var(--d-fs-base, 1rem);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-@media (max-width: 899px) {
+/* Adaptivní hustota: na úzkém PANELU (stack / split-screen) se focus karta sbalí
+   do kompaktní varianty. Reaguje na šířku panelu (container), ne celé stránky →
+   list-page (Focus/Profil) zůstává v bohaté variantě. Container je
+   .dashboard-panel-body (viz blok DASHBOARD PŘEHLED). */
+@container dashpanel (max-width: 520px) {
     .dashboard-focus-item {
         grid-template-columns: 1fr;
-        gap: 0.6rem;
+        gap: 0.4rem;
     }
 
     .dashboard-focus-identity {
         flex-direction: row;
+        align-items: center;
         min-width: 0;
+        gap: 0.5rem;
+    }
+
+    .dashboard-focus-meta {
+        grid-template-columns: 1fr 1fr;
     }
 
     .dashboard-focus-meta > div {
-        grid-template-columns: 88px 1fr;
+        grid-template-columns: auto 1fr;
+    }
+
+    .dashboard-focus-meta dt {
+        font-size: 0.66rem;
+    }
+
+    .dashboard-item-description {
+        -webkit-line-clamp: 1;
+    }
+}
+
+/* Fallback pro prohlížeče bez @container (starší): sbal focus kartu na úzkém
+   viewportu přes media query. */
+@supports not (container-type: inline-size) {
+    @media (max-width: 1024px) {
+        .dashboard-focus-item {
+            grid-template-columns: 1fr;
+            gap: 0.4rem;
+        }
+        .dashboard-focus-identity {
+            flex-direction: row;
+            min-width: 0;
+        }
     }
 }
 
@@ -6993,28 +7014,62 @@ html {
     padding: 0 clamp(16px, 2vw, 48px);
 }
 
+/* ==========================================================================
+   DASHBOARD PŘEHLED — fluid + adaptivní layout (2026-06-09)
+   Spec: docs/superpowers/specs/2026-06-09-dashboard-prehled-layout-design.md
+   - Flex-fill výška (bez měření headeru JSkem): .app-body je flex column →
+     app-main vyplní výšku pod sticky headerem → shell vyplní app-main.
+   - Fluid clamp tokeny (jediný zdroj rozměrů) na .dashboard-shell.
+   - Hybrid: na vysokém viewportu fix 1 obrazovka + interní scroll panelů;
+     na úzkém (<1024) stack + scroll stránky.
+   - Bugfix: meetings list scrolluje (singulár i plurál v overflow pravidle).
+   ========================================================================== */
 .dashboard-shell {
-    height: 100vh;
-    display: grid;
-    grid-template-rows: auto 1fr;
-    grid-template-columns: 100%;
+    /* fluid tokeny — min na 13", max na 28" */
+    --d-fs-label: clamp(0.68rem, 0.60rem + 0.25vw, 0.80rem);
+    --d-fs-base:  clamp(0.80rem, 0.70rem + 0.35vw, 0.98rem);
+    --d-fs-title: clamp(0.92rem, 0.78rem + 0.45vw, 1.18rem);
+    --d-gap-item:  clamp(0.35rem, 0.15rem + 0.45vw, 0.85rem);
+    --d-gap-panel: clamp(0.5rem,  0.30rem + 0.5vw,  0.85rem);
+    --d-pad-card:  clamp(0.5rem,  0.30rem + 0.5vw,  1.05rem);
+    --d-pad-panel: clamp(0.55rem, 0.30rem + 0.6vw,  1.2rem);
+    --d-radius:    clamp(0.45rem, 0.30rem + 0.3vw,  0.85rem);
+    --d-panel-min: clamp(140px, 18vh, 240px);
+
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Definitivní výškový strop pro dashboard (scoped přes :has, jen tato stránka):
+   .app-body má jinak min-height:100vh (roste s obsahem) → flex:1 nemá co rozdělit.
+   height:100dvh + overflow:hidden dá pevnou výšku → app-main = 100dvh - header,
+   panely se sevřou na 1 obrazovku a listy scrollují uvnitř (žádný fold). */
+.app-body:has(.dashboard-shell) {
+    height: 100dvh;
     overflow: hidden;
 }
 
-/* .dashboard-shell-header (+ h1) → odstraněno 2026-06-08; horní hlavička dashboardu
-   (název stránky + podtitulek) smazána kvůli úspoře místa. */
-
-.dashboard-body {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    grid-template-rows: 1fr 1fr;
-    gap: 12px;
+/* Scope flex-fill jen na dashboard (ostatní fluid views nedotčeny).
+   min-height:0 = flexbox min-height:auto past, aby app-main nepřerostl viewport. */
+.app-main--fluid:has(.dashboard-shell) {
+    display: flex;
+    flex-direction: column;
     min-height: 0;
-    padding: 12px 24px 24px;
 }
 
-/* .dashboard-panel — duplicate definice odstraněna 2026-04-29; selektor se nikde
-   v cshtml nepoužívá. Aktivní jsou jen *-body / -header / -footer / -placeholder. */
+/* .dashboard-shell-header (+ h1) → odstraněno 2026-06-08 (úspora místa). */
+
+.dashboard-body {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: minmax(var(--d-panel-min), 1fr) minmax(var(--d-panel-min), 1fr);
+    gap: var(--d-gap-panel);
+    min-height: 0;
+    padding-block: var(--d-gap-panel);
+}
 
 .dashboard-section--focus {
     grid-column: 1;
@@ -7031,41 +7086,77 @@ html {
     grid-row: 2;
 }
 
-.dashboard-panel-body {
+/* Panel = flex column, který clipuje; vnitřní list scrolluje. */
+.dashboard-panel {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    height: 100%;
+    overflow: hidden;
 }
 
-/* .dashboard-panel-header → odstraněno 2026-06-08 (viz výše). */
+.dashboard-panel > [data-dashboard-panel-content] {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.dashboard-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--d-gap-item);
+    /* container query pro adaptivní hustotu karet (reaguje na šířku panelu) */
+    container-type: inline-size;
+    container-name: dashpanel;
+}
+
+/* .dashboard-panel-header → odstraněno 2026-06-08. */
 
 .dashboard-panel-footer {
     flex: 0 0 auto;
-    padding: 10px 16px;
+    padding: var(--d-gap-item) var(--d-pad-card);
     border-top: 1px solid var(--gov-color-border);
     display: flex;
     justify-content: flex-end;
     gap: 8px;
 }
 
+/* Listy scrollují uvnitř panelu — singulár (.dashboard-meeting-list) i plurál
+   (.dashboard-meetings-list) kvůli historickému class mismatch = bugfix. */
 .dashboard-focus-list,
+.dashboard-meeting-list,
 .dashboard-meetings-list,
 .dashboard-news-list {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
-    padding: 0 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--d-gap-item);
+    padding: 0 var(--d-pad-card) var(--d-gap-item);
 }
 
+/* Stack fallback na úzkém okně / split-screen — scroll stránky. */
 @media (max-width: 1024px) {
-    .dashboard-shell {
+    .app-body:has(.dashboard-shell) {
         height: auto;
-        overflow: auto;
+        overflow: visible;
+    }
+    .app-main--fluid:has(.dashboard-shell) {
+        display: block;
+        min-height: 0;
+    }
+    .dashboard-shell {
+        display: block;
+        height: auto;
+        min-height: 0;
     }
     .dashboard-body {
         grid-template-columns: 1fr;
-        grid-template-rows: auto auto auto;
+        grid-template-rows: none;
+        grid-auto-rows: minmax(var(--d-panel-min), auto);
     }
     .dashboard-section--focus,
     .dashboard-section--meetings,
@@ -7074,7 +7165,14 @@ html {
         grid-row: auto;
     }
     .dashboard-panel {
-        min-height: 280px;
+        overflow: visible;
+        min-height: var(--d-panel-min);
+    }
+    .dashboard-focus-list,
+    .dashboard-meeting-list,
+    .dashboard-meetings-list,
+    .dashboard-news-list {
+        overflow-y: visible;
     }
 }
 
