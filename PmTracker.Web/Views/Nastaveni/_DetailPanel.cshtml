@@ -16,9 +16,6 @@
 @if (Model.SectionKey == "role")
 {
     <section class="card">
-        <div class="panel-header">
-            <h3>Role</h3>
-        </div>
         <table class="table">
             <thead>
                 <tr>
@@ -47,9 +44,6 @@
 else if (Model.SectionKey == "akce")
 {
     <section class="card">
-        <div class="panel-header">
-            <h3>Katalog akcí</h3>
-        </div>
         @foreach (var category in Model.PermissionCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.Nazev, StringComparer.CurrentCultureIgnoreCase))
         {
             <div class="settings-group">
@@ -82,9 +76,6 @@ else if (Model.SectionKey == "akce")
 else if (Model.SectionKey == "role-akce")
 {
     <section class="card">
-        <div class="panel-header">
-            <h3>Mapování role -> akce</h3>
-        </div>
         <p class="muted settings-hint">
             Striktní pravidlo pro „Všechny projekty": jako povolení se počítá pouze <strong>GLOBAL</strong> nebo <strong>ALL</strong>.
             Mapování <strong>INCLUDE</strong> bez vybraného projektu se v přehledu efektivních práv nebere jako povolené.
@@ -118,8 +109,7 @@ else if (Model.SectionKey == "role-akce")
 else if (Model.SectionKey == "uzivatele-role")
 {
     <section class="card">
-        <div class="panel-header">
-            <h3>Mapování uživatelů na role</h3>
+        <div class="panel-header" style="justify-content: flex-end;">
             @if (Model.CanManageSettings)
             {
                 <pm-button variant="Primary"
@@ -190,21 +180,12 @@ else if (Model.SectionKey == "uzivatele-role")
 else if (Model.SectionKey == "synchronizace")
 {
     <section class="card">
-        <div class="panel-header">
-            <h3>Synchronizace</h3>
-        </div>
-        <p class="muted settings-hint">
-            Správa periodických a reaktivních synchronizací mezi PM Trackerem a externími systémy (AD, ServiceDesk).
-        </p>
         @await Html.PartialAsync("_SyncPanel", Model.SyncJobCards)
     </section>
 }
 else
 {
     <section class="card">
-        <div class="panel-header">
-            <h3>Efektivní práva</h3>
-        </div>
         <p class="muted settings-hint">
             Pro volbu „Všechny projekty" je oprávnění povoleno pouze při rozsahu <strong>GLOBAL</strong> nebo <strong>ALL</strong>.
             Rozsah <strong>INCLUDE</strong> bez výběru projektu se nepočítá.
