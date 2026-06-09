@@ -18,15 +18,25 @@
             <pm-button variant="Ghost" size="Small" href="@Model.BackUrl">@(Model.BackLabel ?? "Zpět")</pm-button>
         }
     }
-    <div class="page-header-content">
-        <h1>@Model.Title</h1>
-        @if (!string.IsNullOrWhiteSpace(Model.Subtitle))
-        {
-            <p class="muted">@Model.Subtitle</p>
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.Badge))
-        {
-            <span class="badge">@Model.Badge</span>
-        }
-    </div>
+    @* Content blok jen když je co zobrazit — Title/Subtitle/Badge lze vynechat
+       (např. podstránka chce jen back tlačítko). Stránky s Title beze změny. *@
+    @if (!string.IsNullOrWhiteSpace(Model.Title)
+        || !string.IsNullOrWhiteSpace(Model.Subtitle)
+        || !string.IsNullOrWhiteSpace(Model.Badge))
+    {
+        <div class="page-header-content">
+            @if (!string.IsNullOrWhiteSpace(Model.Title))
+            {
+                <h1>@Model.Title</h1>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Subtitle))
+            {
+                <p class="muted">@Model.Subtitle</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.Badge))
+            {
+                <span class="badge">@Model.Badge</span>
+            }
+        </div>
+    }
 </section>
