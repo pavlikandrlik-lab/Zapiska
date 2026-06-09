@@ -4,13 +4,7 @@
     ViewData["BodyClass"] = "dashboard-page";
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = Model.PageTitle,
-    Subtitle = "Správa hodnot a ochrana systémových položek.",
-    BackUrl = Model.BackUrl,
-    BackLabel = Model.BackLabel
-})
+@* Nadpis stránky odstraněn (user 2026-06-09) — generická hlavička pryč; orientaci dává hlavní menu. Tab title řídí ViewData["Title"]. *@
 
 <div class="ciselniky-layout" data-ciselnik-shell data-content-url="@Url.Action("Panel", "Ciselniky")">
     <aside class="ciselniky-sidebar">

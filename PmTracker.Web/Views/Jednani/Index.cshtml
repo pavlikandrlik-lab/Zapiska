@@ -4,13 +4,7 @@
     ViewData["BodyClass"] = "dashboard-page";
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = Model.PageTitle,
-    Subtitle = "Přehled porad podle projektu.",
-    BackUrl = Model.BackUrl,
-    BackLabel = Model.BackLabel
-})
+@* Nadpis stránky odstraněn (user 2026-06-09) — generická hlavička pryč; orientaci dává hlavní menu. Tab title řídí ViewData["Title"]. *@
 
 @foreach (var projekt in Model.Projekty)
 {
