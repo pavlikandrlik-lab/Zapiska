@@ -648,10 +648,11 @@
 .dashboard-meeting-item,
 .dashboard-news-item {
     display: block;
-    /* gov tokens s fallbackem na původní rgba — dark mode reaguje přes design tokens */
+    /* App standard tokeny (govcz.css) — flipují light/dark automaticky.
+       --gov-color-surface: #fff ↔ #1b2128; --gov-color-border flipuje taktéž. */
     border: 1px solid var(--gov-color-border, rgba(0, 43, 73, 0.1));
     border-radius: var(--d-radius, 0.85rem);
-    background: var(--background-neutral-white, rgba(255, 255, 255, 0.92));
+    background: var(--gov-color-surface, #ffffff);
     padding: var(--d-pad-card, 1rem);
     color: inherit;
     text-decoration: none;
@@ -703,7 +704,7 @@
     margin: 0;
     display: grid;
     gap: 0.3rem 0.7rem;
-    color: #5d7483;
+    color: var(--app-muted);
     font-size: var(--d-fs-label, 0.88rem);
 }
 
@@ -715,7 +716,7 @@
 }
 
 .dashboard-focus-meta dt {
-    color: #6b7d8c;
+    color: var(--app-muted);
     text-transform: uppercase;
     font-size: var(--d-fs-label, 0.72rem);
     letter-spacing: 0.04em;
@@ -724,7 +725,7 @@
 
 .dashboard-focus-meta dd {
     margin: 0;
-    color: #2f4555;
+    color: var(--app-text-primary);
     font-weight: 500;
     overflow-wrap: anywhere;
 }
@@ -734,13 +735,13 @@
     gap: 0.6rem;
     flex-wrap: wrap;
     margin-top: 0.45rem;
-    color: #5d7483;
+    color: var(--app-muted);
     font-size: var(--d-fs-base, 0.92rem);
 }
 
 .dashboard-item-project,
 .dashboard-news-label {
-    color: #005b8f;
+    color: var(--gov-color-primary);
     font-size: var(--d-fs-base, 0.92rem);
     font-weight: 700;
 }
@@ -751,12 +752,12 @@
     margin: 0.25rem 0;
     font-size: var(--d-fs-title, 1.05rem);
     font-weight: 700;
-    color: #0f1720;
+    color: var(--app-text-primary);
 }
 
 .dashboard-item-description {
     margin: 0.3rem 0 0;
-    color: #2f4555;
+    color: var(--app-text-primary);
     font-size: var(--d-fs-base, 1rem);
     display: -webkit-box;
     -webkit-line-clamp: 2;
