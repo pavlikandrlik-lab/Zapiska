@@ -11,6 +11,7 @@
 // eventBus.js MUSÍ být první: registruje gov-click → click adapter. Bez něj
 // všechna <gov-button> tlačítka zůstávají hluchá (gov-design-system 4.x emituje
 // 'gov-click' a stopuje nativní click).
+import "./layout/header-height.js"; // Vystavuje --app-header-h (výška headeru) → dashboard přehled: footer pod fold.
 import "../components/pmTabs.js";
 import "../components/pm-date-field.js"; // Custom Element <pm-date-field> — sjednocený datumový input pro celou aplikaci.
 import "./eventBus.js";

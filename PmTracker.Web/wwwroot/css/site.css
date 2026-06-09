@@ -7042,20 +7042,17 @@ html {
     flex-direction: column;
 }
 
-/* Definitivní výškový strop pro dashboard (scoped přes :has, jen tato stránka):
-   .app-body má jinak min-height:100vh (roste s obsahem) → flex:1 nemá co rozdělit.
-   height:100dvh + overflow:hidden dá pevnou výšku → app-main = 100dvh - header,
-   panely se sevřou na 1 obrazovku a listy scrollují uvnitř (žádný fold). */
-.app-body:has(.dashboard-shell) {
-    height: 100dvh;
-    overflow: hidden;
-}
-
-/* Scope flex-fill jen na dashboard (ostatní fluid views nedotčeny).
-   min-height:0 = flexbox min-height:auto past, aby app-main nepřerostl viewport. */
+/* Dashboard main = přesně jedna obrazovka pod headerem (scoped přes :has):
+   height = 100dvh − výška headeru (--app-header-h měří JS modul header-height.js,
+   fallback 110px pro 1. paint / vypnutý JS). Panely se tak vejdou na obrazovku
+   a site footer (margin-top:auto) spadne těsně POD fold — stránka zůstává
+   scrollovatelná, footer není zbytečně vidět. flex:0 0 auto, aby main respektoval
+   výšku (jinak by ho .app-main flex:1 roztáhl). */
 .app-main--fluid:has(.dashboard-shell) {
     display: flex;
     flex-direction: column;
+    flex: 0 0 auto;
+    height: calc(100dvh - var(--app-header-h, 110px));
     min-height: 0;
 }
 
@@ -7140,12 +7137,9 @@ html {
 
 /* Stack fallback na úzkém okně / split-screen — scroll stránky. */
 @media (max-width: 1024px) {
-    .app-body:has(.dashboard-shell) {
-        height: auto;
-        overflow: visible;
-    }
     .app-main--fluid:has(.dashboard-shell) {
         display: block;
+        height: auto;
         min-height: 0;
     }
     .dashboard-shell {
