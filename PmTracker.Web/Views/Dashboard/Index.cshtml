@@ -18,24 +18,28 @@
             <div data-dashboard-panel-content></div>
         </section>
 
-        <section class="dashboard-panel dashboard-section--meetings"
-                 data-dashboard-panel="meetings"
-                 data-dashboard-panel-url="@Model.MeetingsPanelUrl">
-            <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
-                <div class="record-loading-line"></div>
-                <div class="record-loading-line short"></div>
-            </div>
-            <div data-dashboard-panel-content></div>
-        </section>
+        @* Pravý sloup: jednání + novinky sdílí výšku. Prázdný panel uvolní místo
+           druhému (řízeno přes :has v site.css — viz .dashboard-rail). *@
+        <div class="dashboard-rail">
+            <section class="dashboard-panel dashboard-section--meetings"
+                     data-dashboard-panel="meetings"
+                     data-dashboard-panel-url="@Model.MeetingsPanelUrl">
+                <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
+                    <div class="record-loading-line"></div>
+                    <div class="record-loading-line short"></div>
+                </div>
+                <div data-dashboard-panel-content></div>
+            </section>
 
-        <section class="dashboard-panel dashboard-section--news"
-                 data-dashboard-panel="news"
-                 data-dashboard-panel-url="@Model.NewsPanelUrl">
-            <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
-                <div class="record-loading-line"></div>
-                <div class="record-loading-line short"></div>
-            </div>
-            <div data-dashboard-panel-content></div>
-        </section>
+            <section class="dashboard-panel dashboard-section--news"
+                     data-dashboard-panel="news"
+                     data-dashboard-panel-url="@Model.NewsPanelUrl">
+                <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
+                    <div class="record-loading-line"></div>
+                    <div class="record-loading-line short"></div>
+                </div>
+                <div data-dashboard-panel-content></div>
+            </section>
+        </div>
     </div>
 </section>

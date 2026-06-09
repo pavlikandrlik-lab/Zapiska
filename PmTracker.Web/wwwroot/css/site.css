@@ -7062,7 +7062,7 @@ html {
     flex: 1 1 auto;
     display: grid;
     grid-template-columns: 2fr 1fr;
-    grid-template-rows: minmax(var(--d-panel-min), 1fr) minmax(var(--d-panel-min), 1fr);
+    grid-template-rows: 1fr;
     gap: var(--d-gap-panel);
     min-height: 0;
     padding-block: var(--d-gap-panel);
@@ -7070,17 +7070,29 @@ html {
 
 .dashboard-section--focus {
     grid-column: 1;
-    grid-row: 1 / 3;
 }
 
-.dashboard-section--meetings {
+/* Pravý sloup: jednání + novinky sdílí výšku ve flex sloupci. */
+.dashboard-rail {
     grid-column: 2;
-    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--d-gap-panel);
+    min-height: 0;
 }
 
-.dashboard-section--news {
-    grid-column: 2;
-    grid-row: 2;
+/* Dynamické sdílení výšky: panel s OBSAHEM (má list) roste a scrolluje;
+   PRÁZDNÝ panel (jen .muted hláška, žádný list) se smrskne na obsah a uvolní
+   místo druhému. Detekce přes :has — empty-state partial nerenderuje list. */
+.dashboard-rail > .dashboard-panel:has(.dashboard-meeting-list),
+.dashboard-rail > .dashboard-panel:has(.dashboard-meetings-list),
+.dashboard-rail > .dashboard-panel:has(.dashboard-news-list) {
+    flex: 1 1 auto;
+    min-height: var(--d-panel-min);
+}
+
+.dashboard-rail > .dashboard-panel:not(:has(.dashboard-meeting-list)):not(:has(.dashboard-meetings-list)):not(:has(.dashboard-news-list)) {
+    flex: 0 0 auto;
 }
 
 /* Panel = flex column, který clipuje; vnitřní list scrolluje. */
@@ -7153,14 +7165,20 @@ html {
         grid-auto-rows: minmax(var(--d-panel-min), auto);
     }
     .dashboard-section--focus,
-    .dashboard-section--meetings,
-    .dashboard-section--news {
+    .dashboard-rail {
         grid-column: 1;
         grid-row: auto;
+    }
+    .dashboard-rail {
+        display: block;
     }
     .dashboard-panel {
         overflow: visible;
         min-height: var(--d-panel-min);
+    }
+    /* ve stacku ať empty panel nedrží zbytečnou výšku */
+    .dashboard-rail > .dashboard-panel:not(:has(.dashboard-meeting-list)):not(:has(.dashboard-meetings-list)):not(:has(.dashboard-news-list)) {
+        min-height: 0;
     }
     .dashboard-focus-list,
     .dashboard-meeting-list,
