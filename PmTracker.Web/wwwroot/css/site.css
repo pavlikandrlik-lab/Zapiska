@@ -1351,6 +1351,9 @@
     align-items: center;
     justify-content: flex-end;
     flex-wrap: wrap;
+    /* Spodní mezera napevno (dříve jen přes .page-header + .header-actions, což
+       po odstranění page-headerů přestalo platit → akce se lepily na obsah). */
+    margin-bottom: 14px;
 }
 
 .header-actions > form {
