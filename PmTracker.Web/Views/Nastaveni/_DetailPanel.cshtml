@@ -5,13 +5,8 @@
     var defaultAssignmentUserId = selectedUserId ?? Model.UserRoles.FirstOrDefault()?.OsobaId;
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = Model.PageTitle,
-    Subtitle = Model.Popis,
-    BackUrl = Model.BackUrl,
-    BackLabel = Model.BackLabel
-})
+@* Nadpis sekce (název + popis) odstraněn (user 2026-06-10) — orientaci dává
+   sidebar (zvýrazněná aktivní sekce). *@
 
 @if (Model.SectionKey == "role")
 {

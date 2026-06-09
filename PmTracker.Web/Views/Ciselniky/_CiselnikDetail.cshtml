@@ -20,13 +20,8 @@
     }
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = Model.PageTitle,
-    Subtitle = $"Klíč: {Model.Key}",
-    BackUrl = Model.BackUrl,
-    BackLabel = Model.BackLabel
-})
+@* Nadpis číselníku (název + klíč) odstraněn (user 2026-06-10) — první je „Nová
+   položka". Orientaci dává sidebar (zvýrazněný aktivní číselník). *@
 
 @if (Model.CanEditThisCiselnik && Model.CanCreate)
 {

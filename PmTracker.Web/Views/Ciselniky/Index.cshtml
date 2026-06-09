@@ -12,9 +12,11 @@
             @foreach (var ciselnik in Model.Ciselniky)
             {
                 var isActive = ciselnik.Key == Model.VybranyCiselnik.Key;
+                @* href přes query (?id=) místo route-id, aby v adrese nebylo
+                   „/Index/" — produkuje /Ciselniky?id=<klíč> (user 2026-06-10).
+                   Sedí s JS, který klíč čte z ?id=; Panel AJAX má vlastní query. *@
                 <a class="ciselnik-tile @(isActive ? "active" : "")"
-                   asp-action="Index"
-                   asp-route-id="@ciselnik.Key"
+                   href="@(Url.Action("Index", "Ciselniky"))?id=@Uri.EscapeDataString(ciselnik.Key)"
                    data-ciselnik-link
                    data-key="@ciselnik.Key"
                    aria-current="@(isActive ? "page" : null)">
