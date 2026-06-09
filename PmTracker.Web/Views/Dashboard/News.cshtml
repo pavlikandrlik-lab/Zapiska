@@ -1,6 +1,7 @@
 @model DashboardNewsListPageViewModel
 @{
     ViewData["Title"] = Model.PageTitle;
+    ViewData["BodyClass"] = "dashboard-page"; // stejně jako Focus → app-main--fluid (margin:0), zarovnání shora
 }
 
 @* Title + Subtitle záměrně vynechány (user 2026-06-09) — jen back tlačítko.

@@ -828,6 +828,14 @@
     max-width: 56rem;
 }
 
+/* Narrow list-page (Jednání/Novinky) si drží úzký sloupec i pod fluid tierem
+   (2026-06-09): tyto podstránky dostaly bodyClass=dashboard-page kvůli zarovnání
+   shora (app-main margin:0), ale obsah má zůstat úzký — jinak by řídce roztáhl
+   jednoduché karty. Pořadí po .app-main--fluid .dashboard-list-page = vyhrává. */
+.app-main--fluid .dashboard-list-page-narrow {
+    max-width: 56rem;
+}
+
 @media (max-width: 960px) {
     .dashboard-home-grid {
         grid-template-columns: 1fr;
