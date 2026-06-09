@@ -3,10 +3,11 @@
     ViewData["Title"] = Model.PageTitle;
 }
 
+@* Title + Subtitle záměrně vynechány (user 2026-06-09) — jen back tlačítko.
+   Tab title v prohlížeči řídí ViewData["Title"] výše. *@
 @await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
 {
-    Title = Model.PageTitle,
-    Subtitle = Model.Subtitle,
+    Title = "", // prázdný → _PageHeader nadpis nevyrenderuje (required member, nutno nastavit)
     BackUrl = Model.BackUrl,
     BackLabel = Model.BackLabel
 })
