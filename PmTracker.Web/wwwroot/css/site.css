@@ -7022,6 +7022,15 @@ html {
     padding: 0 clamp(16px, 2vw, 48px);
 }
 
+/* Fluid list/index stránky bez dashboard-shellu (Projekty, Číselníky, Nastavení,
+   Profil, Jednání + podstránky Focus/Meetings/News): po odstranění _PageHeaderu
+   (2026-06-09) ztratil obsah horní odsazení, které header dřív poskytoval, a
+   nalepil se pod sticky menu → vrátit top padding. Přehled (s .dashboard-shell)
+   je vyloučen, drží si přesnou výšku 100dvh−header. */
+.app-main--fluid:not(:has(.dashboard-shell)) {
+    padding-top: clamp(14px, 1.5vw, 22px);
+}
+
 /* ==========================================================================
    DASHBOARD PŘEHLED — fluid + adaptivní layout (2026-06-09)
    Spec: docs/superpowers/specs/2026-06-09-dashboard-prehled-layout-design.md
