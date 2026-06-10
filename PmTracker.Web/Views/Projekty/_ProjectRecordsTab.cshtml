@@ -16,34 +16,8 @@
          data-record-target-open-comments="@targetRecordOpenComments.ToString().ToLowerInvariant()"
          data-project-tab-refresh-url="@Model.RefreshUrl"
          data-record-meeting-comment-states-url="@Model.MeetingCommentStatesUrl">
-    <div class="panel-header">
-        <div class="panel-header-actions">
-            <pm-button variant="Ghost"
-                       href="@Model.ProjectPrintUrl"
-                       target="_blank"
-                       rel="noopener"
-                       data-print-trigger="true"
-                       data-project-print-trigger="true"
-                       data-print-pdf-url="@Model.ProjectPrintUrl"
-                       data-print-word-url="@Model.ProjectWordUrl"
-                       data-print-label="Tisk projektu">
-                Tisk projektu
-            </pm-button>
-            @if (Model.CanManageRecords)
-            {
-                <pm-button variant="Primary" href="@Model.CreateRecordEditorUrl">
-                    Nový záznam
-                </pm-button>
-            }
-            @if (Model.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.CreateRecordProposalUrl))
-            {
-                <pm-button variant="Secondary" href="@Model.CreateRecordProposalUrl">
-                    Nový návrh záznamu
-                </pm-button>
-            }
-        </div>
-    </div>
-
+    @* Akce (Tisk projektu / Nový záznam / Nový návrh) přesunuty do tab stripu
+       v Detail.cshtml (.tabs-actions) kvůli úspoře místa — user 2026-06-10. *@
     @await Html.PartialAsync("_ProjectFilterShell", Model.FilterShell)
 
     <div class="records-shell" data-records-view="subsystem" data-subsystem-grouped-shell>

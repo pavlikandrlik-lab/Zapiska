@@ -91,6 +91,35 @@
             Dashboard
         </a>
     }
+
+    @* Akce přesunuty z .panel-header do tab stripu (vpravo) kvůli úspoře místa
+       (user 2026-06-10). Data z Model.ZaznamyTab (records panel se renderuje vždy). *@
+    <div class="tabs-actions">
+        <pm-button variant="Ghost"
+                   size="Small"
+                   href="@Model.ZaznamyTab.ProjectPrintUrl"
+                   target="_blank"
+                   rel="noopener"
+                   data-print-trigger="true"
+                   data-project-print-trigger="true"
+                   data-print-pdf-url="@Model.ZaznamyTab.ProjectPrintUrl"
+                   data-print-word-url="@Model.ZaznamyTab.ProjectWordUrl"
+                   data-print-label="Tisk projektu">
+            Tisk projektu
+        </pm-button>
+        @if (Model.ZaznamyTab.CanManageRecords)
+        {
+            <pm-button variant="Primary" size="Small" href="@Model.ZaznamyTab.CreateRecordEditorUrl">
+                Nový záznam
+            </pm-button>
+        }
+        @if (Model.ZaznamyTab.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.ZaznamyTab.CreateRecordProposalUrl))
+        {
+            <pm-button variant="Secondary" size="Small" href="@Model.ZaznamyTab.CreateRecordProposalUrl">
+                Nový návrh záznamu
+            </pm-button>
+        }
+    </div>
 </div>
 
 @await Html.PartialAsync(

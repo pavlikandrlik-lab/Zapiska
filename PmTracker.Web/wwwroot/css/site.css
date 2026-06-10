@@ -2248,6 +2248,18 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: flex;
     gap: 12px;
     margin-bottom: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Akce projektu (Tisk / Nový záznam) zarovnané vpravo v tab stripu — šetří
+   svislé místo oproti samostatnému .panel-header řádku (2026-06-10). */
+.tabs-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 .tab {
