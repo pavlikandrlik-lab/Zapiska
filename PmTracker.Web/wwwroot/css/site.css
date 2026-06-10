@@ -4571,6 +4571,21 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     padding: 10px 12px;
     background: rgba(255, 255, 255, 0.85);
     margin-bottom: 16px;
+    /* Řádek 1 = „Filtry" + použité chipy vedle sebe; panel se zalomí pod (2026-06-10). */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+}
+
+/* „Filtry" tlačítko: jen auto šířka (dřív width:100% → samostatný řádek),
+   aby vedle něj mohly chipy. Scope na .filter-shell, ať to neovlivní ostatní
+   .filter-toggle (např. project-filter-toggle). */
+.filter-shell > .filter-toggle {
+    width: auto;
+    justify-content: flex-start;
+    gap: 8px;
+    flex: 0 0 auto;
 }
 
 .filter-toggle {
@@ -4587,6 +4602,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .filter-panel {
     margin-top: 12px;
+    /* Rozbalený panel se zalomí na celou šířku pod řádek 1 (Filtry + chipy). */
+    flex-basis: 100%;
 }
 
 .filter-panel.collapsed {
@@ -4597,7 +4614,15 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 12px;
+    /* Chipy v 1. řádku vedle „Filtry" (dřív margin-top:12px → 2. řádek). */
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* JS nastavuje chipRow.hidden=true když nejsou filtry; autorský display:flex by
+   jinak [hidden] přebil → explicitně skrýt (čistý prázdný stav, žádná mezera). */
+.active-filter-row[hidden] {
+    display: none;
 }
 
 .active-filter-chip {
