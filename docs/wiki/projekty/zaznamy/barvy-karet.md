@@ -17,7 +17,7 @@ Každá karta záznamu má vlevo **barevný svislý proužek**. Nese dvojí výz
 |---|---|---|
 | Úkol | `U` | 🟡 jantarová |
 | Informace | `I` | 🔵 modrá |
-| Rozhodnutí | `D` | 🟢 zelená |
+| Rozhodnutí | `D` | 🟣 fialová |
 | ostatní / vlastní | — | ⚪ neutrální šedá |
 
 ## Úkoly — stavová eskalace (semafor)
@@ -38,7 +38,7 @@ Pravidla:
 - Červená platí jen pro **aktivní** úkoly. **Hotový úkol je vždy zelený**, i když
   byl dokončen po termínu (dokončeno = vyřešeno).
 - Eskalace se týká jen kategorie **Úkol**. Informace a Rozhodnutí termín nemají,
-  drží svou barvu (modrá / zelená).
+  drží svou barvu (modrá / fialová). Zelená/červená jsou rezervované pro stav úkolu.
 
 ## Tmavý režim
 

@@ -6692,7 +6692,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
 }
 
 .record-cat--decision .record-bar {
-    background: var(--gov-color-success);
+    background: var(--record-cat-decision);
 }
 
 /* Hotový úkol (finální stav → data-filter-aktivni="false") = zelená (bezpečí/

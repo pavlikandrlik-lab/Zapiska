@@ -32,7 +32,7 @@ navíc `UKOL`/`INFO`/`ROZHODNUTI`). Barva se proto určuje sémanticky podle kó
 |---|---|---|---|
 | Úkol | `U`, `UKOL` | `--gov-color-warning` (jantarová) | akce / pozornost |
 | Informace | `I`, `INFO`, `INF` | `--gov-color-primary` (modrá) | informační, klid |
-| Rozhodnutí | `D`, `ROZHODNUTI`, `ROZH` | `--gov-color-success` (zelená) | rozhodnuto / závěr |
+| Rozhodnutí | `D`, `ROZHODNUTI`, `ROZH` | `--record-cat-decision` (fialová, mimo gov paletu, theme-aware) | rozhodnuto / závěr |
 | ostatní / custom (default) | — | `--gov-color-muted` (neutrální šedá) | bez sémantiky |
 
 ### Úkol 3 — stavová eskalace úkolů (semafor) — 2026-06-11
