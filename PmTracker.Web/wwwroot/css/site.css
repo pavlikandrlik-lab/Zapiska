@@ -3400,7 +3400,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .record-bar {
     width: 6px;
-    background: var(--gov-color-accent);
+    /* Default = neutrální (kategorie bez sémantiky / custom per-projekt). */
+    background: var(--gov-color-muted);
+    /* Zaoblit levé rohy, ať proužek kopíruje zaoblení karty (karta má
+       overflow:visible kvůli jiným prvkům, proto neořízne). */
+    border-radius: var(--gov-radius) 0 0 var(--gov-radius);
 }
 
 .record-content {
@@ -6676,18 +6680,20 @@ pm-tab-panel.sync-tab-panel-content[active] {
     accent-color: #84aef7;
 }
 
+/* Sémantika barev kategorií (2026-06-11) — gov tokeny, theme-aware (light/dark).
+   Úkol=akce/pozornost, Informace=klid/info, Rozhodnutí=hotovo/závěr. */
 .category-u .record-bar,
 .category-ukol .record-bar {
-    background: #dc2626;
+    background: var(--gov-color-warning);
 }
 
 .category-info .record-bar {
-    background: #2563eb;
+    background: var(--gov-color-primary);
 }
 
 .category-rozh .record-bar,
 .category-rozhodnuti .record-bar {
-    background: #7c3aed;
+    background: var(--gov-color-success);
 }
 
 @media (max-width: 1220px) {
