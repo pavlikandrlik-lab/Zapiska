@@ -29,6 +29,16 @@ Zdroj: `PmTracker.Web/wwwroot/css/tokens.css`.
 | `--pm-color-surface` | Pozadí karty / panelu |
 | `--pm-color-border` | Hraniční linie |
 
+#### Feature barvy (mimo obecnou paletu)
+
+| Token | Význam |
+|---|---|
+| `--record-cat-decision` | Barva kategorie **Rozhodnutí** u karet záznamů (fialová — `#7c3aed` light / `#c4b5fd` dark; theme-aware). Mimo gov paletu, protože gov barvy jsou obsazené semaforem úkolů. Zdroj: `govcz.css`. Viz [Barvy karet záznamů](../wiki/projekty/zaznamy/barvy-karet.md). |
+
+> Pozn.: Ostatní barvy karet záznamů používají gov tokeny — Úkol `--gov-color-warning`,
+> Informace `--gov-color-primary`, hotový úkol `--gov-color-success`, po termínu
+> `--gov-color-accent`, ostatní `--gov-color-muted`.
+
 ### Spacing (4pt grid)
 
 `--pm-spacing-3xs` (2px) až `--pm-spacing-3xl` (64px).
