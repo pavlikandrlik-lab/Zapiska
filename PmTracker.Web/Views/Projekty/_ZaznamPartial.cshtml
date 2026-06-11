@@ -2,13 +2,27 @@
 @{
     var summary = Model.Summary;
     var colorClass = "category-" + summary.KategorieKod.ToLowerInvariant();
+    // Sémantická barevná třída čáry — odolná vůči přesnému kódu kategorie
+    // (číselník je editovatelný + CHAR padding): matchuje podle názvu i známých
+    // kódů (normalizováno Trim/Upper). Viz .record-cat--* v site.css (2026-06-11).
+    var catKod = (summary.KategorieKod ?? string.Empty).Trim().ToUpperInvariant();
+    var catName = summary.KategorieNazev ?? string.Empty;
+    var catColor =
+        (catKod is "U" or "UKOL"
+            || catName.Contains("úkol", StringComparison.OrdinalIgnoreCase)
+            || catName.Contains("ukol", StringComparison.OrdinalIgnoreCase)) ? "record-cat--task"
+        : (catKod is "INFO" or "INF" or "I"
+            || catName.Contains("informac", StringComparison.OrdinalIgnoreCase)) ? "record-cat--info"
+        : (catKod is "ROZHODNUTI" or "ROZH" or "R"
+            || catName.Contains("rozhodnut", StringComparison.OrdinalIgnoreCase)) ? "record-cat--decision"
+        : "record-cat--other";
     var projektId = summary.ProjektId;
     var taskPrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = summary.Id, projektId, autoPrint = true }) ?? $"/Export/Ukol/{summary.Id}/Tisk?projektId={projektId}&autoPrint=true";
     var taskPrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = summary.Id, projektId }) ?? $"/Export/Ukol/{summary.Id}/Word?projektId={projektId}";
     var editRecordUrl = Url.Action("Edit", "Zaznamy", new { id = summary.Id, projektId }) ?? $"/Zaznamy/Edit/{summary.Id}";
 }
 
-<article class="record-card collapsed @colorClass"
+<article class="record-card collapsed @colorClass @catColor"
          data-record-id="@summary.Id"
          data-record-detail-url="@Model.DetailUrl"
          data-record-comments-url="@Model.CommentsUrl"

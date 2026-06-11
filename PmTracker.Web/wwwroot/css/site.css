@@ -6681,25 +6681,23 @@ pm-tab-panel.sync-tab-panel-content[active] {
 }
 
 /* Sémantika barev kategorií (2026-06-11) — gov tokeny, theme-aware (light/dark).
-   Úkol=akce/pozornost, Informace=klid/info, Rozhodnutí=hotovo/závěr. */
-.category-u .record-bar,
-.category-ukol .record-bar {
+   Třídy record-cat--* počítá _ZaznamPartial podle názvu i kódu (odolné vůči
+   editovatelnému číselníku / CHAR paddingu). Úkol=akce, Informace=info, Rozhodnutí=závěr. */
+.record-cat--task .record-bar {
     background: var(--gov-color-warning);
 }
 
-.category-info .record-bar {
+.record-cat--info .record-bar {
     background: var(--gov-color-primary);
 }
 
-.category-rozh .record-bar,
-.category-rozhodnuti .record-bar {
+.record-cat--decision .record-bar {
     background: var(--gov-color-success);
 }
 
 /* Hotový úkol (finální stav → data-filter-aktivni="false") = zelená (bezpečí/
    hotovo), přebíjí jantarovou kategorie Úkol. Vyšší specificita (class+attr). */
-.category-u[data-filter-aktivni="false"] .record-bar,
-.category-ukol[data-filter-aktivni="false"] .record-bar {
+.record-cat--task[data-filter-aktivni="false"] .record-bar {
     background: var(--gov-color-success);
 }
 
