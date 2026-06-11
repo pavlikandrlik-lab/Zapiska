@@ -64,6 +64,7 @@ stránkování.
 - [Externí vazba na SD](externi-vazba-sd.md) — propojení s ticketem
 - [Smazat záznam](smazat-zaznam.md) — soft-delete
 - [Filtry a režimy zobrazení](filtry-a-rezimy-zobrazeni.md)
+- [Barvy karet záznamů](barvy-karet.md) — význam barevného proužku (kategorie + stav úkolu)
 
 ## Pro koho
 

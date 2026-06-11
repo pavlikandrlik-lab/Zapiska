@@ -1,4 +1,5 @@
 @model ProjektZaznamCardShellViewModel
+@inject TimeProvider Clock
 @{
     var summary = Model.Summary;
     var colorClass = "category-" + summary.KategorieKod.ToLowerInvariant();
@@ -17,6 +18,13 @@
         : (catKod is "D" or "ROZHODNUTI" or "ROZH"
             || catName.Contains("rozhodnut", StringComparison.OrdinalIgnoreCase)) ? "record-cat--decision"
         : "record-cat--other";
+    // Po termínu: jen AKTIVNÍ úkol s termínem úkolu (AktualniTermin = DatumUkonceni)
+    // v minulosti → červený proužek (urgence). Dnešek z app TimeProvideru.
+    var todayDate = Clock.GetLocalNow().Date;
+    var isOverdue = summary.JeUkol
+        && summary.IsAktivniStav
+        && summary.AktualniTermin.HasValue
+        && summary.AktualniTermin.Value.Date < todayDate;
     var projektId = summary.ProjektId;
     var taskPrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = summary.Id, projektId, autoPrint = true }) ?? $"/Export/Ukol/{summary.Id}/Tisk?projektId={projektId}&autoPrint=true";
     var taskPrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = summary.Id, projektId }) ?? $"/Export/Ukol/{summary.Id}/Word?projektId={projektId}";
@@ -43,6 +51,7 @@
          data-filter-vlastnik="@summary.AktualniVlastnik"
          data-filter-vlastnik-id="@summary.AktualniVlastnikId"
          data-filter-aktivni="@summary.IsAktivniStav.ToString().ToLowerInvariant()"
+         data-record-overdue="@isOverdue.ToString().ToLowerInvariant()"
          data-filter-je-ukol="@summary.JeUkol.ToString().ToLowerInvariant()"
          data-filter-vyjadreni-jednani-stavy="@(string.Join("|", summary.VyjadreniJednaniStavyKody))">
     <div class="record-bar" aria-hidden="true"></div>

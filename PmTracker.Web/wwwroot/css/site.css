@@ -6701,6 +6701,13 @@ pm-tab-panel.sync-tab-panel-content[active] {
     background: var(--gov-color-success);
 }
 
+/* Aktivní úkol PO TERMÍNU (data-record-overdue="true") = červená (urgence),
+   přebíjí jantarovou. Hotové úkoly mají overdue=false (počítá se jen pro aktivní),
+   takže zelená zůstává. Semafor: zelená=hotovo, jantarová=běží, červená=po termínu. */
+.record-cat--task[data-record-overdue="true"] .record-bar {
+    background: var(--gov-color-accent);
+}
+
 @media (max-width: 1220px) {
     .docs-layout {
         grid-template-columns: 230px minmax(0, 1fr);

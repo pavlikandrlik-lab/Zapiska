@@ -23,22 +23,46 @@ ale `overflow:visible` je explicitní → bezpečnější nesahat na něj):
 ```
 
 ### Úkol 2 — sémantika barev (gov tokeny, theme-aware)
-| Kategorie | Token | Význam |
+
+**Produkční kódy kategorií:** `U`=Úkol, `I`=Informace, `D`=Rozhodnutí (dev seed má
+navíc `UKOL`/`INFO`/`ROZHODNUTI`). Barva se proto určuje sémanticky podle kódu
+**i názvu** (fallback) v `_ZaznamPartial` → třídy `record-cat--*`.
+
+| Kategorie | Kódy | Token | Význam |
+|---|---|---|---|
+| Úkol | `U`, `UKOL` | `--gov-color-warning` (jantarová) | akce / pozornost |
+| Informace | `I`, `INFO`, `INF` | `--gov-color-primary` (modrá) | informační, klid |
+| Rozhodnutí | `D`, `ROZHODNUTI`, `ROZH` | `--gov-color-success` (zelená) | rozhodnuto / závěr |
+| ostatní / custom (default) | — | `--gov-color-muted` (neutrální šedá) | bez sémantiky |
+
+### Úkol 3 — stavová eskalace úkolů (semafor) — 2026-06-11
+
+U kategorie **Úkol** proužek navíc reaguje na stav a termín (semafor):
+
+| Stav úkolu | Token | Podmínka |
 |---|---|---|
-| Úkol (`U`/`UKOL`) | `--gov-color-warning` (jantarová) | akce / pozornost |
-| Informace (`INFO`) | `--gov-color-primary` (modrá) | informační, klid |
-| Rozhodnutí (`ROZH`/`ROZHODNUTI`) | `--gov-color-success` (zelená) | rozhodnuto / závěr |
-| ostatní / custom (default) | `--gov-color-muted` (neutrální šedá) | bez sémantiky |
+| Běží, v termínu | `--gov-color-warning` (jantarová) | aktivní, termín ≥ dnes |
+| **Po termínu** | `--gov-color-accent` (červená) | aktivní `JeUkol` + `AktualniTermin.Date < dnes` |
+| Hotový | `--gov-color-success` (zelená) | finální stav (`IsAktivniStav=false`) |
+
+- Termín = **termín úkolu** (`AktualniTermin` = `DatumUkonceni`), ne dílčí harmonogram.
+- Hranice `< dnes` (v den termínu ještě jantarová). Dnešek z app `TimeProvider`.
+- Červená jen pro **aktivní** úkoly; hotový úkol je vždy zelený (overdue se počítá
+  jen pro aktivní). Info/Rozhodnutí se eskalace netýká.
 
 Výhody: konzistence s gov-message/gov-tag, automatický light/dark (řeší i
 dark-mode čitelnost), neutrální fallback pro per-projekt custom kategorie.
+Uživatelská dokumentace: `docs/wiki/projekty/zaznamy/barvy-karet.md`.
 
 ## Dotčené soubory
 - `PmTracker.Web/wwwroot/css/site.css`:
-  - `.record-bar` (ř. ~3401) — přidat `border-radius` (left) + default background
-    `--gov-color-accent` → `--gov-color-muted`.
-  - `.category-* .record-bar` (ř. ~6679–6691) — hardcoded hex → gov tokeny.
-- Žádná změna markupu (`_ZaznamPartial` generuje `category-{kód}` dál).
+  - `.record-bar` — `border-radius` (left) + default background `--gov-color-muted`.
+  - `.record-cat--{task|info|decision}` — barvy přes gov tokeny.
+  - `.record-cat--task[data-filter-aktivni="false"]` → zelená (hotovo).
+  - `.record-cat--task[data-record-overdue="true"]` → červená (po termínu).
+- `PmTracker.Web/Views/Projekty/_ZaznamPartial.cshtml`:
+  - `@inject TimeProvider` + výpočet `catColor` (record-cat--*) a `isOverdue`.
+  - `<article>` dostal `record-cat--*` třídu + `data-record-overdue`.
 
 ## Mimo rozsah
 - Tónování pillu kategorie (zůstává neutrální pill) — jen proužek.
