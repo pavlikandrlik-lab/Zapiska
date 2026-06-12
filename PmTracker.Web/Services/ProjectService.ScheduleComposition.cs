@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Services;
 
@@ -18,21 +19,16 @@ public sealed partial class ProjectService
         }
 
         var taskRecordIds = taskRecords.Select(x => x.Id).ToList();
-        var harmonogramRows = await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
+
+        // Datum-model: kroky harmonogramu (plan_datum + skutecnost_datum) z nové tabulky.
+        var krokRows = await dbContext.ZaznamHarmonogramKroky.AsNoTracking()
             .Where(x => taskRecordIds.Contains(x.ZaznamId))
             .ToListAsync(ct);
-        // DESIGN-10-A (2026-05-01): HodnotaInt je nullable po Phase 1.5. NULL = "krok nenastal"
-        // → vyfiltrovat z mapy. BuildHarmonogramVypocetPublic očekává non-nullable IReadOnlyDictionary<int, int>.
-        // Bez .Where(.HasValue) by cast Dictionary<int,int?> → IReadOnlyDictionary<int,int> hodil
-        // runtime InvalidCastException (kovariance generik nepodporuje).
-        var harmonogramByRecord = harmonogramRows
+        var krokyByRecord = krokRows
             .GroupBy(x => x.ZaznamId)
-            .ToDictionary(
-                group => group.Key,
-                group => (IReadOnlyDictionary<int, int>)group
-                    .Where(item => item.HodnotaInt.HasValue)
-                    .ToDictionary(item => item.TypId, item => item.HodnotaInt!.Value));
-        var schemaCache = new Dictionary<int, HarmonogramSchemaDefinition>();
+            .ToDictionary(g => g.Key, g => (IReadOnlyCollection<ZaznamHarmonogramKrokEntity>)g.ToList());
+        var emptyKroky = (IReadOnlyCollection<ZaznamHarmonogramKrokEntity>)Array.Empty<ZaznamHarmonogramKrokEntity>();
+
         var ownerIds = taskRecords.Select(x => x.AktualniVlastnikId).Distinct().ToList();
         var ownerRows = await dbContext.Osoby.AsNoTracking()
             .Where(x => ownerIds.Contains(x.Id))
@@ -45,52 +41,27 @@ public sealed partial class ProjectService
             })
             .ToListAsync(ct);
         var ownerById = ownerRows.ToDictionary(x => x.Id);
-        var schemaVersions = taskRecords
-            .Select(x => x.HarmonogramSablonaVerze > 0 ? x.HarmonogramSablonaVerze : 0)
-            .Distinct()
-            .ToList();
-        foreach (var schemaVersion in schemaVersions)
-        {
-            schemaCache[schemaVersion] = await harmonogramService.GetSchemaForRecordAsync(schemaVersion, ct);
-        }
+
+        var todayDate = timeProvider.GetUtcNow().UtcDateTime.Date;
 
         return taskRecords
             .Select(record =>
             {
                 var deadline = (record.AktualniTermin ?? record.DatumZalozeni).Date;
-                var schemaVersion = record.HarmonogramSablonaVerze > 0 ? record.HarmonogramSablonaVerze : 0;
-                var schema = schemaCache[schemaVersion];
+                var kroky = krokyByRecord.TryGetValue(record.Id, out var k) ? k : emptyKroky;
 
-                var harmonogramHodnoty = harmonogramByRecord.TryGetValue(record.Id, out var harmonogramValues)
-                    ? harmonogramValues
-                    : EmptyIntMap;
-                var vypocet = harmonogramService.BuildHarmonogramVypocetPublic(record.DatumZalozeni, schema.Kroky, harmonogramHodnoty);
-                var souhrn = harmonogramService.BuildHarmonogramSouhrn(vypocet, deadline);
+                var souhrn = HarmonogramDateBlokBuilder.BuildSouhrn(record.DatumZalozeni, kroky, deadline, todayDate);
                 var owner = ownerById.GetValueOrDefault(record.AktualniVlastnikId);
                 var ownerDisplay = owner is null
                     ? record.AktualniVlastnik
                     : BuildDisplayName(owner.Titul, owner.Jmeno, owner.Prijmeni, owner.Id);
-                var hasVisualDuration = souhrn.CelkoveTrvaniDni > 0;
 
-                if (!hasVisualDuration)
+                if (souhrn.CelkoveTrvaniDni <= 0)
                 {
                     return null;
                 }
 
-                var sharedSteps = vypocet
-                    .Select(krok => new HarmonogramKrokEditViewModel
-                    {
-                        KrokIndex = krok.KrokIndex,
-                        Nazev = krok.Nazev,
-                        BarvaHex = krok.BarvaHex,
-                        TrvaniTypId = krok.TrvaniTypId,
-                        ZpozdeniTypId = krok.ZpozdeniTypId,
-                        TrvaniDni = krok.TrvaniDni,
-                        OdchylkaDni = krok.ZpozdeniDni,
-                        BaselineDatum = krok.BaselineDatum.Date,
-                        SkutecneDatum = krok.PosunuteDatum.Date
-                    })
-                    .ToList();
+                var sharedSteps = HarmonogramDateBlokBuilder.BuildKroky(record.DatumZalozeni, kroky);
 
                 return new ProjektHarmonogramUkolViewModel
                 {
@@ -117,7 +88,7 @@ public sealed partial class ProjectService
                         "project-readonly",
                         record.DatumZalozeni,
                         deadline,
-                        schema.DelayBarvaHex,
+                        "#dc2626",
                         souhrn,
                         sharedSteps)
                 };
