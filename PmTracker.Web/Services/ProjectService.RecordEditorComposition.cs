@@ -114,59 +114,16 @@ public sealed partial class ProjectService
 
         var selectedCategory = categories.FirstOrDefault(x => x.Id == record.KategorieId);
         var isTaskCategory = IsTaskCategory(selectedCategory?.Kod, selectedCategory?.Nazev);
-        var harmonogramSchema = isCreate
-            ? await harmonogramService.GetActiveHarmonogramSchemaAsync(ct)
-            : await harmonogramService.GetSchemaForRecordAsync(record, ct);
-        var harmonogramTypy = harmonogramSchema.Kroky;
-        var allowedTypeIds = harmonogramTypy
-            .SelectMany(x => new[] { x.TrvaniTypId, x.ZpozdeniTypId })
-            .Where(x => x > 0)
-            .Distinct()
-            .ToList();
-        // Plán 4 Feature C Task 6: načti plný záznam včetně Feature C metadat (SkutecnostZdroj,
-        // SkutecnostRezim, PreferredExterniOdkazId) — VM je vystaví per krok pro UI toggle/badge.
-        var harmonogramRows = (!isCreate && isTaskCategory && allowedTypeIds.Count > 0)
-            ? await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-                .Where(x => x.ZaznamId == record.Id && allowedTypeIds.Contains(x.TypId))
+        // Datum-model: kroky harmonogramu (plan_datum + skutecnost_datum + audit) z nové tabulky.
+        var krokRows = (!isCreate && isTaskCategory && record.Id > 0)
+            ? await dbContext.ZaznamHarmonogramKroky.AsNoTracking()
+                .Where(k => k.ZaznamId == record.Id)
                 .ToListAsync(ct)
-            : new List<PmTracker.Web.Models.Entities.ZaznamHarmonogramHodnotaEntity>();
-        // DESIGN-10-A (2026-05-01): NULL HodnotaInt → vyfiltrovat (calc interpretuje missing klíč
-        // jako "krok nenastal", offset = 0).
-        var harmonogramValues = harmonogramRows
-            .Where(x => x.HodnotaInt.HasValue)
-            .ToDictionary(x => x.TypId, x => x.HodnotaInt!.Value);
-        var harmonogramRowsByTypId = harmonogramRows.ToDictionary(x => x.TypId);
-        var harmonogramKroky = harmonogramService.BuildHarmonogramVypocetPublic(record.DatumZalozeni, harmonogramTypy, harmonogramValues);
-
-        // FIX 2026-05-05: Stav: Nestíháme má reflectovat uplynulý čas. Pokud poslední krok schématu
-        // (= krok 10) NEMÁ vyplněnou skutečnost, projekce dokončení projektu zohlední dnešní datum
-        // (= projekt minimálně tak pozadu, kolik už uplynulo od posledního completed kroku).
-        // Bez tohoto fixu kroky bez skutečnosti přidávaly jen plánované trvání → calc neviděl
-        // uplynulý čas → projekt se jevil "stíháme" i když měsíc nikdo nikam nepokročil.
-        var lastStepTypId = harmonogramKroky.Count > 0
-            ? harmonogramKroky[^1].ZpozdeniTypId
-            : 0;
-        var lastStepHasActual = lastStepTypId > 0 && harmonogramValues.ContainsKey(lastStepTypId);
+            : new List<PmTracker.Web.Models.Entities.ZaznamHarmonogramKrokEntity>();
+        var krokRowByPoradi = krokRows.GroupBy(k => (int)k.Poradi).ToDictionary(g => g.Key, g => g.First());
         var todayDate = timeProvider.GetUtcNow().UtcDateTime.Date;
-        var harmonogramSouhrn = harmonogramService.BuildHarmonogramSouhrn(
-            harmonogramKroky,
-            record.DatumUkonceni,
-            todayDate,
-            lastStepHasActual);
-
-        // Plán D Task 8/9 composition: pro každý krok zjistit KrokKey (stabilní GUID identifikátor),
-        // zdroj skutečnosti (FromVyjadreni / Manual / None) a označit ruční kroky {2, 5, 8, 9}.
-        // KrokKey pochází z CiselnikHarmonogramTypu, resolver dohledá aktivní vazbu nebo manuální
-        // HS0X_DELAY zápis.
-        var krokKeyByDurationTypId = allowedTypeIds.Count > 0
-            ? await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => !x.JeZpozdeni && allowedTypeIds.Contains(x.Id))
-                .Select(x => new { x.Id, x.KrokKey })
-                .ToDictionaryAsync(x => x.Id, x => x.KrokKey, ct)
-            : new Dictionary<int, Guid>();
-        var scheduleActualSources = (!isCreate && isTaskCategory && record.Id > 0)
-            ? await scheduleActualSourceResolver.ResolveForRecordAsync(record.Id, record.HarmonogramSablonaVerze, ct)
-            : new Dictionary<Guid, RecordScheduleActualSource>();
+        var harmonogramSouhrn = HarmonogramDateBlokBuilder.BuildSouhrn(
+            record.DatumZalozeni, krokRows, record.DatumUkonceni, todayDate);
 
         // Plán 4 Feature C Task 6: načti pending proposal lock PŘED build Kroky, aby canToggleRezim
         // mohl být použitý per krok (dříve bylo načteno až za Kroky — přesun je no-op pro existing code
@@ -185,21 +142,14 @@ public sealed partial class ProjectService
             ? await harmonogramSkutecnostSync.GetKandidatiForZaznamAsync(record.Id, ct).ConfigureAwait(false)
             : Array.Empty<BindingKandidat>() as IReadOnlyList<BindingKandidat>;
 
-        var harmonogramBlokKroky = harmonogramKroky.Select(krok =>
+        var baseKroky = HarmonogramDateBlokBuilder.BuildKroky(record.DatumZalozeni, krokRows);
+        var harmonogramBlokKroky = baseKroky.Select(baseKrok =>
         {
-            var krokKey = krokKeyByDurationTypId.GetValueOrDefault(krok.TrvaniTypId);
-            var source = krokKey != Guid.Empty && scheduleActualSources.TryGetValue(krokKey, out var s)
-                ? s
-                : null;
-            // Feature C metadata z HS0X_DELAY row (ZpozdeniTypId). Pokud řádek ještě neexistuje
-            // (krok má plánovou hodnotu, skutečnost není zapsaná), delayRow je null → defaulty.
-            harmonogramRowsByTypId.TryGetValue(krok.ZpozdeniTypId, out var delayRow);
+            var poradi = baseKrok.KrokIndex;
+            krokRowByPoradi.TryGetValue(poradi, out var krokRow);
 
-            // Plán 4 Feature C Task 6 UI (dropdown) — resolve kandidátní bindings pro tento krok.
-            // Resolver vrátí kandidáty seřazené MAX first + označí vybraný (preferred nebo MAX).
-            // Pokud kroků je víc než 1 v UI, chevron ▼ se zobrazí.
-            var resolved = PmTracker.Web.Services.Schedules.HarmonogramSkutecnostResolver.Resolve(
-                krok.KrokIndex, bindingKandidati, delayRow?.PreferredExterniOdkazId);
+            var resolved = HarmonogramSkutecnostResolver.Resolve(
+                poradi, bindingKandidati, krokRow?.PreferredExterniOdkazId);
             var kandidatiVm = resolved.Kandidati.Count == 0
                 ? (IReadOnlyList<HarmonogramKrokKandidatViewModel>)Array.Empty<HarmonogramKrokKandidatViewModel>()
                 : resolved.Kandidati.Select(k => new HarmonogramKrokKandidatViewModel
@@ -211,53 +161,38 @@ public sealed partial class ProjectService
                     IsSelected = k.ExterniOdkazId == resolved.VybranyExterniOdkazId
                 }).ToList();
 
-            // FIX 2026-05-04 (round 2): Source* pole pro UI (chat ikonka + viditelný datum)
-            // MUSÍ pocházet VÝHRADNĚ z typ-aware sync resolveru (HarmonogramSkutecnostResolver).
-            // Předchozí fix měl fallback `winner?.ExterniOdkazId ?? source?.SourceExterniOdkazId`
-            // — tím se v případě, že sync resolver odfiltroval všechny bindings (např. PNF K3
-            // binding pro PMP-only krok 3), vrátil typ-ignorant `source` z RecordScheduleActualSourceResolver,
-            // který bral MAX(datum) bez ohledu na (TypZaznamu × KrokPoradi) predikát. Důsledek:
-            // chat ikonka stále odkazovala na PNF.
-            //
-            // Single source of truth: pokud sync resolver nemá kandidáta, UI source je null
-            // (žádná chat ikonka, visible datum padne na fallback SkutecneDatum z PosunuteDatum).
-            // ZdrojSkutecnosti (FromVyjadreni / Manual / None) zůstává z `source` — ten kontroluje
-            // přítomnost bindingu v DB, ne typ-aware match.
             BindingKandidat? winner = resolved.VybranyExterniOdkazId.HasValue
                 ? resolved.Kandidati.FirstOrDefault(k => k.ExterniOdkazId == resolved.VybranyExterniOdkazId.Value)
                 : null;
-            int? typeAwareSourceExterniOdkazId = winner?.ExterniOdkazId;
-            DateTime? typeAwareSourceDatum = winner?.Datum;
-            long? typeAwareSourceVyjadreniId = winner is not null && winner.HotVyjadreniId > 0
-                ? winner.HotVyjadreniId
-                : null;
+
+            var zdroj = krokRow is null
+                ? ZdrojSkutecnosti.None
+                : (PmTracker.Web.Models.Entities.SkutecnostZdrojEnum)krokRow.SkutecnostZdroj switch
+                {
+                    PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Automat => ZdrojSkutecnosti.FromVyjadreni,
+                    PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Manual => ZdrojSkutecnosti.Manual,
+                    PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Historicka => ZdrojSkutecnosti.Manual,
+                    _ => ZdrojSkutecnosti.None
+                };
 
             return new HarmonogramKrokEditViewModel
             {
-                KrokIndex = krok.KrokIndex,
-                Nazev = krok.Nazev,
-                BarvaHex = krok.BarvaHex,
-                TrvaniTypId = krok.TrvaniTypId,
-                ZpozdeniTypId = krok.ZpozdeniTypId,
-                TrvaniDni = krok.TrvaniDni,
-                // FIX 2026-05-01: OdchylkaDni nullable. Krok bez DELAY row → NULL = "krok nenastal".
-                // TimelineCalculator vrací offset=0 pro missing klíč (default int), ale to nesmíme
-                // promítnout do VM jako legitimní 0 (= "vše dle plánu") — UI by zobrazilo actual
-                // segment shodný s baseline pro VŠECHNY kroky bez záznamu, což je broken.
-                OdchylkaDni = delayRow is null ? null : krok.ZpozdeniDni,
-                BaselineDatum = krok.BaselineDatum,
-                SkutecneDatum = krok.PosunuteDatum,
-                KrokKey = krokKey,
-                ZdrojSkutecnosti = source?.Zdroj ?? ZdrojSkutecnosti.None,
-                SourceVyjadreniId = typeAwareSourceVyjadreniId,
-                SourceVyjadreniDatum = typeAwareSourceDatum,
-                SourceExterniOdkazId = typeAwareSourceExterniOdkazId,
-                IsManualKrok = HarmonogramManualSteps.IsManual(krok.KrokIndex),
-                // Plán 4 Feature C Task 6 — UI metadata pro switch + badge
-                DelayHodnotaId = delayRow?.Id,
-                SkutecnostRezim = delayRow?.SkutecnostRezim ?? PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Auto,
-                SkutecnostZdroj = delayRow?.SkutecnostZdroj ?? PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Neznamo,
-                PreferredExterniOdkazId = delayRow?.PreferredExterniOdkazId,
+                KrokIndex = baseKrok.KrokIndex,
+                Nazev = baseKrok.Nazev,
+                BarvaHex = baseKrok.BarvaHex,
+                TrvaniDni = baseKrok.TrvaniDni,
+                OdchylkaDni = baseKrok.OdchylkaDni,
+                BaselineDatum = baseKrok.BaselineDatum,
+                SkutecneDatum = baseKrok.SkutecneDatum,
+                IsManualKrok = baseKrok.IsManualKrok,
+                ZdrojSkutecnosti = zdroj,
+                SourceVyjadreniId = winner is not null && winner.HotVyjadreniId > 0 ? winner.HotVyjadreniId : null,
+                SourceVyjadreniDatum = winner?.Datum,
+                SourceExterniOdkazId = winner?.ExterniOdkazId,
+                DelayHodnotaId = krokRow?.Id,
+                SkutecnostRezim = (PmTracker.Web.Models.Entities.SkutecnostRezimEnum)(krokRow?.SkutecnostRezim ?? 0),
+                SkutecnostZdroj = (PmTracker.Web.Models.Entities.SkutecnostZdrojEnum)(krokRow?.SkutecnostZdroj ?? 0),
+                PreferredExterniOdkazId = krokRow?.PreferredExterniOdkazId,
                 CanToggleRezim = canToggleRezim,
                 Kandidati = kandidatiVm
             };
@@ -267,7 +202,7 @@ public sealed partial class ProjectService
         var scheduleVersion = string.Empty;
         if (!isCreate && isTaskCategory && record.Id > 0)
         {
-            var maxUpdatedAt = await dbContext.ZaznamHarmonogramHodnoty
+            var maxUpdatedAt = await dbContext.ZaznamHarmonogramKroky
                 .Where(x => x.ZaznamId == record.Id)
                 .MaxAsync(x => (DateTime?)x.UpdatedAt, ct);
             if (maxUpdatedAt.HasValue)
@@ -321,16 +256,15 @@ public sealed partial class ProjectService
             // auto-fill chování pro kroky napojené na ServiceDesk vyjádření. Bez tohoto filtru
             // user editující datum kroku 2 by viděl po reload switch=OFF (= Manual rezim
             // pro celý harmonogram), což je nesprávně.
-            HarmonogramAutoFillSwitchOn = !harmonogramRows
-                .Any(h => harmonogramTypy.Any(t => t.ZpozdeniTypId == h.TypId
-                                                && !HarmonogramManualSteps.IsManual(t.KrokIndex))
-                       && h.SkutecnostRezim == Models.Entities.SkutecnostRezimEnum.Manual),
+            HarmonogramAutoFillSwitchOn = !krokRows
+                .Any(k => !HarmonogramManualSteps.IsManual(k.Poradi)
+                       && (Models.Entities.SkutecnostRezimEnum)k.SkutecnostRezim == Models.Entities.SkutecnostRezimEnum.Manual),
             HarmonogramBlok = BuildScheduleBlockViewModel(
                 record.Id,
                 "record-editor",
                 record.DatumZalozeni,
                 record.DatumUkonceni,
-                harmonogramSchema.DelayBarvaHex,
+                "#dc2626",
                 harmonogramSouhrn,
                 harmonogramBlokKroky,
                 permissions: pendingScheduleProposalLock.LocksSchedule
