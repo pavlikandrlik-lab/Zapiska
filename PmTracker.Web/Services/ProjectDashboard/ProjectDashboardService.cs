@@ -104,68 +104,39 @@ public sealed class ProjectDashboardService : IProjectDashboardService
         }
 
         var recordIds = records.Select(r => r.Id).ToList();
-        var harmonogramValues = await _dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-            .Where(h => recordIds.Contains(h.ZaznamId))
+        // Datum-model: kroky harmonogramu (plan_datum + skutecnost_datum) z nové tabulky.
+        var krokRows = await _dbContext.ZaznamHarmonogramKroky.AsNoTracking()
+            .Where(k => recordIds.Contains(k.ZaznamId))
             .ToListAsync(ct);
-
-        // DESIGN-10-A (2026-05-01): HodnotaInt je nullable po Phase 1.5. NULL = "krok nenastal"
-        // → vyfiltrovat z mapy. ScheduleTimelineCalculator.Compute očekává non-nullable hodnoty.
-        // Bez .Where(.HasValue) by cast Dictionary<int,int?> → IReadOnlyDictionary<int,int> hodil
-        // runtime InvalidCastException (kovariance generik nepodporuje).
-        var valuesByRecord = harmonogramValues
-            .GroupBy(v => v.ZaznamId)
-            .ToDictionary(g => g.Key, g => (IReadOnlyDictionary<int, int>)g
-                .Where(v => v.HodnotaInt.HasValue)
-                .ToDictionary(v => v.TypId, v => v.HodnotaInt!.Value));
-
-        // Cache schemas by version to avoid repeated DB calls
-        var schemaCache = new Dictionary<int, HarmonogramSchemaDefinition>();
+        var krokyByRecord = krokRows
+            .GroupBy(k => k.ZaznamId)
+            .ToDictionary(g => g.Key, g => g.GroupBy(x => (int)x.Poradi).ToDictionary(x => x.Key, x => x.First()));
 
         var dashboardRecords = new List<ProjectDashboardRecordRowViewModel>();
 
         foreach (var record in records)
         {
-            if (!valuesByRecord.TryGetValue(record.Id, out var values) || values.Count == 0)
+            if (!krokyByRecord.TryGetValue(record.Id, out var krokByPoradi) || krokByPoradi.Count == 0)
             {
                 continue;
             }
 
-            if (!schemaCache.TryGetValue(record.HarmonogramSablonaVerze, out var schema))
-            {
-                schema = await _harmonogramService.GetSchemaForRecordAsync(record.HarmonogramSablonaVerze, ct);
-                schemaCache[record.HarmonogramSablonaVerze] = schema;
-            }
-
-            if (schema.Kroky.Count == 0)
-            {
-                continue;
-            }
-
-            var stepDefs = schema.Kroky
-                .OrderBy(k => k.KrokIndex)
-                .Select(k => new ScheduleTimelineStepDefinition
+            var steps = HarmonogramKroky.Vse
+                .Select(def =>
                 {
-                    StepIndex = k.KrokIndex,
-                    Code = k.Kod,
-                    Name = k.Nazev,
-                    ColorHex = k.BarvaHex,
-                    DurationTypeId = k.TrvaniTypId,
-                    OffsetTypeId = k.ZpozdeniTypId
+                    krokByPoradi.TryGetValue(def.Poradi, out var row);
+                    return new ScheduleDateStep(def.Poradi, row?.PlanDatum, row?.SkutecnostDatum);
                 })
                 .ToList();
+            var computed = ScheduleDateCalculator.Compute(record.DatumZalozeni, steps);
 
-            var computation = ScheduleTimelineCalculator.Compute(record.DatumZalozeni, stepDefs, values);
-
-            var snapshots = computation.Steps.Select(s =>
+            var snapshots = computed.Select(c =>
             {
-                var stepDef = stepDefs.FirstOrDefault(d => d.StepIndex == s.StepIndex);
-                return new ScheduleStepSnapshot(
-                    s.StepIndex,
-                    stepDef?.Name ?? $"Krok {s.StepIndex}",
-                    s.PlanEndDate,
-                    s.ActualEndDate,
-                    s.DurationDays,
-                    s.OffsetDays);
+                var nazev = HarmonogramKroky.Vse.First(d => d.Poradi == c.Poradi).Nazev;
+                var actualEnd = c.MaSkutecnost ? c.SkutecnostEnd : c.PlanEnd;
+                var duration = (c.PlanEnd - c.PlanStart).Days;
+                var offset = c.MaSkutecnost ? (c.SkutecnostEnd - c.PlanEnd).Days : 0;
+                return new ScheduleStepSnapshot(c.Poradi, nazev, c.PlanEnd, actualEnd, duration, offset);
             }).ToList();
 
             var categorization = DashboardRecordCategorizer.CategorizeRecord(
