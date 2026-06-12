@@ -30,6 +30,11 @@ public sealed class ZaznamHarmonogramVyjadreniVazbaEntity
     public int Id { get; set; }
     public int ZaznamId { get; set; }
     public Guid KrokKey { get; set; }
+    /// <summary>
+    /// Datum-model (2026-06-12): krok harmonogramu identifikovaný pořadím 1–10.
+    /// Nahrazuje <see cref="KrokKey"/> (ten zmizí s číselníkem typů ve Fázi 7).
+    /// </summary>
+    public byte Poradi { get; set; }
     public int ExterniOdkazId { get; set; }
     public long HotVyjadreniId { get; set; }
     public DateTime DatumVyjadreni { get; set; }

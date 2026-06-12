@@ -14,6 +14,7 @@ internal sealed class ZaznamHarmonogramVyjadreniVazbaEntityConfiguration
         b.Property(x => x.Id).HasColumnName("id");
         b.Property(x => x.ZaznamId).HasColumnName("zaznam_id");
         b.Property(x => x.KrokKey).HasColumnName("krok_key");
+        b.Property(x => x.Poradi).HasColumnName("poradi");
         b.Property(x => x.ExterniOdkazId).HasColumnName("externi_odkaz_id");
         b.Property(x => x.HotVyjadreniId).HasColumnName("hot_vyjadreni_id");
         b.Property(x => x.DatumVyjadreni).HasColumnName("datum_vyjadreni");
