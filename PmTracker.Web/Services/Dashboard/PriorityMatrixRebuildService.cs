@@ -233,16 +233,14 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
 
         var collaborationByRecordId = await LoadCollaborationByRecordIdAsync(activeRecordIds, ct);
         var leadsByProjectSubsystem = await LoadLeadAssignmentsAsync(activeRows, ct);
-        var scheduleValuesByRecordId = await LoadScheduleValuesByRecordIdAsync(activeRecordIds, ct);
-        var schemaByVersion = await LoadSchemaByVersionAsync(activeRows, ct);
+        var krokyByRecordId = await LoadKrokyByRecordIdAsync(activeRecordIds, ct);
         var computedRows = new List<RecordPriorityRow>();
 
         foreach (var record in activeRows)
         {
-            var scheduleValues = scheduleValuesByRecordId.GetValueOrDefault(record.Id)
-                ?? new Dictionary<int, int>();
-            var schema = schemaByVersion[record.HarmonogramSablonaVerze];
-            var milestoneDate = ResolveNearestFutureMilestoneDate(today, record.DatumZalozeni, schema, scheduleValues);
+            var krokRows = krokyByRecordId.GetValueOrDefault(record.Id)
+                ?? (IReadOnlyList<ZaznamHarmonogramKrokEntity>)Array.Empty<ZaznamHarmonogramKrokEntity>();
+            var milestoneDate = ResolveNearestFutureMilestoneDate(today, record.DatumZalozeni, krokRows);
             var recordContext = new PriorityRecordContext(
                 record.Id,
                 IsTask: true,
@@ -383,81 +381,46 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
                 group => group.Select(x => x.OsobaId).ToHashSet());
     }
 
-    private async Task<Dictionary<int, IReadOnlyDictionary<int, int>>> LoadScheduleValuesByRecordIdAsync(
+    private async Task<Dictionary<int, IReadOnlyList<ZaznamHarmonogramKrokEntity>>> LoadKrokyByRecordIdAsync(
         HashSet<int> recordIds,
         CancellationToken ct)
     {
         if (recordIds.Count == 0)
         {
-            return new Dictionary<int, IReadOnlyDictionary<int, int>>();
+            return new Dictionary<int, IReadOnlyList<ZaznamHarmonogramKrokEntity>>();
         }
 
-        var rows = await _dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
+        var rows = await _dbContext.ZaznamHarmonogramKroky.AsNoTracking()
             .Where(x => recordIds.Contains(x.ZaznamId))
             .ToListAsync(ct);
 
-        // FIX 2026-05-04: regrese po DESIGN-10-A (commit 5661655) — HodnotaInt je nyní int? (nullable).
-        // Vnitřní ToDictionary produkuje Dictionary<int, int?>, který nelze upcastovat na
-        // IReadOnlyDictionary<int, int> (generika nejsou kovariantní v TValue) → InvalidCastException
-        // při každém Save flow (RebuildForRecordAsync). Fix: vyfiltrovat NULL HodnotaInt
-        // (krok nenastal — caller ResolveNearestFutureMilestoneDate interpretuje missing klíč
-        // jako "nevyhodnocovat") a použít non-nullable .Value v hodnotě dict.
         return rows
             .GroupBy(x => x.ZaznamId)
             .ToDictionary(
                 group => group.Key,
-                group => (IReadOnlyDictionary<int, int>)group
-                    .Where(x => x.HodnotaInt.HasValue)
-                    .ToDictionary(x => x.TypId, x => x.HodnotaInt!.Value));
-    }
-
-    private async Task<Dictionary<int, HarmonogramSchemaDefinition>> LoadSchemaByVersionAsync(
-        IReadOnlyList<PriorityRecordRow> activeRows,
-        CancellationToken ct)
-    {
-        var result = new Dictionary<int, HarmonogramSchemaDefinition>();
-        foreach (var schemaVersion in activeRows.Select(x => x.HarmonogramSablonaVerze).Distinct())
-        {
-            result[schemaVersion] = await _harmonogramService.GetSchemaForRecordAsync(schemaVersion, ct);
-        }
-
-        return result;
+                group => (IReadOnlyList<ZaznamHarmonogramKrokEntity>)group.ToList());
     }
 
     private static DateOnly? ResolveNearestFutureMilestoneDate(
         DateOnly today,
         DateTime startDate,
-        HarmonogramSchemaDefinition schema,
-        IReadOnlyDictionary<int, int> values)
+        IReadOnlyList<ZaznamHarmonogramKrokEntity> krokRows)
     {
-        if (schema.Kroky.Count == 0)
-        {
-            return null;
-        }
-
-        var computation = ScheduleTimelineCalculator.Compute(
-            startDate.Date,
-            schema.Kroky
-                .OrderBy(x => x.KrokIndex)
-                .Select(step => new ScheduleTimelineStepDefinition
-                {
-                    StepIndex = step.KrokIndex,
-                    Code = step.Kod,
-                    Name = step.Nazev,
-                    ColorHex = step.BarvaHex,
-                    DurationTypeId = step.TrvaniTypId,
-                    OffsetTypeId = step.ZpozdeniTypId
-                })
-                .ToList(),
-            values);
-        var nextStep = computation.Steps
-            .Where(step => DateOnly.FromDateTime(step.PlanEndDate.Date) >= today)
-            .OrderBy(step => step.PlanEndDate)
+        var byPoradi = krokRows.GroupBy(k => (int)k.Poradi).ToDictionary(g => g.Key, g => g.First());
+        var steps = HarmonogramKroky.Vse
+            .Select(def =>
+            {
+                byPoradi.TryGetValue(def.Poradi, out var row);
+                return new ScheduleDateStep(def.Poradi, row?.PlanDatum, row?.SkutecnostDatum);
+            })
+            .ToList();
+        var computed = ScheduleDateCalculator.Compute(startDate.Date, steps);
+        var nextStep = computed
+            .Where(c => DateOnly.FromDateTime(c.PlanEnd) >= today)
+            .OrderBy(c => c.PlanEnd)
             .FirstOrDefault();
 
-        return nextStep is null
-            ? null
-            : DateOnly.FromDateTime(nextStep.PlanEndDate.Date);
+        return nextStep is null ? null : DateOnly.FromDateTime(nextStep.PlanEnd);
     }
 
     private async Task<PriorityRebuildResult> ApplyComputedRowsAsync(
