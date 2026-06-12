@@ -64,7 +64,7 @@ public sealed class HarmonogramBlockViewModel
     /// Výchozí stav je prázdná množina — pro read-only / non-editor módy není
     /// třeba lock řešit (input se stejně neinrenderuje).
     /// </summary>
-    public IReadOnlySet<Guid> LockedManualKrokKeys { get; set; } = new HashSet<Guid>();
+    public IReadOnlySet<int> LockedManualKrokKeys { get; set; } = new HashSet<int>();
 
     /// <summary>
     /// Plán D Task 8: UI vlastník potřebuje vědět, zda uživatel smí editovat

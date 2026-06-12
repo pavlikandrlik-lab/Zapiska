@@ -314,54 +314,30 @@ public sealed partial class RecordProposalService
 
     private void ApplySchedulePayloadToModel(ZaznamEditViewModel model, SchedulePlanProposalPayload payload)
     {
-        var valueByType = payload.PlannedHarmonogramHodnoty
-            .Concat(payload.ActualHarmonogramHodnoty)
-            .GroupBy(value => value.TypId)
-            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
-        var schema = model.HarmonogramBlok.Kroky
-            .OrderBy(step => step.KrokIndex)
-            .Select(step => new HarmonogramTypPar(
-                step.KrokIndex,
-                $"STEP_{step.KrokIndex}_DURATION",
-                step.Nazev,
-                step.BarvaHex,
-                step.TrvaniTypId,
-                step.ZpozdeniTypId))
-            .ToList();
-        var vypocet = _harmonogramService.BuildHarmonogramVypocetPublic(model.DatumZalozeni, schema, valueByType);
-        var souhrn = _harmonogramService.BuildHarmonogramSouhrn(vypocet, payload.TerminUkonceni);
-        // Zachovat Plán D VM properties z originálního bloku, pokud je nová vypocet neposkytuje.
-        // Originál přišel z ProjectService.RecordEditorComposition a má KrokKey, ZdrojSkutecnosti
-        // a IsManualKrok naplněné; rebuild po přepočtu je ztratí, pokud je explicitně nepropáčeme.
-        var originalByKrokIndex = model.HarmonogramBlok.Kroky.ToDictionary(k => k.KrokIndex);
-        var kroky = vypocet.Select(krok =>
+        var planByPoradi = payload.PlannedHarmonogramHodnoty
+            .GroupBy(v => v.Poradi).ToDictionary(g => g.Key, g => g.Last().PlanDatum);
+        var actualByPoradi = payload.ActualHarmonogramHodnoty
+            .GroupBy(v => v.Poradi).ToDictionary(g => g.Key, g => g.Last().SkutecnostDatum);
+        var kroky = model.HarmonogramBlok.Kroky.Select(step => new HarmonogramKrokEditViewModel
         {
-            var original = originalByKrokIndex.GetValueOrDefault(krok.KrokIndex);
-            return new HarmonogramKrokEditViewModel
-            {
-                KrokIndex = krok.KrokIndex,
-                Nazev = krok.Nazev,
-                BarvaHex = krok.BarvaHex,
-                TrvaniTypId = krok.TrvaniTypId,
-                ZpozdeniTypId = krok.ZpozdeniTypId,
-                TrvaniDni = krok.TrvaniDni,
-                OdchylkaDni = krok.ZpozdeniDni,
-                BaselineDatum = krok.BaselineDatum,
-                SkutecneDatum = krok.PosunuteDatum,
-                // Plán D Task 8/9 passthrough (M-1 fix).
-                KrokKey = original?.KrokKey ?? Guid.Empty,
-                ZdrojSkutecnosti = original?.ZdrojSkutecnosti ?? ZdrojSkutecnosti.None,
-                SourceVyjadreniId = original?.SourceVyjadreniId,
-                SourceVyjadreniDatum = original?.SourceVyjadreniDatum,
-                SourceExterniOdkazId = original?.SourceExterniOdkazId,
-                IsManualKrok = original?.IsManualKrok ?? HarmonogramManualSteps.IsManual(krok.KrokIndex)
-            };
+            KrokIndex = step.KrokIndex,
+            Nazev = step.Nazev,
+            BarvaHex = step.BarvaHex,
+            TrvaniDni = step.TrvaniDni,
+            OdchylkaDni = step.OdchylkaDni,
+            BaselineDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pd) && pd.HasValue ? pd.Value : step.BaselineDatum,
+            SkutecneDatum = actualByPoradi.TryGetValue(step.KrokIndex, out var sd) && sd.HasValue ? sd.Value : step.SkutecneDatum,
+            ZdrojSkutecnosti = step.ZdrojSkutecnosti,
+            SourceVyjadreniId = step.SourceVyjadreniId,
+            SourceVyjadreniDatum = step.SourceVyjadreniDatum,
+            SourceExterniOdkazId = step.SourceExterniOdkazId,
+            IsManualKrok = step.IsManualKrok
         }).ToList();
 
         model.TerminUkonceni = payload.TerminUkonceni;
         model.HarmonogramBlok = CloneScheduleBlock(
             model.HarmonogramBlok,
-            souhrn: souhrn,
+            souhrn: model.HarmonogramBlok.Souhrn,
             kroky: kroky,
             terminUkonceni: payload.TerminUkonceni);
     }
@@ -385,24 +361,32 @@ public sealed partial class RecordProposalService
         SchedulePlanProposalPayload payload)
     {
         var result = new Dictionary<int, string>();
-        var originalByDurationType = originalModel.HarmonogramBlok.Kroky.ToDictionary(step => step.TrvaniTypId, step => step.TrvaniDni);
-        var originalByDelayType = originalModel.HarmonogramBlok.Kroky.ToDictionary(step => step.ZpozdeniTypId, step => step.OdchylkaDni);
+        var origPlanByPoradi = originalModel.HarmonogramBlok.Kroky.ToDictionary(s => s.KrokIndex, s => s.BaselineDatum);
+        var origActualByPoradi = originalModel.HarmonogramBlok.Kroky.ToDictionary(s => s.KrokIndex, s => s.SkutecneDatum);
 
         foreach (var planned in payload.PlannedHarmonogramHodnoty)
         {
-            var originalValue = originalByDurationType.GetValueOrDefault(planned.TypId);
-            if (originalValue != planned.Hodnota)
+            if (!planned.PlanDatum.HasValue)
             {
-                result[planned.TypId] = $"Původní hodnota: {originalValue} dnů | Navržená hodnota: {planned.Hodnota} dnů";
+                continue;
+            }
+            var orig = origPlanByPoradi.GetValueOrDefault(planned.Poradi);
+            if (orig.Date != planned.PlanDatum.Value.Date)
+            {
+                result[planned.Poradi] = $"Původní plán: {orig:dd.MM.yyyy} | Navržený: {planned.PlanDatum.Value:dd.MM.yyyy}";
             }
         }
 
         foreach (var actual in payload.ActualHarmonogramHodnoty)
         {
-            var originalValue = originalByDelayType.GetValueOrDefault(actual.TypId);
-            if (originalValue != actual.Hodnota)
+            if (!actual.SkutecnostDatum.HasValue)
             {
-                result[actual.TypId] = $"Původní hodnota: {originalValue} dnů | Navržená hodnota: {actual.Hodnota} dnů";
+                continue;
+            }
+            var orig = origActualByPoradi.GetValueOrDefault(actual.Poradi);
+            if (orig.Date != actual.SkutecnostDatum.Value.Date)
+            {
+                result[actual.Poradi] = $"Původní skutečnost: {orig:dd.MM.yyyy} | Navržená: {actual.SkutecnostDatum.Value:dd.MM.yyyy}";
             }
         }
 

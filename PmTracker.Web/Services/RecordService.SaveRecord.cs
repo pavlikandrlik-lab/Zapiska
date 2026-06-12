@@ -249,32 +249,9 @@ public sealed partial class RecordService
             await ReplaceRecordCollaborationAsync(entity.Id, normalizedCollaborationIds, innerCt);
             var addedExternalLinks = await ReplaceRecordExternalLinksAsync(entity.Id, command.ExterniVazby, innerCt);
 
-            List<SaveRecordHarmonogramValueCommand>? normalizedScheduleValues = null;
-            RecordScheduleAuditSnapshot? oldScheduleSnapshot = null;
-            if (command.Id.HasValue)
-            {
-                oldScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(command.Id.Value, innerCt);
-            }
-
-            if (isTaskCategory && command.HarmonogramHodnoty.Count > 0)
-            {
-                var scheduleTypeDefinitions = await composition.ResolveScheduleTypeDefinitionsForRecordAsync(entity, innerCt);
-                var valuesToPersist = pendingScheduleProposalLock.LocksSchedule
-                    ? await BuildScheduleValuesPreservingLockedScopeAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, pendingScheduleProposalLock, innerCt)
-                    : command.HarmonogramHodnoty;
-                normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, innerCt);
-            }
-            else if (!isTaskCategory)
-            {
-                var existingScheduleValues = await dbContext.ZaznamHarmonogramHodnoty
-                    .Where(x => x.ZaznamId == entity.Id)
-                    .ToListAsync(innerCt);
-                if (existingScheduleValues.Count > 0)
-                {
-                    dbContext.ZaznamHarmonogramHodnoty.RemoveRange(existingScheduleValues);
-                    normalizedScheduleValues = [];
-                }
-            }
+            // Datum-model: UPSERT krok rows (plán datumy + manuální skutečnost + rezim).
+            // Auto skutečnost řeší harvest (SyncZaznamAsync), ne save.
+            _ = await PersistScheduleKrokyAsync(entity, command, isTaskCategory, innerCt);
 
             await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, innerCt);
             auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
@@ -283,99 +260,8 @@ public sealed partial class RecordService
                 entity.Id.ToString(CultureInfo.InvariantCulture),
                 oldRecordSnapshot,
                 RecordAuditSnapshot.FromEntity(entity)));
-            if (normalizedScheduleValues is not null)
-            {
-                var newScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt);
-                auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                    oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
-                    AuditEntityType.RecordSchedule,
-                    entity.Id.ToString(CultureInfo.InvariantCulture),
-                    oldScheduleSnapshot,
-                    newScheduleSnapshot));
-            }
 
             await dbContext.SaveChangesAsync(innerCt);
-
-            // Phase 4 (DESIGN-6-A, 2026-05-01) + FIX 2026-05-01 transaction semantics:
-            // Před fixem ApplyManualActualKrokyAsync dělalo vlastní SaveChanges → partial-commit risk.
-            // Nyní: stage do change trackeru → SaveChanges + audit. Vše v outer transakci.
-            // FIX 2026-05-01 (round 3 #17): before snapshot loaduj AŽ KDYŽ něco staged
-            // (pre-staged check by jinak loadoval snapshot zbytečně pro každý SaveRecord call).
-            //
-            // StageManualActualKrokyAsync vrací false pokud:
-            //   - !isTaskCategory nebo command.ManualActualKroky.Count == 0 (no work)
-            //   - overrides.Count == 0 (žádné platné kroky 2/5/8/9 v inputu)
-            // Pre-stage check zachycuje validation exceptions (RVE) v rámci StageAsync.
-            var manualBeforeSnapshot = command.ManualActualKroky.Count > 0 && isTaskCategory
-                ? await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt).ConfigureAwait(false)
-                : null;
-            var manualStaged = await StageManualActualKrokyAsync(
-                command, entity.Id, entity.DatumZalozeni, entity.HarmonogramSablonaVerze,
-                isTaskCategory, innerCt).ConfigureAwait(false);
-            if (manualStaged)
-            {
-                await dbContext.SaveChangesAsync(innerCt);
-                var manualAfterSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt).ConfigureAwait(false);
-                if (manualAfterSnapshot is not null)
-                {
-                    auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                        manualBeforeSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
-                        AuditEntityType.RecordSchedule,
-                        entity.Id.ToString(CultureInfo.InvariantCulture),
-                        manualBeforeSnapshot,
-                        manualAfterSnapshot));
-                    await dbContext.SaveChangesAsync(innerCt);
-                }
-            }
-
-            // FIX 2026-05-04: Phase 1 — chevron toggle pro 2/5/8/9 kroky. Když user zvolí
-            // PreferredZdroj=Auto (= "Z vyjádření"), reset DELAY row daného kroku na Rezim=Auto,
-            // Zdroj=Neznamo, HodnotaInt=null. Composition při reload vrátí FromVyjadreni datum
-            // pokud existuje navázané vyjádření, jinak placeholder.
-            var autoPreferredKeys = command.ManualActualKroky
-                .Where(m => string.Equals(m.PreferredZdroj, "Auto", StringComparison.OrdinalIgnoreCase))
-                .Select(m => m.KrokKey)
-                .ToHashSet();
-            if (autoPreferredKeys.Count > 0 && isTaskCategory)
-            {
-                var resetCount = await ResetManualKrokyToAutoAsync(entity.Id, autoPreferredKeys, innerCt).ConfigureAwait(false);
-                if (resetCount > 0)
-                {
-                    await dbContext.SaveChangesAsync(innerCt);
-                }
-            }
-
-            // FIX 2026-05-05: explicit clear manuálního datumu (user vyprázdní pm-date-field
-            // a chce krok zpět do "nenastalého" stavu, ale zůstat v Manual modu). Kombinace
-            // PreferredZdroj="Manual" + AbsolutniDatum=null je signál pro clear (jinak by
-            // ManualActualKrokApplier.Compute null silently skipnul a stará hodnota by
-            // přetrvala v DB). Distinct od PreferredZdroj=null (legacy proposal flow, žádné UI).
-            var clearKeys = command.ManualActualKroky
-                .Where(m => string.Equals(m.PreferredZdroj, "Manual", StringComparison.OrdinalIgnoreCase)
-                            && !m.AbsolutniDatum.HasValue)
-                .Select(m => m.KrokKey)
-                .ToHashSet();
-            if (clearKeys.Count > 0 && isTaskCategory)
-            {
-                var clearedCount = await ClearManualKrokyAsync(entity.Id, clearKeys, innerCt).ConfigureAwait(false);
-                if (clearedCount > 0)
-                {
-                    await dbContext.SaveChangesAsync(innerCt);
-                }
-            }
-
-            // FIX 2026-05-04: aplikace HarmonogramRezim (master switch Auto/Manual) na auto-eligible
-            // HS0X_DELAY rows (kroky 1/3/4/6/7/10). Manual rezim: nastaví SkutecnostRezim=Manual
-            // (manual datumy už zapsal StageManualActualKrokyAsync přes overrides s acceptAutoEligibleKroky=true).
-            // Auto rezim: SkutecnostRezim=Auto + clear hodnot (HodnotaInt=null, Zdroj=Neznamo) — odpovídá user
-            // požadavku "scénář auto→manual+vyplň→auto = data se ztratí, žádné dotazy". Po commit transakce
-            // se v Auto rezimu spouští SD sync (re-fill ze ServiceDesk vyjádření).
-            var rezimApplied = await ApplyHarmonogramRezimAsync(
-                command, entity.Id, isTaskCategory, currentUser.OsobaId, innerCt).ConfigureAwait(false);
-            if (rezimApplied)
-            {
-                await dbContext.SaveChangesAsync(innerCt);
-            }
 
             // Plán B Task 10: po uložení externích vazeb (kdy mají Id) spustíme harvest.
             // Awaitujeme — enqueue je rychlé a musí skončit před disposalem request scope,
@@ -833,7 +719,7 @@ public sealed partial class RecordService
         // F-11: Soft concurrency check pro harmonogram
         if (!string.IsNullOrEmpty(command.ScheduleVersion) && existingRecord is not null)
         {
-            var currentMaxUpdatedAt = await dbContext.ZaznamHarmonogramHodnoty
+            var currentMaxUpdatedAt = await dbContext.ZaznamHarmonogramKroky
                 .Where(x => x.ZaznamId == existingRecord.Id)
                 .MaxAsync(x => (DateTime?)x.UpdatedAt, ct);
 
@@ -854,111 +740,36 @@ public sealed partial class RecordService
             }
         }
 
-        IReadOnlyList<RecordScheduleTypeDefinition> typeDefinitions;
-        try
-        {
-            typeDefinitions = existingRecord is not null && existingRecord.HarmonogramSablonaVerze > 0
-                ? await composition.ResolveScheduleTypeDefinitionsForSchemaVersionAsync(existingRecord.HarmonogramSablonaVerze, ct)
-                : await composition.ResolveScheduleTypeDefinitionsForSchemaVersionAsync(defaultSchemaVersion, ct);
-        }
-        catch (InvalidOperationException ex)
-        {
-            AddRecordValidationIssue(
-                issues,
-                "HarmonogramHodnoty",
-                ex.Message,
-                "schedule",
-                "schedule_schema_unavailable",
-                null);
-            return;
-        }
-
-        var durationTypeIds = typeDefinitions
-            .Select(x => x.DurationTypeId)
-            .Where(x => x > 0)
-            .ToHashSet();
-        var allowedTypeIds = typeDefinitions
-            .SelectMany(x => new[] { x.DurationTypeId, x.DelayTypeId })
-            .Where(x => x > 0)
-            .ToHashSet();
-
-        var firstIndexByType = new Dictionary<int, int>();
+        // Datum-model: validuj poradí 1–10 + duplicitu. Plán/skutečnost jsou datumy bez range omezení.
+        var seenPoradi = new HashSet<int>();
         for (var index = 0; index < command.HarmonogramHodnoty.Count; index++)
         {
             var item = command.HarmonogramHodnoty[index];
             var rowPrefix = $"HarmonogramHodnoty[{index}]";
 
-            if (item.TypId <= 0)
+            if (item.Poradi is < 1 or > 10)
             {
-                if (item.Hodnota != 0)
-                {
-                    AddRecordValidationIssue(
-                        issues,
-                        $"{rowPrefix}.TypId",
-                        "Typ harmonogramové hodnoty musí být platný.",
-                        "schedule",
-                        "schedule_type_required",
-                        item.TypId.ToString(CultureInfo.InvariantCulture));
-                }
-
+                AddRecordValidationIssue(
+                    issues,
+                    $"{rowPrefix}.Poradi",
+                    "Pořadí kroku harmonogramu musí být 1–10.",
+                    "schedule",
+                    "schedule_poradi_invalid",
+                    item.Poradi.ToString(CultureInfo.InvariantCulture));
                 continue;
             }
 
-            if (!allowedTypeIds.Contains(item.TypId))
+            if (!seenPoradi.Add(item.Poradi))
             {
                 AddRecordValidationIssue(
                     issues,
-                    $"{rowPrefix}.TypId",
-                    $"Typ harmonogramové hodnoty {item.TypId} není v aktivním schématu.",
+                    $"{rowPrefix}.Poradi",
+                    $"Krok {item.Poradi} je zadaný vícekrát.",
                     "schedule",
-                    "schedule_type_not_allowed",
-                    item.TypId.ToString(CultureInfo.InvariantCulture));
-                continue;
-            }
-
-            if (firstIndexByType.TryGetValue(item.TypId, out var firstIndex))
-            {
-                AddRecordValidationIssue(
-                    issues,
-                    $"{rowPrefix}.TypId",
-                    $"Typ harmonogramové hodnoty {item.TypId} je zadaný vícekrát (první výskyt na řádku {firstIndex + 1}).",
-                    "schedule",
-                    "schedule_type_duplicate",
-                    item.TypId.ToString(CultureInfo.InvariantCulture));
-            }
-            else
-            {
-                firstIndexByType[item.TypId] = index;
-            }
-
-            if (durationTypeIds.Contains(item.TypId) && item.Hodnota < 0)
-            {
-                AddRecordValidationIssue(
-                    issues,
-                    $"{rowPrefix}.Hodnota",
-                    "Trvání kroku harmonogramu nesmí být záporné.",
-                    "schedule",
-                    "schedule_duration_negative",
-                    item.Hodnota.ToString(CultureInfo.InvariantCulture));
-            }
-
-            if (Math.Abs(item.Hodnota) > 10_000)
-            {
-                AddRecordValidationIssue(
-                    issues,
-                    $"{rowPrefix}.Hodnota",
-                    "Hodnota harmonogramového kroku je mimo povolený rozsah (max ±10 000 dnů).",
-                    "schedule",
-                    "schedule_value_out_of_range",
-                    item.Hodnota.ToString(CultureInfo.InvariantCulture));
+                    "schedule_poradi_duplicate",
+                    item.Poradi.ToString(CultureInfo.InvariantCulture));
             }
         }
-
-        // FIX 2026-05-04: cross-validation duration + delay >= 0 odstraněna po dohodě
-        // s product ownerem. Důvod: plán a skutečnost nemají být v harmonogramu vzájemně
-        // omezeny — datový nepořádek v plánu by jinak blokoval zadávání skutečnosti.
-        // Vyhodnocení (zpoždění, on-track) probíhá v dashboard/priority matrix, které
-        // tolerují i záporné nebo nekonzistentní hodnoty (clamped přes ScheduleTimelineCalculator).
     }
 
     private static void AddRecordValidationIssue(
@@ -975,6 +786,119 @@ public sealed partial class RecordService
         }
 
         issues.Add(new RecordValidationIssue(fieldKey, message.Trim(), tab, rule, value));
+    }
+
+    /// <summary>
+    /// Datum-model UPSERT: zapíše plán datumy (všechny kroky) + manuální skutečnost (kroky 2/5/8/9)
+    /// + rezim do <c>zaznam_harmonogram_krok</c>. Auto skutečnost řeší harvest sync, ne save.
+    /// </summary>
+    private async Task<bool> PersistScheduleKrokyAsync(
+        PmTracker.Web.Models.Entities.ProjektovyZaznamEntity entity,
+        SaveRecordCommand command,
+        bool isTaskCategory,
+        CancellationToken ct)
+    {
+        if (!isTaskCategory)
+        {
+            var existingNonTask = await dbContext.ZaznamHarmonogramKroky
+                .Where(k => k.ZaznamId == entity.Id)
+                .ToListAsync(ct);
+            if (existingNonTask.Count == 0)
+            {
+                return false;
+            }
+            dbContext.ZaznamHarmonogramKroky.RemoveRange(existingNonTask);
+            return true;
+        }
+
+        if (command.HarmonogramHodnoty.Count == 0 && command.ManualActualKroky.Count == 0)
+        {
+            return false;
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        var existing = await dbContext.ZaznamHarmonogramKroky
+            .Where(k => k.ZaznamId == entity.Id)
+            .ToListAsync(ct);
+        var byPoradi = existing
+            .GroupBy(k => (int)k.Poradi)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var manualByPoradi = command.ManualActualKroky
+            .Where(m => m.Poradi is >= 1 and <= 10)
+            .GroupBy(m => m.Poradi)
+            .ToDictionary(g => g.Key, g => g.Last());
+
+        var rezimManual = string.Equals(command.HarmonogramRezim, "Manual", StringComparison.OrdinalIgnoreCase);
+        var changed = false;
+
+        PmTracker.Web.Models.Entities.ZaznamHarmonogramKrokEntity GetOrCreate(int poradi)
+        {
+            if (byPoradi.TryGetValue(poradi, out var r))
+            {
+                return r;
+            }
+            r = new PmTracker.Web.Models.Entities.ZaznamHarmonogramKrokEntity
+            {
+                ZaznamId = entity.Id,
+                Poradi = (byte)poradi,
+                SkutecnostRezim = (byte)PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Auto,
+                SkutecnostZdroj = (byte)PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Neznamo,
+                UpdatedAt = nowUtc
+            };
+            dbContext.ZaznamHarmonogramKroky.Add(r);
+            byPoradi[poradi] = r;
+            return r;
+        }
+
+        foreach (var item in command.HarmonogramHodnoty)
+        {
+            if (item.Poradi is < 1 or > 10)
+            {
+                continue;
+            }
+            var row = GetOrCreate(item.Poradi);
+            row.PlanDatum = item.PlanDatum?.Date;
+            if (PmTracker.Web.Models.ViewModels.HarmonogramManualSteps.IsManual(item.Poradi))
+            {
+                DateTime? skut = item.SkutecnostDatum?.Date;
+                if (manualByPoradi.TryGetValue(item.Poradi, out var mk) && mk.AbsolutniDatum.HasValue)
+                {
+                    skut = mk.AbsolutniDatum.Value.ToDateTime(TimeOnly.MinValue);
+                }
+                row.SkutecnostDatum = skut;
+                row.SkutecnostRezim = (byte)PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Manual;
+                row.SkutecnostZdroj = skut.HasValue
+                    ? (byte)PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Manual
+                    : (byte)PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Neznamo;
+            }
+            else
+            {
+                row.SkutecnostRezim = rezimManual
+                    ? (byte)PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Manual
+                    : (byte)PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Auto;
+            }
+            row.UpdatedAt = nowUtc;
+            changed = true;
+        }
+
+        foreach (var mk in manualByPoradi.Values)
+        {
+            if (!PmTracker.Web.Models.ViewModels.HarmonogramManualSteps.IsManual(mk.Poradi))
+            {
+                continue;
+            }
+            var row = GetOrCreate(mk.Poradi);
+            row.SkutecnostDatum = mk.AbsolutniDatum?.ToDateTime(TimeOnly.MinValue);
+            row.SkutecnostRezim = (byte)PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Manual;
+            row.SkutecnostZdroj = mk.AbsolutniDatum.HasValue
+                ? (byte)PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Manual
+                : (byte)PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Neznamo;
+            row.UpdatedAt = nowUtc;
+            changed = true;
+        }
+
+        return changed;
     }
 
     private static (int Index, int CodePoint)? FindFirstInvalidControlCharacter(string value)
@@ -1287,350 +1211,24 @@ public sealed partial class RecordService
             throw new InvalidOperationException("Harmonogram lze upravovat pouze u záznamů kategorie úkol.");
         }
 
-        await EnsureScheduleAddScopeAccessAsync(entity, currentUser, canEditScheduleFull, composition, ct);
-
-        var scheduleTypeDefinitions = await composition.ResolveScheduleTypeDefinitionsForRecordAsync(entity, ct);
-        var valuesToPersist = canEditScheduleFull
-            ? command.HarmonogramHodnoty
-            : await BuildScheduleValuesForAddOnlyAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, ct);
-
-        var pendingScheduleProposalLock = await pendingScheduleProposalLockEvaluator.EvaluateAsync(entity.Id, ct);
-        if (pendingScheduleProposalLock.LocksSchedule)
-        {
-            valuesToPersist = await BuildScheduleValuesPreservingLockedScopeAsync(entity.Id, command.HarmonogramHodnoty, scheduleTypeDefinitions, pendingScheduleProposalLock, ct);
-        }
-
         return await ExecuteInSerializableTransactionAsync(async innerCt =>
         {
-            var oldPlanValues = await LoadSchedulePlanValueMapAsync(entity.Id, scheduleTypeDefinitions, innerCt);
-            var oldScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt);
-            var normalizedScheduleValues = await ReplaceRecordScheduleValuesAsync(entity.Id, valuesToPersist, scheduleTypeDefinitions, innerCt);
-            await dbContext.SaveChangesAsync(innerCt);
-            var newPlanValues = await LoadSchedulePlanValueMapAsync(entity.Id, scheduleTypeDefinitions, innerCt);
-            if (!ScheduleValueMapsEqual(oldPlanValues, newPlanValues))
+            var changed = await PersistScheduleKrokyAsync(entity, command, isTaskCategory: true, innerCt);
+            if (changed)
             {
                 await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, innerCt);
-            }
-            var newScheduleSnapshot = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt);
-            auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
-                AuditEntityType.RecordSchedule,
-                entity.Id.ToString(CultureInfo.InvariantCulture),
-                oldScheduleSnapshot,
-                newScheduleSnapshot));
-            await dbContext.SaveChangesAsync(innerCt);
-
-            // Phase 4 (DESIGN-6-A) + FIX 2026-05-01: stage + caller-controlled SaveChanges.
-            var manualBeforeSnapshotSched = newScheduleSnapshot;
-            var manualStagedSched = await StageManualActualKrokyAsync(
-                command, entity.Id, entity.DatumZalozeni, entity.HarmonogramSablonaVerze,
-                isTaskCategory: true, innerCt).ConfigureAwait(false);
-            if (manualStagedSched)
-            {
+                auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
+                    AuditActionType.Update,
+                    AuditEntityType.RecordSchedule,
+                    entity.Id.ToString(CultureInfo.InvariantCulture),
+                    null,
+                    new { Action = "schedule-save" }));
                 await dbContext.SaveChangesAsync(innerCt);
-                var manualAfterSnapshotSched = await LoadRecordScheduleAuditSnapshotAsync(entity.Id, innerCt);
-                if (manualAfterSnapshotSched is not null)
-                {
-                    auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                        AuditActionType.Update,
-                        AuditEntityType.RecordSchedule,
-                        entity.Id.ToString(CultureInfo.InvariantCulture),
-                        manualBeforeSnapshotSched,
-                        manualAfterSnapshotSched));
-                    await dbContext.SaveChangesAsync(innerCt);
-                }
             }
-
             return entity.Id;
         }, ct);
     }
 
-    private async Task EnsureScheduleAddScopeAccessAsync(
-        ProjektovyZaznamEntity entity,
-        CurrentUserContextViewModel currentUser,
-        bool canEditScheduleFull,
-        IRecordWriteCommandsComposition composition,
-        CancellationToken ct)
-    {
-        if (canEditScheduleFull)
-        {
-            return;
-        }
-
-        if (currentUser.OsobaId > 0 && entity.VlastnikId == currentUser.OsobaId)
-        {
-            return;
-        }
-
-        var subsystemLeadEquivalentOsobaIds = await composition.ResolveLeadEquivalentOsobaIdsAsync(entity.ProjektId, entity.SubsystemId, ct);
-        if (currentUser.OsobaId > 0 && subsystemLeadEquivalentOsobaIds.Contains(currentUser.OsobaId))
-        {
-            return;
-        }
-
-        throw new InvalidOperationException("Nemáte oprávnění doplňovat harmonogram tohoto úkolu.");
-    }
-
-    private async Task<List<SaveRecordHarmonogramValueCommand>> BuildScheduleValuesForAddOnlyAsync(
-        int zaznamId,
-        IReadOnlyList<SaveRecordHarmonogramValueCommand> submittedValues,
-        IReadOnlyList<RecordScheduleTypeDefinition> scheduleTypeDefinitions,
-        CancellationToken ct)
-    {
-        if (scheduleTypeDefinitions.Count == 0)
-        {
-            return [];
-        }
-
-        var durationTypeIds = scheduleTypeDefinitions
-            .Select(x => x.DurationTypeId)
-            .Where(x => x > 0)
-            .Distinct()
-            .ToList();
-        var delayTypeIds = scheduleTypeDefinitions
-            .Select(x => x.DelayTypeId)
-            .Where(x => x > 0)
-            .Distinct()
-            .ToList();
-        var durationTypeSet = durationTypeIds.ToHashSet();
-        var allowedTypeIds = durationTypeIds
-            .Concat(delayTypeIds)
-            .ToHashSet();
-        if (allowedTypeIds.Count == 0)
-        {
-            return [];
-        }
-
-        var submittedByType = submittedValues
-            .Where(x => allowedTypeIds.Contains(x.TypId))
-            .GroupBy(x => x.TypId)
-            .ToDictionary(
-                group => group.Key,
-                group => durationTypeSet.Contains(group.Key)
-                    ? Math.Max(0, group.Last().Hodnota)
-                    : group.Last().Hodnota);
-
-        // DESIGN-10-A (2026-05-01): NULL DELAY = "krok nenastal" → vyfiltrovat (klíč chybí v dict).
-        // NULL DURATION → fallback 0 v dict.
-        var existingByType = (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-                .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId))
-                .ToListAsync(ct))
-            .Where(x => durationTypeSet.Contains(x.TypId) || x.HodnotaInt.HasValue)
-            .ToDictionary(
-                x => x.TypId,
-                x => durationTypeSet.Contains(x.TypId)
-                    ? Math.Max(0, x.HodnotaInt ?? 0)
-                    : x.HodnotaInt!.Value);
-
-        var desired = new Dictionary<int, int>();
-
-        foreach (var typeId in delayTypeIds)
-        {
-            if (submittedByType.TryGetValue(typeId, out var delayValue))
-            {
-                desired[typeId] = delayValue;
-            }
-            else if (existingByType.TryGetValue(typeId, out var existingDelayValue))
-            {
-                desired[typeId] = existingDelayValue;
-            }
-        }
-
-        foreach (var typeId in durationTypeIds)
-        {
-            var existingDuration = existingByType.GetValueOrDefault(typeId, 0);
-            if (existingDuration > 0)
-            {
-                desired[typeId] = existingDuration;
-                continue;
-            }
-
-            if (submittedByType.TryGetValue(typeId, out var submittedDuration))
-            {
-                desired[typeId] = submittedDuration;
-            }
-        }
-
-        return desired
-            .Select(item => new SaveRecordHarmonogramValueCommand
-            {
-                TypId = item.Key,
-                Hodnota = item.Value
-            })
-            .OrderBy(x => x.TypId)
-            .ToList();
-    }
-
-    private async Task<List<SaveRecordHarmonogramValueCommand>> BuildScheduleValuesPreservingLockedScopeAsync(
-        int zaznamId,
-        IReadOnlyList<SaveRecordHarmonogramValueCommand> submittedValues,
-        IReadOnlyList<RecordScheduleTypeDefinition> scheduleTypeDefinitions,
-        PendingScheduleProposalLockState lockState,
-        CancellationToken ct)
-    {
-        if (scheduleTypeDefinitions.Count == 0)
-        {
-            return [];
-        }
-
-        var durationTypeIds = scheduleTypeDefinitions
-            .Select(x => x.DurationTypeId)
-            .Where(x => x > 0)
-            .Distinct()
-            .ToList();
-        var delayTypeIds = scheduleTypeDefinitions
-            .Select(x => x.DelayTypeId)
-            .Where(x => x > 0)
-            .Distinct()
-            .ToList();
-        var allowedTypeIds = durationTypeIds
-            .Concat(delayTypeIds)
-            .ToHashSet();
-        if (allowedTypeIds.Count == 0)
-        {
-            return [];
-        }
-
-        if (!lockState.LocksSchedule)
-        {
-            return submittedValues
-                .Where(x => allowedTypeIds.Contains(x.TypId))
-                .GroupBy(x => x.TypId)
-                .Select(group => new SaveRecordHarmonogramValueCommand
-                {
-                    TypId = group.Key,
-                    Hodnota = group.Last().Hodnota
-                })
-                .OrderBy(x => x.TypId)
-                .ToList();
-        }
-
-        // DESIGN-10-A (2026-05-01): NULL HodnotaInt → vyfiltrovat z dict (caller interpretuje
-        // missing klíč jako "krok nenastal").
-        var existingByType = (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-                .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId) && x.HodnotaInt.HasValue)
-                .ToListAsync(ct))
-            .ToDictionary(x => x.TypId, x => x.HodnotaInt!.Value);
-        var submittedByType = submittedValues
-            .Where(x => allowedTypeIds.Contains(x.TypId))
-            .GroupBy(x => x.TypId)
-            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
-
-        var desired = new Dictionary<int, int>();
-
-        foreach (var typeId in durationTypeIds)
-        {
-            if (existingByType.TryGetValue(typeId, out var existingDuration))
-            {
-                desired[typeId] = Math.Max(0, existingDuration);
-            }
-        }
-
-        foreach (var typeId in delayTypeIds)
-        {
-            if (submittedByType.TryGetValue(typeId, out var submittedDelay))
-            {
-                desired[typeId] = submittedDelay;
-            }
-            else if (existingByType.TryGetValue(typeId, out var existingDelay))
-            {
-                desired[typeId] = existingDelay;
-            }
-        }
-
-        return desired
-            .Select(item => new SaveRecordHarmonogramValueCommand
-            {
-                TypId = item.Key,
-                Hodnota = item.Value
-            })
-            .OrderBy(x => x.TypId)
-            .ToList();
-    }
-
-    private async Task<List<SaveRecordHarmonogramValueCommand>> ReplaceRecordScheduleValuesAsync(
-        int zaznamId,
-        IReadOnlyList<SaveRecordHarmonogramValueCommand> harmonogramValues,
-        IReadOnlyList<RecordScheduleTypeDefinition> scheduleTypeDefinitions,
-        CancellationToken ct)
-    {
-        var durationTypeSet = scheduleTypeDefinitions
-            .Select(x => x.DurationTypeId)
-            .Where(x => x > 0)
-            .Distinct()
-            .ToHashSet();
-        var allowedTypeIds = scheduleTypeDefinitions
-            .SelectMany(x => new[] { x.DurationTypeId, x.DelayTypeId })
-            .Where(x => x > 0)
-            .Distinct()
-            .ToHashSet();
-
-        if (allowedTypeIds.Count == 0)
-        {
-            return [];
-        }
-
-        var normalized = harmonogramValues
-            .Where(x => allowedTypeIds.Contains(x.TypId))
-            .GroupBy(x => x.TypId)
-            .Select(group => new
-            {
-                TypId = group.Key,
-                Hodnota = durationTypeSet.Contains(group.Key)
-                    ? Math.Max(0, group.Last().Hodnota)
-                    : group.Last().Hodnota
-            })
-            .Where(x => x.Hodnota != 0)
-            .ToDictionary(x => x.TypId, x => x.Hodnota);
-        var normalizedResult = normalized
-            .Select(item => new SaveRecordHarmonogramValueCommand
-            {
-                TypId = item.Key,
-                Hodnota = item.Value
-            })
-            .OrderBy(x => x.TypId)
-            .ToList();
-
-        var existing = await dbContext.ZaznamHarmonogramHodnoty
-            .Where(x => x.ZaznamId == zaznamId && allowedTypeIds.Contains(x.TypId))
-            .ToListAsync(ct);
-
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        foreach (var row in existing)
-        {
-            if (normalized.TryGetValue(row.TypId, out var value))
-            {
-                row.HodnotaInt = value;
-                row.UpdatedAt = now;
-                normalized.Remove(row.TypId);
-            }
-            else
-            {
-                dbContext.ZaznamHarmonogramHodnoty.Remove(row);
-            }
-        }
-
-        foreach (var item in normalized)
-        {
-            dbContext.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
-            {
-                ZaznamId = zaznamId,
-                TypId = item.Key,
-                HodnotaInt = item.Value,
-                UpdatedAt = now
-            });
-        }
-
-        return normalizedResult;
-    }
-
-    /// <summary>
-    /// QW-4: Spustí <paramref name="operation"/> uvnitř Serializable transakce pod
-    /// SqlServer retrying execution strategy. Pokud už na dbContextu běží tx
-    /// (např. volání z <c>RecordProposalService.ApproveProposalAsync</c>), spustí
-    /// operaci přímo bez nové tx a bez strategy — retry je pak zodpovědnost
-    /// vnějšího volajícího.
-    /// </summary>
     private async Task<T> ExecuteInSerializableTransactionAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         CancellationToken ct)
@@ -1652,399 +1250,4 @@ public sealed partial class RecordService
 
     private DateTime GetLocalNow()
         => timeProvider.GetLocalNow().LocalDateTime;
-
-    private async Task<RecordScheduleAuditSnapshot?> LoadRecordScheduleAuditSnapshotAsync(int recordId, CancellationToken ct)
-    {
-        var rows = await dbContext.ZaznamHarmonogramHodnoty
-            .AsNoTracking()
-            .Where(x => x.ZaznamId == recordId)
-            .OrderBy(x => x.TypId)
-            .ThenBy(x => x.Id)
-            .ToListAsync(ct);
-
-        return rows.Count == 0 ? null : RecordScheduleAuditSnapshot.FromEntities(recordId, rows);
-    }
-
-    private async Task<Dictionary<int, int>> LoadSchedulePlanValueMapAsync(
-        int recordId,
-        IReadOnlyList<RecordScheduleTypeDefinition> scheduleTypeDefinitions,
-        CancellationToken ct)
-    {
-        var durationTypeIds = scheduleTypeDefinitions
-            .Select(x => x.DurationTypeId)
-            .Where(x => x > 0)
-            .Distinct()
-            .ToHashSet();
-        if (durationTypeIds.Count == 0)
-        {
-            return [];
-        }
-
-        // DESIGN-10-A: DURATION row s NULL HodnotaInt → fallback 0 (žádné trvání).
-        var rawList = await dbContext.ZaznamHarmonogramHodnoty
-            .AsNoTracking()
-            .Where(x => x.ZaznamId == recordId && durationTypeIds.Contains(x.TypId))
-            .Select(x => new { x.TypId, x.HodnotaInt })
-            .ToListAsync(ct);
-        return rawList.ToDictionary(x => x.TypId, x => x.HodnotaInt ?? 0);
-    }
-
-    private static bool ScheduleValueMapsEqual(
-        IReadOnlyDictionary<int, int> left,
-        IReadOnlyDictionary<int, int> right)
-    {
-        if (left.Count != right.Count)
-        {
-            return false;
-        }
-
-        foreach (var pair in left)
-        {
-            if (!right.TryGetValue(pair.Key, out var otherValue) || otherValue != pair.Value)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// Phase 4 (DESIGN-6-A, 2026-05-01) + FIX 2026-05-01 transaction semantics —
-    /// stage ManualActualKroky changes do change tracker BEZ SaveChanges. Caller
-    /// (SaveRecordAsync nebo SaveRecordScheduleOnlyAsync) volá SaveChangesAsync sám
-    /// v rámci své outer transakce (předejde partial-commit semantice).
-    ///
-    /// Phantom UI bug 1 fix: před tímto fixem UI input form pole posílalo data,
-    /// ale RecordService.SaveRecord ho silently ignoroval.
-    ///
-    /// Flow:
-    /// 1. Validace (KrokKey ≠ Empty, žádné duplikáty, datum ≤ today)
-    /// 2. Pending lock pre-check (univerzální guard)
-    /// 3. Compute overrides přes shared ManualActualKrokApplier.ApplyAsync
-    /// 4. Stage UPSERT (Add nebo modify properties tracked entity)
-    /// 5. Vrátí true pokud něco staged → caller poté volá SaveChangesAsync + audit
-    /// </summary>
-    private async Task<bool> StageManualActualKrokyAsync(
-        SaveRecordCommand command,
-        int recordId,
-        DateTime datumZalozeni,
-        int harmonogramSablonaVerze,
-        bool isTaskCategory,
-        CancellationToken ct)
-    {
-        if (!isTaskCategory || command.ManualActualKroky.Count == 0)
-        {
-            return false;
-        }
-
-        // 1) Validace strukturální
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-        Records.ManualProposalFieldValidator.ValidateManualActualKroky(command.ManualActualKroky, today);
-
-        // 2) Pending lock pre-check
-        var lockState = await pendingScheduleProposalLockEvaluator.EvaluateAsync(recordId, ct).ConfigureAwait(false);
-        if (lockState.HasPendingProposal && lockState.LockedManualKrokKeys is not null
-            && lockState.LockedManualKrokKeys.Count > 0)
-        {
-            var conflicting = command.ManualActualKroky
-                .Where(m => lockState.LockedManualKrokKeys.Contains(m.KrokKey))
-                .ToList();
-            if (conflicting.Count > 0)
-            {
-                var msg = $"Krok harmonogramu je uzamčený pending návrhem #{lockState.ProposalId}, vyřeš návrh nejdříve.";
-                throw new RecordValidationException(
-                    msg,
-                    new[] { new RecordValidationIssue("ManualActualKroky", msg, "schedule", "schedule.pending-lock", lockState.ProposalId?.ToString()) },
-                    $"StageManualActualKrokyAsync: pending lock #{lockState.ProposalId} blokuje konflikt na {conflicting.Count} kroku/kroků");
-            }
-        }
-
-        // 3) Compute overrides
-        var schema = await harmonogramService.GetSchemaForRecordAsync(
-            new Models.Entities.ProjektovyZaznamEntity
-            {
-                Id = recordId,
-                HarmonogramSablonaVerze = harmonogramSablonaVerze,
-                DatumZalozeni = datumZalozeni
-            },
-            ct).ConfigureAwait(false);
-        var plannedTypeIds = schema.Kroky.Select(k => k.TrvaniTypId).Where(x => x > 0).ToHashSet();
-
-        // FIX 2026-05-04: v Manual rezimu (HarmonogramRezim=Manual) povoleno
-        // ruční datum i pro auto-eligible kroky 1/3/4/6/7/10. Defensivní filter:
-        // pokud je rezim Auto, klient by manual datumy pro auto-eligible neměl posílat,
-        // ale server přesto akceptuje jen kroky 2/5/8/9 (= legacy guard).
-        var rezimManual = string.Equals(command.HarmonogramRezim, "Manual", StringComparison.OrdinalIgnoreCase);
-        var overrides = await Records.ManualActualKrokApplier.ApplyAsync(
-            recordId, command.ManualActualKroky, schema, datumZalozeni, plannedTypeIds,
-            command.HarmonogramHodnoty, dbContext, harmonogramService, ct,
-            acceptAutoEligibleKroky: rezimManual).ConfigureAwait(false);
-
-        if (overrides.Count == 0)
-        {
-            return false;
-        }
-
-        // 4) Stage UPSERT — žádný SaveChangesAsync, jen change tracker.
-        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
-        var existingDelayRows = await dbContext.ZaznamHarmonogramHodnoty
-            .Where(h => h.ZaznamId == recordId && overrides.Select(o => o.DelayTypId).Contains(h.TypId))
-            .ToListAsync(ct).ConfigureAwait(false);
-        var existingByTypId = existingDelayRows.ToDictionary(r => r.TypId);
-
-        foreach (var ov in overrides)
-        {
-            if (existingByTypId.TryGetValue(ov.DelayTypId, out var row))
-            {
-                row.HodnotaInt = ov.OdchylkaDni;
-                row.SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Manual;
-                row.SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Manual;
-                row.UpdatedAt = nowUtc;
-            }
-            else
-            {
-                dbContext.ZaznamHarmonogramHodnoty.Add(new Models.Entities.ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = recordId,
-                    TypId = ov.DelayTypId,
-                    HodnotaInt = ov.OdchylkaDni,
-                    SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Manual,
-                    SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Manual,
-                    UpdatedAt = nowUtc
-                });
-            }
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// FIX 2026-05-04 (Phase 1): chevron toggle 2/5/8/9 → "Z vyjádření" — reset příslušných DELAY
-    /// rows na Rezim=Auto, Zdroj=Neznamo, HodnotaInt=null. Composition při reload vrátí FromVyjadreni
-    /// datum pokud existuje vazba na vyjádření v ServiceDesk. Vrací počet upravených rows.
-    /// </summary>
-    private async Task<int> ResetManualKrokyToAutoAsync(
-        int recordId,
-        IReadOnlySet<Guid> krokKeys,
-        CancellationToken ct)
-    {
-        if (krokKeys.Count == 0) return 0;
-
-        // Resolve KrokKey → DelayTypId přes schema (defensive: jen zpozdeni rows + manual kroky 2/5/8/9)
-        var delayTypIds = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(t => t.JeZpozdeni && krokKeys.Contains(t.KrokKey))
-            .Select(t => new { t.Id, t.KrokPoradi })
-            .ToListAsync(ct).ConfigureAwait(false);
-        var allowedTypIds = delayTypIds
-            .Where(t => HarmonogramManualSteps.IsManual(t.KrokPoradi))
-            .Select(t => t.Id)
-            .ToHashSet();
-        if (allowedTypIds.Count == 0) return 0;
-
-        var rows = await dbContext.ZaznamHarmonogramHodnoty
-            .Where(h => h.ZaznamId == recordId && allowedTypIds.Contains(h.TypId))
-            .ToListAsync(ct).ConfigureAwait(false);
-
-        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
-        var changed = 0;
-        foreach (var row in rows)
-        {
-            if (row.SkutecnostRezim == Models.Entities.SkutecnostRezimEnum.Auto
-                && row.SkutecnostZdroj == Models.Entities.SkutecnostZdrojEnum.Neznamo
-                && row.HodnotaInt is null)
-            {
-                continue;
-            }
-            row.SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Auto;
-            row.SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Neznamo;
-            row.HodnotaInt = null;
-            row.UpdatedAt = nowUtc;
-            changed++;
-        }
-        return changed;
-    }
-
-    /// <summary>
-    /// FIX 2026-05-05: explicit clear datumu pro manuální krok 2/5/8/9. Triggered když user
-    /// vyprázdní pm-date-field (`AbsolutniDatum=null`) a `PreferredZdroj="Manual"` (zachovává
-    /// manual mode flag, jen ruší hodnotu). Před fixem `ManualActualKrokApplier.Compute`
-    /// silent-skipnul null AbsolutniDatum, takže staré HodnotaInt zůstávalo v DB.
-    ///
-    /// Distinct od <see cref="ResetManualKrokyToAutoAsync"/>: tam user explicitně volí Auto
-    /// (= flipne Rezim na Auto, krok přejde pod sync resolver). Tady user zůstává v Manual,
-    /// jen krok znovu "nenastal" (HodnotaInt=null, Zdroj=Neznamo, Rezim=Manual zachován).
-    /// </summary>
-    private async Task<int> ClearManualKrokyAsync(
-        int recordId,
-        IReadOnlySet<Guid> krokKeys,
-        CancellationToken ct)
-    {
-        if (krokKeys.Count == 0) return 0;
-
-        var delayTypIds = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(t => t.JeZpozdeni && krokKeys.Contains(t.KrokKey))
-            .Select(t => new { t.Id, t.KrokPoradi })
-            .ToListAsync(ct).ConfigureAwait(false);
-        var allowedTypIds = delayTypIds
-            .Where(t => HarmonogramManualSteps.IsManual(t.KrokPoradi))
-            .Select(t => t.Id)
-            .ToHashSet();
-        if (allowedTypIds.Count == 0) return 0;
-
-        var rows = await dbContext.ZaznamHarmonogramHodnoty
-            .Where(h => h.ZaznamId == recordId && allowedTypIds.Contains(h.TypId))
-            .ToListAsync(ct).ConfigureAwait(false);
-
-        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
-        var changed = 0;
-        foreach (var row in rows)
-        {
-            // No-op pokud už je čistý (HodnotaInt=null, Zdroj=Neznamo).
-            if (row.HodnotaInt is null
-                && row.SkutecnostZdroj == Models.Entities.SkutecnostZdrojEnum.Neznamo)
-            {
-                continue;
-            }
-            row.HodnotaInt = null;
-            row.SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Neznamo;
-            // Rezim NEPŘEPÍNÁME — user zůstává v Manual modu, jen krok "nenastal".
-            row.UpdatedAt = nowUtc;
-            changed++;
-        }
-        return changed;
-    }
-
-    /// <summary>
-    /// FIX 2026-05-04: aplikuje master switch "Automatické vyplňování harmonogramu" na auto-eligible
-    /// HS0X_DELAY rows (kroky 1/3/4/6/7/10) v rámci Save transakce. Vrací true pokud něco staged
-    /// (caller volá SaveChanges). Manuální kroky 2/5/8/9 zde NEjsou nikdy dotčené — řídí je samostatný
-    /// flow přes <see cref="StageManualActualKrokyAsync"/>.
-    ///
-    /// Manual rezim: SkutecnostRezim=Manual (manual datumy zapsal Stage v acceptAutoEligibleKroky=true režimu).
-    /// Auto rezim:   SkutecnostRezim=Auto + clear (HodnotaInt=null, Zdroj=Neznamo) — odpovídá UX kontraktu
-    ///                "auto→manual+vyplň→auto = data se ztratí". Re-fill ze SD vyjádření spustí auto-sync
-    ///                po commit transakce (volaný v outer scope).
-    /// </summary>
-    private async Task<bool> ApplyHarmonogramRezimAsync(
-        SaveRecordCommand command,
-        int recordId,
-        bool isTaskCategory,
-        int actorOsobaId,
-        CancellationToken ct)
-    {
-        if (!isTaskCategory || string.IsNullOrWhiteSpace(command.HarmonogramRezim))
-        {
-            return false;
-        }
-
-        if (!Enum.TryParse<Models.Entities.SkutecnostRezimEnum>(
-                command.HarmonogramRezim, ignoreCase: true, out var targetRezim))
-        {
-            return false;
-        }
-
-        var manualKrokyPoradi = HarmonogramManualSteps.KrokPoradi;
-        var autoEligibleDelayTypIds = (await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(t => t.JeZpozdeni)
-            .Select(t => new { t.Id, t.KrokPoradi })
-            .ToListAsync(ct).ConfigureAwait(false))
-            .Where(t => !manualKrokyPoradi.Contains(t.KrokPoradi))
-            .Select(t => t.Id)
-            .ToHashSet();
-
-        if (autoEligibleDelayTypIds.Count == 0)
-        {
-            return false;
-        }
-
-        var rows = await dbContext.ZaznamHarmonogramHodnoty
-            .Where(h => h.ZaznamId == recordId && autoEligibleDelayTypIds.Contains(h.TypId))
-            .ToListAsync(ct).ConfigureAwait(false);
-
-        // FIX 2026-05-04: pokud uživatel přepne switch na Manual u záznamu BEZ existujících
-        // auto-eligible DELAY rows (čerstvý záznam, žádný auto-fill ještě neproběhl), musíme
-        // vytvořit placeholder rows s SkutecnostRezim=Manual aby composition při reload spočítala
-        // HarmonogramAutoFillSwitchOn=false (jinak by se rezim nepersistoval). HodnotaInt=NULL
-        // = "krok nenastal" semantika (DESIGN-10-A).
-        if (rows.Count == 0 && targetRezim == Models.Entities.SkutecnostRezimEnum.Manual)
-        {
-            var nowUtcInsert = timeProvider.GetUtcNow().UtcDateTime;
-            foreach (var typId in autoEligibleDelayTypIds)
-            {
-                dbContext.ZaznamHarmonogramHodnoty.Add(new Models.Entities.ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = recordId,
-                    TypId = typId,
-                    HodnotaInt = null,
-                    SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Manual,
-                    SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Neznamo,
-                    UpdatedAt = nowUtcInsert
-                });
-            }
-            auditWriteService.Add(actorOsobaId, new AuditWriteEntry(
-                AuditActionType.Update,
-                AuditEntityType.RecordSchedule,
-                recordId.ToString(CultureInfo.InvariantCulture),
-                BeforeState: new { Action = "apply-harmonogram-rezim-insert-manual-placeholders" },
-                AfterState: new { Rezim = targetRezim, InsertedRows = autoEligibleDelayTypIds.Count }));
-            return true;
-        }
-
-        if (rows.Count == 0)
-        {
-            return false;
-        }
-
-        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
-        var changed = 0;
-
-        foreach (var row in rows)
-        {
-            if (targetRezim == Models.Entities.SkutecnostRezimEnum.Auto)
-            {
-                // Auto: clear ruční overrides — krok se znovu naplní auto-syncem ze SD.
-                if (row.SkutecnostRezim != targetRezim
-                    || row.HodnotaInt != null
-                    || row.SkutecnostZdroj != Models.Entities.SkutecnostZdrojEnum.Neznamo)
-                {
-                    row.SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Auto;
-                    row.HodnotaInt = null;
-                    row.SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Neznamo;
-                    row.UpdatedAt = nowUtc;
-                    changed++;
-                }
-            }
-            else // Manual
-            {
-                // Manual rezim: SkutecnostRezim=Manual. HodnotaInt zachováme — pokud Stage manual
-                // krokyzapsal nový datum (overrides), tak se přepsalo tam; pokud user neposlal datum,
-                // existing hodnota zůstane (legitimní — user vidí prázdné UI ale historická data zůstávají).
-                if (row.SkutecnostRezim != targetRezim)
-                {
-                    row.SkutecnostRezim = Models.Entities.SkutecnostRezimEnum.Manual;
-                    if (row.SkutecnostZdroj == Models.Entities.SkutecnostZdrojEnum.Automat)
-                    {
-                        row.SkutecnostZdroj = Models.Entities.SkutecnostZdrojEnum.Manual;
-                    }
-                    row.UpdatedAt = nowUtc;
-                    changed++;
-                }
-            }
-        }
-
-        if (changed == 0)
-        {
-            return false;
-        }
-
-        auditWriteService.Add(actorOsobaId, new AuditWriteEntry(
-            AuditActionType.Update,
-            AuditEntityType.RecordSchedule,
-            recordId.ToString(CultureInfo.InvariantCulture),
-            BeforeState: new { Action = "apply-harmonogram-rezim-before" },
-            AfterState: new { Rezim = targetRezim, ChangedRows = changed }));
-
-        return true;
-    }
 }

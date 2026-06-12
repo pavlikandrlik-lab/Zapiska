@@ -113,8 +113,9 @@ public sealed class SaveRecordExterniVazbaCommand
 
 public sealed class SaveRecordHarmonogramValueCommand
 {
-    public int TypId { get; set; }
-    public int Hodnota { get; set; }
+    public int Poradi { get; set; }
+    public DateTime? PlanDatum { get; set; }
+    public DateTime? SkutecnostDatum { get; set; }
 }
 
 public sealed class AddCommentCommand

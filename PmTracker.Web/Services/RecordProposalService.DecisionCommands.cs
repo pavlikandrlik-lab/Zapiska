@@ -207,95 +207,68 @@ public sealed partial class RecordProposalService
             ?? throw new InvalidOperationException($"Záznam {proposal.ZaznamId.Value} nebyl nalezen.");
         var oldRecordSnapshot = RecordAuditSnapshot.FromEntity(record);
 
-        var schema = await _harmonogramService.GetSchemaForRecordAsync(record, ct);
-        var scheduleTypeDefinitions = _harmonogramService.BuildRecordScheduleTypeDefinitions(schema);
-        var plannedTypeIds = scheduleTypeDefinitions
-            .Select(x => x.DurationTypeId)
-            .Where(x => x > 0)
-            .Distinct()
-            .ToHashSet();
-        var actualTypeIds = scheduleTypeDefinitions
-            .Select(x => x.DelayTypeId)
-            .Where(x => x > 0)
-            .Distinct()
-            .ToHashSet();
-        var allowedTypeIds = plannedTypeIds.Concat(actualTypeIds).ToHashSet();
-        var submittedValues = (schedulePayload.ChangesSchedulePlan
-                ? schedulePayload.PlannedHarmonogramHodnoty.Where(value => plannedTypeIds.Contains(value.TypId))
-                : Enumerable.Empty<SaveRecordHarmonogramValueCommand>())
-            .Concat(
-                schedulePayload.ChangesScheduleActual
-                    ? schedulePayload.ActualHarmonogramHodnoty.Where(value => actualTypeIds.Contains(value.TypId))
-                    : Enumerable.Empty<SaveRecordHarmonogramValueCommand>())
-            .GroupBy(value => value.TypId)
-            .Select(group => new SaveRecordHarmonogramValueCommand
-            {
-                TypId = group.Key,
-                Hodnota = plannedTypeIds.Contains(group.Key)
-                    ? Math.Max(0, group.Last().Hodnota)
-                    : group.Last().Hodnota
-            })
-            .ToList();
-        var existingRows = await _dbContext.ZaznamHarmonogramHodnoty
-            .Where(x => x.ZaznamId == record.Id && allowedTypeIds.Contains(x.TypId))
-            .ToListAsync(ct);
-        var oldScheduleSnapshot = existingRows.Count == 0
-            ? null
-            : RecordScheduleAuditSnapshot.FromEntities(record.Id, existingRows);
-        var normalizedValues = submittedValues
-            .Where(x => x.Hodnota > 0 || actualTypeIds.Contains(x.TypId))
-            .ToDictionary(x => x.TypId, x => x.Hodnota);
-
+        // Datum-model: aplikuj návrh schedule na krok rows (plán + skutečnost datumy).
         if (schedulePayload.ChangesTermDeadline)
         {
             record.DatumUkonceni = schedulePayload.TerminUkonceni.Date;
         }
 
-        // Plán D: aplikace ManualActualKroky[] — přepočet absolutní datum -> odchylka
-        // proti plánovanému konci kroku. Počítá se s plánem PO aplikaci navrhovaných
-        // změn trvání (submittedValues), takže ruční datum z návrhu ctí posun plánu.
-        if (schedulePayload.ManualActualKroky.Count > 0)
-        {
-            var manualOverrides = await ComputeManualActualOverridesAsync(
-                record.Id,
-                schedulePayload.ManualActualKroky,
-                schema,
-                record.DatumZalozeni,
-                plannedTypeIds,
-                submittedValues,
-                ct);
-            foreach (var ov in manualOverrides)
-            {
-                // Přepiš přípravnou hodnotu (schedulePayload.ActualHarmonogramHodnoty) tím,
-                // co dal user v ManualActualKroky. DELAY hodnoty mohou být i záporné.
-                normalizedValues[ov.DelayTypId] = ov.OdchylkaDni;
-            }
-        }
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        var krokRows = await _dbContext.ZaznamHarmonogramKroky
+            .Where(k => k.ZaznamId == record.Id)
+            .ToListAsync(ct);
+        var krokByPoradi = krokRows.GroupBy(k => (int)k.Poradi).ToDictionary(g => g.Key, g => g.First());
 
-        foreach (var row in existingRows)
+        ZaznamHarmonogramKrokEntity GetOrCreateKrok(int poradi)
         {
-            if (normalizedValues.TryGetValue(row.TypId, out var updatedValue))
+            if (krokByPoradi.TryGetValue(poradi, out var r))
             {
-                row.HodnotaInt = updatedValue;
-                row.UpdatedAt = _timeProvider.GetUtcNow().UtcDateTime;
-                normalizedValues.Remove(row.TypId);
+                return r;
             }
-            else if ((plannedTypeIds.Contains(row.TypId) && schedulePayload.ChangesSchedulePlan)
-                || (actualTypeIds.Contains(row.TypId) && schedulePayload.ChangesScheduleActual))
-            {
-                _dbContext.ZaznamHarmonogramHodnoty.Remove(row);
-            }
-        }
-
-        foreach (var plannedValue in normalizedValues)
-        {
-            _dbContext.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+            r = new ZaznamHarmonogramKrokEntity
             {
                 ZaznamId = record.Id,
-                TypId = plannedValue.Key,
-                HodnotaInt = plannedValue.Value,
-                UpdatedAt = _timeProvider.GetUtcNow().UtcDateTime
-            });
+                Poradi = (byte)poradi,
+                SkutecnostRezim = (byte)SkutecnostRezimEnum.Auto,
+                SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Neznamo,
+                UpdatedAt = nowUtc
+            };
+            _dbContext.ZaznamHarmonogramKroky.Add(r);
+            krokByPoradi[poradi] = r;
+            return r;
+        }
+
+        if (schedulePayload.ChangesSchedulePlan)
+        {
+            foreach (var pv in schedulePayload.PlannedHarmonogramHodnoty.Where(x => x.Poradi is >= 1 and <= 10))
+            {
+                var row = GetOrCreateKrok(pv.Poradi);
+                row.PlanDatum = pv.PlanDatum?.Date;
+                row.UpdatedAt = nowUtc;
+            }
+        }
+
+        if (schedulePayload.ChangesScheduleActual)
+        {
+            foreach (var av in schedulePayload.ActualHarmonogramHodnoty.Where(x => x.Poradi is >= 1 and <= 10))
+            {
+                var row = GetOrCreateKrok(av.Poradi);
+                row.SkutecnostDatum = av.SkutecnostDatum?.Date;
+                row.SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual;
+                row.SkutecnostZdroj = av.SkutecnostDatum.HasValue
+                    ? (byte)SkutecnostZdrojEnum.Manual
+                    : (byte)SkutecnostZdrojEnum.Neznamo;
+                row.UpdatedAt = nowUtc;
+            }
+        }
+
+        foreach (var applied in ManualActualKrokApplier.Compute(schedulePayload.ManualActualKroky, acceptAutoEligibleKroky: true))
+        {
+            var row = GetOrCreateKrok(applied.Poradi);
+            row.SkutecnostDatum = applied.AbsolutniDatum.ToDateTime(TimeOnly.MinValue);
+            row.SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual;
+            row.SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Manual;
+            row.UpdatedAt = nowUtc;
         }
 
         await _dbContext.SaveChangesAsync(ct);
@@ -309,24 +282,6 @@ public sealed partial class RecordProposalService
             record.Id.ToString(CultureInfo.InvariantCulture),
             oldRecordSnapshot,
             RecordAuditSnapshot.FromEntity(record)));
-
-        var newScheduleRows = await _dbContext.ZaznamHarmonogramHodnoty
-            .AsNoTracking()
-            .Where(x => x.ZaznamId == record.Id && allowedTypeIds.Contains(x.TypId))
-            .ToListAsync(ct);
-        var newScheduleSnapshot = newScheduleRows.Count == 0
-            ? null
-            : RecordScheduleAuditSnapshot.FromEntities(record.Id, newScheduleRows);
-        if (oldScheduleSnapshot is not null || newScheduleSnapshot is not null)
-        {
-            _auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
-                oldScheduleSnapshot is null ? AuditActionType.Create : AuditActionType.Update,
-                AuditEntityType.RecordSchedule,
-                record.Id.ToString(CultureInfo.InvariantCulture),
-                oldScheduleSnapshot,
-                newScheduleSnapshot));
-        }
-
         await _dbContext.SaveChangesAsync(ct);
     }
 
@@ -368,7 +323,7 @@ public sealed partial class RecordProposalService
                 _dbContext.VyjadreniVazby.Add(new ZaznamHarmonogramVyjadreniVazbaEntity
                 {
                     ZaznamId = newRecordId,
-                    KrokKey = v.KrokKey,
+                    Poradi = (byte)v.Poradi,
                     ExterniOdkazId = externiOdkazId,
                     HotVyjadreniId = v.HotVyjadreniId,
                     DatumVyjadreni = v.DatumVyjadreni.UtcDateTime,
@@ -381,49 +336,32 @@ public sealed partial class RecordProposalService
             await _dbContext.SaveChangesAsync(ct);
         }
 
-        // ManualActualKroky → DELAY upsert (odchylka dnů)
-        if (createPayload.ManualActualKroky.Count > 0)
+        // ManualActualKroky → UPSERT krok skutečnost datumy (datum-model).
+        var manualApplied = ManualActualKrokApplier.Compute(createPayload.ManualActualKroky, acceptAutoEligibleKroky: true);
+        if (manualApplied.Count > 0)
         {
-            var record = await _dbContext.ProjektoveZaznamy
-                .FirstOrDefaultAsync(x => x.Id == newRecordId, ct)
-                ?? throw new InvalidOperationException($"Nově vytvořený záznam {newRecordId} nebyl nalezen.");
-            var schema = await _harmonogramService.GetSchemaForRecordAsync(record, ct);
-            var plannedTypeIds = schema.Kroky
-                .Select(x => x.TrvaniTypId)
-                .Where(x => x > 0)
-                .ToHashSet();
-
-            var overrides = await ComputeManualActualOverridesAsync(
-                record.Id,
-                createPayload.ManualActualKroky,
-                schema,
-                record.DatumZalozeni,
-                plannedTypeIds,
-                Array.Empty<SaveRecordHarmonogramValueCommand>(),
-                ct);
-
-            var existingByTypId = await _dbContext.ZaznamHarmonogramHodnoty
-                .Where(x => x.ZaznamId == newRecordId && overrides.Select(o => o.DelayTypId).Contains(x.TypId))
-                .ToDictionaryAsync(x => x.TypId, ct);
-
-            var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
-            foreach (var ov in overrides)
+            var existingKroky = await _dbContext.ZaznamHarmonogramKroky
+                .Where(k => k.ZaznamId == newRecordId)
+                .ToListAsync(ct);
+            var krokByPoradi = existingKroky.GroupBy(k => (int)k.Poradi).ToDictionary(g => g.Key, g => g.First());
+            var nowUtcManual = _timeProvider.GetUtcNow().UtcDateTime;
+            foreach (var ov in manualApplied)
             {
-                if (existingByTypId.TryGetValue(ov.DelayTypId, out var existing))
+                if (!krokByPoradi.TryGetValue(ov.Poradi, out var row))
                 {
-                    existing.HodnotaInt = ov.OdchylkaDni;
-                    existing.UpdatedAt = nowUtc;
-                }
-                else
-                {
-                    _dbContext.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+                    row = new ZaznamHarmonogramKrokEntity
                     {
                         ZaznamId = newRecordId,
-                        TypId = ov.DelayTypId,
-                        HodnotaInt = ov.OdchylkaDni,
-                        UpdatedAt = nowUtc
-                    });
+                        Poradi = (byte)ov.Poradi,
+                        UpdatedAt = nowUtcManual
+                    };
+                    _dbContext.ZaznamHarmonogramKroky.Add(row);
+                    krokByPoradi[ov.Poradi] = row;
                 }
+                row.SkutecnostDatum = ov.AbsolutniDatum.ToDateTime(TimeOnly.MinValue);
+                row.SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual;
+                row.SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Manual;
+                row.UpdatedAt = nowUtcManual;
             }
             await _dbContext.SaveChangesAsync(ct);
         }
@@ -433,28 +371,4 @@ public sealed partial class RecordProposalService
         return externiOdkazyIds.Count > 0;
     }
 
-    /// <summary>
-    /// Plán D — sestaví KrokKey -&gt; Poradi a KrokKey -&gt; DelayTypeId mapování pro daný
-    /// záznam a spočítá cílové odchylky z <see cref="ManualActualKrokDto"/> payloadu.
-    /// Plánovaná timeline se počítá s kombinací stávajících hodnot a návrhem změněných
-    /// trvání (<paramref name="submittedValues"/>), takže ruční datum respektuje plán
-    /// PO schválení návrhu.
-    /// </summary>
-    /// <summary>
-    /// DESIGN-6-B (2026-05-01) — delegace na shared <see cref="ManualActualKrokApplier.ApplyAsync"/>.
-    /// Zachovaná wrapper pro existing call sites uvnitř DecisionCommands.
-    /// </summary>
-    private async Task<IReadOnlyList<ManualActualKrokApplier.ManualActualKrokApplied>> ComputeManualActualOverridesAsync(
-        int zaznamId,
-        IReadOnlyList<ManualActualKrokDto> manualKroky,
-        HarmonogramSchemaDefinition schema,
-        DateTime datumZalozeni,
-        IReadOnlySet<int> plannedTypeIds,
-        IReadOnlyList<SaveRecordHarmonogramValueCommand> submittedValues,
-        CancellationToken ct)
-    {
-        return await ManualActualKrokApplier.ApplyAsync(
-            zaznamId, manualKroky, schema, datumZalozeni, plannedTypeIds, submittedValues,
-            _dbContext, _harmonogramService, ct).ConfigureAwait(false);
-    }
 }

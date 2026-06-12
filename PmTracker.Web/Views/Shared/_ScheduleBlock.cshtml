@@ -23,7 +23,7 @@
     // Plán D Task 8: pořadí manual kroků v rámci ManualActualKroky[] binding.
     // Počítá se jen pro kroky, u kterých opravdu renderujeme manual input/read-only.
     var manualInputIndex = 0;
-    var lockedManualKrokKeys = Model.LockedManualKrokKeys ?? new HashSet<Guid>();
+    var lockedManualKrokKeys = Model.LockedManualKrokKeys ?? new HashSet<int>();
 }
 
 <div class="@rootCssClass schedule-block"
@@ -319,7 +319,7 @@
                                     // delay input, který umožní pre-fill. Manual kroky ale renderujeme vždy
                                     // (i u Create — schéma 3 pre-bound vazby).
                                     var zdrojSkut = krok.ZdrojSkutecnosti;
-                                    var isKrokLocked = krok.KrokKey != Guid.Empty && lockedManualKrokKeys.Contains(krok.KrokKey);
+                                    var isKrokLocked = krok.KrokIndex >= 1 && lockedManualKrokKeys.Contains(krok.KrokIndex);
                                     var hasExistingRecord = Model.RecordId > 0;
                                     var useManualCell = krok.IsManualKrok;
                                     var useFromVyjadreniCell = !useManualCell

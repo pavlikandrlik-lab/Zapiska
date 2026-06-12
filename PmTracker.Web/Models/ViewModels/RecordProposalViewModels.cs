@@ -120,7 +120,7 @@ public sealed class ManualActualKrokDtoExtensions
 
 public sealed class ManualActualKrokDto
 {
-    public Guid KrokKey { get; set; }
+    public int Poradi { get; set; }
 
     /// <summary>
     /// Kalendářní datum skutečnosti zadané uživatelem.
@@ -146,7 +146,7 @@ public sealed class ManualActualKrokDto
 
 public sealed class HarmonogramVazbaDto
 {
-    public Guid KrokKey { get; set; }
+    public int Poradi { get; set; }
 
     /// <summary>
     /// Index do <see cref="CreateRecordProposalPayload.ExterniVazby"/> — vazba

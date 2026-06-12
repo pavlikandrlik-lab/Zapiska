@@ -16,7 +16,7 @@ public sealed record PendingScheduleProposalLockState(
     string? Message,
     bool LocksTermDeadline,
     bool LocksSchedule,
-    IReadOnlySet<Guid>? LockedManualKrokKeys = null);
+    IReadOnlySet<int>? LockedManualKrokKeys = null);
 
 public sealed class PendingScheduleProposalLockEvaluator : IPendingScheduleProposalLockEvaluator
 {
@@ -79,12 +79,12 @@ public sealed class PendingScheduleProposalLockEvaluator : IPendingSchedulePropo
         // Plán D: KrokKey, pro které pending návrh obsahuje ruční skutečnost.
         // UI je musí pro přímou editaci (schéma 1) uzamknout, jinak by přímý
         // zápis kolidoval s návrhem, který čeká na schválení.
-        IReadOnlySet<Guid>? lockedManualKrokKeys = null;
+        IReadOnlySet<int>? lockedManualKrokKeys = null;
         if (schedulePayload is not null && schedulePayload.ManualActualKroky.Count > 0)
         {
             lockedManualKrokKeys = schedulePayload.ManualActualKroky
-                .Select(x => x.KrokKey)
-                .Where(x => x != Guid.Empty)
+                .Select(x => x.Poradi)
+                .Where(x => x is >= 1 and <= 10)
                 .ToHashSet();
             // Manuální kroky patří do actual části — zamykají schedule i pokud
             // v payloadu nejsou nastavené ChangesScheduleActual flagy.

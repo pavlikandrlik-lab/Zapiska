@@ -2,8 +2,21 @@ using PmTracker.Web.Models.ViewModels;
 
 namespace PmTracker.Web.Services.Records;
 
+/// <summary>
+/// Datum-model (2026-06-12) — mapování mezi <see cref="SaveRecordCommand"/> a návrhovým payloadem.
+/// Kroky identifikovány pořadím (1–10); plán/skutečnost jsou absolutní datumy.
+/// </summary>
 public sealed class RecordProposalPayloadMapper
 {
+    private static SaveRecordHarmonogramValueCommand Krok(SaveRecordHarmonogramValueCommand v)
+        => new() { Poradi = v.Poradi, PlanDatum = v.PlanDatum, SkutecnostDatum = v.SkutecnostDatum };
+
+    private static ManualActualKrokDto Manual(ManualActualKrokDto x)
+        => new() { Poradi = x.Poradi, AbsolutniDatum = x.AbsolutniDatum, PreferredZdroj = x.PreferredZdroj };
+
+    private static HarmonogramVazbaDto Vazba(HarmonogramVazbaDto x)
+        => new() { Poradi = x.Poradi, ExterniOdkazIndex = x.ExterniOdkazIndex, HotVyjadreniId = x.HotVyjadreniId, DatumVyjadreni = x.DatumVyjadreni };
+
     public RecordProposalPayload BuildCreatePayload(SaveRecordCommand command)
     {
         return new RecordProposalPayload
@@ -37,51 +50,25 @@ public sealed class RecordProposalPayloadMapper
                         DatumPrevzeti = link.DatumPrevzeti
                     })
                     .ToList(),
-                HarmonogramHodnoty = command.HarmonogramHodnoty
-                    .Select(value => new SaveRecordHarmonogramValueCommand
-                    {
-                        TypId = value.TypId,
-                        Hodnota = value.Hodnota
-                    })
-                    .ToList(),
+                HarmonogramHodnoty = command.HarmonogramHodnoty.Select(Krok).ToList(),
                 JednaniIdProCislo = command.JednaniIdProCislo,
-                ManualActualKroky = command.ManualActualKroky
-                    .Select(x => new ManualActualKrokDto
-                    {
-                        KrokKey = x.KrokKey,
-                        AbsolutniDatum = x.AbsolutniDatum
-                    })
-                    .ToList(),
-                HarmonogramVazby = command.HarmonogramVazby
-                    .Select(x => new HarmonogramVazbaDto
-                    {
-                        KrokKey = x.KrokKey,
-                        ExterniOdkazIndex = x.ExterniOdkazIndex,
-                        HotVyjadreniId = x.HotVyjadreniId,
-                        DatumVyjadreni = x.DatumVyjadreni
-                    })
-                    .ToList()
+                ManualActualKroky = command.ManualActualKroky.Select(Manual).ToList(),
+                HarmonogramVazby = command.HarmonogramVazby.Select(Vazba).ToList()
             }
         };
     }
 
-    public RecordProposalPayload BuildSchedulePayload(
-        SaveRecordCommand command,
-        IReadOnlyCollection<int> plannedTypeIds,
-        IReadOnlyCollection<int> actualTypeIds,
-        DateTime originalDeadline,
-        IReadOnlyDictionary<int, int> existingValues)
+    public RecordProposalPayload BuildSchedulePayload(SaveRecordCommand command, DateTime originalDeadline)
     {
-        var plannedTypeIdSet = plannedTypeIds.ToHashSet();
-        var actualTypeIdSet = actualTypeIds.ToHashSet();
-        var submittedByType = command.HarmonogramHodnoty
-            .GroupBy(value => value.TypId)
-            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
         var changesTermDeadline = command.TerminUkonceni.Date != originalDeadline.Date;
-        var changesSchedulePlan = plannedTypeIdSet.Any(typeId =>
-            NormalizeScheduleValue(submittedByType.GetValueOrDefault(typeId)) != NormalizeScheduleValue(existingValues.GetValueOrDefault(typeId)));
-        var changesScheduleActual = actualTypeIdSet.Any(typeId =>
-            NormalizeScheduleValue(submittedByType.GetValueOrDefault(typeId)) != NormalizeScheduleValue(existingValues.GetValueOrDefault(typeId)));
+        var planned = command.HarmonogramHodnoty
+            .Where(v => v.PlanDatum.HasValue)
+            .Select(v => new SaveRecordHarmonogramValueCommand { Poradi = v.Poradi, PlanDatum = v.PlanDatum })
+            .ToList();
+        var actual = command.HarmonogramHodnoty
+            .Where(v => v.SkutecnostDatum.HasValue)
+            .Select(v => new SaveRecordHarmonogramValueCommand { Poradi = v.Poradi, SkutecnostDatum = v.SkutecnostDatum })
+            .ToList();
 
         return new RecordProposalPayload
         {
@@ -91,32 +78,12 @@ public sealed class RecordProposalPayloadMapper
                 ProjektId = command.ProjektId,
                 ZaznamId = command.Id.GetValueOrDefault(),
                 TerminUkonceni = command.TerminUkonceni,
-                PlannedHarmonogramHodnoty = command.HarmonogramHodnoty
-                    .Where(value => plannedTypeIdSet.Contains(value.TypId))
-                    .Select(value => new SaveRecordHarmonogramValueCommand
-                    {
-                        TypId = value.TypId,
-                        Hodnota = value.Hodnota
-                    })
-                    .ToList(),
-                ActualHarmonogramHodnoty = command.HarmonogramHodnoty
-                    .Where(value => actualTypeIdSet.Contains(value.TypId))
-                    .Select(value => new SaveRecordHarmonogramValueCommand
-                    {
-                        TypId = value.TypId,
-                        Hodnota = value.Hodnota
-                    })
-                    .ToList(),
+                PlannedHarmonogramHodnoty = planned,
+                ActualHarmonogramHodnoty = actual,
                 ChangesTermDeadline = changesTermDeadline,
-                ChangesSchedulePlan = changesSchedulePlan,
-                ChangesScheduleActual = changesScheduleActual,
-                ManualActualKroky = command.ManualActualKroky
-                    .Select(x => new ManualActualKrokDto
-                    {
-                        KrokKey = x.KrokKey,
-                        AbsolutniDatum = x.AbsolutniDatum
-                    })
-                    .ToList()
+                ChangesSchedulePlan = planned.Count > 0,
+                ChangesScheduleActual = actual.Count > 0 || command.ManualActualKroky.Count > 0,
+                ManualActualKroky = command.ManualActualKroky.Select(Manual).ToList()
             }
         };
     }
@@ -151,30 +118,10 @@ public sealed class RecordProposalPayloadMapper
                     DatumPrevzeti = link.DatumPrevzeti
                 })
                 .ToList(),
-            HarmonogramHodnoty = payload.HarmonogramHodnoty
-                .Select(value => new SaveRecordHarmonogramValueCommand
-                {
-                    TypId = value.TypId,
-                    Hodnota = value.Hodnota
-                })
-                .ToList(),
+            HarmonogramHodnoty = payload.HarmonogramHodnoty.Select(Krok).ToList(),
             JednaniIdProCislo = payload.JednaniIdProCislo,
-            ManualActualKroky = payload.ManualActualKroky
-                .Select(x => new ManualActualKrokDto
-                {
-                    KrokKey = x.KrokKey,
-                    AbsolutniDatum = x.AbsolutniDatum
-                })
-                .ToList(),
-            HarmonogramVazby = payload.HarmonogramVazby
-                .Select(x => new HarmonogramVazbaDto
-                {
-                    KrokKey = x.KrokKey,
-                    ExterniOdkazIndex = x.ExterniOdkazIndex,
-                    HotVyjadreniId = x.HotVyjadreniId,
-                    DatumVyjadreni = x.DatumVyjadreni
-                })
-                .ToList()
+            ManualActualKroky = payload.ManualActualKroky.Select(Manual).ToList(),
+            HarmonogramVazby = payload.HarmonogramVazby.Select(Vazba).ToList()
         };
     }
 
@@ -214,10 +161,10 @@ public sealed class RecordProposalPayloadMapper
     {
         model.TerminUkonceni = payload.TerminUkonceni;
 
-        var scheduleValuesByType = payload.PlannedHarmonogramHodnoty
-            .Concat(payload.ActualHarmonogramHodnoty)
-            .GroupBy(value => value.TypId)
-            .ToDictionary(group => group.Key, group => group.Last().Hodnota);
+        var planByPoradi = payload.PlannedHarmonogramHodnoty
+            .GroupBy(v => v.Poradi).ToDictionary(g => g.Key, g => g.Last().PlanDatum);
+        var actualByPoradi = payload.ActualHarmonogramHodnoty
+            .GroupBy(v => v.Poradi).ToDictionary(g => g.Key, g => g.Last().SkutecnostDatum);
 
         var rebuiltSteps = model.HarmonogramBlok.Kroky
             .Select(step => new HarmonogramKrokEditViewModel
@@ -225,14 +172,10 @@ public sealed class RecordProposalPayloadMapper
                 KrokIndex = step.KrokIndex,
                 Nazev = step.Nazev,
                 BarvaHex = step.BarvaHex,
-                TrvaniTypId = step.TrvaniTypId,
-                ZpozdeniTypId = step.ZpozdeniTypId,
-                TrvaniDni = scheduleValuesByType.TryGetValue(step.TrvaniTypId, out var duration) ? Math.Max(0, duration) : step.TrvaniDni,
-                OdchylkaDni = scheduleValuesByType.TryGetValue(step.ZpozdeniTypId, out var delay) ? delay : step.OdchylkaDni,
-                BaselineDatum = step.BaselineDatum,
-                SkutecneDatum = step.SkutecneDatum,
-                // Plán D Task 8/9: zachovat VM properties při rebuildu (M-1 fix).
-                KrokKey = step.KrokKey,
+                TrvaniDni = step.TrvaniDni,
+                OdchylkaDni = step.OdchylkaDni,
+                BaselineDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pd) && pd.HasValue ? pd.Value : step.BaselineDatum,
+                SkutecneDatum = actualByPoradi.TryGetValue(step.KrokIndex, out var sd) && sd.HasValue ? sd.Value : step.SkutecneDatum,
                 ZdrojSkutecnosti = step.ZdrojSkutecnosti,
                 SourceVyjadreniId = step.SourceVyjadreniId,
                 SourceVyjadreniDatum = step.SourceVyjadreniDatum,
@@ -253,6 +196,4 @@ public sealed class RecordProposalPayloadMapper
             Permissions = model.HarmonogramBlok.Permissions
         };
     }
-
-    private static int NormalizeScheduleValue(int value) => value;
 }

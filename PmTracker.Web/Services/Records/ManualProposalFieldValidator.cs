@@ -4,24 +4,11 @@ using PmTracker.Web.Services.Data;
 namespace PmTracker.Web.Services.Records;
 
 /// <summary>
-/// Plán D — čisté validace polí přidaných do návrhových payloadů:
-/// <see cref="ManualActualKrokDto"/> (schémata 2 a 3) a
-/// <see cref="HarmonogramVazbaDto"/> (schéma 3). Oddělená třída umožňuje
-/// unit-testovat validační logiku bez DB kontextu.
+/// Datum-model (2026-06-12) — validace polí návrhových payloadů. Kroky identifikovány
+/// pořadím (1–10) místo KrokKey.
 /// </summary>
 public static class ManualProposalFieldValidator
 {
-    /// <summary>
-    /// Ruční skutečnost kroku 2/5/8/9:
-    /// - <c>KrokKey</c> nesmí být <see cref="Guid.Empty"/>.
-    /// - Žádné duplikáty (jeden krok = max jedno datum).
-    /// - Datum nesmí být v budoucnosti (vůči <paramref name="today"/>).
-    /// <para>
-    /// Kontrola, že <c>KrokKey</c> skutečně patří do ručních kroků 2/5/8/9
-    /// se dělá až na úrovni approve commandu, protože tam máme k dispozici
-    /// schéma harmonogramu konkrétního záznamu.
-    /// </para>
-    /// </summary>
     public static void ValidateManualActualKroky(IReadOnlyList<ManualActualKrokDto> manualKroky, DateOnly today)
     {
         if (manualKroky.Count == 0)
@@ -29,105 +16,74 @@ public static class ManualProposalFieldValidator
             return;
         }
 
-        // FIX 2026-05-01 (#7): RecordValidationException místo InvalidOperationException —
-        // user vidí UNEXPECTED_SERVER_ERROR pro IOE, RVE má dedicated handling
-        // (controller AjaxResultMiddleware ho mapuje na 400 s message).
-        var seen = new HashSet<Guid>();
+        var seen = new HashSet<int>();
         foreach (var krok in manualKroky)
         {
-            if (krok.KrokKey == Guid.Empty)
+            if (krok.Poradi is < 1 or > 10)
             {
                 throw new RecordValidationException(
-                    "Ruční skutečnost kroku musí mít vyplněný identifikátor kroku.",
-                    new[] { new RecordValidationIssue("ManualActualKroky", "Ruční skutečnost kroku musí mít vyplněný identifikátor kroku.", "schedule", "manual.krokkey", null) },
-                    "ManualProposalFieldValidator.ValidateManualActualKroky: KrokKey == Empty");
+                    "Ruční skutečnost kroku musí mít platné pořadí (1–10).",
+                    new[] { new RecordValidationIssue("ManualActualKroky", "Ruční skutečnost kroku musí mít platné pořadí (1–10).", "schedule", "manual.poradi", krok.Poradi.ToString()) },
+                    "ValidateManualActualKroky: Poradi mimo 1–10");
             }
 
-            if (!seen.Add(krok.KrokKey))
+            if (!seen.Add(krok.Poradi))
             {
                 throw new RecordValidationException(
                     "Pro jeden krok harmonogramu lze zadat jen jedno ruční datum.",
-                    new[] { new RecordValidationIssue("ManualActualKroky", "Pro jeden krok harmonogramu lze zadat jen jedno ruční datum.", "schedule", "manual.duplicate", krok.KrokKey.ToString()) },
-                    "ManualProposalFieldValidator.ValidateManualActualKroky: duplicate KrokKey");
+                    new[] { new RecordValidationIssue("ManualActualKroky", "Pro jeden krok harmonogramu lze zadat jen jedno ruční datum.", "schedule", "manual.duplicate", krok.Poradi.ToString()) },
+                    "ValidateManualActualKroky: duplicate Poradi");
             }
-
-            // FIX 2026-05-04: future-date check odstraněn po dohodě s product ownerem.
-            // Důvod: plán a skutečnost nemají být v harmonogramu vzájemně omezeny —
-            // datový nepořádek v plánu by jinak blokoval zadávání skutečnosti, což
-            // působí víc problémů než to řeší. Vyhodnocení (zpoždění, on-track status)
-            // probíhá v dashboard / priority matrix, které tolerují i budoucí datumy.
-            // Zachováno: NULL AbsolutniDatum = "krok nenastal" (skip), KrokKey != Empty,
-            // unique KrokKey per Save.
         }
     }
 
-    /// <summary>
-    /// FIX 2026-05-01 (round 2 #12) — pre-check že KrokKey patří mezi manuální {2,5,8,9}.
-    /// Volitelná validace pro callers, kteří mají schema mapu KrokKey→KrokPoradi.
-    /// Defense-in-depth: <see cref="ManualActualKrokApplier.Compute"/> také checkuje,
-    /// ale errorová hláška z Compute je generic. Tady pre-check vyhodí user-friendly RVE.
-    /// </summary>
-    public static void ValidateManualKrokKeysAreManualOnly(
-        IReadOnlyList<ManualActualKrokDto> manualKroky,
-        IReadOnlyDictionary<Guid, int> krokKeyToPoradi)
+    /// <summary>Ověří, že ruční skutečnost míří jen na manuální kroky 2/5/8/9.</summary>
+    public static void ValidateManualKrokKeysAreManualOnly(IReadOnlyList<ManualActualKrokDto> manualKroky)
     {
         foreach (var mk in manualKroky)
         {
-            if (!krokKeyToPoradi.TryGetValue(mk.KrokKey, out var poradi))
+            if (mk.Poradi is < 1 or > 10)
             {
                 throw new RecordValidationException(
-                    "Krok harmonogramu pro zadaný identifikátor neexistuje ve schématu záznamu.",
-                    new[] { new RecordValidationIssue("ManualActualKroky", "Neznámý krok ve schématu záznamu.", "schedule", "manual.unknown-krok", mk.KrokKey.ToString()) },
-                    $"ValidateManualKrokKeysAreManualOnly: KrokKey={mk.KrokKey} nenalezen ve schématu");
+                    "Krok harmonogramu pro zadané pořadí neexistuje.",
+                    new[] { new RecordValidationIssue("ManualActualKroky", "Neznámý krok harmonogramu.", "schedule", "manual.unknown-krok", mk.Poradi.ToString()) },
+                    $"ValidateManualKrokKeysAreManualOnly: Poradi={mk.Poradi} mimo rozsah");
             }
 
-            if (!HarmonogramManualSteps.IsManual(poradi))
+            if (!HarmonogramManualSteps.IsManual(mk.Poradi))
             {
                 throw new RecordValidationException(
-                    $"Krok {poradi} je v Auto rezimu — ručně vyplnit lze jen kroky 2, 5, 8 a 9.",
-                    new[] { new RecordValidationIssue("ManualActualKroky", $"Krok {poradi} není manuální (jen 2/5/8/9 jsou manuální).", "schedule", "manual.auto-step", poradi.ToString()) },
-                    $"ValidateManualKrokKeysAreManualOnly: KrokPoradi={poradi} není v HarmonogramManualSteps");
+                    $"Krok {mk.Poradi} je v Auto rezimu — ručně vyplnit lze jen kroky 2, 5, 8 a 9.",
+                    new[] { new RecordValidationIssue("ManualActualKroky", $"Krok {mk.Poradi} není manuální (jen 2/5/8/9 jsou manuální).", "schedule", "manual.auto-step", mk.Poradi.ToString()) },
+                    $"ValidateManualKrokKeysAreManualOnly: Poradi={mk.Poradi} není manuální");
             }
         }
     }
 
     /// <summary>
-    /// Pre-bound vazby bublina-&gt;krok (schéma 3 — CREATE_RECORD):
-    /// - <c>KrokKey</c> nesmí být <see cref="Guid.Empty"/>.
-    /// - <c>ExterniOdkazIndex</c> musí být v rozsahu [0, externiVazbyCount).
-    /// - <c>HotVyjadreniId</c> musí být kladné.
-    /// - Jeden krok = max jedna bublina (žádné duplikáty KrokKey).
-    /// </summary>
-    /// <summary>
-    /// Phase 6 (DESIGN-5-A + 7-A, 2026-05-01) — odmítne payload obsahující DELAY hodnoty
-    /// pro auto-fillované kroky. Auto kroky (1/3/4 PMP, 1/6/7/10 PNF) se plní automaticky
-    /// ze SD vyjádření a nelze je ani upravit napřímo, ani navrhnout úpravu.
-    /// Vynucuje invariant: Auto rezim ↔ návrh = mutuálně výlučné stavy.
-    ///
-    /// Submit + Approve obě volají tento validátor (defense-in-depth).
+    /// Odmítne payload obsahující skutečnost pro auto-fillované kroky (1/3/4/6/7/10).
     /// </summary>
     /// <param name="actualHodnoty">payload.ActualHarmonogramHodnoty navrhovaného harmonogramu.</param>
-    /// <param name="autoFilledDelayTypIds">Set TypId DELAY řádků auto-fillovaných pro typ záznamu.</param>
+    /// <param name="autoFilledPoradi">Set pořadí auto-fillovaných kroků.</param>
     public static void ValidateAutoStepNotInProposal(
         IReadOnlyList<SaveRecordHarmonogramValueCommand> actualHodnoty,
-        IReadOnlySet<int> autoFilledDelayTypIds)
+        IReadOnlySet<int> autoFilledPoradi)
     {
-        if (actualHodnoty.Count == 0 || autoFilledDelayTypIds.Count == 0)
+        if (actualHodnoty.Count == 0 || autoFilledPoradi.Count == 0)
         {
             return;
         }
 
         foreach (var item in actualHodnoty)
         {
-            if (autoFilledDelayTypIds.Contains(item.TypId))
+            if (item.SkutecnostDatum.HasValue && autoFilledPoradi.Contains(item.Poradi))
             {
-                // FIX 2026-05-01 (#7): RecordValidationException pro user-friendly message.
-                var msg = $"Krok pro TypId {item.TypId} je v Auto rezimu — návrh úpravy skutečnosti není možný. " +
-                          "Použij přímou editaci s ToggleRezim=Manual mimo návrhový workflow, nebo edituj jen manuální kroky 2/5/8/9.";
+                var msg = $"Krok {item.Poradi} je v Auto rezimu — návrh úpravy skutečnosti není možný. " +
+                          "Použij přímou editaci s ToggleRezim=Manual, nebo edituj jen manuální kroky 2/5/8/9.";
                 throw new RecordValidationException(
                     msg,
-                    new[] { new RecordValidationIssue("HarmonogramHodnoty", msg, "schedule", "schedule.auto-step-rejected", item.TypId.ToString()) },
-                    $"ValidateAutoStepNotInProposal: auto step TypId={item.TypId} v payloadu");
+                    new[] { new RecordValidationIssue("HarmonogramHodnoty", msg, "schedule", "schedule.auto-step-rejected", item.Poradi.ToString()) },
+                    $"ValidateAutoStepNotInProposal: auto step Poradi={item.Poradi} v payloadu");
             }
         }
     }
@@ -139,25 +95,23 @@ public static class ManualProposalFieldValidator
             return;
         }
 
-        // FIX 2026-05-01 (#7): RecordValidationException pro user-friendly message (sjednoceno
-        // s ValidateManualActualKroky stejným patternem).
-        var seen = new HashSet<Guid>();
+        var seen = new HashSet<int>();
         foreach (var v in vazby)
         {
-            if (v.KrokKey == Guid.Empty)
+            if (v.Poradi is < 1 or > 10)
             {
                 throw new RecordValidationException(
-                    "Vazba vyjádření na krok musí mít vyplněný identifikátor kroku.",
-                    new[] { new RecordValidationIssue("HarmonogramVazby", "Vazba vyjádření na krok musí mít vyplněný identifikátor kroku.", "schedule", "vazba.krokkey", null) },
-                    "ValidateHarmonogramVazby: KrokKey == Empty");
+                    "Vazba vyjádření na krok musí mít platné pořadí (1–10).",
+                    new[] { new RecordValidationIssue("HarmonogramVazby", "Vazba vyjádření na krok musí mít platné pořadí (1–10).", "schedule", "vazba.poradi", v.Poradi.ToString()) },
+                    "ValidateHarmonogramVazby: Poradi mimo 1–10");
             }
 
-            if (!seen.Add(v.KrokKey))
+            if (!seen.Add(v.Poradi))
             {
                 throw new RecordValidationException(
                     "Pro jeden krok harmonogramu lze navést jen jednu bublinu.",
-                    new[] { new RecordValidationIssue("HarmonogramVazby", "Pro jeden krok harmonogramu lze navést jen jednu bublinu.", "schedule", "vazba.duplicate", v.KrokKey.ToString()) },
-                    "ValidateHarmonogramVazby: duplicate KrokKey");
+                    new[] { new RecordValidationIssue("HarmonogramVazby", "Pro jeden krok harmonogramu lze navést jen jednu bublinu.", "schedule", "vazba.duplicate", v.Poradi.ToString()) },
+                    "ValidateHarmonogramVazby: duplicate Poradi");
             }
 
             if (v.ExterniOdkazIndex < 0 || v.ExterniOdkazIndex >= externiVazbyCount)

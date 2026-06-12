@@ -15,7 +15,7 @@ public sealed partial class ProjectService
         IReadOnlyList<HarmonogramKrokEditViewModel> kroky,
         ScheduleEditorPermissionSet? permissions = null,
         string scheduleVersion = "",
-        IReadOnlySet<Guid>? lockedManualKrokKeys = null,
+        IReadOnlySet<int>? lockedManualKrokKeys = null,
         bool canEditManualActual = false)
     {
         var effectivePermissions = permissions ?? ScheduleEditorPermissionSet.ForReadOnly();
@@ -31,7 +31,7 @@ public sealed partial class ProjectService
             Permissions = effectivePermissions,
             EditorChangedTypeTooltips = new Dictionary<int, string>(),
             ScheduleVersion = scheduleVersion,
-            LockedManualKrokKeys = lockedManualKrokKeys ?? new HashSet<Guid>(),
+            LockedManualKrokKeys = lockedManualKrokKeys ?? new HashSet<int>(),
             CanEditManualActual = canEditManualActual
         };
     }

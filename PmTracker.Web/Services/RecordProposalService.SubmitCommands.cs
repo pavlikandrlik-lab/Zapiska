@@ -135,24 +135,7 @@ public sealed partial class RecordProposalService
         // (planned) změny + manuální DELAY pro kroky 2/5/8/9.
         await ValidateAutoStepsNotInScheduleProposalAsync(command, record, ct);
 
-        var scheduleTypeDefinitions = await ResolveScheduleTypeDefinitionsAsync(record, ct);
-        var existingScheduleValues = await LoadExistingScheduleValuesAsync(record.Id, scheduleTypeDefinitions, ct);
-        var plannedTypeIds = scheduleTypeDefinitions
-            .Select(x => x.DurationTypeId)
-            .Where(x => x > 0)
-            .Distinct()
-            .ToList();
-        var actualTypeIds = scheduleTypeDefinitions
-            .Select(x => x.DelayTypeId)
-            .Where(x => x > 0)
-            .Distinct()
-            .ToList();
-        var payload = _payloadMapper.BuildSchedulePayload(
-            command,
-            plannedTypeIds,
-            actualTypeIds,
-            record.DatumUkonceni,
-            existingScheduleValues);
+        var payload = _payloadMapper.BuildSchedulePayload(command, record.DatumUkonceni);
         var schedulePayload = payload.SchedulePlan;
         if (schedulePayload is null
             || (!schedulePayload.ChangesTermDeadline
