@@ -470,7 +470,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
                     }
 
                     var upsert = UpsertBindingInMemory(
-                        zaznam.Id, krokKey, eo.Id,
+                        zaznam.Id, krokKey, poradi.Value, eo.Id,
                         v.Id, v.Datum, VazbaSource.Auto, existingForKey);
                     switch (upsert)
                     {
@@ -495,7 +495,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
                 }
 
                 var k1Outcome = UpsertBindingInMemory(
-                    zaznam.Id, k1KrokKey, eo.Id,
+                    zaznam.Id, k1KrokKey, poradi: 1, eo.Id,
                     hotVyjadreniId: 0L, // synthetic
                     datumVyjadreni: hotZaznamDatumHint.Value,
                     VazbaSource.Auto, existingK1);
@@ -575,7 +575,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     /// a do seznamu. Single SaveChangesAsync dělá caller.
     /// </summary>
     internal UpsertOutcome UpsertBindingInMemory(
-        int zaznamId, Guid krokKey, int externiOdkazId, long hotVyjadreniId,
+        int zaznamId, Guid krokKey, int poradi, int externiOdkazId, long hotVyjadreniId,
         DateTime datumVyjadreni, VazbaSource source,
         List<ZaznamHarmonogramVyjadreniVazbaEntity> existingForKey)
     {
@@ -614,6 +614,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         {
             ZaznamId = zaznamId,
             KrokKey = krokKey,
+            Poradi = (byte)poradi,
             ExterniOdkazId = externiOdkazId,
             HotVyjadreniId = hotVyjadreniId,
             DatumVyjadreni = datumVyjadreni,
