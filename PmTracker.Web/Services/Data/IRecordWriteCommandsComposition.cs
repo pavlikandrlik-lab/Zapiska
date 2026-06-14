@@ -11,11 +11,5 @@ public interface IRecordWriteCommandsComposition
 
     Task<IReadOnlyList<SpolupracovnikOptionViewModel>> BuildRecordOwnerCandidatesAsync(int projectId, int? selectedOwnerId, CancellationToken ct = default);
 
-    Task<int> EnsurePersistedActiveHarmonogramSchemaVersionAsync(CancellationToken ct = default);
-
-    Task<IReadOnlyList<RecordScheduleTypeDefinition>> ResolveScheduleTypeDefinitionsForRecordAsync(ProjektovyZaznamEntity record, CancellationToken ct = default);
-
-    Task<IReadOnlyList<RecordScheduleTypeDefinition>> ResolveScheduleTypeDefinitionsForSchemaVersionAsync(int schemaVersion, CancellationToken ct = default);
-
     Task<IReadOnlyList<int>> ResolveLeadEquivalentOsobaIdsAsync(int projectId, int subsystemId, CancellationToken ct = default);
 }

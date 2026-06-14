@@ -25,7 +25,5 @@ public interface IRecordEditorQueriesComposition
 
     Task<IReadOnlyDictionary<int, int>> BuildDefaultOwnerOsobaIdsByProjectSubsystemAsync(int projectId, CancellationToken ct = default);
 
-    Task<int> EnsurePersistedActiveHarmonogramSchemaVersionAsync(CancellationToken ct = default);
-
     Task<int> GetNextCisloZaznamuAsync(int projectId, CancellationToken ct = default);
 }

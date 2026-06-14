@@ -73,8 +73,7 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
         string KategorieNazev,
         string? StavKod,
         DateTime DatumZalozeni,
-        DateTime DatumUkonceni,
-        int HarmonogramSablonaVerze);
+        DateTime DatumUkonceni);
 
     private sealed record LeadAssignmentRow(
         int ProjektId,
@@ -83,7 +82,6 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
 
     private readonly PmTrackerDbContext _dbContext;
     private readonly IPriorityScoringService _scoringService;
-    private readonly IHarmonogramService _harmonogramService;
     private readonly IPriorityMatrixRebuildQueue _queue;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<PriorityMatrixRebuildService> _logger;
@@ -91,14 +89,12 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
     public PriorityMatrixRebuildService(
         PmTrackerDbContext dbContext,
         IPriorityScoringService scoringService,
-        IHarmonogramService harmonogramService,
         IPriorityMatrixRebuildQueue queue,
         TimeProvider timeProvider,
         ILogger<PriorityMatrixRebuildService> logger)
     {
         _dbContext = dbContext;
         _scoringService = scoringService;
-        _harmonogramService = harmonogramService;
         _queue = queue;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -318,8 +314,7 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
                 category.Nazev,
                 state != null ? state.Kod : null,
                 record.DatumZalozeni,
-                record.DatumUkonceni,
-                record.HarmonogramSablonaVerze);
+                record.DatumUkonceni);
 
         return await query.ToListAsync(ct);
     }

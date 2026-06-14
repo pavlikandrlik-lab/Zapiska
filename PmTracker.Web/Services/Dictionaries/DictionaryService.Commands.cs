@@ -240,7 +240,6 @@ public sealed partial class DictionaryService
                 },
                 ct),
             ["subsystemy"] = SaveSubsystemRowAsync,
-            [HarmonogramKrokyCiselnikKey] = harmonogramService.SaveHarmonogramStepRowAsync,
             ["stavy-jednani"] = (command, ct) => UpsertSimpleCiselnikAsync(
                 command,
                 dbContext.CiselnikStavuJednani,
@@ -276,7 +275,6 @@ public sealed partial class DictionaryService
             ["organizace"] = (command, ct) => RemoveCiselnikRowAsync(dbContext.CiselnikOrganizace, command.Id, "organizace", ct),
             ["organizacni-celky"] = (command, ct) => RemoveCiselnikRowAsync(dbContext.CiselnikOrganizacniCelky, command.Id, "organizacni-celky", ct),
             ["subsystemy"] = (command, ct) => RemoveCiselnikRowAsync(dbContext.Subsystemy, command.Id, "subsystemy", ct),
-            [HarmonogramKrokyCiselnikKey] = harmonogramService.DeleteHarmonogramStepRowAsync,
             ["stavy-jednani"] = (command, ct) => RemoveCiselnikRowAsync(dbContext.CiselnikStavuJednani, command.Id, "stavy-jednani", ct),
             ["vyzvy"] = (command, ct) => RemoveCiselnikRowAsync(dbContext.Vyzvy, command.Id, "vyzvy", ct)
         };
@@ -313,7 +311,6 @@ public sealed partial class DictionaryService
             "organizacni-celky" => dbContext.CiselnikOrganizacniCelky.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefaultAsync(ct),
             "vyzvy" => dbContext.Vyzvy.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)(x.Stav == VyzvaStav.Odeslano)).FirstOrDefaultAsync(ct),
             "stavy-jednani" => dbContext.CiselnikStavuJednani.AsNoTracking().Where(x => x.Id == id).Select(x => (bool?)x.IsLocked).FirstOrDefaultAsync(ct),
-            HarmonogramKrokyCiselnikKey => Task.FromResult<bool?>(true),
             _ => Task.FromResult<bool?>(null)
         };
     }

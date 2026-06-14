@@ -41,7 +41,6 @@ public sealed partial class RecordService
         int StavUkoluId,
         int? TypUkoluId,
         int SubsystemId,
-        int DefaultSchemaVersion,
         bool IsTaskCategory,
         SaveRecordProjectContext Project,
         ProjektovyZaznamEntity? ExistingRecord,
@@ -80,7 +79,6 @@ public sealed partial class RecordService
         var statusId = validation.StavUkoluId;
         var typeId = validation.TypUkoluId;
         var subsystemId = validation.SubsystemId;
-        var defaultSchemaVersion = validation.DefaultSchemaVersion;
         var isTaskCategory = validation.IsTaskCategory;
         var project = validation.Project;
         var normalizedCollaborationIds = validation.NormalizedCollaborationIds;
@@ -126,11 +124,6 @@ public sealed partial class RecordService
                     entity.CisloViditelneA = entity.CisloZaznamu;
                     entity.CisloViditelneB = 0;
                     entity.CisloJednaniZdrojId = null;
-                }
-
-                if (entity.HarmonogramSablonaVerze <= 0)
-                {
-                    entity.HarmonogramSablonaVerze = defaultSchemaVersion;
                 }
 
                 await dbContext.SaveChangesAsync(innerCt);
@@ -239,8 +232,7 @@ public sealed partial class RecordService
                     VlastnikId = ownerId,
                     DatumZalozeni = command.DatumZalozeni.Date,
                     DatumUkonceni = command.TerminUkonceni.Date,
-                    SubsystemId = subsystemId,
-                    HarmonogramSablonaVerze = defaultSchemaVersion
+                    SubsystemId = subsystemId
                 };
                 dbContext.ProjektoveZaznamy.Add(entity);
             }
@@ -358,7 +350,6 @@ public sealed partial class RecordService
                 .FirstOrDefaultAsync(ct)
             : null;
         var isTaskCategory = IsTaskCategory(category?.Kod, category?.Nazev);
-        var defaultSchemaVersion = await composition.EnsurePersistedActiveHarmonogramSchemaVersionAsync(ct);
 
         var project = await dbContext.Projekty.AsNoTracking()
             .Where(x => x.Id == command.ProjektId)
@@ -485,7 +476,7 @@ public sealed partial class RecordService
         }
 
         await ValidateExternalLinksAsync(command.ExterniVazby, existingRecord, issues, ct);
-        await ValidateScheduleValuesAsync(command, isTaskCategory, existingRecord, defaultSchemaVersion, composition, issues, ct);
+        await ValidateScheduleValuesAsync(command, isTaskCategory, existingRecord, issues, ct);
 
         if (issues.Count > 0)
         {
@@ -501,7 +492,6 @@ public sealed partial class RecordService
             statusId!.Value,
             typeId,
             subsystemId!.Value,
-            defaultSchemaVersion,
             isTaskCategory,
             project!,
             existingRecord,
@@ -706,8 +696,6 @@ public sealed partial class RecordService
         SaveRecordCommand command,
         bool isTaskCategory,
         ProjektovyZaznamEntity? existingRecord,
-        int defaultSchemaVersion,
-        IRecordWriteCommandsComposition composition,
         List<RecordValidationIssue> issues,
         CancellationToken ct)
     {

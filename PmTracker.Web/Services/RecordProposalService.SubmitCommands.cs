@@ -7,6 +7,7 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
+using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Services;
 
@@ -133,7 +134,7 @@ public sealed partial class RecordProposalService
         // Phase 6 (DESIGN-5-A + 7-A, 2026-05-01): odmítnout auto-fillované DELAY kroky.
         // Auto rezim ↔ návrh = mutuálně výlučné stavy. Návrh smí obsahovat jen DURATION
         // (planned) změny + manuální DELAY pro kroky 2/5/8/9.
-        await ValidateAutoStepsNotInScheduleProposalAsync(command, record, ct);
+        ValidateAutoStepsNotInScheduleProposal(command);
 
         var payload = _payloadMapper.BuildSchedulePayload(command, record.DatumUkonceni);
         var schedulePayload = payload.SchedulePlan;
@@ -310,57 +311,21 @@ public sealed partial class RecordProposalService
             .FirstOrDefaultAsync(ct);
     }
 
-    private async Task<Dictionary<int, int>> LoadExistingScheduleValuesAsync(
-        int recordId,
-        IReadOnlyList<RecordScheduleTypeDefinition> scheduleTypeDefinitions,
-        CancellationToken ct)
-    {
-        var allowedTypeIds = scheduleTypeDefinitions
-            .SelectMany(definition => new[] { definition.DurationTypeId, definition.DelayTypeId })
-            .Where(typeId => typeId > 0)
-            .Distinct()
-            .ToList();
-        if (allowedTypeIds.Count == 0)
-        {
-            return [];
-        }
-
-        // DESIGN-10-A (2026-05-01): NULL HodnotaInt = "krok nenastal" → vyfiltrovat z dictionary,
-        // klíč chybí = caller (TimelineCalculator) interpretuje jako missing → offset = 0.
-        return (await _dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-                .Where(x => x.ZaznamId == recordId && allowedTypeIds.Contains(x.TypId) && x.HodnotaInt.HasValue)
-                .Select(x => new { x.TypId, Hodnota = x.HodnotaInt!.Value })
-                .ToListAsync(ct))
-            .ToDictionary(x => x.TypId, x => x.Hodnota);
-    }
-
     /// <summary>
-    /// Phase 6 (DESIGN-5-A + 7-A, 2026-05-01) — odmítne návrh obsahující DELAY hodnoty pro
-    /// auto-fillované kroky (= NENÍ v <see cref="HarmonogramManualSteps.KrokPoradi"/>).
-    ///
-    /// Konzervativní invariant: krok je auto-fillovatelný v některém typu PMP/PNF, takže
-    /// jeho DELAY nemůže být v návrhu. Manuální 2/5/8/9 jsou bezpečné.
+    /// Datum-model (2026-06-12) — odmítne návrh obsahující skutečnost pro auto-fillované
+    /// kroky 1/3/4/6/7/10. Auto rezim ↔ návrh = mutuálně výlučné stavy; návrh smí měnit
+    /// jen manuální kroky 2/5/8/9. Pevné kroky → bez DB lookupu.
     /// </summary>
-    private async Task ValidateAutoStepsNotInScheduleProposalAsync(
-        SaveRecordCommand command,
-        ProjektovyZaznamEntity record,
-        CancellationToken ct)
+    private static void ValidateAutoStepsNotInScheduleProposal(SaveRecordCommand command)
     {
         if (command.HarmonogramHodnoty.Count == 0) return;
 
-        // Schema: TypId → KrokPoradi map pro DELAY řádky aktivního schématu.
-        var delayPoradiByTypId = await _dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(t => t.SablonaVerze == record.HarmonogramSablonaVerze && t.JeZpozdeni)
-            .Select(t => new { t.Id, t.KrokPoradi })
-            .ToDictionaryAsync(x => x.Id, x => x.KrokPoradi, ct);
-
-        // Auto-fillovatelné DelayTypIds = poradi NENÍ v {2, 5, 8, 9}.
-        var autoFilledDelayTypIds = delayPoradiByTypId
-            .Where(kv => !HarmonogramManualSteps.IsManual(kv.Value))
-            .Select(kv => kv.Key)
+        var autoFilledPoradi = HarmonogramKroky.Vse
+            .Where(k => !k.JeManualni)
+            .Select(k => k.Poradi)
             .ToHashSet();
 
         ManualProposalFieldValidator.ValidateAutoStepNotInProposal(
-            command.HarmonogramHodnoty, autoFilledDelayTypIds);
+            command.HarmonogramHodnoty, autoFilledPoradi);
     }
 }

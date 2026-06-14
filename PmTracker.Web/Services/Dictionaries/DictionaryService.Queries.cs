@@ -7,8 +7,6 @@ namespace PmTracker.Web.Services.Dictionaries;
 
 public sealed partial class DictionaryService
 {
-    private const string HarmonogramKrokyCiselnikKey = "harmonogram-kroky";
-
     public async Task<CiselnikyDashboardViewModel> BuildCiselnikyDashboardAsync(
         string? id,
         CurrentUserContextViewModel currentUser,
@@ -186,7 +184,6 @@ public sealed partial class DictionaryService
                 canChangeLockState,
                 ct),
             "subsystemy" => await BuildSubsystemyCiselnikDetailAsync(key, ct),
-            HarmonogramKrokyCiselnikKey => await harmonogramService.BuildHarmonogramKrokyCiselnikDetailAsync(key, canChangeLockState, ct),
             "vyzvy" => new CiselnikDetailViewModel
             {
                 Key = key,

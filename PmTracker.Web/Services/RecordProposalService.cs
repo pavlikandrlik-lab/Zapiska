@@ -42,7 +42,6 @@ public sealed partial class RecordProposalService : IRecordProposalService
     private readonly IRecordProposalAuthorizationPolicy _authorizationPolicy;
     private readonly IPendingScheduleProposalLockEvaluator _pendingScheduleProposalLockEvaluator;
     private readonly RecordProposalPayloadMapper _payloadMapper;
-    private readonly IHarmonogramService _harmonogramService;
     private readonly IPriorityMatrixRebuildService _priorityMatrixRebuildService;
     private readonly IAuditWriteService _auditWriteService;
     private readonly IHarvestScheduler _harvestScheduler;
@@ -55,7 +54,6 @@ public sealed partial class RecordProposalService : IRecordProposalService
         IRecordProposalAuthorizationPolicy authorizationPolicy,
         IPendingScheduleProposalLockEvaluator pendingScheduleProposalLockEvaluator,
         RecordProposalPayloadMapper payloadMapper,
-        IHarmonogramService harmonogramService,
         IPriorityMatrixRebuildService priorityMatrixRebuildService,
         IAuditWriteService auditWriteService,
         IHarvestScheduler harvestScheduler,
@@ -67,7 +65,6 @@ public sealed partial class RecordProposalService : IRecordProposalService
         _authorizationPolicy = authorizationPolicy;
         _pendingScheduleProposalLockEvaluator = pendingScheduleProposalLockEvaluator;
         _payloadMapper = payloadMapper;
-        _harmonogramService = harmonogramService;
         _priorityMatrixRebuildService = priorityMatrixRebuildService;
         _auditWriteService = auditWriteService;
         _harvestScheduler = harvestScheduler;
@@ -91,20 +88,5 @@ public sealed partial class RecordProposalService : IRecordProposalService
         }
 
         return JsonSerializer.Deserialize<RecordProposalPayload>(payloadJson) ?? new RecordProposalPayload();
-    }
-
-    private async Task<IReadOnlyList<RecordScheduleTypeDefinition>> ResolveScheduleTypeDefinitionsAsync(ProjektovyZaznamEntity record, CancellationToken ct)
-    {
-        var schema = await _harmonogramService.GetSchemaForRecordAsync(record, ct);
-        return _harmonogramService.BuildRecordScheduleTypeDefinitions(schema);
-    }
-
-    private async Task<HashSet<int>> ResolvePlannedTypeIdsAsync(ProjektovyZaznamEntity record, CancellationToken ct)
-    {
-        var schema = await _harmonogramService.GetSchemaForRecordAsync(record, ct);
-        return _harmonogramService.BuildRecordScheduleTypeDefinitions(schema)
-            .Select(x => x.DurationTypeId)
-            .Where(x => x > 0)
-            .ToHashSet();
     }
 }

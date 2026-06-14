@@ -121,8 +121,6 @@ public static class DataStoreServiceCollectionExtensions
         // nové externí vazby. Volaný ze RecordService.SaveRecordAsync přes
         // ValidateExternalLinksAsync — PŘED SaveChangesAsync.
         services.AddScoped<ExterniOdkazValidator>();
-        services.AddScoped<HarmonogramService>();
-        services.AddScoped<HarmonogramCatalogService>();
         services.AddScoped<CommentService>();
         services.AddScoped<MeetingService>();
         services.AddScoped<ProjectService>();
@@ -143,8 +141,6 @@ public static class DataStoreServiceCollectionExtensions
         // Vertical-slice command handlers (proof pattern pro postupnou migraci z ProjectService).
         services.AddScoped<PmTracker.Web.Services.Handlers.SaveProjectHandler>();
         services.AddSingleton<IPriorityMatrixRebuildQueue, PriorityMatrixRebuildQueue>();
-        services.AddScoped<IHarmonogramService>(sp => sp.GetRequiredService<HarmonogramService>());
-        services.AddScoped<IHarmonogramCatalogService>(sp => sp.GetRequiredService<HarmonogramCatalogService>());
         services.AddScoped<ICommentService>(sp => sp.GetRequiredService<CommentService>());
         services.AddScoped<IMeetingService>(sp => sp.GetRequiredService<MeetingService>());
         services.AddScoped<IProjectService>(sp => sp.GetRequiredService<ProjectService>());
@@ -165,8 +161,6 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IRecordProposalAuthorizationPolicy, RecordProposalAuthorizationPolicy>();
         services.AddScoped<IPendingScheduleProposalLockEvaluator, PendingScheduleProposalLockEvaluator>();
         services.AddScoped<RecordProposalPayloadMapper>();
-        // Plán D Task 7: resolver zdroje skutečnosti kroku (vyjádření vs. ruční)
-        services.AddScoped<IRecordScheduleActualSourceResolver, RecordScheduleActualSourceResolver>();
         services.AddScoped<IExportCommentProjectionBuilder, ExportCommentProjectionBuilder>();
         services.AddScoped<IExportRoleProjectionBuilder, ExportRoleProjectionBuilder>();
         services.AddScoped<IExportAttendanceProjectionBuilder, ExportAttendanceProjectionBuilder>();

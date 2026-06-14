@@ -59,7 +59,6 @@ public sealed partial class RecordService
                 .OrderBy(x => x.Id)
                 .Select(x => x.Id)
                 .FirstAsync(ct);
-        var activeSchemaVersion = await composition.EnsurePersistedActiveHarmonogramSchemaVersionAsync(ct);
         var nextRecordNumber = await composition.GetNextCisloZaznamuAsync(projektId, ct);
         var createVisibleNumber = project.PouzivatIdentJednani
             ? string.Empty
@@ -84,8 +83,7 @@ public sealed partial class RecordService
             VlastnikId = defaultOwnerId,
             DatumZalozeni = defaultStartDate.Date,
             DatumUkonceni = timeProvider.GetLocalNow().Date,
-            SubsystemId = defaultSubsystem?.SubsystemId ?? 0,
-            HarmonogramSablonaVerze = activeSchemaVersion
+            SubsystemId = defaultSubsystem?.SubsystemId ?? 0
         };
 
         return await composition.BuildZaznamEditForEntityAsync(

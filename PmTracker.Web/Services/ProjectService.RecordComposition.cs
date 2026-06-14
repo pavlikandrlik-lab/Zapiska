@@ -87,9 +87,6 @@ public sealed partial class ProjectService
     async Task<IReadOnlyDictionary<int, int>> IRecordEditorQueriesComposition.BuildDefaultOwnerOsobaIdsByProjectSubsystemAsync(int projectId, CancellationToken ct)
         => await BuildDefaultOwnerOsobaIdsByProjectSubsystemAsync(projectId, ct);
 
-    Task<int> IRecordEditorQueriesComposition.EnsurePersistedActiveHarmonogramSchemaVersionAsync(CancellationToken ct)
-        => harmonogramService.EnsurePersistedActiveHarmonogramSchemaVersionAsync(ct);
-
     Task<int> IRecordEditorQueriesComposition.GetNextCisloZaznamuAsync(int projectId, CancellationToken ct)
         => GetNextCisloZaznamuAsync(projectId, ct);
 
@@ -101,15 +98,6 @@ public sealed partial class ProjectService
 
     async Task<IReadOnlyList<SpolupracovnikOptionViewModel>> IRecordWriteCommandsComposition.BuildRecordOwnerCandidatesAsync(int projectId, int? selectedOwnerId, CancellationToken ct)
         => await BuildRecordOwnerCandidatesAsync(projectId, selectedOwnerId, ct);
-
-    Task<int> IRecordWriteCommandsComposition.EnsurePersistedActiveHarmonogramSchemaVersionAsync(CancellationToken ct)
-        => harmonogramService.EnsurePersistedActiveHarmonogramSchemaVersionAsync(ct);
-
-    async Task<IReadOnlyList<RecordScheduleTypeDefinition>> IRecordWriteCommandsComposition.ResolveScheduleTypeDefinitionsForRecordAsync(ProjektovyZaznamEntity record, CancellationToken ct)
-        => harmonogramService.BuildRecordScheduleTypeDefinitions(await harmonogramService.GetSchemaForRecordAsync(record, ct));
-
-    async Task<IReadOnlyList<RecordScheduleTypeDefinition>> IRecordWriteCommandsComposition.ResolveScheduleTypeDefinitionsForSchemaVersionAsync(int schemaVersion, CancellationToken ct)
-        => harmonogramService.BuildRecordScheduleTypeDefinitions(await harmonogramService.GetSchemaForRecordAsync(schemaVersion, ct));
 
     Task<IReadOnlyList<int>> IRecordWriteCommandsComposition.ResolveLeadEquivalentOsobaIdsAsync(int projectId, int subsystemId, CancellationToken ct)
         => ResolveLeadEquivalentOsobaIdsAsync(projectId, subsystemId, ct);

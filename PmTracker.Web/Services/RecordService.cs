@@ -23,7 +23,6 @@ public sealed partial class RecordService : IRecordService
     private readonly IHarvestScheduler harvestScheduler;
     private readonly ExterniOdkazValidator externiOdkazValidator;
     private readonly TimeProvider timeProvider;
-    private readonly IHarmonogramService harmonogramService;  // Phase 4 (DESIGN-6-A): pro ManualActualKrokApplier.ApplyAsync
 
     public RecordService(
         PmTrackerDbContext dbContext,
@@ -37,8 +36,7 @@ public sealed partial class RecordService : IRecordService
         IAuditWriteService auditWriteService,
         IHarvestScheduler harvestScheduler,
         ExterniOdkazValidator externiOdkazValidator,
-        TimeProvider timeProvider,
-        IHarmonogramService harmonogramService)
+        TimeProvider timeProvider)
     {
         this.dbContext = dbContext;
         this.richTextContentService = richTextContentService;
@@ -52,7 +50,6 @@ public sealed partial class RecordService : IRecordService
         this.harvestScheduler = harvestScheduler;
         this.externiOdkazValidator = externiOdkazValidator;
         this.timeProvider = timeProvider;
-        this.harmonogramService = harmonogramService;
     }
 
     public Task<bool> ProjektExistsAsync(int id, CancellationToken ct = default)

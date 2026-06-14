@@ -12,18 +12,15 @@ namespace PmTracker.Web.Services.ProjectDashboard;
 public sealed class ProjectDashboardService : IProjectDashboardService
 {
     private readonly PmTrackerDbContext _dbContext;
-    private readonly IHarmonogramService _harmonogramService;
     private readonly VyzvyPanelBuilder _vyzvyPanelBuilder;
     private readonly IInformacniSystemQueryService _isQueryService;
 
     public ProjectDashboardService(
         PmTrackerDbContext dbContext,
-        IHarmonogramService harmonogramService,
         VyzvyPanelBuilder vyzvyPanelBuilder,
         IInformacniSystemQueryService isQueryService)
     {
         _dbContext = dbContext;
-        _harmonogramService = harmonogramService;
         _vyzvyPanelBuilder = vyzvyPanelBuilder;
         _isQueryService = isQueryService;
     }
@@ -90,7 +87,6 @@ public sealed class ProjectDashboardService : IProjectDashboardService
                     record.Nazev,
                     record.DatumZalozeni,
                     record.DatumUkonceni,
-                    record.HarmonogramSablonaVerze,
                     SubsystemKod = subsystem.Kod,
                     SubsystemNazev = subsystem.Nazev,
                     VlastnikJmeno = owner.Jmeno + " " + owner.Prijmeni
