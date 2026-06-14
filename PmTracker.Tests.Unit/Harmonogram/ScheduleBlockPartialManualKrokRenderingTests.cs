@@ -85,10 +85,10 @@ public sealed class ScheduleBlockPartialManualKrokRenderingTests
             "Task 8: JS modul manualKroky.js se váže přes data-manual-krok-input.");
         text.Should().Contain(
             "ManualActualKroky[",
-            "Task 8: form POST musí vázat pole na ManualActualKroky[i].KrokKey/AbsolutniDatum.");
+            "Datum-model: form POST váže pole na ManualActualKroky[i].Poradi/AbsolutniDatum.");
         text.Should().Contain(
-            ".KrokKey",
-            "Task 8: KrokKey se posílá jako hidden.");
+            ".Poradi",
+            "Datum-model: pořadí kroku (1–10) se posílá jako hidden místo Guid KrokKey.");
         text.Should().Contain(
             ".AbsolutniDatum",
             "Task 8: AbsolutniDatum se posílá jako yyyy-MM-dd z date inputu.");

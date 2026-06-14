@@ -196,8 +196,17 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
                 .GroupBy(b => (int)b.Poradi)
                 .ToDictionary(g => g.Key, g => g.First());
 
-            // Stepper snapshot pro rebalancer.
-            var stepperKroky = schemaPoradi
+            // Datum-model: rebalancer re-chronologizuje POUZE kroky, které mají aktivní vazbu,
+            // plus cílový krok. Pevných 10 kroků by jinak "nasávalo" volné bubliny do prázdných
+            // mezikroků (např. drag na K3 by vyplnil prázdný K4 místo bound K6). Prázdné kroky
+            // nemají co re-chronologizovat. (schemaPoradi slouží jen k validaci platnosti targetu.)
+            _ = schemaPoradi;
+            var relevantPoradi = bindingByPoradi.Keys
+                .Append(targetKrokPoradi)
+                .Distinct()
+                .OrderBy(p => p)
+                .ToArray();
+            var stepperKroky = relevantPoradi
                 .Select(poradi =>
                 {
                     bindingByPoradi.TryGetValue(poradi, out var b);

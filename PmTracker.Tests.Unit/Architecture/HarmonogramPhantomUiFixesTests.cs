@@ -57,31 +57,16 @@ public sealed class HarmonogramPhantomUiFixesTests
     [Fact]
     public void RecordService_SaveRecord_PersistujeManualActualKroky()
     {
-        // FIX 2026-05-01 (round 2): metoda byla přejmenována Apply→Stage v post-review fix #3
-        // (transakce semantics — caller ovládá SaveChanges, ne metoda samotná).
+        // Datum-model (2026-06-12): manuální skutečnost se zapisuje do zaznam_harmonogram_krok
+        // přes PersistScheduleKrokyAsync (UPSERT plan + skutečnost + rezim). Manuální datumy
+        // dostávají Zdroj=Manual.
         var src = Read("PmTracker.Web/Services/RecordService.SaveRecord.cs");
-        src.Should().Contain("StageManualActualKrokyAsync",
-            "DESIGN-6-A + post-review fix #3 — phantom UI bug 1 fix: ManualActualKroky stage do change trackeru, caller commit + audit v outer transakci.");
+        src.Should().Contain("PersistScheduleKrokyAsync",
+            "phantom UI bug 1 fix (datum-model): ManualActualKroky persist do krok rows.");
         src.Should().Contain("command.ManualActualKroky",
             "Persistence flow musí číst command.ManualActualKroky z input commandu.");
         src.Should().Contain("SkutecnostZdrojEnum.Manual",
-            "User-staged manual values musí dostat Zdroj=Manual.");
-    }
-
-    /// <summary>
-    /// FIX 2026-05-05: explicit clear datumu pro manuální krok 2/5/8/9. User vyprázdní pm-date-field
-    /// (clearable="true" → ✕ button), form pošle AbsolutniDatum=null + PreferredZdroj="Manual".
-    /// SaveRecord MUSÍ rozeznat tuto kombinaci a clear DELAY row (HodnotaInt=null, Zdroj=Neznamo).
-    /// Před fixem ManualActualKrokApplier.Compute null silently skipnul → datum přetrvalo v DB.
-    /// </summary>
-    [Fact]
-    public void RecordService_SaveRecord_ClearManualKrokyHelper_Existuje()
-    {
-        var src = Read("PmTracker.Web/Services/RecordService.SaveRecord.cs");
-        src.Should().Contain("ClearManualKrokyAsync",
-            "FIX 2026-05-05: helper pro explicit clear datumu (PreferredZdroj=Manual + AbsolutniDatum=null).");
-        src.Should().Contain("clearKeys",
-            "Save flow musí filtrovat command.ManualActualKroky kde PreferredZdroj=Manual && !AbsolutniDatum.HasValue.");
+            "User-zadané manuální datumy musí dostat Zdroj=Manual.");
     }
 
     /// <summary>
@@ -99,9 +84,13 @@ public sealed class HarmonogramPhantomUiFixesTests
     [Fact]
     public void HarmonogramController_ToggleRezim_MaCreateIfMissing()
     {
+        // Datum-model (2026-06-12): ToggleRezim adresuje krok přes ZaznamId+Poradi (create-if-missing
+        // přes EnsureKrokRowAsync), ne přes HodnotaId.
         var src = Read("PmTracker.Web/Controllers/HarmonogramController.cs");
-        src.Should().MatchRegex(@"ToggleRezimRequest\(\s*int HodnotaId,\s*SkutecnostRezimEnum Rezim,\s*int\? ZaznamId",
-            "DESIGN-7-B — ToggleRezim musí podporovat create-if-missing přes ZaznamId+KrokPoradi (phantom UI bug 2 fix).");
+        src.Should().MatchRegex(@"ToggleRezimRequest\(int ZaznamId, int Poradi, SkutecnostRezimEnum Rezim\)",
+            "phantom UI bug 2 fix (datum-model) — ToggleRezim přes ZaznamId+Poradi.");
+        src.Should().Contain("EnsureKrokRowAsync",
+            "create-if-missing: krok row se vytvoří, pokud ještě neexistuje.");
     }
 
     [Fact]
@@ -174,14 +163,6 @@ public sealed class HarmonogramPhantomUiFixesTests
     }
 
     [Fact]
-    public void HodnotaInt_JeNullable()
-    {
-        var src = Read("PmTracker.Web/Models/Entities/PmTrackerEntities.cs");
-        src.Should().Contain("public int? HodnotaInt",
-            "DESIGN-10-A — nullable HodnotaInt (NULL = krok nenastal).");
-    }
-
-    [Fact]
     public void ScheduleBlock_NeFiltrujeZeroDuration()
     {
         var src = Read("PmTracker.Web/Views/Shared/_ScheduleBlock.cshtml");
@@ -241,34 +222,6 @@ public sealed class HarmonogramPhantomUiFixesTests
     }
 
     [Fact]
-    public void ScheduleComposition_FiltrujeNullHodnotaInt_PredCastem()
-    {
-        // FIX 2026-05-01 (round 5 #2): cast Dictionary<int, int?> → IReadOnlyDictionary<int, int>
-        // by selhal runtime InvalidCastException (kovariance generik nepodporuje).
-        // Po DESIGN-10-A (Phase 1.5) je HodnotaInt nullable, takže ToDictionary value type
-        // se musí filtrovat (.Where(.HasValue)) + použít !.Value PŘED castem.
-        var src = Read("PmTracker.Web/Services/ProjectService.ScheduleComposition.cs");
-        src.Should().Contain("HodnotaInt.HasValue",
-            "ScheduleComposition musí filtrovat NULL HodnotaInt před castem na non-nullable IReadOnlyDictionary<int,int>.");
-        src.Should().NotMatchRegex(@"item\s*=>\s*item\.HodnotaInt\s*\)\s*\)",
-            "Bare `item => item.HodnotaInt` jako ToDictionary value bez .HasValue filtru způsobí runtime InvalidCastException.");
-    }
-
-    [Fact]
-    public void ProjectDashboardService_FiltrujeNullHodnotaInt_PredCastem()
-    {
-        // FIX 2026-05-01 (round 6 #1): identický pattern jako ScheduleComposition (round 5 #2).
-        // ProjectDashboardService.cs měl Dictionary<int, int?> → IReadOnlyDictionary<int, int>
-        // cast → runtime InvalidCastException při dashboard load. Stejně musí filtrovat
-        // .Where(.HasValue) + !.Value před castem.
-        var src = Read("PmTracker.Web/Services/ProjectDashboard/ProjectDashboardService.cs");
-        src.Should().Contain("HodnotaInt.HasValue",
-            "ProjectDashboardService musí filtrovat NULL HodnotaInt před castem na non-nullable IReadOnlyDictionary<int,int>.");
-        src.Should().NotMatchRegex(@"v\s*=>\s*v\.HodnotaInt\s*\)\s*\)",
-            "Bare `v => v.HodnotaInt` jako ToDictionary value bez .HasValue filtru způsobí runtime InvalidCastException.");
-    }
-
-    [Fact]
     public void ScheduleBlock_DelayDateField_RespektujeNullOdchylka()
     {
         // FIX 2026-05-02: scenario D (auto krok + Zdroj=Manual / Create flow) renderuje DELAY date
@@ -294,9 +247,7 @@ public sealed class HarmonogramPhantomUiFixesTests
         selectStart.Should().BeGreaterThan(0, "metoda SelectCandidate musí existovat.");
         selectEnd.Should().BeGreaterThan(selectStart);
         var section = src[selectStart..selectEnd];
-        section.Should().Contain("_pendingLockEvaluator.EvaluateAsync",
-            "round 5 #1 — SelectCandidate musí provolat pending lock evaluator pro audit-aware blocking.");
-        section.Should().Contain("LockedManualKrokKeys",
-            "round 5 #1 — kontrola krok keys v locked set.");
+        section.Should().Contain("IsScheduleLockedAsync",
+            "datum-model — SelectCandidate musí respektovat pending schedule lock (IsScheduleLockedAsync helper).");
     }
 }

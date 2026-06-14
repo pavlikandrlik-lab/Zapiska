@@ -20,7 +20,7 @@ public sealed class VyjadreniHarvestServiceTests
     // Datum-model (2026-06-12): kroky harmonogramu jsou pevná definice (HarmonogramKroky.Vse),
     // harvest už nečte číselník schématu. Seed helpery zůstávají jako no-op kvůli call-sites.
     private static Task SeedSchemaAsync(PmTrackerDbContext db, int sablonaVerze = 1)
-        => Task.CompletedTask;
+        => db.SaveChangesAsync();
 
     private static VyjadreniHarvestService BuildSut(PmTrackerDbContext db, IVyjadreniQueryService v)
     {
@@ -260,7 +260,7 @@ public sealed class VyjadreniHarvestServiceTests
             {
                 ["336865"] = new HotZaznamFingerprintDto("336865", new DateTime(2026, 3, 14), "otevreno", "PMP")
             });
-        vq.Setup(x => x.GetVyjadreniForTicketAsync("336865", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+        vq.Setup(x => x.GetVyjadreniForTicketAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[]
             {
                 new HotVyjadreniDto(99, "25", "A400P023RVVP",
@@ -272,10 +272,9 @@ public sealed class VyjadreniHarvestServiceTests
         var sut = BuildSut(db, vq.Object);
         var result = await sut.HarvestTicketAsync(1, CancellationToken.None);
 
-        result.Created.Should().Be(1);
+        result.Created.Should().Be(2, "K4 binding + synthetic K1 (fingerprint datum nastaven)");
         var bindings = await db.VyjadreniVazby.Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
-        bindings.Should().HaveCount(1);
-        bindings[0].Poradi.Should().Be((byte)4, "PMP tiket + K4_K7 predikát = K4 (pořadí 4)");
+        bindings.Should().Contain(b => b.Poradi == 4, "PMP tiket + K4_K7 predikát = K4 (pořadí 4)");
     }
 
     /// <summary>
@@ -313,10 +312,9 @@ public sealed class VyjadreniHarvestServiceTests
         var sut = BuildSut(db, vq.Object);
         var result = await sut.HarvestTicketAsync(1, CancellationToken.None);
 
-        result.Created.Should().Be(1);
+        result.Created.Should().Be(2, "K4 binding + synthetic K1 (fingerprint datum nastaven)");
         var bindings = await db.VyjadreniVazby.Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
-        bindings.Should().HaveCount(1);
-        bindings[0].Poradi.Should().Be((byte)4,
+        bindings.Should().Contain(b => b.Poradi == 4,
             "padded \"PMP  \" musí po normalizaci stále mapovat K4_K7 → K4 (ne fallback K7)");
     }
 
@@ -349,9 +347,9 @@ public sealed class VyjadreniHarvestServiceTests
         var sut = BuildSut(db, vq.Object);
         var result = await sut.HarvestTicketAsync(1, CancellationToken.None);
 
-        result.Created.Should().Be(1);
+        result.Created.Should().Be(2, "K7 binding + synthetic K1 (fingerprint datum nastaven)");
         var bindings = await db.VyjadreniVazby.Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
-        bindings[0].Poradi.Should().Be((byte)7, "PNF tiket + K4_K7 predikát = K7 (pořadí 7)");
+        bindings.Should().Contain(b => b.Poradi == 7, "PNF tiket + K4_K7 predikát = K7 (pořadí 7)");
     }
 
     [Fact]
@@ -411,7 +409,7 @@ public sealed class VyjadreniHarvestServiceTests
     // ---------- Spec 2026-04-28: NES skip stepper + synthetic K1 ----------
 
     private static Task SeedSchemaWithK1Async(PmTrackerDbContext db, int sablonaVerze = 1)
-        => Task.CompletedTask;
+        => db.SaveChangesAsync();
 
     [Fact]
     public async Task HarvestTicketAsync_NesTicket_NevytvariStepperBindings()

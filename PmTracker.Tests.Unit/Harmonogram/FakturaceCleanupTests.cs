@@ -18,19 +18,11 @@ public sealed class FakturaceCleanupTests
     }
 
     [Fact]
-    public void HarmonogramService_DefaultHarmonogramKroky_ShouldNotContainFakturace()
+    public void HarmonogramKroky_FixedSteps_ShouldNotContainFakturace()
     {
+        // Datum-model (2026-06-12): pevné kroky jsou v HarmonogramKroky.cs (číselník schématu zrušen).
         var source = File.ReadAllText(Path.Combine(
-            GetRepositoryRoot(), "PmTracker.Web", "Services", "Data", "HarmonogramService.cs"));
-        source.Should().NotContain("HS11_");
-        source.Should().NotContain("fakturace");
-    }
-
-    [Fact]
-    public void HarmonogramCatalogService_ShouldNotContainFakturace()
-    {
-        var source = File.ReadAllText(Path.Combine(
-            GetRepositoryRoot(), "PmTracker.Web", "Services", "Data", "HarmonogramCatalogService.cs"));
+            GetRepositoryRoot(), "PmTracker.Web", "Services", "Schedules", "HarmonogramKroky.cs"));
         source.Should().NotContain("HS11_");
         source.Should().NotContain("fakturace");
     }

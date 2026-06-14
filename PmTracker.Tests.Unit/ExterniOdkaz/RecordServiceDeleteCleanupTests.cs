@@ -110,9 +110,9 @@ public sealed class RecordServiceDeleteCleanupTests
         // queries v tom samém context. AsNoTracking() to eliminuje.
         var source = LoadDeleteRecordSource();
 
-        // Required AsNoTracking pro audit fetches (Vyjadreni a ZaznamHarmonogramHodnoty)
-        source.Should().MatchRegex(@"ZaznamHarmonogramHodnoty[\s\S]{0,200}AsNoTracking",
-            "ZaznamHarmonogramHodnoty audit fetch musí být AsNoTracking.");
+        // Required AsNoTracking pro audit fetches (Vyjadreni a ZaznamHarmonogramKroky)
+        source.Should().MatchRegex(@"ZaznamHarmonogramKroky[\s\S]{0,200}AsNoTracking",
+            "ZaznamHarmonogramKroky audit fetch musí být AsNoTracking.");
         source.Should().MatchRegex(@"Vyjadreni[\s\S]{0,200}AsNoTracking",
             "Vyjadreni audit fetch musí být AsNoTracking.");
     }

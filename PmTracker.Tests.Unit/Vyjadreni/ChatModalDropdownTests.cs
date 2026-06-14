@@ -144,8 +144,8 @@ public sealed class ChatModalDropdownTests
     public void BubbleViewModel_MaPropertiesProDropdown()
     {
         var cs = LoadRepoText("PmTracker.Web/Models/ViewModels/Vyjadreni/VyjadreniModalViewModel.cs");
-        cs.Should().Contain("AssignedKrokKey",
-            "BublinaViewModel musí mít AssignedKrokKey property.");
+        cs.Should().Contain("AssignedKrokPoradi",
+            "BublinaViewModel musí mít AssignedKrokPoradi property (datum-model: pořadí místo Guid KrokKey).");
         cs.Should().Contain("AssignedKrokColor",
             "BublinaViewModel musí mít AssignedKrokColor property.");
         cs.Should().Contain("AssignedKrokIsPinned",
