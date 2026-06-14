@@ -66,13 +66,11 @@ public sealed class BublinaViewModel
     public string? Predikat { get; set; }
     /// <summary>Pořadí kroku, na který je aktuálně navázaná (null = v timeline / buffer).</summary>
     public int? NavazanoNaKrokPoradi { get; set; }
-    public Guid? NavazanoNaKrokKey { get; set; }
 
     /// <summary>
     /// Spec 2026-04-29-modal-vyjadreni-dropdown §6 — krok přiřazený této bublině přes binding
     /// (NULL pokud žádný). Pro UI rendering badge nebo dropdownu.
     /// </summary>
-    public Guid? AssignedKrokKey { get; set; }
     public int? AssignedKrokPoradi { get; set; }
 
     /// <summary>"success" pro auto-fill binding, "warning" pro manuál binding, NULL pokud bez bindingu.</summary>
@@ -85,7 +83,7 @@ public sealed class BublinaViewModel
     public bool AssignedKrokIsPinned { get; set; }
 
     /// <summary>
-    /// Dropdown options pro tuto bublinu (jen pokud AssignedKrokKey je NULL).
+    /// Dropdown options pro tuto bublinu (jen pokud AssignedKrokPoradi je NULL).
     /// Disabled options řídí 1:1 / chronologie validation (server-side computed).
     /// </summary>
     public IReadOnlyList<KrokOptionViewModel> StepOptions { get; set; } =
@@ -102,7 +100,6 @@ public sealed class BublinaViewModel
 public sealed class StepperKrokViewModel
 {
     public int KrokPoradi { get; set; }
-    public Guid KrokKey { get; set; }
     public string Nazev { get; set; } = string.Empty;
     public string? BarvaHex { get; set; }
     /// <summary>Aktuálně navázané HOT_VYJADRENI.id (Active binding).</summary>
@@ -123,7 +120,7 @@ public sealed class CreateVazbaRequest
 {
     public int ExterniOdkazId { get; set; }
     public int ZaznamId { get; set; }
-    public Guid KrokKey { get; set; }
+    public int KrokPoradi { get; set; }
     public long HotVyjadreniId { get; set; }
     public DateTime DatumVyjadreni { get; set; }
     public int ProjektId { get; set; }

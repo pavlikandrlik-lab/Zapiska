@@ -5,7 +5,6 @@ namespace PmTracker.Web.Services.ServiceDesk;
 /// </summary>
 public sealed record StepperKrok(
     int KrokPoradi,
-    Guid KrokKey,
     DateTime? CurrentBubbleDatum,
     long? CurrentBubbleId);
 

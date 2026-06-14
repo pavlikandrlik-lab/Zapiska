@@ -90,7 +90,7 @@
                     {
                         var autor = string.IsNullOrWhiteSpace(bubble.Autor) ? bubble.AutorLogin : bubble.Autor;
                         var klassP = string.IsNullOrWhiteSpace(bubble.Predikat) ? string.Empty : $"pm-chat-bubble--{bubble.Predikat.ToLowerInvariant()}";
-                        var isAssigned = bubble.NavazanoNaKrokKey.HasValue;
+                        var isAssigned = bubble.NavazanoNaKrokPoradi.HasValue;
                         var introClass = bubble.IsTicketIntro ? "pm-chat-bubble--intro" : string.Empty;
                         <li class="pm-chat-bubble @klassP @introClass @(isAssigned ? "pm-chat-bubble--assigned" : string.Empty)"
                             data-bubble
@@ -134,7 +134,7 @@
                                     {
                                         // No selector for intro
                                     }
-                                    else if (bubble.AssignedKrokKey.HasValue)
+                                    else if (bubble.AssignedKrokPoradi.HasValue)
                                     {
                                         <gov-tag color="@bubble.AssignedKrokColor" size="s">
                                             Krok @bubble.AssignedKrokPoradi
@@ -155,7 +155,7 @@
                                         var dropdownOptions = bubble.StepOptions
                                             .Select(o => new
                                             {
-                                                value = o.KrokKey.ToString(),
+                                                value = o.KrokPoradi.ToString(),
                                                 label = $"Krok {o.KrokPoradi}: {o.Nazev}",
                                                 disabled = o.IsDisabled,
                                                 title = o.DisabledReason
@@ -198,9 +198,9 @@
                         _ => "neutral"
                     };
                     <gov-stepper-item color="@color"
-                                      identifier="krok-@krok.KrokKey"
+                                      identifier="krok-@krok.KrokPoradi"
                                       data-step
-                                      data-krok-key="@krok.KrokKey"
+                                      data-krok-key="@krok.KrokPoradi"
                                       data-krok-poradi="@krok.KrokPoradi"
                                       data-vazba-id="@krok.VazbaId"
                                       data-source="@color"

@@ -70,8 +70,8 @@ export function attachBubbleStepSelectors(root) {
     // Dropdown change → POST Create binding.
     root.querySelectorAll('[data-bubble-step-selector]').forEach(function (select) {
         select.addEventListener('gov-change', async function (ev) {
-            const newKrokKey = (ev.detail && ev.detail.value) || '';
-            if (!newKrokKey) return;  // user vybral "—" — no-op
+            const newKrokPoradi = (ev.detail && ev.detail.value) || '';
+            if (!newKrokPoradi) return;  // user vybral "—" — no-op
 
             const vyjadreniId = select.getAttribute('data-vyjadreni-id');
             const vyjadreniDatum = select.getAttribute('data-vyjadreni-datum');
@@ -79,7 +79,7 @@ export function attachBubbleStepSelectors(root) {
                 externiOdkazId: externiOdkazId,
                 zaznamId: zaznamId,
                 projektId: projektId,
-                krokKey: newKrokKey,
+                krokPoradi: Number(newKrokPoradi),
                 hotVyjadreniId: Number(vyjadreniId),
                 datumVyjadreni: vyjadreniDatum
             };

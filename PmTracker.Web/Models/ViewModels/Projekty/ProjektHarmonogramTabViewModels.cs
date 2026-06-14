@@ -96,14 +96,6 @@ public sealed class HarmonogramKrokEditViewModel
     public DateTime PosunuteDatum => SkutecneDatum;
 
     /// <summary>
-    /// Plán D Task 8: stabilní GUID identifikátor kroku schématu, kterým UI
-    /// form POST identifikuje ruční skutečnost (<c>ManualActualKroky[i].KrokKey</c>).
-    /// Default <see cref="Guid.Empty"/> pro zpětnou kompatibilitu s existujícími
-    /// call-sity, které KrokKey zatím neposkytují.
-    /// </summary>
-    public Guid KrokKey { get; init; }
-
-    /// <summary>
     /// Plán D Task 8: odkud pochází skutečnost — <c>None</c> (nenavázáno),
     /// <c>FromVyjadreni</c> (Active vazba HOT_VYJADRENI),
     /// <c>Manual</c> (HS0X_DELAY vyplněn ručně).

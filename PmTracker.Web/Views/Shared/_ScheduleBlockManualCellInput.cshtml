@@ -29,8 +29,8 @@
          data-schedule-actual-source="manual"
          data-rezim-show-on="Manual">
         <input type="hidden"
-               name="ManualActualKroky[@manualInputIndex].KrokKey"
-               value="@krok.KrokKey"
+               name="ManualActualKroky[@manualInputIndex].Poradi"
+               value="@krok.KrokIndex"
                data-manual-krok-keyhidden />
         @* FIX 2026-05-05: PreferredZdroj="Manual" sjednoceno s _ScheduleBlockManualCell.cshtml manual branche
            pro 2/5/8/9. Bez tohoto hidden by clearKeys filter v RecordService.SaveRecord nematchnul a smazat
@@ -53,7 +53,7 @@
                 {
                     ["data-manual-krok-input"] = "true",
                     ["data-manual-krok-index"] = krok.KrokIndex.ToString(),
-                    ["data-manual-krok-key"] = krok.KrokKey.ToString(),
+                    ["data-manual-krok-key"] = krok.KrokIndex.ToString(),
                     ["data-manual-krok-auto-eligible"] = "true"
                 }
             })

@@ -184,14 +184,14 @@ else if (isManualKrok)
             : $"Z vyjádření {vyjadreniDatumDisplay}";
 
         <input type="hidden"
-               name="ManualActualKroky[@manualInputIndex].KrokKey"
-               value="@krok.KrokKey"
+               name="ManualActualKroky[@manualInputIndex].Poradi"
+               value="@krok.KrokIndex"
                data-manual-krok-keyhidden />
         <input type="hidden"
                name="ManualActualKroky[@manualInputIndex].PreferredZdroj"
                value="@initialPreferredZdroj"
                data-manual-krok-preferred-zdroj
-               data-manual-krok-key="@krok.KrokKey" />
+               data-manual-krok-key="@krok.KrokIndex" />
 
         <div class="schedule-actual-manual schedule-actual-manual-editable"
              data-schedule-actual-source="manual"
@@ -211,7 +211,7 @@ else if (isManualKrok)
                     {
                         ["data-manual-krok-input"] = "true",
                         ["data-manual-krok-index"] = krok.KrokIndex.ToString(),
-                        ["data-manual-krok-key"] = krok.KrokKey.ToString()
+                        ["data-manual-krok-key"] = krok.KrokIndex.ToString()
                     }
                 })
         </div>
@@ -242,7 +242,7 @@ else if (isManualKrok)
                data-skutecnost-rezim na cell + hidden PreferredZdroj. Pre-selected = current ZdrojSkutecnosti. *@
             <details class="schedule-actual-cell__dropdown"
                      data-manual-zdroj-dropdown
-                     data-krok-key="@krok.KrokKey">
+                     data-krok-key="@krok.KrokIndex">
                 <summary class="schedule-actual-cell__dropdown-summary"
                          title="Zvolit zdroj skutečnosti"
                          aria-label="Zvolit zdroj skutečnosti">

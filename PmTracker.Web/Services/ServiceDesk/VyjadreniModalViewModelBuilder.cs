@@ -3,6 +3,7 @@ using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels.Vyjadreni;
+using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Services.ServiceDesk;
 
@@ -72,7 +73,7 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
 
         var zaznam = await _db.ProjektoveZaznamy.AsNoTracking()
             .Where(x => x.Id == zaznamId)
-            .Select(x => new { x.Id, x.ProjektId, x.HarmonogramSablonaVerze })
+            .Select(x => new { x.Id, x.ProjektId })
             .FirstOrDefaultAsync(ct).ConfigureAwait(false);
         if (zaznam is null) return null;
 
@@ -102,18 +103,20 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
         vm.TiketSubsystem = tiket?.Subsystem;
         vm.TiketModul = tiket?.Modul;
 
-        var kroky = await _db.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(t => t.SablonaVerze == zaznam.HarmonogramSablonaVerze && !t.JeZpozdeni)
-            .OrderBy(t => t.KrokPoradi)
-            .Select(t => new { t.KrokKey, t.KrokPoradi, t.Nazev, t.BarvaHex })
-            .ToListAsync(ct).ConfigureAwait(false);
+        // Datum-model: kroky harmonogramu jsou pevná definice (1–10), ne číselník.
+        var kroky = HarmonogramKroky.Vse
+            .OrderBy(t => t.Poradi)
+            .Select(t => new { KrokPoradi = (int)t.Poradi, t.Nazev, t.BarvaHex })
+            .ToList();
 
         var activeBindings = await _db.VyjadreniVazby.AsNoTracking()
             .Where(v => v.ZaznamId == zaznamId
                      && v.ExterniOdkazId == externiOdkazId
                      && v.Stav == (byte)VazbaStav.Active)
             .ToListAsync(ct).ConfigureAwait(false);
-        var bindingByKey = activeBindings.ToDictionary(b => b.KrokKey);
+        var bindingByPoradi = activeBindings
+            .GroupBy(b => (int)b.Poradi)
+            .ToDictionary(g => g.Key, g => g.First());
 
         // Spec 2026-04-28-modal-vyjadreni-redesign §3 — filtrovat kroky per typ záznamu.
         // PMP zobrazí {1,2,3,4,5}, PNF {1,6,7,8,9,10}, NES žádné (modal je tehdy bez stepperu).
@@ -122,10 +125,9 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
             .Where(k => relevantSteps.Contains(k.KrokPoradi))
             .Select(k =>
             {
-                bindingByKey.TryGetValue(k.KrokKey, out var b);
+                bindingByPoradi.TryGetValue(k.KrokPoradi, out var b);
                 return new StepperKrokViewModel
                 {
-                    KrokKey = k.KrokKey,
                     KrokPoradi = k.KrokPoradi,
                     Nazev = k.Nazev,
                     BarvaHex = k.BarvaHex,
@@ -178,10 +180,7 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
                 Tym = v.Tym,
                 Typ = v.Typ,
                 Predikat = predikat == HarvestPredicateKind.None ? null : predikat.ToString(),
-                NavazanoNaKrokKey = binding?.KrokKey,
-                NavazanoNaKrokPoradi = binding is null
-                    ? null
-                    : vm.Kroky.FirstOrDefault(k => k.KrokKey == binding.KrokKey)?.KrokPoradi
+                NavazanoNaKrokPoradi = binding is null ? null : (int)binding.Poradi
             });
         }
         vm.Bubliny = bubliny;
@@ -222,7 +221,7 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
         foreach (var b in activeBindings)
         {
             if (b.HotVyjadreniId == 0L) continue;  // skip synthetic K1
-            var krok = vm.Kroky.FirstOrDefault(k => k.KrokKey == b.KrokKey);
+            var krok = vm.Kroky.FirstOrDefault(k => k.KrokPoradi == (int)b.Poradi);
             if (krok is null) continue;
             krokToBoundBubbleDatum[krok.KrokPoradi] = b.DatumVyjadreni;
         }
@@ -246,10 +245,9 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
             // Assigned* properties.
             if (bindingByHotVyjadreniId.TryGetValue(bubble.VyjadreniId, out var binding))
             {
-                var assignedKrok = vm.Kroky.FirstOrDefault(k => k.KrokKey == binding.KrokKey);
+                var assignedKrok = vm.Kroky.FirstOrDefault(k => k.KrokPoradi == (int)binding.Poradi);
                 if (assignedKrok is not null)
                 {
-                    bubble.AssignedKrokKey = assignedKrok.KrokKey;
                     bubble.AssignedKrokPoradi = assignedKrok.KrokPoradi;
                     bubble.AssignedKrokColor = binding.Source switch
                     {
@@ -258,13 +256,13 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
                         _ => null
                     };
                     bubble.AssignedKrokIsPinned = k10Krok is not null
-                        && assignedKrok.KrokKey == k10Krok.KrokKey
+                        && assignedKrok.KrokPoradi == k10Krok.KrokPoradi
                         && k10AutoPinnedHotVyjadreniId == bubble.VyjadreniId;
                 }
             }
 
             // StepOptions jen pokud bublina nemá AssignedKrok (jinak zobrazí badge).
-            if (bubble.AssignedKrokKey.HasValue)
+            if (bubble.AssignedKrokPoradi.HasValue)
             {
                 bubble.StepOptions = Array.Empty<KrokOptionViewModel>();
                 continue;
@@ -299,7 +297,7 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
 
             // 1:1 — krok bound jiné bublině?
             var existingBinding = activeBindings.FirstOrDefault(b =>
-                b.KrokKey == krok.KrokKey && b.HotVyjadreniId > 0L);
+                (int)b.Poradi == krok.KrokPoradi && b.HotVyjadreniId > 0L);
             if (existingBinding is not null && existingBinding.HotVyjadreniId != bubble.VyjadreniId)
             {
                 isDisabled = true;
@@ -327,7 +325,7 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
             }
 
             options.Add(new KrokOptionViewModel(
-                krok.KrokKey, krok.KrokPoradi, krok.Nazev, isDisabled, reason));
+                krok.KrokPoradi, krok.Nazev, isDisabled, reason));
         }
         return options;
     }

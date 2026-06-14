@@ -201,7 +201,7 @@ public sealed class VyjadreniModalController : Controller
         var rebalanceResult = await _rebalance.CreateBindingAsync(new BindingRebalanceRequest(
             ZaznamId: req.ZaznamId,
             ExterniOdkazId: req.ExterniOdkazId,
-            KrokKey: req.KrokKey,
+            KrokPoradi: req.KrokPoradi,
             HotVyjadreniId: req.HotVyjadreniId,
             DatumVyjadreni: req.DatumVyjadreni,
             OsobaId: osobaId), ct).ConfigureAwait(false);
@@ -210,8 +210,8 @@ public sealed class VyjadreniModalController : Controller
         {
             case BindingRebalanceOutcome.ExterniOdkazNotFound:
                 return NotFound(new { error = "Externí odkaz nenalezen nebo nepatří k záznamu." });
-            case BindingRebalanceOutcome.InvalidKrokKey:
-                return BadRequest(new { error = "Neznámý krok — KrokKey nepatří do schématu záznamu." });
+            case BindingRebalanceOutcome.InvalidKrok:
+                return BadRequest(new { error = "Neplatné pořadí kroku (mimo 1–10)." });
         }
 
         return Ok(new
@@ -222,7 +222,6 @@ public sealed class VyjadreniModalController : Controller
                 .SelectMany(c => c.SupersededVazbaIds).Count(),
             CascadeUpdates = rebalanceResult.CascadeUpdates.Select(c => new
             {
-                KrokKey = c.KrokKey,
                 KrokPoradi = c.KrokPoradi,
                 NewVazbaId = c.NewVazbaId,
                 NewHotVyjadreniId = c.NewHotVyjadreniId,

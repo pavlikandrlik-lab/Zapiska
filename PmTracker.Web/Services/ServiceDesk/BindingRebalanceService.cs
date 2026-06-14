@@ -13,14 +13,14 @@ namespace PmTracker.Web.Services.ServiceDesk;
 /// </summary>
 /// <param name="ZaznamId">ID projektového záznamu.</param>
 /// <param name="ExterniOdkazId">ID externí vazby (tiket).</param>
-/// <param name="KrokKey">Guid identifikátor cílového kroku harmonogramu.</param>
+/// <param name="KrokPoradi">Pořadí cílového kroku harmonogramu (1–10).</param>
 /// <param name="HotVyjadreniId">ID bubliny z HOT_VYJADRENI.</param>
 /// <param name="DatumVyjadreni">Datum bubliny (pro chronologie check).</param>
 /// <param name="OsobaId">Autor akce (záznam do <c>created_by_osoba_id</c>).</param>
 public sealed record BindingRebalanceRequest(
     int ZaznamId,
     int ExterniOdkazId,
-    Guid KrokKey,
+    int KrokPoradi,
     long HotVyjadreniId,
     DateTime DatumVyjadreni,
     int? OsobaId);
@@ -28,13 +28,11 @@ public sealed record BindingRebalanceRequest(
 /// <summary>
 /// Výsledek jedné cascade operace — pro klienta, aby uměl re-render stepperu bez full refresh.
 /// </summary>
-/// <param name="KrokKey">Cílový krok (Guid).</param>
 /// <param name="KrokPoradi">Pořadí 1..10 — klient může refreshnout konkrétní box.</param>
 /// <param name="NewVazbaId">ID nově vytvořené Active vazby (null = krok je prázdný / v bufferu).</param>
 /// <param name="NewHotVyjadreniId">ID nové bubliny (null = buffer).</param>
 /// <param name="SupersededVazbaIds">ID vazeb, které byly supersedované.</param>
 public sealed record BindingCascadeUpdate(
-    Guid KrokKey,
     int KrokPoradi,
     int? NewVazbaId,
     long? NewHotVyjadreniId,
@@ -44,7 +42,7 @@ public enum BindingRebalanceOutcome
 {
     Success = 0,
     ExterniOdkazNotFound = 1,
-    InvalidKrokKey = 2
+    InvalidKrok = 2
 }
 
 public sealed record BindingRebalanceResult(
@@ -117,25 +115,18 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
             return Fail(BindingRebalanceOutcome.ExterniOdkazNotFound);
         }
 
-        var zaznam = await _db.ProjektoveZaznamy.AsNoTracking()
-            .Where(x => x.Id == request.ZaznamId)
-            .Select(x => new { x.Id, x.HarmonogramSablonaVerze })
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (zaznam is null)
+        var zaznamExists = await _db.ProjektoveZaznamy.AsNoTracking()
+            .AnyAsync(x => x.Id == request.ZaznamId, ct).ConfigureAwait(false);
+        if (!zaznamExists)
         {
             return Fail(BindingRebalanceOutcome.ExterniOdkazNotFound);
         }
 
-        // Všechny duration kroky daného schématu.
-        var schemaKroky = await _db.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(t => t.SablonaVerze == zaznam.HarmonogramSablonaVerze && !t.JeZpozdeni)
-            .Select(t => new { t.KrokKey, t.KrokPoradi })
-            .ToListAsync(ct).ConfigureAwait(false);
-
-        var targetKrok = schemaKroky.FirstOrDefault(k => k.KrokKey == request.KrokKey);
-        if (targetKrok is null)
+        // Datum-model: pevných 10 kroků (1–10). Cílový krok musí být platné pořadí.
+        var schemaPoradi = HarmonogramKroky.Vse.Select(k => (int)k.Poradi).ToArray();
+        if (!schemaPoradi.Contains(request.KrokPoradi))
         {
-            return Fail(BindingRebalanceOutcome.InvalidKrokKey);
+            return Fail(BindingRebalanceOutcome.InvalidKrok);
         }
 
         // Lock + transakce. Per-externiOdkaz semafor zabraňuje race s auto-harvestem.
@@ -172,7 +163,7 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
                 hotList = Array.Empty<HotVyjadreniDto>();
             }
 
-            return await ExecuteUnderTransactionAsync(request, zaznam.HarmonogramSablonaVerze, schemaKroky.Select(k => (k.KrokKey, k.KrokPoradi)).ToArray(), targetKrok.KrokPoradi, hotList, ct)
+            return await ExecuteUnderTransactionAsync(request, schemaPoradi, request.KrokPoradi, hotList, ct)
                 .ConfigureAwait(false);
         }
         finally
@@ -183,14 +174,11 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
 
     private async Task<BindingRebalanceResult> ExecuteUnderTransactionAsync(
         BindingRebalanceRequest request,
-        int sablonaVerze,
-        IReadOnlyList<(Guid KrokKey, int KrokPoradi)> schemaKroky,
+        IReadOnlyList<int> schemaPoradi,
         int targetKrokPoradi,
         IReadOnlyList<HotVyjadreniDto> hotList,
         CancellationToken ct)
     {
-        _ = sablonaVerze; // ponechano pro budoucí rozšíření (např. diagnostika log)
-
         var strategy = _db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
@@ -204,21 +192,17 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
                          && v.ExterniOdkazId == request.ExterniOdkazId
                          && v.Stav == (byte)VazbaStav.Active)
                 .ToListAsync(ct).ConfigureAwait(false);
-            var bindingByKey = activeBindings
-                .GroupBy(b => b.KrokKey)
+            var bindingByPoradi = activeBindings
+                .GroupBy(b => (int)b.Poradi)
                 .ToDictionary(g => g.Key, g => g.First());
 
-            // Mapování KrokKey → KrokPoradi pro cascade update assembly.
-            var poradiByKey = schemaKroky.ToDictionary(k => k.KrokKey, k => k.KrokPoradi);
-
             // Stepper snapshot pro rebalancer.
-            var stepperKroky = schemaKroky
-                .Select(k =>
+            var stepperKroky = schemaPoradi
+                .Select(poradi =>
                 {
-                    bindingByKey.TryGetValue(k.KrokKey, out var b);
+                    bindingByPoradi.TryGetValue(poradi, out var b);
                     return new StepperKrok(
-                        k.KrokPoradi,
-                        k.KrokKey,
+                        poradi,
                         CurrentBubbleDatum: b?.DatumVyjadreni,
                         CurrentBubbleId: b?.HotVyjadreniId);
                 })
@@ -238,17 +222,17 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
             var nowUtc = _time.GetUtcNow().UtcDateTime;
             int? primaryVazbaId = null;
             var cascadeUpdates = new List<BindingCascadeUpdate>();
-            // entity → (isTarget, krokKey, krokPoradi) — pro post-SaveChanges ID fill.
-            var pendingEntities = new Dictionary<ZaznamHarmonogramVyjadreniVazbaEntity, (bool IsTarget, Guid KrokKey, int KrokPoradi)>();
+            // entity → (isTarget, krokPoradi) — pro post-SaveChanges ID fill.
+            var pendingEntities = new Dictionary<ZaznamHarmonogramVyjadreniVazbaEntity, (bool IsTarget, int KrokPoradi)>();
 
-            // Krok key → entity builder helper
-            ZaznamHarmonogramVyjadreniVazbaEntity BuildEntity(Guid krokKey, long hotVyjadreniId, DateTime datum, VazbaSource source)
+            // Poradi → entity builder helper
+            ZaznamHarmonogramVyjadreniVazbaEntity BuildEntity(int poradi, long hotVyjadreniId, DateTime datum, VazbaSource source)
             {
                 return new ZaznamHarmonogramVyjadreniVazbaEntity
                 {
                     ZaznamId = request.ZaznamId,
                     ExterniOdkazId = request.ExterniOdkazId,
-                    KrokKey = krokKey,
+                    Poradi = (byte)poradi,
                     HotVyjadreniId = hotVyjadreniId,
                     DatumVyjadreni = datum,
                     Source = (byte)source,
@@ -260,9 +244,9 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
 
             foreach (var update in rebalance.Updates)
             {
-                var krokKey = schemaKroky.First(k => k.KrokPoradi == update.KrokPoradi).KrokKey;
+                var poradi = update.KrokPoradi;
                 var isTarget = update.KrokPoradi == targetKrokPoradi;
-                bindingByKey.TryGetValue(krokKey, out var existing);
+                bindingByPoradi.TryGetValue(poradi, out var existing);
 
                 // Idempotence: re-drop téže bubliny na tentýž krok → no-op pro primary,
                 // nebo cascade update, který by vedl k přesně stejnému bindingu, skip.
@@ -285,7 +269,6 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
                     {
                         existing.Stav = (byte)VazbaStav.Superseded;
                         cascadeUpdates.Add(new BindingCascadeUpdate(
-                            KrokKey: krokKey,
                             KrokPoradi: update.KrokPoradi,
                             NewVazbaId: null,
                             NewHotVyjadreniId: null,
@@ -306,7 +289,7 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
                     ? request.DatumVyjadreni
                     : availableBubbles.First(b => b.Id == update.NewBubbleId.Value).Datum;
                 var source = isTarget ? VazbaSource.Manual : VazbaSource.ChronologyCascade;
-                var entity = BuildEntity(krokKey, update.NewBubbleId.Value, newBubbleDatum, source);
+                var entity = BuildEntity(poradi, update.NewBubbleId.Value, newBubbleDatum, source);
                 _db.VyjadreniVazby.Add(entity);
 
                 // SaveChanges musíme volat až na konci; zatím držíme reference.
@@ -318,14 +301,13 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
                 else
                 {
                     cascadeUpdates.Add(new BindingCascadeUpdate(
-                        KrokKey: krokKey,
                         KrokPoradi: update.KrokPoradi,
                         NewVazbaId: null, // fill after save
                         NewHotVyjadreniId: update.NewBubbleId,
                         SupersededVazbaIds: supersededIds));
                 }
                 // Track mapping new entity → update index for post-save ID fill
-                pendingEntities[entity] = (isTarget, krokKey, update.KrokPoradi);
+                pendingEntities[entity] = (isTarget, update.KrokPoradi);
             }
 
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -334,7 +316,7 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
             foreach (var kv in pendingEntities)
             {
                 var entity = kv.Key;
-                var (isTarget, krokKey, krokPoradi) = kv.Value;
+                var (isTarget, krokPoradi) = kv.Value;
                 if (isTarget)
                 {
                     primaryVazbaId = entity.Id;
@@ -344,8 +326,7 @@ public sealed class BindingRebalanceService : IBindingRebalanceService
                     // Najdi odpovídající cascade update a naplň ID.
                     for (int i = 0; i < cascadeUpdates.Count; i++)
                     {
-                        if (cascadeUpdates[i].KrokKey == krokKey
-                            && cascadeUpdates[i].KrokPoradi == krokPoradi
+                        if (cascadeUpdates[i].KrokPoradi == krokPoradi
                             && cascadeUpdates[i].NewVazbaId is null
                             && cascadeUpdates[i].NewHotVyjadreniId == entity.HotVyjadreniId)
                         {

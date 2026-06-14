@@ -427,8 +427,6 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
 
         if (!isNes)
         {
-            var krokKeyByPoradi = await LoadKrokKeyByPoradiAsync(zaznam.HarmonogramSablonaVerze, ct).ConfigureAwait(false);
-
             // Review finding P-1: pre-load aktivní vazby v 1 query, ať UpsertBindingInMemory
             // nemusí per-bublina dělat samostatný .Where(...).ToListAsync.
             // H-2 regression fix: scope pre-load na tento ticket (ExterniOdkazId == eo.Id),
@@ -440,8 +438,8 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
                          && x.ExterniOdkazId == eo.Id
                          && x.Stav == (byte)VazbaStav.Active)
                 .ToListAsync(ct).ConfigureAwait(false);
-            var bindingsByKey = allActiveBindings
-                .GroupBy(b => b.KrokKey)
+            var bindingsByPoradi = allActiveBindings
+                .GroupBy(b => (int)b.Poradi)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
             if (list.Count > 0)
@@ -455,23 +453,16 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
                         skipped++;
                         continue;
                     }
-                    if (!krokKeyByPoradi.TryGetValue(poradi.Value, out var krokKey))
-                    {
-                        _logger.LogDebug("Harvest {ExterniOdkazId}: pořadí {Poradi} není v schema verze {SchemaVerze}; preskakuji vyjadreni id={VyjadreniId}.",
-                            eo.Id, poradi, zaznam.HarmonogramSablonaVerze, v.Id);
-                        skipped++;
-                        continue;
-                    }
 
-                    if (!bindingsByKey.TryGetValue(krokKey, out var existingForKey))
+                    if (!bindingsByPoradi.TryGetValue(poradi.Value, out var existingForKrok))
                     {
-                        existingForKey = new List<ZaznamHarmonogramVyjadreniVazbaEntity>();
-                        bindingsByKey[krokKey] = existingForKey;
+                        existingForKrok = new List<ZaznamHarmonogramVyjadreniVazbaEntity>();
+                        bindingsByPoradi[poradi.Value] = existingForKrok;
                     }
 
                     var upsert = UpsertBindingInMemory(
-                        zaznam.Id, krokKey, poradi.Value, eo.Id,
-                        v.Id, v.Datum, VazbaSource.Auto, existingForKey);
+                        zaznam.Id, poradi.Value, eo.Id,
+                        v.Id, v.Datum, VazbaSource.Auto, existingForKrok);
                     switch (upsert)
                     {
                         case UpsertOutcome.Created: created++; break;
@@ -485,17 +476,16 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             // Krok 1 „příprava zadání dodavateli" se plní z HOT_ZAZNAMY.datum (datum založení tiketu),
             // ne z popisu vyjádření. HotVyjadreniId = 0 je rezervované pro synthetic bindings
             // (žádná FK na HOT_VYJADRENI v PM Tracker DB).
-            if (hotZaznamDatumHint.HasValue
-                && krokKeyByPoradi.TryGetValue(1, out var k1KrokKey))
+            if (hotZaznamDatumHint.HasValue)
             {
-                if (!bindingsByKey.TryGetValue(k1KrokKey, out var existingK1))
+                if (!bindingsByPoradi.TryGetValue(1, out var existingK1))
                 {
                     existingK1 = new List<ZaznamHarmonogramVyjadreniVazbaEntity>();
-                    bindingsByKey[k1KrokKey] = existingK1;
+                    bindingsByPoradi[1] = existingK1;
                 }
 
                 var k1Outcome = UpsertBindingInMemory(
-                    zaznam.Id, k1KrokKey, poradi: 1, eo.Id,
+                    zaznam.Id, poradi: 1, eo.Id,
                     hotVyjadreniId: 0L, // synthetic
                     datumVyjadreni: hotZaznamDatumHint.Value,
                     VazbaSource.Auto, existingK1);
@@ -575,25 +565,25 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     /// a do seznamu. Single SaveChangesAsync dělá caller.
     /// </summary>
     internal UpsertOutcome UpsertBindingInMemory(
-        int zaznamId, Guid krokKey, int poradi, int externiOdkazId, long hotVyjadreniId,
+        int zaznamId, int poradi, int externiOdkazId, long hotVyjadreniId,
         DateTime datumVyjadreni, VazbaSource source,
-        List<ZaznamHarmonogramVyjadreniVazbaEntity> existingForKey)
+        List<ZaznamHarmonogramVyjadreniVazbaEntity> existingForKrok)
     {
         // Deduplikace: stejné hot_vyjadreni_id už jako Active — žádná změna
-        if (existingForKey.Any(x => x.HotVyjadreniId == hotVyjadreniId))
+        if (existingForKrok.Any(x => x.HotVyjadreniId == hotVyjadreniId))
         {
             return UpsertOutcome.Skipped;
         }
 
         // Manuální vazby mají absolutní přednost: nepřepisuj je auto-harvestem
-        if (source == VazbaSource.Auto && existingForKey.Any(x => x.Source == (byte)VazbaSource.Manual))
+        if (source == VazbaSource.Auto && existingForKrok.Any(x => x.Source == (byte)VazbaSource.Manual))
         {
             return UpsertOutcome.Skipped;
         }
 
         // Tie-break: novější datum vyjádření vítězí. Auto-harvest jede chronologicky ASC,
         // takže už navázané bubliny s datem >= aktuálního data jsou "novější".
-        var newest = existingForKey.OrderByDescending(x => x.DatumVyjadreni).FirstOrDefault();
+        var newest = existingForKrok.OrderByDescending(x => x.DatumVyjadreni).FirstOrDefault();
         if (newest != null && newest.DatumVyjadreni >= datumVyjadreni && source == VazbaSource.Auto)
         {
             return UpsertOutcome.Skipped;
@@ -601,19 +591,18 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
 
         var nowUtc = _time.GetUtcNow().UtcDateTime;
         int supersededCount = 0;
-        foreach (var e in existingForKey)
+        foreach (var e in existingForKrok)
         {
             e.Stav = (byte)VazbaStav.Superseded;
             supersededCount++;
         }
-        // Odstraň supersedované z lookupu, aby další iterace pro stejný KrokKey
+        // Odstraň supersedované z lookupu, aby další iterace pro stejný krok
         // neviděly "aktivní" vazby, které už aktivní nejsou.
-        existingForKey.Clear();
+        existingForKrok.Clear();
 
         var entity = new ZaznamHarmonogramVyjadreniVazbaEntity
         {
             ZaznamId = zaznamId,
-            KrokKey = krokKey,
             Poradi = (byte)poradi,
             ExterniOdkazId = externiOdkazId,
             HotVyjadreniId = hotVyjadreniId,
@@ -623,21 +612,9 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             CreatedAt = nowUtc
         };
         _db.VyjadreniVazby.Add(entity);
-        existingForKey.Add(entity);
+        existingForKrok.Add(entity);
 
         return supersededCount > 0 ? UpsertOutcome.Superseded : UpsertOutcome.Created;
-    }
-
-    private async Task<IReadOnlyDictionary<int, Guid>> LoadKrokKeyByPoradiAsync(int sablonaVerze, CancellationToken ct)
-    {
-        var rows = await _db.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(t => t.SablonaVerze == sablonaVerze && !t.JeZpozdeni)
-            .Select(t => new { t.KrokPoradi, t.KrokKey })
-            .ToListAsync(ct).ConfigureAwait(false);
-
-        return rows
-            .GroupBy(x => x.KrokPoradi)
-            .ToDictionary(g => g.Key, g => g.First().KrokKey);
     }
 
     /// <summary>
