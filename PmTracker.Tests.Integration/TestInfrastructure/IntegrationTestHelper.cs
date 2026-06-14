@@ -344,12 +344,6 @@ internal static class IntegrationTestHelper
                 .OrderBy(x => x.Id)
                 .Select(x => x.Id)
                 .FirstAsync();
-        var schemaVersion = await dbContext.HarmonogramSablony
-            .OrderByDescending(x => x.IsAktivni)
-            .ThenByDescending(x => x.Verze)
-            .Select(x => (int?)x.Verze)
-            .FirstOrDefaultAsync() ?? 1;
-
         var maxNumber = await dbContext.ProjektoveZaznamy
             .Where(x => x.ProjektId == projectId)
             .Select(x => (int?)x.CisloZaznamu)
@@ -368,8 +362,7 @@ internal static class IntegrationTestHelper
             VlastnikId = ownerOsobaId,
             DatumZalozeni = DateTime.Today,
             DatumUkonceni = DateTime.Today.AddDays(30),
-            SubsystemId = subsystemId,
-            HarmonogramSablonaVerze = schemaVersion
+            SubsystemId = subsystemId
         };
 
         dbContext.ProjektoveZaznamy.Add(record);

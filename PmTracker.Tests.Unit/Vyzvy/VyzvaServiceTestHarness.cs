@@ -78,7 +78,7 @@ internal static class VyzvaServiceTestHarness
             Id = zaznamId, ProjektId = projektId, KategorieId = 1, CisloZaznamu = zaznamId,
             CisloViditelne = $"RU{zaznamId}", Nazev = "test", VlastnikId = 1,
             DatumZalozeni = DateTime.UtcNow, DatumUkonceni = DateTime.UtcNow,
-            SubsystemId = 1, HarmonogramSablonaVerze = 1,
+            SubsystemId = 1,
         });
         await db.SaveChangesAsync();
     }

@@ -105,18 +105,16 @@ public sealed class ProjectDashboardStatisticsYearFilterTests
             VlastnikId = 1,
             DatumZalozeni = ukonceni.AddMonths(-1),
             DatumUkonceni = ukonceni,
-            SubsystemId = 1,
-            HarmonogramSablonaVerze = 1
+            SubsystemId = 1
         };
 
     private static ProjectDashboardService CreateService(PmTrackerDbContext db)
     {
-        var harmonogramMock = new Mock<IHarmonogramService>();
         var vyzvaServiceMock = new Mock<IVyzvaService>();
         var vyzvyPanelBuilder = new VyzvyPanelBuilder(vyzvaServiceMock.Object, db);
         // Statistics panel nevolá query service, stačí inert mock (Plán 5 Sprint B Task 4).
         var isQueryServiceMock = new Mock<PmTracker.ServiceDesk.Contracts.IInformacniSystemQueryService>();
 
-        return new ProjectDashboardService(db, harmonogramMock.Object, vyzvyPanelBuilder, isQueryServiceMock.Object);
+        return new ProjectDashboardService(db, vyzvyPanelBuilder, isQueryServiceMock.Object);
     }
 }

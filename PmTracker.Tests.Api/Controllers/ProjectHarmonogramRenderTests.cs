@@ -108,51 +108,8 @@ public sealed class ProjectHarmonogramRenderTests
         await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram layered record");
 
-        await using (var dbContext = _fixture.CreateDbContext())
-        {
-            var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
-                .Where(x => x.Id == recordId)
-                .Select(x => new
-                {
-                    x.Id,
-                    x.HarmonogramSablonaVerze
-                })
-                .FirstAsync();
-
-            var firstStepOrder = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && !x.JeZpozdeni)
-                .OrderBy(x => x.KrokPoradi)
-                .Select(x => x.KrokPoradi)
-                .FirstAsync();
-
-            var durationTypeId = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && !x.JeZpozdeni && x.KrokPoradi == firstStepOrder)
-                .Select(x => x.Id)
-                .FirstAsync();
-
-            var delayTypeId = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && x.JeZpozdeni && x.KrokPoradi == firstStepOrder)
-                .Select(x => x.Id)
-                .FirstAsync();
-
-            dbContext.ZaznamHarmonogramHodnoty.AddRange(
-            [
-                new ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = record.Id,
-                    TypId = durationTypeId,
-                    HodnotaInt = 6
-                },
-                new ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = record.Id,
-                    TypId = delayTypeId,
-                    HodnotaInt = -2
-                }
-            ]);
-
-            await dbContext.SaveChangesAsync();
-        }
+        // Datum-model: plán pro všech 10 kroků, skutečnost na kroku 1 (= vyplněný segment).
+        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
@@ -189,47 +146,8 @@ public sealed class ProjectHarmonogramRenderTests
         await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram breakdown record");
 
-        await using (var dbContext = _fixture.CreateDbContext())
-        {
-            var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
-                .Where(x => x.Id == recordId)
-                .Select(x => new { x.Id, x.HarmonogramSablonaVerze })
-                .FirstAsync();
-
-            var firstStepOrder = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && !x.JeZpozdeni)
-                .OrderBy(x => x.KrokPoradi)
-                .Select(x => x.KrokPoradi)
-                .FirstAsync();
-
-            var durationTypeId = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && !x.JeZpozdeni && x.KrokPoradi == firstStepOrder)
-                .Select(x => x.Id)
-                .FirstAsync();
-
-            var delayTypeId = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && x.JeZpozdeni && x.KrokPoradi == firstStepOrder)
-                .Select(x => x.Id)
-                .FirstAsync();
-
-            dbContext.ZaznamHarmonogramHodnoty.AddRange(
-            [
-                new ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = record.Id,
-                    TypId = durationTypeId,
-                    HodnotaInt = 6
-                },
-                new ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = record.Id,
-                    TypId = delayTypeId,
-                    HodnotaInt = 2
-                }
-            ]);
-
-            await dbContext.SaveChangesAsync();
-        }
+        // Datum-model: plán pro všech 10 kroků, skutečnost na krocích 1–2.
+        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
@@ -254,89 +172,51 @@ public sealed class ProjectHarmonogramRenderTests
         await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram zero duration record");
 
-        int firstStepOrder;
-        int secondStepOrder;
-        int thirdStepOrder;
-
-        await using (var dbContext = _fixture.CreateDbContext())
-        {
-            var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
-                .Where(x => x.Id == recordId)
-                .Select(x => new { x.Id, x.HarmonogramSablonaVerze })
-                .FirstAsync();
-
-            var stepOrders = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && !x.JeZpozdeni)
-                .OrderBy(x => x.KrokPoradi)
-                .Select(x => x.KrokPoradi)
-                .Distinct()
-                .Take(3)
-                .ToListAsync();
-
-            stepOrders.Count.Should().BeGreaterThanOrEqualTo(3);
-            firstStepOrder = stepOrders[0];
-            secondStepOrder = stepOrders[1];
-            thirdStepOrder = stepOrders[2];
-
-            var firstDurationTypeId = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && !x.JeZpozdeni && x.KrokPoradi == firstStepOrder)
-                .Select(x => x.Id)
-                .FirstAsync();
-
-            var secondDurationTypeId = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && !x.JeZpozdeni && x.KrokPoradi == secondStepOrder)
-                .Select(x => x.Id)
-                .FirstAsync();
-
-            var secondDelayTypeId = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && x.JeZpozdeni && x.KrokPoradi == secondStepOrder)
-                .Select(x => x.Id)
-                .FirstAsync();
-
-            var thirdDurationTypeId = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-                .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && !x.JeZpozdeni && x.KrokPoradi == thirdStepOrder)
-                .Select(x => x.Id)
-                .FirstAsync();
-
-            dbContext.ZaznamHarmonogramHodnoty.AddRange(
-            [
-                new ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = record.Id,
-                    TypId = firstDurationTypeId,
-                    HodnotaInt = 4
-                },
-                new ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = record.Id,
-                    TypId = secondDurationTypeId,
-                    HodnotaInt = 0
-                },
-                new ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = record.Id,
-                    TypId = secondDelayTypeId,
-                    HodnotaInt = 3
-                },
-                new ZaznamHarmonogramHodnotaEntity
-                {
-                    ZaznamId = record.Id,
-                    TypId = thirdDurationTypeId,
-                    HodnotaInt = 5
-                }
-            ]);
-
-            await dbContext.SaveChangesAsync();
-        }
+        // Datum-model: skutečnost vyplněna na krocích 1 a 3, krok 2 BEZ skutečnosti →
+        // ve skutečnost-tracku se absorbuje (nevykreslí vlastní segment).
+        const int firstStepOrder = 1;
+        const int secondStepOrder = 2;
+        const int thirdStepOrder = 3;
+        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-40), new HashSet<int> { firstStepOrder, thirdStepOrder });
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        Regex.Matches(html, "class=\"schedule-overview-segment\"", RegexOptions.CultureInvariant).Count.Should().Be(4);
+        // Datum-model: skutečnost vyplněna na krocích 1 a 3, krok 2 bez skutečnosti → absorbován.
         html.Should().Contain($"data-rainbow-segment-label-short=\"{firstStepOrder}\"");
         html.Should().Contain($"data-rainbow-segment-label-short=\"{thirdStepOrder}\"");
         html.Should().NotContain($"data-rainbow-segment-label-short=\"{secondStepOrder}\"");
+    }
+
+    /// <summary>
+    /// Datum-model seed: vloží krok rows (plan_datum + volitelně skutecnost_datum) do
+    /// <c>zaznam_harmonogram_krok</c>. Plán je vždy vyplněn pro všech 10 kroků (týdenní rozestup
+    /// od <paramref name="startDate"/>), skutečnost jen pro kroky uvedené v <paramref name="actualSteps"/>.
+    /// </summary>
+    private async Task SeedDatumScheduleAsync(
+        int recordId,
+        DateTime startDate,
+        IReadOnlySet<int> actualSteps)
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+        var now = DateTime.UtcNow;
+        for (var poradi = 1; poradi <= 10; poradi++)
+        {
+            var plan = startDate.Date.AddDays(poradi * 7);
+            DateTime? actual = actualSteps.Contains(poradi) ? plan.AddDays(2) : null;
+            dbContext.ZaznamHarmonogramKroky.Add(new ZaznamHarmonogramKrokEntity
+            {
+                ZaznamId = recordId,
+                Poradi = (byte)poradi,
+                PlanDatum = plan,
+                SkutecnostDatum = actual,
+                SkutecnostZdroj = actual.HasValue ? (byte)2 : (byte)0,
+                SkutecnostRezim = 2,
+                UpdatedAt = now
+            });
+        }
+        await dbContext.SaveChangesAsync();
     }
 }

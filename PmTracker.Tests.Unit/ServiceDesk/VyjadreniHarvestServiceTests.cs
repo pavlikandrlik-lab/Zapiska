@@ -17,41 +17,10 @@ public sealed class VyjadreniHarvestServiceTests
             .UseInMemoryDatabase("harvest-" + Guid.NewGuid())
             .Options);
 
-    private static readonly Guid K3Key = Guid.Parse("11111111-1111-1111-1111-111111111103");
-    private static readonly Guid K4Key = Guid.Parse("11111111-1111-1111-1111-111111111104");
-    private static readonly Guid K6Key = Guid.Parse("11111111-1111-1111-1111-111111111106");
-    private static readonly Guid K7Key = Guid.Parse("11111111-1111-1111-1111-111111111107");
-    private static readonly Guid K10Key = Guid.Parse("11111111-1111-1111-1111-111111111110");
-
-    private static async Task SeedSchemaAsync(PmTrackerDbContext db, int sablonaVerze = 1)
-    {
-        var kroky = new[]
-        {
-            (poradi: 3, kod: "HS03_DURATION", key: K3Key),
-            (poradi: 4, kod: "HS04_DURATION", key: K4Key),
-            (poradi: 6, kod: "HS06_DURATION", key: K6Key),
-            (poradi: 7, kod: "HS07_DURATION", key: K7Key),
-            (poradi: 10, kod: "HS10_DURATION", key: K10Key),
-        };
-        var nextId = 1;
-        foreach (var k in kroky)
-        {
-            db.CiselnikHarmonogramTypu.Add(new HarmonogramTypEntity
-            {
-                Id = nextId++,
-                Kod = k.kod,
-                Nazev = k.kod,
-                Hodnota = 10,
-                IsLocked = false,
-                SablonaVerze = sablonaVerze,
-                KrokKey = k.key,
-                KrokPoradi = k.poradi,
-                JeZpozdeni = false,
-                BarvaHex = "#EF4444"
-            });
-        }
-        await db.SaveChangesAsync();
-    }
+    // Datum-model (2026-06-12): kroky harmonogramu jsou pevná definice (HarmonogramKroky.Vse),
+    // harvest už nečte číselník schématu. Seed helpery zůstávají jako no-op kvůli call-sites.
+    private static Task SeedSchemaAsync(PmTrackerDbContext db, int sablonaVerze = 1)
+        => Task.CompletedTask;
 
     private static VyjadreniHarvestService BuildSut(PmTrackerDbContext db, IVyjadreniQueryService v)
     {
@@ -66,7 +35,7 @@ public sealed class VyjadreniHarvestServiceTests
     public async Task HarvestTicketAsync_K6Pnf_CreatesActiveBinding()
     {
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336865" });
         await SeedSchemaAsync(db);
 
@@ -88,7 +57,7 @@ public sealed class VyjadreniHarvestServiceTests
         var bindings = await db.VyjadreniVazby.Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
         bindings.Should().HaveCount(1);
         bindings[0].HotVyjadreniId.Should().Be(99);
-        bindings[0].KrokKey.Should().Be(K6Key);
+        bindings[0].Poradi.Should().Be((byte)6);
         bindings[0].Source.Should().Be((byte)VazbaSource.Auto);
     }
 
@@ -96,7 +65,7 @@ public sealed class VyjadreniHarvestServiceTests
     public async Task HarvestTicketAsync_UpdatesLastHarvestedAt()
     {
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336865" });
         await SeedSchemaAsync(db);
 
@@ -115,7 +84,7 @@ public sealed class VyjadreniHarvestServiceTests
     public async Task HarvestTicketAsync_NoMatchingPredicate_NoBindingCreated()
     {
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336865" });
         await SeedSchemaAsync(db);
 
@@ -151,7 +120,7 @@ public sealed class VyjadreniHarvestServiceTests
     public async Task HarvestTicketAsync_DuplicateVyjadreni_DoesNotCreateSecondBinding()
     {
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336865" });
         await SeedSchemaAsync(db);
 
@@ -176,13 +145,13 @@ public sealed class VyjadreniHarvestServiceTests
     public async Task HarvestTicketAsync_ManualBindingExists_AutoHarvestSkips()
     {
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336865" });
         await SeedSchemaAsync(db);
         db.VyjadreniVazby.Add(new ZaznamHarmonogramVyjadreniVazbaEntity
         {
             ZaznamId = 100,
-            KrokKey = K6Key,
+            Poradi = 6,
             ExterniOdkazId = 1,
             HotVyjadreniId = 77,
             DatumVyjadreni = new DateTime(2026, 3, 1),
@@ -215,21 +184,21 @@ public sealed class VyjadreniHarvestServiceTests
     public async Task ReHarvestTicketAsync_SupersedesAutoButKeepsManual()
     {
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336865", LastHarvestedAt = new DateTime(2026, 4, 1) });
         await SeedSchemaAsync(db);
 
         db.VyjadreniVazby.AddRange(
             new ZaznamHarmonogramVyjadreniVazbaEntity
             {
-                ZaznamId = 100, KrokKey = K3Key, ExterniOdkazId = 1,
+                ZaznamId = 100, Poradi = 3, ExterniOdkazId = 1,
                 HotVyjadreniId = 11, DatumVyjadreni = new DateTime(2026, 2, 1),
                 Source = (byte)VazbaSource.Auto, Stav = (byte)VazbaStav.Active,
                 CreatedAt = new DateTime(2026, 2, 1)
             },
             new ZaznamHarmonogramVyjadreniVazbaEntity
             {
-                ZaznamId = 100, KrokKey = K6Key, ExterniOdkazId = 1,
+                ZaznamId = 100, Poradi = 6, ExterniOdkazId = 1,
                 HotVyjadreniId = 22, DatumVyjadreni = new DateTime(2026, 2, 5),
                 Source = (byte)VazbaSource.Manual, Stav = (byte)VazbaStav.Active,
                 CreatedAt = new DateTime(2026, 2, 5)
@@ -252,7 +221,7 @@ public sealed class VyjadreniHarvestServiceTests
     public async Task HarvestRecordAsync_IteratesAllExterniOdkazy()
     {
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.AddRange(
             new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "111111" },
             new ZaznamExterniOdkazEntity { Id = 2, ZaznamId = 100, Cislo = "222222" },
@@ -280,7 +249,7 @@ public sealed class VyjadreniHarvestServiceTests
     public async Task HarvestTicketAsync_WhenPmpTicket_K4Predicate_MapsToPoradi4()
     {
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336865" });
         await SeedSchemaAsync(db);
 
@@ -306,7 +275,7 @@ public sealed class VyjadreniHarvestServiceTests
         result.Created.Should().Be(1);
         var bindings = await db.VyjadreniVazby.Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
         bindings.Should().HaveCount(1);
-        bindings[0].KrokKey.Should().Be(K4Key, "PMP tiket + K4_K7 predikát = K4 (pořadí 4)");
+        bindings[0].Poradi.Should().Be((byte)4, "PMP tiket + K4_K7 predikát = K4 (pořadí 4)");
     }
 
     /// <summary>
@@ -321,7 +290,7 @@ public sealed class VyjadreniHarvestServiceTests
     public async Task HarvestTicketAsync_WhenPmpTicketWithPaddedTypZaznamu_MapsToPoradi4()
     {
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336865" });
         await SeedSchemaAsync(db);
 
@@ -347,7 +316,7 @@ public sealed class VyjadreniHarvestServiceTests
         result.Created.Should().Be(1);
         var bindings = await db.VyjadreniVazby.Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
         bindings.Should().HaveCount(1);
-        bindings[0].KrokKey.Should().Be(K4Key,
+        bindings[0].Poradi.Should().Be((byte)4,
             "padded \"PMP  \" musí po normalizaci stále mapovat K4_K7 → K4 (ne fallback K7)");
     }
 
@@ -358,7 +327,7 @@ public sealed class VyjadreniHarvestServiceTests
     public async Task HarvestTicketAsync_WhenPnfTicket_K4K7Predicate_MapsToPoradi7()
     {
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "336866" });
         await SeedSchemaAsync(db);
 
@@ -382,7 +351,7 @@ public sealed class VyjadreniHarvestServiceTests
 
         result.Created.Should().Be(1);
         var bindings = await db.VyjadreniVazby.Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
-        bindings[0].KrokKey.Should().Be(K7Key, "PNF tiket + K4_K7 predikát = K7 (pořadí 7)");
+        bindings[0].Poradi.Should().Be((byte)7, "PNF tiket + K4_K7 predikát = K7 (pořadí 7)");
     }
 
     [Fact]
@@ -392,7 +361,7 @@ public sealed class VyjadreniHarvestServiceTests
         // ne per-zaznam. Jinak by druhý harvest stejného záznamu viděl vazby prvního
         // v change trackeru a při UpsertBindingInMemory by se pletl.
         await using var db = NewDb();
-        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1 });
+        db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 100, ProjektId = 1, Nazev = "Z" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "111111" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 2, ZaznamId = 100, Cislo = "222222" });
         await SeedSchemaAsync(db);
@@ -441,38 +410,8 @@ public sealed class VyjadreniHarvestServiceTests
 
     // ---------- Spec 2026-04-28: NES skip stepper + synthetic K1 ----------
 
-    private static readonly Guid K1Key = Guid.Parse("11111111-1111-1111-1111-111111111101");
-
-    private static async Task SeedSchemaWithK1Async(PmTrackerDbContext db, int sablonaVerze = 1)
-    {
-        var kroky = new[]
-        {
-            (poradi: 1, kod: "HS01_DURATION", key: K1Key),
-            (poradi: 3, kod: "HS03_DURATION", key: K3Key),
-            (poradi: 4, kod: "HS04_DURATION", key: K4Key),
-            (poradi: 6, kod: "HS06_DURATION", key: K6Key),
-            (poradi: 7, kod: "HS07_DURATION", key: K7Key),
-            (poradi: 10, kod: "HS10_DURATION", key: K10Key),
-        };
-        var nextId = 1;
-        foreach (var k in kroky)
-        {
-            db.CiselnikHarmonogramTypu.Add(new HarmonogramTypEntity
-            {
-                Id = nextId++,
-                Kod = k.kod,
-                Nazev = k.kod,
-                Hodnota = 10,
-                IsLocked = false,
-                SablonaVerze = sablonaVerze,
-                KrokKey = k.key,
-                KrokPoradi = k.poradi,
-                JeZpozdeni = false,
-                BarvaHex = "#EF4444"
-            });
-        }
-        await db.SaveChangesAsync();
-    }
+    private static Task SeedSchemaWithK1Async(PmTrackerDbContext db, int sablonaVerze = 1)
+        => Task.CompletedTask;
 
     [Fact]
     public async Task HarvestTicketAsync_NesTicket_NevytvariStepperBindings()
@@ -481,7 +420,7 @@ public sealed class VyjadreniHarvestServiceTests
         await using var db = NewDb();
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
-            Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1
+            Id = 100, ProjektId = 1, Nazev = "Z"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "100001" });
         await SeedSchemaWithK1Async(db);
@@ -519,7 +458,7 @@ public sealed class VyjadreniHarvestServiceTests
         await using var db = NewDb();
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
-            Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1
+            Id = 100, ProjektId = 1, Nazev = "Z"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "200001" });
         await SeedSchemaWithK1Async(db);
@@ -540,7 +479,7 @@ public sealed class VyjadreniHarvestServiceTests
         await sut.HarvestTicketAsync(1, CancellationToken.None);
 
         var k1Bindings = await db.VyjadreniVazby
-            .Where(x => x.KrokKey == K1Key && x.Stav == (byte)VazbaStav.Active)
+            .Where(x => x.Poradi == 1 && x.Stav == (byte)VazbaStav.Active)
             .ToListAsync();
         k1Bindings.Should().HaveCount(1);
         k1Bindings[0].HotVyjadreniId.Should().Be(0L);  // synthetic
@@ -555,7 +494,7 @@ public sealed class VyjadreniHarvestServiceTests
         await using var db = NewDb();
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
-            Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1
+            Id = 100, ProjektId = 1, Nazev = "Z"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "300001" });
         await SeedSchemaWithK1Async(db);
@@ -576,7 +515,7 @@ public sealed class VyjadreniHarvestServiceTests
         await sut.HarvestTicketAsync(1, CancellationToken.None);
 
         var k1Bindings = await db.VyjadreniVazby
-            .Where(x => x.KrokKey == K1Key && x.Stav == (byte)VazbaStav.Active)
+            .Where(x => x.Poradi == 1 && x.Stav == (byte)VazbaStav.Active)
             .ToListAsync();
         k1Bindings.Should().HaveCount(1);
         k1Bindings[0].HotVyjadreniId.Should().Be(0L);
@@ -590,7 +529,7 @@ public sealed class VyjadreniHarvestServiceTests
         await using var db = NewDb();
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
-            Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1
+            Id = 100, ProjektId = 1, Nazev = "Z"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "400001" });
         await SeedSchemaWithK1Async(db);
@@ -612,7 +551,7 @@ public sealed class VyjadreniHarvestServiceTests
         await sut.HarvestTicketAsync(1, CancellationToken.None);
 
         var k1All = await db.VyjadreniVazby
-            .Where(x => x.KrokKey == K1Key)
+            .Where(x => x.Poradi == 1)
             .ToListAsync();
         k1All.Should().HaveCount(1);  // jen jeden binding (deduplikace)
         k1All[0].Stav.Should().Be((byte)VazbaStav.Active);
@@ -628,7 +567,7 @@ public sealed class VyjadreniHarvestServiceTests
         await using var db = NewDb();
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
-            Id = 100, ProjektId = 1, Nazev = "Z", HarmonogramSablonaVerze = 1
+            Id = 100, ProjektId = 1, Nazev = "Z"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 100, Cislo = "500001" });
         await SeedSchemaWithK1Async(db);

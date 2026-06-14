@@ -22,18 +22,14 @@ public enum VazbaStav : byte
 
 /// <summary>
 /// Plán C — vazba mezi vyjádřením v ServiceDesku (HOT_VYJADRENI) a krokem
-/// harmonogramu (HarmonogramTypEntity.KrokKey) na konkrétním projektovém záznamu.
+/// harmonogramu na konkrétním projektovém záznamu. Krok je identifikovaný pořadím 1–10.
 /// Append-only — nové přiřazení supersedne starší (stav=2), nemažeme.
 /// </summary>
 public sealed class ZaznamHarmonogramVyjadreniVazbaEntity
 {
     public int Id { get; set; }
     public int ZaznamId { get; set; }
-    public Guid KrokKey { get; set; }
-    /// <summary>
-    /// Datum-model (2026-06-12): krok harmonogramu identifikovaný pořadím 1–10.
-    /// Nahrazuje <see cref="KrokKey"/> (ten zmizí s číselníkem typů ve Fázi 7).
-    /// </summary>
+    /// <summary>Datum-model (2026-06-12): krok harmonogramu identifikovaný pořadím 1–10.</summary>
     public byte Poradi { get; set; }
     public int ExterniOdkazId { get; set; }
     public long HotVyjadreniId { get; set; }

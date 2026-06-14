@@ -124,7 +124,7 @@ public sealed class FingerprintDetectionTests
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
             Id = 10, ProjektId = 1, SubsystemId = 1, KategorieId = 1,
-            HarmonogramSablonaVerze = 1, Nazev = "test"
+            Nazev = "test"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
         {
@@ -190,8 +190,8 @@ public sealed class FingerprintDetectionTests
     {
         using var db = InMemoryDb();
         db.ProjektoveZaznamy.AddRange(
-            new ProjektovyZaznamEntity { Id = 99, ProjektId = 1, SubsystemId = 1, KategorieId = 1, HarmonogramSablonaVerze = 1, Nazev = "r99" },
-            new ProjektovyZaznamEntity { Id = 88, ProjektId = 1, SubsystemId = 1, KategorieId = 1, HarmonogramSablonaVerze = 1, Nazev = "r88" }
+            new ProjektovyZaznamEntity { Id = 99, ProjektId = 1, SubsystemId = 1, KategorieId = 1, Nazev = "r99" },
+            new ProjektovyZaznamEntity { Id = 88, ProjektId = 1, SubsystemId = 1, KategorieId = 1, Nazev = "r88" }
         );
         db.ZaznamExterniOdkazy.AddRange(
             new ZaznamExterniOdkazEntity { Id = 1, ZaznamId = 99, Cislo = "100001" },

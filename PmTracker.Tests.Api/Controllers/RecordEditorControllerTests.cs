@@ -507,7 +507,7 @@ public sealed class RecordEditorControllerTests
     }
 
     [Fact]
-    public async Task Save_ShouldPersistNegativeScheduleActual_WhenScheduleTabIsSubmitted()
+    public async Task Save_ShouldPersistScheduleKrokDates_WhenScheduleTabIsSubmitted()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiScheduleSaver");
         var projectId = await _fixture.EnsureProjectAsync("APIRED3");
@@ -530,8 +530,7 @@ public sealed class RecordEditorControllerTests
                 x.VlastnikId,
                 x.DatumZalozeni,
                 x.DatumUkonceni,
-                x.SubsystemId,
-                x.HarmonogramSablonaVerze
+                x.SubsystemId
             })
             .FirstAsync();
         var categoryName = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
@@ -546,19 +545,10 @@ public sealed class RecordEditorControllerTests
             .Where(x => x.Id == record.SubsystemId)
             .Select(x => x.Kod)
             .FirstAsync();
-        var firstStepOrder = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && !x.JeZpozdeni)
-            .OrderBy(x => x.KrokPoradi)
-            .Select(x => x.KrokPoradi)
-            .FirstAsync();
-        var durationTypeId = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && !x.JeZpozdeni && x.KrokPoradi == firstStepOrder)
-            .Select(x => x.Id)
-            .FirstAsync();
-        var delayTypeId = await dbContext.CiselnikHarmonogramTypu.AsNoTracking()
-            .Where(x => x.SablonaVerze == record.HarmonogramSablonaVerze && x.JeZpozdeni && x.KrokPoradi == firstStepOrder)
-            .Select(x => x.Id)
-            .FirstAsync();
+
+        // Datum-model: krok 2 je manuální (2/5/8/9) → uloží plan i skutečnost přímo z formuláře.
+        var planDatum = record.DatumZalozeni.Date.AddDays(14);
+        var skutecnostDatum = record.DatumZalozeni.Date.AddDays(18);
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var request = ApiTestHttpHelper.BuildAjaxPost(
@@ -577,10 +567,10 @@ public sealed class RecordEditorControllerTests
                 ("Subsystem", subsystemCode),
                 ("CisloZaznamu", record.CisloZaznamu.ToString()),
                 ("EditorTab", "schedule"),
-                ("HarmonogramHodnoty[0].TypId", durationTypeId.ToString()),
-                ("HarmonogramHodnoty[0].Hodnota", "5"),
-                ("HarmonogramHodnoty[1].TypId", delayTypeId.ToString()),
-                ("HarmonogramHodnoty[1].Hodnota", "-2")));
+                ("HarmonogramRezim", "Manual"),
+                ("HarmonogramHodnoty[0].Poradi", "2"),
+                ("HarmonogramHodnoty[0].PlanDatum", planDatum.ToString("yyyy-MM-dd")),
+                ("HarmonogramHodnoty[0].SkutecnostDatum", skutecnostDatum.ToString("yyyy-MM-dd"))));
 
         var response = await client.SendAsync(request);
         var content = await response.Content.ReadAsStringAsync();
@@ -590,17 +580,14 @@ public sealed class RecordEditorControllerTests
         payload.Ok.Should().BeTrue();
 
         await using var verificationDbContext = _fixture.CreateDbContext();
-        var savedDelay = await verificationDbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-            .Where(x => x.ZaznamId == recordId && x.TypId == delayTypeId)
-            .Select(x => (int?)x.HodnotaInt)
-            .SingleOrDefaultAsync();
-        var savedDuration = await verificationDbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-            .Where(x => x.ZaznamId == recordId && x.TypId == durationTypeId)
-            .Select(x => (int?)x.HodnotaInt)
+        var savedKrok = await verificationDbContext.ZaznamHarmonogramKroky.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId && x.Poradi == 2)
+            .Select(x => new { x.PlanDatum, x.SkutecnostDatum })
             .SingleOrDefaultAsync();
 
-        savedDuration.Should().Be(5);
-        savedDelay.Should().Be(-2);
+        savedKrok.Should().NotBeNull();
+        savedKrok!.PlanDatum.Should().Be(planDatum);
+        savedKrok.SkutecnostDatum.Should().Be(skutecnostDatum);
     }
 
     [Fact]
@@ -851,11 +838,6 @@ public sealed class RecordEditorControllerTests
                 .Where(x => x.Kod == "PMP")
                 .Select(x => x.Id)
                 .FirstAsync();
-            var scheduleTypeId = await dbContext.CiselnikHarmonogramTypu
-                .Where(x => !x.JeZpozdeni)
-                .OrderBy(x => x.KrokPoradi)
-                .Select(x => x.Id)
-                .FirstAsync();
             var statusId = await dbContext.ProjektoveZaznamy
                 .Where(x => x.Id == recordId)
                 .Select(x => x.StavUkoluId)
@@ -881,11 +863,12 @@ public sealed class RecordEditorControllerTests
                 ZaznamId = recordId,
                 OsobaId = collaboratorId
             });
-            dbContext.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+            dbContext.ZaznamHarmonogramKroky.Add(new ZaznamHarmonogramKrokEntity
             {
                 ZaznamId = recordId,
-                TypId = scheduleTypeId,
-                HodnotaInt = 5,
+                Poradi = 2,
+                PlanDatum = DateTime.Today.AddDays(14),
+                SkutecnostDatum = DateTime.Today.AddDays(18),
                 UpdatedAt = DateTime.UtcNow
             });
             dbContext.ZaznamHistorieStavuZaznamu.Add(new ZaznamHistorieStavuZaznamuEntity
@@ -927,11 +910,6 @@ public sealed class RecordEditorControllerTests
                 .Where(x => x.Kod == "PMP")
                 .Select(x => x.Id)
                 .FirstAsync();
-            var scheduleTypeId = await dbContext.CiselnikHarmonogramTypu
-                .Where(x => !x.JeZpozdeni)
-                .OrderBy(x => x.KrokPoradi)
-                .Select(x => x.Id)
-                .FirstAsync();
             var typeId = await dbContext.CiselnikTypuUkolu
                 .OrderBy(x => x.Id)
                 .Select(x => x.Id)
@@ -967,11 +945,12 @@ public sealed class RecordEditorControllerTests
                 ZaznamId = recordId,
                 OsobaId = collaboratorId
             });
-            dbContext.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+            dbContext.ZaznamHarmonogramKroky.Add(new ZaznamHarmonogramKrokEntity
             {
                 ZaznamId = recordId,
-                TypId = scheduleTypeId,
-                HodnotaInt = 3,
+                Poradi = 2,
+                PlanDatum = DateTime.Today.AddDays(14),
+                SkutecnostDatum = DateTime.Today.AddDays(18),
                 UpdatedAt = DateTime.UtcNow
             });
             dbContext.ZaznamHistorieZmenTypu.Add(new ZaznamHistorieZmenTypuEntity
@@ -1041,7 +1020,7 @@ public sealed class RecordEditorControllerTests
         (await verificationDbContext.Vyjadreni.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
         (await verificationDbContext.ZaznamExterniOdkazy.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
         (await verificationDbContext.ZaznamSpoluprace.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
-        (await verificationDbContext.ZaznamHarmonogramHodnoty.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
+        (await verificationDbContext.ZaznamHarmonogramKroky.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
         (await verificationDbContext.ZaznamHistorieZmenTypu.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
 
         var auditExists = await verificationDbContext.AuthzAuditLog.AnyAsync(x =>

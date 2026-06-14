@@ -37,11 +37,6 @@ public sealed class RecordDeleteDataStoreTests
             .Where(x => x.Kod == "PMP")
             .Select(x => x.Id)
             .FirstAsync();
-        var scheduleTypeId = await dbContext.CiselnikHarmonogramTypu
-            .Where(x => !x.JeZpozdeni)
-            .OrderBy(x => x.KrokPoradi)
-            .Select(x => x.Id)
-            .FirstAsync();
         var typeId = await dbContext.CiselnikTypuUkolu
             .OrderBy(x => x.Id)
             .Select(x => x.Id)
@@ -71,11 +66,12 @@ public sealed class RecordDeleteDataStoreTests
             ZaznamId = recordId,
             OsobaId = collaboratorId
         });
-        dbContext.ZaznamHarmonogramHodnoty.Add(new ZaznamHarmonogramHodnotaEntity
+        dbContext.ZaznamHarmonogramKroky.Add(new ZaznamHarmonogramKrokEntity
         {
             ZaznamId = recordId,
-            TypId = scheduleTypeId,
-            HodnotaInt = 4,
+            Poradi = 2,
+            PlanDatum = DateTime.Today.AddDays(14),
+            SkutecnostDatum = DateTime.Today.AddDays(18),
             UpdatedAt = DateTime.UtcNow
         });
         dbContext.ZaznamHistorieZmenTypu.Add(new ZaznamHistorieZmenTypuEntity
@@ -136,7 +132,7 @@ public sealed class RecordDeleteDataStoreTests
         (await dbContext.Vyjadreni.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
         (await dbContext.ZaznamExterniOdkazy.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
         (await dbContext.ZaznamSpoluprace.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
-        (await dbContext.ZaznamHarmonogramHodnoty.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
+        (await dbContext.ZaznamHarmonogramKroky.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
         (await dbContext.ZaznamHistorieZmenTypu.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
         (await dbContext.ZaznamHistorieTerminu.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
         (await dbContext.ZaznamHistorieVlastnik.AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();

@@ -135,7 +135,7 @@ public sealed partial class RecordService
         var vyjadreniCount = await dbContext.Vyjadreni.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
         var externiVazbyCount = await dbContext.ZaznamExterniOdkazy.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
         var spolupraceCount = await dbContext.ZaznamSpoluprace.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
-        var harmonogramCount = await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
+        var harmonogramCount = await dbContext.ZaznamHarmonogramKroky.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
         var harvestCount = await dbContext.VyjadreniVazby.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
         var navrhyTargetCount = await dbContext.ZaznamNavrhy.AsNoTracking().CountAsync(x => x.ZaznamId == zaznamId, ct);
         var navrhyOriginCount = await dbContext.ZaznamNavrhy.AsNoTracking().CountAsync(x => x.ApprovedRecordId == zaznamId, ct);

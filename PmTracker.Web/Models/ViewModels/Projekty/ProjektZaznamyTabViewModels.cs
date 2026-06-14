@@ -124,7 +124,6 @@ public sealed class SubsystemGroupViewModel
 public sealed class ZaznamCardViewModel
 {
     public int Id { get; init; }
-    public int HarmonogramSablonaVerze { get; init; }
     public int CisloZaznamu { get; init; }
     public required string CisloViditelne { get; init; }
     public required string Nazev { get; init; }

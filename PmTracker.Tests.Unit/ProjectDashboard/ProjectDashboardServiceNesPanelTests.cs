@@ -188,12 +188,10 @@ public sealed class ProjectDashboardServiceNesPanelTests
         PmTrackerDbContext db,
         IInformacniSystemQueryService queryService)
     {
-        // BuildNesPanelAsync nevolá IHarmonogramService ani VyzvyPanelBuilder —
-        // inert stuby stačí. Pattern stejný jako v ProjectDashboardStatisticsYearFilterTests.
-        var harmonogramMock = new Mock<IHarmonogramService>();
+        // BuildNesPanelAsync nevolá VyzvyPanelBuilder — inert stuby stačí.
         var vyzvaServiceMock = new Mock<IVyzvaService>();
         var vyzvyPanelBuilder = new VyzvyPanelBuilder(vyzvaServiceMock.Object, db);
 
-        return new ProjectDashboardService(db, harmonogramMock.Object, vyzvyPanelBuilder, queryService);
+        return new ProjectDashboardService(db, vyzvyPanelBuilder, queryService);
     }
 }

@@ -94,29 +94,6 @@ public sealed class CiselnikStavuJednaniEntity
     public bool IsLocked { get; set; }
 }
 
-public sealed class HarmonogramSablonaEntity
-{
-    public int Verze { get; set; }
-    public string DelayBarvaHex { get; set; } = "#DC2626";
-    public bool IsAktivni { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public int? CreatedBy { get; set; }
-}
-
-public sealed class HarmonogramTypEntity
-{
-    public int Id { get; set; }
-    public string Kod { get; set; } = string.Empty;
-    public string Nazev { get; set; } = string.Empty;
-    public int Hodnota { get; set; }
-    public bool IsLocked { get; set; }
-    public int SablonaVerze { get; set; }
-    public Guid KrokKey { get; set; }
-    public int KrokPoradi { get; set; }
-    public bool JeZpozdeni { get; set; }
-    public string? BarvaHex { get; set; }
-}
-
 public sealed class SubsystemEntity
 {
     public int Id { get; set; }
@@ -207,7 +184,6 @@ public sealed class ProjektovyZaznamEntity
     public DateTime DatumZalozeni { get; set; }
     public DateTime DatumUkonceni { get; set; }
     public int SubsystemId { get; set; }
-    public int HarmonogramSablonaVerze { get; set; }
 }
 
 public sealed class ZaznamNavrhEntity
@@ -369,45 +345,6 @@ public sealed class VyjadreniEntity
     public int AutorOsobaId { get; set; }
     public string TextVyjadreni { get; set; } = string.Empty;
     public DateTime DatumVyjadreni { get; set; }
-}
-
-public sealed class ZaznamHarmonogramHodnotaEntity
-{
-    public int Id { get; set; }
-    public int ZaznamId { get; set; }
-    public int TypId { get; set; }
-
-    /// <summary>
-    /// Plán Harmonogram refactor 2026-05-01 (DESIGN-10-A) — nullable.
-    /// Sémantika napříč vrstvami:
-    ///   NULL    = "krok ještě nenastal / nebyl vyplněn" (default insert state, retract po sync)
-    ///   0       = "vše šlo dle plánu" (krok dokončen včas, legitimní hodnota)
-    ///   non-0   = OdchylkaDni (kladné = zpoždění, záporné = předstih)
-    /// Pro DURATION řádky (JeZpozdeni=false) zůstává sémantika: NULL → fallback na default duration ze schématu.
-    /// </summary>
-    public int? HodnotaInt { get; set; }
-
-    public DateTime UpdatedAt { get; set; }
-
-    /// <summary>
-    /// Plán 4 Feature C Task 1 — zdroj datumu skutečnosti (Neznamo/Automat/Manual/Historicka).
-    /// Relevantní pouze pro řádky typu HS0X_DELAY (skutečnost); pro DURATION řádky zůstává Neznamo.
-    /// </summary>
-    public SkutecnostZdrojEnum SkutecnostZdroj { get; set; } = SkutecnostZdrojEnum.Neznamo;
-
-    /// <summary>
-    /// Plán 4 Feature C Task 1 — switch Auto/Ručně.
-    /// <c>Auto</c> (default): auto-fill ze SD bindingů přepisuje delay hodnotu.
-    /// <c>Manual</c>: user přepnul na ruční zápis, sync skipne.
-    /// </summary>
-    public SkutecnostRezimEnum SkutecnostRezim { get; set; } = SkutecnostRezimEnum.Auto;
-
-    /// <summary>
-    /// Plán 4 Feature C Task 1 — volitelný user-preferred binding (FK na zaznam_externi_odkazy.id)
-    /// pro případ 2+ kandidátů u stejného kroku. Pokud je set, resolver preferuje tento binding
-    /// místo default MAX. Pokud harvest binding odstranil, resolver fallbackuje na MAX a clear-uje flag.
-    /// </summary>
-    public int? PreferredExterniOdkazId { get; set; }
 }
 
 public sealed class AuthzSuperadminEntity

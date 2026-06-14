@@ -281,11 +281,6 @@ public sealed class RecordRichTextScenariosTests
                 .OrderBy(x => x.Id)
                 .Select(x => x.Id)
                 .FirstAsync();
-        var schemaVersion = await dbContext.HarmonogramSablony
-            .OrderByDescending(x => x.IsAktivni)
-            .ThenByDescending(x => x.Verze)
-            .Select(x => (int?)x.Verze)
-            .FirstOrDefaultAsync() ?? 1;
         var nextRecordNumber = (await dbContext.ProjektoveZaznamy
             .Where(x => x.ProjektId == _fixture.ProjectId)
             .Select(x => (int?)x.CisloZaznamu)
@@ -304,8 +299,7 @@ public sealed class RecordRichTextScenariosTests
             VlastnikId = ownerId,
             DatumZalozeni = DateTime.Today,
             DatumUkonceni = DateTime.Today.AddDays(30),
-            SubsystemId = subsystemId,
-            HarmonogramSablonaVerze = schemaVersion
+            SubsystemId = subsystemId
         };
 
         dbContext.ProjektoveZaznamy.Add(record);

@@ -23,8 +23,6 @@ public sealed class PmTrackerDbContext : DbContext
     public DbSet<VyzvaEntity> Vyzvy => Set<VyzvaEntity>();
     public DbSet<VyzvaHistorieStavuEntity> VyzvaHistorieStavu => Set<VyzvaHistorieStavuEntity>();
     public DbSet<CiselnikStavuJednaniEntity> CiselnikStavuJednani => Set<CiselnikStavuJednaniEntity>();
-    public DbSet<HarmonogramSablonaEntity> HarmonogramSablony => Set<HarmonogramSablonaEntity>();
-    public DbSet<HarmonogramTypEntity> CiselnikHarmonogramTypu => Set<HarmonogramTypEntity>();
     public DbSet<SubsystemEntity> Subsystemy => Set<SubsystemEntity>();
     public DbSet<OsobaEntity> Osoby => Set<OsobaEntity>();
     public DbSet<ProjektEntity> Projekty => Set<ProjektEntity>();
@@ -46,7 +44,6 @@ public sealed class PmTrackerDbContext : DbContext
     public DbSet<JednaniEntity> Jednani => Set<JednaniEntity>();
     public DbSet<UcastEntity> Ucast => Set<UcastEntity>();
     public DbSet<VyjadreniEntity> Vyjadreni => Set<VyjadreniEntity>();
-    public DbSet<ZaznamHarmonogramHodnotaEntity> ZaznamHarmonogramHodnoty => Set<ZaznamHarmonogramHodnotaEntity>();
     public DbSet<ZaznamHarmonogramVyjadreniVazbaEntity> VyjadreniVazby
         => Set<ZaznamHarmonogramVyjadreniVazbaEntity>();
     public DbSet<ZaznamHarmonogramKrokEntity> ZaznamHarmonogramKroky => Set<ZaznamHarmonogramKrokEntity>();

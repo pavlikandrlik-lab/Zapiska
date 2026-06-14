@@ -13,7 +13,6 @@ internal sealed class ZaznamHarmonogramVyjadreniVazbaEntityConfiguration
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id");
         b.Property(x => x.ZaznamId).HasColumnName("zaznam_id");
-        b.Property(x => x.KrokKey).HasColumnName("krok_key");
         b.Property(x => x.Poradi).HasColumnName("poradi");
         b.Property(x => x.ExterniOdkazId).HasColumnName("externi_odkaz_id");
         b.Property(x => x.HotVyjadreniId).HasColumnName("hot_vyjadreni_id");
@@ -25,8 +24,8 @@ internal sealed class ZaznamHarmonogramVyjadreniVazbaEntityConfiguration
         b.Property(x => x.DeletedAt).HasColumnName("deleted_at");
         b.Property(x => x.DeletedByOsobaId).HasColumnName("deleted_by_osoba_id");
 
-        b.HasIndex(x => new { x.ZaznamId, x.KrokKey, x.Stav })
-            .HasDatabaseName("ix_zhvv_zaznam_krok_stav");
+        b.HasIndex(x => new { x.ZaznamId, x.Poradi, x.Stav })
+            .HasDatabaseName("ix_zhvv_zaznam_poradi_stav");
         b.HasIndex(x => x.ExterniOdkazId)
             .HasDatabaseName("ix_zhvv_externi_odkaz");
     }

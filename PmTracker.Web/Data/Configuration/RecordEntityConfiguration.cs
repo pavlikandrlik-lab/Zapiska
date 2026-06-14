@@ -32,7 +32,6 @@ internal sealed class RecordEntityConfiguration : IEntityTypeConfiguration<Proje
         builder.Property(x => x.DatumZalozeni).HasColumnName("datum_zalozeni");
         builder.Property(x => x.DatumUkonceni).HasColumnName("datum_ukonceni");
         builder.Property(x => x.SubsystemId).HasColumnName("subsystem_id");
-        builder.Property(x => x.HarmonogramSablonaVerze).HasColumnName("harmonogram_sablona_verze");
         builder.HasIndex(x => new { x.ProjektId, x.CisloViditelne })
             .HasFilter("[cislo_viditelne] IS NOT NULL")
             .HasDatabaseName("UX_projektove_zaznamy_projekt_cislo_viditelne")
@@ -43,10 +42,6 @@ internal sealed class RecordEntityConfiguration : IEntityTypeConfiguration<Proje
             .IsUnique();
         builder.HasIndex(x => new { x.ProjektId, x.CisloViditelneA, x.CisloViditelneB, x.CisloZaznamu })
             .HasDatabaseName("IX_projektove_zaznamy_projekt_sort");
-        builder.HasOne<HarmonogramSablonaEntity>()
-            .WithMany()
-            .HasForeignKey(x => x.HarmonogramSablonaVerze)
-            .HasConstraintName("FK_projektove_zaznamy_harmonogram_sablona");
         builder.HasOne<JednaniEntity>()
             .WithMany()
             .HasForeignKey(x => x.CisloJednaniZdrojId)
@@ -284,35 +279,5 @@ internal sealed class RecordCollaborationEntityConfiguration : IEntityTypeConfig
         builder.HasKey(x => new { x.ZaznamId, x.OsobaId });
         builder.Property(x => x.ZaznamId).HasColumnName("zaznam_id");
         builder.Property(x => x.OsobaId).HasColumnName("osoba_id");
-    }
-}
-
-internal sealed class RecordScheduleValueEntityConfiguration : IEntityTypeConfiguration<ZaznamHarmonogramHodnotaEntity>
-{
-    public void Configure(EntityTypeBuilder<ZaznamHarmonogramHodnotaEntity> builder)
-    {
-        builder.ToTable("zaznam_harmonogram_hodnoty");
-        builder.HasKey(x => x.Id);
-        builder.HasIndex(x => new { x.ZaznamId, x.TypId })
-            .IsUnique()
-            .HasDatabaseName("UQ_zaznam_harmonogram_hodnoty_zaznam_typ");
-        builder.Property(x => x.Id).HasColumnName("id");
-        builder.Property(x => x.ZaznamId).HasColumnName("zaznam_id");
-        builder.Property(x => x.TypId).HasColumnName("typ_id");
-        // DESIGN-10-A (2026-05-01): nullable. NULL = "krok ještě nenastal".
-        builder.Property(x => x.HodnotaInt).HasColumnName("hodnota_int").IsRequired(false);
-        builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-        // Plán 4 Feature C Task 1 — audit zdroje skutečnosti + switch Auto/Ručně + preferred kandidát.
-        // Sloupce přidává db_upgrade_1_3_10_harmonogram_skutecnost_zdroj.sql.
-        builder.Property(x => x.SkutecnostZdroj)
-            .HasColumnName("skutecnost_zdroj")
-            .HasConversion<byte>()
-            .HasDefaultValue(SkutecnostZdrojEnum.Neznamo);
-        builder.Property(x => x.SkutecnostRezim)
-            .HasColumnName("skutecnost_rezim")
-            .HasConversion<byte>()
-            .HasDefaultValue(SkutecnostRezimEnum.Auto);
-        builder.Property(x => x.PreferredExterniOdkazId)
-            .HasColumnName("preferred_externi_odkaz_id");
     }
 }

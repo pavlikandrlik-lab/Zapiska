@@ -39,7 +39,7 @@ public sealed partial class RecordService
             // payload, ne pro modifikaci. Po SQL CASCADE budou tyto rows smazané;
             // tracked stav by zůstal stale a způsoboval by potenciální concurrency
             // exceptions při následných SaveChanges v tom samém DbContext.
-            var scheduleRowsForAudit = await dbContext.ZaznamHarmonogramHodnoty
+            var scheduleRowsForAudit = await dbContext.ZaznamHarmonogramKroky
                 .AsNoTracking()
                 .Where(x => x.ZaznamId == command.ZaznamId)
                 .ToListAsync(ct);

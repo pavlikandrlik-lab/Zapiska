@@ -42,7 +42,6 @@ public sealed class VyjadreniModalControllerCreateVazbaTests
             ProjektId = ProjektId,
             SubsystemId = 1,
             KategorieId = 1,
-            HarmonogramSablonaVerze = 1,
             Nazev = "ok"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
@@ -82,8 +81,7 @@ public sealed class VyjadreniModalControllerCreateVazbaTests
         await using var db = NewDb();
         await SeedOwnershipAsync(db);
 
-        var krokKey = Guid.NewGuid();
-        var cascadeKrokKey = Guid.NewGuid();
+        const int krokPoradi = 6;
 
         var rebalance = new Mock<IBindingRebalanceService>();
         BindingRebalanceRequest? captured = null;
@@ -96,7 +94,6 @@ public sealed class VyjadreniModalControllerCreateVazbaTests
                 CascadeUpdates: new[]
                 {
                     new BindingCascadeUpdate(
-                        KrokKey: cascadeKrokKey,
                         KrokPoradi: 7,
                         NewVazbaId: 222,
                         NewHotVyjadreniId: 888L,
@@ -108,7 +105,7 @@ public sealed class VyjadreniModalControllerCreateVazbaTests
         {
             ExterniOdkazId = ExterniOdkazId,
             ZaznamId = ZaznamId,
-            KrokKey = krokKey,
+            KrokPoradi = krokPoradi,
             HotVyjadreniId = 300L,
             DatumVyjadreni = new DateTime(2026, 5, 1),
             ProjektId = ProjektId
@@ -118,7 +115,7 @@ public sealed class VyjadreniModalControllerCreateVazbaTests
         ok.Value.Should().NotBeNull();
 
         captured.Should().NotBeNull();
-        captured!.KrokKey.Should().Be(krokKey);
+        captured!.KrokPoradi.Should().Be(krokPoradi);
         captured.OsobaId.Should().Be(OsobaId);
         captured.ZaznamId.Should().Be(ZaznamId);
         captured.ExterniOdkazId.Should().Be(ExterniOdkazId);
@@ -134,7 +131,7 @@ public sealed class VyjadreniModalControllerCreateVazbaTests
         rebalance
             .Setup(x => x.CreateBindingAsync(It.IsAny<BindingRebalanceRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new BindingRebalanceResult(
-                BindingRebalanceOutcome.InvalidKrokKey,
+                BindingRebalanceOutcome.InvalidKrok,
                 PrimaryVazbaId: null,
                 CascadeUpdates: Array.Empty<BindingCascadeUpdate>()));
 
@@ -143,7 +140,7 @@ public sealed class VyjadreniModalControllerCreateVazbaTests
         {
             ExterniOdkazId = ExterniOdkazId,
             ZaznamId = ZaznamId,
-            KrokKey = Guid.NewGuid(),
+            KrokPoradi = 6,
             HotVyjadreniId = 1L,
             DatumVyjadreni = new DateTime(2026, 5, 1),
             ProjektId = ProjektId
@@ -171,7 +168,7 @@ public sealed class VyjadreniModalControllerCreateVazbaTests
         {
             ExterniOdkazId = ExterniOdkazId,
             ZaznamId = ZaznamId,
-            KrokKey = Guid.NewGuid(),
+            KrokPoradi = 6,
             HotVyjadreniId = 1L,
             DatumVyjadreni = new DateTime(2026, 5, 1),
             ProjektId = ProjektId

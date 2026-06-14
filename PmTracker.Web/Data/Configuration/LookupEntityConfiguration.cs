@@ -168,53 +168,6 @@ internal sealed class MeetingStateLookupEntityConfiguration : IEntityTypeConfigu
     }
 }
 
-internal sealed class ScheduleTemplateLookupEntityConfiguration : IEntityTypeConfiguration<HarmonogramSablonaEntity>
-{
-    public void Configure(EntityTypeBuilder<HarmonogramSablonaEntity> builder)
-    {
-        builder.ToTable("harmonogram_sablony");
-        builder.HasKey(x => x.Verze);
-        builder.HasIndex(x => x.IsAktivni)
-            .IsUnique()
-            .HasFilter("[is_aktivni] = 1")
-            .HasDatabaseName("UQ_harmonogram_sablony_aktivni");
-        builder.Property(x => x.Verze).HasColumnName("verze");
-        builder.Property(x => x.DelayBarvaHex).HasColumnName("delay_barva_hex");
-        builder.Property(x => x.IsAktivni).HasColumnName("is_aktivni");
-        builder.Property(x => x.CreatedAt).HasColumnName("created_at");
-        builder.Property(x => x.CreatedBy).HasColumnName("created_by");
-    }
-}
-
-internal sealed class ScheduleTypeLookupEntityConfiguration : IEntityTypeConfiguration<HarmonogramTypEntity>
-{
-    public void Configure(EntityTypeBuilder<HarmonogramTypEntity> builder)
-    {
-        builder.ToTable("ciselnik_harmonogram_typu");
-        builder.HasKey(x => x.Id);
-        builder.HasOne<HarmonogramSablonaEntity>()
-            .WithMany()
-            .HasForeignKey(x => x.SablonaVerze)
-            .HasConstraintName("FK_ciselnik_harmonogram_typu_sablona");
-        builder.HasIndex(x => new { x.SablonaVerze, x.Kod })
-            .IsUnique()
-            .HasDatabaseName("UQ_ciselnik_harmonogram_typu_sablona_kod");
-        builder.HasIndex(x => new { x.SablonaVerze, x.KrokPoradi, x.JeZpozdeni })
-            .IsUnique()
-            .HasDatabaseName("UQ_ciselnik_harmonogram_typu_sablona_krok_zpozdeni");
-        builder.Property(x => x.Id).HasColumnName("id");
-        builder.Property(x => x.Kod).HasColumnName("kod");
-        builder.Property(x => x.Nazev).HasColumnName("nazev");
-        builder.Property(x => x.Hodnota).HasColumnName("hodnota");
-        builder.Property(x => x.IsLocked).HasColumnName("is_locked");
-        builder.Property(x => x.SablonaVerze).HasColumnName("sablona_verze");
-        builder.Property(x => x.KrokKey).HasColumnName("krok_key");
-        builder.Property(x => x.KrokPoradi).HasColumnName("krok_poradi");
-        builder.Property(x => x.JeZpozdeni).HasColumnName("je_zpozdeni");
-        builder.Property(x => x.BarvaHex).HasColumnName("barva_hex");
-    }
-}
-
 internal sealed class SubsystemLookupEntityConfiguration : IEntityTypeConfiguration<SubsystemEntity>
 {
     public void Configure(EntityTypeBuilder<SubsystemEntity> builder)

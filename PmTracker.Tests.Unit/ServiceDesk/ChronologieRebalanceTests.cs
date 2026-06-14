@@ -11,9 +11,9 @@ public sealed class ChronologieRebalanceTests
     {
         var kroky = new[]
         {
-            new StepperKrok(6, Guid.Parse("11111111-1111-1111-1111-111111111106"),
+            new StepperKrok(6,
                 CurrentBubbleDatum: new DateTime(2026, 3, 1), CurrentBubbleId: 100),
-            new StepperKrok(7, Guid.Parse("11111111-1111-1111-1111-111111111107"),
+            new StepperKrok(7,
                 CurrentBubbleDatum: new DateTime(2026, 4, 1), CurrentBubbleId: 200)
         };
         var available = new[] { new BubleId(300, new DateTime(2026, 6, 1)) };
@@ -34,8 +34,8 @@ public sealed class ChronologieRebalanceTests
     {
         var kroky = new[]
         {
-            new StepperKrok(6, Guid.NewGuid(), new DateTime(2026, 3, 1), 100),
-            new StepperKrok(7, Guid.NewGuid(), new DateTime(2026, 4, 1), 200)
+            new StepperKrok(6, new DateTime(2026, 3, 1), 100),
+            new StepperKrok(7, new DateTime(2026, 4, 1), 200)
         };
         var available = Array.Empty<BubleId>();
 
@@ -52,8 +52,8 @@ public sealed class ChronologieRebalanceTests
         // Starší krok dostane bublinu; následující už je OK (datum dál), nic neměníme
         var kroky = new[]
         {
-            new StepperKrok(3, Guid.NewGuid(), new DateTime(2026, 1, 1), 50),
-            new StepperKrok(6, Guid.NewGuid(), new DateTime(2026, 6, 1), 60)
+            new StepperKrok(3, new DateTime(2026, 1, 1), 50),
+            new StepperKrok(6, new DateTime(2026, 6, 1), 60)
         };
         var result = ChronologyRebalancer.Rebalance(
             kroky, 3, 400, new DateTime(2026, 2, 1), Array.Empty<BubleId>());
@@ -68,9 +68,9 @@ public sealed class ChronologieRebalanceTests
     {
         var kroky = new[]
         {
-            new StepperKrok(3, Guid.NewGuid(), new DateTime(2026, 1, 1), 10),
-            new StepperKrok(6, Guid.NewGuid(), new DateTime(2026, 2, 1), 20),
-            new StepperKrok(7, Guid.NewGuid(), new DateTime(2026, 3, 1), 30)
+            new StepperKrok(3, new DateTime(2026, 1, 1), 10),
+            new StepperKrok(6, new DateTime(2026, 2, 1), 20),
+            new StepperKrok(7, new DateTime(2026, 3, 1), 30)
         };
 
         var result = ChronologyRebalancer.Rebalance(
@@ -85,8 +85,8 @@ public sealed class ChronologieRebalanceTests
     {
         var kroky = new[]
         {
-            new StepperKrok(6, Guid.NewGuid(), new DateTime(2026, 3, 1), 100),
-            new StepperKrok(7, Guid.NewGuid(), new DateTime(2026, 4, 1), 200)
+            new StepperKrok(6, new DateTime(2026, 3, 1), 100),
+            new StepperKrok(7, new DateTime(2026, 4, 1), 200)
         };
         var available = new[]
         {

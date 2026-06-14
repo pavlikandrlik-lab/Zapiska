@@ -144,12 +144,6 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             .Select(x => x.Id)
             .FirstAsync();
         var stateId = await dbContext.CiselnikStavuUkolu.Select(x => x.Id).FirstAsync();
-        var activeSchemaVersion = await dbContext.HarmonogramSablony
-            .Where(x => x.IsAktivni)
-            .OrderByDescending(x => x.Verze)
-            .Select(x => (int?)x.Verze)
-            .FirstOrDefaultAsync()
-            ?? 1;
         var hasProjectSubsystem = await dbContext.ProjektSubsystemy
             .AnyAsync(x => x.ProjektId == projectId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue);
         if (!hasProjectSubsystem)
@@ -177,8 +171,7 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             VlastnikId = ownerOsobaId,
             DatumZalozeni = DateTime.Today,
             DatumUkonceni = DateTime.Today.AddDays(30),
-            SubsystemId = subsystemId,
-            HarmonogramSablonaVerze = activeSchemaVersion
+            SubsystemId = subsystemId
         };
 
         dbContext.ProjektoveZaznamy.Add(row);

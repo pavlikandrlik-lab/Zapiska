@@ -12,15 +12,6 @@ namespace PmTracker.Tests.Unit.Harmonogram;
 public sealed class ScheduleBlockViewModelManualKrokShapeTests
 {
     [Fact]
-    public void HarmonogramKrokEditViewModel_Exposes_KrokKey()
-    {
-        typeof(HarmonogramKrokEditViewModel)
-            .GetProperty(nameof(HarmonogramKrokEditViewModel.KrokKey))
-            .Should().NotBeNull(
-                "Plán D Task 8: UI musí umět navázat manual krok na GUID KrokKey z CiselnikHarmonogramTypu.");
-    }
-
-    [Fact]
     public void HarmonogramKrokEditViewModel_Exposes_ZdrojSkutecnosti()
     {
         typeof(HarmonogramKrokEditViewModel)
@@ -93,7 +84,6 @@ public sealed class ScheduleBlockViewModelManualKrokShapeTests
             BarvaHex = "#fff"
         };
 
-        vm.KrokKey.Should().Be(Guid.Empty, "default hodnota musí být Guid.Empty kvůli back-compat při existujících call-sitech.");
         vm.ZdrojSkutecnosti.Should().Be(ZdrojSkutecnosti.None);
         vm.IsManualKrok.Should().BeFalse();
     }

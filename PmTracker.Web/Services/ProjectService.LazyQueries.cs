@@ -13,7 +13,6 @@ public sealed partial class ProjectService
     private sealed record RecordSummaryRow(
         int Id,
         int ProjektId,
-        int HarmonogramSablonaVerze,
         int CisloZaznamu,
         string? CisloViditelne,
         int CisloViditelneA,
@@ -437,7 +436,6 @@ public sealed partial class ProjectService
             .Select(x => new RecordSummaryRow(
                 x.Id,
                 x.ProjektId,
-                x.HarmonogramSablonaVerze,
                 x.CisloZaznamu,
                 x.CisloViditelne,
                 x.CisloViditelneA,
@@ -564,7 +562,6 @@ public sealed partial class ProjectService
             .Select(x => new RecordSummaryRow(
                 x.Id,
                 x.ProjektId,
-                x.HarmonogramSablonaVerze,
                 x.CisloZaznamu,
                 x.CisloViditelne,
                 x.CisloViditelneA,
@@ -627,7 +624,6 @@ public sealed partial class ProjectService
             return new ZaznamCardViewModel
             {
                 Id = record.Id,
-                HarmonogramSablonaVerze = record.HarmonogramSablonaVerze,
                 CisloZaznamu = record.CisloZaznamu,
                 CisloViditelne = ResolveVisibleRecordNumber(record),
                 Nazev = record.Nazev,

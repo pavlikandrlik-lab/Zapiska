@@ -43,7 +43,7 @@ public sealed class ZaznamyControllerEditAuthzTests
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
             Id = RecordId, ProjektId = ProjektId, SubsystemId = 1, KategorieId = 1,
-            HarmonogramSablonaVerze = 1, Nazev = "target"
+            Nazev = "target"
         });
         await db.SaveChangesAsync();
 
@@ -73,7 +73,7 @@ public sealed class ZaznamyControllerEditAuthzTests
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
             Id = RecordId, ProjektId = ProjektId, SubsystemId = 1, KategorieId = 1,
-            HarmonogramSablonaVerze = 1, Nazev = "target"
+            Nazev = "target"
         });
         await db.SaveChangesAsync();
 

@@ -18,64 +18,6 @@ public sealed class RecordSaveDataStoreTests
     }
 
     [Fact]
-    public async Task SaveRecord_ShouldBootstrapDefaultScheduleSchema_WhenCatalogIsEmpty()
-    {
-        var db = await _fixture.CreateDatabaseAsync("record_save_bootstrap_schema");
-        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
-        var store = IntegrationTestHelper.CreateDataStore(dbContext);
-
-        dbContext.CiselnikHarmonogramTypu.RemoveRange(await dbContext.CiselnikHarmonogramTypu.ToListAsync());
-        dbContext.HarmonogramSablony.RemoveRange(await dbContext.HarmonogramSablony.ToListAsync());
-        await dbContext.SaveChangesAsync();
-
-        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordSchemaAdmin");
-        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordSchemaOwner");
-        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RSCHEMA");
-        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RSCHEMA_SUB", ownerId);
-        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
-        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
-
-        var categoryCode = await dbContext.CiselnikKategoriiZaznamu
-            .OrderBy(x => x.Id)
-            .Select(x => x.Kod)
-            .FirstAsync();
-        var statusCode = await dbContext.CiselnikStavuUkolu
-            .OrderBy(x => x.Id)
-            .Select(x => x.Kod)
-            .FirstAsync();
-        var subsystemCode = await dbContext.Subsystemy
-            .Where(x => x.Id == subsystemId)
-            .Select(x => x.Kod)
-            .SingleAsync();
-
-        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
-
-        var recordId = store.SaveRecord(new SaveRecordCommand
-        {
-            ProjektId = projectId,
-            Kategorie = categoryCode,
-            Stav = statusCode,
-            Nazev = "Schema bootstrap record",
-            Cil = "  Schema bootstrap goal  ",
-            Popis = "Test",
-            VlastnikId = ownerId,
-            DatumZalozeni = new DateTime(2026, 3, 4),
-            TerminUkonceni = new DateTime(2026, 3, 18),
-            Subsystem = subsystemCode
-        }, currentUser);
-
-        recordId.Should().BeGreaterThan(0);
-        (await dbContext.HarmonogramSablony.AnyAsync(x => x.IsAktivni)).Should().BeTrue();
-        (await dbContext.CiselnikHarmonogramTypu.AnyAsync()).Should().BeTrue();
-
-        var saved = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
-        saved.HarmonogramSablonaVerze.Should().BeGreaterThan(0);
-        saved.Cil.Should().Be("Schema bootstrap goal");
-        (await dbContext.HarmonogramSablony.AsNoTracking()
-            .AnyAsync(x => x.Verze == saved.HarmonogramSablonaVerze)).Should().BeTrue();
-    }
-
-    [Fact]
     public async Task SaveRecord_ShouldPersistFiveHundredCharacterGoal_WithPreservedLineBreak()
     {
         var db = await _fixture.CreateDatabaseAsync("record_save_goal_500_with_break");
@@ -194,32 +136,6 @@ public sealed class RecordSaveDataStoreTests
 
         var saved = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
         saved.DatumZalozeni.Date.Should().Be(newCreatedDate.Date);
-    }
-
-    [Fact]
-    public async Task BuildZaznamCreate_ShouldBootstrapPersistedScheduleSchema_WhenCatalogIsEmpty()
-    {
-        var db = await _fixture.CreateDatabaseAsync("record_create_bootstrap_schema");
-        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
-        var store = IntegrationTestHelper.CreateDataStore(dbContext);
-
-        dbContext.CiselnikHarmonogramTypu.RemoveRange(await dbContext.CiselnikHarmonogramTypu.ToListAsync());
-        dbContext.HarmonogramSablony.RemoveRange(await dbContext.HarmonogramSablony.ToListAsync());
-        await dbContext.SaveChangesAsync();
-
-        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordCreateSchemaOwner");
-        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCSCHEMA");
-        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCSCHEMA_SUB", ownerId);
-        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
-        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
-
-        var model = store.BuildZaznamCreate(projectId);
-
-        model.HarmonogramBlok.Kroky.Should().NotBeEmpty();
-        model.HarmonogramBlok.Kroky.All(x => x.TrvaniTypId > 0).Should().BeTrue();
-
-        (await dbContext.HarmonogramSablony.AsNoTracking().AnyAsync(x => x.IsAktivni)).Should().BeTrue();
-        (await dbContext.CiselnikHarmonogramTypu.AsNoTracking().AnyAsync()).Should().BeTrue();
     }
 
     [Fact]
@@ -385,10 +301,6 @@ public sealed class RecordSaveDataStoreTests
             .Select(x => x.Kod)
             .SingleAsync();
 
-        var createModel = store.BuildZaznamCreate(projectId);
-        var durationTypeId = createModel.HarmonogramBlok.Kroky
-            .Select(x => x.TrvaniTypId)
-            .First(x => x > 0);
         var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
 
         var recordId = store.SaveRecord(new SaveRecordCommand
@@ -402,17 +314,19 @@ public sealed class RecordSaveDataStoreTests
             DatumZalozeni = new DateTime(2026, 3, 6),
             TerminUkonceni = new DateTime(2026, 3, 20),
             Subsystem = subsystemCode,
+            HarmonogramRezim = "Manual",
             HarmonogramHodnoty = new List<SaveRecordHarmonogramValueCommand>
             {
                 new()
                 {
-                    TypId = durationTypeId,
-                    Hodnota = 6
+                    Poradi = 2,
+                    PlanDatum = new DateTime(2026, 3, 12),
+                    SkutecnostDatum = new DateTime(2026, 3, 14)
                 }
             }
         }, currentUser);
 
-        (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
+        (await dbContext.ZaznamHarmonogramKroky.AsNoTracking()
             .AnyAsync(x => x.ZaznamId == recordId)).Should().BeTrue();
 
         store.SaveRecord(new SaveRecordCommand
@@ -427,17 +341,10 @@ public sealed class RecordSaveDataStoreTests
             DatumZalozeni = new DateTime(2026, 3, 6),
             TerminUkonceni = new DateTime(2026, 3, 20),
             Subsystem = subsystemCode,
-            HarmonogramHodnoty = new List<SaveRecordHarmonogramValueCommand>
-            {
-                new()
-                {
-                    TypId = durationTypeId,
-                    Hodnota = 9
-                }
-            }
+            HarmonogramHodnoty = []
         }, currentUser);
 
-        (await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
+        (await dbContext.ZaznamHarmonogramKroky.AsNoTracking()
             .AnyAsync(x => x.ZaznamId == recordId)).Should().BeFalse();
     }
 
@@ -524,10 +431,6 @@ public sealed class RecordSaveDataStoreTests
             .Select(x => x.Kod)
             .SingleAsync();
 
-        var createModel = store.BuildZaznamCreate(projectId);
-        var durationTypeId = createModel.HarmonogramBlok.Kroky
-            .Select(x => x.TrvaniTypId)
-            .First(x => x > 0);
         var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
 
         var command = new SaveRecordCommand
@@ -556,13 +459,11 @@ public sealed class RecordSaveDataStoreTests
             {
                 new()
                 {
-                    TypId = durationTypeId,
-                    Hodnota = -4
+                    Poradi = 0
                 },
                 new()
                 {
-                    TypId = 999999,
-                    Hodnota = 5
+                    Poradi = 11
                 }
             }
         };
@@ -574,8 +475,8 @@ public sealed class RecordSaveDataStoreTests
         exception.FieldErrors.Keys.Should().Contain("ExterniVazby[0].Cislo");
         exception.FieldErrors.Keys.Should().Contain("ExterniVazby[0].PredpokladanaCena");
         exception.FieldErrors.Keys.Should().Contain("VybraniSpolupracovniciIds");
-        exception.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[0].Hodnota");
-        exception.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[1].TypId");
+        exception.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[0].Poradi");
+        exception.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[1].Poradi");
 
         var popisError = exception.FieldErrors["Popis"].Single();
         popisError.Should().Contain("U+0001");

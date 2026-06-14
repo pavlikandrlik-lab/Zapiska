@@ -37,8 +37,7 @@ internal sealed record RecordAuditSnapshot(
     int VlastnikId,
     DateTime DatumZalozeni,
     DateTime DatumUkonceni,
-    int SubsystemId,
-    int HarmonogramSablonaVerze)
+    int SubsystemId)
 {
     public static RecordAuditSnapshot FromEntity(ProjektovyZaznamEntity entity) => new(
         entity.Id,
@@ -58,27 +57,28 @@ internal sealed record RecordAuditSnapshot(
         entity.VlastnikId,
         entity.DatumZalozeni,
         entity.DatumUkonceni,
-        entity.SubsystemId,
-        entity.HarmonogramSablonaVerze);
+        entity.SubsystemId);
 }
 
 internal sealed record RecordScheduleValueAuditSnapshot(
-    int TypId,
-    int? HodnotaInt,  // DESIGN-10-A: nullable napříč auditem (NULL = krok nenastal)
+    byte Poradi,
+    DateTime? PlanDatum,
+    DateTime? SkutecnostDatum,
     DateTime UpdatedAt);
 
 internal sealed record RecordScheduleAuditSnapshot(
     int RecordId,
     IReadOnlyList<RecordScheduleValueAuditSnapshot> Values)
 {
-    public static RecordScheduleAuditSnapshot FromEntities(int recordId, IEnumerable<ZaznamHarmonogramHodnotaEntity> values) => new(
+    public static RecordScheduleAuditSnapshot FromEntities(int recordId, IEnumerable<ZaznamHarmonogramKrokEntity> values) => new(
         recordId,
         values
-            .OrderBy(item => item.TypId)
+            .OrderBy(item => item.Poradi)
             .ThenBy(item => item.Id)
             .Select(item => new RecordScheduleValueAuditSnapshot(
-                item.TypId,
-                item.HodnotaInt,
+                item.Poradi,
+                item.PlanDatum,
+                item.SkutecnostDatum,
                 item.UpdatedAt))
             .ToList());
 }

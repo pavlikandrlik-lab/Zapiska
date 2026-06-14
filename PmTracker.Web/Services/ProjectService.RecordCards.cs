@@ -217,7 +217,6 @@ public sealed partial class ProjectService
             return new ZaznamCardViewModel
             {
                 Id = record.Id,
-                HarmonogramSablonaVerze = record.HarmonogramSablonaVerze,
                 CisloZaznamu = record.CisloZaznamu,
                 CisloViditelne = ResolveVisibleRecordNumber(record),
                 Nazev = record.Nazev,

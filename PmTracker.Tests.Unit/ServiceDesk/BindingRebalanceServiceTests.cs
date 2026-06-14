@@ -15,18 +15,14 @@ namespace PmTracker.Tests.Unit.ServiceDesk;
 /// <see cref="ChronologyRebalancer"/> a aplikuje výsledky do DB pod jednou transakcí
 /// a per-externiOdkazId semaforem. Volaný z <c>VyjadreniModalController.CreateVazba</c>
 /// při manual drag-and-drop.
+///
+/// Datum-model (2026-06-12): krok je identifikovaný pořadím 1–10 (Poradi), ne Guid KrokKey.
 /// </summary>
 public sealed class BindingRebalanceServiceTests
 {
-    private static readonly Guid K3Key = Guid.Parse("22222222-0000-0000-0000-000000000003");
-    private static readonly Guid K6Key = Guid.Parse("22222222-0000-0000-0000-000000000006");
-    private static readonly Guid K7Key = Guid.Parse("22222222-0000-0000-0000-000000000007");
-    private static readonly Guid K10Key = Guid.Parse("22222222-0000-0000-0000-000000000010");
-
     private const int ZaznamId = 500;
     private const int ExterniOdkazId = 9001;
     private const string TicketCislo = "123456";
-    private const int SablonaVerze = 1;
 
     private static PmTrackerDbContext NewDb() => new(
         new DbContextOptionsBuilder<PmTrackerDbContext>()
@@ -43,8 +39,7 @@ public sealed class BindingRebalanceServiceTests
             ProjektId = 1,
             Nazev = "Z",
             SubsystemId = 1,
-            KategorieId = 1,
-            HarmonogramSablonaVerze = SablonaVerze
+            KategorieId = 1
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
         {
@@ -52,29 +47,6 @@ public sealed class BindingRebalanceServiceTests
             ZaznamId = ZaznamId,
             Cislo = TicketCislo
         });
-        var kroky = new[]
-        {
-            (poradi: 3, key: K3Key),
-            (poradi: 6, key: K6Key),
-            (poradi: 7, key: K7Key),
-            (poradi: 10, key: K10Key),
-        };
-        var nextId = 1;
-        foreach (var k in kroky)
-        {
-            db.CiselnikHarmonogramTypu.Add(new HarmonogramTypEntity
-            {
-                Id = nextId++,
-                Kod = $"HS0{k.poradi}_DURATION",
-                Nazev = $"Krok {k.poradi}",
-                Hodnota = 10,
-                IsLocked = false,
-                SablonaVerze = SablonaVerze,
-                KrokKey = k.key,
-                KrokPoradi = k.poradi,
-                JeZpozdeni = false
-            });
-        }
         await db.SaveChangesAsync();
     }
 
@@ -100,12 +72,12 @@ public sealed class BindingRebalanceServiceTests
     }
 
     private static BindingRebalanceRequest RequestFor(
-        Guid krokKey, long hotVyjadreniId, DateTime datum, int osobaId = 777)
+        int krokPoradi, long hotVyjadreniId, DateTime datum, int osobaId = 777)
     {
         return new BindingRebalanceRequest(
             ZaznamId: ZaznamId,
             ExterniOdkazId: ExterniOdkazId,
-            KrokKey: krokKey,
+            KrokPoradi: krokPoradi,
             HotVyjadreniId: hotVyjadreniId,
             DatumVyjadreni: datum,
             OsobaId: osobaId);
@@ -120,7 +92,7 @@ public sealed class BindingRebalanceServiceTests
         var sut = BuildSut(db, vq.Object);
 
         var result = await sut.CreateBindingAsync(
-            RequestFor(K6Key, hotVyjadreniId: 101L, datum: new DateTime(2026, 3, 1)),
+            RequestFor(6, hotVyjadreniId: 101L, datum: new DateTime(2026, 3, 1)),
             CancellationToken.None);
 
         result.PrimaryVazbaId.Should().BePositive();
@@ -129,7 +101,7 @@ public sealed class BindingRebalanceServiceTests
         var bindings = await db.VyjadreniVazby.AsNoTracking()
             .Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
         bindings.Should().HaveCount(1);
-        bindings[0].KrokKey.Should().Be(K6Key);
+        bindings[0].Poradi.Should().Be(6);
         bindings[0].HotVyjadreniId.Should().Be(101L);
         bindings[0].Source.Should().Be((byte)VazbaSource.Manual);
     }
@@ -148,7 +120,7 @@ public sealed class BindingRebalanceServiceTests
         {
             ZaznamId = ZaznamId,
             ExterniOdkazId = ExterniOdkazId,
-            KrokKey = K6Key,
+            Poradi = 6,
             HotVyjadreniId = 100L,
             DatumVyjadreni = new DateTime(2026, 3, 1),
             Source = (byte)VazbaSource.Auto,
@@ -164,7 +136,7 @@ public sealed class BindingRebalanceServiceTests
 
         // Target: K3 (poradi 3) s datem 5/1, bublina 300.
         var result = await sut.CreateBindingAsync(
-            RequestFor(K3Key, hotVyjadreniId: 300L, datum: new DateTime(2026, 5, 1)),
+            RequestFor(3, hotVyjadreniId: 300L, datum: new DateTime(2026, 5, 1)),
             CancellationToken.None);
 
         result.PrimaryVazbaId.Should().BePositive();
@@ -172,14 +144,14 @@ public sealed class BindingRebalanceServiceTests
 
         var activeBindings = await db.VyjadreniVazby.AsNoTracking()
             .Where(x => x.Stav == (byte)VazbaStav.Active)
-            .OrderBy(x => x.KrokKey).ToListAsync();
+            .OrderBy(x => x.Poradi).ToListAsync();
 
-        activeBindings.Should().Contain(b => b.KrokKey == K3Key && b.HotVyjadreniId == 300L && b.Source == (byte)VazbaSource.Manual);
-        activeBindings.Should().Contain(b => b.KrokKey == K6Key && b.HotVyjadreniId == 200L && b.Source == (byte)VazbaSource.ChronologyCascade);
+        activeBindings.Should().Contain(b => b.Poradi == 3 && b.HotVyjadreniId == 300L && b.Source == (byte)VazbaSource.Manual);
+        activeBindings.Should().Contain(b => b.Poradi == 6 && b.HotVyjadreniId == 200L && b.Source == (byte)VazbaSource.ChronologyCascade);
 
         // Původní K6=100 musí být superseded, ne active.
         var supersededForK6 = await db.VyjadreniVazby.AsNoTracking()
-            .Where(x => x.KrokKey == K6Key && x.Stav == (byte)VazbaStav.Superseded)
+            .Where(x => x.Poradi == 6 && x.Stav == (byte)VazbaStav.Superseded)
             .ToListAsync();
         supersededForK6.Should().ContainSingle(b => b.HotVyjadreniId == 100L);
     }
@@ -195,7 +167,7 @@ public sealed class BindingRebalanceServiceTests
         {
             ZaznamId = ZaznamId,
             ExterniOdkazId = ExterniOdkazId,
-            KrokKey = K6Key,
+            Poradi = 6,
             HotVyjadreniId = 100L,
             DatumVyjadreni = new DateTime(2026, 3, 1),
             Source = (byte)VazbaSource.Auto,
@@ -208,7 +180,7 @@ public sealed class BindingRebalanceServiceTests
         var sut = BuildSut(db, vq.Object);
 
         var result = await sut.CreateBindingAsync(
-            RequestFor(K3Key, hotVyjadreniId: 300L, datum: new DateTime(2026, 5, 1)),
+            RequestFor(3, hotVyjadreniId: 300L, datum: new DateTime(2026, 5, 1)),
             CancellationToken.None);
 
         result.PrimaryVazbaId.Should().BePositive();
@@ -216,12 +188,12 @@ public sealed class BindingRebalanceServiceTests
         var activeBindings = await db.VyjadreniVazby.AsNoTracking()
             .Where(x => x.Stav == (byte)VazbaStav.Active).ToListAsync();
 
-        activeBindings.Should().ContainSingle(b => b.KrokKey == K3Key && b.HotVyjadreniId == 300L);
-        activeBindings.Should().NotContain(b => b.KrokKey == K6Key);
+        activeBindings.Should().ContainSingle(b => b.Poradi == 3 && b.HotVyjadreniId == 300L);
+        activeBindings.Should().NotContain(b => b.Poradi == 6);
 
         // Superseded stará K6
         var supersededK6 = await db.VyjadreniVazby.AsNoTracking()
-            .Where(x => x.KrokKey == K6Key && x.Stav == (byte)VazbaStav.Superseded).ToListAsync();
+            .Where(x => x.Poradi == 6 && x.Stav == (byte)VazbaStav.Superseded).ToListAsync();
         supersededK6.Should().ContainSingle();
     }
 
@@ -237,7 +209,7 @@ public sealed class BindingRebalanceServiceTests
         {
             ZaznamId = ZaznamId,
             ExterniOdkazId = ExterniOdkazId,
-            KrokKey = K7Key,
+            Poradi = 7,
             HotVyjadreniId = 200L,
             DatumVyjadreni = new DateTime(2026, 8, 1),
             Source = (byte)VazbaSource.Auto,
@@ -250,14 +222,14 @@ public sealed class BindingRebalanceServiceTests
         var sut = BuildSut(db, vq.Object);
 
         var result = await sut.CreateBindingAsync(
-            RequestFor(K3Key, hotVyjadreniId: 300L, datum: new DateTime(2026, 5, 1)),
+            RequestFor(3, hotVyjadreniId: 300L, datum: new DateTime(2026, 5, 1)),
             CancellationToken.None);
 
         result.PrimaryVazbaId.Should().BePositive();
 
         // K7 binding musí zůstat aktivní a beze změny (stejný HotVyjadreniId, žádné superseded).
         var k7Rows = await db.VyjadreniVazby.AsNoTracking()
-            .Where(x => x.KrokKey == K7Key).ToListAsync();
+            .Where(x => x.Poradi == 7).ToListAsync();
         k7Rows.Should().ContainSingle();
         k7Rows[0].Stav.Should().Be((byte)VazbaStav.Active);
         k7Rows[0].HotVyjadreniId.Should().Be(200L);
@@ -274,7 +246,7 @@ public sealed class BindingRebalanceServiceTests
         {
             ZaznamId = ZaznamId,
             ExterniOdkazId = ExterniOdkazId,
-            KrokKey = K6Key,
+            Poradi = 6,
             HotVyjadreniId = 100L,
             DatumVyjadreni = new DateTime(2026, 3, 1),
             Source = (byte)VazbaSource.Auto,
@@ -289,13 +261,13 @@ public sealed class BindingRebalanceServiceTests
         var sut = BuildSut(db, vq.Object);
 
         var result = await sut.CreateBindingAsync(
-            RequestFor(K6Key, hotVyjadreniId: 500L, datum: new DateTime(2026, 5, 1)),
+            RequestFor(6, hotVyjadreniId: 500L, datum: new DateTime(2026, 5, 1)),
             CancellationToken.None);
 
         result.PrimaryVazbaId.Should().BePositive();
 
         var k6Rows = await db.VyjadreniVazby.AsNoTracking()
-            .Where(x => x.KrokKey == K6Key).ToListAsync();
+            .Where(x => x.Poradi == 6).ToListAsync();
         k6Rows.Should().HaveCount(2);
         k6Rows.Should().Contain(b => b.HotVyjadreniId == 100L && b.Stav == (byte)VazbaStav.Superseded);
         k6Rows.Should().Contain(b => b.HotVyjadreniId == 500L && b.Stav == (byte)VazbaStav.Active
@@ -312,7 +284,7 @@ public sealed class BindingRebalanceServiceTests
         {
             ZaznamId = ZaznamId,
             ExterniOdkazId = ExterniOdkazId,
-            KrokKey = K6Key,
+            Poradi = 6,
             HotVyjadreniId = 500L,
             DatumVyjadreni = new DateTime(2026, 5, 1),
             Source = (byte)VazbaSource.Manual,
@@ -325,28 +297,27 @@ public sealed class BindingRebalanceServiceTests
         var sut = BuildSut(db, vq.Object);
 
         await sut.CreateBindingAsync(
-            RequestFor(K6Key, hotVyjadreniId: 500L, datum: new DateTime(2026, 5, 1)),
+            RequestFor(6, hotVyjadreniId: 500L, datum: new DateTime(2026, 5, 1)),
             CancellationToken.None);
 
         var active = await db.VyjadreniVazby.AsNoTracking()
-            .Where(x => x.KrokKey == K6Key && x.Stav == (byte)VazbaStav.Active).ToListAsync();
+            .Where(x => x.Poradi == 6 && x.Stav == (byte)VazbaStav.Active).ToListAsync();
         active.Should().ContainSingle("re-drop téže bubliny nesmí duplicitně zaktivnit další řádek");
     }
 
     [Fact]
-    public async Task CreateBindingAsync_UnknownKrokKey_ReturnsNotFound()
+    public async Task CreateBindingAsync_UnknownKrok_ReturnsInvalidKrok()
     {
         await using var db = NewDb();
         await SeedBaseAsync(db);
         var vq = MockAvailableBubbles();
         var sut = BuildSut(db, vq.Object);
 
-        var unknownKrok = Guid.NewGuid();
         var result = await sut.CreateBindingAsync(
-            RequestFor(unknownKrok, hotVyjadreniId: 100L, datum: new DateTime(2026, 3, 1)),
+            RequestFor(99, hotVyjadreniId: 100L, datum: new DateTime(2026, 3, 1)),
             CancellationToken.None);
 
-        result.Outcome.Should().Be(BindingRebalanceOutcome.InvalidKrokKey);
+        result.Outcome.Should().Be(BindingRebalanceOutcome.InvalidKrok);
         result.PrimaryVazbaId.Should().BeNull();
 
         var any = await db.VyjadreniVazby.AsNoTracking().AnyAsync();
@@ -364,7 +335,7 @@ public sealed class BindingRebalanceServiceTests
         var req = new BindingRebalanceRequest(
             ZaznamId: ZaznamId,
             ExterniOdkazId: 99999, // neexistuje
-            KrokKey: K6Key,
+            KrokPoradi: 6,
             HotVyjadreniId: 100L,
             DatumVyjadreni: new DateTime(2026, 3, 1),
             OsobaId: 1);
@@ -395,7 +366,7 @@ public sealed class BindingRebalanceServiceTests
         {
             ZaznamId = ZaznamId,
             ExterniOdkazId = ExterniOdkazId + 1,
-            KrokKey = K6Key,
+            Poradi = 6,
             HotVyjadreniId = 999L,
             DatumVyjadreni = new DateTime(2026, 3, 1),
             Source = (byte)VazbaSource.Auto,
@@ -408,7 +379,7 @@ public sealed class BindingRebalanceServiceTests
         var sut = BuildSut(db, vq.Object);
 
         await sut.CreateBindingAsync(
-            RequestFor(K3Key, hotVyjadreniId: 300L, datum: new DateTime(2026, 5, 1)),
+            RequestFor(3, hotVyjadreniId: 300L, datum: new DateTime(2026, 5, 1)),
             CancellationToken.None);
 
         var bRow = await db.VyjadreniVazby.AsNoTracking()

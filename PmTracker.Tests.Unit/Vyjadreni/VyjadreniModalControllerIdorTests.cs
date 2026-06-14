@@ -87,7 +87,7 @@ public sealed class VyjadreniModalControllerIdorTests
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
             Id = 500, ProjektId = ProjektB, SubsystemId = 1, KategorieId = 1,
-            HarmonogramSablonaVerze = 1, Nazev = "target"
+            Nazev = "target"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
         {
@@ -102,7 +102,7 @@ public sealed class VyjadreniModalControllerIdorTests
         {
             ExterniOdkazId = 9001,
             ZaznamId = 500,
-            KrokKey = Guid.NewGuid(),
+            KrokPoradi = 6,
             HotVyjadreniId = 1L,
             DatumVyjadreni = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc),
             ProjektId = ProjektA
@@ -122,13 +122,13 @@ public sealed class VyjadreniModalControllerIdorTests
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
             Id = 500, ProjektId = ProjektB, SubsystemId = 1, KategorieId = 1,
-            HarmonogramSablonaVerze = 1, Nazev = "target"
+            Nazev = "target"
         });
         db.VyjadreniVazby.Add(new ZaznamHarmonogramVyjadreniVazbaEntity
         {
             Id = 7001,
             ZaznamId = 500,
-            KrokKey = Guid.NewGuid(),
+            Poradi = 6,
             ExterniOdkazId = 9001,
             HotVyjadreniId = 1L,
             DatumVyjadreni = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc),
@@ -164,7 +164,7 @@ public sealed class VyjadreniModalControllerIdorTests
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
             Id = 500, ProjektId = ProjektA, SubsystemId = 1, KategorieId = 1,
-            HarmonogramSablonaVerze = 1, Nazev = "valid"
+            Nazev = "valid"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
         {
@@ -178,7 +178,7 @@ public sealed class VyjadreniModalControllerIdorTests
         {
             ExterniOdkazId = 9001,
             ZaznamId = 500,
-            KrokKey = Guid.NewGuid(),
+            KrokPoradi = 6,
             HotVyjadreniId = 1L,
             DatumVyjadreni = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc),
             ProjektId = ProjektA
@@ -200,7 +200,7 @@ public sealed class VyjadreniModalControllerIdorTests
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
             Id = 500, ProjektId = ProjektB, SubsystemId = 1, KategorieId = 1,
-            HarmonogramSablonaVerze = 1, Nazev = "target"
+            Nazev = "target"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
         {
@@ -211,7 +211,7 @@ public sealed class VyjadreniModalControllerIdorTests
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
             Id = 501, ProjektId = ProjektA, SubsystemId = 1, KategorieId = 1,
-            HarmonogramSablonaVerze = 1, Nazev = "attacker-record"
+            Nazev = "attacker-record"
         });
         await db.SaveChangesAsync();
 
@@ -252,7 +252,7 @@ public sealed class VyjadreniModalControllerIdorTests
         db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity
         {
             Id = 500, ProjektId = ProjektB, SubsystemId = 1, KategorieId = 1,
-            HarmonogramSablonaVerze = 1, Nazev = "target"
+            Nazev = "target"
         });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
         {

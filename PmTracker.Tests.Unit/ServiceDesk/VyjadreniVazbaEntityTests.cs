@@ -15,7 +15,7 @@ public sealed class VyjadreniVazbaEntityTests
         {
             Id = 1,
             ZaznamId = 42,
-            KrokKey = Guid.NewGuid(),
+            Poradi = 6,
             ExterniOdkazId = 17,
             HotVyjadreniId = 99999,
             DatumVyjadreni = new DateTime(2026, 3, 14),

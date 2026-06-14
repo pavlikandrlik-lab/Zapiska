@@ -128,33 +128,29 @@ public sealed class RecordProposalDataStoreTests
         var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, managerId, subsystemId, "U", "Lock");
         var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
         var editor = store.BuildZaznamEdit(recordId);
-        var firstStep = editor.HarmonogramBlok.Kroky.First(x => x.TrvaniTypId > 0 && x.ZpozdeniTypId > 0);
         var originalDeadline = editor.TerminUkonceni!.Value.Date;
 
-        dbContext.ZaznamHarmonogramHodnoty.AddRange(
-            new ZaznamHarmonogramHodnotaEntity
-            {
-                ZaznamId = recordId,
-                TypId = firstStep.TrvaniTypId,
-                HodnotaInt = 5,
-                UpdatedAt = DateTime.UtcNow
-            },
-            new ZaznamHarmonogramHodnotaEntity
-            {
-                ZaznamId = recordId,
-                TypId = firstStep.ZpozdeniTypId,
-                HodnotaInt = 1,
-                UpdatedAt = DateTime.UtcNow
-            });
+        // Datum-model: krok 2 je manuální (2/5/8/9) → lze ho v pending návrhu zamknout.
+        var originalSkutecnost = originalDeadline.AddDays(-20);
+        dbContext.ZaznamHarmonogramKroky.Add(new ZaznamHarmonogramKrokEntity
+        {
+            ZaznamId = recordId,
+            Poradi = 2,
+            PlanDatum = originalDeadline.AddDays(-25),
+            SkutecnostDatum = originalSkutecnost,
+            SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual,
+            SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Manual,
+            UpdatedAt = DateTime.UtcNow
+        });
         await dbContext.SaveChangesAsync();
 
         var scheduleProposalEditor = store.BuildScheduleProposalEditor(projectId, recordId, proposer);
         var scheduleProposalCommand = BuildEditCommand(scheduleProposalEditor);
         scheduleProposalCommand.TerminUkonceni = originalDeadline.AddDays(10);
-        scheduleProposalCommand.HarmonogramHodnoty =
+        scheduleProposalCommand.HarmonogramRezim = "Manual";
+        scheduleProposalCommand.ManualActualKroky =
         [
-            new SaveRecordHarmonogramValueCommand { TypId = firstStep.TrvaniTypId, Hodnota = 9 },
-            new SaveRecordHarmonogramValueCommand { TypId = firstStep.ZpozdeniTypId, Hodnota = 3 }
+            new ManualActualKrokDto { Poradi = 2, AbsolutniDatum = DateOnly.FromDateTime(originalDeadline.AddDays(-15)) }
         ];
 
         store.SubmitScheduleProposal(scheduleProposalCommand, proposer);
@@ -168,23 +164,22 @@ public sealed class RecordProposalDataStoreTests
         var saveCommand = BuildEditCommand(editorWithLock);
         saveCommand.Nazev = "Lock Record Updated";
         saveCommand.TerminUkonceni = originalDeadline.AddDays(20);
-        saveCommand.HarmonogramHodnoty =
+        saveCommand.HarmonogramRezim = "Manual";
+        saveCommand.ManualActualKroky =
         [
-            new SaveRecordHarmonogramValueCommand { TypId = firstStep.TrvaniTypId, Hodnota = 12 },
-            new SaveRecordHarmonogramValueCommand { TypId = firstStep.ZpozdeniTypId, Hodnota = 4 }
+            new ManualActualKrokDto { Poradi = 2, AbsolutniDatum = DateOnly.FromDateTime(originalDeadline.AddDays(-5)) }
         ];
 
         store.SaveRecord(saveCommand, manager);
 
         var record = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
-        var values = await dbContext.ZaznamHarmonogramHodnoty.AsNoTracking()
-            .Where(x => x.ZaznamId == recordId && (x.TypId == firstStep.TrvaniTypId || x.TypId == firstStep.ZpozdeniTypId))
-            .ToDictionaryAsync(x => x.TypId, x => x.HodnotaInt);
+        var krok2 = await dbContext.ZaznamHarmonogramKroky.AsNoTracking()
+            .SingleAsync(x => x.ZaznamId == recordId && x.Poradi == 2);
 
         record.Nazev.Should().Be("Lock Record Updated");
+        // Pending schedule proposal lock: deadline i zamčená manuální skutečnost kroku 2 se nepřepíšou.
         record.DatumUkonceni.Date.Should().Be(originalDeadline);
-        values[firstStep.TrvaniTypId].Should().Be(5);
-        values[firstStep.ZpozdeniTypId].Should().Be(4);
+        krok2.SkutecnostDatum.Should().Be(originalSkutecnost);
     }
 
     private static SaveRecordCommand BuildCreateProposalCommand(ZaznamEditViewModel editor, int projectId, int ownerId, string name = "Nový návrh")
