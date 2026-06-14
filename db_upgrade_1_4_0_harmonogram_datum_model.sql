@@ -53,6 +53,17 @@ DECLARE @fk SYSNAME = (
 IF @fk IS NOT NULL
     EXEC('ALTER TABLE dbo.projektove_zaznamy DROP CONSTRAINT ' + @fk);
 
+-- default constraint na sloupci blokuje DROP COLUMN -> dropnout ho nejdriv
+DECLARE @df SYSNAME = (
+    SELECT dc.name FROM sys.default_constraints dc
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.projektove_zaznamy')
+      AND dc.parent_column_id = (
+          SELECT c.column_id FROM sys.columns c
+          WHERE c.object_id = OBJECT_ID('dbo.projektove_zaznamy')
+            AND c.name = 'harmonogram_sablona_verze'));
+IF @df IS NOT NULL
+    EXEC('ALTER TABLE dbo.projektove_zaznamy DROP CONSTRAINT ' + @df);
+
 IF COL_LENGTH('dbo.projektove_zaznamy','harmonogram_sablona_verze') IS NOT NULL
     ALTER TABLE dbo.projektove_zaznamy DROP COLUMN harmonogram_sablona_verze;
 
