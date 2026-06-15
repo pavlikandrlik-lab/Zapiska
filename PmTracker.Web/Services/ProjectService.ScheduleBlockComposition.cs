@@ -16,7 +16,8 @@ public sealed partial class ProjectService
         ScheduleEditorPermissionSet? permissions = null,
         string scheduleVersion = "",
         IReadOnlySet<int>? lockedManualKrokKeys = null,
-        bool canEditManualActual = false)
+        bool canEditManualActual = false,
+        ScheduleBarLayout? overviewLayout = null)
     {
         var effectivePermissions = permissions ?? ScheduleEditorPermissionSet.ForReadOnly();
         return new HarmonogramBlockViewModel
@@ -28,6 +29,7 @@ public sealed partial class ProjectService
             DelayBarvaHex = delayBarvaHex,
             Souhrn = souhrn,
             Kroky = kroky,
+            OverviewLayout = overviewLayout,
             Permissions = effectivePermissions,
             EditorChangedTypeTooltips = new Dictionary<int, string>(),
             ScheduleVersion = scheduleVersion,

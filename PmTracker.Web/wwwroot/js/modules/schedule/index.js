@@ -165,6 +165,14 @@ function initScheduleBlockRenderers(scope) {
             return;
         }
 
+        // Datum-model (Fáze 3b): statická zobrazení (karta, tab) pozicuje SERVER
+        // (ScheduleBarLayoutCalculator → inline left/width). Klient je NEPŘEPOČÍTÁVÁ —
+        // jediný zdroj pravdy = server, žádný drift. block.js běží jen pro editor live-preview.
+        const isEditorBlock = String(block.dataset.scheduleMode || "").trim() === "record-editor";
+        if (!isEditorBlock) {
+            return;
+        }
+
         if (block._scheduleRenderer instanceof ScheduleBlockRenderer) {
             block._scheduleRenderer.recalcAll();
             return;

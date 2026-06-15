@@ -53,6 +53,29 @@ public static class HarmonogramDateBlokBuilder
             .ToList();
     }
 
+    /// <summary>
+    /// Datum-model (Fáze 3b): server-side pozice baru (left%/width% + markery) z krok rows.
+    /// Jediný zdroj pravdy pro statická zobrazení — klient (block.js) je nepřepočítává.
+    /// </summary>
+    public static ScheduleBarLayout BuildBarLayout(
+        DateTime start,
+        IReadOnlyCollection<ZaznamHarmonogramKrokEntity> rows,
+        DateTime termin,
+        DateTime today)
+    {
+        var byPoradi = rows.GroupBy(r => (int)r.Poradi).ToDictionary(g => g.Key, g => g.First());
+        var steps = HarmonogramKroky.Vse
+            .Select(def =>
+            {
+                byPoradi.TryGetValue(def.Poradi, out var row);
+                return new ScheduleDateStep(def.Poradi, row?.PlanDatum, row?.SkutecnostDatum);
+            })
+            .ToList();
+
+        var computed = ScheduleDateCalculator.Compute(start, steps);
+        return ScheduleBarLayoutCalculator.Compute(start.Date, termin, today, computed);
+    }
+
     public static HarmonogramSouhrnViewModel BuildSouhrn(
         DateTime start,
         IReadOnlyCollection<ZaznamHarmonogramKrokEntity> rows,

@@ -54,11 +54,11 @@ public sealed class ScheduleBlockMarkupTests
         // Server-rendered zero-duration segmenty v editoru mají display:none jako inline style.
         // JS je pak zobrazí přes applySegmentLayout, jakmile uživatel zadá kladné trvání.
         source.Should().Contain(
-            "initialHidden",
-            "musí existovat proměnná initialHidden pro zero-duration segmenty");
-        source.Should().Contain(
             "display:none;",
-            "zero-duration segmenty musí být skryty přes display:none");
+            "zero-duration / nevyplněné segmenty musí být skryty přes inline display:none");
+        source.Should().Contain(
+            "isPlannedHidden",
+            "view musí rozlišovat skrytí plánového segmentu (TrvaniDni == 0)");
     }
 
     [Fact]

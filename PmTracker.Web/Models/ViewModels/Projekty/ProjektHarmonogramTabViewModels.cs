@@ -53,6 +53,14 @@ public sealed class HarmonogramBlockViewModel
     public string DelayBarvaHex { get; init; } = "#dc2626";
     public HarmonogramSouhrnViewModel Souhrn { get; init; } = new();
     public IReadOnlyList<HarmonogramKrokEditViewModel> Kroky { get; init; } = Array.Empty<HarmonogramKrokEditViewModel>();
+
+    /// <summary>
+    /// Datum-model (Fáze 3b): server-vypočtené pozice baru (left%/width% segmentů + dnes/termín
+    /// markery). Pro statická zobrazení je view renderuje přímo (jediný zdroj pravdy, žádný
+    /// klientský přepočet). NULL = editor mód (live-preview počítá block.js z editovaných datumů).
+    /// </summary>
+    public ScheduleBarLayout? OverviewLayout { get; init; }
+
     public ScheduleEditorPermissionSet Permissions { get; set; } = ScheduleEditorPermissionSet.ForReadOnly();
     public IReadOnlyDictionary<int, string> EditorChangedTypeTooltips { get; set; } = new Dictionary<int, string>();
     public string ScheduleVersion { get; init; } = string.Empty;

@@ -83,6 +83,13 @@
                  data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"></div>
         }
 
+        @{
+            // Datum-model (Fáze 3b): server-vypočtené pozice pro statická zobrazení (jediný
+            // zdroj pravdy). V editoru je layout NULL → block.js pozicuje live z datumů.
+            var ovl = Model.OverviewLayout;
+            var ovlSeg = ovl?.Segments.ToDictionary(s => s.Poradi);
+            string Pct(double v) => v.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + "%";
+        }
         @foreach (var row in new[] { ("planned", "Plán"), ("actual", "Skutečnost") })
         {
             <div class="@overviewRowCssClass" data-schedule-overview-row="@row.Item1">
@@ -91,10 +98,12 @@
                     <div class="@overviewMarkerCssClass today"
                          data-schedule-marker="today"
                          @(isEditor ? "data-schedule-gantt-today" : null)
+                         style="@(ovl is null ? null : $"left:{Pct(ovl.TodayPct)}")"
                          title="Dnes"></div>
                     <div class="@overviewMarkerCssClass @(isEditor ? null : "deadline")"
                          data-schedule-marker="deadline"
-                         @(isEditor ? "data-schedule-gantt-deadline" : null)></div>
+                         @(isEditor ? "data-schedule-gantt-deadline" : null)
+                         style="@(ovl is null ? null : $"left:{Pct(ovl.DeadlinePct)}")"></div>
                     @foreach (var krok in visibleCompactSteps)
                     {
                         // Phase 9 (DESIGN-9-D + 10-A, 2026-05-01): per-row segment visibility.
@@ -108,7 +117,20 @@
                             : $"Krok {krok.KrokIndex} {krok.Nazev}: skutečnost {(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum.ToString("dd.MM.yyyy") : "krok ještě nenastal")}";
                         var isPlannedHidden = row.Item1 == "planned" && krok.TrvaniDni <= 0;
                         var isActualHidden = row.Item1 == "actual" && !krok.OdchylkaDni.HasValue;
-                        var initialHidden = (isPlannedHidden || isActualHidden) ? "display:none;" : string.Empty;
+
+                        // Server-side pozice (statická zobrazení). NULL layout = editor → JS.
+                        string positionStyle = string.Empty;
+                        if (ovlSeg is not null && ovlSeg.TryGetValue(krok.KrokIndex, out var seg))
+                        {
+                            var left = row.Item1 == "planned" ? seg.PlanLeftPct : seg.ActualLeftPct;
+                            var width = row.Item1 == "planned" ? seg.PlanWidthPct : seg.ActualWidthPct;
+                            var hide = row.Item1 == "planned" ? (isPlannedHidden || width <= 0) : (isActualHidden || !seg.HasActual);
+                            positionStyle = hide ? "display:none;" : $"left:{Pct(left)};width:calc({Pct(width)} + 1px);";
+                        }
+                        else
+                        {
+                            positionStyle = (isPlannedHidden || isActualHidden) ? "display:none;" : string.Empty;
+                        }
                         <span class="@overviewSegmentCssClass"
                               role="img"
                               aria-label="@ariaLabel"
@@ -117,7 +139,7 @@
                               data-schedule-segment-kind="@row.Item1"
                               data-step-index="@krok.KrokIndex"
                               data-step-has-actual="@(krok.OdchylkaDni.HasValue ? "true" : "false")"
-                              style="background:@krok.BarvaHex;@initialHidden"
+                              style="background:@krok.BarvaHex;@positionStyle"
                               title="@segmentTitle"></span>
                     }
                 </div>
@@ -132,7 +154,7 @@
                      data-schedule-axis="overview"
                      data-timeline-axis
                      data-axis-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
-                     data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"></div>
+                     data-axis-end="@((Model.OverviewLayout?.AxisEnd ?? Model.TerminUkonceni).ToString("yyyy-MM-dd"))"></div>
             </div>
         }
     </div>
