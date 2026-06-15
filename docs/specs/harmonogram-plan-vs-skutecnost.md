@@ -59,19 +59,46 @@ a řádek „Skutečné dokončení" (u rozpracovaného ukazoval matoucí „dne
 
 Souhrn nově = **Termín** + **Sjednocený stav**.
 
+## Pravidla pro datumy (chronologie)
+
+Ruční vstupy musí být chronologické (**neklesající** — stejný den je OK). Vynuceno na
+**dvou úrovních**: UI nedovolí zadat datum mimo pořadí (okamžitá zpětná vazba) **a** server
+při Save tvrdě odmítne (`RecordValidationException`, chyba na konkrétním poli) jako pojistka.
+
+- **Plán** — pro každý krok N platí `plán(N) ≥ plán(předchozího kroku s plánem)`. Neklesající
+  napříč kroky 1–10.
+- **Ruční skutečnost** (kroky 2/5/8/9) — zadané datum musí být `≥` skutečnost nejbližšího
+  **předchozího** kroku se skutečností a `≤` skutečnost nejbližšího **následujícího** kroku se
+  skutečností (pokud existují). Tedy zapadne chronologicky mezi známé skutečnosti.
+- **Auto skutečnost** (harvest) — chronologii zajišťuje vytěžovací algoritmus
+  ([automat-vytezovani-vyjadreni.md](automat-vytezovani-vyjadreni.md)); z automatu pomatené
+  pořadí nepřijde, proto se zde **znovu nevaliduje** (kalkulátor jen defenzivně ořízne).
+
 ## Lišty (overview souhrn i Rozpad)
 
 Dvě řady na společné časové ose:
 
 - **Plán** — 10 segmentů vždy, pozice dle plánovaných dat (beze změny).
 - **Skutečnost** — segmenty splněných kroků; **aktuální krok se kreslí od konce posledního
-  splněného až po dnešek**. Barva segmentu kopíruje stav kroku: **V prodlení** (dnes > plán
-  aktuálního kroku) = šrafa/červená; **Čeká** (dnes ≤ plán) = neutrální „rozpracováno", ne červená.
-  Ostatní kroky ve stavu „Čeká" (za aktuálním krokem) se nekreslí.
+  splněného až po dnešek**. Ostatní kroky ve stavu „Čeká" (za aktuálním krokem) se nekreslí.
 - Značky: **Termín** (deadline) a **Dnes**.
 
 **Rozpad (breakdown)** — totéž per krok: každý krok ukazuje svůj plánový segment vs. segment
 skutečnosti; aktuální krok táhne skutečnost do dneška.
+
+### Barvy a styl (důležité)
+
+- **Barva kroku je vždy pevná** — daná konfigurací kroku, **stejná v liště Plán, liště
+  Skutečnost i v Rozpadu**. Stav kroku (Čeká / V prodlení / Splněno) se **NEpromítá do barvy**
+  segmentů. (Konkrétní paleta se doladí později — není teď podstatná.)
+- **Plán** = plná čára (solid styl).
+- **Skutečnost** = **šrafovaný** styl a **o kousek nižší na výšku** než plán, aby bylo na první
+  pohled vidět, kde je plán a kde skutečnost (překryv obou na stejné ose).
+- **Prodlení/předstih se pozná délkou, ne barvou**: segment skutečnosti aktuálního kroku
+  přesahuje za konec svého plánového segmentu (až po „Dnes") = vizuální skluz; končí dřív =
+  předstih. Značka „Dnes" to potvrzuje.
+- Stav (Čeká / V prodlení / Splněno) se komunikuje textově (sjednocený stav v souhrnu, tooltip
+  kroku), nikoli barvou segmentu.
 
 ## Nevyplněná skutečnost
 
@@ -97,7 +124,11 @@ skutečnosti; aktuální krok táhne skutečnost do dneška.
 - `ScheduleBarLayoutCalculator` — segment skutečnosti aktuálního kroku táhnout do dneška.
 - `_ScheduleBlock.cshtml` — souhrn (sjednocený stav, zrušit Skutečné dokončení/Stíháme/Překročení
   zvlášť), lišta skutečnosti + Rozpad render aktuálního kroku do dneška, oprava tooltipů.
-- `wwwroot/js/modules/schedule/block.js` — editor live-preview musí zrcadlit stejnou logiku.
+- `ValidateScheduleValuesAsync` (server) — přidat chronologickou validaci plánu + ruční skutečnosti.
+- `wwwroot/js/modules/schedule/block.js` + `pm-date-field` — UI bránění nechronologickému zadání
+  (min/max dle sousedních kroků); editor live-preview musí zrcadlit stejnou logiku výpočtu.
+- CSS (`site.css` / komponenty) — styl lišt: plán plný, skutečnost šrafovaná + nižší výška;
+  barvy kroků pevné (jeden zdroj barvy pro plán/skutečnost/Rozpad).
 
 ## Mimo scope této specifikace
 
@@ -111,4 +142,7 @@ skutečnosti; aktuální krok táhne skutečnost do dneška.
   překročení, „Dokončeno", hraniční případy (žádný/všechny vyplněné, předstih).
 - **Unit** `HarmonogramDateBlokBuilderTests` — 3 stavy per krok, žádný PlanEnd fallback.
 - **Unit** `ScheduleBarLayoutCalculatorTests` — segment aktuálního kroku do dneška.
-- **Api render** — souhrn ukazuje sjednocený stav, neukazuje Skutečné dokončení.
+- **Unit/Api** chronologie — server odmítne nechronologický plán i ruční skutečnost (chyba pole);
+  validní (neklesající, stejný den) projde; auto skutečnost se nevaliduje.
+- **Api render** — souhrn ukazuje sjednocený stav, neukazuje Skutečné dokončení; lišta skutečnosti
+  je šrafovaná/nižší a barvy kroků se shodují s plánem.
