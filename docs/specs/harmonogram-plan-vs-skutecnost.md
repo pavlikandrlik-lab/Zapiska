@@ -1,125 +1,114 @@
-# Specifikace — harmonogram: plán vs. skutečnost
+# Specifikace — harmonogram: Plán vs. Skutečnost (datum-model)
 
-**Stav:** rozpracováno (fáze 4 implementace)
-**Závisí na:** [automat-vytezovani-vyjadreni.md](automat-vytezovani-vyjadreni.md),
-[ticketing-integration.md](ticketing-integration.md)
+**Stav:** schváleno 2026-06-16
+**Nahrazuje:** předchozí verzi (offset/tag/Hangfire model — zrušeno datum-migrací 2026-06)
+**Souvisí:** [automat-vytezovani-vyjadreni.md](automat-vytezovani-vyjadreni.md)
 
 ## Kontext
 
-Dnes se v editoru záznamu ruční edituje **oboje**: plán i skutečnost harmonogramu.
-**Nová logika:**
+Harmonogram má **10 pevných kroků** (kód `HarmonogramKroky.Vse`). Vše je v **absolutních
+datech** — žádné offsety. Každý krok má:
 
-- **Plán** — vyplňuje a schvaluje projektový manažer (stav dnes). Editovatelný.
-- **Skutečnost** — **automaticky odvozená** ze stavu ticketů přes tagy na vyjádřeních ticketů.
-  **Read-only** v editoru záznamu.
+- **Plán** — plánované datum konce kroku (vyplňuje/schvaluje PM). Plánové dokončení = plán kroku 10.
+- **Skutečnost** — reálné datum konce kroku. Vzniká buď **automaticky** z vytěžování vyjádření
+  ticketů ([automat-vytezovani-vyjadreni.md](automat-vytezovani-vyjadreni.md)), nebo **ručně**
+  u kroků 2/5/8/9 (kam vyjádření neplyne). **Nevyplněno = `NULL`** (žádný fallback na plán).
 
-## Chování
+Persistence: `zaznam_harmonogram_krok` (Poradi 1–10, PlanDatum, SkutecnostDatum, SkutecnostRezim,
+SkutecnostZdroj, PreferredExterniOdkazId).
 
-### Plán
+## Pojmy (autoritativní definice)
 
-Beze změny oproti dnešku:
+| Pojem | Význam |
+|---|---|
+| **Plán** | Per-krok plánovaná data. „Kdy to plánujeme." |
+| **Plánové dokončení** | Plán kroku 10 (konec plánové lišty). |
+| **Skutečnost** | Per-krok reálná data (auto/ruční). `NULL` = krok nemá skutečnost. |
+| **Termín** | Deadline = `projektove_zaznamy.DatumUkonceni`. „Dokdy to musí být." Oddělený od plánového dokončení. |
+| **Aktuální krok** | První **nevyplněný** krok **po posledním vyplněném** (s vyplněnou skutečností). |
 
-- PM / PMP vyplní plánované termíny kroků harmonogramu
-- Prochází schválením (existující flow)
-- Editovatelný do schválení, poté uzamčen (audit)
+> Příklad aktuálního kroku: vyplněné skutečnosti u kroků 4, 6, 9 → poslední vyplněný = 9 →
+> **aktuální krok = 10**. Nevyplněné mezery před posledním vyplněným (5, 7, 8) se přeskakují —
+> schéma už postoupilo přes krok 9.
 
-### Skutečnost — výpočet
+## Per-krok stavy (3)
 
-Pro každý krok harmonogramu záznamu:
+| Stav | Podmínka |
+|---|---|
+| **Čeká** | Skutečnost nevyplněna **a** plánované datum kroku je v budoucnu (≥ dnes). |
+| **V prodlení** | Skutečnost nevyplněna **a** plánované datum kroku už ulpynulo (< dnes). |
+| **Splněno** | Skutečnost vyplněna (auto nebo ruční). |
 
-1. Najdi všechny `TicketVyjadreniTag` s `TagKod = <krok>` pro vazby záznamu → ticket
-2. Najdi **MIN(Datum)** vyjádření s tímto tagem
-3. To je **skutečné datum** kroku
+## Sjednocený stav (nahrazuje „Stíháme" + „Překročení" + „Skutečné dokončení")
 
-Pokud žádný tag neexistuje → skutečnost je **nezjištěna** (UI zobrazí „–").
+Místo tří samostatných údajů **jeden** indikátor odvozený z aktuálního kroku:
 
-### UI změny
+```
+Překročení = dnes − plán(aktuální krok)          (znaménkové, v kalendářních dnech)
+```
 
-V editoru záznamu (`_EditZaznamForm.cshtml`) karta **Harmonogram**:
+- **> 0** → „skluz +X dní" (červeně) — aktuální krok je po svém plánu.
+- **< 0** → „v předstihu X dní" (zeleně) — plán aktuálního kroku ještě nenastal.
+- **= 0** → „dle plánu".
+- **Všechny kroky vyplněné** (žádný aktuální krok) → **„Dokončeno"**, překročení 0.
 
-- **Tabulka kroků** — 3 sloupce: *Krok / Plán (editovatelný) / Skutečnost (read-only)*
-- Sloupec **Skutečnost**:
-  - Hodnota nebo „–"
-  - Ikona zdroje: automat 🤖 / manuál 👤 (po najetí tooltip: pravidlo/osoba + datum záznamu tagu)
-  - Klik → otevírá modal „Externí vazby → vyjádření ticketu" (viz `automat-vytezovani-vyjadreni.md`)
-- Sloupec **Plán** zůstává editovatelný dle stávajících permission pravidel
+Zobrazení v souhrnu: **„Aktuální krok: <název> · skluz +X dní"** (resp. „v předstihu", „Dokončeno").
 
-### Co se stane se stávajícími daty
+**Rušíme** ze souhrnu: samostatné „Stíháme/Nestíháme", samostatné „Překročení: X dnů",
+a řádek „Skutečné dokončení" (u rozpracovaného ukazoval matoucí „dnes").
 
-Při migraci (fáze 4):
+Souhrn nově = **Termín** + **Sjednocený stav**.
 
-1. Existující **skutečnost** v DB zůstává viditelná jako **historická**
-   (fallback, pokud neexistuje žádný tag)
-2. Nová logika má **přednost**: tag → MIN(Datum) překryje historickou skutečnost
-3. Po měsíci běhu na produkci + ověření se historická skutečnost smaže migraci
+## Lišty (overview souhrn i Rozpad)
 
-### Dopad na close-guard modal
+Dvě řady na společné časové ose:
 
-Dnes close-guard dirty tracking sleduje i pole skutečnosti harmonogramu
-(viz [modal-close-guard.md](modal-close-guard.md)). Po změně:
+- **Plán** — 10 segmentů vždy, pozice dle plánovaných dat (beze změny).
+- **Skutečnost** — segmenty splněných kroků; **aktuální krok se kreslí od konce posledního
+  splněného až po dnešek**. Barva segmentu kopíruje stav kroku: **V prodlení** (dnes > plán
+  aktuálního kroku) = šrafa/červená; **Čeká** (dnes ≤ plán) = neutrální „rozpracováno", ne červená.
+  Ostatní kroky ve stavu „Čeká" (za aktuálním krokem) se nekreslí.
+- Značky: **Termín** (deadline) a **Dnes**.
 
-- Pole skutečnosti **nebudou v DOM** jako input → automaticky zmizí z tracking
-- `UiHarmonogramDatumy` (vypočítaná pole) již ignorována v close-guardu
-- **Žádná změna** v close-guard logice potřebná
+**Rozpad (breakdown)** — totéž per krok: každý krok ukazuje svůj plánový segment vs. segment
+skutečnosti; aktuální krok táhne skutečnost do dneška.
 
-## Validace
+## Nevyplněná skutečnost
 
-- Plán musí být **<= skutečnost** (pokud skutečnost existuje). Jinak warning, ne error
-  (může jít o zpoždění, které je záměrné)
-- Pokud skutečnost je před plánem → UI vykreslí **zelený** badge "v předstihu"
-- Pokud skutečnost >= plán → **červený** "zpožděno"
-- Pokud skutečnost chybí a plán je v minulosti → **žlutý** "čeká"
+- View-model už **nepoužívá fallback na PlanEnd** pro nevyplněné kroky (dřív `SkutecneDatum =
+  MaSkutecnost ? SkutecnostEnd : PlanEnd` → mohlo se tvářit „skutečnost = plán"). Nově nevyplněno
+  = žádné datum, render dle 3-stavového modelu (Čeká / V prodlení).
 
-## API a datový model
+## Hraniční případy
 
-### Existující tabulka `ProjektovyZaznamHarmonogram`
+| Případ | Chování |
+|---|---|
+| Žádný krok vyplněn | Aktuální krok = 1; Překročení = dnes − plán(1) (znaménkově). |
+| Všechny kroky vyplněny | „Dokončeno", Překročení 0. |
+| Mezery (vyplněno 4,6,9) | Aktuální = 10 (po posledním vyplněném); mezery 5/7/8 přeskočeny. |
+| Skutečnost před plánem (předstih) | Stav „Splněno"; sjednocený stav může být „v předstihu". |
+| Plán aktuálního kroku v budoucnu | Stav aktuálního kroku = „Čeká"; Překročení záporné (předstih). |
 
-Sloupce *PlanDatum* zůstávají. Sloupce *SkutecnostDatum* se budou **dopočítávat**,
-uloží se však stále pro rychlé čtení (denormalizace).
+## Dopad na kód (orientačně — detail řeší implementační plán)
 
-**Nové pole:**
+- `ScheduleDateCalculator.Summarize` — překročení = `dnes − plán(aktuální krok)` (znaménkové),
+  detekce aktuálního kroku, „Dokončeno" stav; zrušit `Stihame` jako separátní vs Termín.
+- `HarmonogramDateBlokBuilder` — odstranit PlanEnd fallback pro nevyplněné; per-krok stav (3).
+- `ScheduleBarLayoutCalculator` — segment skutečnosti aktuálního kroku táhnout do dneška.
+- `_ScheduleBlock.cshtml` — souhrn (sjednocený stav, zrušit Skutečné dokončení/Stíháme/Překročení
+  zvlášť), lišta skutečnosti + Rozpad render aktuálního kroku do dneška, oprava tooltipů.
+- `wwwroot/js/modules/schedule/block.js` — editor live-preview musí zrcadlit stejnou logiku.
 
-| Sloupec | Typ | Popis |
-|---|---|---|
-| `SkutecnostZdrojEnum` | tinyint | 0=Neznámo, 1=Automat, 2=Manual, 3=Historicka (pre-migration) |
-| `SkutecnostPosledniPrepocet` | datetime2 | Kdy byl MIN(Datum) naposled přepočítán |
+## Mimo scope této specifikace
 
-### Recurring job — `HarmonogramSkutecnostSyncJob`
+- Sémantika „hotovo" zaškrtnutím místo data — **není potřeba** (prázdné datum = neplní se, plné = splněno).
+- Změna pravidel vytěžování / mapování predikátů (řeší automat-vytezovani-vyjadreni.md).
+- Redukce počtu kroků (zůstává 10).
 
-Hangfire job (viz `ticketing-integration.md`):
+## Testy
 
-- Běží každých **15 min**
-- Pro každý aktivní ticket (netriviální počet) přepočítá MIN(Datum) dle tagů
-- Zapíše do `ProjektovyZaznamHarmonogram.SkutecnostDatum` + `SkutecnostPosledniPrepocet`
-- Interval konfigurovatelný v UI `/Nastaveni/Integrace`
-
-**Alternativa (lepší, ale složitější):** event-driven — pokud přidán/smazán tag,
-vyvolá se `IHarmonogramRecomputeService.RequestRecompute(ticketId)`, který
-invalidátne cached skutečnost. Job pak jen řeší fallback (přehlédnuté invalidace).
-
-Doporučení: **začít s polling** (jednodušší), přejít na event-driven v pozdější iteraci,
-pokud dojde k výkonnostním problémům.
-
-## Testy (fáze 4)
-
-- **Unit** `HarmonogramSkutecnostServiceTests` — MIN(Datum) výpočet, edge cases
-  (žádný tag, víc tagů, manuál před automat)
-- **Integration** — DB test s fixture: záznam + ticket + tagy + ověření přepsaných polí
-- **Regression** — migrace ze stavu „historická skutečnost" na nový systém
-
-## Otevřené otázky
-
-| # | Otázka | Kdo rozhodne | Deadline |
-|---|---|---|---|
-| H1 | **Redukce kroků harmonogramu** — vedení zvažuje škrtnutí některých kroků, které nelze zjistit automaticky | Vedení | Před fází 4 |
-| H2 | Jak naložit se záznamy bez vazby na ticket (organizační, jiné typy)? | Claude doporučení: ponechat ruční edit skutečnosti + badge „off-ticket" | Před fází 4 |
-| H3 | Víc ticketů na jeden záznam — jak kombinovat skutečnost? | Claude doporučení: MIN(Datum) přes všechny tagy všech vazebních ticketů | Při implementaci |
-| H4 | Zamčení plánu při schválení — zmrazit i schvalovací datum? (historie) | Claude doporučení: ano, snapshot do audit tabulky | Při implementaci |
-| H5 | Termíny vypořádání připomínek — zvažovaný nový krok | Vedení | Před fází 4 |
-
-## Zodpovědnost
-
-- **Redukce kroků:** vedení
-- **Mapování kroků na tagy:** projektový manažer (konfigurace pravidel, viz automat-vytezovani-vyjadreni.md)
-- **Migrace historické skutečnosti:** dodavatel po ověření 1 měsíce produkčního běhu
-- **UI změny editoru:** Claude (dle fáze 2 komponent)
+- **Unit** `ScheduleDateCalculatorTests` — aktuální krok (vč. mezer 4/6/9→10), znaménkové
+  překročení, „Dokončeno", hraniční případy (žádný/všechny vyplněné, předstih).
+- **Unit** `HarmonogramDateBlokBuilderTests` — 3 stavy per krok, žádný PlanEnd fallback.
+- **Unit** `ScheduleBarLayoutCalculatorTests` — segment aktuálního kroku do dneška.
+- **Api render** — souhrn ukazuje sjednocený stav, neukazuje Skutečné dokončení.
