@@ -7,7 +7,7 @@
  *   - + update data-skutecnost-rezim na příslušném cell pro CSS visibility (Manual = input,
  *     Auto = bubble z vyjádření)
  *   - Při Auto: vyčistí hidden ManualActualKroky[i].AbsolutniDatum (= server skip stage,
- *     následně ResetManualKrokyToAutoAsync resetuje DELAY row na Auto rezim).
+ *     následně ResetManualKrokyToAutoAsync resetuje krok řádek na Auto rezim).
  *
  * Persistence: server-side v RecordService.SaveRecord (chevron toggle se ukládá až při Save,
  *              v paměti dokud user nestiskne "Uložit").
@@ -44,7 +44,7 @@
     if (hidden) hidden.value = selectedZdroj;
 
     // Pokud Auto → vyčistit AbsolutniDatum (= server skip manual stage, ResetManualKrokyToAutoAsync
-    // pak resetuje DELAY row a composition při reload vrátí FromVyjadreni datum).
+    // pak resetuje krok řádek a composition při reload vrátí FromVyjadreni datum).
     if (selectedZdroj === 'Auto') {
       const inputs = document.querySelectorAll(
         `pm-date-field[data-manual-krok-key="${krokKey}"]`

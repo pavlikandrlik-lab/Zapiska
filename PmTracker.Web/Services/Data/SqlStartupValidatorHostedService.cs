@@ -11,6 +11,23 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
     private static readonly string[] RequiredProjectRoleCodes = { ProjectRoleCodes.ProjectOwner, ProjectRoleCodes.Host, ProjectRoleCodes.ProjectAdmin, ProjectRoleCodes.ProjectManager, ProjectRoleCodes.Gestor };
     private static readonly string[] RequiredSubsystemRoleCodes = { SubsystemRoleCodes.Lead, SubsystemRoleCodes.DeputyLead, SubsystemRoleCodes.Methodik };
 
+    /// <summary>
+    /// Tabulky, bez kterých aplikace nesmí nastartovat. Datum-model migrace (db_upgrade_1_4_0)
+    /// přidala <c>zaznam_harmonogram_krok</c> (plán + skutečnost datumy harmonogramu) a DROPnula
+    /// offset tabulku <c>zaznam_harmonogram_hodnoty</c> — guard proto vyžaduje novou krok tabulku,
+    /// aby deploy bez 1_4_0 selhal hned při startu, ne až za běhu při čtení harmonogramu.
+    /// </summary>
+    internal static readonly string[] RequiredTables =
+    {
+        "dbo.projekt_subsystemy",
+        "dbo.ciselnik_roli_subsystemu",
+        "dbo.obsazeni_subsystemu_projektu",
+        "dbo.zaznam_navrhy",
+        "dbo.zaznam_priority_uzivatelu",
+        "dbo.zaznam_priority_rebuild_state",
+        "dbo.zaznam_harmonogram_krok"
+    };
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<SqlStartupValidatorHostedService> _logger;
 
@@ -76,15 +93,7 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             throw new InvalidOperationException("V DB chybí sloupec dbo.osoby.email. Obnovte databázi přes PMTracker_insert_sql nebo doplňte sloupec ručně.");
         }
 
-        foreach (var requiredTable in new[]
-                 {
-                     "dbo.projekt_subsystemy",
-                     "dbo.ciselnik_roli_subsystemu",
-                     "dbo.obsazeni_subsystemu_projektu",
-                     "dbo.zaznam_navrhy",
-                     "dbo.zaznam_priority_uzivatelu",
-                     "dbo.zaznam_priority_rebuild_state"
-                 })
+        foreach (var requiredTable in RequiredTables)
         {
             if (!await HasTableAsync(dbContext, requiredTable, ct))
             {
@@ -115,16 +124,6 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             throw new InvalidOperationException(
                 $"Sloupec dbo.projektove_zaznamy.cil má délku {recordGoalMaxLength.Value}, ale aplikace vyžaduje alespoň 500 znaků. " +
                 "Upravte DB ručně: ALTER TABLE dbo.projektove_zaznamy ALTER COLUMN cil NVARCHAR(500) NULL;");
-        }
-
-        var hasLegacyScheduleConstraint = await HasCheckConstraintAsync(
-            dbContext,
-            "dbo.zaznam_harmonogram_hodnoty",
-            "CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative",
-            ct);
-        if (hasLegacyScheduleConstraint)
-        {
-            throw new InvalidOperationException("V DB je legacy constraint CK_zaznam_harmonogram_hodnoty_hodnota_nonnegative, který blokuje zápornou skutečnost harmonogramu. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_1_0_signed_schedule_actual.sql.");
         }
 
         foreach (var requiredColumn in new[] { "datum_prirazeni", "datum_odebrani" })
@@ -350,51 +349,6 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             tableParam.ParameterName = "@tableName";
             tableParam.Value = tableName;
             command.Parameters.Add(tableParam);
-
-            var result = await command.ExecuteScalarAsync(ct);
-            return Convert.ToInt32(result) > 0;
-        }
-        finally
-        {
-            if (mustClose)
-            {
-                await connection.CloseAsync();
-            }
-        }
-    }
-
-    private static async Task<bool> HasCheckConstraintAsync(
-        PmTrackerDbContext dbContext,
-        string tableName,
-        string constraintName,
-        CancellationToken ct)
-    {
-        var connection = dbContext.Database.GetDbConnection();
-        var mustClose = connection.State != ConnectionState.Open;
-        if (mustClose)
-        {
-            await connection.OpenAsync(ct);
-        }
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT COUNT(*)
-                FROM sys.check_constraints
-                WHERE parent_object_id = OBJECT_ID(@tableName)
-                  AND name = @constraintName
-                """;
-
-            var tableParam = command.CreateParameter();
-            tableParam.ParameterName = "@tableName";
-            tableParam.Value = tableName;
-            command.Parameters.Add(tableParam);
-
-            var constraintParam = command.CreateParameter();
-            constraintParam.ParameterName = "@constraintName";
-            constraintParam.Value = constraintName;
-            command.Parameters.Add(constraintParam);
 
             var result = await command.ExecuteScalarAsync(ct);
             return Convert.ToInt32(result) > 0;

@@ -506,7 +506,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         // Plán 4 Feature C Task 5 — po harvest batch commitu zavolej SkutecnostSync
-        // aby Zdroj/Preferred na HS0X_DELAY řádcích reflektoval nové / změněné bindings.
+        // aby Zdroj/Preferred na krok řádcích reflektoval nové / změněné bindings.
         // Best-effort: chyby syncu nezasahují do výsledku harvestu (fingerprinty jsou commited).
         if (_skutecnostSync is not null && (created > 0 || superseded > 0))
         {

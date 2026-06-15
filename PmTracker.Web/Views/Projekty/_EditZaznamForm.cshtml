@@ -128,7 +128,7 @@
     @if (Model.JeUkolKategorie)
     {
         @* Master switch — automatické vs ruční vyplňování harmonogramu pro celý záznam.
-           Initial state: ON pokud existují DELAY řádky a všechny v Auto rezimu, OFF jinak.
+           Initial state: ON pokud existují krok řádky a všechny v Auto rezimu, OFF jinak.
            Pro nový záznam (IsCreate) defaultně ON (auto-fill je standardní flow).
            FIX 2026-05-04: switch je čistě klient-side. Server-side persistence přes hidden
            input HarmonogramRezim při Save form submitu (transactional s datumy v jednom POST). *@

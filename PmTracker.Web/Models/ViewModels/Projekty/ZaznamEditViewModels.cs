@@ -32,7 +32,7 @@ public sealed class ZaznamEditViewModel
     public bool JeUkolKategorie { get; set; }
     /// <summary>
     /// FIX 2026-05-03 — initial state pro master switch "Automatické vyplňování harmonogramu"
-    /// v tab strip řádku. ON = všechny existující DELAY řádky v Auto rezimu (= classic
+    /// v tab strip řádku. ON = všechny existující krok řádky v Auto rezimu (= classic
     /// auto-fill flow). OFF = aspoň jeden krok v Manual rezimu (= mix nebo všechny ručně).
     /// Pro nový záznam (IsCreate) defaultně true.
     /// </summary>

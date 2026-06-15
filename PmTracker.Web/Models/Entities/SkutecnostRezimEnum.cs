@@ -3,7 +3,7 @@ namespace PmTracker.Web.Models.Entities;
 /// <summary>
 /// Plán 4 Feature C Task 1 — rezim plnění skutečnosti pro krok harmonogramu.
 /// Ukládáno jako byte (TINYINT) ve sloupci <c>skutecnost_rezim</c>
-/// na tabulce <c>zaznam_harmonogram_hodnoty</c>.
+/// na tabulce <c>zaznam_harmonogram_krok</c>.
 /// </summary>
 public enum SkutecnostRezimEnum : byte
 {

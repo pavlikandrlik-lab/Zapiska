@@ -3,7 +3,7 @@ namespace PmTracker.Web.Models.Entities;
 /// <summary>
 /// Plán 4 Feature C Task 1 — zdroj datumu skutečnosti pro krok harmonogramu.
 /// Ukládáno jako byte (TINYINT) ve sloupci <c>skutecnost_zdroj</c>
-/// na tabulce <c>zaznam_harmonogram_hodnoty</c>.
+/// na tabulce <c>zaznam_harmonogram_krok</c>.
 /// </summary>
 public enum SkutecnostZdrojEnum : byte
 {
@@ -18,7 +18,7 @@ public enum SkutecnostZdrojEnum : byte
 
     /// <summary>
     /// Migrovaná data před zavedením auto-fill (2026-04-24).
-    /// Pattern: HS0X_DELAY s nenulovou hodnotou, bez vazby na vyjádření.
+    /// Pattern: ruční skutečnost bez vazby na vyjádření.
     /// </summary>
     Historicka = 3,
 }

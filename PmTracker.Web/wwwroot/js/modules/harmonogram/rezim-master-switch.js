@@ -12,7 +12,7 @@
  *
  * Žádný server call. Persistence rezimu + datumů proběhne až při form submit (Save tlačítko)
  * v jednom POST /Zaznamy/Save (transactional). Server (RecordService.SaveRecord
- * + ApplyHarmonogramRezimAsync) aplikuje rezim na auto-eligible HS0X_DELAY rows
+ * + ApplyHarmonogramRezimAsync) aplikuje rezim na auto-eligible krok řádky
  * a v Auto rezimu spustí re-fill ze ServiceDesk vyjádření.
  *
  * Side-effect import v bootstrap.js (memory: project_bundle_sync).

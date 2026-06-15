@@ -11,7 +11,7 @@ public static class RecordProposalTypeCodes
 /// vyjádření (HOT_VYJADRENI), protože nemají textový trigger v ServiceDesku.
 /// Skutečnost u těchto kroků se zadává ručně (ManualActualKrokDto).
 ///
-/// Mapování na názvy kroků (podle <c>HarmonogramService.DefaultHarmonogramKroky</c>):
+/// Mapování na názvy kroků (podle <c>HarmonogramKroky.Vse</c>):
 /// <list type="bullet">
 /// <item>2 — konzultace termínů s dodavatelem</item>
 /// <item>5 — vypořádání připomínek</item>
@@ -75,8 +75,8 @@ public sealed class CreateRecordProposalPayload
 
     /// <summary>
     /// Plán D: ruční skutečnost pro kroky 2/5/8/9, kam vyjádření neplyne.
-    /// Aplikuje se při schválení návrhu do HS0X_DELAY.HodnotaInt jako odchylka
-    /// vůči plánu vypočítanému <see cref="Services.Data.HarmonogramService"/>.
+    /// Aplikuje se při schválení návrhu jako <c>SkutecnostDatum</c> (absolutní datum)
+    /// na krok řádek v <c>zaznam_harmonogram_krok</c>.
     /// </summary>
     public List<ManualActualKrokDto> ManualActualKroky { get; set; } = [];
 
@@ -101,8 +101,8 @@ public sealed class SchedulePlanProposalPayload
 
     /// <summary>
     /// Plán D: ruční skutečnost pro kroky 2/5/8/9 (ty, kam vyjádření v HOT DB
-    /// neplyne). Aplikuje se při schválení návrhu do HS0X_DELAY.HodnotaInt
-    /// jako odchylka v kalendářních dnech vůči plánovaného konce kroku.
+    /// neplyne). Aplikuje se při schválení návrhu jako absolutní <c>SkutecnostDatum</c>
+    /// na krok řádek v <c>zaznam_harmonogram_krok</c>.
     /// </summary>
     public List<ManualActualKrokDto> ManualActualKroky { get; set; } = [];
 }
@@ -110,7 +110,7 @@ public sealed class SchedulePlanProposalPayload
 /// <summary>
 /// FIX 2026-05-04: per-krok preference user-vybraného zdroje skutečnosti pro 2/5/8/9.
 /// Manual = user zadal datum ručně (AbsolutniDatum); Auto = user zvolil "z vyjádření"
-/// (= reset DELAY row, sync z navázaného HOT_VYJADRENI). Null = legacy behavior.
+/// (= skutečnost krok řádku v Auto rezimu, sync z navázaného HOT_VYJADRENI). Null = legacy behavior.
 /// </summary>
 public sealed class ManualActualKrokDtoExtensions
 {
@@ -137,8 +137,8 @@ public sealed class ManualActualKrokDto
     /// <summary>
     /// FIX 2026-05-04: per-krok 2/5/8/9 preference (chevron dropdown):
     ///   "Manual" = uložit AbsolutniDatum jako ruční skutečnost (Zdroj=Manual)
-    ///   "Auto"   = preferovat datum z vyjádření (server resetne DELAY row na Rezim=Auto,
-    ///              Zdroj=Neznamo, HodnotaInt=null → auto-sync ze ServiceDesk)
+    ///   "Auto"   = preferovat datum z vyjádření (server přepne krok řádek na Rezim=Auto,
+    ///              Zdroj=Neznamo, SkutecnostDatum=null → auto-sync ze ServiceDesk)
     ///   null     = legacy (proposal flow, žádný UI toggle) → existing semantika podle AbsolutniDatum
     /// </summary>
     public string? PreferredZdroj { get; set; }

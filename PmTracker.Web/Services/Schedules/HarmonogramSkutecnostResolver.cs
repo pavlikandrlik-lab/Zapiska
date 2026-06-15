@@ -89,7 +89,7 @@ public static class HarmonogramSkutecnostResolver
         // Bez tohoto fixu user, který dříve měl jen PMP tikét, dostal preferred=PMP. Po přidání
         // PNF tiketu s dřívějším HOT_ZAZNAMY.datum resolver stále vracel PMP datum (preferred),
         // místo PNF (= MIN). Signalizujeme PreferredFallbackApplied když preferred ≠ MIN, aby
-        // sync clear-nul stale preferred z DELAY row a další iterace byla čistá.
+        // sync clear-nul stale preferred z krok řádku a další iterace byla čistá.
         if (krokPoradi == 1)
         {
             var min = kandidati[0]; // OrderBy(Datum) ASC výše → kandidati[0] = nejstarší

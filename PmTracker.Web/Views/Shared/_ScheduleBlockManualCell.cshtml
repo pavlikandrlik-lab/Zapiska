@@ -11,7 +11,7 @@
 
     // Plán 4 Feature C Task 6 — audit zdroj badge + toggle switch.
     // Badge mapuje SkutecnostZdroj (enum: Neznamo/Automat/Manual/Historicka) na ikonku + tooltip.
-    // Toggle switch je viditelný jen když existuje HS0X_DELAY řádek (DelayHodnotaId > 0)
+    // Toggle switch je viditelný jen když existuje krok řádek (DelayHodnotaId > 0)
     // a user má CanToggleRezim (schedule not locked + isTaskCategory).
     var featureCBadgeIcon = krok.SkutecnostZdroj switch
     {
@@ -36,7 +36,7 @@
     // Plán 4 Feature C Task 6 UI dropdown — chevron ▼ viditelný pro ≥2 kandidáty
     // + user má CanToggleRezim + není Manual režim (v Manual režimu je Preferred ignorován).
     // Create-if-missing (gap #3 2026-04-24): dropdown je viditelný i když DelayHodnotaId ještě
-    // neexistuje — endpoint SelectCandidate umí create HS0X_DELAY row na první výběr.
+    // neexistuje — endpoint SelectCandidate umí create krok řádek na první výběr.
     var featureCShowDropdown = krok.CanToggleRezim
         && krok.SkutecnostRezim == SkutecnostRezimEnum.Auto
         && krok.Kandidati.Count >= 2;
@@ -164,7 +164,7 @@ else if (isManualKrok)
     @* FIX 2026-05-04: Manuální krok 2/5/8/9 — render OBOU variant (manual input + bubble z vyjádření)
        + chevron-down dropdown pro výběr "Ručně" / "Z vyjádření". Volba se posílá v hidden inputu
        ManualActualKroky[i].PreferredZdroj ("Manual" / "Auto"). Server (RecordService.SaveRecord)
-       Auto = reset DELAY row na Rezim=Auto, Zdroj=Neznamo, HodnotaInt=null. *@
+       Auto = krok řádek na Rezim=Auto, Zdroj=Neznamo, SkutecnostDatum=null (auto-sync). *@
     if (canEdit)
     {
         var isoValue = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual

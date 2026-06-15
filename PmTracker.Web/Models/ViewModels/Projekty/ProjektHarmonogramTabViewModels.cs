@@ -98,15 +98,13 @@ public sealed class HarmonogramKrokEditViewModel
     /// non-0 = OdchylkaDni dnů (kladné = zpoždění, záporné = předstih).
     /// </summary>
     public int? OdchylkaDni { get; init; }
-    public int? ZpozdeniDni => OdchylkaDni;
     public DateTime BaselineDatum { get; init; }
     public DateTime SkutecneDatum { get; init; }
-    public DateTime PosunuteDatum => SkutecneDatum;
 
     /// <summary>
     /// Plán D Task 8: odkud pochází skutečnost — <c>None</c> (nenavázáno),
     /// <c>FromVyjadreni</c> (Active vazba HOT_VYJADRENI),
-    /// <c>Manual</c> (HS0X_DELAY vyplněn ručně).
+    /// <c>Manual</c> (skutečnost zadaná ručně na krok řádku).
     /// </summary>
     public ZdrojSkutecnosti ZdrojSkutecnosti { get; init; } = ZdrojSkutecnosti.None;
 
@@ -126,17 +124,17 @@ public sealed class HarmonogramKrokEditViewModel
     public bool IsManualKrok { get; init; }
 
     /// <summary>
-    /// Plán 4 Feature C Task 6 — ID řádku <c>zaznam_harmonogram_hodnoty</c> pro HS0X_DELAY
-    /// sloupec tohoto kroku. UI ho použije v POST payloadu pro
+    /// Datum-model: ID řádku <c>zaznam_harmonogram_krok</c> tohoto kroku. UI ho posílá
+    /// v POST payloadu (historický klíč <c>HodnotaId</c>) pro
     /// <c>HarmonogramController.ToggleRezim</c> / <c>SelectCandidate</c>.
-    /// <c>null</c> znamená, že HS0X_DELAY řádek ještě neexistuje (krok je na plánové hodnotě,
-    /// není zapsaná skutečnost) — toggle / dropdown nelze volat, UI je skryje.
+    /// <c>null</c> znamená, že krok řádek ještě neexistuje (krok je na plánu, bez zapsané
+    /// skutečnosti) — toggle / dropdown nelze volat, UI je skryje.
     /// </summary>
     public int? DelayHodnotaId { get; init; }
 
     /// <summary>
     /// Plán 4 Feature C Task 6 — režim zdroje skutečnosti pro UI switch Auto ⇄ Ručně.
-    /// Default <see cref="SkutecnostRezimEnum.Auto"/> pokud HS0X_DELAY řádek nexistuje.
+    /// Default <see cref="SkutecnostRezimEnum.Auto"/> pokud krok řádek neexistuje.
     /// </summary>
     public SkutecnostRezimEnum SkutecnostRezim { get; init; } = SkutecnostRezimEnum.Auto;
 
