@@ -266,23 +266,23 @@
                     @for (var i = 0; i < Model.Kroky.Count; i++)
                     {
                         var krok = Model.Kroky[i];
-                        var durationStaticDisabled = krok.TrvaniTypId <= 0;
-                        var delayStaticDisabled = krok.ZpozdeniTypId <= 0;
-                        var stepStaticDisabled = durationStaticDisabled || delayStaticDisabled;
-                        var durationChanged = krok.TrvaniTypId > 0 && Model.EditorChangedTypeTooltips.ContainsKey(krok.TrvaniTypId);
-                        var delayChanged = krok.ZpozdeniTypId > 0 && Model.EditorChangedTypeTooltips.ContainsKey(krok.ZpozdeniTypId);
-                        var durationTooltip = durationChanged ? Model.EditorChangedTypeTooltips[krok.TrvaniTypId] : null;
-                        var delayTooltip = delayChanged ? Model.EditorChangedTypeTooltips[krok.ZpozdeniTypId] : null;
+                        // Datum-model: disabled logika čistě z permission setu. Mrtvé offset gating přes
+                        // krok.TrvaniTypId/ZpozdeniTypId zrušeno — v datum-modelu se nikdy nenastavovalo
+                        // (vždy 0) → editor zamykal všechny plán/skutečnost inputy (regrese migrace).
+                        // Proposal-diff highlight (durationChanged/delayChanged) běžel přes offset TypId;
+                        // dokud se proposal-diff nepředělá na datum-model, je vypnutý (false/null).
+                        var durationChanged = false;
+                        var delayChanged = false;
+                        string? durationTooltip = null;
+                        string? delayTooltip = null;
                         var canEditDuration = !Model.Permissions.IsPlanLocked
                             && !Model.Permissions.IsScheduleLocked
                             && Model.Permissions.CanEditDuration
                             && (!Model.Permissions.IsAddOnlyMode || krok.TrvaniDni <= 0);
                         var canEditDelay = !Model.Permissions.IsScheduleLocked
                             && Model.Permissions.CanEditDelay;
-                        var durationDisabled = !Model.Permissions.IsTaskCategory || durationStaticDisabled || !canEditDuration;
-                        var delayDisabled = !Model.Permissions.IsTaskCategory || delayStaticDisabled || !canEditDelay;
-                        var dateDisabled = !Model.Permissions.IsTaskCategory || stepStaticDisabled || !canEditDuration;
-                        var delayDateDisabled = !Model.Permissions.IsTaskCategory || delayStaticDisabled || !canEditDelay;
+                        var dateDisabled = !Model.Permissions.IsTaskCategory || !canEditDuration;
+                        var delayDateDisabled = !Model.Permissions.IsTaskCategory || !canEditDelay;
                         <tr data-schedule-step-row
                             data-step-index="@krok.KrokIndex"
                             data-step-name="@krok.Nazev"

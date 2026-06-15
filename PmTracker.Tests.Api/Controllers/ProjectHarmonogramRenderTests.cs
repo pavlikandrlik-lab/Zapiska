@@ -202,6 +202,31 @@ public sealed class ProjectHarmonogramRenderTests
             .And.Contain("width:", "skutečnost kroku 3 má vykreslený actual segment");
     }
 
+    [Fact]
+    public async Task Edit_ScheduleTab_PlanDateFields_AreEditable_ForTaskWithEditPermission()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiHarmEditableOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIHARMEDIT");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIHARMSUBEDIT", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram editable plan record");
+        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        // Regrese (datum-migrace): editor zamykal plán-date inputy přes mrtvé TrvaniTypId gating.
+        // Plán je v editoru editovatelný → každé HarmonogramHodnoty[i].PlanDatum pole musí být locked="false".
+        var planFields = Regex.Matches(html, "<pm-date-field\\b[^>]*HarmonogramHodnoty\\[\\d+\\]\\.PlanDatum[^>]*>");
+        planFields.Count.Should().BeGreaterThan(0, "editor renderuje plán date pole");
+        foreach (Match m in planFields)
+        {
+            m.Value.Should().Contain("locked=\"false\"", "plán je v editoru editovatelný (regrese: TrvaniTypId gating)");
+        }
+    }
+
     /// <summary>
     /// Datum-model seed: vloží krok rows (plan_datum + volitelně skutecnost_datum) do
     /// <c>zaznam_harmonogram_krok</c>. Plán je vždy vyplněn pro všech 10 kroků (týdenní rozestup
