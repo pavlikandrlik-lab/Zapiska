@@ -696,27 +696,9 @@ public sealed class RecordEditorControllerTests
         savedLinks.Should().ContainSingle(x => x.Kod == "NES" && x.Cislo == "NES-456" && x.PredpokladanaCena == null);
     }
 
-    [Fact]
-    public async Task Create_ShouldRenderScheduleActualInput_WithoutClientSideMinimumClamp()
-    {
-        var ownerId = await _fixture.EnsurePersonAsync("ApiCreateSignedDelay");
-        var projectId = await _fixture.EnsureProjectAsync("APIRED4");
-        await _fixture.EnsureSubsystemAsync("APIREDSUB4", ownerId);
-
-        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync($"/Zaznamy/Create?projektId={projectId}&asUser={_fixture.AdminOsobaId}");
-        var html = await response.Content.ReadAsStringAsync();
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-
-        var delayInputMatch = Regex.Match(
-            html,
-            "<input[^>]*data-schedule-delay[^>]*>",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
-        delayInputMatch.Success.Should().BeTrue(html);
-        delayInputMatch.Value.Should().NotContain("min=", "skutečnost musí podporovat záporné hodnoty už před prvním uložením");
-    }
+    // Smazáno: Create_ShouldRenderScheduleActualInput_WithoutClientSideMinimumClamp
+    // — testoval offset-model "delay" input (data-schedule-delay) se zápornými hodnotami.
+    // Datum-model nemá offset/delay input; skutečnost je absolutní datum, žádný min-clamp.
 
     [Fact]
     public async Task Create_ShouldPrefillMeetingContextAndStartDate_WhenOpenedFromMeetingDetail()

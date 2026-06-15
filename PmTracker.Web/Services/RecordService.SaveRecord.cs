@@ -243,7 +243,7 @@ public sealed partial class RecordService
 
             // Datum-model: UPSERT krok rows (plán datumy + manuální skutečnost + rezim).
             // Auto skutečnost řeší harvest (SyncZaznamAsync), ne save.
-            _ = await PersistScheduleKrokyAsync(entity, command, isTaskCategory, innerCt);
+            _ = await PersistScheduleKrokyAsync(entity, command, isTaskCategory, pendingScheduleProposalLock.LocksSchedule, innerCt);
 
             await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, innerCt);
             auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
@@ -784,8 +784,17 @@ public sealed partial class RecordService
         PmTracker.Web.Models.Entities.ProjektovyZaznamEntity entity,
         SaveRecordCommand command,
         bool isTaskCategory,
+        bool scheduleLocked,
         CancellationToken ct)
     {
+        // Pending návrh změny harmonogramu zamyká celý harmonogram (plán i skutečnost) –
+        // analogicky k LocksTermDeadline u termínu. Přímý zápis kroků by kolidoval s návrhem,
+        // který čeká na rozhodnutí, proto stávající krok řádky zachováme beze změny.
+        if (scheduleLocked && isTaskCategory)
+        {
+            return false;
+        }
+
         if (!isTaskCategory)
         {
             var existingNonTask = await dbContext.ZaznamHarmonogramKroky
@@ -1199,9 +1208,11 @@ public sealed partial class RecordService
             throw new InvalidOperationException("Harmonogram lze upravovat pouze u záznamů kategorie úkol.");
         }
 
+        var scheduleLock = await pendingScheduleProposalLockEvaluator.EvaluateAsync(entity.Id, ct);
+
         return await ExecuteInSerializableTransactionAsync(async innerCt =>
         {
-            var changed = await PersistScheduleKrokyAsync(entity, command, isTaskCategory: true, innerCt);
+            var changed = await PersistScheduleKrokyAsync(entity, command, isTaskCategory: true, scheduleLock.LocksSchedule, innerCt);
             if (changed)
             {
                 await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, innerCt);

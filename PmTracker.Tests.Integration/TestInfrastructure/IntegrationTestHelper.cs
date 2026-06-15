@@ -11,6 +11,8 @@ using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Export;
 using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Settings;
+using PmTracker.ServiceDesk.Contracts;
+using PmTracker.ServiceDesk.Sql;
 
 namespace PmTracker.Tests.Integration.TestInfrastructure;
 
@@ -68,6 +70,12 @@ internal static class IntegrationTestHelper
         // IHttpContextAccessor potřebuje autorizační audit vrstva.
         services.AddHttpContextAccessor();
         services.AddScoped<IAuthorizationService, AuthorizationService>();
+        // ServiceDesk dotazy jsou v produkci registrované v Program.cs (ne v AddPmTrackerDataStore).
+        // ExterniOdkazValidator (v data-store grafu) je vyžaduje → ve fixture registrujeme
+        // disabled stub (Ticketing vypnutý, vrací prázdno) + default TicketingOptions.
+        services.AddScoped<IVyjadreniQueryService, DisabledVyjadreniQueryService>();
+        services.AddScoped<PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService,
+            PmTracker.Web.Services.Schedules.HarmonogramSkutecnostSyncService>();
         services.AddSingleton(dbContext);
         services.AddSingleton(timeProvider ?? TimeProvider.System);
 

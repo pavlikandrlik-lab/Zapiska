@@ -17,68 +17,8 @@ import {
 import { queueRainbowSegmentRender } from "../ui.js";
 import { renderTimelineAxis } from "./timeline.js";
 
-// F-07: async funkce volající server-side /Schedule/Recalc endpoint.
-// Per-action redesign 2026-04-23: projektId je nyní required v payloadu —
-// ScheduleController ověřuje HasPermission(schedule.preview, projektId).
-async function fetchSchedulePreview(projektId, startDate, deadlineDate, steps, antiForgeryToken) {
-    const payload = {
-        projektId: projektId,
-        recordId: 0,
-        startDate: formatIsoDate(startDate),
-        deadlineDate: formatIsoDate(deadlineDate),
-        steps: steps.map(s => ({
-            stepIndex: s.stepIndex,
-            durationTypeId: s.durationTypeId || 0,
-            delayTypeId: s.delayTypeId || 0,
-            durationDays: s.duration,
-            delayDays: s.delay
-        }))
-    };
-    // FIX 2026-05-02: dev override propagace — pokud aktuální URL obsahuje asUser=N
-    // query, propisni do POST URL aby UserContextMiddleware mohl resolvnout principal.
-    // Production (žádný asUser query) → standardní cookie/AD auth.
-    const currentUrl = new URL(window.location.href);
-    const asUserParam = currentUrl.searchParams.get('asUser');
-    const recalcUrl = asUserParam
-        ? `/Schedule/Recalc?asUser=${encodeURIComponent(asUserParam)}`
-        : '/Schedule/Recalc';
-    const response = await fetch(recalcUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'RequestVerificationToken': antiForgeryToken
-        },
-        body: JSON.stringify(payload),
-        credentials: 'same-origin'
-    });
-    if (!response.ok) {
-        return null;
-    }
-    return await response.json();
-}
-
-// F-07: replaced by server-side /Schedule/Recalc endpoint — kept for use in
-// recalcFromDate / recalcFromDelayDate which need local date arithmetic before recalcAll.
-function buildSchedulePlanAndActual(state, startDate) {
-    const plan = [];
-    const actual = [];
-    let planCursor = new Date(startDate.getTime());
-    let actualCursor = new Date(startDate.getTime());
-
-    state.forEach((item) => {
-        const planStart = new Date(planCursor.getTime());
-        const planEnd = addCalendarDays(planStart, item.duration);
-        plan.push({ start: planStart, end: planEnd });
-        planCursor = new Date(planEnd.getTime());
-
-        const actualStart = new Date(actualCursor.getTime());
-        const actualEnd = addCalendarDays(actualStart, Math.max(0, item.duration + item.delay));
-        actual.push({ start: actualStart, end: actualEnd });
-        actualCursor = new Date(actualEnd.getTime());
-    });
-
-    return { plan, actual };
-}
+// Datum-model (Fáze 3b): /Schedule/Recalc endpoint i offsetový buildSchedulePlanAndActual
+// zrušeny. Editor live-preview počítá čistě z datumů (ScheduleBlockRenderer.computeDateModel).
 
 function buildScheduleScale(startDate, deadlineDate, actualEndDate) {
     const startStamp = toUtcDayStamp(startDate);
@@ -358,39 +298,13 @@ export class ScheduleBlockRenderer {
         this.recalcAll();
     }
 
-    recalcFromDate(stepIndex) {
-        const entry = this.editorRows[stepIndex];
-        if (!entry || !(entry.dateInput instanceof HTMLInputElement)) {
-            this.recalcAll();
-            return;
-        }
-
-        const state = this.readState();
-        const startDate = this.getStartDate();
-        const { plan } = buildSchedulePlanAndActual(state, startDate);
-        const previousPlanEnd = stepIndex === 0
-            ? startDate
-            : plan[stepIndex - 1]?.end || startDate;
-        const selectedDate = parseIsoDate(entry.dateInput.value) || previousPlanEnd;
-        state[stepIndex] = { ...state[stepIndex], duration: Math.max(0, diffCalendarDays(selectedDate, previousPlanEnd)) };
-        this.writeState(state);
+    // Datum-model (Fáze 3b): datum se edituje přímo v inputu; přepočet jen znovu načte
+    // datumy a pozicuje. (Parametr stepIndex ponechán kvůli kompatibilitě bind() volání.)
+    recalcFromDate() {
         this.recalcAll();
     }
 
-    recalcFromDelayDate(stepIndex) {
-        const entry = this.editorRows[stepIndex];
-        if (!entry || !(entry.delayDateInput instanceof HTMLInputElement)) {
-            this.recalcAll();
-            return;
-        }
-
-        const state = this.readState();
-        const startDate = this.getStartDate();
-        const { plan } = buildSchedulePlanAndActual(state, startDate);
-        const planEnd = plan[stepIndex]?.end || startDate;
-        const selectedDate = parseIsoDate(entry.delayDateInput.value) || planEnd;
-        state[stepIndex] = { ...state[stepIndex], delay: diffCalendarDays(selectedDate, planEnd) };
-        this.writeState(state);
+    recalcFromDelayDate() {
         this.recalcAll();
     }
 
@@ -429,7 +343,25 @@ export class ScheduleBlockRenderer {
 
     renderSummary(plan, actual, state, startDate, deadlineDate) {
         const baselineEnd = plan.length > 0 ? plan[plan.length - 1].end : startDate;
-        const shiftedEnd = actual.length > 0 ? actual[actual.length - 1].end : startDate;
+        // Datum-model: skutečné dokončení = poslední VYPLNĚNÝ krok; pokud koncový krok není
+        // vyplněn, projektuj na dnešek (prodlení vůči aktuálnímu datu) — shodně se serverovým
+        // ScheduleDateCalculator.Summarize, aby editor a karta/tab nedriftovaly.
+        const nowRaw = new Date();
+        const todayDate = new Date(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate());
+        let lastFilledEnd = null;
+        for (let i = 0; i < state.length; i++) {
+            if (state[i].hasActual) {
+                lastFilledEnd = actual[i].end;
+            }
+        }
+        const koncovyVyplnen = state.length > 0 && state[state.length - 1].hasActual;
+        let shiftedEnd;
+        if (koncovyVyplnen) {
+            shiftedEnd = actual[actual.length - 1].end;
+        } else {
+            const base = lastFilledEnd || startDate;
+            shiftedEnd = toUtcDayStamp(todayDate) > toUtcDayStamp(base) ? todayDate : base;
+        }
         const totalDuration = state.reduce((sum, item) => sum + item.duration, 0);
         const totalDelay = state.reduce((sum, item) => sum + item.delay, 0);
         const stihame = toUtcDayStamp(shiftedEnd) <= toUtcDayStamp(deadlineDate);
@@ -678,71 +610,82 @@ export class ScheduleBlockRenderer {
     // F-07: recalcAll is now async — calls /Schedule/Recalc server endpoint.
     // Falls back to local buildSchedulePlanAndActual when the fetch fails so the
     // UI stays functional even if the endpoint is temporarily unavailable.
-    async recalcAll() {
-        const state = this.readState();
+    // Datum-model (Fáze 3b): editor live-preview počítá POUZE z datumů na frontendu
+    // (plán z [name$=".PlanDatum"], skutečnost z manuálního inputu nebo data-step-actual-iso).
+    // Žádný server round-trip (/Schedule/Recalc zrušen), žádné offsety. Mirror serverového
+    // ScheduleDateCalculator + ScheduleBarLayoutCalculator — render metody pozicují z {start,end}.
+    recalcAll() {
+        const { plan, actual, state, startDate } = this.computeDateModel();
         if (state.length === 0) {
             return;
         }
-
-        const startDate = this.getStartDate();
         const deadlineDate = this.getDeadlineDate(startDate);
+        this.renderSummary(plan, actual, state, startDate, deadlineDate);
+        this.renderOverview(plan, actual, state, startDate, deadlineDate);
+        this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
+        queueRainbowSegmentRender(this.root);
+    }
 
-        // Debounce: cancel previous pending recalc and schedule a new one.
-        if (this._recalcDebounceTimer !== undefined) {
-            clearTimeout(this._recalcDebounceTimer);
+    rowDateIso(row, suffix) {
+        if (!(row instanceof HTMLElement)) {
+            return null;
         }
+        const input = row.querySelector(`input[name$=".${suffix}"]`);
+        if (input instanceof HTMLInputElement && input.value) {
+            return input.value.trim();
+        }
+        return null;
+    }
 
-        await new Promise((resolve) => {
-            this._recalcDebounceTimer = setTimeout(resolve, 150);
+    // Plán: [name$=".PlanDatum"]. Skutečnost: manuální input (ManualActualKroky[*].AbsolutniDatum)
+    // nebo fallback HarmonogramHodnoty[*].SkutecnostDatum; pro auto kroky read-only z data-step-actual-iso.
+    computeDateModel() {
+        const startDate = this.getStartDate();
+        let planCursor = new Date(startDate.getTime());
+        let actualCursor = new Date(startDate.getTime());
+        const plan = [];
+        const actual = [];
+        const state = [];
+
+        this.editorRows.forEach((entry) => {
+            const row = entry.row;
+            const planEndRaw = parseIsoDate(this.rowDateIso(row, "PlanDatum"));
+            const planStart = new Date(planCursor.getTime());
+            let planEnd = planEndRaw || new Date(planStart.getTime());
+            if (toUtcDayStamp(planEnd) < toUtcDayStamp(planStart)) {
+                planEnd = new Date(planStart.getTime());
+            }
+            plan.push({ start: planStart, end: planEnd });
+            planCursor = new Date(planEnd.getTime());
+
+            const actualIso = this.rowDateIso(row, "AbsolutniDatum")
+                || this.rowDateIso(row, "SkutecnostDatum")
+                || (String(row.dataset.stepActualIso || "").trim() || null);
+            const actualDate = parseIsoDate(actualIso);
+            const actualStart = new Date(actualCursor.getTime());
+            let actualEnd = new Date(actualCursor.getTime());
+            let hasActual = false;
+            if (actualDate) {
+                actualEnd = actualDate;
+                if (toUtcDayStamp(actualEnd) < toUtcDayStamp(actualStart)) {
+                    actualEnd = new Date(actualStart.getTime());
+                }
+                actualCursor = new Date(actualEnd.getTime());
+                hasActual = true;
+            }
+            actual.push({ start: actualStart, end: actualEnd });
+
+            state.push({
+                stepIndex: entry.stepIndex,
+                name: String(row.dataset.stepName || "").trim(),
+                color: String(row.dataset.stepColor || "").trim(),
+                duration: Math.max(0, diffCalendarDays(planEnd, planStart)),
+                delay: hasActual ? diffCalendarDays(actualEnd, planEnd) : 0,
+                hasActual
+            });
         });
 
-        // Try server-side calculation first
-        const token = this.getAntiForgeryToken();
-        let usedServerData = false;
-
-        if (token) {
-            try {
-                // Per-action redesign 2026-04-23: ProjektId je required pro authz check
-                // v /Schedule/Recalc. Zdroj: hidden input v editor formu (name="ProjektId").
-                const projektIdInput = this.form instanceof HTMLFormElement
-                    ? this.form.querySelector('input[name="ProjektId"]')
-                    : null;
-                const projektId = projektIdInput instanceof HTMLInputElement
-                    ? parseInt(projektIdInput.value, 10) || 0
-                    : 0;
-                const serverResult = await fetchSchedulePreview(projektId, startDate, deadlineDate, state, token);
-                if (serverResult && Array.isArray(serverResult.steps)) {
-                    // Build plan/actual arrays from server response for the renderers
-                    const plan = serverResult.steps.map((s) => ({
-                        start: parseIsoDate(s.planStart) || startDate,
-                        end: parseIsoDate(s.planEnd) || startDate
-                    }));
-                    const actual = serverResult.steps.map((s) => ({
-                        start: parseIsoDate(s.actualStart) || startDate,
-                        end: parseIsoDate(s.actualEnd) || startDate
-                    }));
-
-                    this.renderEditorRows(plan, actual);
-                    this.renderSummary(plan, actual, state, startDate, deadlineDate);
-                    this.renderOverview(plan, actual, state, startDate, deadlineDate);
-                    this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
-                    queueRainbowSegmentRender(this.root);
-                    usedServerData = true;
-                }
-            } catch (_err) {
-                // Fall through to local calculation
-            }
-        }
-
-        if (!usedServerData) {
-            // Fallback: local calculation (F-07 kept as fallback)
-            const { plan, actual } = buildSchedulePlanAndActual(state, startDate);
-            this.renderEditorRows(plan, actual);
-            this.renderSummary(plan, actual, state, startDate, deadlineDate);
-            this.renderOverview(plan, actual, state, startDate, deadlineDate);
-            this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
-            queueRainbowSegmentRender(this.root);
-        }
+        return { plan, actual, state, startDate };
     }
 
     bindNumericStepper(button, input, delta, onChange) {

@@ -19,7 +19,6 @@
     var visibleCompactSteps = Model.Kroky
         .OrderBy(krok => krok.KrokIndex)
         .ToList();
-    var editorInputIndex = 0;
     // Plán D Task 8: pořadí manual kroků v rámci ManualActualKroky[] binding.
     // Počítá se jen pro kroky, u kterých opravdu renderujeme manual input/read-only.
     var manualInputIndex = 0;
@@ -267,8 +266,6 @@
                     @for (var i = 0; i < Model.Kroky.Count; i++)
                     {
                         var krok = Model.Kroky[i];
-                        var durationInputIndex = editorInputIndex++;
-                        var delayInputIndex = editorInputIndex++;
                         var durationStaticDisabled = krok.TrvaniTypId <= 0;
                         var delayStaticDisabled = krok.ZpozdeniTypId <= 0;
                         var stepStaticDisabled = durationStaticDisabled || delayStaticDisabled;
@@ -291,7 +288,8 @@
                             data-step-name="@krok.Nazev"
                             data-step-color="@krok.BarvaHex"
                             data-step-duration="@krok.TrvaniDni"
-                            data-step-delay="@krok.OdchylkaDni">
+                            data-step-delay="@krok.OdchylkaDni"
+                            data-step-actual-iso="@(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum.ToString("yyyy-MM-dd") : string.Empty)">
                             <td>@krok.Nazev</td>
                             <td>
                                 @* DESIGN-9-F (2026-05-02): DURATION input redesign — primární editor je
@@ -300,19 +298,15 @@
                                    Stepper +/− odstraněn — datum-driven flow je sjednocený se skutečností. *@
                                 <div class="schedule-stacked-input @(durationChanged ? "proposal-field-changed" : null)"
                                      title="@durationTooltip">
-                                    <input type="hidden" name="HarmonogramHodnoty[@durationInputIndex].TypId" value="@krok.TrvaniTypId" />
-                                    <input type="hidden"
-                                           name="HarmonogramHodnoty[@durationInputIndex].Hodnota"
-                                           value="@krok.TrvaniDni"
-                                           data-schedule-duration-hidden
-                                           data-schedule-static-disabled="@(durationStaticDisabled ? "true" : "false")"
-                                           data-schedule-original-duration="@krok.TrvaniDni" />
+                                    @* Datum-model (Fáze 3b): jeden HarmonogramHodnoty[i] na krok — Poradi + PlanDatum.
+                                       Plánové datum konce kroku je primární editovatelná hodnota (žádné offsety). *@
+                                    <input type="hidden" name="HarmonogramHodnoty[@i].Poradi" value="@krok.KrokIndex" />
                                     <div class="schedule-duration-row">
                                         @await Html.PartialAsync(
                                             "_AppDateField",
                                             new AppDateFieldViewModel
                                             {
-                                                Name = $"UiHarmonogramDatumy[{i}]",
+                                                Name = $"HarmonogramHodnoty[{i}].PlanDatum",
                                                 IsoValue = krok.BaselineDatum.ToString("yyyy-MM-dd"),
                                                 DisplayValue = krok.BaselineDatum.ToString("dd.MM.yyyy"),
                                                 Locked = dateDisabled,
@@ -321,8 +315,7 @@
                                                 ExtraDataAttributes = new Dictionary<string, object?>
                                                 {
                                                     ["data-schedule-duration-calendar"] = "true",
-                                                    ["data-schedule-static-disabled"] = stepStaticDisabled ? "true" : "false",
-                                                    ["data-schedule-original-duration"] = krok.TrvaniDni.ToString(),
+                                                    ["data-schedule-plan-step"] = krok.KrokIndex.ToString(),
                                                     ["title"] = durationTooltip
                                                 }
                                             })
@@ -366,19 +359,9 @@
                                     var canShowManualForRezim = useManualCell || allowManualForAutoEligible;
                                     var assignedManualIndex = canShowManualForRezim ? manualInputIndex++ : -1;
                                 }
-                                @* FIX 2026-05-04: hidden DELAY input pro VŠECHNY non-legacy cells (manual/FromVyjadreni/None)
-                                   aby HarmonogramHodnoty[i] indexy zůstaly continuous. ASP.NET model binder pro List<T>
-                                   čeká [0], [1], [2]... bez mezer — pokud chybí [1], binder zastaví na [0] a command.HarmonogramHodnoty.Count=1.
-                                   Hodnota = krok.OdchylkaDni (pre-existing) nebo 0 (nový/krok nenastal). *@
-                                @if (useManualCell || useFromVyjadreniCell || useNoneCell)
-                                {
-                                    <input type="hidden"
-                                           name="HarmonogramHodnoty[@delayInputIndex].TypId"
-                                           value="@krok.ZpozdeniTypId" />
-                                    <input type="hidden"
-                                           name="HarmonogramHodnoty[@delayInputIndex].Hodnota"
-                                           value="@(krok.OdchylkaDni ?? 0)" />
-                                }
+                                @* Datum-model (Fáze 3b): skutečnost (datum) řeší manuální buňka přes
+                                   ManualActualKroky[]; plán už nese HarmonogramHodnoty[i].PlanDatum výše.
+                                   Žádné offset DELAY páry. *@
                                 @if (useManualCell)
                                 {
                                     @await Html.PartialAsync(
@@ -420,66 +403,32 @@
                                 }
                                 else
                                 {
+                                    // Datum-model (Fáze 3b): fallback (Create flow / ostatní) — skutečnost je
+                                    // datum kroku (HarmonogramHodnoty[i].SkutecnostDatum), žádné offsety/steppery.
+                                    // Prázdné = krok ještě nenastal.
+                                    var hasActualDate = krok.OdchylkaDni.HasValue;
+                                    var skutecnostIso = hasActualDate ? krok.SkutecneDatum.ToString("yyyy-MM-dd") : string.Empty;
+                                    var skutecnostDisplay = hasActualDate ? krok.SkutecneDatum.ToString("dd.MM.yyyy") : string.Empty;
                                     <div class="schedule-stacked-input @(delayChanged ? "proposal-field-changed" : null)"
                                          title="@delayTooltip">
-                                        <input type="hidden" name="HarmonogramHodnoty[@delayInputIndex].TypId" value="@krok.ZpozdeniTypId" />
-                                        <div class="schedule-stacked-main">
-                                            <div class="schedule-stacked-part schedule-stacked-part-top">
-                                                <input class="schedule-days-input schedule-days-input-stacked"
-                                                       type="number"
-                                                       name="HarmonogramHodnoty[@delayInputIndex].Hodnota"
-                                                       value="@krok.OdchylkaDni"
-                                                       data-schedule-delay
-                                                       data-schedule-static-disabled="@(delayStaticDisabled ? "true" : "false")"
-                                                       @((delayDisabled) ? "disabled=\"disabled\"" : null) />
-                                            </div>
-                                            <div class="schedule-stacked-part schedule-stacked-part-bottom">
-                                                @{
-                                                    // FIX 2026-05-02: DESIGN-10-A NULL semantika pro skutečnost.
-                                                    // Pokud OdchylkaDni je null (krok nenastal — žádný delay row),
-                                                    // calculator vrací fallback SkutecneDatum=BaselineDatum, což by
-                                                    // v políčku skutečnost zobrazilo plan datum (typicky DatumZalozeni
-                                                    // pro krok 1 PMP/PNF). Tj. bez tohoto guardu user vidí "datum
-                                                    // založení" místo prázdné = bug. Empty = "krok ještě nenastal".
-                                                    var hasActualDate = krok.OdchylkaDni.HasValue;
-                                                    var skutecnostIso = hasActualDate ? krok.SkutecneDatum.ToString("yyyy-MM-dd") : string.Empty;
-                                                    var skutecnostDisplay = hasActualDate ? krok.SkutecneDatum.ToString("dd.MM.yyyy") : string.Empty;
+                                        @await Html.PartialAsync(
+                                            "_AppDateField",
+                                            new AppDateFieldViewModel
+                                            {
+                                                Name = $"HarmonogramHodnoty[{i}].SkutecnostDatum",
+                                                IsoValue = skutecnostIso,
+                                                DisplayValue = skutecnostDisplay,
+                                                Locked = delayDateDisabled,
+                                                Clearable = true,
+                                                AriaLabel = $"Skutečnost kroku {krok.Nazev}",
+                                                ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(delayChanged ? " proposal-field-changed" : string.Empty)}",
+                                                ExtraDataAttributes = new Dictionary<string, object?>
+                                                {
+                                                    ["data-schedule-delay-date"] = "true",
+                                                    ["data-schedule-actual-step"] = krok.KrokIndex.ToString(),
+                                                    ["title"] = delayTooltip
                                                 }
-                                                @await Html.PartialAsync(
-                                                    "_AppDateField",
-                                                    new AppDateFieldViewModel
-                                                    {
-                                                        Name = $"UiHarmonogramPosunuteDatumy[{i}]",
-                                                        IsoValue = skutecnostIso,
-                                                        DisplayValue = skutecnostDisplay,
-                                                        Locked = delayDateDisabled,
-                                                        AriaLabel = "Otevřít kalendář skutečnosti kroku harmonogramu",
-                                                        ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(delayChanged ? " proposal-field-changed" : string.Empty)}",
-                                                        ExtraDataAttributes = new Dictionary<string, object?>
-                                                        {
-                                                            ["data-schedule-delay-date"] = "true",
-                                                            ["data-schedule-static-disabled"] = delayStaticDisabled ? "true" : "false",
-                                                            ["title"] = delayTooltip
-                                                        }
-                                                    })
-                                            </div>
-                                        </div>
-                                        <div class="schedule-stacked-stepper">
-                                            <button class="icon-btn schedule-step-btn"
-                                                    type="button"
-                                                    data-schedule-delay-inc
-                                                    aria-label="Přidat 1 den odchylky: @krok.Nazev"
-                                                    @((delayDisabled) ? "disabled=\"disabled\"" : null)>
-                                                <gov-icon size="s" name="plus" type="components" aria-hidden="true"></gov-icon>
-                                            </button>
-                                            <button class="icon-btn schedule-step-btn"
-                                                    type="button"
-                                                    data-schedule-delay-dec
-                                                    aria-label="Odebrat 1 den odchylky: @krok.Nazev"
-                                                    @((delayDisabled) ? "disabled=\"disabled\"" : null)>
-                                                <gov-icon size="s" name="dash" type="components" aria-hidden="true"></gov-icon>
-                                            </button>
-                                        </div>
+                                            })
                                     </div>
                                 }
                             </td>

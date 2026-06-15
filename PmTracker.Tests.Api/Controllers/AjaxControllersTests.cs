@@ -261,8 +261,8 @@ public sealed class AjaxControllersTests
                 ("ExterniVazby[0].Typ", "PMP"),
                 ("ExterniVazby[0].Cislo", ""),
                 ("ExterniVazby[0].PredpokladanaCena", "abc"),
-                ("HarmonogramHodnoty[0].TypId", "999999"),
-                ("HarmonogramHodnoty[0].Hodnota", "3")));
+                ("HarmonogramHodnoty[0].Poradi", "99"),
+                ("HarmonogramHodnoty[0].PlanDatum", "2026-06-01")));
 
         var response = await client.SendAsync(request);
 
@@ -275,7 +275,7 @@ public sealed class AjaxControllersTests
         payload.FieldErrors.Keys.Should().Contain("ExterniVazby[0].Cislo");
         payload.FieldErrors.Keys.Should().Contain("ExterniVazby[0].PredpokladanaCena");
         payload.FieldErrors.Keys.Should().Contain("VybraniSpolupracovniciIds");
-        payload.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[0].TypId");
+        payload.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[0].Poradi");
     }
 
     // SavePermission_ShouldReturnAjaxError_ForUnsupportedKey smazáno: endpoint

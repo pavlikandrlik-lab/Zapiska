@@ -52,7 +52,8 @@ Dokument popisuje standardní databázový lifecycle: inicializaci baseline, apl
 27. `db_upgrade_1_3_14_delay_nullable.sql`
 28. `db_upgrade_1_3_15_harmonogram_indexes.sql`
 29. `db_upgrade_1_3_16_fix_harmonogram_hodnoty_cascade.sql`
-30. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
+30. `db_upgrade_1_4_0_harmonogram_datum_model.sql`
+31. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
 
 ### 5.2 Fresh install
 ```powershell

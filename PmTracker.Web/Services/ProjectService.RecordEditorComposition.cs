@@ -124,6 +124,10 @@ public sealed partial class ProjectService
         var todayDate = timeProvider.GetUtcNow().UtcDateTime.Date;
         var harmonogramSouhrn = HarmonogramDateBlokBuilder.BuildSouhrn(
             record.DatumZalozeni, krokRows, record.DatumUkonceni, todayDate);
+        // Fáze 3b: server-seed iniciální pozice baru i pro editor (správný bar při otevření,
+        // bez závislosti na klientu). block.js pak při editaci datumů přepočítá live.
+        var harmonogramBarLayout = HarmonogramDateBlokBuilder.BuildBarLayout(
+            record.DatumZalozeni, krokRows, record.DatumUkonceni, todayDate);
 
         // Plán 4 Feature C Task 6: načti pending proposal lock PŘED build Kroky, aby canToggleRezim
         // mohl být použitý per krok (dříve bylo načteno až za Kroky — přesun je no-op pro existing code
@@ -274,7 +278,8 @@ public sealed partial class ProjectService
                 // Plán D Task 8/9: lock manuálních kroků z pending návrhu + povolit editaci
                 // jen pokud harmonogram není v read-only režimu (full-edit permissions).
                 lockedManualKrokKeys: pendingScheduleProposalLock.LockedManualKrokKeys,
-                canEditManualActual: isTaskCategory && !pendingScheduleProposalLock.LocksSchedule),
+                canEditManualActual: isTaskCategory && !pendingScheduleProposalLock.LocksSchedule,
+                overviewLayout: harmonogramBarLayout),
             DostupniVlastnici = ownerCandidates,
             DostupniSpolupracovnici = collaborationCandidates,
             VybraniSpolupracovniciIds = selectedCollaborationIds,

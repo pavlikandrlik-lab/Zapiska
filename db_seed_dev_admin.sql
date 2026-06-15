@@ -116,78 +116,10 @@ BEGIN TRY
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_stavu_ucasti WHERE kod = N'ABSENT')
         INSERT INTO dbo.ciselnik_stavu_ucasti(kod, nazev, is_locked) VALUES (N'ABSENT', N'Nepřítomen', 1);
 
-    -- Harmonogram baseline for local/dev/test
-    IF NOT EXISTS (SELECT 1 FROM dbo.harmonogram_sablony)
-    BEGIN
-        INSERT INTO dbo.harmonogram_sablony(delay_barva_hex, is_aktivni, created_by)
-        VALUES (N'#DC2626', 1, NULL);
-    END
-
-    DECLARE @sablonaVerze int = (
-        SELECT TOP (1) verze
-        FROM dbo.harmonogram_sablony
-        WHERE is_aktivni = 1
-        ORDER BY verze DESC
-    );
-
-    IF @sablonaVerze IS NULL
-    BEGIN
-        SELECT TOP (1) @sablonaVerze = verze
-        FROM dbo.harmonogram_sablony
-        ORDER BY verze DESC;
-
-        UPDATE dbo.harmonogram_sablony
-        SET is_aktivni = CASE WHEN verze = @sablonaVerze THEN 1 ELSE 0 END;
-    END
-
-    ;WITH source_data AS (
-        SELECT
-            @sablonaVerze AS sablona_verze,
-            v.kod,
-            v.nazev,
-            v.hodnota,
-            v.krok_poradi,
-            v.je_zpozdeni,
-            v.barva_hex,
-            v.krok_key
-        FROM (VALUES
-            (N'HS01_DURATION', N'1. příprava zadání dodavateli', 1, 1, 0, N'#EF4444', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8301')),
-            (N'HS02_DURATION', N'2. konzultace termínů s dodavatelem před vytvořením zadání', 2, 2, 0, N'#F97316', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8302')),
-            (N'HS03_DURATION', N'3. odeslání zadání dodavateli', 3, 3, 0, N'#F59E0B', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8303')),
-            (N'HS04_DURATION', N'4. dodání návrhu řešení', 4, 4, 0, N'#84CC16', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8304')),
-            (N'HS05_DURATION', N'5. vypořádání připomínek', 5, 5, 0, N'#22C55E', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8305')),
-            (N'HS06_DURATION', N'6. odeslání požadavku na výrobu', 6, 6, 0, N'#14B8A6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8306')),
-            (N'HS07_DURATION', N'7. dodání funkcionality dodavatelem', 7, 7, 0, N'#06B6D4', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8307')),
-            (N'HS08_DURATION', N'8. připomínkování', 8, 8, 0, N'#3B82F6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8308')),
-            (N'HS09_DURATION', N'9. testování', 9, 9, 0, N'#6366F1', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8309')),
-            (N'HS10_DURATION', N'10. nasazení do provozu', 10, 10, 0, N'#8B5CF6', CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8310')),
-            (N'HS01_DELAY', N'1. příprava zadání dodavateli - zpoždění', 101, 1, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8301')),
-            (N'HS02_DELAY', N'2. konzultace termínů s dodavatelem před vytvořením zadání - zpoždění', 102, 2, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8302')),
-            (N'HS03_DELAY', N'3. odeslání zadání dodavateli - zpoždění', 103, 3, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8303')),
-            (N'HS04_DELAY', N'4. dodání návrhu řešení - zpoždění', 104, 4, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8304')),
-            (N'HS05_DELAY', N'5. vypořádání připomínek - zpoždění', 105, 5, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8305')),
-            (N'HS06_DELAY', N'6. odeslání požadavku na výrobu - zpoždění', 106, 6, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8306')),
-            (N'HS07_DELAY', N'7. dodání funkcionality dodavatelem - zpoždění', 107, 7, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8307')),
-            (N'HS08_DELAY', N'8. připomínkování - zpoždění', 108, 8, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8308')),
-            (N'HS09_DELAY', N'9. testování - zpoždění', 109, 9, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8309')),
-            (N'HS10_DELAY', N'10. nasazení do provozu - zpoždění', 110, 10, 1, NULL, CONVERT(uniqueidentifier, '9A114F1B-8AA3-44C8-8F8E-E3A9ED4F8310'))
-        ) v(kod, nazev, hodnota, krok_poradi, je_zpozdeni, barva_hex, krok_key)
-    )
-    MERGE dbo.ciselnik_harmonogram_typu AS target
-    USING source_data AS source
-    ON target.sablona_verze = source.sablona_verze AND target.kod = source.kod
-    WHEN NOT MATCHED BY TARGET THEN
-        INSERT (kod, nazev, hodnota, is_locked, sablona_verze, krok_key, krok_poradi, je_zpozdeni, barva_hex)
-        VALUES (source.kod, source.nazev, source.hodnota, 1, source.sablona_verze, source.krok_key, source.krok_poradi, source.je_zpozdeni, source.barva_hex)
-    WHEN MATCHED THEN
-        UPDATE SET
-            target.nazev = source.nazev,
-            target.hodnota = source.hodnota,
-            target.is_locked = 1,
-            target.krok_key = source.krok_key,
-            target.krok_poradi = source.krok_poradi,
-            target.je_zpozdeni = source.je_zpozdeni,
-            target.barva_hex = source.barva_hex;
+    -- Datum-model (Fáze 7/3b 2026-06): harmonogram už nemá číselník schématu ani šablony —
+    -- pevných 10 kroků je v kódu (HarmonogramKroky.Vse). Žádný seed harmonogram_sablony /
+    -- ciselnik_harmonogram_typu (tabulky dropnuty migrací 1_4_0). Skutečnost se vytěžuje
+    -- za běhu do zaznam_harmonogram_krok.
 
     -- Subsystems
     IF NOT EXISTS (SELECT 1 FROM dbo.subsystemy WHERE [kód] = N'INTEGRACE')

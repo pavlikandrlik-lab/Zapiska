@@ -73,8 +73,9 @@ public sealed class ProjectHarmonogramRenderTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        // Filtr „pouze aktivní úkoly" je gov-form-switch s default checked (bare atribut).
         html.Should().Contain("data-filter-key=\"aktivni\"");
-        html.Should().Contain("checked=\"checked\" data-filter-key=\"aktivni\"");
+        html.Should().MatchRegex("data-filter-key=\"aktivni\"\\s+checked");
     }
 
     [Fact]
@@ -184,10 +185,21 @@ public sealed class ProjectHarmonogramRenderTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        // Datum-model: skutečnost vyplněna na krocích 1 a 3, krok 2 bez skutečnosti → absorbován.
-        html.Should().Contain($"data-rainbow-segment-label-short=\"{firstStepOrder}\"");
-        html.Should().Contain($"data-rainbow-segment-label-short=\"{thirdStepOrder}\"");
-        html.Should().NotContain($"data-rainbow-segment-label-short=\"{secondStepOrder}\"");
+        // Datum-model: server pozicuje segmenty inline (segment zůstává v DOM, skrytí přes
+        // display:none). Skutečnost kroku 2 (bez data) se absorbuje → actual segment kroku 2
+        // má display:none; kroky 1 a 3 mají viditelný actual segment (s left/width).
+        string ActualSegment(int step) =>
+            System.Text.RegularExpressions.Regex.Match(
+                html,
+                $"data-schedule-segment-kind=\"actual\"\\s+data-step-index=\"{step}\"[\\s\\S]{{0,200}}?style=\"([^\"]*)\"")
+            .Groups[1].Value;
+
+        ActualSegment(secondStepOrder).Should().Contain("display:none",
+            "skutečnost kroku 2 (bez data) je absorbována → actual segment skrytý");
+        ActualSegment(firstStepOrder).Should().NotContain("display:none")
+            .And.Contain("width:", "skutečnost kroku 1 má vykreslený actual segment");
+        ActualSegment(thirdStepOrder).Should().NotContain("display:none")
+            .And.Contain("width:", "skutečnost kroku 3 má vykreslený actual segment");
     }
 
     /// <summary>
