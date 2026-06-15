@@ -82,23 +82,20 @@ public sealed class HarmonogramPhantomUiFixesTests
     }
 
     [Fact]
-    public void HarmonogramController_ToggleRezim_MaCreateIfMissing()
+    public void HarmonogramController_SelectCandidate_MaCreateIfMissing()
     {
-        // Datum-model (2026-06-12): ToggleRezim adresuje krok přes ZaznamId+Poradi (create-if-missing
-        // přes EnsureKrokRowAsync), ne přes HodnotaId.
+        // Datum-model: per-krok Auto/Ručně toggle byl odstraněn (master switch ho nahradil),
+        // takže ToggleRezim/BulkSetRezim endpointy jsou pryč. SelectCandidate (živý dropdown
+        // výběru kandidáta) adresuje krok přes ZaznamId+Poradi a vytváří krok row create-if-missing.
         var src = Read("PmTracker.Web/Controllers/HarmonogramController.cs");
-        src.Should().MatchRegex(@"ToggleRezimRequest\(int ZaznamId, int Poradi, SkutecnostRezimEnum Rezim\)",
-            "phantom UI bug 2 fix (datum-model) — ToggleRezim přes ZaznamId+Poradi.");
+        src.Should().MatchRegex(@"SelectCandidateRequest\(int ZaznamId, int Poradi, int\? ExterniOdkazId\)",
+            "datum-model — SelectCandidate přes ZaznamId+Poradi.");
         src.Should().Contain("EnsureKrokRowAsync",
             "create-if-missing: krok row se vytvoří, pokud ještě neexistuje.");
-    }
-
-    [Fact]
-    public void HarmonogramController_ToggleRezim_MaPendingLockPreCheck()
-    {
-        var src = Read("PmTracker.Web/Controllers/HarmonogramController.cs");
-        src.Should().Contain("_pendingLockEvaluator",
-            "DESIGN-7-B — ToggleRezim musí pre-checkovat pending lock před Manual→Auto.");
+        src.Should().NotContain("ToggleRezimRequest",
+            "per-krok ToggleRezim endpoint byl odstraněn (master switch ho nahradil).");
+        src.Should().NotContain("BulkSetRezimRequest",
+            "BulkSetRezim endpoint byl odstraněn (master switch persistuje při Save přes HarmonogramRezim).");
     }
 
     [Fact]
@@ -233,6 +230,19 @@ public sealed class HarmonogramPhantomUiFixesTests
             "DELAY date field musí mít NULL guard pro krok bez záznamu (DESIGN-10-A NULL semantika).");
         src.Should().NotMatchRegex(@"IsoValue\s*=\s*krok\.SkutecneDatum\.ToString",
             "Bare krok.SkutecneDatum.ToString jako IsoValue bez null guardu zobrazí computed plan datum místo prázdné políčko.");
+    }
+
+    [Fact]
+    public void SelectCandidateJs_PostujePoradi_NeKrokPoradi()
+    {
+        // Datum-model: server SelectCandidateRequest binduje pole `Poradi` (ne `KrokPoradi`).
+        // Klient (select-candidate.js) posílal `KrokPoradi` → server dostal Poradi=0 → 400.
+        // Dropdown výběru kandidáta tím byl rozbitý. JSON payload musí používat `Poradi`.
+        var src = Read("PmTracker.Web/wwwroot/js/modules/schedule-feature-c/select-candidate.js");
+        src.Should().NotContain("KrokPoradi",
+            "select-candidate.js nesmí posílat zastaralé pole KrokPoradi — server binduje Poradi.");
+        src.Should().MatchRegex(@"Poradi:\s",
+            "JSON payload musí obsahovat klíč Poradi (shoduje se se SelectCandidateRequest).");
     }
 
     [Fact]

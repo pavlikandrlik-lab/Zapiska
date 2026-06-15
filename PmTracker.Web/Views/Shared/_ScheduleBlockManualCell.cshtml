@@ -9,9 +9,10 @@
     var isManualKrok = krok.IsManualKrok;
     var zdroj = krok.ZdrojSkutecnosti;
 
-    // Plán 4 Feature C Task 6 — audit zdroj badge + toggle switch.
+    // Plán 4 Feature C Task 6 — audit zdroj badge.
     // Badge mapuje SkutecnostZdroj (enum: Neznamo/Automat/Manual/Historicka) na ikonku + tooltip.
-    // Toggle switch je viditelný jen když existuje krok řádek (DelayHodnotaId > 0)
+    // Per-krok Auto/Ručně toggle byl odstraněn (master switch v tab strip ho nahradil).
+    // Badge je viditelný jen když existuje krok řádek (DelayHodnotaId > 0)
     // a user má CanToggleRezim (schedule not locked + isTaskCategory).
     var featureCBadgeIcon = krok.SkutecnostZdroj switch
     {
@@ -27,7 +28,7 @@
         SkutecnostZdrojEnum.Historicka => "Skutečnost migrovaná před zavedením auto-fill (historická data).",
         _                              => "Skutečnost nebyla vyplněna."
     };
-    var featureCShowToggle = krok.CanToggleRezim && krok.DelayHodnotaId.HasValue;
+    var featureCShowBadge = krok.CanToggleRezim && krok.DelayHodnotaId.HasValue;
     var featureCRezimLabel = krok.SkutecnostRezim == SkutecnostRezimEnum.Auto ? "Auto" : "Ručně";
     var featureCToggleAriaLabel = krok.SkutecnostRezim == SkutecnostRezimEnum.Auto
         ? $"Přepnout režim skutečnosti kroku {krok.Nazev} z Auto na Ručně"
@@ -55,7 +56,7 @@
      data-skutecnost-rezim="@krok.SkutecnostRezim"
      data-skutecnost-zdroj="@krok.SkutecnostZdroj"
      data-krok-poradi="@krok.KrokIndex">
-    <div class="schedule-actual-cell__feature-c" aria-hidden="@(featureCShowToggle ? "false" : "true")">
+    <div class="schedule-actual-cell__feature-c" aria-hidden="@(featureCShowBadge ? "false" : "true")">
         <span class="schedule-actual-cell__badge"
               data-feature-c-badge
               data-zdroj="@krok.SkutecnostZdroj"
@@ -103,8 +104,8 @@
         @* FIX 2026-05-03: per-krok Auto/Manual toggle nahrazen master switchem v tab strip
            ("Automatické vyplňování harmonogramu" — _EditZaznamForm.cshtml). Per-krok toggle
            byl duplicate UX a user explicitně řekl "chci aby se všechny kroky přepínaly buď
-           auto nebo všechny kroky manuální". Bulk endpoint /Harmonogram/BulkSetRezim ignoruje
-           manuální kroky 2/5/8/9 (= ty nejsou auto-fillable, vyplňují se vždy ručně). *@
+           auto nebo všechny kroky manuální". Master switch přepíná jen auto-eligible kroky;
+           manuální kroky 2/5/8/9 jsou vždy ručně (nejsou auto-fillable). *@
     </div>
 
     <div class="schedule-actual-cell__main">

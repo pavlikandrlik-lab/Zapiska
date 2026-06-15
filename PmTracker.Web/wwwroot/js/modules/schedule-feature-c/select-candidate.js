@@ -7,7 +7,7 @@
 //
 // Flow:
 //   1. Klik na <button data-feature-c-select-candidate> uvnitř <details> dropdownu
-//   2. POST /Harmonogram/SelectCandidate { HodnotaId, ExterniOdkazId, ZaznamId, KrokPoradi }
+//   2. POST /Harmonogram/SelectCandidate { ZaznamId, Poradi, ExterniOdkazId }
 //   3. Po success refresh data-attributes buňky + close <details>
 //
 // Memory: project_manual_actual_kroky_phantom_ui (phantom UI bug 3 closed).
@@ -142,7 +142,6 @@
         event.preventDefault();
 
         const cell = btn.closest(CELL_SELECTOR);
-        const hodnotaId = parseInt(btn.getAttribute('data-hodnota-id') || '0', 10);
         const externiOdkazId = parseInt(btn.getAttribute('data-externi-odkaz-id') || '0', 10);
         const zaznamId = parseInt(btn.getAttribute('data-zaznam-id') || '0', 10);
         const krokPoradi = parseInt(btn.getAttribute('data-krok-poradi') || '0', 10);
@@ -151,12 +150,17 @@
             showError(cell, 'Chybí ID externího odkazu kandidáta.');
             return;
         }
+        if (!Number.isFinite(zaznamId) || zaznamId <= 0 || !Number.isFinite(krokPoradi) || krokPoradi < 1 || krokPoradi > 10) {
+            showError(cell, 'Chybí ZaznamId nebo Poradi kroku.');
+            return;
+        }
 
+        // Datum-model: server SelectCandidateRequest = (ZaznamId, Poradi, ExterniOdkazId).
+        // Krok řádek si server vytvoří create-if-missing (EnsureKrokRowAsync).
         const payload = {
-            HodnotaId: hodnotaId > 0 ? hodnotaId : 0,
-            ExterniOdkazId: externiOdkazId,
-            ZaznamId: zaznamId > 0 ? zaznamId : null,
-            KrokPoradi: krokPoradi > 0 ? krokPoradi : null
+            ZaznamId: zaznamId,
+            Poradi: krokPoradi,
+            ExterniOdkazId: externiOdkazId
         };
 
         // FIX 2026-05-01 (round 3 #21): abort předchozí pending request pro tutéž cell.
