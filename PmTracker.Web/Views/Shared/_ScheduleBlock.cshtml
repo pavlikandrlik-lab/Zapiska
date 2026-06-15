@@ -24,6 +24,11 @@
     // Počítá se jen pro kroky, u kterých opravdu renderujeme manual input/read-only.
     var manualInputIndex = 0;
     var lockedManualKrokKeys = Model.LockedManualKrokKeys ?? new HashSet<int>();
+    // Datum-model (Fáze 3b): server-vypočtené pozice baru pro statická zobrazení (jediný zdroj
+    // pravdy). NULL = editor → block.js pozicuje live z editovaných datumů.
+    var ovl = Model.OverviewLayout;
+    var ovlSeg = ovl?.Segments.ToDictionary(s => s.Poradi);
+    string Pct(double v) => v.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + "%";
 }
 
 <div class="@rootCssClass schedule-block"
@@ -83,13 +88,6 @@
                  data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"></div>
         }
 
-        @{
-            // Datum-model (Fáze 3b): server-vypočtené pozice pro statická zobrazení (jediný
-            // zdroj pravdy). V editoru je layout NULL → block.js pozicuje live z datumů.
-            var ovl = Model.OverviewLayout;
-            var ovlSeg = ovl?.Segments.ToDictionary(s => s.Poradi);
-            string Pct(double v) => v.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + "%";
-        }
         @foreach (var row in new[] { ("planned", "Plán"), ("actual", "Skutečnost") })
         {
             <div class="@overviewRowCssClass" data-schedule-overview-row="@row.Item1">
@@ -184,7 +182,7 @@
                      data-schedule-axis="breakdown"
                      data-timeline-axis
                      data-axis-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
-                     data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"></div>
+                     data-axis-end="@((ovl?.AxisEnd ?? Model.TerminUkonceni).ToString("yyyy-MM-dd"))"></div>
             </div>
             @* Phase 9 (DESIGN-9-D + 10-A, 2026-05-01): žádný filter, render každý krok plně.
                Tolerance hodnot:
@@ -199,7 +197,14 @@
                                 : odchylka < 0 ? $"{odchylka} dnů"
                                 : "0 dnů";
                 var offsetCssClass = odchylka > 0 ? "late" : odchylka < 0 ? "ahead" : null;
-                var plannedHiddenStyle = hasPlan ? string.Empty : "width:0;visibility:hidden;";
+                PmTracker.Web.Services.Schedules.ScheduleBarSegment? bseg = null;
+                if (ovlSeg is not null) { ovlSeg.TryGetValue(krok.KrokIndex, out bseg); }
+                var plannedHiddenStyle = hasPlan && bseg is not null && bseg.PlanWidthPct > 0
+                    ? $"left:{Pct(bseg.PlanLeftPct)};width:calc({Pct(bseg.PlanWidthPct)} + 1px);"
+                    : "width:0;visibility:hidden;";
+                var actualPosStyle = bseg is not null && bseg.HasActual
+                    ? $"left:{Pct(bseg.ActualLeftPct)};width:calc({Pct(bseg.ActualWidthPct)} + 1px);"
+                    : string.Empty;
                 <div class="gantt-step-row"
                      data-schedule-step-row
                      data-step-index="@krok.KrokIndex"
@@ -219,6 +224,7 @@
                     <div class="schedule-layered-track schedule-layered-track--step" data-schedule-breakdown-track>
                         <div class="schedule-layered-marker today"
                              data-schedule-breakdown-today
+                             style="@(ovl is null ? null : $"left:{Pct(ovl.TodayPct)}")"
                              title="Dnes"></div>
                         <span class="schedule-layered-segment planned"
                               role="img"
@@ -237,7 +243,8 @@
                                   aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
                                   data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
                                   data-schedule-breakdown-segment="actual"
-                                  data-step-index="@krok.KrokIndex"></span>
+                                  data-step-index="@krok.KrokIndex"
+                                  style="@actualPosStyle"></span>
                         }
                     </div>
                 </div>
