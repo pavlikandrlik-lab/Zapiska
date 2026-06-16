@@ -184,6 +184,12 @@ export function initCustomDatePickers(scope) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
+            // Datum-model chronologie: min/max z host <pm-date-field> omezují výběr (ISO yyyy-MM-dd
+            // se porovnává lexikograficky = správně dle data). Mimo rozsah = disabled buňka.
+            const hostEl = field.closest("pm-date-field");
+            const minIso = (hostEl && hostEl.getAttribute("min")) || "";
+            const maxIso = (hostEl && hostEl.getAttribute("max")) || "";
+
             for (let i = 0; i < 42; i += 1) {
                 const dayDate = new Date(firstVisibleDate.getFullYear(), firstVisibleDate.getMonth(), firstVisibleDate.getDate() + i);
                 const button = document.createElement("button");
@@ -202,8 +208,15 @@ export function initCustomDatePickers(scope) {
                 if (isSameCalendarDate(dayDate, today)) {
                     button.title = "Dnes";
                 }
+                const iso = button.dataset.iso;
+                if ((minIso && iso < minIso) || (maxIso && iso > maxIso)) {
+                    button.disabled = true;
+                    button.classList.add("out-of-range");
+                    button.title = "Mimo povolené pořadí (chronologie kroků)";
+                }
 
                 button.addEventListener("click", () => {
+                    if (button.disabled) return;
                     selectedDate = dayDate;
                     viewDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), 1);
                     syncValue();

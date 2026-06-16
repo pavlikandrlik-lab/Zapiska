@@ -2147,6 +2147,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     color: var(--gov-color-primary);
 }
 
+/* Datum-model chronologie: den mimo povolené pořadí (min/max) — nevybíratelný. */
+.app-date-day.out-of-range {
+    opacity: 0.35;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+
 .app-time-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

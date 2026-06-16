@@ -758,6 +758,55 @@ public sealed partial class RecordService
                     item.Poradi.ToString(CultureInfo.InvariantCulture));
             }
         }
+
+        // Datum-model chronologie (ruční vstupy musí být neklesající — stejný den OK).
+        // Plán: pro každý krok N platí plán(N) ≥ plán(předchozího kroku s plánem).
+        // Field key musí ukazovat na původní index v posted poli (ne na seřazené pořadí).
+        DateTime? prevPlan = null;
+        int prevPlanPoradi = 0;
+        foreach (var pair in command.HarmonogramHodnoty
+                     .Select((item, index) => (item, index))
+                     .Where(x => x.item.Poradi is >= 1 and <= 10 && x.item.PlanDatum.HasValue)
+                     .OrderBy(x => x.item.Poradi))
+        {
+            var planDate = pair.item.PlanDatum!.Value.Date;
+            if (prevPlan.HasValue && planDate < prevPlan.Value)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"HarmonogramHodnoty[{pair.index}].PlanDatum",
+                    $"Plán kroku {pair.item.Poradi} nesmí být dříve než plán kroku {prevPlanPoradi}.",
+                    "schedule",
+                    "schedule_plan_chronology",
+                    planDate.ToString("yyyy-MM-dd"));
+            }
+            prevPlan = planDate;
+            prevPlanPoradi = pair.item.Poradi;
+        }
+
+        // Ruční skutečnost (kroky 2/5/8/9): neklesající mezi zadanými ručními datumy.
+        // Auto skutečnost (harvest) se NEvaliduje — pořadí zajišťuje vytěžovací algoritmus.
+        DateTime? prevManual = null;
+        int prevManualPoradi = 0;
+        foreach (var pair in command.ManualActualKroky
+                     .Select((item, index) => (item, index))
+                     .Where(x => x.item.Poradi is >= 1 and <= 10 && x.item.AbsolutniDatum.HasValue)
+                     .OrderBy(x => x.item.Poradi))
+        {
+            var skutDate = pair.item.AbsolutniDatum!.Value.ToDateTime(TimeOnly.MinValue).Date;
+            if (prevManual.HasValue && skutDate < prevManual.Value)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    $"ManualActualKroky[{pair.index}].AbsolutniDatum",
+                    $"Ruční skutečnost kroku {pair.item.Poradi} nesmí být dříve než skutečnost kroku {prevManualPoradi}.",
+                    "schedule",
+                    "schedule_actual_chronology",
+                    skutDate.ToString("yyyy-MM-dd"));
+            }
+            prevManual = skutDate;
+            prevManualPoradi = pair.item.Poradi;
+        }
     }
 
     private static void AddRecordValidationIssue(

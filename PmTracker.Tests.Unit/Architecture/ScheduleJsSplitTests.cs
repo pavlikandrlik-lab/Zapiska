@@ -110,4 +110,19 @@ public sealed class ScheduleJsSplitTests
         src.Should().Contain("aktualniIndex", "computeDateModel počítá aktuální krok");
         src.Should().Contain("Aktuální krok:", "renderSummary sestavuje sjednocený stav");
     }
+
+    [Fact]
+    public void Chronologie_PmDateFieldPodporujeMinMax_PickerDisablujeMimoRozsah_BlockJsNastavujeBounds()
+    {
+        var pmDateField = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/components/pm-date-field.js"));
+        pmDateField.Should().Contain("ATTR_MIN").And.Contain("ATTR_MAX", "pm-date-field zná min/max atributy");
+
+        var picker = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/pickers/date.js"));
+        picker.Should().Contain("getAttribute(\"min\")").And.Contain("getAttribute(\"max\")",
+            "kalendář čte min/max z host elementu");
+        picker.Should().Contain("out-of-range", "mimo-rozsah dny se disablují");
+
+        var block = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/schedule/block.js"));
+        block.Should().Contain("applyPlanChronologyBounds", "block.js nastavuje min/max z sousedních kroků");
+    }
 }

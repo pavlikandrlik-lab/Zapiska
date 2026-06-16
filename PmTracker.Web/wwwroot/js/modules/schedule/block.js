@@ -606,7 +606,26 @@ export class ScheduleBlockRenderer {
         this.renderSummary(plan, actual, state, startDate, deadlineDate, aktualniIndex);
         this.renderOverview(plan, actual, state, startDate, deadlineDate);
         this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
+        this.applyPlanChronologyBounds();
         queueRainbowSegmentRender(this.root);
+    }
+
+    // Datum-model chronologie (UI): plán kroku N musí být ≥ plán(N-1) a ≤ plán(N+1). Nastaví
+    // min/max na host <pm-date-field>, takže kalendář mimo-pořadí dny disabluje (date.js).
+    // Server validuje shodně (ValidateScheduleValuesAsync) jako pojistka.
+    applyPlanChronologyBounds() {
+        for (let i = 0; i < this.editorRows.length; i++) {
+            const host = this.editorRows[i].dateInput instanceof HTMLElement
+                ? this.editorRows[i].dateInput.closest("pm-date-field")
+                : null;
+            if (!host) continue;
+            const prevIso = i > 0 && this.editorRows[i - 1].dateInput instanceof HTMLElement
+                ? (this.editorRows[i - 1].dateInput.value || "") : "";
+            const nextIso = i < this.editorRows.length - 1 && this.editorRows[i + 1].dateInput instanceof HTMLElement
+                ? (this.editorRows[i + 1].dateInput.value || "") : "";
+            if (prevIso) host.setAttribute("min", prevIso); else host.removeAttribute("min");
+            if (nextIso) host.setAttribute("max", nextIso); else host.removeAttribute("max");
+        }
     }
 
     rowDateIso(row, suffix) {

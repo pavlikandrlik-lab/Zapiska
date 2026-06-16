@@ -35,6 +35,9 @@ const ATTR_LOCKED = "locked";
 const ATTR_ARIA = "aria-label";
 const ATTR_CONTAINER_CLASS = "container-css-class";
 const ATTR_CLEARABLE = "clearable";
+// Datum-model chronologie: min/max omezují výběr v kalendáři (čte je picker date.js z host elementu).
+const ATTR_MIN = "min";
+const ATTR_MAX = "max";
 
 function escapeHtml(value) {
     if (value === null || value === undefined) return "";
@@ -48,7 +51,7 @@ function escapeHtml(value) {
 
 class PmDateFieldElement extends HTMLElement {
     static get observedAttributes() {
-        return [ATTR_NAME, ATTR_ISO, ATTR_DISPLAY, ATTR_LOCKED, ATTR_ARIA, ATTR_CONTAINER_CLASS, ATTR_CLEARABLE];
+        return [ATTR_NAME, ATTR_ISO, ATTR_DISPLAY, ATTR_LOCKED, ATTR_ARIA, ATTR_CONTAINER_CLASS, ATTR_CLEARABLE, ATTR_MIN, ATTR_MAX];
     }
 
     connectedCallback() {

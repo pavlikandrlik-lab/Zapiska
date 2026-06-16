@@ -278,6 +278,109 @@ public sealed class AjaxControllersTests
         payload.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[0].Poradi");
     }
 
+    [Fact]
+    public async Task SaveRecord_NechronologickyPlan_VratiFieldError()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiChronoOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APICHRONO");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APICHRONO_SUB", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            if (!await dbContext.ProjektSubsystemy.AnyAsync(x => x.ProjektId == projectId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue))
+            {
+                dbContext.ProjektSubsystemy.Add(new ProjektSubsystemEntity { ProjektId = projectId, SubsystemId = subsystemId, DatumPrirazeni = DateTime.UtcNow });
+                await dbContext.SaveChangesAsync();
+            }
+        }
+
+        await using var lookupContext = _fixture.CreateDbContext();
+        var categoryCode = await lookupContext.CiselnikKategoriiZaznamu.Where(x => x.Kod == "U" || x.Kod == "UKOL").OrderBy(x => x.Id).Select(x => x.Kod).FirstAsync();
+        var statusCode = await lookupContext.CiselnikStavuUkolu.OrderBy(x => x.Id).Select(x => x.Kod).FirstAsync();
+        var subsystemCode = await lookupContext.Subsystemy.Where(x => x.Id == subsystemId).Select(x => x.Kod).SingleAsync();
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        // Validní záznam, ale plán krok 2 (5.6.) je DŘÍVE než plán krok 1 (10.6.) → chronologie chyba.
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Zaznamy/Save?asUser={_fixture.AdminOsobaId}",
+            ApiTestHttpHelper.BuildForm(
+                ("ProjektId", projectId.ToString()),
+                ("Kategorie", categoryCode),
+                ("Stav", statusCode),
+                ("Nazev", "API chronologie test"),
+                ("Cil", "Test"),
+                ("Popis", "Validní popis"),
+                ("VlastnikId", ownerId.ToString()),
+                ("DatumZalozeni", "2026-06-01"),
+                ("TerminUkonceni", "2026-12-01"),
+                ("Subsystem", subsystemCode),
+                ("HarmonogramHodnoty[0].Poradi", "1"),
+                ("HarmonogramHodnoty[0].PlanDatum", "2026-06-10"),
+                ("HarmonogramHodnoty[1].Poradi", "2"),
+                ("HarmonogramHodnoty[1].PlanDatum", "2026-06-05")));
+
+        var response = await client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+        payload.ErrorCode.Should().Be("RECORD_VALIDATION_FAILED");
+        payload.FieldErrors.Keys.Should().Contain("HarmonogramHodnoty[1].PlanDatum",
+            "plán kroku 2 nesmí být dříve než plán kroku 1");
+    }
+
+    [Fact]
+    public async Task SaveRecord_ChronologickyPlanStejnyDen_Projde()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiChronoOkOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APICHRONOOK");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APICHRONOOK_SUB", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            if (!await dbContext.ProjektSubsystemy.AnyAsync(x => x.ProjektId == projectId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue))
+            {
+                dbContext.ProjektSubsystemy.Add(new ProjektSubsystemEntity { ProjektId = projectId, SubsystemId = subsystemId, DatumPrirazeni = DateTime.UtcNow });
+                await dbContext.SaveChangesAsync();
+            }
+        }
+
+        await using var lookupContext = _fixture.CreateDbContext();
+        var categoryCode = await lookupContext.CiselnikKategoriiZaznamu.Where(x => x.Kod == "U" || x.Kod == "UKOL").OrderBy(x => x.Id).Select(x => x.Kod).FirstAsync();
+        var statusCode = await lookupContext.CiselnikStavuUkolu.OrderBy(x => x.Id).Select(x => x.Kod).FirstAsync();
+        var subsystemCode = await lookupContext.Subsystemy.Where(x => x.Id == subsystemId).Select(x => x.Kod).SingleAsync();
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        // Stejný den u sousedních kroků je OK (neklesající).
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Zaznamy/Save?asUser={_fixture.AdminOsobaId}",
+            ApiTestHttpHelper.BuildForm(
+                ("ProjektId", projectId.ToString()),
+                ("Kategorie", categoryCode),
+                ("Stav", statusCode),
+                ("Nazev", "API chronologie OK"),
+                ("Cil", "Test"),
+                ("Popis", "Validní popis"),
+                ("VlastnikId", ownerId.ToString()),
+                ("DatumZalozeni", "2026-06-01"),
+                ("TerminUkonceni", "2026-12-01"),
+                ("Subsystem", subsystemCode),
+                ("HarmonogramHodnoty[0].Poradi", "1"),
+                ("HarmonogramHodnoty[0].PlanDatum", "2026-06-10"),
+                ("HarmonogramHodnoty[1].Poradi", "2"),
+                ("HarmonogramHodnoty[1].PlanDatum", "2026-06-10")));
+
+        var response = await client.SendAsync(request);
+
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+        if (payload.FieldErrors is not null)
+        {
+            payload.FieldErrors.Keys.Should().NotContain(
+                k => k.Contains("PlanDatum"), "stejný den je chronologicky validní");
+        }
+    }
+
     // SavePermission_ShouldReturnAjaxError_ForUnsupportedKey smazáno: endpoint
     // /Nastaveni/SavePermission byl odstraněn v seed-only RBAC refactoru (commit f1bce3f
     // / 96cd687, 2026-04-22). Role/akce/mapování se mění v PermissionSeedConfiguration.cs
