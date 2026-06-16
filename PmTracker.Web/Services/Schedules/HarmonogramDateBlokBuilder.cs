@@ -13,7 +13,8 @@ public static class HarmonogramDateBlokBuilder
 {
     public static IReadOnlyList<HarmonogramKrokEditViewModel> BuildKroky(
         DateTime start,
-        IReadOnlyCollection<ZaznamHarmonogramKrokEntity> rows)
+        IReadOnlyCollection<ZaznamHarmonogramKrokEntity> rows,
+        DateTime today)
     {
         var byPoradi = rows.GroupBy(r => (int)r.Poradi).ToDictionary(g => g.Key, g => g.First());
         var steps = HarmonogramKroky.Vse
@@ -24,7 +25,7 @@ public static class HarmonogramDateBlokBuilder
             })
             .ToList();
 
-        var computed = ScheduleDateCalculator.Compute(start, steps);
+        var computed = ScheduleDateCalculator.Compute(start, steps, today);
         var resultByPoradi = computed.ToDictionary(x => x.Poradi);
 
         return HarmonogramKroky.Vse
@@ -33,7 +34,9 @@ public static class HarmonogramDateBlokBuilder
                 var c = resultByPoradi[def.Poradi];
                 byPoradi.TryGetValue(def.Poradi, out var row);
                 var trvaniDni = (c.PlanEnd - c.PlanStart).Days;
-                int? odchylka = c.MaSkutecnost ? (c.SkutecnostEnd - c.PlanEnd).Days : null;
+                // OdchylkaDni + SkutecneDatum jen u SKUTEČNĚ vyplněných (ne u projektovaného aktuálního kroku).
+                var skutecneDatum = row?.SkutecnostDatum?.Date;
+                int? odchylka = skutecneDatum.HasValue ? (skutecneDatum.Value - c.PlanEnd).Days : null;
 
                 return new HarmonogramKrokEditViewModel
                 {
@@ -43,7 +46,8 @@ public static class HarmonogramDateBlokBuilder
                     TrvaniDni = trvaniDni,
                     OdchylkaDni = odchylka,
                     BaselineDatum = c.PlanEnd,
-                    SkutecneDatum = c.MaSkutecnost ? c.SkutecnostEnd : c.PlanEnd,
+                    SkutecneDatum = skutecneDatum,   // null = nevyplněno (žádný PlanEnd fallback)
+                    Stav = c.Stav,
                     IsManualKrok = def.JeManualni,
                     SkutecnostRezim = (SkutecnostRezimEnum)(row?.SkutecnostRezim ?? 0),
                     SkutecnostZdroj = (SkutecnostZdrojEnum)(row?.SkutecnostZdroj ?? 0),
@@ -72,7 +76,7 @@ public static class HarmonogramDateBlokBuilder
             })
             .ToList();
 
-        var computed = ScheduleDateCalculator.Compute(start, steps);
+        var computed = ScheduleDateCalculator.Compute(start, steps, today);
         return ScheduleBarLayoutCalculator.Compute(start.Date, termin, today, computed);
     }
 
@@ -92,16 +96,19 @@ public static class HarmonogramDateBlokBuilder
             .ToList();
 
         var s = ScheduleDateCalculator.Summarize(start, steps, termin, today);
+        var aktualniNazev = s.AktualniKrokPoradi.HasValue
+            ? HarmonogramKroky.Vse.FirstOrDefault(k => k.Poradi == s.AktualniKrokPoradi.Value)?.Nazev
+            : null;
 
         return new HarmonogramSouhrnViewModel
         {
             BaselineDokonceni = s.PlanoveDokonceni,
-            SkutecneDokonceni = s.SkutecneDokonceni,
             TerminUkolu = s.Termin,
             CelkoveTrvaniDni = Math.Max(0, (s.PlanoveDokonceni - start.Date).Days),
-            CelkovaOdchylkaDni = (s.SkutecneDokonceni - s.PlanoveDokonceni).Days,
-            Stihame = s.Stihame,
+            AktualniKrokPoradi = s.AktualniKrokPoradi,
+            AktualniKrokNazev = aktualniNazev,
             PrekroceniDni = s.PrekroceniDni,
+            Dokonceno = s.Dokonceno,
         };
     }
 }

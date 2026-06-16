@@ -99,7 +99,15 @@ public sealed class HarmonogramKrokEditViewModel
     /// </summary>
     public int? OdchylkaDni { get; init; }
     public DateTime BaselineDatum { get; init; }
-    public DateTime SkutecneDatum { get; init; }
+
+    /// <summary>
+    /// Datum-model: reálné datum skutečnosti kroku. <c>null</c> = nevyplněno (žádný PlanEnd fallback —
+    /// zdroj zkreslení „skutečnost = plán" zrušen). Render dle <see cref="Stav"/>.
+    /// </summary>
+    public DateTime? SkutecneDatum { get; init; }
+
+    /// <summary>Per-krok stav: Čeká / V prodlení / Splněno (datum-model).</summary>
+    public HarmonogramKrokStav Stav { get; init; } = HarmonogramKrokStav.Ceka;
 
     /// <summary>
     /// Plán D Task 8: odkud pochází skutečnost — <c>None</c> (nenavázáno),
@@ -201,13 +209,22 @@ public sealed class ScheduleBlockManualCellViewModel
 
 public sealed class HarmonogramSouhrnViewModel
 {
+    /// <summary>Plánové dokončení = plán posledního kroku (plán kroku 10).</summary>
     public DateTime BaselineDokonceni { get; init; }
-    public DateTime SkutecneDokonceni { get; init; }
-    public DateTime PosunuteDokonceni => SkutecneDokonceni;
     public DateTime TerminUkolu { get; init; }
     public int CelkoveTrvaniDni { get; init; }
-    public int CelkovaOdchylkaDni { get; init; }
-    public int CelkoveZpozdeniDni => CelkovaOdchylkaDni;
-    public bool Stihame { get; init; }
+
+    /// <summary>Pořadí aktuálního (rozpracovaného) kroku; <c>null</c> = vše vyplněno (Dokončeno).</summary>
+    public int? AktualniKrokPoradi { get; init; }
+
+    /// <summary>Název aktuálního kroku pro sjednocený stav v souhrnu.</summary>
+    public string? AktualniKrokNazev { get; init; }
+
+    /// <summary>Znaménkové překročení = dnes − plán(aktuální krok); 0 když Dokončeno.</summary>
     public int PrekroceniDni { get; init; }
+
+    public bool Dokonceno { get; init; }
+
+    /// <summary>Odvozené pro gov-tag konzumenty (ProjektHarmonogramUkolViewModel.Stihame, _ProjectScheduleTab).</summary>
+    public bool Stihame => Dokonceno || PrekroceniDni <= 0;
 }

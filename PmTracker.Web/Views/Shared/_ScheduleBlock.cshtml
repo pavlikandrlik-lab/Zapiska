@@ -63,15 +63,19 @@
             </gov-message>
         }
 
+        var stavOk = Model.Souhrn.Dokonceno || Model.Souhrn.PrekroceniDni <= 0;
+        var skluz = Model.Souhrn.PrekroceniDni;
+        var stavText = Model.Souhrn.Dokonceno ? "Dokončeno"
+            : skluz > 0 ? $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · skluz +{skluz} dní"
+            : skluz < 0 ? $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · v předstihu {-skluz} dní"
+            : $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · dle plánu";
         <div class="schedule-summary-grid">
             <div><span class="label">Termín:</span> <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></div>
             <div><span class="label">Plán dokončení:</span> <strong data-schedule-summary-baseline>@Model.Souhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></div>
-            <div><span class="label">Skutečné dokončení:</span> <strong data-schedule-summary-shifted>@Model.Souhrn.SkutecneDokonceni.ToString("dd.MM.yyyy")</strong></div>
             <div><span class="label">Trvání:</span> <strong data-schedule-summary-duration>@Model.Souhrn.CelkoveTrvaniDni</strong> dnů</div>
-            <div class="schedule-status-line @(Model.Souhrn.Stihame ? "ok" : "late")">
+            <div class="schedule-status-line @(stavOk ? "ok" : "late")">
                 <span class="label">Stav:</span>
-                <strong data-schedule-summary-state>@(Model.Souhrn.Stihame ? "Stíháme" : "Nestíháme")</strong>
-                <span data-schedule-summary-overrun>@(Model.Souhrn.Stihame ? string.Empty : $"(+{Model.Souhrn.PrekroceniDni} dnů)")</span>
+                <strong data-schedule-summary-state>@stavText</strong>
             </div>
         </div>
     }
@@ -108,10 +112,10 @@
                         //   actual row: hidden pokud OdchylkaDni == NULL (krok ještě nenastal)
                         var segmentTitle = row.Item1 == "planned"
                             ? $"{krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
-                            : $"{krok.Nazev}: skutečnost {(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum.ToString("dd.MM.yyyy") : "—")}";
+                            : $"{krok.Nazev}: skutečnost {(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy") : "—")}";
                         var ariaLabel = row.Item1 == "planned"
                             ? $"Krok {krok.KrokIndex} {krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
-                            : $"Krok {krok.KrokIndex} {krok.Nazev}: skutečnost {(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum.ToString("dd.MM.yyyy") : "krok ještě nenastal")}";
+                            : $"Krok {krok.KrokIndex} {krok.Nazev}: skutečnost {(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy") : "krok ještě nenastal")}";
                         var isPlannedHidden = row.Item1 == "planned" && krok.TrvaniDni <= 0;
                         var isActualHidden = row.Item1 == "actual" && !krok.OdchylkaDni.HasValue;
 
@@ -162,11 +166,16 @@
     }
     else
     {
+        var miniSkluz = Model.Souhrn.PrekroceniDni;
+        var miniStav = Model.Souhrn.Dokonceno ? "Dokončeno"
+            : miniSkluz > 0 ? $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · skluz +{miniSkluz} dní"
+            : miniSkluz < 0 ? $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · v předstihu {-miniSkluz} dní"
+            : $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · dle plánu";
+        var miniOk = Model.Souhrn.Dokonceno || miniSkluz <= 0;
         <div class="schedule-layered-summary">
             <span>Plán: <strong data-schedule-summary-baseline>@Model.Souhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></span>
-            <span>Skutečnost: <strong data-schedule-summary-shifted>@Model.Souhrn.SkutecneDokonceni.ToString("dd.MM.yyyy")</strong></span>
             <span>Termín: <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></span>
-            <span><span title="Suma odchylek všech kroků harmonogramu">Překročení:</span> <strong data-schedule-summary-overrun>@(Model.Souhrn.PrekroceniDni > 0 ? $"{Model.Souhrn.PrekroceniDni} dnů" : "0 dnů")</strong></span>
+            <span class="schedule-status-line @(miniOk ? "ok" : "late")">Stav: <strong data-schedule-summary-state>@miniStav</strong></span>
         </div>
 
         <div class="gantt-steps schedule-steps" data-schedule-steps data-schedule-record-id="@Model.RecordId" hidden="hidden">
@@ -239,8 +248,8 @@
                         {
                             <span class="schedule-layered-segment actual"
                                   role="img"
-                                  aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
-                                  data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum.ToString("dd.MM.yyyy")"
+                                  aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy")"
+                                  data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy")"
                                   data-schedule-breakdown-segment="actual"
                                   data-step-index="@krok.KrokIndex"
                                   style="@actualPosStyle"></span>
@@ -289,7 +298,7 @@
                             data-step-color="@krok.BarvaHex"
                             data-step-duration="@krok.TrvaniDni"
                             data-step-delay="@krok.OdchylkaDni"
-                            data-step-actual-iso="@(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum.ToString("yyyy-MM-dd") : string.Empty)">
+                            data-step-actual-iso="@(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum!.Value.ToString("yyyy-MM-dd") : string.Empty)">
                             <td>@krok.Nazev</td>
                             <td>
                                 @* DESIGN-9-F (2026-05-02): DURATION input redesign — primární editor je
@@ -407,8 +416,8 @@
                                     // datum kroku (HarmonogramHodnoty[i].SkutecnostDatum), žádné offsety/steppery.
                                     // Prázdné = krok ještě nenastal.
                                     var hasActualDate = krok.OdchylkaDni.HasValue;
-                                    var skutecnostIso = hasActualDate ? krok.SkutecneDatum.ToString("yyyy-MM-dd") : string.Empty;
-                                    var skutecnostDisplay = hasActualDate ? krok.SkutecneDatum.ToString("dd.MM.yyyy") : string.Empty;
+                                    var skutecnostIso = hasActualDate ? krok.SkutecneDatum!.Value.ToString("yyyy-MM-dd") : string.Empty;
+                                    var skutecnostDisplay = hasActualDate ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy") : string.Empty;
                                     <div class="schedule-stacked-input @(delayChanged ? "proposal-field-changed" : null)"
                                          title="@delayTooltip">
                                         @await Html.PartialAsync(

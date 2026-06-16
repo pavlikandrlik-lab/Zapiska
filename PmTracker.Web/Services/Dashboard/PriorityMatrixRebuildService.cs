@@ -409,7 +409,7 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
                 return new ScheduleDateStep(def.Poradi, row?.PlanDatum, row?.SkutecnostDatum);
             })
             .ToList();
-        var computed = ScheduleDateCalculator.Compute(startDate.Date, steps);
+        var computed = ScheduleDateCalculator.Compute(startDate.Date, steps, today.ToDateTime(TimeOnly.MinValue));
         var nextStep = computed
             .Where(c => DateOnly.FromDateTime(c.PlanEnd) >= today)
             .OrderBy(c => c.PlanEnd)

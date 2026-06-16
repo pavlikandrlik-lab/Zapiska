@@ -124,14 +124,17 @@ public sealed class ProjectDashboardService : IProjectDashboardService
                     return new ScheduleDateStep(def.Poradi, row?.PlanDatum, row?.SkutecnostDatum);
                 })
                 .ToList();
-            var computed = ScheduleDateCalculator.Compute(record.DatumZalozeni, steps);
+            var computed = ScheduleDateCalculator.Compute(record.DatumZalozeni, steps, referenceDate);
 
             var snapshots = computed.Select(c =>
             {
+                // Dashboard kategorizace pracuje jen se SKUTEČNĚ vyplněnou skutečností; projekci
+                // aktuálního kroku do dneška (vizuální prvek lišty) sem nepouštíme (JeAktualniKrok guard).
+                var maRealnouSkutecnost = c.MaSkutecnost && !c.JeAktualniKrok;
                 var nazev = HarmonogramKroky.Vse.First(d => d.Poradi == c.Poradi).Nazev;
-                var actualEnd = c.MaSkutecnost ? c.SkutecnostEnd : c.PlanEnd;
+                var actualEnd = maRealnouSkutecnost ? c.SkutecnostEnd : c.PlanEnd;
                 var duration = (c.PlanEnd - c.PlanStart).Days;
-                var offset = c.MaSkutecnost ? (c.SkutecnostEnd - c.PlanEnd).Days : 0;
+                var offset = maRealnouSkutecnost ? (c.SkutecnostEnd - c.PlanEnd).Days : 0;
                 return new ScheduleStepSnapshot(c.Poradi, nazev, c.PlanEnd, actualEnd, duration, offset);
             }).ToList();
 

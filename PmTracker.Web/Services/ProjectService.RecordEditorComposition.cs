@@ -146,7 +146,7 @@ public sealed partial class ProjectService
             ? await harmonogramSkutecnostSync.GetKandidatiForZaznamAsync(record.Id, ct).ConfigureAwait(false)
             : Array.Empty<BindingKandidat>() as IReadOnlyList<BindingKandidat>;
 
-        var baseKroky = HarmonogramDateBlokBuilder.BuildKroky(record.DatumZalozeni, krokRows);
+        var baseKroky = HarmonogramDateBlokBuilder.BuildKroky(record.DatumZalozeni, krokRows, todayDate);
         var harmonogramBlokKroky = baseKroky.Select(baseKrok =>
         {
             var poradi = baseKrok.KrokIndex;
@@ -188,6 +188,7 @@ public sealed partial class ProjectService
                 OdchylkaDni = baseKrok.OdchylkaDni,
                 BaselineDatum = baseKrok.BaselineDatum,
                 SkutecneDatum = baseKrok.SkutecneDatum,
+                Stav = baseKrok.Stav,
                 IsManualKrok = baseKrok.IsManualKrok,
                 ZdrojSkutecnosti = zdroj,
                 SourceVyjadreniId = winner is not null && winner.HotVyjadreniId > 0 ? winner.HotVyjadreniId : null,

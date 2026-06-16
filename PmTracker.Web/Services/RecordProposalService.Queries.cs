@@ -383,10 +383,11 @@ public sealed partial class RecordProposalService
             {
                 continue;
             }
-            var orig = origActualByPoradi.GetValueOrDefault(actual.Poradi);
-            if (orig.Date != actual.SkutecnostDatum.Value.Date)
+            var orig = origActualByPoradi.GetValueOrDefault(actual.Poradi);   // DateTime? (nevyplněno = null)
+            if (orig?.Date != actual.SkutecnostDatum.Value.Date)
             {
-                result[actual.Poradi] = $"Původní skutečnost: {orig:dd.MM.yyyy} | Navržená: {actual.SkutecnostDatum.Value:dd.MM.yyyy}";
+                var origText = orig.HasValue ? orig.Value.ToString("dd.MM.yyyy") : "—";
+                result[actual.Poradi] = $"Původní skutečnost: {origText} | Navržená: {actual.SkutecnostDatum.Value:dd.MM.yyyy}";
             }
         }
 

@@ -131,7 +131,7 @@
        stejný datum pro všechny FromVyjadreni kroky (chybný diff/baseline scenario),
        i když tooltip ukazoval správný per-krok datum. *@
     var visibleDatum = krok.SourceVyjadreniDatum?.ToString("dd.MM.yyyy")
-        ?? krok.SkutecneDatum.ToString("dd.MM.yyyy");
+        ?? (krok.SkutecneDatum?.ToString("dd.MM.yyyy") ?? "—");
     <div class="schedule-actual-from-vyjadreni" data-schedule-actual-source="vyjadreni" data-rezim-show-on="Auto">
         <span class="schedule-actual-datum" data-manual-krok-readonly>@visibleDatum</span>
         @if (krok.SourceExterniOdkazId.HasValue && Model.ZaznamId > 0)
@@ -168,12 +168,10 @@ else if (isManualKrok)
        Auto = krok řádek na Rezim=Auto, Zdroj=Neznamo, SkutecnostDatum=null (auto-sync). *@
     if (canEdit)
     {
-        var isoValue = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
-            ? krok.SkutecneDatum.ToString("yyyy-MM-dd")
-            : string.Empty;
-        var displayValue = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
-            ? krok.SkutecneDatum.ToString("dd.MM.yyyy")
-            : string.Empty;
+        var hasManualDate = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
+            && krok.SkutecneDatum.HasValue;
+        var isoValue = hasManualDate ? krok.SkutecneDatum!.Value.ToString("yyyy-MM-dd") : string.Empty;
+        var displayValue = hasManualDate ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy") : string.Empty;
         var hasVyjadreniBinding = krok.SourceVyjadreniDatum.HasValue;
         var initialPreferredZdroj = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.FromVyjadreni
             ? "Auto"
@@ -275,7 +273,8 @@ else if (isManualKrok)
     else
     {
         var readonlyLabel = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
-            ? krok.SkutecneDatum.ToString("dd.MM.yyyy")
+                && krok.SkutecneDatum.HasValue
+            ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy")
             : "—";
         var lockedTooltip = isLocked
             ? "Skutečnost tohoto kroku je uzamčená — čeká se na rozhodnutí návrhu."

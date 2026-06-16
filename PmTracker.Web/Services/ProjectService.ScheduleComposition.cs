@@ -61,7 +61,7 @@ public sealed partial class ProjectService
                     return null;
                 }
 
-                var sharedSteps = HarmonogramDateBlokBuilder.BuildKroky(record.DatumZalozeni, kroky);
+                var sharedSteps = HarmonogramDateBlokBuilder.BuildKroky(record.DatumZalozeni, kroky, todayDate);
                 var barLayout = HarmonogramDateBlokBuilder.BuildBarLayout(record.DatumZalozeni, kroky, deadline, todayDate);
 
                 return new ProjektHarmonogramUkolViewModel

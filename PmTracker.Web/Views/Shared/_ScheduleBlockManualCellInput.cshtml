@@ -16,12 +16,10 @@
     var krok = Model.Krok;
     var manualInputIndex = Model.ManualInputIndex;
     var canEdit = Model.CanEditManualActual && !Model.IsLocked;
-    var isoValue = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
-        ? krok.SkutecneDatum.ToString("yyyy-MM-dd")
-        : string.Empty;
-    var displayValue = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
-        ? krok.SkutecneDatum.ToString("dd.MM.yyyy")
-        : string.Empty;
+    var hasManualDate = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
+        && krok.SkutecneDatum.HasValue;
+    var isoValue = hasManualDate ? krok.SkutecneDatum!.Value.ToString("yyyy-MM-dd") : string.Empty;
+    var displayValue = hasManualDate ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy") : string.Empty;
 }
 @if (canEdit)
 {
