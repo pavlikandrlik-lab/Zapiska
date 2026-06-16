@@ -99,4 +99,15 @@ public sealed class ScheduleJsSplitTests
         bundle.Should().Contain("applyProjectScheduleFilters");
         bundle.Should().Contain("initRecordSchedulePlanner");
     }
+
+    [Fact]
+    public void BlockJs_RenderSummary_PouzivaAktualniKrok_NeStihameVsTermin()
+    {
+        // Datum-model: editor live-preview souhrn = sjednocený stav (aktuální krok + znaménkové
+        // překročení), ne staré „Stíháme/Nestíháme vs deadline".
+        var src = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/schedule/block.js"));
+        src.Should().NotContain("Nestíháme", "souhrn už nepoužívá Stíháme/Nestíháme");
+        src.Should().Contain("aktualniIndex", "computeDateModel počítá aktuální krok");
+        src.Should().Contain("Aktuální krok:", "renderSummary sestavuje sjednocený stav");
+    }
 }

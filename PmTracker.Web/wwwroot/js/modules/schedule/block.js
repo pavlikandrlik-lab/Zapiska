@@ -341,31 +341,27 @@ export class ScheduleBlockRenderer {
         segment.style.display = "none";
     }
 
-    renderSummary(plan, actual, state, startDate, deadlineDate) {
+    renderSummary(plan, actual, state, startDate, deadlineDate, aktualniIndex) {
         const baselineEnd = plan.length > 0 ? plan[plan.length - 1].end : startDate;
-        // Datum-model: skutečné dokončení = poslední VYPLNĚNÝ krok; pokud koncový krok není
-        // vyplněn, projektuj na dnešek (prodlení vůči aktuálnímu datu) — shodně se serverovým
-        // ScheduleDateCalculator.Summarize, aby editor a karta/tab nedriftovaly.
+        const totalDuration = state.reduce((sum, item) => sum + item.duration, 0);
         const nowRaw = new Date();
         const todayDate = new Date(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate());
-        let lastFilledEnd = null;
-        for (let i = 0; i < state.length; i++) {
-            if (state[i].hasActual) {
-                lastFilledEnd = actual[i].end;
-            }
+
+        // Datum-model: sjednocený stav z aktuálního kroku (mirror ScheduleDateCalculator.Summarize +
+        // _ScheduleBlock.cshtml). aktualniIndex == -1 → vše vyplněno → Dokončeno.
+        const idx = typeof aktualniIndex === "number" ? aktualniIndex : -1;
+        const dokonceno = idx < 0;
+        let prekroceni = 0;
+        let stavText = "Dokončeno";
+        if (!dokonceno) {
+            const planAktualniEnd = plan[idx] ? plan[idx].end : todayDate;
+            prekroceni = diffCalendarDays(todayDate, planAktualniEnd); // znaménkové (dnes − plán)
+            const nazev = state[idx] ? state[idx].name : "";
+            stavText = prekroceni > 0 ? `Aktuální krok: ${nazev} · skluz +${prekroceni} dní`
+                : prekroceni < 0 ? `Aktuální krok: ${nazev} · v předstihu ${-prekroceni} dní`
+                : `Aktuální krok: ${nazev} · dle plánu`;
         }
-        const koncovyVyplnen = state.length > 0 && state[state.length - 1].hasActual;
-        let shiftedEnd;
-        if (koncovyVyplnen) {
-            shiftedEnd = actual[actual.length - 1].end;
-        } else {
-            const base = lastFilledEnd || startDate;
-            shiftedEnd = toUtcDayStamp(todayDate) > toUtcDayStamp(base) ? todayDate : base;
-        }
-        const totalDuration = state.reduce((sum, item) => sum + item.duration, 0);
-        const totalDelay = state.reduce((sum, item) => sum + item.delay, 0);
-        const stihame = toUtcDayStamp(shiftedEnd) <= toUtcDayStamp(deadlineDate);
-        const overrunDays = stihame ? 0 : diffCalendarDays(shiftedEnd, deadlineDate);
+        const stavOk = dokonceno || prekroceni <= 0;
 
         if (this.summaryDeadline instanceof HTMLElement) {
             this.summaryDeadline.textContent = formatDisplayDate(deadlineDate);
@@ -373,26 +369,15 @@ export class ScheduleBlockRenderer {
         if (this.summaryBaseline instanceof HTMLElement) {
             this.summaryBaseline.textContent = formatDisplayDate(baselineEnd);
         }
-        if (this.summaryShifted instanceof HTMLElement) {
-            this.summaryShifted.textContent = formatDisplayDate(shiftedEnd);
-        }
         if (this.summaryDuration instanceof HTMLElement) {
             this.summaryDuration.textContent = String(totalDuration);
         }
-        if (this.summaryDelay instanceof HTMLElement) {
-            this.summaryDelay.textContent = totalDelay > 0 ? `+${totalDelay}` : String(totalDelay);
-        }
         if (this.summaryState instanceof HTMLElement) {
-            this.summaryState.textContent = stihame ? "Stíháme" : "Nestíháme";
-        }
-        if (this.summaryOverrun instanceof HTMLElement) {
-            this.summaryOverrun.textContent = this.mode === "record-editor"
-                ? (stihame ? "" : `(+${overrunDays} dnů)`)
-                : `${overrunDays} dnů`;
+            this.summaryState.textContent = stavText;
         }
         if (this.statusLine instanceof HTMLElement) {
-            this.statusLine.classList.toggle("ok", stihame);
-            this.statusLine.classList.toggle("late", !stihame);
+            this.statusLine.classList.toggle("ok", stavOk);
+            this.statusLine.classList.toggle("late", !stavOk);
         }
     }
 
@@ -553,9 +538,7 @@ export class ScheduleBlockRenderer {
                 actualLeft,
                 actualWidth,
                 `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)} - ${formatDisplayDate(actualItem.end)}`);
-            if (entry.actualSegment instanceof HTMLElement) {
-                entry.actualSegment.style.setProperty("--schedule-actual-color", this.delayColor);
-            }
+            // Barva skutečnosti je pevná barva kroku (--seg-color z server renderu); delay-color override zrušen.
         });
     }
 
@@ -615,12 +598,12 @@ export class ScheduleBlockRenderer {
     // Žádný server round-trip (/Schedule/Recalc zrušen), žádné offsety. Mirror serverového
     // ScheduleDateCalculator + ScheduleBarLayoutCalculator — render metody pozicují z {start,end}.
     recalcAll() {
-        const { plan, actual, state, startDate } = this.computeDateModel();
+        const { plan, actual, state, startDate, aktualniIndex } = this.computeDateModel();
         if (state.length === 0) {
             return;
         }
         const deadlineDate = this.getDeadlineDate(startDate);
-        this.renderSummary(plan, actual, state, startDate, deadlineDate);
+        this.renderSummary(plan, actual, state, startDate, deadlineDate, aktualniIndex);
         this.renderOverview(plan, actual, state, startDate, deadlineDate);
         this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
         queueRainbowSegmentRender(this.root);
@@ -681,11 +664,30 @@ export class ScheduleBlockRenderer {
                 color: String(row.dataset.stepColor || "").trim(),
                 duration: Math.max(0, diffCalendarDays(planEnd, planStart)),
                 delay: hasActual ? diffCalendarDays(actualEnd, planEnd) : 0,
-                hasActual
+                hasActual,
+                jeAktualni: false
             });
         });
 
-        return { plan, actual, state, startDate };
+        // Datum-model: aktuální krok = první nevyplněný PO posledním vyplněném. Kreslí skutečnost
+        // do dneška (rozpracováno/prodlení) — mirror serverového ScheduleDateCalculator.Compute.
+        let lastFilled = -1;
+        for (let i = 0; i < state.length; i++) {
+            if (state[i].hasActual) lastFilled = i;
+        }
+        let aktualniIndex = -1;
+        for (let i = 0; i < state.length; i++) {
+            if (!state[i].hasActual && i > lastFilled) { aktualniIndex = i; break; }
+        }
+        if (aktualniIndex >= 0) {
+            const nowRaw = new Date();
+            const todayDate = new Date(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate());
+            const st = actual[aktualniIndex].start;
+            actual[aktualniIndex].end = toUtcDayStamp(todayDate) > toUtcDayStamp(st) ? todayDate : st;
+            state[aktualniIndex].jeAktualni = true;
+        }
+
+        return { plan, actual, state, startDate, aktualniIndex };
     }
 
     bindNumericStepper(button, input, delta, onChange) {
