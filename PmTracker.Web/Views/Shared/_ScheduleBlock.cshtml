@@ -107,17 +107,18 @@
                          style="@(ovl is null ? null : $"left:{Pct(ovl.DeadlinePct)}")"></div>
                     @foreach (var krok in visibleCompactSteps)
                     {
-                        // Phase 9 (DESIGN-9-D + 10-A, 2026-05-01): per-row segment visibility.
-                        //   planned row: hidden pokud TrvaniDni == 0
-                        //   actual row: hidden pokud OdchylkaDni == NULL (krok ještě nenastal)
+                        // Datum-model: per-row viditelnost segmentu.
+                        //   planned row: skrytý pokud TrvaniDni == 0
+                        //   actual row: viditelný pokud má segment skutečnosti (vyplněný krok NEBO
+                        //     aktuální krok táhnoucí do dneška) — řídí seg.HasActual ze server layoutu.
+                        var skutDatumLabel = krok.SkutecneDatum?.ToString("dd.MM.yyyy") ?? "rozpracováno";
                         var segmentTitle = row.Item1 == "planned"
                             ? $"{krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
-                            : $"{krok.Nazev}: skutečnost {(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy") : "—")}";
+                            : $"{krok.Nazev}: skutečnost {skutDatumLabel}";
                         var ariaLabel = row.Item1 == "planned"
                             ? $"Krok {krok.KrokIndex} {krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
-                            : $"Krok {krok.KrokIndex} {krok.Nazev}: skutečnost {(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy") : "krok ještě nenastal")}";
+                            : $"Krok {krok.KrokIndex} {krok.Nazev}: skutečnost {skutDatumLabel}";
                         var isPlannedHidden = row.Item1 == "planned" && krok.TrvaniDni <= 0;
-                        var isActualHidden = row.Item1 == "actual" && !krok.OdchylkaDni.HasValue;
 
                         // Server-side pozice (statická zobrazení). NULL layout = editor → JS.
                         string positionStyle = string.Empty;
@@ -125,12 +126,14 @@
                         {
                             var left = row.Item1 == "planned" ? seg.PlanLeftPct : seg.ActualLeftPct;
                             var width = row.Item1 == "planned" ? seg.PlanWidthPct : seg.ActualWidthPct;
-                            var hide = row.Item1 == "planned" ? (isPlannedHidden || width <= 0) : (isActualHidden || !seg.HasActual);
+                            // actual řada: seg.HasActual je autoritativní (true i pro aktuální krok).
+                            var hide = row.Item1 == "planned" ? (isPlannedHidden || width <= 0) : !seg.HasActual;
                             positionStyle = hide ? "display:none;" : $"left:{Pct(left)};width:calc({Pct(width)} + 1px);";
                         }
                         else
                         {
-                            positionStyle = (isPlannedHidden || isActualHidden) ? "display:none;" : string.Empty;
+                            var isActualHiddenNoLayout = row.Item1 == "actual" && !krok.OdchylkaDni.HasValue;
+                            positionStyle = (isPlannedHidden || isActualHiddenNoLayout) ? "display:none;" : string.Empty;
                         }
                         <span class="@overviewSegmentCssClass"
                               role="img"
@@ -140,7 +143,7 @@
                               data-schedule-segment-kind="@row.Item1"
                               data-step-index="@krok.KrokIndex"
                               data-step-has-actual="@(krok.OdchylkaDni.HasValue ? "true" : "false")"
-                              style="background:@krok.BarvaHex;@positionStyle"
+                              style="--seg-color:@krok.BarvaHex;@positionStyle"
                               title="@segmentTitle"></span>
                     }
                 </div>
@@ -213,6 +216,9 @@
                 var actualPosStyle = bseg is not null && bseg.HasActual
                     ? $"left:{Pct(bseg.ActualLeftPct)};width:calc({Pct(bseg.ActualWidthPct)} + 1px);"
                     : string.Empty;
+                // Server layout je autoritativní pro actual segment (true i pro aktuální krok do dneška).
+                var maActualSegment = bseg?.HasActual == true;
+                var skutLabel = krok.SkutecneDatum?.ToString("dd.MM.yyyy") ?? "rozpracováno";
                 <div class="gantt-step-row"
                      data-schedule-step-row
                      data-step-index="@krok.KrokIndex"
@@ -243,16 +249,16 @@
                               data-schedule-breakdown-segment="planned"
                               data-step-index="@krok.KrokIndex"
                               data-step-zero-plan="@(hasPlan ? "false" : "true")"
-                              style="background:@krok.BarvaHex;@plannedHiddenStyle"></span>
-                        @if (hasActual)
+                              style="--seg-color:@krok.BarvaHex;@plannedHiddenStyle"></span>
+                        @if (maActualSegment)
                         {
                             <span class="schedule-layered-segment actual"
                                   role="img"
-                                  aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy")"
-                                  data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy")"
+                                  aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @skutLabel"
+                                  data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @skutLabel"
                                   data-schedule-breakdown-segment="actual"
                                   data-step-index="@krok.KrokIndex"
-                                  style="@actualPosStyle"></span>
+                                  style="--seg-color:@krok.BarvaHex;@actualPosStyle"></span>
                         }
                     </div>
                 </div>

@@ -2489,6 +2489,26 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: clip;
+    /* Datum-model: pevná barva kroku z inline --seg-color (plán = plná). */
+    background: var(--seg-color, var(--schedule-delay));
+}
+
+/* Editor skutečnost: stejná pevná barva kroku, šrafovaná + nižší. */
+.schedule-mini-gantt-segment[data-schedule-segment-kind="actual"] {
+    top: 50%;
+    bottom: auto;
+    height: 60%;
+    transform: translateY(-50%);
+    background:
+        repeating-linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.55) 0,
+            rgba(255, 255, 255, 0.55) 4px,
+            transparent 4px,
+            transparent 8px
+        ),
+        var(--seg-color, var(--schedule-delay));
+    border: 1px solid rgba(15, 23, 42, 0.42);
 }
 
 .schedule-mini-gantt-marker {
@@ -3015,9 +3035,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     text-overflow: clip;
     opacity: 0.96;
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    /* Datum-model: barva kroku je vždy pevná (--seg-color z inline stylu). Plán = plná. */
+    background: var(--seg-color, var(--schedule-delay));
 }
 
-.schedule-overview-segment.actual {
+/* Skutečnost: stejná pevná barva kroku, ale šrafovaná + o kousek nižší, aby šla odlišit od plánu. */
+.schedule-overview-segment[data-schedule-segment-kind="actual"] {
+    top: 50%;
+    bottom: auto;
+    height: 60%;
+    transform: translateY(-50%);
     background:
         repeating-linear-gradient(
             135deg,
@@ -3026,7 +3053,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
             transparent 4px,
             transparent 8px
         ),
-        var(--schedule-actual-color, var(--record-schedule-delay-color, var(--schedule-delay)));
+        var(--seg-color, var(--schedule-delay));
     border: 1px solid rgba(15, 23, 42, 0.42);
     box-shadow:
         0 0 0 1px rgba(255, 255, 255, 0.35) inset,
@@ -3113,6 +3140,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     bottom: 0;
     opacity: 0.94;
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    /* Datum-model: plán = plná, pevná barva kroku (--seg-color z inline stylu). */
+    background: var(--seg-color, var(--schedule-delay));
 }
 
 .schedule-layered-segment.actual {
@@ -3120,6 +3149,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 8px;
     transform: translateY(-50%);
     border: 1px solid rgba(15, 23, 42, 0.42);
+    /* Skutečnost: stejná pevná barva kroku, šrafovaná + nižší (8px) → odlišení od plánu. */
     background:
         repeating-linear-gradient(
             135deg,
@@ -3128,7 +3158,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
             transparent 4px,
             transparent 8px
         ),
-        var(--schedule-actual-color, var(--record-schedule-delay-color, var(--schedule-delay)));
+        var(--seg-color, var(--schedule-delay));
     box-shadow:
         0 0 0 1px rgba(255, 255, 255, 0.35) inset,
         0 1px 2px rgba(15, 23, 42, 0.14);
@@ -6544,7 +6574,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
     box-shadow: inset 0 0 0 1px rgba(191, 218, 255, 0.2);
 }
 
-:root[data-theme="dark"] .schedule-overview-segment.actual,
+:root[data-theme="dark"] .schedule-overview-segment[data-schedule-segment-kind="actual"],
 :root[data-theme="dark"] .schedule-layered-segment.actual {
     border-color: rgba(226, 232, 240, 0.62);
     box-shadow:

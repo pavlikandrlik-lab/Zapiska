@@ -203,6 +203,27 @@ public sealed class ProjectHarmonogramRenderTests
     }
 
     [Fact]
+    public async Task Detail_AktualniKrok_MaViditelnySegmentSkutecnosti_DoDneska()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiHarmAktualniOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIHARMAKT");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIHARMSUBAKT", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram aktuální krok record");
+        // Vyplněno 1,2 → aktuální krok = 3 (nevyplněný, plán v minulosti → táhne do dneška).
+        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var html = await (await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}")).Content.ReadAsStringAsync();
+
+        // Overview actual segment kroku 3 (aktuální) musí být viditelný (ne display:none, má width).
+        string OverviewActual(int step) =>
+            Regex.Match(html, $"data-schedule-segment-kind=\"actual\"\\s+data-step-index=\"{step}\"[\\s\\S]{{0,200}}?style=\"([^\"]*)\"").Groups[1].Value;
+        OverviewActual(3).Should().NotContain("display:none", "aktuální krok 3 se kreslí jako rozpracovaný")
+            .And.Contain("width:", "segment skutečnosti aktuálního kroku má šířku (táhne do dneška)");
+    }
+
+    [Fact]
     public async Task Edit_ScheduleTab_PlanDateFields_AreEditable_ForTaskWithEditPermission()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiHarmEditableOwner");
