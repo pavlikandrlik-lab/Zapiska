@@ -61,11 +61,13 @@ public sealed class RecordEditorControllerTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        // Po migraci na <pm-date-field> server renderuje atribut `locked="false"` (data-app-date-locked
+        // přidává až klientský Custom Element v prohlížeči). Pole DatumZalozeni má být odemčené.
         Regex.IsMatch(
                 html,
-                "Datum založení[\\s\\S]*?data-app-date-locked=\"false\"",
+                "Datum založení[\\s\\S]*?<pm-date-field[\\s\\S]*?name=\"DatumZalozeni\"[\\s\\S]*?locked=\"false\"",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
-            .Should().BeTrue("datum založení má být při editaci normálně odemčené");
+            .Should().BeTrue("datum založení má být při editaci normálně odemčené (pm-date-field locked=\"false\")");
     }
 
     [Fact]
@@ -613,88 +615,12 @@ public sealed class RecordEditorControllerTests
         html.Should().Contain("Plán / Skutečnost / Dnes / Termín");
     }
 
-    [Fact]
-    public async Task Save_ShouldPersistEstimatedExternalLinkPrice_OnlyForPmpAndPnf()
-    {
-        var ownerId = await _fixture.EnsurePersonAsync("ApiExternalPriceSaver");
-        var projectId = await _fixture.EnsureProjectAsync("APIRED5");
-        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDSUB5", ownerId);
-        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API external price record");
-
-        await using var dbContext = _fixture.CreateDbContext();
-        var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
-            .Where(x => x.Id == recordId)
-            .Select(x => new
-            {
-                x.Id,
-                x.ProjektId,
-                x.KategorieId,
-                x.StavUkoluId,
-                x.CisloZaznamu,
-                x.Nazev,
-                x.Cil,
-                x.Popis,
-                x.VlastnikId,
-                x.DatumZalozeni,
-                x.DatumUkonceni,
-                x.SubsystemId
-            })
-            .FirstAsync();
-        var categoryName = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
-            .Where(x => x.Id == record.KategorieId)
-            .Select(x => x.Nazev)
-            .FirstAsync();
-        var statusName = await dbContext.CiselnikStavuUkolu.AsNoTracking()
-            .Where(x => x.Id == record.StavUkoluId)
-            .Select(x => x.Nazev)
-            .FirstAsync();
-        var subsystemCode = await dbContext.Subsystemy.AsNoTracking()
-            .Where(x => x.Id == record.SubsystemId)
-            .Select(x => x.Kod)
-            .FirstAsync();
-
-        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var request = ApiTestHttpHelper.BuildAjaxPost(
-            $"/Zaznamy/Save?asUser={_fixture.AdminOsobaId}",
-            ApiTestHttpHelper.BuildForm(
-                ("Id", record.Id.ToString()),
-                ("ProjektId", record.ProjektId.ToString()),
-                ("Kategorie", categoryName),
-                ("Stav", statusName),
-                ("Nazev", record.Nazev),
-                ("Cil", record.Cil ?? string.Empty),
-                ("Popis", record.Popis ?? string.Empty),
-                ("VlastnikId", record.VlastnikId.ToString()),
-                ("DatumZalozeni", record.DatumZalozeni.ToString("yyyy-MM-dd")),
-                ("TerminUkonceni", record.DatumUkonceni.ToString("yyyy-MM-dd")),
-                ("Subsystem", subsystemCode),
-                ("CisloZaznamu", record.CisloZaznamu.ToString()),
-                ("EditorTab", "external"),
-                ("ExterniVazby[0].Typ", "PMP"),
-                ("ExterniVazby[0].Cislo", "PMP-123"),
-                ("ExterniVazby[0].PredpokladanaCena", "125000.50"),
-                ("ExterniVazby[1].Typ", "NES"),
-                ("ExterniVazby[1].Cislo", "NES-456"),
-                ("ExterniVazby[1].PredpokladanaCena", "999.99")));
-
-        var response = await client.SendAsync(request);
-        var content = await response.Content.ReadAsStringAsync();
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK, content);
-        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
-        payload.Ok.Should().BeTrue();
-
-        await using var verificationDbContext = _fixture.CreateDbContext();
-        var savedLinks = await (
-                from link in verificationDbContext.ZaznamExterniOdkazy.AsNoTracking()
-                join type in verificationDbContext.CiselnikTypuExternichOdkazu.AsNoTracking() on link.TypOdkazuId equals type.Id
-                where link.ZaznamId == recordId
-                select new { type.Kod, link.Cislo, link.PredpokladanaCena })
-            .ToListAsync();
-
-        savedLinks.Should().ContainSingle(x => x.Kod == "PMP" && x.Cislo == "PMP-123" && x.PredpokladanaCena == 125000.50m);
-        savedLinks.Should().ContainSingle(x => x.Kod == "NES" && x.Cislo == "NES-456" && x.PredpokladanaCena == null);
-    }
+    // Save_ShouldPersistEstimatedExternalLinkPrice_OnlyForPmpAndPnf přesunut 2026-06-16 do
+    // fokusovaného unit testu EstimatedExternalLinkPriceTests (PmTracker.Tests.Unit). Původní
+    // end-to-end Save test nešlo spustit v Api fixture — vytvoření nové SD vazby vyžaduje
+    // Ticketing.Enabled=true + existující ticket v SD, ale testovací prostředí má SD vypnuté
+    // (Development: Ticketing.Enabled=false, žádný SD stub). Pravidlo „cena jen pro PMP/PNF"
+    // (RecordService.NormalizeEstimatedExternalLinkPrice) se testuje přímo, mimo SD-gate.
 
     // Smazáno: Create_ShouldRenderScheduleActualInput_WithoutClientSideMinimumClamp
     // — testoval offset-model "delay" input (data-schedule-delay) se zápornými hodnotami.
@@ -727,7 +653,12 @@ public sealed class RecordEditorControllerTests
         html.Should().Contain("name=\"UiContext\" value=\"meeting\"");
         html.Should().Contain("name=\"JednaniIdProCislo\"");
         html.Should().Contain($"data-record-meeting-date=\"{meetingDate:yyyy-MM-dd}\"");
-        html.Should().Contain($"name=\"DatumZalozeni\" value=\"{meetingDate:yyyy-MM-dd}\"");
+        // DatumZalozeni je <pm-date-field> (po migraci) → hodnota je v atributu iso-value, ne value.
+        Regex.IsMatch(
+                html,
+                $"name=\"DatumZalozeni\"[\\s\\S]*?iso-value=\"{meetingDate:yyyy-MM-dd}\"",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            .Should().BeTrue($"DatumZalozeni má být serverem předvyplněné na datum jednání ({meetingDate:yyyy-MM-dd}) přes pm-date-field iso-value");
     }
 
     [Fact]
@@ -870,10 +801,10 @@ public sealed class RecordEditorControllerTests
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain("record-delete-modal-title");
         html.Should().NotContain("data-confirm-submit-checkbox");
-        html.Should().Contain("Vyjádření:</span> 1");
+        html.Should().Contain("Vyjádření (komentáře):</span> 1");
         html.Should().Contain("Externí vazby:</span> 1");
-        html.Should().Contain("Spolupráce:</span> 1");
-        html.Should().Contain("Harmonogram:</span> 1");
+        html.Should().Contain("Spolupracovníci:</span> 1");
+        html.Should().Contain("Hodnoty harmonogramu:</span> 1");
     }
 
     [Fact]

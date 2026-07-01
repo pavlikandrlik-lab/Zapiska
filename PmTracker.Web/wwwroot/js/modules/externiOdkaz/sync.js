@@ -263,15 +263,30 @@
     if (!target || typeof target.hasAttribute !== 'function') return;
     if (!target.hasAttribute('data-external-cislo')) return;
 
+    // 7c (2026-06-17): v editoru NÁVRHU se externí vazby jen zadávají (čísla) — netěžit ani
+    // nezkoumat obsah (žádný /ExterniOdkaz/Sync preview). Harvest = skutečnost až po založení
+    // reálného záznamu klasickou cestou.
+    if (typeof target.closest === 'function' && target.closest('[data-is-proposal-editor="true"]')) return;
+
     const existing = timers.get(target);
     if (existing) clearTimeout(existing);
     const timer = setTimeout(() => syncCislo(target), DEBOUNCE_MS);
     timers.set(target, timer);
   }
 
+  function syncPrefilledInputs() {
+    document.querySelectorAll('[data-external-cislo]').forEach(function (input) {
+      if (input.value && /^\d{6}$/.test(input.value.trim())) {
+        if (typeof input.closest === 'function' && input.closest('[data-is-proposal-editor="true"]')) return;
+        syncCislo(input);
+      }
+    });
+  }
+
   function init() {
     document.addEventListener('input', onInput);
     document.addEventListener('gov-input', onInput);
+    syncPrefilledInputs();
   }
 
   global.pmExterniOdkazSync = {

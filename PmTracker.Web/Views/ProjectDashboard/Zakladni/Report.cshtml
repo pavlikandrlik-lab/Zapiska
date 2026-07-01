@@ -1,0 +1,21 @@
+@model PmTracker.Web.Services.ProjectDashboard.Zakladni.ZakladniReportViewModel
+<section class="zr-report" data-zakladni-report data-projekt-id="@Model.ProjektId">
+    <h2 class="zr-report-title">@Model.ProjektNazev</h2>
+    <partial name="~/Views/ProjectDashboard/Zakladni/_ObdobiSelector.cshtml" model="Model" />
+    @if (Model.Sections.Count == 0)
+    {
+        <p class="muted">Pro toto období zatím nejsou žádné grafy.</p>
+    }
+    else
+    {
+        foreach (var sekce in Model.Sections)
+        {
+            <div class="zr-section" data-section="@sekce.Key">
+                @foreach (var chart in sekce.Charts)
+                {
+                    <partial name="~/Views/ProjectDashboard/Zakladni/_Chart.cshtml" model="chart" />
+                }
+            </div>
+        }
+    }
+</section>

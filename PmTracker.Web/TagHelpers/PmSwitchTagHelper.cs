@@ -11,7 +11,7 @@ namespace PmTracker.Web.TagHelpers;
 /// <pre><pm-switch name="notifikace" label="Zasílat notifikace" /></pre>
 ///
 /// Thin wrapper nad gov-form-switch. Pro přepnutí motivu použij
-/// &lt;gov-theme-switch&gt; přímo (ta má vlastní JS handler v site.bundle.js).
+/// &lt;gov-theme-switch&gt; přímo (ta má vlastní JS handler v ESM modulech).
 ///
 /// Dokumentace: docs/architecture/switches.md
 /// </summary>

@@ -484,6 +484,23 @@ public sealed class CurrentUserContextViewModel
         return authz.HasPermission(permissionKey, projektId);
     }
 
+    /// <summary>
+    /// True, pokud osoba má klíč z PŘÍMÉ projektové role (nebo globálně), tj. NE pouze
+    /// jako zděděný subsystémový grant. Pro rozlišení „projektová role vs. vedoucí subsystému".
+    /// </summary>
+    public bool HasDirectProjectPermission(string permissionKey, int projektId)
+    {
+        if (IsProjectReadOnly(projektId) && PermissionKeys.IsBlockedForDeletedProject(permissionKey))
+        {
+            return false;
+        }
+
+        var authz = Authorization ?? throw new InvalidOperationException(
+            "AuthorizationSnapshot musí být vyplněn pro tento request.");
+
+        return authz.HasDirectProjectPermission(permissionKey, projektId);
+    }
+
     public bool HasPermissionPrefix(string permissionPrefix)
     {
         if (IsSuperAdmin) return true;

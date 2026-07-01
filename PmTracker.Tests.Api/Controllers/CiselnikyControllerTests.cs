@@ -28,7 +28,9 @@ public sealed class CiselnikyControllerTests
         var decodedHtml = WebUtility.HtmlDecode(html);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        decodedHtml.Should().Contain("Klíč: typy-ukolu");
+        // Nadpis "Klíč: <key>" byl záměrně odstraněn (commit 6b4ed1d); klíč číselníku nese
+        // hidden input v každém řádku/formuláři.
+        decodedHtml.Should().Contain("name=\"Key\" value=\"typy-ukolu\"");
         decodedHtml.Should().Contain("Nová položka");
     }
 

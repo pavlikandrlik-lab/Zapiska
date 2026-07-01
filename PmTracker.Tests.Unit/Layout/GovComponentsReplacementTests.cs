@@ -214,11 +214,23 @@ public sealed class GovComponentsReplacementTests
 
         content.Should().Contain("<gov-message color=\"error\">",
             "_EditZaznamBasicPanel.cshtml musí používat <gov-message color=\"error\"> místo .alert.danger");
-        content.Should().Contain("<gov-message color=\"warning\">",
-            "_EditZaznamBasicPanel.cshtml musí používat <gov-message color=\"warning\"> místo .alert.warning");
+        // Warning banner (zámek harmonogramu) se 2026-06-29 přesunul na vrch _EditZaznamForm.cshtml
+        // (form-level notice nad záložkami). Viz EditZaznamForm_PouzivaGovMessageProZamek
+        // a ScheduleLockBannerPlacementTests.
         content.Should().NotContain("class=\"alert danger\"",
             "_EditZaznamBasicPanel.cshtml nesmí obsahovat .alert.danger");
         content.Should().NotContain("class=\"alert warning\"",
             "_EditZaznamBasicPanel.cshtml nesmí obsahovat .alert.warning");
+    }
+
+    [Fact]
+    public void EditZaznamForm_PouzivaGovMessageProZamek()
+    {
+        var content = ReadView("Projekty", "_EditZaznamForm.cshtml");
+
+        content.Should().Contain("<gov-message color=\"warning\">",
+            "_EditZaznamForm.cshtml musí používat <gov-message color=\"warning\"> pro form-level banner zámku harmonogramu");
+        content.Should().NotContain("class=\"alert warning\"",
+            "_EditZaznamForm.cshtml nesmí obsahovat staré .alert.warning");
     }
 }

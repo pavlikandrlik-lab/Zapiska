@@ -36,6 +36,7 @@
                         {
                             <article class="schedule-card"
                                      data-schedule-item
+                                     data-schedule-record-id="@item.ZaznamId"
                                      data-filter-subsystem="@item.Subsystem"
                                      data-filter-subsystem-kod="@item.SubsystemKod"
                                      data-filter-kategorie="@item.Kategorie"
@@ -62,6 +63,14 @@
                                     </div>
                                     <div class="schedule-card-actions">
                                         <gov-tag color="@(item.Stihame ? "success" : "error")" size="s">@(item.Stihame ? "Stíháme" : "Nestíháme")</gov-tag>
+                                        <pm-button variant="Secondary"
+                                                   size="Small"
+                                                   data-goto-record="@item.ZaznamId"
+                                                   data-stop-propagation="true"
+                                                   aria-label="Zobrazit záznam"
+                                                   title="Zobrazit záznam">
+                                            <gov-icon size="s" name="list" type="components" aria-hidden="true"></gov-icon>
+                                        </pm-button>
                                         <pm-button variant="Secondary"
                                                    size="Small"
                                                    data-schedule-expand-toggle="true"

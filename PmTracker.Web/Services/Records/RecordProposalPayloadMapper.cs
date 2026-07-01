@@ -155,6 +155,36 @@ public sealed class RecordProposalPayloadMapper
             })
             .ToList();
         model.JednaniIdProCislo = payload.JednaniIdProCislo;
+
+        if (payload.HarmonogramHodnoty.Count > 0)
+        {
+            var planByPoradi = payload.HarmonogramHodnoty
+                .GroupBy(v => v.Poradi).ToDictionary(g => g.Key, g => g.Last().PlanDatum);
+
+            var rebuiltSteps = model.HarmonogramBlok.Kroky
+                .Select(step => new HarmonogramKrokEditViewModel
+                {
+                    KrokIndex = step.KrokIndex,
+                    Nazev = step.Nazev,
+                    BarvaHex = step.BarvaHex,
+                    TrvaniDni = step.TrvaniDni,
+                    OdchylkaDni = step.OdchylkaDni,
+                    BaselineDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pd) && pd.HasValue ? pd.Value : step.BaselineDatum,
+                    SkutecneDatum = step.SkutecneDatum,
+                    ZdrojSkutecnosti = step.ZdrojSkutecnosti,
+                    SourceVyjadreniId = step.SourceVyjadreniId,
+                    SourceVyjadreniDatum = step.SourceVyjadreniDatum,
+                    SourceExterniOdkazId = step.SourceExterniOdkazId,
+                    IsManualKrok = step.IsManualKrok
+                })
+                .ToList();
+
+            model.HarmonogramBlok = model.HarmonogramBlok with
+            {
+                TerminUkonceni = payload.TerminUkonceni,
+                Kroky = rebuiltSteps
+            };
+        }
     }
 
     public void ApplySchedulePayload(ZaznamEditViewModel model, SchedulePlanProposalPayload payload)
@@ -184,16 +214,12 @@ public sealed class RecordProposalPayloadMapper
             })
             .ToList();
 
-        model.HarmonogramBlok = new HarmonogramBlockViewModel
+        // `with`: zachová OverviewLayout/Today/ScheduleVersion/lock state — dřív object-initializer
+        // zahazoval vše krom explicitně uvedeného (marker přilepený na left:0 + ztráta lock stavu).
+        model.HarmonogramBlok = model.HarmonogramBlok with
         {
-            RecordId = model.HarmonogramBlok.RecordId,
-            Mode = model.HarmonogramBlok.Mode,
-            DatumZalozeni = model.HarmonogramBlok.DatumZalozeni,
             TerminUkonceni = payload.TerminUkonceni,
-            DelayBarvaHex = model.HarmonogramBlok.DelayBarvaHex,
-            Souhrn = model.HarmonogramBlok.Souhrn,
-            Kroky = rebuiltSteps,
-            Permissions = model.HarmonogramBlok.Permissions
+            Kroky = rebuiltSteps
         };
     }
 }

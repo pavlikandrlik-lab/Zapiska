@@ -85,14 +85,4 @@ public sealed class PickersJsSplitTests
         content.Should().Contain("export * from \"./adPerson.js\"");
     }
 
-    [Fact]
-    public void Bundle_ShouldContainKeyExports()
-    {
-        var bundle = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/site.bundle.js"));
-        bundle.Should().Contain("initCustomDatePickers");
-        bundle.Should().Contain("initCustomTimePickers");
-        bundle.Should().Contain("initSinglePersonPickers");
-        bundle.Should().Contain("initAdPersonPickers");
-        bundle.Should().Contain("formatPersonEntryLabel");
-    }
 }

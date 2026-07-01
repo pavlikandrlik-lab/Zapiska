@@ -38,7 +38,12 @@ public sealed class CommentService(
 
         await EnsureMeetingAllowsCommentChangesAsync(meeting, ct);
 
-        var subsystemLeadEquivalentOsobaIds = await ResolveLeadEquivalentOsobaIdsAsync(record.ProjektId, record.SubsystemId, ct);
+        var leadEquivalentBySubsystem = await ResolveLeadEquivalentOsobaIdsBySubsystemAsync(record.ProjektId, ct);
+        var subsystemLeadEquivalentOsobaIds = leadEquivalentBySubsystem.GetValueOrDefault(record.SubsystemId, []);
+        // Je osoba vedoucím/zástupcem NĚKTERÉHO subsystému projektu? Pak podléhá subsystémovému
+        // omezení komentářů (jen vlastní subsystém v DRAFT), nehledě na zděděný comments.add.
+        var isSubsystemLeadEquivalentInProject = leadEquivalentBySubsystem.Values
+            .Any(ids => ids.Contains(currentUser.OsobaId));
         var meetingState = await dbContext.CiselnikStavuJednani
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
@@ -46,6 +51,7 @@ public sealed class CommentService(
             currentUser,
             record.ProjektId,
             subsystemLeadEquivalentOsobaIds,
+            isSubsystemLeadEquivalentInProject,
             IsDraftMeeting(meetingState));
         if (!canAdd)
         {

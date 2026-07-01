@@ -64,7 +64,7 @@ public sealed class ProjektyViewModelsSplitTests
             "class ZaznamCardSummaryViewModel",
             "class ZaznamCardDetailViewModel",
             "class ZaznamCommentsPanelViewModel",
-            "class HarmonogramBlockViewModel",
+            "record HarmonogramBlockViewModel",
             "class ProjektHarmonogramTabViewModel",
             "class ProjektJednaniTabViewModel",
             "class ProjektTymTabViewModel",

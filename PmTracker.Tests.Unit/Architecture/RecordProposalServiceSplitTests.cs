@@ -49,8 +49,6 @@ public sealed class RecordProposalServiceSplitTests
             "BuildScheduleProposalEditorAsync patří do Queries");
         content.Should().Contain("BuildProposalDetailAsync",
             "BuildProposalDetailAsync patří do Queries");
-        content.Should().Contain("BuildEditableRecordEditorFromProposalAsync",
-            "BuildEditableRecordEditorFromProposalAsync patří do Queries");
         content.Should().Contain("BuildPrefilledCreateRecordEditorFromProposalAsync",
             "BuildPrefilledCreateRecordEditorFromProposalAsync patří do Queries");
     }

@@ -53,6 +53,32 @@ public sealed class HarmonogramDateBlokBuilderTests
     }
 
     [Fact]
+    public void BuildKroky_exposesPlanAndActualStartEnd_ForTooltip()
+    {
+        // krok 1 vyplněn (skut 13.1.), krok 2 nevyplněn (aktuální → táhne do dneška).
+        var rows = new[]
+        {
+            Row(1, new DateTime(2026, 1, 10), new DateTime(2026, 1, 13)),
+            Row(2, new DateTime(2026, 1, 20), null),
+        };
+
+        var kroky = HarmonogramDateBlokBuilder.BuildKroky(Start, rows, Today);
+
+        var k1 = kroky.Single(k => k.KrokIndex == 1);
+        k1.PlanZacatek.Should().Be(new DateTime(2026, 1, 1), "plán kroku 1 začíná datem založení");
+        k1.BaselineDatum.Should().Be(new DateTime(2026, 1, 10));
+        k1.SkutecnostZacatek.Should().Be(new DateTime(2026, 1, 1));
+        k1.SkutecnostKonec.Should().Be(new DateTime(2026, 1, 13));
+
+        var k2 = kroky.Single(k => k.KrokIndex == 2);
+        k2.PlanZacatek.Should().Be(new DateTime(2026, 1, 10), "plán kroku 2 navazuje na konec kroku 1");
+        k2.SkutecnostKonec.Should().Be(Today, "aktuální (nevyplněný) krok táhne skutečnost do dneška");
+
+        var k3 = kroky.Single(k => k.KrokIndex == 3);
+        k3.SkutecnostZacatek.Should().BeNull("krok 3 nemá skutečnost (není vyplněný ani aktuální)");
+    }
+
+    [Fact]
     public void BuildSouhrn_ma_aktualni_krok_a_znamenkove_prekroceni()
     {
         // krok 1 vyplněn, krok 2 (a dál) nevyplněn → aktuální = 2

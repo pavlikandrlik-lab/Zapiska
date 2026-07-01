@@ -9,17 +9,11 @@
          role="tabpanel"
          aria-labelledby="tab-navrhy"
          data-tab-panel="navrhy">
-    <div class="panel-header">
-        <div class="panel-header-actions">
-            @if (Model.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.CreateRecordProposalUrl))
-            {
-                <pm-button variant="Primary" href="@Model.CreateRecordProposalUrl">
-                    Nový návrh záznamu
-                </pm-button>
-            }
-        </div>
-    </div>
-
+    @* „Nový návrh záznamu" zde NEduplikujeme — akce žije v tab stripu vpravo nahoře
+       (Detail.cshtml .tabs-actions, size Small), renderovaném i na Návrhy tabu.
+       Panel-header tlačítko (Medium) odstraněno kvůli nesouladu velikostí + duplicitě
+       (user 2026-06-22, vzor „akce v tab stripu" z 2026-06-10). *@
+    @await Html.PartialAsync("_ProposalFilterShell", Model.FilterShell)
     <div class="proposal-section-grid">
         <section class="card">
             <h3>Návrhy založení záznamu</h3>
@@ -32,7 +26,12 @@
                 <div class="proposal-list">
                     @foreach (var item in Model.NavrhyZalozeni)
                     {
-                        <article class="proposal-card">
+                        <article class="proposal-card"
+                                data-filter-stav-navrhu="@(string.Equals(item.Stav, "SUPERSEDED", StringComparison.OrdinalIgnoreCase) ? "REJECTED" : item.Stav)"
+                                data-filter-typ-navrhu="@item.TypNavrhu"
+                                data-filter-subsystem="@item.Subsystem"
+                                data-filter-autor="@item.CreatedByOsobaId"
+                                data-filter-rozhodl="@(item.DecidedByOsobaId?.ToString() ?? "")">
                             <div class="proposal-card-header">
                                 <div>
                                     <div class="record-title">@(string.IsNullOrWhiteSpace(item.Nazev) ? $"Návrh #{item.Id}" : item.Nazev)</div>
@@ -66,42 +65,9 @@
                                         Detail návrhu
                                     </pm-button>
                                 }
-                                @if (item.CanApprove)
-                                {
-                                    <form asp-controller="Navrhy"
-                                          asp-action="ApproveProposal"
-                                          method="post"
-                                          data-ajax-submit="true">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
-                                        <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <pm-button variant="Primary" size="Small" native-type="submit">Schválit</pm-button>
-                                    </form>
-                                }
-                                @if (item.CanReject)
-                                {
-                                    <form asp-controller="Navrhy"
-                                          asp-action="RejectProposal"
-                                          method="post"
-                                          data-ajax-submit="true">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
-                                        <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <pm-button variant="Secondary" size="Small" native-type="submit">Zamítnout</pm-button>
-                                    </form>
-                                }
-                                @if (item.CanRejectAndTakeOver)
-                                {
-                                    <form asp-controller="Navrhy"
-                                          asp-action="RejectAndTakeOverCreateProposal"
-                                          method="post"
-                                          data-ajax-submit="true">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
-                                        <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <pm-button variant="Secondary" size="Small" native-type="submit">Zamítnout a převzít data</pm-button>
-                                    </form>
-                                }
+                                @* 7a (2026-06-17): rozhodovací akce (Schválit / Zamítnout /
+                                   Zamítnout a převzít data) přesunuty do detailu návrhu. Na panelu
+                                   zůstává jen „Detail návrhu" (+ „Předvyplnit formulář" pro rozhodnuté). *@
                                 @if (item.CanPrefillCreateForm
                                      && !string.Equals(item.Stav, RecordProposalStateCodes.Pending, StringComparison.OrdinalIgnoreCase)
                                      && !string.IsNullOrWhiteSpace(item.PrefillCreateFormUrl))
@@ -130,7 +96,12 @@
                 <div class="proposal-list">
                     @foreach (var item in Model.NavrhyHarmonogramu)
                     {
-                        <article class="proposal-card">
+                        <article class="proposal-card"
+                                data-filter-stav-navrhu="@(string.Equals(item.Stav, "SUPERSEDED", StringComparison.OrdinalIgnoreCase) ? "REJECTED" : item.Stav)"
+                                data-filter-typ-navrhu="@item.TypNavrhu"
+                                data-filter-subsystem="@item.Subsystem"
+                                data-filter-autor="@item.CreatedByOsobaId"
+                                data-filter-rozhodl="@(item.DecidedByOsobaId?.ToString() ?? "")">
                             <div class="proposal-card-header">
                                 <div>
                                     <div class="record-title">
@@ -167,42 +138,9 @@
                                         Detail návrhu
                                     </pm-button>
                                 }
-                                @if (item.CanApprove)
-                                {
-                                    <form asp-controller="Navrhy"
-                                          asp-action="ApproveProposal"
-                                          method="post"
-                                          data-ajax-submit="true">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
-                                        <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <pm-button variant="Primary" size="Small" native-type="submit">Schválit</pm-button>
-                                    </form>
-                                }
-                                @if (item.CanReject)
-                                {
-                                    <form asp-controller="Navrhy"
-                                          asp-action="RejectProposal"
-                                          method="post"
-                                          data-ajax-submit="true">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
-                                        <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <pm-button variant="Secondary" size="Small" native-type="submit">Zamítnout</pm-button>
-                                    </form>
-                                }
-                                @if (item.CanRejectAndEdit)
-                                {
-                                    <form asp-controller="Navrhy"
-                                          asp-action="RejectAndEditProposal"
-                                          method="post"
-                                          data-ajax-submit="true">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="ProjektId" value="@item.ProjektId" />
-                                        <input type="hidden" name="ProposalId" value="@item.Id" />
-                                        <pm-button variant="Secondary" size="Small" native-type="submit">Zamítnout a upravit</pm-button>
-                                    </form>
-                                }
+                                @* 7a (2026-06-17): rozhodovací akce (Schválit / Zamítnout /
+                                   Zamítnout a upravit) přesunuty do detailu návrhu. Na panelu
+                                   zůstává jen „Detail návrhu". *@
                             </div>
                         </article>
                     }

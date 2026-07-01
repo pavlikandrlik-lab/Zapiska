@@ -46,24 +46,22 @@ public sealed class ChatModalStepperVazbaIdTests
     }
 
     [Fact]
-    public void ChatModalDragDropBundle_CallsDeleteBindingWithVazbaId()
+    public void ChatModalDragDropModule_CallsDeleteBindingWithVazbaId()
     {
-        var text = LoadRepoText("PmTracker.Web/wwwroot/js/site.bundle.js");
+        // ESM modul (aplikace běží na site.js; legacy site.bundle.js odstraněn 2026-06-16).
+        var text = LoadRepoText("PmTracker.Web/wwwroot/js/modules/vyjadreni/bubbleStepSelector.js");
         text.Should().Contain(
-            "'/Vyjadreni/HarmonogramVazba/Delete'",
-            "A-5: bundle musí POSTovat na Delete endpoint");
+            "/Vyjadreni/HarmonogramVazba/Delete",
+            "A-5: modul musí POSTovat na Delete endpoint");
         text.Should().Contain(
             "data-vazba-id",
-            "A-5: bundle čte skutečnou VazbaId ze step atributu");
-        text.Should().Contain(
-            "refreshModal",
-            "A-5: po mutaci se modal refreshuje");
+            "A-5: modul čte skutečnou VazbaId ze step atributu");
     }
 
     [Fact]
-    public void ChatModalBundle_ExposesRefreshModalOnPublicApi()
+    public void ChatModalModule_ExposesRefreshModalOnPublicApi()
     {
-        var text = LoadRepoText("PmTracker.Web/wwwroot/js/site.bundle.js");
+        var text = LoadRepoText("PmTracker.Web/wwwroot/js/modules/vyjadreni/chatModal.js");
         text.Should().Contain(
             "global.pmChatModal = { init, open, close, refreshModal }",
             "A-5: pmChatModal API musí vystavit refreshModal");

@@ -19,7 +19,6 @@ public sealed partial class ProjektyController : BaseController
     private const string TeamTab = "tym";
     private const string ProposalsTab = "navrhy";
     private const string TeamRefreshScope = "projekty-detail-tym";
-    private const string ProposalsRefreshScope = "projekty-detail-navrhy";
 
     private readonly IProjectService _projectService;
     private readonly IMeetingService _meetingService;
@@ -195,10 +194,11 @@ public sealed partial class ProjektyController : BaseController
     {
         var projectId = model.ProjektId;
         var canManageRecords = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projectId);
-        // F4 redesign 2026-04-23: records.comment.subsystemlead nahrazen proposals.record.create
-        // — samostatný per-action klíč pro tvorbu návrhů na záznam (nezávisle na komentářové doméně).
-        var canCreateRecordProposal = !canManageRecords
-            && CurrentUserContext.HasPermission(PermissionKeys.ProposalsRecordCreate, projectId);
+        // „Nový návrh záznamu" gateujeme stejnou autoritativní branou jako panel Návrhů
+        // (CreatableSubsystemIds > 0), aby se tlačítko v tab stripu zobrazilo přesně těm
+        // uživatelům, co návrh opravdu mohou založit. Dřívější heuristika
+        // (!canManageRecords && ProposalsRecordCreate) se s panelem rozcházela (user 2026-06-22).
+        var canCreateRecordProposal = await _recordProposalService.CanCreateRecordProposalAsync(projectId, CurrentUserContext, ct);
 
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.CanManageRecords = canManageRecords;
@@ -285,6 +285,7 @@ public sealed partial class ProjektyController : BaseController
     private void PrepareProjectProposalsTabPresentation(ProjektNavrhyTabViewModel model)
     {
         model.CreateRecordProposalUrl = Url.Action("CreateRecordProposal", "Navrhy", new { projektId = model.ProjektId }) ?? $"/Navrhy/CreateRecordProposal?projektId={model.ProjektId}";
+        model.FilterShell.CurrentUserOsobaId = CurrentUserContext.OsobaId;
 
         foreach (var item in model.NavrhyZalozeni.Concat(model.NavrhyHarmonogramu))
         {

@@ -25,30 +25,32 @@ public sealed class DashboardLayoutTests
     public void DashboardCss_ShouldDefineFullHeightGrid()
     {
         var css = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/css/site.css"));
+        // Výška „přesně jedna obrazovka" se od 2026-06-08 počítá na
+        // .app-main--fluid:has(.dashboard-shell) = 100dvh − hlavička (dřív
+        // .dashboard-shell{height:100vh;overflow:hidden}; shell je teď flex a stránka smí scrollovat).
         css.Should().MatchRegex(
-            @"\.dashboard-shell\s*\{[\s\S]*?height\s*:\s*100vh",
-            "shell má 100vh height (non-scrollable outer)");
-        css.Should().MatchRegex(
-            @"\.dashboard-shell\s*\{[\s\S]*?overflow\s*:\s*hidden",
-            "shell overflow hidden (non-scrollable outer)");
+            @"\.app-main--fluid:has\(\.dashboard-shell\)\s*\{[\s\S]*?height\s*:\s*calc\(\s*100dvh",
+            "výška dashboardu = 100dvh − hlavička na .app-main--fluid:has(.dashboard-shell)");
         css.Should().MatchRegex(
             @"\.dashboard-body\s*\{[\s\S]*?grid-template-columns\s*:\s*2fr\s+1fr",
-            "body grid 2/3 + 1/3");
+            "body grid 2/3 (focus) + 1/3 (rail)");
     }
 
     [Fact]
-    public void DashboardCss_ShouldPlacePanelsIn2By3Layout()
+    public void DashboardCss_ShouldPlaceFocusLeftAndRailRight_WithDynamicHeightSharing()
     {
         var css = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/css/site.css"));
+        // Focus vlevo (grid-column 1); pravý sloupec = .dashboard-rail (grid-column 2) flex-column,
+        // kde Jednání + Novinky dynamicky sdílí výšku přes :has (panel s obsahem roste, prázdný se smrští).
         css.Should().MatchRegex(
-            @"\.dashboard-section--focus[\s\S]*?grid-column\s*:\s*1[\s\S]*?grid-row\s*:\s*1\s*/\s*3",
-            "Focus panel span vlevo celá výška");
+            @"\.dashboard-section--focus\s*\{[\s\S]*?grid-column\s*:\s*1",
+            "Focus panel vlevo (grid-column 1)");
         css.Should().MatchRegex(
-            @"\.dashboard-section--meetings[\s\S]*?grid-column\s*:\s*2[\s\S]*?grid-row\s*:\s*1",
-            "Meetings vpravo nahoře");
+            @"\.dashboard-rail\s*\{[\s\S]*?grid-column\s*:\s*2",
+            "pravý sloupec (rail) vpravo (grid-column 2)");
         css.Should().MatchRegex(
-            @"\.dashboard-section--news[\s\S]*?grid-column\s*:\s*2[\s\S]*?grid-row\s*:\s*2",
-            "News vpravo dole");
+            @"\.dashboard-rail\s*>\s*\.dashboard-panel:has\([\s\S]*?flex\s*:\s*1\s+1\s+auto",
+            "panel s obsahem v railu roste — dynamické sdílení výšky Jednání/Novinky přes :has");
     }
 
     [Fact]

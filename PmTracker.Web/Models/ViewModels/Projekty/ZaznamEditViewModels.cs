@@ -64,6 +64,10 @@ public sealed class ZaznamEditViewModel
     public bool CanApproveProposal { get; set; }
     public bool CanRejectProposal { get; set; }
     public bool CanRejectAndEditProposal { get; set; }
+    // 7a (2026-06-17): rozhodovací akce přesunuty z panelu do detailu. Návrh ZALOŽENÍ má
+    // v detailu „Zamítnout a převzít data" (RejectAndTakeOverCreateProposal); návrh HARMONOGRAMU
+    // má „Zamítnout a upravit" (RejectAndEditProposal). Rozlišeno podle typu návrhu.
+    public bool CanRejectAndTakeOverProposal { get; set; }
     // CanPrefillProposalForm smazáno 2026-04-23 — EditFromProposal bypass zrušen.
     public string? ProposalSummaryNote { get; set; }
     public IReadOnlyDictionary<string, string> ProposalChangedFieldTooltips { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -72,6 +76,10 @@ public sealed class ZaznamEditViewModel
     public bool AllowTermDeadlineEdit { get; set; } = true;
     public bool ShowExternalTab { get; set; } = true;
     public bool ShowCollaborationTab { get; set; } = true;
+    // 7c (2026-06-17): v návrhu ZALOŽENÍ se u externích vazeb pouze zadávají čísla; harvest
+    // (4 datumy, bubliny vyjádření, chat „Vyjádření a termíny") = skutečnost, vznikne až po
+    // založení reálného záznamu klasickou cestou. Když true, externí panel skryje harvest UI.
+    public bool HideExternalHarvestUi { get; set; }
     public bool HasPendingScheduleProposalLock { get; set; }
     public int? PendingScheduleProposalId { get; set; }
     public string? PendingScheduleProposalMessage { get; set; }

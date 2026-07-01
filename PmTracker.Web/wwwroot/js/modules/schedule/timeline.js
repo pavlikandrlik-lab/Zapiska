@@ -268,6 +268,219 @@ export function renderTimelineAxis(container, startDate, endDate, options) {
 
 }
 
+/**
+ * Parsuje server-serializované měsíční ticky z data-schedule-ticks (JSON `{left,label}[]`).
+ * Kanonická osa (scheduleAxis.js / ScheduleBarLayoutCalculator) je počítá; JS je jen kreslí.
+ */
+export function buildTicksFromServer(json) {
+    if (!json) {
+        return [];
+    }
+    try {
+        const parsed = JSON.parse(json);
+        return Array.isArray(parsed)
+            ? parsed
+                .filter((t) => t && Number.isFinite(t.left))
+                .map((t) => ({ left: t.left, label: String(t.label ?? "") }))
+            : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Rozmístí popisky tiků v px (left + maxWidth) relativně k px pozici gridline.
+ * KRITICKÉ: `.timeline-axis-label` je position:absolute uvnitř 1px-širokého tiku, takže
+ * bez tohoto JS by se opíral o nesmyslné CSS `left:4px; max-width:calc(100% − 4px)` (100% = 1px).
+ * Sdílí stejné chování s renderTimelineAxis (gantt). Popisek umístění: první start, poslední end,
+ * ostatní vycentrované na gridline; překryvy se skryjí (gridline zůstává).
+ */
+function layoutAxisLabels(container, containerWidth) {
+    const minLabelGap = 6;
+    const tickNodes = Array.from(container.querySelectorAll(".timeline-axis-tick"))
+        .filter((tickNode) => tickNode instanceof HTMLElement);
+    const lastIndex = tickNodes.length - 1;
+    const resolveLabelWidth = (labelNode) => {
+        const measuredLabelWidth = labelNode.offsetWidth;
+        const computedStyle = window.getComputedStyle(labelNode);
+        const fallbackFontSpec = `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+        const fallbackLabelWidth = Math.ceil(measureTextWidth(labelNode.textContent || "", fallbackFontSpec));
+        return measuredLabelWidth > 0 ? measuredLabelWidth : fallbackLabelWidth;
+    };
+    const resolveTickLeftPx = (tickNode) => {
+        const serializedPx = Number.parseFloat(tickNode.dataset.axisLeftPx || "");
+        if (Number.isFinite(serializedPx)) {
+            return serializedPx;
+        }
+        const measuredLeft = Number.parseFloat(tickNode.style.left || "0");
+        return Number.isFinite(measuredLeft) ? measuredLeft : 0;
+    };
+    const resolveLabelPlacement = (index) =>
+        (tickNodes.length === 1 || index === 0) ? "start" : index === lastIndex ? "end" : "center";
+    const clampAbsoluteLeft = (value, width) => Math.max(0, Math.min(value, Math.max(0, containerWidth - width)));
+    const resolveLabelLayout = (tickNode, labelNode, index) => {
+        const placement = resolveLabelPlacement(index);
+        const tickLeftPx = resolveTickLeftPx(tickNode);
+        const maxWidthByPlacement = placement === "start"
+            ? Math.max(1, containerWidth - tickLeftPx)
+            : placement === "end" ? Math.max(1, tickLeftPx) : Math.max(1, containerWidth);
+        labelNode.style.maxWidth = `${Math.max(1, Math.floor(maxWidthByPlacement))}px`;
+        const labelWidthRaw = resolveLabelWidth(labelNode);
+        const labelWidth = Math.max(1, Math.min(maxWidthByPlacement, labelWidthRaw > 0 ? labelWidthRaw : 1));
+        const desiredLeft = placement === "start"
+            ? tickLeftPx
+            : placement === "end" ? tickLeftPx - labelWidth : tickLeftPx - (labelWidth / 2);
+        const absoluteLeft = clampAbsoluteLeft(desiredLeft, labelWidth);
+        return { labelNode, tickLeftPx, labelWidth, absoluteLeft, absoluteRight: absoluteLeft + labelWidth };
+    };
+    const applyLabelLayout = (layout, hidden) => {
+        if (!layout) {
+            return;
+        }
+        layout.labelNode.hidden = hidden;
+        if (!hidden) {
+            layout.labelNode.style.left = `${Math.round(layout.absoluteLeft - layout.tickLeftPx)}px`;
+        }
+    };
+
+    const labelLayouts = tickNodes
+        .map((tickNode, index) => {
+            const labelNode = tickNode.querySelector(".timeline-axis-label");
+            if (!(labelNode instanceof HTMLElement)) {
+                return null;
+            }
+            labelNode.hidden = false;
+            labelNode.style.left = "0px";
+            return resolveLabelLayout(tickNode, labelNode, index);
+        })
+        .filter((layout) => layout !== null);
+
+    if (labelLayouts.length === 1) {
+        applyLabelLayout(labelLayouts[0], false);
+    } else if (labelLayouts.length >= 2) {
+        const firstLayout = labelLayouts[0];
+        const lastLayout = labelLayouts[labelLayouts.length - 1];
+        applyLabelLayout(firstLayout, false);
+        applyLabelLayout(lastLayout, false);
+        let previousLabelRight = firstLayout.absoluteRight;
+        const reservedLastLeft = lastLayout.absoluteLeft;
+        for (let index = 1; index < labelLayouts.length - 1; index += 1) {
+            const currentLayout = labelLayouts[index];
+            const overlaps = currentLayout.absoluteLeft < previousLabelRight + minLabelGap
+                || currentLayout.absoluteRight > reservedLastLeft - minLabelGap;
+            applyLabelLayout(currentLayout, overlaps);
+            if (!overlaps) {
+                previousLabelRight = currentLayout.absoluteRight;
+            }
+        }
+    }
+
+    // „DNES"/„TERMÍN" popisky na ose (priorita nad měsíčními popisky): vykreslí se z data-axis-today-pct
+    // / data-axis-deadline-pct a měsíční popisek, který by je překryl, se schová. Vždy poslední, aby vyhrály.
+    layoutAxisEventMarkers(container, containerWidth, labelLayouts, minLabelGap);
+}
+
+/**
+ * Vykreslí „DNES" a „TERMÍN" ukazatele na ose (gridline + popisek) na pozici z data-axis-today-pct
+ * a data-axis-deadline-pct (% osy). Prázdné/NaN → datum mimo osu → marker se nevykreslí. Měsíční popisek
+ * kolidující s těmito popisky se schová (mají prioritu). Markery jsou samostatné uzly (.timeline-axis-event),
+ * ne .timeline-axis-tick, takže se nepletou do rozmístění měsíčních popisků.
+ */
+function layoutAxisEventMarkers(container, containerWidth, monthLabelLayouts, minLabelGap) {
+    container.querySelectorAll(".timeline-axis-event").forEach((node) => node.remove());
+
+    const renderMarker = (pctRaw, modifierClass, text) => {
+        const pct = Number.parseFloat(pctRaw || "");
+        if (!Number.isFinite(pct)) {
+            return;
+        }
+        const leftPx = (Math.max(0, Math.min(100, pct)) / 100) * containerWidth;
+
+        const markerNode = document.createElement("span");
+        markerNode.className = `timeline-axis-event ${modifierClass}`;
+        markerNode.dataset.axisLeftPx = leftPx.toFixed(4);
+        markerNode.style.left = `${leftPx.toFixed(4)}px`;
+
+        const labelNode = document.createElement("span");
+        labelNode.className = "timeline-axis-event-label";
+        labelNode.textContent = text;
+        markerNode.appendChild(labelNode);
+        container.appendChild(markerNode);
+
+        // Popisek vycentrovat na gridline, ořezat na šířku kontejneru.
+        const computedStyle = window.getComputedStyle(labelNode);
+        const fontSpec = `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`;
+        const labelWidth = Math.max(1, labelNode.offsetWidth || Math.ceil(measureTextWidth(text, fontSpec)));
+        const desiredLeft = leftPx - (labelWidth / 2);
+        const absoluteLeft = Math.max(0, Math.min(desiredLeft, Math.max(0, containerWidth - labelWidth)));
+        const absoluteRight = absoluteLeft + labelWidth;
+        labelNode.style.left = `${Math.round(absoluteLeft - leftPx)}px`;
+
+        // Událostní popisek vyhrává: schovej každý měsíční popisek, který by se s ním (s mezerou) překrýval.
+        monthLabelLayouts.forEach((layout) => {
+            if (!layout || layout.labelNode.hidden) {
+                return;
+            }
+            const overlaps = layout.absoluteLeft < absoluteRight + minLabelGap
+                && layout.absoluteRight > absoluteLeft - minLabelGap;
+            if (overlaps) {
+                layout.labelNode.hidden = true;
+            }
+        });
+    };
+
+    // TERMÍN první, DNES druhý → při vzájemné kolizi je DNES nakreslen navrch (vyšší priorita).
+    renderMarker(container.dataset.axisDeadlinePct, "deadline", "TERMÍN");
+    renderMarker(container.dataset.axisTodayPct, "today", "DNES");
+}
+
+/**
+ * Vykreslí měsíční ticky ze seznamu (gridline left v %, plná šířka — bez edge-insetu, sjednoceno
+ * se segmenty/markery). Popisky pozicuje layoutAxisLabels v px (jinak je CSS opře o 1px tik).
+ * Pozn.: gantt board používá vlastní renderTimelineAxis (vzorkování) — tato cesta je jen pro
+ * statickou kartu / editor s kanonickou osou.
+ */
+export function renderTicksFromList(container, ticks, attempt = 0) {
+    if (!(container instanceof HTMLElement) || !Array.isArray(ticks)) {
+        return;
+    }
+    const containerWidth = Math.max(0, container.clientWidth);
+    if (containerWidth <= 32 && attempt < 10) {
+        // lazy tab / skrytý panel → šířka 0; zkusit po dalším frame.
+        window.requestAnimationFrame(() => renderTicksFromList(container, ticks, attempt + 1));
+        return;
+    }
+
+    container.replaceChildren();
+    if (ticks.length === 0) {
+        return;
+    }
+
+    ticks.forEach((tick, index) => {
+        const leftPct = Math.max(0, Math.min(100, tick.left));
+        const tickNode = document.createElement("span");
+        tickNode.className = "timeline-axis-tick";
+        if (index === 0) {
+            tickNode.classList.add("edge");
+        } else if (index === ticks.length - 1) {
+            // Pravý krajní tick: gridline na 100 % by se kreslil za okrajem osy (overflow:hidden ho ořízne).
+            // edge-end ho přes CSS posune o vlastní šířku dovnitř → zrcadlí levý první tick a je vidět.
+            tickNode.classList.add("edge", "edge-end");
+        }
+        tickNode.style.left = `${leftPct}%`;
+        // px pozice gridline (BEZ edge-insetu → zarovnáno s pruhy) pro layout popisků.
+        tickNode.dataset.axisLeftPx = ((leftPct / 100) * containerWidth).toFixed(4);
+
+        const labelNode = document.createElement("span");
+        labelNode.className = "timeline-axis-label";
+        labelNode.textContent = tick.label;
+        tickNode.appendChild(labelNode);
+        container.appendChild(tickNode);
+    });
+
+    layoutAxisLabels(container, containerWidth);
+}
+
 export function renderStaticTimelineAxes(scope) {
     const root = scope instanceof HTMLElement || scope instanceof Document ? scope : document;
     root.querySelectorAll("[data-timeline-axis][data-axis-start][data-axis-end]").forEach((container) => {
@@ -275,6 +488,14 @@ export function renderStaticTimelineAxes(scope) {
             return;
         }
 
+        // Kanonická osa: server dodal měsíční ticky → kreslíme je přímo (žádné vzorkování).
+        const serverTicks = container.dataset.scheduleTicks;
+        if (typeof serverTicks === "string" && serverTicks.length > 0) {
+            renderTicksFromList(container, buildTicksFromServer(serverTicks));
+            return;
+        }
+
+        // Fallback (např. breakdown osa bez serverových ticků) → původní vzorkovací cesta.
         const startDate = parseIsoDate(container.dataset.axisStart);
         const endDate = parseIsoDate(container.dataset.axisEnd);
         if (!(startDate instanceof Date) || !(endDate instanceof Date)) {

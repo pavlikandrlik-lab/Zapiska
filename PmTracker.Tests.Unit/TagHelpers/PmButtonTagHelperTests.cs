@@ -47,7 +47,7 @@ public sealed class PmButtonTagHelperTests
     public async Task DataAtributy_NaInputu_SePropagujiNaGovButtonOutput()
     {
         // Regrese: <pm-button data-modal-url="..."> musí propagovat data-modal-url
-        // na výsledný <gov-button>, jinak JS delegated handler v site.bundle.js
+        // na výsledný <gov-button>, jinak JS delegated handler v modules/modals.js
         // (target.closest("[data-modal-url]")) nikdy nematchuje a tlačítko "nedělá nic".
         var helper = new PmButtonTagHelper { Variant = PmButtonVariant.Primary };
         var extra = new TagHelperAttributeList

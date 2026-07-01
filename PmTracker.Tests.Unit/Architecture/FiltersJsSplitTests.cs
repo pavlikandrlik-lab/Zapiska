@@ -66,13 +66,4 @@ public sealed class FiltersJsSplitTests
         content.Should().Contain("setFilterPanelOpen");
     }
 
-    [Fact]
-    public void Bundle_ShouldContainKeyExports()
-    {
-        var bundle = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/site.bundle.js"));
-        bundle.Should().Contain("applyProjectRecordFilters");
-        bundle.Should().Contain("renderProjectFilterChips");
-        bundle.Should().Contain("initProjectRecordsUi");
-        bundle.Should().Contain("buildProjectPrintFilterSnapshot");
-    }
 }

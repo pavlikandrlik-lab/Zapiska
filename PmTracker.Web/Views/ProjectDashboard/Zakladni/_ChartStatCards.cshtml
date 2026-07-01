@@ -1,0 +1,14 @@
+@model PmTracker.Web.Services.ProjectDashboard.Zakladni.ChartData
+<div class="zr-statcards">
+    @foreach (var s in Model.Stats)
+    {
+        <div class="zr-statcard">
+            <div class="zr-statcard-value">@s.Value</div>
+            <div class="zr-statcard-label">@s.Label</div>
+            @if (!string.IsNullOrWhiteSpace(s.Note))
+            {
+                <div class="zr-statcard-note muted">@s.Note</div>
+            }
+        </div>
+    }
+</div>

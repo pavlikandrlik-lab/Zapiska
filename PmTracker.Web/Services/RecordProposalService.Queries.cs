@@ -1,6 +1,8 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Models.ViewModels.Projekty;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Schedules;
@@ -13,6 +15,12 @@ public sealed partial class RecordProposalService
     {
         var access = await _authorizationPolicy.EvaluateProjectAccessAsync(projectId, currentUser, ct);
         return access.CanViewTab;
+    }
+
+    public async Task<bool> CanCreateRecordProposalAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+    {
+        var access = await _authorizationPolicy.EvaluateProjectAccessAsync(projectId, currentUser, ct);
+        return access.CreatableSubsystemIds.Count > 0;
     }
 
     public async Task<ProjektNavrhyTabViewModel> BuildProjectProposalsTabAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
@@ -82,7 +90,7 @@ public sealed partial class RecordProposalService
             .Select(proposal => BuildProposalListItem(proposal, currentUser, access.CanDecide, peopleById, subsystemById, recordRowsById))
             .ToList();
 
-        return new ProjektNavrhyTabViewModel
+        var result = new ProjektNavrhyTabViewModel
         {
             ProjektId = projectId,
             CanCreateRecordProposal = access.CreatableSubsystemIds.Count > 0,
@@ -94,6 +102,43 @@ public sealed partial class RecordProposalService
                 .Where(x => string.Equals(x.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
                 .ToList()
         };
+
+        var allItems = result.NavrhyZalozeni.Concat(result.NavrhyHarmonogramu).ToList();
+        result.FilterShell = new ProposalFilterShellViewModel
+        {
+            ProjektId = projectId,
+            StavyNavrhuMoznosti =
+            [
+                new() { Value = RecordProposalStateCodes.Pending, Label = "Čeká na rozhodnutí" },
+                new() { Value = RecordProposalStateCodes.Approved, Label = "Schváleno" },
+                new() { Value = RecordProposalStateCodes.Rejected, Label = "Zamítnuto" },
+            ],
+            TypyNavrhuMoznosti =
+            [
+                new() { Value = RecordProposalTypeCodes.CreateRecord, Label = "Návrh záznamu" },
+                new() { Value = RecordProposalTypeCodes.SchedulePlanChange, Label = "Návrh harmonogramu" },
+            ],
+            SubsystemyMoznosti = allItems
+                .Where(p => !string.IsNullOrWhiteSpace(p.Subsystem))
+                .Select(p => p.Subsystem)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(s => s, StringComparer.Create(new CultureInfo("cs-CZ"), false))
+                .Select(s => new LookupOptionViewModel { Value = s, Label = s })
+                .ToList(),
+            AutoriMoznosti = allItems
+                .DistinctBy(p => p.CreatedByOsobaId)
+                .OrderBy(p => p.Autor, StringComparer.Create(new CultureInfo("cs-CZ"), false))
+                .Select(p => new LookupOptionViewModel { Value = p.CreatedByOsobaId.ToString(), Label = p.Autor })
+                .ToList(),
+            RozhodliMoznosti = allItems
+                .Where(p => p.DecidedByOsobaId.HasValue && !string.IsNullOrWhiteSpace(p.RozhodlUzivatel))
+                .DistinctBy(p => p.DecidedByOsobaId)
+                .OrderBy(p => p.RozhodlUzivatel, StringComparer.Create(new CultureInfo("cs-CZ"), false))
+                .Select(p => new LookupOptionViewModel { Value = p.DecidedByOsobaId!.Value.ToString(), Label = p.RozhodlUzivatel! })
+                .ToList(),
+        };
+
+        return result;
     }
 
     public async Task<ZaznamEditViewModel> BuildCreateRecordProposalEditorAsync(int projectId, CurrentUserContextViewModel currentUser, int? meetingId = null, CancellationToken ct = default)
@@ -257,7 +302,15 @@ public sealed partial class RecordProposalService
         model.FormController = "Navrhy";
         model.FormAction = "SubmitCreateProposal";
         model.ProposalEditorMode = RecordProposalEditorModes.CreateProposal;
+        model.CanEditRecord = true;
+        model.CanEditScheduleFull = true;
         model.SecondaryNote = "Návrh se uloží ke schválení. Provozní záznam vznikne až po schválení projektovým manažerem nebo administrátorem projektu.";
+        // 7b (2026-06-17): v návrhu založení se vyplňuje jen PLÁN; skutečnost vznikne až po
+        // založení reálného záznamu (klasický režim). Skryjeme skutečnostní vstupy v harmonogramu.
+        model.HarmonogramBlok.HideActual = true;
+        // 7c (2026-06-17): externí vazby v návrhu = jen zadání čísel; harvest (4 datumy, bubliny,
+        // chat) je skutečnost — až po založení. Skryjeme harvest UI externího panelu.
+        model.HideExternalHarvestUi = true;
     }
 
     private void ConfigureScheduleProposalEditor(ZaznamEditViewModel model)
@@ -291,6 +344,10 @@ public sealed partial class RecordProposalService
         model.FormAction = "Save";
         model.ProposalEditorMode = RecordProposalEditorModes.None;
         model.SecondaryNote = "Formulář je předvyplněný daty z vybraného návrhu. Po uložení vznikne běžný provozní záznam.";
+        model.CanEditRecord = true;
+        model.CanEditScheduleFull = true;
+        model.AllowBasicMetadataEdit = true;
+        model.AllowTermDeadlineEdit = true;
     }
 
     private void ConfigureStandardTakenOverScheduleEditor(ZaznamEditViewModel model)
@@ -429,13 +486,18 @@ public sealed partial class RecordProposalService
             editorChangedTypeTooltips: changedScheduleTypeTooltips);
         model.CanApproveProposal = canDecide && isPending;
         model.CanRejectProposal = canDecide && isPending;
-        model.CanRejectAndEditProposal = canDecide && isPending;
+        // 7a: reject varianta podle typu návrhu. Založení → „Zamítnout a převzít data";
+        // harmonogram → „Zamítnout a upravit".
+        model.CanRejectAndTakeOverProposal = canDecide && isPending && isCreateProposal;
+        model.CanRejectAndEditProposal = canDecide && isPending && !isCreateProposal;
         // CanPrefillProposalForm smazáno z VM 2026-04-23 — EditFromProposal bypass zrušen.
         model.ProposalChangedFieldTooltips = changedFieldTooltips ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         model.ProposalChangedScheduleTypeTooltips = changedScheduleTypeTooltips ?? new Dictionary<int, string>();
     }
 
-    private static HarmonogramBlockViewModel CloneScheduleBlock(
+    // internal (InternalsVisibleTo PmTracker.Tests.Unit): regresní test ověřuje, že clone
+    // zachová marker-řídící pole (OverviewLayout, Today) — dříve je object-initializer tiše zahazoval.
+    internal static HarmonogramBlockViewModel CloneScheduleBlock(
         HarmonogramBlockViewModel source,
         HarmonogramSouhrnViewModel? souhrn = null,
         IReadOnlyList<HarmonogramKrokEditViewModel>? kroky = null,
@@ -443,21 +505,15 @@ public sealed partial class RecordProposalService
         ScheduleEditorPermissionSet? permissions = null,
         IReadOnlyDictionary<int, string>? editorChangedTypeTooltips = null)
     {
-        return new HarmonogramBlockViewModel
+        // `with`: zachová VŠECHNA pole source (vč. OverviewLayout/Today/ScheduleVersion/lock state),
+        // přepíše jen explicitně zadané. Object-initializer tu dřív tiše zahazoval nová pola.
+        return source with
         {
-            RecordId = source.RecordId,
-            Mode = source.Mode,
-            DatumZalozeni = source.DatumZalozeni,
             TerminUkonceni = terminUkonceni ?? source.TerminUkonceni,
-            DelayBarvaHex = source.DelayBarvaHex,
             Souhrn = souhrn ?? source.Souhrn,
             Kroky = kroky ?? source.Kroky,
             Permissions = permissions ?? source.Permissions,
             EditorChangedTypeTooltips = editorChangedTypeTooltips ?? source.EditorChangedTypeTooltips,
-            ScheduleVersion = source.ScheduleVersion,
-            // Plán D Task 8/9 passthrough (M-1 fix) — lock state + edit capability zachovat.
-            LockedManualKrokKeys = source.LockedManualKrokKeys,
-            CanEditManualActual = source.CanEditManualActual
         };
     }
 
@@ -486,10 +542,12 @@ public sealed partial class RecordProposalService
             StavLabel = GetProposalStateLabel(proposal.Stav),
             Subsystem = subsystemById.GetValueOrDefault(proposal.SubsystemId, "-"),
             Autor = peopleById.GetValueOrDefault(proposal.CreatedByOsobaId, $"Osoba #{proposal.CreatedByOsobaId}"),
+            CreatedByOsobaId = proposal.CreatedByOsobaId,
             CreatedAt = proposal.CreatedAt,
             RozhodlUzivatel = proposal.DecidedByOsobaId.HasValue
                 ? peopleById.GetValueOrDefault(proposal.DecidedByOsobaId.Value, $"Osoba #{proposal.DecidedByOsobaId.Value}")
                 : null,
+            DecidedByOsobaId = proposal.DecidedByOsobaId,
             DecidedAt = proposal.DecidedAt,
             Nazev = createPayload?.Nazev ?? recordRow?.Nazev,
             Cil = createPayload?.Cil ?? recordRow?.Cil,

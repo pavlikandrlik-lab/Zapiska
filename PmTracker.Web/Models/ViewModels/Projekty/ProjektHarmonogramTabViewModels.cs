@@ -44,12 +44,20 @@ public sealed class ProjektHarmonogramUkolViewModel
     public string? ScheduleProposalUrl { get; set; }
 }
 
-public sealed class HarmonogramBlockViewModel
+// record (ne class): rebuild/clone sites (CloneScheduleBlock, ZaznamyController, RecordProposalPayloadMapper)
+// používají `source with { … }`, takže nově přidaná pole se automaticky propagují. Dříve object-initializer
+// tiše zahazoval OverviewLayout/Today → marker přilepený na left:0 v detailu návrhu.
+public sealed record HarmonogramBlockViewModel
 {
     public int RecordId { get; init; }
     public string Mode { get; init; } = "project-readonly";
     public DateTime DatumZalozeni { get; init; }
     public DateTime TerminUkonceni { get; init; }
+
+    /// <summary>Lokální (pražské) dnešní datum — sjednocený zdroj pro marker „Dnes" v UI
+    /// (server i JS čtou totéž, viz data-schedule-today). Konec UTC/local rozkolu.</summary>
+    public DateTime Today { get; init; }
+
     public string DelayBarvaHex { get; init; } = "#dc2626";
     public HarmonogramSouhrnViewModel Souhrn { get; init; } = new();
     public IReadOnlyList<HarmonogramKrokEditViewModel> Kroky { get; init; } = Array.Empty<HarmonogramKrokEditViewModel>();
@@ -81,6 +89,14 @@ public sealed class HarmonogramBlockViewModel
     /// Default je <c>false</c> (read-only) — composition musí explicitně povolit.
     /// </summary>
     public bool CanEditManualActual { get; set; }
+
+    /// <summary>
+    /// 7b (2026-06-17): v návrhu ZALOŽENÍ se vyplňuje pouze PLÁN; skutečnost vznikne až po
+    /// založení reálného záznamu klasickou cestou (nový záznam ještě neexistuje, skutečnost
+    /// nelze). Když <c>true</c>, skutečnostní sloupec v editoru nerenderuje vstupy — jen
+    /// poznámku „vyplní se po založení".
+    /// </summary>
+    public bool HideActual { get; set; }
 }
 
 public sealed class HarmonogramKrokEditViewModel
@@ -99,6 +115,18 @@ public sealed class HarmonogramKrokEditViewModel
     /// </summary>
     public int? OdchylkaDni { get; init; }
     public DateTime BaselineDatum { get; init; }
+
+    /// <summary>Datum-model: začátek plánového segmentu (= konec předchozího kroku; krok 1 = datum
+    /// založení). Spolu s <see cref="BaselineDatum"/> (konec) tvoří rozsah pro tooltip „od-do".</summary>
+    public DateTime PlanZacatek { get; init; }
+
+    /// <summary>Datum-model: začátek segmentu skutečnosti. <c>null</c> = krok nemá skutečnost (ani
+    /// vyplněnou, ani projektovanou aktuální). Pro tooltip „od-do".</summary>
+    public DateTime? SkutecnostZacatek { get; init; }
+
+    /// <summary>Datum-model: konec segmentu skutečnosti — u aktuálního (rozpracovaného) kroku = dnes.
+    /// <c>null</c> = krok nemá skutečnost. Pro tooltip „od-do".</summary>
+    public DateTime? SkutecnostKonec { get; init; }
 
     /// <summary>
     /// Datum-model: reálné datum skutečnosti kroku. <c>null</c> = nevyplněno (žádný PlanEnd fallback —

@@ -71,7 +71,25 @@ public sealed class ScheduleJsSplitTests
     {
         var content = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/schedule/timeline.js"));
         content.Should().Contain("renderTimelineAxis");
+        // buildTimelineAxisTicks zůstává — používá ho gantt board (mimo rozsah osy-redesignu 2026-06-23).
         content.Should().Contain("buildTimelineAxisTicks");
+        // Nová cesta pro kanonickou osu (statická karta + editor): render ze seznamu ticků.
+        content.Should().Contain("renderTicksFromList");
+        content.Should().Contain("buildTicksFromServer");
+    }
+
+    [Fact]
+    public void ScheduleAxisModule_IsCanonicalAxisTwin_UsedByEditor()
+    {
+        // 2026-06-23 redesign osy: kanonický výpočet osy (dvojče C# ScheduleBarLayoutCalculator).
+        var axis = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/schedule/scheduleAxis.js"));
+        axis.Length.Should().BeGreaterThan(500, "scheduleAxis.js je plnohodnotný modul");
+        axis.Should().Contain("export function computeAxisLayout", "kanonický výpočet osy");
+
+        var block = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/schedule/block.js"));
+        block.Should().Contain("computeAxisLayout", "editor live-preview používá kanonickou osu");
+        block.Should().NotContain("buildScheduleScale", "stará editor-osa byla nahrazena kanonickou");
+        block.Should().NotContain("resolveBreakdownAxis", "rozpad sdílí kanonickou osu (vlastní výpočet zrušen)");
     }
 
     [Fact]
@@ -87,17 +105,6 @@ public sealed class ScheduleJsSplitTests
         var content = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/schedule/index.js"));
         content.Should().Contain("initRecordSchedulePlanner");
         content.Should().Contain("initProjectScheduleUi");
-    }
-
-    [Fact]
-    public void Bundle_ShouldContainKeyExports()
-    {
-        var bundle = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/site.bundle.js"));
-        bundle.Should().Contain("class ProjectGanttBoard");
-        bundle.Should().Contain("class ScheduleBlockRenderer");
-        bundle.Should().Contain("renderTimelineAxis");
-        bundle.Should().Contain("applyProjectScheduleFilters");
-        bundle.Should().Contain("initRecordSchedulePlanner");
     }
 
     [Fact]

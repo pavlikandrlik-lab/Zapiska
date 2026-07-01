@@ -44,7 +44,7 @@
 /* Re-harvest tlačítko 2026-04-29: pm-button (TagHelper → gov-button) má vlastní styling.
    Custom .pm-chat-modal__reharvest-btn rules odstraněny (plain <button> nahrazen). */
 
-/* Body = jeden scrollovatelný container, grid 70:30 (default ≥ 1600px) */
+/* Body = jeden scrollovatelný container, grid 70:30 (≥ 1100px); pod 1100px stack (1 sloupec). */
 .pm-chat-modal__body {
     display: grid;
     grid-template-columns: 70fr 30fr;

@@ -107,17 +107,19 @@ public sealed class LayoutWidthPolicyTests
     }
 
     [Fact]
-    public void DashboardMeetingsAndNews_ShouldStayNarrow()
+    public void DashboardMeetingsAndNews_ShouldUseFluidLayout()
     {
-        // Úmyslně ponecháno narrow pro reading UX newsfeed / chronological feed.
-        // YAGNI override — pokud později user bude chtít wide, změníme tehdy.
+        // 2026-06-09 (commit 807b9f2): Jednání/Novinky podstránky přepnuty na fluid
+        // (BodyClass=dashboard-page) kvůli zarovnání shora jako Focus (app-main margin:0).
+        // Obsah přitom zůstává úzký přes .dashboard-list-page-narrow (max-width 56rem),
+        // ne přes width tier — reading UX je zachované.
         var meetings = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Dashboard/Meetings.cshtml"));
         var news = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Dashboard/News.cshtml"));
 
-        meetings.Should().NotContain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
-            "Dashboard/Meetings je chronological feed — reading UX, ne data grid");
-        news.Should().NotContain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
-            "Dashboard/News je newsfeed — reading UX");
+        meetings.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Dashboard/Meetings je fluid (zarovnání shora jako Focus); úzký obsah řeší dashboard-list-page-narrow");
+        news.Should().Contain("ViewData[\"BodyClass\"] = \"dashboard-page\"",
+            "Dashboard/News je fluid (zarovnání shora jako Focus); úzký obsah řeší dashboard-list-page-narrow");
     }
 
     [Fact]

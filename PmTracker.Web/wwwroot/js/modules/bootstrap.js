@@ -57,7 +57,8 @@ import {
     initProjectFilterTabSync,
     persistFilterState,
     saveProjectFilterDefaults,
-    setFilterPanelOpen
+    setFilterPanelOpen,
+    initProposalFilterUi
 } from "./filters.js";
 
 
@@ -109,6 +110,9 @@ import {
     handleProjectDashboardClick,
     initProjectDashboardShell
 } from "./projectDashboard.js";
+import { initZakladniReport } from "./dashboard/zakladniReport.js";
+import { bindEchartsResize, initEchartsReport } from "./dashboard/echartsRender.js";
+import { initCrossTabNav } from "./crossTabNav.js";
 
 const projectIndexFilterOptions = {
     hideDoneStorageKey: "pmtracker.projects.hideDone",
@@ -134,6 +138,8 @@ function handleProjectFilterInputChange(scope) {
             else if (resolvedScope === "gantt") {
                 applyProjectGanttFilters();
             }
+            // proposals scope: apply řeší přímo modulový applyProjectFilterScope
+            // (applyProposalFilters je v témže modulu) — sem se nedostane.
         }
     });
 }
@@ -734,6 +740,8 @@ export function bootstrapPmTrackerApp() {
         () => initProjectTabs(),
         () => initProjectRecordsUi({ preserveServerView: true }),
         () => initProjectScheduleUi(),
+        () => initCrossTabNav(),
+        () => initProposalFilterUi(),
         () => initProjectFilterTabSync(),
         () => initProjectRecordPageshowSync(),
         () => initCommentSortUi(document),
@@ -748,6 +756,9 @@ export function bootstrapPmTrackerApp() {
         () => initProjectIndexUi(),
         () => initDashboardShell(),
         () => initProjectDashboardShell(),
+        () => initZakladniReport(),
+        () => initEchartsReport(document),
+        () => bindEchartsResize(),
         () => initSessionCoordinator(),
         () => initModalAjaxSubmit(),
         () => initSearchAdminCard(),

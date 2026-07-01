@@ -1,0 +1,73 @@
+@model PmTracker.Web.Models.ViewModels.Projekty.ProposalFilterShellViewModel
+
+<div class="filter-shell"
+     data-project-filter-scope="proposals"
+     data-project-id="@Model.ProjektId"
+     data-current-user-id="@Model.CurrentUserOsobaId">
+
+    <button class="filter-toggle" type="button" data-filter-toggle>
+        Filtry
+        <span class="filter-icon" aria-hidden="true">
+            <gov-icon size="s" name="funnel" type="components"></gov-icon>
+        </span>
+    </button>
+    <div class="active-filter-row" data-filter-chip-row="proposals" hidden="hidden"></div>
+
+    <div class="filter-panel collapsed" data-filter-panel>
+        <div class="filter-grid">
+            <label>
+                Stav návrhu
+                <select data-filter-key="stavNavrhu">
+                    <option value="">Vše</option>
+                    @foreach (var option in Model.StavyNavrhuMoznosti)
+                    {
+                        <option value="@option.Value"
+                                selected="@(string.Equals(option.Value, "PENDING", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">
+                            @option.Label
+                        </option>
+                    }
+                </select>
+            </label>
+            <label>
+                Typ návrhu
+                <select data-filter-key="typNavrhu">
+                    <option value="">Vše</option>
+                    @foreach (var option in Model.TypyNavrhuMoznosti)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Subsystém
+                <select data-filter-key="subsystem">
+                    <option value="">Vše</option>
+                    @foreach (var option in Model.SubsystemyMoznosti)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Autor
+                <select data-filter-key="autor">
+                    <option value="">Vše</option>
+                    @foreach (var option in Model.AutoriMoznosti)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Rozhodl
+                <select data-filter-key="rozhodl">
+                    <option value="">Vše</option>
+                    @foreach (var option in Model.RozhodliMoznosti)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+            </label>
+        </div>
+    </div>
+</div>

@@ -23,15 +23,18 @@ public static class HarmonogramKroky
 {
     public static readonly IReadOnlyList<HarmonogramKrokDefinice> Vse =
     [
-        new(1,  "HS01", "1. priprava zadani dodavateli", "#EF4444", false, "K1"),
-        new(2,  "HS02", "2. konzultace terminu s dodavatelem pred vytvorenim zadani", "#F97316", true,  null),
-        new(3,  "HS03", "3. odeslani zadani dodavateli", "#F59E0B", false, "K3"),
-        new(4,  "HS04", "4. dodani navrhu reseni", "#84CC16", false, "K4_K7"),
-        new(5,  "HS05", "5. vyporadani pripominek", "#22C55E", true,  null),
-        new(6,  "HS06", "6. odeslani pozadavku na vyrobu", "#14B8A6", false, "K6"),
-        new(7,  "HS07", "7. dodani funkcionality dodavatelem", "#06B6D4", false, "K4_K7"),
-        new(8,  "HS08", "8. pripominkovani", "#3B82F6", true,  null),
-        new(9,  "HS09", "9. testovani", "#6366F1", true,  null),
-        new(10, "HS10", "10. nasazeni do provozu", "#8B5CF6", false, "K10"),
+        // Barvy dle Excelu: PMP (kroky 1–5) = MS Office „Zelená, zvýraznění 6" (Accent6 #70AD47),
+        // PNF (kroky 6–10) = „Zlatá, zvýraznění 4" (Accent4 #FFC000). Krok 1 je sdílený start → PMP.
+        // V každé skupině jemný přechod „světlá 80 %" → „světlá 40 %" (lineární interpolace přes 5 kroků).
+        new(1,  "HS01", "1. priprava zadani dodavateli", "#E2EFDA", false, "K1"),
+        new(2,  "HS02", "2. konzultace terminu s dodavatelem pred vytvorenim zadani", "#D4E7C7", true,  null),
+        new(3,  "HS03", "3. odeslani zadani dodavateli", "#C6E0B4", false, "K3"),
+        new(4,  "HS04", "4. dodani navrhu reseni", "#B7D8A1", false, "K4_K7"),
+        new(5,  "HS05", "5. vyporadani pripominek", "#A9D08E", true,  null),
+        new(6,  "HS06", "6. odeslani pozadavku na vyrobu", "#FFF2CC", false, "K6"),
+        new(7,  "HS07", "7. dodani funkcionality dodavatelem", "#FFECB3", false, "K4_K7"),
+        new(8,  "HS08", "8. pripominkovani", "#FFE699", true,  null),
+        new(9,  "HS09", "9. testovani", "#FFDF80", true,  null),
+        new(10, "HS10", "10. nasazeni do provozu", "#FFD966", false, "K10"),
     ];
 }

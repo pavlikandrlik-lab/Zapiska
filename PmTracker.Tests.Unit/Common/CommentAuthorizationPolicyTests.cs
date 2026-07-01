@@ -17,7 +17,87 @@ public sealed class CommentAuthorizationPolicyTests
             visibleProjectIds: [2],
             globalPermissions: [PermissionKeys.CommentsAdd]);
 
-        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [999], isDraftMeeting: false).Should().BeTrue();
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [999], isSubsystemLeadEquivalentInProject: false, isDraftMeeting: false).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanAddComment_ShouldAllow_ProjectRole_AnywhereInProject_EvenInOpenMeeting()
+    {
+        // Přímá projektová role (comments.add v perProjectDirect) → komentuje kdekoli, i v OPEN.
+        var user = BuildUser(
+            osobaId: 5,
+            visibleProjectIds: [2],
+            perProjectDirectPermissions: new Dictionary<int, IReadOnlySet<string>>
+            {
+                { 2, new HashSet<string> { PermissionKeys.CommentsAdd } }
+            });
+
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [999], isSubsystemLeadEquivalentInProject: false, isDraftMeeting: false).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanAddComment_ShouldAllow_DualRole_ProjectRolePlusSubsystemLead_AnywhereInProject()
+    {
+        // „Vyšší bere": kdo má comments.add z projektové role, není omezen subsystémem,
+        // i když je zároveň vedoucím nějakého subsystému (isSubsystemLeadEquivalentInProject=true).
+        var user = BuildUser(
+            osobaId: 5,
+            visibleProjectIds: [2],
+            perProjectDirectPermissions: new Dictionary<int, IReadOnlySet<string>>
+            {
+                { 2, new HashSet<string> { PermissionKeys.CommentsAdd } }
+            });
+
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [99], isSubsystemLeadEquivalentInProject: true, isDraftMeeting: false).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanAddComment_ShouldDeny_SubsystemLead_ForForeignSubsystem()
+    {
+        // Vedoucí subsystému A (NEní v lead-equivalent listu záznamu = subsystém B) → nesmí, ani v DRAFT.
+        // Subsystémový lead: comments.add je v EFEKTIVNÍ sadě (zděděno), ale NE v přímé (direct).
+        var user = BuildUser(
+            osobaId: 12,
+            visibleProjectIds: [2],
+            perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
+            {
+                { 2, new HashSet<string> { PermissionKeys.MeetingsNotesSubsystemLead, PermissionKeys.CommentsAdd } }
+            },
+            perProjectDirectPermissions: new Dictionary<int, IReadOnlySet<string>>());
+
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [99], isSubsystemLeadEquivalentInProject: true, isDraftMeeting: true).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanAddComment_ShouldAllow_SubsystemLead_ForOwnSubsystem_InDraft()
+    {
+        var user = BuildUser(
+            osobaId: 12,
+            visibleProjectIds: [2],
+            perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
+            {
+                { 2, new HashSet<string> { PermissionKeys.MeetingsNotesSubsystemLead, PermissionKeys.CommentsAdd } }
+            },
+            perProjectDirectPermissions: new Dictionary<int, IReadOnlySet<string>>());
+
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12, 14], isSubsystemLeadEquivalentInProject: true, isDraftMeeting: true).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanAddComment_ShouldPreserve_NonLeadSubsystemRole_WithInheritedCommentsAdd()
+    {
+        // METODIK subsystému: má comments.add (zděděno do efektivní project sady, NE direct), ale NENÍ
+        // lead-equivalent (isSubsystemLeadEquivalentInProject=false) → zachované chování (smí).
+        var user = BuildUser(
+            osobaId: 7,
+            visibleProjectIds: [2],
+            perProjectPermissions: new Dictionary<int, IReadOnlySet<string>>
+            {
+                { 2, new HashSet<string> { PermissionKeys.CommentsAdd } }
+            },
+            perProjectDirectPermissions: new Dictionary<int, IReadOnlySet<string>>());
+
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [99], isSubsystemLeadEquivalentInProject: false, isDraftMeeting: false).Should().BeTrue();
     }
 
     [Fact]
@@ -59,7 +139,7 @@ public sealed class CommentAuthorizationPolicyTests
                 { 2, new HashSet<string> { PermissionKeys.MeetingsNotesSubsystemLead } }
             });
 
-        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12], isDraftMeeting: false).Should().BeFalse();
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12], isSubsystemLeadEquivalentInProject: true, isDraftMeeting: false).Should().BeFalse();
     }
 
     [Fact]
@@ -189,7 +269,7 @@ public sealed class CommentAuthorizationPolicyTests
             });
 
         _sut.CanCommentAsSubsystemLeader(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12]).Should().BeFalse();
-        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12], isDraftMeeting: true).Should().BeFalse();
+        _sut.CanAddComment(user, projektId: 2, subsystemLeadEquivalentOsobaIds: [12], isSubsystemLeadEquivalentInProject: true, isDraftMeeting: true).Should().BeFalse();
     }
 
     private static CurrentUserContextViewModel BuildUser(
@@ -197,7 +277,8 @@ public sealed class CommentAuthorizationPolicyTests
         IReadOnlyList<int>? visibleProjectIds = null,
         IReadOnlyList<int>? deletedProjectIds = null,
         IReadOnlyCollection<string>? globalPermissions = null,
-        IReadOnlyDictionary<int, IReadOnlySet<string>>? perProjectPermissions = null)
+        IReadOnlyDictionary<int, IReadOnlySet<string>>? perProjectPermissions = null,
+        IReadOnlyDictionary<int, IReadOnlySet<string>>? perProjectDirectPermissions = null)
     {
         return new CurrentUserContextViewModel
         {
@@ -216,7 +297,8 @@ public sealed class CommentAuthorizationPolicyTests
                 IsSuperAdmin: false,
                 GlobalPermissions: new HashSet<string>(globalPermissions ?? []),
                 PerProjectPermissions: perProjectPermissions ?? new Dictionary<int, IReadOnlySet<string>>(),
-                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>())
+                PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+                PerProjectDirectPermissions: perProjectDirectPermissions)
         };
     }
 }

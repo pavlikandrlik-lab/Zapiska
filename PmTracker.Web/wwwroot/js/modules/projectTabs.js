@@ -20,6 +20,7 @@ import {
 } from "./navigationShared.js";
 import { initMeetingOverview } from "./meetingOverview.js";
 import { initProjectScheduleUi, renderStaticTimelineAxes } from "./schedule.js";
+import { initProposalFilterUi } from "./filters/index.js";
 import { initTableTools } from "./tableTools.js";
 import { queueRainbowSegmentRender } from "./ui.js";
 
@@ -273,6 +274,9 @@ export async function loadProjectTabPanel(tabNameOrPanel, options = {}) {
             else if (tabKey === "harmonogram") {
                 initProjectScheduleUi();
                 renderStaticTimelineAxes(currentPanel);
+            }
+            else if (tabKey === "navrhy") {
+                initProposalFilterUi();
             }
 
             initTableTools(currentPanel);

@@ -172,6 +172,7 @@ public sealed class ProjektNavrhyTabViewModel
     public string? CreateRecordProposalUrl { get; set; }
     public IReadOnlyList<RecordProposalListItemViewModel> NavrhyZalozeni { get; init; } = Array.Empty<RecordProposalListItemViewModel>();
     public IReadOnlyList<RecordProposalListItemViewModel> NavrhyHarmonogramu { get; init; } = Array.Empty<RecordProposalListItemViewModel>();
+    public Projekty.ProposalFilterShellViewModel FilterShell { get; set; } = new();
 }
 
 public sealed class RecordProposalListItemViewModel
@@ -186,8 +187,10 @@ public sealed class RecordProposalListItemViewModel
     public required string StavLabel { get; init; }
     public required string Subsystem { get; init; }
     public required string Autor { get; init; }
+    public int CreatedByOsobaId { get; init; }
     public DateTime CreatedAt { get; init; }
     public string? RozhodlUzivatel { get; init; }
+    public int? DecidedByOsobaId { get; init; }
     public DateTime? DecidedAt { get; init; }
     public string? Nazev { get; init; }
     public string? Cil { get; init; }

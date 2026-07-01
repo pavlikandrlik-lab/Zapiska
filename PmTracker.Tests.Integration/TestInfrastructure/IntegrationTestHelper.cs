@@ -139,7 +139,9 @@ internal static class IntegrationTestHelper
             IsSuperAdmin: isSuperAdmin,
             GlobalPermissions: globalKeys,
             PerProjectPermissions: perProject,
-            PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>());
+            PerSubsystemPermissions: new Dictionary<int, IReadOnlySet<string>>(),
+            // Helper nemá subsystémovou dimenzi → všechny project-scope granty jsou „přímé".
+            PerProjectDirectPermissions: perProject);
     }
 
     public static PermissionGrantViewModel AllowProjectPermission(string key, int projectId)

@@ -45,6 +45,23 @@ public sealed class ChatModalRedesignTests
     }
 
     [Fact]
+    public void ChatModalCshtml_NeprevadiSdDatumVyjadreniNaLocalTime()
+    {
+        // FIX 2026-06-22: datum SD vyjádření je už lokální čas (SQL datetime, Kind=Unspecified).
+        // ToLocalTime by Unspecified bralo jako UTC a uměle přičetlo offset serveru (+1 h:
+        // 23:09 → 00:09). Bublina i stepper proto datum zobrazují BEZ ToLocalTime.
+        var html = LoadRepoText("PmTracker.Web/Views/Vyjadreni/_ChatModal.cshtml");
+
+        html.Should().NotContain("bubble.Datum.ToLocalTime()",
+            "datum bubliny (SD lokální čas) se nesmí převádět přes ToLocalTime");
+        html.Should().NotContain("AktualniVyjadreniDatum?.ToLocalTime()",
+            "datum bound vyjádření ve stepperu (SD lokální čas) se nesmí převádět přes ToLocalTime");
+        // Naopak skutečný UTC timestamp (LastHarvestedAt) ToLocalTime používat MÁ — guard proti chybné „opravě".
+        html.Should().Contain("LastHarvestedAt.Value.ToLocalTime()",
+            "LastHarvestedAt je UTC (GetUtcNow) → ToLocalTime je správně a má zůstat");
+    }
+
+    [Fact]
     public void ChatModalCshtml_PouzivaNativeGovStepper()
     {
         var html = LoadRepoText("PmTracker.Web/Views/Vyjadreni/_ChatModal.cshtml");
@@ -89,15 +106,15 @@ public sealed class ChatModalRedesignTests
     [Fact]
     public void ChatModalCss_MaSpravneBreakpointy()
     {
+        // Rozhodnutí 2026-06-16: 2 úrovně (70:30 až po ≥ 1100px, pak stack). Prostřední
+        // úroveň 60:40 (≤ 1599px) byla odstraněna v b823dd7 a NEobnovuje se — 70:30 je správně.
         var css = LoadRepoText("PmTracker.Web/wwwroot/css/components/chat-modal.css");
         css.Should().Contain("grid-template-columns: 70fr 30fr",
-            "Default grid musí být 70:30 (≥ 1600px viewport).");
-        css.Should().Contain("max-width: 1599px",
-            "Breakpoint pro 60:40 grid je při ≤ 1599px.");
-        css.Should().Contain("grid-template-columns: 60fr 40fr",
-            "Mid breakpoint má 60:40 grid.");
+            "Default grid je 70:30 (od ≥ 1100px po velké monitory).");
         css.Should().Contain("max-width: 1099px",
             "Stack breakpoint je při ≤ 1099px.");
+        css.Should().Contain("grid-template-columns: 1fr",
+            "Pod ≤ 1099px se sloupce skládají pod sebe (jeden sloupec).");
     }
 
     [Fact]

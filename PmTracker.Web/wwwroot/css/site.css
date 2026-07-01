@@ -4,6 +4,7 @@
 @import "components/sdconnector-page.css";
 @import "components/sdconnector-inspect.css";
 @import "components/schedule-actual-cell-feature-c.css";
+@import "components/zakladni-report.css";
 
 :root {
     --schedule-step-1: #ef4444;
@@ -1361,6 +1362,29 @@
     display: inline-flex;
 }
 
+/* Hlavička karty s hledáním + akcemi na jednom řádku: tlačítka zůstanou vpravo
+   pohromadě, hledání se nalevo od nich zmenšuje (nezalamuje se pod tlačítka).
+   user 2026-06-22 — „posunout o řádek výš" = vedle tlačítek, ne pod ně. */
+.header-actions-with-search {
+    flex-wrap: nowrap;
+}
+
+.header-actions-with-search .table-tools-search {
+    flex: 0 1 240px;
+    min-width: 0;
+}
+
+.header-actions-with-search .table-tools-search input[type="search"] {
+    width: 100%;
+}
+
+.header-actions-with-search .header-actions-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
 .panel-header {
     display: flex;
     justify-content: space-between;
@@ -2319,15 +2343,35 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 16px;
 }
 
+/* Proposal changed field — oranžové podbarvení změněného pole při schvalování. Zrcadlí
+   strukturu .proposal-field-editable (padding = rámeček kolem CELÉHO pole + srovnatelná
+   sytost), aby se podbarvilo celé pole, ne jen ikona kalendáře (2026-06-29). */
 .proposal-field-changed {
-    background: rgba(245, 158, 11, 0.12);
+    background: rgba(245, 158, 11, 0.22);
     border-radius: var(--gov-radius-sm);
+    padding: 4px 6px;
 }
 
 .proposal-field-changed .app-date-display-input,
 .proposal-field-changed .schedule-days-input-stacked,
 .proposal-field-changed .app-date-trigger {
-    background-color: rgba(245, 158, 11, 0.08);
+    background-color: rgba(245, 158, 11, 0.16);
+}
+
+/* Bordered buňka harmonogramu (.schedule-stacked-input) má vlastní bílé pozadí deklarované
+   POZDĚJI než .proposal-field-changed → obecné pravidlo ji nepřebije. Specifické pravidlo
+   (vyšší specificita) podbarví CELOU buňku oranžově; vnitřní input/„X dnů" jsou průhledné,
+   ať prosvítá oranžová celé buňky (ne jen ikona/rámeček). 2026-06-29. */
+.schedule-stacked-input.proposal-field-changed {
+    background: rgba(245, 158, 11, 0.22);
+    padding: 0;
+}
+
+.schedule-stacked-input.proposal-field-changed .schedule-date-field,
+.schedule-stacked-input.proposal-field-changed .app-date-display-input,
+.schedule-stacked-input.proposal-field-changed .schedule-days-input-stacked,
+.schedule-stacked-input.proposal-field-changed .schedule-duration-days-readonly {
+    background: transparent;
 }
 
 /* Proposal editable field — podbarvené zelené pole v návrhu. User report
@@ -2348,13 +2392,30 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .record-editor-actions {
     position: sticky;
     bottom: 0;
+    /* 7e (2026-06-17): tlačítka v jednom řádku (record-editor-actions-buttons), poznámka pod
+       čarou (record-editor-footnote) POD nimi → sloupcové uspořádání, zarovnané vpravo. */
     display: flex;
-    justify-content: flex-end;
-    gap: 10px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
     margin-top: 8px;
     padding: 14px 0 4px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--gov-color-surface) 24px);
     z-index: 5;
+}
+
+.record-editor-actions-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.record-editor-footnote {
+    margin: 0;
+    text-align: right;
+    font-size: 0.85rem;
+    max-width: 60ch;
 }
 
 .record-editor-page-card {
@@ -2518,22 +2579,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: 1px solid rgba(15, 23, 42, 0.42);
 }
 
-.schedule-mini-gantt-marker {
-    position: absolute;
-    top: -2px;
-    bottom: -2px;
-    width: 2px;
-    left: 0;
-    background: #0f172a;
-    opacity: 0.7;
-    z-index: 5;
-}
-
-.schedule-mini-gantt-marker.today {
-    background: #111111;
-    opacity: 0.95;
-    z-index: 6;
-}
 
 .timeline-axis {
     position: relative;
@@ -2553,6 +2598,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .timeline-axis-tick.edge {
     background: rgba(71, 85, 105, 0.55);
+}
+
+.timeline-axis-tick.edge-end {
+    transform: translateX(-100%);
 }
 
 .timeline-axis-label {
@@ -2575,35 +2624,56 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     pointer-events: none;
 }
 
-.timeline-axis-marker.today {
+/* „DNES" / „TERMÍN" — pill popisky pod osou (top:100%), oddělené od měsíčních popisků nahoře. */
+.timeline-axis-event {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 2px;
-    left: 0;
-    background: #111111;
-    opacity: 0.95;
-    z-index: 6;
+    width: 0;
+    background: transparent;
     pointer-events: none;
 }
 
-.timeline-axis-today-label {
+.timeline-axis-event.today {
+    z-index: 8;
+}
+
+.timeline-axis-event.deadline {
+    z-index: 7;
+}
+
+.timeline-axis-event-label {
     position: absolute;
-    top: 14px;
-    left: -16px;
+    top: 50%;
     display: inline-block;
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 10px;
+    box-sizing: border-box;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
     line-height: 1.1;
-    font-weight: 600;
     padding: 1px 4px;
     border-radius: 4px;
-    color: #111111;
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.22);
+    color: #ffffff;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.timeline-axis-event.today .timeline-axis-event-label {
+    background: #0f172a;
+}
+
+.timeline-axis-event.deadline .timeline-axis-event-label {
+    background: #1d4ed8;
+}
+
+:root[data-theme="dark"] .timeline-axis-event.today .timeline-axis-event-label {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+:root[data-theme="dark"] .timeline-axis-event.deadline .timeline-axis-event-label {
+    background: #93c5fd;
+    color: #0f172a;
 }
 
 .schedule-timeline-axis {
@@ -2949,7 +3019,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    flex-wrap: wrap;
+    /* nowrap: trvání zůstává vedle datumu plánu na jednom řádku. Dřív `wrap` →
+       3-místné „123 dnů" se nevešlo a padalo pod datum (user 2026-06-22). */
+    flex-wrap: nowrap;
 }
 
 .schedule-duration-days-readonly {
@@ -2958,12 +3030,21 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     white-space: nowrap;
     user-select: none;
     font-variant-numeric: tabular-nums;
+    /* Pevná rezerva na „999 dnů" ukrojená z datumu plánu (.schedule-date-field má
+       min-width:0, takže o místo ustoupí). Stabilní šířka pro 1–3 číslice → bez
+       poskakování i bez zalomení. */
+    flex: 0 0 auto;
+    min-width: 4rem;
+    text-align: right;
 }
 
 /* Schedule tab in project detail */
 .schedule-project-list {
     display: grid;
     gap: 12px;
+    /* Malá standardní mezera za poslední dlaždicí harmonogramu, aby nelícovala
+       s patičkou stránky (user 2026-06-22). */
+    padding-bottom: 12px;
 }
 
 .schedule-card {
@@ -3019,7 +3100,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     /* gantt track pozadí — gov primary-subtle s fallbackem; user může override
        přes --schedule-track-color nebo na úrovni :root[data-theme="dark"] */
     background: var(--schedule-track-color, var(--background-primary-subtle, #dce6f5));
-    overflow: hidden;
+    /* overflow:visible (dříve hidden): markery „Dnes"/„Termín" se na krajích neořežou.
+       Bezpečné — segmenty už nepřetékají (+1px hack odstraněn, šířka ≤ 100 %), a samy mají
+       border-radius (pill tvar nezávisí na ořezu stopy). 2026-06-23 redesign osy. */
+    overflow: visible;
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
 }
 
@@ -3067,25 +3151,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
         0 1px 2px rgba(15, 23, 42, 0.14);
 }
 
-.schedule-overview-marker {
-    position: absolute;
-    top: -3px;
-    bottom: -3px;
-    width: 2px;
-    left: 0;
-    opacity: 0.92;
-    z-index: 5;
-}
-
-.schedule-overview-marker.deadline {
-    /* deadline marker — používá text-primary (slate dark v light, světlá v dark) */
-    background: var(--schedule-marker-deadline-color, var(--app-text-primary, #1e293b));
-}
-
-.schedule-overview-marker.today {
-    /* today marker — používá strongest contrast (black v light, white v dark) */
-    background: var(--schedule-marker-today-color, var(--gov-color-text, #111111));
-}
 
 .schedule-overview-axis-row {
     display: grid;
@@ -3176,21 +3241,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 8px;
 }
 
-.schedule-layered-marker {
-    position: absolute;
-    top: -3px;
-    bottom: -3px;
-    width: 2px;
-    left: 0;
-    /* layered deadline marker — sdílí token s overview marker */
-    background: var(--schedule-marker-deadline-color, var(--app-text-primary, #1e293b));
-    opacity: 0.9;
-    z-index: 6;
-}
-
-.schedule-layered-marker.today {
-    background: var(--schedule-marker-today-color, var(--gov-color-text, #111111));
-}
 
 .schedule-layered-legend {
     display: flex;
@@ -3427,12 +3477,37 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border-radius: var(--gov-radius);
     overflow: visible;
     box-shadow: var(--gov-shadow-soft);
-    margin-bottom: 16px;
+    /* Žádný margin-bottom: svislé mezery mezi dlaždicemi řeší výhradně grid gap
+       kontejneru .card-list (parita s harmonogramem .schedule-card). */
 }
 
 .record-card.is-filter-hidden,
 .subsystem-group.is-filter-hidden {
     display: none !important;
+}
+
+/* Krátké zvýraznění karty po překliku záznam ⇄ harmonogram (crossTabNav.js), ať ji
+   uživatel hned najde. Platí pro .record-card i .schedule-card. */
+.cross-nav-highlight {
+    animation: cross-nav-pulse 1.6s ease-out;
+}
+
+/* Scroll cíl překliku (crossTabNav scrollIntoView block:"start"). Header je sticky
+   o výšce --app-header-h (~110px); bez odsazení by scroll dojel „příliš nahoru" a vršek
+   karty se schoval za header. scroll-margin-top na cíli funguje pro libovolný scroller
+   (na rozdíl od html scroll-padding-top) a bere reálnou výšku headeru + malou mezeru. */
+.record-card[data-record-id],
+.schedule-card[data-schedule-record-id] {
+    scroll-margin-top: calc(var(--app-header-h, 110px) + 4px);
+}
+
+@keyframes cross-nav-pulse {
+    0% {
+        box-shadow: 0 0 0 3px var(--gov-color-primary, #2362a2);
+    }
+    100% {
+        box-shadow: 0 0 0 3px rgba(35, 98, 162, 0);
+    }
 }
 
 .record-bar {
@@ -3508,6 +3583,37 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin-top: 8px;
     font-size: 12px;
     color: var(--gov-color-muted);
+}
+
+.proposal-section-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.proposal-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.proposal-card {
+    border: 1px solid var(--gov-color-border);
+    border-radius: var(--gov-radius);
+    padding: 12px;
+}
+
+.proposal-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.proposal-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
 }
 
 .record-collab-inline {
@@ -4603,7 +4709,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .card-list {
     display: grid;
-    gap: 16px;
+    /* Mezera mezi dlaždicemi záznamů = stejná jako harmonogram (.schedule-group-list, 12px). */
+    gap: 12px;
 }
 
 .filter-shell {
@@ -6566,16 +6673,6 @@ pm-tab-panel.sync-tab-panel-content[active] {
     box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.5);
 }
 
-:root[data-theme="dark"] .timeline-axis-marker.today {
-    background: #111111;
-}
-
-:root[data-theme="dark"] .timeline-axis-today-label {
-    color: #f8fafc;
-    background: rgba(15, 23, 42, 0.92);
-    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.45);
-}
-
 :root[data-theme="dark"] .schedule-overview-segment,
 :root[data-theme="dark"] .schedule-layered-segment.planned {
     box-shadow: inset 0 0 0 1px rgba(191, 218, 255, 0.2);
@@ -6589,14 +6686,10 @@ pm-tab-panel.sync-tab-panel-content[active] {
         0 1px 2px rgba(15, 23, 42, 0.3);
 }
 
-:root[data-theme="dark"] .schedule-overview-marker.deadline,
-:root[data-theme="dark"] .schedule-layered-marker,
 :root[data-theme="dark"] .schedule-layered-legend-swatch.deadline {
     background: #dbeafe;
 }
 
-:root[data-theme="dark"] .schedule-overview-marker.today,
-:root[data-theme="dark"] .schedule-layered-marker.today,
 :root[data-theme="dark"] .schedule-layered-legend-swatch.today {
     background: #111111;
 }
@@ -6905,7 +6998,10 @@ pm-tab-panel.sync-tab-panel-content[active] {
 }
 
 html {
-    scroll-padding-top: 92px;
+    /* Odsazení kotev/scrollIntoView pod sticky header. Dřív pevných 92px, ale header
+       vyrostl na --app-header-h (~110px) → 92px bylo málo a vršek cíle mizel za headerem.
+       Navázáno na reálnou výšku headeru + malá mezera. */
+    scroll-padding-top: calc(var(--app-header-h, 110px) + 4px);
 }
 
 /* ============================================================

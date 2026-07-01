@@ -121,7 +121,7 @@ public sealed partial class ProjectService
                 .ToListAsync(ct)
             : new List<PmTracker.Web.Models.Entities.ZaznamHarmonogramKrokEntity>();
         var krokRowByPoradi = krokRows.GroupBy(k => (int)k.Poradi).ToDictionary(g => g.Key, g => g.First());
-        var todayDate = timeProvider.GetUtcNow().UtcDateTime.Date;
+        var todayDate = timeProvider.GetLocalNow().Date;
         var harmonogramSouhrn = HarmonogramDateBlokBuilder.BuildSouhrn(
             record.DatumZalozeni, krokRows, record.DatumUkonceni, todayDate);
         // Fáze 3b: server-seed iniciální pozice baru i pro editor (správný bar při otevření,
@@ -280,7 +280,8 @@ public sealed partial class ProjectService
                 // jen pokud harmonogram není v read-only režimu (full-edit permissions).
                 lockedManualKrokKeys: pendingScheduleProposalLock.LockedManualKrokKeys,
                 canEditManualActual: isTaskCategory && !pendingScheduleProposalLock.LocksSchedule,
-                overviewLayout: harmonogramBarLayout),
+                overviewLayout: harmonogramBarLayout,
+                today: todayDate),
             DostupniVlastnici = ownerCandidates,
             DostupniSpolupracovnici = collaborationCandidates,
             VybraniSpolupracovniciIds = selectedCollaborationIds,

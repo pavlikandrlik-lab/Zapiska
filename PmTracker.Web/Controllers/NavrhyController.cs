@@ -11,7 +11,6 @@ namespace PmTracker.Web.Controllers;
 public sealed class NavrhyController : BaseController
 {
     private const string ProposalsTab = "navrhy";
-    private const string ProposalsRefreshScope = "projekty-detail-navrhy";
 
     private readonly IRecordProposalService _recordProposalService;
 
@@ -77,7 +76,6 @@ public sealed class NavrhyController : BaseController
     //   1. ApproveProposal (proposals.accept) — návrh explicitně schválen
     //   2. ZaznamyController.Edit (records.edit) — standardní editace záznamu
     // Pro „nesouhlasím, upravím jinak": RejectAndEditProposal (proposals.reject + records.edit).
-    // Service metoda BuildEditableRecordEditorFromProposalAsync bude smazána ve Fázi 3.
 
     [HttpGet]
     [Authorize(Policy = "permission:proposals.edit.own")]
@@ -222,9 +220,11 @@ public sealed class NavrhyController : BaseController
 
     private JsonResult BuildProposalTabAjaxSuccess(int projektId, string message)
     {
+        var redirectUrl = Url.Action("Detail", "Projekty", new { id = projektId, tab = ProposalsTab })
+                          ?? $"/Projekty/Detail/{projektId}?tab={ProposalsTab}";
         return AjaxSuccessResult(
-            refreshScope: ProposalsRefreshScope,
-            refreshUrl: Url.Action("NavrhyTabPartial", "Projekty", new { id = projektId }),
+            refreshScope: "page",
+            refreshUrl: redirectUrl,
             projectId: projektId,
             tab: ProposalsTab,
             message: message);

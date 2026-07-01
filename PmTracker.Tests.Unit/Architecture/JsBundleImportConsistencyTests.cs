@@ -5,12 +5,13 @@ using FluentAssertions;
 namespace PmTracker.Tests.Unit.Architecture;
 
 /// <summary>
-/// Guard proti silent regresím v site.bundle.js a JS modulech:
-/// - import-omission v modulu = ReferenceError při runtime (bundler nic nehlásí)
-/// - bundle rename conflicting definitions na `X2` ale missing references v cizích modulech zůstávají `X`
+/// Guard proti silent regresím v ESM JS modulech: import-omission v modulu = ReferenceError
+/// při runtime (bundler nic nehlásí).
 ///
 /// User report 2026-04-19: modal po save nešel zavřít, protože `getActiveModalContainer()`
 /// byl volán v recordEditor.js bez importu a `recordEditorState` používán v ui.js bez importu.
+///
+/// (Bundle-rename guardy odstraněny 2026-06-16 spolu s legacy site.bundle.js — ESM nezesuffixovává.)
 /// </summary>
 public sealed class JsBundleImportConsistencyTests
 {
@@ -66,38 +67,6 @@ public sealed class JsBundleImportConsistencyTests
             source.Should().Contain(
                 "registerFloatingChooser",
                 "ui/print.js exportuje registerFloatingChooser runtime registry (aux chooser infrastructure)");
-        }
-    }
-
-    [Fact]
-    public void SiteBundle_MustNotReferenceUndefinedRecordEditorState()
-    {
-        var source = ReadModule("PmTracker.Web/wwwroot/js/site.bundle.js");
-
-        // Pokud je `recordEditorState2` definovaný (bundle rename), všechny reference musí být
-        // recordEditorState2 – samotné `recordEditorState.` bez suffixu = silent bug
-        if (source.Contains("var recordEditorState2"))
-        {
-            var bareUsageRegex = new Regex(@"(?<![a-zA-Z0-9_])recordEditorState\.[a-zA-Z]");
-            var matches = bareUsageRegex.Matches(source);
-            matches.Count.Should().Be(0,
-                "bundle má definici recordEditorState2 – všechny reference musí mít suffix 2. " +
-                $"Nalezeno {matches.Count} nezesuffixovaných použití (silent regression po bundle rename).");
-        }
-    }
-
-    [Fact]
-    public void SiteBundle_MustNotReferenceUndefinedGetActiveModalContainer()
-    {
-        var source = ReadModule("PmTracker.Web/wwwroot/js/site.bundle.js");
-
-        if (source.Contains("function getActiveModalContainer2"))
-        {
-            var bareCallRegex = new Regex(@"(?<![a-zA-Z0-9_])getActiveModalContainer\(");
-            var matches = bareCallRegex.Matches(source);
-            matches.Count.Should().Be(0,
-                "bundle má definici getActiveModalContainer2() – všechny volání musí být suffixováné. " +
-                $"Nalezeno {matches.Count} nezesuffixovaných volání (silent regression).");
         }
     }
 }

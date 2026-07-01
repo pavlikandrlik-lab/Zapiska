@@ -42,7 +42,7 @@ public sealed partial class ProjectService
             .ToListAsync(ct);
         var ownerById = ownerRows.ToDictionary(x => x.Id);
 
-        var todayDate = timeProvider.GetUtcNow().UtcDateTime.Date;
+        var todayDate = timeProvider.GetLocalNow().Date;
 
         return taskRecords
             .Select(record =>
@@ -56,7 +56,11 @@ public sealed partial class ProjectService
                     ? record.AktualniVlastnik
                     : BuildDisplayName(owner.Titul, owner.Jmeno, owner.Prijmeni, owner.Id);
 
-                if (souhrn.CelkoveTrvaniDni <= 0)
+                // Záznam patří do harmonogramu, jen pokud má aspoň jednu vyplněnou hodnotu kroku —
+                // plán NEBO skutečnost (i jen harvestovanou z napojených externích záznamů). Dřív tu
+                // byla podmínka jen na plán (CelkoveTrvaniDni > 0), která skryla záznamy, které mají
+                // vyplněnou pouze skutečnost.
+                if (!HarmonogramKrokPredicates.MaVyplnenouHodnotu(kroky))
                 {
                     return null;
                 }
@@ -92,7 +96,8 @@ public sealed partial class ProjectService
                         "#dc2626",
                         souhrn,
                         sharedSteps,
-                        overviewLayout: barLayout)
+                        overviewLayout: barLayout,
+                        today: todayDate)
                 };
             })
             .Where(x => x is not null)

@@ -25,6 +25,7 @@ import {
 } from "./projectTabs.js";
 import { initMeetingOverview } from "./meetingOverview.js";
 import { initProjectScheduleUi } from "./schedule.js";
+import { initProposalFilterUi } from "./filters/index.js";
 import { closeAllFloatingPanels } from "./ui.js";
 
 function invalidateRecordMeetingCommentStateCacheForPayload(payload) {
@@ -535,6 +536,7 @@ export async function refreshPageScope(payload) {
             initProjectTabs();
             initProjectRecordsUi();
             initProjectScheduleUi();
+            initProposalFilterUi();
             initMeetingOverview(document);
             initCommentSortUi(document);
             if (preserveRecordUi) {

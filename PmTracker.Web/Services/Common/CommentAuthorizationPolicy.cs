@@ -27,16 +27,26 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
         return currentUser.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projektId);
     }
 
-    public bool CanAddComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, bool isDraftMeeting)
+    public bool CanAddComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, bool isSubsystemLeadEquivalentInProject, bool isDraftMeeting)
     {
-        // Obecný klíč comments.add pokrývá běžné role (VP, ADM_PROJ, PROJ_MAN, GEST, VEDOUCI, METODIK).
-        if (currentUser.HasPermission(PermissionKeys.CommentsAdd, projektId))
+        // Vícevrstvá autorizace (rozhodnutí 2026-06-16):
+        // 1) PŘÍMÁ projektová (či globální) role s comments.add → komentuje kdekoli v projektu
+        //    (princip „vyšší bere"; pokrývá i kombinaci projektová role + vedoucí subsystému).
+        if (currentUser.HasDirectProjectPermission(PermissionKeys.CommentsAdd, projektId))
         {
             return true;
         }
 
-        // Subsystem lead fallback v DRAFT jednání (pokud nemá comments.add, ale má subsystem lead roli).
-        return isDraftMeeting && CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
+        // 2) Vedoucí / zástupce vedoucího subsystému → jen VLASTNÍ subsystém a jen v DRAFT jednání.
+        //    comments.add zděděný čistě ze subsystémové role NEopravňuje komentovat cizí subsystém.
+        if (isSubsystemLeadEquivalentInProject)
+        {
+            return isDraftMeeting && CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
+        }
+
+        // 3) Ostatní držitelé comments.add bez vedoucí-subsystému role (např. METODIK subsystému
+        //    přes zděděný grant) — zachované chování dle efektivní sady oprávnění.
+        return currentUser.HasPermission(PermissionKeys.CommentsAdd, projektId);
     }
 
     public bool CanModifyComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, int commentAuthorOsobaId, bool isDraftMeeting)
@@ -47,11 +57,23 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
             return true;
         }
 
-        // Autor vlastního komentáře + subsystem lead v DRAFT jednání.
-        return commentAuthorOsobaId > 0
-            && currentUser.OsobaId == commentAuthorOsobaId
-            && currentUser.HasPermission(PermissionKeys.CommentsEditOwn, projektId)
-            && (!isDraftMeeting || CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds));
+        var isOwn = commentAuthorOsobaId > 0 && currentUser.OsobaId == commentAuthorOsobaId;
+        if (!isOwn)
+        {
+            return false;
+        }
+
+        // Autor vlastního komentáře s comments.edit.own (v DRAFT navíc omezeno na vlastní subsystém).
+        if (currentUser.HasPermission(PermissionKeys.CommentsEditOwn, projektId)
+            && (!isDraftMeeting || CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds)))
+        {
+            return true;
+        }
+
+        // Rozhodnutí 2026-06-16 (implikovaný CRUD): vedoucí subsystému (meetings.notes.subsystemlead)
+        // smí upravit/smazat VLASTNÍ komentář svého subsystému v DRAFT jednání i bez samostatného
+        // comments.edit.own grantu. Mimo DRAFT / cizí subsystém → ne (CanCommentAsSubsystemLeader).
+        return isDraftMeeting && CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
     }
 
     public bool CanDeleteComment(CurrentUserContextViewModel currentUser, int projektId, int commentAuthorOsobaId)

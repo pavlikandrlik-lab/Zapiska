@@ -9,6 +9,7 @@ import {
     isPlainObject,
     parseJsonPayload,
     resolveAjaxResponseTraceId,
+    resolveFormSubmitterAttr,
     setButtonDisabled,
     SUBMIT_SELECTOR,
     truncateDiagnosticBody
@@ -22,6 +23,7 @@ import {
     resolveRecordEditorTabForFieldKey,
     resolveRecordEditorTabLabel
 } from "./recordEditor.js";
+import { setRecordFormTab } from "./recordEditor/form.js";
 import { refreshPageScope } from "./navigation.js";
 
 const sessionExpiredErrorCode = "SESSION_EXPIRED";
@@ -791,11 +793,15 @@ export function initModalAjaxSubmit() {
             return;
         }
 
+        // gov-button (pm-button) drží formaction/formmethod na host elementu, ale
+        // event.submitter je vnitřní nativní <button> bez nich → vystoupat na host.
+        // Viz docs/known-issues/proposal-decision-buttons-formaction-405.md.
+        const submitterHost = submitter instanceof Element ? submitter.closest("gov-button") : null;
         const submitterAction = isButtonLike(submitter)
-            ? (submitter.getAttribute("formaction") || "")
+            ? resolveFormSubmitterAttr(submitter, "formaction", submitterHost)
             : "";
         const submitterMethod = isButtonLike(submitter)
-            ? (submitter.getAttribute("formmethod") || "")
+            ? resolveFormSubmitterAttr(submitter, "formmethod", submitterHost)
             : "";
         const action = appendCurrentAsUser(submitterAction || target.getAttribute("action") || window.location.href);
         const method = (submitterMethod || target.getAttribute("method") || "post").toUpperCase();

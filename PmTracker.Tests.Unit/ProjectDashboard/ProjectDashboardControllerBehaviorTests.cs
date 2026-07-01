@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PmTracker.Web.Controllers;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.ProjectDashboard;
+using PmTracker.Web.Services.ProjectDashboard.Zakladni;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.ProjectDashboard;
@@ -13,6 +14,12 @@ public sealed class ProjectDashboardControllerBehaviorTests
 {
     private const int AccessibleProjectId = 1;
     private const int InaccessibleProjectId = 99;
+
+    private sealed class NullDatasetLoader : IZakladniDatasetLoader
+    {
+        public System.Threading.Tasks.Task<ZakladniDataset> LoadAsync(int projektId, Obdobi obdobi, System.Threading.CancellationToken ct)
+            => System.Threading.Tasks.Task.FromResult(new ZakladniDataset { Obdobi = obdobi });
+    }
 
     [Fact]
     public async Task Index_ShouldReturnView_WhenUserHasAccess()
@@ -104,7 +111,8 @@ public sealed class ProjectDashboardControllerBehaviorTests
             TimeProvider.System,
             NullLoggerFactory.Instance,
             service,
-            new PmTracker.Web.Services.Export.NesPanelExcelExportService())
+            new PmTracker.Web.Services.Export.NesPanelExcelExportService(),
+            new ZakladniReportBuilder(new NullDatasetLoader(), System.Array.Empty<IZakladniChartProvider>()))
         {
             ControllerContext = new ControllerContext
             {

@@ -80,6 +80,9 @@
                         <span class="vyzvy-switch-status" data-vyzvy-switch-status>@statusText</span>
                     </div>
 
+                    @* 7c: harvest UI (chat + 4 datumy) skryté v návrhu založení — skutečnost až po založení. *@
+                    @if (!Model.HideExternalHarvestUi)
+                    {
                     <div class="external-action-chat">
                         <pm-button variant="Secondary" size="Small" data-external-chat-open="true"
                                    data-external-odkaz-id="@vazba.Id"
@@ -90,6 +93,7 @@
                             <gov-icon size="s" name="chat-left-text" type="components" aria-hidden="true"></gov-icon>
                         </pm-button>
                     </div>
+                    }
 
                     @* FIX 2026-05-05 (revert 2026-05-04): 4 datumy jsou READ-ONLY display.
                        User je needituje — auto-fill harvest (PerTicketMetadataSyncService) je
@@ -99,6 +103,8 @@
                        sync.js po user zadání čísla tiketu fetchne preview 4 datumů z HOT_ZAZNAMY
                        a updatuje text těchto spanů (ne form input).
                        Prázdné datumy ukazují ikonu kalendáře (placeholder, user požadavek 2026-04-27). *@
+                    @if (!Model.HideExternalHarvestUi)
+                    {
                     <div class="external-dates external-dates-readonly" data-external-dates @(ticketResolved ? null : "hidden=\"hidden\"")>
                         <div class="external-date-item">
                             <span class="label">Datum objednání</span>
@@ -153,6 +159,7 @@
                             }
                         </div>
                     </div>
+                    }
 
                     <div class="external-action-trash">
                         <pm-button variant="Secondary" size="Small" data-external-remove="true"
@@ -210,6 +217,9 @@
                     <span class="vyzvy-switch-status" data-vyzvy-switch-status></span>
                 </div>
 
+                @* 7c: harvest UI skryté v návrhu založení (nové řádky šablony). *@
+                @if (!Model.HideExternalHarvestUi)
+                {
                 <div class="external-action-chat">
                     <pm-button variant="Secondary" size="Small" data-external-chat-open="true"
                                data-external-odkaz-id="0"
@@ -249,6 +259,7 @@
                         </span>
                     </div>
                 </div>
+                }
 
                 <div class="external-action-trash">
                     <pm-button variant="Secondary" size="Small" data-external-remove="true"

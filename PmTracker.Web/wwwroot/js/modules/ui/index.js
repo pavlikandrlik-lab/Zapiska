@@ -32,8 +32,9 @@ export function renderAllRainbowSegmentLabels(scope) {
     const root = scope instanceof HTMLElement || scope instanceof Document ? scope : document;
     root
         .querySelectorAll(
+            // Pozn.: .schedule-layered-segment (rozpad) ZÁMĚRNĚ vynechán — krok je pojmenovaný
+            // ve vlastní koloně a skutečnostní čára by popisek na segmentu překryla.
             ".schedule-overview-segment[data-rainbow-segment-label-short], "
-            + ".schedule-layered-segment[data-rainbow-segment-label-short], "
             + ".schedule-mini-gantt-segment[data-rainbow-segment-label-short]")
         .forEach((segment) => {
             renderRainbowSegmentLabel(segment);

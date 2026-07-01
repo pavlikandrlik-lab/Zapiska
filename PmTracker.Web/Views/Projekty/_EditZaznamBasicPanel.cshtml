@@ -15,6 +15,15 @@
         && (Model.Kategorie.Contains("úkol", StringComparison.OrdinalIgnoreCase)
             || Model.Kategorie.Contains("ukol", StringComparison.OrdinalIgnoreCase));
     var safeDescriptionHtml = RichTextContentService.ToSafeHtml(Model.Popis);
+
+    // Hodnota, kterou by odeslal <select name="Subsystem"> (value = Kod, jinak Nazev) —
+    // přesně podle option-value logiky níže. Použito pro hidden carrier při zámku metadat.
+    var subsystemSelectedOption = Model.Subsystemy.FirstOrDefault(s =>
+        string.Equals(s.Kod, Model.Subsystem, StringComparison.Ordinal)
+        || string.Equals(s.Nazev, Model.Subsystem, StringComparison.Ordinal));
+    var subsystemSubmitValue = subsystemSelectedOption is null
+        ? Model.Subsystem
+        : (string.IsNullOrWhiteSpace(subsystemSelectedOption.Kod) ? subsystemSelectedOption.Nazev : subsystemSelectedOption.Kod);
 }
 
 <pm-tab-panel key="basic" class="record-modal-panel" data-record-modal-panel="basic">
@@ -36,15 +45,15 @@
             </select>
         </label>
         @*
-            Typ úkolu — v návrhu (IsProposalEditor) se NESMÍ měnit, protože
-            změna typu úkolu není součástí návrhového workflow (návrh
-            harmonogramu / vytvoření záznamu). User opakovaně (2026-04-19 večer):
-            "v návrhu v záložce základní údaje je možné rozkliknout Typ úkolu
-            a vybrat něco jiného, pořád to není opravené".
+            7d (2026-06-17): Typ úkolu je editovatelný i v NÁVRHU ZALOŽENÍ (a klasickém editoru),
+            pokud je kategorie úkol — reverze rozhodnutí z 2026-04-19. Zamčení řídí jen
+            `metadataLocked` (= !AllowBasicMetadataEdit): návrh ZMĚNY harmonogramu má basic pole
+            zamčená (metadataLocked=true → typ zamčený), návrh založení/klasik nikoli.
+            JS (recordEditor/form.js) drží stejnou logiku při změně kategorie.
         *@
         <label class="record-form-type-row" for="typ-ukolu" data-typ-ukolu-row>
             Typ úkolu
-            <select id="typ-ukolu" name="TypUkolu" @(metadataLocked || Model.IsProposalEditor ? "disabled=\"disabled\"" : null)>
+            <select id="typ-ukolu" name="TypUkolu" @(metadataLocked ? "disabled=\"disabled\"" : null)>
                 <option value="">-</option>
                 @foreach (var typ in Model.TypyUkolu)
                 {
@@ -157,13 +166,6 @@
         </label>
     </div>
 
-    @if (Model.HasPendingScheduleProposalLock && !string.IsNullOrWhiteSpace(Model.PendingScheduleProposalMessage))
-    {
-        <gov-message color="warning">
-            @Model.PendingScheduleProposalMessage
-        </gov-message>
-    }
-
     <div class="record-form-row record-form-row-dates">
         <label>
             Datum založení
@@ -263,4 +265,18 @@
             </div>
         </label>
     </div>
+
+    @if (metadataLocked)
+    {
+        @* Zamčená metadata (návrh ZMĚNY termínu a harmonogramu): disabled <select>/<input> se
+           s formulářem NEodesílají, ale SaveRecordCommand má Kategorie/Stav/Nazev/Subsystem
+           [Required]. Bez hidden carrierů spadne POST /Navrhy/SubmitScheduleProposal na
+           REQUEST_VALIDATION_FAILED. Hodnoty server u návrhu harmonogramu ignoruje (načítá
+           záznam z DB), ale sdílený příkaz musí projít model validací. Stejný princip jako
+           hidden VlastnikId a _AppDateField locked. Regrese opravena 2026-06-29. *@
+        <input type="hidden" name="Kategorie" value="@Model.Kategorie" data-locked-metadata-hidden />
+        <input type="hidden" name="Stav" value="@Model.Stav" data-locked-metadata-hidden />
+        <input type="hidden" name="Nazev" value="@Model.Nazev" data-locked-metadata-hidden />
+        <input type="hidden" name="Subsystem" value="@subsystemSubmitValue" data-locked-metadata-hidden />
+    }
 </pm-tab-panel>

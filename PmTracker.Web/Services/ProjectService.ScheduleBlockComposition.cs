@@ -17,7 +17,8 @@ public sealed partial class ProjectService
         string scheduleVersion = "",
         IReadOnlySet<int>? lockedManualKrokKeys = null,
         bool canEditManualActual = false,
-        ScheduleBarLayout? overviewLayout = null)
+        ScheduleBarLayout? overviewLayout = null,
+        DateTime? today = null)
     {
         var effectivePermissions = permissions ?? ScheduleEditorPermissionSet.ForReadOnly();
         return new HarmonogramBlockViewModel
@@ -26,6 +27,7 @@ public sealed partial class ProjectService
             Mode = mode,
             DatumZalozeni = datumZalozeni.Date,
             TerminUkonceni = terminUkonceni.Date,
+            Today = (today ?? DateTime.Today).Date,
             DelayBarvaHex = delayBarvaHex,
             Souhrn = souhrn,
             Kroky = kroky,

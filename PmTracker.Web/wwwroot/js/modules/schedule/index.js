@@ -57,13 +57,29 @@ export function persistGanttFilterState() {
     });
 }
 
-function syncScheduleExpandButton(button, details) {
+// updateLabel: psát textový label tlačítka? JEN true na skutečném user toggle.
+//
+// gov-button je Stencil web komponenta se slot-relokací — po hydrataci renderuje label
+// do interního <button class="element">. Zápis textContent na HOST ten interní uzel smaže
+// a když hydratace ještě neproběhla (čerstvě lazy-loadnutý harmonogram panel), následný
+// hydratační render slotovaný text ZDVOJÍ → „RozpadRozpad". Reprodukováno na cross-tab
+// cestě „Zobrazit v harmonogramu" (goto): tam init běží dřív, než se gov-button dohydratuje.
+//
+// Server ale renderuje kroky VŽDY sbalené (data-schedule-steps hidden) + label „Rozpad" +
+// aria-expanded="false" → při INIT není co na labelu měnit. Proto init label NEpíše
+// (updateLabel=false) a jen srovná aria-expanded (bezpečný atribut na hostu). Label se
+// zapíše až na user toggle, kdy je tlačítko dávno dohydratované a zápis je bezpečný.
+function syncScheduleExpandButton(button, details, { updateLabel = false } = {}) {
     if (!isButtonLike(button) || !(details instanceof HTMLElement)) {
         return;
     }
 
     const expanded = !details.hidden;
-    button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
+
+    if (updateLabel) {
+        button.textContent = expanded ? "Skrýt rozpad" : "Rozpad";
+    }
+
     button.setAttribute("aria-expanded", String(expanded));
 }
 
@@ -89,7 +105,8 @@ export function toggleScheduleBreakdown(toggleOrTarget) {
 
     const expanded = details.hidden;
     details.hidden = !expanded;
-    syncScheduleExpandButton(button, details);
+    // user toggle → tlačítko je dohydratované, label zápis je bezpečný.
+    syncScheduleExpandButton(button, details, { updateLabel: true });
 
     if (expanded) {
         renderStaticTimelineAxes(details);

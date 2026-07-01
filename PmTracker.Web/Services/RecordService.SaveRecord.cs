@@ -245,6 +245,13 @@ public sealed partial class RecordService
             // Auto skutečnost řeší harvest (SyncZaznamAsync), ne save.
             _ = await PersistScheduleKrokyAsync(entity, command, isTaskCategory, pendingScheduleProposalLock.LocksSchedule, innerCt);
 
+            // FIX 2026-06-16: flush před priority rebuildem. RebuildForRecordAsync čte spolupráci
+            // (ZaznamSpoluprace), kroky a externí vazby přes AsNoTracking = dotaz do DB. EF Core
+            // před dotazem neflushuje pending změny, takže bez tohoto SaveChanges by rebuild viděl
+            // zastaralý stav (nově přidaný spolupracovník by nedostal priority row, smazaný by ji
+            // neztratil) až do příštího full rebuildu. Vše běží uvnitř vnější transakce → atomické.
+            await dbContext.SaveChangesAsync(innerCt);
+
             await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, innerCt);
             auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
                 command.Id.HasValue ? AuditActionType.Update : AuditActionType.Create,
@@ -1059,11 +1066,14 @@ public sealed partial class RecordService
             .FirstOrDefaultAsync(ct)
             ?? throw new InvalidOperationException($"Typ externí vazby '{value}' neexistuje.");
 
-    private static bool SupportsEstimatedExternalLinkPrice(string? externalTypeCode)
+    // internal (ne private) kvůli fokusovanému unit testu EstimatedExternalLinkPriceTests
+    // (InternalsVisibleTo PmTracker.Tests.Unit) — pravidlo „cena jen pro PMP/PNF" se testuje
+    // přímo, ne přes SD-gated Save endpoint (Ticketing.Enabled=false v testech).
+    internal static bool SupportsEstimatedExternalLinkPrice(string? externalTypeCode)
         => !string.IsNullOrWhiteSpace(externalTypeCode)
             && (Ci.Equals(externalTypeCode, "PMP") || Ci.Equals(externalTypeCode, "PNF"));
 
-    private static decimal? NormalizeEstimatedExternalLinkPrice(string? externalTypeCode, string? estimatedPrice)
+    internal static decimal? NormalizeEstimatedExternalLinkPrice(string? externalTypeCode, string? estimatedPrice)
     {
         if (!SupportsEstimatedExternalLinkPrice(externalTypeCode) || string.IsNullOrWhiteSpace(estimatedPrice))
         {

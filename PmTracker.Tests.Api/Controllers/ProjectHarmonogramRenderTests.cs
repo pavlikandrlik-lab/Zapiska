@@ -224,6 +224,30 @@ public sealed class ProjectHarmonogramRenderTests
     }
 
     [Fact]
+    public async Task Detail_Harmonogram_RendersMonthTicksAndLocalToday_AndNoPlusOnePxHack()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiHarmTicksOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIHARMTCK");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIHARMSUBTCK", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram ticks record");
+        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var html = await (await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}")).Content.ReadAsStringAsync();
+
+        html.Should().Contain("data-schedule-ticks=", "měsíční ticky se serializují na osu pro JS render");
+        html.Should().Contain("data-schedule-today=", "lokální dnešek je v data atributu (sjednocený zdroj markeru s osou)");
+
+        // +1px hack odstraněn — segment plánu má width:NN% bez calc() (sjednocení souřadnic s markery/ticky).
+        var planSegmentStyle = Regex.Match(
+            html,
+            "data-schedule-segment-kind=\"planned\"\\s+data-step-index=\"1\"[\\s\\S]{0,200}?style=\"([^\"]*)\"")
+            .Groups[1].Value;
+        planSegmentStyle.Should().Contain("width:").And.NotContain("calc(");
+    }
+
+    [Fact]
     public async Task Edit_ScheduleTab_PlanDateFields_AreEditable_ForTaskWithEditPermission()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiHarmEditableOwner");

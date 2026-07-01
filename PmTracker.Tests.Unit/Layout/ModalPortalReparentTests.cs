@@ -28,13 +28,4 @@ public sealed class ModalPortalReparentTests
         js.Should().Contain("restoreFloatingRoot",
             "modals.js musí volat restoreFloatingRoot před clear modalu");
     }
-
-    [Fact]
-    public void SiteBundle_ShouldContainReparentHelpers()
-    {
-        var bundle = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/site.bundle.js"));
-        bundle.Should().Contain("reparentFloatingRootIntoModal",
-            "site.bundle.js synchronizovan s modals.js");
-        bundle.Should().Contain("restoreFloatingRoot");
-    }
 }

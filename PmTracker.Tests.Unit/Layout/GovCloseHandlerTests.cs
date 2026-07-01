@@ -22,15 +22,4 @@ public sealed class GovCloseHandlerTests
             @"handleGovCloseEvent[\s\S]*?closeModal\(\)",
             "handler obsahuje fallback volání closeModal() pro non-record-editor modaly");
     }
-
-    [Fact]
-    public void SiteBundle_ShouldContainUniversalCloseFallback()
-    {
-        var bundle = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/site.bundle.js"));
-        bundle.Should().Contain("function handleGovCloseEvent",
-            "bundle synchronizovan");
-        bundle.Should().MatchRegex(
-            @"handleGovCloseEvent[\s\S]*?closeModal\(\)",
-            "bundle obsahuje fallback closeModal()");
-    }
 }

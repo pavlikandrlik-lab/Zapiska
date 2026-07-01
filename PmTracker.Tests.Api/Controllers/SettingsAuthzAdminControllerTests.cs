@@ -51,9 +51,10 @@ public sealed class SettingsAuthzAdminControllerTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        // Sekce je teď read-only — render titulku + tabulky stačí; mutující tlačítko
-        // („Přidat mapování") bylo odstraněno v commitu 727a888 / 96cd687.
-        html.Should().Contain("Mapování role -> akce").And.Contain("<table");
+        // Sekce je teď read-only — render tabulky mapování role → akce stačí; nadpis sekce panel
+        // nerenderuje a mutující tlačítko („Přidat mapování") bylo odstraněno (727a888 / 96cd687).
+        // Distinktivní sloupce sekce: Akce / Rozsah / Projekty (INCLUDE) / Povoleno.
+        html.Should().Contain("<table").And.Contain("Projekty (INCLUDE)").And.Contain("<th>Rozsah</th>");
     }
 
     [Fact]

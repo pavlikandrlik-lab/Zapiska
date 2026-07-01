@@ -8,12 +8,7 @@
          role="tabpanel"
          aria-labelledby="tab-jednani"
          data-tab-panel="jednani">
-    @if (Model.CanCreateMeetings)
-    {
-        <div class="panel-header">
-            <pm-button variant="Primary" data-modal-url="@Url.Action("NewMeetingModal", "Jednani", new { projektId = Model.ProjektId })">Nové jednání</pm-button>
-        </div>
-    }
+    @* „Nové jednání" tlačítko přesunuto do tab stripu vpravo (Detail.cshtml .tabs-actions, 2026-06-16). *@
 
     @if (Model.RocniSkupiny.Count == 0)
     {

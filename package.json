@@ -1,0 +1,8 @@
+{
+  "name": "pmtracker-js-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/js/schedule/*.test.js tests/js/dom/*.test.js"
+  }
+}

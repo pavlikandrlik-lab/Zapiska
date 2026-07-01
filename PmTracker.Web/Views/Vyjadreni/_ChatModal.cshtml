@@ -122,8 +122,11 @@
                                     {
                                         <span class="pm-chat-bubble__tym">@bubble.AutorLogin</span>
                                     }
+                                    @* FIX 2026-06-22: SD datum vyjádření je už lokální čas (SQL datetime,
+                                       Kind=Unspecified). NEvolat ToLocalTime — to by Unspecified bralo jako UTC
+                                       a uměle přičetlo offset serveru (+1 h: 23:09 → 00:09). Zobrazit přímo. *@
                                     <time class="pm-chat-bubble__datum" datetime="@bubble.Datum.ToString("o")">
-                                        @bubble.Datum.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                        @bubble.Datum.ToString("dd.MM.yyyy HH:mm")
                                     </time>
                                 }
                                 @* Spec 2026-04-29-modal-vyjadreni-dropdown §1, §6 — krok selector
@@ -210,7 +213,8 @@
                         <span slot="prefix">@krok.KrokPoradi</span>
                         <span slot="headline">@krok.Nazev</span>
                         <span slot="content">
-                            @krok.AktualniVyjadreniDatum?.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                            @* FIX 2026-06-22: datum bound vyjádření je SD lokální čas — bez ToLocalTime (viz bublina výše). *@
+                            @krok.AktualniVyjadreniDatum?.ToString("dd.MM.yyyy HH:mm")
                             @if (canEdit)
                             {
                                 <button type="button" class="pm-chat-step__clear"

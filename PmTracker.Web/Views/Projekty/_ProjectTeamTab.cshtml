@@ -9,25 +9,30 @@
          aria-labelledby="tab-tym"
          data-tab-panel="tym"
          data-table-tools-root>
-    <div class="table-tools-toolbar">
-        <label class="table-tools-search">
-            <span>Hledat v týmu</span>
-            <input type="search"
-                   placeholder="Osoba, role, subsystém, organizace..."
-                   data-table-tools-search-input />
-        </label>
-    </div>
     <div class="stack-lg">
         <section class="card">
+            @* „Hledat v týmu" je v hlavičce první karty vlevo vedle akcí — o řádek výš,
+               šetří svislé místo (user 2026-06-16). Tlačítka zůstávají vpravo pohromadě
+               (.header-actions-buttons, nezalamují se), hledání se zmenšuje nalevo od nich
+               (.header-actions-with-search nowrap, user 2026-06-22).
+               Vstup zůstává uvnitř data-table-tools-root sekce, takže filtruje celý panel. *@
             <div class="panel-header">
                 <h3>Projektové role</h3>
-                @if (Model.CanManageTeam)
-                {
-                    <div class="header-actions">
-                        <pm-button variant="Primary" data-modal-url="@Url.Action("AssignProjectRoleModal", "Projekty", new { projektId = Model.ProjektId })">Přidat projektovou roli</pm-button>
-                        <pm-button variant="Secondary" data-modal-url="@Url.Action("AssignProjectSubsystemRoleModal", "Projekty", new { projektId = Model.ProjektId })">Přidat roli v subsystému</pm-button>
-                    </div>
-                }
+                <div class="header-actions header-actions-with-search">
+                    <label class="table-tools-search">
+                        <input type="search"
+                               aria-label="Hledat v týmu"
+                               placeholder="Hledat v týmu..."
+                               data-table-tools-search-input />
+                    </label>
+                    @if (Model.CanManageTeam)
+                    {
+                        <div class="header-actions-buttons">
+                            <pm-button variant="Primary" data-modal-url="@Url.Action("AssignProjectRoleModal", "Projekty", new { projektId = Model.ProjektId })">Přidat projektovou roli</pm-button>
+                            <pm-button variant="Secondary" data-modal-url="@Url.Action("AssignProjectSubsystemRoleModal", "Projekty", new { projektId = Model.ProjektId })">Přidat roli v subsystému</pm-button>
+                        </div>
+                    }
+                </div>
             </div>
             <table class="table" data-table-tools-table data-table-empty-message="Žádná projektová role neodpovídá zadanému filtru.">
                 <thead>

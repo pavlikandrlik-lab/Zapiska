@@ -1,0 +1,67 @@
+[
+  {
+    "name": "two-steps-month-snap",
+    "input": {
+      "start": "2026-01-01", "deadline": "2026-02-01", "today": "2026-01-15",
+      "steps": [
+        {"poradi": 1, "planStart": "2026-01-01", "planEnd": "2026-01-11", "maSkutecnost": true,  "skutecnostStart": "2026-01-01", "skutecnostEnd": "2026-01-13"},
+        {"poradi": 2, "planStart": "2026-01-11", "planEnd": "2026-01-21", "maSkutecnost": false, "skutecnostStart": "2026-01-13", "skutecnostEnd": "2026-01-13"}
+      ]
+    },
+    "expected": {
+      "axisStart": "2026-01-01", "axisEnd": "2026-03-01", "totalDays": 59,
+      "todayPct": 23.7288, "deadlinePct": 52.5424,
+      "monthTicks": [
+        {"left": 0.0, "label": "01/2026"},
+        {"left": 52.5424, "label": "02/2026"},
+        {"left": 100.0, "label": "03/2026"}
+      ],
+      "segments": [
+        {"poradi": 1, "planLeft": 0.0, "planWidth": 16.9492, "hasActual": true,  "actualLeft": 0.0, "actualWidth": 20.339},
+        {"poradi": 2, "planLeft": 16.9492, "planWidth": 16.9492, "hasActual": false, "actualLeft": 0.0, "actualWidth": 0.0}
+      ]
+    }
+  },
+  {
+    "name": "last-day-of-month-edge",
+    "input": {
+      "start": "2026-01-01", "deadline": "2026-03-31", "today": "2026-02-01",
+      "steps": [
+        {"poradi": 1, "planStart": "2026-01-01", "planEnd": "2026-03-31", "maSkutecnost": false, "skutecnostStart": "2026-01-01", "skutecnostEnd": "2026-01-01"}
+      ]
+    },
+    "expected": {
+      "axisStart": "2026-01-01", "axisEnd": "2026-04-01", "totalDays": 90,
+      "todayPct": 34.4444, "deadlinePct": 98.8889,
+      "monthTicks": [
+        {"left": 0.0, "label": "01/2026"},
+        {"left": 34.4444, "label": "02/2026"},
+        {"left": 65.5556, "label": "03/2026"},
+        {"left": 100.0, "label": "04/2026"}
+      ],
+      "segments": [
+        {"poradi": 1, "planLeft": 0.0, "planWidth": 98.8889, "hasActual": false, "actualLeft": 0.0, "actualWidth": 0.0}
+      ]
+    }
+  },
+  {
+    "name": "today-outside-future-task",
+    "input": {
+      "start": "2026-04-01", "deadline": "2026-04-10", "today": "2026-01-15",
+      "steps": [
+        {"poradi": 1, "planStart": "2026-04-01", "planEnd": "2026-04-10", "maSkutecnost": false, "skutecnostStart": "2026-04-01", "skutecnostEnd": "2026-04-01"}
+      ]
+    },
+    "expected": {
+      "axisStart": "2026-04-01", "axisEnd": "2026-05-01", "totalDays": 30,
+      "todayPct": null, "deadlinePct": 30.0,
+      "monthTicks": [
+        {"left": 0.0, "label": "04/2026"},
+        {"left": 100.0, "label": "05/2026"}
+      ],
+      "segments": [
+        {"poradi": 1, "planLeft": 0.0, "planWidth": 30.0, "hasActual": false, "actualLeft": 0.0, "actualWidth": 0.0}
+      ]
+    }
+  }
+]

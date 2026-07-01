@@ -56,6 +56,7 @@ Každá PR, která přidává novou knihovnu nebo asset, musí projít:
 |----------------------|------------------------------------------|--------|---------------------------------------------------------------------|
 | Quill rich text      | `~/lib/quill/`                           | (viz)  | npm `quill`                                                         |
 | gov-design-system    | `~/lib/gov-design-system/`               | 4.2.9  | npm `@gov-design-system-ce/components`, `@gov-design-system-ce/styles` 4.2.7 |
+| Apache ECharts       | `~/lib/echarts/` (`echarts.esm.min.js`)  | 5.5.1  | npm `echarts` (dist ESM); grafy základního projektového reportu     |
 
 ## Publish workflow
 

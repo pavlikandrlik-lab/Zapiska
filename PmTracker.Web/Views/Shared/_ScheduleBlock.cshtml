@@ -9,7 +9,7 @@
     var overviewAxisSpacerCssClass = isEditor ? "schedule-mini-gantt-axis-spacer" : "schedule-overview-axis-spacer";
     var overviewAxisCssClass = isEditor ? "timeline-axis schedule-mini-gantt-axis-track" : "timeline-axis schedule-overview-axis";
     var overviewSegmentCssClass = isEditor ? "schedule-mini-gantt-segment" : "schedule-overview-segment";
-    var overviewMarkerCssClass = isEditor ? "schedule-mini-gantt-marker" : "schedule-overview-marker";
+
     // V editoru musíme vyrenderovat segmenty pro VŠECHNY kroky (i zero-duration),
     // aby je JS mohl zobrazit, když uživatel zadá kladné trvání. Segmenty s width=0
     // se schovávají přes display:none ve schedule.js (applySegmentLayout/resetSegmentLayout).
@@ -28,6 +28,10 @@
     var ovl = Model.OverviewLayout;
     var ovlSeg = ovl?.Segments.ToDictionary(s => s.Poradi);
     string Pct(double v) => v.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    // „Dnes"/„Termín" jsou popisky DNES/TERMÍN na ose (ne svislé čáry): server dodá pozici v %, JS
+    // (renderTicksFromList / block.js) je vykreslí. Prázdné = datum mimo osu → popisek se nezobrazí.
+    var todayPctAttr = ovl?.TodayPct?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+    var deadlinePctAttr = ovl?.DeadlinePct?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
 }
 
 <div class="@rootCssClass schedule-block"
@@ -36,6 +40,7 @@
      data-schedule-record-id="@Model.RecordId"
      data-schedule-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
      data-schedule-deadline="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"
+     data-schedule-today="@Model.Today.ToString("yyyy-MM-dd")"
      @(isEditor ? "data-record-schedule-editor" : null)
      style="--record-schedule-delay-color:@Model.DelayBarvaHex;">
     @if (isEditor)
@@ -88,7 +93,9 @@
                  data-schedule-axis="overview"
                  data-timeline-axis
                  data-axis-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
-                 data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"></div>
+                 data-axis-end="@Model.TerminUkonceni.ToString("yyyy-MM-dd")"
+                 data-axis-today-pct="@todayPctAttr"
+                 data-axis-deadline-pct="@deadlinePctAttr"></div>
         }
 
         @foreach (var row in new[] { ("planned", "Plán"), ("actual", "Skutečnost") })
@@ -96,28 +103,23 @@
             <div class="@overviewRowCssClass" data-schedule-overview-row="@row.Item1">
                 <span class="@overviewLabelCssClass">@row.Item2</span>
                 <div class="@overviewTrackCssClass" data-schedule-overview-track="@row.Item1">
-                    <div class="@overviewMarkerCssClass today"
-                         data-schedule-marker="today"
-                         @(isEditor ? "data-schedule-gantt-today" : null)
-                         style="@(ovl is null ? null : $"left:{Pct(ovl.TodayPct)}")"
-                         title="Dnes"></div>
-                    <div class="@overviewMarkerCssClass @(isEditor ? null : "deadline")"
-                         data-schedule-marker="deadline"
-                         @(isEditor ? "data-schedule-gantt-deadline" : null)
-                         style="@(ovl is null ? null : $"left:{Pct(ovl.DeadlinePct)}")"></div>
+                    @* „Dnes" i „Termín" už nejsou svislé čáry v pruhu — jsou to popisky DNES/TERMÍN na ose
+                       (viz data-axis-today-pct / data-axis-deadline-pct). *@
                     @foreach (var krok in visibleCompactSteps)
                     {
                         // Datum-model: per-row viditelnost segmentu.
                         //   planned row: skrytý pokud TrvaniDni == 0
                         //   actual row: viditelný pokud má segment skutečnosti (vyplněný krok NEBO
                         //     aktuální krok táhnoucí do dneška) — řídí seg.HasActual ze server layoutu.
-                        var skutDatumLabel = krok.SkutecneDatum?.ToString("dd.MM.yyyy") ?? "rozpracováno";
+                        // Tooltip: „N. název: druh od-do" (od = začátek, do = konec segmentu).
+                        var planOdDo = $"{krok.PlanZacatek:dd.MM.yyyy}-{krok.BaselineDatum:dd.MM.yyyy}";
+                        var skutOdDo = krok.SkutecnostZacatek.HasValue && krok.SkutecnostKonec.HasValue
+                            ? $"{krok.SkutecnostZacatek.Value:dd.MM.yyyy}-{krok.SkutecnostKonec.Value:dd.MM.yyyy}"
+                            : "rozpracováno";
                         var segmentTitle = row.Item1 == "planned"
-                            ? $"{krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
-                            : $"{krok.Nazev}: skutečnost {skutDatumLabel}";
-                        var ariaLabel = row.Item1 == "planned"
-                            ? $"Krok {krok.KrokIndex} {krok.Nazev}: plán {krok.BaselineDatum:dd.MM.yyyy}"
-                            : $"Krok {krok.KrokIndex} {krok.Nazev}: skutečnost {skutDatumLabel}";
+                            ? $"{krok.Nazev}: plán {planOdDo}"
+                            : $"{krok.Nazev}: skutečnost {skutOdDo}";
+                        var ariaLabel = segmentTitle;
                         var isPlannedHidden = row.Item1 == "planned" && krok.TrvaniDni <= 0;
 
                         // Server-side pozice (statická zobrazení). NULL layout = editor → JS.
@@ -128,7 +130,7 @@
                             var width = row.Item1 == "planned" ? seg.PlanWidthPct : seg.ActualWidthPct;
                             // actual řada: seg.HasActual je autoritativní (true i pro aktuální krok).
                             var hide = row.Item1 == "planned" ? (isPlannedHidden || width <= 0) : !seg.HasActual;
-                            positionStyle = hide ? "display:none;" : $"left:{Pct(left)};width:calc({Pct(width)} + 1px);";
+                            positionStyle = hide ? "display:none;" : $"left:{Pct(left)};width:{Pct(width)};";
                         }
                         else
                         {
@@ -158,7 +160,10 @@
                      data-schedule-axis="overview"
                      data-timeline-axis
                      data-axis-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
-                     data-axis-end="@((Model.OverviewLayout?.AxisEnd ?? Model.TerminUkonceni).ToString("yyyy-MM-dd"))"></div>
+                     data-axis-end="@((Model.OverviewLayout?.AxisEnd ?? Model.TerminUkonceni).ToString("yyyy-MM-dd"))"
+                     data-axis-today-pct="@todayPctAttr"
+                     data-axis-deadline-pct="@deadlinePctAttr"
+                     data-schedule-ticks="@(ovl is null ? null : System.Text.Json.JsonSerializer.Serialize(ovl.MonthTicks.Select(t => new { left = t.LeftPct, label = t.Label })))"></div>
             </div>
         }
     </div>
@@ -189,11 +194,19 @@
             </div>
             <div class="schedule-layered-axis-row">
                 <span class="schedule-layered-axis-spacer" aria-hidden="true"></span>
+                @* Breakdown osa musí nést STEJNÁ kanonická data jako overview osa (řádky 159-166):
+                   serverové měsíční ticky + DNES/TERMÍN pct. Bez nich renderStaticTimelineAxes
+                   (timeline.js) spadne do fallback renderTimelineAxis (edge-inset + syrový start +
+                   vzorkování dnů) a ticky NElícují s pruhy (které jedou na server %). S nimi jde
+                   kanonickou větví renderTicksFromList (full-width %, měsíční předěly) = lícuje. *@
                 <div class="timeline-axis schedule-layered-axis"
                      data-schedule-axis="breakdown"
                      data-timeline-axis
                      data-axis-start="@Model.DatumZalozeni.ToString("yyyy-MM-dd")"
-                     data-axis-end="@((ovl?.AxisEnd ?? Model.TerminUkonceni).ToString("yyyy-MM-dd"))"></div>
+                     data-axis-end="@((ovl?.AxisEnd ?? Model.TerminUkonceni).ToString("yyyy-MM-dd"))"
+                     data-axis-today-pct="@todayPctAttr"
+                     data-axis-deadline-pct="@deadlinePctAttr"
+                     data-schedule-ticks="@(ovl is null ? null : System.Text.Json.JsonSerializer.Serialize(ovl.MonthTicks.Select(t => new { left = t.LeftPct, label = t.Label })))"></div>
             </div>
             @* Phase 9 (DESIGN-9-D + 10-A, 2026-05-01): žádný filter, render každý krok plně.
                Tolerance hodnot:
@@ -211,14 +224,18 @@
                 PmTracker.Web.Services.Schedules.ScheduleBarSegment? bseg = null;
                 if (ovlSeg is not null) { ovlSeg.TryGetValue(krok.KrokIndex, out bseg); }
                 var plannedHiddenStyle = hasPlan && bseg is not null && bseg.PlanWidthPct > 0
-                    ? $"left:{Pct(bseg.PlanLeftPct)};width:calc({Pct(bseg.PlanWidthPct)} + 1px);"
+                    ? $"left:{Pct(bseg.PlanLeftPct)};width:{Pct(bseg.PlanWidthPct)};"
                     : "width:0;visibility:hidden;";
                 var actualPosStyle = bseg is not null && bseg.HasActual
-                    ? $"left:{Pct(bseg.ActualLeftPct)};width:calc({Pct(bseg.ActualWidthPct)} + 1px);"
+                    ? $"left:{Pct(bseg.ActualLeftPct)};width:{Pct(bseg.ActualWidthPct)};"
                     : string.Empty;
                 // Server layout je autoritativní pro actual segment (true i pro aktuální krok do dneška).
                 var maActualSegment = bseg?.HasActual == true;
-                var skutLabel = krok.SkutecneDatum?.ToString("dd.MM.yyyy") ?? "rozpracováno";
+                // Tooltip: „N. název: druh od-do".
+                var planTitleB = $"{krok.Nazev}: plán {krok.PlanZacatek:dd.MM.yyyy}-{krok.BaselineDatum:dd.MM.yyyy}";
+                var skutTitleB = krok.SkutecnostZacatek.HasValue && krok.SkutecnostKonec.HasValue
+                    ? $"{krok.Nazev}: skutečnost {krok.SkutecnostZacatek.Value:dd.MM.yyyy}-{krok.SkutecnostKonec.Value:dd.MM.yyyy}"
+                    : $"{krok.Nazev}: skutečnost rozpracováno";
                 <div class="gantt-step-row"
                      data-schedule-step-row
                      data-step-index="@krok.KrokIndex"
@@ -236,16 +253,11 @@
                         }
                     </div>
                     <div class="schedule-layered-track schedule-layered-track--step" data-schedule-breakdown-track>
-                        <div class="schedule-layered-marker today"
-                             data-schedule-breakdown-today
-                             style="@(ovl is null ? null : $"left:{Pct(ovl.TodayPct)}")"
-                             title="Dnes"></div>
+                        @* „Dnes" čára odstraněna — dnešek je popisek DNES na ose (schedule-layered-axis). *@
                         <span class="schedule-layered-segment planned"
                               role="img"
-                              aria-label="Krok @krok.KrokIndex @krok.Nazev: plán @krok.BaselineDatum.ToString("dd.MM.yyyy")"
-                              data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: plán @krok.BaselineDatum.ToString("dd.MM.yyyy")"
-                              data-rainbow-segment-label-full="@krok.Nazev"
-                              data-rainbow-segment-label-short="@krok.KrokIndex"
+                              aria-label="@planTitleB"
+                              title="@planTitleB"
                               data-schedule-breakdown-segment="planned"
                               data-step-index="@krok.KrokIndex"
                               data-step-zero-plan="@(hasPlan ? "false" : "true")"
@@ -254,8 +266,8 @@
                         {
                             <span class="schedule-layered-segment actual"
                                   role="img"
-                                  aria-label="Krok @krok.KrokIndex @krok.Nazev: skutečnost @skutLabel"
-                                  data-segment-tooltip="Krok @krok.KrokIndex @krok.Nazev: skutečnost @skutLabel"
+                                  aria-label="@skutTitleB"
+                                  title="@skutTitleB"
                                   data-schedule-breakdown-segment="actual"
                                   data-step-index="@krok.KrokIndex"
                                   style="--seg-color:@krok.BarvaHex;@actualPosStyle"></span>
@@ -284,12 +296,16 @@
                         // Datum-model: disabled logika čistě z permission setu. Mrtvé offset gating přes
                         // krok.TrvaniTypId/ZpozdeniTypId zrušeno — v datum-modelu se nikdy nenastavovalo
                         // (vždy 0) → editor zamykal všechny plán/skutečnost inputy (regrese migrace).
-                        // Proposal-diff highlight (durationChanged/delayChanged) běžel přes offset TypId;
-                        // dokud se proposal-diff nepředělá na datum-model, je vypnutý (false/null).
-                        var durationChanged = false;
-                        var delayChanged = false;
-                        string? durationTooltip = null;
-                        string? delayTooltip = null;
+                        // Proposal-diff highlight: per-krok diff (původní vs navržená hodnota) dodává server
+                        // v EditorChangedTypeTooltips (klíč = KrokIndex). Minimální varianta (2026-06-29):
+                        // zvýrazní celý změněný krok (plán i skutečnost) jedním tooltipem. Mimo proposal-detail
+                        // je slovník prázdný → žádné zvýraznění.
+                        var krokDiffTooltip = Model.EditorChangedTypeTooltips.GetValueOrDefault(krok.KrokIndex);
+                        var krokChanged = !string.IsNullOrEmpty(krokDiffTooltip);
+                        var durationChanged = krokChanged;
+                        var delayChanged = krokChanged;
+                        string? durationTooltip = krokDiffTooltip;
+                        string? delayTooltip = krokDiffTooltip;
                         var canEditDuration = !Model.Permissions.IsPlanLocked
                             && !Model.Permissions.IsScheduleLocked
                             && Model.Permissions.CanEditDuration
@@ -370,14 +386,21 @@
                                     // kroky 1/3/4/6/7/10. Tj. assignedManualIndex se přiděluje VŠEM task-eligible cells
                                     // (ne jen 2/5/8/9). Cell partial render obě varianty (auto bubble + manual input)
                                     // a CSS pravidlo na data-skutecnost-rezim řídí výchozí viditelnost.
+                                    // 7b: u skrytého skutečnostního sloupce (návrh založení) NErenderujeme žádný
+                                    // skutečnostní input → manualInputIndex se nesmí inkrementovat.
                                     var allowManualForAutoEligible = !useManualCell && hasExistingRecord && Model.CanEditManualActual;
-                                    var canShowManualForRezim = useManualCell || allowManualForAutoEligible;
+                                    var canShowManualForRezim = !Model.HideActual && (useManualCell || allowManualForAutoEligible);
                                     var assignedManualIndex = canShowManualForRezim ? manualInputIndex++ : -1;
                                 }
                                 @* Datum-model (Fáze 3b): skutečnost (datum) řeší manuální buňka přes
                                    ManualActualKroky[]; plán už nese HarmonogramHodnoty[i].PlanDatum výše.
                                    Žádné offset DELAY páry. *@
-                                @if (useManualCell)
+                                @if (Model.HideActual)
+                                {
+                                    @* 7b: návrh založení vyplňuje pouze plán; skutečnost až po založení. *@
+                                    <span class="muted schedule-actual-after-create" data-schedule-actual-hidden>Vyplní se po založení</span>
+                                }
+                                else if (useManualCell)
                                 {
                                     @await Html.PartialAsync(
                                         "_ScheduleBlockManualCell",

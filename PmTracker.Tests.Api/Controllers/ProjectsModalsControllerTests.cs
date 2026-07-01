@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Api.TestInfrastructure;
@@ -69,7 +70,14 @@ public sealed class ProjectsModalsControllerTests
         html.Should().Contain($"name=\"Id\" value=\"{projectId}\"");
         html.Should().Contain("name=\"Nazev\" value=\"Modal edit project\"");
         html.Should().Contain($"name=\"Zkratka\" value=\"{marker}\"");
-        decodedHtml.Should().Contain("name=\"PouzivatIdentJednani\" value=\"true\" checked=\"checked\"");
+        // Po migraci na <gov-form-switch>: skutečnou form-hodnotu nese hidden input (value="true"),
+        // vizuální stav přepínače je `checked` atribut na gov-form-switch.
+        html.Should().Contain("name=\"PouzivatIdentJednani\" value=\"true\"");
+        Regex.IsMatch(
+                html,
+                "<gov-form-switch[^>]*data-project-pouzivat-ident-jednani[^>]*checked",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            .Should().BeTrue("přepínač PouzivatIdentJednani má být zapnutý (checked) pro projekt s hodnotou true");
     }
 
     [Fact]

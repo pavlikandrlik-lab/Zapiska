@@ -5,6 +5,9 @@ namespace PmTracker.Web.Services;
 public interface IRecordProposalService
 {
     Task<bool> CanViewProposalTabAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
+    // Autoritativní brána pro „Nový návrh záznamu" — stejná logika jako panel Návrhů
+    // (CreatableSubsystemIds > 0), single source of truth v RecordProposalAuthorizationPolicy.
+    Task<bool> CanCreateRecordProposalAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
     Task<ProjektNavrhyTabViewModel> BuildProjectProposalsTabAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
     Task<ZaznamEditViewModel> BuildCreateRecordProposalEditorAsync(int projectId, CurrentUserContextViewModel currentUser, int? meetingId = null, CancellationToken ct = default);
     Task<ZaznamEditViewModel> BuildScheduleProposalEditorAsync(int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default);

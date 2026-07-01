@@ -455,6 +455,30 @@ export function isButtonLike(el) {
 }
 
 /**
+ * Přečte form-override atribut (formaction/formmethod) z submitteru formuláře.
+ * gov-button (pm-button) se renderuje jako web komponenta: formaction/formmethod
+ * zůstanou na host elementu <gov-button>, ale event.submitter je vnitřní nativní
+ * <button>, do kterého komponenta tyto atributy NEKOPÍRUJE. Bez tohoto vystoupání
+ * na host by se formaction ztratil → POST míří na prázdnou form action ("/" → 405).
+ * Viz docs/known-issues/proposal-decision-buttons-formaction-405.md.
+ *
+ * @param {{getAttribute: (name: string) => (string|null)}|null} submitter
+ * @param {string} attrName "formaction" | "formmethod"
+ * @param {{getAttribute: (name: string) => (string|null)}|null} closestGovButton
+ *   Nejbližší gov-button host (submitter.closest("gov-button")) nebo null.
+ * @returns {string} hodnota atributu, jinak "".
+ */
+export function resolveFormSubmitterAttr(submitter, attrName, closestGovButton) {
+    if (!submitter) return "";
+    const own = submitter.getAttribute(attrName);
+    if (own) return own;
+    if (closestGovButton) {
+        return closestGovButton.getAttribute(attrName) || "";
+    }
+    return "";
+}
+
+/**
  * Nastaví disabled stav pro button-like element.
  * Pro <gov-button> musí nastavit DOM atribut (custom element ho sleduje),
  * .disabled property na JS instanci nemusí mít efekt.

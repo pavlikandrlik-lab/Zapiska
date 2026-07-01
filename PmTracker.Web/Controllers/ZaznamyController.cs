@@ -158,19 +158,10 @@ public sealed partial class ZaznamyController : BaseController
                 && canEditScheduleDirect
         };
 
-        model.HarmonogramBlok = new HarmonogramBlockViewModel
+        // `with`: zachová OverviewLayout/Today a ostatní pole, přepíše jen permissions-odvozené.
+        model.HarmonogramBlok = model.HarmonogramBlok with
         {
-            RecordId = model.HarmonogramBlok.RecordId,
-            Mode = model.HarmonogramBlok.Mode,
-            DatumZalozeni = model.HarmonogramBlok.DatumZalozeni,
-            TerminUkonceni = model.HarmonogramBlok.TerminUkonceni,
-            DelayBarvaHex = model.HarmonogramBlok.DelayBarvaHex,
-            Souhrn = model.HarmonogramBlok.Souhrn,
-            Kroky = model.HarmonogramBlok.Kroky,
             Permissions = schedulePermissions,
-            EditorChangedTypeTooltips = model.HarmonogramBlok.EditorChangedTypeTooltips,
-            ScheduleVersion = model.HarmonogramBlok.ScheduleVersion,
-            LockedManualKrokKeys = model.HarmonogramBlok.LockedManualKrokKeys,
             CanEditManualActual = schedulePermissions.CanEditManualActual
         };
         model.ActiveEditorTab = !canEditRecord && canManageSchedule && model.JeUkolKategorie

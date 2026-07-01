@@ -46,6 +46,9 @@ public static class HarmonogramDateBlokBuilder
                     TrvaniDni = trvaniDni,
                     OdchylkaDni = odchylka,
                     BaselineDatum = c.PlanEnd,
+                    PlanZacatek = c.PlanStart,
+                    SkutecnostZacatek = c.MaSkutecnost ? c.SkutecnostStart : null,
+                    SkutecnostKonec = c.MaSkutecnost ? c.SkutecnostEnd : null,
                     SkutecneDatum = skutecneDatum,   // null = nevyplněno (žádný PlanEnd fallback)
                     Stav = c.Stav,
                     IsManualKrok = def.JeManualni,

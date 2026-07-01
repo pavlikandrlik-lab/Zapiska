@@ -8,8 +8,8 @@ namespace PmTracker.Tests.Unit.Meetings;
 /// Pokrývá specifikaci docs/specs/meeting-time-picker.md.
 ///
 /// Time picker v modalech jednání (Nové/Upravit) musí nabízet pouze časy
-/// v rozsahu 06:00–22:45 po 15 minutách. Test kontroluje jak zdrojový
-/// modul (pickers.js), tak production bundle (site.bundle.js).
+/// v rozsahu 06:00–22:45 po 15 minutách. Test kontroluje ESM zdrojový modul
+/// pickers/time.js (legacy site.bundle.js odstraněn 2026-06-16; aplikace běží na site.js).
 /// </summary>
 public sealed class MeetingTimePickerRangeTests
 {
@@ -45,22 +45,6 @@ public sealed class MeetingTimePickerRangeTests
         source.Should().NotMatchRegex(
             @"for\s*\(\s*let\s+hour\s*=\s*0\s*;\s*hour\s*<\s*24\s*;",
             "modul pickers/time.js nesmí obsahovat starý rozsah 0–24");
-    }
-
-    [Fact]
-    public void PickerBundle_ShouldUseSixToTwentyTwoRange()
-    {
-        var bundle = LoadText("PmTracker.Web/wwwroot/js/site.bundle.js");
-
-        // Bundle je ručně committovaný a aplikace ho načítá (viz _Layout.cshtml),
-        // takže musí obsahovat synchronizovanou verzi time picker logiky.
-        bundle.Should().MatchRegex(
-            @"for\s*\(\s*let\s+hour\s*=\s*6\s*;\s*hour\s*<=\s*22\s*;",
-            "site.bundle.js musí obsahovat rozsah 6–22 (aplikace načítá bundle, ne modul!)");
-
-        bundle.Should().NotMatchRegex(
-            @"for\s*\(\s*let\s+hour\s*=\s*0\s*;\s*hour\s*<\s*24\s*;",
-            "site.bundle.js nesmí obsahovat starý rozsah 0–24 — spec meeting-time-picker.md");
     }
 
     [Fact]

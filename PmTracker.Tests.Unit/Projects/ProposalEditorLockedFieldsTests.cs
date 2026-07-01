@@ -6,10 +6,14 @@ namespace PmTracker.Tests.Unit.Projects;
 /// <summary>
 /// Pokrývá specifikaci docs/specs/record-proposal-editor.md.
 ///
-/// V editoru návrhu úpravy harmonogramu (proposal editor) smí uživatel
-/// měnit POUZE termín ukončení a harmonogram. Metadata záznamu (kategorie,
-/// typ úkolu, stav, subsystém, vlastník) musí být zamčená na serveru
-/// i na klientovi. Klient NESMÍ odemknout pole, které server zamkl.
+/// V editoru návrhu ZMĚNY termínu a harmonogramu smí uživatel měnit POUZE termín
+/// ukončení a harmonogram — metadata (kategorie, typ úkolu, stav, subsystém, vlastník)
+/// jsou zamčená (AllowBasicMetadataEdit=false → metadataLocked=true). Klient NESMÍ
+/// odemknout pole, které server zamkl.
+///
+/// 7d (2026-06-17): zámek typu úkolu řídí VÝHRADNĚ metadataLocked. Návrh ZALOŽENÍ
+/// (a klasický create/edit) má metadataLocked=false → typ úkolu je editovatelný při
+/// kategorii úkol. Dřívější proposal-specifický zámek (isProposalEditor) byl odstraněn.
 /// </summary>
 public sealed class ProposalEditorLockedFieldsTests
 {
@@ -54,12 +58,15 @@ public sealed class ProposalEditorLockedFieldsTests
         source.Should().Contain(
             "form.dataset.metadataLocked === \"true\"",
             "JS musí číst zámek z data-metadata-locked");
+        // 7d (2026-06-17): typ úkolu se zamyká VÝHRADNĚ přes metadataLocked. Návrh ZMĚNY
+        // harmonogramu má metadataLocked=true → zamčeno; návrh ZALOŽENÍ i klasik mají
+        // metadataLocked=false → typ je editovatelný při kategorii úkol.
         source.Should().Contain(
-            "form.dataset.isProposalEditor === \"true\"",
-            "JS musí číst proposal flag z data-is-proposal-editor (ConfigureCreateProposalEditor ponechává AllowBasicMetadataEdit=true, takže samotný metadataLocked nestačí)");
-        source.Should().Contain(
-            "typeSelect.disabled = !isTask || metadataLocked || isProposalEditor;",
-            "TypUkolu select musí zůstat disabled pro proposal editory i když metadata nejsou locked (typ úkolu není součástí návrhového workflow)");
+            "typeSelect.disabled = !isTask || metadataLocked;",
+            "TypUkolu je disabled jen když není úkol nebo jsou metadata zamčená (ne kvůli proposal módu)");
+        source.Should().NotContain(
+            "!isTask || metadataLocked || isProposalEditor",
+            "proposal-specifický zámek typu úkolu byl v 7d odstraněn — řídí jen metadataLocked");
     }
 
     [Fact]
@@ -72,12 +79,44 @@ public sealed class ProposalEditorLockedFieldsTests
             "var metadataLocked = !Model.AllowBasicMetadataEdit;",
             "panel musí odvozovat metadataLocked z AllowBasicMetadataEdit");
 
-        // TypUkolu select disable — metadataLocked musí i nadále disablovat select
-        // A navíc v proposal módu (IsProposalEditor) taky (user report opakovaně,
-        // commit 2026-04-19 večer).
+        // 7d (2026-06-17): TypUkolu select disable řídí JEN metadataLocked (ne IsProposalEditor) —
+        // návrh založení i klasik povolí typ při kategorii úkol; návrh změny harmonogramu má
+        // metadataLocked=true (basic pole zamčená).
         source.Should().MatchRegex(
-            "name=\"TypUkolu\"[^>]*metadataLocked \\|\\| Model\\.IsProposalEditor[^>]*disabled",
-            "select TypUkolu musí respektovat metadataLocked || Model.IsProposalEditor");
+            "name=\"TypUkolu\"[^>]*metadataLocked[^>]*disabled",
+            "select TypUkolu musí respektovat metadataLocked");
+        source.Should().NotContain(
+            "metadataLocked || Model.IsProposalEditor",
+            "proposal-specifický zámek typu úkolu byl v 7d odstraněn");
+    }
+
+    /// <summary>
+    /// Regrese 2026-06-29: návrh ZMĚNY termínu a harmonogramu (AllowBasicMetadataEdit=false
+    /// → metadataLocked=true) renderoval Kategorie/Stav/Nazev/Subsystem jako disabled
+    /// &lt;select&gt;/&lt;input&gt;. Disabled prvky se s formulářem NEodesílají, ale
+    /// SaveRecordCommand je má [Required] → POST /Navrhy/SubmitScheduleProposal spadl na
+    /// REQUEST_VALIDATION_FAILED (Kategorie/Nazev/Stav/Subsystem required).
+    ///
+    /// Oprava (stejný princip jako VlastnikId hidden input a _AppDateField locked): při
+    /// zámku metadat panel pošle jejich hodnoty hidden inputy, aby validace prošla. Hidden
+    /// inputy MUSÍ být pod podmínkou metadataLocked — jinak by v create/edit (pole povolená)
+    /// odeslaly stejný name dvakrát.
+    /// </summary>
+    [Fact]
+    public void BasicPanel_ShouldSubmitLockedRequiredMetadata_WhenMetadataLocked()
+    {
+        var source = LoadText("PmTracker.Web/Views/Projekty/_EditZaznamBasicPanel.cshtml");
+
+        source.Should().MatchRegex(
+            @"@if\s*\(\s*metadataLocked\s*\)",
+            "hidden carriers pro zamčená metadata musí být pod podmínkou metadataLocked (jinak dvojité odeslání v create/edit)");
+
+        foreach (var field in new[] { "Kategorie", "Stav", "Nazev", "Subsystem" })
+        {
+            source.Should().Contain(
+                $"<input type=\"hidden\" name=\"{field}\"",
+                $"zamčené [Required] pole {field} se musí odeslat hidden inputem, jinak SaveRecordCommand spadne na [Required] validaci");
+        }
     }
 
     [Fact]

@@ -95,6 +95,14 @@
     @* Akce přesunuty z .panel-header do tab stripu (vpravo) kvůli úspoře místa
        (user 2026-06-10). Data z Model.ZaznamyTab (records panel se renderuje vždy). *@
     <div class="tabs-actions">
+        @* „Nový návrh záznamu" jako první (vlevo) — jediné místo akce, gateované
+           autoritativní branou CanCreateRecordProposalAsync (user 2026-06-22). *@
+        @if (Model.ZaznamyTab.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.ZaznamyTab.CreateRecordProposalUrl))
+        {
+            <pm-button variant="Secondary" size="Small" href="@Model.ZaznamyTab.CreateRecordProposalUrl">
+                Nový návrh záznamu
+            </pm-button>
+        }
         <pm-button variant="Ghost"
                    size="Small"
                    href="@Model.ZaznamyTab.ProjectPrintUrl"
@@ -113,10 +121,13 @@
                 Nový záznam
             </pm-button>
         }
-        @if (Model.ZaznamyTab.CanCreateRecordProposal && !string.IsNullOrWhiteSpace(Model.ZaznamyTab.CreateRecordProposalUrl))
+        @* „Nové jednání" přesunuto z panel-headeru záložky Jednání do tab stripu vpravo
+           (user 2026-06-16) — konzistentní s ostatními projektovými akcemi, šetří svislé místo.
+           Model.CanCreateMeetings je projektová úroveň (vždy dostupná; jednání tab je lazy). *@
+        @if (Model.CanCreateMeetings)
         {
-            <pm-button variant="Secondary" size="Small" href="@Model.ZaznamyTab.CreateRecordProposalUrl">
-                Nový návrh záznamu
+            <pm-button variant="Primary" size="Small" data-modal-url="@Url.Action("NewMeetingModal", "Jednani", new { projektId = Model.Projekt.Id })">
+                Nové jednání
             </pm-button>
         }
     </div>

@@ -86,13 +86,26 @@ function applyProjectFilterScope(scope, options = {}) {
         return;
     }
 
+    // Proposals apply žije ve stejném modulu (žádná cross-module závislost jako schedule),
+    // takže ho řešíme přímo — funguje i pro persistFilterState cestu (dropdown change),
+    // která volá tento handler s prázdnými options (bez applyScope callbacku).
+    if (scope === "proposals") {
+        applyProposalFilters();
+        return;
+    }
+
     if (typeof options.applyScope === "function") {
         options.applyScope(scope, buildProjectFilterStateFromInputs(scope));
     }
 }
 
 export function handleProjectFilterInputChange(scope, options = {}) {
-    persistProjectFilterSessionState(scope);
+    // Proposals nemá session persistenci (PENDING default každé načtení) a storage klíč je
+    // sdílený napříč scopy (neobsahuje scope) — zápis proposals state by přepsal records/schedule
+    // filtr. Proto pro proposals session-state NEpersistujeme; stav žije jen v DOM inputech.
+    if (scope !== "proposals") {
+        persistProjectFilterSessionState(scope);
+    }
     renderProjectFilterChips(scope);
     setProjectFilterSaveStatus(scope, "");
     applyProjectFilterScope(scope, options);
@@ -178,4 +191,66 @@ export function initProjectRecordsUi(options = {}) {
         applyRecordsView(showGroupedView ? "subsystem" : "flat");
     }
     initSubsystemScrollIndicator();
+}
+
+// ---------------------------------------------------------------------------
+// Public exports — proposals filter
+// ---------------------------------------------------------------------------
+
+function normalizeProposalFilterToken(value) {
+    if (value === null || value === undefined) {
+        return "";
+    }
+    return String(value).trim().toUpperCase();
+}
+
+export function applyProposalFilters() {
+    const root = document.querySelector('[data-project-filter-scope="proposals"]');
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+
+    const state = buildProjectFilterStateFromInputs("proposals");
+    const filters = {
+        stavNavrhu: normalizeProposalFilterToken(state.stavNavrhu),
+        typNavrhu: normalizeProposalFilterToken(state.typNavrhu),
+        subsystem: normalizeProposalFilterToken(state.subsystem),
+        autor: normalizeProposalFilterToken(state.autor),
+        rozhodl: normalizeProposalFilterToken(state.rozhodl)
+    };
+
+    const panel = root.closest("[data-tab-panel]") || document;
+
+    panel.querySelectorAll(".proposal-card").forEach((card) => {
+        const matches =
+            (!filters.stavNavrhu || normalizeProposalFilterToken(card.dataset.filterStavNavrhu) === filters.stavNavrhu)
+            && (!filters.typNavrhu || normalizeProposalFilterToken(card.dataset.filterTypNavrhu) === filters.typNavrhu)
+            && (!filters.subsystem || normalizeProposalFilterToken(card.dataset.filterSubsystem) === filters.subsystem)
+            && (!filters.autor || normalizeProposalFilterToken(card.dataset.filterAutor) === filters.autor)
+            && (!filters.rozhodl || normalizeProposalFilterToken(card.dataset.filterRozhodl) === filters.rozhodl);
+        card.hidden = !matches;
+    });
+
+    // Skryj celou sekci (.card = nadpis + list), pokud po filtraci nezbyla žádná viditelná
+    // karta — jinak by zůstal osamocený nadpis bez obsahu. Sekce bez návrhů (server Count==0,
+    // jen .muted zpráva, žádný .proposal-list) necháme být — reprezentují trvalý prázdný stav.
+    panel.querySelectorAll(".proposal-section-grid > .card").forEach((section) => {
+        const list = section.querySelector(".proposal-list");
+        if (!(list instanceof HTMLElement)) {
+            return;
+        }
+        const hasVisible = list.querySelectorAll(".proposal-card:not([hidden])").length > 0;
+        section.hidden = !hasVisible;
+    });
+}
+
+export function initProposalFilterUi() {
+    const root = document.querySelector('[data-project-filter-scope="proposals"]');
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+    // Panel startuje collapsed z markupu (.filter-panel.collapsed) — nevoláme setFilterPanelOpen,
+    // protože to zapisuje do sdíleného localStorage klíče a přebilo by records/schedule preferenci.
+    restoreProjectFilterScope("proposals");
+    applyProposalFilters();
 }

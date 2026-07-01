@@ -28,11 +28,12 @@ public sealed class HarmonogramDateBlokBuilderBarLayoutTests
         var layout = HarmonogramDateBlokBuilder.BuildBarLayout(
             Start, rows, termin: new DateTime(2026, 2, 1), today: new DateTime(2026, 1, 15));
 
-        layout.TotalDays.Should().Be(31);
+        // Osa přichycená na měsíce: contentEnd = 1.2. → axisEnd = 1.3. (1. den měsíce po obsahu) → 59 dní.
+        layout.TotalDays.Should().Be(59);
         var s1 = layout.Segments.Single(s => s.Poradi == 1);
-        s1.PlanWidthPct.Should().BeApproximately(10 * 100.0 / 31, 0.01);
+        s1.PlanWidthPct.Should().BeApproximately(10 * 100.0 / 59, 0.01);
         s1.HasActual.Should().BeTrue();
-        s1.ActualWidthPct.Should().BeApproximately(12 * 100.0 / 31, 0.01);
+        s1.ActualWidthPct.Should().BeApproximately(12 * 100.0 / 59, 0.01);
 
         // Kroky 3–10 bez dat (NULL) → nulová šířka plánu (plan_datum NULL → planEnd=planStart).
         layout.Segments.Single(s => s.Poradi == 10).PlanWidthPct.Should().Be(0.0);

@@ -108,10 +108,29 @@ internal sealed class AuthorizationSnapshotBuilder(PmTrackerDbContext db) : IAut
             kvp => kvp.Key,
             kvp => (IReadOnlySet<string>)kvp.Value);
 
+        // Direct = jen příspěvek PŘÍMÝCH projektových rolí (projectRows), BEZ MEDIUM-1 propagace
+        // subsystémových grantů. Umožňuje odlišit „mám klíč díky projektové roli" (celoprojektově)
+        // od „mám ho jen jako vedoucí subsystému" (omezeno na vlastní subsystém).
+        var perProjectDirectMutable = new Dictionary<int, HashSet<string>>();
+        foreach (var row in projectRows)
+        {
+            if (!perProjectDirectMutable.TryGetValue(row.ProjektId, out var set))
+            {
+                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                perProjectDirectMutable[row.ProjektId] = set;
+            }
+            set.Add(row.Klic);
+        }
+
+        var perProjectDirect = perProjectDirectMutable.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (IReadOnlySet<string>)kvp.Value);
+
         return new AuthorizationSnapshot(
             IsSuperAdmin: isSuperAdmin,
             GlobalPermissions: new HashSet<string>(globalPerms, StringComparer.OrdinalIgnoreCase),
             PerProjectPermissions: perProjectFinal,
-            PerSubsystemPermissions: perSubsystem);
+            PerSubsystemPermissions: perSubsystem,
+            PerProjectDirectPermissions: perProjectDirect);
     }
 }

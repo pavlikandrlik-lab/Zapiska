@@ -149,6 +149,28 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IDashboardService>(sp => sp.GetRequiredService<DashboardService>());
         services.AddScoped<PmTracker.Web.Services.ProjectDashboard.VyzvyPanelBuilder>();
         services.AddScoped<IProjectDashboardService, ProjectDashboardService>();
+        // Základní report — rámec grafů. Chart-providery (konkrétní grafy) se registrují níže.
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniDatasetLoader,
+            PmTracker.Web.Services.ProjectDashboard.Zakladni.ZakladniDatasetLoader>();
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.ZakladniReportBuilder>();
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
+            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.RecordsPerSubsystemProvider>();
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
+            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.RecordStatusPieProvider>();
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
+            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.RecordStatusBreakdownProvider>();
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
+            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.VyjadreniStatsProvider>();
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
+            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.VyjadreniPerSubsystemProvider>();
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
+            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.DeadlineDisciplineStatsProvider>();
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
+            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.DeadlineCompliancePerSubsystemProvider>();
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
+            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.DeadlineOriginalCompliancePerSubsystemProvider>();
+        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
+            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.DeadlineAvgShiftDaysPerSubsystemProvider>();
         services.AddScoped<IHomeDashboardService>(sp => sp.GetRequiredService<HomeDashboardService>());
         services.AddScoped<IPeopleService>(sp => sp.GetRequiredService<PeopleService>());
         services.AddScoped<IProfileService>(sp => sp.GetRequiredService<ProfileService>());

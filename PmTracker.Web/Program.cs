@@ -98,7 +98,30 @@ app.Use(async (context, next) =>
 });
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+if (app.Environment.IsDevelopment())
+{
+    // Dev-only: ESM moduly se importují relativním URL bez verze (asp-append-version verzuje
+    // jen entry site.js, jehož obsah se při změně submodulu nemění → prohlížeč servíruje
+    // cached site.js i cached importované moduly). Při iteraci na JS to způsobuje, že změny
+    // v modulech nedorazí do prohlížeče bez ručního clear-cache. no-cache vynutí revalidaci
+    // (na localhostu instantní) → vývojář vždy dostane čerstvé moduly. V produkci necháváme
+    // standardní caching (deploy = plná výměna souborů + ohlášený hard-refresh).
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = ctx =>
+        {
+            if (ctx.File.Name.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+                || ctx.File.Name.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+            }
+        }
+    });
+}
+else
+{
+    app.UseStaticFiles();
+}
 
 app.UseRouting();
 

@@ -61,6 +61,73 @@ public sealed class ScheduleBlockMarkupTests
             "view musí rozlišovat skrytí plánového segmentu (TrvaniDni == 0)");
     }
 
+    /// <summary>
+    /// Regrese 2026-06-29: rozpadová (layered/breakdown) osa nelícovala s pruhy, zatímco
+    /// overview osa ano. Overview osa nese serverové kanonické ticky (data-schedule-ticks)
+    /// + DNES/TERMÍN pct → renderStaticTimelineAxes kreslí renderTicksFromList (full-width %,
+    /// měsíční předěly, bez edge-insetu) = lícuje se server-pozicovanými segmenty. Breakdown
+    /// osa měla jen data-axis-start/end → fallback renderTimelineAxis (edge-inset + syrový start
+    /// + vzorkování dnů) → ticky neseděly. Fix: breakdown osa musí nést stejná kanonická data
+    /// jako overview, aby šla stejnou (kanonickou) větví.
+    /// </summary>
+    [Fact]
+    public void BreakdownAxis_ShouldCarryServerCanonicalTicks_LikeOverviewAxis()
+    {
+        var source = LoadScheduleBlockSource();
+
+        source.Should().MatchRegex(
+            "data-schedule-axis=\"breakdown\"[\\s\\S]{0,600}data-schedule-ticks",
+            "breakdown osa musí nést serverové měsíční ticky (jinak JS fallback nelícuje s pruhy)");
+        source.Should().MatchRegex(
+            "data-schedule-axis=\"breakdown\"[\\s\\S]{0,600}data-axis-today-pct",
+            "breakdown osa musí nést DNES pct ze serveru (kanonická pozice)");
+        source.Should().MatchRegex(
+            "data-schedule-axis=\"breakdown\"[\\s\\S]{0,600}data-axis-deadline-pct",
+            "breakdown osa musí nést TERMÍN pct ze serveru (kanonická pozice)");
+    }
+
+    /// <summary>
+    /// 2026-06-29: hover info parity. Overview segment ukazuje informace přes nativní
+    /// atribut title="@segmentTitle". Layered (breakdown) segmenty měly místo toho
+    /// data-segment-tooltip, který NIKDO nečte (mrtvý atribut — žádné JS/CSS/test) →
+    /// při najetí myší se nic neukázalo. Fix: nativní title (stejný mechanismus jako
+    /// overview) na obou breakdown segmentech + odstranění mrtvého data-segment-tooltip.
+    /// </summary>
+    [Fact]
+    public void LayeredSegments_ShouldExposeNativeTitleTooltip_LikeOverview()
+    {
+        var source = LoadScheduleBlockSource();
+
+        source.Should().MatchRegex(
+            "schedule-layered-segment planned\"[\\s\\S]{0,400}title=\"",
+            "plánový breakdown segment musí mít nativní title (hover info parity s overview)");
+        source.Should().MatchRegex(
+            "schedule-layered-segment actual\"[\\s\\S]{0,400}title=\"",
+            "skutečnostní breakdown segment musí mít nativní title (hover info parity s overview)");
+        source.Should().NotContain(
+            "data-segment-tooltip",
+            "mrtvý atribut data-segment-tooltip (nikdo ho nečte) musí být nahrazen nativním title");
+    }
+
+    /// <summary>
+    /// 2026-06-29: při schvalování návrhu harmonogramu se změněné kroky nezvýrazňovaly —
+    /// durationChanged/delayChanged byly po datum-model migraci natvrdo false. Diff data ale
+    /// existují (HarmonogramBlockViewModel.EditorChangedTypeTooltips, per-krok klíč). Minimální
+    /// oprava: odvodit zvýraznění + tooltip z tohoto slovníku, ne z hardcoded false/null.
+    /// </summary>
+    [Fact]
+    public void EditorMode_HighlightsProposalChangedSteps_FromEditorDiff()
+    {
+        var source = LoadScheduleBlockSource();
+
+        source.Should().NotContain("var durationChanged = false;",
+            "zvýraznění změněných kroků návrhu nesmí být natvrdo vypnuté");
+        source.Should().NotContain("var delayChanged = false;",
+            "zvýraznění změněných kroků návrhu nesmí být natvrdo vypnuté");
+        source.Should().Contain("EditorChangedTypeTooltips",
+            "durationChanged/delayChanged + tooltipy se odvozují z per-krok diffu EditorChangedTypeTooltips");
+    }
+
     [Fact]
     public void BreakdownSteps_ShouldRenderAllSteps_NoFilter()
     {

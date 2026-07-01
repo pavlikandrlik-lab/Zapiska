@@ -1,0 +1,24 @@
+@model PmTracker.Web.Services.ProjectDashboard.Zakladni.ChartData
+@using PmTracker.Web.Services.ProjectDashboard.Zakladni
+<figure class="zr-chart" data-chart-key="@Model.Key">
+    <figcaption class="zr-chart-caption">
+        <span class="zr-chart-title">@Model.Title</span>
+        @if (!string.IsNullOrWhiteSpace(Model.Insight))
+        {
+            <span class="zr-chart-insight">@Model.Insight</span>
+        }
+    </figcaption>
+    @if (Model.Kind == ChartKind.StatCards)
+    {
+        <partial name="~/Views/ProjectDashboard/Zakladni/_ChartStatCards.cshtml" model="Model" />
+    }
+    else
+    {
+        @* Bar/StackedBar/Pie/Line → klient Apache ECharts (echartsRender.js). Data v JSON atributu. *@
+        <div class="zr-echart" data-echart data-chart-json="@ChartJson.Serialize(Model)" role="img" aria-label="@Model.Title"></div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Note))
+    {
+        <figcaption class="zr-chart-note muted">@Model.Note</figcaption>
+    }
+</figure>

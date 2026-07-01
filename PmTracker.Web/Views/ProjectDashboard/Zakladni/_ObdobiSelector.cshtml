@@ -1,0 +1,24 @@
+@model PmTracker.Web.Services.ProjectDashboard.Zakladni.ZakladniReportViewModel
+@{
+    var currentYear = System.DateTime.Now.Year;
+    var url = $"/projekty/{Model.ProjektId}/dashboard/zakladni-report";
+}
+<div class="zr-obdobi" data-zakladni-obdobi data-url="@url">
+    <label>Rok
+        <select data-zakladni-obdobi-rok>
+            @for (var y = currentYear; y >= currentYear - 5; y--)
+            {
+                <option value="@y" selected="@(Model.Obdobi.Label == y.ToString() ? "selected" : null)">@y</option>
+            }
+        </select>
+    </label>
+    <label>Kvartál
+        <select data-zakladni-obdobi-kvartal>
+            <option value="">celý rok</option>
+            @for (var q = 1; q <= 4; q++)
+            {
+                <option value="@q">Q@q</option>
+            }
+        </select>
+    </label>
+</div>

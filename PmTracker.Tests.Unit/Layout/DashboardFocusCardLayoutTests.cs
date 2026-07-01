@@ -44,18 +44,20 @@ public sealed class DashboardFocusCardLayoutTests
         var css = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/css/site.css"));
 
         css.Should().MatchRegex(
-            @"\.dashboard-focus-item\s*\{[\s\S]*?grid-template-columns\s*:\s*auto\s+minmax\(\s*0\s*,\s*1fr\s*\)\s+minmax\(\s*180px\s*,\s*260px\s*\)",
-            "focus item je grid: auto (identity) | minmax(0,1fr) (content) | minmax(180px,260px) (meta)");
+            @"\.dashboard-focus-item\s*\{[\s\S]*?grid-template-columns\s*:\s*auto\s+minmax\(\s*0\s*,\s*1fr\s*\)\s+clamp\(\s*150px\s*,\s*14vw\s*,\s*240px\s*\)",
+            "focus item je grid: auto (identity) | minmax(0,1fr) (content) | clamp(150px,14vw,240px) (meta)");
     }
 
     [Fact]
-    public void SiteCss_DashboardFocusItem_ShouldStackOnNarrowViewport()
+    public void SiteCss_DashboardFocusItem_ShouldStackOnNarrowPanel()
     {
         var css = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/css/site.css"));
 
+        // Sbalení reaguje na šířku PANELU (container query), ne celého viewportu →
+        // list-page (Focus/Profil) zůstává v bohaté variantě, jen úzký dashboard panel se stackuje.
         css.Should().MatchRegex(
-            @"@media\s*\(\s*max-width:\s*899px\s*\)\s*\{[\s\S]*?\.dashboard-focus-item\s*\{[\s\S]*?grid-template-columns\s*:\s*1fr",
-            "pod 900px se karta stackuje na 1 sloupec (tablet/mobile fallback)");
+            @"@container\s+dashpanel\s*\(\s*max-width:\s*520px\s*\)\s*\{[\s\S]*?\.dashboard-focus-item\s*\{[\s\S]*?grid-template-columns\s*:\s*1fr",
+            "na úzkém panelu (@container dashpanel < 520px) se karta stackuje na 1 sloupec");
     }
 
     [Fact]

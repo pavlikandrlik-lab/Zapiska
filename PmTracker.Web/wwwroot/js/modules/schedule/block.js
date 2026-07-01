@@ -6,33 +6,42 @@
  */
 
 import {
-    addCalendarDays,
     diffCalendarDays,
     formatDisplayDate,
     formatIsoDate,
-    msPerDay,
     parseIsoDate,
     toUtcDayStamp
 } from "../utils.js";
 import { queueRainbowSegmentRender } from "../ui.js";
-import { renderTimelineAxis } from "./timeline.js";
+import { renderTimelineAxis, renderTicksFromList } from "./timeline.js";
+import { computeAxisLayout } from "./scheduleAxis.js";
+
+/**
+ * „Dnes" pro editor live-preview = lokální datum dodané serverem v data-schedule-today
+ * (sjednocený zdroj s osou). Fallback new Date() jen kdyby atribut chyběl.
+ */
+export function resolveToday(root) {
+    const iso = root && root.dataset ? root.dataset.scheduleToday : null;
+    return parseIsoDate(iso) || new Date();
+}
+
+/**
+ * Sestaví vstup kroků pro computeAxisLayout z editor modelu (plan/actual/state).
+ * Aktuální (běžící) krok má maSkutecnost=true, aby contentEnd zahrnul „dnes" — shodně se serverem.
+ */
+function buildAxisSteps(plan, actual, state) {
+    return state.map((s, i) => ({
+        poradi: s.stepIndex,
+        planStart: plan[i].start,
+        planEnd: plan[i].end,
+        maSkutecnost: s.hasActual || s.jeAktualni,
+        skutecnostStart: actual[i].start,
+        skutecnostEnd: actual[i].end
+    }));
+}
 
 // Datum-model (Fáze 3b): /Schedule/Recalc endpoint i offsetový buildSchedulePlanAndActual
 // zrušeny. Editor live-preview počítá čistě z datumů (ScheduleBlockRenderer.computeDateModel).
-
-function buildScheduleScale(startDate, deadlineDate, actualEndDate) {
-    const startStamp = toUtcDayStamp(startDate);
-    const axisEndStamp = Math.max(
-        startStamp,
-        toUtcDayStamp(deadlineDate),
-        toUtcDayStamp(actualEndDate),
-        toUtcDayStamp(new Date()));
-    const totalDays = Math.max(1, Math.round((axisEndStamp - startStamp) / msPerDay));
-    return {
-        totalDays,
-        axisEndDate: addCalendarDays(startDate, totalDays)
-    };
-}
 
 function toSchedulePercent(valueDate, axisStart, totalDays) {
     const days = diffCalendarDays(valueDate, axisStart);
@@ -53,7 +62,8 @@ function formatScheduleSegmentWidth(value) {
         return "0%";
     }
 
-    return `calc(${value.toFixed(4)}% + 1px)`;
+    // Sjednocení souřadnic s osou/markery (2026-06-23): bez +1px hacku, šířka = přesné %.
+    return `${value.toFixed(4)}%`;
 }
 
 function formatScheduleOffsetLabel(delay) {
@@ -83,10 +93,8 @@ export class ScheduleBlockRenderer {
         this.statusLine = root.querySelector(".schedule-status-line");
         this.overviewAxis = root.querySelector('[data-schedule-axis="overview"]');
         this.breakdownAxis = root.querySelector('[data-schedule-axis="breakdown"]');
-        this.overviewTodayMarkers = Array.from(root.querySelectorAll('[data-schedule-marker="today"]'))
-            .filter((node) => node instanceof HTMLElement);
-        this.overviewDeadlineMarkers = Array.from(root.querySelectorAll('[data-schedule-marker="deadline"]'))
-            .filter((node) => node instanceof HTMLElement);
+        // „Dnes"/„Termín" jsou nově popisky DNES/TERMÍN na ose (renderTicksFromList z data-axis-*-pct),
+        // ne svislé čáry v pruzích — žádné per-řádkové markery se v block.js nedrží.
         this.overviewPlannedSegments = this.collectSegmentMap('[data-schedule-segment-kind="planned"]');
         this.overviewActualSegments = this.collectSegmentMap('[data-schedule-segment-kind="actual"]');
         this.breakdownRows = Array.from(root.querySelectorAll("[data-schedule-breakdown-track]"))
@@ -111,8 +119,7 @@ export class ScheduleBlockRenderer {
                     offset: row.querySelector("[data-schedule-offset]"),
                     track,
                     plannedSegment: track.querySelector('[data-schedule-breakdown-segment="planned"]'),
-                    actualSegment: track.querySelector('[data-schedule-breakdown-segment="actual"]'),
-                    todayMarker: track.querySelector("[data-schedule-breakdown-today]")
+                    actualSegment: track.querySelector('[data-schedule-breakdown-segment="actual"]')
                 };
             })
             .filter((entry) => entry && Number.isInteger(entry.stepIndex))
@@ -308,14 +315,31 @@ export class ScheduleBlockRenderer {
         this.recalcAll();
     }
 
-    setAxisRange(axis, startDate, endDate) {
+    setAxisRange(axis, startDate, endDate, monthTicks = null, todayPct = null, deadlinePct = null) {
         if (!(axis instanceof HTMLElement) || !(startDate instanceof Date) || !(endDate instanceof Date)) {
             return;
         }
 
         axis.dataset.axisStart = formatIsoDate(startDate);
         axis.dataset.axisEnd = formatIsoDate(endDate);
-        renderTimelineAxis(axis, startDate, endDate);
+        // „DNES"/„TERMÍN" popisky na ose: renderTicksFromList je čte z data-axis-today-pct /
+        // data-axis-deadline-pct. null = datum mimo osu → popisek se nevykreslí.
+        if (Number.isFinite(todayPct)) {
+            axis.dataset.axisTodayPct = String(todayPct);
+        } else {
+            delete axis.dataset.axisTodayPct;
+        }
+        if (Number.isFinite(deadlinePct)) {
+            axis.dataset.axisDeadlinePct = String(deadlinePct);
+        } else {
+            delete axis.dataset.axisDeadlinePct;
+        }
+        // Kanonická osa: máme měsíční ticky → kreslíme je (shodně se statickou kartou).
+        if (Array.isArray(monthTicks)) {
+            renderTicksFromList(axis, monthTicks.map((t) => ({ left: t.left, label: t.label })));
+        } else {
+            renderTimelineAxis(axis, startDate, endDate);
+        }
     }
 
     applySegmentLayout(segment, leftPercent, widthPercent, title) {
@@ -344,8 +368,7 @@ export class ScheduleBlockRenderer {
     renderSummary(plan, actual, state, startDate, deadlineDate, aktualniIndex) {
         const baselineEnd = plan.length > 0 ? plan[plan.length - 1].end : startDate;
         const totalDuration = state.reduce((sum, item) => sum + item.duration, 0);
-        const nowRaw = new Date();
-        const todayDate = new Date(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate());
+        const todayDate = resolveToday(this.root);
 
         // Datum-model: sjednocený stav z aktuálního kroku (mirror ScheduleDateCalculator.Summarize +
         // _ScheduleBlock.cshtml). aktualniIndex == -1 → vše vyplněno → Dokončeno.
@@ -382,24 +405,18 @@ export class ScheduleBlockRenderer {
     }
 
     renderOverview(plan, actual, state, startDate, deadlineDate) {
-        const actualEnd = actual.length > 0 ? actual[actual.length - 1].end : startDate;
-        const { totalDays, axisEndDate } = buildScheduleScale(startDate, deadlineDate, actualEnd);
-        const today = new Date();
-        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const todayPercent = toSchedulePercent(todayDate, startDate, totalDays);
-        const deadlinePercent = toSchedulePercent(deadlineDate, startDate, totalDays);
-
-        this.overviewTodayMarkers.forEach((marker) => {
-            marker.style.left = formatSchedulePercent(todayPercent);
-            marker.title = `Dnes: ${formatDisplayDate(todayDate)}`;
+        // Kanonická osa (shodná se serverem / statickou kartou): přichycená na měsíce.
+        const layout = computeAxisLayout({
+            start: startDate,
+            deadline: deadlineDate,
+            today: resolveToday(this.root),
+            steps: buildAxisSteps(plan, actual, state)
         });
+        const axisStart = layout.axisStart;
+        const totalDays = layout.totalDays;
 
-        this.overviewDeadlineMarkers.forEach((marker) => {
-            marker.style.left = formatSchedulePercent(deadlinePercent);
-            marker.title = `Termín úkolu: ${formatDisplayDate(deadlineDate)}`;
-        });
-
-        this.setAxisRange(this.overviewAxis, startDate, axisEndDate);
+        // „Dnes" i „Termín" už nejsou svislé čáry v pruhu — vykreslí se jako popisky DNES/TERMÍN na ose.
+        this.setAxisRange(this.overviewAxis, axisStart, layout.axisEnd, layout.monthTicks, layout.todayPct, layout.deadlinePct);
 
         let previousPlanRight = 0;
         let previousActualRight = 0;
@@ -416,10 +433,10 @@ export class ScheduleBlockRenderer {
                 return;
             }
 
-            const rawPlanLeft = toSchedulePercent(planItem.start, startDate, totalDays);
-            const rawPlanRight = toSchedulePercent(planItem.end, startDate, totalDays);
-            const rawActualLeft = toSchedulePercent(actualItem.start, startDate, totalDays);
-            const rawActualRight = toSchedulePercent(actualItem.end, startDate, totalDays);
+            const rawPlanLeft = toSchedulePercent(planItem.start, axisStart, totalDays);
+            const rawPlanRight = toSchedulePercent(planItem.end, axisStart, totalDays);
+            const rawActualLeft = toSchedulePercent(actualItem.start, axisStart, totalDays);
+            const rawActualRight = toSchedulePercent(actualItem.end, axisStart, totalDays);
 
             if (item.duration > 0) {
                 skippedCompactActualWidth = 0;  // Reset při každém viditelném kroku
@@ -430,7 +447,7 @@ export class ScheduleBlockRenderer {
                     plannedSegment,
                     planLeft,
                     planWidth,
-                    `${item.name}: plán ${formatDisplayDate(planItem.start)} - ${formatDisplayDate(planItem.end)}`);
+                    `${item.name}: plán ${formatDisplayDate(planItem.start)}-${formatDisplayDate(planItem.end)}`);
                 previousPlanRight = planRight;
 
                 const adjustedActualLeft = Math.max(0, rawActualLeft - skippedCompactActualWidth);
@@ -445,7 +462,7 @@ export class ScheduleBlockRenderer {
                         actualSegment,
                         actualLeft,
                         actualWidth,
-                        `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)} - ${formatDisplayDate(actualItem.end)}`);
+                        `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)}-${formatDisplayDate(actualItem.end)}`);
                 }
                 previousActualRight = actualRight;
             } else {
@@ -458,45 +475,24 @@ export class ScheduleBlockRenderer {
         });
     }
 
-    resolveBreakdownAxis(plan, actual, startDate, deadlineDate) {
-        const dates = [];
-        plan.forEach((item) => {
-            dates.push(item.start, item.end);
-        });
-        actual.forEach((item) => {
-            dates.push(item.start, item.end);
-        });
-
-        if (dates.length === 0) {
-            return {
-                axisStart: startDate,
-                axisEnd: deadlineDate
-            };
-        }
-
-        const sorted = dates.slice().sort((left, right) => left.getTime() - right.getTime());
-        const axisStart = sorted[0];
-        const latest = sorted[sorted.length - 1];
-        const axisEnd = latest.getTime() > deadlineDate.getTime() ? latest : deadlineDate;
-
-        return {
-            axisStart,
-            axisEnd
-        };
-    }
-
     renderBreakdown(plan, actual, state, startDate, deadlineDate) {
         if (this.breakdownRows.length === 0) {
             return;
         }
 
-        const { axisStart, axisEnd } = this.resolveBreakdownAxis(plan, actual, startDate, deadlineDate);
-        const totalDays = Math.max(1, diffCalendarDays(axisEnd, axisStart));
-        const today = new Date();
-        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const todayPercent = toSchedulePercent(todayDate, axisStart, totalDays);
+        // Rozpad sdílí TUTÉŽ kanonickou osu jako overview (svislé zarovnání) — žádná vlastní osa.
+        const layout = computeAxisLayout({
+            start: startDate,
+            deadline: deadlineDate,
+            today: resolveToday(this.root),
+            steps: buildAxisSteps(plan, actual, state)
+        });
+        const axisStart = layout.axisStart;
+        const axisEnd = layout.axisEnd;
+        const totalDays = layout.totalDays;
 
-        this.setAxisRange(this.breakdownAxis, axisStart, axisEnd);
+        // „Dnes"/„Termín" jsou popisky DNES/TERMÍN na sdílené ose (setAxisRange), ne čáry v každém řádku.
+        this.setAxisRange(this.breakdownAxis, axisStart, axisEnd, layout.monthTicks, layout.todayPct, layout.deadlinePct);
 
         this.breakdownRows.forEach((entry, index) => {
             const item = state[index];
@@ -512,11 +508,6 @@ export class ScheduleBlockRenderer {
                 entry.offset.classList.toggle("ahead", item.delay < 0);
             }
 
-            if (entry.todayMarker instanceof HTMLElement) {
-                entry.todayMarker.style.left = formatSchedulePercent(todayPercent);
-                entry.todayMarker.title = `Dnes: ${formatDisplayDate(todayDate)}`;
-            }
-
             if (item.duration <= 0) {
                 this.resetSegmentLayout(entry.plannedSegment);
                 this.resetSegmentLayout(entry.actualSegment);
@@ -529,7 +520,7 @@ export class ScheduleBlockRenderer {
                 entry.plannedSegment,
                 plannedLeft,
                 plannedWidth,
-                `${item.name}: plán ${formatDisplayDate(planItem.start)} - ${formatDisplayDate(planItem.end)}`);
+                `${item.name}: plán ${formatDisplayDate(planItem.start)}-${formatDisplayDate(planItem.end)}`);
 
             const actualLeft = toSchedulePercent(actualItem.start, axisStart, totalDays);
             const actualWidth = toScheduleWidthPercent(actualItem.start, actualItem.end, totalDays);
@@ -537,7 +528,7 @@ export class ScheduleBlockRenderer {
                 entry.actualSegment,
                 actualLeft,
                 actualWidth,
-                `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)} - ${formatDisplayDate(actualItem.end)}`);
+                `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)}-${formatDisplayDate(actualItem.end)}`);
             // Barva skutečnosti je pevná barva kroku (--seg-color z server renderu); delay-color override zrušen.
         });
     }
@@ -699,8 +690,7 @@ export class ScheduleBlockRenderer {
             if (!state[i].hasActual && i > lastFilled) { aktualniIndex = i; break; }
         }
         if (aktualniIndex >= 0) {
-            const nowRaw = new Date();
-            const todayDate = new Date(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate());
+            const todayDate = resolveToday(this.root);
             const st = actual[aktualniIndex].start;
             actual[aktualniIndex].end = toUtcDayStamp(todayDate) > toUtcDayStamp(st) ? todayDate : st;
             state[aktualniIndex].jeAktualni = true;

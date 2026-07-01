@@ -100,6 +100,20 @@
                         <gov-icon size="s" name="pencil" type="components" aria-hidden="true"></gov-icon>
                     </pm-button>
                 }
+                @* Tlačítko překliku na harmonogram jen pro záznamy, které mají v harmonogramu dlaždici
+                   (= aspoň jedna vyplněná hodnota kroku: plán nebo skutečnost). Jinak by odkazovalo
+                   na neexistující kartu. Predikát = HarmonogramKrokPredicates.MaVyplnenouHodnotu. *@
+                @if (summary.MaHarmonogramHodnotu)
+                {
+                    <pm-button variant="Secondary"
+                               size="Small"
+                               data-goto-schedule="@summary.Id"
+                               data-stop-propagation="true"
+                               aria-label="Zobrazit v harmonogramu"
+                               title="Zobrazit v harmonogramu">
+                        <gov-icon size="s" name="calendar-date" type="components" aria-hidden="true"></gov-icon>
+                    </pm-button>
+                }
                 @if (summary.CanCreateScheduleProposal && !string.IsNullOrWhiteSpace(summary.ScheduleProposalUrl))
                 {
                     <pm-button variant="Secondary"
@@ -108,7 +122,7 @@
                                data-stop-propagation="true"
                                aria-label="Navrhnout termín a harmonogram"
                                title="Navrhnout termín a harmonogram">
-                        <gov-icon size="s" name="calendar-date" type="components" aria-hidden="true"></gov-icon>
+                        <gov-icon size="s" name="calendar-plus" type="components" aria-hidden="true"></gov-icon>
                     </pm-button>
                 }
                 <span class="record-toggle-indicator" aria-hidden="true">›</span>

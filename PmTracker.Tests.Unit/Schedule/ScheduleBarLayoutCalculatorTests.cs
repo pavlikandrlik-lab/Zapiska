@@ -5,18 +5,20 @@ using Xunit;
 namespace PmTracker.Tests.Unit.Schedule;
 
 /// <summary>
-/// Datum-model (Fáze 3b): server je jediný zdroj pozic baru (left%/width%) pro statická
-/// zobrazení. Tento kalkulátor portuje pozicování z klientského block.js na server
-/// nad výsledkem <see cref="ScheduleDateCalculator"/>. Bez DB / DOM → čistá funkce.
+/// Datum-model: server je jediný zdroj pozic baru (left%/width%) pro statická zobrazení.
+/// Osa je přichycená na celé měsíce (start = 1. dne měsíce začátku, end = 1. den měsíce PO obsahu →
+/// pravý okraj je vždy popsaný měsíční předěl); markery „dnes"/„termín" jsou nullable (skryté mimo interval).
+/// Bez DB / DOM → čistá funkce.
+/// Spec: docs/superpowers/specs/2026-06-23-harmonogram-osa-redesign-design.md
 /// </summary>
 public sealed class ScheduleBarLayoutCalculatorTests
 {
     private static readonly DateTime Start = new(2026, 1, 1);
 
     [Fact]
-    public void Compute_TwoSteps_PositionsPlanAndActualSegmentsAsPercentOfAxis()
+    public void Compute_TwoSteps_AxisSnapsToWholeMonths()
     {
-        // Plán: krok1 → 11.1. (10 dní), krok2 → 21.1. (10 dní). Skutečnost: krok1 13.1., krok2 nevyplněn.
+        // start 1.1., deadline 1.2. → contentEnd = 1.2. → axisEnd = 1.3.2026 (1. den měsíce po obsahu, 59 dní).
         var steps = new[]
         {
             new ScheduleDateStepResult(1, Start, new DateTime(2026, 1, 11), MaSkutecnost: true,  Start, new DateTime(2026, 1, 13), HarmonogramKrokStav.Splneno, JeAktualniKrok: false),
@@ -24,36 +26,34 @@ public sealed class ScheduleBarLayoutCalculatorTests
         };
 
         var layout = ScheduleBarLayoutCalculator.Compute(
-            Start,
-            deadline: new DateTime(2026, 2, 1),
-            today: new DateTime(2026, 1, 15),
-            steps);
+            Start, deadline: new DateTime(2026, 2, 1), today: new DateTime(2026, 1, 15), steps);
 
-        // Osa: start 1.1. → max(deadline 1.2., today, planEnd, actualEnd) = 1.2. → 31 dní.
-        layout.TotalDays.Should().Be(31);
-        layout.AxisEnd.Should().Be(new DateTime(2026, 2, 1));
+        layout.AxisStart.Should().Be(new DateTime(2026, 1, 1));
+        layout.AxisEnd.Should().Be(new DateTime(2026, 3, 1));
+        layout.TotalDays.Should().Be(59);
 
-        // today = 14. den, deadline = 31. den.
-        layout.TodayPct.Should().BeApproximately(14 * 100.0 / 31, 0.01);
-        layout.DeadlinePct.Should().BeApproximately(100.0, 0.01);
+        layout.TodayPct.Should().NotBeNull();
+        layout.TodayPct!.Value.Should().BeApproximately(14 * 100.0 / 59, 0.01);
+        layout.DeadlinePct.Should().NotBeNull();
+        layout.DeadlinePct!.Value.Should().BeApproximately(31 * 100.0 / 59, 0.01);
 
         var s1 = layout.Segments.Single(s => s.Poradi == 1);
         s1.PlanLeftPct.Should().BeApproximately(0.0, 0.01);
-        s1.PlanWidthPct.Should().BeApproximately(10 * 100.0 / 31, 0.01);
+        s1.PlanWidthPct.Should().BeApproximately(10 * 100.0 / 59, 0.01);
         s1.HasActual.Should().BeTrue();
         s1.ActualLeftPct.Should().BeApproximately(0.0, 0.01);
-        s1.ActualWidthPct.Should().BeApproximately(12 * 100.0 / 31, 0.01);
+        s1.ActualWidthPct.Should().BeApproximately(12 * 100.0 / 59, 0.01);
 
         var s2 = layout.Segments.Single(s => s.Poradi == 2);
-        s2.PlanLeftPct.Should().BeApproximately(10 * 100.0 / 31, 0.01);
-        s2.PlanWidthPct.Should().BeApproximately(10 * 100.0 / 31, 0.01);
+        s2.PlanLeftPct.Should().BeApproximately(10 * 100.0 / 59, 0.01);
+        s2.PlanWidthPct.Should().BeApproximately(10 * 100.0 / 59, 0.01);
         s2.HasActual.Should().BeFalse();
     }
 
     [Fact]
     public void Compute_ZeroWidthPlanStep_ProducesZeroWidthSegment()
     {
-        // Krok s plan_datum == předchozí konec → nulová šířka (nevykreslí se).
+        // Krok s plan_datum == předchozí konec → nulová šířka (nevykreslí se) — nezávisle na ose.
         var steps = new[]
         {
             new ScheduleDateStepResult(1, Start, new DateTime(2026, 1, 11), MaSkutecnost: false, Start, Start, HarmonogramKrokStav.Ceka, JeAktualniKrok: false),
@@ -67,19 +67,57 @@ public sealed class ScheduleBarLayoutCalculatorTests
     }
 
     [Fact]
-    public void Compute_AxisExtendsToTodayWhenLatest()
+    public void Compute_AxisEndIsFirstDayOfMonthAfterContent()
     {
-        // Deadline i plán dřív než dnešek → osa musí sahat k dnešku (jinak marker mimo).
+        // contentEnd = 31.3. → axisEnd = 1.4. (1. den měsíce po obsahu, ne poslední den měsíce);
+        // pravý okraj osy je tak vždy popsaný měsíční předěl a deadline nelícuje s krajem.
         var steps = new[]
         {
-            new ScheduleDateStepResult(1, Start, new DateTime(2026, 1, 6), MaSkutecnost: false, Start, Start, HarmonogramKrokStav.Ceka, JeAktualniKrok: false),
+            new ScheduleDateStepResult(1, Start, new DateTime(2026, 3, 31), MaSkutecnost: false, Start, Start, HarmonogramKrokStav.Ceka, JeAktualniKrok: false),
         };
 
         var layout = ScheduleBarLayoutCalculator.Compute(
-            Start, deadline: new DateTime(2026, 1, 6), today: new DateTime(2026, 1, 21), steps);
+            Start, deadline: new DateTime(2026, 3, 31), today: new DateTime(2026, 2, 1), steps);
 
-        layout.AxisEnd.Should().Be(new DateTime(2026, 1, 21));
-        layout.TotalDays.Should().Be(20);
-        layout.TodayPct.Should().BeApproximately(100.0, 0.01);
+        layout.AxisEnd.Should().Be(new DateTime(2026, 4, 1));
+        layout.MonthTicks.Should().Contain(t => t.Label == "04/2026" && t.LeftPct == 100.0,
+            "1. den měsíce po obsahu leží přesně na pravém okraji → popsaný");
+    }
+
+    [Fact]
+    public void Compute_TodayOutsideAxis_TodayPctIsNull()
+    {
+        // úkol v budoucnu: start a plán v dubnu, dnes v lednu → dnes před osou → marker skrytý.
+        var aprilStart = new DateTime(2026, 4, 1);
+        var steps = new[]
+        {
+            new ScheduleDateStepResult(1, aprilStart, new DateTime(2026, 4, 10), MaSkutecnost: false, aprilStart, aprilStart, HarmonogramKrokStav.Ceka, JeAktualniKrok: false),
+        };
+
+        var layout = ScheduleBarLayoutCalculator.Compute(
+            aprilStart, deadline: new DateTime(2026, 4, 10), today: new DateTime(2026, 1, 15), steps);
+
+        layout.TodayPct.Should().BeNull();
+    }
+
+    [Fact]
+    public void Compute_MonthTicks_AreFirstDayOfEachMonth()
+    {
+        // osa 1.1. → 1.3. → ticky 1.1.(0%), 1.2.(31/59) a 1.3.(100% — pravý okraj).
+        var steps = new[]
+        {
+            new ScheduleDateStepResult(1, Start, new DateTime(2026, 1, 11), MaSkutecnost: false, Start, Start, HarmonogramKrokStav.Ceka, JeAktualniKrok: false),
+        };
+
+        var layout = ScheduleBarLayoutCalculator.Compute(
+            Start, deadline: new DateTime(2026, 2, 1), today: new DateTime(2026, 1, 15), steps);
+
+        layout.MonthTicks.Should().HaveCount(3);
+        layout.MonthTicks[0].LeftPct.Should().BeApproximately(0.0, 0.01);
+        layout.MonthTicks[0].Label.Should().Be("01/2026");
+        layout.MonthTicks[1].Label.Should().Be("02/2026");
+        layout.MonthTicks[1].LeftPct.Should().BeApproximately(31 * 100.0 / 59, 0.01);
+        layout.MonthTicks[2].Label.Should().Be("03/2026");
+        layout.MonthTicks[2].LeftPct.Should().BeApproximately(100.0, 0.01);
     }
 }

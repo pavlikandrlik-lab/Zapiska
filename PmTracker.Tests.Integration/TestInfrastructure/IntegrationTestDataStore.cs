@@ -111,6 +111,12 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
     public void RejectProposal(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordProposalService>().RejectProposalAsync(command, currentUser).GetAwaiter().GetResult();
 
+    public void RejectAndTakeOverCreateProposal(ProposalDecisionCommand command, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordProposalService>().RejectAndTakeOverCreateProposalAsync(command, currentUser).GetAwaiter().GetResult();
+
+    public ZaznamEditViewModel BuildPrefilledCreateEditorFromProposal(int projektId, int proposalId, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordProposalService>().BuildPrefilledCreateRecordEditorFromProposalAsync(projektId, proposalId, currentUser).GetAwaiter().GetResult();
+
     public void DeleteRecord(DeleteRecordCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordService>().DeleteRecordAsync(command, currentUser).GetAwaiter().GetResult();
 

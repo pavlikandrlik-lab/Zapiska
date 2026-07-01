@@ -67,6 +67,12 @@ public sealed class ZaznamCardSummaryViewModel
     public IReadOnlyList<int> AktualniSubsystemLeadEquivalentOsobaIds { get; init; } = Array.Empty<int>();
     public bool IsAktivniStav { get; init; } = true;
     public bool JeUkol { get; init; }
+    /// <summary>
+    /// Záznam má aspoň jednu vyplněnou hodnotu harmonogramu (plán NEBO skutečnost) → existuje
+    /// pro něj dlaždice v projektové záložce harmonogram, takže smí mít tlačítko překliku.
+    /// Sdílený predikát viz <see cref="PmTracker.Web.Services.Schedules.HarmonogramKrokPredicates"/>.
+    /// </summary>
+    public bool MaHarmonogramHodnotu { get; init; }
     public IReadOnlyList<string> VyjadreniJednaniStavyKody { get; init; } = Array.Empty<string>();
     public DateTime DatumZalozeni { get; init; }
     public bool CanEditRecord { get; set; }

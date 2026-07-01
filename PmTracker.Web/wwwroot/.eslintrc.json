@@ -12,7 +12,6 @@
         "max-lines": ["warn", { "max": 300, "skipBlankLines": true, "skipComments": true }]
     },
     "ignorePatterns": [
-        "site.bundle.js",
         "lib/"
     ]
 }

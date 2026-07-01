@@ -60,6 +60,11 @@ export function initRichTextEditors(scope) {
             } else {
                 host.appendChild(textarea);
             }
+            labelParent.addEventListener("click", (e) => {
+                if (host.contains(e.target) || e.target === host) {
+                    e.preventDefault();
+                }
+            });
         } else {
             host.appendChild(textarea);
         }

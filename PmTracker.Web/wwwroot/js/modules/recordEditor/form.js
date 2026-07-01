@@ -114,18 +114,13 @@ export function updateTaskTypeVisibility(categorySelect) {
     const scheduleTab = form.querySelector("[data-record-schedule-tab]");
     const schedulePanel = form.querySelector("[data-record-schedule-panel]");
     const scheduleNote = form.querySelector("[data-record-schedule-note]");
-    // V proposal editoru (návrh úpravy harmonogramu I návrh založení
-    // záznamu) NESMÍ být TypUkolu měnitelný — typ úkolu není součástí
-    // návrhového workflow. Razor to zajišťuje přes
-    // `metadataLocked || IsProposalEditor`, ale JS musí mít stejnou
-    // logiku, jinak na event změny kategorie typeSelect.disabled=false
-    // re-enable typeSelect. User report 2026-04-19 noc: "F není to opraveno,
-    // stále mohu rozkliknout a rozbalí se mi nabídka - Typ úkolu".
-    // Root cause: ConfigureCreateProposalEditor ponechává
-    // AllowBasicMetadataEdit=true (návrh založení má být editable kromě
-    // typu), takže metadataLocked=false a samotný check nestačí.
+    // 7d (2026-06-17): Typ úkolu je editovatelný i v NÁVRHU ZALOŽENÍ, pokud je kategorie úkol —
+    // reverze rozhodnutí z 2026-04-19. Zamčení řídí výhradně `metadataLocked`: návrh ZMĚNY
+    // harmonogramu má `AllowBasicMetadataEdit=false` (metadataLocked=true → typ zamčený), ale
+    // návrh ZALOŽENÍ i klasický editor mají metadataLocked=false → typ se povolí při kategorii úkol.
+    // (Dříve `|| isProposalEditor` zamykalo typ ve všech návrzích — proto v návrhu nešel vybrat.)
     const metadataLocked = form.dataset.metadataLocked === "true";
-    const isProposalEditor = form.dataset.isProposalEditor === "true";
+    const isCreate = form.dataset.isCreate === "true";
 
     if (topRow instanceof HTMLElement) {
         topRow.dataset.hasType = isTask ? "true" : "false";
@@ -138,13 +133,17 @@ export function updateTaskTypeVisibility(categorySelect) {
     const typeSelect = typeRow.querySelector("select");
     typeRow.hidden = !isTask;
     if (typeSelect instanceof HTMLSelectElement) {
-        typeSelect.disabled = !isTask || metadataLocked || isProposalEditor;
+        typeSelect.disabled = !isTask || metadataLocked;
         if (!isTask) {
             typeSelect.value = "";
         }
     }
 
-    if (scheduleTab instanceof HTMLElement) {
+    // 7d (2026-06-17): v CREATE editoru (klasik i návrh založení) je harmonogram tab vždy
+    // přítomný — kategorie se vybírá, tab nelze v markupu dynamicky vkládat (rozbilo by rohy
+    // pm-tabs). Tab proto NEskrýváme; viditelnost obsahu (note vs vstupy) řídí kategorie níže.
+    // Mimo create (editace existujícího záznamu) zachováváme původní chování: tab skrytý pro ne-úkol.
+    if (scheduleTab instanceof HTMLElement && !isCreate) {
         scheduleTab.hidden = !isTask;
     }
 

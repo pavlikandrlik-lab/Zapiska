@@ -488,6 +488,18 @@ public sealed partial class ProjectService
         var people = await LoadPeopleByIdsAsync(ownerIds, ct);
         var leadEquivalentOsobaIdsBySubsystem = await BuildLeadEquivalentOsobaIdsByProjectSubsystemAsync(projectId, ct);
 
+        // Které záznamy mají aspoň jednu vyplněnou hodnotu harmonogramu (plán NEBO skutečnost) —
+        // řídí zařazení do harmonogramu i viditelnost překlikového tlačítka. Predikát zrcadlí
+        // HarmonogramKrokPredicates.MaVyplnenouHodnotu (zde EF-translatovatelně proti DB).
+        var harmonogramRecordIds = records.Select(x => x.Id).ToList();
+        var recordIdsWithHarmonogram = (await dbContext.ZaznamHarmonogramKroky.AsNoTracking()
+            .Where(k => harmonogramRecordIds.Contains(k.ZaznamId)
+                && (k.PlanDatum != null || k.SkutecnostDatum != null))
+            .Select(k => k.ZaznamId)
+            .Distinct()
+            .ToListAsync(ct))
+            .ToHashSet();
+
         return records.Select(record =>
         {
             var category = categories.GetValueOrDefault(record.KategorieId);
@@ -498,6 +510,7 @@ public sealed partial class ProjectService
             return new ZaznamCardSummaryViewModel
             {
                 Id = record.Id,
+                MaHarmonogramHodnotu = recordIdsWithHarmonogram.Contains(record.Id),
                 ProjektId = record.ProjektId,
                 CisloZaznamu = record.CisloZaznamu,
                 CisloViditelne = ResolveVisibleRecordNumber(record),

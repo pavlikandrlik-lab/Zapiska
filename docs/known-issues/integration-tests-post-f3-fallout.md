@@ -4,6 +4,9 @@
 **Kontext:** Po F8 A1 fix (DI + PermissionSeeder ve fixture) prošlo 61/66 integration testů.
 Zbývajících 5 selhání NENÍ DI regrese — jde o designové otázky po F3.1/F3.7 redesignu.
 
+> **VYŘEŠENO 2026-06-16.** Skupina 1 opravena (rozhodnutí uživatele: vícevrstvá autorizace
+> „klíč + omezení na subsystém"). Viz sekce „Řešení skupiny 1" níže. Skupina 2 trvá.
+
 ## Skupina 1 — Subsystem lead scope restrikce v komentářích (4 testy)
 
 **Testy:**
@@ -26,20 +29,53 @@ vyžadovala buď:
 2. Explicitní subsystem-lead-equivalent gate v `CanAddComment` (přidat check nad rámec `CommentsAdd`)
 3. Rozdělit resolver tak, aby subsystem-scoped granty byly výhradně per-subsystem
 
+### Řešení skupiny 1 (2026-06-16)
+
+Příčina: `AuthorizationSnapshot` přes MEDIUM-1 propaguje subsystémové granty (vč. `comments.add`)
+do `PerProjectPermissions`, takže `CanAddComment` se ukončil na project-scope kontrole dřív, než
+se dostal k subsystémovému omezení. Vedoucí tak komentoval libovolný subsystém.
+
+Oprava (vícevrstvá autorizace „klíč + omezení na subsystém"):
+- `AuthorizationSnapshot` má novou (volitelnou) sadu `PerProjectDirectPermissions` = oprávnění
+  POUZE z přímých projektových rolí (bez MEDIUM-1 propagace) + metodu `HasDirectProjectPermission`.
+  `AuthorizationSnapshotBuilder` ji plní z `projectRows`. Existující efektivní sada beze změny
+  (nulová regrese pro dashboard/UI flagy/atd.).
+- `CanAddComment` rozhoduje třístupňově: (1) přímá projektová/globální `comments.add` → kdekoli
+  („vyšší bere", pokrývá i kombinaci projektová role + vedoucí subsystému); (2) vedoucí/zástupce
+  subsystému → jen vlastní subsystém v DRAFT; (3) ostatní (např. METODIK přes zděděný grant) →
+  zachované chování.
+- `CanModifyComment`: vedoucí subsystému smí upravit/smazat VLASTNÍ komentář svého subsystému
+  v DRAFT i bez samostatného `comments.edit.own` (implikovaný CRUD).
+- `CommentService.AddCommentAsync` počítá „je osoba lead-equivalent některého subsystému projektu"
+  z `GetLeadEquivalentOsobaIdsBySubsystemAsync` a předává do policy.
+
+Pozn. METODIK_SUBSYSTEMU: nemá `meetings.notes.subsystemlead` ani není lead-equivalent (lead-equiv
+= jen Lead/Deputy), proto je u něj zachováno dosavadní chování (komentuje přes zděděný `comments.add`).
+Pokud by se měl i METODIK omezit jen na vlastní subsystém, je to samostatný follow-up (vyžaduje
+mapování globální `SubsystemId` ↔ `ProjektSubsystemId` v subsystémové dimenzi snapshotu).
+
 ## Skupina 2 — DashboardPriority.SaveRecord + Collaboration
+
+> **VYŘEŠENO 2026-06-16 — byl to REÁLNÝ produkční bug, ne test-setup.** Původní vysvětlení níže
+> (async hosted service) bylo MYLNÉ: `SaveRecord` volá `RebuildForRecordAsync` **synchronně** (ř. 248).
 
 **Test:** `DashboardPriorityDataStoreTests.SaveRecord_ShouldCreateAndRemovePriorityRow_WhenCollaborationChanges`
 
-**Očekávání:** Přidání collaboratora do `VybraniSpolupracovniciIds` při SaveRecord vytvoří
-priority matrix row v `ZaznamPriorityUzivatelu`.
+**Skutečná příčina:** `ReplaceRecordCollaborationAsync` (RecordService.SaveRecord.cs) přidá/odebere
+`ZaznamSpoluprace` jen do change trackeru bez `SaveChangesAsync`. Následný `RebuildForRecordAsync`
+čte spolupráci přes `ZaznamSpoluprace.AsNoTracking()` = dotaz do DB; EF Core před dotazem neflushuje
+pending změny → rebuild viděl zastaralý stav (nový spolupracovník bez priority row, smazaný ji
+neztratil) až do příštího full rebuildu.
 
-**Realita:** Priority matrix queue processor je hosted service, který ve fixture (ServiceCollection,
-žádný aplikační host) neběží. `IPriorityMatrixRebuildQueue.Enqueue` zapíše do fronty, ale nikdo
-ji nezpracuje → row nevznikne.
+**Oprava:** `await dbContext.SaveChangesAsync(innerCt)` PŘED `RebuildForRecordAsync` (uvnitř vnější
+transakce → atomické). Test je správný; chyba byla v pořadí flushe. Scoring algoritmus je v pořádku
+(collaborator má roleWeight 40).
 
-**Řešení:** Test musí po SaveRecord explicitně volat `FullRebuildPriorityMatrix()` (jak to dělá
-jiné testy ve stejném souboru), nebo fixture musí spustit `PriorityMatrixQueuedRebuildHostedService`.
-Není to authz regrese — je to issue testovacího setupu (priority matrix rebuild je async).
+---
+
+*(Původní mylné vysvětlení, ponecháno pro historii:)*
+~~Priority matrix queue processor je hosted service, který ve fixture neběží~~ — NEPLATÍ, rebuild
+je synchronní.
 
 ## Doporučení
 

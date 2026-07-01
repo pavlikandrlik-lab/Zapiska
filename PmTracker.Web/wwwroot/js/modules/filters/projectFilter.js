@@ -53,20 +53,29 @@ const projectFilterFields = [
     { inputKey: "groupBySubsystem", stateKey: "groupBySubsystem", type: "checkbox", skipChip: true }
 ];
 
-function buildProjectFilterConfig(scope) {
+const proposalFilterFields = [
+    { inputKey: "stavNavrhu", stateKey: "stavNavrhu", type: "select", chipLabel: "Stav návrhu" },
+    { inputKey: "typNavrhu", stateKey: "typNavrhu", type: "select", chipLabel: "Typ návrhu" },
+    { inputKey: "subsystem", stateKey: "subsystem", type: "select", chipLabel: "Subsystém" },
+    { inputKey: "autor", stateKey: "autor", type: "select", chipLabel: "Autor" },
+    { inputKey: "rozhodl", stateKey: "rozhodl", type: "select", chipLabel: "Rozhodl" },
+];
+
+function buildProjectFilterConfig(scope, fields) {
     return {
         rootSelector: `[data-project-filter-scope="${scope}"]`,
         inputSelector: "[data-filter-key]",
         keyAttribute: "data-filter-key",
         chipRowSelector: `[data-filter-chip-row="${scope}"]`,
         statusSelector: `[data-filter-save-status="${scope}"]`,
-        fields: projectFilterFields
+        fields: fields || projectFilterFields
     };
 }
 
 const projectFilterConfigs = {
     records: buildProjectFilterConfig("records"),
-    schedule: buildProjectFilterConfig("schedule")
+    schedule: buildProjectFilterConfig("schedule"),
+    proposals: buildProjectFilterConfig("proposals", proposalFilterFields)
 };
 
 // ---------------------------------------------------------------------------
@@ -566,6 +575,13 @@ export function renderProjectFilterChips(scope) {
 }
 
 export function restoreProjectFilterScope(scope) {
+    if (scope === "proposals") {
+        const fallbackState = buildProjectFilterStateFromInputs(scope);
+        applyProjectFilterStateToInputs(scope, fallbackState);
+        renderProjectFilterChips(scope);
+        return fallbackState;
+    }
+
     // 2026-04-30: migrace ze starých scope-suffixed storage klíčů (records + schedule
     // měly oddělené state/defaults). Spec: project-filter-unification-design.
     migrateLegacyProjectFilterStorageKeys(getProjectFilterProjectId(scope));

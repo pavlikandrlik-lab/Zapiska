@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Export;
 using PmTracker.Web.Services.ProjectDashboard;
+using PmTracker.Web.Services.ProjectDashboard.Zakladni;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
@@ -18,6 +19,7 @@ public sealed class ProjectDashboardController : BaseController
 {
     private readonly IProjectDashboardService _dashboardService;
     private readonly INesPanelExcelExportService _nesExcelExport;
+    private readonly ZakladniReportBuilder _reportBuilder;
     private readonly TimeProvider _timeProvider;
 
     public ProjectDashboardController(
@@ -25,11 +27,13 @@ public sealed class ProjectDashboardController : BaseController
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
         IProjectDashboardService dashboardService,
-        INesPanelExcelExportService nesExcelExport)
+        INesPanelExcelExportService nesExcelExport,
+        ZakladniReportBuilder reportBuilder)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _dashboardService = dashboardService;
         _nesExcelExport = nesExcelExport;
+        _reportBuilder = reportBuilder;
         _timeProvider = timeProvider;
     }
 
@@ -135,6 +139,28 @@ public sealed class ProjectDashboardController : BaseController
         var muzeEditovat = CurrentUserContext.HasPermission(PermissionKeys.VyzvyCreate, projektId);
         var model = await _dashboardService.BuildVyzvyPanelAsync(projektId, muzeEditovat, ct);
         return PartialView("~/Views/ProjectDashboard/_VyzvyPanel.cshtml", model);
+    }
+
+    [HttpGet("zakladni-report")]
+    [Authorize(Policy = "permission:dashboard.statistics.view")]
+    public async Task<IActionResult> ZakladniReport(
+        int projektId, int? rok = null, int? kvartal = null,
+        DateTime? od = null, DateTime? doDate = null, CancellationToken ct = default)
+    {
+        if (!await EnsureDashboardAccessAsync(projektId, ct))
+        {
+            return Forbid();
+        }
+
+        var currentYear = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).Year;
+        Obdobi obdobi = (od.HasValue && doDate.HasValue)
+            ? Obdobi.Rozsah(od.Value, doDate.Value)
+            : kvartal.HasValue
+                ? Obdobi.Kvartal(rok ?? currentYear, kvartal.Value)
+                : Obdobi.Rok(rok ?? currentYear);
+
+        var model = await _reportBuilder.BuildAsync(projektId, obdobi, ct);
+        return PartialView("~/Views/ProjectDashboard/Zakladni/Report.cshtml", model);
     }
 
     private Task<bool> EnsureDashboardAccessAsync(int projectId, CancellationToken ct)

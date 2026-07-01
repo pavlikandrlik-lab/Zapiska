@@ -51,13 +51,20 @@ public sealed class UiJsSplitTests
         content.Should().Contain("renderAllRainbowSegmentLabels");
     }
 
+    /// <summary>
+    /// 2026-06-29: rozpad (breakdown) má kroky pojmenované ve vlastní koloně (.gantt-step-name),
+    /// takže popisek NA segmentu je redundantní — a skutečnostní čára kreslená přes plánovou ho
+    /// překryla, takže zůstávaly zbytky textu. Rainbow popisky tedy patří jen na overview rainbow
+    /// strip (a editor mini-gantt), NE na rozpadové .schedule-layered-segment.
+    /// </summary>
     [Fact]
-    public void Bundle_ShouldContainKeyExports()
+    public void RainbowLabels_ShouldTargetOverviewNotBreakdown()
     {
-        var bundle = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/site.bundle.js"));
-        bundle.Should().Contain("closeAllFloatingPanels");
-        bundle.Should().Contain("handlePrintTriggerClick");
-        bundle.Should().Contain("renderAllRainbowSegmentLabels");
-        bundle.Should().Contain("getGlobalFloatingLayerRoot");
+        var content = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/ui/index.js"));
+        content.Should().Contain(".schedule-overview-segment[data-rainbow-segment-label-short]",
+            "overview rainbow strip popisky kroků zůstávají");
+        content.Should().NotContain(".schedule-layered-segment[data-rainbow-segment-label-short]",
+            "rozpadové segmenty nesmí dostávat rainbow popisky (skutečnostní čára je překryje)");
     }
+
 }

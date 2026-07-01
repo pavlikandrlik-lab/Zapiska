@@ -562,6 +562,9 @@ public sealed class ProjektyControllerBehaviorTests
         public Task<bool> CanViewProposalTabAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => Task.FromResult(false);
 
+        public Task<bool> CanCreateRecordProposalAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => Task.FromResult(false);
+
         public Task<ProjektNavrhyTabViewModel> BuildProjectProposalsTabAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => Task.FromResult(new ProjektNavrhyTabViewModel { ProjektId = projectId });
 
@@ -572,9 +575,6 @@ public sealed class ProjektyControllerBehaviorTests
             => throw new NotSupportedException();
 
         public Task<ZaznamEditViewModel> BuildProposalDetailAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
-            => throw new NotSupportedException();
-
-        public Task<ZaznamEditViewModel> BuildEditableRecordEditorFromProposalAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => throw new NotSupportedException();
 
         public Task<ZaznamEditViewModel> BuildPrefilledCreateRecordEditorFromProposalAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
