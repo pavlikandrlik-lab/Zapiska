@@ -6,17 +6,9 @@
     var otevrenyStav = Model.StavyJednani.FirstOrDefault(x => string.Equals(x.Value, Model.OtevrenyStavKod, StringComparison.OrdinalIgnoreCase));
     var isLocked = !string.IsNullOrWhiteSpace(Model.UzavrenyStavKod)
         && string.Equals(Model.Jednani.StavKod, Model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase);
-    var isDraftMeeting = string.Equals(Model.Jednani.StavKod, "DRAFT", StringComparison.OrdinalIgnoreCase);
     var canEditMeetingFields = Model.CanEditMeeting && !isLocked;
-    var canEditRecordNotes = Model.CanEditRecords && !isLocked;
-    var meetingPrintUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = Model.Jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Tisk?autoPrint=true";
-    var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = Model.Jednani.Id }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Word";
-    var createRecordInMeetingUrl = Url.Action("Create", "Zaznamy", new
-    {
-        projektId = Model.ProjektId,
-        jednaniId = Model.Jednani.Id,
-        uiContext = "meeting"
-    }) ?? $"/Zaznamy/Create?projektId={Model.ProjektId}&jednaniId={Model.Jednani.Id}&uiContext=meeting";
+    var meetingPrintUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = Model.Jednani.Id, projektId = Model.ProjektId, autoPrint = true }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Tisk?projektId={Model.ProjektId}&autoPrint=true";
+    var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = Model.Jednani.Id, projektId = Model.ProjektId }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Word?projektId={Model.ProjektId}";
     var attendancePanelId = $"meeting-attendance-panel-{Model.Jednani.Id}";
     var attendanceSummaryItems = Model.Ucast
         .GroupBy(x => string.IsNullOrWhiteSpace(x.StavUcasti) ? "Bez stavu" : x.StavUcasti)
@@ -28,15 +20,8 @@
         : $"Celkem {Model.Ucast.Count} osob · {string.Join(" · ", attendanceSummaryItems)}";
 }
 
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = Model.PageTitle,
-    Subtitle = Model.ProjektNazev,
-    BackUrl = Model.BackUrl,
-    BackLabel = Model.BackLabel,
-    Badge = Model.Jednani.Stav
-})
-
+@* Navigaci „zpět" a titulek jednání nese drobečková lišta (frame bar pod menu);
+   samostatný _PageHeader odstraněn (2026-07-04). *@
 <section class="meeting-detail-header">
     <p class="muted">@Model.Jednani.Datum.ToString("dd.MM.yyyy") v @Model.Jednani.CasZacatek.ToString("HH\\:mm")</p>
     <p class="muted">Místo: @Model.Jednani.Misto</p>
@@ -45,10 +30,8 @@
         <p class="muted">Uzamkl: @(string.IsNullOrWhiteSpace(Model.Jednani.UzamklOsoba) ? "-" : Model.Jednani.UzamklOsoba)</p>
     }
     <div class="header-actions meeting-detail-actions">
+        @* A6 (2026-07-08): BEZ href — viz Projekty/Detail.cshtml, stejný fix. *@
         <pm-button variant="Ghost"
-                   href="@meetingPrintUrl"
-                   target="_blank"
-                   rel="noopener"
                    data-print-trigger="true"
                    data-print-pdf-url="@meetingPrintUrl"
                    data-print-word-url="@meetingWordUrl"
@@ -94,7 +77,8 @@
                            data-meeting-attendance-toggle="true"
                            aria-expanded="false"
                            aria-controls="@attendancePanelId">
-                    Zobrazit účast
+                    @* Label ve spanu — JS ho přepíná bez zásahu do gov-button hostu (slot relocation). *@
+                    <span data-meeting-attendance-label>Zobrazit účast</span>
                 </pm-button>
             </div>
         </div>
@@ -103,47 +87,46 @@
                 <input type="hidden" name="projektId" value="@Model.ProjektId" />
                 <input type="hidden" name="jednaniId" value="@Model.Jednani.Id" />
                 <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                <table class="table meeting-attendance-table">
-                    <thead>
-                        <tr>
-                            <th>Osoba</th>
-                            <th>Stav účasti</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @for (var i = 0; i < Model.Ucast.Count; i++)
-                    {
-                        var ucast = Model.Ucast[i];
-                        <tr>
-                            <td>
-                                @ucast.Osoba
-                                @if (!string.IsNullOrWhiteSpace(ucast.Email))
+                @* A1 (2026-07-08): grid řádkových karet místo tabulky. Form kontrakt rows[i] beze změny.
+                   D1 (2026-07-10): inline tok jméno → role → e-mail (zalomení až při nedostatku šířky),
+                   column-major dvousloupec — --attendance-rows = ⌈počet/2⌉ řídí grid-template-rows,
+                   číslo řádku kreslí CSS counter (::before), žádná změna dat. *@
+                <div class="meeting-attendance-grid" style="--attendance-rows: @((Model.Ucast.Count + 1) / 2)">
+                @for (var i = 0; i < Model.Ucast.Count; i++)
+                {
+                    var ucast = Model.Ucast[i];
+                    <div class="meeting-attendance-row">
+                        <div class="meeting-attendance-person">
+                            <strong>@ucast.Osoba</strong>
+                            @if (ucast.AktivniRole.Count > 0)
+                            {
+                                <span class="muted meeting-attendance-roles">@string.Join(" · ", ucast.AktivniRole)</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(ucast.Email))
+                            {
+                                <span class="muted meeting-attendance-email">@ucast.Email</span>
+                            }
+                            <input type="hidden" name="rows[@i].OsobaId" value="@ucast.OsobaId" />
+                        </div>
+                        <select class="meeting-attendance-select" name="rows[@i].StavUcasti"
+                                aria-label="Stav účasti — @ucast.Osoba" disabled="@(!canEditMeetingFields)">
+                            @foreach (var stav in Model.StavyUcasti)
+                            {
+                                var selected = string.Equals(stav.Value, ucast.StavUcastiKod, StringComparison.OrdinalIgnoreCase)
+                                    || string.Equals(stav.Label, ucast.StavUcasti, StringComparison.OrdinalIgnoreCase);
+                                if (selected)
                                 {
-                                    <div class="muted">@ucast.Email</div>
+                                    <option value="@stav.Value" selected="selected">@stav.Label</option>
                                 }
-                                <input type="hidden" name="rows[@i].OsobaId" value="@ucast.OsobaId" />
-                            </td>
-                            <td>
-                                <select class="meeting-attendance-select" name="rows[@i].StavUcasti" disabled="@(!canEditMeetingFields)">
-                                    @foreach (var stav in Model.StavyUcasti)
-                                    {
-                                        var selected = string.Equals(stav.Value, ucast.StavUcastiKod, StringComparison.OrdinalIgnoreCase)
-                                            || string.Equals(stav.Label, ucast.StavUcasti, StringComparison.OrdinalIgnoreCase);
-                                        if (selected)
-                                        {
-                                            <option value="@stav.Value" selected="selected">@stav.Label</option>
-                                        }
-                                        else
-                                        {
-                                            <option value="@stav.Value">@stav.Label</option>
-                                        }
-                                    }
-                                </select>
-                            </td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
+                                else
+                                {
+                                    <option value="@stav.Value">@stav.Label</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                }
+                </div>
                 @if (canEditMeetingFields)
                 {
                     <div class="meeting-notes-actions">
@@ -221,39 +204,8 @@
                 </div>
             </div>
         </div>
-
-        <div class="card">
-            <div class="meeting-task-header">
-                <h2>Zápis úkolů</h2>
-                @if (Model.CanEditRecords)
-                {
-                    <pm-button variant="Primary" href="@createRecordInMeetingUrl">
-                        Nový záznam
-                    </pm-button>
-                }
-            </div>
-            <div class="task-list">
-                @for (var i = 0; i < Model.Ukoly.Count; i++)
-                {
-                    var ukol = Model.Ukoly[i];
-                    var canCommentTask = canEditRecordNotes
-                        || (Model.HasSubsystemLeadPermission
-                            && !isLocked
-                            && isDraftMeeting
-                            && Model.CurrentUserOsobaId > 0
-                            && ukol.SubsystemLeadEquivalentOsobaIds.Contains(Model.CurrentUserOsobaId));
-                    @await Html.PartialAsync("_TaskItemPartial", new JednaniTaskItemPartialViewModel
-                    {
-                        ProjektId = Model.ProjektId,
-                        JednaniId = Model.Jednani.Id,
-                        JednaniCislo = Model.Jednani.CisloJednani,
-                        CanEditRecordNotes = canEditRecordNotes,
-                        CanCommentAsSubsystemLeader = canCommentTask && !canEditRecordNotes,
-                        CurrentUserOsobaId = Model.CurrentUserOsobaId,
-                        Ukol = ukol
-                    })
-                }
-            </div>
-        </div>
+        @* Sekce „Zápis úkolů" (záznamy + jejich vyjádření) odstraněna 2026-07-08 — na detailu
+           jednání zůstávají jen detaily jednání (účast + stav). Vyjádření se evidují ze záložky
+           Záznamy. Server stále počítá Model.Ukoly (integr. test + sdílené helpery), UI ho nerenderuje. *@
     </section>
 </div>

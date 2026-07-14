@@ -475,6 +475,21 @@ public sealed class ExportControllerTests
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task MeetingDetail_PrintLinks_ShouldCarryProjektId_ForPerProjectAuthz()
+    {
+        var projectId = await _fixture.EnsureProjectAsync("APIPRINTLINK");
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", Interlocked.Increment(ref _meetingSequence));
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Jednani/Detail/{meetingId}?asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain($"/Export/Jednani/{meetingId}/Tisk?projektId={projectId}");
+        html.Should().Contain($"/Export/Jednani/{meetingId}/Word?projektId={projectId}");
+    }
+
     private async Task<ExportScenarioData> CreateExportScenarioAsync()
     {
         var suffix = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
