@@ -253,6 +253,7 @@ public static class PermissionKeys
     [
         // Nový model — read-grantující klíče (pokud osoba má kterýkoli z nich,
         // smí vidět projekt).
+        ProjectsReadAll,
         ProjectsEdit,
         ProjectsDelete,
         RecordsCreate,

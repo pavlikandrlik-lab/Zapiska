@@ -159,6 +159,28 @@ public sealed class CurrentUserContextPermissionTests
     }
 
     [Fact]
+    public void CanAccessProject_ShouldGrantAllProjects_ForGlobalProjectsReadAll()
+    {
+        // projects.read.all je kanonický klíč management visibility (role READ_ALL).
+        // Musí být v ProjectReadGrantKeys — jinak custom role jen s tímto klíčem nevidí nic
+        // a READ_ALL funguje pouze díky vedlejším dashboard/export klíčům.
+        var user = BuildUser(
+            isSuperAdmin: false,
+            grants: new PermissionGrantViewModel
+            {
+                PermissionKey = PermissionKeys.ProjectsReadAll,
+                ScopeLevel = "GLOBAL",
+                ScopeMode = "ALL",
+                IsAllowed = true,
+                ProjectIds = Array.Empty<int>()
+            });
+
+        user.CanAccessProject(3).Should().BeTrue();
+        user.CanAccessProject(999).Should().BeTrue();
+        PermissionKeys.GrantsProjectRead(PermissionKeys.ProjectsReadAll).Should().BeTrue();
+    }
+
+    [Fact]
     public void HasPermission_ShouldStillReturnTrue_ForGlobalPermissionWithoutProjectId()
     {
         var user = BuildUser(
