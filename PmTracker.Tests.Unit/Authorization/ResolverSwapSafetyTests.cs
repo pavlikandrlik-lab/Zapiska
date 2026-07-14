@@ -137,8 +137,9 @@ public sealed class ResolverSwapSafetyTests
     }
 
     /// <summary>
-    /// Cílová sada klíčů pro VLASTNIK_PROJEKTU / ADM_PROJ / PROJ_MAN (59 cílových
-    /// klíčů per-action matice; F7 2026-04-23 odstranil deprecated klíče).
+    /// Cílová sada klíčů pro VLASTNIK_PROJEKTU / ADM_PROJ / PROJ_MAN (58 cílových
+    /// klíčů per-action matice; F7 2026-04-23 odstranil deprecated klíče;
+    /// 2026-07-14 odstraněn mrtvý schedule.preview).
     /// </summary>
     private static IEnumerable<string> ProjectExecutiveAllKeys() => new[]
     {
@@ -157,7 +158,6 @@ public sealed class ResolverSwapSafetyTests
         "proposals.takeover",
         "records.assign.meeting", "records.create", "records.delete", "records.edit",
         "records.schedule.edit",
-        "schedule.preview",
         "search.index",
         "team.candidates.search", "team.member.add", "team.member.remove",
         "team.role.assign", "team.role.deactivate",

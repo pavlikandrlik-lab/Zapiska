@@ -23,7 +23,7 @@ Příklady:
 - `comments.edit.own` — `comments` doména, `edit` akce, `own` scope
 - `dashboard.nes.view` — `dashboard` doména, `nes` panel, `view` akce
 
-## Kompletní katalog (76 klíčů ve 15 kategoriích)
+## Kompletní katalog (75 klíčů ve 14 kategoriích)
 
 Zdroj: `PermissionKeys.cs` + `PermissionSeedConfiguration.cs`.
 
@@ -172,11 +172,8 @@ Zdroj: `PermissionKeys.cs` + `PermissionSeedConfiguration.cs`.
 | `search.index` | GLOBAL | Globální fulltext hledání |
 | `search.reindex` | GLOBAL | Administrátorská akce: full reindex FTS |
 
-### 15. Harmonogram preview (`SCHEDULE`) — 1 klíč
-
-| Klíč | ScopeLevel | Popis |
-|---|---|---|
-| `schedule.preview` | PROJECT | Stateless kalkulace pro editor úkolu |
+> Sekce 15 (`SCHEDULE` / `schedule.preview`) odstraněna 2026-07-14 — klíč hlídal endpoint
+> smazaný při harmonogram datum-model migraci; viz `db_upgrade_1_4_1_drop_schedule_preview.sql`.
 
 ## Granularita
 

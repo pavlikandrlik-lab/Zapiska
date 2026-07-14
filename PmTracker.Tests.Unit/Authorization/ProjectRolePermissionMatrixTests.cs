@@ -19,7 +19,7 @@ public sealed class ProjectRolePermissionMatrixTests
             .ToArray();
 
     // -------------------------------------------------------------------------
-    // VLASTNIK_PROJEKTU = ADM_PROJ = PROJ_MAN (59 cílových klíčů)
+    // VLASTNIK_PROJEKTU = ADM_PROJ = PROJ_MAN (58 cílových klíčů; 2026-07-14 odstraněn mrtvý schedule.preview)
     // -------------------------------------------------------------------------
     private static readonly string[] ProjectExecutiveTargetKeys =
     [
@@ -38,7 +38,6 @@ public sealed class ProjectRolePermissionMatrixTests
         "proposals.takeover",
         "records.assign.meeting", "records.create", "records.delete", "records.edit",
         "records.schedule.edit",
-        "schedule.preview",
         "search.index",
         "team.candidates.search", "team.member.add", "team.member.remove",
         "team.role.assign", "team.role.deactivate",

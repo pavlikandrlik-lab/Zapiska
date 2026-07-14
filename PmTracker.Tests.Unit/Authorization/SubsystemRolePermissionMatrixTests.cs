@@ -28,7 +28,6 @@ public sealed class SubsystemRolePermissionMatrixTests
         "export.word.jednani", "export.word.projekt", "export.word.ukol",
         "meetings.notes.subsystemlead",
         "proposals.edit.own", "proposals.record.create", "proposals.schedule.create",
-        "schedule.preview",
         "search.index"
     ];
 

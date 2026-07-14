@@ -149,13 +149,6 @@ public class AuthorizationPolicyEnforcementTests
             // projektu — per-action redesign 2026-04-23; ověřeno VyzvaServiceAssignmentAuthzTests.
             "PmTracker.Web.Controllers.VyzvyController.Prerdit",
 
-            // ---- ScheduleController ----
-
-            // Recalc: kalkulační endpoint pro preview harmonogramu (stateless výpočet).
-            // Nepotřebuje per-project autorizaci — pracuje jen se vstupy bez DB operace.
-            // Třídy kontroleru nemá [Authorize], žádná policy nemůže být aplikována.
-            "PmTracker.Web.Controllers.ScheduleController.Recalc",
-
             // ---- ExterniOdkazController (Plán B) ----
 
             // Sync: projektId přichází z form body (POST /ExterniOdkaz/Sync) — není v route.

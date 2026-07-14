@@ -125,8 +125,8 @@ public static class PermissionKeys
     public const string SearchIndex = "search.index";
     public const string SearchReindex = "search.reindex";
 
-    // --- 15. Harmonogram preview ----------------------------------------------
-    public const string SchedulePreview = "schedule.preview";
+    // Sekce 15 (SchedulePreview) odstraněna 2026-07-14 — klíč hlídal ScheduleController.Recalc
+    // smazaný ve Fázi 7a harmonogram datum-model migrace (52d6607); žádný endpoint ho nekontroloval.
 
     // =========================================================================
     // Definitions: bijekce s PermissionSeedConfiguration.Actions.
@@ -239,9 +239,6 @@ public static class PermissionKeys
         new(SearchIndex, "Fulltext hledání", "SEARCH", "GLOBAL", "Globální fulltext hledání."),
         new(SearchReindex, "Spustit reindex", "SEARCH", "GLOBAL", "Administrátorská akce: full reindex FTS."),
 
-        // 15. Harmonogram preview
-        new(SchedulePreview, "Náhledový přepočet harmonogramu", "SCHEDULE", "PROJECT", "Stateless kalkulace pro editor úkolu."),
-
         // =====================================================================
         // DEPRECATED (pre-redesign). Mapping test vynucuje existenci i v seedu
         // dokud F7 (DB migrace) staré klíče neodstraní.
@@ -314,8 +311,7 @@ public static class PermissionKeys
         ExportPdfUkol,
         ExportWordProjekt,
         ExportWordJednani,
-        ExportWordUkol,
-        SchedulePreview
+        ExportWordUkol
     ],
         StringComparer.OrdinalIgnoreCase);
 

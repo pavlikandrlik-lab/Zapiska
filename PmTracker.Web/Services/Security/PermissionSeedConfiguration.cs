@@ -88,7 +88,6 @@ public static class PermissionSeedConfiguration
         new("EXPORT", "Export", 70),
         new("SETTINGS", "Nastavení", 75),
         new("SEARCH", "Hledání", 80),
-        new("SCHEDULE", "Harmonogram preview", 85),
         // Ponecháno pro deprecated klíče (MASTER sjednoceno pod PEOPLE/CISELNIKY).
         new("MASTER", "Master data (deprecated)", 95)
     ];
@@ -217,10 +216,10 @@ public static class PermissionSeedConfiguration
 
         // ==== 14. Hledání ====
         new("search.index", "Fulltext hledání", "SEARCH", PermissionScopeLevel.Global),
-        new("search.reindex", "Spustit reindex", "SEARCH", PermissionScopeLevel.Global),
+        new("search.reindex", "Spustit reindex", "SEARCH", PermissionScopeLevel.Global)
 
-        // ==== 15. Harmonogram preview ====
-        new("schedule.preview", "Náhledový přepočet harmonogramu", "SCHEDULE", PermissionScopeLevel.Project)
+        // Sekce 15 (schedule.preview) odstraněna 2026-07-14 — klíč hlídal ScheduleController.Recalc
+        // smazaný ve Fázi 7a harmonogram datum-model migrace; viz db_upgrade_1_4_1_drop_schedule_preview.sql.
 
         // F7 2026-04-23: 8 deprecated klíčů smazáno — viz
         // db_upgrade_1_3_8_authz_per_action_redesign.sql (DELETE z authz.permissions +
@@ -319,7 +318,6 @@ public static class PermissionSeedConfiguration
         new("SUPERADMIN", "settings.sd.view", ScopeMode.All, true),
         new("SUPERADMIN", "search.index", ScopeMode.All, true),
         new("SUPERADMIN", "search.reindex", ScopeMode.All, true),
-        new("SUPERADMIN", "schedule.preview", ScopeMode.All, true),
 
         // --- APP_ADMIN (76/76 — = SUPERADMIN na úrovni permission modelu) ---
         new("APP_ADMIN", "projects.read.all", ScopeMode.All, true),
@@ -397,7 +395,6 @@ public static class PermissionSeedConfiguration
         new("APP_ADMIN", "settings.sd.view", ScopeMode.All, true),
         new("APP_ADMIN", "search.index", ScopeMode.All, true),
         new("APP_ADMIN", "search.reindex", ScopeMode.All, true),
-        new("APP_ADMIN", "schedule.preview", ScopeMode.All, true),
 
         // --- READ_ALL (13 klíčů — management visibility) ---
         new("READ_ALL", "projects.read.all", ScopeMode.All, true),
@@ -414,7 +411,7 @@ public static class PermissionSeedConfiguration
         new("READ_ALL", "export.word.ukol", ScopeMode.All, true),
         new("READ_ALL", "search.index", ScopeMode.All, true),
 
-        // --- VLASTNIK_PROJEKTU (59 klíčů — plný vlastník projektového obsahu; bez project metadata) ---
+        // --- VLASTNIK_PROJEKTU (58 klíčů — plný vlastník projektového obsahu; bez project metadata) ---
         new("VLASTNIK_PROJEKTU", "records.create", ScopeMode.All, true),
         new("VLASTNIK_PROJEKTU", "records.edit", ScopeMode.All, true),
         new("VLASTNIK_PROJEKTU", "records.delete", ScopeMode.All, true),
@@ -473,9 +470,8 @@ public static class PermissionSeedConfiguration
         new("VLASTNIK_PROJEKTU", "export.word.jednani", ScopeMode.All, true),
         new("VLASTNIK_PROJEKTU", "export.word.ukol", ScopeMode.All, true),
         new("VLASTNIK_PROJEKTU", "search.index", ScopeMode.All, true),
-        new("VLASTNIK_PROJEKTU", "schedule.preview", ScopeMode.All, true),
 
-        // --- ADM_PROJ (59 klíčů — = VLASTNIK_PROJEKTU pro obsah projektu) ---
+        // --- ADM_PROJ (58 klíčů — = VLASTNIK_PROJEKTU pro obsah projektu) ---
         new("ADM_PROJ", "records.create", ScopeMode.All, true),
         new("ADM_PROJ", "records.edit", ScopeMode.All, true),
         new("ADM_PROJ", "records.delete", ScopeMode.All, true),
@@ -534,9 +530,8 @@ public static class PermissionSeedConfiguration
         new("ADM_PROJ", "export.word.jednani", ScopeMode.All, true),
         new("ADM_PROJ", "export.word.ukol", ScopeMode.All, true),
         new("ADM_PROJ", "search.index", ScopeMode.All, true),
-        new("ADM_PROJ", "schedule.preview", ScopeMode.All, true),
 
-        // --- PROJ_MAN (59 klíčů — = ADM_PROJ pro obsah projektu) ---
+        // --- PROJ_MAN (58 klíčů — = ADM_PROJ pro obsah projektu) ---
         new("PROJ_MAN", "records.create", ScopeMode.All, true),
         new("PROJ_MAN", "records.edit", ScopeMode.All, true),
         new("PROJ_MAN", "records.delete", ScopeMode.All, true),
@@ -595,7 +590,6 @@ public static class PermissionSeedConfiguration
         new("PROJ_MAN", "export.word.jednani", ScopeMode.All, true),
         new("PROJ_MAN", "export.word.ukol", ScopeMode.All, true),
         new("PROJ_MAN", "search.index", ScopeMode.All, true),
-        new("PROJ_MAN", "schedule.preview", ScopeMode.All, true),
 
         // --- GEST (15 klíčů — komentátor + read-only) ---
         new("GEST", "comments.add", ScopeMode.All, true),
@@ -628,7 +622,7 @@ public static class PermissionSeedConfiguration
         new("HOST", "export.word.ukol", ScopeMode.All, true),
         new("HOST", "search.index", ScopeMode.All, true),
 
-        // --- VEDOUCI_SUBSYSTEMU (20 klíčů — subsystémový lead + export/tisk) ---
+        // --- VEDOUCI_SUBSYSTEMU (19 klíčů — subsystémový lead + export/tisk) ---
         new("VEDOUCI_SUBSYSTEMU", "comments.add", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "comments.edit.own", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "comments.delete.own", ScopeMode.All, true),
@@ -642,7 +636,6 @@ public static class PermissionSeedConfiguration
         new("VEDOUCI_SUBSYSTEMU", "dashboard.statistics.view", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "dashboard.vyzvy.view", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "search.index", ScopeMode.All, true),
-        new("VEDOUCI_SUBSYSTEMU", "schedule.preview", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "export.pdf.projekt", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "export.pdf.jednani", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "export.pdf.ukol", ScopeMode.All, true),
@@ -650,7 +643,7 @@ public static class PermissionSeedConfiguration
         new("VEDOUCI_SUBSYSTEMU", "export.word.jednani", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "export.word.ukol", ScopeMode.All, true),
 
-        // --- ZASTUPCE_VEDOUCIHO_SUBSYSTEMU (20 klíčů — = VEDOUCI) ---
+        // --- ZASTUPCE_VEDOUCIHO_SUBSYSTEMU (19 klíčů — = VEDOUCI) ---
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "comments.add", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "comments.edit.own", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "comments.delete.own", ScopeMode.All, true),
@@ -664,7 +657,6 @@ public static class PermissionSeedConfiguration
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "dashboard.statistics.view", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "dashboard.vyzvy.view", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "search.index", ScopeMode.All, true),
-        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "schedule.preview", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "export.pdf.projekt", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "export.pdf.jednani", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "export.pdf.ukol", ScopeMode.All, true),
