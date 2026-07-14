@@ -46,7 +46,6 @@ public sealed class ExportController : BaseController
         string? typ = null,
         int? vlastnik = null,
         bool aktivni = false,
-        bool mine = false,
         int? jednaniVyjadreniStav = null,
         CancellationToken ct = default)
     {
@@ -64,7 +63,6 @@ public sealed class ExportController : BaseController
             typ,
             vlastnik,
             aktivni,
-            mine,
             jednaniVyjadreniStav);
 
         var model = await _exportTemplateUseCase.BuildProjectTemplateAsync(projektId, CurrentUserContext, autoPrint, filters, ct);
@@ -82,7 +80,6 @@ public sealed class ExportController : BaseController
         string? typ = null,
         int? vlastnik = null,
         bool aktivni = false,
-        bool mine = false,
         int? jednaniVyjadreniStav = null,
         CancellationToken ct = default)
     {
@@ -100,7 +97,6 @@ public sealed class ExportController : BaseController
             typ,
             vlastnik,
             aktivni,
-            mine,
             jednaniVyjadreniStav);
 
         var model = await _exportTemplateUseCase.BuildProjectTemplateAsync(projektId, CurrentUserContext, autoPrint: false, filters, ct);
@@ -109,15 +105,24 @@ public sealed class ExportController : BaseController
 
     [HttpGet("Jednani/{jednaniId:int}/Tisk")]
     [Authorize(Policy = "permission:export.pdf.jednani")]
-    public async Task<IActionResult> JednaniTisk(int jednaniId, bool autoPrint = true, CancellationToken ct = default)
+    public async Task<IActionResult> JednaniTisk(int jednaniId, int projektId, bool autoPrint = true, CancellationToken ct = default)
     {
-        var projectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
-        if (!projectId.HasValue)
+        var meetingProjectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
+        if (meetingProjectId is null)
         {
             return NotFound();
         }
 
-        var accessCheck = await EnsureProjectReadableAsync(projectId.Value, ct);
+        // projektId nese authz kontext pro project-scoped policy. Je-li zadané, musí odpovídat
+        // skutečnému projektu jednání (jinak by šlo autorizovat proti spravovanému projektu a
+        // tisknout cizí jednání). Bez projektId projde jen globálně oprávněný uživatel (policy
+        // udělá global check ještě před tělem) — zpětná kompatibilita přímých URL.
+        if (projektId != 0 && projektId != meetingProjectId.Value)
+        {
+            return NotFound();
+        }
+
+        var accessCheck = await EnsureProjectReadableAsync(meetingProjectId.Value, ct);
         if (accessCheck is not null)
         {
             return accessCheck;
@@ -129,15 +134,20 @@ public sealed class ExportController : BaseController
 
     [HttpGet("Jednani/{jednaniId:int}/Word")]
     [Authorize(Policy = "permission:export.word.jednani")]
-    public async Task<IActionResult> JednaniWord(int jednaniId, CancellationToken ct = default)
+    public async Task<IActionResult> JednaniWord(int jednaniId, int projektId, CancellationToken ct = default)
     {
-        var projectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
-        if (!projectId.HasValue)
+        var meetingProjectId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
+        if (meetingProjectId is null)
         {
             return NotFound();
         }
 
-        var accessCheck = await EnsureProjectReadableAsync(projectId.Value, ct);
+        if (projektId != 0 && projektId != meetingProjectId.Value)
+        {
+            return NotFound();
+        }
+
+        var accessCheck = await EnsureProjectReadableAsync(meetingProjectId.Value, ct);
         if (accessCheck is not null)
         {
             return accessCheck;
@@ -186,7 +196,7 @@ public sealed class ExportController : BaseController
 
         if (jednaniId.HasValue)
         {
-            return RedirectToAction(nameof(JednaniTisk), new { jednaniId = jednaniId.Value, autoPrint });
+            return RedirectToAction(nameof(JednaniTisk), new { jednaniId = jednaniId.Value, projektId, autoPrint });
         }
 
         return RedirectToAction(nameof(ProjektTisk), new { projektId, autoPrint });
@@ -199,7 +209,7 @@ public sealed class ExportController : BaseController
     {
         if (request.JednaniId.HasValue)
         {
-            return RedirectToAction(nameof(JednaniTisk), new { jednaniId = request.JednaniId.Value, autoPrint = true });
+            return RedirectToAction(nameof(JednaniTisk), new { jednaniId = request.JednaniId.Value, projektId = request.ProjektId, autoPrint = true });
         }
 
         return RedirectToAction(nameof(ProjektTisk), new { projektId = request.ProjektId, autoPrint = true });
@@ -219,7 +229,6 @@ public sealed class ExportController : BaseController
         string? typ,
         int? vlastnik,
         bool aktivni,
-        bool mine,
         int? jednaniVyjadreniStav)
     {
         return new ProjectExportRecordFilters
@@ -231,7 +240,6 @@ public sealed class ExportController : BaseController
             Typ = string.IsNullOrWhiteSpace(typ) ? null : typ.Trim(),
             VlastnikId = vlastnik > 0 ? vlastnik : null,
             Aktivni = aktivni,
-            Mine = mine,
             JednaniVyjadreniStavId = jednaniVyjadreniStav > 0 ? jednaniVyjadreniStav : null
         };
     }

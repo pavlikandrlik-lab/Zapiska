@@ -381,7 +381,7 @@ public sealed class ExportControllerTests
             $"/Export/Dialog?projektId={data.ProjectId}&jednaniId={data.MeetingId}&autoPrint=false&asUser={_fixture.AdminOsobaId}");
 
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-        GetLocation(response).ToLowerInvariant().Should().Be($"/export/jednani/{data.MeetingId}/tisk?autoprint=false");
+        GetLocation(response).ToLowerInvariant().Should().Be($"/export/jednani/{data.MeetingId}/tisk?projektid={data.ProjectId}&autoprint=false");
     }
 
     [Fact]
@@ -410,7 +410,7 @@ public sealed class ExportControllerTests
         var response = await client.PostAsync($"/Export/Pdf?asUser={_fixture.AdminOsobaId}", form);
 
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-        GetLocation(response).ToLowerInvariant().Should().Be($"/export/jednani/{data.MeetingId}/tisk?autoprint=true");
+        GetLocation(response).ToLowerInvariant().Should().Be($"/export/jednani/{data.MeetingId}/tisk?projektid={data.ProjectId}&autoprint=true");
     }
 
     [Fact]
@@ -488,6 +488,20 @@ public sealed class ExportControllerTests
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain($"/Export/Jednani/{meetingId}/Tisk?projektId={projectId}");
         html.Should().Contain($"/Export/Jednani/{meetingId}/Word?projektId={projectId}");
+    }
+
+    [Fact]
+    public async Task JednaniTisk_ShouldReturnNotFound_WhenProjektIdDoesNotMatchMeeting()
+    {
+        var projectA = await _fixture.EnsureProjectAsync("APISPOOFA");
+        var projectB = await _fixture.EnsureProjectAsync("APISPOOFB");
+        var meetingInA = await _fixture.CreateMeetingAsync(projectA, "OPEN", Interlocked.Increment(ref _meetingSequence));
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        // AdminOsobaId má globální export → policy projde pro projektId=B; guard musí odmítnout B != A.
+        var response = await client.GetAsync($"/Export/Jednani/{meetingInA}/Tisk?projektId={projectB}&asUser={_fixture.AdminOsobaId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     private async Task<ExportScenarioData> CreateExportScenarioAsync()
