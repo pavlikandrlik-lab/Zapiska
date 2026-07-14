@@ -345,6 +345,38 @@ public sealed class ProjectsModalsControllerTests
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task SearchProjectMemberCandidates_ShouldSucceed_ForProjectScopedRole()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiCandSearchOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APICANDSRCH");
+        await _fixture.EnsureProjectRoleAssignmentAsync(
+            projectId, ownerId, PmTracker.Web.Models.ViewModels.ProjectRoleCodes.ProjectOwner);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync(
+            $"/Projekty/SearchProjectMemberCandidates/{projectId}?q=jan&asUser={ownerId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            "VLASTNIK_PROJEKTU drží team.candidates.search per-projekt — nesmí dostat 403 z globálního checku");
+    }
+
+    [Fact]
+    public async Task SearchProjectMemberCandidates_ShouldReturnForbidden_ForSubsystemLeadWithoutTeamKey()
+    {
+        var leadId = await _fixture.EnsurePersonAsync("ApiCandSearchLead");
+        var projectId = await _fixture.EnsureProjectAsync("APICANDLEAD");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APICANDLEADS", leadId);
+        await _fixture.EnsureSubsystemLeadAsync(projectId, subsystemId, leadId);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync(
+            $"/Projekty/SearchProjectMemberCandidates/{projectId}?q=jan&asUser={leadId}");
+
+        // Vedoucí subsystému projekt číst smí (CanAccessProject), ale team.candidates.search nedrží.
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     private async Task<int> EnsureProjectSubsystemAsync(int projectId, int subsystemId)
     {
         await using var dbContext = _fixture.CreateDbContext();

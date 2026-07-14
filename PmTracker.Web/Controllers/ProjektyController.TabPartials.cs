@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
 using System.Globalization;
@@ -38,12 +37,21 @@ public sealed partial class ProjektyController
     }
 
     [HttpGet]
-    [Authorize(Policy = "permission:team.candidates.search")]
     public async Task<IActionResult> SearchProjectMemberCandidates(int id, [FromQuery(Name = "q")] string? query, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(id))
         {
             return NotFound();
+        }
+
+        // Authz úklid 2026-07-14: dříve [Authorize(Policy="permission:team.candidates.search")],
+        // ale route nese "id" (ne "projektId") → PermissionAuthorizationHandler degradoval na
+        // global-only check a 403 pro per-projektové role (VLASTNIK/ADM_PROJ/PROJ_MAN).
+        // Body-check proti témuž id, které akce používá — vzor H-1 IDOR fix
+        // (viz allowlist v AuthorizationPolicyEnforcementTests).
+        if (!CurrentUserContext.HasPermission(PermissionKeys.TeamCandidatesSearch, id))
+        {
+            return Forbid();
         }
 
         var results = await _projectService.SearchProjectMemberCandidatesAsync(query ?? string.Empty, ct);
