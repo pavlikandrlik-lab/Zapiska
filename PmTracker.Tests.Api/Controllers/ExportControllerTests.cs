@@ -504,6 +504,21 @@ public sealed class ExportControllerTests
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task JednaniTisk_ShouldSucceed_ForSubsystemLead_WithProjektId()
+    {
+        var leadId = await _fixture.EnsurePersonAsync("ApiExportSubLead");
+        var projectId = await _fixture.EnsureProjectAsync("APISUBEXP");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APISUBEXPS", leadId);
+        await _fixture.EnsureSubsystemLeadAsync(projectId, subsystemId, leadId);
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", Interlocked.Increment(ref _meetingSequence));
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Export/Jednani/{meetingId}/Tisk?projektId={projectId}&asUser={leadId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     private async Task<ExportScenarioData> CreateExportScenarioAsync()
     {
         var suffix = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();

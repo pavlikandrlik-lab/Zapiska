@@ -24,6 +24,8 @@ public sealed class SubsystemRolePermissionMatrixTests
         "comments.add", "comments.delete.own", "comments.edit.own",
         "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
         "dashboard.view", "dashboard.vyzvy.view",
+        "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
+        "export.word.jednani", "export.word.projekt", "export.word.ukol",
         "meetings.notes.subsystemlead",
         "proposals.edit.own", "proposals.record.create", "proposals.schedule.create",
         "schedule.preview",
@@ -52,6 +54,8 @@ public sealed class SubsystemRolePermissionMatrixTests
             "comments.add", "comments.delete.own", "comments.edit.own",
             "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
             "dashboard.view", "dashboard.vyzvy.view",
+            "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
+            "export.word.jednani", "export.word.projekt", "export.word.ukol",
             "search.index"
         });
     }

@@ -628,7 +628,7 @@ public static class PermissionSeedConfiguration
         new("HOST", "export.word.ukol", ScopeMode.All, true),
         new("HOST", "search.index", ScopeMode.All, true),
 
-        // --- VEDOUCI_SUBSYSTEMU (14 klíčů — subsystémový lead) ---
+        // --- VEDOUCI_SUBSYSTEMU (20 klíčů — subsystémový lead + export/tisk) ---
         new("VEDOUCI_SUBSYSTEMU", "comments.add", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "comments.edit.own", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "comments.delete.own", ScopeMode.All, true),
@@ -643,8 +643,14 @@ public static class PermissionSeedConfiguration
         new("VEDOUCI_SUBSYSTEMU", "dashboard.vyzvy.view", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "search.index", ScopeMode.All, true),
         new("VEDOUCI_SUBSYSTEMU", "schedule.preview", ScopeMode.All, true),
+        new("VEDOUCI_SUBSYSTEMU", "export.pdf.projekt", ScopeMode.All, true),
+        new("VEDOUCI_SUBSYSTEMU", "export.pdf.jednani", ScopeMode.All, true),
+        new("VEDOUCI_SUBSYSTEMU", "export.pdf.ukol", ScopeMode.All, true),
+        new("VEDOUCI_SUBSYSTEMU", "export.word.projekt", ScopeMode.All, true),
+        new("VEDOUCI_SUBSYSTEMU", "export.word.jednani", ScopeMode.All, true),
+        new("VEDOUCI_SUBSYSTEMU", "export.word.ukol", ScopeMode.All, true),
 
-        // --- ZASTUPCE_VEDOUCIHO_SUBSYSTEMU (14 klíčů — = VEDOUCI) ---
+        // --- ZASTUPCE_VEDOUCIHO_SUBSYSTEMU (20 klíčů — = VEDOUCI) ---
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "comments.add", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "comments.edit.own", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "comments.delete.own", ScopeMode.All, true),
@@ -659,8 +665,14 @@ public static class PermissionSeedConfiguration
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "dashboard.vyzvy.view", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "search.index", ScopeMode.All, true),
         new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "schedule.preview", ScopeMode.All, true),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "export.pdf.projekt", ScopeMode.All, true),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "export.pdf.jednani", ScopeMode.All, true),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "export.pdf.ukol", ScopeMode.All, true),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "export.word.projekt", ScopeMode.All, true),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "export.word.jednani", ScopeMode.All, true),
+        new("ZASTUPCE_VEDOUCIHO_SUBSYSTEMU", "export.word.ukol", ScopeMode.All, true),
 
-        // --- METODIK_SUBSYSTEMU (9 klíčů — komentátor + read) ---
+        // --- METODIK_SUBSYSTEMU (15 klíčů — komentátor + read + export/tisk) ---
         new("METODIK_SUBSYSTEMU", "comments.add", ScopeMode.All, true),
         new("METODIK_SUBSYSTEMU", "comments.edit.own", ScopeMode.All, true),
         new("METODIK_SUBSYSTEMU", "comments.delete.own", ScopeMode.All, true),
@@ -669,7 +681,13 @@ public static class PermissionSeedConfiguration
         new("METODIK_SUBSYSTEMU", "dashboard.nes.view", ScopeMode.All, true),
         new("METODIK_SUBSYSTEMU", "dashboard.statistics.view", ScopeMode.All, true),
         new("METODIK_SUBSYSTEMU", "dashboard.vyzvy.view", ScopeMode.All, true),
-        new("METODIK_SUBSYSTEMU", "search.index", ScopeMode.All, true)
+        new("METODIK_SUBSYSTEMU", "search.index", ScopeMode.All, true),
+        new("METODIK_SUBSYSTEMU", "export.pdf.projekt", ScopeMode.All, true),
+        new("METODIK_SUBSYSTEMU", "export.pdf.jednani", ScopeMode.All, true),
+        new("METODIK_SUBSYSTEMU", "export.pdf.ukol", ScopeMode.All, true),
+        new("METODIK_SUBSYSTEMU", "export.word.projekt", ScopeMode.All, true),
+        new("METODIK_SUBSYSTEMU", "export.word.jednani", ScopeMode.All, true),
+        new("METODIK_SUBSYSTEMU", "export.word.ukol", ScopeMode.All, true)
     ];
 
     // F7 2026-04-23: BuildDeprecatedCompatibilityMappings smazán;
