@@ -1038,6 +1038,14 @@ EOF
 > s `Czech_CI_AS`. Mezi testy Tasku 5 proto musí být aspoň jeden, který hledá slovo
 > s háčkem **v `popis` nebo `text_vyjadreni`** — jinak by se regrese na non-Unicode
 > cestě neodhalila. Ruční protějšek pro produkci: `db_check_search_collation.sql`.
+>
+> **Test DB musí mít collation produkce.** `SqlServerTestDatabaseManager.CreateDatabaseAsync`
+> nově zakládá DB s `COLLATE Czech_CI_AS`. Serverový default kontejneru Azure SQL Edge je
+> `SQL_Latin1_General_CP1_CI_AS` (**CP1252**), který v `text` sloupcích mrší `ě ř č`
+> (best-fit na `e r c`) už při uložení — na rozdíl od produkční CP1250. Bez téhle změny
+> by snippet z `text_vyjadreni`/`popis` v testu přišel bez diakritiky, ačkoli v produkci
+> dorazí správně. Změna je sdílená všemi integration/api testy; ověřeno, že nezavádí
+> regresi (jediná selhání jsou pre-existing authz/harmonogram).
 
 Jádro. Testuje se integračně proti reálné databázi, protože `COLLATE` ani `EXISTS` nejde ověřit in-memory.
 

@@ -114,7 +114,13 @@ public sealed class SqlServerTestDatabaseManager : IAsyncDisposable
         await connection.OpenAsync(cancellationToken);
 
         await using var command = connection.CreateCommand();
-        command.CommandText = $"CREATE DATABASE [{databaseName}]";
+        // Produkce běží na Czech_CI_AS. Bez explicitní collation by testovací DB
+        // zdědila serverový default kontejneru (SQL_Latin1_General_CP1_CI_AS = CP1252),
+        // který v non-Unicode sloupcích typu `text` (popis, text_vyjadreni) mrší
+        // česká písmena s háčkem (ě ř č → e r c), zatímco CP1250 je uloží věrně.
+        // Vyhledávání i jeho testy stojí na chování collation nad těmito sloupci,
+        // takže test DB musí kódovou stránku produkce zrcadlit.
+        command.CommandText = $"CREATE DATABASE [{databaseName}] COLLATE Czech_CI_AS";
         command.CommandTimeout = 60;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
