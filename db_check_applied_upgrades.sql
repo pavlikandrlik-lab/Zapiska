@@ -83,6 +83,28 @@ IF OBJECT_ID(N'authz.permissions', N'U') IS NOT NULL
         N'SELECT @c = COUNT(*) FROM authz.permissions WHERE klic = N''schedule.preview'';',
         N'@c INT OUTPUT', @c = @schedule_preview OUTPUT;
 
+DECLARE @pozadavek INT = CASE
+    WHEN COL_LENGTH(N'dbo.zaznam_externi_odkazy', N'pozadavek') IS NOT NULL THEN 1 ELSE 0 END;
+    -- 1_4_2: sloupec s textem požadavku u externí vazby
+
+DECLARE @kalkulace INT = CASE
+    WHEN COL_LENGTH(N'dbo.zaznam_externi_odkazy', N'kalkulace_cena') IS NOT NULL
+     AND COL_LENGTH(N'dbo.zaznam_externi_odkazy', N'kalkulace_id') IS NOT NULL
+     AND COL_LENGTH(N'dbo.zaznam_externi_odkazy', N'kalkulace_nacteno') IS NOT NULL
+    THEN 1 ELSE 0 END;
+    -- 1_4_3: snímek skutečné ceny z kalkulace u externí vazby
+
+DECLARE @searchCleanup INT = CASE
+    WHEN OBJECT_ID(N'dbo.SearchIndex', N'U') IS NULL
+     AND OBJECT_ID(N'dbo.search_reindex_checkpoint', N'U') IS NULL
+     AND NOT EXISTS (SELECT 1 FROM authz.permissions WHERE klic = N'search.reindex')
+    THEN 1 ELSE 0 END;
+    -- 1_4_4: úklid po zrušené indexové vrstvě vyhledávání
+
+DECLARE @editZamek INT = CASE
+    WHEN OBJECT_ID(N'dbo.zaznam_edit_zamek', N'U') IS NOT NULL THEN 1 ELSE 0 END;
+    -- 1_4_5: tabulka zámku karty záznamu (souběžná editace)
+
 -- ---------------------------------------------------------------------------
 -- Otisky jednotlivých skriptů (v pořadí nasazování)
 -- ---------------------------------------------------------------------------
@@ -124,10 +146,14 @@ INSERT @r VALUES (60, N'db_upgrade_1_1_4_record_priority_matrix',
          THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
     N'tabulky zaznam_priority_uzivatelu + zaznam_priority_rebuild_state');
 
+-- 1_1_5 zavedla search_reindex_checkpoint, kterou 1_4_4 zase ruší. Sonda na
+-- existenci tabulky by proto po 1_4_4 hlásila CHYBÍ navždy. Rozhoduje pořadí:
+-- dokud 1_4_4 neproběhla, tabulka tu má být; poté tu být nesmí.
 INSERT @r VALUES (70, N'db_upgrade_1_1_5_search_checkpoint',
-    CASE WHEN OBJECT_ID(N'dbo.search_reindex_checkpoint', N'U') IS NOT NULL
-         THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
-    N'tabulka search_reindex_checkpoint');
+    CASE WHEN OBJECT_ID(N'dbo.search_reindex_checkpoint', N'U') IS NOT NULL THEN N'APLIKOVÁN'
+         WHEN @searchCleanup = 1 THEN N'NEAKTUÁLNÍ (zrušeno v 1_4_4)'
+         ELSE N'CHYBÍ' END,
+    N'tabulka search_reindex_checkpoint (ruší ji 1_4_4)');
 
 INSERT @r VALUES (80, N'db_upgrade_1_1_6_project_roles_manager_gestor',
     CASE WHEN @role_proj_man_gest IS NULL THEN N'NELZE OVĚŘIT'
@@ -288,6 +314,22 @@ INSERT @r VALUES (300, N'db_upgrade_1_4_1_drop_schedule_preview',
          ELSE N'CHYBÍ' END,
     N'absence mrtvého klíče schedule.preview v authz.permissions (nalezeno: '
         + ISNULL(CAST(@schedule_preview AS NVARCHAR(10)), N'-') + N')');
+
+INSERT @r VALUES (310, N'db_upgrade_1_4_2_externi_odkaz_pozadavek',
+    CASE WHEN @pozadavek = 1 THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
+    N'sloupec zaznam_externi_odkazy.pozadavek (text požadavku do výzvy)');
+
+INSERT @r VALUES (320, N'db_upgrade_1_4_3_externi_odkaz_kalkulace',
+    CASE WHEN @kalkulace = 1 THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
+    N'sloupce zaznam_externi_odkazy.kalkulace_cena/_id/_nacteno (snímek skutečné ceny)');
+
+INSERT @r VALUES (330, N'db_upgrade_1_4_4_search_cleanup',
+    CASE WHEN @searchCleanup = 1 THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
+    N'zrušené tabulky SearchIndex + search_reindex_checkpoint a klíč search.reindex');
+
+INSERT @r VALUES (340, N'db_upgrade_1_4_5_record_edit_lock',
+    CASE WHEN @editZamek = 1 THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
+    N'tabulka dbo.zaznam_edit_zamek (bez ní se editor neotevře nikomu — fail-soft vypne zámek)');
 
 -- ---------------------------------------------------------------------------
 -- Výstup
