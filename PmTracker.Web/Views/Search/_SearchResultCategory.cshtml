@@ -1,0 +1,48 @@
+@using PmTracker.Web.Services.Search
+@model SearchResultCategory
+
+@* Kategorie výsledků. Dnes jediná (Záznamy), partial je ale samostatný, aby
+   přidání další znamenalo jen další položku v kolekci, ne zásah do stránky. *@
+<section class="app-search-results" data-search-category="@Model.Key">
+    <h2 class="gov-text--body-l">@Model.Nazev <span class="gov-color--text-secondary">(@Model.Items.Count)</span></h2>
+
+    <gov-card-grid>
+        @foreach (var item in Model.Items)
+        {
+            <article>
+                <gov-card direction="horizontal" href="@item.DetailUrl">
+                    <gov-flex gap="s" direction="column">
+                        <h3 class="gov-card__headline">
+                            @if (!string.IsNullOrEmpty(item.CisloViditelne))
+                            {
+                                <span class="gov-color--text-secondary">@item.CisloViditelne</span>
+                                <text> — </text>
+                            }
+                            @item.Nazev
+                            <span class="app-search-item__meta">@item.SubsystemKod</span>
+                        </h3>
+
+                        @if (item.Snippet is not null)
+                        {
+                            <p class="app-search-item__snippet">
+                                @item.Snippet.Before<mark class="app-search-hl">@item.Snippet.Match</mark>@item.Snippet.After
+                                @if (item.MatchKind == SearchMatchKind.Vyjadreni && item.CisloJednani.HasValue)
+                                {
+                                    <span class="app-search-item__badge">@item.CisloJednani</span>
+                                }
+                                else if (item.MatchKind == SearchMatchKind.Popis)
+                                {
+                                    <span class="app-search-item__badge">popis</span>
+                                }
+                                else if (item.MatchKind == SearchMatchKind.ExterniOdkaz)
+                                {
+                                    <span class="app-search-item__badge">Ext. záz.</span>
+                                }
+                            </p>
+                        }
+                    </gov-flex>
+                </gov-card>
+            </article>
+        }
+    </gov-card-grid>
+</section>

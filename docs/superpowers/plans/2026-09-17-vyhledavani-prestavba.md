@@ -2406,6 +2406,18 @@ public sealed class SearchPageRenderTests : IClassFixture<PmTrackerWebAppFactory
 
 **Pozn.:** Razor kóduje diakritiku na HTML entity, takže na český text v HTML testech se nekotvi — testuj atributy a ASCII třídy.
 
+**Opravy oproti plánu (zjištěno při exekuci 2026-09-21):**
+- Test používá `ApiSqlFixture` (Collection) + `?asUser`, ne `IClassFixture<PmTrackerWebAppFactory>`
+  (stejně jako Task 6 — factory má povinný ctor arg). Plán navíc v těle míchal `_factory`/`_fixture`.
+- Render testy musí **seednout záznam se „zal" v názvu** (`EnsureProjectAsync`/`EnsureSubsystemAsync`/
+  `EnsureRecordAsync`), jinak se karta výsledku nevykreslí a `gov-card`/`data-search-category`/
+  `app-search-hl` v HTML nejsou.
+- **Runtime gov 4.2.9 nezná `gov-page-heading` ani `gov-card-grid`** (jsou to 4.7.0 template featury,
+  v repu jen v `DesignSystem-FIS-v1.0.0/assets`, ne v `wwwroot/lib`). `gov-card`, `gov-flex`,
+  `gov-container` v runtime jsou. Stránka je proto funkčně čitelná (karty se stylují), ale header
+  a mřížka se plně nastylují až s **už dohodnutým upgradem gov 4.2.9→4.7.0**. Markup je záměrně
+  ponechán v gov-template slovníku (forward-compatible), backfill app- CSS by DS duplikoval.
+
 - [ ] **Step 2: Spusť test, ověř že padá**
 
 ```bash

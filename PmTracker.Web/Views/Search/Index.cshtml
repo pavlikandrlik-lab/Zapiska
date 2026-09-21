@@ -1,42 +1,30 @@
-@model PmTracker.Web.Models.ViewModels.Search.SearchPageViewModel
+@using PmTracker.Web.Models.ViewModels.Search
+@model SearchPageViewModel
 @{
-    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Query)
-        ? "Vyhledávání"
-        : $"Vyhledávání: {Model.Query}";
-    ViewData["BodyClass"] = "dashboard-page";
+    ViewData["Title"] = "Výsledky vyhledávání";
 }
 
-@* Prozatímní stránka výsledků. Task 8 ji nahradí šablonou podle gov Design systému. *@
-<gov-container id="main">
-    <h1>Výsledky vyhledávání</h1>
+@* Kostra podle gov šablony „Výsledky vyhledávání".
+   Místo pro filtry vlevo zůstává prázdné — dokud je kategorie jediná,
+   není podle čeho filtrovat (spec 2026-09-17 §4). *@
+<header class="gov-page-heading">
+    <h1>
+        Vyhledávání „<b>@Model.Query</b>"
+    </h1>
+    <span class="gov-color--text-secondary">@Model.Result.TotalCount výsledků vyhledávání</span>
+</header>
 
-    @if (string.IsNullOrWhiteSpace(Model.Query))
+@if (Model.Result.TotalCount == 0)
+{
+    <p class="gov-text--body-m" data-search-empty>
+        Nic nenalezeno. Zkuste jiný výraz — hledá se od tří znaků a v názvu,
+        popisu, vyjádřeních a číslech externích záznamů.
+    </p>
+}
+else
+{
+    foreach (var category in Model.Result.Categories)
     {
-        <gov-message color="primary"><p>Zadejte hledaný výraz.</p></gov-message>
+        <partial name="_SearchResultCategory" model="category" />
     }
-    else if (Model.Result.TotalCount == 0)
-    {
-        <gov-message color="primary"><p>Pro „@Model.Query" se nic nenašlo.</p></gov-message>
-    }
-    else
-    {
-        @foreach (var category in Model.Result.Categories)
-        {
-            <section>
-                <h2>@category.Nazev</h2>
-                <ul>
-                    @foreach (var item in category.Items)
-                    {
-                        <li>
-                            <a href="@item.DetailUrl">@item.Nazev</a>
-                            @if (!string.IsNullOrEmpty(item.SubsystemKod))
-                            {
-                                <span>@item.SubsystemKod</span>
-                            }
-                        </li>
-                    }
-                </ul>
-            </section>
-        }
-    }
-</gov-container>
+}
