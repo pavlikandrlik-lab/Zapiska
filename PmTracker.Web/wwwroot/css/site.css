@@ -193,6 +193,68 @@
     display: none;
 }
 
+/* Dropdown vyhledávání — lokální odchylka od DS FIS, viz docs/known-issues/ds-fis-odchylky.md.
+   gov-form-autocomplete umí jen jednořádkový text, proto si seznam kreslíme sami. */
+.app-search-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.app-search-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+}
+
+.app-search-item:hover,
+.app-search-item:focus,
+.app-search-item.is-active,
+.app-search-item[aria-selected="true"] {
+    background: var(--pm-surface);
+}
+
+/* 80 / 20 — text vlevo, metadata vpravo. */
+.app-search-item__row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.app-search-item__title,
+.app-search-item__snippet {
+    flex: 1 1 80%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-search-item__meta,
+.app-search-item__badge {
+    flex: 0 0 20%;
+    text-align: right;
+    font-size: 0.8125rem;
+    color: var(--pm-text-muted);
+    white-space: nowrap;
+}
+
+.app-search-item__snippet {
+    font-size: 0.8125rem;
+    color: var(--pm-text-muted);
+}
+
+/* Tmavý text natvrdo, ať je čitelný na žlutém podkladu i v dark mode
+   (color: inherit by ve tmavém motivu dalo světlý text na žluté). */
+.app-search-hl {
+    background: #fde68a;
+    color: #1f2937;
+    padding: 0 0.0625rem;
+    border-radius: 2px;
+}
+
 /* ── Global search suggest dlaždice ─────────────────────────────────────── */
 
 .global-search-list {
@@ -372,7 +434,9 @@
     padding: 8px;
     display: grid;
     gap: 4px;
-    z-index: 20;
+    /* Nad drobečkovou lištou (.app-breadcrumb-bar má 40), jinak sticky lišta
+       překryje rozbalený profilový dropdown (topbar dropdowny drží ~100+). */
+    z-index: 110;
 }
 
 .user-menu-panel[hidden] {
@@ -607,6 +671,90 @@
     color: var(--gov-color-primary);
 }
 
+/* Drobečková lišta (frame bar pod menu) — pevná navigace zanoření.
+   Modal se zavírá jen křížkem; tato lišta se zavírá ✕ = jdi na rodiče. */
+.app-breadcrumb-bar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.25rem;
+    padding: 0.25rem 1rem;
+    background: var(--pm-surface);
+    border-top: 1px solid var(--pm-border);
+    border-bottom: 1px solid var(--pm-border);
+    font-size: 0.875rem;
+}
+.app-breadcrumb-back {
+    display: inline-flex;
+    align-items: center;
+    color: var(--pm-text-muted);
+    padding: 0.125rem;
+    border-radius: 0.25rem;
+}
+.app-breadcrumb-back:hover { color: var(--pm-text); background: var(--pm-border); }
+.app-breadcrumb-list {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+.app-breadcrumb-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+    /* margin:0 ruší gov core `ul li { margin-bottom: var(--spacing-s) }`: 8px margin na
+       ne-posledních <li> roztahoval list → align-items:center centroval kratší položky
+       o 4px níž → drobečky „skákaly" podle hloubky. */
+    margin: 0;
+}
+.app-breadcrumb-item:not(:first-child)::before {
+    content: "›";
+    color: var(--pm-text-muted);
+    padding: 0 0.25rem;
+}
+.app-breadcrumb-link,
+.app-breadcrumb-current {
+    display: inline-flex;
+    /* center (ne baseline) pro robustnost při různě vysokých inline prvcích (✕ ikona). */
+    align-items: center;
+    max-width: 22rem;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.app-breadcrumb-text { overflow: hidden; text-overflow: ellipsis; }
+.app-breadcrumb-link { color: var(--pm-text); }
+/* Podtržení celého odkazu (název i „| zkratka"), ne jen názvu — dřív zkratka nebyla podtržená. */
+.app-breadcrumb-link:hover { text-decoration: underline; }
+.app-breadcrumb-current { color: var(--pm-text-muted); font-weight: 600; }
+.app-breadcrumb-suffix { color: var(--pm-text-muted); font-weight: 400; }
+.app-breadcrumb-close {
+    display: inline-flex;
+    align-items: center;
+    color: var(--pm-text-muted);
+    padding: 0.0625rem;
+    border-radius: 0.25rem;
+}
+.app-breadcrumb-close:hover { color: var(--pm-text); background: var(--pm-border); }
+
+/* Úzká šířka: schovej všechny drobečky kromě aktuálního, nech ← + aktuální. */
+@media (max-width: 640px) {
+    .app-breadcrumb-item:not(:last-child) { display: none; }
+    .app-breadcrumb-item:not(:first-child)::before { content: none; }
+}
+
+/* Stav projektu přesunutý z page-headeru do řádku záložek (vlevo). */
+/* margin-left:0 — badge drží menu vlevo (žádný auto-margin z page-headeru → žádné centrování). */
+.tabs-status { align-self: center; margin-left: 0; margin-right: 0.5rem; }
+
 .dashboard-home {
     display: block;
 }
@@ -654,10 +802,25 @@
     border: 1px solid var(--gov-color-border, rgba(0, 43, 73, 0.1));
     border-radius: var(--d-radius, 0.85rem);
     background: var(--gov-color-surface, #ffffff);
-    padding: var(--d-pad-card, 1rem);
+    /* A2: svislý padding 70 % — šetří ~7px nahoře+dole na 13". */
+    padding: calc(var(--d-pad-card, 1rem) * 0.7) var(--d-pad-card, 1rem);
     color: inherit;
     text-decoration: none;
     transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    /* B1 (2026-07-09): snap na začátek dlaždice — žádné proříznuté dlaždice po scrollu. */
+    scroll-snap-align: start;
+}
+
+/* C2 (2026-07-10): dlaždice jednání = flex-wrap tok — na širokém panelu 1 řádka
+   (kód | badge | titulek | datum čas projekt), na úzkém přirozené zalomení podle
+   obsahu. Záměrný override display:block ze sdíleného bloku výše; focus/news
+   dlaždice beze změny. */
+.dashboard-meeting-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.6rem;
+    row-gap: 0.25rem;
 }
 
 /* Focus karty (2026-04-21, fluid 2026-06-09): 3-col grid (identity | content |
@@ -682,7 +845,6 @@
 }
 
 .dashboard-focus-item-top,
-.dashboard-meeting-item-top,
 .dashboard-news-item-top {
     display: flex;
     gap: 0.6rem;
@@ -735,9 +897,10 @@
     display: flex;
     gap: 0.6rem;
     flex-wrap: wrap;
-    margin-top: 0.45rem;
+    margin-top: 0.2rem;
     color: var(--app-muted);
-    font-size: var(--d-fs-base, 0.92rem);
+    /* A2: meta menší než titulek (poměr ≤1.25) — vlastník/datum nemají konkurovat názvu. */
+    font-size: var(--d-fs-label, 0.82rem);
 }
 
 .dashboard-item-project,
@@ -750,10 +913,24 @@
 .dashboard-focus-title,
 .dashboard-meeting-title,
 .dashboard-news-title {
-    margin: 0.25rem 0;
-    font-size: var(--d-fs-title, 1.05rem);
+    margin: 0.15rem 0;
+    /* A2 (2026-07-08): base místo title — 18px titulek na ~170px dlaždici tlačil 3. řádek
+       mimo panel-min (150px na 13"); s base (~15.7px) + těsnějším spacingem se dlaždice vejde. */
+    font-size: var(--d-fs-base, 0.95rem);
     font-weight: 700;
     color: var(--app-text-primary);
+}
+
+/* C2 (2026-07-10): úpravy pro inline tok dlaždice jednání (flex-wrap blok výše).
+   Blokové svislé marginy nemají v řádce smysl; baseline zarovnání. Umístěno až
+   ZA base typografické bloky kvůli test pinům (Block() bere první výskyt třídy). */
+.dashboard-meeting-item .dashboard-meeting-title {
+    margin: 0;
+}
+
+.dashboard-meeting-item .dashboard-item-meta {
+    margin-top: 0;
+    min-width: 0;
 }
 
 .dashboard-item-description {
@@ -817,6 +994,12 @@
 
 .dashboard-list-page {
     max-width: 76rem;
+}
+
+/* A3 (2026-07-08): jednotný spodní odstup listových podstránek od footeru. */
+.dashboard-list-page,
+.dashboard-list-page-narrow {
+    padding-bottom: var(--app-content-bottom-gap);
 }
 
 /* Focus list-page uvnitř fluid tier (Dashboard/Focus) — zrušit max-width cap,
@@ -2293,6 +2476,63 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
 }
 
+/* Projektové menu (Option 2, 2026-07-07): 3 primární + sekundární skupina.
+   Aktivní sekundární tab je vždy inline (podtržení viditelné), „+" jednosměrně odkryje
+   neaktivní inline „do boku", zámeček (spodní index) po rozbalení = trvalé rozbalení. */
+.tab-secondary-group {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Sbaleno: neaktivní sekundární skryté, „+" viditelný, zámek skrytý.
+   Aktivní tab (.tab.active) se NIKDY neschová → podtržení vidět i sbalené. */
+.tab-secondary-group:not(.is-expanded) .tab-secondary:not(.active) { display: none; }
+.tab-secondary-group:not(.is-expanded) .project-menu-lock { display: none; }
+/* Rozbaleno: „+" pryč, sekundární + zámek viditelné. */
+.tab-secondary-group.is-expanded .tab-overflow-toggle { display: none; }
+
+.tab-overflow-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.project-menu-lock {
+    /* Spodní index vpravo dole u posledního tabu — malý, zarovnaný dolů, mírně přesahuje. */
+    align-self: flex-end;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 2px;
+    padding: 1px 3px;
+    border: none;
+    background: transparent;
+    color: var(--pm-text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    transform: translateY(35%);
+}
+
+.project-menu-lock:hover {
+    color: var(--gov-color-primary, #2362a2);
+    background: var(--pm-surface);
+}
+
+/* Ikona reflektuje stav; hover ukáže opačnou (afordance přepnutí). Literal name kvůli
+   GovIconReferencesTests — viditelnost řídí CSS, ne dynamický Razor name. */
+.project-menu-lock .icon-lock { display: none; }
+.project-menu-lock .icon-unlock { display: inline-flex; }
+.project-menu-lock:hover .icon-unlock { display: none; }
+.project-menu-lock:hover .icon-lock { display: inline-flex; }
+
+.project-menu-lock.is-locked .icon-unlock { display: none; }
+.project-menu-lock.is-locked .icon-lock { display: inline-flex; }
+.project-menu-lock.is-locked:hover .icon-lock { display: none; }
+.project-menu-lock.is-locked:hover .icon-unlock { display: inline-flex; }
+
 .tab {
     padding: 10px 16px;
     border-radius: 6px 6px 0 0;
@@ -3544,16 +3784,40 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     font-weight: 600;
 }
 
+/* Toggle na kartě (2026-07-13): akce ve dvou řadách — řada 1 max 3 tlačítka + badge,
+   řada 2 switch Harmonogram. Jen letité flexy (i15). */
 .record-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.record-actions-row {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
+.record-actions [hidden] {
+    display: none !important;
+}
+
+/* Šipka menu: chevron-right → rotace o 90° (dolů) když je menu otevřené. Stav drží třída
+   na kartě (record-actions-menu-open) — pm-button strhává aria-expanded z hostu, proto
+   se rotace neváže na atribut triggeru, ale na třídu karty, kterou řídí JS. */
+[data-record-menu-chevron] {
+    transition: transform 0.2s ease;
+}
+
+.record-card.record-actions-menu-open [data-record-menu-chevron] {
+    transform: rotate(90deg);
+}
+
 /* Chip stavu záznamu v akční liště — stejná výška jako sousední tlačítka
    (icon-btn 34px, gov-button Small ~32px). User: "chip stavu má jinou velikost
    než tlačítka, srovnej chip do velikosti tlačítek". */
-.record-actions > .badge {
+.record-actions .badge {
     min-height: 32px;
     padding: 0 12px;
     font-size: 13px;
@@ -3636,19 +3900,72 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: 1px solid #bfdbfe;
 }
 
-.record-toggle-indicator {
+/* R7 (2026-07-13): indikátor rozbalení přesunut vlevo (mezi kraj karty a kategorii). */
+.record-expand-indicator {
     display: inline-block;
+    margin-top: 2px;
     font-size: 18px;
     transform: rotate(90deg);
     transition: transform 0.2s ease;
 }
 
-.record-card.collapsed .record-toggle-indicator {
+.record-card.collapsed .record-expand-indicator {
     transform: rotate(0deg);
 }
 
 .record-card.collapsed .record-body {
     display: none;
+}
+
+/* Toggle na kartě (2026-07-13): pohled řídí třída na kartě — žádné :has (i15).
+   V pohledu harmonogram je skrytý detail i vyjádření (R3), jinak schedule shell. */
+.record-card:not(.record-card--schedule-view) .record-schedule-shell {
+    display: none;
+}
+
+.record-card--schedule-view .record-detail-shell,
+.record-card--schedule-view .record-comments-lazy {
+    display: none;
+}
+
+.record-schedule-tag-row {
+    margin: 2px 0 10px;
+}
+
+/* Svislé menu akcí karty — obsah panelu; pozicování dodává floating vrstva (ui/floating.js). */
+.record-actions-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 250px;
+    padding: 6px;
+    background: var(--pm-surface);
+    border: 1px solid var(--pm-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.record-actions-menu[hidden] {
+    display: none;
+}
+
+.record-actions-menu-item {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.record-actions-menu-item:hover,
+.record-actions-menu-item:focus-visible {
+    background: rgba(37, 99, 235, 0.10);
 }
 
 .record-detail-shell,
@@ -4432,12 +4749,16 @@ gov-dialog[data-modal-container][data-modal-scrollable="true"] .modal-content {
     overflow: auto;
 }
 
-.collab-option {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0 10px;
+/* B5 (2026-07-09): jednořádkový výběr — checkbox | jméno | org celek vpravo.
+   Email z výpisu pryč (zůstává v data-collab-label pro hledání).
+   `label.collab-option` (0,1,1): remíza s `.form-grid label { display:grid }` —
+   vyhrává pozdější pravidlo (tenhle blok), jinak by grid stackoval řádek do sloupce. */
+label.collab-option {
+    display: flex;
+    flex-direction: row;
     align-items: center;
-    padding: 8px 10px;
+    gap: 10px;
+    padding: 6px 10px;
     border-bottom: 1px solid var(--gov-color-border);
 }
 
@@ -4448,25 +4769,24 @@ gov-dialog[data-modal-container][data-modal-scrollable="true"] .modal-content {
 .collab-option input[type="checkbox"] {
     width: auto;
     margin: 0;
+    flex: 0 0 auto;
 }
 
 .collab-option-name {
     font-size: 14px;
     font-weight: 600;
     line-height: 1.2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.collab-option-email {
-    grid-column: 2;
-    font-size: 12px;
-    color: #1d4f8f;
-    font-weight: 600;
-}
-
-.collab-option-origin {
-    grid-column: 2;
-    font-size: 12px;
-    color: var(--gov-color-muted);
+.collab-option-org {
+    margin-left: auto;
+    flex: 0 0 auto;
+    color: var(--pm-text-muted);
+    font-size: 13px;
 }
 
 .office-picker {
@@ -4501,6 +4821,12 @@ gov-dialog[data-modal-container][data-modal-scrollable="true"] .modal-content {
     position: fixed;
     pointer-events: auto;
     margin: 0;
+    /* Panel se mountuje do #floating-panel-root v <body> (mimo gov-dialog, aby fixed
+       pozicování neřešil transform containing-block dialogu). Tím ale ztratí z-index
+       z pravidla `gov-dialog … .office-search-panel { z-index: 2600 }` a spadl by na
+       .office-search-panel z-index:50 → pod modal (.modal-root z-index:2000). Držíme ho
+       nad modalem (2600) a pod record-editor close-guardem (2700). */
+    z-index: 2600;
 }
 
 .floating-panel--match-anchor {
@@ -4825,6 +5151,14 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     padding-top: 22px;
 }
 
+/* „Pouze aktivní záznamy" (přepínač uprostřed gridu vedle selectu): gov pozicuje knob
+   ve svém shadow DOM přes --padding-ver, takže host padding-top ho NEposune. transform je
+   spolehlivý (posune celý vykreslený prvek) → srovná knob na svislý střed vedlejšího selectu.
+   Vyloučeno filter-inline-wide (groupBySubsystem stojí sám na svém řádku). */
+.filter-grid gov-form-switch[size]:not(.filter-inline-wide) {
+    transform: translateY(26px);
+}
+
 .filter-inline {
     display: flex;
     align-items: center;
@@ -5040,7 +5374,9 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-project-overview__actions {
-    margin-top: auto;
+    /* B7 (2026-07-09): NE margin-top:auto — sidebar se natahuje s výškou karty
+       (rozbalené roky) a auto-margin odvezl tlačítka na dno mimo dohled. */
+    margin-top: var(--pm-spacing-s);
     padding-top: var(--pm-spacing-s);
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -5149,6 +5485,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     display: flex;
     flex-direction: column;
     gap: 10px;
+    /* A3 (2026-07-08): poslední řada karet jednání nesmí být nalepená na footer. */
+    margin-bottom: var(--app-content-bottom-gap);
 }
 
 .meeting-year-group {
@@ -5348,25 +5686,85 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     gap: 12px;
 }
 
-.meeting-attendance-table {
-    min-width: 100%;
+/* A1 (2026-07-08) + D1 (2026-07-10): řádkové karty účasti.
+   D1: inline tok v kartě (jméno · role · e-mail, flex-wrap zalomí až při
+   nedostatku šířky), column-major dvousloupec s deterministickým počtem řádků
+   ze serveru (--attendance-rows = ⌈n/2⌉) a decentní číslo řádku (CSS counter).
+   Jen letité konstrukce — i15 lekce (feedback_i15_edge_css_compat):
+   žádné :has, intrinsic keywords ani multi-column balancování. */
+.meeting-attendance-grid {
+    counter-reset: attendance-row;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px 24px;
 }
 
-.meeting-attendance-table th:last-child,
-.meeting-attendance-table td:last-child {
+/* Dvousloupec plněný shora dolů: levý 1..⌈n/2⌉, pravý zbytek. Práh 1900px
+   odpovídá dřívějšímu auto-fill minmax(680px) (2×680 + gap + okraje). */
+@media (min-width: 1900px) {
+    .meeting-attendance-grid {
+        grid-auto-flow: column;
+        grid-template-rows: repeat(var(--attendance-rows, 1), auto);
+        grid-template-columns: none;
+        grid-auto-columns: 1fr;
+    }
+}
+
+.meeting-attendance-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--pm-border);
+    border-radius: 6px;
+    background: var(--pm-surface);
+}
+
+/* Decentní číslo řádku uvnitř karty — jen vizuální orientace (netiskne se,
+   není v datech); pořadí = B6 řazení, s column-major tokem čte dolů po sloupci. */
+.meeting-attendance-row::before {
+    counter-increment: attendance-row;
+    content: counter(attendance-row) ".";
+    flex: 0 0 auto;
+    min-width: 1.6em;
+    color: var(--pm-text-muted);
+    font-size: 0.75rem;
+    user-select: none;
+}
+
+.meeting-attendance-person {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.6rem;
+    row-gap: 0.15rem;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.meeting-attendance-row .meeting-attendance-select {
     width: 240px;
-    min-width: 240px;
+    flex: 0 0 auto;
+    margin-left: auto;
 }
 
-.meeting-attendance-table td {
-    padding-top: 6px;
-    padding-bottom: 6px;
+.meeting-attendance-roles {
+    font-size: 0.8125rem;
+}
+
+.meeting-attendance-email {
+    font-size: 0.78rem;
+    opacity: 0.85;
 }
 
 .meeting-attendance-select {
-    width: 100%;
-    min-width: 220px;
     white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+    /* Číslo a jméno zůstávají v řádce; select se zalomí pod ně na plnou šířku. */
+    .meeting-attendance-row { flex-wrap: wrap; }
+    .meeting-attendance-row .meeting-attendance-select { width: 100%; }
 }
 
 .meeting-status {
@@ -6212,6 +6610,22 @@ pm-tab-panel.sync-tab-panel-content[active] {
     flex-wrap: wrap;
 }
 
+/* A5 (2026-07-08): karty per instance role — typ (Aplikační/Projektová/Subsystémová)
+   jako badge, projekt/subsystém jako tlumené scope popisky v summary. */
+.profile-role-typ {
+    flex: 0 0 auto;
+}
+
+.profile-role-scope {
+    color: var(--pm-text-muted);
+    font-weight: 400;
+    font-size: 0.875rem;
+}
+
+.profile-role-scope strong {
+    color: var(--pm-text);
+}
+
 .profile-role-name {
     font-size: 16px;
 }
@@ -6231,14 +6645,6 @@ pm-tab-panel.sync-tab-panel-content[active] {
     margin-top: 0;
 }
 
-.profile-print-preference-card {
-    align-content: start;
-}
-
-.profile-print-preference-card p {
-    margin: 0 0 10px;
-}
-
 .profile-preferences-card {
     align-content: start;
 }
@@ -6251,6 +6657,47 @@ pm-tab-panel.sync-tab-panel-content[active] {
     min-height: 20px;
     font-size: 13px;
     color: var(--gov-color-muted);
+}
+
+.preferences-list {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.preference-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--pm-border);
+    border-radius: 6px;
+}
+
+.preference-row-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.preference-row-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem;
+    border: none;
+    background: transparent;
+    color: var(--pm-text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.preference-row-remove:hover {
+    color: var(--gov-color-error-500, #c52a3a);
+    background: var(--pm-surface);
 }
 
 .profile-rights-filters {
@@ -6595,10 +7042,6 @@ pm-tab-panel.sync-tab-panel-content[active] {
 :root[data-theme="dark"] .collab-picker,
 :root[data-theme="dark"] .collab-options {
     background: var(--gov-color-surface);
-}
-
-:root[data-theme="dark"] .collab-option-email {
-    color: #9dc4ff;
 }
 
 :root[data-theme="dark"] .office-search-panel {
@@ -7233,8 +7676,10 @@ html {
      na úzkém (<1024) stack + scroll stránky.
    - Bugfix: meetings list scrolluje (singulár i plurál v overflow pravidle).
    ========================================================================== */
-.dashboard-shell {
-    /* fluid tokeny — min na 13", max na 28" */
+/* A3 (2026-07-08): dashboard fluid tokeny v :root — subpages (Dashboard/Focus|Meetings|News,
+   .dashboard-list-page bez .dashboard-shell) jinak var(--d-…) resolvnou na NIC → gap 0,
+   slepené karty (stejná třída chyb jako --pm-* 2026-06). Hodnoty beze změny (min 13", max 28"). */
+:root {
     --d-fs-label: clamp(0.68rem, 0.60rem + 0.25vw, 0.80rem);
     --d-fs-base:  clamp(0.80rem, 0.70rem + 0.35vw, 0.98rem);
     --d-fs-title: clamp(0.92rem, 0.78rem + 0.45vw, 1.18rem);
@@ -7244,7 +7689,11 @@ html {
     --d-pad-panel: clamp(0.55rem, 0.30rem + 0.6vw,  1.2rem);
     --d-radius:    clamp(0.45rem, 0.30rem + 0.3vw,  0.85rem);
     --d-panel-min: clamp(140px, 18vh, 240px);
+    /* Jednotný spodní odstup obsahu od footeru (reference: Záznamy projektu = 20px). */
+    --app-content-bottom-gap: 20px;
+}
 
+.dashboard-shell {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
@@ -7263,6 +7712,8 @@ html {
     flex: 0 0 auto;
     height: calc(100dvh - var(--app-header-h, 110px));
     min-height: 0;
+    /* A3: obsah nesmí být nalepený na footer — panely mají interní scroll, výška drží. */
+    padding-bottom: var(--app-content-bottom-gap);
 }
 
 /* .dashboard-shell-header (+ h1) → odstraněno 2026-06-08 (úspora místa). */
@@ -7290,18 +7741,30 @@ html {
     min-height: 0;
 }
 
-/* Dynamické sdílení výšky: panel s OBSAHEM (má list) roste a scrolluje;
-   PRÁZDNÝ panel (jen .muted hláška, žádný list) se smrskne na obsah a uvolní
-   místo druhému. Detekce přes :has — empty-state partial nerenderuje list. */
-.dashboard-rail > .dashboard-panel:has(.dashboard-meeting-list),
-.dashboard-rail > .dashboard-panel:has(.dashboard-meetings-list),
-.dashboard-rail > .dashboard-panel:has(.dashboard-news-list) {
-    flex: 1 1 auto;
-    min-height: var(--d-panel-min);
+/* C2 (2026-07-10, rev. 2): dělení pravého sloupce — jen letité flex základy.
+   První verze (flex-basis 0 + max-height: max-content na :has panelech) fungovala
+   v aktuálním Chromiumu, ale Edge na intranetovém i15 počítal max-content stlačeně
+   → jednání ořezaná jak před fixem. Proto bez :has i bez intrinsic keywords:
+   - jednání: velikost přesně podle obsahu (basis auto), shrink 0 = NIKDY je nic
+     nestlačí pod obsah, strop 50 % sloupce (%-max-height — počítá každý prohlížeč),
+   - novinky: vezmou si zbytek (grow 1, shrink 1),
+   - prázdný stav se řeší přirozeně: panel bez listu má malý obsah → malá výška. */
+.dashboard-rail > .dashboard-section--meetings {
+    flex: 0 0 auto;
+    min-height: 0;
 }
 
-.dashboard-rail > .dashboard-panel:not(:has(.dashboard-meeting-list)):not(:has(.dashboard-meetings-list)):not(:has(.dashboard-news-list)) {
-    flex: 0 0 auto;
+.dashboard-rail > .dashboard-section--news {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* Strop 50 % platí, jen když novinky reálně mají obsah (list) — prázdné novinky
+   nechají jednání růst podle obsahu. Jedno-úrovňové :has (vnořené :has je
+   neplatný selektor!); prohlížeč bez :has = jednání dle obsahu bez stropu,
+   což odpovídá chování před 2026-06 (kosmetický, přijatelný fallback). */
+.dashboard-rail > .dashboard-section--meetings:has(+ .dashboard-section--news .dashboard-news-list) {
+    max-height: 50%;
 }
 
 /* Panel = flex column, který clipuje; vnitřní list scrolluje. */
@@ -7354,6 +7817,11 @@ html {
     flex-direction: column;
     gap: var(--d-gap-item);
     padding: 0 var(--d-pad-card) var(--d-gap-item);
+    /* B1 (2026-07-09): scroll-snap — po doscrollování jsou viditelné dlaždice celé
+       (proximity: plynulý scroll bez lepení); fade dole signalizuje pokračování.
+       Konstantní mask (bez JS) — fade je i na konci scrollu, přijatelný kompromis. */
+    scroll-snap-type: y proximity;
+    mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent);
 }
 
 /* Stack fallback na úzkém okně / split-screen — scroll stránky. */
@@ -7409,3 +7877,125 @@ pm-button gov-icon {
     font-size: 16px;
     line-height: 1;
 }
+
+/* === stránka záznamu (2026-07-14) === */
+/* Hlavička na plnou šířku + dva sloupce 40/60. Jen letité grid/flex základy (i15). */
+.record-page-grid {
+    display: grid;
+    grid-template-columns: 40% 1fr;
+    gap: 16px;
+    align-items: start;
+    margin-top: 16px;
+}
+
+.record-page-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.record-page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.record-page-header .record-title {
+    font-size: 20px;
+    margin: 4px 0 0;
+}
+
+/* Wrapper karty kolem vyjádření — nese jen hooky pro AJAX obnovu, vzhled má sloupec sám. */
+.record-card--page-column {
+    display: block;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+.record-card--page-column .record-bar {
+    display: none;
+}
+
+.record-page-schedule-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.record-page-schedule-head h2 {
+    margin: 0;
+}
+
+/* Segmentovaný přepínač Graf/Tabulka. */
+.schedule-view-switch {
+    display: flex;
+    border: 1px solid var(--pm-border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.schedule-view-switch-btn {
+    padding: 6px 14px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.schedule-view-switch-btn[aria-pressed="true"] {
+    background: rgba(37, 99, 235, 0.12);
+    font-weight: 600;
+}
+
+/* Režim podoby řídí třída na kontejneru — žádné :has (i15). */
+.record-page-schedule--table [data-record-page-schedule-graph] {
+    display: none;
+}
+
+.record-page-schedule:not(.record-page-schedule--table) [data-record-page-schedule-table] {
+    display: none;
+}
+
+/* Datumy v read-only tabulce jsou jen text — v užším sloupci stránky se input scvrkl
+   na 64 px a datum se oříznulo („09.0…"). Držíme minimální šířku na celé datum. */
+.record-page-schedule .schedule-table-wrap .schedule-date-field,
+.record-page-schedule .schedule-table-wrap .app-date-display-input {
+    min-width: 140px;
+}
+
+/* Bez harmonogramu jeden sloupec — vyjádření využijí celou šířku. */
+.record-page-grid--single {
+    grid-template-columns: 1fr;
+}
+
+@media (max-width: 1100px) {
+    .record-page-grid {
+        grid-template-columns: 1fr;
+    }
+}
+/* === konec stránky záznamu === */
+
+/* === Spec 2026-09-17 §4.3: stránka „záznam upravuje jiný uživatel" === */
+.record-edit-locked-title {
+    font-weight: 600;
+}
+
+.record-edit-locked-detail {
+    margin-top: 4px;
+}
+
+.record-edit-locked-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 16px;
+}
+/* === konec stránky zamčeného záznamu === */
