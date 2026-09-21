@@ -546,6 +546,11 @@ public static class SearchQueryText
         return null;
     }
 
+    /// <summary>
+    /// Konec textu o `count` slovech — jako <b>výsek</b>, ne jako slova poskládaná mezerou.
+    /// LIKE hledá podřetězec, takže shoda běžně padne doprostřed slova nebo čísla; skládání
+    /// ze slov by do dat vložilo mezeru, která v nich není („123456" -> „1234 56").
+    /// </summary>
     private static string TakeLastWords(string text, int count)
     {
         if (string.IsNullOrEmpty(text) || count <= 0)
@@ -553,16 +558,18 @@ public static class SearchQueryText
             return string.Empty;
         }
 
-        var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length == 0)
+        var start = text.Length;
+        for (var word = 0; word < count; word++)
         {
-            return string.Empty;
+            while (start > 0 && char.IsWhiteSpace(text[start - 1])) { start--; }
+            if (start == 0) { break; }
+            while (start > 0 && !char.IsWhiteSpace(text[start - 1])) { start--; }
         }
 
-        var taken = string.Join(' ', words.TakeLast(count));
-        return taken + " ";
+        return text[start..];
     }
 
+    /// <summary>Začátek textu o `count` slovech, jako výsek. Platí totéž co výše.</summary>
     private static string TakeFirstWords(string text, int count)
     {
         if (string.IsNullOrEmpty(text) || count <= 0)
@@ -570,13 +577,15 @@ public static class SearchQueryText
             return string.Empty;
         }
 
-        var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length == 0)
+        var end = 0;
+        for (var word = 0; word < count; word++)
         {
-            return string.Empty;
+            while (end < text.Length && char.IsWhiteSpace(text[end])) { end++; }
+            if (end == text.Length) { break; }
+            while (end < text.Length && !char.IsWhiteSpace(text[end])) { end++; }
         }
 
-        return " " + string.Join(' ', words.Take(count));
+        return text[..end];
     }
 }
 ```

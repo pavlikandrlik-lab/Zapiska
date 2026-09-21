@@ -103,6 +103,16 @@ public static class SearchQueryText
         return null;
     }
 
+    /// <summary>
+    /// Konec <paramref name="text"/> o <paramref name="count"/> slovech — jako <b>výsek</b>
+    /// původního textu, ne jako slova poskládaná mezerou.
+    /// <para>
+    /// Na rozdílu záleží: LIKE hledá podřetězec, takže shoda běžně padne doprostřed slova
+    /// nebo čísla. Skládání ze slov by pak do dat vložilo mezeru, která v nich není —
+    /// z „123456" by bylo „1234 56" a ze „Zálohování" „Zá loho vání". Výsek nechá
+    /// oddělovače přesně tak, jak byly.
+    /// </para>
+    /// </summary>
     private static string TakeLastWords(string text, int count)
     {
         if (string.IsNullOrEmpty(text) || count <= 0)
@@ -110,16 +120,32 @@ public static class SearchQueryText
             return string.Empty;
         }
 
-        var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length == 0)
+        var start = text.Length;
+        for (var word = 0; word < count; word++)
         {
-            return string.Empty;
+            while (start > 0 && char.IsWhiteSpace(text[start - 1]))
+            {
+                start--;
+            }
+
+            if (start == 0)
+            {
+                break;
+            }
+
+            while (start > 0 && !char.IsWhiteSpace(text[start - 1]))
+            {
+                start--;
+            }
         }
 
-        var taken = string.Join(' ', words.TakeLast(count));
-        return taken + " ";
+        return text[start..];
     }
 
+    /// <summary>
+    /// Začátek <paramref name="text"/> o <paramref name="count"/> slovech, jako výsek.
+    /// Platí totéž co pro <see cref="TakeLastWords"/> — viz tamní poznámka.
+    /// </summary>
     private static string TakeFirstWords(string text, int count)
     {
         if (string.IsNullOrEmpty(text) || count <= 0)
@@ -127,12 +153,25 @@ public static class SearchQueryText
             return string.Empty;
         }
 
-        var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length == 0)
+        var end = 0;
+        for (var word = 0; word < count; word++)
         {
-            return string.Empty;
+            while (end < text.Length && char.IsWhiteSpace(text[end]))
+            {
+                end++;
+            }
+
+            if (end == text.Length)
+            {
+                break;
+            }
+
+            while (end < text.Length && !char.IsWhiteSpace(text[end]))
+            {
+                end++;
+            }
         }
 
-        return " " + string.Join(' ', words.Take(count));
+        return text[..end];
     }
 }

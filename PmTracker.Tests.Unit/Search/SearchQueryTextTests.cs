@@ -77,6 +77,38 @@ public sealed class SearchQueryTextTests
         snippet!.Match.Should().Be("Zálohování");
     }
 
+    [Theory]
+    // Čísla tiketů a záznamů — shoda skoro vždy padne doprostřed.
+    [InlineData("123456", "1234")]
+    [InlineData("123456", "3456")]
+    [InlineData("SD-123456", "123456")]
+    [InlineData("RU 123/2026", "123")]
+    [InlineData("INC0012345", "12345")]
+    // Běžný text: LIKE hledá podřetězec, takže i tady je shoda uprostřed slova normální.
+    [InlineData("Zálohování", "loho")]
+    [InlineData("nezálohovat", "zaloh")]
+    public void BuildSnippet_ShodaUprostredSlova_NevkladaMezeryNavic(string text, string dotaz)
+    {
+        // Když se výřez do textu vejde celý, musí ho složit zpátky znak po znaku.
+        // Dřív se skládal ze slov spojených mezerou, takže z „123456" vypadlo
+        // „1234 56" a ze „Zálohování" „Zá loho vání".
+        var snippet = SearchQueryText.BuildSnippet(text, new[] { dotaz });
+
+        snippet.Should().NotBeNull();
+        (snippet!.Before + snippet.Match + snippet.After).Should().Be(text,
+            "výřez nesmí do dat vložit mezeru, která tam není");
+    }
+
+    [Fact]
+    public void BuildSnippet_ZachovaPuvodniOddelovace()
+    {
+        // Oddělovač mezi slovy patří do Before/After tak, jak je v datech.
+        var snippet = SearchQueryText.BuildSnippet("verze 1.2/3 hotova", new[] { "1.2" });
+
+        snippet.Should().NotBeNull();
+        (snippet!.Before + snippet.Match + snippet.After).Should().Be("verze 1.2/3 hotova");
+    }
+
     [Fact]
     public void BuildSnippet_BezShodyVraciNull()
     {
