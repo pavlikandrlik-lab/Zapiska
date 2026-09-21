@@ -1762,16 +1762,22 @@ using PmTracker.Tests.Api.TestInfrastructure;
 
 namespace PmTracker.Tests.Api.Controllers;
 
-public sealed class SearchEndpointsTests : IClassFixture<PmTrackerWebAppFactory>
+[Collection(ApiSqlCollection.CollectionName)]
+public sealed class SearchEndpointsTests
 {
-    private readonly PmTrackerWebAppFactory _factory;
+    private readonly ApiSqlFixture _fixture;
 
-    public SearchEndpointsTests(PmTrackerWebAppFactory factory) => _factory = factory;
+    public SearchEndpointsTests(ApiSqlFixture fixture) => _fixture = fixture;
+
+    // PmTrackerWebAppFactory má povinný ctor arg connectionString, takže se používá
+    // přes ApiSqlFixture (Collection), ne přes IClassFixture. TestAuthHandler přihlásí
+    // osobu podle ?asUser; AdminOsobaId je seedovaný superadmin.
+    private string AsUser => $"asUser={_fixture.AdminOsobaId}";
 
     [Fact]
     public async Task Suggest_PodPrahemTriZnaku_VraciPrazdnoBezChyby()
     {
-        var client = _factory.CreateClient();
+        var client = _fixture.Factory.CreateClient();
 
         var response = await client.GetAsync("/Search/Suggest?q=za");
 
@@ -1783,7 +1789,7 @@ public sealed class SearchEndpointsTests : IClassFixture<PmTrackerWebAppFactory>
     [Fact]
     public async Task Suggest_VraciOcekavanyTvarJson()
     {
-        var client = _factory.CreateClient();
+        var client = _fixture.Factory.CreateClient();
 
         var response = await client.GetAsync("/Search/Suggest?q=zal");
 
@@ -1800,7 +1806,7 @@ public sealed class SearchEndpointsTests : IClassFixture<PmTrackerWebAppFactory>
     [Fact]
     public async Task Index_SeVykresli()
     {
-        var client = _factory.CreateClient();
+        var client = _fixture.Factory.CreateClient();
 
         var response = await client.GetAsync("/Search/Index?q=zal");
 
@@ -1810,7 +1816,7 @@ public sealed class SearchEndpointsTests : IClassFixture<PmTrackerWebAppFactory>
     [Fact]
     public async Task Reindex_UzNeexistuje()
     {
-        var client = _factory.CreateClient();
+        var client = _fixture.Factory.CreateClient();
 
         var response = await client.PostAsync("/Search/Reindex", null);
 
@@ -1821,7 +1827,7 @@ public sealed class SearchEndpointsTests : IClassFixture<PmTrackerWebAppFactory>
     [Fact]
     public async Task Status_UzNeexistuje()
     {
-        var client = _factory.CreateClient();
+        var client = _fixture.Factory.CreateClient();
 
         var response = await client.GetAsync("/Search/Status");
 
@@ -1867,6 +1873,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using PmTracker.Web.Models.ViewModels.Search;
 using PmTracker.Web.Services.Search;
+using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
@@ -1875,7 +1882,15 @@ public sealed class SearchController : BaseController
 {
     private readonly IRecordSearchService _search;
 
-    public SearchController(IRecordSearchService search) => _search = search;
+    public SearchController(
+        IUserContextResolver userContextResolver,
+        TimeProvider timeProvider,
+        ILoggerFactory loggerFactory,
+        IRecordSearchService search)
+        : base(userContextResolver, timeProvider, loggerFactory)
+    {
+        _search = search;
+    }
 
     /// <summary>Data pro dropdown pod vyhledávacím polem.</summary>
     [HttpGet]
@@ -1934,6 +1949,18 @@ public sealed class SearchController : BaseController
     private const int PageLimit = 40;
 }
 ```
+
+**Minimální view teď, gov šablona v Tasku 8.** Index vrací `View(...)`, takže
+`Views/Search/Index.cshtml` musí existovat a vázat `SearchPageViewModel`, jinak endpoint
+spadne na 500. Task 6 napíše prozatímní placeholder (gov-message pro prázdné stavy, prostý
+seznam výsledků); finální šablonu podle gov Design systému staví Task 8.
+
+**Obsoletní testy staré vrstvy vyřešené už v Tasku 6** (nešly nechat červené přes 3 tasky):
+smazány `PmTracker.Tests.Api/Controllers/SuggestEndpointTests.cs` (starý JSON kontrakt `hits`),
+`PmTracker.Tests.Unit/Search/SearchBootstrapTests.cs` (Status endpoint + reindex hosted service),
+`PmTracker.Tests.Unit/Authorization/SearchReindexAuthzTests.cs` (zaniklý reindex); z
+`PolicyAttributeMigrationTests` odstraněna jen metoda `SearchController_ShouldUseAuthorizePolicyAttribute`.
+Rate-limiting invariant zachován (atribut přesunut na třídu), gov-message invariant zachován ve view.
 
 **Ověřené členy `BaseController`** (nepřepisovat podle paměti):
 - `protected CurrentUserContextViewModel CurrentUserContext { get; }` — `BaseController.cs:19`
@@ -2341,7 +2368,7 @@ public sealed class SearchPageRenderTests : IClassFixture<PmTrackerWebAppFactory
     [Fact]
     public async Task Stranka_PouzivaGovKostruSablony()
     {
-        var client = _factory.CreateClient();
+        var client = _fixture.Factory.CreateClient();
 
         var response = await client.GetAsync("/Search/Index?q=zal");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -2355,7 +2382,7 @@ public sealed class SearchPageRenderTests : IClassFixture<PmTrackerWebAppFactory
     [Fact]
     public async Task Stranka_RenderujeKategorieJakoSekce()
     {
-        var client = _factory.CreateClient();
+        var client = _fixture.Factory.CreateClient();
 
         var response = await client.GetAsync("/Search/Index?q=zal");
         var html = await response.Content.ReadAsStringAsync();
@@ -2367,7 +2394,7 @@ public sealed class SearchPageRenderTests : IClassFixture<PmTrackerWebAppFactory
     [Fact]
     public async Task Stranka_MaZvyrazneniShody()
     {
-        var client = _factory.CreateClient();
+        var client = _fixture.Factory.CreateClient();
 
         var response = await client.GetAsync("/Search/Index?q=zal");
         var html = await response.Content.ReadAsStringAsync();

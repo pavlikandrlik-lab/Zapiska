@@ -44,13 +44,4 @@ public sealed class PolicyAttributeMigrationTests
             "body hasPermission callback musí být nahrazen [Authorize(Policy)] atributem");
     }
 
-    [Fact]
-    public void SearchController_ShouldUseAuthorizePolicyAttribute()
-    {
-        var code = File.ReadAllText(ResolvePath("PmTracker.Web/Controllers/SearchController.cs"));
-
-        code.Should().Contain("[Authorize(Policy = \"permission:search.reindex\")]");
-        code.Should().NotContain("if (!CurrentUserContext.HasPermission(PermissionKeys.SearchReindex",
-            "body check musí být nahrazen [Authorize(Policy)] atributem");
-    }
 }
