@@ -66,7 +66,7 @@ Identifikátory jednání ("8201"), zkratky projektů ("FIS-EIS"), kódy subsyst
 
 - **Velmi krátký dotaz** (1-2 znaky) může vrátit příliš mnoho výsledků nebo
   být zamítnut
-- **Speciální znaky** (`%`, `_`, regex) nejsou podporované
+- **Speciální znaky** (`%`, `_`) se berou doslova, regex podporovaný není
 - **Hledání jen v jednom projektu** — globální search neumí scope na projekt;
   pro to použij filtr v záznamech projektu
 
@@ -80,7 +80,53 @@ narazit na 429 Too Many Requests.
 
 Pro každého přihlášeného uživatele. Výsledky filtrované jeho přístupy.
 
+## Když vyhledávání nevrací nic
+
+Tabulku indexu **nezakládá aplikace** — vzniká databázovým skriptem
+`db_upgrade_1_4_4_search_index.sql`, který spouští správce databáze pod účtem
+s `db_owner`. Účet, pod kterým aplikace běží, na zakládání tabulek právo nemá.
+
+Když hledání vrací prázdno pro cokoli, podívej se do logu (`logs/pmtracker-*.log`)
+— aplikace při startu píše konkrétní důvod:
+
+| Stav v logu | Co to znamená | Co s tím |
+|---|---|---|
+| `TableMissing` | Chybí tabulka `dbo.SearchIndex` | Spustit migrační skript |
+| `Unavailable` | Databáze neodpovídá | Zkontrolovat connection string a práva účtu aplikace |
+
+Skript je idempotentní, jde spustit opakovaně. Po doběhnutí **restartuj aplikaci** —
+index se naplní při startu. Stav vrací i endpoint `/Search/Status` (pole `state`
+a `stateDetail`), na kterém stojí karta vyhledávání v Profilu s tlačítkem pro ruční
+přegenerování, a offline ho ukáže `db_check_applied_upgrades.sql`.
+
+## Jak hledání funguje
+
+Hledá se přes `LIKE` nad indexovou tabulkou, **ne fulltextem** — produkční SQL Server
+nemá nainstalovanou komponentu Full-Text Search (rozhodnutí 2026-09-17). Prakticky to
+znamená:
+
+- **Na diakritice ani velikosti písmen nezáleží** — „zalohovani“ najde „Zálohování“.
+  (Dotaz si vynucuje collation `Czech_CI_AI`; samotná databáze má `Czech_CI_AS`,
+  tedy akcent-citlivou.)
+- **Hledá se na podřetězce, ne na slovní tvary** — „záznam“ najde „záznamu“
+  i „záznamech“, ale „záznamu“ **nenajde** „záznam“. Zkus kratší tvar nebo kořen slova.
+- **Víceslovný dotaz vyžaduje všechna slova** (v názvu, klíčových slovech nebo textu),
+  ne nutně vedle sebe. Bere se prvních 6 slov.
+- **Řazení**: shoda v názvu váží nejvíc, pak klíčová slova, pak text; celá fráze
+  v názvu jde nahoru.
+- **`%` a `_` se berou doslova** — hledání „50 %“ hledá opravdu „50 %“.
+
 ## Související
 
 - [Moje priority](moje-priority.md) — aktivní pracovní pohled (ne hledání)
 - [Projekty](../projekty/) — listing s filtry, alternativa k vyhledávání
+
+## Hledání bez diakritiky
+
+Hledá se bez ohledu na diakritiku a velikost písmen — „zalohovani" najde „Zálohování",
+„rizeni" najde „Řízení". Platí to i pro písmena s háčkem (`č ř š ž`), která čeština
+bere jako samostatná písmena abecedy; kvůli nim se porovnává přes
+`COLLATE Latin1_General_CI_AI`, ne přes českou collation.
+
+Jestli to na konkrétní databázi opravdu funguje, ukáže `db_check_search_collation.sql` —
+spustí se proti produkci, nic nemění a ve sloupci *Verdikt* má mít samé `OK`.

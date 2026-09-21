@@ -1021,6 +1021,15 @@ EOF
 
 ### Task 5: Vyhledávací služba — EF dotaz
 
+> **Collation na non-Unicode sloupcích — ověřit integračně.** `popis` a `text_vyjadreni`
+> jsou typu `text`, tedy **non-Unicode** (kódová stránka 1250 podle `Czech_CI_AS`).
+> `COLLATE Latin1_General_CI_AI` na nich funguje **přímo, bez `CAST`** a vrácený text
+> zůstává s plnou diakritikou — SQL Server dělá pro porovnání best-fit (`Ř→R`, `ě→e`),
+> na uloženou ani vrácenou hodnotu nesahá. Změřeno 2026-09-21 na databázi založené
+> s `Czech_CI_AS`. Mezi testy Tasku 5 proto musí být aspoň jeden, který hledá slovo
+> s háčkem **v `popis` nebo `text_vyjadreni`** — jinak by se regrese na non-Unicode
+> cestě neodhalila. Ruční protějšek pro produkci: `db_check_search_collation.sql`.
+
 Jádro. Testuje se integračně proti reálné databázi, protože `COLLATE` ani `EXISTS` nejde ověřit in-memory.
 
 **Files:**
