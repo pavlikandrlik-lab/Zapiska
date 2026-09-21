@@ -97,8 +97,9 @@ Hranice, při které se toto rozhodnutí musí revidovat: **~100 000 záznamů**
 
 Databáze má collation `Czech_CI_AS` — nerozlišuje velikost písmen, ale **rozlišuje diakritiku**. Bez zásahu by „zalohovani" nenašlo „Zálohování".
 
-- Každý `LIKE` se vynucuje přes `COLLATE Czech_CI_AI`. Ověřeno empiricky, že to funguje **i na sloupcích typu `text`** bez nutnosti `CAST`.
-- V EF Core se zapisuje jako `EF.Functions.Like(EF.Functions.Collate(x, "Czech_CI_AI"), pattern)`.
+- Každý `LIKE` se vynucuje přes `COLLATE Latin1_General_CI_AI`. Ověřeno empiricky, že to funguje **i na sloupcích typu `text`** bez nutnosti `CAST`.
+- **Ne `Czech_CI_AI`.** Čeština bere `č ř š ž` jako samostatná písmena abecedy, ne jako diakritické varianty — mají vlastní primární váhu, kterou akcent-necitlivost minout nemůže. Pod `Czech_CI_AI` by „rizeni" nenašlo „Řízení". Ověřeno na SQL Serveru 2026-09-21.
+- V EF Core se zapisuje jako `EF.Functions.Like(EF.Functions.Collate(x, "Latin1_General_CI_AI"), pattern)`.
 - Vstup se escapuje (`\` `%` `_` `[`) a `LIKE` dostane `ESCAPE '\'`, aby dotaz „50 %" hledal doslova „50 %".
 - Víceslovný dotaz: všechna slova musí padnout (AND mezi slovy, OR mezi poli), max 6 slov.
 - **Minimální délka dotazu: 3 znaky.**

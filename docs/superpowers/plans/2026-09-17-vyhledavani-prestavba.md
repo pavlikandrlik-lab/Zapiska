@@ -16,7 +16,8 @@
 
 - **Minimální délka dotazu: 3 znaky.** Kratší dotaz vrací prázdný výsledek bez dotazu do DB.
 - **Maximálně 6 slov** z dotazu se bere v potaz.
-- **Collation `Czech_CI_AI`** u každého `LIKE`. Databáze má `Czech_CI_AS` (akcent-citlivou), bez vynucení by „zalohovani" nenašlo „Zálohování".
+- **Collation `Latin1_General_CI_AI`** u každého `LIKE`. Databáze má `Czech_CI_AS` (akcent-citlivou), bez vynucení by „zalohovani" nenašlo „Zálohování".
+  **NE `Czech_CI_AI`** — čeština bere `č ř š ž` jako samostatná písmena abecedy s vlastní primární váhou, takže je akcent-necitlivost neskládá: pod `Czech_CI_AI` i `Czech_100_CI_AI` dotaz „rizeni" nenajde „Řízení" a „cislo" nenajde „Číslo". Ověřeno dotazem na SQL Server 2026-09-21. `Latin1_General_CI_AI` je skládá a přitom drží `á→a, ě→e, ď→d, ů→u, ý→y`.
 - **Escapování LIKE hranatými závorkami**, ne `ESCAPE` klauzulí — projekt to tak dělá v `DbSuggestService`: `raw.Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]")`.
 - **7 výsledků v dropdownu.** Řazení **vzestupně**, texty i čísla. Žádné skórování relevance.
 - **Autorizace jedním pravidlem:** uživatel vidí záznam právě tehdy, když vidí projekt v plném rozsahu `CanAccessProject`. `null` = bez omezení (superadmin / globální read klíč), **prázdná množina = žádné výsledky** (ne „žádný filtr").
@@ -25,8 +26,9 @@
 - **Migrace musí projít na Azure SQL Edge** — testovací kontejner nepodporuje fulltext ani vše, co MSSQL 2022. Nepodporovanou věc přeskočit s `RAISERROR(...,10,1)`, nikdy `16`.
 
 **Ověřená API (nevymyšlená, zkontrolováno kompilací proti EF Core 8):**
-- `EF.Functions.Like(EF.Functions.Collate(sloupec, "Czech_CI_AI"), vzor)` — překládá se.
-- `CompareInfo.IndexOf(ReadOnlySpan<char>, ReadOnlySpan<char>, CompareOptions, out int matchLength)` — pro `cs-CZ` s `IgnoreCase | IgnoreNonSpace` vrací `"zaloha"` → `"Záloha"` index 0, matchLength 6; bez shody index −1, matchLength 0.
+- `EF.Functions.Like(EF.Functions.Collate(sloupec, "Latin1_General_CI_AI"), vzor)` — překládá se.
+- `CompareInfo.IndexOf(ReadOnlySpan<char>, ReadOnlySpan<char>, CompareOptions, out int matchLength)` s `IgnoreCase | IgnoreNonSpace` vrací `"zaloha"` → `"Záloha"` index 0, matchLength 6; bez shody index −1, matchLength 0.
+  **Kultura musí být `InvariantCulture`, ne `cs-CZ`** — jedině ta se shoduje s `Latin1_General_CI_AI`. `cs-CZ` by se rozešla na háčcích a text vrácený dotazem by pak nešlo zvýraznit.
 
 **Ověřená fakta o schématu:**
 - `projektove_zaznamy.popis` a `vyjadreni.text_vyjadreni` jsou typu **`text`** (legacy LOB). `COLLATE` na nich funguje přímo, `CAST` není potřeba.
@@ -304,7 +306,7 @@ Bez databáze, bez EF. Všechno testovatelné unit testy.
 
 **Interfaces:**
 - Produces:
-  - `SearchQueryText.MinQueryLength` = 3, `MaxTerms` = 6, `AccentInsensitiveCollation` = `"Czech_CI_AI"`
+  - `SearchQueryText.MinQueryLength` = 3, `MaxTerms` = 6, `AccentInsensitiveCollation` = `"Latin1_General_CI_AI"`
   - `IReadOnlyList<string> SearchQueryText.SplitTerms(string? query)`
   - `string SearchQueryText.EscapeLikePattern(string raw)`
   - `string SearchQueryText.ToContainsPattern(string term)`
@@ -462,12 +464,24 @@ public static class SearchQueryText
     public const int MaxTerms = 6;
 
     /// <summary>
-    /// Databáze má Czech_CI_AS (rozlišuje diakritiku). Bez vynucení téhle collation
-    /// by „zalohovani" nenašlo „Zálohování".
+    /// Databáze má Czech_CI_AS (rozlišuje diakritiku). Bez vynucení akcent-necitlivé
+    /// collation by „zalohovani" nenašlo „Zálohování".
+    /// <para>
+    /// Proč NE Czech_CI_AI: čeština bere č, ř, š a ž jako <b>samostatná písmena
+    /// abecedy</b>, ne jako diakritické varianty c/r/s/z. Mají proto vlastní primární
+    /// váhu, kterou akcent-necitlivost ze své podstaty minout nemůže — pod Czech_CI_AI
+    /// i Czech_100_CI_AI dotaz „rizeni" nenajde „Řízení" a „cislo" nenajde „Číslo".
+    /// Latin1_General_CI_AI je skládá a zároveň drží á→a, ě→e, ď→d, ů→u, ý→y.
+    /// </para>
     /// </summary>
-    public const string AccentInsensitiveCollation = "Czech_CI_AI";
+    public const string AccentInsensitiveCollation = "Latin1_General_CI_AI";
 
-    private static readonly CompareInfo Czech = CultureInfo.GetCultureInfo("cs-CZ").CompareInfo;
+    /// <summary>
+    /// Protějšek collation na straně .NET. Musí skládat přesně totéž co databáze,
+    /// jinak by text, který dotaz vrátil, nešlo zvýraznit. InvariantCulture se
+    /// s Latin1_General_CI_AI shoduje; cs-CZ by se rozešla právě na háčcích.
+    /// </summary>
+    private static readonly CompareInfo AccentFolding = CultureInfo.InvariantCulture.CompareInfo;
 
     private const CompareOptions AccentInsensitive =
         CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace;
@@ -517,7 +531,7 @@ public static class SearchQueryText
                 continue;
             }
 
-            var index = Czech.IndexOf(haystack.AsSpan(), term.AsSpan(), AccentInsensitive, out var matchLength);
+            var index = AccentFolding.IndexOf(haystack.AsSpan(), term.AsSpan(), AccentInsensitive, out var matchLength);
             if (index < 0 || matchLength <= 0)
             {
                 continue;
