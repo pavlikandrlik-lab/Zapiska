@@ -123,7 +123,6 @@ public static class PermissionKeys
 
     // --- 14. Hledání -----------------------------------------------------------
     public const string SearchIndex = "search.index";
-    public const string SearchReindex = "search.reindex";
 
     // Sekce 15 (SchedulePreview) odstraněna 2026-07-14 — klíč hlídal ScheduleController.Recalc
     // smazaný ve Fázi 7a harmonogram datum-model migrace (52d6607); žádný endpoint ho nekontroloval.
@@ -237,7 +236,6 @@ public static class PermissionKeys
 
         // 14. Hledání
         new(SearchIndex, "Fulltext hledání", "SEARCH", "GLOBAL", "Globální fulltext hledání."),
-        new(SearchReindex, "Spustit reindex", "SEARCH", "GLOBAL", "Administrátorská akce: full reindex FTS."),
 
         // =====================================================================
         // DEPRECATED (pre-redesign). Mapping test vynucuje existenci i v seedu

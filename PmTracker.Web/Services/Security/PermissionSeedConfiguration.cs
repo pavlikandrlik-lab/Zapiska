@@ -215,8 +215,7 @@ public static class PermissionSeedConfiguration
         new("settings.sd.view", "SD konektor (admin přehled)", "SETTINGS", PermissionScopeLevel.Global),
 
         // ==== 14. Hledání ====
-        new("search.index", "Fulltext hledání", "SEARCH", PermissionScopeLevel.Global),
-        new("search.reindex", "Spustit reindex", "SEARCH", PermissionScopeLevel.Global)
+        new("search.index", "Fulltext hledání", "SEARCH", PermissionScopeLevel.Global)
 
         // Sekce 15 (schedule.preview) odstraněna 2026-07-14 — klíč hlídal ScheduleController.Recalc
         // smazaný ve Fázi 7a harmonogram datum-model migrace; viz db_upgrade_1_4_1_drop_schedule_preview.sql.
@@ -317,7 +316,6 @@ public static class PermissionSeedConfiguration
         new("SUPERADMIN", "settings.sync.run", ScopeMode.All, true),
         new("SUPERADMIN", "settings.sd.view", ScopeMode.All, true),
         new("SUPERADMIN", "search.index", ScopeMode.All, true),
-        new("SUPERADMIN", "search.reindex", ScopeMode.All, true),
 
         // --- APP_ADMIN (76/76 — = SUPERADMIN na úrovni permission modelu) ---
         new("APP_ADMIN", "projects.read.all", ScopeMode.All, true),
@@ -394,7 +392,6 @@ public static class PermissionSeedConfiguration
         new("APP_ADMIN", "settings.sync.run", ScopeMode.All, true),
         new("APP_ADMIN", "settings.sd.view", ScopeMode.All, true),
         new("APP_ADMIN", "search.index", ScopeMode.All, true),
-        new("APP_ADMIN", "search.reindex", ScopeMode.All, true),
 
         // --- READ_ALL (13 klíčů — management visibility) ---
         new("READ_ALL", "projects.read.all", ScopeMode.All, true),

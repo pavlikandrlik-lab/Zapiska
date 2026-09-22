@@ -93,7 +93,6 @@ public sealed class PerActionKeyCoverageTests
     [Theory]
     [InlineData("projects.create")]
     [InlineData("projects.read.all")]
-    [InlineData("search.reindex")]
     [InlineData("people.ad.sync")]
     public void CoreGlobalKeys_MustHave_GlobalScopeLevel(string key)
     {

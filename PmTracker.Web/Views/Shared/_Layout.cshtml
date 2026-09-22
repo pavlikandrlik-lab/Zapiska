@@ -1,5 +1,4 @@
 @inject PmTracker.Web.Services.Common.IApplicationVersionProvider ApplicationVersionProvider
-@inject Microsoft.Extensions.Options.IOptions<PmTracker.Web.Services.Search.SearchOptions> SearchOptionsAccessor
 
 @{
     var themeModeCookie = Context.Request.Cookies["pmtracker.theme.mode"];
@@ -55,8 +54,7 @@
                   asp-controller="Search"
                   asp-action="Index"
                   class="app-search"
-                  role="search"
-                  data-search-enabled="@(SearchOptionsAccessor.Value.Enabled ? "true" : "false")">
+                  role="search">
                 <gov-form-search color="primary" size="m">
                     <gov-form-input slot="input" size="m" name="q" placeholder="Hledání"
                                     identifier="app-global-search-input"
@@ -123,6 +121,14 @@
                 <a class="@NavClass("nastaveni")" asp-controller="Nastaveni" asp-action="Index">Nastavení</a>
             }
         </nav>
+
+        @{
+            var breadcrumbTrail = ViewData["Breadcrumbs"] as PmTracker.Web.Models.ViewModels.BreadcrumbTrail;
+        }
+        @if (breadcrumbTrail is not null)
+        {
+            <partial name="_BreadcrumbBar" model="breadcrumbTrail" />
+        }
     </header>
 
     @{

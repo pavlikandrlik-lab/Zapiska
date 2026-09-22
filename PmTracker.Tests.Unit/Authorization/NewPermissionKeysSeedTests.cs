@@ -13,7 +13,6 @@ public sealed class NewPermissionKeysSeedTests
     [InlineData("comments.add")]
     [InlineData("comments.edit.own")]
     [InlineData("comments.delete.own")]
-    [InlineData("search.reindex")]
     [InlineData("projects.read.all")]
     public void NewKey_ShouldBeInPermissionKeysSupportedSet(string key)
     {
@@ -28,7 +27,6 @@ public sealed class NewPermissionKeysSeedTests
     [InlineData("comments.add")]
     [InlineData("comments.edit.own")]
     [InlineData("comments.delete.own")]
-    [InlineData("search.reindex")]
     [InlineData("projects.read.all")]
     public void NewKey_ShouldBeSeededInActionsList(string key)
     {
@@ -52,7 +50,7 @@ public sealed class NewPermissionKeysSeedTests
     [Fact]
     public void GlobalScope_NewKeys_ShouldBeGlobalScopeLevel()
     {
-        foreach (var key in new[] { "search.reindex", "projects.read.all" })
+        foreach (var key in new[] { "projects.read.all" })
         {
             var action = PermissionSeedConfiguration.Actions.First(a => a.Klic == key);
             action.ScopeLevel.Should().Be(PermissionScopeLevel.Global,

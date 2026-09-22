@@ -56,7 +56,6 @@ public sealed class PmTrackerDbContext : DbContext
     public DbSet<AuthzRolePermissionProjectEntity> AuthzRolePermissionProjects => Set<AuthzRolePermissionProjectEntity>();
     public DbSet<AuthzUserRoleEntity> AuthzUserRoles => Set<AuthzUserRoleEntity>();
     public DbSet<AuthzAuditLogEntity> AuthzAuditLog => Set<AuthzAuditLogEntity>();
-    public DbSet<SearchReindexCheckpointEntity> SearchReindexCheckpoint => Set<SearchReindexCheckpointEntity>();
     public DbSet<AdSyncSettingsEntity> AdSyncSettings => Set<AdSyncSettingsEntity>();
     public DbSet<SdActiveSyncSettingsEntity> SdActiveSyncSettings => Set<SdActiveSyncSettingsEntity>();
     public DbSet<SdArchiveSyncSettingsEntity> SdArchiveSyncSettings => Set<SdArchiveSyncSettingsEntity>();

@@ -24,67 +24,31 @@
             </div>
             <div>
                 <dt>Role</dt>
-                <dd>@string.Join(", ", Model.Uzivatel.RoleKody)</dd>
+                @* A5 (2026-07-08): jen počet — výčet je hned níže v „Moje role a práva". *@
+                <dd><a href="#moje-prava">@Model.MojeRole.Count rolí</a></dd>
             </div>
         </dl>
     </section>
 
-    <section class="card profile-print-preference-card">
-        <h2>Preferovaný formát tisku</h2>
-        <p class="muted">Nastavení je uloženo pouze v tomto prohlížeči na tomto počítači.</p>
-        <p><strong>Aktuálně:</strong> <span data-print-preference-current>není nastaven</span></p>
-        <pm-button variant="Secondary" data-print-preference-reset="true">Zrušit uloženou volbu</pm-button>
-    </section>
-
     <section class="card profile-preferences-card">
-        <h2>Uložené filtry projektu</h2>
-        <p class="muted">Výchozí filtry a dočasně zapamatovaný stav se ukládají pouze v tomto prohlížeči na tomto počítači.</p>
-        <pm-button variant="Secondary" data-project-filter-preferences-reset="true">Smazat uložené projektové filtry</pm-button>
-        <p class="profile-preference-status" data-project-filter-preferences-status aria-live="polite"></p>
+        <h2>Předvolby</h2>
+        <p class="muted">Uloženo pouze v tomto prohlížeči na tomto počítači. Každou předvolbu lze smazat samostatně.</p>
+        <ul class="preferences-list" data-preferences-list></ul>
+        <p class="muted" data-preferences-empty hidden>Žádné uložené předvolby.</p>
+        <p class="profile-preference-status" data-preferences-status aria-live="polite"></p>
     </section>
 
-    @* Inbox #16 (2026-04-21): Reindex vyhledávání — viditelné jen pro super-admina.
-       Status + tlačítko se načítají AJAXem z /Search/Status a /Search/Reindex. *@
-    @if (Model.Uzivatel.IsSuperAdmin)
-    {
-        <section class="card profile-preferences-card"
-                 data-search-admin-card
-                 data-status-url="@Url.Action("Status", "Search")"
-                 data-reindex-url="@Url.Action("Reindex", "Search")">
-            <h2>Vyhledávání (admin)</h2>
-            <p class="muted">Stav fulltextového indexu a ruční reindex všech entit.</p>
-            <dl class="search-admin-status">
-                <div>
-                    <dt>Provider</dt>
-                    <dd data-search-provider>–</dd>
-                </div>
-                <div>
-                    <dt>Povoleno</dt>
-                    <dd data-search-enabled>–</dd>
-                </div>
-                <div>
-                    <dt>FTS index</dt>
-                    <dd data-search-fts>–</dd>
-                </div>
-                <div>
-                    <dt>Dokumentů v indexu</dt>
-                    <dd data-search-count>–</dd>
-                </div>
-            </dl>
-            <div class="search-admin-actions">
-                <pm-button variant="Secondary" data-search-reindex-trigger>Reindexovat vše</pm-button>
-            </div>
-            <p class="profile-preference-status" data-search-reindex-status aria-live="polite"></p>
-            @Html.AntiForgeryToken()
-        </section>
-    }
+    @* Karta „Vyhledávání (admin)" (reindex FTS) zanikla se zrušením indexové vrstvy
+       (spec 2026-09-17 §5). Vyhledávání jede přímo nad ostrými tabulkami, není co reindexovat. *@
 </div>
 
 <section id="moje-prava" class="card profile-rights-card">
     <div class="panel-header">
         <div>
             <h2>Moje role a práva</h2>
-            <p class="muted">Přehled přiřazených rolí a jejich akcí včetně rozsahu.</p>
+            @* A5 (2026-07-08): jednotné karty per INSTANCE role (aplikační / projektová /
+               subsystémová) — nahrazuje dřívější oddělenou tabulku „Odvozená práva". *@
+            <p class="muted">Všechny přiřazené role (aplikační, projektové i subsystémové) a jejich akce včetně rozsahu.</p>
         </div>
     </div>
 
@@ -97,11 +61,20 @@
         <div class="profile-role-list">
         @foreach (var role in Model.MojeRole)
         {
-            <details class="profile-role-card">
+            <details class="profile-role-card" data-role-typ="@role.TypRole">
                 <summary class="profile-role-summary">
                     <span class="profile-role-summary-main">
+                        <span class="profile-role-typ badge">@role.TypRole</span>
                         <span class="profile-role-name">@role.RoleNazev</span>
                         <code>@role.RoleKod</code>
+                        @if (!string.IsNullOrWhiteSpace(role.ProjektZkratka))
+                        {
+                            <span class="profile-role-scope">Projekt: <strong>@role.ProjektZkratka</strong></span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(role.SubsystemKod))
+                        {
+                            <span class="profile-role-scope">Subsystém: <strong>@role.SubsystemKod</strong></span>
+                        }
                     </span>
                     <span class="profile-role-summary-meta">@role.Akce.Count akcí</span>
                 </summary>
@@ -151,54 +124,5 @@
             </details>
         }
         </div>
-    }
-</section>
-
-<section class="card profile-rights-card">
-    <div class="panel-header">
-        <div>
-            <h2>Odvozená práva z projektu a subsystému</h2>
-            <p class="muted">Práva odvozená z aktivních projektových a subsystémových rolí.</p>
-        </div>
-    </div>
-
-    @if (Model.OdvozenaPrava.Count == 0)
-    {
-        <p class="muted">Nebyly nalezeny žádné odvozené granty.</p>
-    }
-    else
-    {
-        <table class="table profile-role-table">
-            <thead>
-                <tr>
-                    <th>Akce</th>
-                    <th>Název</th>
-                    <th>Přístup</th>
-                    <th>Rozsah</th>
-                    <th>Zdroj</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var pravo in Model.OdvozenaPrava)
-                {
-                    <tr>
-                        <td><code>@pravo.PermissionKlic</code></td>
-                        <td>@pravo.PermissionNazev</td>
-                        <td>
-                            @if (pravo.IsAllowed)
-                            {
-                                <span class="unlock">Povoleno</span>
-                            }
-                            else
-                            {
-                                <span class="lock">Zakázáno</span>
-                            }
-                        </td>
-                        <td>@pravo.ScopeSummary</td>
-                        <td>@pravo.SourceSummary</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
     }
 </section>

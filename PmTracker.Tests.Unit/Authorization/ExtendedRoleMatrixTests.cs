@@ -28,7 +28,7 @@ public sealed class ExtendedRoleMatrixTests
         {
             "dashboard.view", "export.pdf.projekt", "export.word.projekt",
             "comments.add", "comments.edit.own", "comments.delete.own",
-            "search.reindex", "projects.read.all"
+            "projects.read.all"
         });
     }
 
