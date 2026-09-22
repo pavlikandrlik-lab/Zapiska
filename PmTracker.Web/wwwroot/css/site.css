@@ -223,8 +223,10 @@
     gap: 0.5rem;
 }
 
-.app-search-item__title,
-.app-search-item__snippet {
+/* Jednořádkové oříznutí platí jen v dropdownu (kompaktní nabídka). Na stránce
+   výsledků má výřej okolí shody přetéct do víc řádků — v tom je její smysl. */
+.app-search-list .app-search-item__title,
+.app-search-list .app-search-item__snippet {
     flex: 1 1 80%;
     min-width: 0;
     overflow: hidden;

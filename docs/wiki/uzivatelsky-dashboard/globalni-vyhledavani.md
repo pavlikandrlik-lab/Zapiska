@@ -78,8 +78,9 @@ stop-words ani řazení podle relevance. Prakticky:
 
 ## Performance
 
-Vyhledávací endpoint má **rate limiter** (typicky 30 dotazů / 10 sekund per uživatel).
-Při hodně rychlých dotazech můžeš narazit na 429 Too Many Requests — proto ten debounce.
+Vyhledávací endpoint má **rate limiter** (pevné okno, řádově desítky dotazů za
+10 sekund; okno je zatím sdílené, ne per-uživatel). Při hodně rychlých dotazech
+můžeš narazit na 429 Too Many Requests — proto ten debounce.
 
 ## Ověření chování na konkrétní databázi
 
