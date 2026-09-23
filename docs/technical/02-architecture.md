@@ -115,10 +115,17 @@ Dvě vrstvy, každá řeší jiného protivníka:
    kódem `RECORD_STALE` a hláška pojmenuje autora z auditu. Pokrývá i to, na co zámek
    nedosáhne: schválení návrhu harmonogramu, vypršelý zámek, dva taby.
 
-**Invariant, na kterém to stojí:** verzi posouvá jen uživatelský zápis. Audit s entitou
-`zaznam` píší výhradně `SaveRecord`, `DeleteRecord`, `MeetingIdentifier` a schválení
-návrhu; automatika (harvest, rebalance, sync harmonogramu) neaudituje nic, takže její
-zásahy do kroků nikoho neblokují. Hlídá to test `AutomatScheduleWrite_ShouldNotChangeRecordVersion`.
+**Invariant, na kterém to stojí:** verzi posouvá jen uživatelský zápis, který by uložení
+editoru mohlo přepsat. Audit s entitou `zaznam` píší výhradně `SaveRecord`, `DeleteRecord`,
+`MeetingIdentifier` a rozhodnutí o návrhu; automatika (harvest, rebalance, sync harmonogramu)
+neaudituje nic, takže její zásahy do kroků nikoho neblokují. Hlídá to test
+`AutomatScheduleWrite_ShouldNotChangeRecordVersion`.
+
+**Výjimka `assign`:** doplnění identifikátoru z jednání verzi neposouvá. Mění jen číslo
+záznamu, které editor nepřepíše, a tlačítko je uvnitř editoru, který se po akci nepřenačte —
+posunutá verze by uživatele zablokovala jeho vlastní akcí. Vyřadit se smí jen akce, jejíž zápis
+uložení editoru prokazatelně nepřepíše; hlídá to `SaveRecord_ShouldSucceed_AfterMeetingIdentifierWasAssignedFromOpenEditor`
+(ověřuje i to, že identifikátor uložení přežije).
 
 Dřívější kontrola `ScheduleVersion` (skalární `MAX(UpdatedAt)` nad kroky) byla zrušena —
 blokovala uložení kvůli automatice a před kolizí uživatel × automat nechránila, protože
@@ -131,8 +138,8 @@ do skutečnosti auto-eligible kroků se uživatel nedostane.
   proti kterému controller ověřoval oprávnění; kdyby ji guard v `if/else` řetězu přeskočil,
   právo `records.edit` na jednom projektu by otevřelo záznamy všech ostatních.
 - `RecordLastWriterQuery` musí číst **tentýž auditní řádek**, který `RecordVersionQuery`
-  považuje za verzi (poslední podle `id`, bez filtru na akci). Jinak hláška pojmenuje někoho,
-  kdo s aktuální verzí nemá nic společného — verzi posouvá i `assign` identifikátoru z jednání.
+  považuje za verzi. Obě místa proto berou řádky ze sdíleného `RecordVersionQuery.VersionRows`
+  (poslední podle `id`) — jinak hláška pojmenuje někoho, kdo s aktuální verzí nemá nic společného.
 
 Tabulku zámku vyžaduje `SqlStartupValidatorHostedService`: nasazení bez
 `db_upgrade_1_4_5_record_edit_lock.sql` selže při startu a hláška ten skript jmenuje.

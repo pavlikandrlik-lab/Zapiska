@@ -208,6 +208,8 @@ Nabízela se obava, že po AJAX uložení zůstane v otevřeném editoru starý 
 
 Guard test to přesto pohlídá: po úspěšném save musí odpověď nést `refreshScope = "page"`. Kdyby se editor někdy překlopil na in-place refresh, test spadne a obnova tokenu se doplní.
 
+> **Doplněno 2026-09-23:** úvaha výše platí jen pro **Uložit**. V editoru je ještě tlačítko „Doplnit identifikátor z jednání“, po kterém se editor nepřenačte (`refreshScope: "record-card"` na stránce editoru žádnou kartu nenajde). Řeší to nález N5 v §11 — tahle akce verzi neposouvá.
+
 ---
 
 ## 6. Odstranění falešných konfliktů
@@ -356,7 +358,7 @@ Proč byl i kalibrovaný odhad vedle:
 
 ## 11. Review po implementaci — 2026-09-18
 
-Zpětná kontrola hotového kódu. Čtyři nálezy, všechny opravené a pokryté testem.
+Zpětná kontrola hotového kódu. Čtyři nálezy, všechny opravené a pokryté testem; pátý (N5) přibyl 2026-09-23.
 
 ### N1 — Kontrola příslušnosti k projektu přestala platit (vážné)
 
@@ -373,14 +375,13 @@ Regrese: `SaveRecord_ShouldRejectForeignProject_EvenWhenRecordVersionIsCurrent`
 
 ### N2 — Hláška mohla pojmenovat nesprávného člověka
 
-`RecordVersionQuery` bere za verzi `MAX(id)` přes **všechny** auditní akce nad záznamem,
-`RecordLastWriterQuery` ale hledal jen `update`/`approve` a řadil podle `created_at`.
-Když verzi posunulo doplnění identifikátoru z jednání (`assign`), hláška pojmenovala
-autora staršího uložení — nebo nikoho.
+`RecordVersionQuery` a `RecordLastWriterQuery` četly auditní řádky každý jinak (jiný filtr
+akcí, jiné řazení), takže hláška mohla jmenovat autora jiného řádku, než který byl verzí —
+nebo nikoho.
 
-Oprava: obě místa čtou **tentýž řádek** — poslední podle `id`. Jméno formátuje sdílený
-`PersonDisplayNameQuery`. Regrese:
-`StaleMessage_ShouldNameActorOfLatestAuditEntry_NotJustLastUpdate`.
+Oprava: obě místa berou řádky ze sdíleného `RecordVersionQuery.VersionRows` a poslední podle
+`id`. Jméno formátuje sdílený `PersonDisplayNameQuery`. Regrese (po N5 přepsaná):
+`StaleMessage_ShouldNameAuthorOfVersionRow_NotLaterMeetingAssign`.
 
 ### N3 — Chybějící migrace se projevila až za běhu
 
@@ -398,6 +399,24 @@ Test: `StartovniGuard_VyzadujeTabulkuZamku_APojmenujeSkript`.
 - **Stránka zamčeného záznamu neměla rám ani styly.** Doplněn `card` wrapper jako u editoru
   a tři pravidla do `site.css` (třídy v šabloně existovaly, v CSS ne).
 - **Zbytkové komentáře o `row_version`** z opuštěné varianty přepsány na audit-id.
+
+### N5 — Doplnění identifikátoru zablokovalo vlastní uložení (nalezeno 2026-09-23)
+
+Nalezeno při sepisování ručních testů. Tlačítko „Doplnit identifikátor z jednání“ je **uvnitř
+editoru**; akce zapíše audit `assign`, a ten posouval verzi. Editor se po ní nepřenačte
+(`refreshScope: "record-card"` na stránce editoru nic nenajde), takže držel starou verzi a další
+Uložit skončilo hláškou „uložil jiný uživatel: (uživatel sám)“ — přesně ten falešný konflikt,
+kvůli kterému celá práce vznikla. Zavedla to Fáze 1.
+
+Oprava: `assign` verzi neposouvá. Je to bezpečné, protože uložení editoru identifikátor
+nepřepíše — doplňuje ho jen když je prázdný a entitu čte čerstvě z DB. Pravidlo pro budoucí
+akce je záměrně asymetrické: vyřadit se smí jen akce, jejíž zápis editor prokazatelně
+nepřepíše; cokoli jiného verzi posouvá, horší případ je tak zbytečný konflikt, ne ztracená data.
+Regrese: `SaveRecord_ShouldSucceed_AfterMeetingIdentifierWasAssignedFromOpenEditor` (jde přes
+skutečnou službu a hlídá i předpoklad, že identifikátor uložení přežije).
+
+Mimo rozsah (starší chování, nezaviněné touto prací): editor po doplnění dál ukazuje staré
+číslo i tlačítko „Doplnit identifikátor“, dokud se stránka nepřenačte.
 
 ### Co review prověřilo a nechalo být
 

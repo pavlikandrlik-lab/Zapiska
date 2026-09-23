@@ -99,6 +99,9 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
     public int SaveRecord(SaveRecordCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordService>().SaveRecordAsync(command, currentUser).GetAwaiter().GetResult();
 
+    public void AssignMeetingIdentifier(AssignMeetingIdentifierCommand command, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordService>().AssignMeetingIdentifierAsync(command, currentUser).GetAwaiter().GetResult();
+
     public void SubmitCreateRecordProposal(SaveRecordCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordProposalService>().SubmitCreateRecordProposalAsync(command, currentUser).GetAwaiter().GetResult();
 

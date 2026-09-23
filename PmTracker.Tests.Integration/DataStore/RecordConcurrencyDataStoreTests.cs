@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Integration.TestInfrastructure;
 using PmTracker.Web.Models.Entities;
+using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
 
@@ -149,38 +150,83 @@ public sealed class RecordConcurrencyDataStoreTests
     }
 
     /// <summary>
-    /// Verzi posouvá KAŽDÝ auditní zápis nad záznamem, ne jen uložení editoru — například
-    /// doplnění identifikátoru z jednání (action „assign“). Hláška proto musí pojmenovat
-    /// autora právě toho posledního zápisu; dřívější dotaz filtroval na update/approve
-    /// a v tomhle případě nepojmenoval nikoho.
+    /// Nález 2026-09-23: „Doplnit identifikátor z jednání“ je tlačítko UVNITŘ editoru a editor se
+    /// po něm nepřenačte. Kdyby doplnění posunulo verzi, další uložení téhož uživatele by skončilo
+    /// hláškou „uložil jiný uživatel: (on sám)“. Editor identifikátor nepřepisuje, takže přepis
+    /// nehrozí a konflikt se hlásit nesmí. Druhá asertace hlídá právě tenhle předpoklad — kdyby
+    /// uložení editoru začalo identifikátor přepisovat, musí doplnění verzi zase posouvat.
     /// </summary>
     [Fact]
-    public async Task StaleMessage_ShouldNameActorOfLatestAuditEntry_NotJustLastUpdate()
+    public async Task SaveRecord_ShouldSucceed_AfterMeetingIdentifierWasAssignedFromOpenEditor()
     {
-        var db = await _fixture.CreateDatabaseAsync("record_stale_names_latest_actor");
+        var db = await _fixture.CreateDatabaseAsync("record_save_after_meeting_assign");
         await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
         var store = IntegrationTestHelper.CreateDataStore(dbContext);
-        var scenario = await RecordConcurrencyScenario.SeedAsync(dbContext, store, "LASTACT");
+        var scenario = await RecordConcurrencyScenario.SeedAsync(dbContext, store, "ASSIGNOK");
 
         var versionInEditor = await RecordVersionQuery.ResolveVersionTokenAsync(
             dbContext, scenario.RecordId, CancellationToken.None);
 
-        var jinyOsobaId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "Zdenek");
-        dbContext.AuthzAuditLog.Add(new AuthzAuditLogEntity
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(
+            dbContext, scenario.ProjectId, "OPEN", meetingNumber: 9801);
+        store.AssignMeetingIdentifier(new AssignMeetingIdentifierCommand
         {
-            ActorOsobaId = jinyOsobaId,
-            EntityType = "zaznam",
-            EntityId = scenario.RecordId.ToString(),
-            Action = "assign",
-            CreatedAt = DateTime.UtcNow
-        });
-        await dbContext.SaveChangesAsync();
+            ProjektId = scenario.ProjectId,
+            ZaznamId = scenario.RecordId,
+            JednaniId = meetingId
+        }, scenario.CurrentUser);
 
-        var command = scenario.BuildRenameCommand("Pokus po cizim assignu");
+        var command = scenario.BuildRenameCommand("Ulozeno po doplneni identifikatoru");
+        command.RecordVersion = versionInEditor;
+        var act = () => store.SaveRecord(command, scenario.CurrentUser);
+
+        act.Should().NotThrow<RecordStaleException>(
+            "doplnění identifikátoru z otevřeného editoru nesmí zablokovat vlastní uložení");
+        var saved = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == scenario.RecordId);
+        saved.Nazev.Should().Be("Ulozeno po doplneni identifikatoru");
+        saved.CisloJednaniZdrojId.Should().Be(meetingId,
+            "uložení editoru doplněný identifikátor nepřepíše — jinak by doplnění muselo verzi posouvat");
+    }
+
+    /// <summary>
+    /// Hláška musí jmenovat autora TOHO řádku, který je verzí — ne pozdějšího doplnění
+    /// identifikátoru, které verzi neposouvá. Obě místa proto čtou tytéž řádky
+    /// (<see cref="RecordVersionQuery"/>), aby se nemohla rozejít.
+    /// </summary>
+    [Fact]
+    public async Task StaleMessage_ShouldNameAuthorOfVersionRow_NotLaterMeetingAssign()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_stale_names_version_author");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+        var scenario = await RecordConcurrencyScenario.SeedAsync(dbContext, store, "VERAUTHOR");
+
+        var versionInEditor = await RecordVersionQuery.ResolveVersionTokenAsync(
+            dbContext, scenario.RecordId, CancellationToken.None);
+
+        // Bohumil mezitím záznam uloží — to je skutečný konflikt.
+        var bohumilId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "Bohumil");
+        var bohumil = IntegrationTestHelper.BuildUser(bohumilId, isSuperAdmin: true);
+        store.SaveRecord(scenario.BuildRenameCommand("Ulozil Bohumil"), bohumil);
+
+        // Zdeněk potom jen doplní identifikátor z jednání.
+        var zdenekId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "Zdenek");
+        var zdenek = IntegrationTestHelper.BuildUser(zdenekId, isSuperAdmin: true);
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(
+            dbContext, scenario.ProjectId, "OPEN", meetingNumber: 9802);
+        store.AssignMeetingIdentifier(new AssignMeetingIdentifierCommand
+        {
+            ProjektId = scenario.ProjectId,
+            ZaznamId = scenario.RecordId,
+            JednaniId = meetingId
+        }, zdenek);
+
+        var command = scenario.BuildRenameCommand("Pokus se starou verzi");
         command.RecordVersion = versionInEditor;
         var act = () => store.SaveRecord(command, scenario.CurrentUser);
 
         act.Should().Throw<RecordStaleException>()
-            .WithMessage("*Tester Zdenek*", "hláška musí pojmenovat autora posledního zápisu");
+            .WithMessage("*Tester Bohumil*", "konflikt způsobilo Bohumilovo uložení")
+            .And.Message.Should().NotContain("Zdenek", "doplnění identifikátoru verzi neposouvá");
     }
 }
