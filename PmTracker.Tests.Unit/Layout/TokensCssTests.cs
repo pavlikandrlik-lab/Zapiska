@@ -77,16 +77,16 @@ public sealed class TokensCssTests
         var layoutPath = Path.Combine(RepoRoot().FullName, "PmTracker.Web", "Views", "Shared", "_Layout.cshtml");
         var layout = File.ReadAllText(layoutPath);
         var tokensIndex = layout.IndexOf("~/css/tokens.css", StringComparison.Ordinal);
-        var coreCssIndex = layout.IndexOf("core.min.css", StringComparison.Ordinal);
+        var coreCssIndex = layout.IndexOf("~/assets/gov/styles/components.css", StringComparison.Ordinal);
         var siteCssIndex = layout.IndexOf("~/css/site.css", StringComparison.Ordinal);
-        tokensIndex.Should().BeGreaterThan(coreCssIndex, "tokens.css musí být po gov core.min.css (přepisuje gov tokeny)");
+        tokensIndex.Should().BeGreaterThan(coreCssIndex, "tokens.css musí být po gov components.css (přepisuje gov tokeny)");
         tokensIndex.Should().BeLessThan(siteCssIndex, "tokens.css musí být před site.css (aby ji site.css viděla)");
     }
 
     [Fact]
     public void TokensCss_NeobsahujeNeexistujiciGovPrefix()
     {
-        // gov-design-system 4.2.7 NEpoužívá prefix --gov-*.
+        // gov-design-system 4.x NEpoužívá prefix --gov-*.
         // Regresní test: kdyby někdo v budoucnu přidal --gov-* odkaz, neresolvoval by na gov tokens.
         var content = TokensCssContent();
         content.Should().NotContain("var(--gov-",
@@ -100,7 +100,7 @@ public sealed class TokensCssTests
         // v gov-design-system styles. Kdyby někdo přepsal token bez ověření v gov DS,
         // tento test to odchytí.
         var pmContent = TokensCssContent();
-        var govTokensPath = Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "lib", "gov-design-system", "styles", "lib", "tokens.min.css");
+        var govTokensPath = Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "assets", "gov", "styles", "tokens.css");
         var govContent = File.ReadAllText(govTokensPath);
 
         // Vezmi jeden reprezentativní token z pm (--color-primary-600) a ověř, že je v gov

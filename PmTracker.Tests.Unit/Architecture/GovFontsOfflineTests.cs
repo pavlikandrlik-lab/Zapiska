@@ -1,55 +1,41 @@
 using System.IO;
 using FluentAssertions;
+using static PmTracker.Tests.Unit.Architecture.ArchitectureTestBase;
 
 namespace PmTracker.Tests.Unit.Architecture;
 
 /// <summary>
-/// Guard: aplikace musí fungovat offline. Gov-design-system core CSS referencoval
-/// fonty přes `url("/playground/build/assets/fonts/...")` — cesty které v PM Tracker
-/// neexistují → každé načtení stránky generovalo 20× HTTP 404 na fonty a
-/// (v corporate prostředí bez Roboto nainstalovaným) fallback na sans-serif.
-///
-/// User rozhodnutí 2026-04-19: strip url() parts z @font-face, zůstává jen
-/// src: local(...) — pokud má klient Roboto nainstalovaný, použije se; jinak
-/// CSS stack fallback (font-family: Roboto, sans-serif) → sans-serif bez 404.
+/// Guard: aplikace musí fungovat offline. DS gov components/core.css odkazuje v @font-face
+/// na /playground/build/assets/fonts/… — cesty, které v aplikaci neexistují (každá stránka
+/// by házela 20× 404; v 4.2.9 se kvůli tomu upravoval soubor DS). Soubory DS se nově
+/// needitují (README kitu, pravidlo 1): core.css se jen nenačítá a písmo jde přes
+/// fonts/roboto.css s lokálními woff2 (GovAssets470Tests).
 /// </summary>
 public sealed class GovFontsOfflineTests
 {
-    private static string LocateRepositoryRoot()
+    [Fact]
+    public void Layout_NenacitaCoreCssSPlaygroundFonty()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "PmTracker.sln")))
-        {
-            directory = directory.Parent;
-        }
-
-        if (directory is null)
-        {
-            throw new InvalidOperationException("Nepodařilo se najít kořen repozitáře.");
-        }
-
-        return directory.FullName;
+        // Kontroluje jen href — komentář v layoutu core.css zmiňuje.
+        var layout = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Shared/_Layout.cshtml"));
+        layout.Should().NotMatchRegex("href=\"[^\"]*components/core\\.css");
+        layout.Should().Contain("href=\"~/assets/gov/fonts/roboto.css\"", "písmo DS se načítá z lokálních woff2");
     }
 
     [Theory]
-    [InlineData("PmTracker.Web/wwwroot/lib/gov-design-system/dist/core/core.css")]
-    [InlineData("PmTracker.Web/wwwroot/lib/gov-design-system/dist/core/core.min.css")]
-    public void GovCoreCss_MustNotReferenceExternalFontUrls(string relativePath)
+    [InlineData("tokens.css")]
+    [InlineData("templates-tokens.css")]
+    [InlineData("styles.css")]
+    [InlineData("layout.css")]
+    [InlineData("components.css")]
+    [InlineData("templates.css")]
+    [InlineData("animations.css")]
+    [InlineData("content.css")]
+    [InlineData("skip-links.css")]
+    public void NacitaneCssDs_NeodkazujiNaExterniFonty(string file)
     {
-        var path = Path.Combine(LocateRepositoryRoot(), relativePath.Replace('/', Path.DirectorySeparatorChar));
-        File.Exists(path).Should().BeTrue($"gov core CSS musí existovat: {path}");
-
-        var source = File.ReadAllText(path);
-
-        source.Should().NotContain(
-            "/playground/build/assets/fonts/",
-            "gov core CSS nesmí odkazovat na '/playground/build/assets/fonts/' — tyto cesty v PM Tracker " +
-            "neexistují a každé načtení stránky generuje HTTP 404 na 20 font souborů. " +
-            "Použijte pouze src: local(...) – když klient nemá Roboto, CSS stack fallback " +
-            "(Roboto, sans-serif) zajistí zobrazení bez síťového dotazu.");
-
-        source.Should().NotContain(
-            "fonts.gstatic.com",
-            "aplikace musí běžet offline, gov fonty se nesmí stahovat z Google CDN.");
+        var css = File.ReadAllText(ResolvePath($"PmTracker.Web/wwwroot/assets/gov/styles/{file}"));
+        css.Should().NotContain("/playground/build/assets/fonts/");
+        css.Should().NotContain("fonts.gstatic.com", "gov fonty se nesmí stahovat z Google CDN");
     }
 }

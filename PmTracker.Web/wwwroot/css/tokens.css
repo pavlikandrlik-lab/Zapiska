@@ -5,10 +5,10 @@
  * semantika (--pm-*). Všechen CSS v site.css a komponentách má
  * používat --pm-* proměnné, ne přímé gov tokeny ani hardcoded hodnoty.
  *
- * Zdroj gov tokenů: ~/lib/gov-design-system/styles/lib/tokens.min.css
+ * Zdroj gov tokenů: ~/assets/gov/styles/tokens.css
  * Dokumentace: docs/architecture/tokens.md
  *
- * POZOR: gov-design-system 4.2.7 nepoužívá prefix --gov-*.
+ * POZOR: gov-design-system 4.x nepoužívá prefix --gov-*.
  * Správné názvy: --color-primary-600, --spacing-m, --corner-radius-s,
  * --text-primary, --background-page, --border-subtle atd.
  */

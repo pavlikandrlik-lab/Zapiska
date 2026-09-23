@@ -6,7 +6,7 @@ namespace PmTracker.Tests.Unit.Search;
 /// <summary>
 /// Ověřuje strukturu globálního vyhledávání v _Layout.cshtml.
 /// Markup využívá skutečné Web Components z @gov-design-system-ce/components
-/// hostované LOKÁLNĚ v ~/lib/gov-design-system/ (aplikace MUSÍ běžet offline).
+/// hostované LOKÁLNĚ v ~/assets/gov/ (aplikace MUSÍ běžet offline).
 /// </summary>
 public sealed class GlobalSearchMarkupTests
 {
@@ -87,7 +87,7 @@ public sealed class GlobalSearchMarkupTests
     public void Layout_MaLocalScript_GovComponents()
     {
         var layout = LoadLayoutSource();
-        layout.Should().Contain("~/lib/gov-design-system/dist/core/core.esm.min.js",
+        layout.Should().Contain("~/assets/gov/components/core.esm.js",
             "layout musí načítat gov-design-system loader LOKÁLNĚ (offline-first, ne z CDN)");
         layout.Should().NotContain("cdn.jsdelivr.net",
             "layout nesmí načítat žádné assety z externí CDN (offline-first)");
@@ -97,36 +97,10 @@ public sealed class GlobalSearchMarkupTests
     public void Layout_MaLocalCss_GovComponents()
     {
         var layout = LoadLayoutSource();
-        layout.Should().Contain("~/lib/gov-design-system/dist/core/core.min.css",
+        layout.Should().Contain("~/assets/gov/styles/components.css",
             "layout musí načítat gov-design-system CSS LOKÁLNĚ");
-        layout.Should().Contain("~/lib/gov-design-system/styles/lib/tokens.min.css",
+        layout.Should().Contain("~/assets/gov/styles/tokens.css",
             "layout musí načítat gov-design-system tokens LOKÁLNĚ");
-    }
-
-    [Fact]
-    public void Layout_MaLocalniGovAssety_VRepozitari()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "PmTracker.sln")))
-        {
-            directory = directory.Parent;
-        }
-
-        directory.Should().NotBeNull();
-        var libRoot = Path.Combine(
-            directory!.FullName,
-            "PmTracker.Web", "wwwroot", "lib", "gov-design-system");
-
-        File.Exists(Path.Combine(libRoot, "dist", "core", "core.esm.min.js"))
-            .Should().BeTrue("loader core.esm.min.js musí být lokálně v repozitáři (offline)");
-        File.Exists(Path.Combine(libRoot, "dist", "core", "core.min.css"))
-            .Should().BeTrue("core.min.css musí být lokálně v repozitáři (offline)");
-        File.Exists(Path.Combine(libRoot, "styles", "lib", "tokens.min.css"))
-            .Should().BeTrue("tokens.min.css musí být lokálně v repozitáři (offline)");
-
-        // Loader dynamicky importuje chunk p-DT2tslUp.js — musí být vedle něj
-        File.Exists(Path.Combine(libRoot, "dist", "core", "p-DT2tslUp.js"))
-            .Should().BeTrue("runtime chunk p-DT2tslUp.js musí být lokálně (dynamicky importovaný loaderem)");
     }
 
     [Fact]

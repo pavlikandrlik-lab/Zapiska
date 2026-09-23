@@ -77,32 +77,6 @@ public sealed class OfflineAssetsTests
     }
 
     [Fact]
-    public void GovDesignSystem_JeLokalneVRepozitari()
-    {
-        var libRoot = Path.Combine(RepoRoot().FullName, "PmTracker.Web", "wwwroot", "lib", "gov-design-system");
-
-        Directory.Exists(libRoot).Should().BeTrue(
-            $"složka {libRoot} musí existovat (offline asset gov-design-system)");
-
-        var coreDir = Path.Combine(libRoot, "dist", "core");
-        Directory.Exists(coreDir).Should().BeTrue($"{coreDir} musí existovat");
-
-        // Loader + klíčový runtime chunk + CSS
-        File.Exists(Path.Combine(coreDir, "core.esm.min.js")).Should().BeTrue();
-        File.Exists(Path.Combine(coreDir, "core.min.css")).Should().BeTrue();
-        File.Exists(Path.Combine(coreDir, "p-DT2tslUp.js")).Should().BeTrue(
-            "dynamicky importovaný chunk — bez něj komponenty nezaregistrují");
-
-        // Minimální počet chunks (loader potřebuje ~88 chunků)
-        var chunkCount = Directory.GetFiles(coreDir, "p-*.js").Length;
-        chunkCount.Should().BeGreaterThanOrEqualTo(80,
-            $"v {coreDir} musí být alespoň 80 runtime chunks (gov-design-system rozděluje komponenty); nalezeno: {chunkCount}");
-
-        // Tokens CSS
-        File.Exists(Path.Combine(libRoot, "styles", "lib", "tokens.min.css")).Should().BeTrue();
-    }
-
-    [Fact]
     public void SpecDocument_OfflineDeployment_Existuje()
     {
         var specPath = Path.Combine(RepoRoot().FullName, "docs", "specs", "offline-deployment.md");
