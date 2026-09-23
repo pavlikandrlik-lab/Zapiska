@@ -1,0 +1,2 @@
+const t=t=>{if(typeof t==="string"&&t.length){const n=/^[a-z-]+\/[a-z-]+$/;if(n.test(t)){const n=t.split("/");return{type:n[0],name:n[1]}}}return null};export{t as p};
+//# sourceMappingURL=p-GYov8gU1.js.map

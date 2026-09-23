@@ -1,0 +1,2 @@
+import{i as r,a as t}from"./p-B3tdsiZv.js";const n=n=>{if(r(n)&&n.length){try{console.log(n);const r=JSON.parse(n);if(Array.isArray(r)||t(r)){return r}}catch(r){console.log(r);return null}}return null};const s=s=>{if(r(s)){const r=n(s);if(r&&t(r)){return r}}else if(t(s)&&Object.keys(s).length){return s}return null};export{s as a,n as p};
+//# sourceMappingURL=p-HoauDRMe.js.map

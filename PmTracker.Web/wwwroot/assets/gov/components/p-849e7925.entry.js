@@ -1,0 +1,2 @@
+import{r as s,h as t,H as r,g as e}from"./p-ClISz4NF.js";import{a as i}from"./p-C6JN9gdb.js";import{g as o}from"./p-5VeKSK5B.js";import"./p-BcQO4NH2.js";const d=class{constructor(t){s(this,t);this.column="12";this.row="1";this.h=o(this.host)}render(){return t(r,{key:"d6bcb33350544ab5ff2df56d0d2c95d9fa73ddee",class:this.h.classes(i.root),role:"listitem"},t("slot",{key:"578f7449e5142770d8dff105f3fdd08c6404f167"}))}get host(){return e(this)}};export{d as gov_grid_item};
+//# sourceMappingURL=p-849e7925.entry.js.map

@@ -120,35 +120,23 @@ app.UseHttpsRedirection();
 var staticContentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
 staticContentTypeProvider.Mappings[".css"] = "text/css; charset=utf-8";
 staticContentTypeProvider.Mappings[".js"] = "text/javascript; charset=utf-8";
+// Písmo DS gov 4.7.0 (wwwroot/assets/gov/fonts) — explicitně, ať nezáleží na výchozí tabulce.
+staticContentTypeProvider.Mappings[".woff2"] = "font/woff2";
 
-if (app.Environment.IsDevelopment())
+// Cache-Control: DS gov natrvalo, ve vývoji aplikační .js/.css no-cache (viz StaticAssetCachePolicy).
+var isDevelopment = app.Environment.IsDevelopment();
+app.UseStaticFiles(new StaticFileOptions
 {
-    // Dev-only: ESM moduly se importují relativním URL bez verze (asp-append-version verzuje
-    // jen entry site.js, jehož obsah se při změně submodulu nemění → prohlížeč servíruje
-    // cached site.js i cached importované moduly). Při iteraci na JS to způsobuje, že změny
-    // v modulech nedorazí do prohlížeče bez ručního clear-cache. no-cache vynutí revalidaci
-    // (na localhostu instantní) → vývojář vždy dostane čerstvé moduly. V produkci necháváme
-    // standardní caching (deploy = plná výměna souborů + ohlášený hard-refresh).
-    app.UseStaticFiles(new StaticFileOptions
+    ContentTypeProvider = staticContentTypeProvider,
+    OnPrepareResponse = ctx =>
     {
-        ContentTypeProvider = staticContentTypeProvider,
-        OnPrepareResponse = ctx =>
+        var cacheControl = StaticAssetCachePolicy.Resolve(ctx.Context.Request.Path.Value ?? string.Empty, isDevelopment);
+        if (cacheControl is not null)
         {
-            if (ctx.File.Name.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
-                || ctx.File.Name.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
-            {
-                ctx.Context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
-            }
+            ctx.Context.Response.Headers.CacheControl = cacheControl;
         }
-    });
-}
-else
-{
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        ContentTypeProvider = staticContentTypeProvider
-    });
-}
+    }
+});
 
 app.UseRouting();
 
