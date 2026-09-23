@@ -39,14 +39,11 @@ public sealed class ProjectMenuOverflowScenariosTests
         await page.Locator("#main").ClickAsync(new() { Position = new() { X = 10, Y = 10 } });
         await Expect(page.Locator(".tabs [data-tab='tym']")).ToBeVisibleAsync();
 
-        // Zámek → reload → trvale rozbaleno (is-expanded), „+" pryč. Zámek spouští
-        // window.location.reload() (projectMenu.js); DS gov 4.7.0 má oproti 4.2.9 5×
-        // víc <link>/<script> na /assets/gov/ (10 vs. 2) — cachují se natrvalo
-        // (StaticAssetCachePolicy.Immutable), ale i tak je celkový reflow/parse na
-        // reload nad výchozí 5s expect-timeout. WaitForLoadStateAsync počká na
-        // dokončení navigace (výchozí navigation timeout 30s) předtím, než se testuje
-        // stav, který renderuje až server po reloadu — bez toho test na zatíženém
-        // běhu (celá sada) zvládal doběhnout na hraně a příležitostně selhal.
+        // Zámek → reload → trvale rozbaleno (is-expanded), „+" pryč. Klik na zámek volá
+        // window.location.reload() (projectMenu.js). Klikací handler zámku ale registruje
+        // až deferred modul site.js → bootstrapPmTrackerApp() (initLockToggle) — klik na
+        // čerstvě reloadovanou stránku dřív, než se stihne připojit, je no-op. Proto se po
+        // každém reloadu čeká na `load`, než se na zámek klikne znovu.
         await page.Locator("[data-project-menu-lock-toggle]").ClickAsync();
         await page.WaitForLoadStateAsync(LoadState.Load);
         await Expect(page.Locator("[data-project-menu-toggle]")).ToHaveCountAsync(0);
