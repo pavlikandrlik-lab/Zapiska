@@ -10,8 +10,16 @@
         : string.Equals(themeModeCookie, "light", System.StringComparison.OrdinalIgnoreCase)
             ? "light"
             : null;
-    // Razor nevynechá řetězcový atribut s hodnotou null (vypíše prázdný data-theme="") —
-    // atribut proto sestavíme jako celek a bez volby ho úplně vynecháme.
+    // Razor's conditional attribute-omission codegen (BeginWriteAttribute/EndWriteAttribute,
+    // the mechanism that drops an attribute when its bound value is null) does not apply to
+    // attributes whose name starts with "data-" — verified against the generated source
+    // (EmitCompilerGeneratedFiles) for this exact <html data-theme="@serverTheme"> markup:
+    // the compiler emits a plain WriteLiteral+Write instead, so a null serverTheme renders
+    // data-theme="" rather than omitting the attribute. Non-data- attributes (id, class,
+    // href, aria-*, arbitrary custom names) do use the conditional codegen and omit on null;
+    // only the "data-" prefix is special-cased. serverTheme is restricted to the two literal
+    // strings "dark"/"light" above (never request-controlled text), so building the fragment
+    // by hand and writing it unescaped is safe.
     var themeAttribute = serverTheme is null ? "" : $" data-theme=\"{serverTheme}\"";
 }
 
