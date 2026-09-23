@@ -52,11 +52,10 @@ wwwroot/assets/gov/
   │                templates, animations, content, skip-links, index — 10 CSS)
   ├─ fonts/       (roboto*.woff2 + roboto.css)
   ├─ icons/       (colored, complex, components, templates)
-  ├─ logo_main_white.png, logo_main_dark.png (nebo vlastní logo Zápisky)
-  └─ favicon.svg
+  └─ (logo zůstává ~/images/zapiska-logo.svg — z kitu se logo nekopíruje, §9.2)
 ```
 
-Zdroj = `DesignSystem-FIS-v1.0.0/assets/gov` + kořenové logo/favicon.
+Zdroj = `DesignSystem-FIS-v1.0.0/assets/gov`.
 `ds-fis/` složka se **nekopíruje**.
 
 Stará `wwwroot/lib/gov-design-system/` (4.2.9) se po ověření odstraní; do té
@@ -121,7 +120,7 @@ nastavit `Cache-Control: public,max-age=31536000,immutable` v `OnPrepareResponse
 | Navigace | `<nav class="app-nav">`, `app-` odkazy, `NavClass()` active | `<nav class="gov-navigation" id="main-navigation">`, aktivní stav gov třídou |
 | Skip-links | nemá | `gov-skip-links` |
 | Uživatel | vlastní `user-menu` (button+panel, JS) | `gov-dropdown` s ikonou osoby (+ **Odhlásit** jako app- odchylka, §7) |
-| Motiv | `theme.js` 3-stav + cookie | nativní `gov-theme-switch` |
+| Motiv | `theme.js` 3-stav + cookie | nativní `gov-theme-switch` + tenký cookie most (§9.1) |
 | Search | `app-search` form + Task-7 dropdown | tentýž dropdown v search slotu `gov-header` |
 | Patička | `<footer class="app-footer">`, odkazy na Dokumentaci | `<footer class="gov-footer">`, sloupce + verze `DS gov.cz 4.7.0` |
 | gov jádro | 4.2.9 (`lib/`) | 4.7.0 (`assets/gov/`) |
