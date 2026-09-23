@@ -1,20 +1,39 @@
 @inject PmTracker.Web.Services.Common.IApplicationVersionProvider ApplicationVersionProvider
 
 @{
+    // Motiv: server vypíše data-theme jen pro výslovnou volbu uživatele (cookie ukládá
+    // most v theme.js). Bez volby atribut chybí a inline skript v <head> dosadí motiv
+    // podle systému — hodnota "auto" se nikdy nevypisuje, přepnula by jen gov tokeny.
     var themeModeCookie = Context.Request.Cookies["pmtracker.theme.mode"];
-    var serverThemeMode = string.Equals(themeModeCookie, "dark", System.StringComparison.OrdinalIgnoreCase)
+    var serverTheme = string.Equals(themeModeCookie, "dark", System.StringComparison.OrdinalIgnoreCase)
         ? "dark"
         : string.Equals(themeModeCookie, "light", System.StringComparison.OrdinalIgnoreCase)
             ? "light"
             : null;
+    // Razor nevynechá řetězcový atribut s hodnotou null (vypíše prázdný data-theme="") —
+    // atribut proto sestavíme jako celek a bez volby ho úplně vynecháme.
+    var themeAttribute = serverTheme is null ? "" : $" data-theme=\"{serverTheme}\"";
 }
 
 <!DOCTYPE html>
-<html lang="cs" data-theme="@serverThemeMode" data-theme-mode="@serverThemeMode">
+<html lang="cs"@Html.Raw(themeAttribute)>
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Zápiska</title>
+
+    @* Bez uložené volby motiv podle systému — ještě před prvním vykreslením CSS, jinak by
+       gov tokeny (html:not([data-theme]) sledují systém) a site.css ([data-theme="dark"])
+       ukázaly napůl tmavou stránku. Změnu systému za běhu nesledujeme. *@
+    <script>
+        (function () {
+            var root = document.documentElement;
+            if (!root.hasAttribute("data-theme")) {
+                var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+                root.setAttribute("data-theme", dark ? "dark" : "light");
+            }
+        })();
+    </script>
 
     @* Konfigurace DS gov — musí být před loaderem komponent. iconsPath míří na aplikační
        strom ikon (nadmnožina sady kitu), ne na assets/gov/icons — odchylka č. 3
@@ -101,9 +120,8 @@
             </form>
 
             <div class="app-user-tools">
-                <!-- gov-theme-switch Web Component (gov-design-system 4.x) emituje gov-change event.
-                     theme.js zachycuje event, řídí 3-stavový model (light/dark/auto) a persistuje
-                     volbu do cookie pmtracker.theme.mode. gov-theme-switch slouží pouze jako UI prvek. -->
+                <!-- gov-theme-switch (DS gov 4.7.0) přepíná motiv sám; theme.js jen ukládá volbu
+                     do roční cookie pmtracker.theme.mode pro vykreslení na serveru. -->
                 <div data-theme-switch class="app-theme-switch">
                     <gov-theme-switch
                         aria-label-light="Přepnout na tmavý mód"

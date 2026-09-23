@@ -92,20 +92,15 @@ public sealed class GlobalSearchDynamicResultsTests
     {
         var page = await _fixture.NewPageAsync();
 
-        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty?asUser={_fixture.AdminOsobaId}");
-
-        // Přepneme na dark mode
-        var themeSwitch = page.Locator("[data-theme-switch-input]");
-        if (await themeSwitch.IsVisibleAsync())
+        var baseUri = new Uri(_fixture.BaseUrl);
+        await page.Context.AddCookiesAsync(new[]
         {
-            // Zapneme dark mode
-            var isChecked = await themeSwitch.IsCheckedAsync();
-            if (!isChecked)
-            {
-                await themeSwitch.CheckAsync();
-                await page.WaitForTimeoutAsync(300);
-            }
-        }
+            new Cookie { Name = "pmtracker.theme.mode", Value = "dark", Domain = baseUri.Host, Path = "/" }
+        });
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty?asUser={_fixture.AdminOsobaId}");
+        (await page.EvaluateAsync<string>("document.documentElement.getAttribute('data-theme')"))
+            .Should().Be("dark");
 
         // Ověříme že ikona lupy je v DOM právě jednou
         var searchIcons = page.Locator("[data-global-search] .gov-icon--system svg");

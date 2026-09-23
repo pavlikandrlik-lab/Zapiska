@@ -21,10 +21,12 @@ To znamená:
 
 | Volba | Vzhled |
 |---|---|
-| **Světlé** | Default; bílé pozadí, tmavý text |
+| **Světlé** | Bílé pozadí, tmavý text |
 | **Tmavé** | Tmavé pozadí, světlý text — vhodné pro večerní práci |
 
-Přepínač je **gov-theme-switch** komponenta, vidíš ji v hlavičce nebo v profilu.
+Dokud si téma nezvolíš, řídí se **nastavením systému** (Windows / prohlížeče).
+Volbu uděláš přepínačem v hlavičce; pamatuje se rok v tomto prohlížeči (cookie
+`pmtracker.theme.mode`).
 
 ### Výchozí editor záznamu
 

@@ -32,7 +32,8 @@ public sealed class GovComponentsReplacementTests
     /// <summary>
     /// gov-theme-switch Web Component je použita v _Layout.cshtml.
     /// CSS aproximace (label+input+SVG ikonky) byla odstraněna a nahrazena skutečnou gov komponentou.
-    /// theme.js zachycuje gov-change event a řídí 3-stavový model (light/dark/auto).
+    /// Přepínání obstarává gov-theme-switch sám; theme.js jen ukládá volbu do cookie
+    /// pmtracker.theme.mode.
     /// </summary>
     [Fact]
     public void Layout_MaGovThemeSwitch_NeboPuvodniCssAproximaciSZduvodnenim()

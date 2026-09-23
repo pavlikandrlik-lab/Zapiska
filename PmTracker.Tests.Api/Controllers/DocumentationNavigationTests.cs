@@ -83,6 +83,5 @@ public sealed class DocumentationNavigationTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain("data-theme=\"dark\"");
-        html.Should().Contain("data-theme-mode=\"dark\"");
     }
 }
