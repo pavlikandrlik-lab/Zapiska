@@ -1,7 +1,7 @@
 # Standardní gov hlavička a patička (upgrade gov 4.2.9 → 4.7.0) — specifikace
 
 **Datum:** 2026-09-23
-**Stav:** návrh k odsouhlasení
+**Stav:** rozhodnutí uzavřena, čeká na schválení specu
 
 ## 1. Cíl
 
@@ -19,7 +19,7 @@ gov weby (referenčně dia.gov.cz). Vzhled a struktura zbytku aplikace se neměn
 | **Bílá hlavička** | Plyne z vypuštění DS FIS — vanilla gov hlavička je bílá. |
 | **Získání assetů** | **Kopie předsestaveného** `assets/gov` z `DesignSystem-FIS-v1.0.0/` do `wwwroot/assets/gov`. Žádný Node v buildu ani runtime (sedí na offline nasazení). |
 | **Vyhledávání** | Ponechat stávající **Task-7 dropdown** (`app-search-*`, authz-filtrovaný, záznamocentrický) vsazený do search slotu nové hlavičky. Nepoužívat `gov-form-autocomplete`. |
-| **Motiv** | **Nativní** `gov-theme-switch` (gov 4.7.0). Náš dark-mode CSS i gov jedou oba na `[data-theme="dark"]`, takže je kompatibilní. |
+| **Motiv** | **Nativní** `gov-theme-switch` (gov 4.7.0) + tenký cookie most pro první vykreslení (§9.1). Náš dark-mode CSS i gov jedou oba na `[data-theme="dark"]`. |
 | **Navigace** | Plochá, 6 položek gated oprávněními (jako dnes) namapovaných do `gov-navigation`. **Bez** mega-menu / submenu (YAGNI). |
 | **Breadcrumbs** | Zůstává stávající `_BreadcrumbBar` + `BreadcrumbTrail`. **Mimo rozsah.** |
 
@@ -132,7 +132,7 @@ nastavit `Cache-Control: public,max-age=31536000,immutable` v `OnPrepareResponse
 - Vyhledávací dropdown a jeho JS/CSS (`global-search.js`, `app-search-*`).
 - Aplikační komponentní CSS v `site.css` (karty, harmonogram, dashboard…) —
   **kód se nemění**, ale vizuál se ověřuje po upgradu jádra (§8).
-- `theme.js` zůstane jen jako tenký most, pokud bude potřeba (viz §9 otevřený bod).
+- `theme.js` zůstává jen jako tenký cookie most (§9.1).
 
 ## 7. Rizika
 
@@ -156,24 +156,22 @@ Ruční průchod (dělá uživatel), reprezentativní obrazovky s gov komponenta
 - [ ] Dark mode na reprezentativních stránkách
 - [ ] Edge/i15 (nosný layout, charset) — dle paměti
 
-## 9. Otevřené body k rozhodnutí
+## 9. Doplňující rozhodnutí (2026-09-23)
 
-1. **Persistence a first-paint motivu.** Náš `theme.js` dnes drží 3-stav
-   (light/dark/auto) v cookie a nastaví `data-theme` ještě před vykreslením
-   (bez probliknutí). Nativní gov-theme-switch může persistovat jinak
-   (localStorage) a „auto" stav řešit jen přes `prefers-color-scheme`.
-   **Rozhodnout:** čistě nativní (přijmout případné probliknutí a chování „auto"
-   dle gov), nebo ponechat tenký cookie-most v `theme.js` jen pro server-side
-   první vykreslení. *Doporučení: ponechat tenký most, pokud se objeví probliknutí.*
-2. **Logo v hlavičce.** Kit má `logo_main_white.png`. Aplikace má
-   `zapiska-logo.svg`. **Rozhodnout:** ponechat logo Zápisky (doporučeno), nebo
-   gov generické logo.
-3. **Obsah patičky.** Namapovat stávající odkazy (Uživatelská příručka,
-   Technická dokumentace, Q&A, Changelog) do sloupců `gov-footer`. Text verze
-   ponechat aplikační. **Rozhodnout jen, pokud chceš jiné rozdělení sloupců.**
-4. **Šířka obsahu.** Vanilla gov omezuje obsah na ~1200 px; aplikace je dnes
-   širší (fluid tier). Hlavička/patička budou gov-šířky. **Rozhodnout:** srovnat
-   šířku obsahu s gov, nebo nechat obsah širší než chrome (může vypadat nesourodě).
+1. **Motiv — nativní + tenký cookie most.** Přepínač je nativní `gov-theme-switch`
+   4.7.0. Z `theme.js` zůstane jen tenký most: při vykreslení serverem nastaví
+   `data-theme` podle cookie `pmtracker.theme.mode` (žádné probliknutí světlého
+   motivu při načtení v tmavém režimu) a při `gov-change` volbu do cookie uloží.
+   Vlastní 3-stavová logika a UI nad přepínačem se ruší.
+2. **Logo — Zápiska.** V hlavičce zůstává `zapiska-logo.svg` a název „Zápiska".
+   Logo z kitu (`logo_main_*.png`) se nekopíruje.
+3. **Obsah patičky — výchozí mapování.** Stávající odkazy (Uživatelská příručka,
+   Technická dokumentace, Q&A, Changelog) jdou do sloupců `gov-footer`; řádek
+   verze ve formátu `Verze … · DS gov.cz 4.7.0`.
+4. **Šířka — nechat nesourodě.** Hlavička a patička mají standardní gov šířku
+   obsahu (~1200 px), obsah stránek si ponechá dnešní šířku (fluid tier u datových
+   stránek). Okraje nebudou lícovat — přijato jako vědomý kompromis, žádná
+   `app-` odchylka šířky se nezavádí.
 
 ## 10. Testy
 
