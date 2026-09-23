@@ -188,10 +188,6 @@ public sealed class ProjectDashboardServiceNesPanelTests
         PmTrackerDbContext db,
         IInformacniSystemQueryService queryService)
     {
-        // BuildNesPanelAsync nevolá VyzvyPanelBuilder — inert stuby stačí.
-        var vyzvaServiceMock = new Mock<IVyzvaService>();
-        var vyzvyPanelBuilder = new VyzvyPanelBuilder(vyzvaServiceMock.Object, db);
-
-        return new ProjectDashboardService(db, vyzvyPanelBuilder, queryService);
+        return new ProjectDashboardService(db, queryService);
     }
 }

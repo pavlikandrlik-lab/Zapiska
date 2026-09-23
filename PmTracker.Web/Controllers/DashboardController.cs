@@ -32,6 +32,7 @@ public sealed class DashboardController : BaseController
     [HttpGet("")]
     public IActionResult Index()
     {
+        SetSectionRootBreadcrumb("Přehled");
         return View(AttachCurrentUser(_dashboardService.BuildDashboardPage(CurrentUserContext)));
     }
 
@@ -64,6 +65,7 @@ public sealed class DashboardController : BaseController
     {
         var model = AttachCurrentUser(await _dashboardService.BuildFocusListPageAsync(CurrentUserContext, ct));
         PrepareFocusPresentation(model.Items);
+        SetSectionChildBreadcrumb("Přehled", Url.Action("Index", "Dashboard", WithAsUserRoute())!, model.PageTitle);
         return View(model);
     }
 
@@ -72,6 +74,7 @@ public sealed class DashboardController : BaseController
     {
         var model = AttachCurrentUser(await _dashboardService.BuildMeetingsListPageAsync(CurrentUserContext, ct));
         PrepareMeetingsPresentation(model.Items);
+        SetSectionChildBreadcrumb("Přehled", Url.Action("Index", "Dashboard", WithAsUserRoute())!, model.PageTitle);
         return View(model);
     }
 
@@ -80,6 +83,7 @@ public sealed class DashboardController : BaseController
     {
         var model = AttachCurrentUser(await _dashboardService.BuildNewsListPageAsync(CurrentUserContext, take ?? NewsListDefaultTake, ct));
         PrepareNewsPresentation(model.Items);
+        SetSectionChildBreadcrumb("Přehled", Url.Action("Index", "Dashboard", WithAsUserRoute())!, model.PageTitle);
         return View(model);
     }
 

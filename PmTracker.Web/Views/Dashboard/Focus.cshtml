@@ -4,16 +4,8 @@
     ViewData["BodyClass"] = "dashboard-page";
 }
 
-@* Title + Subtitle záměrně vynechány (user 2026-06-09) — na této podstránce
-   se nadpis „Na co se soustředit" nezobrazuje, zůstává jen back tlačítko.
+@* Navigaci „zpět" nese drobečková lišta (frame bar pod menu); _PageHeader odstraněn (2026-07-04).
    Tab title v prohlížeči řídí ViewData["Title"] výše. *@
-@await Html.PartialAsync("_PageHeader", new PageHeaderViewModel
-{
-    Title = "", // prázdný → _PageHeader nadpis nevyrenderuje (required member, nutno nastavit)
-    BackUrl = Model.BackUrl,
-    BackLabel = Model.BackLabel
-})
-
 <section class="dashboard-list-page">
     @await Html.PartialAsync("_DashboardFocusList", Model.Items)
 </section>

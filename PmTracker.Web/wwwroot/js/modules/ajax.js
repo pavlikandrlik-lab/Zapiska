@@ -10,6 +10,8 @@ import {
     parseJsonPayload,
     resolveAjaxResponseTraceId,
     resolveFormSubmitterAttr,
+    sanitizeFileName,
+    saveTextAsFile,
     setButtonDisabled,
     SUBMIT_SELECTOR,
     truncateDiagnosticBody
@@ -27,6 +29,8 @@ import { setRecordFormTab } from "./recordEditor/form.js";
 import { refreshPageScope } from "./navigation.js";
 
 const sessionExpiredErrorCode = "SESSION_EXPIRED";
+// Spec 2026-09-17 §5.3 — cizí lidský zápis; jediná cesta ven je načíst záznam znovu.
+const recordStaleErrorCode = "RECORD_STALE";
 
 export function resolveErrorTarget(field, form) {
     if (!(field instanceof HTMLElement)) {
@@ -229,7 +233,8 @@ export function renderModalFormErrors(form, payload) {
 
         const normalizedErrorCode = (errorCode || "").toUpperCase();
         if (normalizedErrorCode === sessionStaleErrorCode
-            || normalizedErrorCode === sessionExpiredErrorCode) {
+            || normalizedErrorCode === sessionExpiredErrorCode
+            || normalizedErrorCode === recordStaleErrorCode) {
             const recoveryActions = document.createElement("div");
             recoveryActions.className = "modal-submit-diagnostics-actions";
             const reloadButton = document.createElement("button");
@@ -275,55 +280,19 @@ export function renderModalFormErrors(form, payload) {
             saveButton.className = "modal-submit-action-btn";
             saveButton.textContent = "Uložit log chyby";
             saveButton.addEventListener("click", async () => {
-                const safeTraceId = (traceId || "diagnostic-log").replace(/[\\/:*?"<>|\s]+/g, "_");
-                const fileName = `${safeTraceId}.txt`;
-                // BOM ﻿ aby Notepad otevřel UTF-8 bez "ANSI" misdetection.
-                const fileBody = "﻿" + diagnosticLog;
-                const blob = new Blob([fileBody], { type: "text/plain;charset=utf-8" });
-                let saved = false;
-                try {
-                    if (typeof window.showSaveFilePicker === "function") {
-                        const handle = await window.showSaveFilePicker({
-                            suggestedName: fileName,
-                            types: [{
-                                description: "Textový soubor (UTF-8)",
-                                accept: { "text/plain": [".txt"] }
-                            }]
-                        });
-                        const writable = await handle.createWritable();
-                        await writable.write(blob);
-                        await writable.close();
-                        saved = true;
-                    } else {
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = fileName;
-                        a.style.display = "none";
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-                        saved = true;
-                    }
-                } catch (err) {
-                    if (err && err.name === "AbortError") {
-                        // user zavřel Save dialog — žádné UI zobrazení chyby
-                        return;
-                    }
-                    saveButton.textContent = "Uložení selhalo";
-                    window.setTimeout(() => {
-                        saveButton.textContent = "Uložit log chyby";
-                    }, 1800);
+                // 2026-09-08: ukládání je sdílené s chybovou stránkou (utils.saveTextAsFile).
+                const stav = await saveTextAsFile(
+                    diagnosticLog,
+                    sanitizeFileName(traceId, "diagnostic-log"));
+                if (stav === "aborted") {
                     return;
                 }
-                if (saved) {
-                    saveButton.textContent = "Uloženo";
-                    window.setTimeout(() => {
-                        saveButton.textContent = "Uložit log chyby";
-                    }, 1800);
-                }
+                saveButton.textContent = stav === "saved" ? "Uloženo" : "Uložení selhalo";
+                window.setTimeout(() => {
+                    saveButton.textContent = "Uložit log chyby";
+                }, 1800);
             });
+
             actions.appendChild(saveButton);
 
             diagnosticBlock.appendChild(actions);

@@ -16,7 +16,16 @@ public abstract partial class BaseController : Controller
     private readonly TimeProvider _timeProvider;
     private readonly ILoggerFactory _loggerFactory;
 
+    private ILogger? _logger;
+
     protected CurrentUserContextViewModel CurrentUserContext { get; private set; } = null!;
+
+    /// <summary>
+    /// Logger pojmenovaný podle konkrétního controlleru. Líně vytvořený — controllery,
+    /// které nelogují, si nic nealokují.
+    /// </summary>
+    protected ILogger Logger
+        => _logger ??= _loggerFactory.CreateLogger(GetType().FullName ?? nameof(BaseController));
 
     protected BaseController(
         IUserContextResolver userContextResolver,
@@ -31,6 +40,15 @@ public abstract partial class BaseController : Controller
     protected DateTime GetLocalNow()
     {
         return _timeProvider.GetLocalNow().LocalDateTime;
+    }
+
+    /// <summary>
+    /// UTC čas z TimeProvideru. Diagnostické výpisy razítkují v UTC; testy si čas
+    /// podvrhují, takže přímé DateTime.UtcNow by je obešlo.
+    /// </summary>
+    protected DateTime GetUtcNow()
+    {
+        return _timeProvider.GetUtcNow().UtcDateTime;
     }
 
     protected T AttachCurrentUser<T>(T model)

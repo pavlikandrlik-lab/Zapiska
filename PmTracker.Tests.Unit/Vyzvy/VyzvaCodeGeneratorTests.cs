@@ -10,11 +10,6 @@ public sealed class VyzvaCodeGeneratorTests
     public void Generuj_FormatujeJakoPoradoveLomitkoRok()
         => VyzvaCodeGenerator.Generuj(poradoveVRoce: 2, rok: 2026).Should().Be("2/2026");
 
-    [Fact]
-    public void DalsiPoradoveVRoce_Prazdny_Vraci1()
-        => VyzvaCodeGenerator.DalsiPoradoveVRoce(Array.Empty<int>()).Should().Be(1);
-
-    [Fact]
-    public void DalsiPoradoveVRoce_NejvyssiPlus1()
-        => VyzvaCodeGenerator.DalsiPoradoveVRoce(new[] { 1, 2, 5 }).Should().Be(6);
+    // DalsiPoradoveVRoce zaniklo 2026-09-07 — čísla výzev se domlouvají se SVA
+    // a zadávají ručně, aplikace další číslo negeneruje (spec §5.1).
 }

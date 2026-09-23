@@ -55,12 +55,22 @@
         : "pm-tab";
 }
 
+@* A8 (2026-07-09): data-record-editor-presentation="page" — editor je výhradně stránkový
+   (jediný konzument = EditZaznamPage). Atribut je podmínkou outbound-guardu
+   (bootstrap.maybeGuardOutboundNavigation) i history trapu (historyTrap.js) — bez něj
+   byly OBA mrtvé (selektor nematchoval). Pozn.: Razor komentář NESMÍ být uvnitř tagu
+   s TagHelpery — spolkl by následující atribut.
+   B3 (2026-07-09): data-record-editor-guard="off" na detailu návrhu (IsProposalDecisionDetail)
+   — rozhodovací stránka nemá koncept rozpracovanosti; historyTrap se nearmuje a
+   promptRecordEditorDiscard propouští bez dialogu. *@
 <form class="form-grid record-editor-form"
       asp-controller="@Model.FormController"
       asp-action="@Model.FormAction"
       method="post"
       data-ajax-submit="@(Model.UseAjaxSubmit ? "true" : "false")"
       data-record-editor-form="true"
+      data-record-editor-presentation="page"
+      data-record-editor-guard="@(Model.IsProposalDecisionDetail ? "off" : "on")"
       data-record-editor-back-url="@Model.BackUrl"
       data-record-editor-project-id="@Model.ProjektId"
       data-record-owner-autofill="true"
@@ -73,6 +83,7 @@
     <input type="hidden" name="Id" value="@(Model.IsCreate ? null : Model.Id)" />
     <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
     <input type="hidden" name="CisloZaznamu" value="@Model.CisloZaznamu" />
+    <input type="hidden" name="RecordVersion" value="@Model.RecordVersion" />
     <input type="hidden" name="EditorTab" value="@defaultEditorTab" data-record-active-tab-input />
     <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
     <input type="hidden" name="UiContext" value="@Model.UiContext" />
@@ -144,11 +155,15 @@
            Pro nový záznam (IsCreate) defaultně ON (auto-fill je standardní flow).
            FIX 2026-05-04: switch je čistě klient-side. Server-side persistence přes hidden
            input HarmonogramRezim při Save form submitu (transactional s datumy v jednom POST). *@
+        @* C3 (2026-07-10): na schvalování návrhu (IsProposalDecisionDetail) je switch
+           read-only — pravidlo „vše read-only, žádný editovatelný prvek". Stav zůstává
+           viditelný (schvalovatel má vidět Auto/Manual režim). *@
         <gov-form-switch size="m"
                          class="record-editor-tabs-rezim-switch"
                          data-record-rezim-switch
                          data-record-zaznam-id="@Model.Id"
                          data-record-projekt-id="@Model.ProjektId"
+                         disabled="@(Model.IsProposalDecisionDetail ? "disabled" : null)"
                          @(Model.HarmonogramAutoFillSwitchOn ? "checked" : null)>
             <span slot="label"><label>Automatické vyplňování harmonogramu</label></span>
         </gov-form-switch>

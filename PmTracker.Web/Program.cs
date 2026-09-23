@@ -18,6 +18,10 @@ using PmTrackerAuthzServiceImpl = PmTracker.Web.Services.Security.AuthorizationS
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Souborový log (2026-09-08). Bez něj šlo všechno jen do konzole, kterou IIS v in-process
+// režimu zahazuje, takže po chybě nezbyla žádná stopa a nešlo zjistit proč ani kde nastala.
+builder.Logging.AddPmTrackerFileLog(builder.Configuration, builder.Environment);
+
 builder.Services.AddControllersWithViews(options =>
 {
     options.Filters.Add<AjaxAntiforgeryResultFilter>();
@@ -26,6 +30,9 @@ builder.Services.AddControllersWithViews(options =>
 builder.Services.AddScoped<
     PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService,
     PmTracker.Web.Services.Schedules.HarmonogramSkutecnostSyncService>();
+builder.Services.AddScoped<
+    PmTracker.Web.Services.Records.IRecordEditLockService,
+    PmTracker.Web.Services.Records.RecordEditLockService>();
 builder.Services.AddAuthentication(IISDefaults.AuthenticationScheme);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<PmTrackerAuthzService, PmTrackerAuthzServiceImpl>();
@@ -49,6 +56,8 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 builder.Services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
+builder.Services.Configure<PmTracker.Web.Services.Export.PdfExportOptions>(
+    builder.Configuration.GetSection(PmTracker.Web.Services.Export.PdfExportOptions.SectionName));
 builder.Services
     .AddPmTrackerDataStore(builder.Configuration);
 builder.Services.AddPmTrackerSearch(builder.Configuration);
@@ -68,6 +77,11 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
+
+// Musí být UVNITŘ UseExceptionHandler (tedy registrovaný až za ním): výjimku chytí jako
+// první, doplní kontext požadavku do logu a pustí ji dál, aby chybovou stránku vykreslil
+// handler nad ním. Registruje se ve všech prostředích — ve vývoji je log stejně užitečný.
+app.UseMiddleware<RequestExceptionLoggingMiddleware>();
 
 // M-4: defense-in-depth security headers — CSP, X-Frame-Options, X-Content-Type-Options,
 // Referrer-Policy + zachovaný X-Trace-Id pro diagnostiku.
@@ -98,6 +112,15 @@ app.Use(async (context, next) =>
 });
 
 app.UseHttpsRedirection();
+
+// FIX 2026-07-10: explicitní charset pro textové statické soubory. Bez něj posílá
+// server jen `text/css` a prohlížeč kódování HÁDÁ — Edge na české Windows (i15)
+// spadl na CP1250 a UTF-8 glyfy v CSS (breadcrumb separátor „›", filtry „▾")
+// renderoval jako mojibake („â€ş"). HTTP hlavička má nejvyšší prioritu → konec hádání.
+var staticContentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+staticContentTypeProvider.Mappings[".css"] = "text/css; charset=utf-8";
+staticContentTypeProvider.Mappings[".js"] = "text/javascript; charset=utf-8";
+
 if (app.Environment.IsDevelopment())
 {
     // Dev-only: ESM moduly se importují relativním URL bez verze (asp-append-version verzuje
@@ -108,6 +131,7 @@ if (app.Environment.IsDevelopment())
     // standardní caching (deploy = plná výměna souborů + ohlášený hard-refresh).
     app.UseStaticFiles(new StaticFileOptions
     {
+        ContentTypeProvider = staticContentTypeProvider,
         OnPrepareResponse = ctx =>
         {
             if (ctx.File.Name.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
@@ -120,7 +144,10 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    app.UseStaticFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        ContentTypeProvider = staticContentTypeProvider
+    });
 }
 
 app.UseRouting();

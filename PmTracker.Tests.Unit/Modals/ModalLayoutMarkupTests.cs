@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FluentAssertions;
 
 namespace PmTracker.Tests.Unit.Modals;
@@ -83,5 +85,57 @@ public sealed class ModalLayoutMarkupTests
         js.Should().Contain(
             "handleGovCloseEvent",
             "musí existovat handler pro gov-close");
+    }
+
+    /// <summary>
+    /// Bug 2026-07-04: modaly se zavírají jen křížkem/Escape/tlačítkem, backdrop
+    /// NEzavírá (viz <see cref="Layout.ModalBackdropCloseTests"/>). Ta garance sedí
+    /// v _ModalLayout (gov-dialog + block-backdrop-close="true") + sdíleném
+    /// handleDocumentClick. Aby ji zdědil KAŽDÝ textový modal (nový projekt, úprava
+    /// projektu, nové jednání, osoby, role…), musí každý *Modal*.cshtml jet přes
+    /// Layout="_ModalLayout". Nový modal, který sdílený layout obejde, by pro sebe
+    /// backdrop-close bug reintrodukoval — proto ho tento test zachytí.
+    /// </summary>
+    [Fact]
+    public void AllFormModalPartials_ShouldUseSharedModalLayout()
+    {
+        var viewsRoot = Path.Combine(RepoRoot().FullName, "PmTracker.Web", "Views");
+
+        // Dokumentované výjimky — vlastní modal systémy (ne _ModalLayout):
+        //  _ModalLayout.cshtml       = layout sám
+        //  _ModalFormActions.cshtml  = sdílený partial akčních tlačítek (ne standalone modal)
+        //  _ChatModal.cshtml         = vlastní gov-dialog v chatModal.js (má autosave)
+        //
+        // ReassignModal.cshtml zrušen 2026-09-07 — přesuny PNF pokrývá tažení
+        // a kontextové menu, třetí cesta ke stejné akci nebyla potřeba (spec §8.5).
+        var documentedExceptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "_ModalLayout.cshtml",
+            "_ModalFormActions.cshtml",
+            "_ChatModal.cshtml"
+        };
+
+        var offenders = Directory
+            .EnumerateFiles(viewsRoot, "*Modal*.cshtml", SearchOption.AllDirectories)
+            .Where(path => !documentedExceptions.Contains(Path.GetFileName(path)))
+            .Where(path => !File.ReadAllText(path).Contains("Layout = \"_ModalLayout\"", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        offenders.Should().BeEmpty(
+            "každý textový modal musí dědit backdrop-close chování z _ModalLayout; " +
+            "sdílený layout obchází: " + string.Join(", ", offenders));
+    }
+
+    private static DirectoryInfo RepoRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "PmTracker.sln")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory ?? throw new InvalidOperationException("Nepodařilo se najít kořen repozitáře (PmTracker.sln).");
     }
 }

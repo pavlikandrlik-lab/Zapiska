@@ -25,40 +25,34 @@ public sealed class VyzvaServiceAssignmentTests
         ev.VyzvaId.Should().BeNull();
     }
 
+    /// <summary>
+    /// Do 2026-09-07 se PNF při zapnutí switche automaticky přiřadilo do nejstarší
+    /// rozpracované výzvy. Nově výzvy vznikají prázdné a plní se vědomým přesunem,
+    /// takže automatika by je plnila za zády uživatele a buffer by zůstal prázdný
+    /// (spec §8.4). Test na výběr nejnižšího pořadového čísla proto zanikl — žádný
+    /// výběr už se nekoná.
+    /// </summary>
     [Fact]
-    public async Task ZaradidOn_PripravaVyzvaExistuje_Priradi()
+    public async Task ZaradidOn_PripravaVyzvaExistuje_PrestoKonciVBufferu()
     {
         using var db = VyzvaServiceTestHarness.CreateDb();
         await VyzvaServiceTestHarness.SeedProjektAsync(db);
         await VyzvaServiceTestHarness.SeedPnfTypAsync(db);
         await VyzvaServiceTestHarness.SeedZaznamAsync(db, 2);
-        db.Vyzvy.Add(new VyzvaEntity { Id = 30, ProjektId = 1, Kod = "1/2026", PoradoveVRoce = 1, Rok = 2026, Stav = VyzvaStav.Priprava, DatumZalozeni = DateTime.UtcNow, ZalozilOsobaId = 1, MistoPlneniSnapshot = "F", CisloRamcoveSmlouvySnapshot = "A" });
+        db.Vyzvy.AddRange(
+            new VyzvaEntity { Id = 30, ProjektId = 1, Kod = "1/2026", PoradoveVRoce = 1, Rok = 2026, Stav = VyzvaStav.Priprava, DatumZalozeni = DateTime.UtcNow, ZalozilOsobaId = 1, MistoPlneniSnapshot = "F", CisloRamcoveSmlouvySnapshot = "A" },
+            new VyzvaEntity { Id = 31, ProjektId = 1, Kod = "2/2026", PoradoveVRoce = 2, Rok = 2026, Stav = VyzvaStav.Priprava, DatumZalozeni = DateTime.UtcNow, ZalozilOsobaId = 1, MistoPlneniSnapshot = "F", CisloRamcoveSmlouvySnapshot = "A" });
         db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 11, ZaznamId = 2, TypOdkazuId = 1, Cislo = "333333" });
         await db.SaveChangesAsync();
 
         var svc = VyzvaServiceTestHarness.CreateService(db);
-        await svc.NastavitZaradidAsync(11, true, CancellationToken.None);
+        var result = await svc.NastavitZaradidAsync(11, true, CancellationToken.None);
 
-        (await db.ZaznamExterniOdkazy.FindAsync(11))!.VyzvaId.Should().Be(30);
-    }
-
-    [Fact]
-    public async Task ZaradidOn_DveVyzvyPriprava_PriradiNejnizsiPoradove()
-    {
-        using var db = VyzvaServiceTestHarness.CreateDb();
-        await VyzvaServiceTestHarness.SeedProjektAsync(db);
-        await VyzvaServiceTestHarness.SeedPnfTypAsync(db);
-        await VyzvaServiceTestHarness.SeedZaznamAsync(db, 3);
-        db.Vyzvy.AddRange(
-            new VyzvaEntity { Id = 40, ProjektId = 1, Kod = "2/2026", PoradoveVRoce = 2, Rok = 2026, Stav = VyzvaStav.Priprava, DatumZalozeni = DateTime.UtcNow, ZalozilOsobaId = 1, MistoPlneniSnapshot = "F", CisloRamcoveSmlouvySnapshot = "A" },
-            new VyzvaEntity { Id = 41, ProjektId = 1, Kod = "1/2026", PoradoveVRoce = 1, Rok = 2026, Stav = VyzvaStav.Priprava, DatumZalozeni = DateTime.UtcNow, ZalozilOsobaId = 1, MistoPlneniSnapshot = "F", CisloRamcoveSmlouvySnapshot = "A" });
-        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity { Id = 12, ZaznamId = 3, TypOdkazuId = 1, Cislo = "444444" });
-        await db.SaveChangesAsync();
-
-        var svc = VyzvaServiceTestHarness.CreateService(db);
-        await svc.NastavitZaradidAsync(12, true, CancellationToken.None);
-
-        (await db.ZaznamExterniOdkazy.FindAsync(12))!.VyzvaId.Should().Be(41);
+        result.Should().BeOfType<VyzvaResult<PmTracker.Web.Services.Vyzvy.Unit>.Ok>();
+        var ev = await db.ZaznamExterniOdkazy.FindAsync(11);
+        ev!.ZaradidDoVyzvy.Should().BeTrue();
+        ev.VyzvaId.Should().BeNull(
+            "switch znamená jen čekání v bufferu — zařazení do výzvy je vždy vědomý přesun");
     }
 
     [Fact]

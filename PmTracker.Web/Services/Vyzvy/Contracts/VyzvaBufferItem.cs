@@ -5,4 +5,5 @@ public sealed record VyzvaBufferItem(
     int ZaznamId,
     string Cislo,
     string? StrucneNazev,
-    decimal? PredpokladanaCena);
+    decimal? PredpokladanaCena,
+    decimal? KalkulaceCena = null);

@@ -61,6 +61,15 @@ public sealed partial class RecordService : IRecordService
     public Task<ProjektZaznamCardShellViewModel?> BuildRecordCardShellAsync(int projectId, int recordId, CancellationToken ct = default)
         => projectService.BuildRecordCardShellAsync(projectId, recordId, ct);
 
+    public Task<ZaznamScheduleBlockViewModel?> BuildRecordScheduleBlockAsync(int projectId, int recordId, CancellationToken ct = default)
+        => projectService.BuildRecordScheduleBlockAsync(projectId, recordId, ct);
+
+    public Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, CancellationToken ct = default)
+        => projectService.BuildRecordDetailPageAsync(projectId, recordId, ct);
+
+    public Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, bool canOpenVyjadreni, CancellationToken ct = default)
+        => projectService.BuildRecordDetailPageAsync(projectId, recordId, canOpenVyjadreni, ct);
+
     public Task<ZaznamCardDetailViewModel?> BuildRecordCardDetailAsync(int projectId, int recordId, CancellationToken ct = default)
         => projectService.BuildRecordCardDetailAsync(projectId, recordId, ct);
 

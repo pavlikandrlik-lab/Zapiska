@@ -6,8 +6,12 @@ namespace PmTracker.Web.Services.Vyzvy;
 
 public sealed partial class VyzvaService
 {
-    public async Task<VyzvaResult<VyzvaDetail>> ZaloztVyzvuZBufferuAsync(
-        int projektId, int zalozilOsobaId, DateTime now, CancellationToken ct)
+    /// <summary>Povolený rozsah pořadového čísla výzvy (spec 2026-09-07 §5.1).</summary>
+    private const int MinPoradoveVRoce = 1;
+    private const int MaxPoradoveVRoce = 999;
+
+    public async Task<VyzvaResult<VyzvaDetail>> ZalozitVyzvuAsync(
+        int projektId, int poradoveVRoce, int zalozilOsobaId, DateTime now, CancellationToken ct)
     {
         var projekt = await _db.Projekty.FirstOrDefaultAsync(p => p.Id == projektId, ct);
         if (projekt == null)
@@ -17,41 +21,45 @@ public sealed partial class VyzvaService
         if (string.IsNullOrWhiteSpace(projekt.CisloRamcoveSmlouvy))
             return Fail<VyzvaDetail>(VyzvaErrorCode.ProjectMissingCisloRamcoveSmlouvy, "Projekt nemá číslo rámcové smlouvy");
 
-        var pnfTypId = await GetPnfTypIdAsync(ct);
-        var bufferIds = await _db.ZaznamExterniOdkazy.AsNoTracking()
-            .WhereVBufferuProjektu(_db, projektId, pnfTypId)
-            .Select(ev => ev.Id)
-            .ToListAsync(ct);
-
-        if (bufferIds.Count == 0)
-            return Fail<VyzvaDetail>(VyzvaErrorCode.BufferEmpty, "Buffer je prázdný");
+        if (poradoveVRoce < MinPoradoveVRoce || poradoveVRoce > MaxPoradoveVRoce)
+            return Fail<VyzvaDetail>(VyzvaErrorCode.InvalidVyzvaNumber,
+                $"Číslo výzvy musí být v rozsahu {MinPoradoveVRoce}–{MaxPoradoveVRoce}.");
 
         var rok = now.Year;
-        var existujiciPoradove = await _db.Vyzvy.AsNoTracking()
-            .Where(v => v.CisloRamcoveSmlouvySnapshot == projekt.CisloRamcoveSmlouvy && v.Rok == rok)
-            .Select(v => v.PoradoveVRoce)
-            .ToListAsync(ct);
-        var dalsiPoradove = VyzvaCodeGenerator.DalsiPoradoveVRoce(existujiciPoradove);
+        var smlouva = projekt.CisloRamcoveSmlouvy!;
+        if (await JeCisloObsazeneAsync(smlouva, rok, poradoveVRoce, ct))
+            return Fail<VyzvaDetail>(VyzvaErrorCode.DuplicateVyzvaNumber,
+                $"Výzva {poradoveVRoce}/{rok} už pro tuto rámcovou smlouvu existuje.");
 
         var vyzva = new VyzvaEntity
         {
             ProjektId = projektId,
-            Kod = VyzvaCodeGenerator.Generuj(dalsiPoradove, rok),
-            PoradoveVRoce = dalsiPoradove,
+            Kod = VyzvaCodeGenerator.Generuj(poradoveVRoce, rok),
+            PoradoveVRoce = poradoveVRoce,
             Rok = rok,
             Stav = VyzvaStav.Priprava,
             DatumZalozeni = now,
             ZalozilOsobaId = zalozilOsobaId,
             MistoPlneniSnapshot = projekt.MistoPlneni!,
-            CisloRamcoveSmlouvySnapshot = projekt.CisloRamcoveSmlouvy!,
+            CisloRamcoveSmlouvySnapshot = smlouva,
         };
         _db.Vyzvy.Add(vyzva);
-        await _db.SaveChangesAsync(ct);
 
-        var polozky = await _db.ZaznamExterniOdkazy
-            .Where(ev => bufferIds.Contains(ev.Id))
-            .ToListAsync(ct);
-        foreach (var p in polozky) p.VyzvaId = vyzva.Id;
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // Souběh dvou zakládajících: unique index ux_vyzvy_smlouva_rok_poradove porazí
+            // druhého. Překládáme na srozumitelnou hlášku místo serverové chyby.
+            // (Filtr `when (await ...)` nejde — await v catch filtru C# nedovoluje.)
+            _db.Entry(vyzva).State = EntityState.Detached;
+            if (!await JeCisloObsazeneAsync(smlouva, rok, poradoveVRoce, ct)) throw;
+
+            return Fail<VyzvaDetail>(VyzvaErrorCode.DuplicateVyzvaNumber,
+                $"Výzva {poradoveVRoce}/{rok} už pro tuto rámcovou smlouvu existuje.");
+        }
 
         _db.VyzvaHistorieStavu.Add(new VyzvaHistorieStavuEntity
         {
@@ -66,4 +74,8 @@ public sealed partial class VyzvaService
         var detail = await GetVyzvaAsync(vyzva.Id, ct);
         return new VyzvaResult<VyzvaDetail>.Ok(detail!);
     }
+
+    private Task<bool> JeCisloObsazeneAsync(string cisloSmlouvy, int rok, int poradove, CancellationToken ct)
+        => _db.Vyzvy.AsNoTracking().AnyAsync(
+            v => v.CisloRamcoveSmlouvySnapshot == cisloSmlouvy && v.Rok == rok && v.PoradoveVRoce == poradove, ct);
 }

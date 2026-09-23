@@ -48,9 +48,15 @@ public sealed class DashboardLayoutTests
         css.Should().MatchRegex(
             @"\.dashboard-rail\s*\{[\s\S]*?grid-column\s*:\s*2",
             "pravý sloupec (rail) vpravo (grid-column 2)");
+        // C2 rev. 2 (2026-07-10): dělení railu bez :has v nosné logice — jednání
+        // podle obsahu (shrink 0), novinky zbytek; detailní kontrakt pinuje
+        // DashboardTileTypographyTests.RailPanels_MeetingsContentSizedWithHalfCap_NewsTakeRest.
         css.Should().MatchRegex(
-            @"\.dashboard-rail\s*>\s*\.dashboard-panel:has\([\s\S]*?flex\s*:\s*1\s+1\s+auto",
-            "panel s obsahem v railu roste — dynamické sdílení výšky Jednání/Novinky přes :has");
+            @"\.dashboard-rail\s*>\s*\.dashboard-section--meetings\s*\{[\s\S]*?flex\s*:\s*0\s+0\s+auto",
+            "jednání panel = přesně obsah, nic ho nestlačí");
+        css.Should().MatchRegex(
+            @"\.dashboard-rail\s*>\s*\.dashboard-section--news\s*\{[\s\S]*?flex\s*:\s*1\s+1\s+auto",
+            "novinky si vezmou zbytek railu");
     }
 
     [Fact]

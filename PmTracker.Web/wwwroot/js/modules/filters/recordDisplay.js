@@ -13,7 +13,6 @@
 import {
     getProjectFilterConfig,
     getProjectFilterInput,
-    getProjectFilterCurrentUserId,
     getProjectFilterStorageKey,
     buildProjectFilterStateFromInputs,
     setProjectFilterSaveStatus,
@@ -214,8 +213,6 @@ export function applyProjectRecordFilters() {
     }
 
     const state = buildProjectFilterStateFromInputs("records");
-    const currentUserId = getProjectFilterCurrentUserId("records");
-    const hasCurrentUser = currentUserId && currentUserId !== "0";
     const filters = {
         subsystem: normalizeFilterToken(state.subsystem),
         kategorie: normalizeFilterToken(state.kategorie),
@@ -223,7 +220,6 @@ export function applyProjectRecordFilters() {
         typ: normalizeFilterToken(state.typ),
         vlastnik: normalizeFilterToken(state.vlastnik),
         onlyActive: Boolean(state.aktivni),
-        mine: Boolean(state.mine),
         meetingCommentState: normalizeFilterToken(state.jednaniVyjadreniStav)
     };
     const projectId = getProjectFilterProjectId("records");
@@ -251,7 +247,6 @@ export function applyProjectRecordFilters() {
         const matchesMeetingCommentState = !filters.meetingCommentState
             || !hasMeetingCommentStateCache
             || (isTask && commentMeetingStates.includes(filters.meetingCommentState));
-        const matchesMine = !filters.mine || (hasCurrentUser && vlastnik === currentUserId);
 
         const matches =
             (!filters.subsystem || subsystem === filters.subsystem) &&
@@ -260,7 +255,6 @@ export function applyProjectRecordFilters() {
             (!filters.typ || typ === filters.typ) &&
             (!filters.vlastnik || vlastnik === filters.vlastnik) &&
             (!filters.onlyActive || isActive) &&
-            matchesMine &&
             matchesMeetingCommentState;
 
         setRecordFilterVisibility(item, matches);
@@ -359,11 +353,18 @@ function updateSubsystemScrollIndicator() {
 
     const anchorY = Math.max(132, Math.min(window.innerHeight * 0.35, 220));
     const currentGroup = resolveCurrentSubsystemGroup(visibleGroups, anchorY);
+    // 2026-09-01: v bublině je KÓD subsystému — plné názvy jsou dlouhé a do úzkého
+    // proužku se nevejdou. Subsystém bez vyplněného kódu spadne zpět na název,
+    // aby bublina nezůstala prázdná.
+    const subsystemCode = currentGroup instanceof HTMLElement
+        ? (currentGroup.getAttribute("data-subsystem-kod") || "").trim()
+        : "";
     const subsystemName = currentGroup instanceof HTMLElement
         ? (currentGroup.getAttribute("data-subsystem-name") || "").trim()
         : "";
+    const subsystemLabel = subsystemCode || subsystemName;
 
-    if (!subsystemName) {
+    if (!subsystemLabel) {
         indicator.hidden = true;
         return;
     }
@@ -373,7 +374,7 @@ function updateSubsystemScrollIndicator() {
     const currentCenter = currentRect.top + (currentRect.height / 2);
     const progress = Math.max(0, Math.min(1, (currentCenter - shellRect.top) / Math.max(shellRect.height, 1)));
     bubble.style.transform = `translateY(${Math.round(progress * bubbleTravel)}px)`;
-    label.textContent = subsystemName;
+    label.textContent = subsystemLabel;
     indicator.hidden = false;
 }
 

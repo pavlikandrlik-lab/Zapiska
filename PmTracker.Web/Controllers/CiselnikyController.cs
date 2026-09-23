@@ -27,6 +27,7 @@ public sealed class CiselnikyController : BaseController
         var model = await _dictionaryService.BuildCiselnikyDashboardAsync(id, CurrentUserContext, ct);
         model.PageTitle = "Číselníky";
         PrepareDictionaryDetailPresentation(model.VybranyCiselnik);
+        SetCiselnikyBreadcrumbs(model, id);
         return View(model);
     }
 
@@ -35,7 +36,24 @@ public sealed class CiselnikyController : BaseController
         var model = await _dictionaryService.BuildCiselnikyDashboardAsync(id, CurrentUserContext, ct);
         model.PageTitle = "Číselníky";
         PrepareDictionaryDetailPresentation(model.VybranyCiselnik);
+        SetCiselnikyBreadcrumbs(model, id);
         return View("Index", model);
+    }
+
+    // Číselníky = master-detail na jedné stránce (Index i Detail renderují Index.cshtml).
+    // Bez id = sekční kořen „Číselníky"; s id (deep-link na konkrétní číselník) = Číselníky ▸ název.
+    private void SetCiselnikyBreadcrumbs(CiselnikyDashboardViewModel model, string? id)
+    {
+        if (!string.IsNullOrWhiteSpace(id))
+        {
+            SetBreadcrumbs(
+                new Breadcrumb("Číselníky", Url.Action("Index", "Ciselniky", WithAsUserRoute()), null, false),
+                new Breadcrumb(model.VybranyCiselnik.Nazev, null, null, true));
+        }
+        else
+        {
+            SetSectionRootBreadcrumb("Číselníky");
+        }
     }
 
     public async Task<IActionResult> Panel(string id, CancellationToken ct)

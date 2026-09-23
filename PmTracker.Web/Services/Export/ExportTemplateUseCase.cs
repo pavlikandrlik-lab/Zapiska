@@ -1,4 +1,5 @@
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Common;
 
 namespace PmTracker.Web.Services.Export;
 
@@ -12,7 +13,7 @@ public interface IExportTemplateUseCase
 public sealed class ExportTemplateUseCase(IExportTemplateQueries queries, TimeProvider timeProvider) : IExportTemplateUseCase
 {
     public async Task<PdfExportTemplateViewModel> BuildProjectTemplateAsync(int projektId, CurrentUserContextViewModel currentUser, bool autoPrint, ProjectExportRecordFilters? filters = null, CancellationToken ct = default)
-        => BuildTemplate(await queries.GetProjectTemplateAsync(projektId, currentUser, filters, ct), currentUser, autoPrint);
+        => BuildTemplate(await queries.GetProjectTemplateAsync(projektId, filters, ct), currentUser, autoPrint);
 
     public async Task<PdfExportTemplateViewModel> BuildMeetingTemplateAsync(int jednaniId, CurrentUserContextViewModel currentUser, bool autoPrint, CancellationToken ct = default)
         => BuildTemplate(await queries.GetMeetingTemplateAsync(jednaniId, ct), currentUser, autoPrint);
@@ -89,7 +90,7 @@ public sealed class ExportTemplateUseCase(IExportTemplateQueries queries, TimePr
             {
                 Subsystem = group.Key.Subsystem,
                 Records = group
-                    .OrderBy(record => CategoryOrder(record.Kategorie))
+                    .OrderBy(record => RecordDisplayOrdering.CategoryOrder(record.Kategorie))
                     .ThenBy(record => record.Kategorie, StringComparer.CurrentCultureIgnoreCase)
                     .ThenBy(record => record.CisloViditelneA)
                     .ThenBy(record => record.CisloViditelneB)
@@ -97,26 +98,5 @@ public sealed class ExportTemplateUseCase(IExportTemplateQueries queries, TimePr
                     .ToList()
             })
             .ToList();
-    }
-
-    private static int CategoryOrder(string? category)
-    {
-        var normalized = (category ?? string.Empty).Trim().ToLowerInvariant();
-        if (normalized.Contains("info"))
-        {
-            return 1;
-        }
-
-        if (normalized.Contains("rozh"))
-        {
-            return 2;
-        }
-
-        if (normalized.Contains("ukol") || normalized.Contains("úkol"))
-        {
-            return 3;
-        }
-
-        return 4;
     }
 }

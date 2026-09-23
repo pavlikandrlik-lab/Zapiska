@@ -20,6 +20,9 @@ Uživatelská příručka popisuje běžnou práci v aplikaci PM Tracker: projek
 - Záznam obsahuje stav, vlastníka, termíny, subsystém a externí vazby.
 - Vyjádření podporuje více řádků a vazbu na konkrétní jednání.
 - U uzavřeného jednání může být zápis vyjádření omezen.
+- **Záznam se na dobu úprav zamyká.** Když ho někdo edituje, ostatním se editor neotevře
+  a uvidí, kdo na něm pracuje a odkdy. Zámek padá uložením nebo odchodem z editoru;
+  po 15 minutách bez aktivity vyprší sám (např. když prohlížeč spadne).
 
 ## 5) Jednání
 - Číslo jednání musí být unikátní v rámci projektu.
@@ -37,6 +40,10 @@ Podporované exporty:
 - Nevidíš tlačítko `Upravit`: chybí oprávnění nebo scope.
 - Nelze uložit změnu: položka je zamčená (`is_locked=1`) nebo chybí právo editace.
 - Nefunguje externí odkaz: vazba neobsahuje validní ticket ID.
+- „Tento záznam upravuje jiný uživatel": kolega má otevřenou úpravu. Počkej, až uloží,
+  nebo se s ním domluv; po 15 minutách jeho nečinnosti se záznam uvolní sám.
+- „Záznam mezitím uložil jiný uživatel": tvůj formulář stojí na starší verzi. Použij
+  **Obnovit stránku**, zkontroluj, co kolega změnil, a zadej svoji úpravu znovu.
 
 ## 8) Podpora
 - FIS: 973 200 840

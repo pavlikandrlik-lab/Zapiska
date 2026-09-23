@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="cs">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Obecná aplikace</title>
+	<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+
+	<!--
+		========================================================================
+		Sestaveno z oficiálních balíčků Design systému gov.cz (v4.7.0):
+		  @gov-design-system-ce/styles / templates  – VEŠKERÉ CSS (nic vlastního)
+		  @gov-design-system-ce/components           – webové komponenty
+		  @gov-design-system-ce/templates/scripts    – chování hlavní navigace
+		  @gov-design-system-ce/fonts                – Roboto
+		Markup hlavičky / navigace / patičky / page-heading je převzat
+		1:1 z packages/templates (organisms/header, molecules/main-navigation,
+		organisms/footer, molecules/page-heading).
+
+		Vše lokální v assets/gov/. Spouštět přes statický server (viz README.md).
+		========================================================================
+	-->
+
+	<!-- Konfigurace DS – před loaderem komponent -->
+	<script>
+		window.GOV_DS_CONFIG = { iconsPath: "assets/gov/icons", canValidateWcagOnRender: false };
+	</script>
+
+	<!-- CSS Design systému gov.cz (pořadí dle balíčku templates) -->
+	<link rel="stylesheet" href="assets/gov/styles/tokens.css" />
+	<link rel="stylesheet" href="assets/gov/styles/templates-tokens.css" />
+	<link rel="stylesheet" href="assets/gov/styles/styles.css" />
+	<link rel="stylesheet" href="assets/gov/styles/layout.css" />
+	<link rel="stylesheet" href="assets/gov/styles/components.css" />
+	<link rel="stylesheet" href="assets/gov/styles/templates.css" />
+	<link rel="stylesheet" href="assets/gov/styles/animations.css" />
+	<link rel="stylesheet" href="assets/gov/styles/content.css" />
+	<link rel="stylesheet" href="assets/gov/styles/skip-links.css" />
+	<link rel="stylesheet" href="assets/gov/styles/index.css" />
+	<link rel="stylesheet" href="assets/gov/fonts/roboto.css" />
+
+	<!-- DS FIS v1.0.0 – veškeré odchylky od DS gov (viz CHANGES.md).
+	     Odebráním tohoto řádku a řádku s ds-fis.js se aplikace vrátí
+	     k čistému vzhledu DS gov v4. -->
+	<link rel="stylesheet" href="assets/ds-fis/ds-fis.css" />
+
+	<!-- Webové komponenty DS -->
+	<script type="module" src="assets/gov/components/core.esm.js"></script>
+	<!-- Skripty šablon DS (rozbalování hlavní navigace, tlačítko „nahoru") -->
+	<script src="assets/gov/templates/scripts.js" defer></script>
+	<script>
+		window.addEventListener("DOMContentLoaded", function () {
+			if (window.initTemplateScripts) window.initTemplateScripts();
+		});
+	</script>
+	<!-- DS FIS v1.0.0 – chování nadstavby (viz CHANGES.md) -->
+	<script src="assets/ds-fis/ds-fis.js" defer></script>
+</head>
+
+<body>
+	<!-- Přeskakovací odkazy (šablona skip-links) – skryté, zobrazí se při fokusu -->
+	<div class="gov-skip-links">
+		<a href="#main-navigation">Přeskočit na navigaci</a>
+		<a href="#main">Přeskočit na obsah</a>
+	</div>
+
+	<!-- ===================== HLAVIČKA + HLAVNÍ NAVIGACE ===================== -->
+	<header class="gov-header">
+		<div class="gov-header__divider">
+			<div class="gov-header__content">
+				<gov-flex class="app-header-left" align-items="center" responsive="false">
+					<a href="#" class="gov-header__logo" aria-label="Obecná aplikace — přejít na úvod">
+						<gov-flex align-items="center" gap="m" responsive="false">
+							<img class="app-logo" src="assets/logo_main_white.png" alt="" />
+							<gov-flex direction="column" gap="unset" responsive="false">
+								<span class="app-header-title gov-text--headline-m">Obecná aplikace</span>
+								<span class="app-header-subtitle gov-text--body-xs gov-color--text-secondary">Finanční informační systém</span>
+							</gov-flex>
+						</gov-flex>
+					</a>
+				</gov-flex>
+
+				<!-- Vyhledávání s našeptávačem – gov-form-search (chrom pole + lupa + křížek)
+				     s vnořenou komponentou gov-form-autocomplete. Data + chování: ds-fis.js -->
+				<form role="search" id="search" class="gov-search gov-search--fixed-width">
+					<gov-form-control>
+						<gov-form-search size="m" color="neutral">
+							<gov-form-autocomplete slot="input"
+								identifier="site-search"
+								size="m"
+								minlength="1"
+								name="q"
+								placeholder="Hledejte…"
+								aria-label="Vyhledávání"
+								message-empty="Nic nenalezeno – zkuste jiný výraz.">
+							</gov-form-autocomplete>
+							<gov-button slot="button-erase" class="js-ac-clear" type="base" color="neutral" size="m"
+								aria-label="Vymazat zadaný výraz" hidden>
+								<gov-icon slot="icon-start" name="x"></gov-icon>
+							</gov-button>
+							<gov-button slot="button" type="solid" color="primary" size="m"
+								native-type="submit" aria-label="Vyhledat">
+								<gov-icon slot="icon-start" name="search"></gov-icon>
+							</gov-button>
+						</gov-form-search>
+					</gov-form-control>
+				</form>
+
+				<!-- Mobil / tablet: lupa (rozbalí hledání) -->
+				<gov-flex class="gov-header__mobile" align-items="center" responsive="false">
+					<gov-button class="js-ac-mobile-toggle" type="base" color="primary" size="m"
+						aria-label="Zobrazit vyhledávání" aria-expanded="false" aria-controls="search">
+						<gov-icon slot="icon-start" name="search"></gov-icon>
+					</gov-button>
+				</gov-flex>
+
+				<gov-flex class="gov-header__action" justify-content="flex-end" align-items="center" gap="m">
+					<gov-theme-switch size="m" aria-label="Přepnout světlý a tmavý motiv"></gov-theme-switch>
+
+					<!-- Přihlášený uživatel – rozbalovací menu účtu (šablona header--small, gov-dropdown) -->
+					<gov-dropdown position="right">
+						<gov-button type="base" color="primary" size="m" aria-label="Účet uživatele Jan Novák – MO 1234">
+							<gov-icon slot="icon-start" name="person-fill"></gov-icon>
+							<span class="app-user-name">Jan Novák&nbsp;–&nbsp;MO&nbsp;1234</span>
+							<gov-icon slot="icon-end" name="chevron-down" size="m"></gov-icon>
+						</gov-button>
+						<ul slot="list" role="menu">
+							<li role="presentation">
+								<gov-button type="base" color="primary" size="m" expanded role="menuitem">Můj profil</gov-button>
+							</li>
+							<li role="presentation">
+								<gov-button type="base" color="primary" size="m" expanded role="menuitem">Nastavení účtu</gov-button>
+							</li>
+							<li role="separator"><hr class="app-user-menu__sep" /></li>
+							<li role="presentation" class="app-user-menu__info">
+								<span class="gov-text--body-s">
+									<span class="gov-color--text-secondary">Platnost hesla:</span>
+									<strong>vyprší za 42&nbsp;dní</strong>
+								</span>
+							</li>
+						</ul>
+					</gov-dropdown>
+				</gov-flex>
+
+				<!-- Mobil / tablet: hamburger (rozbalí hlavní navigaci) -->
+				<gov-button class="js-gov-header__navigation-trigger app-hamburger" type="base" color="primary" size="m"
+					aria-label="Zobrazit / skrýt menu" aria-expanded="false">
+					<gov-icon slot="icon-start" name="list"></gov-icon>
+				</gov-button>
+			</div>
+		</div>
+
+		<div class="gov-header__navigation js-gov-header__navigation"
+			style="padding-block: var(--templates-margin-s); padding-inline: var(--templates-margin-l)">
+			<nav class="gov-navigation" aria-label="Hlavní navigace" id="main-navigation">
+				<!-- položky rozprostřené na celou šířku obsahu stránky -->
+				<ul style="justify-content: space-between">
+					<li><a href="#">Přehled</a></li>
+
+					<!-- Úzké rozbalovací menu (šablona main-navigation--submenu) -->
+					<li>
+						<gov-button type="base" color="primary" size="l"
+							aria-expanded="false" aria-controls="subnav1" aria-label="Otevřít menu Sekce">
+							Sekce
+							<gov-icon slot="icon-end" name="chevron-down" size="l"></gov-icon>
+						</gov-button>
+						<ul class="gov-subnavigation" id="subnav1" hidden aria-hidden="true">
+							<li><a href="#">Přehled</a></li>
+							<li><a href="#">Nový záznam</a></li>
+							<li><a href="#">Import a export</a></li>
+						</ul>
+					</li>
+
+					<!-- Široké rozbalovací menu (šablona main-navigation--mega-menu) -->
+					<li class="gov-navigation--has-megamenu">
+						<gov-button type="base" color="primary" size="l"
+							aria-expanded="false" aria-controls="megamenu2" aria-label="Otevřít menu Agendy">
+							Agendy
+							<gov-icon slot="icon-end" name="chevron-down" size="l"></gov-icon>
+						</gov-button>
+						<ul class="gov-mega-menu" id="megamenu2" hidden aria-hidden="true">
+							<li class="gov-mega-menu__heading">
+								<a href="#"><span><gov-icon type="components" name="briefcase" size="m"></gov-icon> Agenda A</span></a>
+								<ul>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+									<li class="gov-mega-menu__more"><a href="#">+ Další</a></li>
+								</ul>
+							</li>
+							<li class="gov-mega-menu__heading">
+								<a href="#"><span><gov-icon type="components" name="briefcase" size="m"></gov-icon> Agenda B</span></a>
+								<ul>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+									<li class="gov-mega-menu__more"><a href="#">+ Další</a></li>
+								</ul>
+							</li>
+							<li class="gov-mega-menu__heading">
+								<a href="#"><span><gov-icon type="components" name="briefcase" size="m"></gov-icon> Agenda C</span></a>
+								<ul>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+								</ul>
+							</li>
+							<li class="gov-mega-menu__heading">
+								<a href="#"><span><gov-icon type="components" name="briefcase" size="m"></gov-icon> Agenda D</span></a>
+								<ul>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+									<li><a href="#">Položka menu</a></li>
+									<li class="gov-mega-menu__more"><a href="#">+ Další</a></li>
+								</ul>
+							</li>
+						</ul>
+					</li>
+
+					<li><a href="#">Dokumenty</a></li>
+					<li><a href="#">Číselníky</a></li>
+					<li><a href="#">Nápověda</a></li>
+				</ul>
+			</nav>
+		</div>
+	</header>
+
+	<!-- ===================== OBSAH ===================== -->
+	<gov-container id="main">
+		<!-- PAGE HEADING – drobečková navigace + nadpis (šablona molecules/page-heading) -->
+		<header class="gov-page-heading">
+			<gov-flex direction="column" gap="l">
+				<gov-breadcrumbs aria-hidden="true">
+					<ul>
+						<li><a href="#">Úvod</a></li>
+						<li><gov-icon name="chevron-right" type="components"></gov-icon><a href="#">Sekce</a></li>
+						<li><gov-icon name="chevron-right" type="components"></gov-icon><strong>Přehled</strong></li>
+					</ul>
+				</gov-breadcrumbs>
+
+				<h1>Přehled</h1>
+
+				<div class="gov-text-content">
+					<p class="gov-text--body-xl">
+						Ukázkový obsah aplikační šablony postavené na Design systému gov.cz
+						s nadstavbou DS FIS. Seznam záznamů lze filtrovat, otevřít k náhledu
+						nebo exportovat.
+					</p>
+				</div>
+			</gov-flex>
+		</header>
+
+		<main>
+			<!-- Filtr -->
+			<section aria-labelledby="h-filtr">
+				<h2 id="h-filtr">Filtr</h2>
+				<gov-grid gap="m">
+					<gov-grid-item col-span="12" col-span-md="6" col-span-lg="3">
+						<gov-form-control>
+							<gov-form-label slot="top" size="m">Období</gov-form-label>
+							<gov-form-select>
+								<select>
+									<option>3. čtvrtletí 2026</option>
+									<option>2. čtvrtletí 2026</option>
+									<option>1. čtvrtletí 2026</option>
+									<option>Rok 2025</option>
+								</select>
+							</gov-form-select>
+						</gov-form-control>
+					</gov-grid-item>
+					<gov-grid-item col-span="12" col-span-md="6" col-span-lg="3">
+						<gov-form-control>
+							<gov-form-label slot="top" size="m">Typ</gov-form-label>
+							<gov-form-select>
+								<select>
+									<option>Všechny typy</option>
+									<option>Typ A</option>
+									<option>Typ B</option>
+									<option>Typ C</option>
+								</select>
+							</gov-form-select>
+						</gov-form-control>
+					</gov-grid-item>
+					<gov-grid-item col-span="12" col-span-md="6" col-span-lg="3">
+						<gov-form-control>
+							<gov-form-label slot="top" size="m">Kategorie</gov-form-label>
+							<gov-form-select>
+								<select>
+									<option>Všechny kategorie</option>
+									<option>Kategorie 1</option>
+									<option>Kategorie 2</option>
+									<option>Kategorie 3</option>
+								</select>
+							</gov-form-select>
+						</gov-form-control>
+					</gov-grid-item>
+					<gov-grid-item col-span="12" col-span-md="6" col-span-lg="3">
+						<gov-form-control>
+							<gov-form-label slot="top" size="m">Hledat</gov-form-label>
+							<gov-form-input input-type="search" placeholder="Název, číslo…">
+								<gov-icon slot="icon-end" name="search" aria-hidden="true"></gov-icon>
+							</gov-form-input>
+						</gov-form-control>
+					</gov-grid-item>
+				</gov-grid>
+				<gov-spacer size="m"></gov-spacer>
+				<gov-flex gap="s" responsive="false" class="gov-flex--wrap">
+					<gov-button type="solid" color="primary" size="m">Filtrovat</gov-button>
+					<gov-button type="base" color="primary" size="m">Zrušit filtr</gov-button>
+				</gov-flex>
+			</section>
+
+			<!-- Souhrn -->
+			<section aria-labelledby="h-souhrn">
+				<h2 id="h-souhrn">Souhrn</h2>
+				<gov-grid gap="m">
+					<gov-grid-item col-span="12" col-span-md="6" col-span-lg="3">
+						<gov-card>
+							<p class="gov-text--body-s gov-color--text-secondary">Záznamů celkem</p>
+							<p class="gov-text--headline-l">1&nbsp;248</p>
+							<gov-tag type="subtle" color="neutral" size="xs">za zvolené období</gov-tag>
+						</gov-card>
+					</gov-grid-item>
+					<gov-grid-item col-span="12" col-span-md="6" col-span-lg="3">
+						<gov-card>
+							<p class="gov-text--body-s gov-color--text-secondary">Zpracováno</p>
+							<p class="gov-text--headline-l">892</p>
+							<gov-tag type="subtle" color="success" size="xs">▲ 71,5 %</gov-tag>
+						</gov-card>
+					</gov-grid-item>
+					<gov-grid-item col-span="12" col-span-md="6" col-span-lg="3">
+						<gov-card>
+							<p class="gov-text--body-s gov-color--text-secondary">Ke schválení</p>
+							<p class="gov-text--headline-l">34</p>
+							<gov-tag type="subtle" color="warning" size="xs">vyžaduje pozornost</gov-tag>
+						</gov-card>
+					</gov-grid-item>
+					<gov-grid-item col-span="12" col-span-md="6" col-span-lg="3">
+						<gov-card>
+							<p class="gov-text--body-s gov-color--text-secondary">Nové tento týden</p>
+							<p class="gov-text--headline-l">12</p>
+							<gov-tag type="subtle" color="neutral" size="xs">+3 oproti minulému</gov-tag>
+						</gov-card>
+					</gov-grid-item>
+				</gov-grid>
+			</section>
+
+			<!-- Seznam záznamů -->
+			<section aria-labelledby="h-seznam">
+				<h2 id="h-seznam">Seznam poboček</h2>
+
+				<!-- Komplexní tabulka (šablona templates/gov-table-complex) – tabulka
+				     v ohraničeném rámu + stránkování s volbou počtu záznamů. -->
+				<gov-flex class="gov-table-complex" data-size="s" direction="column" responsive="true">
+					<gov-flex class="gov-table-complex__wrapper" direction="column" responsive="true">
+						<div class="gov-table" data-size="s">
+							<table>
+								<caption class="gov-sr-only">Seznam poboček</caption>
+								<thead>
+									<tr>
+										<th scope="col">Název pobočky</th>
+										<th scope="col">Adresa</th>
+										<th scope="col" class="gov-table--align-right gov-table--nowrap">Číselný údaj</th>
+										<th scope="col">Dokument</th>
+										<th scope="col">Objednání</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr>
+										<td class="gov-table--nowrap">Hlavní město Praha</td>
+										<td class="gov-table--nowrap"><gov-link href="#" target="_blank" size="s">Novomoravská 34</gov-link></td>
+										<td class="gov-table--align-right gov-table--nowrap">1 384 732</td>
+										<td><gov-link href="#" target="_blank" size="s">Praha.pdf</gov-link></td>
+										<td class="gov-table--nowrap">
+											<gov-button color="secondary" type="solid" size="xs" expanded>
+												Rezervovat
+												<gov-icon slot="icon-end" type="components" name="chevron-right"></gov-icon>
+											</gov-button>
+										</td>
+									</tr>
+									<tr>
+										<td class="gov-table--nowrap">Brno</td>
+										<td class="gov-table--nowrap"><gov-link href="#" target="_blank" size="s">Sedlcká 22</gov-link></td>
+										<td class="gov-table--align-right gov-table--nowrap">400 566</td>
+										<td><gov-link href="#" target="_blank" size="s">Brno_v2.pdf</gov-link></td>
+										<td class="gov-table--nowrap">
+											<gov-button color="secondary" type="solid" size="xs" expanded>
+												Rezervovat
+												<gov-icon slot="icon-end" type="components" name="chevron-right"></gov-icon>
+											</gov-button>
+										</td>
+									</tr>
+									<tr>
+										<td class="gov-table--nowrap">Ostrava</td>
+										<td class="gov-table--nowrap"><gov-link href="#" target="_blank" size="s">Nové Sasko 374</gov-link></td>
+										<td class="gov-table--align-right gov-table--nowrap">284 765</td>
+										<td><gov-link href="#" target="_blank" size="s">Ostrava.docx</gov-link></td>
+										<td class="gov-table--nowrap">
+											<gov-button color="secondary" type="solid" size="xs" expanded>
+												Rezervovat
+												<gov-icon slot="icon-end" type="components" name="chevron-right"></gov-icon>
+											</gov-button>
+										</td>
+									</tr>
+									<tr>
+										<td class="gov-table--nowrap">Plzeň</td>
+										<td class="gov-table--nowrap"><gov-link href="#" target="_blank" size="s">Jihočeských hrdinů 222</gov-link></td>
+										<td class="gov-table--align-right gov-table--nowrap">185 599</td>
+										<td>-</td>
+										<td class="gov-table--nowrap">
+											<gov-button color="secondary" type="solid" size="xs" expanded>
+												Rezervovat
+												<gov-icon slot="icon-end" type="components" name="chevron-right"></gov-icon>
+											</gov-button>
+										</td>
+									</tr>
+									<tr>
+										<td class="gov-table--nowrap">Liberec</td>
+										<td class="gov-table--nowrap"><gov-link href="#" target="_blank" size="s">Česká 4678</gov-link></td>
+										<td class="gov-table--align-right gov-table--nowrap">107 982</td>
+										<td><gov-link href="#" target="_blank" size="s">Liberec.pdf</gov-link></td>
+										<td class="gov-table--nowrap">
+											<gov-button color="secondary" type="solid" size="xs" expanded>
+												Rezervovat
+												<gov-icon slot="icon-end" type="components" name="chevron-right"></gov-icon>
+											</gov-button>
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</gov-flex>
+
+					<gov-flex class="gov-table-complex__pagination" direction="column-reverse"
+						justify-content="flex-end" align-items="flex-start" responsive="true">
+						<gov-flex class="gov-table-complex__per-page" justify-content="flex-end"
+							align-items="center" direction="row" responsive="true">
+							<gov-form-select name="per-page" size="s">
+								<select aria-label="Počet záznamů na stránku">
+									<option value="5" selected>5</option>
+									<option value="10">10</option>
+									<option value="25">25</option>
+								</select>
+							</gov-form-select>
+							<label>záznamů na stránku</label>
+						</gov-flex>
+						<gov-pagination size="s" color="primary" current="1" total="33" page-size="5"></gov-pagination>
+					</gov-flex>
+				</gov-flex>
+			</section>
+		</main>
+	</gov-container>
+
+	<!-- ===================== PATIČKA ===================== -->
+	<footer class="gov-footer">
+		<gov-flex class="gov-footer__content" direction="column" justify-content="space-between" gap="3xl">
+			<gov-flex responsive="false">
+				<ul class="gov-footer__main gov-list--plain">
+					<li>
+						<nav aria-labelledby="f-col-1">
+							<h5 id="f-col-1">Obecná aplikace</h5>
+							<ul class="gov-list--plain">
+								<li><gov-link href="#" size="s">Přehled</gov-link></li>
+								<li><gov-link href="#" size="s">Nový záznam</gov-link></li>
+								<li><gov-link href="#" size="s">Nápověda</gov-link></li>
+							</ul>
+						</nav>
+					</li>
+					<li>
+						<nav aria-labelledby="f-col-2">
+							<h5 id="f-col-2">Sekce</h5>
+							<ul class="gov-list--plain">
+								<li><gov-link href="#" size="s">Sekce 1</gov-link></li>
+								<li><gov-link href="#" size="s">Sekce 2</gov-link></li>
+								<li><gov-link href="#" size="s">Sekce 3</gov-link></li>
+							</ul>
+						</nav>
+					</li>
+					<li>
+						<h5 id="f-contact">Hotline / Helpdesk</h5>
+						<address>
+							<ul class="gov-footer__address gov-list--plain">
+								<li><gov-link href="#" size="s">Kontaktovat podporu</gov-link></li>
+								<li><gov-link href="tel:+420800100200" size="s">+420 800 100 200</gov-link></li>
+							</ul>
+						</address>
+					</li>
+				</ul>
+			</gov-flex>
+
+			<gov-flex direction="column" gap="m-nudge">
+				<hr />
+				<gov-flex class="gov-footer-copy" justify-content="space-between" gap="m">
+					<p>© 2026 Ministerstvo obrany ČR – Sekce ekonomická</p>
+					<span>Verze 1.0.0 · DS gov.cz 4.7.0 · DS FIS v1.0.0</span>
+				</gov-flex>
+			</gov-flex>
+		</gov-flex>
+	</footer>
+</body>
+</html>

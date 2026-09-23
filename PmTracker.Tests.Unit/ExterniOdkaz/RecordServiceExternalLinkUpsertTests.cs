@@ -100,7 +100,9 @@ public sealed class RecordServiceExternalLinkUpsertTests
         // 2026-04-28: FK_zhvv_externi_odkaz zůstává NO ACTION (multi-cascade-path constraint
         // SQL 1785 — vyjadreni_vazby má dva FK na projektove_zaznamy). Aplikace musí
         // explicitně cleanup-ovat navázané vyjadreni_vazby rows PŘED RemoveRange externí vazby.
-        // EF Core SaveChanges respektuje FK ordering.
+        // POZOR: tenhle test čte zdrojový kód jako text — o pořadí SQL příkazů neříká nic.
+        // To zajišťuje deklarovaný vztah v ZaznamHarmonogramVyjadreniVazbaEntityConfiguration
+        // a hlídá ho ExternalLinkDeleteWithBindingTests proti reálnému SQL Serveru.
         var source = LoadServiceSource();
         var methodIndex = source.IndexOf("ReplaceRecordExternalLinksAsync(int zaznamId,", StringComparison.Ordinal);
         var methodSlice = source[methodIndex..Math.Min(methodIndex + 6000, source.Length)];
@@ -118,5 +120,70 @@ public sealed class RecordServiceExternalLinkUpsertTests
         indexOfBindingsCleanup.Should().BeGreaterThan(0, "VyjadreniVazby cleanup musí v kódu existovat.");
         indexOfExterniOdkazyDelete.Should().BeGreaterThan(indexOfBindingsCleanup,
             "VyjadreniVazby.RemoveRange(bindingsToCleanup) musí být PŘED ZaznamExterniOdkazy.RemoveRange(toDelete).");
+    }
+
+    /// <summary>
+    /// Text požadavku je pole formuláře, takže ho UPSERT musí propsat v OBOU větvích —
+    /// při úpravě existující vazby i při založení nové. Vynechání jedné z nich by se
+    /// projevilo jako „text se občas neuloží" (spec 2026-09-08 §5.5).
+    /// </summary>
+    [Fact]
+    public void ReplaceRecordExternalLinksAsync_UkladaPozadavekVObouVetvich()
+    {
+        var source = LoadServiceSource();
+        var methodIndex = source.IndexOf("ReplaceRecordExternalLinksAsync(int zaznamId,", StringComparison.Ordinal);
+        methodIndex.Should().BeGreaterThan(0);
+
+        var methodSlice = source[methodIndex..Math.Min(methodIndex + 6000, source.Length)];
+
+        methodSlice.Should().Contain("existingEntity.Pozadavek = pozadavek",
+            "úprava existující vazby musí text přepsat");
+        methodSlice.Should().Contain("Pozadavek = pozadavek,",
+            "nová vazba musí text uložit rovnou při založení");
+        methodSlice.Should().Contain("HasVisibleText",
+            "prázdný odstavec z Quillu (<p><br></p>) se nesmí uložit jako text");
+    }
+
+    /// <summary>
+    /// Zařazení do výzvy vlastní VyzvaService (spec 2026-09-10 R0.1). UPSERT u existující vazby
+    /// nesmí přepsat VyzvaId ani ZaradidDoVyzvy — dřív to dělal podle pole, které formulář
+    /// neposílá, a každé uložení vytáhlo PNF z výzvy.
+    /// </summary>
+    [Fact]
+    public void ReplaceRecordExternalLinksAsync_NesahaNaZarazeniExistujiciVazby()
+    {
+        var source = LoadServiceSource();
+        var start = source.IndexOf("ReplaceRecordExternalLinksAsync(int zaznamId,", StringComparison.Ordinal);
+        start.Should().BeGreaterThan(0);
+        var end = source.IndexOf("\n    private ", start + 1, StringComparison.Ordinal);
+        var metoda = end < 0 ? source[start..] : source[start..end];
+
+        metoda.Should().NotContain("existingEntity.VyzvaId", "zařazení do výzvy vlastní VyzvaService");
+        metoda.Should().NotContain("existingEntity.ZaradidDoVyzvy", "přepínač se ukládá vlastním endpointem");
+        source.Should().NotContain("ResolveVyzvaIdAsync", "mrtvé pole Vyzva se už nikam nepřekládá");
+    }
+
+    /// <summary>
+    /// Nová vazba nemá Id, takže přepínač nemohl zavolat set-zaradid — stav nese formulář.
+    /// Do bufferu smí jen PNF a jen s oprávněním, které hlídá i endpoint přepínače (R0.2).
+    /// Integration sada novou vazbu přes uložení nezaloží (ServiceDesk je vypnutý), proto pin.
+    /// </summary>
+    [Fact]
+    public void ReplaceRecordExternalLinksAsync_NovaPnfJdeDoBufferuJenSOpravnenim()
+    {
+        var source = LoadServiceSource();
+
+        source.Should().Contain("ZaradidDoVyzvy = link.ZaradidDoVyzvy && smiZaraditDoBufferu && JePnf(link.Typ)",
+            "nová vazba bere stav přepínače z formuláře, ale jen PNF a jen s oprávněním");
+        source.Should().Contain("currentUser.HasPermission(PermissionKeys.VyzvyPnfAssign, command.ProjektId)",
+            "stejné oprávnění, jaké hlídá endpoint přepínače");
+    }
+
+    /// <summary>Snímek skutečné ceny vlastní harvest — uložení záznamu na něj nesahá (R8).</summary>
+    [Fact]
+    public void RecordService_NesahaNaSnimekKalkulace()
+    {
+        LoadServiceSource().Should().NotContain("Kalkulace",
+            "KalkulaceCena/Id/Nacteno plní jen IKalkulaceSnapshotService");
     }
 }

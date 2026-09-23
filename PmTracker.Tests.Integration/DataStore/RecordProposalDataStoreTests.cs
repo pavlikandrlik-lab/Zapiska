@@ -4,6 +4,7 @@ using PmTracker.Tests.Integration.TestInfrastructure;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Data;
 
 namespace PmTracker.Tests.Integration.DataStore;
 
@@ -180,6 +181,249 @@ public sealed class RecordProposalDataStoreTests
         // Pending schedule proposal lock: deadline i zamčená manuální skutečnost kroku 2 se nepřepíšou.
         record.DatumUkonceni.Date.Should().Be(originalDeadline);
         krok2.SkutecnostDatum.Should().Be(originalSkutecnost);
+    }
+
+    [Fact]
+    public async Task BuildProposalDetail_ScheduleChange_ShouldCarryProposedPlanDates_EmptyWhereUnset()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_proposal_schedule_detail_plandatum");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var proposerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ProposalSchedDetailLead");
+        var managerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ProposalSchedDetailManager");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCPROPSD");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCPROPSD_SYS", proposerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, proposerId, SubsystemRoleCodes.Lead);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, managerId, ProjectRoleCodes.ProjectManager);
+
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, managerId, subsystemId, "U", "SchedDetail");
+        var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+
+        var editor = store.BuildScheduleProposalEditor(projectId, recordId, proposer);
+        var start = editor.DatumZalozeni.Date;
+        var plan1 = start.AddDays(10);
+        var plan3 = start.AddDays(30);
+
+        var command = BuildEditCommand(editor);
+        command.TerminUkonceni = start.AddDays(60);
+        // 10 kroků jako reálný formulář: plán jen u kroku 1 a 3, ostatní prázdné (null).
+        command.HarmonogramHodnoty = Enumerable.Range(1, 10)
+            .Select(p => new SaveRecordHarmonogramValueCommand
+            {
+                Poradi = p,
+                PlanDatum = p == 1 ? plan1 : (p == 3 ? plan3 : (DateTime?)null)
+            })
+            .ToList();
+
+        store.SubmitScheduleProposal(command, proposer);
+
+        var proposalId = await dbContext.ZaznamNavrhy.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId && x.TypNavrhu == RecordProposalTypeCodes.SchedulePlanChange)
+            .OrderByDescending(x => x.Id)
+            .Select(x => x.Id)
+            .FirstAsync();
+
+        var manager = IntegrationTestHelper.BuildUser(
+            managerId,
+            visibleProjectIds: [projectId],
+            grants: [IntegrationTestHelper.AllowProjectPermission(PermissionKeys.ProposalsAccept, projectId)]);
+        var detail = store.BuildProposalDetail(projectId, proposalId, manager);
+
+        var kroky = detail.HarmonogramBlok.Kroky;
+        kroky.Single(k => k.KrokIndex == 1).PlanDatum.Should().Be(plan1, "detail návrhu drží navržený plán kroku 1");
+        kroky.Single(k => k.KrokIndex == 3).PlanDatum.Should().Be(plan3, "detail návrhu drží navržený plán kroku 3");
+        kroky.Single(k => k.KrokIndex == 2).PlanDatum.Should().BeNull("krok 2 návrh nevyplnil → prázdné pole (žádný pre-fill)");
+    }
+
+    [Fact]
+    public async Task BuildProposalDetail_CreateRecord_ShouldCarryProposedPlanDates_EmptyWhereUnset()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_proposal_create_detail_plandatum");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var proposerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ProposalCreateDetailLead");
+        var managerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ProposalCreateDetailManager");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCPROPCD");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCPROPCD_SYS", proposerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, proposerId, SubsystemRoleCodes.Lead);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, managerId, ProjectRoleCodes.ProjectManager);
+
+        var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+        var editor = store.BuildCreateRecordProposalEditor(projectId, proposer);
+        var command = BuildCreateProposalCommand(editor, projectId, managerId);
+        var start = command.DatumZalozeni.Date;
+        var plan1 = start.AddDays(10);
+        var plan3 = start.AddDays(30);
+        command.HarmonogramHodnoty = Enumerable.Range(1, 10)
+            .Select(p => new SaveRecordHarmonogramValueCommand
+            {
+                Poradi = p,
+                PlanDatum = p == 1 ? plan1 : (p == 3 ? plan3 : (DateTime?)null)
+            })
+            .ToList();
+
+        store.SubmitCreateRecordProposal(command, proposer);
+
+        var proposalId = await dbContext.ZaznamNavrhy.AsNoTracking()
+            .Where(x => x.TypNavrhu == RecordProposalTypeCodes.CreateRecord)
+            .OrderByDescending(x => x.Id)
+            .Select(x => x.Id)
+            .FirstAsync();
+
+        var manager = IntegrationTestHelper.BuildUser(
+            managerId,
+            visibleProjectIds: [projectId],
+            grants: [IntegrationTestHelper.AllowProjectPermission(PermissionKeys.ProposalsAccept, projectId)]);
+        var detail = store.BuildProposalDetail(projectId, proposalId, manager);
+
+        var kroky = detail.HarmonogramBlok.Kroky;
+        kroky.Single(k => k.KrokIndex == 1).PlanDatum.Should().Be(plan1, "detail návrhu založení drží navržený plán kroku 1");
+        kroky.Single(k => k.KrokIndex == 3).PlanDatum.Should().Be(plan3, "detail návrhu založení drží navržený plán kroku 3");
+        kroky.Single(k => k.KrokIndex == 2).PlanDatum.Should().BeNull("krok 2 návrh nevyplnil → prázdné pole");
+    }
+
+    [Fact]
+    public async Task BuildCreateRecordProposalEditor_ShouldSetOwnerToSelectedSubsystemLead_WhenDefaultSubsystemIsNotCreatable()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_proposal_owner_sync");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        // Proposer je vedoucí jen subsystému B. Výchozí (první) projektový subsystém A vede jiná
+        // osoba. Návrh se tedy musí přepnout na B a vlastník musí sednout na vedoucího B (proposer),
+        // ne zůstat na vedoucím výchozího subsystému A.
+        var proposerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "OwnerSyncProposer");
+        var otherLeadId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "OwnerSyncOtherLead");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCPROPOWN");
+        var subsystemA = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCPROPOWN_A", otherLeadId);
+        var subsystemB = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCPROPOWN_B", proposerId);
+
+        // Pořadí mapování rozhoduje o výchozím subsystému (Poradi = pořadí vložení) → A první.
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemA, otherLeadId, SubsystemRoleCodes.Lead);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemB, proposerId, SubsystemRoleCodes.Lead);
+
+        var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+        var editor = store.BuildCreateRecordProposalEditor(projectId, proposer);
+
+        // Vybraný subsystém = B (jediný, kde je proposer vedoucí).
+        var selectedSubsystem = editor.Subsystemy.Single(option =>
+            string.Equals(option.Kod, editor.Subsystem, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(option.Nazev, editor.Subsystem, StringComparison.OrdinalIgnoreCase));
+        selectedSubsystem.Kod.Should().Be("RCPROPOWN_B", "návrh se má omezit na subsystém, kde je proposer vedoucí");
+
+        // Invariant: vlastník návrhu = vedoucí vybraného subsystému.
+        editor.VlastnikId.Should().Be(selectedSubsystem.DefaultOwnerOsobaId,
+            "vlastník musí odpovídat vedoucímu vybraného subsystému");
+        editor.VlastnikId.Should().Be(proposerId,
+            "vlastníkem má být vedoucí subsystému B (proposer), ne vedoucí výchozího subsystému A");
+    }
+
+    [Fact]
+    public async Task SubmitCreateRecordProposal_ShouldRejectNonChronologicalPlanDates()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_proposal_plan_chronology");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var proposerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "PlanChronoLead");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCPROPCHR");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCPROPCHR_SYS", proposerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, proposerId, SubsystemRoleCodes.Lead);
+
+        var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+        var editor = store.BuildCreateRecordProposalEditor(projectId, proposer);
+        var command = BuildCreateProposalCommand(editor, projectId, proposerId);
+
+        var start = command.DatumZalozeni.Date;
+        command.TerminUkonceni = start.AddDays(60);
+        // Nesmyslné pořadí: plán kroku 3 (start+10) je DŘÍVE než plán kroku 1 (start+30).
+        command.HarmonogramHodnoty =
+        [
+            new SaveRecordHarmonogramValueCommand { Poradi = 1, PlanDatum = start.AddDays(30) },
+            new SaveRecordHarmonogramValueCommand { Poradi = 3, PlanDatum = start.AddDays(10) }
+        ];
+
+        var act = () => store.SubmitCreateRecordProposal(command, proposer);
+
+        act.Should().Throw<RecordValidationException>(
+            "nesmyslné (klesající) plán datumy harmonogramu se nesmí uložit ani jako návrh");
+
+        var proposals = await dbContext.ZaznamNavrhy.AsNoTracking().ToListAsync();
+        proposals.Should().BeEmpty("neplatný návrh se nesmí zapsat do databáze");
+    }
+
+    [Fact]
+    public async Task SubmitScheduleProposal_ShouldRejectNonChronologicalPlanDates()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_proposal_schedule_plan_chronology");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var proposerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "SchedChronoLead");
+        var managerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "SchedChronoManager");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCPROPSCHR");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCPROPSCHR_SYS", proposerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, proposerId, SubsystemRoleCodes.Lead);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, managerId, ProjectRoleCodes.ProjectManager);
+
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, managerId, subsystemId, "U", "SchedChrono");
+        var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+
+        var editor = store.BuildScheduleProposalEditor(projectId, recordId, proposer);
+        var command = BuildEditCommand(editor);
+        var start = editor.DatumZalozeni.Date;
+        command.TerminUkonceni = start.AddDays(60);
+        // Nesmyslné pořadí: plán kroku 3 (start+10) je DŘÍVE než plán kroku 1 (start+30).
+        command.HarmonogramHodnoty =
+        [
+            new SaveRecordHarmonogramValueCommand { Poradi = 1, PlanDatum = start.AddDays(30) },
+            new SaveRecordHarmonogramValueCommand { Poradi = 3, PlanDatum = start.AddDays(10) }
+        ];
+
+        var act = () => store.SubmitScheduleProposal(command, proposer);
+
+        act.Should().Throw<RecordValidationException>(
+            "návrh změny harmonogramu nesmí uložit klesající plán datumy");
+
+        var proposals = await dbContext.ZaznamNavrhy.AsNoTracking().ToListAsync();
+        proposals.Should().BeEmpty("neplatný návrh se nesmí zapsat do databáze");
+    }
+
+    [Fact]
+    public async Task SubmitCreateRecordProposal_ShouldRejectExternalLink_WhenTicketTypeCannotBeResolved()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_proposal_external_type");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var proposerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExtTypeLead");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RCPROPEXT");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RCPROPEXT_SYS", proposerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, proposerId, SubsystemRoleCodes.Lead);
+
+        var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+        var editor = store.BuildCreateRecordProposalEditor(projectId, proposer);
+        var command = BuildCreateProposalCommand(editor, projectId, proposerId);
+        // Externí vazba s číslem tiketu, který SD (ve fixture vypnuté) nedohledá → Typ nelze určit.
+        command.ExterniVazby =
+        [
+            new SaveRecordExterniVazbaCommand { Id = 0, Cislo = "334565", Typ = null }
+        ];
+
+        var act = () => store.SubmitCreateRecordProposal(command, proposer);
+
+        act.Should().Throw<RecordValidationException>(
+            "návrh s externí vazbou bez rozřešeného typu se nesmí uložit (jinak by byl neschvalitelný)");
+
+        var proposals = await dbContext.ZaznamNavrhy.AsNoTracking().ToListAsync();
+        proposals.Should().BeEmpty("neplatný návrh se nesmí zapsat do databáze");
     }
 
     private static SaveRecordCommand BuildCreateProposalCommand(ZaznamEditViewModel editor, int projectId, int ownerId, string name = "Nový návrh")

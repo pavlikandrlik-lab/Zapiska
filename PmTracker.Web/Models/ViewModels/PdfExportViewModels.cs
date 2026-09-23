@@ -77,6 +77,12 @@ public sealed class PdfExportRecordViewModel
     public string? TypUkolu { get; init; }
     public required string Stav { get; init; }
     public bool IsPaused { get; init; }
+
+    /// <summary>
+    /// Ukončený úkol — v tisku jednání ke dni jednání, jinde podle dnešního stavu.
+    /// Podbarvení ukončených (2026-09-05), spec §4.2.
+    /// </summary>
+    public bool IsCompleted { get; init; }
     public required string Vlastnik { get; init; }
     public required string SubsystemKod { get; init; }
     public required string Subsystem { get; init; }

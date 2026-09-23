@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Export;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Vyzvy;
 
 namespace PmTracker.Web.Controllers;
 
@@ -13,10 +15,19 @@ namespace PmTracker.Web.Controllers;
 public sealed class ExportController : BaseController
 {
     private const string WordContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    private const string PdfContentType = "application/pdf";
+    private const string PdfViewPath = "~/Views/Export/PdfTemplate.cshtml";
+    private const string VyzvaViewPath = "~/Views/Export/VyzvaTemplate.cshtml";
     private readonly IExportTemplateUseCase _exportTemplateUseCase;
     private readonly IProjectService _projectService;
     private readonly IMeetingService _meetingService;
     private readonly IWordExportService _wordExportService;
+    private readonly IVyzvaExportBuilder _vyzvaExportBuilder;
+    private readonly IVyzvaWordExportService _vyzvaWordExportService;
+    private readonly IPdfRenderer _pdfRenderer;
+    private readonly IViewRenderer _viewRenderer;
+    private readonly IWebHostEnvironment _environment;
+    private readonly ILogger<ExportController> _logger;
 
     public ExportController(
         IUserContextResolver userContextResolver,
@@ -25,13 +36,24 @@ public sealed class ExportController : BaseController
         IExportTemplateUseCase exportTemplateUseCase,
         IProjectService projectService,
         IMeetingService meetingService,
-        IWordExportService wordExportService)
+        IWordExportService wordExportService,
+        IVyzvaExportBuilder vyzvaExportBuilder,
+        IVyzvaWordExportService vyzvaWordExportService,
+        IPdfRenderer pdfRenderer,
+        IViewRenderer viewRenderer,
+        IWebHostEnvironment environment)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _exportTemplateUseCase = exportTemplateUseCase;
         _projectService = projectService;
         _meetingService = meetingService;
         _wordExportService = wordExportService;
+        _vyzvaExportBuilder = vyzvaExportBuilder;
+        _vyzvaWordExportService = vyzvaWordExportService;
+        _pdfRenderer = pdfRenderer;
+        _viewRenderer = viewRenderer;
+        _environment = environment;
+        _logger = loggerFactory.CreateLogger<ExportController>();
     }
 
     [HttpGet("Projekt/{projektId:int}/Tisk")]
@@ -66,7 +88,7 @@ public sealed class ExportController : BaseController
             jednaniVyjadreniStav);
 
         var model = await _exportTemplateUseCase.BuildProjectTemplateAsync(projektId, CurrentUserContext, autoPrint, filters, ct);
-        return View("~/Views/Export/PdfTemplate.cshtml", model);
+        return await BuildPrintResultAsync(model, ct);
     }
 
     [HttpGet("Projekt/{projektId:int}/Word")]
@@ -129,7 +151,7 @@ public sealed class ExportController : BaseController
         }
 
         var model = await _exportTemplateUseCase.BuildMeetingTemplateAsync(jednaniId, CurrentUserContext, autoPrint, ct);
-        return View("~/Views/Export/PdfTemplate.cshtml", model);
+        return await BuildPrintResultAsync(model, ct);
     }
 
     [HttpGet("Jednani/{jednaniId:int}/Word")]
@@ -168,7 +190,7 @@ public sealed class ExportController : BaseController
         }
 
         var model = await _exportTemplateUseCase.BuildTaskTemplateAsync(projektId, zaznamId, CurrentUserContext, autoPrint, ct);
-        return View("~/Views/Export/PdfTemplate.cshtml", model);
+        return await BuildPrintResultAsync(model, ct);
     }
 
     [HttpGet("Ukol/{zaznamId:int}/Word")]
@@ -213,6 +235,102 @@ public sealed class ExportController : BaseController
         }
 
         return RedirectToAction(nameof(ProjektTisk), new { projektId = request.ProjektId, autoPrint = true });
+    }
+
+    /// <summary>
+    /// Serverové PDF (2026-09-04): vyrenderuje tiskovou šablonu, nechá ji vysázet
+    /// prohlížečem a vrátí dokument k otevření. Když sazba selže, vrátí se dnešní
+    /// HTML tisk — tisk tak nikdy nepřestane fungovat (spec §8).
+    /// </summary>
+    /// <summary>
+    /// Výzva k poskytnutí plnění podle resortního formuláře (spec 2026-09-07 §9).
+    /// Word i PDF staví ze stejné projekce, aby se obsah obou formátů nemohl rozejít.
+    /// </summary>
+    [HttpGet("Vyzva/{vyzvaId:int}/Tisk")]
+    [Authorize(Policy = "permission:vyzvy.word.export")]
+    public async Task<IActionResult> VyzvaTisk(int vyzvaId, int projektId, CancellationToken ct = default)
+    {
+        var model = await LoadVyzvaExportAsync(vyzvaId, projektId, ct);
+        if (model is null) return NotFound();
+
+        var accessCheck = await EnsureProjectReadableAsync(model.ProjektId, ct);
+        if (accessCheck is not null) return accessCheck;
+
+        var html = await _viewRenderer.RenderToStringAsync(ControllerContext, VyzvaViewPath, model);
+        var stylesheetPath = Path.Combine(_environment.WebRootPath, "css", "pdf-export.css");
+
+        var result = await _pdfRenderer.RenderAsync(
+            new PdfRenderRequest { Html = html, StylesheetPath = stylesheetPath }, ct);
+
+        if (!result.Succeeded)
+        {
+            _logger.LogWarning(
+                "PDF výzvy se nevyrobilo ({Duvod}), tisk pokračuje HTML cestou.", result.FailureReason);
+            return View(VyzvaViewPath, model);
+        }
+
+        Response.Headers.ContentDisposition = new ContentDispositionHeaderValue("inline")
+        {
+            FileNameStar = VyzvaExportFileName(model, "pdf")
+        }.ToString();
+
+        return File(result.Bytes!, PdfContentType);
+    }
+
+    [HttpGet("Vyzva/{vyzvaId:int}/Word")]
+    [Authorize(Policy = "permission:vyzvy.word.export")]
+    public async Task<IActionResult> VyzvaWord(int vyzvaId, int projektId, CancellationToken ct = default)
+    {
+        var model = await LoadVyzvaExportAsync(vyzvaId, projektId, ct);
+        if (model is null) return NotFound();
+
+        var accessCheck = await EnsureProjectReadableAsync(model.ProjektId, ct);
+        if (accessCheck is not null) return accessCheck;
+
+        var payload = _vyzvaWordExportService.BuildDocument(model);
+        return File(payload, WordContentType, VyzvaExportFileName(model, "docx"));
+    }
+
+    /// <summary>
+    /// Null, když výzva neexistuje nebo zadané projektId neodpovídá jejímu projektu.
+    /// Bez té kontroly by šlo autorizovat proti spravovanému projektu a tisknout cizí výzvu
+    /// (stejný guard jako u jednání).
+    /// </summary>
+    private async Task<Models.ViewModels.Vyzvy.VyzvaExportViewModel?> LoadVyzvaExportAsync(
+        int vyzvaId, int projektId, CancellationToken ct)
+    {
+        var model = await _vyzvaExportBuilder.BuildAsync(vyzvaId, ct);
+        if (model is null) return null;
+        if (projektId != 0 && projektId != model.ProjektId) return null;
+        return model;
+    }
+
+    private static string VyzvaExportFileName(
+        Models.ViewModels.Vyzvy.VyzvaExportViewModel model, string pripona)
+        => $"Vyzva_{model.PoradoveVRoce}_{model.Rok}_{model.InformacniSystem}.{pripona}";
+
+    private async Task<IActionResult> BuildPrintResultAsync(
+        PdfExportTemplateViewModel model, CancellationToken ct)
+    {
+        var html = await _viewRenderer.RenderToStringAsync(ControllerContext, PdfViewPath, model);
+        var stylesheetPath = Path.Combine(_environment.WebRootPath, "css", "pdf-export.css");
+
+        var result = await _pdfRenderer.RenderAsync(
+            new PdfRenderRequest { Html = html, StylesheetPath = stylesheetPath }, ct);
+
+        if (!result.Succeeded)
+        {
+            _logger.LogWarning(
+                "PDF se nevyrobilo ({Duvod}), tisk pokračuje HTML cestou.", result.FailureReason);
+            return View(PdfViewPath, model);
+        }
+
+        Response.Headers.ContentDisposition = new ContentDispositionHeaderValue("inline")
+        {
+            FileNameStar = PdfExportFileName.Build(model, GetLocalNow())
+        }.ToString();
+
+        return File(result.Bytes!, PdfContentType);
     }
 
     private FileResult BuildWordResult(PdfExportTemplateViewModel model)

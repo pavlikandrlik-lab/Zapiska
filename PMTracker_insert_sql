@@ -769,7 +769,7 @@ GO
 MERGE dbo.ciselnik_stavu_ucasti AS target
 USING (VALUES
     (N'PRESENT', N'Přítomen', 1),
-    (N'ONLINE', N'Online', 1),
+    (N'ONLINE', N'Videokonference', 1),
     (N'EXCUSED', N'Omluven', 1),
     (N'ABSENT', N'Nepřítomen', 1)
 ) AS source(kod, nazev, is_locked)

@@ -4,12 +4,13 @@ using FluentAssertions;
 namespace PmTracker.Tests.Unit.Projects;
 
 /// <summary>
-/// 2026-06-29: vzájemný překlik záznam ⇄ harmonogram + odlišení ikon.
-/// - Tlačítko „Navrhnout termín a harmonogram" dostane ikonu calendar-plus
-///   (kalendář se přesouvá na nové tlačítko překliku, aby to nemátlo).
-/// - Na kartě záznamu nové tlačítko „přejít na harmonogram" (data-goto-schedule, ikona kalendáře).
-/// - Na kartě harmonogramu nové tlačítko „přejít na záznam" (data-goto-record, ikona list).
+/// 2026-06-29: vzájemný překlik záznam ⇄ harmonogram.
 /// - crossTabNav.js přepne záložku (setActiveTab + ensureProjectTabLoaded) a sjede na kartu.
+/// - Na kartě harmonogramu tlačítko „přejít na záznam" (data-goto-record, ikona list).
+/// 2026-07-13 (toggle spec): na kartě záznamu se ikony calendar-date/calendar-plus přesunuly
+/// do svislého textového menu (data-goto-schedule / návrh změny harmonogramu jako menu položky);
+/// hooky a gating na MaHarmonogramHodnotu zůstávají, jen bez ikon. Markup karty detailně
+/// pinuje RecordCardScheduleToggleMarkupTests.
 /// </summary>
 public sealed class RecordScheduleCrossNavTests
 {
@@ -32,28 +33,31 @@ public sealed class RecordScheduleCrossNavTests
     }
 
     [Fact]
-    public void ProposalButton_UsesCalendarPlusIcon()
+    public void ProposalIsMenuItem_LinkingToScheduleProposalUrl()
     {
         var src = LoadText("PmTracker.Web/Views/Projekty/_ZaznamPartial.cshtml");
 
+        // Toggle spec 2026-07-13: návrh změny harmonogramu je textová položka svislého menu
+        // (ikona calendar-plus zrušena), gated na CanCreateScheduleProposal + ScheduleProposalUrl.
+        src.Should().Contain("summary.CanCreateScheduleProposal",
+            "položka Navrhnout změnu harmonogramu je gated na oprávnění");
         src.Should().MatchRegex(
-            "ScheduleProposalUrl\"[\\s\\S]{0,300}name=\"calendar-plus\"",
-            "tlačítko Navrhnout termín a harmonogram má mít ikonu calendar-plus (kalendář je vyhrazen pro překlik)");
+            "record-actions-menu-item[\\s\\S]{0,200}summary\\.ScheduleProposalUrl",
+            "návrh změny harmonogramu je menu položka odkazující na ScheduleProposalUrl");
     }
 
     [Fact]
-    public void RecordCard_HasGotoScheduleButton_WithCalendarIconAndRecordId()
+    public void GotoScheduleIsMenuItem_WithRecordId()
     {
         var src = LoadText("PmTracker.Web/Views/Projekty/_ZaznamPartial.cshtml");
 
+        // Toggle spec 2026-07-13: překlik na záložku Harmonogram je textová položka menu
+        // (ikona calendar-date zrušena), stále nese id záznamu v data-goto-schedule.
         src.Should().Contain("data-goto-schedule=\"@summary.Id\"",
-            "karta záznamu má tlačítko překliku na harmonogram nesoucí id záznamu v hodnotě hooku");
+            "menu položka překliku na harmonogram nese id záznamu v hodnotě hooku");
         src.Should().MatchRegex(
-            "data-goto-schedule=\"@summary.Id\"[\\s\\S]{0,300}name=\"calendar-date\"",
-            "tlačítko překliku na harmonogram má ikonu kalendáře (calendar-date)");
-        src.Should().MatchRegex(
-            "data-goto-schedule=\"@summary.Id\"[\\s\\S]{0,200}data-stop-propagation=\"true\"",
-            "tlačítko nesmí spustit rozbalení karty (stop-propagation)");
+            "record-actions-menu-item[\\s\\S]{0,120}data-goto-schedule=\"@summary.Id\"",
+            "překlik na harmonogram je textová položka svislého menu");
     }
 
     [Fact]
@@ -105,6 +109,18 @@ public sealed class RecordScheduleCrossNavTests
     {
         var js = LoadText("PmTracker.Web/wwwroot/js/modules/bootstrap.js");
         js.Should().Contain("initCrossTabNav", "bootstrap musí inicializovat překlik záznam⇄harmonogram");
+    }
+
+    // 2026-07-05: po založení / editaci / schválení návrhu appka sjede na záznam a VYSVÍTÍ ho,
+    // aby uživatel hned viděl výsledek a nemusel ho hledat. Deep-link reuse (data-record-target-id).
+    [Fact]
+    public void RecordDeepLink_FlashesTargetCard_WithCrossNavHighlight()
+    {
+        var js = LoadText("PmTracker.Web/wwwroot/js/modules/recordLazyLoading.js");
+
+        js.Should().MatchRegex(
+            "initProjectRecordDeepLink[\\s\\S]{0,1200}cross-nav-highlight",
+            "deep-link cílové karty musí přidat flash třídu cross-nav-highlight (vysvícení záznamu)");
     }
 
     // 2026-07-01: „RozpadRozpad" na cross-tab cestě — reprodukováno v prohlížeči. Zápis

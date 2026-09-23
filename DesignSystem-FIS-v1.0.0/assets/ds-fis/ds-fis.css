@@ -1,0 +1,405 @@
+/* ==========================================================================
+   DS FIS v1.0.0
+   Nadstavba nad Design systémem gov.cz (v4.7.0) – aplikační šablona
+   („Obecná aplikace").
+
+   Tento soubor obsahuje VŠECHNY vizuální odchylky od DS gov.
+   Vše je řešeno přes tokeny / selektory DS – žádná změna zdrojových
+   souborů DS. Odebráním <link> na tento soubor (a <script ds-fis.js>)
+   se aplikace vrátí k čistému vzhledu DS gov v4.
+
+   Načítat AŽ ZA všemi styly DS a za písmem.
+   Kompletní popis jednotlivých bodů: CHANGES.md
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   0) Tokeny DS FIS
+   -------------------------------------------------------------------------- */
+:root {
+	/* modrá hlavičky = pozadí patičky DS (--color-primary-900, #0c3372) */
+	--fis-header-bg: var(--color-primary-900);
+	--fis-on-header: #ffffff;
+	--fis-on-header-muted: rgba(255, 255, 255, 0.82);
+	--fis-header-hover: rgba(255, 255, 255, 0.14);
+	--fis-header-separator: rgba(255, 255, 255, 0.28);
+
+	/* jemné modré orámování rozbalovacích boxů v hlavičce */
+	--fis-popover-border: color-mix(in srgb, var(--color-primary-900) 16%, transparent);
+	--fis-popover-shadow: 0 16px 34px -18px color-mix(in srgb, var(--color-primary-900) 42%, transparent);
+
+	/* zlom mezi „desktop" a „tablet/mobil" rozvržením hlavičky */
+	--fis-header-breakpoint: 75em;
+}
+
+/* --------------------------------------------------------------------------
+   1) Tmavě modrá hlavička (ve stylu gov.cz v3, sjednoceno s patičkou)
+   -------------------------------------------------------------------------- */
+.gov-header {
+	background-color: var(--fis-header-bg);
+	--component-nav-background: var(--fis-header-bg);
+	--component-nav-separator: var(--fis-header-separator);
+}
+.gov-header__divider { border-bottom-color: var(--fis-header-separator); }
+.gov-header__navigation { border-top-color: var(--fis-header-separator); }
+
+/* logo (bílá varianta PNG), název, podnázev */
+.gov-header__logo,
+.gov-header__logo .app-header-title { color: var(--fis-on-header); }
+.gov-header__logo .app-header-subtitle { color: var(--fis-on-header-muted); }
+/* rozměr loga v hlavičce – jediné místo, kde se nastavuje (ne v index.html) */
+.gov-header__logo .app-logo {
+	display: block;
+	height: 3.25rem;
+	width: 3.25rem;
+	object-fit: contain;
+}
+
+/* odkazy hlavní navigace */
+.gov-header .gov-navigation > ul > li > a { color: var(--fis-on-header); }
+.gov-header .gov-navigation > ul > li > a:hover,
+.gov-header .gov-navigation > ul > li > a:active {
+	background-color: var(--fis-header-hover);
+	color: var(--fis-on-header);
+}
+
+/* spouštěcí tlačítka „base" PŘÍMO v hlavičce (rozbalovací menu, účet, mobil)
+   – jen přímé potomky, ne položky uvnitř rozbalených panelů (ty mají světlé
+     pozadí a musí zůstat tmavé). gov-button čte proměnnou --color. */
+.gov-header .gov-navigation > ul > li > gov-button,
+.gov-header__action > gov-dropdown > gov-button,
+.gov-header__mobile gov-button,
+.gov-header .app-hamburger {
+	--color: var(--fis-on-header);
+	--hover-color: var(--fis-on-header);
+	--active-color: var(--fis-on-header);
+	--hover-background: var(--fis-header-hover);
+	--active-background: var(--fis-header-hover);
+}
+.gov-header .gov-navigation > ul > li > gov-button gov-icon,
+.gov-header__action > gov-dropdown > gov-button gov-icon,
+.gov-header__mobile gov-button gov-icon,
+.gov-header .app-hamburger gov-icon { color: var(--fis-on-header); }
+
+.gov-header__action gov-theme-switch { --track-border-color: var(--fis-header-separator); }
+
+/* --------------------------------------------------------------------------
+   2) Širší obsahová plocha pro širokoúhlé monitory
+      (řídí token DS – roztáhne se obsah, pruh navigace i patička)
+   -------------------------------------------------------------------------- */
+@media (min-width: 100rem) {
+	:root {
+		--templates-layout-page-limit-max: 96rem;   /* 1536 px */
+		--container-width: 96rem;
+	}
+}
+@media (min-width: 128rem) {
+	:root {
+		--templates-layout-page-limit-max: 90%;  /* 1760 px */
+		--container-width: 90%;
+	}
+}
+
+/* Na širokoúhlých monitorech nenechat hlavní navigaci roztáhnout přes
+   celou šířku obsahu (položky by byly příliš daleko od sebe) – držet ji
+   v užším středovém pásu. Platí jen pro desktop (nad zlomem hlavičky);
+   pod ním je navigace plovoucí panel na celou šířku (sekce 4). */
+@media (min-width: 100rem) {
+	.gov-header__navigation.js-gov-header__navigation {
+		max-width: 75%;
+		margin-inline: auto;
+	}
+}
+@media (min-width: 128rem) {
+	.gov-header__navigation.js-gov-header__navigation {
+		max-width: 60%;
+	}
+}
+
+/* --------------------------------------------------------------------------
+   3) Rozvržení hlavičky – název stránky má přednost, hledání ho nikdy
+      nepřekryje; nad ním se automaticky zmenšuje a pod zlomem se schová
+   -------------------------------------------------------------------------- */
+.gov-header__content { gap: var(--spacing-l); }
+.app-header-left .gov-header__logo { min-width: 0; }
+/* celý řetězec obalů vlevo musí smět zmenšit → název/podnázev se ořízne
+   (…) místo aby přetekl a podlezl pod vyhledávací pole */
+.app-header-left > a,
+.app-header-left > a > gov-flex,
+.app-header-left > a > gov-flex > gov-flex { min-width: 0; }
+.app-header-title,
+.app-header-subtitle {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+#search .gov-form-control,
+#search gov-form-control,
+#search gov-form-search,
+#search gov-form-autocomplete { width: 100%; }
+
+/* mobilní ovládání (lupa + hamburger) – ve výchozím (širokém) stavu skryté */
+.gov-header__mobile,
+.app-hamburger { display: none; }
+
+@media (min-width: 75em) {
+	/* obě strany rostou stejně → hledání zůstává přesně na středu */
+	.app-header-left { flex: 1 1 0; min-width: 0; }
+	.gov-header__action { flex: 1 1 0; justify-content: flex-end; }
+	/* šířka vyhledávacího pole se stupňuje podle šířky okna, aby v úzkém
+	   pásmu (kolem 1280 px) nepřekrývalo název aplikace */
+	#search.gov-search--fixed-width {
+		flex: 0 1 24rem;
+		width: 24rem;
+		max-width: 24rem;
+		min-width: 0;
+	}
+}
+@media (min-width: 90em) {
+	#search.gov-search--fixed-width { flex-basis: 30rem; width: 30rem; max-width: 30rem; }
+}
+@media (min-width: 106em) {
+	#search.gov-search--fixed-width { flex-basis: 38rem; width: 38rem; max-width: 38rem; }
+}
+
+/* --------------------------------------------------------------------------
+   4) Tablet i mobil (< 75 em)
+      – široká lišta hledání se schová, ovládá se lupou
+      – ikony v jedné řadě vpravo: lupa · uživatel · hamburger (vše bílé)
+      – hlavní navigace = rozbalovací panel pod hlavičkou
+      – podmenu se rozbalují POD položkou (bílý zaoblený box)
+   -------------------------------------------------------------------------- */
+@media (max-width: 74.99em) {
+	.gov-header { position: relative; }
+	.gov-header__content {
+		flex-direction: row;
+		flex-wrap: nowrap;
+		align-items: center;
+		gap: var(--spacing-xs);
+		padding: var(--templates-margin-m) var(--templates-margin-l);
+	}
+	.app-header-left { flex: 1 1 auto; min-width: 0; }
+	.app-header-left > a,
+	.app-header-left > a > gov-flex,
+	.app-header-left > a > gov-flex > gov-flex { min-width: 0; }
+
+	.gov-header__mobile,
+	.app-hamburger { display: inline-flex; flex: 0 0 auto; }
+	.gov-header__action { display: flex; flex: 0 0 auto; }
+	.gov-header__action gov-theme-switch { display: none; }
+	.gov-header__action .app-user-name { display: none; }
+	.gov-header__action gov-dropdown > gov-button gov-icon[name="chevron-down"] { display: none; }
+	.gov-header__action gov-dropdown > gov-button gov-icon[name="person-fill"] {
+		width: 1.375rem; height: 1.375rem;
+	}
+
+	/* široká lišta hledání = plovoucí panel pod hlavičkou */
+	#search.gov-search--fixed-width {
+		flex: none;
+		position: absolute;
+		left: 0; right: 0; top: 100%;
+		width: 100%;
+		max-width: none;
+		padding: var(--spacing-s) var(--templates-margin-l) var(--spacing-m);
+		background: var(--fis-header-bg);
+		box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.4);
+		z-index: 30;
+		display: none;
+	}
+	.app-search-open #search.gov-search--fixed-width { display: block; }
+
+	/* hlavní navigace jako rozbalovací panel */
+	.gov-header__navigation {
+		position: absolute;
+		left: 0; right: 0; top: 100%;
+		z-index: 25;
+		max-width: none;
+		margin: 0;
+		padding: var(--spacing-s) var(--templates-margin-l) var(--spacing-m);
+		background: var(--fis-header-bg);
+		box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.4);
+	}
+	.gov-header__navigation[hidden] { display: none; }
+	.gov-header__navigation > .gov-navigation > ul {
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--spacing-2xs);
+		justify-content: flex-start;
+	}
+	/* položka menu = svislý blok: spouštěč nahoře, podmenu POD ním */
+	.gov-header__navigation .gov-navigation > ul > li {
+		display: block;
+		width: 100%;
+		position: static;
+	}
+	.gov-header__navigation .gov-navigation > ul > li > a {
+		width: 100%;
+		justify-content: flex-start;
+	}
+	.gov-header__navigation .gov-navigation > ul > li > gov-button {
+		width: 100%;
+	}
+
+	/* Rozbalené podmenu dle DS (Šablony → main-navigation, mobilní zobrazení):
+	   plochý blok na CELOU šířku panelu – bez rámu, bez zaoblení, bez stínu,
+	   bez odsazení, jen světlé podbarvení. */
+	.gov-header .gov-subnavigation,
+	.gov-header .gov-mega-menu {
+		position: static;
+		width: auto;
+		display: block;
+		margin: 0;
+		border: none;
+		border-radius: 0;
+		box-shadow: none;
+		background: var(--background-block-primary);
+	}
+	.gov-header .gov-subnavigation { padding: var(--spacing-s) var(--spacing-m); }
+	.gov-header .gov-mega-menu {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0;
+		padding: var(--spacing-s) 0;
+	}
+	.gov-header .gov-subnavigation li a,
+	.gov-header .gov-mega-menu li a { color: var(--text-secondary); }
+	.gov-header .gov-mega-menu__heading span { color: var(--text-primary-color); }
+}
+
+/* --------------------------------------------------------------------------
+   5) Našeptávač vyhledávání (gov-form-autocomplete uvnitř gov-form-search)
+   -------------------------------------------------------------------------- */
+#search { z-index: 40; }
+/* seznam polohovat vůči celému poli (#search), aby měl jeho šířku */
+#search gov-form-autocomplete { position: static; }
+.gov-header .gov-form-autocomplete__list {
+	top: calc(100% + 0.375rem);   /* pár px pod polem – nepřekrývá orámování */
+	left: 0;
+	right: 0;
+	width: auto;
+	z-index: 40;                  /* nad pruhem navigace (ten má z-index 10) */
+	padding-left: 0;
+	background-color: var(--background-block-primary);  /* neprůhledné */
+	border: 1px solid var(--fis-popover-border);
+	box-shadow: var(--fis-popover-shadow);
+	overflow-y: auto;
+}
+/* zrušit generické stylování <ul><li> z DS (odrážky, mezery, odsazení) */
+.gov-header .gov-form-autocomplete__list > li {
+	position: static;
+	margin: 0;
+	padding: 0;
+}
+.gov-header .gov-form-autocomplete__list > li::before { content: none; display: none; }
+.gov-header .gov-form-autocomplete__list > .gov-form-autocomplete__item {
+	display: flex;
+	align-items: center;
+	min-height: var(--height-component-l);   /* všechny řádky stejně vysoké */
+	padding: var(--spacing-xs) var(--spacing-m);
+	line-height: 1.35;
+}
+.gov-header .gov-form-autocomplete__list > .gov-form-autocomplete__item--empty {
+	color: var(--text-secondary);
+	cursor: default;
+}
+.js-ac-clear[hidden] { display: none; }
+
+/* --------------------------------------------------------------------------
+   6) Rozbalovací boxy v hlavičce (Sekce / Agendy) NA DESKTOPU – jemné modré
+      orámování + stín (aby po otevření „vystoupily")
+      + srovnání horní hrany úzkého menu se spodní hranou hlavičky.
+      Pod zlomem hlavičky jsou podmenu ploché bloky v panelu (sekce 4).
+   -------------------------------------------------------------------------- */
+@media (min-width: 75em) {
+	.gov-header .gov-subnavigation,
+	.gov-header .gov-mega-menu {
+		border: 1px solid var(--fis-popover-border);
+		border-top: 0;
+		box-shadow: var(--fis-popover-shadow);
+	}
+	/* celoširoké mega-menu – roztáhnout přesně na šířku obsahu (DS má napevno
+	   width:100vw; max-width:1240px) */
+	.gov-header .gov-mega-menu {
+		left: 0;
+		width: 100%;
+		max-width: none;
+	}
+	/* výchozí `top` u úzkého menu počítá jen s výškou tlačítka, ne s dolním
+	   odsazením pruhu navigace */
+	.gov-header .gov-subnavigation {
+		top: calc(var(--height-component-l) + var(--templates-margin-s));
+	}
+}
+
+/* --------------------------------------------------------------------------
+   7) Menu přihlášeného uživatele
+   -------------------------------------------------------------------------- */
+/* ikona osoby před jménem */
+.gov-header__action gov-dropdown > gov-button gov-icon[name="person-fill"] {
+	width: 1.125rem;
+	height: 1.125rem;
+}
+/* položky „Můj profil" / „Nastavení účtu" zarovnat doprava */
+.gov-header__action gov-dropdown .gov-dropdown__list gov-button .element,
+.gov-header__action gov-dropdown ul gov-button .element {
+	justify-content: flex-end !important;
+	text-align: right;
+}
+/* informační blok „Platnost hesla: …" + oddělovač */
+.app-user-menu__sep {
+	width: auto;
+	margin: var(--spacing-2xs) var(--spacing-m);
+	border: 0;
+	border-top: 1px solid var(--border-subtlest);
+}
+.app-user-menu__info {
+	padding: var(--spacing-xs) var(--spacing-m) var(--spacing-s);
+	white-space: nowrap;
+}
+/* před hydratací komponenty neukazovat vnitřní seznam (jinak probliknutí) */
+gov-dropdown:not(.hydrated) [slot="list"],
+gov-dropdown:not(.hydrated) > ul {
+	display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   8) Patička – zmírnit odsazení (DS působí roztahaně)
+   -------------------------------------------------------------------------- */
+.gov-footer { padding-block: var(--spacing-2xl); }
+/* mezera mezi bloky patičky – na mobilu menší (jinak zbytečně velký odskok) */
+.gov-footer .gov-footer__content { gap: var(--spacing-l); }
+@media (min-width: 48em) {
+	.gov-footer .gov-footer__content { gap: var(--spacing-2xl); }
+}
+/* copyright i verze stejnou (menší) velikostí – DS dává verzi body-m */
+.gov-footer-copy p,
+.gov-footer-copy span {
+	font-size: var(--font-size-body-xs);
+	line-height: 150%;
+}
+
+/* --------------------------------------------------------------------------
+   9) Úvodní text pod nadpisem stránky – celá šířka obsahu
+      (DS ho omezuje na ~polovinu)
+   -------------------------------------------------------------------------- */
+.gov-text-content { max-width: none; }
+
+/* --------------------------------------------------------------------------
+   10) Potlačit přeteklou položku „Další" z hlavní navigace
+       (skript DS ji tvoří na úzkém displeji; ds-fis.js vrací položky zpět)
+   -------------------------------------------------------------------------- */
+.gov-navigation .js-deferred-items-container,
+.gov-navigation .gov-deferred-navigation { display: none !important; }
+
+/* --------------------------------------------------------------------------
+   11) Přilepená patička – u krátké stránky drží patička spodní okraj okna
+   -------------------------------------------------------------------------- */
+body {
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+	min-height: 100dvh;
+}
+body > .gov-header,
+body > .gov-footer { flex: 0 0 auto; }
+body > #main { flex: 1 0 auto; }

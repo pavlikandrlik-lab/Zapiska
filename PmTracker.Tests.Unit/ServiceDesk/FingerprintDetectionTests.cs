@@ -300,4 +300,49 @@ public sealed class FingerprintDetectionTests
 
         result.TicketsChecked.Should().Be(2);
     }
+
+    /// <summary>
+    /// Snímek skutečné ceny se obnoví i na rychlé cestě, kdy fingerprint tiketu sedí a drill
+    /// se přeskočí. Akceptace kalkulace fingerprint nemění (spec 2026-09-10 A3 R4).
+    /// </summary>
+    [Fact]
+    public async Task HarvestSingleTicketAsync_ShodnyFingerprint_PresToObnoviSnimekKalkulace()
+    {
+        using var db = InMemoryDb();
+        var datum = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        db.ZaznamExterniOdkazy.Add(new ZaznamExterniOdkazEntity
+        {
+            Id = 1, ZaznamId = 10, Cislo = "100001",
+            LastKnownHotZaznamDatum = datum,
+            LastKnownMaxVyjadreniId = 500L,
+            LastKnownVyjadreniCount = 3
+        });
+        await db.SaveChangesAsync();
+
+        var vq = new Mock<IVyjadreniQueryService>();
+        vq.Setup(q => q.GetHotZaznamFingerprintsAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new Dictionary<string, HotZaznamFingerprintDto>
+          {
+              ["100001"] = new HotZaznamFingerprintDto("100001", datum, "otevreno")
+          });
+        vq.Setup(q => q.GetVyjadreniSecondaryFingerprintsAsync(It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new Dictionary<string, VyjadreniSecondaryFingerprintDto>
+          {
+              ["100001"] = new VyjadreniSecondaryFingerprintDto("100001", MaxId: 500L, Count: 3)
+          });
+        var snimek = new Mock<IKalkulaceSnapshotService>();
+
+        var sut = new VyjadreniHarvestService(
+            db, vq.Object,
+            new FakeTimeProvider(new DateTimeOffset(2026, 4, 22, 12, 0, 0, TimeSpan.Zero)),
+            new PerExterniOdkazLockRegistry(),
+            NullLogger<VyjadreniHarvestService>.Instance,
+            kalkulaceSnapshot: snimek.Object);
+
+        var result = await sut.HarvestSingleTicketAsync(externiOdkazId: 1, CancellationToken.None);
+
+        result.Message.Should().Contain("Fingerprint", "jde o rychlou cestu bez drillu");
+        snimek.Verify(s => s.SyncAsync(
+            It.Is<IReadOnlyCollection<int>>(ids => ids.Contains(1)), It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

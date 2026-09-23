@@ -58,7 +58,7 @@ neni pristupny pres `querySelector` z light DOM — selector by nasel `gov-form-
 Dotcene soubory:
 - `Views/Projekty/Index.cshtml` — skryt hotove, skryt smazane (JS: pageSwitchers.js)
 - `Views/Projekty/ProjectModal.cshtml` — PouzivatIdentJednani (form submit, ne JS filter)
-- `Views/Projekty/_ProjectRecordsTab.cshtml` — groupBySubsystem, aktivni, mine (JS: filters.js)
+- `Views/Projekty/_ProjectRecordsTab.cshtml` — groupBySubsystem, aktivni (JS: filters.js)
 
 ### Tlacitka (.btn, .icon-btn)
 

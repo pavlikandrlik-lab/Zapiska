@@ -64,4 +64,19 @@ public sealed class ProfileControllerTests
             html.Should().NotContain("Diagnostický náhled výsledných oprávnění podle rolí a rozsahů.");
         }
     }
+
+    /// <summary>A5 (2026-07-08): karty per instance role; sekce „Odvozená práva" zanikla.</summary>
+    [Fact]
+    public async Task Index_ShowsRoleInstanceCards_NoDerivedSection()
+    {
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Profil?asUser={_fixture.AdminOsobaId}");
+        var html = System.Net.WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("data-role-typ=");
+        html.Should().NotContain("Odvozená práva z projektu a subsystému");
+        // Identita: počet rolí s kotvou, ne výčet kódů.
+        html.Should().MatchRegex(@"\d+ rolí");
+    }
 }

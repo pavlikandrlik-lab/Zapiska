@@ -5,9 +5,23 @@
 
 <section class="card">
     <h1>Došlo k chybě</h1>
-    <p>Omlouváme se, požadavek se nepodařilo zpracovat.</p>
+    <p>@(Model.Message ?? "Omlouváme se, požadavek se nepodařilo zpracovat.")</p>
+
     @if (Model.ShowRequestId)
     {
-        <p class="muted">Request ID: <span>@Model.RequestId</span></p>
+        <p class="muted">Request ID: <span data-error-trace>@Model.RequestId</span></p>
+    }
+
+    @if (Model.ShowDiagnostics)
+    {
+        @* Třídy jsou schválně stejné jako u panelu v modalech — vzhled i CSS se sdílí. *@
+        <details class="modal-submit-diagnostics" data-error-diagnostics>
+            <summary>Diagnostický log</summary>
+            <div class="modal-submit-diagnostics-actions">
+                <button type="button" class="modal-submit-action-btn" data-error-copy>Kopírovat log</button>
+                <button type="button" class="modal-submit-action-btn" data-error-save>Uložit log chyby</button>
+            </div>
+            <pre class="modal-submit-diagnostics-log" data-error-log>@Model.DiagnosticLog</pre>
+        </details>
     }
 </section>

@@ -1,4 +1,3 @@
-import { isButtonLike, setButtonDisabled } from "../utils.js";
 import { buildProjectPrintFilterQueryParams, buildProjectPrintFilterSnapshot } from "../filters.js";
 
 const printFormatStorageKey = "pmtracker.print.preferredFormat";
@@ -48,12 +47,10 @@ export function setStoredPrintFormat(format) {
     }
 
     localStorage.setItem(printFormatStorageKey, format);
-    refreshPrintPreferenceUi();
 }
 
 export function clearStoredPrintFormat() {
     localStorage.removeItem(printFormatStorageKey);
-    refreshPrintPreferenceUi();
 }
 
 export function getPrintFormatLabel(format) {
@@ -66,19 +63,6 @@ export function getPrintFormatLabel(format) {
     }
 
     return "není nastaven";
-}
-
-export function refreshPrintPreferenceUi() {
-    const preferred = getStoredPrintFormat();
-    document.querySelectorAll("[data-print-preference-current]").forEach((element) => {
-        element.textContent = getPrintFormatLabel(preferred);
-    });
-
-    document.querySelectorAll("[data-print-preference-reset]").forEach((element) => {
-        if (isButtonLike(element)) {
-            setButtonDisabled(element, preferred === null);
-        }
-    });
 }
 
 export function clearPrintHoverTimer() {
@@ -465,8 +449,6 @@ export function handlePrintTriggerClick(trigger) {
 }
 
 export function initPrintFormatChooser() {
-    refreshPrintPreferenceUi();
-
     document.addEventListener("pointerover", (event) => {
         const target = event.target;
         if (!(target instanceof Element)) {

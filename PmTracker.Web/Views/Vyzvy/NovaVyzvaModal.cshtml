@@ -1,0 +1,53 @@
+@using PmTracker.Web.Models.ViewModels.Vyzvy
+@model NovaVyzvaModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "nova-vyzva-modal-title";
+    var obsazena = Model.ObsazenaCisla.Count > 0
+        ? string.Join(", ", Model.ObsazenaCisla)
+        : null;
+}
+
+<h2 id="nova-vyzva-modal-title">Nová výzva</h2>
+
+@* Číslo výzvy přiděluje SVA mimo aplikaci — proto ruční zadání, ne generátor (spec §5.1). *@
+<form class="form-grid"
+      asp-controller="Vyzvy"
+      asp-action="Zalozit"
+      method="post"
+      data-ajax-submit="true">
+    <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
+
+    <label>
+        Číslo výzvy v roce @Model.Rok
+        <input type="number"
+               name="PoradoveVRoce"
+               min="1"
+               max="999"
+               step="1"
+               required="required"
+               inputmode="numeric"
+               autofocus="autofocus" />
+    </label>
+
+    @if (!string.IsNullOrWhiteSpace(Model.CisloRamcoveSmlouvy))
+    {
+        <p class="muted">Rámcová smlouva: @Model.CisloRamcoveSmlouvy</p>
+    }
+
+    @if (obsazena is not null)
+    {
+        <p class="muted">Už obsazená čísla v roce @Model.Rok: @obsazena</p>
+    }
+
+    @if (Model.ProhlizenyRok is int prohlizeny && prohlizeny != Model.Rok)
+    {
+        <gov-message color="warning">
+            Prohlížíte rok @prohlizeny, ale nová výzva vznikne v roce @Model.Rok.
+        </gov-message>
+    }
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel { SubmitLabel = "Založit výzvu" })
+</form>

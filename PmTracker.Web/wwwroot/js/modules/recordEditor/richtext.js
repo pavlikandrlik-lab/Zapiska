@@ -182,3 +182,8 @@ export function setRecordEditorRichTextValue(textarea, nextValue) {
         editor.setText(normalized);
     }
 }
+
+// Most pro starší IIFE moduly, které nemohou importovat z ESM (sync.js předvyplňuje
+// text požadavku po dohledání tiketu). Stejný vzor jako window.pmExterniOdkazSync.
+window.pmRichText = window.pmRichText || {};
+window.pmRichText.setValue = setRecordEditorRichTextValue;

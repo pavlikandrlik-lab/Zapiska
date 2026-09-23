@@ -1,0 +1,2 @@
+function t(t){if(!t)return[];return Array.from(t.querySelectorAll('a[href], button:not([disabled]), textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])'))}export{t as g};
+//# sourceMappingURL=p-CdDyilVg.js.map

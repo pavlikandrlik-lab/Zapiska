@@ -35,7 +35,6 @@ public interface IExportRecordProjectionBuilder
         bool limitComments,
         bool applyMeetingSnapshotRules,
         ProjectExportRecordFilters? projectFilters,
-        int? currentUserOsobaId,
         CancellationToken ct = default);
 }
 
@@ -47,6 +46,15 @@ public interface IExportRecordVisibilityEvaluator
         IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> statusHistory,
         DateTime anchorMeetingDate,
         DateTime? previousMeetingDate);
+
+    /// <summary>
+    /// Byl úkol ukončený ke dni jednání? Podbarvení ukončených (2026-09-05), rozhodnutí U5.
+    /// </summary>
+    bool IsCompletedForMeetingPrint(
+        ProjektovyZaznamEntity record,
+        IReadOnlyDictionary<int, CiselnikStavuUkoluEntity> taskStates,
+        IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> statusHistory,
+        DateTime anchorMeetingDate);
 }
 
 public interface IExportRoleProjectionBuilder
@@ -203,6 +211,25 @@ public sealed class ExportRecordVisibilityEvaluator : IExportRecordVisibilityEva
 
         var statusAtPreviousMeeting = ResolveTaskStatusAtDate(record.StavUkoluId, statusHistory, previousMeetingDate.Value);
         return !IsFinalTaskStatus(statusAtPreviousMeeting, taskStates);
+    }
+
+    public bool IsCompletedForMeetingPrint(
+        ProjektovyZaznamEntity record,
+        IReadOnlyDictionary<int, CiselnikStavuUkoluEntity> taskStates,
+        IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> statusHistory,
+        DateTime anchorMeetingDate)
+    {
+        var statusAtAnchorMeeting = ResolveTaskStatusAtDate(record.StavUkoluId, statusHistory, anchorMeetingDate);
+        if (!statusAtAnchorMeeting.HasValue)
+        {
+            return false;
+        }
+
+        // Pozor: viditelnost dál používá holé is_final (IsFinalTaskStatus), zatímco
+        // podbarvení jde přes TaskStatusRules, které navíc vylučuje pozastavení.
+        // Rozporný stav v databázi tedy řádek skryje, ale nepodbarví — a startovní
+        // varování na něj upozorní (spec §6).
+        return TaskStatusRules.IsCompleted(taskStates.GetValueOrDefault(statusAtAnchorMeeting.Value));
     }
 
     private static int? ResolveTaskStatusAtDate(
@@ -600,7 +627,6 @@ public sealed class ExportRecordProjectionBuilder(
         bool limitComments,
         bool applyMeetingSnapshotRules,
         ProjectExportRecordFilters? projectFilters,
-        int? currentUserOsobaId,
         CancellationToken ct = default)
     {
         var recordsQuery = dbContext.ProjektoveZaznamy.AsNoTracking()
@@ -677,16 +703,6 @@ public sealed class ExportRecordProjectionBuilder(
                     .Select(x => x.Id)
                     .ToArrayAsync(ct);
                 recordsQuery = recordsQuery.Where(x => !x.StavUkoluId.HasValue || activeTaskStateIds.Contains(x.StavUkoluId.Value));
-            }
-
-            if (projectFilters.Mine)
-            {
-                if (!currentUserOsobaId.HasValue || currentUserOsobaId.Value <= 0)
-                {
-                    return [];
-                }
-
-                recordsQuery = recordsQuery.Where(x => x.VlastnikId == currentUserOsobaId.Value);
             }
 
             if (projectFilters.JednaniVyjadreniStavId.HasValue)
@@ -786,6 +802,10 @@ public sealed class ExportRecordProjectionBuilder(
                 .FirstOrDefault();
         var previousMeetingNumber = previousMeeting?.CisloJednani;
 
+        // Ukončenost k datu jednání (2026-09-05, rozhodnutí U5). Mimo tisk jednání
+        // zůstává null a příznak se odvodí z dnešního stavu záznamu.
+        HashSet<int>? completedRecordIds = null;
+
         if (applyMeetingSnapshotRules && anchorMeeting is not null)
         {
             var statusHistoryByRecord = (await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking()
@@ -809,6 +829,17 @@ public sealed class ExportRecordProjectionBuilder(
                     anchorMeetingDate,
                     previousMeetingDate))
                 .ToList();
+
+            completedRecordIds = records
+                .Where(record => exportRecordVisibilityEvaluator.IsCompletedForMeetingPrint(
+                    record,
+                    taskStates,
+                    statusHistoryByRecord.TryGetValue(record.Id, out var completionHistory)
+                        ? completionHistory
+                        : Array.Empty<ZaznamHistorieStavuZaznamuEntity>(),
+                    anchorMeetingDate))
+                .Select(record => record.Id)
+                .ToHashSet();
         }
 
         var filteredComments = anchorMeeting is null
@@ -861,7 +892,8 @@ public sealed class ExportRecordProjectionBuilder(
                 .Select(link =>
                 {
                     var typeCode = externalTypeMap.GetValueOrDefault(link.TypOdkazuId)?.Kod ?? "-";
-                    return FormatExternalLinkDisplay(typeCode, link.Cislo, link.PredpokladanaCena, link.PlanDodani);
+                    // Předpokládaná cena do PDF ani Wordu nesmí (uživatel 2026-09-10) — jen skutečná.
+                    return FormatExternalLinkDisplay(typeCode, link.Cislo, link.KalkulaceCena, link.PlanDodani);
                 })
                 .ToList();
 
@@ -895,8 +927,8 @@ public sealed class ExportRecordProjectionBuilder(
                 ZaznamId = record.Id,
                 CisloZaznamu = record.CisloZaznamu,
                 CisloViditelne = ResolveVisibleRecordNumber(record),
-                CisloViditelneA = ResolveVisibleNumberPartA(record),
-                CisloViditelneB = ResolveVisibleNumberPartB(record),
+                CisloViditelneA = RecordDisplayOrdering.VisibleNumberPartA(record.CisloViditelneA, record.CisloZaznamu),
+                CisloViditelneB = RecordDisplayOrdering.VisibleNumberPartB(record.CisloViditelneTyp, record.CisloViditelneB),
                 Nazev = record.Nazev,
                 Cil = record.Cil,
                 Popis = record.Popis,
@@ -906,8 +938,12 @@ public sealed class ExportRecordProjectionBuilder(
                 TypUkolu = taskType?.Nazev,
                 Stav = record.StavUkoluId.HasValue ? taskStates.GetValueOrDefault(record.StavUkoluId.Value)?.Nazev ?? "-" : "-",
                 IsPaused = record.StavUkoluId.HasValue
-                    && (taskStates.GetValueOrDefault(record.StavUkoluId.Value)?.Nazev ?? string.Empty)
-                        .Contains("pozastav", StringComparison.CurrentCultureIgnoreCase),
+                    && TaskStatusRules.IsPausedName(taskStates.GetValueOrDefault(record.StavUkoluId.Value)?.Nazev),
+                IsCompleted = completedRecordIds is not null
+                    ? completedRecordIds.Contains(record.Id)
+                    : TaskStatusRules.IsCompleted(record.StavUkoluId.HasValue
+                        ? taskStates.GetValueOrDefault(record.StavUkoluId.Value)
+                        : null),
                 Vlastnik = BuildDisplayNameFromOsoba(people.GetValueOrDefault(record.VlastnikId)),
                 SubsystemKod = subsystem?.Kod ?? "-",
                 Subsystem = subsystem?.Nazev ?? "-",
@@ -965,30 +1001,11 @@ public sealed class ExportRecordProjectionBuilder(
         return record.CisloZaznamu.ToString(CultureInfo.InvariantCulture);
     }
 
-    private static int ResolveVisibleNumberPartA(ProjektovyZaznamEntity record)
-    {
-        if (record.CisloViditelneA > 0)
-        {
-            return record.CisloViditelneA;
-        }
-
-        return Math.Max(0, record.CisloZaznamu);
-    }
-
-    private static int ResolveVisibleNumberPartB(ProjektovyZaznamEntity record)
-    {
-        return record.CisloViditelneTyp == 1
-            ? Math.Max(1, record.CisloViditelneB)
-            : 0;
-    }
-
     private static IEnumerable<ProjektovyZaznamEntity> OrderRecordsByVisibleNumber(IEnumerable<ProjektovyZaznamEntity> rows)
-    {
-        return rows
-            .OrderBy(ResolveVisibleNumberPartA)
-            .ThenBy(ResolveVisibleNumberPartB)
+        => rows
+            .OrderBy(x => RecordDisplayOrdering.VisibleNumberPartA(x.CisloViditelneA, x.CisloZaznamu))
+            .ThenBy(x => RecordDisplayOrdering.VisibleNumberPartB(x.CisloViditelneTyp, x.CisloViditelneB))
             .ThenBy(x => x.CisloZaznamu);
-    }
 
     private string BuildDisplayName(string? titul, string jmeno, string prijmeni, int id)
     {
@@ -1006,18 +1023,18 @@ public sealed class ExportRecordProjectionBuilder(
         return BuildDisplayName(osoba.Titul, osoba.Jmeno, osoba.Prijmeni, osoba.Id);
     }
 
-    private static string FormatEstimatedPrice(decimal estimatedPrice)
+    private static string FormatPrice(decimal price)
     {
-        return $"{estimatedPrice.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ"))} Kč";
+        return $"{price.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ"))} Kč";
     }
 
-    private static string FormatExternalLinkDisplay(string typeCode, string number, decimal? estimatedPrice, DateTime? plannedDelivery)
+    private static string FormatExternalLinkDisplay(string typeCode, string number, decimal? realPrice, DateTime? plannedDelivery)
     {
         var header = $"{typeCode} {number}".Trim();
         var details = new List<string>();
-        if (estimatedPrice.HasValue)
+        if (realPrice.HasValue)
         {
-            details.Add(FormatEstimatedPrice(estimatedPrice.Value));
+            details.Add(FormatPrice(realPrice.Value));
         }
 
         if (plannedDelivery.HasValue)

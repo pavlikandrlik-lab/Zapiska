@@ -64,7 +64,9 @@ public sealed class ProjectFilterPreferencesScenariosTests
 
         var recordsShell = page.Locator("[data-project-filter-scope='records']");
         await OpenFiltersAsync(recordsShell);
-        await ToggleSwitchAsync(recordsShell, "Jen mé záznamy");
+        // „Jen mé záznamy" zrušen 2026-07-05 — persistenci ověřujeme na switchi „Pouze aktivní záznamy"
+        // (výchozí zapnutý → vypneme, aby uložená hodnota byla non-default).
+        await ToggleSwitchAsync(recordsShell, "Pouze aktivní záznamy");
         await recordsShell.Locator("[data-filter-save-defaults='records']").ClickAsync();
         await Expect(recordsShell.Locator("[data-filter-save-status='records']")).ToContainTextAsync("Výchozí filtry uloženy");
 
@@ -79,7 +81,7 @@ public sealed class ProjectFilterPreferencesScenariosTests
 
         await page.Locator("[data-tab='zaznamy']").ClickAsync();
         await OpenFiltersAsync(page.Locator("[data-project-filter-scope='records']"));
-        await Expect(page.Locator("[data-project-filter-scope='records'] [data-filter-key='mine']")).ToBeCheckedAsync();
+        await Expect(page.Locator("[data-project-filter-scope='records'] [data-filter-key='aktivni']")).Not.ToBeCheckedAsync();
 
         await page.Locator("[data-tab='harmonogram']").ClickAsync();
         var restoredScheduleShell = page.Locator("[data-project-filter-scope='schedule']");
@@ -90,28 +92,27 @@ public sealed class ProjectFilterPreferencesScenariosTests
     }
 
     [Fact]
-    public async Task Profile_ShouldClearStoredProjectFilterPreferences()
+    public async Task Profile_ShouldRemoveSingleProjectFilterPreference()
     {
         var page = await _fixture.NewPageAsync();
 
+        // Ulož výchozí filtry pro aktuální projekt (vznikne jedna položka předvolby).
         await page.GotoAsync(ProjectDetailUrl("zaznamy"));
-
         var recordsShell = page.Locator("[data-project-filter-scope='records']");
         await OpenFiltersAsync(recordsShell);
-        await ToggleSwitchAsync(recordsShell, "Jen mé záznamy");
+        await ToggleSwitchAsync(recordsShell, "Pouze aktivní záznamy");
         await recordsShell.Locator("[data-filter-save-defaults='records']").ClickAsync();
+        await Expect(recordsShell.Locator("[data-filter-save-status='records']")).ToContainTextAsync("Výchozí filtry uloženy");
 
+        // Profil ▸ Předvolby — řádek filtrů projektu má vlastní tlačítko smazat.
         await page.GotoAsync($"{_fixture.BaseUrl}/Profil?asUser={_fixture.AdminOsobaId}");
-        await page.GetByRole(AriaRole.Button, new() { Name = "Smazat uložené projektové filtry" }).ClickAsync();
-        await Expect(page.Locator("[data-project-filter-preferences-status]")).ToContainTextAsync("Uložené projektové filtry byly odstraněny.");
+        var list = page.Locator("[data-preferences-list]");
+        var projectFilterRemove = list.Locator("[data-preference-remove][data-preference-descriptor='projectFilters']");
+        await Expect(projectFilterRemove).ToHaveCountAsync(1);
 
-        await page.GotoAsync(ProjectDetailUrl("zaznamy"));
-        recordsShell = page.Locator("[data-project-filter-scope='records']");
-        await OpenFiltersAsync(recordsShell);
-
-        await Expect(recordsShell.Locator("[data-filter-key='mine']")).Not.ToBeCheckedAsync();
-        await Expect(recordsShell.Locator("[data-filter-key='aktivni']")).ToBeCheckedAsync();
-        await Expect(recordsShell.Locator("[data-filter-key='groupBySubsystem']")).ToBeCheckedAsync();
+        await projectFilterRemove.First.ClickAsync();
+        await Expect(page.Locator("[data-preferences-status]")).ToContainTextAsync("odstraněna");
+        await Expect(projectFilterRemove).ToHaveCountAsync(0);
 
         await page.Context.CloseAsync();
     }
@@ -143,7 +144,7 @@ public sealed class ProjectFilterPreferencesScenariosTests
 
         var popup = await page.RunAndWaitForPopupAsync(async () =>
         {
-            await page.GetByRole(AriaRole.Link, new() { Name = "Tisk projektu" }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new() { Name = "Tisk projektu" }).ClickAsync();
             await Expect(page.Locator("[data-print-filter-scope='current']")).ToBeVisibleAsync();
             await page.GetByRole(AriaRole.Button, new() { Name = "Použít aktuální filtry" }).ClickAsync();
         });
@@ -165,7 +166,7 @@ public sealed class ProjectFilterPreferencesScenariosTests
 
         await page.EvaluateAsync("window.localStorage.removeItem('pmtracker.print.preferredFormat');");
 
-        await page.GetByRole(AriaRole.Link, new() { Name = "Tisk projektu" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Tisk projektu" }).ClickAsync();
         await Expect(page.Locator("[data-print-filter-scope='current']")).ToBeVisibleAsync();
 
         await page.GetByRole(AriaRole.Button, new() { Name = "Použít aktuální filtry" }).ClickAsync();
@@ -188,7 +189,7 @@ public sealed class ProjectFilterPreferencesScenariosTests
         await OpenFiltersAsync(recordsShell);
         await recordsShell.Locator("[data-filter-key='aktivni']").UncheckAsync();
 
-        await page.GetByRole(AriaRole.Link, new() { Name = "Tisk projektu" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Tisk projektu" }).ClickAsync();
 
         await Expect(page.Locator("[data-print-filter-scope='current']")).ToHaveCountAsync(0);
         await Expect(page.Locator("[data-print-choice='pdf']")).ToBeVisibleAsync();

@@ -1,4 +1,6 @@
 using System.Globalization;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using PmTracker.Web.Models.ViewModels;
 
@@ -148,14 +150,51 @@ public sealed partial class OpenXmlWordExportService
         return row;
     }
 
-    private static void AppendSectionProperties(Body body)
+    /// <summary>
+    /// 2026-09-04: číslování stránek dole uprostřed. Word ho sází polem PAGE/NUMPAGES,
+    /// takže se přečísluje samo podle skutečného zalomení (na rozdíl od tisku z prohlížeče,
+    /// který číslo stránky přes CSS neumí).
+    /// </summary>
+    private static string AppendPageNumberFooter(MainDocumentPart mainPart)
+    {
+        var footerPart = mainPart.AddNewPart<FooterPart>();
+        var footerId = mainPart.GetIdOfPart(footerPart);
+
+        Run Field(FieldCharValues type) => new(new FieldChar { FieldCharType = type });
+        Run Instruction(string code) => new(new FieldCode(code) { Space = SpaceProcessingModeValues.Preserve });
+        Run Label(string text) => new(new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+
+        footerPart.Footer = new Footer(
+            new Paragraph(
+                new ParagraphProperties(new Justification { Val = JustificationValues.Center }),
+                Label("Strana "),
+                Field(FieldCharValues.Begin),
+                Instruction(" PAGE "),
+                Field(FieldCharValues.Separate),
+                Label("1"),
+                Field(FieldCharValues.End),
+                Label(" z "),
+                Field(FieldCharValues.Begin),
+                Instruction(" NUMPAGES "),
+                Field(FieldCharValues.Separate),
+                Label("1"),
+                Field(FieldCharValues.End)));
+        footerPart.Footer.Save();
+
+        return footerId;
+    }
+
+    private static void AppendSectionProperties(Body body, MainDocumentPart mainPart)
     {
         if (body.Elements<SectionProperties>().Any())
         {
             return;
         }
 
+        var footerId = AppendPageNumberFooter(mainPart);
+
         body.Append(new SectionProperties(
+            new FooterReference { Type = HeaderFooterValues.Default, Id = footerId },
             new PageSize
             {
                 Width = 11906U,

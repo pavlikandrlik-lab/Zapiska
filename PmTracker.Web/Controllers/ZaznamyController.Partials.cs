@@ -42,6 +42,23 @@ public sealed partial class ZaznamyController
     }
 
     [HttpGet]
+    public async Task<IActionResult> RecordSchedulePartial(int projektId, int zaznamId, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(projektId))
+        {
+            return NotFound();
+        }
+
+        var model = await _recordService.BuildRecordScheduleBlockAsync(projektId, zaznamId, ct);
+        if (model is null)
+        {
+            return NotFound();
+        }
+
+        return PartialView("~/Views/Projekty/_ZaznamSchedulePartial.cshtml", model);
+    }
+
+    [HttpGet]
     public async Task<IActionResult> RecordCommentsPartial(int projektId, int zaznamId, int? limit, bool loadAll = false, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
@@ -80,13 +97,21 @@ public sealed partial class ZaznamyController
 
         summary.CanEditRecord = canEditRecord;
         summary.CanEditSchedule = canEditSchedule;
-        summary.CanManageSchedule = canEditSchedule || canCreateScheduleProposal;
+        // Tužka (→ Edit action) se řídí edit-právy, NE návrhem — sjednoceno s celostránkovou
+        // cestou (ProjektyController.PrepareRecordCardShellPresentation). Dřív tu prosakoval
+        // canCreateScheduleProposal → proposal-only user viděl tužku na AJAX-refreshnuté kartě,
+        // ale klik = 403. Obě cesty musí renderovat identickou kartu (toggle spec 2026-07-13).
+        summary.CanManageSchedule = canEditSchedule;
+        summary.CanCreateScheduleProposal = canCreateScheduleProposal;
         summary.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
         summary.CanAddComment = canEditRecord || canAddGeneralComment || canCommentAsSubsystemLead;
         summary.EditButtonLabel = canEditRecord ? "Upravit" : "GANTT";
         summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         record.DetailUrl ??= Url.Action(nameof(RecordDetailPartial), new { projektId, zaznamId = summary.Id });
         record.CommentsUrl ??= Url.Action(nameof(RecordCommentsPartial), new { projektId, zaznamId = summary.Id });
+        record.ScheduleUrl ??= Url.Action(nameof(RecordSchedulePartial), new { projektId, zaznamId = summary.Id });
+        record.RecordPageUrl ??= Url.Action(nameof(Detail), new { id = summary.Id, returnUrl = ProjektDetailTabUrl(projektId, "zaznamy") });
+        summary.ScheduleProposalUrl ??= Url.Action("CreateScheduleProposal", "Navrhy", new { projektId, zaznamId = summary.Id });
     }
 
     private void PrepareRecordCommentsPresentation(ZaznamCommentsPanelViewModel model, ZaznamCardSummaryViewModel summary)

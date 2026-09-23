@@ -35,6 +35,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
     private readonly IPerExterniOdkazLockRegistry _lockRegistry;
     private readonly IHarmonogramSkutecnostSyncService? _skutecnostSync;
     private readonly IPerTicketMetadataSyncService? _metadataSync;
+    private readonly IKalkulaceSnapshotService? _kalkulaceSnapshot;
     private readonly ILogger<VyjadreniHarvestService> _logger;
 
     public VyjadreniHarvestService(
@@ -44,7 +45,8 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         IPerExterniOdkazLockRegistry lockRegistry,
         ILogger<VyjadreniHarvestService> logger,
         IHarmonogramSkutecnostSyncService? skutecnostSync = null,
-        IPerTicketMetadataSyncService? metadataSync = null)
+        IPerTicketMetadataSyncService? metadataSync = null,
+        IKalkulaceSnapshotService? kalkulaceSnapshot = null)
     {
         _db = db;
         _vyjadreni = vyjadreni;
@@ -52,6 +54,7 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         _lockRegistry = lockRegistry;
         _skutecnostSync = skutecnostSync;
         _metadataSync = metadataSync;
+        _kalkulaceSnapshot = kalkulaceSnapshot;
         _logger = logger;
     }
 
@@ -150,6 +153,12 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
             return VyjadreniHarvestResult.Empty($"Ticket #{eo.Cislo} neexistuje v HOT_ZAZNAMY.");
         }
 
+        // Spec 2026-09-10 A3 R4: snímek skutečné ceny PŘED rozhodnutím podle fingerprintu.
+        // Akceptace kalkulace mění HOT_KALKULACE, ne fingerprint tiketu — za rychlou cestou
+        // by se po akceptaci nikdy neobnovil. Běží i po uložení záznamu: SaveRecord plánuje
+        // harvest každé vazby (R5).
+        await SyncKalkulaceBestEffortAsync(new[] { eo.Id }, ct).ConfigureAwait(false);
+
         var secondaries = await _vyjadreni.GetVyjadreniSecondaryFingerprintsAsync(new[] { eo.Cislo! }, ct).ConfigureAwait(false);
         secondaries.TryGetValue(eo.Cislo!, out var secondary);
         secondary ??= new VyjadreniSecondaryFingerprintDto(eo.Cislo!, MaxId: 0L, Count: 0);
@@ -244,6 +253,9 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
                     Reason: ex.Message));
             }
         }
+
+        // Snímek skutečné ceny dávkově pro celý rozsah, nezávisle na fingerprintu (A3 R4).
+        await SyncKalkulaceBestEffortAsync(scopedCandidates.Select(x => x.Id).ToArray(), ct).ConfigureAwait(false);
 
         var finishedAt = _time.GetUtcNow().UtcDateTime;
         return new SdHarvestResult(
@@ -539,6 +551,22 @@ public sealed class VyjadreniHarvestService : IVyjadreniHarvestService
         }
 
         return new VyjadreniHarvestResult(list.Count, created, superseded, skipped);
+    }
+
+    private async Task SyncKalkulaceBestEffortAsync(IReadOnlyCollection<int> externiOdkazIds, CancellationToken ct)
+    {
+        if (_kalkulaceSnapshot is null) return;
+
+        try
+        {
+            await _kalkulaceSnapshot.SyncAsync(externiOdkazIds, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Best-effort jako metadata sync: chyba snímku nesmí shodit harvest vyjádření.
+            _logger.LogWarning(ex, "VyjadreniHarvestService: snímek kalkulace selhal pro {Pocet} vazeb.",
+                externiOdkazIds.Count);
+        }
     }
 
     private static bool IsArchiveStav(string? stav)

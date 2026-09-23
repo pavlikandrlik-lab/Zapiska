@@ -99,6 +99,23 @@ public sealed class ZaznamyControllerEditAuthzTests
             "uživatel bez records.edit (pouze schedule.edit) nesmí triggerovat T5 harvest.");
     }
 
+    /// <summary>
+    /// Spec 2026-09-17 §4 — zámek karty jede přes raw SQL MERGE, který InMemory provider
+    /// neumí. Autorizační testy o zámku nic netvrdí, takže jim stačí vždy úspěšné získání.
+    /// Chování zámku pokrývá RecordEditLockDataStoreTests proti reálné databázi.
+    /// </summary>
+    private sealed class AlwaysAcquiringEditLockService : IRecordEditLockService
+    {
+        public Task<RecordEditLockResult> TryAcquireAsync(int zaznamId, int osobaId, CancellationToken ct = default)
+            => Task.FromResult(new RecordEditLockResult(true, osobaId, DateTime.UtcNow));
+
+        public Task HeartbeatAsync(int zaznamId, int osobaId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task ReleaseAsync(int zaznamId, int osobaId, CancellationToken ct = default)
+            => Task.CompletedTask;
+    }
+
     private static ZaznamyController BuildController(
         PmTrackerDbContext db,
         IRecordService recordService,
@@ -114,7 +131,8 @@ public sealed class ZaznamyControllerEditAuthzTests
             projectEditQuery: new ProjectEditQuery(recordService),
             recordUiFlowResolver: recordUiFlow,
             harvestScheduler: harvestScheduler,
-            db: db)
+            db: db,
+            editLockService: new AlwaysAcquiringEditLockService())
         {
             ControllerContext = new ControllerContext
             {

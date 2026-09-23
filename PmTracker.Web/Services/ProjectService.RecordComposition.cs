@@ -79,6 +79,9 @@ public sealed partial class ProjectService
     async Task<IReadOnlyList<JednaniOptionViewModel>> IRecordEditorQueriesComposition.BuildOpenMeetingOptionsAsync(IReadOnlyList<JednaniListItemViewModel> meetings, CancellationToken ct)
         => await BuildOpenMeetingOptionsAsync(meetings, ct);
 
+    async Task<IReadOnlyList<JednaniOptionViewModel>> IRecordEditorQueriesComposition.BuildOpenMeetingOptionsForCreateAsync(int projektId, IReadOnlyList<JednaniListItemViewModel> meetings, CancellationToken ct)
+        => await BuildOpenMeetingOptionsForCreateAsync(projektId, meetings, ct);
+
     int? IRecordEditorQueriesComposition.ResolveSelectedMeetingIdForNumber(
         IReadOnlyList<JednaniOptionViewModel> openMeetingOptions,
         int? contextMeetingId)
@@ -126,32 +129,6 @@ public sealed partial class ProjectService
         return record.CisloZaznamu.ToString(CultureInfo.InvariantCulture);
     }
 
-    private static int ResolveVisibleNumberPartA(ProjektovyZaznamEntity record)
-    {
-        if (record.CisloViditelneA > 0)
-        {
-            return record.CisloViditelneA;
-        }
-
-        return Math.Max(0, record.CisloZaznamu);
-    }
-
-    private static int ResolveVisibleNumberPartB(ProjektovyZaznamEntity record)
-    {
-        if (record.CisloViditelneTyp == RecordDisplayNumberTypeMeeting)
-        {
-            return Math.Max(1, record.CisloViditelneB);
-        }
-
-        return 0;
-    }
-
-    private static IEnumerable<ProjektovyZaznamEntity> OrderRecordsByVisibleNumber(IEnumerable<ProjektovyZaznamEntity> rows)
-        => rows
-            .OrderBy(ResolveVisibleNumberPartA)
-            .ThenBy(ResolveVisibleNumberPartB)
-            .ThenBy(x => x.CisloZaznamu);
-
     private static bool IsMeetingReadOnly(JednaniEntity? meeting, CiselnikStavuJednaniEntity? status)
         => MeetingStatePolicy.IsReadOnly(meeting, status);
 
@@ -166,6 +143,26 @@ public sealed partial class ProjectService
             .ToListAsync(ct);
 
         return RecordNumberAllocator.FindLowestAvailablePositive(existingValues);
+    }
+
+    /// <summary>
+    /// Náhledová predikce pořadí (část B) pro každé číslo jednání v projektu: mapa
+    /// CisloJednani → nejnižší volné pořadí. Jeden AsNoTracking dotaz, grupování in-memory.
+    /// Není transakční (na rozdíl od <see cref="AllocateMeetingOrderTransactionalAsync"/>) — slouží
+    /// jen pro náhled ve formuláři; finální pořadí se přiděluje až při uložení.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<int, int>> GetNextMeetingOrdersByCisloJednaniAsync(int projektId, CancellationToken ct)
+    {
+        var rows = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.ProjektId == projektId && x.CisloViditelneTyp == RecordDisplayNumberTypeMeeting)
+            .Select(x => new { x.CisloViditelneA, x.CisloViditelneB })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(x => x.CisloViditelneA)
+            .ToDictionary(
+                g => g.Key,
+                g => RecordNumberAllocator.FindLowestAvailablePositive(g.Select(v => v.CisloViditelneB)));
     }
 
     private async Task<int> AllocateMeetingOrderTransactionalAsync(int projektId, int cisloJednani, CancellationToken ct)

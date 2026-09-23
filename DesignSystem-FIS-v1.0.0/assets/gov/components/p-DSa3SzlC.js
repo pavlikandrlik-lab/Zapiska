@@ -1,0 +1,2 @@
+import{u as o,a as t,b as s}from"./p-NA77ggSe.js";const a={bg:"#ecae1a",text:"#3b3b3b"};const c={bg:"#2362a2",text:"#fff"};const e=(a,e=c,n)=>{const g=["color: "+e.text,"background: "+e.bg,"font-size: 11px","padding: 2px 4px","border-radius: 3px","font-weight: 600"].join(";");if(t()||o()||s()){console.log("%cgov",g,a,n)}};const n=(t,s)=>{if(o()){e(t,a,s)}};export{n as g};
+//# sourceMappingURL=p-DSa3SzlC.js.map

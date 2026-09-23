@@ -23,7 +23,7 @@ public sealed partial class VyzvaService
 
         var raw = await _db.ZaznamExterniOdkazy.AsNoTracking()
             .WhereVBufferuProjektu(_db, projektId, pnfTypId)
-            .Select(ev => new { ev.Id, ev.ZaznamId, ev.Cislo, ev.PredpokladanaCena })
+            .Select(ev => new { ev.Id, ev.ZaznamId, ev.Cislo, ev.PredpokladanaCena, ev.KalkulaceCena })
             .ToListAsync(ct);
 
         if (raw.Count == 0) return Array.Empty<VyzvaBufferItem>();
@@ -34,13 +34,14 @@ public sealed partial class VyzvaService
         return raw.Select(r => new VyzvaBufferItem(
             r.Id, r.ZaznamId, r.Cislo,
             hot.GetValueOrDefault(r.Cislo)?.Strucne,
-            r.PredpokladanaCena)).ToList();
+            r.PredpokladanaCena,
+            r.KalkulaceCena)).ToList();
     }
 
-    public async Task<IReadOnlyList<VyzvaDetail>> GetVyzvyAsync(int projektId, CancellationToken ct)
+    public async Task<IReadOnlyList<VyzvaDetail>> GetVyzvyAsync(int projektId, int rok, CancellationToken ct)
     {
         var vyzvy = await _db.Vyzvy.AsNoTracking()
-            .Where(v => v.ProjektId == projektId)
+            .Where(v => v.ProjektId == projektId && v.Rok == rok)
             .OrderByDescending(v => v.DatumZalozeni)
             .ToListAsync(ct);
         if (vyzvy.Count == 0) return Array.Empty<VyzvaDetail>();
@@ -56,6 +57,41 @@ public sealed partial class VyzvaService
         var hot = await LoadHotZaznamyAsync(allCisla, ct);
 
         return vyzvy.Select(v => MapToDetail(v, polozkyMap.GetValueOrDefault(v.Id) ?? new(), hot)).ToList();
+    }
+
+    public async Task<IReadOnlyList<int>> GetRokyAsync(int projektId, CancellationToken ct)
+        => await _db.Vyzvy.AsNoTracking()
+            .Where(v => v.ProjektId == projektId)
+            .Select(v => v.Rok)
+            .Distinct()
+            .OrderByDescending(r => r)
+            .ToListAsync(ct);
+
+    public Task<string?> GetCisloRamcoveSmlouvyAsync(int projektId, CancellationToken ct)
+        => _db.Projekty.AsNoTracking()
+            .Where(p => p.Id == projektId)
+            .Select(p => p.CisloRamcoveSmlouvy)
+            .FirstOrDefaultAsync(ct);
+
+    /// <summary>
+    /// Obsazená pořadová čísla — nápověda do formuláře Nová výzva. Unikátnost drží
+    /// index ux_vyzvy_smlouva_rok_poradove, tedy per rámcová smlouva a rok, ne per projekt:
+    /// dva projekty na téže smlouvě sdílejí jednu číselnou řadu.
+    /// </summary>
+    public async Task<IReadOnlyList<int>> GetObsazenaCislaAsync(int projektId, int rok, CancellationToken ct)
+    {
+        var cisloSmlouvy = await _db.Projekty.AsNoTracking()
+            .Where(p => p.Id == projektId)
+            .Select(p => p.CisloRamcoveSmlouvy)
+            .FirstOrDefaultAsync(ct);
+        if (string.IsNullOrWhiteSpace(cisloSmlouvy)) return Array.Empty<int>();
+
+        return await _db.Vyzvy.AsNoTracking()
+            .Where(v => v.CisloRamcoveSmlouvySnapshot == cisloSmlouvy && v.Rok == rok)
+            .Select(v => v.PoradoveVRoce)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(ct);
     }
 
     public async Task<VyzvaDetail?> GetVyzvaAsync(int vyzvaId, CancellationToken ct)
@@ -83,5 +119,6 @@ public sealed partial class VyzvaService
             polozky.Select(ev => new VyzvaDetailItem(
                 ev.Id, ev.ZaznamId, ev.Cislo,
                 hot.GetValueOrDefault(ev.Cislo)?.Strucne,
-                ev.PredpokladanaCena)).ToList());
+                ev.PredpokladanaCena,
+                ev.KalkulaceCena)).ToList());
 }

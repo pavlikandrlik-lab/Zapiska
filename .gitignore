@@ -47,6 +47,15 @@ PmTracker.Web/appsettings.Production.json
 *.xlsx
 *.xls
 
+# Podklady k tisku výzvy (2026-09-07): export z HOT_KALKULACE a SQL dotaz nad
+# produkční databází. Obsahují reálné resortní údaje — nikdy neverzovat.
+# Vzorové výzvy (*.docx) kryje pravidlo výše.
+# Explicitně i bez pravidla *.docx: vzory výzev nesou reálná čísla smluv a jména,
+# nesmí uniknout ani tehdy, kdyby se *.docx někdy zúžilo (uživatel 2026-09-10).
+*_Vyzva_*.docx
+*.csv
+/kalkulace*
+
 # Claude Code lokální stav — review finding Q-6/A-9
 .claude/hooks/
 .claude/settings.json

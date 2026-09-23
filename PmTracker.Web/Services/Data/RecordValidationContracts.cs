@@ -7,8 +7,20 @@ public static class AjaxErrorCodes
     public const string OperationFailed = "OPERATION_FAILED";
     public const string UnexpectedServerError = "UNEXPECTED_SERVER_ERROR";
     public const string SessionExpired = "SESSION_EXPIRED";
+
+    /// <summary>Spec 2026-09-17 §5 — záznam mezitím uložil jiný člověk.</summary>
+    public const string RecordStale = "RECORD_STALE";
     public const string NonJsonResponse = "NON_JSON_RESPONSE";
     public const string EmptyAjaxResponse = "EMPTY_AJAX_RESPONSE";
+}
+
+/// <summary>
+/// Spec 2026-09-17 §5 — záznam mezitím uložil jiný ČLOVĚK (ne automat).
+/// Verzí je id posledního auditního zápisu; automat neaudituje, takže sem jeho zápisy nevedou.
+/// </summary>
+public sealed class RecordStaleException(string message) : Exception(message)
+{
+    public string ErrorCode => AjaxErrorCodes.RecordStale;
 }
 
 public sealed record RecordValidationIssue(

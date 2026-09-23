@@ -1,0 +1,112 @@
+@model ZaznamDetailPageViewModel
+@{
+    ViewData["Title"] = $"Záznam {Model.Summary.CisloViditelne}";
+    @* Široký (fluid) tier — stejně jako detail projektu a jednání. Bez něj by stránka
+       zůstala ve vycentrovaném sloupci 1280 px s prázdnými kraji. *@
+    ViewData["BodyClass"] = "dashboard-page";
+    var summary = Model.Summary;
+    var hasSchedule = Model.Schedule is not null && Model.ScheduleTable is not null;
+    @* Bez harmonogramu nemá pravý sloupec obsah → vyjádření dostanou celou šířku.
+       Modifikátor přidává server (žádné :has — i15 pojistka). *@
+    var gridCssClass = hasSchedule ? "record-page-grid" : "record-page-grid record-page-grid--single";
+    var commentsUrl = Url.Action("RecordCommentsPartial", "Zaznamy", new { projektId = Model.ProjektId, zaznamId = summary.Id });
+}
+
+@* Stránka záznamu (2026-07-14): read-only detail na trvalé URL. Hlavička na plnou šířku,
+   pod ní dva sloupce — vlevo vyjádření (jediná zapisující část), vpravo harmonogram
+   s přepínačem Graf/Tabulka. Navigaci „zpět" nese drobečková lišta. *@
+<section class="card record-page-header">
+    <div class="record-page-header-top">
+        <div>
+            <div class="record-meta">
+                <span class="pill">@summary.KategorieNazev</span>
+                @if (!string.IsNullOrWhiteSpace(summary.TypUkolu))
+                {
+                    <span class="pill ghost">@summary.TypUkolu</span>
+                }
+            </div>
+            <h1 class="record-title">#@summary.CisloViditelne - @summary.Nazev</h1>
+            @if (!string.IsNullOrWhiteSpace(summary.Cil))
+            {
+                <div class="record-subtitle record-goal-subtitle">@summary.Cil</div>
+            }
+        </div>
+        <div class="record-page-header-actions">
+            <span class="badge">@summary.Stav</span>
+            @if (!string.IsNullOrWhiteSpace(Model.PrintPdfUrl))
+            {
+                <a class="icon-btn"
+                   href="@Model.PrintPdfUrl"
+                   target="_blank"
+                   rel="noopener"
+                   aria-label="Tisk záznamu #@summary.CisloViditelne"
+                   data-print-trigger="true"
+                   data-print-pdf-url="@Model.PrintPdfUrl"
+                   data-print-word-url="@Model.PrintWordUrl"
+                   data-print-label="Tisk záznamu #@summary.CisloViditelne">
+                    <gov-icon size="s" name="printer" type="components" aria-hidden="true"></gov-icon>
+                </a>
+            }
+            @if (Model.CanEditRecord && !string.IsNullOrWhiteSpace(Model.EditUrl))
+            {
+                <pm-button variant="Secondary" size="Small" href="@Model.EditUrl">Upravit</pm-button>
+            }
+            @if (Model.CanCreateScheduleProposal && !string.IsNullOrWhiteSpace(Model.ScheduleProposalUrl))
+            {
+                <pm-button variant="Secondary" size="Small" href="@Model.ScheduleProposalUrl">Navrhnout změnu harmonogramu</pm-button>
+            }
+        </div>
+    </div>
+    @* Termín/vlastník/subsystém (včetně historie) dodává _ZaznamDetailPartial níže —
+       tady jen datum založení, které v něm není. *@
+    <div class="record-summary-meta">
+        <span><span class="label">Založeno:</span> @summary.DatumZalozeni.ToString("dd.MM.yyyy")</span>
+    </div>
+    @* Bohatá část: historie vlastníka/termínu/subsystému, popis, chips externích odkazů, spolupráce. *@
+    @await Html.PartialAsync("~/Views/Projekty/_ZaznamDetailPartial.cshtml", Model.Detail)
+</section>
+
+<div class="@gridCssClass">
+    @* Levý sloupec — vyjádření. Wrapper .record-card je NUTNÝ: AJAX obnova vyjádření
+       hledá .record-card[data-record-id] a v ní [data-record-comments-shell]. Wrapper
+       nesmí mít třídu collapsed (skryla by tělo) ani data-record-toggle hlavičku. *@
+    <article class="record-card record-card--page-column"
+             data-record-id="@summary.Id"
+             data-record-comments-url="@commentsUrl"
+             data-record-comments-base-url="@commentsUrl"
+             data-record-comments-loaded="true">
+        <div class="record-body">
+            <div class="record-comments-lazy"
+                 data-record-comments-shell
+                 data-record-comments-scope="@summary.Id"
+                 data-record-comments-url="@commentsUrl"
+                 data-record-comments-base-url="@commentsUrl"
+                 data-record-comments-loaded="true">
+                @await Html.PartialAsync("~/Views/Projekty/_ZaznamCommentsPartial.cshtml", Model.Comments)
+            </div>
+        </div>
+    </article>
+
+    @if (hasSchedule)
+    {
+        <section class="card record-page-schedule" data-record-page-schedule>
+            <div class="record-page-schedule-head">
+                <h2>Harmonogram</h2>
+                @* Přepínač Graf/Tabulka — dvě tlačítka, ne gov-form-switch: přepínáme mezi
+                   dvěma pojmenovanými pohledy a vyhýbáme se gov-host omezením. *@
+                <div class="schedule-view-switch" role="group" aria-label="Podoba harmonogramu">
+                    <button type="button" class="schedule-view-switch-btn"
+                            data-schedule-view-toggle="graph" aria-pressed="true">Graf</button>
+                    <button type="button" class="schedule-view-switch-btn"
+                            data-schedule-view-toggle="table" aria-pressed="false">Tabulka</button>
+                </div>
+            </div>
+            <div data-record-page-schedule-graph>
+                @await Html.PartialAsync("~/Views/Projekty/_ZaznamSchedulePartial.cshtml", Model.Schedule)
+            </div>
+            <div data-record-page-schedule-table>
+                @await Html.PartialAsync("~/Views/Shared/_ScheduleTable.cshtml", Model.ScheduleTable)
+            </div>
+        </section>
+    }
+</div>

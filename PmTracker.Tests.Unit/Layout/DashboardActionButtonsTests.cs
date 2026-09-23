@@ -22,15 +22,15 @@ public sealed class DashboardActionButtonsTests
     }
 
     [Fact]
-    public void ZaznamPartial_ProposeButton_ShouldBeIconOnly()
+    public void ZaznamPartial_ProposeAction_IsMenuItem()
     {
-        // 2026-04-27: ikona změněna z "plus" na "calendar-date" (Bootstrap Icons 1.11.3,
-        // přidána do wwwroot/assets/icons/components/). Vizuálně vyjadřuje akci
-        // „navrhnout termín v kalendáři" lépe než generický plus.
+        // Toggle spec 2026-07-13: návrh změny harmonogramu už není ikonové tlačítko v hlavičce
+        // (calendar-date/calendar-plus zrušeny) — je to textová položka svislého menu akcí.
         var view = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Projekty/_ZaznamPartial.cshtml"));
-        view.Should().MatchRegex(@"<gov-icon[^>]*\bname=""calendar-date""",
-            "Navrhnout termín má gov-icon calendar-date (Bootstrap Icons 1.11.3, přidána 2026-04-27)");
-        view.Should().Contain("aria-label=\"Navrhnout termín a harmonogram\"");
+        view.Should().MatchRegex(
+            @"record-actions-menu-item[\s\S]{0,200}summary\.ScheduleProposalUrl",
+            "návrh změny harmonogramu je menu položka odkazující na ScheduleProposalUrl");
+        view.Should().NotContain("calendar-date", "ikona kalendáře v hlavičce karty zanikla (přesun do menu)");
     }
 
     [Fact]

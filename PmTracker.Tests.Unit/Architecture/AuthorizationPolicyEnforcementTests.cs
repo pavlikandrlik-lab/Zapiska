@@ -55,6 +55,13 @@ public class AuthorizationPolicyEnforcementTests
             // DeleteRecord: projektId z form body (DeleteRecordCommand.ProjektId), ne route.
             "PmTracker.Web.Controllers.ZaznamyController.DeleteRecord",
 
+            // ReleaseEditLock (spec 2026-09-17 §4.2): uvolňuje VÝHRADNĚ vlastní zámek volajícího —
+            // RecordEditLockService filtruje na osoba_id, takže cizí zámek nejde odemknout ani
+            // podvrženým zaznamId. Žádný permission klíč sem nesedí: editor otevírá records.edit
+            // i records.schedule.edit a obě role musí po sobě umět uklidit. Volá se beaconem
+            // z pagehide, takže nemá ani antiforgery token.
+            "PmTracker.Web.Controllers.ZaznamyController.ReleaseEditLock",
+
             // AssignMeetingIdentifier: projektId z form body (AssignMeetingIdentifierCommand.ProjektId).
             "PmTracker.Web.Controllers.ZaznamyController.AssignMeetingIdentifier",
 

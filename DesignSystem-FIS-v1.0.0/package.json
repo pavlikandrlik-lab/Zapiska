@@ -1,0 +1,16 @@
+{
+  "name": "reporty-gov-design-system",
+  "private": true,
+  "description": "Šablona aplikace Reporty postavená na Design systému gov.cz (v4.7.0)",
+  "dependencies": {
+    "@gov-design-system-ce/components": "^4.7.0",
+    "@gov-design-system-ce/fonts": "^4.7.0",
+    "@gov-design-system-ce/icons": "^4.7.0",
+    "@gov-design-system-ce/styles": "^4.7.0",
+    "@gov-design-system-ce/templates": "^4.7.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "tslib": "^2.8.1"
+  }
+}

@@ -302,6 +302,29 @@ public sealed class ZaznamExterniOdkazEntity
     public DateTime? DatumPrevzeti { get; set; }
     public int? VyzvaId { get; set; }
     public bool ZaradidDoVyzvy { get; set; }
+
+    /// <summary>
+    /// Text požadavku do výzvy, sanitizované HTML z rich text editoru (spec 2026-09-08).
+    /// NULL u vazeb založených před 2026-09-08 — nedoplňuje se, pracovník si je vyplní
+    /// podle potřeby. Prázdno i NULL znamenají ve výzvě žádný text; popis tiketu se
+    /// jako náhrada nepoužívá, celý smysl pole je brát text odjinud než z tiketu.
+    /// Harvest ze ServiceDesku se tohoto pole nikdy nedotkne.
+    /// </summary>
+    public string? Pozadavek { get; set; }
+
+    /// <summary>
+    /// Snímek skutečné ceny z akceptované kalkulace — HOT_KALKULACE.cena, celková včetně licence,
+    /// bez DPH. Plní ho výhradně IKalkulaceSnapshotService při harvestu; uložení záznamu na něj
+    /// nesahá (spec 2026-09-10 A3). NULL = kalkulace není známá.
+    /// </summary>
+    public decimal? KalkulaceCena { get; set; }
+
+    /// <summary>HOT_KALKULACE.id kalkulace, ze které je KalkulaceCena.</summary>
+    public long? KalkulaceId { get; set; }
+
+    /// <summary>Kdy se snímek naposledy změnil (UTC).</summary>
+    public DateTime? KalkulaceNacteno { get; set; }
+
     public DateTime? LastHarvestedAt { get; set; }
 
     // Fingerprint — spec §5.2. Primary = HOT_ZAZNAMY.datum (last-modified),

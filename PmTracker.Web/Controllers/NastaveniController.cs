@@ -37,6 +37,7 @@ public sealed class NastaveniController : BaseController
         var model = AttachCurrentUser(await _settingsService.BuildNastaveniDashboardAsync(normalizedSection, CurrentUserContext, userId, projektId, ct));
         model.PageTitle = "Nastavení";
         PrepareSettingsPanelPresentation(model.AktivniPanel);
+        SetSectionRootBreadcrumb("Nastavení");
         return View(model);
     }
 

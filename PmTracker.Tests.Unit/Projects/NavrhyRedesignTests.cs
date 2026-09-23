@@ -65,7 +65,7 @@ public sealed class NavrhyRedesignTests
     [Fact]
     public void ScheduleBlock_ShouldHideActualWhenFlagSet()
     {
-        var block = Load("PmTracker.Web/Views/Shared/_ScheduleBlock.cshtml");
+        var block = Load("PmTracker.Web/Views/Shared/_ScheduleTable.cshtml");
         block.Should().Contain("Model.HideActual", "7b: skutečnostní sloupec se skrývá přes HideActual");
         block.Should().Contain("Vyplní se po založení",
             "7b: místo skutečnostního vstupu se zobrazí poznámka");
@@ -98,11 +98,18 @@ public sealed class NavrhyRedesignTests
     }
 
     [Fact]
-    public void ExternalSyncJs_ShouldSkipProposalEditor()
+    public void ExternalSyncJs_ShouldResolveTypeOnly_InProposalEditor_DeferringHarvest()
     {
         var sync = Load("PmTracker.Web/wwwroot/js/modules/externiOdkaz/sync.js");
+        // 7c revid. 2026-07-05: v editoru návrhu se resolvuje jen Typ (metadata tiketu), harvest
+        // (4 datumy/chat/buffer = skutečnost) se odkládá až po založení. Bez Typu by schválení
+        // padlo na external_type_required.
         sync.Should().Contain("data-is-proposal-editor=\"true\"",
-            "7c: sync (SD preview) se v editoru návrhu přeskočí — netěžit ani nezkoumat obsah");
+            "proposalMode se detekuje přes data-is-proposal-editor");
+        sync.Should().Contain("typeOnly",
+            "sync v editoru návrhu resolvuje jen Typ (typeOnly)");
+        sync.Should().MatchRegex(@"if\s*\(!typeOnly\)",
+            "harvest (applyHarvestedDates/saveToBuffer/data-buffered) je gated za !typeOnly");
     }
 
     // ---- 7d: harmonogram tab v create editoru vždy ----

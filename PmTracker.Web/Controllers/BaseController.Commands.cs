@@ -244,6 +244,14 @@ public abstract partial class BaseController
                 validationException.DiagnosticLog);
         }
 
+        if (exception is RecordStaleException staleException)
+        {
+            return AjaxErrorResult(
+                staleException.Message,
+                staleException.ErrorCode,
+                staleException);
+        }
+
         if (exception is InvalidOperationException invalidOperationException)
         {
             return AjaxErrorResult(

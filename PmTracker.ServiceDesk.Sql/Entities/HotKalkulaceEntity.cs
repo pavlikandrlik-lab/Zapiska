@@ -1,14 +1,17 @@
 namespace PmTracker.ServiceDesk.Sql.Entities;
 
+// 2026-09-08: sloupce id_kalk, verze a termin se schválně NEMAPUJÍ. Jejich CLR typy
+// v entitě neodpovídaly databázi a čtení celé tabulky na nich padalo
+// (InvalidCastException v SqlDataReader) — což shodilo tisk výzvy, prvního konzumenta
+// téhle tabulky. Podle sys.columns je verze nvarchar(100), id_kalk nvarchar(30)
+// a termin int, ne datum. Nikdo je nečte; lidsky čitelný termín nese text_termin.
+// Kdyby je někdo potřeboval, nejdřív si ověř skutečný typ v sys.columns.
 internal sealed class HotKalkulaceEntity
 {
     public long Id { get; set; }
     public string? Pid { get; set; }
-    public int? IdKalk { get; set; }
-    public int? Verze { get; set; }
     public string? Akceptace { get; set; }
     public DateTime? Datum { get; set; }
-    public DateTime? Termin { get; set; }
     public decimal? PracnostA { get; set; }
     public decimal? PracnostP { get; set; }
     public decimal? PracnostT { get; set; }
@@ -23,7 +26,7 @@ internal sealed class HotKalkulaceEntity
     public decimal? CenaI { get; set; }
     public decimal? Cena { get; set; }
     public decimal? SazbaL { get; set; }
-    public int? PocetL { get; set; }
+    public decimal? PocetL { get; set; }
     public decimal? CenaL { get; set; }
     public string? RozpadLicence { get; set; }
     public string? Popis { get; set; }

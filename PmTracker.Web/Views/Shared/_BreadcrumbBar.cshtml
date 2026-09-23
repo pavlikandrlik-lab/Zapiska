@@ -1,0 +1,42 @@
+@model PmTracker.Web.Models.ViewModels.BreadcrumbTrail
+@if (Model is { Items.Count: > 0 })
+{
+    <nav class="app-breadcrumb-bar" aria-label="Drobečková navigace">
+        @if (Model.ParentUrl is not null)
+        {
+            <a class="app-breadcrumb-back" href="@Model.ParentUrl" aria-label="Zpět o úroveň výš">
+                <gov-icon name="arrow-left" type="components"></gov-icon>
+            </a>
+        }
+        <ol class="app-breadcrumb-list">
+            @for (var i = 0; i < Model.Items.Count; i++)
+            {
+                var item = Model.Items[i];
+                var isCurrent = i == Model.Items.Count - 1;
+                var parentOfThis = i > 0 ? Model.Items[i - 1].Url : null;
+                <li class="app-breadcrumb-item">
+                    @if (item.Url is not null && !isCurrent)
+                    {
+                        <a class="app-breadcrumb-link" href="@item.Url">
+                            <span class="app-breadcrumb-text">@item.Text</span>@if (item.MutedSuffix is not null)
+                            {<span class="app-breadcrumb-suffix"> | @item.MutedSuffix</span>}
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="app-breadcrumb-current" aria-current="page">
+                            <span class="app-breadcrumb-text">@item.Text</span>@if (item.MutedSuffix is not null)
+                            {<span class="app-breadcrumb-suffix"> | @item.MutedSuffix</span>}
+                        </span>
+                    }
+                    @if (item.IsClosable && parentOfThis is not null)
+                    {
+                        <a class="app-breadcrumb-close" href="@parentOfThis" aria-label="Zavřít @item.Text">
+                            <gov-icon name="x" type="components"></gov-icon>
+                        </a>
+                    }
+                </li>
+            }
+        </ol>
+    </nav>
+}

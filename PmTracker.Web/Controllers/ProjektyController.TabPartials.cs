@@ -117,4 +117,24 @@ public sealed partial class ProjektyController
         PrepareProjectProposalsTabPresentation(model);
         return PartialView("~/Views/Projekty/_ProjectProposalsTab.cshtml", model);
     }
+
+    /// <summary>
+    /// Panel Výzev jako projektová záložka (2026-09-07 přesun z dashboardu).
+    /// Zobrazení NENÍ gateované oprávněním — vidí ho každý, kdo vidí projekt
+    /// (spec 2026-09-07-vyzvy-dokonceni-design §4.1). Omezené jsou až měnící akce,
+    /// které si klíče ověřují samy ve VyzvyController.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> VyzvyTabPartial(int id, int? rok = null, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(id))
+        {
+            return NotFound();
+        }
+
+        var muzeEditovat = CurrentUserContext.HasPermission(PermissionKeys.VyzvyCreate, id);
+        var muzeTisknout = CurrentUserContext.HasPermission(PermissionKeys.VyzvyWordExport, id);
+        var model = await _vyzvyPanelBuilder.BuildAsync(id, muzeEditovat, muzeTisknout, rok, ct);
+        return PartialView("~/Views/Projekty/_ProjectVyzvyTab.cshtml", model);
+    }
 }

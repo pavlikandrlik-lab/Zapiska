@@ -15,10 +15,24 @@ public sealed partial class MeetingService
     private sealed record ActiveProjectMembershipRow(
         int OsobaId,
         string Osoba,
+        string Prijmeni,
+        string Jmeno,
         string? Email,
         bool HasNonHostProjectRole,
         bool HasSubsystemRole,
+        int GroupPriority,
         IReadOnlyList<string> AktivniRole);
+
+    /// <summary>B6 (2026-07-09): pořadí role-skupin v účasti jednání (menší = dřív):
+    /// 1 Vlastník → 2 Gestor → 3 Proj. manažer → 4 Administrátor → 5 zbytek (vč. subsystémových).</summary>
+    private static int ResolveProjectRoleGroupPriority(string? roleKod) => roleKod switch
+    {
+        _ when Ci.Equals(roleKod, "VLASTNIK_PROJEKTU") => 1,
+        _ when Ci.Equals(roleKod, "GEST") => 2,
+        _ when Ci.Equals(roleKod, "PROJ_MAN") => 3,
+        _ when Ci.Equals(roleKod, "ADM_PROJ") => 4,
+        _ => 5
+    };
 
     public async Task<JednaniDetailViewModel> BuildJednaniDetailAsync(int id, CancellationToken ct = default)
     {
@@ -33,7 +47,10 @@ public sealed partial class MeetingService
         var currentMeeting = meetings.FirstOrDefault(x => x.Id == id)
             ?? throw new InvalidOperationException($"Jednání {id} nebylo nalezeno v seznamu projektu.");
 
-        var attendance = await BuildMeetingAttendanceAsync(id, project.Id, ct);
+        // A1 (2026-07-08): membership rows JEDNOU — sdílí je účast (role labely),
+        // legacy fallback i kandidáti modalu (dřív se BuildActiveProjectMembershipRowsAsync volal 2×).
+        var membershipRows = await BuildActiveProjectMembershipRowsAsync(project.Id, ct);
+        var attendance = await BuildMeetingAttendanceAsync(id, membershipRows, ct);
         var taskRows = await BuildMeetingTasksAsync(id, project.Id, ct);
         var meetingStatusesRaw = await dbContext.CiselnikStavuJednani.AsNoTracking()
             .OrderBy(x => x.Id)
@@ -72,12 +89,13 @@ public sealed partial class MeetingService
         {
             ProjektId = project.Id,
             ProjektNazev = project.CelyNazev,
+            ProjektZkratka = project.Zkratka,
             Jednani = currentMeeting,
             OtevrenyStavKod = openStatusCode,
             UzavrenyStavKod = closedStatusCode,
             Ucast = attendance,
             Ukoly = taskRows,
-            AvailableParticipantCandidates = await BuildMeetingParticipantCandidatesAsync(project.Id, meeting.Id, ct),
+            AvailableParticipantCandidates = await BuildMeetingParticipantCandidatesAsync(project.Id, meeting.Id, includeAlreadyPresent: false, membershipRows, ct),
             StavyJednani = meetingStatuses,
             StavyUcasti = attendanceStatuses
         };
@@ -164,8 +182,15 @@ public sealed partial class MeetingService
         };
     }
 
-    private async Task<List<UcastViewModel>> BuildMeetingAttendanceAsync(int meetingId, int projectId, CancellationToken ct)
+    private async Task<List<UcastViewModel>> BuildMeetingAttendanceAsync(
+        int meetingId,
+        IReadOnlyList<ActiveProjectMembershipRow> membershipRows,
+        CancellationToken ct)
     {
+        // A1 (2026-07-08): role labely per osoba z předaných membership rows (načtené jednou v detailu).
+        var rolesByOsoba = membershipRows.ToDictionary(x => x.OsobaId, x => x.AktivniRole);
+        // B6 (2026-07-09): skupinová priorita pro explicitní účast (osoba mimo aktivní tým → 5).
+        var priorityByOsoba = membershipRows.ToDictionary(x => x.OsobaId, x => x.GroupPriority);
         var attendances = await dbContext.Ucast.AsNoTracking()
             .Where(x => x.JednaniId == meetingId)
             .ToListAsync(ct);
@@ -177,7 +202,7 @@ public sealed partial class MeetingService
 
         if (attendances.Count == 0)
         {
-            return await BuildLegacyMeetingAttendanceAsync(projectId, defaultState, ct);
+            return BuildLegacyMeetingAttendance(membershipRows, defaultState);
         }
 
         var attendanceByPerson = attendances.ToDictionary(x => x.OsobaId);
@@ -189,7 +214,10 @@ public sealed partial class MeetingService
                 .ToDictionaryAsync(x => x.Id, ct);
 
         return participantIds
-            .OrderBy(osobaId => BuildDisplayNameFromOsoba(people.GetValueOrDefault(osobaId)), StringComparer.CurrentCultureIgnoreCase)
+            // B6 (2026-07-09): skupina dle role → příjmení → jméno.
+            .OrderBy(osobaId => priorityByOsoba.GetValueOrDefault(osobaId, 5))
+            .ThenBy(osobaId => people.GetValueOrDefault(osobaId)?.Prijmeni ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(osobaId => people.GetValueOrDefault(osobaId)?.Jmeno ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
             .Select(osobaId =>
             {
                 var attendance = attendanceByPerson.GetValueOrDefault(osobaId);
@@ -203,32 +231,30 @@ public sealed partial class MeetingService
                     Osoba = BuildDisplayNameFromOsoba(people.GetValueOrDefault(osobaId)),
                     Email = people.GetValueOrDefault(osobaId)?.Email?.Trim(),
                     StavUcastiKod = attendanceState?.Kod,
-                    StavUcasti = attendanceState?.Nazev ?? "-"
+                    StavUcasti = attendanceState?.Nazev ?? "-",
+                    AktivniRole = rolesByOsoba.GetValueOrDefault(osobaId, [])
                 };
             })
             .ToList();
     }
 
-    private async Task<List<UcastViewModel>> BuildLegacyMeetingAttendanceAsync(
-        int projectId,
-        CiselnikStavuUcastiEntity? defaultState,
-        CancellationToken ct)
+    private static List<UcastViewModel> BuildLegacyMeetingAttendance(
+        IReadOnlyList<ActiveProjectMembershipRow> membershipRows,
+        CiselnikStavuUcastiEntity? defaultState)
     {
-        var participants = await BuildDefaultAttendanceParticipantRowsAsync(projectId, ct);
-        if (participants.Count == 0)
-        {
-            return [];
-        }
-
-        return participants
-            .OrderBy(item => item.Osoba, StringComparer.CurrentCultureIgnoreCase)
+        return membershipRows
+            .Where(item => item.HasNonHostProjectRole || item.HasSubsystemRole)
+            .OrderBy(item => item.GroupPriority)
+            .ThenBy(item => item.Prijmeni, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(item => item.Jmeno, StringComparer.CurrentCultureIgnoreCase)
             .Select(item => new UcastViewModel
             {
                 OsobaId = item.OsobaId,
                 Osoba = item.Osoba,
                 Email = item.Email,
                 StavUcastiKod = defaultState?.Kod,
-                StavUcasti = defaultState?.Nazev ?? "-"
+                StavUcasti = defaultState?.Nazev ?? "-",
+                AktivniRole = item.AktivniRole
             })
             .ToList();
     }
@@ -310,15 +336,25 @@ public sealed partial class MeetingService
         int meetingId,
         bool includeAlreadyPresent,
         CancellationToken ct)
+        => await BuildMeetingParticipantCandidatesAsync(
+            projectId, meetingId, includeAlreadyPresent,
+            await BuildActiveProjectMembershipRowsAsync(projectId, ct), ct);
+
+    private async Task<List<MeetingParticipantCandidateViewModel>> BuildMeetingParticipantCandidatesAsync(
+        int projectId,
+        int meetingId,
+        bool includeAlreadyPresent,
+        IReadOnlyList<ActiveProjectMembershipRow> membershipRows,
+        CancellationToken ct)
     {
+        _ = projectId; // membership rows už jsou k projektu vázané; parametr drží symetrii API.
         var alreadyPresentIds = (await dbContext.Ucast.AsNoTracking()
             .Where(x => x.JednaniId == meetingId)
             .Select(x => x.OsobaId)
             .ToListAsync(ct))
             .ToHashSet();
-        var activeRoles = await BuildActiveProjectMembershipRowsAsync(projectId, ct);
 
-        return activeRoles
+        return membershipRows
             .Select(group => new MeetingParticipantCandidateViewModel
             {
                 OsobaId = group.OsobaId,
@@ -327,15 +363,8 @@ public sealed partial class MeetingService
                 AktivniRole = group.AktivniRole
             })
             .Where(x => includeAlreadyPresent || !alreadyPresentIds.Contains(x.OsobaId))
-            .OrderBy(x => x.Osoba, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
-    }
-
-    private async Task<List<ActiveProjectMembershipRow>> BuildDefaultAttendanceParticipantRowsAsync(int projectId, CancellationToken ct)
-    {
-        var rows = await BuildActiveProjectMembershipRowsAsync(projectId, ct);
-        return rows
-            .Where(item => item.HasNonHostProjectRole || item.HasSubsystemRole)
+            // Bez re-sortu: membershipRows už jsou řazené podle příjmení+jména (user 2026-07-09);
+            // OrderBy(Osoba) by pořadí rozbil zpět na display name (titul/jméno první).
             .ToList();
     }
 
@@ -386,18 +415,24 @@ public sealed partial class MeetingService
             {
                 item.OsobaId,
                 Osoba = BuildDisplayName(item.Titul, item.Jmeno, item.Prijmeni, item.OsobaId),
+                item.Prijmeni,
+                item.Jmeno,
                 Email = item.Email?.Trim(),
                 HasNonHostProjectRole = !Ci.Equals(item.RoleKod, ProjectRoleCodes.Host),
                 HasSubsystemRole = false,
+                GroupPriority = ResolveProjectRoleGroupPriority(item.RoleKod),
                 RoleLabel = item.RoleNazev
             })
             .Concat(subsystemRoleRows.Select(item => new
             {
                 item.OsobaId,
                 Osoba = BuildDisplayName(item.Titul, item.Jmeno, item.Prijmeni, item.OsobaId),
+                item.Prijmeni,
+                item.Jmeno,
                 Email = item.Email?.Trim(),
                 HasNonHostProjectRole = false,
                 HasSubsystemRole = true,
+                GroupPriority = 5,
                 RoleLabel = BuildSubsystemRoleLabel(item.RoleNazev, item.SubsystemKod, item.SubsystemNazev)
             }))
             .ToList();
@@ -410,16 +445,22 @@ public sealed partial class MeetingService
                 return new ActiveProjectMembershipRow(
                     group.Key,
                     first.Osoba,
+                    first.Prijmeni,
+                    first.Jmeno,
                     first.Email,
                     group.Any(item => item.HasNonHostProjectRole),
                     group.Any(item => item.HasSubsystemRole),
+                    group.Min(item => item.GroupPriority),
                     group.Select(item => item.RoleLabel)
                         .Where(item => !string.IsNullOrWhiteSpace(item))
                         .Distinct(Ci)
                         .OrderBy(item => item, StringComparer.CurrentCultureIgnoreCase)
                         .ToList());
             })
-            .OrderBy(item => item.Osoba, StringComparer.CurrentCultureIgnoreCase)
+            // B6 (2026-07-09): skupina dle role → příjmení → jméno.
+            .OrderBy(item => item.GroupPriority)
+            .ThenBy(item => item.Prijmeni, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(item => item.Jmeno, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
     }
 
@@ -506,30 +547,10 @@ public sealed partial class MeetingService
         return record.CisloZaznamu.ToString(CultureInfo.InvariantCulture);
     }
 
-    private static int ResolveVisibleNumberPartA(ProjektovyZaznamEntity record)
-    {
-        if (record.CisloViditelneA > 0)
-        {
-            return record.CisloViditelneA;
-        }
-
-        return Math.Max(0, record.CisloZaznamu);
-    }
-
-    private static int ResolveVisibleNumberPartB(ProjektovyZaznamEntity record)
-    {
-        if (record.CisloViditelneTyp == RecordDisplayNumberTypeMeeting)
-        {
-            return Math.Max(1, record.CisloViditelneB);
-        }
-
-        return 0;
-    }
-
     private static IEnumerable<ProjektovyZaznamEntity> OrderRecordsByVisibleNumber(IEnumerable<ProjektovyZaznamEntity> rows)
         => rows
-            .OrderBy(ResolveVisibleNumberPartA)
-            .ThenBy(ResolveVisibleNumberPartB)
+            .OrderBy(x => RecordDisplayOrdering.VisibleNumberPartA(x.CisloViditelneA, x.CisloZaznamu))
+            .ThenBy(x => RecordDisplayOrdering.VisibleNumberPartB(x.CisloViditelneTyp, x.CisloViditelneB))
             .ThenBy(x => x.CisloZaznamu);
 
     private static bool IsMeetingTaskVisible(string? stavKod)

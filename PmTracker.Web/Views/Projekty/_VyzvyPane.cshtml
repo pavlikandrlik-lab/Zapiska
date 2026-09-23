@@ -1,0 +1,171 @@
+@using System.Globalization
+@using PmTracker.Web.Models.ViewModels.Vyzvy
+@model VyzvyPaneViewModel
+@{
+    var css = CultureInfo.GetCultureInfo("cs-CZ");
+}
+
+<section class="vyzvy-pane" data-vyzvy-pane="@Model.Klic" hidden="@(Model.Klic != "buffer")">
+    @if (!Model.JeBuffer && Model.Vyzva is not null)
+    {
+        <header class="vyzvy-pane-header">
+            <h3 class="vyzvy-pane-title">Výzva @Model.Vyzva.Kod</h3>
+            <gov-tag size="s" type="subtle" color="@VyzvaStavPresentation.Color(Model.Vyzva.Stav)">
+                @VyzvaStavPresentation.Label(Model.Vyzva.Stav)
+            </gov-tag>
+            <span class="vyzvy-pane-meta">
+                @Model.Vyzva.ZalozilJmeno · @Model.Vyzva.DatumZalozeni.ToString("d. M. yyyy", css)
+            </span>
+            @if (Model.Vyzva.DatumOdeslani is DateTime odeslano)
+            {
+                <span class="vyzvy-pane-meta">odesláno @odeslano.ToString("d. M. yyyy", css)</span>
+            }
+
+            @* Uzavření výzvy (Příprava → Odesláno) má vlastní tlačítko v liště vpravo nahoře.
+               Menu tady zůstává kvůli ostatním přechodům — zrušení a znovuotevření. *@
+            @if (Model.MuzeEditovat && Model.Vyzva.PovoleneStavy.Count > 0)
+            {
+                <span class="vyzvy-stav-menu" data-vyzvy-stav-menu>
+                    <pm-button variant="Secondary" size="Small" data-vyzvy-stav-toggle>Změnit stav</pm-button>
+                    <ul class="vyzvy-stav-menu-list">
+                        @foreach (var stav in Model.Vyzva.PovoleneStavy)
+                        {
+                            <li>
+                                <button type="button"
+                                        data-vyzvy-action="zmenit-stav"
+                                        data-vyzva-id="@Model.Vyzva.Id"
+                                        data-novy-stav="@stav">@VyzvaStavPresentation.Label(stav)</button>
+                            </li>
+                        }
+                    </ul>
+                </span>
+            }
+        </header>
+    }
+
+    @if (Model.Skupiny.Count == 0)
+    {
+        <p class="vyzvy-pane-empty muted">
+            @(Model.JeBuffer
+                ? "Buffer je prázdný — přepněte switch u PNF v externích vazbách."
+                : "Výzva zatím neobsahuje žádné PNF.")
+        </p>
+    }
+    else
+    {
+        @* Se zamčenou výzvou (Odesláno/Zrušeno) se hýbat nedá — karty nejsou tažitelné
+           a menu se vůbec nerenderuje (spec §8.3). Serverové guardy zůstávají první linií. *@
+        var lzeHybat = Model.MuzeEditovat && (Model.JeBuffer || Model.Vyzva?.Stav == "Priprava");
+
+        @foreach (var skupina in Model.Skupiny)
+        {
+            <section class="vyzvy-zaznam">
+                <h4 class="vyzvy-zaznam-hlavicka">
+                    <span class="vyzvy-zaznam-cislo">@(skupina.CisloViditelne ?? "—")</span>
+                    <span class="vyzvy-zaznam-nazev">@skupina.Nazev</span>
+                </h4>
+                <ul class="vyzvy-pnf-list">
+                    @foreach (var p in skupina.Polozky)
+                    {
+                        @* Karta PNF (2026-09-08): proužek vlevo jako u karty záznamu,
+                           první řádek číslo a název, druhý cena. Tažení chytá celou kartu. *@
+                        <li class="vyzvy-pnf"
+                            data-externi-odkaz-id="@p.ExterniOdkazId"
+                            draggable="@(lzeHybat ? "true" : "false")">
+                            <span class="vyzvy-pnf-bar" aria-hidden="true"></span>
+                            <span class="vyzvy-pnf-body">
+                                <span class="vyzvy-pnf-title">
+                                    <span class="vyzvy-pnf-cislo">#@p.Cislo</span>
+                                    <span class="vyzvy-pnf-nazev">@(p.StrucneNazev ?? "(bez názvu z HOT)")</span>
+                                </span>
+                                @* Skutečná cena z kalkulace má přednost (spec 2026-09-10 A3 R7). *@
+                                <span class="vyzvy-pnf-meta">
+                                    @if (p.KalkulaceCena is decimal skutecna)
+                                    {
+                                        <text>Cena:</text>
+                                        <span class="vyzvy-pnf-cena" data-cena-zdroj="kalkulace">@skutecna.ToString("N2", css)</span>
+                                        <text>Kč</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Předpokládaná cena:</text>
+                                        <span class="vyzvy-pnf-cena" data-cena-zdroj="predpokladana">@(p.PredpokladanaCena?.ToString("N2", css) ?? "—")</span>
+                                        <text>Kč</text>
+                                    }
+                                </span>
+                            </span>
+                            @if (lzeHybat)
+                            {
+                                <span class="vyzvy-pnf-menu">
+                                    <button type="button" class="vyzvy-pnf-dots"
+                                            data-vyzvy-menu-trigger
+                                            aria-haspopup="menu"
+                                            aria-expanded="false"
+                                            aria-label="Přesunout PNF @p.Cislo"
+                                            title="Přesunout">
+                                        <gov-icon size="s" name="three-dots-vertical" type="components" aria-hidden="true"></gov-icon>
+                                    </button>
+                                    <div class="vyzvy-pnf-menu-panel" data-vyzvy-menu hidden role="menu">
+                                        @foreach (var cil in Model.CilePresunu)
+                                        {
+                                            var jeAktualni = Model.JeBuffer
+                                                ? cil.VyzvaId == null
+                                                : cil.VyzvaId == Model.Vyzva!.Id;
+                                            if (jeAktualni) { continue; }
+
+                                            <button type="button" class="vyzvy-pnf-menu-item" role="menuitem"
+                                                    data-vyzvy-presun
+                                                    data-externi-odkaz-id="@p.ExterniOdkazId"
+                                                    data-cilova-vyzva-id="@(cil.VyzvaId?.ToString() ?? "")">
+                                                Přesunout do: @cil.Popisek
+                                            </button>
+                                        }
+                                    </div>
+                                </span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+    }
+
+    @* Patička vpravo dole: součet a tisk. Jen u výzvy — buffer není dokument a nemá
+       co tisknout. Rendruje se i u prázdné výzvy, ta se tisknout smí (spec §9.7). *@
+    @if (!Model.JeBuffer && Model.Vyzva is not null && (Model.MuzeTisknout || Model.Vyzva.CelkovaCena.HasValue))
+    {
+        <div class="vyzvy-pane-footer">
+            @if (Model.Vyzva.CelkovaCena is decimal celkem)
+            {
+                <p class="vyzvy-pane-soucet">
+                    CELKEM:
+                    <strong data-vyzvy-celkem="@celkem.ToString(CultureInfo.InvariantCulture)">@celkem.ToString("N2", css) Kč</strong>
+                    @if (Model.Vyzva.PocetJenPredpokladanych > 0)
+                    {
+                        <span class="vyzvy-pane-soucet-poznamka"
+                              data-vyzvy-soucet-predpokladane="@Model.Vyzva.PocetJenPredpokladanych">
+                            (z toho @Model.Vyzva.PocetJenPredpokladanych PNF jen s předpokládanou cenou)
+                        </span>
+                    }
+                </p>
+            }
+            @if (Model.MuzeTisknout)
+            {
+                @* Výběr formátu zrušen 2026-09-08 — do spisové služby jde vždy Word.
+                   Náhled otevře tiskovou podobu v nové kartě; endpoint vrací PDF jako
+                   inline, takže se zobrazí v prohlížeči a dialog tisku nevyskočí.
+
+                   Prostý <a>, ne pm-button: ten strhává atributy z hostu, takže by se
+                   neuplatnil target="_blank" a náhled by přebil stávající stránku
+                   (memory feedback_pm_button_strips_host_attributes). *@
+                <a data-vyzva-nahled
+                   target="_blank"
+                   rel="noopener"
+                   href="@Url.Action("VyzvaTisk", "Export", new { vyzvaId = Model.Vyzva.Id, projektId = Model.ProjektId })">Náhled</a>
+
+                <a data-vyzva-word
+                   href="@Url.Action("VyzvaWord", "Export", new { vyzvaId = Model.Vyzva.Id, projektId = Model.ProjektId })">Tisk výzvy</a>
+            }
+        </div>
+    }
+</section>

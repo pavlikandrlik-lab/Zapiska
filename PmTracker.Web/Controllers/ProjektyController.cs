@@ -6,6 +6,7 @@ using PmTracker.Web.Services;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.ProjectDashboard;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Vyzvy;
 using System.Globalization;
 
 namespace PmTracker.Web.Controllers;
@@ -18,12 +19,14 @@ public sealed partial class ProjektyController : BaseController
     private const string MeetingsTab = "jednani";
     private const string TeamTab = "tym";
     private const string ProposalsTab = "navrhy";
+    private const string VyzvyTabKey = "vyzvy";
     private const string TeamRefreshScope = "projekty-detail-tym";
 
     private readonly IProjectService _projectService;
     private readonly IMeetingService _meetingService;
     private readonly IRecordProposalService _recordProposalService;
     private readonly IProjectDashboardService _projectDashboardService;
+    private readonly IVyzvyPanelBuilder _vyzvyPanelBuilder;
 
     public ProjektyController(
         IUserContextResolver userContextResolver,
@@ -32,13 +35,15 @@ public sealed partial class ProjektyController : BaseController
         IProjectService projectService,
         IMeetingService meetingService,
         IRecordProposalService recordProposalService,
-        IProjectDashboardService projectDashboardService)
+        IProjectDashboardService projectDashboardService,
+        IVyzvyPanelBuilder vyzvyPanelBuilder)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _projectService = projectService;
         _meetingService = meetingService;
         _recordProposalService = recordProposalService;
         _projectDashboardService = projectDashboardService;
+        _vyzvyPanelBuilder = vyzvyPanelBuilder;
     }
 
     public async Task<IActionResult> Index(CancellationToken ct = default)
@@ -68,6 +73,7 @@ public sealed partial class ProjektyController : BaseController
                 .ToList()
         };
 
+        SetSectionRootBreadcrumb("Projekty");
         return View(model);
     }
 
@@ -90,6 +96,7 @@ public sealed partial class ProjektyController : BaseController
         model.TargetRecordOpenComments = requestedTab == RecordsTab && openComments;
         await PrepareProjectDetailPresentationAsync(model, ct);
         await PrepareActiveProjectTabAsync(model, requestedTab, ct);
+        SetProjectBreadcrumbs(id, model.Projekt.Nazev, model.Projekt.Zkratka);
         return View(model);
     }
 
@@ -121,6 +128,8 @@ public sealed partial class ProjektyController : BaseController
         // Per-action redesign 2026-04-23: dashboard.view klíč řídí viditelnost tlačítka
         // (hardkódovaný whitelist rolí ProjectDashboardAuthorizationPolicy smazán).
         model.CanViewDashboard = CurrentUserContext.HasPermission(PermissionKeys.DashboardView, projectId);
+        // Trvale rozbalené menu — cookie čtená serverově (render bez fliknutí), zapisovaná klientsky.
+        model.ProjectMenuLocked = Request.Cookies["pmtracker.projectMenu.locked"] == "1";
         model.PageTitle = model.Projekt.Nazev;
         model.BackUrl = Url.Action("Index", "Projekty") ?? "/Projekty";
         model.BackLabel = "Zpět na přehled";
@@ -133,6 +142,7 @@ public sealed partial class ProjektyController : BaseController
         model.JednaniTab.LoadUrl = Url.Action(nameof(JednaniTabPartial), new { id = projectId }) ?? $"/Projekty/JednaniTabPartial/{projectId}";
         model.TymTab.LoadUrl = Url.Action(nameof(TymTabPartial), new { id = projectId }) ?? $"/Projekty/TymTabPartial/{projectId}";
         model.NavrhyTab.LoadUrl = Url.Action(nameof(NavrhyTabPartial), new { id = projectId }) ?? $"/Projekty/NavrhyTabPartial/{projectId}";
+        model.VyzvyTab.LoadUrl = Url.Action(nameof(VyzvyTabPartial), new { id = projectId }) ?? $"/Projekty/VyzvyTabPartial/{projectId}";
 
         await PrepareProjectRecordsTabPresentationAsync(model.ZaznamyTab, ct);
     }
@@ -169,6 +179,16 @@ public sealed partial class ProjektyController : BaseController
             var proposalsTab = await _recordProposalService.BuildProjectProposalsTabAsync(model.Projekt.Id, CurrentUserContext, ct);
             PrepareProjectProposalsTabPresentation(proposalsTab);
             model.LoadedNavrhyTab = proposalsTab;
+            return;
+        }
+
+        // Výzvy nemají permission gate — stačí přístup k projektu, který volající už ověřil.
+        if (string.Equals(requestedTab, VyzvyTabKey, StringComparison.OrdinalIgnoreCase))
+        {
+            var muzeEditovat = CurrentUserContext.HasPermission(PermissionKeys.VyzvyCreate, model.Projekt.Id);
+            var muzeTisknout = CurrentUserContext.HasPermission(PermissionKeys.VyzvyWordExport, model.Projekt.Id);
+            model.LoadedVyzvyTab = await _vyzvyPanelBuilder.BuildAsync(
+                model.Projekt.Id, muzeEditovat, muzeTisknout, rok: null, ct: ct);
         }
     }
 
@@ -182,7 +202,8 @@ public sealed partial class ProjektyController : BaseController
         if (string.Equals(tab, ScheduleTab, StringComparison.OrdinalIgnoreCase)
             || string.Equals(tab, MeetingsTab, StringComparison.OrdinalIgnoreCase)
             || string.Equals(tab, TeamTab, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(tab, ProposalsTab, StringComparison.OrdinalIgnoreCase))
+            || string.Equals(tab, ProposalsTab, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tab, VyzvyTabKey, StringComparison.OrdinalIgnoreCase))
         {
             return tab!.ToLowerInvariant();
         }
@@ -233,7 +254,10 @@ public sealed partial class ProjektyController : BaseController
         // schedule-only editace probíhá výhradně přes návrh (ProposalsScheduleCreate).
         var canCreateScheduleProposal = summary.JeUkol
             && CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, projectId);
-        summary.CanManageSchedule = summary.CanEditSchedule || canCreateScheduleProposal;
+        // Tužka (→ Edit action) se řídí edit-právy, NE návrhem. Návrh má vlastní tlačítko
+        // (CanCreateScheduleProposal → ScheduleProposalUrl). Dřív sem prosakoval canCreateScheduleProposal
+        // → vedoucí subsystému viděl tužku na cizích záznamech, ale klik = 403.
+        summary.CanManageSchedule = summary.CanEditSchedule;
         // F4 redesign: UI flag pro „přidat komentář za vedoucího subsystému" = meetings.notes.subsystemlead
         // (per-action klíč pro zápis v jednání).
         summary.CanCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId)
@@ -246,6 +270,8 @@ public sealed partial class ProjektyController : BaseController
         summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         record.DetailUrl = Url.Action("RecordDetailPartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordDetailPartial?projektId={projectId}&zaznamId={summary.Id}";
         record.CommentsUrl = Url.Action("RecordCommentsPartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={summary.Id}";
+        record.ScheduleUrl = Url.Action("RecordSchedulePartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordSchedulePartial?projektId={projectId}&zaznamId={summary.Id}";
+        record.RecordPageUrl = Url.Action("Detail", "Zaznamy", new { id = summary.Id, returnUrl = ProjektDetailTabUrl(projectId, RecordsTab) }) ?? $"/Zaznamy/Detail/{summary.Id}";
         summary.ScheduleProposalUrl = Url.Action("CreateScheduleProposal", "Navrhy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Navrhy/CreateScheduleProposal?projektId={projectId}&zaznamId={summary.Id}";
     }
 
@@ -253,16 +279,20 @@ public sealed partial class ProjektyController : BaseController
     {
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
 
-        // F4 redesign 2026-04-23: records.schedule.add → proposals.schedule.create.
-        var canManageSchedules = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId)
-            || CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, model.ProjektId)
-            || CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, model.ProjektId);
+        // Tlačítko „Upravit" v harmonogramu odkazuje na Edit action → gate musí zrcadlit server
+        // (records.edit || records.schedule.edit), NE návrhový klíč. Dřív sem prosakoval
+        // proposals.schedule.create → vedoucí subsystému viděl „Upravit", ale klik = 403.
+        var canManageSchedules = RecordEditorAffordancePolicy.CanOpenEditor(CurrentUserContext, model.ProjektId);
 
+        // C1 (2026-07-10): cross-nav origin — ← v editoru/návrhu otevřeném z gantu
+        // vrací na záložku Harmonogram, ne na kanonické Záznamy/Návrhy.
+        var scheduleTabReturnUrl = Url.Action(nameof(Detail), new { id = model.ProjektId, tab = ScheduleTab })
+            ?? $"/Projekty/Detail/{model.ProjektId}?tab={ScheduleTab}";
         foreach (var item in model.HarmonogramUkoly)
         {
             item.CanManageSchedule = canManageSchedules;
-            item.ScheduleEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = model.ProjektId }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
-            item.ScheduleProposalUrl = Url.Action("CreateScheduleProposal", "Navrhy", new { projektId = model.ProjektId, zaznamId = item.ZaznamId }) ?? $"/Navrhy/CreateScheduleProposal?projektId={model.ProjektId}&zaznamId={item.ZaznamId}";
+            item.ScheduleEditUrl = Url.Action("Edit", "Zaznamy", new { id = item.ZaznamId, projektId = model.ProjektId, returnUrl = scheduleTabReturnUrl }) ?? $"/Zaznamy/Edit/{item.ZaznamId}";
+            item.ScheduleProposalUrl = Url.Action("CreateScheduleProposal", "Navrhy", new { projektId = model.ProjektId, zaznamId = item.ZaznamId, returnUrl = scheduleTabReturnUrl }) ?? $"/Navrhy/CreateScheduleProposal?projektId={model.ProjektId}&zaznamId={item.ZaznamId}";
         }
     }
 

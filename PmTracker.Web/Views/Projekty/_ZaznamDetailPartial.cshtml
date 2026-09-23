@@ -58,9 +58,18 @@
         {
             var odkaz = Model.ExterniOdkazy[i];
             var tooltipId = $"chip-tooltip-{Guid.NewGuid():N}-{i}";
-            var estimatedPriceLabel = odkaz.PredpokladanaCena.HasValue
-                ? $"{odkaz.PredpokladanaCena.Value.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ"))} Kč"
+            // Skutečná cena z kalkulace má přednost (spec 2026-09-10 A3 R7). Předpokládaná jen
+            // s příponou, aby ji nikdo nečetl jako konečnou.
+            var csCz = CultureInfo.GetCultureInfo("cs-CZ");
+            var realPriceLabel = odkaz.KalkulaceCena.HasValue
+                ? $"{odkaz.KalkulaceCena.Value.ToString("N2", csCz)} Kč"
                 : null;
+            var estimatedPriceLabel = odkaz.PredpokladanaCena.HasValue
+                ? $"{odkaz.PredpokladanaCena.Value.ToString("N2", csCz)} Kč"
+                : null;
+            var chipPriceLabel = realPriceLabel
+                ?? (estimatedPriceLabel is null ? null : $"{estimatedPriceLabel} (předp.)");
+            var chipPriceSource = realPriceLabel is not null ? "kalkulace" : "predpokladana";
             <span class="chip-wrap">
                 @if (!string.IsNullOrWhiteSpace(odkaz.ServiceDeskUrl))
                 {
@@ -76,9 +85,9 @@
                         {
                             <span class="chip-sub">@odkaz.Vyzva</span>
                         }
-                        @if (!string.IsNullOrWhiteSpace(estimatedPriceLabel))
+                        @if (!string.IsNullOrWhiteSpace(chipPriceLabel))
                         {
-                            <span class="chip-sub">@estimatedPriceLabel</span>
+                            <span class="chip-sub" data-cena-zdroj="@chipPriceSource">@chipPriceLabel</span>
                         }
                     </a>
                 }
@@ -91,9 +100,9 @@
                         {
                             <span class="chip-sub">@odkaz.Vyzva</span>
                         }
-                        @if (!string.IsNullOrWhiteSpace(estimatedPriceLabel))
+                        @if (!string.IsNullOrWhiteSpace(chipPriceLabel))
                         {
-                            <span class="chip-sub">@estimatedPriceLabel</span>
+                            <span class="chip-sub" data-cena-zdroj="@chipPriceSource">@chipPriceLabel</span>
                         }
                     </span>
                 }
@@ -108,8 +117,12 @@
                         <strong>@(string.IsNullOrWhiteSpace(odkaz.Vyzva) ? "-" : odkaz.Vyzva)</strong>
                     </span>
                     <span class="chip-tooltip-row">
+                        <span>Cena z kalkulace:</span>
+                        <strong>@(realPriceLabel ?? "-")</strong>
+                    </span>
+                    <span class="chip-tooltip-row">
                         <span>Předpokl. cena:</span>
-                        <strong>@(string.IsNullOrWhiteSpace(estimatedPriceLabel) ? "-" : estimatedPriceLabel)</strong>
+                        <strong>@(estimatedPriceLabel ?? "-")</strong>
                     </span>
                     <span class="chip-tooltip-row">
                         <span>Objednáno:</span>

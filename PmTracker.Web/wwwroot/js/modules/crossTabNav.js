@@ -8,6 +8,7 @@
 // Reuse existující tab infrastruktury z projectTabs.js: setActiveTab přepne aktivní
 // panel, ensureProjectTabLoaded případně lazy-loadne harmonogram (vrací Promise).
 import { ensureProjectTabLoaded, setActiveTab, syncTabQuery } from "./projectTabs.js";
+import { resetRecordViewToRecord } from "./recordScheduleView.js";
 
 const HIGHLIGHT_CLASS = "cross-nav-highlight";
 const HIGHLIGHT_MS = 1600;
@@ -68,6 +69,9 @@ export function initCrossTabNav() {
             const recordId = (toRecord.dataset.gotoRecord || "").trim();
             if (recordId) {
                 event.preventDefault();
+                // R9/4: návrat na záznam = pohled záznam (uživatel jde číst záznam,
+                // ne harmonogram, který právě opustil).
+                resetRecordViewToRecord(recordId);
                 navigateToTab("zaznamy", `.record-card[data-record-id="${CSS.escape(recordId)}"]`);
             }
         }

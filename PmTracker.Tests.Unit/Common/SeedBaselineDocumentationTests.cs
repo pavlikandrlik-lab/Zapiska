@@ -68,7 +68,7 @@ public sealed class SeedBaselineDocumentationTests
         script.Should().Contain("N'DRAFT', N'Příprava'");
         script.Should().Contain("N'CLOSED', N'Uzavřeno'");
         script.Should().Contain("N'PRESENT', N'Přítomen'");
-        script.Should().Contain("N'ONLINE', N'Online'");
+        script.Should().Contain("N'ONLINE', N'Videokonference'");
         script.Should().Contain("N'EXCUSED', N'Omluven'");
         script.Should().Contain("N'ABSENT', N'Nepřítomen'");
         script.Should().Contain("N'mp', N'MiniProjekt'");
@@ -81,6 +81,15 @@ public sealed class SeedBaselineDocumentationTests
         script.Should().Contain("N'HS01_DURATION'");
         script.Should().Contain("N'HS10_DELAY'");
         script.Should().NotContain("HS11");
+    }
+
+    [Fact]
+    public void DevSeed_ShouldContainVideokonferenceAttendanceState()
+    {
+        var script = File.ReadAllText(Path.Combine(GetRepositoryRoot(), "db_seed_dev_admin.sql"));
+
+        script.Should().Contain("N'ONLINE', N'Videokonference'",
+            "bez tohoto řádku se videokonferenční účast nikdy neprojde lokálně ani v testech");
     }
 
     [Fact]

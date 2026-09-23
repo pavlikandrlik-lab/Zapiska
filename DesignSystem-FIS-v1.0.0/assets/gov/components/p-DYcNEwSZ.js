@@ -1,0 +1,2 @@
+import{S as o}from"./p-BcQO4NH2.js";import{p as t}from"./p-CQvUntGY.js";const m=t(o,["_XS","_S","_M","_L","_XL"]);const e={root:"gov-form-autocomplete",list:"gov-form-autocomplete__list",item:"gov-form-autocomplete__item",empty:"gov-form-autocomplete__item--empty",loading:"gov-form-autocomplete__item--loading"};export{e as F,m as a};
+//# sourceMappingURL=p-DYcNEwSZ.js.map

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using static PmTracker.Tests.Unit.Architecture.ArchitectureTestBase;
 
@@ -42,6 +43,33 @@ public sealed class ModalLayoutRulesTests
             "_ModalLayout.cshtml nastavuje opt-in flag pro variant=record-editor");
         modalLayout.Should().Contain("record-editor",
             "_ModalLayout.cshtml musí rozlišovat variant record-editor pro opt-in scroll flag");
+    }
+
+    [Fact]
+    public void SiteCss_FloatingPanel_ShouldStackAboveModalRoot_ButBelowRecordEditorCloseGuard()
+    {
+        // Bug 2026-07-04: floating pickery (person/AD/date/time) se mountují do #floating-panel-root
+        // v <body> (mimo gov-dialog kvůli transform containing-block). Tím ztratí z-index z pravidla
+        // `gov-dialog … .office-search-panel { z-index: 2600 }` a spadnou pod modal (.modal-root:2000),
+        // takže výsledky se vykreslí ZA modalem. Invariant: .floating-panel > .modal-root, ale < close-guard.
+        var css = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/css/site.css"));
+        var noComments = Regex.Replace(css, @"/\*[\s\S]*?\*/", string.Empty);
+
+        int ZIndexOf(string selector)
+        {
+            var match = Regex.Match(noComments, Regex.Escape(selector) + @"\s*\{[^}]*?z-index\s*:\s*(\d+)");
+            match.Success.Should().BeTrue($"pravidlo {selector} musí definovat z-index");
+            return int.Parse(match.Groups[1].Value);
+        }
+
+        var floatingPanel = ZIndexOf(".floating-panel");
+        var modalRoot = ZIndexOf(".modal-root");
+        var closeGuard = ZIndexOf(".record-editor-close-guard");
+
+        floatingPanel.Should().BeGreaterThan(modalRoot,
+            "floating dropdown panely musí být NAD modalem, jinak se výsledky vykreslí za ním");
+        floatingPanel.Should().BeLessThan(closeGuard,
+            "floating panel zůstává POD record-editor close-guardem");
     }
 
     [Fact]

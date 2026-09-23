@@ -500,6 +500,55 @@ export function setButtonDisabled(el, disabled) {
 export const SUBMIT_SELECTOR =
     'button[type="submit"], input[type="submit"], gov-button[native-type="submit"]';
 
+/**
+ * Uloží text jako UTF-8 .txt. Preferuje native Save As dialog (File System Access API,
+ * Chromium 86+), jinak spadne na anchor download s blob URL (Firefox/Safari).
+ *
+ * Vytaženo 2026-09-08 z ajax.js, aby stejnou obsluhu měla i chybová stránka —
+ * uživatel má u chyby vidět totéž ať spadne modal, nebo obyčejný GET.
+ *
+ * @returns {Promise<"saved"|"aborted"|"failed">}
+ */
+export async function saveTextAsFile(text, fileName) {
+    // BOM ﻿ aby Notepad otevřel UTF-8 bez "ANSI" misdetection.
+    const blob = new Blob(["\ufeff" + String(text || "")], { type: "text/plain;charset=utf-8" });
+    try {
+        if (typeof window.showSaveFilePicker === "function") {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: fileName,
+                types: [{
+                    description: "Textový soubor (UTF-8)",
+                    accept: { "text/plain": [".txt"] }
+                }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return "saved";
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+        return "saved";
+    } catch (error) {
+        // Zavření Save dialogu uživatelem není chyba — nic se nehlásí.
+        return error && error.name === "AbortError" ? "aborted" : "failed";
+    }
+}
+
+/** Název souboru bez znaků, které Windows v cestě nepovolí. */
+export function sanitizeFileName(value, fallback) {
+    const base = String(value || "").trim() || fallback;
+    return `${base.replace(/[\\/:*?"<>|\s]+/g, "_")}.txt`;
+}
+
 export async function copyTextToClipboard(text) {
     const value = String(text || "");
     if (!value) {

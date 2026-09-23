@@ -1,4 +1,5 @@
 import { fetchHtmlFragment } from "./navigationShared.js";
+import { isButtonLike } from "./utils.js";
 
 function readBooleanStorageDefaultTrue(key) {
     const rawValue = window.localStorage.getItem(key);
@@ -153,7 +154,9 @@ export function initProjectIndexStatusFilters(scope, options = {}) {
 }
 
 export function toggleMeetingAttendancePanel(button) {
-    if (!(button instanceof HTMLButtonElement)) {
+    // isButtonLike (ne instanceof HTMLButtonElement): tlačítko renderuje pm-button → <gov-button>,
+    // což NENÍ HTMLButtonElement → původní guard vracel early → panel se netogloval.
+    if (!isButtonLike(button)) {
         return;
     }
 
@@ -170,7 +173,12 @@ export function toggleMeetingAttendancePanel(button) {
     const shouldOpen = panel.hidden;
     panel.hidden = !shouldOpen;
     button.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
-    button.textContent = shouldOpen ? "Skrýt účast" : "Zobrazit účast";
+    // Label měň na vnořeném spanu, NE přes button.textContent na gov-button hostu
+    // (to rozbíjí Stencil slot relocation → zdvojený label „RozpadRozpad").
+    const label = button.querySelector("[data-meeting-attendance-label]");
+    if (label instanceof HTMLElement) {
+        label.textContent = shouldOpen ? "Skrýt účast" : "Zobrazit účast";
+    }
 }
 
 export function initCiselnikAjaxSwitch(options = {}) {

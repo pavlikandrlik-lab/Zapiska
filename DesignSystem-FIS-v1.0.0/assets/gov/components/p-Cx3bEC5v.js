@@ -1,0 +1,2 @@
+import{S as o}from"./p-BcQO4NH2.js";import{p as i}from"./p-CQvUntGY.js";const t=i(o,["_XS","_S","_M","_L","_XL"]);const c={root:"gov-accordion"};const r={root:"gov-accordion-item",disabled:"gov-accordion-item--disabled",details:"gov-accordion-item__details",summary:"gov-accordion-item__summary",icon:"gov-accordion-item__icon",title:"gov-accordion-item__title",right:"gov-accordion-item__right",arrow:"gov-accordion-item__arrow",content:"gov-accordion-item__content"};export{r as A,c as a,t as b};
+//# sourceMappingURL=p-Cx3bEC5v.js.map

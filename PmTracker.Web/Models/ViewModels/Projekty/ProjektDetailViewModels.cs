@@ -12,10 +12,12 @@ public sealed class ProjektDetailViewModel : BaseViewModel
     public ProjektLazyTabShellViewModel JednaniTab { get; init; } = new() { TabKey = "jednani", LoadingText = "Načítání jednání..." };
     public ProjektLazyTabShellViewModel TymTab { get; init; } = new() { TabKey = "tym", LoadingText = "Načítání týmu..." };
     public ProjektLazyTabShellViewModel NavrhyTab { get; init; } = new() { TabKey = "navrhy", LoadingText = "Načítání návrhů..." };
+    public ProjektLazyTabShellViewModel VyzvyTab { get; init; } = new() { TabKey = "vyzvy", LoadingText = "Načítání výzev..." };
     public ProjektHarmonogramTabViewModel? LoadedHarmonogramTab { get; set; }
     public ProjektJednaniTabViewModel? LoadedJednaniTab { get; set; }
     public ProjektTymTabViewModel? LoadedTymTab { get; set; }
     public ProjektNavrhyTabViewModel? LoadedNavrhyTab { get; set; }
+    public PmTracker.Web.Models.ViewModels.Vyzvy.VyzvyPanelViewModel? LoadedVyzvyTab { get; set; }
     public bool CanCreateMeetings { get; set; }
     public bool CanEditMeetings { get; set; }
     public bool CanManageTeam { get; set; }
@@ -23,6 +25,10 @@ public sealed class ProjektDetailViewModel : BaseViewModel
     public bool CanManageSchedules { get; set; }
     public bool CanViewProposals { get; set; }
     public bool CanViewDashboard { get; set; }
+
+    /// <summary>Trvale rozbalené projektové menu (cookie pmtracker.projectMenu.locked). Řídí A/B render lišty.</summary>
+    public bool ProjectMenuLocked { get; set; }
+
     public int CurrentUserOsobaId { get; set; }
     public int? TargetRecordId { get; set; }
     public bool TargetRecordOpenComments { get; set; }

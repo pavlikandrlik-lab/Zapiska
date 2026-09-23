@@ -10,7 +10,6 @@ import {
     parseIsoDate
 } from "../utils.js";
 import {
-    getProjectFilterCurrentUserId,
     getProjectFilterInput,
     setRecordFilterVisibility
 } from "../filters.js";
@@ -69,8 +68,6 @@ export class ProjectGanttBoard {
     }
 
     getFilters() {
-        const currentUserId = getProjectFilterCurrentUserId("gantt");
-        const hasCurrentUser = currentUserId && currentUserId !== "0";
         return {
             subsystem: normalizeFilterToken(getGanttFilterValue("subsystem")),
             kategorie: normalizeFilterToken(getGanttFilterValue("kategorie")),
@@ -78,9 +75,6 @@ export class ProjectGanttBoard {
             typ: normalizeFilterToken(getGanttFilterValue("typ")),
             vlastnik: normalizeFilterToken(getGanttFilterValue("vlastnik")),
             onlyActive: Boolean(getGanttFilterValue("aktivni")),
-            mine: Boolean(getGanttFilterValue("mine")),
-            currentUserId,
-            hasCurrentUser,
             stihani: normalizeFilterToken(getGanttFilterValue("stihani"))
         };
     }
@@ -97,7 +91,6 @@ export class ProjectGanttBoard {
         const vlastnik = normalizeFilterToken(node.dataset.ganttFilterVlastnikId || node.dataset.ganttFilterVlastnik);
         const isActive = node.dataset.ganttFilterAktivni === "true";
         const stihani = normalizeFilterToken(node.dataset.ganttFilterStihani);
-        const matchesMine = !filters.mine || (filters.hasCurrentUser && vlastnik === filters.currentUserId);
 
         return (!filters.subsystem || subsystem === filters.subsystem)
             && (!filters.kategorie || kategorie === filters.kategorie)
@@ -105,7 +98,6 @@ export class ProjectGanttBoard {
             && (!filters.typ || typ === filters.typ)
             && (!filters.vlastnik || vlastnik === filters.vlastnik)
             && (!filters.onlyActive || isActive)
-            && matchesMine
             && (!filters.stihani || stihani === filters.stihani);
     }
 

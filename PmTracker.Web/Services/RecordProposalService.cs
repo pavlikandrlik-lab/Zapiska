@@ -45,6 +45,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
     private readonly IPriorityMatrixRebuildService _priorityMatrixRebuildService;
     private readonly IAuditWriteService _auditWriteService;
     private readonly IHarvestScheduler _harvestScheduler;
+    private readonly IExternalLinkProposalTypeResolver _externalLinkTypeResolver;
     private readonly TimeProvider _timeProvider;
 
     public RecordProposalService(
@@ -57,6 +58,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
         IPriorityMatrixRebuildService priorityMatrixRebuildService,
         IAuditWriteService auditWriteService,
         IHarvestScheduler harvestScheduler,
+        IExternalLinkProposalTypeResolver externalLinkTypeResolver,
         TimeProvider timeProvider)
     {
         _dbContext = dbContext;
@@ -68,6 +70,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
         _priorityMatrixRebuildService = priorityMatrixRebuildService;
         _auditWriteService = auditWriteService;
         _harvestScheduler = harvestScheduler;
+        _externalLinkTypeResolver = externalLinkTypeResolver;
         _timeProvider = timeProvider;
     }
 

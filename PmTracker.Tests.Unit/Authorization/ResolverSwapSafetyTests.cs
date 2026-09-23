@@ -73,17 +73,21 @@ public sealed class ResolverSwapSafetyTests
 
         var grants = await UserContextResolver.LoadDbDrivenProjectRoleGrantsAsync(db, 42, CancellationToken.None);
 
-        // Per-action redesign (F7 2026-04-23): GEST má 15 cílových klíčů (deprecated smazány).
+        // Per-action redesign (F7 2026-04-23): GEST měl komentátorský + read-only balíček.
+        // 2026-09-07: přibyly klíče vyzvy.* — Gestor projektu je jednou ze čtyř projektových
+        // rolí s právem spravovat výzvy (spec 2026-09-07-vyzvy-dokonceni-design §4.2).
         var grantKeys = grants.Select(g => g.PermissionKey).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         grantKeys.Should().BeEquivalentTo(new[]
         {
             "comments.add", "comments.delete.own", "comments.edit.own",
             "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
-            "dashboard.view", "dashboard.vyzvy.view",
+            "dashboard.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "search.index"
-        }, "GEST má komentátorský balíček + read-only po per-action redesignu");
+            "search.index",
+            "vyzvy.create", "vyzvy.pnf.assign", "vyzvy.pnf.reassign",
+            "vyzvy.state.change", "vyzvy.word.export"
+        }, "GEST má komentátorský balíček, read-only a správu výzev");
     }
 
     [Fact]
@@ -107,7 +111,7 @@ public sealed class ResolverSwapSafetyTests
         grantKeys.Should().BeEquivalentTo(new[]
         {
             "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
-            "dashboard.view", "dashboard.vyzvy.view",
+            "dashboard.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
             "search.index"
@@ -146,7 +150,7 @@ public sealed class ResolverSwapSafetyTests
         "comments.add", "comments.delete.any", "comments.delete.own",
         "comments.edit.any", "comments.edit.own",
         "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
-        "dashboard.view", "dashboard.vyzvy.view",
+        "dashboard.view",
         "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
         "export.word.jednani", "export.word.projekt", "export.word.ukol",
         "externiodkazy.sync",

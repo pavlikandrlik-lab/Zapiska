@@ -1,136 +1,258 @@
-.vyzvy-panel { display: flex; flex-direction: column; gap: 1.5rem; padding: 1rem 0; }
+/* Panel Výzev — projektová záložka.
+   Nosný layout je vlastní grid: gov design system nemá komponentu pro sloupec
+   přepínatelných dlaždic. Ovládací prvky uvnitř jsou gov (gov-form-select, gov-tag,
+   pm-button → gov-button).
+   Držíme letité flex/grid základy kvůli Edge na i15 — žádné :has jako nosný prvek.
 
-.vyzvy-card {
-  background: var(--pm-surface, #ffffff);
-  border: 1px solid var(--pm-border, #e2e8f0);
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+   2026-09-08 grafické předělání (zadání uživatele): lišta vpravo nahoře, dlaždice výzvy
+   i karty PNF ve stejném vizuálním jazyce jako karta záznamu (.record-card), chip
+   u kurzoru při tažení. Barvy jedou na gov tokenech, které mají tmavé varianty
+   v govcz.css — proto tu nejsou hex fallbacky, ty by se v tmavém režimu nepřebarvily. */
+
+.vyzvy-panel { display: flex; flex-direction: column; gap: 1rem; padding: 1rem 0; }
+.vyzvy-panel-warning { display: block; margin-bottom: 0.5rem; }
+
+/* Lišta vpravo nahoře: rok, Uzavřít výzvu, Nová výzva. „Nová výzva" je úplně vpravo,
+   aby vyšla pod tlačítko „Nové jednání" v tab stripu. */
+.vyzvy-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
-.vyzvy-card-buffer { border-left: 4px solid var(--token-warning, #f59e0b); }
-.vyzvy-card-vyzva { border-left: 4px solid var(--token-muted, #94a3b8); }
+/* Šířka na čtyři číslice a rozbalovací šipku — víc select nepotřebuje. */
+.vyzvy-toolbar-rok { flex: 0 0 auto; width: 7rem; }
 
-.vyzvy-card-vyzva[data-stav="Priprava"] { border-left-color: var(--token-warning, #f59e0b); }
-.vyzvy-card-vyzva[data-stav="Odeslano"] { border-left-color: var(--token-success, #10b981); }
-.vyzvy-card-vyzva[data-stav="Zruseno"] { border-left-color: var(--token-muted, #94a3b8); opacity: 0.75; }
+.vyzvy-toolbar-uzavrit[hidden] { display: none; }
 
-.vyzvy-card-header {
-  display: flex; align-items: center; gap: 0.75rem;
-  padding-bottom: 0.75rem; cursor: pointer;
+.vyzvy-toolbar-blokace {
+  margin: 0;
+  max-width: 46ch;
+  text-align: right;
+  font-size: 0.8125rem;
 }
 
-.vyzvy-card-title { margin: 0; font-size: 1rem; font-weight: 600; }
+/* 20/80 — sloupec dlaždic vlevo, obsah vybrané dlaždice vpravo. */
+.vyzvy-layout { display: grid; grid-template-columns: minmax(220px, 1fr) 4fr; gap: 1rem; align-items: start; }
 
-/* .vyzvy-card-badge / .badge-warning / .badge-success / .badge-muted —
-   nahrazeno za <gov-tag> v VyzvaCard.cshtml + BufferCard.cshtml (2026-04-29). */
+.vyzvy-rail { display: flex; flex-direction: column; gap: 0.75rem; }
+.vyzvy-rail-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.vyzvy-rail-list > li::before { content: none !important; }
 
-.vyzvy-card-meta { margin-left: auto; font-size: 0.8125rem; color: var(--pm-text-muted, #64748b); }
-
-.vyzvy-card-toggle-btn { background: transparent; border: none; cursor: pointer; font-size: 1rem; color: var(--pm-text-muted, #64748b); }
-
-.vyzvy-card-body { display: none; padding-top: 0.75rem; border-top: 1px solid var(--pm-border, #e2e8f0); }
-.vyzvy-card.open > .vyzvy-card-body { display: block; }
-
-.vyzvy-card-footer {
-  display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;
-  padding-top: 0.75rem; border-top: 1px solid var(--pm-border, #e2e8f0); margin-top: 0.75rem;
+/* Dlaždice výzvy i buffer: karta s barevným proužkem vlevo, dva řádky.
+   Řádek 1 = kód a stav vedle sebe, řádek 2 = počet PNF. */
+.vyzvy-tile {
+  width: 100%;
+  display: flex;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  background: var(--gov-color-surface);
+  border: 1px solid var(--gov-color-border);
+  border-radius: var(--gov-radius);
+  box-shadow: var(--gov-shadow-soft);
+  /* Ať proužek kopíruje zaoblení karty. */
+  overflow: hidden;
 }
 
-.vyzvy-polozky { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-/* Gov Design System adds `::before { content: "●" }` na všechny `ul > li` —
-   u komponent výzvy je potřeba tyto bullet pseudo-elementy skrýt. */
-.vyzvy-polozky > li::before { content: none !important; }
+.vyzvy-tile-bar { flex: 0 0 6px; width: 6px; background: var(--gov-color-muted); }
+.vyzvy-tile--priprava .vyzvy-tile-bar { background: var(--gov-color-warning); }
+.vyzvy-tile--odeslano .vyzvy-tile-bar { background: var(--gov-color-success); }
 
-.vyzvy-polozka {
-  display: grid; grid-template-columns: auto auto 1fr auto; gap: 0.75rem; align-items: center;
-  padding: 0.5rem 0.75rem; background: var(--pm-surface-alt, #f8fafc); border-radius: 6px; font-size: 0.875rem;
+.vyzvy-tile-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.7rem;
 }
 
-.vyzvy-polozka-cislo { font-family: var(--pm-font-mono, monospace); font-weight: 500; }
-.vyzvy-polozka-meta  { font-family: var(--pm-font-mono, monospace); color: var(--pm-text-muted, #64748b); }
-.vyzvy-polozka-cena  { text-align: right; font-variant-numeric: tabular-nums; }
+.vyzvy-tile-head { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.vyzvy-tile-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vyzvy-tile-count { font-size: 0.8125rem; color: var(--gov-color-muted); }
 
-.vyzvy-polozky-table { width: 100%; border-collapse: collapse; }
-.vyzvy-polozky-table th, .vyzvy-polozky-table td {
-  padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--pm-border, #e2e8f0);
-}
-.vyzvy-polozky-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-.vyzvy-polozky-table tr.total td {
-  font-weight: 600; border-top: 2px solid var(--pm-border, #e2e8f0); border-bottom: none;
+.vyzvy-tile:hover { border-color: var(--gov-color-primary); }
+
+/* Vybraná dlaždice: primární rámeček (zdvojený vnitřním stínem, ať neposkakuje layout)
+   a podbarvení. */
+.vyzvy-tile.is-selected {
+  border-color: var(--gov-color-primary);
+  background: var(--gov-color-bg);
+  box-shadow: inset 0 0 0 1px var(--gov-color-primary);
 }
 
-.vyzvy-stav-menu { position: relative; }
+.vyzvy-tile.is-drag-over {
+  border-style: dashed;
+  border-color: var(--gov-color-primary);
+  background: var(--gov-color-bg);
+}
+
+.vyzvy-content { min-width: 0; }
+.vyzvy-pane-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.75rem; margin-bottom: 0.75rem; }
+.vyzvy-pane-title { margin: 0; font-size: 1rem; font-weight: 600; }
+.vyzvy-pane-meta { font-size: 0.8125rem; color: var(--gov-color-muted); }
+.vyzvy-pane-empty { padding: 0.75rem 0; }
+
+/* Patička panelu: součet a tisk vpravo dole. */
+.vyzvy-pane-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--gov-color-border);
+}
+
+.vyzvy-pane-soucet { margin: 0; }
+
+/* Náhled a Tisk jsou odkazy, ne pm-button: ten strhává atributy z hostu, takže by se
+   neuplatnil target="_blank" a náhled by přebil stávající stránku. Vzhled tlačítka si
+   proto nesou samy — obecná sada .pm-btn* v aplikaci neexistuje. */
+.vyzvy-pane-footer a {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--gov-color-border);
+  border-radius: var(--gov-radius-sm, 4px);
+  background: var(--gov-color-surface);
+  color: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.vyzvy-pane-footer a:hover { border-color: var(--gov-color-primary); }
+
+.vyzvy-pane-footer a[data-vyzva-word] {
+  border-color: var(--gov-color-primary);
+  box-shadow: inset 0 0 0 1px var(--gov-color-primary);
+}
+
+/* Karta PNF — stejný jazyk jako dlaždice výzvy, dva řádky. */
+.vyzvy-pnf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.vyzvy-pnf-list > li::before { content: none !important; }
+
+.vyzvy-pnf {
+  display: flex;
+  align-items: stretch;
+  background: var(--gov-color-surface);
+  border: 1px solid var(--gov-color-border);
+  border-radius: var(--gov-radius);
+  box-shadow: var(--gov-shadow-soft);
+  overflow: hidden;
+}
+
+.vyzvy-pnf-bar { flex: 0 0 6px; width: 6px; background: var(--gov-color-muted); }
+
+.vyzvy-pnf-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.vyzvy-pnf-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem; font-weight: 600; }
+.vyzvy-pnf-cislo { font-family: var(--pm-font-mono, monospace); }
+.vyzvy-pnf-nazev { min-width: 0; font-weight: 400; overflow-wrap: anywhere; }
+.vyzvy-pnf-meta { font-size: 0.8125rem; color: var(--gov-color-muted); }
+.vyzvy-pnf-cena { font-variant-numeric: tabular-nums; }
+
+.vyzvy-pnf[draggable="true"] { cursor: grab; }
+.vyzvy-pnf.is-dragging { opacity: 0.5; }
+
+/* Chip u kurzoru při tažení. Povrch s primárním rámečkem, ne plná primární výplň —
+   v tmavém režimu je --gov-color-primary světlá a bílý text by na ní zanikl. */
+.vyzvy-drag-chip {
+  position: fixed;
+  z-index: 3000;
+  pointer-events: none;
+  padding: 0.3rem 0.6rem;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--app-text-primary);
+  background: var(--gov-color-surface);
+  border: 1px solid var(--gov-color-primary);
+  border-radius: var(--gov-radius-sm);
+  box-shadow: var(--gov-shadow-soft);
+}
+
+.vyzvy-drag-chip[hidden] { display: none; }
+
+/* Skupina = jeden projektový záznam a pod ním jeho PNF. */
+.vyzvy-zaznam { margin-bottom: 1.25rem; }
+.vyzvy-zaznam-hlavicka { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; margin: 0 0 0.5rem; font-size: 0.95rem; }
+.vyzvy-zaznam-cislo { font-weight: 700; }
+.vyzvy-zaznam-nazev { color: var(--gov-color-muted); }
+
+/* Měnič stavu v hlavičce panelu. Uzavření má vlastní tlačítko v liště, tohle menu
+   pokrývá zbylé přechody (zrušení, znovuotevření). */
+.vyzvy-stav-menu { position: relative; display: inline-block; margin-left: auto; }
 .vyzvy-stav-menu-list {
-  display: none; position: absolute; top: calc(100% + 4px); right: 0;
-  list-style: none; margin: 0; padding: 0.25rem 0;
-  background: var(--pm-surface, #ffffff); border: 1px solid var(--pm-border, #e2e8f0);
-  border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  min-width: 14rem; z-index: 20;
+  display: none;
+  position: absolute;
+  right: 0;
+  z-index: 20;
+  min-width: 180px;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--gov-color-surface);
+  border: 1px solid var(--gov-color-border);
+  border-radius: var(--gov-radius-sm);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
 }
-.vyzvy-stav-menu-list > li {
-  margin: 0; padding: 0;
-  display: block;
-}
-/* Gov Design System přidává `::before { content: "●" }` na `ul > li` —
-   v menu musíme pseudo-element vypnout, jinak čouhá zleva mimo container. */
 .vyzvy-stav-menu-list > li::before { content: none !important; }
 .vyzvy-stav-menu.open .vyzvy-stav-menu-list { display: block; }
 .vyzvy-stav-menu-list button {
-  width: 100%; text-align: left; background: transparent; border: none;
-  padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.875rem;
-  color: var(--pm-text, #0f172a);
+  display: block; width: 100%; text-align: left;
+  border: 0; background: transparent; padding: 0.4rem 0.6rem; cursor: pointer; color: inherit;
 }
-.vyzvy-stav-menu-list button:hover { background: var(--pm-surface-alt, #f1f5f9); }
-
-.vyzvy-empty { padding: 1rem; text-align: center; }
-.vyzvy-block-reason { margin-left: 0.75rem; font-size: 0.8125rem; }
+.vyzvy-stav-menu-list button:hover { background: var(--gov-color-bg); }
 
 .vyzvy-switch-wrap { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
-.vyzvy-switch-status { font-size: 0.8125rem; color: var(--pm-text-muted, #64748b); }
+.vyzvy-switch-status { font-size: 0.8125rem; color: var(--gov-color-muted); }
 
-.vyzvy-reassign-columns {
-  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr);
-  gap: 1rem; overflow-x: auto; padding: 1rem 0;
+/* Kontextové menu ⋯ u karty PNF. Panel se za běhu mountuje do #floating-panel-root,
+   takže tady jen jeho vzhled — pozicování řeší ui/floating.js. */
+.vyzvy-pnf-menu { display: flex; align-items: flex-start; padding: 0.45rem 0.45rem 0 0; }
+.vyzvy-pnf-dots {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+  line-height: 1;
+  color: var(--gov-color-muted);
+  border-radius: 4px;
 }
-.vyzvy-reassign-column {
-  background: var(--pm-surface-alt, #f8fafc); border-radius: 8px;
-  padding: 0.75rem; min-height: 200px;
-}
-.vyzvy-reassign-column.drag-over { background: var(--background-warning-subtle, #fef3c7); outline: 2px dashed var(--token-warning, #f59e0b); }
-.vyzvy-reassign-item {
-  background: var(--pm-surface, #ffffff); border: 1px solid var(--pm-border, #e2e8f0);
-  border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;
-  cursor: grab; font-size: 0.875rem;
-}
-.vyzvy-reassign-item.dragging { opacity: 0.5; }
+.vyzvy-pnf-dots:hover { background: var(--gov-color-bg); }
 
-/* Generic overlay modal used for dynamic Vyzvy dialogs (reassign). */
-.pm-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 2600;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 48px 24px 24px;
-  background: rgba(15, 23, 42, 0.55);
-  overflow-y: auto;
+.vyzvy-pnf-menu-panel {
+  min-width: 220px;
+  padding: 0.25rem;
+  background: var(--gov-color-surface);
+  border: 1px solid var(--gov-color-border);
+  border-radius: var(--gov-radius-sm);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
 }
-.pm-modal[hidden] { display: none; }
-.pm-modal > .modal-body {
-  width: min(960px, 100%);
-  background: var(--pm-surface, #ffffff);
-  border: 1px solid var(--pm-border, #e2e8f0);
-  border-radius: 10px;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.28);
-  padding: 1.25rem 1.5rem 1rem;
-  max-height: calc(100vh - 96px);
-  overflow-y: auto;
+.vyzvy-pnf-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  color: inherit;
+  border-radius: 4px;
 }
-.pm-modal > .modal-body > h2 { margin-top: 0; }
-.pm-modal .modal-footer {
-  display: flex; justify-content: flex-end; gap: 0.5rem;
-  padding-top: 0.75rem; margin-top: 0.75rem;
-  border-top: 1px solid var(--pm-border, #e2e8f0);
-}
+.vyzvy-pnf-menu-item:hover { background: var(--gov-color-bg); }

@@ -25,6 +25,7 @@ public sealed class ProfilController : BaseController
     {
         var model = await _profileService.BuildProfilPageAsync(CurrentUserContext, projektId, ct);
         model.PageTitle = "Můj profil";
+        SetSectionRootBreadcrumb("Můj profil");
         return View(model);
     }
 }

@@ -32,9 +32,10 @@
       s atributem pro JS delegaci byl odstraněn z tohoto layoutu v Task 5 —
       JS close atribut zůstává v _ModalFormActions a per-view partials pro
       explicitní cancel buttony uvnitř formulářů.
-    - block-close="true" + block-backdrop-close="true" disablují self-close
-      v gov-dialog interních handlerech — gov-close je čistě "žádost o zavření"
-      kterou musí schválit náš dirty-check flow (promptRecordEditorDiscard).
+    - block-close se NEPOUŽÍVÁ (A7 2026-07-08): nová gov verze renderuje X jako
+      disabled=blockClose → X by byl mrtvý. X → gov-close event + gov self-close;
+      handleGovCloseEvent (bootstrap) dodělá aplikační úklid přes closeModal().
+      block-backdrop-close="true" zůstává — backdrop klik nesmí zavírat (drag-select).
     - Title slot — prázdný v layoutu; jednotlivé view si rendrují svůj
       vlastní <h2 id="record-modal-title">...</h2> uvnitř body, takže
       přemapování není potřeba (potvrzeno v plan Task 0 findings).
@@ -48,7 +49,6 @@
     aplikaci přijatelný, protože celá aplikace vyžaduje JS pro provoz.
 *@
 <gov-dialog open="true"
-            block-close="true"
             block-backdrop-close="true"
             data-modal-container
             data-modal-variant="@normalizedVariant"

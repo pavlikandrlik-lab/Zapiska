@@ -1,0 +1,2 @@
+import{p as r}from"./p-HoauDRMe.js";import{i as t}from"./p-B3tdsiZv.js";const e=(r,t)=>{if(Number.isInteger(r)&&Number.isInteger(t)){return[...Array(t+1).keys()].slice(r)}return[]};const s=e=>{if(Array.isArray(e)){return e}else if(t(e)){const t=r(e);if(Array.isArray(t)){return t}}return[]};export{e as c,s as p};
+//# sourceMappingURL=p-BhvgFWun.js.map

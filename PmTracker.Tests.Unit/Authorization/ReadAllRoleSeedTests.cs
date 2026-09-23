@@ -33,7 +33,7 @@ public sealed class ReadAllRoleSeedTests
         permissions.Should().BeEquivalentTo(new[]
         {
             "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
-            "dashboard.view", "dashboard.vyzvy.view",
+            "dashboard.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
             "projects.read.all",

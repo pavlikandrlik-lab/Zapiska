@@ -120,6 +120,10 @@ public sealed class SDConnectorController : Controller
         vm.NeverHarvestedCount = rows.Count(r => !r.LastHarvestedAt.HasValue);
         vm.Rows = rows;
 
+        // A4 (2026-07-08): SDConnector nedědí z BaseController → breadcrumb přes ViewData přímo
+        // (stejný kontrakt, který čte _Layout/_BreadcrumbBar; helper SetSectionRootBreadcrumb dělá totéž).
+        ViewData["Breadcrumbs"] = new PmTracker.Web.Models.ViewModels.BreadcrumbTrail(
+            [new PmTracker.Web.Models.ViewModels.Breadcrumb("SD konektor", null, null, false)]);
         return View(vm);
     }
 
@@ -198,6 +202,13 @@ public sealed class SDConnectorController : Controller
             TicketingEnabled = _ticketingOptions.Value.Enabled,
             InitialCislo = initial
         };
+        // A4 (2026-07-08): podstránka sekce SD konektor (viz Index — ViewData přímo).
+        var indexUrl = Url.Action("Index", "SDConnector") ?? "/SDConnector";
+        ViewData["Breadcrumbs"] = new PmTracker.Web.Models.ViewModels.BreadcrumbTrail(
+        [
+            new PmTracker.Web.Models.ViewModels.Breadcrumb("SD konektor", indexUrl, null, false),
+            new PmTracker.Web.Models.ViewModels.Breadcrumb("Inspekce", null, null, true)
+        ]);
         return View(vm);
     }
 

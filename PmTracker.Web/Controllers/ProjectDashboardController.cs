@@ -52,6 +52,8 @@ public sealed class ProjectDashboardController : BaseController
             model.ActiveTab = dashTab;
         }
 
+        // Dashboard je podúroveň konkrétního projektu: Projekty › [projekt] › Dashboard.
+        SetProjectBreadcrumbs(projektId, model.Projekt.Nazev, model.Projekt.Zkratka, currentText: "Dashboard");
         return View(model);
     }
 
@@ -122,23 +124,6 @@ public sealed class ProjectDashboardController : BaseController
         return File(bytes,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             filename);
-    }
-
-    [HttpGet("vyzvy-panel")]
-    [Authorize(Policy = "permission:dashboard.vyzvy.view")]
-    public async Task<IActionResult> VyzvyPanel(int projektId, CancellationToken ct = default)
-    {
-        if (!await EnsureDashboardAccessAsync(projektId, ct))
-        {
-            return Forbid();
-        }
-
-        // Per-action redesign 2026-04-23: muzeEditovat je nyní plynule HasPermission check
-        // (žádné hardcoded role codes v service). Klíč vyzvy.create pokrývá oprávnění
-        // spravovat výzvy projektu.
-        var muzeEditovat = CurrentUserContext.HasPermission(PermissionKeys.VyzvyCreate, projektId);
-        var model = await _dashboardService.BuildVyzvyPanelAsync(projektId, muzeEditovat, ct);
-        return PartialView("~/Views/ProjectDashboard/_VyzvyPanel.cshtml", model);
     }
 
     [HttpGet("zakladni-report")]

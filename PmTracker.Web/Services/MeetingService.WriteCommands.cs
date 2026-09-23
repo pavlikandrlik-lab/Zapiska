@@ -351,6 +351,9 @@ public sealed partial class MeetingService
         }
 
         var defaultStateId = await ResolveDefaultAttendanceStatusIdAsync(ct);
+        // Předvyplnění podle historie (spec 2026-09-05): kdo na jednání běžně nechodí,
+        // dostane rovnou svůj obvyklý stav a obsluha dopisuje jen výjimky.
+        var predictedStateIdByOsobaId = await attendancePredictor.PredictAsync(projectId, participantIds, ct);
         var existingIds = (await dbContext.Ucast.AsNoTracking()
             .Where(x => x.JednaniId == meetingId)
             .Select(x => x.OsobaId)
@@ -363,7 +366,9 @@ public sealed partial class MeetingService
             {
                 JednaniId = meetingId,
                 OsobaId = personId,
-                StavUcastiId = defaultStateId
+                StavUcastiId = predictedStateIdByOsobaId.TryGetValue(personId, out var predictedStateId)
+                    ? predictedStateId
+                    : defaultStateId
             })
             .ToList();
         if (rows.Count == 0)

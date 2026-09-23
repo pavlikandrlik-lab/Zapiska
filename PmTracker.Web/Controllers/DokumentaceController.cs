@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Documentation;
 using PmTracker.Web.Services.Security;
 
@@ -116,6 +117,22 @@ public sealed class DokumentaceController : BaseController
     {
         var model = _documentationService.BuildPage(key);
         ViewData["Title"] = model.Title;
+        SetDocumentationBreadcrumbs(key, model);
         return View("Index", model);
+    }
+
+    // Strom-dokumentace (home) = sekční kořen „Dokumentace"; ostatní stránky = Dokumentace ▸ SectionLabel.
+    private void SetDocumentationBreadcrumbs(string key, DocumentationPageViewModel model)
+    {
+        if (string.Equals(key, "tech-documentation-tree", StringComparison.Ordinal))
+        {
+            SetSectionRootBreadcrumb("Dokumentace");
+        }
+        else
+        {
+            SetBreadcrumbs(
+                new Breadcrumb("Dokumentace", Url.Action("StromDokumentace", "Dokumentace", WithAsUserRoute()), null, false),
+                new Breadcrumb(model.SectionLabel, null, null, true));
+        }
     }
 }

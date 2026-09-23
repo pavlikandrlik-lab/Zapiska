@@ -143,40 +143,24 @@ public static class OpenXmlWordElements
 
     internal static RunProperties CreateRunProperties(int sizeHalfPoints, bool bold, bool italic, bool strike, bool underline, string? colorHex = null)
     {
-        var runProperties = new RunProperties(
-            new RunFonts
-            {
-                Ascii = "Times New Roman",
-                HighAnsi = "Times New Roman",
-                EastAsia = "Times New Roman",
-                ComplexScript = "Times New Roman"
-            },
-            new FontSize { Val = sizeHalfPoints.ToString(CultureInfo.InvariantCulture) });
-
-        if (bold)
+        // Pořadí podle schématu (CT_RPr): rFonts, b, i, strike, color, sz, u. Word špatné pořadí
+        // toleruje, validátor ne (2026-09-10, validace výzvy).
+        var runProperties = new RunProperties(new RunFonts
         {
-            runProperties.Append(new Bold());
-        }
+            Ascii = "Times New Roman",
+            HighAnsi = "Times New Roman",
+            EastAsia = "Times New Roman",
+            ComplexScript = "Times New Roman"
+        });
 
-        if (italic)
-        {
-            runProperties.Append(new Italic());
-        }
+        if (bold) runProperties.Append(new Bold());
+        if (italic) runProperties.Append(new Italic());
+        if (strike) runProperties.Append(new Strike());
+        if (!string.IsNullOrWhiteSpace(colorHex)) runProperties.Append(new Color { Val = colorHex });
 
-        if (strike)
-        {
-            runProperties.Append(new Strike());
-        }
+        runProperties.Append(new FontSize { Val = sizeHalfPoints.ToString(CultureInfo.InvariantCulture) });
 
-        if (underline)
-        {
-            runProperties.Append(new Underline { Val = UnderlineValues.Single });
-        }
-
-        if (!string.IsNullOrWhiteSpace(colorHex))
-        {
-            runProperties.Append(new Color { Val = colorHex });
-        }
+        if (underline) runProperties.Append(new Underline { Val = UnderlineValues.Single });
 
         return runProperties;
     }

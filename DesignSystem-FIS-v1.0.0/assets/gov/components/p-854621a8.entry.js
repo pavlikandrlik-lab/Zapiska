@@ -1,0 +1,2 @@
+import{r as s,h as t,H as e,g as o}from"./p-ClISz4NF.js";import{g as r}from"./p-5VeKSK5B.js";const a={root:"gov-container"};const c=class{constructor(t){s(this,t);this.h=r(this.host)}render(){return t(e,{key:"88b5de300e090ded2905af3effcc0841e830978b",class:this.h.classes(a.root)},t("slot",{key:"7ad4d6f210d0f093d665a74dbc07e857cd8938dd"}))}get host(){return o(this)}};export{c as gov_container};
+//# sourceMappingURL=p-854621a8.entry.js.map

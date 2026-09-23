@@ -1,0 +1,25 @@
+@model PmTracker.Web.Models.ViewModels.RecordEditLockedViewModel
+@{
+    ViewData["Title"] = $"Záznam #{Model.CisloViditelne} — právě se upravuje";
+}
+
+@* Spec 2026-09-17 §4.3: editor se druhému uživateli vůbec nerenderuje.
+   Kotva pro testy je atribut data-record-edit-locked — na český text se
+   assertovat nedá, Razor ho kóduje na HTML entity. *@
+@* Rám stránky je stejný `card` jako u editoru — bez něj by hláška visela v prázdném layoutu. *@
+<section class="card record-edit-locked" data-record-edit-locked="true" data-record-id="@Model.ZaznamId">
+    <gov-message color="warning" role="alert">
+        <div class="record-edit-locked-title">
+            Tento záznam upravuje jiný uživatel: <strong>@Model.HolderDisplayName</strong>
+        </div>
+        <div class="record-edit-locked-detail">
+            Úpravy začaly v @Model.SinceLocal.ToString("HH:mm"). Zkuste to prosím později —
+            jakmile kolega úpravy uloží nebo od záznamu odejde, otevře se vám editor normálně.
+        </div>
+    </gov-message>
+
+    <div class="record-edit-locked-actions">
+        <a class="gov-link" href="@Model.RetryUrl" data-record-edit-locked-retry>Zkusit znovu</a>
+        <a class="gov-link" href="@Model.BackUrl" data-record-edit-locked-back>Zpět na záznam</a>
+    </div>
+</section>

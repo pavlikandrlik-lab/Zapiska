@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Common;
 
 namespace PmTracker.Web.Services;
 
@@ -14,11 +15,21 @@ public sealed partial class ProjectService
         var records = await dbContext.ProjektoveZaznamy.AsNoTracking()
             .Where(x => x.ProjektId == projectId)
             .ToListAsync(ct);
-        records = [.. OrderRecordsByVisibleNumber(records)];
-        var recordIds = records.Select(record => record.Id).ToArray();
 
         // Perf: číselníky přes scoped cache — brání duplicitnímu SELECT při více tabů (RecordCards + TeamComposition + RecordEditorComposition čtou stejné tabulky v rámci jedné Projekty/Detail stránky).
         var categories = await lookupCache.GetCategoriesAsync(ct);
+
+        // Pořadí = kategorie (Info → Rozhodnutí → Úkol → ostatní) primárně, viditelné číslo dle jednání
+        // sekundárně. Stejný složený sort jako tisk (sdílený RecordDisplayOrdering). Klient uvnitř
+        // subsystému toto pořadí zachovává (řadí jen skupiny subsystémů).
+        records = records
+            .OrderBy(x => RecordDisplayOrdering.CategoryOrder(categories.GetValueOrDefault(x.KategorieId)?.Nazev))
+            .ThenBy(x => categories.GetValueOrDefault(x.KategorieId)?.Nazev, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => RecordDisplayOrdering.VisibleNumberPartA(x.CisloViditelneA, x.CisloZaznamu))
+            .ThenBy(x => RecordDisplayOrdering.VisibleNumberPartB(x.CisloViditelneTyp, x.CisloViditelneB))
+            .ThenBy(x => x.CisloZaznamu)
+            .ToList();
+        var recordIds = records.Select(record => record.Id).ToArray();
         var taskTypes = await lookupCache.GetTaskTypesAsync(ct);
         var taskStates = await lookupCache.GetTaskStatesAsync(ct);
         var subsystems = await lookupCache.GetSubsystemsAsync(ct);
@@ -180,6 +191,7 @@ public sealed partial class ProjectService
                         TypNazev = extTypeById.GetValueOrDefault(link.TypOdkazuId)?.Nazev,
                         Cislo = link.Cislo,
                         PredpokladanaCena = link.PredpokladanaCena,
+                        KalkulaceCena = link.KalkulaceCena,
                         ServiceDeskTicketId = ticketId,
                         ServiceDeskUrl = BuildServiceDeskUrl(ticketId),
                         Vyzva = link.VyzvaId.HasValue ? vyzvaById.GetValueOrDefault(link.VyzvaId.Value)?.Kod : null,

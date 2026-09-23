@@ -9,7 +9,6 @@ public sealed record ProjectExportRecordFilters
     public string? Typ { get; init; }
     public int? VlastnikId { get; init; }
     public bool Aktivni { get; init; }
-    public bool Mine { get; init; }
     public int? JednaniVyjadreniStavId { get; init; }
 
     public bool HasRelevantFilters =>
@@ -19,6 +18,5 @@ public sealed record ProjectExportRecordFilters
         || !string.IsNullOrWhiteSpace(Typ)
         || VlastnikId.HasValue
         || Aktivni
-        || Mine
         || JednaniVyjadreniStavId.HasValue;
 }

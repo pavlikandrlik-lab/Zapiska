@@ -27,6 +27,7 @@ import {
     initRecordFormTabs,
     initRecordGoalAutoGrow,
     initRecordMeetingDateSync,
+    initRecordMeetingNumberPreview,
     updateTaskTypeVisibility
 } from "./form.js";
 import { initRichTextEditors } from "./richtext.js";
@@ -58,6 +59,7 @@ export function initRecordFormEnhancements(scope) {
     initRecordFormTabs(scope);
     initRecordGoalAutoGrow(scope);
     initRecordMeetingDateSync(scope);
+    initRecordMeetingNumberPreview(scope);
     initRichTextEditors(scope);
     initRecordSchedulePlanner(scope);
     initRecordEditorDirtyTracking(scope);

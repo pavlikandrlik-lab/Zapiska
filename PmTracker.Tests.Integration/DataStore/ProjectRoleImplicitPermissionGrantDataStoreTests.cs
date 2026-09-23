@@ -78,10 +78,12 @@ public sealed class ProjectRoleImplicitPermissionGrantDataStoreTests
         currentUser.VisibleProjectIds.Should().Contain(projectId);
         currentUser.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId).Should().BeTrue();
 
-        profile.OdvozenaPrava.Should().Contain(x =>
-            x.PermissionKlic == PermissionKeys.MeetingsNotesSubsystemLead &&
-            x.IsAllowed &&
-            x.SourceSummary.Contains("Subsystémová role", StringComparison.OrdinalIgnoreCase));
+        // A5 (2026-07-08): OdvozenaPrava nahrazeno kartami per instance role — grant je vidět
+        // jako akce subsystémové instance.
+        profile.MojeRole.Should().Contain(role =>
+            role.TypRole == "Subsystémová" &&
+            role.SubsystemKod == "SUBDEP_SYS" &&
+            role.Akce.Any(a => a.PermissionKlic == PermissionKeys.MeetingsNotesSubsystemLead && a.IsAllowed));
 
         store.AddComment(new AddCommentCommand
         {

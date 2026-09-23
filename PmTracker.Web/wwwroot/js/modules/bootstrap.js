@@ -23,10 +23,14 @@ import "./harmonogram/manualKroky.js";
 import "./harmonogram/duration-calendar-binding.js"; // DESIGN-9-F (2026-05-02) — kalendář ⇄ readonly dny.
 import "./harmonogram/manual-zdroj-toggle.js"; // FIX 2026-05-04 — chevron toggle 2/5/8/9 (Ručně ⇄ Z vyjádření).
 import "./harmonogram/rezim-master-switch.js";       // 2026-05-03 — gov-form-switch v tab strip pro Auto/Manual bulk.
+import "./ui/anchoredMenu.js";                      // 2026-09-07 — jedno menu pro kartu záznamu i přesun PNF.
+import "./ui/errorPageCopy.js";                    // 2026-09-08 — kopírování diagnostiky na chybové stránce.
+import "./recordScheduleView.js";                   // 2026-07-13 — toggle Záznam ⇄ Harmonogram na kartě.
+import "./recordPageScheduleView.js";               // 2026-07-14 — přepínač Graf/Tabulka na stránce záznamu.
 import "./schedule-feature-c/select-candidate.js"; // Phase 11 (DESIGN-9-A) — phantom UI bug 3 fix
 import "./schedule-feature-c/preview-sync.js";    // Phase 12 (DESIGN-9-C) — pre-fetch staging
-import "./vyzvy/index.js";
-import "./vyzvy/panelController.js";
+import "./vyzvy/panelController.js";                // 2026-09-08 — nese i bootstrap panelu (dřív samostatný modul).
+import "./vyzvy/dragDrop.js";                       // 2026-09-07 — tažení PNF na dlaždice railu.
 import "./vyzvy/switchController.js";
 
 import { initCommentSortUi } from "./comments.js";
@@ -52,7 +56,6 @@ import {
 import { initMeetingOverview, toggleMeetingYearGroup, toggleProjectHistory } from "./meetingOverview.js";
 import {
     clearProjectFilterInput,
-    clearProjectFilterPreferenceStorage,
     handleProjectFilterInputChange as handleProjectFilterModuleInputChange,
     initProjectFilterTabSync,
     persistFilterState,
@@ -81,6 +84,8 @@ import {
     requestRecordEditorPageCancel,
     updateTaskTypeVisibility
 } from "./recordEditor.js";
+// A8 (2026-07-08): pushState-trap — aplikační dialog při šipce zpět na dirty stránkovém editoru.
+import { initRecordEditorHistoryTrap } from "./recordEditor/historyTrap.js";
 import {
     applyProjectGanttFilters,
     applyProjectScheduleFilters,
@@ -90,8 +95,9 @@ import {
     renderStaticTimelineAxes,
     toggleScheduleBreakdown
 } from "./schedule.js";
+import { initPersonalPreferences } from "./preferences/render.js";
+import { initProjectMenuOverflow } from "./projectMenu.js";
 import {
-    clearStoredPrintFormat,
     closeAllFloatingPanels,
     closePrintChooser,
     handlePrintTriggerClick,
@@ -113,6 +119,7 @@ import {
 import { initZakladniReport } from "./dashboard/zakladniReport.js";
 import { bindEchartsResize, initEchartsReport } from "./dashboard/echartsRender.js";
 import { initCrossTabNav } from "./crossTabNav.js";
+import { initRecordEditLock } from "./recordEditor/editLock.js";
 
 const projectIndexFilterOptions = {
     hideDoneStorageKey: "pmtracker.projects.hideDone",
@@ -163,24 +170,6 @@ function handleDocumentClick(event) {
             ? event.target.parentElement
             : null;
     if (!(target instanceof Element)) {
-        return;
-    }
-
-    const resetPrintPreference = target.closest("[data-print-preference-reset]");
-    if (isButtonLike(resetPrintPreference)) {
-        event.preventDefault();
-        clearStoredPrintFormat();
-        return;
-    }
-
-    const resetProjectFilterPreferences = target.closest("[data-project-filter-preferences-reset]");
-    if (isButtonLike(resetProjectFilterPreferences)) {
-        event.preventDefault();
-        clearProjectFilterPreferenceStorage();
-        const status = document.querySelector("[data-project-filter-preferences-status]");
-        if (status instanceof HTMLElement) {
-            status.textContent = "Uložené projektové filtry byly odstraněny.";
-        }
         return;
     }
 
@@ -299,12 +288,14 @@ function handleDocumentClick(event) {
         return;
     }
 
-    // Fáze 2E: backdrop click — target je gov-dialog přímo (ne vnitřní element).
-    if (target instanceof HTMLElement && target.tagName === "GOV-DIALOG" && target.hasAttribute("data-modal-container")) {
-        event.preventDefault();
-        closeModal();
-        return;
-    }
+    // Bug 2026-07-04: ŽÁDNÝ backdrop-close. gov-dialog vyplňuje viewport a
+    // vycentrovaný obsah je uvnitř; při text-selection dragu z inputu ven na
+    // ztmavené pozadí se `click` retargetuje na společného předka (gov-dialog),
+    // takže gesto myši končící na backdropu by se jinak vyhodnotilo jako kliknutí
+    // na pozadí a zavřelo modal. _ModalLayout.cshtml navíc deklaruje
+    // block-backdrop-close="true" — backdrop modal zavírat nemá. Modal se zavírá
+    // jen křížkem (gov-close → handleGovCloseEvent), tlačítky data-modal-close a
+    // Escape (handleDocumentOverlayKeydown).
 
     // Sjednocený filter toggle handler 2026-04-30: scope se detekuje z DOM (closest shell),
     // panel se hledá uvnitř shell aby v případě dvou mountovaných shellů (records + schedule)
@@ -658,6 +649,8 @@ export function bootstrapPmTrackerApp() {
 
     runInitializers([
         () => initProjectTabs(),
+        () => initProjectMenuOverflow(),
+        () => initRecordEditorHistoryTrap(),
         () => initProjectRecordsUi({ preserveServerView: true }),
         () => initProjectScheduleUi(),
         () => initCrossTabNav(),
@@ -679,8 +672,12 @@ export function bootstrapPmTrackerApp() {
         () => initZakladniReport(),
         () => initEchartsReport(document),
         () => bindEchartsResize(),
+        // Pořadí: editLock musí být PŘED keep-alive koordinátorem — ten si při prvním
+        // běhu čte data-record-edit-lock-id z <html> a posílá ho jako heartbeat.
+        () => initRecordEditLock(),
         () => initSessionCoordinator(),
         () => initModalAjaxSubmit(),
+        () => initPersonalPreferences(),
         // Legacy IIFE moduly registrují window.pm* + nabízejí init() volaný
         // po DOMContentLoaded. Při importu side-effects už registrují globaly,
         // ale init() volání jsou explicitní (legacy bundle pattern). Voláme

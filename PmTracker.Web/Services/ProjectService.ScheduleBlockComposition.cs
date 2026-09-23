@@ -14,7 +14,6 @@ public sealed partial class ProjectService
         HarmonogramSouhrnViewModel souhrn,
         IReadOnlyList<HarmonogramKrokEditViewModel> kroky,
         ScheduleEditorPermissionSet? permissions = null,
-        string scheduleVersion = "",
         IReadOnlySet<int>? lockedManualKrokKeys = null,
         bool canEditManualActual = false,
         ScheduleBarLayout? overviewLayout = null,
@@ -34,7 +33,6 @@ public sealed partial class ProjectService
             OverviewLayout = overviewLayout,
             Permissions = effectivePermissions,
             EditorChangedTypeTooltips = new Dictionary<int, string>(),
-            ScheduleVersion = scheduleVersion,
             LockedManualKrokKeys = lockedManualKrokKeys ?? new HashSet<int>(),
             CanEditManualActual = canEditManualActual
         };

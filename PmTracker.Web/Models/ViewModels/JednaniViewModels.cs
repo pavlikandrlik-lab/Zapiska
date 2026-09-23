@@ -3,8 +3,6 @@ namespace PmTracker.Web.Models.ViewModels;
 public sealed class JednaniIndexViewModel : BaseViewModel
 {
     public string PageTitle { get; set; } = string.Empty;
-    public string? BackUrl { get; set; }
-    public string? BackLabel { get; set; }
     public required IReadOnlyList<JednaniProjektListItemViewModel> Projekty { get; init; }
 }
 
@@ -35,10 +33,9 @@ public sealed class JednaniYearGroupViewModel
 public sealed class JednaniDetailViewModel : BaseViewModel
 {
     public string PageTitle { get; set; } = string.Empty;
-    public string? BackUrl { get; set; }
-    public string? BackLabel { get; set; }
     public int ProjektId { get; init; }
     public required string ProjektNazev { get; init; }
+    public required string ProjektZkratka { get; init; }
     public required JednaniListItemViewModel Jednani { get; init; }
     public string? OtevrenyStavKod { get; init; }
     public string? UzavrenyStavKod { get; init; }
@@ -60,6 +57,8 @@ public sealed class UcastViewModel
     public string? Email { get; init; }
     public string? StavUcastiKod { get; init; }
     public required string StavUcasti { get; init; }
+    /// <summary>A1 (2026-07-08): aktivní role osoby v projektu (projektové + „Role (SUBSYSTÉM)").</summary>
+    public IReadOnlyList<string> AktivniRole { get; init; } = [];
 }
 
 public sealed class JednaniUkolViewModel

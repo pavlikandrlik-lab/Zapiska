@@ -12,16 +12,13 @@ namespace PmTracker.Web.Services.ProjectDashboard;
 public sealed class ProjectDashboardService : IProjectDashboardService
 {
     private readonly PmTrackerDbContext _dbContext;
-    private readonly VyzvyPanelBuilder _vyzvyPanelBuilder;
     private readonly IInformacniSystemQueryService _isQueryService;
 
     public ProjectDashboardService(
         PmTrackerDbContext dbContext,
-        VyzvyPanelBuilder vyzvyPanelBuilder,
         IInformacniSystemQueryService isQueryService)
     {
         _dbContext = dbContext;
-        _vyzvyPanelBuilder = vyzvyPanelBuilder;
         _isQueryService = isQueryService;
     }
 
@@ -50,7 +47,6 @@ public sealed class ProjectDashboardService : IProjectDashboardService
             RecordsPanelUrl = $"/projekty/{projectId}/dashboard/records-panel",
             NesPanelUrl = $"/projekty/{projectId}/dashboard/nes-panel",
             StatisticsPanelUrl = $"/projekty/{projectId}/dashboard/statistics-panel",
-            VyzvyPanelUrl = $"/projekty/{projectId}/dashboard/vyzvy-panel",
             BackUrl = $"/Projekty/Detail/{projectId}"
         };
     }
@@ -353,15 +349,6 @@ public sealed class ProjectDashboardService : IProjectDashboardService
             PocetVProdleni = items.Count,
             PrumerneProdleniDni = items.Count > 0 ? items.Average(x => x.DniProdleni) : 0.0
         };
-    }
-
-    public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
-        int projektId, bool muzeEditovat, CancellationToken ct)
-    {
-        // Per-action redesign 2026-04-23: muzeEditovat rozhoduje caller přes
-        // HasPermission(VyzvyCreate). CanUserEditProjectVyzvyAsync (hardcoded role codes)
-        // byl smazán — nálezy 1, 3, 9 z authz-ui-serverside-mismatch.md uzavřené.
-        return _vyzvyPanelBuilder.BuildAsync(projektId, muzeEditovat, ct);
     }
 
     // CanAccessDashboardAsync smazáno 2026-04-23 — nahrazeno Policy atributem

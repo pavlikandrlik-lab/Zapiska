@@ -535,6 +535,52 @@ public sealed class ProjectMembershipDataStoreTests
         externalLinks.Should().NotContain(link => link.Contains("NES NES-456 (", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Předpokládaná cena do PDF ani Wordu nesmí (uživatel 2026-09-10). Export ukáže jen
+    /// skutečnou cenu z kalkulace; vazba bez ní je bez ceny.
+    /// </summary>
+    [Fact]
+    public async Task TaskPrintTemplate_ExterniVazba_UkazeJenSkutecnouCenu()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_external_real_price");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportRealPriceAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExportRealPriceOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "EXPCENA");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "EXPCENA_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, ProjectRoleCodes.ProjectOwner);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", "ExportRealPriceRecord");
+        await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", meetingNumber: 9611);
+
+        var pnfTypeId = await dbContext.CiselnikTypuExternichOdkazu.Where(x => x.Kod == "PNF").Select(x => x.Id).FirstAsync();
+        var pmpTypeId = await dbContext.CiselnikTypuExternichOdkazu.Where(x => x.Kod == "PMP").Select(x => x.Id).FirstAsync();
+
+        dbContext.ZaznamExterniOdkazy.AddRange(
+            new ZaznamExterniOdkazEntity
+            {
+                ZaznamId = recordId, TypOdkazuId = pnfTypeId, Cislo = "941903",
+                PredpokladanaCena = 12000m, KalkulaceCena = 10340m,
+            },
+            new ZaznamExterniOdkazEntity
+            {
+                ZaznamId = recordId, TypOdkazuId = pmpTypeId, Cislo = "PMP-777",
+                PredpokladanaCena = 500m,
+            });
+        await dbContext.SaveChangesAsync();
+
+        var model = store.BuildTaskPrintTemplate(projectId, recordId, currentUser, autoPrint: false);
+        var externalLinks = model.Zaznamy.Single().ExterniVazby;
+
+        var skutecna = 10340m.ToString("N2", CultureInfo.GetCultureInfo("cs-CZ"));
+        externalLinks.Should().Contain($"PNF 941903 ({skutecna} Kč)", "export ukáže skutečnou cenu");
+        externalLinks.Should().Contain("PMP PMP-777", "předpokládaná cena se do exportu nedostane");
+        externalLinks.Should().NotContain(l => l.Contains("12", StringComparison.Ordinal) && l.Contains("000,00", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task MeetingPrintTemplate_ShouldExcludeRecordsCreatedAfterMeetingDate_OnlyForMeetingPrint()
     {

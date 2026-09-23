@@ -34,6 +34,9 @@ public sealed partial class RecordProposalService
 
         ValidateCommonProposalInput(command);
         await EnsureCreateProposalMeetingSelectionAsync(command, ct);
+        // Autoritativně dohledat Typ externí vazby ze ServiceDesku (klient v návrhu netěží).
+        // Bez toho by návrh nesl Typ=null a schválení (SaveRecord) by padlo na external_type_required.
+        await _externalLinkTypeResolver.ResolveAndValidateAsync(command.ExterniVazby, ct);
 
         var payload = _payloadMapper.BuildCreatePayload(command);
         var strategy = _dbContext.Database.CreateExecutionStrategy();
@@ -235,6 +238,9 @@ public sealed partial class RecordProposalService
 
         ValidateManualActualKroky(command.ManualActualKroky);
         ValidateHarmonogramVazby(command.HarmonogramVazby, command.ExterniVazby.Count);
+        // Parita se SaveRecord: návrh nesmí obejít chronologii harmonogramu (klesající plán/skutečnost).
+        // U návrhu založení je skutečnost prázdná (nelze ji vyplnit) → kontroluje se de facto jen plán.
+        ScheduleChronologyValidator.EnsureChronological(command);
     }
 
     private void ValidateScheduleProposalInput(SaveRecordCommand command, ProjektovyZaznamEntity record)
@@ -245,6 +251,8 @@ public sealed partial class RecordProposalService
         }
 
         ValidateManualActualKroky(command.ManualActualKroky);
+        // Parita se SaveRecord: plán i ruční skutečnost musí být chronologické i v návrhu změny harmonogramu.
+        ScheduleChronologyValidator.EnsureChronological(command);
     }
 
     private void ValidateManualActualKroky(IReadOnlyList<ManualActualKrokDto> manualKroky)

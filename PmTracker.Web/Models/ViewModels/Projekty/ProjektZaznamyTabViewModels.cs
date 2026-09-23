@@ -37,6 +37,12 @@ public sealed class ProjektZaznamCardShellViewModel
     public required ZaznamCardSummaryViewModel Summary { get; init; }
     public string? DetailUrl { get; set; }
     public string? CommentsUrl { get; set; }
+
+    /// <summary>Toggle na kartě záznamu (2026-07-13): lazy endpoint pohledu „harmonogram".</summary>
+    public string? ScheduleUrl { get; set; }
+
+    /// <summary>Stránka záznamu (2026-07-14): odkaz na samostatnou stránku (nová karta prohlížeče).</summary>
+    public string? RecordPageUrl { get; set; }
     public ZaznamCardDetailViewModel? Detail { get; set; }
     public ZaznamCommentsPanelViewModel? Comments { get; set; }
     public bool DetailLoaded { get; set; }
@@ -177,6 +183,10 @@ public sealed class ExterniOdkazViewModel
     public string? TypNazev { get; init; }
     public required string Cislo { get; init; }
     public decimal? PredpokladanaCena { get; init; }
+
+    /// <summary>Skutečná cena z akceptované kalkulace (snímek z harvestu) — má přednost.</summary>
+    public decimal? KalkulaceCena { get; init; }
+
     public string? ServiceDeskTicketId { get; init; }
     public string? ServiceDeskUrl { get; init; }
     public string? Vyzva { get; init; }
@@ -220,4 +230,12 @@ public sealed class SpolupracovnikOptionViewModel
 public sealed class ProjektMeetingCommentStatesResponseViewModel
 {
     public IReadOnlyDictionary<string, IReadOnlyList<string>> StatesByRecordId { get; init; } = new Dictionary<string, IReadOnlyList<string>>();
+}
+
+/// <summary>Toggle na kartě záznamu (2026-07-13): payload pohledu „harmonogram" —
+/// štítek Stíháme/Nestíháme + sdílený readonly blok s rozbaleným rozpadem.</summary>
+public sealed class ZaznamScheduleBlockViewModel
+{
+    public bool Stihame { get; init; }
+    public HarmonogramBlockViewModel HarmonogramBlok { get; init; } = new();
 }

@@ -195,6 +195,10 @@ export function initProjectRecordDeepLink(scope = document) {
     window.requestAnimationFrame(async () => {
         await toggleRecordCard(targetCard, { expand: true });
         targetCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        // Vysvítit cílový záznam (po založení / editaci / schválení návrhu) — stejná flash třída
+        // jako cross-tab navigace, aby uživatel hned viděl, že akce proběhla a KDE záznam je.
+        targetCard.classList.add("cross-nav-highlight");
+        window.setTimeout(() => targetCard.classList.remove("cross-nav-highlight"), 1600);
         if (openComments) {
             const commentsShell = targetCard.querySelector("[data-record-comments-shell]");
             if (commentsShell instanceof HTMLElement) {

@@ -42,18 +42,10 @@ public sealed partial class VyzvaService
 
         odkaz.ZaradidDoVyzvy = zaradit;
 
-        if (zaradit && odkaz.VyzvaId == null)
-        {
-            // projektId already resolved above for ACL check — reuse it
-            var cilovaVyzva = await _db.Vyzvy.AsNoTracking()
-                .Where(v => v.ProjektId == projektId && v.Stav == VyzvaStav.Priprava)
-                .OrderBy(v => v.PoradoveVRoce)
-                .Select(v => (int?)v.Id)
-                .FirstOrDefaultAsync(ct);
-
-            odkaz.VyzvaId = cilovaVyzva;
-        }
-        else if (!zaradit && odkaz.VyzvaId.HasValue)
+        // Switch = jen „čeká v bufferu". Dřív se PNF automaticky přiřadilo do nejstarší
+        // rozpracované výzvy, ale výzvy se nově zakládají prázdné a plní vědomým přesunem —
+        // automatika by je plnila za zády uživatele a buffer by zůstal prázdný (spec §8.4).
+        if (!zaradit && odkaz.VyzvaId.HasValue)
         {
             odkaz.VyzvaId = null;
         }

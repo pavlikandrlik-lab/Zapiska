@@ -71,7 +71,6 @@ public sealed record HarmonogramBlockViewModel
 
     public ScheduleEditorPermissionSet Permissions { get; set; } = ScheduleEditorPermissionSet.ForReadOnly();
     public IReadOnlyDictionary<int, string> EditorChangedTypeTooltips { get; set; } = new Dictionary<int, string>();
-    public string ScheduleVersion { get; init; } = string.Empty;
 
     /// <summary>
     /// Plán D Task 8: KrokKey kroků, u kterých je ruční skutečnost v pending
@@ -97,6 +96,13 @@ public sealed record HarmonogramBlockViewModel
     /// poznámku „vyplní se po založení".
     /// </summary>
     public bool HideActual { get; set; }
+
+    /// <summary>
+    /// Toggle na kartě záznamu (2026-07-13): true = readonly rozpad kroků se renderuje
+    /// rovnou viditelný (bez tlačítka „Rozpad"). Výchozí false = dosavadní chování
+    /// (záložka Harmonogram rozbaluje tlačítkem).
+    /// </summary>
+    public bool BreakdownExpanded { get; init; }
 }
 
 public sealed class HarmonogramKrokEditViewModel
@@ -115,6 +121,15 @@ public sealed class HarmonogramKrokEditViewModel
     /// </summary>
     public int? OdchylkaDni { get; init; }
     public DateTime BaselineDatum { get; init; }
+
+    /// <summary>
+    /// Datum-model: SUROVÉ uložené plánové datum konce kroku. <c>null</c> = nevyplněno.
+    /// Na rozdíl od <see cref="BaselineDatum"/> (vypočtený konec segmentu, který pro nevyplněné
+    /// kroky kolabuje na začátek = datum založení) se NEdopočítává — editor podle něj renderuje
+    /// prázdné pole tam, kde plán ještě neexistuje (jinak by pre-fill datem založení vynucoval
+    /// kaskádu překlikávání sousedních kroků).
+    /// </summary>
+    public DateTime? PlanDatum { get; init; }
 
     /// <summary>Datum-model: začátek plánového segmentu (= konec předchozího kroku; krok 1 = datum
     /// založení). Spolu s <see cref="BaselineDatum"/> (konec) tvoří rozsah pro tooltip „od-do".</summary>
@@ -145,13 +160,13 @@ public sealed class HarmonogramKrokEditViewModel
     public ZdrojSkutecnosti ZdrojSkutecnosti { get; init; } = ZdrojSkutecnosti.None;
 
     /// <summary>Plán D Task 8: pro <c>FromVyjadreni</c> HOT_VYJADRENI id pro chat modal routing.</summary>
-    public long? SourceVyjadreniId { get; init; }
+    public long? SourceVyjadreniId { get; set; }
 
     /// <summary>Plán D Task 8: datum vyjádření pro tooltip „Z vyjádření {datum}".</summary>
-    public DateTime? SourceVyjadreniDatum { get; init; }
+    public DateTime? SourceVyjadreniDatum { get; set; }
 
     /// <summary>Plán D Task 8: externí odkaz ID, na který chat ikona míří (<c>data-external-odkaz-id</c>).</summary>
-    public int? SourceExterniOdkazId { get; init; }
+    public int? SourceExterniOdkazId { get; set; }
 
     /// <summary>
     /// Plán D Task 8: zda krok patří do <see cref="HarmonogramManualSteps.KrokPoradi"/>

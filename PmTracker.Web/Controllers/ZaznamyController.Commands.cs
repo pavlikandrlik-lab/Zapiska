@@ -29,8 +29,10 @@ public sealed partial class ZaznamyController
         var contextMeetingId = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase)
             ? command.MeetingId
             : null;
-        var redirectAfterSave = () => RedirectRecordEditorSaveTarget(command.ProjektId, command.ReturnUrl, projectTab, normalizedUiContext, contextMeetingId);
+        // savedRecordId je nastaven až v operation; redirect/AJAX lambdy se ale vyhodnocují AŽ po ní,
+        // takže do cílové URL doplní recordId (deep-link → sjet na záznam a vysvítit ho).
         var savedRecordId = 0;
+        var redirectAfterSave = () => RedirectRecordEditorSaveTarget(command.ProjektId, command.ReturnUrl, projectTab, normalizedUiContext, contextMeetingId, savedRecordId);
 
         return await ExecuteValidatedCommandAsync(
             hasPermission: () => canCreateRecord || canEditRecord || canSaveScheduleOnly,
@@ -44,7 +46,26 @@ public sealed partial class ZaznamyController
                 projectTab,
                 normalizedUiContext,
                 contextMeetingId)),
-            operation: async () => savedRecordId = await _recordService.SaveRecordAsync(command, CurrentUserContext, ct));
+            operation: async () =>
+            {
+                savedRecordId = await _recordService.SaveRecordAsync(command, CurrentUserContext, ct);
+
+                // Spec 2026-09-17 §4.2 — po uložení editor končí (klient dělá plnou navigaci),
+                // takže zámek nemá co držet. Best-effort: selhání uvolnění nesmí shodit
+                // už uložený záznam, nejhorší následek je zámek držený do vypršení TTL.
+                if (command.Id.HasValue)
+                {
+                    try
+                    {
+                        await _editLockService.ReleaseAsync(command.Id.Value, CurrentUserContext.OsobaId, ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex,
+                            "Uvolnění zámku záznamu {ZaznamId} selhalo; vyprší TTL.", command.Id.Value);
+                    }
+                }
+            });
     }
 
     [HttpPost]
@@ -165,7 +186,7 @@ public sealed partial class ZaznamyController
             : null;
         var refreshUrl = string.Equals(normalizedUiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(meetingDetailUrl)
             ? meetingDetailUrl
-            : BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab);
+            : BuildRestoreReturnUrl(command.ProjektId, command.ReturnUrl, projectTab, savedRecordId);
         return AjaxSuccessResult(
             refreshScope: "page",
             refreshUrl: refreshUrl,
@@ -225,21 +246,41 @@ public sealed partial class ZaznamyController
             ?? (Url.Action("Detail", "Projekty", new { id = projektId, tab = fallbackTab }) ?? $"/Projekty/Detail/{projektId}?tab={fallbackTab}");
     }
 
-    private string BuildRestoreReturnUrl(int projektId, string? returnUrl, string fallbackTab)
+    private string BuildRestoreReturnUrl(int projektId, string? returnUrl, string fallbackTab, int focusRecordId = 0)
     {
         var candidate = NormalizeLocalReturnUrl(returnUrl)
             ?? (Url.Action("Detail", "Projekty", new { id = projektId, tab = fallbackTab }) ?? $"/Projekty/Detail/{projektId}?tab={fallbackTab}");
 
-        return QueryHelpers.AddQueryString(candidate, "restoreRecordEditorState", "1");
+        candidate = QueryHelpers.AddQueryString(candidate, "restoreRecordEditorState", "1");
+        if (focusRecordId > 0)
+        {
+            // Deep-link na uložený záznam — na záložce Záznamy se sjede + vysvítí (initProjectRecordDeepLink).
+            candidate = SetSingleQueryValue(candidate, "recordId", focusRecordId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+        return candidate;
     }
 
-    private IActionResult RedirectRecordEditorSaveTarget(int projektId, string? returnUrl, string fallbackTab, string uiContext, int? meetingId)
+    // Nastaví (nebo přepíše) jednu query hodnotu — brání duplicitnímu recordId, kdyby ho returnUrl už nesl.
+    private static string SetSingleQueryValue(string url, string key, string value)
+    {
+        var qIndex = url.IndexOf('?');
+        var path = qIndex < 0 ? url : url[..qIndex];
+        var query = qIndex < 0 ? string.Empty : url[qIndex..];
+        var parsed = QueryHelpers.ParseQuery(query);
+        var pairs = parsed
+            .Where(kv => !string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(kv => kv.Key, kv => (string?)kv.Value.ToString());
+        pairs[key] = value;
+        return QueryHelpers.AddQueryString(path, pairs);
+    }
+
+    private IActionResult RedirectRecordEditorSaveTarget(int projektId, string? returnUrl, string fallbackTab, string uiContext, int? meetingId, int savedRecordId)
     {
         if (string.Equals(uiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && meetingId.HasValue)
         {
             return Redirect(BuildMeetingDetailUrl(meetingId.Value));
         }
 
-        return Redirect(BuildRestoreReturnUrl(projektId, returnUrl, fallbackTab));
+        return Redirect(BuildRestoreReturnUrl(projektId, returnUrl, fallbackTab, savedRecordId));
     }
 }

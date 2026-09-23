@@ -46,6 +46,7 @@ public sealed class OsobyController : BaseController
         var model = AttachCurrentUser(await _peopleService.BuildOsobyAsync(ct));
         model.PageTitle = "Osoby";
         model.CanManagePeople = CurrentUserContext.HasPermissionPrefix(PermissionKeys.PeoplePrefix);
+        SetSectionRootBreadcrumb("Osoby");
         return View(model);
     }
 

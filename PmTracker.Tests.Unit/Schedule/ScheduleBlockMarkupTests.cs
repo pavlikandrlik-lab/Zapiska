@@ -29,6 +29,34 @@ public sealed class ScheduleBlockMarkupTests
         return File.ReadAllText(viewPath);
     }
 
+    /// <summary>
+    /// Stránka záznamu (2026-07-14): tabulková sekce editoru se přesunula do
+    /// _ScheduleTable.cshtml (sdílí ji editor i read-only režim stránky záznamu).
+    /// </summary>
+    private static string LoadScheduleTableSource()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "PmTracker.sln")))
+        {
+            directory = directory.Parent;
+        }
+
+        if (directory is null)
+        {
+            throw new InvalidOperationException("Nepodařilo se najít kořen repozitáře (PmTracker.sln).");
+        }
+
+        var viewPath = Path.Combine(
+            directory.FullName,
+            "PmTracker.Web",
+            "Views",
+            "Shared",
+            "_ScheduleTable.cshtml");
+
+        File.Exists(viewPath).Should().BeTrue($"_ScheduleTable.cshtml musí existovat na cestě {viewPath}");
+        return File.ReadAllText(viewPath);
+    }
+
     [Fact]
     public void EditorMode_ShouldRenderAllSteps_IncludingZeroDuration()
     {
@@ -118,7 +146,7 @@ public sealed class ScheduleBlockMarkupTests
     [Fact]
     public void EditorMode_HighlightsProposalChangedSteps_FromEditorDiff()
     {
-        var source = LoadScheduleBlockSource();
+        var source = LoadScheduleTableSource();
 
         source.Should().NotContain("var durationChanged = false;",
             "zvýraznění změněných kroků návrhu nesmí být natvrdo vypnuté");

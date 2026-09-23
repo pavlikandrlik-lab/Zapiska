@@ -1,6 +1,7 @@
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 
+using PmTracker.Web.Services.Records;
 namespace PmTracker.Web.Services.Schedules;
 
 /// <summary>
@@ -38,6 +39,22 @@ public static class HarmonogramDateBlokBuilder
                 var skutecneDatum = row?.SkutecnostDatum?.Date;
                 int? odchylka = skutecneDatum.HasValue ? (skutecneDatum.Value - c.PlanEnd).Days : null;
 
+                // 2026-09-03 (bug): read-only zobrazení (karta, tabulka na stránce záznamu)
+                // psalo „Automat zatím nenašel vhodné vyjádření", i když skutečnost existovala.
+                // Builder plnil jen surový SkutecnostZdroj z DB; buňka se ale řídí podle
+                // ZdrojSkutecnosti, které zůstávalo None. Mapování je shodné s editorem
+                // (ProjectService.RecordEditorComposition) — jediný rozdíl je, že tady
+                // nedohledáváme zdrojové vyjádření (to potřebuje jen editor pro chat ikonu).
+                var zdrojSkutecnosti = !skutecneDatum.HasValue
+                    ? ZdrojSkutecnosti.None
+                    : (SkutecnostZdrojEnum)(row?.SkutecnostZdroj ?? 0) switch
+                    {
+                        SkutecnostZdrojEnum.Automat => ZdrojSkutecnosti.FromVyjadreni,
+                        SkutecnostZdrojEnum.Manual => ZdrojSkutecnosti.Manual,
+                        SkutecnostZdrojEnum.Historicka => ZdrojSkutecnosti.Manual,
+                        _ => ZdrojSkutecnosti.None
+                    };
+
                 return new HarmonogramKrokEditViewModel
                 {
                     KrokIndex = def.Poradi,
@@ -46,10 +63,14 @@ public static class HarmonogramDateBlokBuilder
                     TrvaniDni = trvaniDni,
                     OdchylkaDni = odchylka,
                     BaselineDatum = c.PlanEnd,
+                    // Surové uložené plánové datum (null = nevyplněno) — editor podle něj renderuje
+                    // prázdné pole; BaselineDatum (dopočtený konec) zůstává pro bar/tooltip.
+                    PlanDatum = row?.PlanDatum?.Date,
                     PlanZacatek = c.PlanStart,
                     SkutecnostZacatek = c.MaSkutecnost ? c.SkutecnostStart : null,
                     SkutecnostKonec = c.MaSkutecnost ? c.SkutecnostEnd : null,
                     SkutecneDatum = skutecneDatum,   // null = nevyplněno (žádný PlanEnd fallback)
+                    ZdrojSkutecnosti = zdrojSkutecnosti,
                     Stav = c.Stav,
                     IsManualKrok = def.JeManualni,
                     SkutecnostRezim = (SkutecnostRezimEnum)(row?.SkutecnostRezim ?? 0),

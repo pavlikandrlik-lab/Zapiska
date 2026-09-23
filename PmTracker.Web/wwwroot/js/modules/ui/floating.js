@@ -234,16 +234,20 @@ export function positionFloatingPanel(panel, anchor, options = {}) {
         bottom: window.innerHeight - 8
     };
     const modalContainer = anchor.closest("[data-modal-container]");
-    const baseBoundary = modalContainer instanceof HTMLElement
-        ? (() => {
-            const modalRect = modalContainer.getBoundingClientRect();
-            return {
-                left: Math.max(viewportBoundary.left, modalRect.left + 8),
-                right: Math.min(viewportBoundary.right, modalRect.right - 8),
-                top: Math.max(viewportBoundary.top, modalRect.top + 8),
-                bottom: Math.min(viewportBoundary.bottom, modalRect.bottom - 8)
-            };
-        })()
+    const modalRect = modalContainer instanceof HTMLElement ? modalContainer.getBoundingClientRect() : null;
+    // FIX 2026-07-07: gov-dialog (Fáze 2E) má host element s VÝŠKOU 0 — reálný dialog je v shadow
+    // DOM. modalRect pak dává bottom<=0 → boundary.bottom záporný → availableBelow=0 → panel se
+    // vždy „flipne" nad pole a přistane u horního okraje obrazovky (bug: datum/čas v jednání).
+    // Panel je mountovaný do body-level #floating-panel-root a renderuje se NAD modalem (z-index 2600),
+    // takže degenerovaný (nulový/záporný) modal rect ignorujeme a použijeme viewport boundary.
+    const modalRectUsable = modalRect !== null && modalRect.height > 0 && modalRect.bottom > modalRect.top;
+    const baseBoundary = modalRectUsable
+        ? {
+            left: Math.max(viewportBoundary.left, modalRect.left + 8),
+            right: Math.min(viewportBoundary.right, modalRect.right - 8),
+            top: Math.max(viewportBoundary.top, modalRect.top + 8),
+            bottom: Math.min(viewportBoundary.bottom, modalRect.bottom - 8)
+        }
         : viewportBoundary;
     const boundary = resolveRecordEditorFloatingBoundary(anchor, baseBoundary, kind);
     const anchorRect = anchor.getBoundingClientRect();
@@ -324,8 +328,22 @@ export function positionFloatingPanel(panel, anchor, options = {}) {
         top = boundary.top;
     }
 
-    panel.style.left = `${Math.round(left)}px`;
-    panel.style.top = `${Math.round(top)}px`;
+    // FIX 2026-07-07: left/top jsou spočtené ve VIEWPORT souřadnicích. modals.js přesouvá
+    // #floating-panel-root do aktivního gov-dialogu (top-layer interaktivita), jenže .gov-dialog__dialog
+    // má centrovací transform → z position:fixed se stane relativní k transformovanému boxu dialogu,
+    // ne k viewportu (panel se posouval o offset dialogu — datum/čas se otvíraly mimo pole). Když má
+    // panel transformovaný containing-block (offsetParent != null u fixed elementu), odečteme jeho
+    // origin, aby výsledná pozice seděla na viewport.
+    let appliedLeft = left;
+    let appliedTop = top;
+    const containingBlock = panel.offsetParent;
+    if (containingBlock instanceof HTMLElement) {
+        const cbRect = containingBlock.getBoundingClientRect();
+        appliedLeft -= cbRect.left;
+        appliedTop -= cbRect.top;
+    }
+    panel.style.left = `${Math.round(appliedLeft)}px`;
+    panel.style.top = `${Math.round(appliedTop)}px`;
     panel.style.visibility = "";
 }
 

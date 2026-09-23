@@ -35,6 +35,11 @@ public sealed class NavrhyController : BaseController
 
         var model = await _recordProposalService.BuildCreateRecordProposalEditorAsync(projektId, CurrentUserContext, ct: ct);
         PrepareProposalEditorModel(model, returnUrl);
+        // A4 (2026-07-08): návrhové stránky = kanonická projektová větev (vzor ZaznamyController).
+        // C1 (2026-07-10): ← = model.BackUrl (origin returnUrl ?? tab=navrhy).
+        SetProjectBreadcrumbs(projektId, model.ProjektNazev, model.ProjektZkratka,
+            currentText: "Nový návrh záznamu",
+            backUrl: model.BackUrl);
         return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
@@ -49,6 +54,9 @@ public sealed class NavrhyController : BaseController
 
         var model = await _recordProposalService.BuildScheduleProposalEditorAsync(projektId, zaznamId, CurrentUserContext, ct);
         PrepareProposalEditorModel(model, returnUrl);
+        SetProjectBreadcrumbs(projektId, model.ProjektNazev, model.ProjektZkratka,
+            currentText: "Návrh změny harmonogramu",
+            backUrl: model.BackUrl);
         return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
@@ -67,6 +75,9 @@ public sealed class NavrhyController : BaseController
 
         var model = await _recordProposalService.BuildProposalDetailAsync(projektId, proposalId, CurrentUserContext, ct);
         PrepareProposalEditorModel(model, returnUrl);
+        SetProjectBreadcrumbs(projektId, model.ProjektNazev, model.ProjektZkratka,
+            currentText: "Schválení návrhu",
+            backUrl: model.BackUrl);
         return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
@@ -93,6 +104,9 @@ public sealed class NavrhyController : BaseController
 
         var model = await _recordProposalService.BuildPrefilledCreateRecordEditorFromProposalAsync(projektId, proposalId, CurrentUserContext, ct);
         PrepareProposalEditorModel(model, returnUrl);
+        SetProjectBreadcrumbs(projektId, model.ProjektNazev, model.ProjektZkratka,
+            currentText: "Převzetí návrhu",
+            backUrl: model.BackUrl);
         return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
@@ -131,14 +145,18 @@ public sealed class NavrhyController : BaseController
     [Authorize(Policy = "permission:proposals.accept")]
     public Task<IActionResult> ApproveProposal(ProposalDecisionCommand command, CancellationToken ct = default)
     {
+        // Po schválení skoč na dotčený záznam (u návrhu založení = nově vzniklý) a vysvíti ho —
+        // uživatel jinak neví, kam záznam „zmizel". approvedRecordId nastaví operation, redirect/AJAX
+        // lambdy se vyhodnocují až po ní.
+        int? approvedRecordId = null;
         return ExecuteValidatedCommandAsync(
             hasPermission: () => CurrentUserContext.CanAccessProject(command.ProjektId),
             invalidAjaxMessage: "Návrh nelze schválit.",
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: () => RedirectToProposalTab(command.ProjektId),
-            onSuccessRedirect: () => Task.FromResult<IActionResult>(RedirectToProposalTab(command.ProjektId)),
-            onAjaxSuccess: () => Task.FromResult<IActionResult>(BuildProposalTabAjaxSuccess(command.ProjektId, "Návrh byl schválen.")),
-            operation: async () => await _recordProposalService.ApproveProposalAsync(command, CurrentUserContext, ct));
+            onSuccessRedirect: () => Task.FromResult(RedirectAfterApprove(command.ProjektId, approvedRecordId)),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(BuildApproveAjaxSuccess(command.ProjektId, approvedRecordId, "Návrh byl schválen.")),
+            operation: async () => approvedRecordId = await _recordProposalService.ApproveProposalAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
@@ -244,13 +262,30 @@ public sealed class NavrhyController : BaseController
     private RedirectToActionResult RedirectToProposalTab(int projektId)
         => RedirectToAction("Detail", "Projekty", new { id = projektId, tab = ProposalsTab })!;
 
-    private string? NormalizeLocalReturnUrl(string? returnUrl)
+    private const string RecordsTab = "zaznamy";
+
+    private string BuildRecordFocusUrl(int projektId, int recordId)
+        => Url.Action("Detail", "Projekty", new { id = projektId, tab = RecordsTab, recordId })
+           ?? $"/Projekty/Detail/{projektId}?tab={RecordsTab}&recordId={recordId}";
+
+    private IActionResult RedirectAfterApprove(int projektId, int? recordId)
+        => recordId is > 0
+            ? Redirect(BuildRecordFocusUrl(projektId, recordId.Value))
+            : RedirectToProposalTab(projektId);
+
+    private JsonResult BuildApproveAjaxSuccess(int projektId, int? recordId, string message)
     {
-        if (string.IsNullOrWhiteSpace(returnUrl))
+        if (recordId is > 0)
         {
-            return null;
+            return AjaxSuccessResult(
+                refreshScope: "page",
+                refreshUrl: BuildRecordFocusUrl(projektId, recordId.Value),
+                projectId: projektId,
+                recordId: recordId,
+                tab: RecordsTab,
+                message: message);
         }
 
-        return Url.IsLocalUrl(returnUrl) ? returnUrl : null;
+        return BuildProposalTabAjaxSuccess(projektId, message);
     }
 }

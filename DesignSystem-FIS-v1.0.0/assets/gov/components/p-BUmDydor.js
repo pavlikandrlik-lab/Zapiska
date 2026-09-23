@@ -1,0 +1,2 @@
+import{p as o}from"./p-CQvUntGY.js";import{S as r}from"./p-BcQO4NH2.js";const t=o(r,["_XS","_S","_M","_L","_2XL"]);var s;(function(o){o["HORIZONTAL"]="horizontal";o["VERTICAL"]="vertical"})(s||(s={}));const a={root:"gov-form-group"};const c={root:"gov-form-radio-group"};const p={root:"gov-form-checkbox-group"};export{a as F,t as a,s as b,p as c,c as d};
+//# sourceMappingURL=p-BUmDydor.js.map

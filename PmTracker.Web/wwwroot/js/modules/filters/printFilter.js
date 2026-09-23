@@ -20,7 +20,6 @@ const projectPrintRelevantRecordStateKeys = [
     "typ",
     "vlastnik",
     "aktivni",
-    "mine",
     "jednaniVyjadreniStav"
 ];
 
@@ -37,7 +36,6 @@ export function buildProjectPrintFilterSnapshot() {
         typ: typeof state.typ === "string" ? state.typ.trim() : "",
         vlastnik: typeof state.vlastnik === "string" ? state.vlastnik.trim() : "",
         aktivni: Boolean(state.aktivni),
-        mine: Boolean(state.mine),
         jednaniVyjadreniStav: typeof state.jednaniVyjadreniStav === "string" ? state.jednaniVyjadreniStav.trim() : ""
     };
 
@@ -80,10 +78,6 @@ export function buildProjectPrintFilterQueryParams(useCurrentFilters) {
 
     if (snapshot.aktivni) {
         params.set("aktivni", "true");
-    }
-
-    if (snapshot.mine) {
-        params.set("mine", "true");
     }
 
     if (snapshot.jednaniVyjadreniStav) {

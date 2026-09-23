@@ -86,7 +86,8 @@
         </label>
         <label class="record-form-number" for="cislo">
             Číslo
-            <input id="cislo" type="text" value="@Model.CisloViditelne" disabled="disabled" />
+            <input id="cislo" type="text" value="@Model.CisloViditelne" disabled="disabled"
+                   data-record-number-preview="true" />
         </label>
     </div>
 
@@ -105,6 +106,8 @@
                         var selected = Model.JednaniIdProCislo.HasValue && Model.JednaniIdProCislo.Value == meeting.Id;
                         <option value="@meeting.Id"
                                 data-record-meeting-date="@meeting.Datum.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
+                                data-cislo-jednani="@meeting.CisloJednani"
+                                data-next-poradi="@meeting.NextPoradiProCislo"
                                 selected="@selected">
                             @meeting.Label
                         </option>
@@ -119,7 +122,8 @@
             </gov-message>
         }
     }
-    else if (!Model.IsCreate && Model.MuzeDoplnitIdentifikatorJednani)
+    @* B4 (2026-07-09): na rozhodovacím detailu návrhu žádné akce. *@
+    else if (!Model.IsCreate && Model.MuzeDoplnitIdentifikatorJednani && !Model.IsProposalDecisionDetail)
     {
         <div class="record-form-row">
             <div class="record-identifier-assign">

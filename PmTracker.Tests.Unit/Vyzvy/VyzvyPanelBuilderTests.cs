@@ -24,7 +24,7 @@ public sealed class VyzvyPanelBuilderTests
         var svc = VyzvaServiceTestHarness.CreateService(db);
         var builder = new VyzvyPanelBuilder(svc, db);
 
-        var result = await builder.BuildAsync(1, muzeEditovat: true, CancellationToken.None);
+        var result = await builder.BuildAsync(1, muzeEditovat: true, muzeTisknout: true, rok: 2026, ct: CancellationToken.None);
 
         result.ProjektId.Should().Be(1);
         result.Buffer.MuzeZaloztVyzvu.Should().BeFalse();
@@ -46,14 +46,18 @@ public sealed class VyzvyPanelBuilderTests
         var svc = VyzvaServiceTestHarness.CreateService(db);
         var builder = new VyzvyPanelBuilder(svc, db);
 
-        var result = await builder.BuildAsync(1, muzeEditovat: true, CancellationToken.None);
+        var result = await builder.BuildAsync(1, muzeEditovat: true, muzeTisknout: true, rok: 2026, ct: CancellationToken.None);
 
         result.Buffer.MuzeZaloztVyzvu.Should().BeFalse();
         result.Buffer.DuvodBlokace.Should().Contain("Číslo rámcové smlouvy");
     }
 
+    /// <summary>
+    /// Od 2026-09-07 vzniká výzva prázdná (spec §5.2), takže prázdný buffer už
+    /// zakládání nebrání — dřív to byla blokující podmínka.
+    /// </summary>
     [Fact]
-    public async Task Build_PrazdnyBuffer_DuvodJePrazdnyBuffer()
+    public async Task Build_PrazdnyBuffer_ZalozeniNeblokuje()
     {
         using var db = VyzvaServiceTestHarness.CreateDb();
         await VyzvaServiceTestHarness.SeedProjektAsync(db);
@@ -62,10 +66,11 @@ public sealed class VyzvyPanelBuilderTests
         var svc = VyzvaServiceTestHarness.CreateService(db);
         var builder = new VyzvyPanelBuilder(svc, db);
 
-        var result = await builder.BuildAsync(1, muzeEditovat: true, CancellationToken.None);
+        var result = await builder.BuildAsync(1, muzeEditovat: true, muzeTisknout: true, rok: 2026, ct: CancellationToken.None);
 
-        result.Buffer.MuzeZaloztVyzvu.Should().BeFalse();
-        result.Buffer.DuvodBlokace.Should().Contain("prázdný");
+        result.Buffer.Polozky.Should().BeEmpty();
+        result.Buffer.MuzeZaloztVyzvu.Should().BeTrue();
+        result.Buffer.DuvodBlokace.Should().BeNull();
     }
 
     [Fact]
@@ -92,7 +97,7 @@ public sealed class VyzvyPanelBuilderTests
         var svc = VyzvaServiceTestHarness.CreateService(db);
         var builder = new VyzvyPanelBuilder(svc, db);
 
-        var result = await builder.BuildAsync(1, muzeEditovat: true, CancellationToken.None);
+        var result = await builder.BuildAsync(1, muzeEditovat: true, muzeTisknout: true, rok: 2026, ct: CancellationToken.None);
 
         result.Vyzvy.Should().HaveCount(2);
         var priprava = result.Vyzvy.First(v => v.Stav == "Priprava");
@@ -119,14 +124,14 @@ public sealed class VyzvyPanelBuilderTests
         var svc = VyzvaServiceTestHarness.CreateService(db);
         var builder = new VyzvyPanelBuilder(svc, db);
 
-        var result = await builder.BuildAsync(1, muzeEditovat: true, CancellationToken.None);
+        var result = await builder.BuildAsync(1, muzeEditovat: true, muzeTisknout: true, rok: 2026, ct: CancellationToken.None);
         var v = result.Vyzvy.First();
 
         v.PovoleneStavy.Should().BeEquivalentTo(new[] { "Odeslano", "Zruseno" });
     }
 
     [Fact]
-    public async Task Build_MuzeEditovatFalse_BufferMuzeZaloztIZablokovanyReason()
+    public async Task Build_MuzeEditovatFalse_ZalozeniNedostupne()
     {
         using var db = VyzvaServiceTestHarness.CreateDb();
         await VyzvaServiceTestHarness.SeedProjektAsync(db);
@@ -135,9 +140,9 @@ public sealed class VyzvyPanelBuilderTests
         var svc = VyzvaServiceTestHarness.CreateService(db);
         var builder = new VyzvyPanelBuilder(svc, db);
 
-        var result = await builder.BuildAsync(1, muzeEditovat: false, CancellationToken.None);
+        var result = await builder.BuildAsync(1, muzeEditovat: false, muzeTisknout: true, rok: 2026, ct: CancellationToken.None);
 
-        // muzeEditovat: false → button nesmí být aktivní, i kdyby buffer byl plný
+        // muzeEditovat: false → tlačítko nesmí být aktivní, i když projekt má vše vyplněné
         result.MuzeEditovat.Should().BeFalse();
         result.Buffer.MuzeZaloztVyzvu.Should().BeFalse();
     }

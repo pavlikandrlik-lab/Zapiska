@@ -158,15 +158,20 @@ export function reparentFloatingRootIntoModal(dialog) {
     if (!(root instanceof HTMLElement)) {
         return;
     }
+    // FIX 2026-07-09: cíl je .modal-content (plain div UVNITŘ dialogu), NE gov-dialog host.
+    // Stencil patchuje DOM metody hostu (slot relocation) a patched prepend při nedokončené
+    // hydrataci intermitentně padal na „TypeError: Illegal invocation" (pageerror v E2E i živě).
+    // Stacking context je stejný — root je pořád uvnitř dialogu.
+    const target = dialog.querySelector(".modal-content") ?? dialog;
     // Už uvnitř modalu? (idempotent guard)
-    if (root.parentElement === dialog) {
+    if (root.parentElement === target) {
         return;
     }
     if (floatingRootOriginalParent === null) {
         floatingRootOriginalParent = root.parentElement;
         floatingRootOriginalNextSibling = root.nextSibling;
     }
-    dialog.prepend(root);
+    target.prepend(root);
 }
 
 export function restoreFloatingRoot() {
@@ -234,7 +239,7 @@ export async function openUrlModal(url, trigger) {
         reportClientDiagnostic("modal-load-failed", { url });
         if (modalRoot instanceof HTMLElement) {
             modalRoot.innerHTML = `
-                <gov-dialog open="true" block-close="true" block-backdrop-close="true" data-modal-container data-modal-variant="default" aria-labelledby="modal-error-title" tabindex="-1">
+                <gov-dialog open="true" block-backdrop-close="true" data-modal-container data-modal-variant="default" aria-labelledby="modal-error-title" tabindex="-1">
                     <h2 id="modal-error-title" class="sr-only">Chyba načtení dialogu</h2>
                     <p>Nepodařilo se načíst obsah dialogu.</p>
                     <div class="modal-actions">

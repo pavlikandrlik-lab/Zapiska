@@ -117,6 +117,9 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
     public ZaznamEditViewModel BuildPrefilledCreateEditorFromProposal(int projektId, int proposalId, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordProposalService>().BuildPrefilledCreateRecordEditorFromProposalAsync(projektId, proposalId, currentUser).GetAwaiter().GetResult();
 
+    public ZaznamEditViewModel BuildProposalDetail(int projektId, int proposalId, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordProposalService>().BuildProposalDetailAsync(projektId, proposalId, currentUser).GetAwaiter().GetResult();
+
     public void DeleteRecord(DeleteRecordCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordService>().DeleteRecordAsync(command, currentUser).GetAwaiter().GetResult();
 
@@ -134,6 +137,9 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
 
     public void DeleteMeeting(DeleteMeetingCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IMeetingService>().DeleteMeetingAsync(command, currentUser).GetAwaiter().GetResult();
+
+    public void SaveMeetingStatus(SaveMeetingStatusCommand command, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IMeetingService>().SaveMeetingStatusAsync(command, currentUser).GetAwaiter().GetResult();
 
     public void AddMeetingParticipant(AddMeetingParticipantCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IMeetingService>().AddMeetingParticipantAsync(command, currentUser).GetAwaiter().GetResult();

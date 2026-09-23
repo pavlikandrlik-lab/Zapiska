@@ -113,6 +113,9 @@ public static class DataStoreServiceCollectionExtensions
         // 2026-04-28: Per-ticket metadata sync (4 datumy na kartě externí vazby).
         // Volaný z VyjadreniHarvestService po commitu harvest batch.
         services.AddScoped<IPerTicketMetadataSyncService, PerTicketMetadataSyncService>();
+        // 2026-09-10: snímek skutečné ceny z kalkulace. Volaný z VyjadreniHarvestService
+        // před rozhodnutím podle fingerprintu (spec 2026-09-10 A3 R4).
+        services.AddScoped<IKalkulaceSnapshotService, KalkulaceSnapshotService>();
         services.AddScoped<IVyjadreniModalViewModelBuilder, VyjadreniModalViewModelBuilder>();
         // Plán C/D follow-up: manuální drag-and-drop rebalance přes ChronologyRebalancer.
         // Volaný z VyjadreniModalController.CreateVazba.
@@ -123,8 +126,13 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<ExterniOdkazValidator>();
         services.AddScoped<CommentService>();
         services.AddScoped<MeetingService>();
+        // Předvyplnění účasti u nového jednání (2026-09-05) — odhad z historie
+        // uzavřených jednání, spec docs/superpowers/specs/2026-09-05-predvyplneni-ucasti-design.md.
+        services.AddScoped<PmTracker.Web.Services.Meetings.IAttendancePredictor,
+                           PmTracker.Web.Services.Meetings.AttendancePredictor>();
         services.AddScoped<ProjectService>();
         services.AddScoped<RecordService>();
+        services.AddScoped<IExternalLinkProposalTypeResolver, ExternalLinkProposalTypeResolver>();
         services.AddScoped<RecordProposalService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<HomeDashboardService>();
@@ -147,7 +155,9 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IRecordService>(sp => sp.GetRequiredService<RecordService>());
         services.AddScoped<IRecordProposalService>(sp => sp.GetRequiredService<RecordProposalService>());
         services.AddScoped<IDashboardService>(sp => sp.GetRequiredService<DashboardService>());
-        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.VyzvyPanelBuilder>();
+        services.AddScoped<PmTracker.Web.Services.Vyzvy.VyzvyPanelBuilder>();
+        services.AddScoped<PmTracker.Web.Services.Vyzvy.IVyzvyPanelBuilder>(sp => sp.GetRequiredService<PmTracker.Web.Services.Vyzvy.VyzvyPanelBuilder>());
+        services.AddScoped<PmTracker.Web.Services.Vyzvy.IVyzvaExportBuilder, PmTracker.Web.Services.Vyzvy.VyzvaExportBuilder>();
         services.AddScoped<IProjectDashboardService, ProjectDashboardService>();
         // Základní report — rámec grafů. Chart-providery (konkrétní grafy) se registrují níže.
         services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniDatasetLoader,
@@ -192,6 +202,14 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IExportTemplateQueries, ExportTemplateQueries>();
         services.AddScoped<IExportTemplateUseCase, ExportTemplateUseCase>();
         services.AddScoped<IWordExportService, OpenXmlWordExportService>();
+        services.AddScoped<IVyzvaWordExportService, OpenXmlVyzvaExportService>();
+        // Serverové PDF (2026-09-04) — sazba tisku headless prohlížečem, spec §6.
+        services.AddSingleton<PmTracker.Web.Services.Export.IBrowserExecutableResolver,
+                              PmTracker.Web.Services.Export.BrowserExecutableResolver>();
+        services.AddSingleton<PmTracker.Web.Services.Export.IPdfRenderer,
+                              PmTracker.Web.Services.Export.ChromiumPdfRenderer>();
+        services.AddScoped<PmTracker.Web.Services.Export.IViewRenderer,
+                           PmTracker.Web.Services.Export.RazorViewRenderer>();
         // Plán 4 Feature C gap #4 (2026-04-24) — NES panel Excel export
         services.AddScoped<PmTracker.Web.Services.Export.INesPanelExcelExportService,
                            PmTracker.Web.Services.Export.NesPanelExcelExportService>();

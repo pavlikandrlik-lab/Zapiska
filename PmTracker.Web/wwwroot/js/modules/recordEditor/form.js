@@ -13,6 +13,7 @@
  * - initMeetingNumberValidation
  * - initRecordGoalAutoGrow
  * - initRecordMeetingDateSync
+ * - initRecordMeetingNumberPreview
  * - resolveRecordEditorTabForFieldKey / resolveRecordEditorTabLabel
  * - resolveRecordEditorFieldLabel / buildContextualSummaryMessage
  * - normalizeServerFieldKey
@@ -311,24 +312,46 @@ function onScheduleTabActivated(form) {
     }
 
     // Schedule planner přepsal hodnoty UiHarmonogramDatumy[*] a normalizoval
-    // duration/delay inputy. Toto není uživatelská změna — obnovíme snapshot,
-    // aby se po přepnutí na schedule tab nespouštěl close guard a modal šel
-    // zavřít. Viz docs/specs/modal-close-guard.md.
+    // duration/delay inputy. Toto není uživatelská změna — baseline se musí srovnat,
+    // aby samotná návštěva tabu nespouštěla close guard. Viz docs/specs/modal-close-guard.md.
     //
-    // FIX 2026-05-05: snapshot rebuild VÝHRADNĚ při PRVNÍ aktivaci. Předchozí impl
-    // resetla snapshot při každém vstupu do tabu, čímž "absorbla" user-induced změny
-    // udělané mezi tab switches → form se po re-aktivaci tabu jevil clean → close
-    // guard ("opravdu zavřít?") se přeskočil. Re-aktivace planneru je idempotentní,
-    // takže rebuild po prvním vstupu není potřebný.
+    // FIX 2026-05-05: jen při PRVNÍ aktivaci (re-aktivace planneru je idempotentní).
+    // B2 (2026-07-09): MERGE místo plného rebuildu. Plný rebuild absorboval i USER změny
+    // udělané před prvním vstupem na schedule tab → form „clean" → dialogy (back/breadcrumb/
+    // Zrušit) nevyskočily. Merge přepíše v baseline JEN schedule klíče (planner šum) —
+    // ostatní user dirt přežije.
     if (form.dataset.recordEditorScheduleSnapshotRebuilt === "true") {
         return;
     }
     window.requestAnimationFrame(() => {
-        if (form.isConnected) {
-            form.dataset.recordEditorSnapshot = buildRecordEditorFormSnapshot(form);
-            form.dataset.recordEditorScheduleSnapshotRebuilt = "true";
+        if (!form.isConnected) {
+            return;
         }
+        const baseline = form.dataset.recordEditorSnapshot || "";
+        const current = buildRecordEditorFormSnapshot(form);
+        form.dataset.recordEditorSnapshot = mergeScheduleKeysIntoBaseline(baseline, current);
+        form.dataset.recordEditorScheduleSnapshotRebuilt = "true";
     });
+}
+
+const scheduleSnapshotKeyPrefixes = ["UiHarmonogramDatumy", "HarmonogramHodnoty"];
+
+function isScheduleSnapshotKey(entry) {
+    return scheduleSnapshotKeyPrefixes.some((prefix) => entry.startsWith(prefix));
+}
+
+/**
+ * B2: vrátí baseline, ve kterém jsou schedule položky nahrazené schedule položkami
+ * z current. Snapshot = řazené položky `key=value` oddělené "&"
+ * (buildRecordEditorFormSnapshot v draft.js).
+ */
+function mergeScheduleKeysIntoBaseline(baseline, current) {
+    const baselineEntries = baseline ? baseline.split("&") : [];
+    const currentEntries = current ? current.split("&") : [];
+    const merged = baselineEntries.filter((entry) => !isScheduleSnapshotKey(entry))
+        .concat(currentEntries.filter((entry) => isScheduleSnapshotKey(entry)));
+    merged.sort();
+    return merged.join("&");
 }
 
 export function initExternalLinksEditors(scope) {
@@ -699,6 +722,35 @@ export function initRecordMeetingDateSync(scope) {
 
         meetingSelect.addEventListener("change", syncToSelectedMeeting);
         syncToSelectedMeeting();
+    });
+}
+
+export function initRecordMeetingNumberPreview(scope) {
+    scope.querySelectorAll('form[data-record-editor-form="true"][data-is-create="true"]').forEach((form) => {
+        if (!(form instanceof HTMLFormElement) || form.dataset.recordMeetingNumberPreviewReady === "true") {
+            return;
+        }
+
+        const meetingSelect = form.querySelector("[data-record-meeting-number-select]");
+        const numberInput = form.querySelector('[data-record-number-preview="true"]');
+        if (!(meetingSelect instanceof HTMLSelectElement) || !(numberInput instanceof HTMLInputElement)) {
+            return;
+        }
+
+        form.dataset.recordMeetingNumberPreviewReady = "true";
+        const syncNumberPreview = () => {
+            const selectedOption = meetingSelect.options[meetingSelect.selectedIndex];
+            const cisloJednani = (selectedOption?.dataset.cisloJednani || "").trim();
+            const nextPoradi = (selectedOption?.dataset.nextPoradi || "").trim();
+            if (!cisloJednani || !nextPoradi) {
+                return;
+            }
+
+            numberInput.value = `${cisloJednani}-${nextPoradi}`;
+        };
+
+        meetingSelect.addEventListener("change", syncNumberPreview);
+        syncNumberPreview();
     });
 }
 

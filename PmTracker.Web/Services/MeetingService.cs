@@ -2,6 +2,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Audit;
+using PmTracker.Web.Services.Meetings;
 
 namespace PmTracker.Web.Services;
 
@@ -13,6 +14,7 @@ public sealed partial class MeetingService : IMeetingService
     private readonly ICommentService commentService;
     private readonly IAuditWriteService auditWriteService;
     private readonly TimeProvider timeProvider;
+    private readonly IAttendancePredictor attendancePredictor;
 
     public MeetingService(
         PmTrackerDbContext dbContext,
@@ -20,7 +22,8 @@ public sealed partial class MeetingService : IMeetingService
         IPersonIdentityMatcher personIdentityMatcher,
         ICommentService commentService,
         IAuditWriteService auditWriteService,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IAttendancePredictor attendancePredictor)
     {
         this.dbContext = dbContext;
         this.textNormalizer = textNormalizer;
@@ -28,5 +31,6 @@ public sealed partial class MeetingService : IMeetingService
         this.commentService = commentService;
         this.auditWriteService = auditWriteService;
         this.timeProvider = timeProvider;
+        this.attendancePredictor = attendancePredictor;
     }
 }

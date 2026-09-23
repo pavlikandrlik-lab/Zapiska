@@ -7,6 +7,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PmTracker.Web.Services.Export;
 
 namespace PmTracker.Tests.Api.TestInfrastructure;
 
@@ -48,6 +49,11 @@ public sealed class PmTrackerWebAppFactory : WebApplicationFactory<Program>
             // Testy pojedou bez cache — každé volání je čerstvé z DB.
             services.RemoveAll<IMemoryCache>();
             services.AddSingleton<IMemoryCache, NullMemoryCache>();
+
+            // Serverové PDF (2026-09-04): Api testy nesmí spouštět prohlížeč.
+            services.RemoveAll<IPdfRenderer>();
+            services.AddSingleton<FakePdfRenderer>();
+            services.AddSingleton<IPdfRenderer>(sp => sp.GetRequiredService<FakePdfRenderer>());
             services
                 .AddAuthentication(options =>
                 {

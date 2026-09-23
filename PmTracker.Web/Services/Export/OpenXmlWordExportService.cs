@@ -25,6 +25,9 @@ public sealed partial class OpenXmlWordExportService(IRichTextContentService ric
 {
     private const string PausedRecordFillHex = "FDF4E8";
 
+    /// <summary>Ukončený úkol — jemná modrá, stejná jako v tiskovém CSS (2026-09-05).</summary>
+    private const string CompletedRecordFillHex = "EFF6FF";
+
     /// <summary>Sestaví Word dokument ze šablony exportu.</summary>
     public byte[] BuildDocument(PdfExportTemplateViewModel model)
     {
@@ -37,41 +40,18 @@ public sealed partial class OpenXmlWordExportService(IRichTextContentService ric
 
             AppendHeader(body, model, BuildDocumentTitle(model));
             AppendRecordsSection(body, mainPart, model.Zaznamy);
-            AppendSectionProperties(body);
+            AppendSectionProperties(body, mainPart);
             mainPart.Document.Save();
         }
 
         return stream.ToArray();
     }
 
-    // ── private record structs (používány napříč partials, musí být v core) ──
-
-    private readonly record struct HtmlInlineToken(
-        string Text,
-        bool Bold,
-        bool Italic,
-        bool Underline,
-        string? LinkHref,
-        bool IsLineBreak);
-
-    private readonly record struct HtmlParagraphModel(
-        int IndentLevel,
-        IReadOnlyList<HtmlInlineToken> Tokens);
-
-    private readonly record struct HtmlStyleState(
-        bool Bold = false,
-        bool Italic = false,
-        bool Underline = false,
-        string? LinkHref = null);
+    // 2026-09-08: HtmlInlineToken/HtmlParagraphModel/HtmlStyleState se přestěhovaly
+    // do RichTextHtmlParser jako RichTextToken/RichTextParagraph — parser sdílí i výzva.
 
     // ── source-generated regexes (musí být v partial class, ne v static helper) ──
 
     [GeneratedRegex(@"^rgba?\(\s*(?<r>\d{1,3})\s*,\s*(?<g>\d{1,3})\s*,\s*(?<b>\d{1,3})", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex RgbRegex();
-
-    [GeneratedRegex(@"<\s*br\s*/?\s*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex BreakTagRegex();
-
-    [GeneratedRegex(@"(?:^|\s)ql-indent-(?<level>\d+)(?:\s|$)", RegexOptions.CultureInvariant)]
-    private static partial Regex IndentClassRegex();
 }

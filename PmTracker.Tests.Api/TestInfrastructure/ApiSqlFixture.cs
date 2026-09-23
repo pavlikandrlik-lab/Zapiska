@@ -344,6 +344,68 @@ public sealed class ApiSqlFixture : IAsyncLifetime
         await dbContext.SaveChangesAsync();
     }
 
+    /// <summary>Projektové (viditelné) číslo záznamu — drobečky i karty ho používají místo databázového Id.</summary>
+    public async Task<string> GetRecordVisibleNumberAsync(int recordId)
+    {
+        await using var dbContext = CreateDbContext();
+        var row = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == recordId)
+            .Select(x => new { x.CisloViditelne, x.CisloZaznamu })
+            .FirstAsync();
+        return string.IsNullOrWhiteSpace(row.CisloViditelne) ? row.CisloZaznamu.ToString() : row.CisloViditelne;
+    }
+
+    /// <summary>
+    /// Skutečnost kroku vytěžená z vyjádření: externí odkaz + aktivní vazba na krok.
+    /// Read-only zobrazení z ní odvozuje odkaz „odkud skutečnost pochází".
+    /// </summary>
+    public async Task<int> SeedHarvestedActualAsync(int projectId, int recordId, int poradi)
+    {
+        await using var dbContext = CreateDbContext();
+
+        var typId = await dbContext.CiselnikTypuExternichOdkazu.Select(x => x.Id).FirstAsync();
+        var cislo = $"{900000 + recordId}";
+        var odkaz = await dbContext.ZaznamExterniOdkazy
+            .FirstOrDefaultAsync(x => x.ZaznamId == recordId && x.Cislo == cislo);
+        if (odkaz is null)
+        {
+            odkaz = new ZaznamExterniOdkazEntity
+            {
+                ZaznamId = recordId,
+                TypOdkazuId = typId,
+                Cislo = cislo
+            };
+            dbContext.ZaznamExterniOdkazy.Add(odkaz);
+            await dbContext.SaveChangesAsync();
+        }
+
+        var hasBinding = await dbContext.VyjadreniVazby
+            .AnyAsync(x => x.ZaznamId == recordId && x.Poradi == (byte)poradi && x.Stav == (byte)VazbaStav.Active);
+        if (!hasBinding)
+        {
+            dbContext.VyjadreniVazby.Add(new ZaznamHarmonogramVyjadreniVazbaEntity
+            {
+                ZaznamId = recordId,
+                Poradi = (byte)poradi,
+                ExterniOdkazId = odkaz.Id,
+                HotVyjadreniId = 500000 + recordId,
+                DatumVyjadreni = DateTime.UtcNow.Date.AddDays(-5),
+                Source = 1,
+                Stav = (byte)VazbaStav.Active,
+                CreatedAt = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        // Krok musí být označen jako vytěžený automatem, jinak jde buňka jinou větví.
+        var krok = await dbContext.ZaznamHarmonogramKroky
+            .FirstAsync(x => x.ZaznamId == recordId && x.Poradi == (byte)poradi);
+        krok.SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Automat;
+        await dbContext.SaveChangesAsync();
+
+        return odkaz.Id;
+    }
+
     public async Task<int> CreateMeetingAsync(int projectId, string stateCode, int meetingNumber)
     {
         await using var dbContext = CreateDbContext();

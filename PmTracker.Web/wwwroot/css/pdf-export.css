@@ -186,6 +186,13 @@ body {
     background: #fff;
 }
 
+/* Podbarvení ukončených úkolů (2026-09-05). Stojí ZÁMĚRNĚ před pravidlem pro
+   pozastavené — obě mají stejnou specificitu, takže rozhoduje pořadí a
+   pozastavení musí vyhrát (spec §4.3). */
+.task-row.completed td {
+    background: #eff6ff;
+}
+
 .task-row.paused td {
     background: #fdf4e8;
 }
@@ -528,3 +535,51 @@ tr.task-row {
         display: table-header-group;
     }
 }
+
+/* ── Výzva k poskytnutí plnění (2026-09-07, spec §9) ──
+   Podle finálního vzoru (spec 2026-09-10 B1): Times New Roman, tělo 12 b., tabulky 10 b. */
+.vyzva-sheet { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.35; }
+.vyzva-priloha { text-align: right; margin: 0 0 1.5rem; }
+.vyzva-hlavicka { margin-bottom: 1.5rem; }
+.vyzva-hlavicka p { margin: 0; }
+.vyzva-hlavicka-urad { font-size: 16pt; font-weight: 700; }
+.vyzva-hlavicka-odbor { font-weight: 700; }
+.vyzva-male { font-size: 10pt; }
+.vyzva-cj { display: flex; margin: 1.5rem 0; }
+.vyzva-cj-datum { margin-left: 12rem; }
+.vyzva-nadpis { font-size: 12pt; text-align: justify; margin: 1.5rem 0; }
+.vyzva-blok { text-align: justify; }
+.vyzva-stred { text-align: center; font-weight: 700; margin: 1rem 0; }
+.vyzva-tucne { font-weight: 700; }
+.vyzva-bez-mezer { margin: 0; }
+.vyzva-sheet h2 { font-size: 12pt; margin: 1.4rem 0 0.6rem; }
+.vyzva-sheet h3 { font-size: 12pt; margin: 1rem 0 0.4rem; }
+
+.vyzva-tabulka { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 10pt; }
+.vyzva-tabulka th,
+.vyzva-tabulka td { border: 1px solid #000; padding: 3px 5px; vertical-align: top; }
+.vyzva-tabulka th { background: #efefef; text-align: left; }
+.vyzva-tabulka tr.vyzva-soucet td { font-weight: 700; }
+.vyzva-kalkulace td:nth-child(n+3),
+.vyzva-kalkulace th:nth-child(n+3) { text-align: right; }
+
+.vyzva-podpisy { width: 100%; margin-top: 2rem; font-size: 9pt; }
+.vyzva-podpisy td { width: 50%; padding: 0.35rem 0; vertical-align: top; }
+
+/* Zalomení před sekcemi 2, 3 a 4 jako ve vzoru; nadpis požadavku drží s tabulkou
+   a řádek tabulky se nedělí — náhrada ručních zalomení konkrétní výzvy (spec B8). */
+.vyzva-zalomit { break-before: page; page-break-before: always; }
+.vyzva-sheet h3 { break-after: avoid; page-break-after: avoid; }
+.vyzva-tabulka tr { break-inside: avoid; page-break-inside: avoid; }
+
+/* Text požadavku od pracovníka. Times New Roman 12 shodně s Wordem, ať náhled
+   neukazuje něco jiného než stažený dokument (spec R6). */
+.vyzva-pozadavek {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 12pt;
+  line-height: 1.4;
+}
+
+.vyzva-pozadavek p { margin: 0 0 0.4em; }
+.vyzva-pozadavek ul,
+.vyzva-pozadavek ol { margin: 0 0 0.4em 1.2em; }

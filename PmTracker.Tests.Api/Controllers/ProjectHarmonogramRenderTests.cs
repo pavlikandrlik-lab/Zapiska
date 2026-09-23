@@ -18,7 +18,7 @@ public sealed class ProjectHarmonogramRenderTests
     }
 
     [Fact]
-    public async Task Detail_ShouldRenderInlineProjectHeader_LikeMainLayout()
+    public async Task Detail_ShouldRenderProjectIdentityInBreadcrumbBar()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiProjectHeaderOwner");
         var projectId = await _fixture.EnsureProjectAsync("APIHARMHDR");
@@ -31,10 +31,11 @@ public sealed class ProjectHarmonogramRenderTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain("project-header-row");
-        html.Should().Contain("project-title-inline");
-        html.Should().Contain("project-status-inline");
-        html.Should().Contain("Zkratka: APIHARMHDR");
+        // Projektová hlavička se přesunula do drobečkové lišty (frame bar pod menu).
+        html.Should().Contain("app-breadcrumb-bar");
+        html.Should().Contain("app-breadcrumb-suffix");   // " | APIHARMHDR"
+        html.Should().Contain("APIHARMHDR");
+        html.Should().NotContain("project-title-inline");
     }
 
     [Fact]
@@ -110,7 +111,7 @@ public sealed class ProjectHarmonogramRenderTests
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram layered record");
 
         // Datum-model: plán pro všech 10 kroků, skutečnost na kroku 1 (= vyplněný segment).
-        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
+        await _fixture.SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
@@ -148,7 +149,7 @@ public sealed class ProjectHarmonogramRenderTests
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram breakdown record");
 
         // Datum-model: plán pro všech 10 kroků, skutečnost na krocích 1–2.
-        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
+        await _fixture.SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
@@ -178,7 +179,7 @@ public sealed class ProjectHarmonogramRenderTests
         const int firstStepOrder = 1;
         const int secondStepOrder = 2;
         const int thirdStepOrder = 3;
-        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-40), new HashSet<int> { firstStepOrder, thirdStepOrder });
+        await _fixture.SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-40), new HashSet<int> { firstStepOrder, thirdStepOrder });
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
@@ -211,7 +212,7 @@ public sealed class ProjectHarmonogramRenderTests
         await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram aktuální krok record");
         // Vyplněno 1,2 → aktuální krok = 3 (nevyplněný, plán v minulosti → táhne do dneška).
-        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
+        await _fixture.SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var html = await (await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}")).Content.ReadAsStringAsync();
@@ -231,7 +232,7 @@ public sealed class ProjectHarmonogramRenderTests
         var subsystemId = await _fixture.EnsureSubsystemAsync("APIHARMSUBTCK", ownerId);
         await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram ticks record");
-        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
+        await _fixture.SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var html = await (await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}")).Content.ReadAsStringAsync();
@@ -255,7 +256,7 @@ public sealed class ProjectHarmonogramRenderTests
         var subsystemId = await _fixture.EnsureSubsystemAsync("APIHARMSUBEDIT", ownerId);
         await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram editable plan record");
-        await SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
+        await _fixture.SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}");
@@ -272,33 +273,45 @@ public sealed class ProjectHarmonogramRenderTests
         }
     }
 
-    /// <summary>
-    /// Datum-model seed: vloží krok rows (plan_datum + volitelně skutecnost_datum) do
-    /// <c>zaznam_harmonogram_krok</c>. Plán je vždy vyplněn pro všech 10 kroků (týdenní rozestup
-    /// od <paramref name="startDate"/>), skutečnost jen pro kroky uvedené v <paramref name="actualSteps"/>.
-    /// </summary>
-    private async Task SeedDatumScheduleAsync(
-        int recordId,
-        DateTime startDate,
-        IReadOnlySet<int> actualSteps)
+    [Fact]
+    public async Task Edit_ScheduleTab_PlanDateField_IsEmpty_WhereNoPlanDate_ButKeepsValueWhereSet()
     {
-        await using var dbContext = _fixture.CreateDbContext();
-        var now = DateTime.UtcNow;
-        for (var poradi = 1; poradi <= 10; poradi++)
+        var ownerId = await _fixture.EnsurePersonAsync("ApiHarmEmptyPlanOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIHARMEMPTY");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIHARMSUBEMPTY", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram empty plan record");
+
+        // Jen krok 3 má plánové datum; ostatní kroky žádný řádek (plán = null).
+        await using (var dbContext = _fixture.CreateDbContext())
         {
-            var plan = startDate.Date.AddDays(poradi * 7);
-            DateTime? actual = actualSteps.Contains(poradi) ? plan.AddDays(2) : null;
             dbContext.ZaznamHarmonogramKroky.Add(new ZaznamHarmonogramKrokEntity
             {
                 ZaznamId = recordId,
-                Poradi = (byte)poradi,
-                PlanDatum = plan,
-                SkutecnostDatum = actual,
-                SkutecnostZdroj = actual.HasValue ? (byte)2 : (byte)0,
+                Poradi = 3,
+                PlanDatum = new DateTime(2026, 3, 20),
+                SkutecnostDatum = null,
+                SkutecnostZdroj = 0,
                 SkutecnostRezim = 2,
-                UpdatedAt = now
+                UpdatedAt = DateTime.UtcNow
             });
+            await dbContext.SaveChangesAsync();
         }
-        await dbContext.SaveChangesAsync();
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+
+        // Krok 3 (i=2) má uložené plánové datum → iso-value zůstává vyplněné.
+        var step3Field = Regex.Match(html, "<pm-date-field\\b[^>]*HarmonogramHodnoty\\[2\\]\\.PlanDatum[^>]*>");
+        step3Field.Success.Should().BeTrue("krok 3 plán pole se renderuje");
+        step3Field.Value.Should().Contain("iso-value=\"2026-03-20\"", "vyplněný krok drží svou hodnotu");
+
+        // Krok 1 (i=0) nemá plánové datum → iso-value prázdné (dřív = datum založení = zdroj kaskády).
+        var step1Field = Regex.Match(html, "<pm-date-field\\b[^>]*HarmonogramHodnoty\\[0\\]\\.PlanDatum[^>]*>");
+        step1Field.Success.Should().BeTrue("krok 1 plán pole se renderuje");
+        step1Field.Value.Should().Contain("iso-value=\"\"", "nevyplněný krok má prázdné plánové datum (žádný pre-fill datem založení)");
     }
 }

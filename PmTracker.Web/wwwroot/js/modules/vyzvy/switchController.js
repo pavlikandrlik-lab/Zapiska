@@ -7,11 +7,17 @@
 
   async function handleSwitch(switchEl, isChecked) {
     const externiOdkazId = switchEl.dataset.externiOdkazId;
-    if (!externiOdkazId) return;
-
     const wrap = switchEl.closest('[data-external-vyzvy-switch-wrap]');
     const statusEl = wrap ? wrap.querySelector('[data-vyzvy-switch-status]') : null;
     const hiddenState = wrap ? wrap.querySelector('[data-external-vyzvy-switch-state]') : null;
+
+    // Nová vazba ještě nemá Id (spec 2026-09-10 R0.3), set-zaradid nemá co volat.
+    // Stav nese skryté pole formuláře a PNF se do bufferu zařadí při uložení záznamu.
+    if (!externiOdkazId || externiOdkazId === '0') {
+      if (hiddenState) hiddenState.value = isChecked ? 'true' : 'false';
+      if (statusEl) statusEl.textContent = isChecked ? 'Po uložení půjde do bufferu' : '';
+      return;
+    }
 
     switchEl.setAttribute('disabled', '');
     try {
@@ -38,25 +44,16 @@
     }
   }
 
-  function bindSwitches(root) {
-    const scope = root || document;
-    scope.querySelectorAll('gov-form-switch[data-vyzvy-switch]').forEach(function (sw) {
-      if (sw.dataset.vyzvyBound === 'true') return;
-      sw.dataset.vyzvyBound = 'true';
-      sw.addEventListener('gov-change', function (e) {
-        const checked = e && e.detail ? !!e.detail.checked : !!sw.checked;
-        handleSwitch(sw, checked);
-      });
-    });
-  }
-
-  global.pmVyzvy = global.pmVyzvy || {};
-  global.pmVyzvy.bindSwitches = bindSwitches;
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { bindSwitches(); });
-  } else {
-    bindSwitches();
-  }
-  document.addEventListener('pm:record-editor-loaded', function (e) { bindSwitches(e.target || document); });
+  // Delegace z document (spec 2026-09-10 R0.3): nový řádek vazby vzniká klonem šablony
+  // (recordEditor/form.js) až po načtení stránky a posluchač navázaný na jednotlivé
+  // přepínače by ho minul. gov-change ze Stencil komponenty probublává — stejný vzor
+  // používá recordScheduleView.js.
+  document.addEventListener('gov-change', function (e) {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const sw = target.closest('gov-form-switch[data-vyzvy-switch]');
+    if (!sw) return;
+    const checked = e.detail ? !!e.detail.checked : !!sw.checked;
+    handleSwitch(sw, checked);
+  });
 })(window);

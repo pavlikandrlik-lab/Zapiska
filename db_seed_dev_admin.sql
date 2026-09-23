@@ -111,6 +111,8 @@ BEGIN TRY
 
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_stavu_ucasti WHERE kod = N'PRESENT')
         INSERT INTO dbo.ciselnik_stavu_ucasti(kod, nazev, is_locked) VALUES (N'PRESENT', N'Přítomen', 1);
+    IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_stavu_ucasti WHERE kod = N'ONLINE')
+        INSERT INTO dbo.ciselnik_stavu_ucasti(kod, nazev, is_locked) VALUES (N'ONLINE', N'Videokonference', 1);
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_stavu_ucasti WHERE kod = N'EXCUSED')
         INSERT INTO dbo.ciselnik_stavu_ucasti(kod, nazev, is_locked) VALUES (N'EXCUSED', N'Omluven', 1);
     IF NOT EXISTS (SELECT 1 FROM dbo.ciselnik_stavu_ucasti WHERE kod = N'ABSENT')

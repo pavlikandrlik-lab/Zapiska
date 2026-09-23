@@ -257,6 +257,7 @@ public sealed partial class ProjectService
                     TypNazev = extTypeById.GetValueOrDefault(link.TypOdkazuId)?.Nazev,
                     Cislo = link.Cislo,
                     PredpokladanaCena = link.PredpokladanaCena,
+                    KalkulaceCena = link.KalkulaceCena,
                     ServiceDeskTicketId = ticketId,
                     ServiceDeskUrl = BuildServiceDeskUrl(ticketId),
                     Vyzva = link.VyzvaId.HasValue ? vyzvaById.GetValueOrDefault(link.VyzvaId.Value)?.Kod : null,
@@ -456,9 +457,15 @@ public sealed partial class ProjectService
             return [];
         }
 
+        // Pořadí záznamů = kategorie (Info → Rozhodnutí → Úkol → ostatní) primárně, viditelné číslo
+        // dle jednání sekundárně (sdílený RecordDisplayOrdering — stejné jako tisk). Kategorie potřebuje
+        // název → načteme číselník před řazením.
+        var allCategories = await lookupCache.GetCategoriesAsync(ct);
         records = records
-            .OrderBy(ResolveVisibleNumberPartA)
-            .ThenBy(ResolveVisibleNumberPartB)
+            .OrderBy(x => RecordDisplayOrdering.CategoryOrder(allCategories.GetValueOrDefault(x.KategorieId)?.Nazev))
+            .ThenBy(x => allCategories.GetValueOrDefault(x.KategorieId)?.Nazev, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => RecordDisplayOrdering.VisibleNumberPartA(x.CisloViditelneA, x.CisloZaznamu))
+            .ThenBy(x => RecordDisplayOrdering.VisibleNumberPartB(x.CisloViditelneTyp, x.CisloViditelneB))
             .ThenBy(x => x.CisloZaznamu)
             .ToList();
         var ownerIds = records.Select(x => x.VlastnikId).Distinct().ToArray();
@@ -466,8 +473,6 @@ public sealed partial class ProjectService
         var taskTypeIds = records.Where(x => x.AktualniTypUkoluId.HasValue).Select(x => x.AktualniTypUkoluId!.Value).Distinct().ToArray();
         var taskStateIds = records.Where(x => x.StavUkoluId.HasValue).Select(x => x.StavUkoluId!.Value).Distinct().ToArray();
         var subsystemIds = records.Select(x => x.SubsystemId).Distinct().ToArray();
-        // Perf: cache-backed lookups — viz LookupTableCache + ProjectQueryHelpers.
-        var allCategories = await lookupCache.GetCategoriesAsync(ct);
         var allTaskTypes = await lookupCache.GetTaskTypesAsync(ct);
         var allTaskStates = await lookupCache.GetTaskStatesAsync(ct);
         var allSubsystems = await lookupCache.GetSubsystemsAsync(ct);

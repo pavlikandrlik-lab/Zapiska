@@ -98,7 +98,10 @@ public sealed partial class OpenXmlWordExportService
 
     private TableRow CreateRecordRow(MainDocumentPart mainPart, PdfExportRecordViewModel record)
     {
-        var recordFillColor = record.IsPaused ? PausedRecordFillHex : null;
+        // Pozastavení má přednost před ukončením (2026-09-05, spec §4.3).
+        var recordFillColor = record.IsPaused
+            ? PausedRecordFillHex
+            : record.IsCompleted ? CompletedRecordFillHex : null;
         var commentsCell = CreateRecordCell("8100", recordFillColor);
         var peopleCell = CreateRecordCell("2100", recordFillColor);
         var deadlinesCell = CreateRecordCell("1600", recordFillColor);
@@ -343,7 +346,7 @@ public sealed partial class OpenXmlWordExportService
         string? shadingHex,
         string? textColorHex = null)
     {
-        var parsed = ParseRichHtml(safeHtml);
+        var parsed = RichTextHtmlParser.Parse(safeHtml);
         if (parsed.Count == 0)
         {
             return;
@@ -442,233 +445,6 @@ public sealed partial class OpenXmlWordExportService
         }
 
         return new Paragraph(paragraphProperties);
-    }
-
-    private static IReadOnlyList<HtmlParagraphModel> ParseRichHtml(string safeHtml)
-    {
-        if (string.IsNullOrWhiteSpace(safeHtml))
-        {
-            return Array.Empty<HtmlParagraphModel>();
-        }
-
-        var normalizedForXml = NormalizeHtmlForXml(safeHtml);
-        XDocument document;
-        try
-        {
-            document = XDocument.Parse($"<root>{normalizedForXml}</root>", LoadOptions.PreserveWhitespace);
-        }
-        catch
-        {
-            return
-            [
-                new HtmlParagraphModel(
-                    IndentLevel: 0,
-                    Tokens: [new HtmlInlineToken(WebUtility.HtmlDecode(safeHtml), false, false, false, null, false)])
-            ];
-        }
-
-        var paragraphs = new List<HtmlParagraphModel>();
-        var root = document.Root;
-        if (root is null)
-        {
-            return paragraphs;
-        }
-
-        foreach (var node in root.Nodes())
-        {
-            if (node is XElement element && element.Name.LocalName.Equals("p", StringComparison.OrdinalIgnoreCase))
-            {
-                var tokens = new List<HtmlInlineToken>();
-                foreach (var childNode in element.Nodes())
-                {
-                    AppendInlineTokens(childNode, default, tokens);
-                }
-
-                paragraphs.Add(new HtmlParagraphModel(ParseIndentLevel(element.Attribute("class")?.Value), tokens));
-                continue;
-            }
-
-            if (node is XElement listElement && IsListElement(listElement))
-            {
-                AppendListParagraphs(listElement, paragraphs, baseIndentLevel: 0);
-                continue;
-            }
-
-            if (node is XText textNode)
-            {
-                if (string.IsNullOrWhiteSpace(textNode.Value))
-                {
-                    continue;
-                }
-
-                paragraphs.Add(new HtmlParagraphModel(0, [new HtmlInlineToken(textNode.Value, false, false, false, null, false)]));
-                continue;
-            }
-
-            if (node is XElement otherElement)
-            {
-                var tokens = new List<HtmlInlineToken>();
-                AppendInlineTokens(otherElement, default, tokens);
-                if (tokens.Count > 0)
-                {
-                    paragraphs.Add(new HtmlParagraphModel(ParseIndentLevel(otherElement.Attribute("class")?.Value), tokens));
-                }
-            }
-        }
-
-        return paragraphs;
-    }
-
-    private static void AppendListParagraphs(XElement listElement, List<HtmlParagraphModel> paragraphs, int baseIndentLevel)
-    {
-        var defaultListTag = listElement.Name.LocalName.Equals("ol", StringComparison.OrdinalIgnoreCase)
-            ? "ol"
-            : "ul";
-        var orderedIndex = 0;
-
-        foreach (var node in listElement.Nodes())
-        {
-            if (node is not XElement listItemElement
-                || !listItemElement.Name.LocalName.Equals("li", StringComparison.OrdinalIgnoreCase))
-            {
-                if (node is XElement nestedListElement && IsListElement(nestedListElement))
-                {
-                    AppendListParagraphs(nestedListElement, paragraphs, baseIndentLevel + 1);
-                }
-
-                continue;
-            }
-
-            var resolvedListTag = ResolveListTag(defaultListTag, listItemElement);
-            var marker = resolvedListTag == "ol"
-                ? $"{++orderedIndex}. "
-                : "• ";
-            if (resolvedListTag != "ol")
-            {
-                orderedIndex = 0;
-            }
-
-            var tokens = new List<HtmlInlineToken>
-            {
-                new(marker, false, false, false, null, false)
-            };
-
-            foreach (var child in listItemElement.Nodes())
-            {
-                if (child is XElement nestedList && IsListElement(nestedList))
-                {
-                    continue;
-                }
-
-                AppendInlineTokens(child, default, tokens);
-            }
-
-            var itemIndentLevel = baseIndentLevel + ParseIndentLevel(listItemElement.Attribute("class")?.Value);
-            paragraphs.Add(new HtmlParagraphModel(itemIndentLevel, tokens));
-
-            foreach (var nestedList in listItemElement.Elements().Where(IsListElement))
-            {
-                AppendListParagraphs(nestedList, paragraphs, itemIndentLevel + 1);
-            }
-        }
-    }
-
-    private static bool IsListElement(XElement element)
-    {
-        return element.Name.LocalName.Equals("ul", StringComparison.OrdinalIgnoreCase)
-            || element.Name.LocalName.Equals("ol", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string ResolveListTag(string defaultListTag, XElement listItemElement)
-    {
-        var listMode = (listItemElement.Attribute("data-list")?.Value ?? string.Empty).Trim();
-        if (listMode.Equals("bullet", StringComparison.OrdinalIgnoreCase))
-        {
-            return "ul";
-        }
-
-        if (listMode.Equals("ordered", StringComparison.OrdinalIgnoreCase))
-        {
-            return "ol";
-        }
-
-        return defaultListTag;
-    }
-
-    private static void AppendInlineTokens(XNode node, HtmlStyleState style, List<HtmlInlineToken> target)
-    {
-        if (node is XText textNode)
-        {
-            if (textNode.Value.Length > 0)
-            {
-                target.Add(new HtmlInlineToken(textNode.Value, style.Bold, style.Italic, style.Underline, style.LinkHref, false));
-            }
-
-            return;
-        }
-
-        if (node is not XElement element)
-        {
-            return;
-        }
-
-        var localName = element.Name.LocalName;
-        if (localName.Equals("br", StringComparison.OrdinalIgnoreCase))
-        {
-            target.Add(new HtmlInlineToken(string.Empty, style.Bold, style.Italic, style.Underline, style.LinkHref, true));
-            return;
-        }
-
-        var nextStyle = style;
-        if (localName.Equals("strong", StringComparison.OrdinalIgnoreCase) || localName.Equals("b", StringComparison.OrdinalIgnoreCase))
-        {
-            nextStyle = nextStyle with { Bold = true };
-        }
-        else if (localName.Equals("em", StringComparison.OrdinalIgnoreCase) || localName.Equals("i", StringComparison.OrdinalIgnoreCase))
-        {
-            nextStyle = nextStyle with { Italic = true };
-        }
-        else if (localName.Equals("u", StringComparison.OrdinalIgnoreCase))
-        {
-            nextStyle = nextStyle with { Underline = true };
-        }
-        else if (localName.Equals("a", StringComparison.OrdinalIgnoreCase))
-        {
-            var href = (element.Attribute("href")?.Value ?? string.Empty).Trim();
-            nextStyle = nextStyle with
-            {
-                LinkHref = string.IsNullOrWhiteSpace(href) ? null : href
-            };
-        }
-
-        foreach (var child in element.Nodes())
-        {
-            AppendInlineTokens(child, nextStyle, target);
-        }
-    }
-
-    private static int ParseIndentLevel(string? classValue)
-    {
-        if (string.IsNullOrWhiteSpace(classValue))
-        {
-            return 0;
-        }
-
-        var match = IndentClassRegex().Match(classValue);
-        if (!match.Success)
-        {
-            return 0;
-        }
-
-        return int.TryParse(match.Groups["level"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var level)
-            ? Math.Clamp(level, 0, 8)
-            : 0;
-    }
-
-    private static string NormalizeHtmlForXml(string html)
-    {
-        var normalized = BreakTagRegex().Replace(html, "<br />");
-        return normalized.Replace("&nbsp;", "&#160;", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int CategoryOrder(string? category)

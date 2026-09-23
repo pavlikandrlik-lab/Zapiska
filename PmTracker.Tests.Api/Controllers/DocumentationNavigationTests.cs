@@ -37,7 +37,8 @@ public sealed class DocumentationNavigationTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain("docs-breadcrumb");
+        // Lokální docs-breadcrumb nahrazen jednotnou frame lištou pod menu (2026-07-04).
+        html.Should().Contain("app-breadcrumb-bar");
         html.Should().Contain("Technická dokumentace");
         html.Should().Contain("Uživatelské a provozní");
         html.Should().Contain(expectedMarker);

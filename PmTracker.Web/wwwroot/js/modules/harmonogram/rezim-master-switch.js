@@ -65,6 +65,10 @@
     const sw = event.target?.closest?.(SWITCH_SELECTOR);
     if (!sw) return;
 
+    // C3 (2026-07-10): read-only stránka (schvalování návrhu) renderuje switch
+    // s disabled — event od gov komponenty se nesmí propsat do hidden inputu ani cells.
+    if (sw.hasAttribute('disabled')) return;
+
     // gov-form-switch CustomEvent: event.detail.checked je authoritative.
     const isChecked = (event && event.detail && typeof event.detail.checked === 'boolean')
       ? event.detail.checked

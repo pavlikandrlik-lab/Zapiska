@@ -7,6 +7,9 @@ public interface IRecordService
     Task<bool> ProjektExistsAsync(int id, CancellationToken ct = default);
     Task<ProjektDetailViewModel> BuildProjektDetailAsync(int id, CancellationToken ct = default);
     Task<ProjektZaznamCardShellViewModel?> BuildRecordCardShellAsync(int projectId, int recordId, CancellationToken ct = default);
+    Task<ZaznamScheduleBlockViewModel?> BuildRecordScheduleBlockAsync(int projectId, int recordId, CancellationToken ct = default);
+    Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, CancellationToken ct = default);
+    Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, bool canOpenVyjadreni, CancellationToken ct = default);
     Task<ZaznamCardDetailViewModel?> BuildRecordCardDetailAsync(int projectId, int recordId, CancellationToken ct = default);
     Task<ZaznamCommentsPanelViewModel?> BuildRecordCommentsPanelAsync(int projectId, int recordId, CancellationToken ct = default);
     Task<ZaznamCommentsPanelViewModel?> BuildRecordCommentsPanelAsync(int projectId, int recordId, int? limit, bool loadAll, CancellationToken ct = default);

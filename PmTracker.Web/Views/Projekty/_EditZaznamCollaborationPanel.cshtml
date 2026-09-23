@@ -1,11 +1,15 @@
 @model ZaznamEditViewModel
+@{
+    // B4 (2026-07-09): detail návrhu = čistě rozhodovací — výběr spolupracovníků je read-only.
+    var collabDisabled = Model.IsProposalDecisionDetail;
+}
 
 <pm-tab-panel key="collaboration" class="record-modal-panel" data-record-modal-panel="collaboration">
     <div class="section-divider">Spolupráce</div>
     <div class="collab-picker">
         <label>
             Vyhledat osobu
-            <input type="search" placeholder="Jméno, organizace..." data-collab-search />
+            <input type="search" placeholder="Jméno, organizace..." data-collab-search disabled="@(collabDisabled ? "disabled" : null)" />
         </label>
         <div class="collab-options" data-collab-options>
             @foreach (var osoba in Model.DostupniSpolupracovnici)
@@ -15,15 +19,16 @@
                 <label class="collab-option" data-collab-option data-collab-label="@searchable">
                     @if (isChecked)
                     {
-                        <input type="checkbox" name="VybraniSpolupracovniciIds" value="@osoba.OsobaId" checked="checked" />
+                        <input type="checkbox" name="VybraniSpolupracovniciIds" value="@osoba.OsobaId" checked="checked" disabled="@(collabDisabled ? "disabled" : null)" />
                     }
                     else
                     {
-                        <input type="checkbox" name="VybraniSpolupracovniciIds" value="@osoba.OsobaId" />
+                        <input type="checkbox" name="VybraniSpolupracovniciIds" value="@osoba.OsobaId" disabled="@(collabDisabled ? "disabled" : null)" />
                     }
+                    @* B5 (2026-07-09): jednořádkově jméno + org celek; email/organizace zůstávají
+                       v data-collab-label (hledání), z výpisu jsou pryč. *@
                     <span class="collab-option-name">@osoba.Osoba</span>
-                    <span class="collab-option-email">@(string.IsNullOrWhiteSpace(osoba.Email) ? "-" : osoba.Email)</span>
-                    <span class="collab-option-origin">@(osoba.Organizace ?? "-") / @(osoba.OrganizacniCelek ?? "-")</span>
+                    <span class="collab-option-org">@(osoba.OrganizacniCelek ?? "-")</span>
                 </label>
             }
         </div>

@@ -6,7 +6,6 @@ public enum VyzvaErrorCode
     ProjectNotFound = 1,
     ProjectMissingMistoPlneni = 2,
     ProjectMissingCisloRamcoveSmlouvy = 3,
-    BufferEmpty = 4,
     InvalidStateTransition = 5,
     VyzvaNotFound = 6,
     ExternalLinkNotFound = 7,
@@ -14,6 +13,11 @@ public enum VyzvaErrorCode
     VyzvaIsLocked = 9,
     PnfAlreadyInAnotherVyzva = 10,
     AccessDenied = 11,
+
+    // 2026-09-07: číslo výzvy zadává uživatel ručně (spec §5.1). Kód 4 = BufferEmpty
+    // zanikl — prázdný buffer už zakládání neblokuje.
+    InvalidVyzvaNumber = 12,
+    DuplicateVyzvaNumber = 13,
 }
 
 public sealed record VyzvaError(VyzvaErrorCode Code, string Message);

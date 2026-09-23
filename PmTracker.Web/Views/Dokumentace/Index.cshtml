@@ -1,12 +1,7 @@
 @model DocumentationPageViewModel
 
 <section class="docs-page">
-    <nav class="docs-breadcrumb" aria-label="Drobečková navigace">
-        <a asp-controller="Dokumentace" asp-action="StromDokumentace">Dokumentace</a>
-        <span>/</span>
-        <span>@Model.SectionLabel</span>
-    </nav>
-
+    @* Lokální docs-breadcrumb nahrazen jednotnou frame lištou pod menu (Dokumentace ▸ …), 2026-07-04. *@
     <div class="docs-header">
         <h1>@Model.Title</h1>
         <p>@Model.Subtitle</p>

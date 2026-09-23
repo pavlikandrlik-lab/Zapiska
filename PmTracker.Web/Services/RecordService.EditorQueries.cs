@@ -33,7 +33,9 @@ public sealed partial class RecordService
         var defaultSubsystem = activeProjectSubsystems.FirstOrDefault();
         var meetings = await composition.BuildJednaniListAsync(projektId, ct);
         var meetingById = meetings.ToDictionary(x => x.Id);
-        var openMeetingOptions = await composition.BuildOpenMeetingOptionsAsync(meetings, ct);
+        var openMeetingOptions = project.PouzivatIdentJednani
+            ? await composition.BuildOpenMeetingOptionsForCreateAsync(projektId, meetings, ct)
+            : await composition.BuildOpenMeetingOptionsAsync(meetings, ct);
         var contextMeeting = jednaniId.HasValue ? meetingById.GetValueOrDefault(jednaniId.Value) : null;
         var selectedMeetingIdForNumber = project.PouzivatIdentJednani
             ? composition.ResolveSelectedMeetingIdForNumber(openMeetingOptions, contextMeeting?.Id)
@@ -60,8 +62,12 @@ public sealed partial class RecordService
                 .Select(x => x.Id)
                 .FirstAsync(ct);
         var nextRecordNumber = await composition.GetNextCisloZaznamuAsync(projektId, ct);
+        // Náhled čísla dle jednání: {CisloJednani}-{predikované pořadí} pro předvybrané jednání.
+        // Bez otevřeného jednání zůstává prázdné (založení je stejně zablokované).
         var createVisibleNumber = project.PouzivatIdentJednani
-            ? string.Empty
+            ? (selectedMeetingForNumber is not null
+                ? $"{selectedMeetingForNumber.CisloJednani}-{selectedMeetingForNumber.NextPoradiProCislo}"
+                : string.Empty)
             : nextRecordNumber.ToString(CultureInfo.InvariantCulture);
 
         var draft = new ProjektovyZaznamEntity

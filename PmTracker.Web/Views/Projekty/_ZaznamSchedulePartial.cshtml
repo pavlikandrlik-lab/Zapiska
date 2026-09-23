@@ -1,0 +1,7 @@
+@model ZaznamScheduleBlockViewModel
+@* Toggle na kartě záznamu (2026-07-13): obsah pohledu „harmonogram" — štítek + sdílený
+   readonly blok (stejné kreslení jako dlaždice v záložce Harmonogram, bez jejího obalu). *@
+<div class="record-schedule-tag-row">
+    <gov-tag color="@(Model.Stihame ? "success" : "error")" size="s">@(Model.Stihame ? "Stíháme" : "Nestíháme")</gov-tag>
+</div>
+@await Html.PartialAsync("_ScheduleBlock", Model.HarmonogramBlok)

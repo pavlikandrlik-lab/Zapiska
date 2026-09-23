@@ -94,7 +94,13 @@ async function performKeepAliveRequest(source, force) {
     }, keepAliveTimeoutMs);
 
     try {
-        const response = await fetch(keepAliveEndpointPath, {
+        // Spec 2026-09-17 §4.2 — heartbeat zámku karty jede na existujícím keep-alive,
+        // aby editor nepotřeboval vlastní časovač. Id vystavuje recordEditor/editLock.js.
+        const lockRecordId = document.documentElement.dataset.recordEditLockId || "";
+        const endpointUrl = lockRecordId
+            ? `${keepAliveEndpointPath}?zaznamId=${encodeURIComponent(lockRecordId)}`
+            : keepAliveEndpointPath;
+        const response = await fetch(endpointUrl, {
             method: "GET",
             headers: {
                 "X-Requested-With": "XMLHttpRequest",

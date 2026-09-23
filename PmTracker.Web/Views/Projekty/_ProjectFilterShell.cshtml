@@ -7,7 +7,7 @@
 <div class="filter-shell"
      data-project-filter-scope="@Model.Scope"
      data-project-id="@Model.ProjektId"
-     data-current-user-id="@Model.CurrentUserOsobaId">
+     data-project-zkratka="@Model.Zkratka">
     <button class="filter-toggle" type="button" data-filter-toggle>
         Filtry
         <span class="filter-icon" aria-hidden="true">
@@ -31,7 +31,7 @@
                 </select>
             </label>
             <label>
-                Řadit podle
+                Řazení subsystémů
                 <select data-filter-key="sortBy">
                     <option value="project-asc" selected="selected">podle pořadí projektu vzestupně</option>
                     <option value="project-desc">podle pořadí projektu sestupně</option>
@@ -79,12 +79,6 @@
                     }
                 </select>
             </label>
-            <gov-form-switch size="m" data-filter-key="aktivni" checked>
-                <span slot="label"><label>Pouze aktivní záznamy</label></span>
-            </gov-form-switch>
-            <gov-form-switch size="m" data-filter-key="mine">
-                <span slot="label"><label>Jen mé záznamy</label></span>
-            </gov-form-switch>
             <label>
                 Jednání-vyjádření
                 <select data-filter-key="jednani-vyjadreni-stav">
@@ -95,6 +89,9 @@
                     }
                 </select>
             </label>
+            <gov-form-switch size="m" data-filter-key="aktivni" checked>
+                <span slot="label"><label>Pouze aktivní záznamy</label></span>
+            </gov-form-switch>
         </div>
         <div class="filter-actions">
             <pm-button variant="Ghost" size="Small" data-filter-save-defaults="@Model.Scope">Uložit jako výchozí</pm-button>

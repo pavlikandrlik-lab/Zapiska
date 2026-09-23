@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Logging.Abstractions;
 using PmTracker.Web.Controllers;
 using PmTracker.Web.Models.ViewModels;
@@ -121,7 +122,19 @@ public sealed class ProjectDashboardControllerBehaviorTests
         };
 
         SetCurrentUserContext(controller, BuildCurrentUserContext(isSuperAdmin, visibleProjectIds));
+        // Index nastavuje drobečky (SetProjectBreadcrumbs → Url.Action) → IUrlHelper musí být přítomen.
+        controller.Url = new StubUrlHelper();
         return controller;
+    }
+
+    private sealed class StubUrlHelper : IUrlHelper
+    {
+        public ActionContext ActionContext { get; } = new();
+        public string? Action(UrlActionContext actionContext) => "/stub";
+        public string? Content(string? contentPath) => contentPath;
+        public bool IsLocalUrl(string? url) => true;
+        public string? Link(string? routeName, object? values) => "/stub";
+        public string? RouteUrl(UrlRouteContext routeContext) => "/stub";
     }
 
     private static void SetCurrentUserContext(
@@ -183,7 +196,6 @@ public sealed class ProjectDashboardControllerBehaviorTests
                 RecordsPanelUrl = $"/projekty/{projectId}/dashboard/records-panel",
                 NesPanelUrl = $"/projekty/{projectId}/dashboard/nes-panel",
                 StatisticsPanelUrl = $"/projekty/{projectId}/dashboard/statistics-panel",
-                VyzvyPanelUrl = $"/projekty/{projectId}/dashboard/vyzvy-panel",
                 BackUrl = $"/projekty/detail/{projectId}"
             });
         }
@@ -220,17 +232,6 @@ public sealed class ProjectDashboardControllerBehaviorTests
             return Task.FromResult(new ProjectDashboardNesPanelViewModel
             {
                 IsServiceDeskIntegrated = false
-            });
-        }
-
-        public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(
-            int projektId, bool muzeEditovat, CancellationToken ct)
-        {
-            return Task.FromResult(new ProjectDashboardVyzvyPanelViewModel
-            {
-                ProjektId = projektId,
-                MuzeEditovat = muzeEditovat,
-                ChybaProjektuMessage = "Panel výzev se připravuje.",
             });
         }
 

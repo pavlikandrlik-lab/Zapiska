@@ -8,6 +8,7 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
+using PmTracker.Web.Services.Schedules;
 using PmTracker.Web.Services.Audit;
 
 namespace PmTracker.Web.Services;
@@ -239,7 +240,10 @@ public sealed partial class RecordService
 
             await dbContext.SaveChangesAsync(innerCt);
             await ReplaceRecordCollaborationAsync(entity.Id, normalizedCollaborationIds, innerCt);
-            var addedExternalLinks = await ReplaceRecordExternalLinksAsync(entity.Id, command.ExterniVazby, innerCt);
+            // Nová PNF do bufferu jen s oprávněním, které hlídá i endpoint přepínače (R0.2).
+            var smiZaraditDoBufferu = currentUser.HasPermission(PermissionKeys.VyzvyPnfAssign, command.ProjektId);
+            var addedExternalLinks = await ReplaceRecordExternalLinksAsync(
+                entity.Id, command.ExterniVazby, smiZaraditDoBufferu, innerCt);
 
             // Datum-model: UPSERT krok rows (plán datumy + manuální skutečnost + rezim).
             // Auto skutečnost řeší harvest (SyncZaznamAsync), ne save.
@@ -388,6 +392,9 @@ public sealed partial class RecordService
         }
         else if (existingRecord is not null && existingRecord.ProjektId != command.ProjektId)
         {
+            // POZOR na pořadí větví: tohle je jediná vazba mezi Id záznamu z formuláře
+            // a ProjektId, proti kterému controller ověřoval oprávnění. Musí zůstat PŘED
+            // kontrolou verze — jinak by cizí projekt propadl dál (regrese z Fáze 1).
             AddRecordValidationIssue(
                 issues,
                 "Id",
@@ -395,6 +402,18 @@ public sealed partial class RecordService
                 "basic",
                 "record_project_mismatch",
                 command.Id?.ToString(CultureInfo.InvariantCulture));
+        }
+        // Spec 2026-09-17 §5 — cizí LIDSKÝ zápis. Verzí je id posledního auditního zápisu;
+        // automat neaudituje, takže jeho zásahy do harmonogramu sem nevedou. Prázdná verze =
+        // kontrola se přeskočí (create, formulář z doby před nasazením).
+        else if (existingRecord is not null && !string.IsNullOrWhiteSpace(command.RecordVersion))
+        {
+            var currentVersion = await RecordVersionQuery.ResolveVersionTokenAsync(dbContext, existingRecord.Id, ct);
+            if (!string.Equals(currentVersion, command.RecordVersion.Trim(), StringComparison.Ordinal))
+            {
+                var lastWriter = await RecordLastWriterQuery.ResolveAsync(dbContext, existingRecord.Id, ct);
+                throw new RecordStaleException(RecordStaleMessageBuilder.Build(lastWriter));
+            }
         }
 
         SaveRecordMeetingContext? meetingForNumbering = null;
@@ -483,7 +502,7 @@ public sealed partial class RecordService
         }
 
         await ValidateExternalLinksAsync(command.ExterniVazby, existingRecord, issues, ct);
-        await ValidateScheduleValuesAsync(command, isTaskCategory, existingRecord, issues, ct);
+        ValidateScheduleValues(command, isTaskCategory, issues);
 
         if (issues.Count > 0)
         {
@@ -566,9 +585,6 @@ public sealed partial class RecordService
         var typeRows = await dbContext.CiselnikTypuExternichOdkazu.AsNoTracking()
             .Select(x => new { x.Id, x.Kod, x.Nazev })
             .ToListAsync(ct);
-        var vyzvaRows = await dbContext.Vyzvy.AsNoTracking()
-            .Select(x => new { x.Id, x.Kod })
-            .ToListAsync(ct);
 
         // Plán 3 Feature D (2026-04-24, U10): hard constraint — každá NOVĚ
         // přidávaná externí vazba musí mít platné 6-místné HOT_ZAZNAMY.id,
@@ -592,13 +608,12 @@ public sealed partial class RecordService
             var typeValue = (link.Typ ?? string.Empty).Trim();
             var cisloValue = (link.Cislo ?? string.Empty).Trim();
             var priceValue = (link.PredpokladanaCena ?? string.Empty).Trim();
-            var vyzvaValue = (link.Vyzva ?? string.Empty).Trim();
             var rowPrefix = $"ExterniVazby[{index}]";
 
             var hasType = !string.IsNullOrWhiteSpace(typeValue);
             var hasCislo = !string.IsNullOrWhiteSpace(cisloValue);
             // FIX 2026-05-05: 4 datumy odstraněny z empty-row check (form je needituje, harvest spravuje).
-            if (!hasType && !hasCislo && string.IsNullOrWhiteSpace(priceValue) && string.IsNullOrWhiteSpace(vyzvaValue))
+            if (!hasType && !hasCislo && string.IsNullOrWhiteSpace(priceValue))
             {
                 continue;
             }
@@ -638,21 +653,6 @@ public sealed partial class RecordService
                     "external",
                     "external_type_not_found",
                     typeValue);
-            }
-
-            if (!string.IsNullOrWhiteSpace(vyzvaValue))
-            {
-                var vyzvaExists = vyzvaRows.Any(x => string.Equals(x.Kod, vyzvaValue, StringComparison.OrdinalIgnoreCase));
-                if (!vyzvaExists)
-                {
-                    AddRecordValidationIssue(
-                        issues,
-                        $"{rowPrefix}.Vyzva",
-                        $"Výzva '{vyzvaValue}' neexistuje.",
-                        "external",
-                        "external_vyzva_not_found",
-                        vyzvaValue);
-                }
             }
 
             if (!string.IsNullOrWhiteSpace(priceValue))
@@ -699,40 +699,16 @@ public sealed partial class RecordService
         }
     }
 
-    private async Task ValidateScheduleValuesAsync(
+    // Spec 2026-09-17 §6.1: po zrušení kontroly verze harmonogramu už metoda nesahá
+    // do DB, takže je synchronní a nepotřebuje ani záznam, ani CancellationToken.
+    private static void ValidateScheduleValues(
         SaveRecordCommand command,
         bool isTaskCategory,
-        ProjektovyZaznamEntity? existingRecord,
-        List<RecordValidationIssue> issues,
-        CancellationToken ct)
+        List<RecordValidationIssue> issues)
     {
         if (!isTaskCategory || command.HarmonogramHodnoty.Count == 0)
         {
             return;
-        }
-
-        // F-11: Soft concurrency check pro harmonogram
-        if (!string.IsNullOrEmpty(command.ScheduleVersion) && existingRecord is not null)
-        {
-            var currentMaxUpdatedAt = await dbContext.ZaznamHarmonogramKroky
-                .Where(x => x.ZaznamId == existingRecord.Id)
-                .MaxAsync(x => (DateTime?)x.UpdatedAt, ct);
-
-            var currentVersion = currentMaxUpdatedAt.HasValue
-                ? currentMaxUpdatedAt.Value.Ticks.ToString("X16")
-                : string.Empty;
-
-            if (currentVersion != command.ScheduleVersion)
-            {
-                AddRecordValidationIssue(
-                    issues,
-                    "ScheduleVersion",
-                    "Harmonogram byl mezitím upraven jiným uživatelem. Načtěte záznam znovu.",
-                    "schedule",
-                    "schedule_stale_data",
-                    null);
-                return;
-            }
         }
 
         // Datum-model: validuj poradí 1–10 + duplicitu. Plán/skutečnost jsou datumy bez range omezení.
@@ -767,53 +743,9 @@ public sealed partial class RecordService
         }
 
         // Datum-model chronologie (ruční vstupy musí být neklesající — stejný den OK).
-        // Plán: pro každý krok N platí plán(N) ≥ plán(předchozího kroku s plánem).
-        // Field key musí ukazovat na původní index v posted poli (ne na seřazené pořadí).
-        DateTime? prevPlan = null;
-        int prevPlanPoradi = 0;
-        foreach (var pair in command.HarmonogramHodnoty
-                     .Select((item, index) => (item, index))
-                     .Where(x => x.item.Poradi is >= 1 and <= 10 && x.item.PlanDatum.HasValue)
-                     .OrderBy(x => x.item.Poradi))
-        {
-            var planDate = pair.item.PlanDatum!.Value.Date;
-            if (prevPlan.HasValue && planDate < prevPlan.Value)
-            {
-                AddRecordValidationIssue(
-                    issues,
-                    $"HarmonogramHodnoty[{pair.index}].PlanDatum",
-                    $"Plán kroku {pair.item.Poradi} nesmí být dříve než plán kroku {prevPlanPoradi}.",
-                    "schedule",
-                    "schedule_plan_chronology",
-                    planDate.ToString("yyyy-MM-dd"));
-            }
-            prevPlan = planDate;
-            prevPlanPoradi = pair.item.Poradi;
-        }
-
-        // Ruční skutečnost (kroky 2/5/8/9): neklesající mezi zadanými ručními datumy.
-        // Auto skutečnost (harvest) se NEvaliduje — pořadí zajišťuje vytěžovací algoritmus.
-        DateTime? prevManual = null;
-        int prevManualPoradi = 0;
-        foreach (var pair in command.ManualActualKroky
-                     .Select((item, index) => (item, index))
-                     .Where(x => x.item.Poradi is >= 1 and <= 10 && x.item.AbsolutniDatum.HasValue)
-                     .OrderBy(x => x.item.Poradi))
-        {
-            var skutDate = pair.item.AbsolutniDatum!.Value.ToDateTime(TimeOnly.MinValue).Date;
-            if (prevManual.HasValue && skutDate < prevManual.Value)
-            {
-                AddRecordValidationIssue(
-                    issues,
-                    $"ManualActualKroky[{pair.index}].AbsolutniDatum",
-                    $"Ruční skutečnost kroku {pair.item.Poradi} nesmí být dříve než skutečnost kroku {prevManualPoradi}.",
-                    "schedule",
-                    "schedule_actual_chronology",
-                    skutDate.ToString("yyyy-MM-dd"));
-            }
-            prevManual = skutDate;
-            prevManualPoradi = pair.item.Poradi;
-        }
+        // Sdílený validátor se ScheduleChronologyValidator — tentýž zdroj pravidel používají
+        // i cesty odeslání návrhu, aby návrh nemohl obejít chronologii vynucenou při uložení.
+        ScheduleChronologyValidator.CollectIssues(command, issues);
     }
 
     private static void AddRecordValidationIssue(
@@ -937,7 +869,11 @@ public sealed partial class RecordService
 
         foreach (var mk in manualByPoradi.Values)
         {
-            if (!PmTracker.Web.Models.ViewModels.HarmonogramManualSteps.IsManual(mk.Poradi))
+            // Spec 2026-09-17 §6.2 — v ručním režimu patří i auto-eligible kroky
+            // (1/3/4/6/7/10) uživateli; UI pro ně input renderuje, server ho dosud
+            // zahazoval. V režimu Automatika je dál ignorujeme — tam kroky řídí automat.
+            var isManualStep = PmTracker.Web.Models.ViewModels.HarmonogramManualSteps.IsManual(mk.Poradi);
+            if (!isManualStep && !rezimManual)
             {
                 continue;
             }
@@ -1069,6 +1005,9 @@ public sealed partial class RecordService
     // internal (ne private) kvůli fokusovanému unit testu EstimatedExternalLinkPriceTests
     // (InternalsVisibleTo PmTracker.Tests.Unit) — pravidlo „cena jen pro PMP/PNF" se testuje
     // přímo, ne přes SD-gated Save endpoint (Ticketing.Enabled=false v testech).
+    private static bool JePnf(string? typ)
+        => string.Equals(typ?.Trim(), "PNF", StringComparison.OrdinalIgnoreCase);
+
     internal static bool SupportsEstimatedExternalLinkPrice(string? externalTypeCode)
         => !string.IsNullOrWhiteSpace(externalTypeCode)
             && (Ci.Equals(externalTypeCode, "PMP") || Ci.Equals(externalTypeCode, "PNF"));
@@ -1099,19 +1038,6 @@ public sealed partial class RecordService
 
         return await dbContext.CiselnikTypuUkolu
             .Where(x => x.Kod == value || x.Nazev == value)
-            .Select(x => (int?)x.Id)
-            .FirstOrDefaultAsync(ct);
-    }
-
-    private async Task<int?> ResolveVyzvaIdAsync(string? value, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        return await dbContext.Vyzvy
-            .Where(x => x.Kod == value)
             .Select(x => (int?)x.Id)
             .FirstOrDefaultAsync(ct);
     }
@@ -1148,16 +1074,21 @@ public sealed partial class RecordService
     ///   zůstává <c>NO ACTION</c>. Aplikace explicitně cleanup-uje
     ///   <c>vyjadreni_vazby</c> rows PŘED smazáním externí vazby — pre-flight
     ///   harvest_locked check ODSTRANĚN, delete je nyní běžná operace.
+    /// - 2026-09-06: samotné pořadí <c>RemoveRange</c> volání v kódu na pořadí SQL
+    ///   příkazů NEMÁ vliv. Do 2026-09-06 tu chyběl vztah v EF modelu, takže EF
+    ///   neznalo závislost a mazalo v libovolném pořadí → SQL 547. Záruku dnes dává
+    ///   deklarace vztahu v <c>ZaznamHarmonogramVyjadreniVazbaEntityConfiguration</c>.
     ///
     /// Logika:
     /// 1. UPDATE existing rows by Id (zachová Id → FK references v vyjadreni_vazby zůstanou platné
     ///    pro PRESERVED vazby).
     /// 2. INSERT nové vazby (Id == 0).
     /// 3. DELETE existing rows co NEJSOU v command — aplikace nejdřív RemoveRange
-    ///    navázaných vyjadreni_vazby rows, pak RemoveRange externí vazby
-    ///    (EF Core SaveChanges respektuje FK ordering).
+    ///    navázaných vyjadreni_vazby rows, pak RemoveRange externí vazby. Pořadí
+    ///    SQL příkazů plyne z deklarovaného vztahu v EF modelu, ne z pořadí těchto
+    ///    dvou řádků.
     /// </summary>
-    private async Task<List<ZaznamExterniOdkazEntity>> ReplaceRecordExternalLinksAsync(int zaznamId, IReadOnlyList<SaveRecordExterniVazbaCommand> externalLinks, CancellationToken ct)
+    private async Task<List<ZaznamExterniOdkazEntity>> ReplaceRecordExternalLinksAsync(int zaznamId, IReadOnlyList<SaveRecordExterniVazbaCommand> externalLinks, bool smiZaraditDoBufferu, CancellationToken ct)
     {
         var existing = await dbContext.ZaznamExterniOdkazy.Where(x => x.ZaznamId == zaznamId).ToListAsync(ct);
         var existingById = existing.ToDictionary(e => e.Id);
@@ -1198,8 +1129,14 @@ public sealed partial class RecordService
             // validLinks už filtroval null/whitespace Typ a Cislo (! je tedy bezpečné)
             var typeId = await ResolveTypOdkazuIdAsync(link.Typ!, ct);
             var price = NormalizeEstimatedExternalLinkPrice(link.Typ, link.PredpokladanaCena);
-            var vyzvaId = await ResolveVyzvaIdAsync(link.Vyzva, ct);
             var cislo = link.Cislo!.Trim();
+
+            // Rich text projde sanitizací stejně jako popis záznamu. HasVisibleText
+            // odfiltruje prázdný odstavec z Quillu (<p><br></p>), který by se do výzvy
+            // vytiskl jako prázdné místo.
+            var pozadavek = richTextContentService.HasVisibleText(link.Pozadavek)
+                ? richTextContentService.NormalizeForStorage(link.Pozadavek)
+                : null;
 
             if (link.Id > 0 && existingById.TryGetValue(link.Id, out var existingEntity))
             {
@@ -1211,7 +1148,10 @@ public sealed partial class RecordService
                 existingEntity.TypOdkazuId = typeId;
                 existingEntity.Cislo = cislo;
                 existingEntity.PredpokladanaCena = price;
-                existingEntity.VyzvaId = vyzvaId;
+                existingEntity.Pozadavek = pozadavek;
+                // 2026-09-10: VyzvaId ani ZaradidDoVyzvy se tu nepřepisují — zařazení do výzvy
+                // vlastní VyzvaService. Dřív se VyzvaId skládalo z pole Vyzva, které formulář
+                // od 2026-04-20 neposílá, a každé uložení vytáhlo PNF z výzvy (spec 2026-09-10 §0).
                 result.Add(existingEntity);
             }
             else
@@ -1224,7 +1164,11 @@ public sealed partial class RecordService
                     TypOdkazuId = typeId,
                     Cislo = cislo,
                     PredpokladanaCena = price,
-                    VyzvaId = vyzvaId
+                    Pozadavek = pozadavek,
+                    // Nová vazba ještě nemá Id, takže přepínač nemohl zavolat set-zaradid —
+                    // stav nese skryté pole formuláře. VyzvaId zůstává null: do konkrétní výzvy
+                    // se PNF dostane jen vědomým přesunem (spec 2026-09-10 R0.2).
+                    ZaradidDoVyzvy = link.ZaradidDoVyzvy && smiZaraditDoBufferu && JePnf(link.Typ),
                 };
                 dbContext.ZaznamExterniOdkazy.Add(entity);
                 result.Add(entity);

@@ -20,6 +20,71 @@ public sealed class RecordEditorControllerTests
         _fixture = fixture;
     }
 
+    /// <summary>
+    /// Spec 2026-09-17 §5.2 — editor musí nést verzi záznamu, jinak Save nemá podle čeho
+    /// poznat cizí zápis a chování spadne zpět na last-write-wins.
+    /// </summary>
+    [Fact]
+    public async Task Edit_ShouldRenderRecordVersionField()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiEditRecordVersion");
+        var projectId = await _fixture.EnsureProjectAsync("APIRECVER");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIRECVERSUB", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API record version");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        Regex.IsMatch(
+            html,
+            "<input[^>]*name=\"RecordVersion\"",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            .Should().BeTrue("editor musí renderovat skryté pole RecordVersion");
+    }
+
+    /// <summary>
+    /// Spec 2026-09-17 §5.4 — po uložení se stránka celá přenačte, takže se verze
+    /// vyrenderuje čerstvá a není potřeba ji obnovovat v otevřeném formuláři.
+    /// Kdyby se editor překlopil na in-place refresh, tenhle test spadne a obnovu
+    /// tokenu bude nutné doplnit.
+    /// </summary>
+    [Fact]
+    public async Task Save_ShouldReturnPageRefreshScope_SoRecordVersionIsAlwaysReloaded()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiSaveRefreshScope");
+        var projectId = await _fixture.EnsureProjectAsync("APIREFSC");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREFSCSUB", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API refresh scope");
+
+        await using var dbContext = _fixture.CreateDbContext();
+        var subsystemCode = await dbContext.Subsystemy.AsNoTracking()
+            .Where(x => x.Id == subsystemId).Select(x => x.Kod).SingleAsync();
+        var statusCode = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+            .OrderBy(x => x.Id).Select(x => x.Kod).FirstAsync();
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Zaznamy/Save?asUser={_fixture.AdminOsobaId}",
+            ApiTestHttpHelper.BuildForm(
+                ("Id", recordId.ToString()),
+                ("ProjektId", projectId.ToString()),
+                ("Kategorie", "U"),
+                ("Stav", statusCode),
+                ("Nazev", "API refresh scope zaznam"),
+                ("VlastnikId", ownerId.ToString()),
+                ("DatumZalozeni", "2026-09-01"),
+                ("TerminUkonceni", "2026-12-31"),
+                ("Subsystem", subsystemCode)));
+        var response = await client.SendAsync(request);
+
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+        payload.Ok.Should().BeTrue();
+        payload.RefreshScope.Should().Be("page",
+            "editor se po uložení celý přenačte; jinak je nutné vracet novou verzi záznamu");
+    }
+
     [Fact]
     public async Task Edit_ShouldRenderPageEditor()
     {
@@ -659,6 +724,34 @@ public sealed class RecordEditorControllerTests
                 $"name=\"DatumZalozeni\"[\\s\\S]*?iso-value=\"{meetingDate:yyyy-MM-dd}\"",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
             .Should().BeTrue($"DatumZalozeni má být serverem předvyplněné na datum jednání ({meetingDate:yyyy-MM-dd}) přes pm-date-field iso-value");
+    }
+
+    [Fact]
+    public async Task Create_ShouldRenderMeetingBasedNumberPreview_WhenMeetingNumberingEnabled()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiCreateNumberPreviewOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIREDNUMPREV");
+        await _fixture.EnsureSubsystemAsync("APIREDNUMPREVSUB", ownerId);
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 9860);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var project = await dbContext.Projekty.FirstAsync(x => x.Id == projectId);
+            project.PouzivatIdentJednani = true;
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Create?projektId={projectId}&jednaniId={meetingId}&uiContext=meeting&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        // Pole „Číslo" ukazuje náhled dle jednání (9860-1), NE interní inkrementální CisloZaznamu.
+        html.Should().Contain("id=\"cislo\" type=\"text\" value=\"9860-1\"");
+        // Option nese data pro živý JS náhled při změně jednání.
+        html.Should().Contain("data-cislo-jednani=\"9860\"");
+        html.Should().Contain("data-next-poradi=\"1\"");
+        html.Should().Contain("data-record-number-preview=\"true\"");
     }
 
     [Fact]

@@ -1,19 +1,15 @@
 using PmTracker.Web.Data;
-using PmTracker.Web.Models.ViewModels;
-using PmTracker.Web.Services.Settings;
 
 namespace PmTracker.Web.Services.Profile;
 
 public sealed partial class ProfileService : IProfileService
 {
     private readonly PmTrackerDbContext dbContext;
-    private readonly IUserAuthorizationAuditSnapshotBuilder userAuthorizationSnapshotBuilder;
 
-    public ProfileService(
-        PmTrackerDbContext dbContext,
-        IUserAuthorizationAuditSnapshotBuilder userAuthorizationSnapshotBuilder)
+    // A5 (2026-07-08): IUserAuthorizationAuditSnapshotBuilder odstraněn — profil skládá
+    // role instance přímými dotazy (PageQueries), granty audit snapshotu už nekonzumuje.
+    public ProfileService(PmTrackerDbContext dbContext)
     {
         this.dbContext = dbContext;
-        this.userAuthorizationSnapshotBuilder = userAuthorizationSnapshotBuilder;
     }
 }

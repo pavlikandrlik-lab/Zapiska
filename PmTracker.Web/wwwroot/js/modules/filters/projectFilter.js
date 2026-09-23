@@ -4,11 +4,11 @@
  * Fáze 3B Task 4: extrahováno z filters.js (1105 LOC → submodul ~420 LOC).
  *
  * Exports:
- *   getProjectFilterConfig, getProjectFilterInput, getProjectFilterCurrentUserId,
+ *   getProjectFilterConfig, getProjectFilterInput,
  *   getProjectFilterStorageKey, normalizeProjectFilterState, buildProjectFilterStateFromInputs,
  *   setProjectFilterSaveStatus, renderProjectFilterChips, handleProjectFilterInputChange,
  *   restoreProjectFilterScope, saveProjectFilterDefaults, clearProjectFilterInput,
- *   clearProjectFilterPreferenceStorage,
+ *   listSavedProjectFilterPreferences, removeProjectFilterPreference,
  *   compareSubsystemSortMeta, normalizeFilterText, normalizeSubsystemSortMode,
  *   readSubsystemGroupSortMeta, sortSubsystemGroupsInContainer
  */
@@ -18,19 +18,6 @@
 // ---------------------------------------------------------------------------
 
 const projectFilterStoragePrefix = "pmtracker.projectFilters.v1.project.";
-const legacyProjectFilterPrefixes = [
-    "pmtracker.filter.",
-    "pmtracker.schedule.filter.",
-    "pmtracker.gantt.filter."
-];
-const legacyProjectFilterKeys = [
-    "pmtracker.records.view",
-    "pmtracker.gantt.filters.open"
-];
-const legacyGanttStoragePrefixes = [
-    "pmtracker.gantt.pinned.",
-    "pmtracker.gantt.expanded."
-];
 
 /**
  * Sjednocený config pro oba scopes (records, schedule) — DRY refactor 2026-04-30.
@@ -48,7 +35,6 @@ const projectFilterFields = [
     { inputKey: "typ", stateKey: "typ", type: "select", chipLabel: "Typ úkolu" },
     { inputKey: "vlastnik", stateKey: "vlastnik", type: "select", chipLabel: "Vlastník" },
     { inputKey: "aktivni", stateKey: "aktivni", type: "checkbox", chipLabel: "Pouze aktivní úkoly" },
-    { inputKey: "mine", stateKey: "mine", type: "checkbox", chipLabel: "Jen mé záznamy" },
     { inputKey: "jednani-vyjadreni-stav", stateKey: "jednaniVyjadreniStav", type: "select", chipLabel: "Jednání-vyjádření" },
     { inputKey: "groupBySubsystem", stateKey: "groupBySubsystem", type: "checkbox", skipChip: true }
 ];
@@ -238,10 +224,6 @@ function isGovFormSwitch(el) {
     return el instanceof HTMLElement && el.tagName && el.tagName.toLowerCase() === "gov-form-switch";
 }
 
-export function getProjectFilterCurrentUserId(scope) {
-    return normalizeFilterToken(getProjectFilterRoot(scope)?.dataset.currentUserId || "");
-}
-
 /**
  * Storage klíč pro filter state — sjednocený 2026-04-30 (bez scope segmentu).
  * Klíč: ${prefix}${projectId}.${kind} (kind = "state" | "defaults").
@@ -327,18 +309,6 @@ function writeJsonStorage(storage, key, value) {
     }
 
     storage.setItem(key, JSON.stringify(value));
-}
-
-function removeMatchingStorageKeys(storage, predicate) {
-    const keys = [];
-    for (let i = 0; i < storage.length; i += 1) {
-        const key = storage.key(i);
-        if (key && predicate(key)) {
-            keys.push(key);
-        }
-    }
-
-    keys.forEach((key) => storage.removeItem(key));
 }
 
 // ---------------------------------------------------------------------------
@@ -601,6 +571,16 @@ export function saveProjectFilterDefaults(scope) {
     const state = persistProjectFilterSessionState(scope);
     const key = getProjectFilterStorageKey(scope, "defaults");
     writeJsonStorage(localStorage, key, state);
+
+    // Companion label klíč — čitelný název projektu pro správu předvoleb (Profil ▸ Předvolby).
+    const projectId = getProjectFilterProjectId(scope);
+    const zkratka = (getProjectFilterRoot(scope)?.dataset.projectZkratka || "").trim();
+    if (projectId && projectId !== "0" && zkratka) {
+        try {
+            localStorage.setItem(`${projectFilterStoragePrefix}${projectId}.label`, zkratka);
+        } catch { /* storage disabled/full — label je volitelný */ }
+    }
+
     setProjectFilterSaveStatus(scope, "Výchozí filtry uloženy v tomto prohlížeči.");
 }
 
@@ -621,16 +601,47 @@ export function clearProjectFilterInput(scope, inputKey) {
     }
 }
 
-export function clearProjectFilterPreferenceStorage() {
-    removeMatchingStorageKeys(localStorage, (key) =>
-        key.startsWith(projectFilterStoragePrefix)
-        || legacyProjectFilterKeys.includes(key)
-        || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix))
-        || legacyGanttStoragePrefixes.some((prefix) => key.startsWith(prefix)));
+/**
+ * Vyjmenuje uložené projektové filtrové předvolby (jedna položka na projekt) pro
+ * správu na Profilu. Čte `${prefix}<id>.defaults` a companion `${prefix}<id>.label`.
+ */
+export function listSavedProjectFilterPreferences() {
+    const items = [];
+    try {
+        for (let i = 0; i < localStorage.length; i += 1) {
+            const key = localStorage.key(i);
+            if (!key || !key.startsWith(projectFilterStoragePrefix) || !key.endsWith(".defaults")) {
+                continue;
+            }
+            const projectId = key.slice(projectFilterStoragePrefix.length, -".defaults".length);
+            // legacy scope-suffixed klíče (`<id>.records.defaults`) mají v projectId tečku — přeskoč.
+            if (!projectId || projectId.includes(".")) {
+                continue;
+            }
+            const label = localStorage.getItem(`${projectFilterStoragePrefix}${projectId}.label`);
+            items.push({
+                projectId,
+                label: label && label.trim() ? `Filtry projektu ${label.trim()}` : `Filtry projektu #${projectId}`
+            });
+        }
+    } catch { /* storage disabled — vrať co je */ }
+    return items.sort((a, b) => a.label.localeCompare(b.label, "cs"));
+}
 
-    removeMatchingStorageKeys(sessionStorage, (key) =>
-        key.startsWith(projectFilterStoragePrefix)
-        || legacyProjectFilterKeys.includes(key)
-        || legacyProjectFilterPrefixes.some((prefix) => key.startsWith(prefix))
-        || legacyGanttStoragePrefixes.some((prefix) => key.startsWith(prefix)));
+/** Smaže filtrovou předvolbu jednoho projektu (defaults + label z localStorage, state ze sessionStorage). */
+export function removeProjectFilterPreference(projectId) {
+    const id = String(projectId || "").trim();
+    if (!id) {
+        return;
+    }
+    try {
+        localStorage.removeItem(`${projectFilterStoragePrefix}${id}.defaults`);
+        localStorage.removeItem(`${projectFilterStoragePrefix}${id}.label`);
+        sessionStorage.removeItem(`${projectFilterStoragePrefix}${id}.state`);
+        // legacy scope-suffixed klíče téhož projektu (migrace 2026-04-30)
+        ["records", "schedule"].forEach((seg) => {
+            localStorage.removeItem(`${projectFilterStoragePrefix}${id}.${seg}.defaults`);
+            sessionStorage.removeItem(`${projectFilterStoragePrefix}${id}.${seg}.state`);
+        });
+    } catch { /* storage disabled */ }
 }

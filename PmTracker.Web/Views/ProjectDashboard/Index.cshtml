@@ -28,10 +28,6 @@
                 data-dashboard-tab="statistiky" type="button">
             Statické informace
         </button>
-        <button class="dashboard-tab @(Model.ActiveTab == "vyzvy" ? "active" : null)"
-                data-dashboard-tab="vyzvy" type="button">
-            Výzvy
-        </button>
     </div>
 
     <section class="dashboard-tab-panel @(Model.ActiveTab == "zaznamy" ? "active" : null)"
@@ -61,17 +57,6 @@
              data-dashboard-tab-panel="statistiky"
              data-dashboard-panel="statistics"
              data-dashboard-panel-url="@Model.StatisticsPanelUrl">
-        <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
-            <div class="record-loading-line"></div>
-            <div class="record-loading-line short"></div>
-        </div>
-        <div data-dashboard-panel-content></div>
-    </section>
-
-    <section class="dashboard-tab-panel @(Model.ActiveTab == "vyzvy" ? "active" : null)"
-             data-dashboard-tab-panel="vyzvy"
-             data-dashboard-panel="vyzvy"
-             data-dashboard-panel-url="@Model.VyzvyPanelUrl">
         <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
             <div class="record-loading-line"></div>
             <div class="record-loading-line short"></div>

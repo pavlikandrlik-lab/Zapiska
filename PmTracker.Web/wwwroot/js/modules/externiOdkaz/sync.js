@@ -117,7 +117,10 @@
     setDateFieldValue(row, '[data-external-datum-prevzeti]', data.datumPrevzeti);
   }
 
-  async function syncCislo(inputEl) {
+  async function syncCislo(inputEl, options) {
+    // typeOnly (editor návrhu): resolvuj jen Typ vazby (NES/PMP/PNF) — netěž skutečnost
+    // (4 datumy / chat / buffer), ta vzniká až po založení reálného záznamu.
+    const typeOnly = !!(options && options.typeOnly);
     const row = inputEl.closest('[data-external-row]');
     if (!row) return;
     const cislo = (inputEl.value || '').trim();
@@ -149,23 +152,32 @@
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
       if (data.nalezeno) {
+        // Typ + odvozená viditelnost (cena/výzva) — potřebné i v návrhu (metadata tiketu).
         setTypDisplay(row, data.typ);
         setTypHidden(row, data.typ);
         setCenaVisible(row, isCenaTyp(data.typ));
         setVyzvaVisible(row, isPnf(data.typ));
-        setChatEnabled(row, true);
-        setDatesVisible(row, true);
-        applyHarvestedDates(row, data);
-        // FIX 2026-05-02: localStorage buffer — dokud user neuloží záznam,
-        // chat modal a Save flow čte z bufferu (řeší ExterniOdkazId=0 pre-Save case).
-        saveToBuffer(projektId, cislo, data);
-        row.setAttribute('data-buffered', cislo);
+        setPozadavekVisible(row, isPnf(data.typ));
+        if (isPnf(data.typ)) {
+          predvyplnPozadavek(row, data.popis);
+        }
         row.removeAttribute('data-not-found');
+        // Harvest (skutečnost) jen mimo návrh — v návrhu se odkládá až po založení.
+        if (!typeOnly) {
+          setChatEnabled(row, true);
+          setDatesVisible(row, true);
+          applyHarvestedDates(row, data);
+          // FIX 2026-05-02: localStorage buffer — dokud user neuloží záznam,
+          // chat modal a Save flow čte z bufferu (řeší ExterniOdkazId=0 pre-Save case).
+          saveToBuffer(projektId, cislo, data);
+          row.setAttribute('data-buffered', cislo);
+        }
       } else {
         setTypDisplay(row, null);
         setTypHidden(row, '');
         setCenaVisible(row, false);
         setVyzvaVisible(row, false);
+        setPozadavekVisible(row, false);
         setChatEnabled(row, false);
         setDatesVisible(row, false);
         clearBuffer(projektId, cislo);
@@ -220,6 +232,34 @@
     }
   }
 
+  // Předvyplnění textu požadavku popisem tiketu (spec 2026-09-08 §5.4). Jen u PNF
+  // a jen do prázdného pole — rozepsaný text se nikdy nepřepíše, jinak by pracovníkovi
+  // zmizelo, co už napsal, kdyby jen opravil číslo tiketu.
+  //
+  // Stávající vazby se nepředvyplňují: mají text uložený (i prázdný) a tahle větev
+  // se u nich neuplatní, protože pole není prázdné nebo si ho pracovník smazal záměrně.
+  function predvyplnPozadavek(row, popis) {
+    const textarea = row.querySelector('[data-external-pozadavek-input]');
+    if (!textarea || !popis) return;
+    if ((textarea.value || '').trim()) return;
+
+    if (global.pmRichText && typeof global.pmRichText.setValue === 'function') {
+      global.pmRichText.setValue(textarea, popis);
+    } else {
+      textarea.value = popis;
+    }
+  }
+
+  function setPozadavekVisible(row, visible) {
+    const pole = row.querySelector('[data-external-pozadavek-field]');
+    if (!pole) return;
+    if (visible) {
+      pole.removeAttribute('hidden');
+    } else {
+      pole.setAttribute('hidden', 'hidden');
+    }
+  }
+
   function setVyzvaVisible(row, visible) {
     const vyzva = row.querySelector('[data-external-vyzvy-switch-wrap]');
     if (!vyzva) return;
@@ -263,22 +303,24 @@
     if (!target || typeof target.hasAttribute !== 'function') return;
     if (!target.hasAttribute('data-external-cislo')) return;
 
-    // 7c (2026-06-17): v editoru NÁVRHU se externí vazby jen zadávají (čísla) — netěžit ani
-    // nezkoumat obsah (žádný /ExterniOdkaz/Sync preview). Harvest = skutečnost až po založení
-    // reálného záznamu klasickou cestou.
-    if (typeof target.closest === 'function' && target.closest('[data-is-proposal-editor="true"]')) return;
+    // 7c (2026-06-17, revid. 2026-07-05): v editoru NÁVRHU NETĚŽÍME skutečnost (4 datumy/chat/buffer)
+    // — ta vzniká až po založení. ALE Typ (NES/PMP/PNF) je metadata tiketu, které návrh potřebuje,
+    // jinak schválení padne na external_type_required → v návrhu resolvujeme jen Typ (typeOnly).
+    const proposalMode = typeof target.closest === 'function'
+        && target.closest('[data-is-proposal-editor="true"]') != null;
 
     const existing = timers.get(target);
     if (existing) clearTimeout(existing);
-    const timer = setTimeout(() => syncCislo(target), DEBOUNCE_MS);
+    const timer = setTimeout(() => syncCislo(target, { typeOnly: proposalMode }), DEBOUNCE_MS);
     timers.set(target, timer);
   }
 
   function syncPrefilledInputs() {
     document.querySelectorAll('[data-external-cislo]').forEach(function (input) {
       if (input.value && /^\d{6}$/.test(input.value.trim())) {
-        if (typeof input.closest === 'function' && input.closest('[data-is-proposal-editor="true"]')) return;
-        syncCislo(input);
+        const proposalMode = typeof input.closest === 'function'
+          && input.closest('[data-is-proposal-editor="true"]') != null;
+        syncCislo(input, { typeOnly: proposalMode });
       }
     });
   }

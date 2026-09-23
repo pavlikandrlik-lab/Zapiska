@@ -2,6 +2,7 @@ using System.Net;
 using System.Threading;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using PmTracker.Tests.Api.TestInfrastructure;
 using PmTracker.Web.Models.Entities;
 
@@ -61,6 +62,15 @@ public sealed class ExportControllerTests
         }
     }
 
+    /// <summary>
+    /// Serverové PDF (2026-09-04): tisk vrací PDF, ne HTML. Kontrolovaná značka je
+    /// ale pořád tatáž šablona — jen se přebírá ze vstupu generátoru místo z těla
+    /// odpovědi, takže pokrytí vzhledu tisku zůstává nedotčené.
+    /// </summary>
+    private string RenderedPrintHtml()
+        => _fixture.Factory.Services.GetRequiredService<FakePdfRenderer>().LastHtml
+           ?? throw new InvalidOperationException("Generátor PDF nedostal žádné HTML.");
+
     [Fact]
     public async Task ReadEndpoints_ShouldReturnExpectedContentTypes_WhenProjectIsReadable()
     {
@@ -69,11 +79,11 @@ public sealed class ExportControllerTests
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var routes = new (string Route, string ExpectedMediaType, bool IsWord)[]
         {
-            ($"/Export/Projekt/{data.ProjectId}/Tisk?asUser={_fixture.AdminOsobaId}", "text/html", false),
+            ($"/Export/Projekt/{data.ProjectId}/Tisk?asUser={_fixture.AdminOsobaId}", "application/pdf", false),
             ($"/Export/Projekt/{data.ProjectId}/Word?asUser={_fixture.AdminOsobaId}", WordContentType, true),
-            ($"/Export/Jednani/{data.MeetingId}/Tisk?asUser={_fixture.AdminOsobaId}", "text/html", false),
+            ($"/Export/Jednani/{data.MeetingId}/Tisk?asUser={_fixture.AdminOsobaId}", "application/pdf", false),
             ($"/Export/Jednani/{data.MeetingId}/Word?asUser={_fixture.AdminOsobaId}", WordContentType, true),
-            ($"/Export/Ukol/{data.RecordId}/Tisk?projektId={data.ProjectId}&asUser={_fixture.AdminOsobaId}", "text/html", false),
+            ($"/Export/Ukol/{data.RecordId}/Tisk?projektId={data.ProjectId}&asUser={_fixture.AdminOsobaId}", "application/pdf", false),
             ($"/Export/Ukol/{data.RecordId}/Word?projektId={data.ProjectId}&asUser={_fixture.AdminOsobaId}", WordContentType, true)
         };
 
@@ -148,7 +158,7 @@ public sealed class ExportControllerTests
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Export/Jednani/{meetingId}/Tisk?asUser={_fixture.AdminOsobaId}");
-        var html = await response.Content.ReadAsStringAsync();
+        var html = RenderedPrintHtml();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain("class=\"attendance\"");
@@ -200,7 +210,7 @@ public sealed class ExportControllerTests
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Export/Jednani/{meetingId}/Tisk?asUser={_fixture.AdminOsobaId}");
-        var html = await response.Content.ReadAsStringAsync();
+        var html = RenderedPrintHtml();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().Contain("class=\"comment-item\" style=\"color:#DC2626;\"");
@@ -249,7 +259,7 @@ public sealed class ExportControllerTests
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Export/Projekt/{projectId}/Tisk?asUser={_fixture.AdminOsobaId}");
-        var html = await response.Content.ReadAsStringAsync();
+        var html = RenderedPrintHtml();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         // CSS stylizace paused řádku (.task-row.paused td { background: #fdf4e8; }) se
@@ -302,7 +312,7 @@ public sealed class ExportControllerTests
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Export/Projekt/{projectId}/Tisk?useCurrentFilters=true&aktivni=true&vlastnik={ownerId}&asUser={_fixture.AdminOsobaId}");
-        var html = await response.Content.ReadAsStringAsync();
+        var html = RenderedPrintHtml();
         var decodedHtml = WebUtility.HtmlDecode(html);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
@@ -350,7 +360,7 @@ public sealed class ExportControllerTests
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Export/Projekt/{projectId}/Tisk?useCurrentFilters=false&aktivni=true&asUser={_fixture.AdminOsobaId}");
-        var html = await response.Content.ReadAsStringAsync();
+        var html = RenderedPrintHtml();
         var decodedHtml = WebUtility.HtmlDecode(html);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);

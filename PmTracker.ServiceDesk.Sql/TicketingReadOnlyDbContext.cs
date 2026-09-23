@@ -92,11 +92,8 @@ public sealed class TicketingReadOnlyDbContext : DbContext
             // HasConversion<int>() nutné aby SqlDataReader nečetl GetInt64 (= InvalidCastException).
             e.Property(x => x.Id).HasColumnName("id").HasConversion<int>();
             e.Property(x => x.Pid).HasColumnName("pid");
-            e.Property(x => x.IdKalk).HasColumnName("id_kalk");
-            e.Property(x => x.Verze).HasColumnName("verze");
             e.Property(x => x.Akceptace).HasColumnName("akceptace");
             e.Property(x => x.Datum).HasColumnName("datum");
-            e.Property(x => x.Termin).HasColumnName("termin");
             e.Property(x => x.PracnostA).HasColumnName("pracnost_a");
             e.Property(x => x.PracnostP).HasColumnName("pracnost_p");
             e.Property(x => x.PracnostT).HasColumnName("pracnost_t");

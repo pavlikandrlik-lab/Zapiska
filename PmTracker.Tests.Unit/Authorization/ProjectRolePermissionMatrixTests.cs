@@ -26,7 +26,7 @@ public sealed class ProjectRolePermissionMatrixTests
         "comments.add", "comments.delete.any", "comments.delete.own",
         "comments.edit.any", "comments.edit.own",
         "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
-        "dashboard.view", "dashboard.vyzvy.view",
+        "dashboard.view",
         "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
         "export.word.jednani", "export.word.projekt", "export.word.ukol",
         "externiodkazy.sync",
@@ -76,7 +76,7 @@ public sealed class ProjectRolePermissionMatrixTests
         PermissionsFor("HOST").Should().BeEquivalentTo(new[]
         {
             "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
-            "dashboard.view", "dashboard.vyzvy.view",
+            "dashboard.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
             "search.index"
@@ -86,15 +86,19 @@ public sealed class ProjectRolePermissionMatrixTests
     [Fact]
     public void GEST_ShouldHaveCommentsAndReadOnly()
     {
-        // GEST = komentátor + read-only.
+        // GEST = komentátor + read-only, ALE od 2026-09-07 smí spravovat výzvy
+        // (spec 2026-09-07-vyzvy-dokonceni-design §4.2 — Gestor projektu je jednou
+        // ze čtyř rolí s právem měnit výzvy).
         PermissionsFor("GEST").Should().BeEquivalentTo(new[]
         {
             "comments.add", "comments.delete.own", "comments.edit.own",
             "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
-            "dashboard.view", "dashboard.vyzvy.view",
+            "dashboard.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "search.index"
+            "search.index",
+            "vyzvy.create", "vyzvy.pnf.assign", "vyzvy.pnf.reassign",
+            "vyzvy.state.change", "vyzvy.word.export"
         });
     }
 }

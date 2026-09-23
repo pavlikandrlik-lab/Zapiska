@@ -15,6 +15,5 @@ public interface IProjectDashboardService
     /// </summary>
     Task<ProjectDashboardNesPanelViewModel> BuildNesPanelAsync(int projektId, DateTime reference, CancellationToken ct = default);
 
-    Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(int projektId, bool muzeEditovat, CancellationToken ct);
     // CanAccessDashboardAsync smazáno v redesignu 2026-04-23 — dashboard.view policy atribut na endpointech.
 }

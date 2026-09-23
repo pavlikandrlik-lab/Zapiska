@@ -1,0 +1,53 @@
+@using PmTracker.Web.Models.ViewModels.Vyzvy
+@model VyzvyPanelViewModel
+
+@* Sloupec dlaždic vlevo. Výběr roku i „Nová výzva" se 2026-09-08 přestěhovaly
+   do lišty vpravo nahoře (_VyzvyToolbar) — rail je čistě seznam dlaždic.
+   Dlaždice je dvouřádková: kód se stavem, pod tím počet PNF. Buffer vypadá stejně. *@
+<nav class="vyzvy-rail" aria-label="Výzvy projektu">
+    <ul class="vyzvy-rail-list">
+        @* Buffer je první vždy, nezávisle na zvoleném roce (spec §6.3). *@
+        <li>
+            <button type="button" class="vyzvy-tile vyzvy-tile--buffer is-selected"
+                    data-vyzvy-tile="buffer"
+                    data-vyzvy-drop-target="buffer"
+                    data-vyzvy-drop-label="buffer"
+                    data-vyzvy-muze-uzavrit="false"
+                    aria-pressed="true">
+                <span class="vyzvy-tile-bar" aria-hidden="true"></span>
+                <span class="vyzvy-tile-body">
+                    <span class="vyzvy-tile-head">
+                        <span class="vyzvy-tile-title">Buffer</span>
+                    </span>
+                    <span class="vyzvy-tile-count">@Model.Buffer.Polozky.Count PNF</span>
+                </span>
+            </button>
+        </li>
+
+        @foreach (var v in Model.Vyzvy)
+        {
+            var jeZamcena = v.Stav != "Priprava";
+            @* Uzavřít = přechod do Odesláno. Ptáme se stavového automatu (PovoleneStavy),
+               ne na stav napřímo — jinak by se logika rozešla s VyzvaStateMachine. *@
+            var lzeUzavrit = Model.MuzeEditovat && v.PovoleneStavy.Contains("Odeslano");
+            <li>
+                <button type="button" class="vyzvy-tile vyzvy-tile--@v.Stav.ToLowerInvariant()"
+                        data-vyzvy-tile="vyzva-@v.Id"
+                        data-vyzva-id="@v.Id"
+                        data-vyzvy-drop-target="@(jeZamcena ? "none" : "vyzva")"
+                        data-vyzvy-drop-label="@v.Kod"
+                        data-vyzvy-muze-uzavrit="@(lzeUzavrit ? "true" : "false")"
+                        aria-pressed="false">
+                    <span class="vyzvy-tile-bar" aria-hidden="true"></span>
+                    <span class="vyzvy-tile-body">
+                        <span class="vyzvy-tile-head">
+                            <span class="vyzvy-tile-title">@v.Kod</span>
+                            <gov-tag size="s" type="subtle" color="@VyzvaStavPresentation.Color(v.Stav)">@VyzvaStavPresentation.Label(v.Stav)</gov-tag>
+                        </span>
+                        <span class="vyzvy-tile-count">@v.Polozky.Count PNF</span>
+                    </span>
+                </button>
+            </li>
+        }
+    </ul>
+</nav>

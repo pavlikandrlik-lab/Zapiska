@@ -28,5 +28,14 @@ internal sealed class ZaznamHarmonogramVyjadreniVazbaEntityConfiguration
             .HasDatabaseName("ix_zhvv_zaznam_poradi_stav");
         b.HasIndex(x => x.ExterniOdkazId)
             .HasDatabaseName("ix_zhvv_externi_odkaz");
+
+        // FK_zhvv_externi_odkaz je v databázi ON DELETE NO ACTION (db_upgrade_1_3_6).
+        // Vztah musí být v modelu, i když se přes něj nenaviguje: bez něj EF nezná
+        // závislost mezi bindingem a externí vazbou a při jejich současném mazání
+        // pošle DELETE v libovolném pořadí → SQL 547 (hlášení 2026-09-06).
+        b.HasOne<ZaznamExterniOdkazEntity>()
+            .WithMany()
+            .HasForeignKey(x => x.ExterniOdkazId)
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

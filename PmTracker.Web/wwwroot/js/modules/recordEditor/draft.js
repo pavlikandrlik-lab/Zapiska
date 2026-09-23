@@ -443,6 +443,11 @@ export function promptRecordEditorDiscard(form, trigger) {
         return Promise.resolve(true);
     }
 
+    // B3 (2026-07-09): guard="off" (detail návrhu) — žádný dialog, rovnou propustit.
+    if (form.dataset.recordEditorGuard === "off") {
+        return Promise.resolve(true);
+    }
+
     closeRecordEditorCloseGuard({ restoreFocus: false });
 
     return new Promise((resolve) => {

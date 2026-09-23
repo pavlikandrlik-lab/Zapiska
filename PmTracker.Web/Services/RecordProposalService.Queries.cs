@@ -286,11 +286,24 @@ public sealed partial class RecordProposalService
             throw new InvalidOperationException("Pro aktuálního uživatele není v projektu dostupný žádný relevantní subsystém pro návrh záznamu.");
         }
 
-        if (!model.Subsystemy.Any(option =>
-                string.Equals(option.Kod, model.Subsystem, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(option.Nazev, model.Subsystem, StringComparison.OrdinalIgnoreCase)))
+        var selectedSubsystem = model.Subsystemy.FirstOrDefault(option =>
+            string.Equals(option.Kod, model.Subsystem, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(option.Nazev, model.Subsystem, StringComparison.OrdinalIgnoreCase));
+
+        if (selectedSubsystem is null)
         {
-            model.Subsystem = model.Subsystemy[0].Kod;
+            selectedSubsystem = model.Subsystemy[0];
+            model.Subsystem = selectedSubsystem.Kod;
+        }
+
+        // Invariant: vlastník návrhu = vedoucí vybraného subsystému. Dorovnáváme serverově, protože
+        // BuildZaznamCreateAsync předvyplní vlastníka dle VÝCHOZÍHO projektového subsystému, který se tu
+        // ale přepíná na subsystém proposera. Klientský autofill (initRecordOwnerAutofill) to nezachrání:
+        // init-fill přeskočí (VlastnikId není prázdné) a u vedoucího s jediným subsystémem se nikdy
+        // nespustí change event. Bez tohoto by vlastník ≠ vedoucí vybraného subsystému.
+        if (selectedSubsystem.DefaultOwnerOsobaId > 0)
+        {
+            model.VlastnikId = selectedSubsystem.DefaultOwnerOsobaId;
         }
     }
 
@@ -383,6 +396,9 @@ public sealed partial class RecordProposalService
             TrvaniDni = step.TrvaniDni,
             OdchylkaDni = step.OdchylkaDni,
             BaselineDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pd) && pd.HasValue ? pd.Value : step.BaselineDatum,
+            // Surové plánové datum (null = nevyplněno) → detail návrhu renderuje prázdné pole tam,
+            // kde návrh plán nevyplnil (dřív padalo na default null pro všechny kroky).
+            PlanDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pdRaw) ? pdRaw : step.PlanDatum,
             SkutecneDatum = actualByPoradi.TryGetValue(step.KrokIndex, out var sd) && sd.HasValue ? sd.Value : step.SkutecneDatum,
             ZdrojSkutecnosti = step.ZdrojSkutecnosti,
             SourceVyjadreniId = step.SourceVyjadreniId,
@@ -505,7 +521,7 @@ public sealed partial class RecordProposalService
         ScheduleEditorPermissionSet? permissions = null,
         IReadOnlyDictionary<int, string>? editorChangedTypeTooltips = null)
     {
-        // `with`: zachová VŠECHNA pole source (vč. OverviewLayout/Today/ScheduleVersion/lock state),
+        // `with`: zachová VŠECHNA pole source (vč. OverviewLayout/Today/lock state),
         // přepíše jen explicitně zadané. Object-initializer tu dřív tiše zahazoval nová pola.
         return source with
         {

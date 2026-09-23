@@ -279,6 +279,59 @@ public sealed class AjaxControllersTests
     }
 
     [Fact]
+    public async Task SaveRecord_Create_ReturnsRefreshUrlWithRecordId_ForDeepLinkFocus()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiFocusCreateOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIFOCUSCREATE");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIFOCUSCREATE_SUB", ownerId);
+        await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            if (!await dbContext.ProjektSubsystemy.AnyAsync(x => x.ProjektId == projectId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue))
+            {
+                dbContext.ProjektSubsystemy.Add(new ProjektSubsystemEntity
+                {
+                    ProjektId = projectId,
+                    SubsystemId = subsystemId,
+                    DatumPrirazeni = DateTime.UtcNow
+                });
+                await dbContext.SaveChangesAsync();
+            }
+        }
+
+        await using var lookupContext = _fixture.CreateDbContext();
+        // INFO (Informace) = ne-úkolová kategorie → přeskočí validaci harmonogramu (jednodušší validní create).
+        var categoryCode = await lookupContext.CiselnikKategoriiZaznamu
+            .Where(x => x.Kod == "INFO" || x.Nazev == "Informace")
+            .OrderBy(x => x.Id).Select(x => x.Kod).FirstAsync();
+        var statusCode = await lookupContext.CiselnikStavuUkolu.OrderBy(x => x.Id).Select(x => x.Kod).FirstAsync();
+        var subsystemCode = await lookupContext.Subsystemy.Where(x => x.Id == subsystemId).Select(x => x.Kod).SingleAsync();
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var request = ApiTestHttpHelper.BuildAjaxPost(
+            $"/Zaznamy/Save?asUser={_fixture.AdminOsobaId}",
+            ApiTestHttpHelper.BuildForm(
+                ("ProjektId", projectId.ToString()),
+                ("Kategorie", categoryCode),
+                ("Stav", statusCode),
+                ("Nazev", "API focus create"),
+                ("VlastnikId", ownerId.ToString()),
+                ("DatumZalozeni", "2026-05-05"),
+                ("TerminUkonceni", "2026-05-20"),
+                ("Subsystem", subsystemCode)));
+
+        var response = await client.SendAsync(request);
+        var payload = await ApiTestHttpHelper.ReadModalResultAsync(response);
+
+        payload.Ok.Should().BeTrue(payload.Message);
+        payload.RecordId.Should().HaveValue();
+        payload.RecordId!.Value.Should().BeGreaterThan(0);
+        payload.RefreshUrl.Should().Contain($"recordId={payload.RecordId!.Value}",
+            "po založení musí redirect nést recordId → záložka Záznamy na něj sjede a vysvítí ho");
+    }
+
+    [Fact]
     public async Task SaveRecord_NechronologickyPlan_VratiFieldError()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiChronoOwner");

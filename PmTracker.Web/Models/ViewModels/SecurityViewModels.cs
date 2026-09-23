@@ -104,7 +104,6 @@ public static class PermissionKeys
     public const string DashboardRecordsView = "dashboard.records.view";
     public const string DashboardNesView = "dashboard.nes.view";
     public const string DashboardStatisticsView = "dashboard.statistics.view";
-    public const string DashboardVyzvyView = "dashboard.vyzvy.view";
 
     // --- 12. Export ------------------------------------------------------------
     public const string ExportPdfProjekt = "export.pdf.projekt";
@@ -206,18 +205,17 @@ public static class PermissionKeys
         new(CiselnikyRowDelete, "Smazat řádek číselníku", "CISELNIKY", "GLOBAL", "Smazání řádku číselníku."),
 
         // 10. Výzvy
-        new(VyzvyCreate, "Založit výzvu", "VYZVY", "PROJECT", "Založení výzvy z bufferu."),
+        new(VyzvyCreate, "Založit výzvu", "VYZVY", "PROJECT", "Založení nové výzvy s ručně zadaným číslem."),
         new(VyzvyStateChange, "Změnit stav výzvy", "VYZVY", "PROJECT", "Změna stavu výzvy."),
         new(VyzvyPnfAssign, "Zařadit PNF", "VYZVY", "PROJECT", "Zařadit / vyřadit PNF do bufferu."),
         new(VyzvyPnfReassign, "Přeřadit PNF", "VYZVY", "PROJECT", "Přeřadit PNF mezi výzvami."),
-        new(VyzvyWordExport, "Word export výzvy", "VYZVY", "PROJECT", "Stáhnout Word export výzvy (budoucí feature)."),
+        new(VyzvyWordExport, "Export výzvy", "VYZVY", "PROJECT", "Tisk výzvy do Wordu i PDF."),
 
         // 11. Dashboard
         new(DashboardView, "Otevřít projektový dashboard", "DASHBOARD", "PROJECT", "Vstup na dashboard projektu."),
         new(DashboardRecordsView, "Záložka Záznamy", "DASHBOARD", "PROJECT", "Panel Záznamy v dashboardu."),
         new(DashboardNesView, "Záložka NES v prodlení", "DASHBOARD", "PROJECT", "Panel NES v prodlení."),
         new(DashboardStatisticsView, "Záložka Statistiky", "DASHBOARD", "PROJECT", "Panel Statistiky."),
-        new(DashboardVyzvyView, "Záložka Výzvy", "DASHBOARD", "PROJECT", "Panel Výzvy v dashboardu."),
 
         // 12. Export
         new(ExportPdfProjekt, "PDF export projektu", "EXPORT", "PROJECT", "Tisk projektu do PDF."),
@@ -304,7 +302,6 @@ public static class PermissionKeys
         DashboardRecordsView,
         DashboardNesView,
         DashboardStatisticsView,
-        DashboardVyzvyView,
         ExportPdfProjekt,
         ExportPdfJednani,
         ExportPdfUkol,

@@ -27,6 +27,7 @@ public sealed partial class ZaznamyController : BaseController
     private readonly IRecordUiFlowResolver _recordUiFlowResolver;
     private readonly IHarvestScheduler _harvestScheduler;
     private readonly PmTrackerDbContext _db;
+    private readonly IRecordEditLockService _editLockService;
 
     public ZaznamyController(
         IUserContextResolver userContextResolver,
@@ -36,7 +37,8 @@ public sealed partial class ZaznamyController : BaseController
         IProjectEditQuery projectEditQuery,
         IRecordUiFlowResolver recordUiFlowResolver,
         IHarvestScheduler harvestScheduler,
-        PmTrackerDbContext db)
+        PmTrackerDbContext db,
+        IRecordEditLockService editLockService)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _recordService = recordService;
@@ -44,7 +46,65 @@ public sealed partial class ZaznamyController : BaseController
         _recordUiFlowResolver = recordUiFlowResolver;
         _harvestScheduler = harvestScheduler;
         _db = db;
+        _editLockService = editLockService;
     }
+
+    /// <summary>
+    /// Stránka záznamu (2026-07-14): read-only detail na trvalé URL (sdílitelný odkaz).
+    /// Guard = přístup k projektu; žádné edit právo se nevyžaduje — stránka ukazuje totéž,
+    /// co uživatel vidí na kartě v záložce Záznamy. Autorizace PŘED těžkými dotazy.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> Detail(int id, string? returnUrl, CancellationToken ct = default)
+    {
+        var projektId = await _db.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => (int?)x.ProjektId)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (projektId is null) return NotFound();
+
+        if (!CurrentUserContext.CanAccessProject(projektId.Value))
+        {
+            return NotFound();
+        }
+
+        // Odkaz „odkud skutečnost pochází" nabídneme jen tomu, kdo okno vyjádření smí otevřít —
+        // jinak by ikona vedla na akci, kterou server odmítne. Samotné akce v okně (re-harvest,
+        // vazby) mají vlastní oprávnění na serveru.
+        var canOpenVyjadreni = CurrentUserContext.HasPermission(PermissionKeys.VyjadreniModalOpen, projektId.Value);
+        var model = await _recordService.BuildRecordDetailPageAsync(projektId.Value, id, canOpenVyjadreni, ct);
+        if (model is null) return NotFound();
+
+        PrepareRecordDetailPagePresentation(model, returnUrl);
+        SetProjectBreadcrumbs(
+            model.ProjektId, model.ProjektNazev, model.ProjektZkratka,
+            currentText: $"Záznam #{model.Summary.CisloViditelne}",
+            backUrl: model.BackUrl);
+        return View("~/Views/Projekty/ZaznamDetailPage.cshtml", model);
+    }
+
+    private void PrepareRecordDetailPagePresentation(ZaznamDetailPageViewModel model, string? returnUrl)
+    {
+        var projektId = model.ProjektId;
+        var recordId = model.Summary.Id;
+
+        model.CanEditRecord = RecordEditorAffordancePolicy.CanOpenEditor(CurrentUserContext, projektId);
+        model.CanCreateScheduleProposal = model.Summary.JeUkol
+            && CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, projektId);
+
+        var pageUrl = Url.Action(nameof(Detail), new { id = recordId }) ?? $"/Zaznamy/Detail/{recordId}";
+        model.EditUrl = Url.Action(nameof(Edit), new { id = recordId, projektId, returnUrl = pageUrl });
+        model.ScheduleProposalUrl = Url.Action("CreateScheduleProposal", "Navrhy",
+            new { projektId, zaznamId = recordId, returnUrl = pageUrl });
+        model.PrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = recordId, projektId, autoPrint = true });
+        model.PrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = recordId, projektId });
+        model.BackUrl = NormalizeLocalReturnUrl(returnUrl) ?? ProjektDetailTabUrl(projektId, "zaznamy");
+
+        // Vyjádření: stejná presentation jako na kartě (oprávnění, filtr draft jednání).
+        PrepareRecordCommentsPresentation(model.Comments, model.Summary);
+        model.Comments.CurrentUserOsobaId = CurrentUserContext.OsobaId;
+    }
+
 
     public async Task<IActionResult> Edit(int id, string? returnUrl, CancellationToken ct = default)
     {
@@ -62,9 +122,19 @@ public sealed partial class ZaznamyController : BaseController
         // přístupný pouze uživatelům s records.edit nebo records.schedule.edit; návrhový workflow
         // (proposals.schedule.create) má vlastní endpoint a nepoužívá tento editor.
         var canManageSchedulePermission = CurrentUserContext.HasPermission(PermissionKeys.RecordsScheduleEdit, projektId.Value);
-        if (!canEditRecord && !canManageSchedulePermission)
+        // Sdílená afordance-gate (RecordEditorAffordancePolicy) — stejnou funkci používá UI pro
+        // zobrazení tužky/Upravit, takže se server a UI nemůžou rozejít (návrhový klíč editor neotvírá).
+        if (!RecordEditorAffordancePolicy.CanOpenEditor(CurrentUserContext, projektId.Value))
         {
             return Forbid();
+        }
+
+        // Spec 2026-09-17 §4.2 — zámek karty. Získává se PO autorizaci, ale PŘED těžkým
+        // dotazem i harvest triggerem: nemá smysl připravovat editor, který se nezobrazí.
+        var lockResult = await _editLockService.TryAcquireAsync(id, CurrentUserContext.OsobaId, ct);
+        if (!lockResult.Acquired)
+        {
+            return await BuildRecordEditLockedResultAsync(id, projektId.Value, lockResult, ct);
         }
 
         var model = await _projectEditQuery.GetEditModelAsync(id, ct);
@@ -82,7 +152,56 @@ public sealed partial class ZaznamyController : BaseController
         }
 
         PrepareRecordEditorModel(model, returnUrl, canEditRecord, canManageSchedule);
+        // C1 (2026-07-10): ← = model.BackUrl (origin returnUrl ?? tab=zaznamy / meeting detail).
+        SetProjectBreadcrumbs(
+            model.ProjektId, model.ProjektNazev, model.ProjektZkratka,
+            currentText: model.IsCreate ? "Nový záznam" : $"Záznam #{model.CisloViditelne}",
+            backUrl: model.BackUrl);
         return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
+    }
+
+    /// <summary>
+    /// Spec 2026-09-17 §4.3 — stránka „upravuje jiný uživatel". Jméno se formátuje
+    /// sdíleným <see cref="PersonDisplayName"/>, aby se hlášky o souběhu neshodovaly jen náhodou.
+    /// </summary>
+    private async Task<IActionResult> BuildRecordEditLockedResultAsync(
+        int zaznamId,
+        int projektId,
+        RecordEditLockResult lockResult,
+        CancellationToken ct)
+    {
+        var holderName = lockResult.HolderOsobaId.HasValue
+            ? await PersonDisplayNameQuery.ResolveAsync(_db, lockResult.HolderOsobaId.Value, ct)
+            : PersonDisplayName.Unknown;
+
+        var identity = await _db.Projekty.AsNoTracking()
+            .Where(x => x.Id == projektId)
+            .Select(x => new { x.CelyNazev, x.Zkratka })
+            .FirstOrDefaultAsync(ct);
+        var cisloViditelne = await _db.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == zaznamId)
+            .Select(x => x.CisloViditelne ?? x.CisloZaznamu.ToString())
+            .FirstOrDefaultAsync(ct) ?? string.Empty;
+
+        var backUrl = Url.Action("Detail", "Zaznamy", new { id = zaznamId }) ?? $"/Zaznamy/Detail/{zaznamId}";
+        var model = new RecordEditLockedViewModel
+        {
+            ZaznamId = zaznamId,
+            ProjektId = projektId,
+            ProjektNazev = identity?.CelyNazev ?? string.Empty,
+            ProjektZkratka = identity?.Zkratka ?? string.Empty,
+            CisloViditelne = cisloViditelne,
+            HolderDisplayName = holderName,
+            SinceLocal = (lockResult.HolderSinceUtc ?? DateTime.UtcNow).ToLocalTime(),
+            RetryUrl = Url.Action("Edit", "Zaznamy", new { id = zaznamId }) ?? $"/Zaznamy/Edit/{zaznamId}",
+            BackUrl = backUrl
+        };
+
+        SetProjectBreadcrumbs(
+            model.ProjektId, model.ProjektNazev, model.ProjektZkratka,
+            currentText: $"Záznam #{model.CisloViditelne}",
+            backUrl: backUrl);
+        return View("~/Views/Projekty/RecordEditLockedPage.cshtml", model);
     }
 
     [Authorize(Policy = "permission:records.edit")]
@@ -105,6 +224,11 @@ public sealed partial class ZaznamyController : BaseController
             canManageSchedule: model.JeUkolKategorie,
             uiContext: normalizedUiContext,
             meetingId: contextMeetingId);
+        // C1 (2026-07-10): ← = model.BackUrl (origin returnUrl ?? tab=zaznamy / meeting detail).
+        SetProjectBreadcrumbs(
+            model.ProjektId, model.ProjektNazev, model.ProjektZkratka,
+            currentText: model.IsCreate ? "Nový záznam" : $"Záznam #{model.CisloViditelne}",
+            backUrl: model.BackUrl);
         return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
     }
 
@@ -215,16 +339,6 @@ public sealed partial class ZaznamyController : BaseController
         }
 
         return UiContextProject;
-    }
-
-    private string? NormalizeLocalReturnUrl(string? returnUrl)
-    {
-        if (string.IsNullOrWhiteSpace(returnUrl))
-        {
-            return null;
-        }
-
-        return Url.IsLocalUrl(returnUrl) ? returnUrl : null;
     }
 
     private string BuildMeetingDetailUrl(int meetingId)

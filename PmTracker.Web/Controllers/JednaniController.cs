@@ -31,6 +31,7 @@ public sealed partial class JednaniController : BaseController
         var projectFilter = BuildMeetingOverviewProjectFilter(projektId);
         var projekty = await _meetingService.BuildJednaniOverviewAsync(projectFilter, ct);
 
+        SetSectionRootBreadcrumb("Jednání");
         return View(new JednaniIndexViewModel
         {
             CurrentUserContext = CurrentUserContext,
@@ -71,11 +72,16 @@ public sealed partial class JednaniController : BaseController
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.PageTitle = $"Jednání č. {model.Jednani.CisloJednani}";
 
-        var fallbackUrl = Url.Action("Index", "Jednani", new { projektId = model.ProjektId }) ?? "/Jednani";
-        var isValidReturnUrl = !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl);
-
-        model.BackUrl = isValidReturnUrl ? returnUrl : fallbackUrl;
-        model.BackLabel = isValidReturnUrl ? "Zpět na projekt" : "Zpět na jednání";
+        // C1 (2026-07-10): origin (returnUrl z přehledu /Jednani, dashboard novinek, …)
+        // se propisuje do breadcrumb ← (validace + kanonický tab=jednani fallback
+        // uvnitř SetProjectBreadcrumbs). Dřívější model.BackUrl/BackLabel byl mrtvý
+        // relikt — view ho od přechodu na breadcrumb lištu nerenderuje.
+        SetProjectBreadcrumbs(
+            model.ProjektId,
+            model.ProjektNazev,
+            model.ProjektZkratka,
+            meeting: (model.Jednani.Id, model.PageTitle),
+            backUrl: returnUrl);
 
         return View(model);
     }

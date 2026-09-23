@@ -102,3 +102,19 @@ iisreset
 - Hosting bootstrap: `/Users/Pavel.Andrlik/Documents/PM Tracker/publish/web.config`
 - SQL baseline/patch: `/Users/Pavel.Andrlik/Documents/PM Tracker/PMTracker_insert_sql`, `/Users/Pavel.Andrlik/Documents/PM Tracker/db_upgrade_*.sql`
 - Provozní checklist: `/Users/Pavel.Andrlik/Documents/PM Tracker/docs/technical/08-operations-runbooks.md`
+
+## Serverové PDF (tisk)
+
+Tisk projektu, jednání i záznamu vzniká sazbou v headless Edgi na serveru.
+Po nasazení ověřit:
+
+1. Edge je nainstalovaný — `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`.
+   Jiná cesta se zapíše do `Export:Pdf:BrowserExecutablePath` v `appsettings.json`.
+2. Účet aplikačního poolu smí spustit proces prohlížeče (antivirus / politiky spouštění).
+3. Dočasný adresář účtu poolu je zapisovatelný — vzniká v něm `%TEMP%\pmtracker-pdf\<guid>`,
+   po každém tisku se maže.
+4. Kontrola: otevřít tisk projektu. Přijde-li PDF s patičkou „Strana 1 z N", je vše v pořádku.
+   Přijde-li stará HTML stránka s tiskovým dialogem, sazba selhala — důvod je
+   v logu jako varování „PDF se nevyrobilo".
+
+Vypnutí bez nasazení nové verze: `Export:Pdf:Enabled = false` (tisk se vrátí na HTML cestu).

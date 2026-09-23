@@ -61,6 +61,13 @@ public sealed class SaveRecordCommand
     /// </summary>
     public List<HarmonogramVazbaDto> HarmonogramVazby { get; set; } = new();
 
+    /// <summary>
+    /// Spec 2026-09-17 §5.2 — verze záznamu z doby načtení editoru (id posledního
+    /// auditního zápisu). Prázdné = nový záznam nebo formulář z doby před nasazením
+    /// → kontrola se přeskočí.
+    /// </summary>
+    public string? RecordVersion { get; set; }
+
     public string? EditorTab { get; set; }
 
     public string? ReturnUrl { get; set; }
@@ -71,7 +78,6 @@ public sealed class SaveRecordCommand
 
     public int? MeetingId { get; set; }
 
-    public string? ScheduleVersion { get; set; }
 
     /// <summary>
     /// FIX 2026-05-04: master switch "Automatické vyplňování harmonogramu" (Auto/Manual).
@@ -102,9 +108,15 @@ public sealed class SaveRecordExterniVazbaCommand
     public string? Typ { get; set; }
     public string? Cislo { get; set; }
     public string? PredpokladanaCena { get; set; }
-    public string? Vyzva { get; set; }
     public int? VyzvaId { get; set; }
     public bool ZaradidDoVyzvy { get; set; }
+
+    /// <summary>
+    /// Text požadavku do výzvy (spec 2026-09-08). Rich text HTML z Quillu; před uložením
+    /// projde sanitizací. Renderuje se jen u PNF, u ostatních typů zůstane null.
+    /// </summary>
+    public string? Pozadavek { get; set; }
+
     public DateTime? DatumObjednani { get; set; }
     public DateTime? PlanDodani { get; set; }
     public DateTime? DatumDodani { get; set; }

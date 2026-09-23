@@ -1,0 +1,209 @@
+@model HarmonogramBlockViewModel
+@{
+    // Stránka záznamu (2026-07-14): tabulková část harmonogramu vyčleněná z _ScheduleBlock,
+    // aby ji mohl použít editor (přes _ScheduleBlock) i read-only tabulkový režim na
+    // stránce záznamu. ČISTÝ PŘESUN — výstup se nesmí lišit.
+    // Plán D Task 8: pořadí manual kroků v rámci ManualActualKroky[] binding.
+    // Počítá se jen pro kroky, u kterých opravdu renderujeme manual input/read-only.
+    var manualInputIndex = 0;
+    var lockedManualKrokKeys = Model.LockedManualKrokKeys ?? new HashSet<int>();
+}
+        <div class="schedule-table-wrap">
+            <table class="table schedule-table">
+                <thead>
+                    <tr>
+                        <th>Krok</th>
+                        <th>Trvání / datum</th>
+                        <th>Skutečnost / datum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < Model.Kroky.Count; i++)
+                    {
+                        var krok = Model.Kroky[i];
+                        // Datum-model: disabled logika čistě z permission setu. Mrtvé offset gating přes
+                        // krok.TrvaniTypId/ZpozdeniTypId zrušeno — v datum-modelu se nikdy nenastavovalo
+                        // (vždy 0) → editor zamykal všechny plán/skutečnost inputy (regrese migrace).
+                        // Proposal-diff highlight: per-krok diff (původní vs navržená hodnota) dodává server
+                        // v EditorChangedTypeTooltips (klíč = KrokIndex). Minimální varianta (2026-06-29):
+                        // zvýrazní celý změněný krok (plán i skutečnost) jedním tooltipem. Mimo proposal-detail
+                        // je slovník prázdný → žádné zvýraznění.
+                        var krokDiffTooltip = Model.EditorChangedTypeTooltips.GetValueOrDefault(krok.KrokIndex);
+                        var krokChanged = !string.IsNullOrEmpty(krokDiffTooltip);
+                        var durationChanged = krokChanged;
+                        var delayChanged = krokChanged;
+                        string? durationTooltip = krokDiffTooltip;
+                        string? delayTooltip = krokDiffTooltip;
+                        var canEditDuration = !Model.Permissions.IsPlanLocked
+                            && !Model.Permissions.IsScheduleLocked
+                            && Model.Permissions.CanEditDuration
+                            && (!Model.Permissions.IsAddOnlyMode || krok.TrvaniDni <= 0);
+                        var canEditDelay = !Model.Permissions.IsScheduleLocked
+                            && Model.Permissions.CanEditDelay;
+                        var dateDisabled = !Model.Permissions.IsTaskCategory || !canEditDuration;
+                        var delayDateDisabled = !Model.Permissions.IsTaskCategory || !canEditDelay;
+                        <tr data-schedule-step-row
+                            data-step-index="@krok.KrokIndex"
+                            data-step-name="@krok.Nazev"
+                            data-step-color="@krok.BarvaHex"
+                            data-step-duration="@krok.TrvaniDni"
+                            data-step-delay="@krok.OdchylkaDni"
+                            data-step-actual-iso="@(krok.OdchylkaDni.HasValue ? krok.SkutecneDatum!.Value.ToString("yyyy-MM-dd") : string.Empty)">
+                            <td>@krok.Nazev</td>
+                            <td>
+                                @* DESIGN-9-F (2026-05-02): DURATION input redesign — primární editor je
+                                   kalendář (datum konce kroku). Trvání ve dnech se vypočte JS-em z rozdílu
+                                   (datum konce - datum začátku) a propíše do hidden input pro form POST.
+                                   Stepper +/− odstraněn — datum-driven flow je sjednocený se skutečností. *@
+                                <div class="schedule-stacked-input @(durationChanged ? "proposal-field-changed" : null)"
+                                     title="@durationTooltip">
+                                    @* Datum-model (Fáze 3b): jeden HarmonogramHodnoty[i] na krok — Poradi + PlanDatum.
+                                       Plánové datum konce kroku je primární editovatelná hodnota (žádné offsety). *@
+                                    <input type="hidden" name="HarmonogramHodnoty[@i].Poradi" value="@krok.KrokIndex" />
+                                    <div class="schedule-duration-row">
+                                        @await Html.PartialAsync(
+                                            "_AppDateField",
+                                            new AppDateFieldViewModel
+                                            {
+                                                Name = $"HarmonogramHodnoty[{i}].PlanDatum",
+                                                // Surové plánové datum: prázdné pole tam, kde plán ještě neexistuje
+                                                // (žádný BaselineDatum/datum-založení fallback → nevynucuje kaskádu).
+                                                IsoValue = krok.PlanDatum?.ToString("yyyy-MM-dd") ?? string.Empty,
+                                                DisplayValue = krok.PlanDatum?.ToString("dd.MM.yyyy") ?? string.Empty,
+                                                Locked = dateDisabled,
+                                                AriaLabel = $"Datum konce kroku {krok.Nazev}",
+                                                ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(durationChanged ? " proposal-field-changed" : string.Empty)}",
+                                                ExtraDataAttributes = new Dictionary<string, object?>
+                                                {
+                                                    ["data-schedule-duration-calendar"] = "true",
+                                                    ["data-schedule-plan-step"] = krok.KrokIndex.ToString(),
+                                                    ["title"] = durationTooltip
+                                                }
+                                            })
+                                        <span class="schedule-duration-days-readonly"
+                                              data-schedule-duration-readonly
+                                              aria-label="Trvání ve dnech"
+                                              title="Trvání kroku v kalendářních dnech (vypočteno z datumu konce a začátku kroku)">
+                                            @krok.TrvaniDni dnů
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                @{
+                                    // Plán D Task 8: Skutečnost sloupec — rozhodnutí mezi 4 scénáři:
+                                    //  A) Manual krok {2,5,8,9} → date input (editable/read-only) přes _ScheduleBlockManualCell
+                                    //  B) Auto krok s ZdrojSkutecnosti.FromVyjadreni → read-only odchylka + chat ikona
+                                    //  C) Auto krok s ZdrojSkutecnosti.None → warning ikona (jen u existujícího záznamu)
+                                    //  D) Ostatní (Create flow, legacy) → původní delay input UI
+                                    //
+                                    // U Create flow (RecordId = 0) ještě neexistuje žádná vazba / skutečnost,
+                                    // takže ani warning ani read-only zobrazení nedává smysl — padá to na legacy
+                                    // delay input, který umožní pre-fill. Manual kroky ale renderujeme vždy
+                                    // (i u Create — schéma 3 pre-bound vazby).
+                                    var zdrojSkut = krok.ZdrojSkutecnosti;
+                                    var isKrokLocked = krok.KrokIndex >= 1 && lockedManualKrokKeys.Contains(krok.KrokIndex);
+                                    var hasExistingRecord = Model.RecordId > 0;
+                                    var useManualCell = krok.IsManualKrok;
+                                    var useFromVyjadreniCell = !useManualCell
+                                        && hasExistingRecord
+                                        && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.FromVyjadreni;
+                                    var useNoneCell = !useManualCell
+                                        && !useFromVyjadreniCell
+                                        && hasExistingRecord
+                                        && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.None;
+                                    // FIX 2026-05-04: master switch Manual rezim podporuje ruční datum i pro auto-eligible
+                                    // kroky 1/3/4/6/7/10. Tj. assignedManualIndex se přiděluje VŠEM task-eligible cells
+                                    // (ne jen 2/5/8/9). Cell partial render obě varianty (auto bubble + manual input)
+                                    // a CSS pravidlo na data-skutecnost-rezim řídí výchozí viditelnost.
+                                    // 7b: u skrytého skutečnostního sloupce (návrh založení) NErenderujeme žádný
+                                    // skutečnostní input → manualInputIndex se nesmí inkrementovat.
+                                    var allowManualForAutoEligible = !useManualCell && hasExistingRecord && Model.CanEditManualActual;
+                                    var canShowManualForRezim = !Model.HideActual && (useManualCell || allowManualForAutoEligible);
+                                    var assignedManualIndex = canShowManualForRezim ? manualInputIndex++ : -1;
+                                }
+                                @* Datum-model (Fáze 3b): skutečnost (datum) řeší manuální buňka přes
+                                   ManualActualKroky[]; plán už nese HarmonogramHodnoty[i].PlanDatum výše.
+                                   Žádné offset DELAY páry. *@
+                                @if (Model.HideActual)
+                                {
+                                    @* 7b: návrh založení vyplňuje pouze plán; skutečnost až po založení. *@
+                                    <span class="muted schedule-actual-after-create" data-schedule-actual-hidden>Vyplní se po založení</span>
+                                }
+                                else if (useManualCell)
+                                {
+                                    @await Html.PartialAsync(
+                                        "_ScheduleBlockManualCell",
+                                        new ScheduleBlockManualCellViewModel
+                                        {
+                                            Krok = krok,
+                                            ManualInputIndex = assignedManualIndex,
+                                            ZaznamId = Model.RecordId,
+                                            CanEditManualActual = Model.CanEditManualActual,
+                                            IsLocked = isKrokLocked
+                                        })
+                                }
+                                else if (useFromVyjadreniCell)
+                                {
+                                    @await Html.PartialAsync(
+                                        "_ScheduleBlockManualCell",
+                                        new ScheduleBlockManualCellViewModel
+                                        {
+                                            Krok = krok,
+                                            ManualInputIndex = assignedManualIndex,
+                                            ZaznamId = Model.RecordId,
+                                            CanEditManualActual = Model.CanEditManualActual,
+                                            IsLocked = isKrokLocked
+                                        })
+                                }
+                                else if (useNoneCell)
+                                {
+                                    @await Html.PartialAsync(
+                                        "_ScheduleBlockManualCell",
+                                        new ScheduleBlockManualCellViewModel
+                                        {
+                                            Krok = krok,
+                                            ManualInputIndex = assignedManualIndex,
+                                            ZaznamId = Model.RecordId,
+                                            CanEditManualActual = Model.CanEditManualActual,
+                                            IsLocked = isKrokLocked
+                                        })
+                                }
+                                else
+                                {
+                                    // Datum-model (Fáze 3b): fallback (Create flow / ostatní) — skutečnost je
+                                    // datum kroku (HarmonogramHodnoty[i].SkutecnostDatum), žádné offsety/steppery.
+                                    // Prázdné = krok ještě nenastal.
+                                    var hasActualDate = krok.OdchylkaDni.HasValue;
+                                    var skutecnostIso = hasActualDate ? krok.SkutecneDatum!.Value.ToString("yyyy-MM-dd") : string.Empty;
+                                    var skutecnostDisplay = hasActualDate ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy") : string.Empty;
+                                    <div class="schedule-stacked-input @(delayChanged ? "proposal-field-changed" : null)"
+                                         title="@delayTooltip">
+                                        @await Html.PartialAsync(
+                                            "_AppDateField",
+                                            new AppDateFieldViewModel
+                                            {
+                                                Name = $"HarmonogramHodnoty[{i}].SkutecnostDatum",
+                                                IsoValue = skutecnostIso,
+                                                DisplayValue = skutecnostDisplay,
+                                                Locked = delayDateDisabled,
+                                                // 2026-09-03: u zamčeného pole nenabízet křížek „vymazat" —
+                                                // nic by neudělal (read-only zobrazení).
+                                                Clearable = !delayDateDisabled,
+                                                AriaLabel = $"Skutečnost kroku {krok.Nazev}",
+                                                ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(delayChanged ? " proposal-field-changed" : string.Empty)}",
+                                                ExtraDataAttributes = new Dictionary<string, object?>
+                                                {
+                                                    ["data-schedule-delay-date"] = "true",
+                                                    ["data-schedule-actual-step"] = krok.KrokIndex.ToString(),
+                                                    ["title"] = delayTooltip
+                                                }
+                                            })
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>

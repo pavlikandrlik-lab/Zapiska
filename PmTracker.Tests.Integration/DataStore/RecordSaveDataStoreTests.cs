@@ -170,6 +170,61 @@ public sealed class RecordSaveDataStoreTests
     }
 
     [Fact]
+    public async Task BuildZaznamCreate_ShouldPreviewMeetingBasedNumber_AndIncrementOrder_WhenMeetingNumberingIsEnabled()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_create_number_preview_meeting");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordNumberPreviewAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordNumberPreviewOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RNUMPREV");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RNUMPREV_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var project = await dbContext.Projekty.FirstAsync(x => x.Id == projectId);
+        project.PouzivatIdentJednani = true;
+        await dbContext.SaveChangesAsync();
+
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, "OPEN", 920);
+
+        // 1) Žádný záznam pro jednání zatím neexistuje → náhled ukazuje první volné pořadí "920-1"
+        //    (dřív se chybně ukazovalo interní inkrementální CisloZaznamu).
+        var firstModel = store.BuildZaznamCreate(projectId, meetingId);
+        firstModel.CisloViditelne.Should().Be("920-1");
+        var firstOption = firstModel.JednaniProCisloOptions.Single(x => x.Id == meetingId);
+        firstOption.CisloJednani.Should().Be(920);
+        firstOption.NextPoradiProCislo.Should().Be(1);
+
+        // 2) Po založení záznamu do jednání se náhled posune na "920-2".
+        var categoryCode = await dbContext.CiselnikKategoriiZaznamu.OrderBy(x => x.Id).Select(x => x.Kod).FirstAsync();
+        var statusCode = await dbContext.CiselnikStavuUkolu.OrderBy(x => x.Id).Select(x => x.Kod).FirstAsync();
+        var subsystemCode = await dbContext.Subsystemy.Where(x => x.Id == subsystemId).Select(x => x.Kod).SingleAsync();
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
+
+        var savedRecordId = store.SaveRecord(new SaveRecordCommand
+        {
+            ProjektId = projectId,
+            Kategorie = categoryCode,
+            Stav = statusCode,
+            Nazev = "První záznam k jednání",
+            Subsystem = subsystemCode,
+            VlastnikId = ownerId,
+            DatumZalozeni = new DateTime(2026, 5, 14),
+            TerminUkonceni = new DateTime(2026, 5, 20),
+            JednaniIdProCislo = meetingId
+        }, currentUser);
+
+        var savedRecord = await dbContext.ProjektoveZaznamy.AsNoTracking().FirstAsync(x => x.Id == savedRecordId);
+        savedRecord.CisloViditelne.Should().Be("920-1");
+
+        var secondModel = store.BuildZaznamCreate(projectId, meetingId);
+        secondModel.CisloViditelne.Should().Be("920-2");
+        secondModel.JednaniProCisloOptions.Single(x => x.Id == meetingId).NextPoradiProCislo.Should().Be(2);
+    }
+
+    [Fact]
     public async Task BuildZaznamCreate_ShouldFallbackToOpenMeeting_WhenContextMeetingIsClosed_AndMeetingNumberingIsEnabled()
     {
         var db = await _fixture.CreateDatabaseAsync("record_create_context_meeting_closed");
@@ -484,5 +539,203 @@ public sealed class RecordSaveDataStoreTests
         exception.DiagnosticLog.Should().Contain("CommandValues");
         exception.DiagnosticLog.Should().Contain("Record save validation failed.");
         exception.DiagnosticLog.Should().Contain("Popis");
+    }
+
+    /// <summary>
+    /// Text požadavku se ukládá k vazbě a přežije opětovné uložení záznamu. UPSERT drží
+    /// Id, takže FK z vyjadreni_vazby zůstanou platné (memory feedback_replace_upsert_for_audit_fk).
+    ///
+    /// Vazba se seeduje přímo do DB: v integrační fixture je ServiceDesk vypnutý a validace
+    /// by NOVOU vazbu odmítla jako nenalezený tiket (stejný postup jako
+    /// ExternalLinkDeleteWithBindingTests). Ověřuje se tedy UPDATE větev UPSERTu; že text
+    /// ukládá i větev pro novou vazbu, hlídá zdrojový pin
+    /// RecordServiceExternalLinkUpsertTests.ReplaceRecordExternalLinksAsync_UkladaPozadavekVObouVetvich.
+    /// </summary>
+    [Fact]
+    public async Task SaveRecord_UlozitAZachovatTextPozadavkuUPnfVazby()
+    {
+        var db = await _fixture.CreateDatabaseAsync("record_save_pozadavek_pnf");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordPozadavekAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordPozadavekOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RPOZADAVEK");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RPOZADAVEK_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(
+            dbContext, projectId, ownerId, subsystemId, "U", "Zaznam s pozadavkem");
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
+
+        var record = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
+        var categoryCode = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+            .Where(x => x.Id == record.KategorieId).Select(x => x.Kod).FirstAsync();
+        var statusCode = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+            .Where(x => x.Id == record.StavUkoluId).Select(x => x.Kod).FirstAsync();
+        var subsystemCode = await dbContext.Subsystemy.AsNoTracking()
+            .Where(x => x.Id == record.SubsystemId).Select(x => x.Kod).FirstAsync();
+
+        // Vazba vzniká přímo v DB — bez zapnutého ServiceDesku by novou validace odmítla.
+        var pnfTypeId = await dbContext.CiselnikTypuExternichOdkazu.AsNoTracking()
+            .Where(x => x.Kod == "PNF").Select(x => x.Id).FirstAsync();
+        var vazba = new ZaznamExterniOdkazEntity
+        {
+            ZaznamId = recordId,
+            TypOdkazuId = pnfTypeId,
+            Cislo = "336865"
+        };
+        dbContext.ZaznamExterniOdkazy.Add(vazba);
+        await dbContext.SaveChangesAsync();
+        var vazbaId = vazba.Id;
+        vazba.Pozadavek.Should().BeNull("stávající vazby začínají prázdné");
+        dbContext.ChangeTracker.Clear();
+
+        SaveRecordCommand Prikaz(string? pozadavek) => new()
+        {
+            Id = record.Id,
+            ProjektId = record.ProjektId,
+            Kategorie = categoryCode,
+            Stav = statusCode,
+            Nazev = record.Nazev,
+            Cil = record.Cil,
+            Popis = record.Popis,
+            VlastnikId = record.VlastnikId,
+            DatumZalozeni = record.DatumZalozeni,
+            TerminUkonceni = record.DatumUkonceni,
+            Subsystem = subsystemCode,
+            CisloZaznamu = record.CisloZaznamu,
+            ExterniVazby = new List<SaveRecordExterniVazbaCommand>
+            {
+                new()
+                {
+                    Id = vazbaId,
+                    Typ = "PNF",
+                    Cislo = "336865",
+                    Pozadavek = pozadavek
+                }
+            }
+        };
+
+        store.SaveRecord(Prikaz("<p>Chceme sestavu.</p>"), currentUser);
+
+        var poUlozeni = await dbContext.ZaznamExterniOdkazy.AsNoTracking()
+            .SingleAsync(x => x.ZaznamId == recordId && x.Cislo == "336865");
+        poUlozeni.Id.Should().Be(vazbaId, "UPSERT nesmí vazbu smazat a založit znovu");
+        poUlozeni.Pozadavek.Should().Contain("Chceme sestavu.");
+
+        // Druhé uložení: text se přepíše, Id zůstává, takže FK z audit tabulek drží.
+        store.SaveRecord(Prikaz("<p>Nove zadani.</p>"), currentUser);
+
+        var poZmene = await dbContext.ZaznamExterniOdkazy.AsNoTracking()
+            .SingleAsync(x => x.ZaznamId == recordId && x.Cislo == "336865");
+        poZmene.Id.Should().Be(vazbaId);
+        poZmene.Pozadavek.Should().Contain("Nove zadani.");
+        poZmene.Pozadavek.Should().NotContain("Chceme sestavu.");
+    }
+
+    /// <summary>
+    /// Regrese z 2026-04-20: uložení záznamu přepisovalo VyzvaId podle textového pole Vyzva,
+    /// které formulář od přechodu na přepínač neposílá. PNF po každém uložení vypadlo z výzvy
+    /// do bufferu — i z odeslané, zamčené výzvy (spec 2026-09-10 §0).
+    ///
+    /// Scénář z hlášení uživatele: u PNF ve výzvě se změní jen předpokládaná cena.
+    /// </summary>
+    [Theory]
+    [InlineData(VyzvaStav.Priprava)]
+    [InlineData(VyzvaStav.Odeslano)]
+    public async Task SaveRecord_ZmenaCenyPnfVeVyzve_ZachovaZarazeni(VyzvaStav stav)
+    {
+        var db = await _fixture.CreateDatabaseAsync($"record_save_keeps_vyzva_{(int)stav}");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordKeepVyzvaAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RecordKeepVyzvaOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "RKEEPVYZVA");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "RKEEPVYZVA_SUB", ownerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, ownerId, "HOST");
+
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(
+            dbContext, projectId, ownerId, subsystemId, "U", "Zaznam s PNF ve vyzve");
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true);
+
+        var record = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
+        var categoryCode = await dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
+            .Where(x => x.Id == record.KategorieId).Select(x => x.Kod).FirstAsync();
+        var statusCode = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+            .Where(x => x.Id == record.StavUkoluId).Select(x => x.Kod).FirstAsync();
+        var subsystemCode = await dbContext.Subsystemy.AsNoTracking()
+            .Where(x => x.Id == record.SubsystemId).Select(x => x.Kod).FirstAsync();
+
+        var vyzva = new VyzvaEntity
+        {
+            ProjektId = projectId,
+            Kod = "3/2026",
+            PoradoveVRoce = 3,
+            Rok = 2026,
+            Stav = stav,
+            DatumZalozeni = new DateTime(2026, 9, 1),
+            ZalozilOsobaId = ownerId,
+            DatumOdeslani = stav == VyzvaStav.Odeslano ? new DateTime(2026, 9, 5) : null,
+            OdeslalOsobaId = stav == VyzvaStav.Odeslano ? ownerId : null,
+            MistoPlneniSnapshot = "FIS (EIS): VZ 8201",
+            CisloRamcoveSmlouvySnapshot = "INT-SML-KEEP",
+        };
+        dbContext.Vyzvy.Add(vyzva);
+        await dbContext.SaveChangesAsync();
+
+        // Vazba vzniká přímo v DB — novou vazbu by validace bez ServiceDesku odmítla.
+        var pnfTypeId = await dbContext.CiselnikTypuExternichOdkazu.AsNoTracking()
+            .Where(x => x.Kod == "PNF").Select(x => x.Id).FirstAsync();
+        var vazba = new ZaznamExterniOdkazEntity
+        {
+            ZaznamId = recordId,
+            TypOdkazuId = pnfTypeId,
+            Cislo = "336865",
+            PredpokladanaCena = 1000m,
+            ZaradidDoVyzvy = true,
+            VyzvaId = vyzva.Id,
+        };
+        dbContext.ZaznamExterniOdkazy.Add(vazba);
+        await dbContext.SaveChangesAsync();
+        var vazbaId = vazba.Id;
+        dbContext.ChangeTracker.Clear();
+
+        // Přesně to, co posílá formulář: Id, typ, číslo, cenu a skryté VyzvaId + ZaradidDoVyzvy.
+        store.SaveRecord(new SaveRecordCommand
+        {
+            Id = record.Id,
+            ProjektId = record.ProjektId,
+            Kategorie = categoryCode,
+            Stav = statusCode,
+            Nazev = record.Nazev,
+            Cil = record.Cil,
+            Popis = record.Popis,
+            VlastnikId = record.VlastnikId,
+            DatumZalozeni = record.DatumZalozeni,
+            TerminUkonceni = record.DatumUkonceni,
+            Subsystem = subsystemCode,
+            CisloZaznamu = record.CisloZaznamu,
+            ExterniVazby = new List<SaveRecordExterniVazbaCommand>
+            {
+                new()
+                {
+                    Id = vazbaId,
+                    Typ = "PNF",
+                    Cislo = "336865",
+                    PredpokladanaCena = "2000",
+                    VyzvaId = vyzva.Id,
+                    ZaradidDoVyzvy = true,
+                },
+            },
+        }, currentUser);
+
+        var poUlozeni = await dbContext.ZaznamExterniOdkazy.AsNoTracking().SingleAsync(x => x.Id == vazbaId);
+        poUlozeni.PredpokladanaCena.Should().Be(2000m, "změna ceny se uložit musí");
+        poUlozeni.VyzvaId.Should().Be(vyzva.Id, "uložení záznamu nesmí PNF vytáhnout z výzvy");
+        poUlozeni.ZaradidDoVyzvy.Should().BeTrue("přepínač zůstává zapnutý");
     }
 }

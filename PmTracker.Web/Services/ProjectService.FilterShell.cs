@@ -7,8 +7,8 @@ namespace PmTracker.Web.Services;
 public sealed partial class ProjectService
 {
     /// <summary>
-    /// DRY helper pro <c>ProjectFilterShellViewModel</c> — single source of truth pro 10
-    /// lookup options sdílených mezi Records a Schedule taby. Spec
+    /// DRY helper pro <c>ProjectFilterShellViewModel</c> — single source of truth pro
+    /// lookup options 9 filter polí sdílených mezi Records a Schedule taby. Spec
     /// 2026-04-30-project-filter-unification-design (2026-04-30).
     /// Owner list je union všech aktivních vlastníků záznamů projektu, aby filter state
     /// byl validní na obou tabech (záznam, který filtruje "vlastník=X" v Records, musí mít
@@ -63,18 +63,27 @@ public sealed partial class ProjectService
                 select new { o.Id, o.Jmeno, o.Prijmeni })
             .Distinct()
             .ToListAsync(ct);
+        // Zobrazení „Příjmení Jméno" a řazení dle příjmení (pak jména) — konzistentní s tím,
+        // jak uživatelé lidi vyhledávají (uživatelský požadavek 2026-07-05).
         var ownerLookups = ownerOptions
+            .OrderBy(o => o.Prijmeni, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(o => o.Jmeno, StringComparer.CurrentCultureIgnoreCase)
             .Select(o => new LookupOptionViewModel
             {
                 Value = o.Id.ToString(CultureInfo.InvariantCulture),
-                Label = $"{o.Jmeno} {o.Prijmeni}".Trim()
+                Label = $"{o.Prijmeni} {o.Jmeno}".Trim()
             })
-            .OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+
+        var projektZkratka = await dbContext.Projekty.AsNoTracking()
+            .Where(x => x.Id == projektId)
+            .Select(x => x.Zkratka)
+            .FirstOrDefaultAsync(ct) ?? string.Empty;
 
         return new ProjectFilterShellViewModel
         {
             ProjektId = projektId,
+            Zkratka = projektZkratka,
             Scope = scope,
             SubsystemyMoznosti = subsystemOptions,
             KategorieMoznosti = categoryOptions,

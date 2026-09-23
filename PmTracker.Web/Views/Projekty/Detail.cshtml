@@ -15,25 +15,16 @@
     var meetingsTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "jednani", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=jednani";
     var teamTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "tym", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=tym";
     var proposalsTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "navrhy", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=navrhy";
+    var vyzvyTabUrl = Url.Action("Detail", "Projekty", new { id = Model.Projekt.Id, tab = "vyzvy", asUser }) ?? $"/Projekty/Detail/{Model.Projekt.Id}?tab=vyzvy";
 }
 
-<section class="page-header page-header-compact">
-    <div class="project-header-row">
-        @if (!string.IsNullOrWhiteSpace(Model.BackUrl))
-        {
-            <pm-button variant="Ghost" size="Small" href="@Model.BackUrl">@(Model.BackLabel ?? "Zpět")</pm-button>
-            <span class="project-header-divider">|</span>
-        }
-        <h1 class="project-title-inline">@Model.PageTitle</h1>
-        <span class="pill">Zkratka: @Model.Projekt.Zkratka</span>
-        @if (!string.IsNullOrWhiteSpace(Model.Projekt.Stav))
-        {
-            <span class="badge project-status-inline">@Model.Projekt.Stav</span>
-        }
-    </div>
-</section>
-
 <div class="tabs" role="tablist">
+    @* project-status-inline ZÁMĚRNĚ vynecháno: jeho jediný efekt je margin-left:auto z page-headeru,
+       který v řádku tabů (spolu s auto-marginem akcí) centroval menu. .tabs-status drží zarovnání vlevo. *@
+    @if (!string.IsNullOrWhiteSpace(Model.Projekt.Stav))
+    {
+        <span class="badge tabs-status">@Model.Projekt.Stav</span>
+    }
     <a class="tab @(Model.ActiveTab == "zaznamy" ? "active" : null)"
        id="tab-zaznamy"
        href="@recordsTabUrl"
@@ -61,36 +52,55 @@
        data-tab="jednani">
         Jednání
     </a>
-    <a class="tab @(Model.ActiveTab == "tym" ? "active" : null)"
-       id="tab-tym"
-       href="@teamTabUrl"
-       role="tab"
-       aria-selected="@(Model.ActiveTab == "tym" ? "true" : "false")"
-       aria-controls="panel-tym"
-       data-tab="tym">
-        Osoby (tým)
-    </a>
-    @if (Model.CanViewProposals)
-    {
-        <a class="tab @(Model.ActiveTab == "navrhy" ? "active" : null)"
-           id="tab-navrhy"
-           href="@proposalsTabUrl"
-           role="tab"
-           aria-selected="@(Model.ActiveTab == "navrhy" ? "true" : "false")"
-           aria-controls="panel-navrhy"
-           data-tab="navrhy">
-            Návrhy
-        </a>
-    }
-    @if (Model.CanViewDashboard)
-    {
-        <a class="tab"
-           role="tab"
-           aria-selected="false"
-           href="@Url.Action("Index", "ProjectDashboard", new { projektId = Model.Projekt.Id })">
-            Dashboard
-        </a>
-    }
+    @* Sekundární záložky (Option 2, 2026-07-07): aktivní sekundární tab je VŽDY inline
+       (podtržení viditelné i ve sbaleném stavu), „+" jednosměrně odkryje neaktivní inline
+       „do boku", po rozbalení se vpravo dole u posledního tabu objeví zámeček (trvalé
+       rozbalení = roční cookie). Zamčeno serverově = skupina rovnou rozbalená.
+       Sbalení/expand řídí třída .is-expanded (JS pro „+"), aktivní tab se nikdy neschová. *@
+    <div class="tab-secondary-group @(Model.ProjectMenuLocked ? "is-expanded" : null)" data-project-menu-group>
+        <a class="tab tab-secondary @(Model.ActiveTab == "tym" ? "active" : null)"
+           id="tab-tym" href="@teamTabUrl" role="tab"
+           aria-selected="@(Model.ActiveTab == "tym" ? "true" : "false")"
+           aria-controls="panel-tym" data-tab="tym">Osoby (tým)</a>
+        @if (Model.CanViewProposals)
+        {
+            <a class="tab tab-secondary @(Model.ActiveTab == "navrhy" ? "active" : null)"
+               id="tab-navrhy" href="@proposalsTabUrl" role="tab"
+               aria-selected="@(Model.ActiveTab == "navrhy" ? "true" : "false")"
+               aria-controls="panel-navrhy" data-tab="navrhy">Návrhy</a>
+        }
+        @* Výzvy — bez permission gate: vidí je každý, kdo vidí projekt (spec 2026-09-07 §4.1). *@
+        <a class="tab tab-secondary @(Model.ActiveTab == "vyzvy" ? "active" : null)"
+           id="tab-vyzvy" href="@vyzvyTabUrl" role="tab"
+           aria-selected="@(Model.ActiveTab == "vyzvy" ? "true" : "false")"
+           aria-controls="panel-vyzvy" data-tab="vyzvy">Výzvy</a>
+        @if (Model.CanViewDashboard)
+        {
+            <a class="tab tab-secondary" role="tab" aria-selected="false"
+               href="@Url.Action("Index", "ProjectDashboard", new { projektId = Model.Projekt.Id })">Dashboard</a>
+        }
+
+        @* „+" — odkryje neaktivní sekundární inline. Jen v odemčeném stavu (zamčeno = server už
+           rozbalil). Ve sbaleném stavu viditelný, po klientském rozbalení CSS skryje. *@
+        @if (!Model.ProjectMenuLocked)
+        {
+            <button type="button" class="tab tab-overflow-toggle"
+                    data-project-menu-toggle aria-label="Zobrazit další záložky">
+                <gov-icon size="s" name="plus" type="components" aria-hidden="true"></gov-icon>
+            </button>
+        }
+
+        @* Zámeček — spodní index vpravo dole u posledního tabu; viditelný jen po rozbalení (CSS). *@
+        <button type="button"
+                class="project-menu-lock @(Model.ProjectMenuLocked ? "is-locked" : null)"
+                data-project-menu-lock-toggle
+                data-locked="@(Model.ProjectMenuLocked ? "1" : "0")"
+                title="@(Model.ProjectMenuLocked ? "Odemknout — sbalit menu (jde i v Nastavení ▸ Předvolby)" : "Zamknout rozbalené menu natrvalo")"
+                aria-label="@(Model.ProjectMenuLocked ? "Odemknout projektové menu" : "Zamknout rozbalené projektové menu")">
+            <gov-icon class="project-menu-lock-icon icon-lock" size="s" name="lock" type="components" aria-hidden="true"></gov-icon>
+            <gov-icon class="project-menu-lock-icon icon-unlock" size="s" name="unlock" type="components" aria-hidden="true"></gov-icon>
+        </button>
+    </div>
 
     @* Akce přesunuty z .panel-header do tab stripu (vpravo) kvůli úspoře místa
        (user 2026-06-10). Data z Model.ZaznamyTab (records panel se renderuje vždy). *@
@@ -103,11 +113,10 @@
                 Nový návrh záznamu
             </pm-button>
         }
+        @* A6 (2026-07-08): BEZ href — gov-button s href otevírá interní anchor dřív, než
+           uživatel zvolí formát v chooseru. URL nese data-print-pdf/word-url (resolvePrintUrl). *@
         <pm-button variant="Ghost"
                    size="Small"
-                   href="@Model.ZaznamyTab.ProjectPrintUrl"
-                   target="_blank"
-                   rel="noopener"
                    data-print-trigger="true"
                    data-project-print-trigger="true"
                    data-print-pdf-url="@Model.ZaznamyTab.ProjectPrintUrl"
@@ -206,6 +215,38 @@ else
             <div class="record-loading-error" data-project-tab-error hidden></div>
         </section>
     }
+}
+
+@* Výzvy — panel bez permission gate, stejný lazy vzor jako Návrhy. *@
+@if (Model.LoadedVyzvyTab is not null)
+{
+    @await Html.PartialAsync(
+        "_ProjectVyzvyTab",
+        Model.LoadedVyzvyTab,
+        new ViewDataDictionary(ViewData)
+        {
+            ["IsActive"] = Model.ActiveTab == "vyzvy"
+        })
+}
+else
+{
+    <section id="panel-vyzvy"
+             class="tab-panel @(Model.ActiveTab == "vyzvy" ? "active" : null)"
+             role="tabpanel"
+             aria-labelledby="tab-vyzvy"
+             data-tab-panel="vyzvy"
+             data-project-tab-lazy-url="@Model.VyzvyTab.LoadUrl"
+             data-project-tab-loaded="false">
+        <div class="lazy-tab-placeholder" data-project-tab-placeholder>
+            <div class="record-loading-placeholder">
+                <div class="record-loading-line"></div>
+                <div class="record-loading-line short"></div>
+                <div class="record-loading-line"></div>
+            </div>
+            <p class="muted">@Model.VyzvyTab.LoadingText</p>
+        </div>
+        <div class="record-loading-error" data-project-tab-error hidden></div>
+    </section>
 }
 
 @if (Model.LoadedJednaniTab is not null)

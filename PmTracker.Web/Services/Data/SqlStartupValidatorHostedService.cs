@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.ViewModels;
 using System.Data;
+using PmTracker.Web.Services.Common;
 
 namespace PmTracker.Web.Services.Data;
 
@@ -99,6 +100,15 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             {
                 throw new InvalidOperationException($"V DB chybí tabulka {requiredTable}. Obnovte databázi přes PMTracker_insert_sql nebo spusťte upgrade skript.");
             }
+        }
+
+        // Spec 2026-09-17 §4.1 — zámek karty záznamu. Vlastní check místo RequiredTables,
+        // aby hláška pojmenovala konkrétní skript: bez tabulky spadne otevření editoru
+        // za běhu, a operátor by z obecné hlášky nevyčetl, co spustit.
+        if (!await HasTableAsync(dbContext, "dbo.zaznam_edit_zamek", ct))
+        {
+            throw new InvalidOperationException(
+                "V DB chybí tabulka dbo.zaznam_edit_zamek. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_4_5_record_edit_lock.sql.");
         }
 
         var hasCommentAuthorColumn = await HasColumnAsync(dbContext, "dbo.vyjadreni", "autor_osoba_id", ct);
@@ -201,6 +211,25 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
                 "Očekávaná akce: spustit db_upgrade_1_3_0_cleanup_orphaned_role_permissions.sql. " +
                 "Aplikace funguje, ale orphaned role mohou zmást audit.",
                 customActiveRolesCount);
+        }
+
+        // Podbarvení ukončených (2026-09-05, spec §6): číselník stavů úkolů se udržuje
+        // přímo v databázi, aplikace ho needituje. Rozporný řádek (pozastavení označené
+        // jako koncový stav) by jinak nikdo neodhalil. Číselník je malý, načte se celý
+        // a filtruje se stejnou funkcí jako v exportu.
+        var taskStates = await dbContext.CiselnikStavuUkolu.AsNoTracking().ToListAsync(ct);
+        var contradictoryTaskStates = taskStates
+            .Where(state => state.IsFinal && TaskStatusRules.IsPausedName(state.Nazev))
+            .Select(state => state.Nazev)
+            .ToList();
+
+        if (contradictoryTaskStates.Count > 0)
+        {
+            _logger.LogWarning(
+                "Stavy úkolů {Stavy} jsou označené jako koncové (is_final) a zároveň vypadají jako " +
+                "pozastavení. Očekávaná akce: zrušit is_final u těchto stavů přímo v databázi. " +
+                "Aplikace funguje, tisk je ale nebude podbarvovat jako ukončené.",
+                string.Join(", ", contradictoryTaskStates));
         }
 
         _logger.LogInformation("SQL startup validace proběhla úspěšně.");

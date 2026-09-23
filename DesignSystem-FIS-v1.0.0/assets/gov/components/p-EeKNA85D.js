@@ -1,0 +1,2 @@
+import{C as o}from"./p-U40vKHrs.js";import{p as s}from"./p-CQvUntGY.js";import{S as t}from"./p-BcQO4NH2.js";const r=s(o,["NEUTRAL","ERROR","WARNING","SUCCESS"]);s(t,["_XS","_S","_M","_L","_XL"]);const m={root:"gov-form-message",content:"gov-form-message__content"};export{m as F,r as a};
+//# sourceMappingURL=p-EeKNA85D.js.map

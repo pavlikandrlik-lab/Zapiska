@@ -12,7 +12,7 @@ public sealed class MeetingServiceDelegationTests
     public async Task SaveMeetingNotesBatchAsync_ShouldDelegateToCommentService()
     {
         var commentService = new FakeCommentService();
-        var sut = new MeetingService(null!, null!, null!, commentService, new FakeAuditWriteService(), TimeProvider.System);
+        var sut = new MeetingService(null!, null!, null!, commentService, new FakeAuditWriteService(), TimeProvider.System, null!);
         var currentUser = BuildCurrentUser();
         var rows = new List<(int ZaznamId, string Text)>
         {

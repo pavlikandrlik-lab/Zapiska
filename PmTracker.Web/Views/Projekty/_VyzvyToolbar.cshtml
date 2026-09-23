@@ -1,0 +1,41 @@
+@using PmTracker.Web.Models.ViewModels.Vyzvy
+@model VyzvyPanelViewModel
+@{
+    // gov-form-select bere nabídku jako JSON v atributu options a emituje gov-change
+    // s ev.detail.value (stejný vzor jako selektor kroku v chat modalu).
+    var rokOptions = Model.DostupneRoky
+        .Select(r => new { value = r.ToString(), label = r.ToString(), disabled = false })
+        .ToArray();
+}
+
+@* Lišta vpravo nahoře (2026-09-08): rok, Uzavřít výzvu, Nová výzva. „Nová výzva" je
+   úplně vpravo, aby vyšla pod tlačítko „Nové jednání" v tab stripu. *@
+<div class="vyzvy-toolbar" data-vyzvy-toolbar>
+    <gov-form-select size="s"
+                     class="vyzvy-toolbar-rok"
+                     data-vyzvy-rok
+                     value="@Model.VybranyRok"
+                     options="@System.Text.Json.JsonSerializer.Serialize(rokOptions)">
+    </gov-form-select>
+
+    @if (Model.MuzeEditovat)
+    {
+        @* Viditelnost řídí selectTile podle vybrané dlaždice — na bufferu ani u zamčené
+           výzvy se nenabízí, proto se rendruje skryté. Atribut hidden nese obalový span:
+           pm-button si atributy z hostu strhává, takže na něm by se neuplatnil. *@
+        <span class="vyzvy-toolbar-uzavrit" data-vyzvy-uzavrit hidden>
+            <pm-button variant="Secondary" size="Small" data-vyzvy-action="uzavrit">Uzavřít výzvu</pm-button>
+        </span>
+
+        @if (Model.Buffer.MuzeZaloztVyzvu)
+        {
+            @* Standardní modal aplikace: data-modal-url → openUrlModal (bootstrap.js). *@
+            <pm-button variant="Primary" size="Small"
+                       data-modal-url="@Url.Action("NovaVyzvaModal", "Vyzvy", new { projektId = Model.ProjektId, rok = Model.VybranyRok })">Nová výzva</pm-button>
+        }
+        else
+        {
+            <p class="muted vyzvy-toolbar-blokace" data-vyzvy-zalozit-blokace>@Model.Buffer.DuvodBlokace</p>
+        }
+    }
+</div>

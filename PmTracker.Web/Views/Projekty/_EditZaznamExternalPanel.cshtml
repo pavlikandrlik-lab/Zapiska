@@ -1,5 +1,9 @@
 @using System.Globalization
 @model ZaznamEditViewModel
+@{
+    // B4 (2026-07-09): detail návrhu — externí vazby read-only, žádné add/remove/chat akce.
+    var externalReadonly = Model.IsProposalDecisionDetail;
+}
 <pm-tab-panel key="external" class="record-modal-panel" data-record-modal-panel="external">
     <div class="section-divider">Externí vazby</div>
     <div data-external-links-editor>
@@ -45,7 +49,8 @@
                                         pattern="[0-9]{6}"
                                         inputmode="numeric"
                                         data-external-cislo
-                                        data-external-odkaz-id="@vazba.Id"></gov-form-input>
+                                        data-external-odkaz-id="@vazba.Id"
+                                        disabled="@(externalReadonly ? "true" : null)"></gov-form-input>
                     </label>
 
                     <div class="external-field-typ">
@@ -63,7 +68,7 @@
                                         min="0"
                                         inputmode="decimal"
                                         data-external-price-input
-                                        @(showEstimatedPrice ? null : "disabled")></gov-form-input>
+                                        @(showEstimatedPrice && !externalReadonly ? null : "disabled")></gov-form-input>
                     </label>
 
                     <div class="external-field-vyzva" data-external-vyzvy-switch-wrap
@@ -74,14 +79,16 @@
                         <gov-form-switch size="m"
                                          data-vyzvy-switch
                                          data-externi-odkaz-id="@vazba.Id"
+                                         @(externalReadonly ? "disabled" : null)
                                          @(vazba.ZaradidDoVyzvy ? "checked" : null)>
                             <span slot="label"><label>Zařadit</label></span>
                         </gov-form-switch>
                         <span class="vyzvy-switch-status" data-vyzvy-switch-status>@statusText</span>
                     </div>
 
-                    @* 7c: harvest UI (chat + 4 datumy) skryté v návrhu založení — skutečnost až po založení. *@
-                    @if (!Model.HideExternalHarvestUi)
+                    @* 7c: harvest UI (chat + 4 datumy) skryté v návrhu založení — skutečnost až po založení.
+                       B4: chat akce nepatří na rozhodovací detail návrhu. *@
+                    @if (!Model.HideExternalHarvestUi && !externalReadonly)
                     {
                     <div class="external-action-chat">
                         <pm-button variant="Secondary" size="Small" data-external-chat-open="true"
@@ -161,6 +168,24 @@
                     </div>
                     }
 
+                    @* Text požadavku do výzvy (spec 2026-09-08 §5.3). Renderuje se vždy
+                       a u ne-PNF se schová atributem — typ je u nově zadávaného tiketu
+                       ještě neznámý a odhalí ho sync.js, stejně jako pole ceny. *@
+                    <label class="external-field-pozadavek"
+                           data-external-pozadavek-field
+                           @(isPnf ? null : "hidden=\"hidden\"")>
+                        <span class="external-field-label">Text požadavku do výzvy</span>
+                        <textarea name="ExterniVazby[@i].Pozadavek"
+                                  rows="5"
+                                  data-rich-text="true"
+                                  data-rich-text-min-height="120"
+                                  data-external-pozadavek-input
+                                  placeholder="Co je u tohoto PNF požadováno"
+                                  @(externalReadonly ? "disabled" : null)>@vazba.Pozadavek</textarea>
+                    </label>
+
+                    @if (!externalReadonly)
+                    {
                     <div class="external-action-trash">
                         <pm-button variant="Secondary" size="Small" data-external-remove="true"
                                    title="Odebrat vazbu"
@@ -168,10 +193,14 @@
                             <gov-icon size="s" name="trash3" type="components" aria-hidden="true"></gov-icon>
                         </pm-button>
                     </div>
+                    }
                 </div>
             }
         </div>
 
+        @* B4: template + add jen mimo rozhodovací detail (template obsahuje remove/add hooky). *@
+        @if (!externalReadonly)
+        {
         <template data-external-template>
             <div class="external-row" data-external-row>
                 <input type="hidden" name="ExterniVazby[__index__].Id" value="0" />
@@ -261,6 +290,18 @@
                 </div>
                 }
 
+                @* Nová vazba: typ ještě neznáme, takže pole je schované a sync.js ho
+                   po dohledání tiketu odhalí a předvyplní popisem. *@
+                <label class="external-field-pozadavek" data-external-pozadavek-field hidden="hidden">
+                    <span class="external-field-label">Text požadavku do výzvy</span>
+                    <textarea name="ExterniVazby[__index__].Pozadavek"
+                              rows="5"
+                              data-rich-text="true"
+                              data-rich-text-min-height="120"
+                              data-external-pozadavek-input
+                              placeholder="Co je u tohoto PNF požadováno"></textarea>
+                </label>
+
                 <div class="external-action-trash">
                     <pm-button variant="Secondary" size="Small" data-external-remove="true"
                                title="Odebrat vazbu"
@@ -272,5 +313,6 @@
         </template>
 
         <pm-button variant="Secondary" data-external-add="true">Přidat externí vazbu</pm-button>
+        }
     </div>
 </pm-tab-panel>

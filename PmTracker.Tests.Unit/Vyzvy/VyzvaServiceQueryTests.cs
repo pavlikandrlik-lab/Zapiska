@@ -76,7 +76,7 @@ public sealed class VyzvaServiceQueryTests
         await db.SaveChangesAsync();
 
         var svc = VyzvaServiceTestHarness.CreateService(db);
-        var result = await svc.GetVyzvyAsync(1, CancellationToken.None);
+        var result = await svc.GetVyzvyAsync(1, 2026, CancellationToken.None);
 
         result.Should().HaveCount(2);
         result[0].Kod.Should().Be("2/2026");

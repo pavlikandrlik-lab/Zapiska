@@ -1,0 +1,13 @@
+@using PmTracker.Web.Models.ViewModels.Vyzvy
+@model VyzvyPanelViewModel
+@{
+    var isActive = ViewData["IsActive"] as bool? ?? false;
+}
+
+<section id="panel-vyzvy"
+         class="tab-panel @(isActive ? "active" : null)"
+         role="tabpanel"
+         aria-labelledby="tab-vyzvy"
+         data-tab-panel="vyzvy">
+    @await Html.PartialAsync("_VyzvyPanelBody", Model)
+</section>

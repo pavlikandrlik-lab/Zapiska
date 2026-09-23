@@ -31,5 +31,15 @@ public sealed class JednaniOptionViewModel
     public DateTime Datum { get; init; }
     public string? StavKod { get; init; }
 
+    /// <summary>Číslo jednání (část A identifikátoru záznamu). 0 = nevyplněno v kontextech, kde není potřeba.</summary>
+    public int CisloJednani { get; init; }
+
+    /// <summary>
+    /// Predikované nejnižší volné pořadí (část B) pro záznam napojený na toto jednání.
+    /// Vyplněno jen v create-form kontextu pro náhled čísla; jinde 0. Finální hodnota se
+    /// přiděluje transakčně až při uložení, tato je jen náhled.
+    /// </summary>
+    public int NextPoradiProCislo { get; init; }
+
     public bool IsDraft => string.Equals(StavKod, "DRAFT", StringComparison.OrdinalIgnoreCase);
 }

@@ -225,7 +225,7 @@ public sealed class HarmonogramPhantomUiFixesTests
         // field přes _AppDateField. Před fixem IsoValue=krok.SkutecneDatum.ToString(...) bez kontroly
         // OdchylkaDni.HasValue → calculator pro krok bez delay rowu vrátil SkutecneDatum=BaselineDatum
         // (= DatumZalozeni pro krok 1) → user viděl "datum založení" v prázdném políčku skutečnost.
-        var src = Read("PmTracker.Web/Views/Shared/_ScheduleBlock.cshtml");
+        var src = Read("PmTracker.Web/Views/Shared/_ScheduleTable.cshtml");
         src.Should().Contain("OdchylkaDni.HasValue",
             "DELAY date field musí mít NULL guard pro krok bez záznamu (DESIGN-10-A NULL semantika).");
         src.Should().NotMatchRegex(@"IsoValue\s*=\s*krok\.SkutecneDatum\.ToString",

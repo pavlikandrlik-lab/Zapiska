@@ -16,6 +16,7 @@ import {
     loadRecordComments,
     loadRecordDetail
 } from "./recordLazyLoading.js";
+import { applyRecordViewState, loadRecordSchedule } from "./recordScheduleView.js";
 import {
     initProjectRecordsUi,
     initProjectTabs,
@@ -69,6 +70,12 @@ export function buildRecordUiState(scopeRoot) {
                 || card.querySelector('[data-record-comments-shell][data-record-comments-loaded="true"]') instanceof HTMLElement))
         .map((card) => card.getAttribute("data-record-id") || "")
         .filter(Boolean);
+    const scheduleViewRecordIds = Array.from(root.querySelectorAll(".record-card[data-record-id]"))
+        .filter((card) => card instanceof HTMLElement
+            && !isElementInHiddenTree(card)
+            && card.dataset.recordViewSchedule === "true")
+        .map((card) => card.getAttribute("data-record-id") || "")
+        .filter(Boolean);
 
     const commentSortDirectionByRecordId = {};
     const commentLoadStateByRecordId = {};
@@ -103,6 +110,7 @@ export function buildRecordUiState(scopeRoot) {
         scrollY: window.scrollY,
         expandedRecordIds,
         loadedCommentRecordIds,
+        scheduleViewRecordIds,
         commentSortDirectionByRecordId,
         commentLoadStateByRecordId
     };
@@ -120,6 +128,7 @@ export async function restoreRecordUiState(state) {
 
     const expandedSet = new Set(Array.isArray(state.expandedRecordIds) ? state.expandedRecordIds : []);
     const loadedCommentSet = new Set(Array.isArray(state.loadedCommentRecordIds) ? state.loadedCommentRecordIds : []);
+    const scheduleViewSet = new Set(Array.isArray(state.scheduleViewRecordIds) ? state.scheduleViewRecordIds : []);
     document.querySelectorAll(".record-card[data-record-id]").forEach((card) => {
         if (!(card instanceof HTMLElement)) {
             return;
@@ -132,6 +141,10 @@ export async function restoreRecordUiState(state) {
         if (header instanceof HTMLElement) {
             header.setAttribute("aria-expanded", String(shouldExpand));
         }
+        if (scheduleViewSet.has(recordId)) {
+            card.dataset.recordViewSchedule = "true";
+        }
+        applyRecordViewState(card);
     });
 
     const directionMap = state.commentSortDirectionByRecordId && typeof state.commentSortDirectionByRecordId === "object"
@@ -165,6 +178,9 @@ export async function restoreRecordUiState(state) {
             else if (directionMap[recordId] === "asc" || directionMap[recordId] === "desc") {
                 applyRecordCommentSortDirection(card, directionMap[recordId]);
             }
+            if (scheduleViewSet.has(recordId)) {
+                await loadRecordSchedule(card);
+            }
         })());
     });
 
@@ -193,6 +209,7 @@ export async function refreshRecordCard(payload) {
     const wasCollapsed = anchorCurrentCard.classList.contains("collapsed");
     const detailWasLoaded = anchorCurrentCard.dataset.recordDetailLoaded === "true";
     const commentsWereLoaded = anchorCurrentCard.dataset.recordCommentsLoaded === "true";
+    const scheduleViewActive = anchorCurrentCard.dataset.recordViewSchedule === "true";
     const previousCommentState = readRecordCommentsReloadState(anchorCurrentCard);
 
     const html = await fetchHtmlFragment(refreshUrl);
@@ -215,6 +232,11 @@ export async function refreshRecordCard(payload) {
         if (header instanceof HTMLElement) {
             header.setAttribute("aria-expanded", String(!wasCollapsed));
         }
+        // Toggle (2026-07-13, R9/3): poloha přepínače přežívá výměnu karty.
+        if (scheduleViewActive) {
+            card.dataset.recordViewSchedule = "true";
+            applyRecordViewState(card);
+        }
         navigationRuntime.initRecordFormEnhancements?.(card);
     });
 
@@ -228,6 +250,9 @@ export async function refreshRecordCard(payload) {
                     limit: previousCommentState.loadedCount,
                     loadAll: previousCommentState.loadAll
                 });
+            }
+            if (scheduleViewActive) {
+                await loadRecordSchedule(card);
             }
         });
     await Promise.all(hydrateTasks);
@@ -380,6 +405,20 @@ export async function refreshPageScope(payload) {
         setActiveTab(activeTab);
         syncTabQuery(activeTab);
         window.scrollTo({ top: scrollY, behavior: "auto" });
+        return;
+    }
+
+    if (scope === "vyzvy-panel") {
+        // Modal Nová výzva jede standardní ajax-submit cestou; panel se překreslí
+        // na místě, aby obrazovka neuskočila (spec 2026-09-07 §8.2). uiContext nese
+        // klíč dlaždice, na kterou se má po překreslení přepnout.
+        const vybrat = typeof payload.uiContext === "string" && payload.uiContext
+            ? payload.uiContext
+            : undefined;
+        // Rok z refreshUrl: uživatel mohl prohlížet starší rok, ale výzva vznikla
+        // v aktuálním — bez přepnutí by dlaždice v railu nebyla a výběr by spadl na buffer.
+        const rok = new URL(refreshUrl, window.location.origin).searchParams.get("rok") || undefined;
+        await window.pmVyzvy?.reloadCurrentPanel?.({ vybrat, rok });
         return;
     }
 

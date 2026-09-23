@@ -11,6 +11,8 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.ProjectDashboard;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Vyzvy;
+using PmTracker.Web.Models.ViewModels.Vyzvy;
 
 namespace PmTracker.Tests.Unit.Controllers;
 
@@ -140,7 +142,8 @@ public sealed class ProjektyControllerTeamAuthzTests
             projectService: projectService,
             meetingService: new StubMeetingService(),
             recordProposalService: new StubRecordProposalService(),
-            projectDashboardService: new StubProjectDashboardService())
+            projectDashboardService: new StubProjectDashboardService(),
+            vyzvyPanelBuilder: new StubVyzvyPanelBuilder())
         {
             ControllerContext = new ControllerContext
             {
@@ -219,6 +222,12 @@ public sealed class ProjektyControllerTeamAuthzTests
             => throw new NotSupportedException();
         public Task<ProjektZaznamCardShellViewModel?> BuildRecordCardShellAsync(int projectId, int recordId, CancellationToken ct = default)
             => Task.FromResult<ProjektZaznamCardShellViewModel?>(null);
+        public Task<ZaznamScheduleBlockViewModel?> BuildRecordScheduleBlockAsync(int projectId, int recordId, CancellationToken ct = default)
+            => Task.FromResult<ZaznamScheduleBlockViewModel?>(null);
+        public Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, CancellationToken ct = default)
+            => Task.FromResult<ZaznamDetailPageViewModel?>(null);
+        public Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, bool canOpenVyjadreni, CancellationToken ct = default)
+            => Task.FromResult<ZaznamDetailPageViewModel?>(null);
         public Task<ZaznamCardDetailViewModel?> BuildRecordCardDetailAsync(int projectId, int recordId, CancellationToken ct = default)
             => Task.FromResult<ZaznamCardDetailViewModel?>(null);
         public Task<ZaznamCommentsPanelViewModel?> BuildRecordCommentsPanelAsync(int projectId, int recordId, CancellationToken ct = default)
@@ -295,8 +304,15 @@ public sealed class ProjektyControllerTeamAuthzTests
         public Task<ProjectDashboardRecordsPanelViewModel> BuildRecordsPanelAsync(int projectId, DateTime referenceDate, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ProjectDashboardStatisticsPanelViewModel> BuildStatisticsPanelAsync(int projectId, int year, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ProjectDashboardNesPanelViewModel> BuildNesPanelAsync(int projektId, DateTime reference, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<ProjectDashboardVyzvyPanelViewModel> BuildVyzvyPanelAsync(int projektId, bool muzeEditovat, CancellationToken ct) => throw new NotSupportedException();
         // CanAccessDashboardAsync smazáno v redesignu 2026-04-23
+    }
+
+    /// <summary>Panel Výzev tyto testy neřeší — builder jen musí jít zkonstruovat.</summary>
+    private sealed class StubVyzvyPanelBuilder : IVyzvyPanelBuilder
+    {
+        public Task<VyzvyPanelViewModel> BuildAsync(
+            int projektId, bool muzeEditovat, bool muzeTisknout, int? rok, CancellationToken ct)
+            => Task.FromResult(new VyzvyPanelViewModel { ProjektId = projektId, MuzeEditovat = muzeEditovat });
     }
 
     private sealed class StubTempDataProvider : ITempDataProvider

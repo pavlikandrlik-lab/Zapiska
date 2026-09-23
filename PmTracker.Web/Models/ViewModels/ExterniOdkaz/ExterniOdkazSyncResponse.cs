@@ -18,7 +18,11 @@ public sealed record ExterniOdkazSyncResponse(
     DateTime? PlanDodani,
     DateTime? DatumDodani,
     DateTime? DatumPrevzeti,
-    IReadOnlyList<ExterniOdkazVyjadreniPreviewDto> Vyjadreni);
+    IReadOnlyList<ExterniOdkazVyjadreniPreviewDto> Vyjadreni,
+    // Popis tiketu z HOT_ZAZNAMY — klient jím předvyplní text požadavku u nové PNF vazby
+    // (spec 2026-09-08 §5.4). Poziční parametr až na konci s výchozí hodnotou, aby
+    // nerozbil existující volání (stejný postup jako Pid v HotZaznamDto).
+    string? Popis = null);
 
 /// <summary>
 /// Lehký DTO bublina vyjádření pro pre-Save chat preview (před uložením

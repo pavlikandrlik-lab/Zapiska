@@ -43,7 +43,8 @@ public sealed class RecordProposalPayloadMapper
                         Typ = link.Typ,
                         Cislo = link.Cislo,
                         PredpokladanaCena = link.PredpokladanaCena,
-                        Vyzva = link.Vyzva,
+                        ZaradidDoVyzvy = link.ZaradidDoVyzvy,
+                        Pozadavek = link.Pozadavek,
                         DatumObjednani = link.DatumObjednani,
                         PlanDodani = link.PlanDodani,
                         DatumDodani = link.DatumDodani,
@@ -111,7 +112,8 @@ public sealed class RecordProposalPayloadMapper
                     Typ = link.Typ,
                     Cislo = link.Cislo,
                     PredpokladanaCena = link.PredpokladanaCena,
-                    Vyzva = link.Vyzva,
+                    ZaradidDoVyzvy = link.ZaradidDoVyzvy,
+                    Pozadavek = link.Pozadavek,
                     DatumObjednani = link.DatumObjednani,
                     PlanDodani = link.PlanDodani,
                     DatumDodani = link.DatumDodani,
@@ -146,12 +148,12 @@ public sealed class RecordProposalPayloadMapper
                 Cislo = link.Cislo,
                 PredpokladanaCena = decimal.TryParse(link.PredpokladanaCena, out var price) ? price : null,
                 VyzvaId = link.VyzvaId,
-                VyzvaKod = link.Vyzva,
                 ZaradidDoVyzvy = link.ZaradidDoVyzvy,
                 DatumObjednani = link.DatumObjednani,
                 PlanDodani = link.PlanDodani,
                 DatumDodani = link.DatumDodani,
-                DatumPrevzeti = link.DatumPrevzeti
+                DatumPrevzeti = link.DatumPrevzeti,
+                Pozadavek = link.Pozadavek
             })
             .ToList();
         model.JednaniIdProCislo = payload.JednaniIdProCislo;
@@ -170,6 +172,9 @@ public sealed class RecordProposalPayloadMapper
                     TrvaniDni = step.TrvaniDni,
                     OdchylkaDni = step.OdchylkaDni,
                     BaselineDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pd) && pd.HasValue ? pd.Value : step.BaselineDatum,
+                    // Surové plánové datum (null = nevyplněno) → editor/detail renderuje prázdné pole.
+                    // Payload má entry → jeho raw hodnota (i null); jinak fallback na step.PlanDatum.
+                    PlanDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pdRaw) ? pdRaw : step.PlanDatum,
                     SkutecneDatum = step.SkutecneDatum,
                     ZdrojSkutecnosti = step.ZdrojSkutecnosti,
                     SourceVyjadreniId = step.SourceVyjadreniId,
@@ -187,39 +192,6 @@ public sealed class RecordProposalPayloadMapper
         }
     }
 
-    public void ApplySchedulePayload(ZaznamEditViewModel model, SchedulePlanProposalPayload payload)
-    {
-        model.TerminUkonceni = payload.TerminUkonceni;
-
-        var planByPoradi = payload.PlannedHarmonogramHodnoty
-            .GroupBy(v => v.Poradi).ToDictionary(g => g.Key, g => g.Last().PlanDatum);
-        var actualByPoradi = payload.ActualHarmonogramHodnoty
-            .GroupBy(v => v.Poradi).ToDictionary(g => g.Key, g => g.Last().SkutecnostDatum);
-
-        var rebuiltSteps = model.HarmonogramBlok.Kroky
-            .Select(step => new HarmonogramKrokEditViewModel
-            {
-                KrokIndex = step.KrokIndex,
-                Nazev = step.Nazev,
-                BarvaHex = step.BarvaHex,
-                TrvaniDni = step.TrvaniDni,
-                OdchylkaDni = step.OdchylkaDni,
-                BaselineDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pd) && pd.HasValue ? pd.Value : step.BaselineDatum,
-                SkutecneDatum = actualByPoradi.TryGetValue(step.KrokIndex, out var sd) && sd.HasValue ? sd.Value : step.SkutecneDatum,
-                ZdrojSkutecnosti = step.ZdrojSkutecnosti,
-                SourceVyjadreniId = step.SourceVyjadreniId,
-                SourceVyjadreniDatum = step.SourceVyjadreniDatum,
-                SourceExterniOdkazId = step.SourceExterniOdkazId,
-                IsManualKrok = step.IsManualKrok
-            })
-            .ToList();
-
-        // `with`: zachová OverviewLayout/Today/ScheduleVersion/lock state — dřív object-initializer
-        // zahazoval vše krom explicitně uvedeného (marker přilepený na left:0 + ztráta lock stavu).
-        model.HarmonogramBlok = model.HarmonogramBlok with
-        {
-            TerminUkonceni = payload.TerminUkonceni,
-            Kroky = rebuiltSteps
-        };
-    }
+    // ApplySchedulePayload smazán 2026-07-04: byl bez volajícího (duplikát
+    // RecordProposalService.Queries.ApplySchedulePayloadToModel, který je jediná živá cesta).
 }

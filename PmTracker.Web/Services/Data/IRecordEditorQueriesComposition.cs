@@ -19,6 +19,12 @@ public interface IRecordEditorQueriesComposition
 
     Task<IReadOnlyList<JednaniOptionViewModel>> BuildOpenMeetingOptionsAsync(IReadOnlyList<JednaniListItemViewModel> meetings, CancellationToken ct = default);
 
+    /// <summary>
+    /// Jako <see cref="BuildOpenMeetingOptionsAsync"/>, ale navíc doplní predikované pořadí
+    /// (<see cref="JednaniOptionViewModel.NextPoradiProCislo"/>) pro náhled čísla dle jednání v create-formu.
+    /// </summary>
+    Task<IReadOnlyList<JednaniOptionViewModel>> BuildOpenMeetingOptionsForCreateAsync(int projektId, IReadOnlyList<JednaniListItemViewModel> meetings, CancellationToken ct = default);
+
     int? ResolveSelectedMeetingIdForNumber(
         IReadOnlyList<JednaniOptionViewModel> openMeetingOptions,
         int? contextMeetingId);

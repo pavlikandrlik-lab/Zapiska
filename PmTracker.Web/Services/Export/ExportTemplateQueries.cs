@@ -11,7 +11,7 @@ namespace PmTracker.Web.Services.Export;
 /// </summary>
 public interface IExportTemplateQueries
 {
-    Task<ExportTemplateQueryResult> GetProjectTemplateAsync(int projektId, CurrentUserContextViewModel currentUser, ProjectExportRecordFilters? filters = null, CancellationToken ct = default);
+    Task<ExportTemplateQueryResult> GetProjectTemplateAsync(int projektId, ProjectExportRecordFilters? filters = null, CancellationToken ct = default);
     Task<ExportTemplateQueryResult> GetMeetingTemplateAsync(int jednaniId, CancellationToken ct = default);
     Task<ExportTemplateQueryResult> GetTaskTemplateAsync(int projektId, int zaznamId, CancellationToken ct = default);
 }
@@ -38,13 +38,13 @@ public sealed class ExportTemplateQueries : IExportTemplateQueries
         this.exportTemplateSummaryBuilder = exportTemplateSummaryBuilder;
     }
 
-    public async Task<ExportTemplateQueryResult> GetProjectTemplateAsync(int projektId, CurrentUserContextViewModel currentUser, ProjectExportRecordFilters? filters = null, CancellationToken ct = default)
+    public async Task<ExportTemplateQueryResult> GetProjectTemplateAsync(int projektId, ProjectExportRecordFilters? filters = null, CancellationToken ct = default)
     {
         var project = await dbContext.Projekty.AsNoTracking().FirstOrDefaultAsync(x => x.Id == projektId, ct)
             ?? throw new InvalidOperationException($"Projekt {projektId} nebyl nalezen.");
         var normalizedFilters = NormalizeProjectExportFilters(filters);
         var appliedRuleSummary = normalizedFilters is { UseCurrentFilters: true, HasRelevantFilters: true }
-            ? await BuildProjectFilterSummaryAsync(normalizedFilters, currentUser.OsobaId, ct)
+            ? await BuildProjectFilterSummaryAsync(normalizedFilters, ct)
             : Array.Empty<string>();
         var summary = normalizedFilters is { UseCurrentFilters: true, HasRelevantFilters: true }
             ? exportTemplateSummaryBuilder.BuildFilteredProjectSummary(appliedRuleSummary)
@@ -66,7 +66,7 @@ public sealed class ExportTemplateQueries : IExportTemplateQueries
             ProjektoveRole = await exportRoleProjectionBuilder.BuildProjectRoleRowsAsync(project.Id, ct),
             AppliedRuleSummary = summary.AppliedRuleSummary,
             Legenda = summary.Legenda,
-            Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(projektId, null, null, limitComments: false, applyMeetingSnapshotRules: false, normalizedFilters, currentUser.OsobaId, ct),
+            Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(projektId, null, null, limitComments: false, applyMeetingSnapshotRules: false, normalizedFilters, ct),
             Dochazka = []
         };
     }
@@ -97,7 +97,7 @@ public sealed class ExportTemplateQueries : IExportTemplateQueries
             ProjektoveRole = await exportRoleProjectionBuilder.BuildProjectRoleRowsAsync(project.Id, ct),
             AppliedRuleSummary = summary.AppliedRuleSummary,
             Legenda = summary.Legenda,
-            Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(project.Id, meeting.Id, null, limitComments: true, applyMeetingSnapshotRules: true, null, null, ct),
+            Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(project.Id, meeting.Id, null, limitComments: true, applyMeetingSnapshotRules: true, null, ct),
             Dochazka = await exportAttendanceProjectionBuilder.BuildAttendanceGroupsAsync(meeting.Id, project.Id, ct)
         };
     }
@@ -129,7 +129,7 @@ public sealed class ExportTemplateQueries : IExportTemplateQueries
             ProjektoveRole = [],
             AppliedRuleSummary = summary.AppliedRuleSummary,
             Legenda = summary.Legenda,
-            Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(projektId, lastMeeting?.Id, zaznamId, limitComments: true, applyMeetingSnapshotRules: false, null, null, ct),
+            Zaznamy = await exportRecordProjectionBuilder.BuildExportRecordsAsync(projektId, lastMeeting?.Id, zaznamId, limitComments: true, applyMeetingSnapshotRules: false, null, ct),
             Dochazka = []
         };
     }
@@ -152,7 +152,7 @@ public sealed class ExportTemplateQueries : IExportTemplateQueries
         };
     }
 
-    private async Task<IReadOnlyList<string>> BuildProjectFilterSummaryAsync(ProjectExportRecordFilters filters, int currentUserOsobaId, CancellationToken ct)
+    private async Task<IReadOnlyList<string>> BuildProjectFilterSummaryAsync(ProjectExportRecordFilters filters, CancellationToken ct)
     {
         var appliedRules = new List<string>();
 
@@ -212,14 +212,6 @@ public sealed class ExportTemplateQueries : IExportTemplateQueries
         if (filters.Aktivni)
         {
             appliedRules.Add("Pouze aktivní úkoly");
-        }
-
-        if (filters.Mine)
-        {
-            var mineLabel = currentUserOsobaId > 0
-                ? "Jen mé záznamy"
-                : "Jen mé záznamy (bez identifikované osoby)";
-            appliedRules.Add(mineLabel);
         }
 
         if (filters.JednaniVyjadreniStavId.HasValue)

@@ -70,6 +70,11 @@ public sealed partial class ProjectService
         var defaultOwnerBySubsystemId = await BuildDefaultOwnerOsobaIdsByProjectSubsystemAsync(record.ProjektId, ct);
         var ownerCandidates = await BuildRecordOwnerCandidatesAsync(record.ProjektId, record.VlastnikId, ct);
         var collaborationCandidates = await BuildRecordOwnerCandidatesAsync(record.ProjektId, null, ct);
+        // Identita projektu pro drobečkovou lištu (Projekty ▸ projekt ▸ záznam).
+        var projectIdentity = await dbContext.Projekty.AsNoTracking()
+            .Where(x => x.Id == record.ProjektId)
+            .Select(x => new { x.CelyNazev, x.Zkratka })
+            .FirstAsync(ct);
 
         var extTypes = (await lookupCache.GetExternalLinkTypesAsync(ct)).Values.OrderBy(x => x.Kod).ToList();
         var vyzvyById = (await lookupCache.GetVyzvyAsync(ct))
@@ -104,7 +109,8 @@ public sealed partial class ProjectService
                     PlanDodani = x.PlanDodani,
                     DatumDodani = x.DatumDodani,
                     DatumPrevzeti = x.DatumPrevzeti,
-                    LastHarvestedAt = x.LastHarvestedAt
+                    LastHarvestedAt = x.LastHarvestedAt,
+                    Pozadavek = x.Pozadavek
                 })
                 .ToList();
 
@@ -187,6 +193,10 @@ public sealed partial class ProjectService
                 TrvaniDni = baseKrok.TrvaniDni,
                 OdchylkaDni = baseKrok.OdchylkaDni,
                 BaselineDatum = baseKrok.BaselineDatum,
+                // Surové plánové datum (null = nevyplněno) → editor renderuje prázdné pole.
+                // Re-map z baseKrok (BuildKroky) — bez tohoto by PlanDatum spadl na default null
+                // i pro vyplněné kroky.
+                PlanDatum = baseKrok.PlanDatum,
                 SkutecneDatum = baseKrok.SkutecneDatum,
                 Stav = baseKrok.Stav,
                 IsManualKrok = baseKrok.IsManualKrok,
@@ -203,25 +213,22 @@ public sealed partial class ProjectService
             };
         }).ToList();
 
-        // F-11: Soft concurrency check — načti MAX(UpdatedAt) harmonogramových hodnot jako version stamp
-        var scheduleVersion = string.Empty;
-        if (!isCreate && isTaskCategory && record.Id > 0)
-        {
-            var maxUpdatedAt = await dbContext.ZaznamHarmonogramKroky
-                .Where(x => x.ZaznamId == record.Id)
-                .MaxAsync(x => (DateTime?)x.UpdatedAt, ct);
-            if (maxUpdatedAt.HasValue)
-            {
-                scheduleVersion = maxUpdatedAt.Value.Ticks.ToString("X16");
-            }
-        }
+        // Spec 2026-09-17 §5.2 — verze záznamu = id posledního auditního zápisu.
+        // Audit píší jen uživatelské cesty (save / delete / identifikátor / schválení),
+        // automat neaudituje, takže jeho zásahy do harmonogramu verzi neposunou.
+        var recordVersion = isCreate || record.Id <= 0
+            ? string.Empty
+            : await RecordVersionQuery.ResolveVersionTokenAsync(dbContext, record.Id, ct);
 
         return new ZaznamEditViewModel
         {
             Id = record.Id,
+            RecordVersion = recordVersion,
             CisloZaznamu = record.CisloZaznamu,
             CisloViditelne = ResolveVisibleRecordNumber(record),
             ProjektId = record.ProjektId,
+            ProjektNazev = projectIdentity.CelyNazev,
+            ProjektZkratka = projectIdentity.Zkratka,
             IsCreate = isCreate,
             PouzivatIdentJednani = projectUsesMeetingNumbering,
             MaDostupneJednaniProCislo = meetingOptions.Count > 0,
@@ -275,7 +282,6 @@ public sealed partial class ProjectService
                 permissions: pendingScheduleProposalLock.LocksSchedule
                     ? ScheduleEditorPermissionSet.ForActiveScheduleProposal(isTaskCategory)
                     : ScheduleEditorPermissionSet.ForFullEdit(isTaskCategory),
-                scheduleVersion: scheduleVersion,
                 // Plán D Task 8/9: lock manuálních kroků z pending návrhu + povolit editaci
                 // jen pokud harmonogram není v read-only režimu (full-edit permissions).
                 lockedManualKrokKeys: pendingScheduleProposalLock.LockedManualKrokKeys,
@@ -298,6 +304,11 @@ public sealed partial class ProjectService
     }
 
     private List<JednaniOptionViewModel> BuildOpenMeetingOptions(IReadOnlyList<JednaniListItemViewModel> meetings)
+        => BuildOpenMeetingOptions(meetings, EmptyIntMap);
+
+    private List<JednaniOptionViewModel> BuildOpenMeetingOptions(
+        IReadOnlyList<JednaniListItemViewModel> meetings,
+        IReadOnlyDictionary<int, int> nextOrderByCisloJednani)
     {
         return meetings
             .Where(IsMeetingOpenForRecordNumbering)
@@ -306,13 +317,30 @@ public sealed partial class ProjectService
             {
                 Id = x.Id,
                 Label = $"Jednání č. {x.CisloJednani} ({x.Datum:dd.MM.yyyy})",
-                Datum = x.Datum.Date
+                Datum = x.Datum.Date,
+                StavKod = x.StavKod,
+                CisloJednani = x.CisloJednani,
+                // Prázdný slot pořadí (žádný existující záznam pro toto jednání) → první volné je 1.
+                NextPoradiProCislo = nextOrderByCisloJednani.GetValueOrDefault(x.CisloJednani, 1)
             })
             .ToList();
     }
 
     private Task<List<JednaniOptionViewModel>> BuildOpenMeetingOptionsAsync(IReadOnlyList<JednaniListItemViewModel> meetings, CancellationToken ct)
         => Task.FromResult(BuildOpenMeetingOptions(meetings));
+
+    /// <summary>
+    /// Varianta pro create-form: doplní i predikované pořadí (část B) k náhledu čísla dle jednání.
+    /// Jeden dotaz na projekt, grupování in-memory přes RecordNumberAllocator.
+    /// </summary>
+    private async Task<List<JednaniOptionViewModel>> BuildOpenMeetingOptionsForCreateAsync(
+        int projektId,
+        IReadOnlyList<JednaniListItemViewModel> meetings,
+        CancellationToken ct)
+    {
+        var nextOrderByCisloJednani = await GetNextMeetingOrdersByCisloJednaniAsync(projektId, ct);
+        return BuildOpenMeetingOptions(meetings, nextOrderByCisloJednani);
+    }
 
     private static int? ResolveSelectedMeetingIdForNumber(
         IReadOnlyList<JednaniOptionViewModel> openMeetingOptions,

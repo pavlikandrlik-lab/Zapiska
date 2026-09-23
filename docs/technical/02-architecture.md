@@ -96,3 +96,43 @@ Dokument popisuje interní architekturu aplikace tak, aby změny byly proveditel
 - Data store registration: `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Services/Data/DataStoreServiceCollectionExtensions.cs`
 - Authz model a view modely: `/Users/Pavel.Andrlik/Documents/PM Tracker/PmTracker.Web/Models/ViewModels/SecurityViewModels.cs`
 - SQL baseline: `/Users/Pavel.Andrlik/Documents/PM Tracker/PMTracker_insert_sql`
+
+## 10. Souběžná editace záznamu
+
+Návrh a rozhodnutí: `docs/superpowers/specs/2026-09-17-record-edit-concurrency-design.md`.
+
+Dvě vrstvy, každá řeší jiného protivníka:
+
+1. **Zámek karty (prevence, člověk × člověk).** `dbo.zaznam_edit_zamek`, jeden řádek na
+   záznam. `GET /Zaznamy/Edit` ho po autorizaci a před načtením modelu získává atomickým
+   `MERGE`; cizí živý zámek vrátí stránku „upravuje jiný uživatel" a editor se nevykreslí.
+   Vlastní zámek je re-entrantní (dva taby téhož uživatele). TTL 15 minut bez heartbeatu,
+   heartbeat veze existující keep-alive (`/App/KeepAlive?zaznamId=…`), uvolnění při odchodu
+   jde `sendBeacon` na `/Zaznamy/ReleaseEditLock`. Služba: `RecordEditLockService`.
+
+2. **Record guard (detekce, zbytek).** Editor nese `RecordVersion` = id posledního
+   auditního zápisu nad záznamem (`RecordVersionQuery`). Při neshodě se uložení odmítne
+   kódem `RECORD_STALE` a hláška pojmenuje autora z auditu. Pokrývá i to, na co zámek
+   nedosáhne: schválení návrhu harmonogramu, vypršelý zámek, dva taby.
+
+**Invariant, na kterém to stojí:** verzi posouvá jen uživatelský zápis. Audit s entitou
+`zaznam` píší výhradně `SaveRecord`, `DeleteRecord`, `MeetingIdentifier` a schválení
+návrhu; automatika (harvest, rebalance, sync harmonogramu) neaudituje nic, takže její
+zásahy do kroků nikoho neblokují. Hlídá to test `AutomatScheduleWrite_ShouldNotChangeRecordVersion`.
+
+Dřívější kontrola `ScheduleVersion` (skalární `MAX(UpdatedAt)` nad kroky) byla zrušena —
+blokovala uložení kvůli automatice a před kolizí uživatel × automat nechránila, protože
+do skutečnosti auto-eligible kroků se uživatel nedostane.
+
+**Dvě místa, kde na pořadí záleží:**
+
+- Ve `ValidateSaveRecordAsync` stojí kontrola verze **až za** kontrolou
+  `record_project_mismatch`. Ta je jediná vazba mezi `Id` záznamu z formuláře a `ProjektId`,
+  proti kterému controller ověřoval oprávnění; kdyby ji guard v `if/else` řetězu přeskočil,
+  právo `records.edit` na jednom projektu by otevřelo záznamy všech ostatních.
+- `RecordLastWriterQuery` musí číst **tentýž auditní řádek**, který `RecordVersionQuery`
+  považuje za verzi (poslední podle `id`, bez filtru na akci). Jinak hláška pojmenuje někoho,
+  kdo s aktuální verzí nemá nic společného — verzi posouvá i `assign` identifikátoru z jednání.
+
+Tabulku zámku vyžaduje `SqlStartupValidatorHostedService`: nasazení bez
+`db_upgrade_1_4_5_record_edit_lock.sql` selže při startu a hláška ten skript jmenuje.

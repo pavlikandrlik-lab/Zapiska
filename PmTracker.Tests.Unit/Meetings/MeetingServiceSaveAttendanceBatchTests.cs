@@ -7,6 +7,7 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Meetings;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Tests.Unit.Meetings;
@@ -36,7 +37,8 @@ public sealed class MeetingServiceSaveAttendanceBatchTests
     }
 
     private static MeetingService CreateService(PmTrackerDbContext db)
-        => new(db, null!, null!, new FakeCommentService(), new FakeAuditWriteService(), TimeProvider.System);
+        => new(db, null!, null!, new FakeCommentService(), new FakeAuditWriteService(), TimeProvider.System,
+            new AttendancePredictor(db));
 
     private static CurrentUserContextViewModel BuildCurrentUser() =>
         new()

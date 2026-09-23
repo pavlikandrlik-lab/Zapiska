@@ -5,9 +5,18 @@ public sealed class ZaznamEditViewModel
     public string PageTitle { get; set; } = string.Empty;
     public string? BackLabel { get; set; }
     public int Id { get; set; }
+
+    /// <summary>
+    /// Spec 2026-09-17 §5.2 — verze načteného záznamu (id posledního auditního zápisu).
+    /// Putuje formulářem a Save podle ní pozná cizí LIDSKÝ zápis. Prázdné u nového záznamu.
+    /// </summary>
+    public string RecordVersion { get; set; } = string.Empty;
+
     public int CisloZaznamu { get; set; }
     public required string CisloViditelne { get; set; }
     public int ProjektId { get; set; }
+    public string ProjektNazev { get; set; } = string.Empty;
+    public string ProjektZkratka { get; set; } = string.Empty;
     public bool IsCreate { get; set; }
     public bool PouzivatIdentJednani { get; set; }
     public bool MaDostupneJednaniProCislo { get; set; }
@@ -129,4 +138,29 @@ public sealed class ExterniOdkazEditViewModel
     public DateTime? DatumDodani { get; set; }
     public DateTime? DatumPrevzeti { get; set; }
     public DateTime? LastHarvestedAt { get; set; }
+
+    /// <summary>Text požadavku do výzvy — sanitizované HTML, jen u PNF (spec 2026-09-08).</summary>
+    public string? Pozadavek { get; set; }
+}
+
+/// <summary>
+/// Spec 2026-09-17 §4.3 — stránka, kterou uvidí uživatel, jehož do editace nepustí
+/// cizí zámek. Editor se vůbec nerenderuje.
+/// </summary>
+public sealed class RecordEditLockedViewModel
+{
+    public int ZaznamId { get; init; }
+    public int ProjektId { get; init; }
+    public string ProjektNazev { get; init; } = string.Empty;
+    public string ProjektZkratka { get; init; } = string.Empty;
+    public string CisloViditelne { get; init; } = string.Empty;
+
+    /// <summary>„Příjmení Jméno" držitele zámku (PersonDisplayName).</summary>
+    public string HolderDisplayName { get; init; } = string.Empty;
+
+    /// <summary>Kdy začaly úpravy — v místním čase.</summary>
+    public DateTime SinceLocal { get; init; }
+
+    public string RetryUrl { get; init; } = string.Empty;
+    public string BackUrl { get; init; } = string.Empty;
 }

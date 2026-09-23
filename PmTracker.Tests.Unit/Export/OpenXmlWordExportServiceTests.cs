@@ -1,3 +1,5 @@
+using System.Linq;
+using System.IO;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using FluentAssertions;
@@ -268,6 +270,37 @@ public sealed class OpenXmlWordExportServiceTests
         allText.Should().Contain("Vlastník: Tester");
     }
 
+    /// <summary>
+    /// 2026-09-04: tištěné výstupy neměly číslování stránek. Word (.docx) ho umí nativně
+    /// polem PAGE v zápatí — dole uprostřed.
+    /// </summary>
+    [Fact]
+    public void BuildDocument_ShouldNumberPages_InCenteredFooter()
+    {
+        var sut = CreateSut();
+
+        var payload = sut.BuildDocument(CreateModelWithCommentHtml("<p>Text</p>"));
+
+        using var stream = new MemoryStream(payload);
+        using var document = WordprocessingDocument.Open(stream, false);
+        var mainPart = document.MainDocumentPart!;
+
+        var footerPart = mainPart.FooterParts.FirstOrDefault();
+        footerPart.Should().NotBeNull("dokument musí mít zápatí s číslem stránky");
+
+        var footerXml = footerPart!.Footer.OuterXml;
+        footerXml.Should().Contain("PAGE", "číslo stránky se sází polem PAGE (přečísluje se samo)");
+        footerXml.Should().Contain("NUMPAGES", "u čísla je i celkový počet stran");
+
+        var justification = footerPart.Footer.Descendants<Justification>().FirstOrDefault();
+        justification.Should().NotBeNull();
+        justification!.Val!.Value.Should().Be(JustificationValues.Center, "číslování patří doprostřed");
+
+        // Sekce musí zápatí odkazovat, jinak se v dokumentu nezobrazí.
+        var sectionProperties = mainPart.Document.Body!.Elements<SectionProperties>().Single();
+        sectionProperties.Elements<FooterReference>().Should().ContainSingle();
+    }
+
     private static OpenXmlWordExportService CreateSut()
     {
         return new OpenXmlWordExportService(new RichTextContentService());
@@ -345,5 +378,102 @@ public sealed class OpenXmlWordExportServiceTests
                 }
             ]
         };
+    }
+
+    /// <summary>Podbarvení ukončených (2026-09-05): Word podbarví celý řádek jako u pozastavených.</summary>
+    [Fact]
+    public void BuildDocument_ShouldShadeWholeCompletedRecordRow()
+    {
+        var payload = CreateSut().BuildDocument(
+            CreateModelWithSingleRecord("Ukončený úkol", isPaused: false, isCompleted: true));
+
+        AssertRowShading(payload, "Ukončený úkol", "EFF6FF");
+    }
+
+    /// <summary>
+    /// Podbarvení ukončených (2026-09-05), spec §4.3: kdyby data přinesla obojí,
+    /// vyhrává pozastavení.
+    /// </summary>
+    [Fact]
+    public void BuildDocument_ShouldPreferPausedShading_OverCompleted()
+    {
+        var payload = CreateSut().BuildDocument(
+            CreateModelWithSingleRecord("Sporný úkol", isPaused: true, isCompleted: true));
+
+        AssertRowShading(payload, "Sporný úkol", "FDF4E8");
+    }
+
+    private static PdfExportTemplateViewModel CreateModelWithSingleRecord(
+        string recordName, bool isPaused, bool isCompleted) => new()
+    {
+        ExportVariant = "meeting",
+        AutoPrint = false,
+        ProjektId = 10,
+        ProjektZkratka = "EXP",
+        ProjektNazev = "Export projekt",
+        JednaniId = 20,
+        JednaniCislo = 551,
+        JednaniDatum = new DateTime(2026, 2, 17),
+        JednaniMisto = "A1",
+        JednaniStav = "Otevřeno",
+        Vytvoril = "Tester",
+        VytvorenoDne = new DateTime(2026, 2, 18, 12, 0, 0),
+        SnapshotSummary = string.Empty,
+        PreparationSummary = null,
+        ProjektoveRole = [],
+        AppliedRuleSummary = ["Automatický meeting výstup"],
+        Legenda = [],
+        Dochazka = [],
+        Zaznamy =
+        [
+            new PdfExportRecordViewModel
+            {
+                ZaznamId = 30,
+                CisloZaznamu = 1,
+                CisloViditelne = "1",
+                CisloViditelneA = 1,
+                CisloViditelneB = 0,
+                Nazev = recordName,
+                Cil = "Cíl",
+                Popis = "<p>Popis</p>",
+                KategorieKod = "U",
+                Kategorie = "Úkol",
+                TypUkoluKod = null,
+                TypUkolu = null,
+                Stav = isPaused ? "Pozastaveno" : "Ukončeno",
+                IsPaused = isPaused,
+                IsCompleted = isCompleted,
+                Vlastnik = "Ing. Test Autor",
+                SubsystemKod = "SUB",
+                Subsystem = "Subsystem",
+                DatumZalozeni = new DateTime(2026, 2, 1),
+                HistorieTerminu = [],
+                Termin = new DateTime(2026, 3, 1),
+                ExterniVazby = [],
+                Spoluprace = [],
+                Vyjadreni = []
+            }
+        ]
+    };
+
+    private static void AssertRowShading(byte[] payload, string recordName, string expectedFillHex)
+    {
+        using var stream = new MemoryStream(payload);
+        using var document = WordprocessingDocument.Open(stream, false);
+        var body = document.MainDocumentPart?.Document?.Body;
+        body.Should().NotBeNull();
+
+        var recordRow = body!.Descendants<TableRow>()
+            .FirstOrDefault(row => row.InnerText.Contains(recordName, StringComparison.Ordinal));
+        recordRow.Should().NotBeNull();
+
+        var cells = recordRow!.Elements<TableCell>().ToList();
+        cells.Should().HaveCount(3);
+        foreach (var cell in cells)
+        {
+            cell.TableCellProperties.Should().NotBeNull();
+            cell.TableCellProperties!.GetFirstChild<Shading>().Should().NotBeNull();
+            cell.TableCellProperties.GetFirstChild<Shading>()!.Fill?.Value.Should().Be(expectedFillHex);
+        }
     }
 }

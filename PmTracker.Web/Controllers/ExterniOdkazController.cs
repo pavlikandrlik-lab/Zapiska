@@ -103,6 +103,7 @@ public sealed class ExterniOdkazController : Controller
             PlanDodani: metadata.PlanDodani,
             DatumDodani: metadata.DatumDodani,
             DatumPrevzeti: metadata.DatumPrevzeti,
-            Vyjadreni: preview));
+            Vyjadreni: preview,
+            Popis: dto.Popis));
     }
 }

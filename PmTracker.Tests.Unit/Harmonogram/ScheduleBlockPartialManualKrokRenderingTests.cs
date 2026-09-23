@@ -13,7 +13,7 @@ namespace PmTracker.Tests.Unit.Harmonogram;
 /// </summary>
 public sealed class ScheduleBlockPartialManualKrokRenderingTests
 {
-    private const string PartialPath = "PmTracker.Web/Views/Shared/_ScheduleBlock.cshtml";
+    private const string PartialPath = "PmTracker.Web/Views/Shared/_ScheduleTable.cshtml";
     private const string ManualCellPartialPath = "PmTracker.Web/Views/Shared/_ScheduleBlockManualCell.cshtml";
 
     private static string LoadRepoText(string relativePath)

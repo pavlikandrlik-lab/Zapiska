@@ -74,6 +74,9 @@ internal static class IntegrationTestHelper
         // ExterniOdkazValidator (v data-store grafu) je vyžaduje → ve fixture registrujeme
         // disabled stub (Ticketing vypnutý, vrací prázdno) + default TicketingOptions.
         services.AddScoped<IVyjadreniQueryService, DisabledVyjadreniQueryService>();
+        // ExternalLinkProposalTypeResolver (v RecordProposalService grafu) vyžaduje ITicketingQueryService.
+        // Ve fixture je Ticketing vypnutý (vrací null) → resolver odmítne externí vazbu jako „ticket nenalezen".
+        services.AddScoped<ITicketingQueryService, DisabledTicketingQueryService>();
         services.AddScoped<PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService,
             PmTracker.Web.Services.Schedules.HarmonogramSkutecnostSyncService>();
         services.AddSingleton(dbContext);

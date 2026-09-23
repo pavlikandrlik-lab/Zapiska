@@ -17,8 +17,20 @@
         ? (string.IsNullOrWhiteSpace(Model.KategorieKod) ? "-" : Model.KategorieKod)
         : Model.TypUkoluKod;
     var subsystemCode = string.IsNullOrWhiteSpace(Model.SubsystemKod) ? "-" : Model.SubsystemKod;
+
+    // Podbarvení ukončených (2026-09-05): pozastavení má přednost, proto se přidávají
+    // obě třídy a rozhodne pořadí pravidel v pdf-export.css.
+    var rowClasses = "task-row";
+    if (Model.IsCompleted)
+    {
+        rowClasses += " completed";
+    }
+    if (Model.IsPaused)
+    {
+        rowClasses += " paused";
+    }
 }
-<tr class="task-row @(Model.IsPaused ? "paused" : string.Empty)">
+<tr class="@rowClasses">
     <td>
         <div class="record-title-row">
             <h2 class="record-title"><span class="record-code-badge">@recordCode@Model.CisloViditelne</span> - @Model.Nazev</h2>
