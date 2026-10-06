@@ -105,32 +105,4 @@ public sealed class LayoutGovHeaderTests
         var block = Block(SiteCssBezKomentaru(), ".docs-content h1,\n.docs-content h2,\n.docs-content h3");
         block.Should().Contain("scroll-margin-top: var(--app-sticky-top)");
     }
-
-    [Fact]
-    public void UzivatelskeMenu_ZobrazujeKodOrganizace()
-    {
-        // Menu účtu má kromě jména ukázat i kód organizace (kit DesignSystem-FIS-v1.0.0
-        // i dřívější header před DS gov) — jinak je NavPermissionsViewModel.CurrentUserOrgCode
-        // mrtvé pole.
-        var layout = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Shared/_Layout.cshtml"));
-
-        var spanMatch = Regex.Match(layout, @"<span class=""app-user-name"">@([^<]+)</span>");
-        spanMatch.Success.Should().BeTrue("app-user-name span má existovat");
-
-        var expression = spanMatch.Groups[1].Value;
-        var pouzivaOrgCode = expression.Contains("CurrentUserOrgCode");
-
-        if (!pouzivaOrgCode)
-        {
-            // Span vypisuje proměnnou (ne výraz přímo) — dohledáme její deklaraci v @{ } bloku.
-            var identifier = Regex.Match(expression, @"^\w+").Value;
-            var declaration = Regex.Match(layout, @"var\s+" + Regex.Escape(identifier) + @"\s*=.*?;",
-                RegexOptions.Singleline);
-            declaration.Success.Should().BeTrue($"proměnná {identifier} má mít deklaraci");
-            pouzivaOrgCode = declaration.Value.Contains("CurrentUserOrgCode");
-        }
-
-        pouzivaOrgCode.Should().BeTrue(
-            "app-user-name má zobrazovat i kód organizace (NavPermissionsViewModel.CurrentUserOrgCode), ne jen jméno");
-    }
 }

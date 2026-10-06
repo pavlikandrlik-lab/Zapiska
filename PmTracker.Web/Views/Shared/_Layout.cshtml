@@ -84,14 +84,12 @@
             ? string.Join(", ", roles)
             : string.Empty;
         var profileUrl = Url.Action("Index", "Profil");
-        // Kód organizace (kit DesignSystem-FIS-v1.0.0, i dřívější header před DS gov)
-        // se doplňuje za pomlčku jen když existuje, ať nezůstane osamocená pomlčka.
-        var userAccountLabel = string.IsNullOrWhiteSpace(nav?.CurrentUserOrgCode)
-            ? nav?.CurrentUserDisplayName
-            : $"{nav?.CurrentUserDisplayName} – {nav?.CurrentUserOrgCode}";
+        // Kód organizace (kit DesignSystem-FIS-v1.0.0, i dřívější header před DS gov) se doplňuje
+        // za pomlčku jen když existuje, ať nezůstane osamocená pomlčka. Nezlomitelné mezery
+        // drží pomlčku na řádku se jménem i kódem.
         var userAccountName = string.IsNullOrWhiteSpace(nav?.CurrentUserOrgCode)
             ? nav?.CurrentUserDisplayName
-            : $"{nav?.CurrentUserDisplayName} – {nav?.CurrentUserOrgCode}";
+            : $"{nav?.CurrentUserDisplayName}\u00a0–\u00a0{nav?.CurrentUserOrgCode}";
     }
     <div class="gov-skip-links">
         <a href="#main-navigation">Přeskočit na navigaci</a>
@@ -152,7 +150,7 @@
 
                     <gov-dropdown position="right" class="app-user-menu">
                         <gov-button type="base" color="primary" size="m"
-                                    aria-label="Účet uživatele @userAccountLabel">
+                                    aria-label="Účet uživatele @userAccountName">
                             <gov-icon slot="icon-start" name="person-fill" type="components"></gov-icon>
                             <span class="app-user-name">@userAccountName</span>
                             <gov-icon slot="icon-end" name="chevron-down" size="m" type="components"></gov-icon>

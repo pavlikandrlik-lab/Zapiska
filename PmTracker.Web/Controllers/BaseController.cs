@@ -130,9 +130,9 @@ public abstract partial class BaseController : Controller
             CurrentUserDisplayName = CurrentUserContext.DisplayName,
             CurrentUserEmail = CurrentUserContext.Email,
             CurrentUserOrg = CurrentUserContext.OrganizacniCelek,
-            CurrentUserOrgCode = string.IsNullOrWhiteSpace(CurrentUserContext.OrganizacniCelekKod)
-                ? CurrentUserContext.OrganizacniCelek
-                : CurrentUserContext.OrganizacniCelekKod,
+            // Jen skutečný kód celku (resolver ho normalizuje na null). Žádný fallback na
+            // OrganizacniCelek — ten je bez celku zástupné "-" a hlavička by ukázala „Jméno – -".
+            CurrentUserOrgCode = CurrentUserContext.OrganizacniCelekKod,
             CurrentUserRoles = CurrentUserContext.RoleKody
         };
 

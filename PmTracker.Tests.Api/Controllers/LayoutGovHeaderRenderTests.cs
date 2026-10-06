@@ -1,7 +1,9 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Api.TestInfrastructure;
+using PmTracker.Web.Models.Entities;
 
 namespace PmTracker.Tests.Api.Controllers;
 
@@ -99,5 +101,83 @@ public sealed class LayoutGovHeaderRenderTests
         html.Should().Contain("name=\"person-fill\"");
         html.Should().Contain("href=\"/Profil\"");
         html.Should().Contain("href=\"/Profil#moje-prava\"");
+    }
+
+    [Fact]
+    public async Task MenuUzivatele_ZobrazujeKodOrganizace()
+    {
+        var osobaId = await EnsurePersonInOrgUnitAsync("ApiHeaderOrgCode", orgUnitKod: "APIORG");
+
+        var (label, name) = UserAccountTexts(await GetAsync("/Projekty", osobaId));
+
+        // \s pokryje i nezlomitelnou mezeru kolem pomlčky.
+        name.Should().MatchRegex(@"^Ing\. ApiHeaderOrgCode Api\s–\sAPIORG$");
+        label.Should().MatchRegex(@"ApiHeaderOrgCode Api\s–\sAPIORG$");
+    }
+
+    [Fact]
+    public async Task MenuUzivatele_BezOrganizacnihoCelku_NemaOsamocenouPomlcku()
+    {
+        var osobaId = await EnsurePersonInOrgUnitAsync("ApiHeaderNoOrg", orgUnitKod: null);
+
+        var (label, name) = UserAccountTexts(await GetAsync("/Projekty", osobaId));
+
+        name.Should().Be("Ing. ApiHeaderNoOrg Api");
+        label.Should().EndWith("ApiHeaderNoOrg Api");
+    }
+
+    /// <summary>Text tlačítka účtu a jeho aria-label, s dekódovanými HTML entitami.</summary>
+    private static (string Label, string Name) UserAccountTexts(string html)
+    {
+        var start = html.IndexOf("<gov-dropdown position=\"right\" class=\"app-user-menu\">", StringComparison.Ordinal);
+        start.Should().BeGreaterThan(0, "menu účtu má být gov-dropdown");
+        var end = html.IndexOf("<ul slot=\"list\"", start, StringComparison.Ordinal);
+        var button = html[start..end];
+
+        var label = Regex.Match(button, "aria-label=\"([^\"]*)\"");
+        var name = Regex.Match(button, "<span class=\"app-user-name\">([^<]*)</span>");
+        label.Success.Should().BeTrue("tlačítko účtu má mít aria-label");
+        name.Success.Should().BeTrue("tlačítko účtu má vypsat jméno ve span.app-user-name");
+
+        return (WebUtility.HtmlDecode(label.Groups[1].Value), WebUtility.HtmlDecode(name.Groups[1].Value));
+    }
+
+    private async Task<int> EnsurePersonInOrgUnitAsync(string marker, string? orgUnitKod)
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+
+        var email = $"{marker.ToLowerInvariant()}@pmtracker.test";
+        var existing = await dbContext.Osoby.Where(x => x.Email == email).Select(x => (int?)x.Id).FirstOrDefaultAsync();
+        if (existing.HasValue)
+        {
+            return existing.Value;
+        }
+
+        int? orgUnitId = null;
+        if (orgUnitKod is not null)
+        {
+            var orgUnit = await dbContext.CiselnikOrganizacniCelky.FirstOrDefaultAsync(x => x.Kod == orgUnitKod);
+            if (orgUnit is null)
+            {
+                orgUnit = new CiselnikOrganizacniCelekEntity { Kod = orgUnitKod, Nazev = $"{orgUnitKod} útvar" };
+                dbContext.CiselnikOrganizacniCelky.Add(orgUnit);
+                await dbContext.SaveChangesAsync();
+            }
+
+            orgUnitId = orgUnit.Id;
+        }
+
+        var person = new OsobaEntity
+        {
+            Jmeno = marker,
+            Prijmeni = "Api",
+            Titul = "Ing.",
+            Email = email,
+            OrganizaceId = await dbContext.CiselnikOrganizace.Select(x => x.Id).FirstAsync(),
+            OrganizacniCelekId = orgUnitId
+        };
+        dbContext.Osoby.Add(person);
+        await dbContext.SaveChangesAsync();
+        return person.Id;
     }
 }
