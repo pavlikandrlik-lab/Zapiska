@@ -1,6 +1,7 @@
-(function () {
-    'use strict';
+// ES modul (kvůli sdílenému appendCurrentAsUser); IIFE zůstává kvůli předčasným return.
+import { appendCurrentAsUser } from "./modules/navigationShared.js";
 
+(function () {
     /** Popisek druhého řádku podle toho, proč se záznam našel. */
     var MATCH_BADGE = {
         Nazev: '',
@@ -11,47 +12,34 @@
 
     var form = document.querySelector('[data-global-search]');
     if (!form) return;
-    var input = form.querySelector('input[name="q"]');
+    var govInput = form.querySelector('gov-form-input');
     var dropdown = form.querySelector('[data-global-search-dropdown]');
-    if (!input || !dropdown) return;
+    if (!govInput || !dropdown) return;
+
+    // Vnitřní <input name="q"> vykreslí gov-form-input až při hydrataci — Stencil načítá
+    // komponenty líně a asynchronně, takže při běhu tohoto modulu input ještě neexistuje.
+    // Napojení musí počkat, až je komponenta vykreslená.
+    var input = null;
+    var eraseButton = form.querySelector('[data-global-search-erase]');
 
     var timer = null;
     var abortController = null;
     var activeIndex = -1;
     var currentItems = [];
 
-    // ARIA housekeeping
-    input.setAttribute('role', 'combobox');
-    input.setAttribute('aria-autocomplete', 'list');
-    input.setAttribute('aria-expanded', 'false');
-    input.setAttribute('aria-haspopup', 'listbox');
-    input.setAttribute('aria-controls', 'global-search-listbox');
-
-    dropdown.setAttribute('id', 'global-search-listbox');
-    dropdown.setAttribute('role', 'listbox');
-
-    // Erase (křížek) tlačítko — zobrazuje se jen když je v inputu text.
-    // gov-form-search má slot="button-erase" ale bez built-in logiky viditelnosti.
-    var eraseButton = form.querySelector('[data-global-search-erase]');
-
-    function syncEraseVisibility() {
-        if (!eraseButton) return;
-        eraseButton.hidden = !(input.value && input.value.length > 0);
-    }
-
-    if (eraseButton) {
-        eraseButton.addEventListener('click', function (ev) {
-            ev.preventDefault();
-            input.value = '';
-            syncEraseVisibility();
-            clearDropdown();
-            input.focus();
-            input.dispatchEvent(new Event('input', { bubbles: true }));
+    customElements.whenDefined('gov-form-input')
+        .then(function () { return govInput.componentOnReady(); })
+        .then(function () {
+            var rendered = govInput.querySelector('input[name="q"]');
+            if (rendered) bind(rendered);
         });
-    }
 
-    input.addEventListener('input', syncEraseVisibility);
-    syncEraseVisibility();
+    // Křížek („Smazat dotaz") jen s neprázdným dotazem. gov-form-search viditelnost slotu
+    // button-erase neřídí a atribut hidden na slotovaném gov-buttonu nevydrží — Stencil ho
+    // při vykreslení gov-form-search přepíše na false. Proto třída na formuláři + site.css.
+    function syncEraseVisibility() {
+        form.classList.toggle('app-search--has-query', input.value.length > 0);
+    }
 
     function clearDropdown() {
         dropdown.replaceChildren();
@@ -205,7 +193,7 @@
         }
         abortController = new AbortController();
         try {
-            var res = await fetch('/Search/Suggest?q=' + encodeURIComponent(query), {
+            var res = await fetch(appendCurrentAsUser('/Search/Suggest?q=' + encodeURIComponent(query)), {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 signal: abortController.signal
             });
@@ -226,15 +214,16 @@
         suggest(q);
     }
 
-    input.addEventListener('input', function () {
+    function onQueryInput() {
+        syncEraseVisibility();
         var q = input.value.trim();
         if (timer) clearTimeout(timer);
         if (q.length < 3) { clearDropdown(); return; }
         // debounce 200 ms — bez něj by každý úhoz poslal dotaz a narazil na rate limit
         timer = setTimeout(fireSuggest, 200);
-    });
+    }
 
-    input.addEventListener('keydown', function (ev) {
+    function onQueryKeydown(ev) {
         var options = getOptions();
         var count = options.length;
 
@@ -265,15 +254,45 @@
             navigateTo(currentItems[activeIndex].detailUrl);
             clearDropdown();
         }
-    });
+    }
 
-    document.addEventListener('click', function (ev) {
-        if (!form.contains(ev.target)) {
-            clearDropdown();
+    function bind(renderedInput) {
+        input = renderedInput;
+
+        // ARIA housekeeping
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-expanded', 'false');
+        input.setAttribute('aria-haspopup', 'listbox');
+        input.setAttribute('aria-controls', 'global-search-listbox');
+
+        dropdown.setAttribute('id', 'global-search-listbox');
+        dropdown.setAttribute('role', 'listbox');
+
+        input.addEventListener('input', onQueryInput);
+        input.addEventListener('keydown', onQueryKeydown);
+
+        if (eraseButton) {
+            eraseButton.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                input.value = '';
+                input.focus();
+                // gov-form-input si z input eventu převezme novou hodnotu; náš handler skryje
+                // křížek i dropdown.
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
         }
-    });
 
-    form.addEventListener('submit', function () {
-        clearDropdown();
-    });
+        document.addEventListener('click', function (ev) {
+            if (!form.contains(ev.target)) {
+                clearDropdown();
+            }
+        });
+
+        form.addEventListener('submit', function () {
+            clearDropdown();
+        });
+
+        syncEraseVisibility();
+    }
 })();

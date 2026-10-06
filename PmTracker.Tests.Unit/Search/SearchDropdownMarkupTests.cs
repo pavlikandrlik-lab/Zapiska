@@ -67,4 +67,17 @@ public sealed class SearchDropdownMarkupTests
         doc.Should().Contain("gov-form-autocomplete");
         doc.Should().Contain("app-search-dropdown");
     }
+
+    [Fact]
+    public void Dropdown_SuggestNeseDevImpersonaci()
+    {
+        // Každý AJAX požadavek aplikace přidává ?asUser přes appendCurrentAsUser; bez něj
+        // Suggest při dev impersonaci (a v E2E) skončí 500 a dropdown se neotevře.
+        Js().Should().Contain("import { appendCurrentAsUser } from \"./modules/navigationShared.js\";");
+        Js().Should().MatchRegex(@"fetch\(appendCurrentAsUser\('/Search/Suggest");
+
+        var layout = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Shared/_Layout.cshtml"));
+        layout.Should().Contain("<script type=\"module\" src=\"~/js/global-search.js\" asp-append-version=\"true\"></script>",
+            "import funguje jen v modulu");
+    }
 }

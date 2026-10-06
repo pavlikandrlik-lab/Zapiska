@@ -21,6 +21,17 @@ zarovnanými vpravo a se zvýrazněnou shodou — to se do plochého řetězce n
 v `.app-search-dropdown` / `.app-search-item*` (soubory `wwwroot/js/global-search.js`
 a `wwwroot/css/site.css`). Soubory `assets/gov/**` ani `assets/ds-fis/*` se needitují.
 
+Napojení na gov pole (2026-10-06):
+
+- `global-search.js` je ES modul. Na vnitřní `<input name="q">` se napojí až po
+  hydrataci `gov-form-input` (`customElements.whenDefined` + `componentOnReady()`),
+  protože ten input vzniká až při vykreslení komponenty.
+- Viditelnost křížku řídí třída `app-search--has-query` na formuláři. Atribut `hidden`
+  na slotovaném `gov-button` nevydrží, protože ho Stencil při vykreslení
+  `gov-form-search` přepíše na `false`.
+- `autocomplete` je u `gov-form-input` boolean, proto `autocomplete="false"`.
+  Hodnota `"off"` by našeptávač prohlížeče zapnula.
+
 **Podklad pro případnou centrální úpravu DS:** `gov-form-autocomplete` by
 potřebovala slot nebo callback pro vykreslení položky (obdoba `renderOption`),
 aby šlo zobrazit víceřádkovou položku s metadaty. Patřilo by to do DS gov

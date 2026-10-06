@@ -22,8 +22,9 @@ public sealed class StyleGuideRenderTests
         var response = await page.GotoAsync($"{_fixture.BaseUrl}/StyleGuide");
         response!.Status.Should().Be(200);
 
-        // Počkáme na hydrataci gov Web Components
-        await page.WaitForSelectorAsync("gov-button", new() { Timeout = 5000 });
+        // Počkáme na hydrataci gov Web Components. Selektor míří do obsahu StyleGuide — první
+        // gov-button v dokumentu je křížek hledání v hlavičce, skrytý při prázdném dotazu.
+        await WaitForHydratedButtonsAsync(page);
 
         var buttonCount = await page.Locator("gov-button").CountAsync();
         buttonCount.Should().BeGreaterThan(4, "StyleGuide zobrazuje alespoň 4 varianty pm-button");
@@ -140,7 +141,7 @@ public sealed class StyleGuideRenderTests
     {
         var page = await _fixture.NewPageAsync();
         await page.GotoAsync($"{_fixture.BaseUrl}/StyleGuide");
-        await page.WaitForSelectorAsync("gov-button", new() { Timeout = 5000 });
+        await WaitForHydratedButtonsAsync(page);
 
         await page.EvaluateAsync(@"() => {
             window.__clickCount = 0;
@@ -160,4 +161,8 @@ public sealed class StyleGuideRenderTests
 
         await page.Context.CloseAsync();
     }
+
+    private static Task WaitForHydratedButtonsAsync(IPage page) =>
+        page.WaitForSelectorAsync("[data-styleguide-section=\"tlacitka\"] gov-button.hydrated",
+            new() { State = WaitForSelectorState.Attached, Timeout = 5000 });
 }

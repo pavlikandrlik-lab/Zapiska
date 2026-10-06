@@ -130,4 +130,51 @@ public sealed class GlobalSearchDynamicResultsTests
 
         await page.Context.CloseAsync();
     }
+
+    [Fact]
+    public async Task Vyhledavani_PoHydrataci_JeComboboxBezNaseptavaceProhlizece()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty?asUser={_fixture.AdminOsobaId}");
+
+        // Vnitřní <input> vykreslí gov-form-input až po hydrataci; global-search.js se na něj
+        // musí napojit až potom (dřív skončil na null a dropdown nikdy nefungoval).
+        var input = page.Locator("[data-global-search] input[name='q']");
+        await Assertions.Expect(input).ToHaveAttributeAsync("role", "combobox");
+        await Assertions.Expect(input).ToHaveAttributeAsync("aria-controls", "global-search-listbox");
+        await Assertions.Expect(input).ToHaveAttributeAsync("autocomplete", "off");
+
+        await page.Context.CloseAsync();
+    }
+
+    [Fact]
+    public async Task Vyhledavani_Krizek_JeVidetJenSDotazem()
+    {
+        var page = await _fixture.NewPageAsync();
+
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty?asUser={_fixture.AdminOsobaId}");
+
+        var input = page.Locator("[data-global-search] input[name='q']");
+        await Assertions.Expect(input).ToHaveAttributeAsync("role", "combobox");
+
+        // Host gov-buttonu nemá vlastní box (viz Playwright + gov komponenty) — viditelnost
+        // se čte z computed display, ne přes ToBeVisible.
+        const string eraseDisplayed =
+            "() => getComputedStyle(document.querySelector('[data-global-search-erase]')).display !== 'none'";
+
+        (await page.EvaluateAsync<bool>(eraseDisplayed)).Should().BeFalse("prázdné pole nemá křížek");
+
+        await input.FillAsync("test");
+        await page.WaitForFunctionAsync(eraseDisplayed);
+
+        await page.Locator("[data-global-search-erase] button").ClickAsync();
+        await Assertions.Expect(input).ToHaveValueAsync("");
+        // Hodnotu musí převzít i komponenta, jinak by ji příští vykreslení vrátilo zpět.
+        await Assertions.Expect(page.Locator("[data-global-search] gov-form-input")).ToHaveJSPropertyAsync("value", "");
+        await page.WaitForFunctionAsync($"() => !({eraseDisplayed})()");
+        await Assertions.Expect(page.Locator("[data-global-search-dropdown]")).ToBeHiddenAsync();
+
+        await page.Context.CloseAsync();
+    }
 }

@@ -102,6 +102,13 @@
     align-items: stretch;
 }
 
+/* Křížek „Smazat dotaz" jen s neprázdným dotazem; třídu přepíná global-search.js. Atribut
+   hidden na slotovaném gov-buttonu nejde použít — Stencil ho při vykreslení gov-form-search
+   přepíše na false. */
+.app-search:not(.app-search--has-query) [data-global-search-erase] {
+    display: none;
+}
+
 /* Roztahni gov Web Components na plnou sirku vyhrazeneho prostoru */
 .app-search gov-form-control,
 .app-search gov-form-search {
