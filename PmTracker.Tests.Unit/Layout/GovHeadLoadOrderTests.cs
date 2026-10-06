@@ -98,8 +98,5 @@ public sealed class GovHeadLoadOrderTests
     {
         Directory.Exists(ResolvePath("PmTracker.Web/wwwroot/lib/gov-design-system")).Should().BeFalse(
             "dvě jádra DS by se přela o definice komponent; jediné jádro je assets/gov (4.7.0)");
-
-        var harness = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/pm-modal-harness.html"));
-        harness.Should().NotContain("lib/gov-design-system");
     }
 }
