@@ -2,6 +2,7 @@ import {
     applyCommentSort,
     buildRecordCommentsRequestUrl,
     initCommentSortUi,
+    reloadProjectRecordCommentsPanel,
     setCommentSortButtonLabel
 } from "./comments.js";
 import { navigationRuntime } from "./navigationRuntime.js";
@@ -12,6 +13,7 @@ import {
     resolveRecordCardElement,
     setLazyLoadingState
 } from "./navigationShared.js";
+import { highlightSearchTerms } from "./searchHighlight.js";
 import { queueRainbowSegmentRender } from "./ui.js";
 
 const cardInteractiveSelector = [
@@ -191,21 +193,51 @@ export function initProjectRecordDeepLink(scope = document) {
 
     panel.dataset.recordTargetHandled = "true";
     const openComments = panel.dataset.recordTargetOpenComments === "true";
+    // Cíl z vyhledávání (RecordSearchService.BuildDetailUrl): vyjádření se shodou a hledaný text.
+    const targetCommentId = String(panel.dataset.recordTargetCommentId || "").trim();
+    const highlight = String(panel.dataset.recordTargetHighlight || "").trim();
 
     window.requestAnimationFrame(async () => {
         await toggleRecordCard(targetCard, { expand: true });
-        targetCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        const targetComment = targetCommentId
+            ? await revealRecordComment(targetCard, targetCommentId)
+            : null;
+        if (targetComment) {
+            targetComment.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        else {
+            targetCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
         // Vysvítit cílový záznam (po založení / editaci / schválení návrhu) — stejná flash třída
         // jako cross-tab navigace, aby uživatel hned viděl, že akce proběhla a KDE záznam je.
         targetCard.classList.add("cross-nav-highlight");
         window.setTimeout(() => targetCard.classList.remove("cross-nav-highlight"), 1600);
-        if (openComments) {
+        if (openComments && !targetComment) {
             const commentsShell = targetCard.querySelector("[data-record-comments-shell]");
             if (commentsShell instanceof HTMLElement) {
                 commentsShell.scrollIntoView({ behavior: "smooth", block: "nearest" });
             }
         }
+        if (highlight) {
+            highlightSearchTerms(targetCard, highlight);
+        }
     });
+}
+
+// Vyjádření se shodou může být mimo prvních pět načtených (panel bere nejnovější) —
+// pak se dočtou všechna, jako by uživatel klikl na „Načíst vše".
+async function revealRecordComment(card, commentId) {
+    const selector = `[data-comment-item][data-comment-id="${CSS.escape(commentId)}"]`;
+    let comment = card.querySelector(selector);
+    if (!(comment instanceof HTMLElement)) {
+        const commentsPanel = card.querySelector("[data-record-comments-panel]");
+        if (commentsPanel instanceof HTMLElement && commentsPanel.dataset.recordCommentsIsFullyLoaded !== "true") {
+            await reloadProjectRecordCommentsPanel(commentsPanel, { loadAll: true });
+            comment = card.querySelector(selector);
+        }
+    }
+
+    return comment instanceof HTMLElement ? comment : null;
 }
 
 export function handleNavigationCardClick(target) {

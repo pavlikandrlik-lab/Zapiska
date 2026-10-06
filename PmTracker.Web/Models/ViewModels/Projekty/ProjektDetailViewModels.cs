@@ -32,6 +32,12 @@ public sealed class ProjektDetailViewModel : BaseViewModel
     public int CurrentUserOsobaId { get; set; }
     public int? TargetRecordId { get; set; }
     public bool TargetRecordOpenComments { get; set; }
+
+    /// <summary>Vyjádření se shodou z vyhledávání — detail ho načte a posune se na něj.</summary>
+    public int? TargetCommentId { get; set; }
+
+    /// <summary>Hledaný text z vyhledávání — slova se na kartě záznamu dočasně podsvítí.</summary>
+    public string? TargetHighlight { get; set; }
     public string? CreateRecordEditorUrl { get; set; }
     public string? ReturnToProjectUrl { get; set; }
     public string? ProjectPrintUrl { get; set; }

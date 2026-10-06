@@ -1,4 +1,6 @@
 using System.Net;
+using System.Text.Encodings.Web;
+using Microsoft.Extensions.DependencyInjection;
 using FluentAssertions;
 using PmTracker.Tests.Api.TestInfrastructure;
 
@@ -25,10 +27,10 @@ public sealed class RecordFocusDeepLinkRenderTests
         return (projectId, recordId);
     }
 
-    private async Task<string> GetDetailAsync(int projectId, string tab, int recordId)
+    private async Task<string> GetDetailAsync(int projectId, string tab, int recordId, string extraQuery = "")
     {
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync($"/Projekty/Detail/{projectId}?tab={tab}&recordId={recordId}&asUser={_fixture.AdminOsobaId}");
+        var response = await client.GetAsync($"/Projekty/Detail/{projectId}?tab={tab}&recordId={recordId}{extraQuery}&asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         return html;
@@ -53,4 +55,26 @@ public sealed class RecordFocusDeepLinkRenderTests
         html.Should().NotContain($"data-record-target-id=\"{recordId}\"",
             "deep-link cíl je vázán jen na záložku Záznamy — na jiné se recordId ignoruje");
     }
+
+    [Fact]
+    public async Task RecordsTab_ZVysledkuHledani_PredaVyjadreniAHledanyTextKarte()
+    {
+        var (projectId, recordId) = await SeedProjectWithRecordAsync();
+        var html = await GetDetailAsync(projectId, "zaznamy", recordId, "&vyjadreniId=987&hl=z%C3%A1loha%20dat");
+
+        var encoder = _fixture.Factory.Services.GetRequiredService<HtmlEncoder>();
+        html.Should().Contain("data-record-target-comment-id=\"987\"", "detail otevře vyjádření se shodou");
+        html.Should().Contain($"data-record-target-highlight=\"{encoder.Encode("záloha dat")}\"", "a podsvítí hledaný text");
+    }
+
+    [Fact]
+    public async Task ProposalsTab_ZVysledkuHledani_NepredavaCilVyjadreni()
+    {
+        var (projectId, recordId) = await SeedProjectWithRecordAsync();
+        var html = await GetDetailAsync(projectId, "navrhy", recordId, "&vyjadreniId=987&hl=zaloha");
+
+        html.Should().NotContain("data-record-target-comment-id=\"987\"");
+        html.Should().NotContain("data-record-target-highlight=\"zaloha\"");
+    }
 }
+

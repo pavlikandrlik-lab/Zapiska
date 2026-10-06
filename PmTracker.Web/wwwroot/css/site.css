@@ -212,6 +212,21 @@
     border-radius: 2px;
 }
 
+/* Podsvícení hledaného textu po příchodu z výsledků (searchHighlight.js): stejná žlutá
+   jako zvýraznění v dropdownu, po 15 s plynule zmizí. Tmavý text drží kontrast i v tmavém
+   motivu. */
+mark.app-search-flash {
+    background-color: #fde68a;
+    color: #1f2937;
+    border-radius: 2px;
+    transition: background-color 1s ease, color 1s ease;
+}
+
+mark.app-search-flash.app-search-flash--fading {
+    background-color: transparent;
+    color: inherit;
+}
+
 /* ── Global search suggest dlaždice ─────────────────────────────────────── */
 
 .global-search-list {

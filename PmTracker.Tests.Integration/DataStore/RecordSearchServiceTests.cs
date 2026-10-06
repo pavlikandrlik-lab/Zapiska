@@ -205,6 +205,40 @@ public sealed class RecordSearchServiceTests
     }
 
     [Fact]
+    public async Task Hledani_OdkazNaShoduVeVyjadreni_NeseIdVyjadreniAHledanyText()
+    {
+        var db = await _fixture.CreateDatabaseAsync("search_odkaz_vyjadreni");
+        var seed = await SearchSeed.CreateAsync(db.ConnectionString);
+        var zaznamId = await seed.AddRecordAsync(seed.ProjektId, "Nesouvisející název");
+        var jednaniId = await seed.AddMeetingAsync(seed.ProjektId, cisloJednani: 8301);
+        await seed.AddStatementAsync(zaznamId, jednaniId, "<p>Úvodní vyjádření</p>");
+        var shodaId = await seed.AddStatementAsync(zaznamId, jednaniId, "<p>Proběhla záloha dat</p>");
+
+        var service = CreateService(db.ConnectionString);
+        var result = await service.SearchAsync("záloha dat", User(isSuperAdmin: true), 7, default);
+
+        var item = result.Categories.Single().Items.Single();
+        item.VyjadreniId.Should().Be(shodaId, "detail má otevřít a podsvítit právě vyjádření se shodou");
+        item.DetailUrl.Should().Be(
+            $"/Projekty/Detail/{seed.ProjektId}?recordId={zaznamId}&vyjadreniId={shodaId}&hl=z%C3%A1loha%20dat");
+    }
+
+    [Fact]
+    public async Task Hledani_OdkazNaShoduVNazvu_NeseJenHledanyText()
+    {
+        var db = await _fixture.CreateDatabaseAsync("search_odkaz_nazev");
+        var seed = await SearchSeed.CreateAsync(db.ConnectionString);
+        var zaznamId = await seed.AddRecordAsync(seed.ProjektId, "Zálohování serveru");
+
+        var service = CreateService(db.ConnectionString);
+        var result = await service.SearchAsync("zálohování", User(isSuperAdmin: true), 7, default);
+
+        var item = result.Categories.Single().Items.Single();
+        item.VyjadreniId.Should().BeNull();
+        item.DetailUrl.Should().Be($"/Projekty/Detail/{seed.ProjektId}?recordId={zaznamId}&hl=z%C3%A1lohov%C3%A1n%C3%AD");
+    }
+
+    [Fact]
     public async Task Hledani_NajdeZaznamPodleCislaExterniVazby()
     {
         var db = await _fixture.CreateDatabaseAsync("search_externi");

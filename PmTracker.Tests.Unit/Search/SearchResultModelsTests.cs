@@ -14,6 +14,7 @@ public sealed class SearchResultModelsTests
         MatchKind: SearchMatchKind.Nazev,
         Snippet: null,
         CisloJednani: null,
+        VyjadreniId: null,
         DetailUrl: $"/Projekty/Detail/10?recordId={id}");
 
     [Fact]

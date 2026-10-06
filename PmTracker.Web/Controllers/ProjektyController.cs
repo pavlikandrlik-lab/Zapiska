@@ -21,6 +21,7 @@ public sealed partial class ProjektyController : BaseController
     private const string ProposalsTab = "navrhy";
     private const string VyzvyTabKey = "vyzvy";
     private const string TeamRefreshScope = "projekty-detail-tym";
+    private const int MaxTargetHighlightLength = 200;
 
     private readonly IProjectService _projectService;
     private readonly IMeetingService _meetingService;
@@ -77,7 +78,8 @@ public sealed partial class ProjektyController : BaseController
         return View(model);
     }
 
-    public async Task<IActionResult> Detail(int id, string? tab, int? recordId, bool openComments = false, CancellationToken ct = default)
+    public async Task<IActionResult> Detail(int id, string? tab, int? recordId, bool openComments = false,
+        int? vyjadreniId = null, string? hl = null, CancellationToken ct = default)
     {
         if (!await _projectService.ProjektExistsAsync(id, ct))
         {
@@ -94,6 +96,16 @@ public sealed partial class ProjektyController : BaseController
         model.ActiveTab = requestedTab;
         model.TargetRecordId = requestedTab == RecordsTab ? recordId : null;
         model.TargetRecordOpenComments = requestedTab == RecordsTab && openComments;
+        if (model.TargetRecordId is not null)
+        {
+            // Cíl z vyhledávání (RecordSearchService.BuildDetailUrl). Délka hl je zastropovaná
+            // jen proto, aby z URL nešel do stránky libovolně dlouhý text.
+            model.TargetCommentId = vyjadreniId;
+            var highlight = hl?.Trim();
+            model.TargetHighlight = string.IsNullOrEmpty(highlight)
+                ? null
+                : highlight.Length > MaxTargetHighlightLength ? highlight[..MaxTargetHighlightLength] : highlight;
+        }
         await PrepareProjectDetailPresentationAsync(model, ct);
         await PrepareActiveProjectTabAsync(model, requestedTab, ct);
         SetProjectBreadcrumbs(id, model.Projekt.Nazev, model.Projekt.Zkratka);

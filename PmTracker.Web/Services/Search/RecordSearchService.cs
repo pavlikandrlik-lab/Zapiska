@@ -102,6 +102,7 @@ public sealed class RecordSearchService : IRecordSearchService
                     .OrderBy(v => v.Id)
                     .Select(v => new
                     {
+                        v.Id,
                         v.TextVyjadreni,
                         CisloJednani = _db.Jednani
                             .Where(j => j.Id == v.JednaniId)
@@ -140,6 +141,7 @@ public sealed class RecordSearchService : IRecordSearchService
             }
 
             int? cisloJednani = null;
+            int? vyjadreniId = null;
 
             if (snippet is null)
             {
@@ -150,6 +152,7 @@ public sealed class RecordSearchService : IRecordSearchService
                     {
                         kind = SearchMatchKind.Vyjadreni;
                         cisloJednani = v.CisloJednani;
+                        vyjadreniId = v.Id;
                         break;
                     }
                 }
@@ -177,7 +180,8 @@ public sealed class RecordSearchService : IRecordSearchService
                 MatchKind: kind,
                 Snippet: snippet,
                 CisloJednani: cisloJednani,
-                DetailUrl: $"/Projekty/Detail/{row.ProjektId}?recordId={row.Id}"));
+                VyjadreniId: vyjadreniId,
+                DetailUrl: BuildDetailUrl(row.ProjektId, row.Id, vyjadreniId, trimmed)));
         }
 
         _logger.LogDebug("Vyhledávání '{Query}': {Count} výsledků.", trimmed, items.Count);
@@ -186,6 +190,21 @@ public sealed class RecordSearchService : IRecordSearchService
         [
             new SearchResultCategory(SearchCategoryKeys.Zaznamy, "Záznamy", items)
         ]);
+    }
+
+    /// <summary>
+    /// Odkaz na záznam v detailu projektu. Detail podle vyjadreniId otevře vyjádření se
+    /// shodou (i když není mezi prvními načtenými) a slova z hl na kartě dočasně podsvítí.
+    /// </summary>
+    private static string BuildDetailUrl(int projektId, int zaznamId, int? vyjadreniId, string query)
+    {
+        var url = $"/Projekty/Detail/{projektId}?recordId={zaznamId}";
+        if (vyjadreniId is not null)
+        {
+            url += $"&vyjadreniId={vyjadreniId}";
+        }
+
+        return url + "&hl=" + Uri.EscapeDataString(query);
     }
 
     /// <summary>

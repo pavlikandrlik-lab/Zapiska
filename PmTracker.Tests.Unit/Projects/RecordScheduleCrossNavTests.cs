@@ -118,8 +118,13 @@ public sealed class RecordScheduleCrossNavTests
     {
         var js = LoadText("PmTracker.Web/wwwroot/js/modules/recordLazyLoading.js");
 
-        js.Should().MatchRegex(
-            "initProjectRecordDeepLink[\\s\\S]{0,1200}cross-nav-highlight",
+        // Tělo funkce až po první uzavírací závorku na začátku řádku (konec top-level funkce).
+        var start = js.IndexOf("export function initProjectRecordDeepLink", StringComparison.Ordinal);
+        start.Should().BeGreaterThanOrEqualTo(0, "deep-link obsluhuje initProjectRecordDeepLink");
+        var end = js.IndexOf("\n}\n", start, StringComparison.Ordinal);
+        var body = js[start..end];
+
+        body.Should().Contain("cross-nav-highlight",
             "deep-link cílové karty musí přidat flash třídu cross-nav-highlight (vysvícení záznamu)");
     }
 

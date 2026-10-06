@@ -23,6 +23,19 @@ Hledá se v:
 - **Stránka výsledků** `/Search/Index` — kompletní seznam, otevře se odesláním
   vyhledávacího pole (Enter).
 
+## Po kliknutí na výsledek
+
+Otevře se detail projektu na záložce Záznamy, rozbalí se nalezený záznam a stránka
+na něj sjede. Hledaná slova se na kartě záznamu **na 15 sekund podsvítí žlutě**,
+pak podsvícení samo zmizí.
+
+Pokud se shoda našla ve **vyjádření**, stránka sjede rovnou na to vyjádření. Platí to
+i tehdy, když je starší a mezi prvními načtenými by nebylo: aplikace v takovém
+případě načte všechna vyjádření záznamu.
+
+Podsvítí se jen doslovná shoda, velikost písmen nehraje roli. Na diakritice zde
+záleží: dotaz „reseni“ záznam se slovem „řešení“ najde, ale slovo nepodsvítí.
+
 ## Filtrace přístupovými právy
 
 Výsledky se **filtrují podle tvých přístupových práv**. Uvidíš záznam právě tehdy,

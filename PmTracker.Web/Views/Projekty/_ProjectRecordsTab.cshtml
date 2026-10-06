@@ -3,6 +3,8 @@
     var isActive = ViewData["IsActive"] as bool? ?? true;
     var targetRecordId = ViewData["TargetRecordId"] as int?;
     var targetRecordOpenComments = ViewData["TargetRecordOpenComments"] as bool? ?? false;
+    var targetCommentId = ViewData["TargetCommentId"] as int?;
+    var targetHighlight = ViewData["TargetHighlight"] as string ?? string.Empty;
 }
 
 <section id="panel-zaznamy"
@@ -14,6 +16,8 @@
          data-project-id="@Model.ProjektId"
          data-record-target-id="@(targetRecordId?.ToString() ?? string.Empty)"
          data-record-target-open-comments="@targetRecordOpenComments.ToString().ToLowerInvariant()"
+         data-record-target-comment-id="@(targetCommentId?.ToString() ?? string.Empty)"
+         data-record-target-highlight="@targetHighlight"
          data-project-tab-refresh-url="@Model.RefreshUrl"
          data-record-meeting-comment-states-url="@Model.MeetingCommentStatesUrl">
     @* Akce (Tisk projektu / Nový záznam / Nový návrh) přesunuty do tab stripu

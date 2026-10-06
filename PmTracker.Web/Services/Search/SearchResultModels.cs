@@ -32,6 +32,7 @@ public sealed record SearchResultItem(
     SearchMatchKind MatchKind,
     SearchSnippet? Snippet,
     int? CisloJednani,
+    int? VyjadreniId,
     string DetailUrl);
 
 /// <summary>
