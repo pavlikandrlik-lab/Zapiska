@@ -48,7 +48,6 @@ import {
     initProjectRecordsUi,
     initProjectTabs,
     initSettingsAjaxSwitch,
-    initUserMenu,
     loadRecordDetail,
     toggleRecordCard,
     toggleMeetingAttendancePanel
@@ -659,7 +658,6 @@ export function bootstrapPmTrackerApp() {
         () => initProjectRecordPageshowSync(),
         () => initCommentSortUi(document),
         () => initTheme(),
-        () => initUserMenu(),
         () => initPrintFormatChooser(),
         () => initPageSwitchers(),
         () => initRecordFormEnhancements(document),

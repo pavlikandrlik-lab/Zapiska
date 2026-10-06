@@ -65,18 +65,6 @@ public sealed class ThemeSwitchGovComponentTests
     }
 
     /// <summary>
-    /// Layout musí stále obsahovat data-theme-switch root element pro JS a testy.
-    /// </summary>
-    [Fact]
-    public void Layout_ObsahujeDataThemeSwitchRoot()
-    {
-        var content = ReadLayout();
-
-        content.Should().Contain("data-theme-switch",
-            "_Layout.cshtml musí obsahovat data-theme-switch atribut (root pro theme.js a testy)");
-    }
-
-    /// <summary>
     /// CSS site.css nesmí obsahovat kolidující .gov-theme-switch-icon-sun / -moon pravidla
     /// (odstraněná CSS aproximace). Samostatné .gov-switch pravidla mohou zůstat pro filtry.
     /// </summary>

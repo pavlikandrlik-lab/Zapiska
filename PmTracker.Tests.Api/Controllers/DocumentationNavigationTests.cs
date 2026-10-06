@@ -65,11 +65,8 @@ public sealed class DocumentationNavigationTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         html.Should().NotContain("Vzhled: přepnout");
-        // Fáze 2 gov-design-system: <gov-theme-switch> Web Component nahradil pre-hydration
-        // BEM markup s .gov-switch.gov-theme-switch a <input data-theme-switch-input>.
-        // Server nyní renderuje tag + atributy; shadow DOM řeší gov-design-system na klientu.
+        // Hlavička renderuje nativní gov-theme-switch (DS gov 4.7.0).
         html.Should().Contain("<gov-theme-switch", "layout musí renderovat gov-theme-switch web component");
-        html.Should().Contain("data-theme-switch", "theme switch container musí mít hook pro theme.js");
     }
 
     [Fact]

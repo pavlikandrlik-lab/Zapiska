@@ -29,10 +29,9 @@ public sealed class BreadcrumbBarMarkupTests
     }
 
     [Fact]
-    public void SiteCss_DefinesStickyBreadcrumbBar()
+    public void SiteCss_DefinesBreadcrumbBar()
     {
         var css = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/css/site.css"));
         css.Should().Contain(".app-breadcrumb-bar");
-        css.Should().MatchRegex(@"\.app-breadcrumb-bar[^}]*position:\s*sticky");
     }
 }

@@ -66,3 +66,30 @@ kitu a že existuje každá ikona použitá ve view/JS.
 **Podklad pro centrální úpravu DS:** rozšířit `@gov-design-system-ce/icons` o běžné
 akční ikony (pencil, plus, trash, save, printer, lock, unlock, calendar…), nebo umožnit
 v `gov-icon` více kořenů ikon.
+
+## 4. Zvýraznění aktivní položky hlavní navigace (2026-09-23)
+
+**Čeho se týká:** `gov-navigation` v hlavičce.
+
+**Co DS předepisuje:** `templates.css` nemá styl aktuální stránky — navigace ji vizuálně neoznačuje.
+
+**Proč se odchylujeme:** aplikace má šest sekcí a uživatelé byli zvyklí vidět, kde jsou.
+
+**Jak je odchylka provedena:** `_Layout.cshtml` dává aktivnímu odkazu `aria-current="page"`
+(přístupnost, v souladu s DS). Vizuál řeší `.app-main-nav a[aria-current="page"]`
+v `site.css` (třída `app-main-nav` na `<nav class="gov-navigation">`), jen tokeny DS.
+
+**Podklad pro centrální úpravu DS:** doplnit do `templates.css` styl
+`.gov-navigation a[aria-current="page"]`. Patří do DS gov.
+
+## 5. Obsah stránek mimo `gov-container` a `gov-page-heading` (2026-09-23)
+
+**Čeho se týká:** README kitu, pravidlo 2 („obsah se vkládá jen dovnitř `<gov-container id="main">`").
+
+**Proč se odchylujeme:** rozsah přestavby je jen hlavička a patička (spec 2026-09-23 §2).
+Stránky mají vlastní šířkové tiery (`app-main`, `app-main--fluid`) a drobečkovou lištu
+`_BreadcrumbBar`; přestavba na `gov-container` + `gov-page-heading` by zasáhla všechny obrazovky.
+
+**Jak je odchylka provedena:** obsah zůstává v `<main id="main" class="app-main">` (id `main`
+je cíl skip-linku), drobečky v `_BreadcrumbBar` pod hlavičkou. Struktura hlavičky a patičky
+odpovídá `index.html`.

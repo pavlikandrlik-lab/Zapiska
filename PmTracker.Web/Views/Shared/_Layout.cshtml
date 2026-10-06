@@ -82,109 +82,139 @@
     @{
         var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).ToLowerInvariant();
         var suppressActiveNavigation = string.Equals(currentController, "dashboard", System.StringComparison.OrdinalIgnoreCase);
-        string NavClass(string controller) => !suppressActiveNavigation && currentController == controller ? "app-nav-link active" : "app-nav-link";
+        // aria-current="page" pro položku aktuální sekce; null = Razor atribut nevypíše.
+        // Na dashboardu se nezvýrazňuje nic (stejně jako dřív NavClass).
+        string? NavCurrent(string controller) => !suppressActiveNavigation && currentController == controller ? "page" : null;
         var nav = ViewData["NavPermissions"] as NavPermissionsViewModel;
         var roleList = nav?.CurrentUserRoles is { Count: > 0 } roles
             ? string.Join(", ", roles)
             : string.Empty;
+        var profileUrl = Url.Action("Index", "Profil");
     }
-    <a class="skip-link" href="#main">Přeskočit na obsah</a>
+    <div class="gov-skip-links">
+        <a href="#main-navigation">Přeskočit na navigaci</a>
+        <a href="#main">Přeskočit na obsah</a>
+    </div>
 
-    <header class="app-header">
-        <div class="app-topbar">
-            <a class="app-brand" asp-controller="Dashboard" asp-action="Index" aria-label="Přejít na hlavní přehled">
-                <div class="app-logo" aria-hidden="true">
-                    <img class="app-logo-image" src="~/images/zapiska-logo.svg" alt="" />
-                </div>
-                <div>
-                    <div class="app-title">Zápiska</div>
-                </div>
-            </a>
-
-            @* Globální hledání v layoutu používá gov-form-search přímo (ne pm-search), protože
-               pm-search (Fáze 2D) zatím nepodporuje slot="button-erase" (clear query button)
-               ani atributy identifier + autocomplete na vnořeném gov-form-input.
-               Tech debt: rozšířit pm-search o Erasable property a předávání dalších atributů. *@
-            <form data-global-search
-                  method="get"
-                  asp-controller="Search"
-                  asp-action="Index"
-                  class="app-search"
-                  role="search">
-                <gov-form-search color="primary" size="m">
-                    <gov-form-input slot="input" size="m" name="q" placeholder="Hledání"
-                                    identifier="app-global-search-input"
-                                    aria-label="Globální vyhledávání"
-                                    autocomplete="off"></gov-form-input>
-                    <gov-button slot="button-erase" size="s" color="primary" type="base"
-                                data-global-search-erase hidden aria-label="Smazat dotaz">
-                        <gov-icon size="s" slot="icon-start" name="x" type="components"></gov-icon>
-                    </gov-button>
-                    <gov-button slot="button" color="primary" size="s" type="solid">
-                        Hledat
-                    </gov-button>
-                </gov-form-search>
-                <div data-global-search-dropdown class="app-search-dropdown" hidden></div>
-            </form>
-
-            <div class="app-user-tools">
-                <!-- gov-theme-switch (DS gov 4.7.0) přepíná motiv sám; theme.js jen ukládá volbu
-                     do roční cookie pmtracker.theme.mode pro vykreslení na serveru. -->
-                <div data-theme-switch class="app-theme-switch">
-                    <gov-theme-switch
-                        aria-label-light="Přepnout na tmavý mód"
-                        aria-label-dark="Přepnout na světlý mód"
-                        label-light="Světlý mód"
-                        label-dark="Tmavý mód"
-                        size="m">
-                    </gov-theme-switch>
-                </div>
-
-                <div class="user-menu" data-user-menu>
-                    <button class="user-menu-toggle" type="button" data-user-menu-toggle aria-expanded="false" aria-haspopup="menu">
-                        <span class="app-user-name">@nav?.CurrentUserDisplayName</span>
-                        <span class="app-user-org">@nav?.CurrentUserOrgCode</span>
-                    </button>
-                    <div class="user-menu-panel" data-user-menu-panel hidden>
-                        <div class="user-menu-meta">
-                            <strong>@nav?.CurrentUserDisplayName</strong>
-                            <span>@(string.IsNullOrWhiteSpace(nav?.CurrentUserEmail) ? "-" : nav?.CurrentUserEmail)</span>
-                            <span>@nav?.CurrentUserOrg</span>
-                            <span>@roleList</span>
+    @* Hlavička a hlavní navigace: struktura z DesignSystem-FIS-v1.0.0/index.html bez DS FIS
+       specifik (spec 2026-09-23 §4.3). Vanilla DS gov = bílá hlavička. Pod 48 em DS schová
+       .gov-header__action (motiv, účet) a ukáže hamburger v .gov-header__mobile. *@
+    <header class="gov-header">
+        <div class="gov-header__divider">
+            <div class="gov-header__content">
+                <a class="gov-header__logo" href="@Url.Action("Index", "Dashboard")" aria-label="Zápiska – přejít na hlavní přehled">
+                    <gov-flex align-items="center" gap="m" responsive="false">
+                        <div class="app-logo" aria-hidden="true">
+                            <img class="app-logo-image" src="~/images/zapiska-logo.svg" alt="" />
                         </div>
-                        <a class="user-menu-link" asp-controller="Profil" asp-action="Index">Můj profil</a>
-                        <a class="user-menu-link" asp-controller="Profil" asp-action="Index" asp-fragment="moje-prava">Moje práva</a>
-                    </div>
-                </div>
+                        <div class="app-title">Zápiska</div>
+                    </gov-flex>
+                </a>
+
+                @* Globální hledání v layoutu používá gov-form-search přímo (ne pm-search), protože
+                   pm-search (Fáze 2D) zatím nepodporuje slot="button-erase" (clear query button)
+                   ani atributy identifier + autocomplete na vnořeném gov-form-input.
+                   Seznam výsledků kreslí global-search.js (odchylka č. 1); třídy gov-search dávají
+                   šířku podle DS. *@
+                <form data-global-search
+                      method="get"
+                      asp-controller="Search"
+                      asp-action="Index"
+                      class="gov-search gov-search--fixed-width app-search"
+                      role="search">
+                    <gov-form-search color="primary" size="m">
+                        <gov-form-input slot="input" size="m" name="q" placeholder="Hledání"
+                                        identifier="app-global-search-input"
+                                        aria-label="Globální vyhledávání"
+                                        autocomplete="off"></gov-form-input>
+                        <gov-button slot="button-erase" size="s" color="primary" type="base"
+                                    data-global-search-erase hidden aria-label="Smazat dotaz">
+                            <gov-icon size="s" slot="icon-start" name="x" type="components"></gov-icon>
+                        </gov-button>
+                        <gov-button slot="button" color="primary" size="s" type="solid">
+                            Hledat
+                        </gov-button>
+                    </gov-form-search>
+                    <div data-global-search-dropdown class="app-search-dropdown" hidden></div>
+                </form>
+
+                <gov-flex class="gov-header__action" justify-content="flex-end" align-items="center" gap="m">
+                    <!-- gov-theme-switch (DS gov 4.7.0) přepíná motiv sám; theme.js jen ukládá volbu
+                         do roční cookie pmtracker.theme.mode pro vykreslení na serveru. -->
+                    <gov-theme-switch size="m"
+                                      aria-label-light="Přepnout na tmavý mód"
+                                      aria-label-dark="Přepnout na světlý mód"
+                                      label-light="Světlý mód"
+                                      label-dark="Tmavý mód">
+                    </gov-theme-switch>
+
+                    <gov-dropdown position="right" class="app-user-menu">
+                        <gov-button type="base" color="primary" size="m"
+                                    aria-label="Účet uživatele @nav?.CurrentUserDisplayName">
+                            <gov-icon slot="icon-start" name="person-fill" type="components"></gov-icon>
+                            <span class="app-user-name">@nav?.CurrentUserDisplayName</span>
+                            <gov-icon slot="icon-end" name="chevron-down" size="m" type="components"></gov-icon>
+                        </gov-button>
+                        <ul slot="list" role="menu">
+                            <li role="presentation" class="app-user-menu__info">
+                                <strong>@nav?.CurrentUserDisplayName</strong>
+                                <span>@(string.IsNullOrWhiteSpace(nav?.CurrentUserEmail) ? "-" : nav?.CurrentUserEmail)</span>
+                                <span>@nav?.CurrentUserOrg</span>
+                                <span>@roleList</span>
+                            </li>
+                            <li role="separator"><hr class="app-user-menu__sep" /></li>
+                            <li role="presentation">
+                                <gov-button type="base" color="primary" size="m" expanded role="menuitem"
+                                            href="@profileUrl">Můj profil</gov-button>
+                            </li>
+                            <li role="presentation">
+                                <gov-button type="base" color="primary" size="m" expanded role="menuitem"
+                                            href="@(profileUrl + "#moje-prava")">Moje práva</gov-button>
+                            </li>
+                        </ul>
+                    </gov-dropdown>
+                </gov-flex>
+
+                <gov-flex class="gov-header__mobile" align-items="center" responsive="false">
+                    <gov-button class="js-gov-header__navigation-trigger" type="base" color="primary" size="m"
+                                aria-label="Zobrazit / skrýt menu" aria-expanded="false">
+                        <gov-icon slot="icon-start" name="list" type="components"></gov-icon>
+                    </gov-button>
+                </gov-flex>
             </div>
         </div>
 
-        <nav class="app-nav" aria-label="Hlavní menu">
-            <a class="@NavClass("dashboard")" asp-controller="Dashboard" asp-action="Index">Přehled</a>
-            <a class="@NavClass("projekty")" asp-controller="Projekty" asp-action="Index">Projekty</a>
-            @if (nav?.CanViewPeople == true)
-            {
-                <a class="@NavClass("osoby")" asp-controller="Osoby" asp-action="Index">Osoby</a>
-            }
-            @if (nav?.CanViewCiselniky == true)
-            {
-                <a class="@NavClass("ciselniky")" asp-controller="Ciselniky" asp-action="Index">Číselníky</a>
-            }
-            <a class="@NavClass("jednani")" asp-controller="Jednani" asp-action="Index">Jednání</a>
-            @if (nav?.CanViewSettings == true)
-            {
-                <a class="@NavClass("nastaveni")" asp-controller="Nastaveni" asp-action="Index">Nastavení</a>
-            }
-        </nav>
-
-        @{
-            var breadcrumbTrail = ViewData["Breadcrumbs"] as PmTracker.Web.Models.ViewModels.BreadcrumbTrail;
-        }
-        @if (breadcrumbTrail is not null)
-        {
-            <partial name="_BreadcrumbBar" model="breadcrumbTrail" />
-        }
+        <div class="gov-header__navigation js-gov-header__navigation"
+             style="padding-block: var(--templates-margin-s); padding-inline: var(--templates-margin-l)">
+            <nav class="gov-navigation app-main-nav" aria-label="Hlavní navigace" id="main-navigation">
+                <ul>
+                    <li><a href="@Url.Action("Index", "Dashboard")" aria-current="@NavCurrent("dashboard")">Přehled</a></li>
+                    <li><a href="@Url.Action("Index", "Projekty")" aria-current="@NavCurrent("projekty")">Projekty</a></li>
+                    @if (nav?.CanViewPeople == true)
+                    {
+                        <li><a href="@Url.Action("Index", "Osoby")" aria-current="@NavCurrent("osoby")">Osoby</a></li>
+                    }
+                    @if (nav?.CanViewCiselniky == true)
+                    {
+                        <li><a href="@Url.Action("Index", "Ciselniky")" aria-current="@NavCurrent("ciselniky")">Číselníky</a></li>
+                    }
+                    <li><a href="@Url.Action("Index", "Jednani")" aria-current="@NavCurrent("jednani")">Jednání</a></li>
+                    @if (nav?.CanViewSettings == true)
+                    {
+                        <li><a href="@Url.Action("Index", "Nastaveni")" aria-current="@NavCurrent("nastaveni")">Nastavení</a></li>
+                    }
+                </ul>
+            </nav>
+        </div>
     </header>
+
+    @{
+        var breadcrumbTrail = ViewData["Breadcrumbs"] as PmTracker.Web.Models.ViewModels.BreadcrumbTrail;
+    }
+    @if (breadcrumbTrail is not null)
+    {
+        <partial name="_BreadcrumbBar" model="breadcrumbTrail" />
+    }
 
     @{
         var bodyClass = ViewData["BodyClass"]?.ToString();

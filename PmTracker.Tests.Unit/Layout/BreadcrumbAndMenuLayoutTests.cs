@@ -7,9 +7,9 @@ namespace PmTracker.Tests.Unit.Layout;
 
 /// <summary>
 /// Invarianty oprav 2026-07-07 (breadcrumb + projektové menu):
-/// 1a) profilový dropdown nad drobečkovou lištou (z-index), 1b) drobečky zarovnané
-/// (li margin reset) + podtržení celého odkazu, 2a) menu vlevo (badge bez auto-marginu),
-/// 1c) dashboard projektu v cestě. Source-assertion, aby regrese selhala bez běhu appky.
+/// 1b) drobečky zarovnané (li margin reset) + podtržení celého odkazu, 2a) menu vlevo
+/// (badge bez auto-marginu), 1c) dashboard projektu v cestě. Source-assertion, aby
+/// regrese selhala bez běhu appky.
 /// </summary>
 public sealed class BreadcrumbAndMenuLayoutTests
 {
@@ -21,25 +21,6 @@ public sealed class BreadcrumbAndMenuLayoutTests
         return dir?.FullName ?? throw new InvalidOperationException("repo root nenalezen");
     }
     private static string Read(string rel) => File.ReadAllText(Path.Combine(RepoRoot(), rel));
-
-    private static int ZIndexOf(string css, string selector)
-    {
-        // Najdi blok „selector { ... }" a v něm z-index: N.
-        var block = Regex.Match(css, Regex.Escape(selector) + @"\s*\{[^}]*\}", RegexOptions.Singleline);
-        block.Success.Should().BeTrue($"selektor {selector} má existovat");
-        var z = Regex.Match(block.Value, @"z-index:\s*(\d+)");
-        z.Success.Should().BeTrue($"{selector} má mít z-index");
-        return int.Parse(z.Groups[1].Value);
-    }
-
-    [Fact] // 1a
-    public void UserMenuDropdown_StacksAbove_BreadcrumbBar()
-    {
-        var css = Read("PmTracker.Web/wwwroot/css/site.css");
-        ZIndexOf(css, ".user-menu-panel").Should().BeGreaterThan(
-            ZIndexOf(css, ".app-breadcrumb-bar"),
-            "profilový dropdown se nesmí schovat pod sticky drobečkovou lištu");
-    }
 
     [Fact] // 1b — zarovnání: li margin reset na položce drobečku
     public void BreadcrumbItem_ResetsListItemMargin()

@@ -31,7 +31,6 @@ export {
     initProfileRightsFilter,
     initProjectIndexStatusFilters,
     initSettingsAjaxSwitch,
-    initUserMenu,
     toggleMeetingAttendancePanel,
     toggleProjectStatusFilterPanel
 } from "./pageSwitchers.js";

@@ -1,33 +1,32 @@
-// Měří výšku sticky .app-header a vystavuje ji jako CSS proměnnou --app-header-h
-// na :root. Dashboard přehled ji používá pro height: calc(100dvh - var(--app-header-h)),
-// aby se panely vešly přesně na jednu obrazovku a site footer spadl těsně pod fold
-// (stránka zůstává scrollovatelná, footer není zbytečně vidět).
-//
-// Header je dvouřádkový (.app-topbar + .app-nav) a může se na úzkém viewportu
-// zalamovat → výšku držíme aktuální přes ResizeObserver + resize fallback.
-// CSS má fallback (var(--app-header-h, 110px)) pro první paint / vypnutý JS.
+// Vystavuje --app-header-h = vzdálenost od vršku stránky k <main id="main"> (gov hlavička
+// + hlavní navigace + případná drobečková lišta). Dashboard přehled ji používá pro
+// height: calc(100dvh - var(--app-header-h)), aby se panely vešly na jednu obrazovku
+// a patička spadla těsně pod fold. Hlavička není přilepená — jde o výšku nad obsahem
+// při scrollu 0. Na úzkém viewportu se hlavička zalamuje → ResizeObserver + resize.
+// CSS má fallback (var(--app-header-h, …)) pro první vykreslení / vypnutý JS.
 
-function applyHeaderHeight(header) {
-    const h = Math.round(header.getBoundingClientRect().height);
+function applyHeaderHeight(main) {
+    const h = Math.round(main.getBoundingClientRect().top + window.scrollY);
     if (h > 0) {
         document.documentElement.style.setProperty("--app-header-h", `${h}px`);
     }
 }
 
 export function initHeaderHeightVar() {
-    const header = document.querySelector(".app-header");
-    if (!header) {
+    const main = document.getElementById("main");
+    const header = document.querySelector(".gov-header");
+    if (!main || !header) {
         return;
     }
 
-    applyHeaderHeight(header);
+    applyHeaderHeight(main);
 
     if (typeof ResizeObserver !== "undefined") {
-        const observer = new ResizeObserver(() => applyHeaderHeight(header));
+        const observer = new ResizeObserver(() => applyHeaderHeight(main));
         observer.observe(header);
     }
 
-    window.addEventListener("resize", () => applyHeaderHeight(header), { passive: true });
+    window.addEventListener("resize", () => applyHeaderHeight(main), { passive: true });
 }
 
 initHeaderHeightVar();
