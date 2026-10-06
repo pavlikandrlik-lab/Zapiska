@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging.Abstractions;
 using PmTracker.Tests.Integration.TestInfrastructure;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Search;
 using PmTracker.Web.Services.Security;
 
@@ -44,7 +45,7 @@ public sealed class RecordSearchServiceTests
     private static RecordSearchService CreateService(string connectionString)
     {
         var db = IntegrationTestHelper.CreateDbContext(connectionString);
-        return new RecordSearchService(db, new ProjectVisibilityResolver(),
+        return new RecordSearchService(db, new ProjectVisibilityResolver(), new RichTextContentService(),
             NullLogger<RecordSearchService>.Instance);
     }
 
@@ -139,6 +140,50 @@ public sealed class RecordSearchServiceTests
         item.Snippet!.Match.Should().Be("záloha");
         item.Snippet.Before.Should().Be("Dnes proběhla ");
         item.Snippet.After.Should().Be(" dat a");
+    }
+
+    [Fact]
+    public async Task Hledani_NahledZRichTextuVyjadreni_JeProstyTextBezZnacekAEntit()
+    {
+        // Vyjádření se ukládá přes RichTextContentService.NormalizeForStorage — jako HTML
+        // z editoru Quill s diakritikou kódovanou na entity (&#x159;). Test proto seeduje
+        // stejný tvar jako produkce, ne holý text.
+        var db = await _fixture.CreateDatabaseAsync("search_vyjadreni_richtext");
+        var seed = await SearchSeed.CreateAsync(db.ConnectionString);
+        var zaznamId = await seed.AddRecordAsync(seed.ProjektId, "Nesouvisející název");
+        var jednaniId = await seed.AddMeetingAsync(seed.ProjektId, cisloJednani: 8202);
+        var stored = new RichTextContentService().NormalizeForStorage(
+            "<ul><li>T: 31.10.2025</li><li>Rozhodnuto o <strong>řešení</strong> zálohy</li></ul>");
+        stored.Should().Contain("</li><li>").And.Contain("&#x", "seed má odpovídat uloženému tvaru");
+        await seed.AddStatementAsync(zaznamId, jednaniId, stored);
+
+        var service = CreateService(db.ConnectionString);
+        var result = await service.SearchAsync("rozhodnuto", User(isSuperAdmin: true), 7, default);
+
+        var item = result.Categories.Single().Items.Single();
+        item.MatchKind.Should().Be(SearchMatchKind.Vyjadreni);
+        item.Snippet!.Before.Should().Be("T: 31.10.2025 ");
+        item.Snippet.Match.Should().Be("Rozhodnuto");
+        item.Snippet.After.Should().Be(" o řešení");
+    }
+
+    [Fact]
+    public async Task Hledani_NahledZRichTextuPopisu_JeProstyText()
+    {
+        var db = await _fixture.CreateDatabaseAsync("search_popis_richtext");
+        var seed = await SearchSeed.CreateAsync(db.ConnectionString);
+        var stored = new RichTextContentService().NormalizeForStorage(
+            "<p>Úvod</p><p>Ověřit <em>zálohování</em> serveru</p>");
+        await seed.AddRecordAsync(seed.ProjektId, "Nesouvisející název", popis: stored);
+
+        var service = CreateService(db.ConnectionString);
+        var result = await service.SearchAsync("serveru", User(isSuperAdmin: true), 7, default);
+
+        var item = result.Categories.Single().Items.Single();
+        item.MatchKind.Should().Be(SearchMatchKind.Popis);
+        item.Snippet!.Before.Should().Be("Ověřit zálohování ");
+        item.Snippet.Match.Should().Be("serveru");
+        item.Snippet.After.Should().BeEmpty();
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Common;
 
 namespace PmTracker.Web.Services.Search;
 
@@ -19,15 +20,18 @@ public sealed class RecordSearchService : IRecordSearchService
 
     private readonly PmTrackerDbContext _db;
     private readonly IProjectVisibilityResolver _visibility;
+    private readonly IRichTextContentService _richText;
     private readonly ILogger<RecordSearchService> _logger;
 
     public RecordSearchService(
         PmTrackerDbContext db,
         IProjectVisibilityResolver visibility,
+        IRichTextContentService richText,
         ILogger<RecordSearchService> logger)
     {
         _db = db;
         _visibility = visibility;
+        _richText = richText;
         _logger = logger;
     }
 
@@ -127,7 +131,7 @@ public sealed class RecordSearchService : IRecordSearchService
 
             if (snippet is null)
             {
-                snippet = SearchQueryText.BuildSnippet(row.Popis, terms)
+                snippet = SearchQueryText.BuildSnippet(PlainText(row.Popis), terms)
                           ?? SearchQueryText.BuildSnippet(row.Cil, terms);
                 if (snippet is not null)
                 {
@@ -141,7 +145,7 @@ public sealed class RecordSearchService : IRecordSearchService
             {
                 foreach (var v in row.Vyjadreni)
                 {
-                    snippet = SearchQueryText.BuildSnippet(v.TextVyjadreni, terms);
+                    snippet = SearchQueryText.BuildSnippet(PlainText(v.TextVyjadreni), terms);
                     if (snippet is not null)
                     {
                         kind = SearchMatchKind.Vyjadreni;
@@ -183,4 +187,13 @@ public sealed class RecordSearchService : IRecordSearchService
             new SearchResultCategory(SearchCategoryKeys.Zaznamy, "Záznamy", items)
         ]);
     }
+
+    /// <summary>
+    /// Popis a vyjádření jsou HTML z editoru (značky + diakritika kódovaná na entity).
+    /// Náhled se staví z prostého textu; konce odstavců a položek seznamu se slijí do
+    /// jedné mezery, ať náhled zůstane na jednom řádku.
+    /// </summary>
+    private string PlainText(string? richText) =>
+        string.Join(' ', _richText.ToPlainText(richText)
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 }
