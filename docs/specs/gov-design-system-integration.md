@@ -1,7 +1,8 @@
 # Gov Design System — integrace Web Components
 
-Gov Design System je hostován lokálně v `PmTracker.Web/wwwroot/lib/gov-design-system/`.
-Komponenty jsou registrovány přes `core.esm.min.js` (tagy `<gov-*>` jsou dostupné globálně).
+Gov Design System 4.7.0 je hostován lokálně v `PmTracker.Web/wwwroot/assets/gov/` (1:1 kopie
+předsestaveného kitu). Komponenty registruje `components/core.esm.js`, hlavičku a hlavní
+navigaci ovládá `templates/scripts.js` (`initTemplateScripts`).
 
 ## Skutecne nahrazene Web Components
 

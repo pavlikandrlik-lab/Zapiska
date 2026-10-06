@@ -92,4 +92,14 @@ public sealed class GovHeadLoadOrderTests
         tags.Should().HaveCount(12, "9 CSS ze styles/ + roboto.css + core.esm.js + scripts.js");
         tags.Should().OnlyContain(tag => tag.Contains("asp-append-version=\"true\""));
     }
+
+    [Fact]
+    public void StaraKnihovna429_UzNeexistuje()
+    {
+        Directory.Exists(ResolvePath("PmTracker.Web/wwwroot/lib/gov-design-system")).Should().BeFalse(
+            "dvě jádra DS by se přela o definice komponent; jediné jádro je assets/gov (4.7.0)");
+
+        var harness = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/pm-modal-harness.html"));
+        harness.Should().NotContain("lib/gov-design-system");
+    }
 }

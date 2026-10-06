@@ -47,15 +47,16 @@ Každá PR, která přidává novou knihovnu nebo asset, musí projít:
 
 - `PmTracker.Tests.Unit/Layout/OfflineAssetsTests.cs` — ověřuje:
   - `_Layout.cshtml` neobsahuje `cdn.` / `https://cdn`
-  - `~/lib/gov-design-system/` assety fyzicky existují v repozitáři
+  - `~/assets/gov/` (DS gov 4.7.0) assety fyzicky existují v repozitáři
   - `site.css` neobsahuje `@import url("https://...")`
+- `GovAssets470Tests` — kopie DS, fonty a ikony leží lokálně
 
 ## Historie / aktuální knihovny
 
 | Knihovna              | Lokace                                   | Verze  | Zdroj                                                               |
 |----------------------|------------------------------------------|--------|---------------------------------------------------------------------|
 | Quill rich text      | `~/lib/quill/`                           | (viz)  | npm `quill`                                                         |
-| gov-design-system    | `~/lib/gov-design-system/`               | 4.2.9  | npm `@gov-design-system-ce/components`, `@gov-design-system-ce/styles` 4.2.7 |
+| gov-design-system    | `~/assets/gov/`                          | 4.7.0  | předsestavený kit DesignSystem-FIS-v1.0.0/assets/gov (bez icons/, bez ds-fis/) |
 | Apache ECharts       | `~/lib/echarts/` (`echarts.esm.min.js`)  | 5.5.1  | npm `echarts` (dist ESM); grafy základního projektového reportu     |
 
 ## Publish workflow
@@ -64,8 +65,9 @@ Každá PR, která přidává novou knihovnu nebo asset, musí projít:
 do výsledné složky. Po publishi ověř:
 
 ```bash
-ls publish/wwwroot/lib/gov-design-system/dist/core/ | wc -l   # min 89
-ls publish/wwwroot/lib/gov-design-system/styles/lib/tokens.min.css
+ls publish/wwwroot/assets/gov/components/ | wc -l        # min 140 (core.esm.js + p-*.js)
+ls publish/wwwroot/assets/gov/styles/components.css publish/wwwroot/assets/gov/fonts/roboto.css
+ls publish/wwwroot/assets/icons/components/person-fill.svg
 ```
 
 Pokud některý soubor chybí, offline nasazení selže (search pole se vůbec nezobrazí).

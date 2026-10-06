@@ -8,7 +8,7 @@ namespace PmTracker.Tests.Unit.Layout;
 /// Inbox úprava #10 (2026-04-21): gov-dialog variantní šířka (wide / record-editor).
 ///
 /// Root cause (ověřeno Playwright probe v aplikačním kontextu, light-DOM, viewport 1920×1080):
-///   - gov-dialog 4.2.9 dist CSS: .gov-dialog__dialog { max-width: var(--max-width, 52.5rem); max-height: 75vh }
+///   - gov-dialog (DS gov 4.x, `assets/gov/styles/components.css`): .gov-dialog__dialog { max-width: var(--max-width, 52.5rem); max-height: 75vh }
 ///   - gov-dialog NEMÁ shadow DOM → inner <dialog class="gov-dialog__dialog"> je dostupný přes přímý class selector
 ///   - max-height je hardcoded 75vh (žádná CSS var) → override jen přes přímý selector
 ///
@@ -25,8 +25,8 @@ public sealed class GovDialogVariantWidthTests
         // Match deklarace (--gov-dialog-max-*: value), ne zmínky v komentářích.
         css.Should().NotMatchRegex(
             @"--gov-dialog-max-width\s*:",
-            "gov-dialog 4.2.9 nečte --gov-dialog-max-width — správný název je --max-width " +
-            "(viz gov-design-system/styles/lib/html/components/gov-dialog.css)");
+            "gov-dialog nečte --gov-dialog-max-width — správný název je --max-width " +
+            "(viz assets/gov/styles/components.css)");
         css.Should().NotMatchRegex(
             @"--gov-dialog-max-height\s*:",
             "gov-dialog max-height je hardcoded 75vh — override jde pouze přes přímý selector " +

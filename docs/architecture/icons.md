@@ -21,9 +21,8 @@ na funkční.
 
 ## Dostupné ikony
 
-Gov-design-system 4.2.9 poskytuje sadu `type="components"`. Názvy (výběr):
-- `check`, `x`, `arrow-left`, `arrow-right`, `arrow-up`, `arrow-down`
-- `search`, `pencil`, `trash`, `plus`, `minus`
-- `info`, `warning`, `error`
-
-Úplný seznam: https://designsystem.gov.cz/komponenty/ikony.html
+`gov-icon type="components"` bere SVG z `wwwroot/assets/icons/components/{name}.svg`
+(`window.GOV_DS_CONFIG.iconsPath` v `_Layout.cshtml`). Strom je aplikační: Bootstrap Icons
+1.11.3, které stahujeme sami, + ikony sady DS gov 4.7.0, které jsme neměli (odchylka č. 3
+v `docs/known-issues/ds-fis-odchylky.md`). Novou ikonu přidej jako SVG do této složky —
+`GovAssets470Tests.KazdaIkonaPouzitaVAplikaci_Existuje` selže, když chybí.

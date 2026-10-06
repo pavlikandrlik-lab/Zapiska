@@ -2,7 +2,7 @@
 
 ## Přehled
 
-PM Tracker používá **gov-dialog** (gov-design-system 4.2.9 Web Component)
+PM Tracker používá **gov-dialog** (DS gov 4.7.0 Web Component)
 pro všechny modální dialogy. Thin wrapper `pm-dialog` (Fáze 2C) poskytuje
 standalone použití s title slotem, ale pro aplikační modaly s AJAX obsahem
 se používá **`_ModalLayout.cshtml`** (Fáze 2E).
