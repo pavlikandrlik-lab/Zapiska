@@ -102,6 +102,21 @@
     align-items: stretch;
 }
 
+/* Odchylka č. 7: obsah hlavičky (logo, hledání, motiv, účet) přes celou šířku obrazovky
+   místo DS limitu stránky (75rem); hlavní navigace zůstává v šířce stránky. Hledání se
+   roztahuje mezi logem a akcemi jako před přechodem na gov hlavičku (max 560 px). */
+.gov-header__content.app-header-wide {
+    max-width: none;
+}
+
+@media (min-width: 48em) {
+    .app-search {
+        flex: 1 1 auto;
+        max-width: 560px;
+        margin: 0 var(--spacing-l);
+    }
+}
+
 /* Křížek „Smazat dotaz" jen s neprázdným dotazem; třídu přepíná global-search.js. Atribut
    hidden na slotovaném gov-buttonu nejde použít — Stencil ho při vykreslení gov-form-search
    přepíše na false. */
@@ -356,6 +371,25 @@
    pod WCAG 1.4.11 (3:1). Světlejší token DS dává ~5,2:1 proti oběma. */
 :root[data-theme="dark"] .app-main-nav a[aria-current="page"] {
     box-shadow: inset 0 -3px 0 var(--color-primary-400);
+}
+
+/* Odchylka č. 6: nižší hlavní navigace (25 px místo 48 px). Výšku položek dává token
+   --height-component-l, který sdílí všechny komponenty velikosti L — proto se přepisuje
+   jen uvnitř navigace a jen na desktopu; v mobilním menu zůstávají dotykové cíle 48 px.
+   Řádek textu (27 px) je pak vyšší než položka a vnitřní podtržení by přeškrtlo písmena
+   s dolní dotahovou (j, y) — podtržení aktivní položky proto jde těsně pod ni. */
+@media (min-width: 48em) {
+    .app-main-nav {
+        --height-component-l: 25px;
+    }
+
+    .app-main-nav a[aria-current="page"] {
+        box-shadow: 0 3px 0 var(--color-primary-600);
+    }
+
+    :root[data-theme="dark"] .app-main-nav a[aria-current="page"] {
+        box-shadow: 0 3px 0 var(--color-primary-400);
+    }
 }
 
 /* Kontakty v patičce: index.css DS se nenačítá (odchylka č. 2), <address> by zůstal kurzívou. */
@@ -7455,7 +7489,7 @@ html {
 
 /* Dashboard main = přesně jedna obrazovka pod hlavičkou (scoped přes :has):
    height = 100dvh − --app-header-h. --app-header-h = vzdálenost od vršku stránky k #main
-   (gov hlavička + navigace + drobečky), měří header-height.js; fallback 174px (změřeno
+   (gov hlavička + navigace + drobečky), měří header-height.js; fallback 151px (změřeno
    na / při 1920×1080) pro 1. paint / vypnutý JS. Panely se tak vejdou na obrazovku
    a site footer (margin-top:auto) spadne těsně POD fold — stránka zůstává
    scrollovatelná, footer není zbytečně vidět. flex:0 0 auto, aby main respektoval
@@ -7464,7 +7498,7 @@ html {
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;
-    height: calc(100dvh - var(--app-header-h, 174px));
+    height: calc(100dvh - var(--app-header-h, 151px));
     min-height: 0;
     /* A3: obsah nesmí být nalepený na footer — panely mají interní scroll, výška drží. */
     padding-bottom: var(--app-content-bottom-gap);

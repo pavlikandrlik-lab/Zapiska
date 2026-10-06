@@ -106,3 +106,35 @@ Stránky mají vlastní šířkové tiery (`app-main`, `app-main--fluid`) a drob
 **Jak je odchylka provedena:** obsah zůstává v `<main id="main" class="app-main">` (id `main`
 je cíl skip-linku), drobečky v `_BreadcrumbBar` pod hlavičkou. Struktura hlavičky a patičky
 odpovídá `index.html`.
+
+## 6. Nižší hlavní navigace (2026-10-06)
+
+**Čeho se týká:** `gov-navigation` v hlavičce. DS dává položkám výšku
+`var(--height-component-l)` (3rem = 48 px).
+
+**Proč se odchylujeme:** výslovné přání uživatele. Navigace s 48 px vysokými položkami
+zabírá zbytečně moc místa, 25 px se mu líbí víc.
+
+**Jak je odchylka provedena:** token `--height-component-l` sdílí všechny komponenty
+velikosti L, proto se nemění globálně. `site.css` ho přepisuje jen na `.app-main-nav`
+a jen od 48em. V rozbaleném mobilním menu zůstávají dotykové cíle 48 px.
+
+Řádek textu položky (27 px) je pak vyšší než položka. Podtržení aktivní položky
+(odchylka č. 4) by přeškrtlo písmena s dolní dotahovou, proto je na desktopu těsně
+pod položkou (`box-shadow: 0 3px 0`), ne uvnitř.
+
+## 7. Obsah hlavičky přes celou šířku obrazovky (2026-10-06)
+
+**Čeho se týká:** `.gov-header__content` (logo, hledání, přepínač motivu, účet).
+DS ho omezuje na `max-width: var(--templates-layout-page-limit-max)` (75rem).
+Hledání má v kitu pevnou šířku `gov-search--fixed-width` (26.5rem).
+
+**Proč se odchylujeme:** výslovné přání uživatele. Na širokém monitoru má horní řádek
+využít celou šířku a hledání se má roztahovat jako před přechodem na gov hlavičku.
+
+**Jak je odchylka provedena:**
+
+- `.gov-header__content` má třídu `app-header-wide` a `site.css` jí ruší `max-width`.
+- Formulář hledání nemá `gov-search--fixed-width`. Od 48em ho `.app-search` roztahuje
+  mezi logem a akcemi (`flex: 1 1 auto`, nejvýš 560 px).
+- Hlavní navigace (`.gov-header__navigation`) zůstává v šířce stránky DS.

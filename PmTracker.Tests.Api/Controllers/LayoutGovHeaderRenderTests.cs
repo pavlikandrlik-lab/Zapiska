@@ -45,12 +45,13 @@ public sealed class LayoutGovHeaderRenderTests
         html.Should().Contain("href=\"#main-navigation\"");
         html.Should().Contain("href=\"#main\"");
         html.Should().Contain("<header class=\"gov-header\">");
+        html.Should().Contain("class=\"gov-header__content app-header-wide\"", "odchylka č. 7");
         html.Should().Contain("class=\"gov-navigation app-main-nav\"");
         html.Should().Contain("js-gov-header__navigation-trigger", "hamburger pro úzký displej");
-        html.Should().Contain("class=\"gov-search gov-search--fixed-width app-search\"",
+        html.Should().Contain("class=\"gov-search app-search\"",
             "vyhledávání zůstává v hlavičce");
 
-        html.Should().NotContain("app-header");
+        html.Should().NotMatchRegex(@"app-header(?![\w-])", "stará třída hlavičky (app-header-wide je odchylka č. 7)");
         html.Should().NotContain("app-topbar");
         html.Should().NotContain("class=\"app-nav");
         html.Should().NotContain("data-user-menu");

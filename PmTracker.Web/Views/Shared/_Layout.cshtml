@@ -101,7 +101,7 @@
        .gov-header__action (motiv, účet) a ukáže hamburger v .gov-header__mobile. *@
     <header class="gov-header">
         <div class="gov-header__divider">
-            <div class="gov-header__content">
+            <div class="gov-header__content app-header-wide">
                 <a class="gov-header__logo" href="@Url.Action("Index", "Dashboard")" aria-label="Zápiska – přejít na hlavní přehled">
                     <gov-flex align-items="center" gap="m" responsive="false">
                         <div class="app-logo" aria-hidden="true">
@@ -114,13 +114,13 @@
                 @* Globální hledání v layoutu používá gov-form-search přímo (ne pm-search), protože
                    pm-search (Fáze 2D) zatím nepodporuje slot="button-erase" (clear query button)
                    ani atributy identifier + autocomplete na vnořeném gov-form-input.
-                   Seznam výsledků kreslí global-search.js (odchylka č. 1); třídy gov-search dávají
-                   šířku podle DS. *@
+                   Seznam výsledků kreslí global-search.js (odchylka č. 1). Šířku dává .app-search
+                   (roste s hlavičkou, odchylka č. 7), ne pevná gov-search--fixed-width. *@
                 <form data-global-search
                       method="get"
                       asp-controller="Search"
                       asp-action="Index"
-                      class="gov-search gov-search--fixed-width app-search"
+                      class="gov-search app-search"
                       role="search">
                     <gov-form-search color="primary" size="m">
                         <gov-form-input slot="input" size="m" name="q" placeholder="Hledání"
