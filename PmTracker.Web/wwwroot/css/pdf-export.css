@@ -540,9 +540,11 @@ tr.task-row {
    Podle finálního vzoru (spec 2026-09-10 B1): Times New Roman, tělo 12 b., tabulky 10 b. */
 .vyzva-sheet { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.35; }
 .vyzva-priloha { text-align: right; margin: 0 0 1.5rem; }
-.vyzva-hlavicka { margin-bottom: 1.5rem; }
+/* Hlavička úřadu jako ve vzoru a ve Wordu: na střed, první řádek proložený, pod adresou čára. */
+.vyzva-hlavicka { margin-bottom: 1.5rem; text-align: center; }
 .vyzva-hlavicka p { margin: 0; }
-.vyzva-hlavicka-urad { font-size: 16pt; font-weight: 700; }
+.vyzva-hlavicka-urad { font-size: 16pt; font-weight: 700; letter-spacing: 2pt; }
+.vyzva-hlavicka-adresa { border-bottom: 1.5pt solid #000; padding-bottom: 1pt; }
 .vyzva-hlavicka-odbor { font-weight: 700; }
 .vyzva-male { font-size: 10pt; }
 .vyzva-cj { display: flex; margin: 1.5rem 0; }
