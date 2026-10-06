@@ -10,16 +10,10 @@
         : string.Equals(themeModeCookie, "light", System.StringComparison.OrdinalIgnoreCase)
             ? "light"
             : null;
-    // Razor's conditional attribute-omission codegen (BeginWriteAttribute/EndWriteAttribute,
-    // the mechanism that drops an attribute when its bound value is null) does not apply to
-    // attributes whose name starts with "data-" — verified against the generated source
-    // (EmitCompilerGeneratedFiles) for this exact <html data-theme="@serverTheme"> markup:
-    // the compiler emits a plain WriteLiteral+Write instead, so a null serverTheme renders
-    // data-theme="" rather than omitting the attribute. Non-data- attributes (id, class,
-    // href, aria-*, arbitrary custom names) do use the conditional codegen and omit on null;
-    // only the "data-" prefix is special-cased. serverTheme is restricted to the two literal
-    // strings "dark"/"light" above (never request-controlled text), so building the fragment
-    // by hand and writing it unescaped is safe.
+    // Razor nepoužije podmíněné vynechání atributu s hodnotou null u atributů "data-*"
+    // (ověřeno ve vygenerovaném kódu — vypsal by data-theme=""), proto se atribut skládá
+    // ručně. serverTheme je jen "dark"/"light" (nikdy text z requestu), takže Html.Raw
+    // je bezpečné.
     var themeAttribute = serverTheme is null ? "" : $" data-theme=\"{serverTheme}\"";
 }
 
@@ -90,6 +84,14 @@
             ? string.Join(", ", roles)
             : string.Empty;
         var profileUrl = Url.Action("Index", "Profil");
+        // Kód organizace (kit DesignSystem-FIS-v1.0.0, i dřívější header před DS gov)
+        // se doplňuje za pomlčku jen když existuje, ať nezůstane osamocená pomlčka.
+        var userAccountLabel = string.IsNullOrWhiteSpace(nav?.CurrentUserOrgCode)
+            ? nav?.CurrentUserDisplayName
+            : $"{nav?.CurrentUserDisplayName} – {nav?.CurrentUserOrgCode}";
+        var userAccountName = string.IsNullOrWhiteSpace(nav?.CurrentUserOrgCode)
+            ? nav?.CurrentUserDisplayName
+            : $"{nav?.CurrentUserDisplayName} – {nav?.CurrentUserOrgCode}";
     }
     <div class="gov-skip-links">
         <a href="#main-navigation">Přeskočit na navigaci</a>
@@ -150,9 +152,9 @@
 
                     <gov-dropdown position="right" class="app-user-menu">
                         <gov-button type="base" color="primary" size="m"
-                                    aria-label="Účet uživatele @nav?.CurrentUserDisplayName">
+                                    aria-label="Účet uživatele @userAccountLabel">
                             <gov-icon slot="icon-start" name="person-fill" type="components"></gov-icon>
-                            <span class="app-user-name">@nav?.CurrentUserDisplayName</span>
+                            <span class="app-user-name">@userAccountName</span>
                             <gov-icon slot="icon-end" name="chevron-down" size="m" type="components"></gov-icon>
                         </gov-button>
                         <ul slot="list" role="menu">

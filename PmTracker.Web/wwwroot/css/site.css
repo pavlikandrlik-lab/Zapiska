@@ -7405,8 +7405,8 @@ html {
 /* Fluid list/index stránky bez dashboard-shellu (Projekty, Číselníky, Nastavení,
    Profil, Jednání + podstránky Focus/Meetings/News): po odstranění _PageHeaderu
    (2026-06-09) ztratil obsah horní odsazení, které header dřív poskytoval, a
-   nalepil se pod sticky menu → vrátit top padding. Přehled (s .dashboard-shell)
-   je vyloučen, drží si přesnou výšku 100dvh−header. */
+   začínal hned u horního okraje app-main → vrátit top padding. Přehled (s
+   .dashboard-shell) je vyloučen, drží si přesnou výšku 100dvh−header. */
 .app-main--fluid:not(:has(.dashboard-shell)) {
     padding-top: clamp(14px, 1.5vw, 22px);
 }
@@ -7415,7 +7415,8 @@ html {
    DASHBOARD PŘEHLED — fluid + adaptivní layout (2026-06-09)
    Spec: docs/superpowers/specs/2026-06-09-dashboard-prehled-layout-design.md
    - Flex-fill výška (bez měření headeru JSkem): .app-body je flex column →
-     app-main vyplní výšku pod sticky headerem → shell vyplní app-main.
+     app-main vyplní zbývající výšku pod headerem (ten už není sticky, DS
+     gov 4.7.0) → shell vyplní app-main.
    - Fluid clamp tokeny (jediný zdroj rozměrů) na .dashboard-shell.
    - Hybrid: na vysokém viewportu fix 1 obrazovka + interní scroll panelů;
      na úzkém (<1024) stack + scroll stránky.

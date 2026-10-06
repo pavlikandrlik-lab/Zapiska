@@ -40,12 +40,11 @@ karet). Po kliknutí volá `navigateToTab(tab, cardSelector)`:
    `.record-card[data-record-id]`) nemusí být hned v DOM (lazy-load), proto retry přes
    `requestAnimationFrame` (až 20×); pak `scrollIntoView({ block: "start" })` + zvýraznění.
 
-### Odsazení scrollu pod sticky header
+### Odsazení scrollu
 
-Header je sticky o výšce `--app-header-h` (~110 px). Aby scroll nezajel „příliš nahoru" a
-vršek karty nezmizel za headerem, jsou scroll cíle odsazené: `html { scroll-padding-top }`
-a `.record-card`/`.schedule-card { scroll-margin-top }` = `calc(var(--app-header-h) + 4px)`
-(navázáno na reálnou výšku headeru, ne pevná konstanta — ta časem zastarala na 92 px).
+Hlavička není přilepená (DS gov 4.7.0, 2026-09-23). Scroll cíle mají jen malé odsazení
+od horního okraje: `html { scroll-padding-top }` a `.record-card`/`.schedule-card
+{ scroll-margin-top }` = `var(--app-sticky-top)` (16 px).
 
 ## Implementační gotcha — label tlačítka „Rozpad" (gov-button)
 

@@ -6,8 +6,8 @@ description: Téma, preference editoru, tisk — lokální volby uložené v pro
 # Uživatelské nastavení
 
 V profilu si můžeš nastavit **uživatelské preference**. Tyto volby ovlivňují
-jen tvůj uživatelský zážitek a **ukládají se v browseru** (sessionStorage /
-localStorage), nikoli na server.
+jen tvůj uživatelský zážitek a **ukládají se v prohlížeči** (cookie /
+localStorage / sessionStorage), nikoli na server.
 
 To znamená:
 
@@ -61,7 +61,7 @@ Reset je instant a non-destructive.
 
 | Preference | Storage | Klíč |
 |---|---|---|
-| Téma | localStorage | `pmtracker.theme` |
+| Téma | cookie (1 rok) | `pmtracker.theme.mode` |
 | Editor záznamu | localStorage | `pmtracker.recordEditor.preference` |
 | Formát tisku | localStorage | `pmtracker.print.format` |
 | Filtry projektů | localStorage | `pmtracker.projects.*` |
