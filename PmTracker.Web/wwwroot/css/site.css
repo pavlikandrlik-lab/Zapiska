@@ -344,6 +344,13 @@
     box-shadow: inset 0 -3px 0 var(--color-primary-600);
 }
 
+/* Tmavý motiv (odchylka č. 4): --color-primary-600 má proti pozadí navigace
+   (--color-neutral-950) i proti tmavé výplni (--color-primary-950) jen ~1,7:1 —
+   pod WCAG 1.4.11 (3:1). Světlejší token DS dává ~5,2:1 proti oběma. */
+:root[data-theme="dark"] .app-main-nav a[aria-current="page"] {
+    box-shadow: inset 0 -3px 0 var(--color-primary-400);
+}
+
 /* gov-theme-switch + gov-form-switch CSS aproximace odstraněny — nahrazeny Web Components.
    Filtry projektů (Index, _ProjectRecordsTab) i ProjectModal nyní používají
    <gov-form-switch> s gov-change eventem. Externí vazba taktéž. */
