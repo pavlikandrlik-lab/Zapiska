@@ -88,7 +88,7 @@ public sealed class GlobalSearchDynamicResultsTests
     }
 
     [Fact]
-    public async Task DarkMode_MaJedinouLupu_VDom()
+    public async Task DarkMode_MaJednoPoleAJednoTlacitkoHledat()
     {
         var page = await _fixture.NewPageAsync();
 
@@ -102,10 +102,16 @@ public sealed class GlobalSearchDynamicResultsTests
         (await page.EvaluateAsync<string>("document.documentElement.getAttribute('data-theme')"))
             .Should().Be("dark");
 
-        // Ověříme že ikona lupy je v DOM právě jednou
-        var searchIcons = page.Locator("[data-global-search] .gov-icon--system svg");
-        var count = await searchIcons.CountAsync();
-        count.Should().Be(1, "v dark mode musí být v search formuláři právě jedna ikona lupy");
+        // Tmavý motiv nesmí ovládací prvky hledání zdvojit. Odeslání je textové tlačítko
+        // „Hledat" podle gov designu — ikonu lupy formulář nemá.
+        var form = page.Locator("[data-global-search]");
+        await Assertions.Expect(form.Locator("input[name='q']")).ToHaveAttributeAsync("role", "combobox");
+        await Assertions.Expect(form.Locator("input")).ToHaveCountAsync(1);
+
+        var submit = form.Locator("gov-button[slot='button']");
+        await Assertions.Expect(submit).ToHaveCountAsync(1);
+        await Assertions.Expect(submit.Locator("button")).ToHaveCountAsync(1);
+        await Assertions.Expect(submit).ToContainTextAsync("Hledat");
 
         await page.Context.CloseAsync();
     }
