@@ -24,11 +24,6 @@
     --app-nav-active-border: #005ea5;
     --app-text-primary: #0b0c0c;
     --app-muted: #505a5f;
-    --app-footer-bg: #1d2a44;
-    --app-footer-text: #dfe7f3;
-    --app-footer-title: #ffffff;
-    --app-footer-meta: #b4c3dc;
-    --app-footer-divider: rgba(223, 231, 243, 0.18);
 }
 
 :root[data-theme="dark"] {
@@ -55,11 +50,6 @@
     --app-nav-active-border: #9cc8ff;
     --app-text-primary: #f3f5f7;
     --app-muted: #a7b0ba;
-    --app-footer-bg: #0c1117;
-    --app-footer-text: #c9d6e8;
-    --app-footer-title: #ffffff;
-    --app-footer-meta: #a7bbd6;
-    --app-footer-divider: rgba(201, 214, 232, 0.18);
 }
 
 * {

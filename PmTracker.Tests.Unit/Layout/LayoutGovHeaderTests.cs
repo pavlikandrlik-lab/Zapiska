@@ -34,6 +34,7 @@ public sealed class LayoutGovHeaderTests
     [InlineData(@"\.app-user-tools(?![\w-])")]
     [InlineData(@"\.app-theme-switch(?![\w-])")]
     [InlineData(@"\[data-theme-switch\]")]
+    [InlineData(@"\.app-footer")]
     public void SiteCss_NemaSelektoryStareHlavicky(string selectorPattern)
     {
         SiteCssBezKomentaru().Should().NotMatchRegex(selectorPattern);

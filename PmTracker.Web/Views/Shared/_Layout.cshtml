@@ -228,31 +228,54 @@
         @RenderBody()
     </main>
 
-    <footer class="app-footer">
-        <div class="app-footer-grid">
-            <div>
-                <h3>Dokumenty</h3>
-                <a asp-controller="Dokumentace" asp-action="UzivatelskaPrirucka">Uživatelská příručka</a>
-                <a asp-controller="Dokumentace" asp-action="StromDokumentace">Technická dokumentace</a>
-                <a asp-controller="Dokumentace" asp-action="Qa">Q and A</a>
-                <a asp-controller="Dokumentace" asp-action="Changelog">Changelog verzí</a>
-            </div>
-            <div>
-                <h3>Informace</h3>
-                <a href="https://servicedesk.fis.acr" target="_blank" rel="noopener noreferrer">Servicedesk</a>
-                <a href="https://www.fis.acr/fis" target="_blank" rel="noopener noreferrer">Portál FIS</a>
-                <a href="https://www.portalcechy.sis.acr" target="_blank" rel="noopener noreferrer">Portál ŠIS</a>
-            </div>
-            <div>
-                <h3>Podpora</h3>
-                <span>FIS: 973 200 840</span>
-                <span>ISSP: 973 225 500</span>
-                <span>ŠIS: 973 211 111</span>
-            </div>
-        </div>
-        <div class="app-footer-meta">
-            <small class="app-footer-version">Verze @ApplicationVersionProvider.DisplayVersion</small>
-        </div>
+    @* Patička: struktura z DesignSystem-FIS-v1.0.0/index.html (gov-footer), obsah jako dřív
+       (spec 2026-09-23 §12.7). Copyright z kitu se nepřidává. *@
+    <footer class="gov-footer">
+        <gov-flex class="gov-footer__content" direction="column" justify-content="space-between" gap="3xl">
+            <gov-flex responsive="false">
+                <ul class="gov-footer__main gov-list--plain">
+                    <li>
+                        <nav aria-labelledby="footer-dokumenty">
+                            <h5 id="footer-dokumenty">Dokumenty</h5>
+                            <ul class="gov-list--plain">
+                                <li><gov-link href="@Url.Action("UzivatelskaPrirucka", "Dokumentace")" size="s">Uživatelská příručka</gov-link></li>
+                                <li><gov-link href="@Url.Action("StromDokumentace", "Dokumentace")" size="s">Technická dokumentace</gov-link></li>
+                                <li><gov-link href="@Url.Action("Qa", "Dokumentace")" size="s">Q and A</gov-link></li>
+                                <li><gov-link href="@Url.Action("Changelog", "Dokumentace")" size="s">Changelog verzí</gov-link></li>
+                            </ul>
+                        </nav>
+                    </li>
+                    <li>
+                        <nav aria-labelledby="footer-informace">
+                            <h5 id="footer-informace">Informace</h5>
+                            <ul class="gov-list--plain">
+                                <li><gov-link href="https://servicedesk.fis.acr" external size="s">Servicedesk</gov-link></li>
+                                <li><gov-link href="https://www.fis.acr/fis" external size="s">Portál FIS</gov-link></li>
+                                <li><gov-link href="https://www.portalcechy.sis.acr" external size="s">Portál ŠIS</gov-link></li>
+                            </ul>
+                        </nav>
+                    </li>
+                    <li>
+                        <h5 id="footer-podpora">Podpora</h5>
+                        @* app-address: index.css (nenačítá se, odchylka č. 2) by jinak zrušil kurzívu <address>. *@
+                        <address class="app-address">
+                            <ul class="gov-footer__address gov-list--plain">
+                                <li>FIS: 973 200 840</li>
+                                <li>ISSP: 973 225 500</li>
+                                <li>ŠIS: 973 211 111</li>
+                            </ul>
+                        </address>
+                    </li>
+                </ul>
+            </gov-flex>
+
+            <gov-flex direction="column" gap="m-nudge">
+                <hr />
+                <gov-flex class="gov-footer-copy" justify-content="space-between" gap="m">
+                    <span>Verze @ApplicationVersionProvider.DisplayVersion · DS gov.cz 4.7.0</span>
+                </gov-flex>
+            </gov-flex>
+        </gov-flex>
     </footer>
 
     <div id="modal-root" class="modal-root" aria-hidden="true"></div>
