@@ -189,7 +189,7 @@ public sealed class RecordSearchService : IRecordSearchService
     }
 
     /// <summary>
-    /// Popis a vyjádření jsou HTML z editoru (značky + diakritika kódovaná na entity).
+    /// Popis a vyjádření jsou HTML z editoru (značky, entity jako &amp;amp; a &amp;lt;).
     /// Náhled se staví z prostého textu; konce odstavců a položek seznamu se slijí do
     /// jedné mezery, ať náhled zůstane na jednom řádku.
     /// </summary>

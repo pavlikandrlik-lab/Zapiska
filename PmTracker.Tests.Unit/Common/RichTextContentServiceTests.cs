@@ -101,4 +101,45 @@ public sealed class RichTextContentServiceTests
 
         result.Should().Be("První\nDruhý");
     }
+
+    // Ukládá se písmo tak, jak je: HtmlEncoder.Default dřív z „ř" dělal &#x159; a LIKE
+    // v databázi pak slova s diakritikou nenašel (db_upgrade_1_4_6 data převádí zpět).
+    [Fact]
+    public void NormalizeForStorage_UkladaDiakritikuAOstatniZnakyBezEntit()
+    {
+        const string input = "<p>Řešení žádosti – „uvozovky“ 😀 Жук → ≥ ✓ ' +</p>";
+
+        var result = _sut.NormalizeForStorage(input);
+
+        result.Should().Be(input);
+    }
+
+    [Fact]
+    public void NormalizeForStorage_KodujeJenZnakyNebezpecneVHtml()
+    {
+        const string input = "<p>a &lt; b &amp;&amp; c &gt; d &quot;e&quot;</p>";
+
+        var result = _sut.NormalizeForStorage(input);
+
+        result.Should().Be("<p>a &lt; b &amp;&amp; c &gt; d &quot;e&quot;</p>");
+    }
+
+    [Fact]
+    public void NormalizeForStorage_OdkazSDiakritikou_KodujeJenAmpersandAUvozovky()
+    {
+        const string input = "<p><a href=\"https://example.cz/řešení?a=1&amp;b=2\">Řešení</a></p>";
+
+        var result = _sut.NormalizeForStorage(input);
+
+        result.Should().Be("<p><a href=\"https://example.cz/řešení?a=1&amp;b=2\">Řešení</a></p>");
+    }
+
+    [Fact]
+    public void ToSafeHtml_PrevodHolehoTextu_ZachovaDiakritikuAKodujeZnacky()
+    {
+        var result = _sut.ToSafeHtml("Řádek 1\nŘádek <2> & víc");
+
+        result.Should().Be("<p>Řádek 1<br>Řádek &lt;2&gt; &amp; víc</p>");
+    }
 }
+

@@ -105,6 +105,16 @@ DECLARE @editZamek INT = CASE
     WHEN OBJECT_ID(N'dbo.zaznam_edit_zamek', N'U') IS NOT NULL THEN 1 ELSE 0 END;
     -- 1_4_5: tabulka zámku karty záznamu (souběžná editace)
 
+DECLARE @richtextUnicode INT = CASE
+    WHEN (SELECT TYPE_NAME(user_type_id) FROM sys.columns
+          WHERE object_id = OBJECT_ID(N'dbo.vyjadreni') AND name = N'text_vyjadreni') = N'nvarchar'
+     AND (SELECT TYPE_NAME(user_type_id) FROM sys.columns
+          WHERE object_id = OBJECT_ID(N'dbo.projektove_zaznamy') AND name = N'popis') = N'nvarchar'
+     AND (SELECT TYPE_NAME(user_type_id) FROM sys.columns
+          WHERE object_id = OBJECT_ID(N'dbo.zaznam_historie_terminu') AND name = N'duvod') = N'nvarchar'
+    THEN 1 ELSE 0 END;
+    -- 1_4_6: rich text v Unicode (NVARCHAR(MAX)) a bez entit pro písmena
+
 -- ---------------------------------------------------------------------------
 -- Otisky jednotlivých skriptů (v pořadí nasazování)
 -- ---------------------------------------------------------------------------
@@ -330,6 +340,10 @@ INSERT @r VALUES (330, N'db_upgrade_1_4_4_search_cleanup',
 INSERT @r VALUES (340, N'db_upgrade_1_4_5_record_edit_lock',
     CASE WHEN @editZamek = 1 THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
     N'tabulka dbo.zaznam_edit_zamek (bez ní se editor neotevře nikomu — fail-soft vypne zámek)');
+
+INSERT @r VALUES (350, N'db_upgrade_1_4_6_richtext_unicode',
+    CASE WHEN @richtextUnicode = 1 THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
+    N'popis, text_vyjadreni a duvod jsou NVARCHAR(MAX) (bez toho hledání nenajde slova s diakritikou v popisu a vyjádřeních)');
 
 -- ---------------------------------------------------------------------------
 -- Výstup

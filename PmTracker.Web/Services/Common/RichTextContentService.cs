@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -122,7 +121,7 @@ public sealed partial class RichTextContentService : IRichTextContentService
         {
             if (!string.IsNullOrEmpty(textNode.Value))
             {
-                builder.Append(HtmlEncoder.Default.Encode(textNode.Value));
+                builder.Append(EncodeHtml(textNode.Value));
             }
             return;
         }
@@ -161,7 +160,7 @@ public sealed partial class RichTextContentService : IRichTextContentService
             }
 
             builder.Append("<a href=\"")
-                .Append(HtmlEncoder.Default.Encode(href))
+                .Append(EncodeHtml(href))
                 .Append("\">");
             foreach (var child in element.Nodes())
             {
@@ -339,12 +338,41 @@ public sealed partial class RichTextContentService : IRichTextContentService
         return normalized.Replace("&nbsp;", "&#160;", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Kóduje jen znaky, které v HTML něco znamenají (&amp;, &lt;, &gt; a uvozovky
+    /// v atributu). Písmena i ostatní znaky zůstávají, jak jsou — HtmlEncoder.Default
+    /// z „ř" dělal &amp;#x159; a LIKE v databázi pak slova s diakritikou nenašel.
+    /// Rich text sloupce jsou od db_upgrade_1_4_6 NVARCHAR(MAX), takže se nic neztratí.
+    /// </summary>
+    private static string EncodeHtml(string value)
+    {
+        if (value.AsSpan().IndexOfAny("&<>\"") < 0)
+        {
+            return value;
+        }
+
+        var builder = new StringBuilder(value.Length + 16);
+        foreach (var ch in value)
+        {
+            switch (ch)
+            {
+                case '&': builder.Append("&amp;"); break;
+                case '<': builder.Append("&lt;"); break;
+                case '>': builder.Append("&gt;"); break;
+                case '"': builder.Append("&quot;"); break;
+                default: builder.Append(ch); break;
+            }
+        }
+
+        return builder.ToString();
+    }
+
     private static string ConvertPlainTextToHtml(string value)
     {
         var normalized = NormalizeLineEndings(value);
         var encodedLines = normalized
             .Split('\n')
-            .Select(HtmlEncoder.Default.Encode);
+            .Select(EncodeHtml);
         return $"<p>{string.Join("<br>", encodedLines)}</p>";
     }
 

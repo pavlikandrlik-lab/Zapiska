@@ -146,15 +146,14 @@ public sealed class RecordSearchServiceTests
     public async Task Hledani_NahledZRichTextuVyjadreni_JeProstyTextBezZnacekAEntit()
     {
         // Vyjádření se ukládá přes RichTextContentService.NormalizeForStorage — jako HTML
-        // z editoru Quill s diakritikou kódovanou na entity (&#x159;). Test proto seeduje
-        // stejný tvar jako produkce, ne holý text.
+        // z editoru Quill. Test proto seeduje stejný tvar jako produkce, ne holý text.
         var db = await _fixture.CreateDatabaseAsync("search_vyjadreni_richtext");
         var seed = await SearchSeed.CreateAsync(db.ConnectionString);
         var zaznamId = await seed.AddRecordAsync(seed.ProjektId, "Nesouvisející název");
         var jednaniId = await seed.AddMeetingAsync(seed.ProjektId, cisloJednani: 8202);
         var stored = new RichTextContentService().NormalizeForStorage(
             "<ul><li>T: 31.10.2025</li><li>Rozhodnuto o <strong>řešení</strong> zálohy</li></ul>");
-        stored.Should().Contain("</li><li>").And.Contain("&#x", "seed má odpovídat uloženému tvaru");
+        stored.Should().Contain("</li><li>", "seed má odpovídat uloženému tvaru");
         await seed.AddStatementAsync(zaznamId, jednaniId, stored);
 
         var service = CreateService(db.ConnectionString);
@@ -165,6 +164,25 @@ public sealed class RecordSearchServiceTests
         item.Snippet!.Before.Should().Be("T: 31.10.2025 ");
         item.Snippet.Match.Should().Be("Rozhodnuto");
         item.Snippet.After.Should().Be(" o řešení");
+    }
+
+    [Fact]
+    public async Task Hledani_NajdeSlovoSDiakritikouVUlozenemRichTextuVyjadreni()
+    {
+        var db = await _fixture.CreateDatabaseAsync("search_vyjadreni_diakritika");
+        var seed = await SearchSeed.CreateAsync(db.ConnectionString);
+        var zaznamId = await seed.AddRecordAsync(seed.ProjektId, "Nesouvisející název");
+        var jednaniId = await seed.AddMeetingAsync(seed.ProjektId, cisloJednani: 8203);
+        var stored = new RichTextContentService().NormalizeForStorage(
+            "<ul><li>Rozhodnuto o <strong>řešení</strong> zálohy</li></ul>");
+        await seed.AddStatementAsync(zaznamId, jednaniId, stored);
+
+        var service = CreateService(db.ConnectionString);
+        var result = await service.SearchAsync("řešení", User(isSuperAdmin: true), 7, default);
+
+        var item = result.Categories.Single().Items.Should().ContainSingle("slovo s diakritikou se musí najít").Subject;
+        item.MatchKind.Should().Be(SearchMatchKind.Vyjadreni);
+        item.Snippet!.Match.Should().Be("řešení");
     }
 
     [Fact]
