@@ -15,8 +15,9 @@ public interface IVyzvaWordExportService
 /// <summary>
 /// Staví .docx výzvy přesně podle finálního vzoru (spec 2026-09-10 část B): A4, Times New
 /// Roman 12 v těle a 10 v tabulkách, záhlaví s přílohou, zápatí s číslem stránky, skutečné
-/// seznamy Wordu. Výchozí písmo, řádkování a okraje buněk nese vlastní část stylů jako vzor —
-/// bez ní by si je Word dosadil po svém (bezpatková čísla bodů, řádkování 1,15).
+/// seznamy Wordu. Hlavičku, záhlaví stránky, styly a nastavení přebírá 1:1 z XML vzoru
+/// (<see cref="VyzvaWordVzor"/>) — bez vlastních stylů by si Word dosadil výchozí formát po svém
+/// (bezpatková čísla bodů, řádkování 1,15).
 /// Čte tutéž projekci jako náhled <c>Views/Export/VyzvaTemplate.cshtml</c> —
 /// pořadí a obsah částí musí zůstat shodné. Údaje, které aplikace nemá (č. j., datum, termín),
 /// zůstávají prázdné k doplnění ve Wordu.
@@ -28,15 +29,9 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
 
     private const int Telo = 24;            // 12 b. — styl Normal vzoru
     private const int Male = 20;            // 10 b. — tabulky a štítky v sekci 2
-    private const int PrvniRadekUradu = 32; // 16 b.
     private const int Podpisy = 18;         // 9 b.
     private const int SirkaTextu = 9072;    // A4 11906 − 2 × okraj 1417 (twipy)
     private const int PrazdnyRadek = 276;   // výška prázdného řádku Times New Roman 12 b. (twipy)
-    private const string Pismo = "Times New Roman";
-
-    private const string StylNormalni = "Normal";
-    private const string StylZahlavi = "Header";
-    private const string StylZapati = "Footer";
 
     private const int NumSekce = 1;
     private const int NumPozadavkySekce1 = 2;
@@ -72,8 +67,12 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
                 ?? throw new InvalidOperationException("Word body nebyl inicializován.");
             var cislovani = new Cislovani();
 
-            Styly(mainPart);
-            Nastaveni(mainPart);
+            var styly = mainPart.AddNewPart<StyleDefinitionsPart>();
+            styly.Styles = VyzvaWordVzor.Styly();
+            styly.Styles.Save();
+            var nastaveni = mainPart.AddNewPart<DocumentSettingsPart>();
+            nastaveni.Settings = VyzvaWordVzor.Nastaveni();
+            nastaveni.Settings.Save();
 
             // Sekce 2, 3 a 4 začínají na nové stránce vlastností nadpisu (Nadpis novaStrana).
             AppendUvod(body, model);
@@ -157,30 +156,6 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
     private static void NadpisPozadavku(Body body, string? nazev, int numId)
         => body.Append(Odstavec(nazev ?? string.Empty, tucne: true, pred: 180, numId: numId, drzetSDalsim: true));
 
-    /// <summary>Odstavec ve stylu Záhlaví (vzor: hlavička úřadu i záhlaví stránky).</summary>
-    private static Paragraph OdstavecZahlavi(
-        string text, JustificationValues zarovnani, bool tucne = false, int velikost = Telo,
-        int? prolozeni = null, bool caraPod = false)
-    {
-        var format = Format(tucne, velikost);
-        if (prolozeni.HasValue)
-        {
-            // Schéma CT_RPr: spacing před sz.
-            format.InsertBefore(new Spacing { Val = prolozeni.Value }, format.GetFirstChild<FontSize>());
-        }
-
-        var pPr = new ParagraphProperties(new ParagraphStyleId { Val = StylZahlavi });
-        if (caraPod)
-        {
-            pPr.Append(new ParagraphBorders(
-                new BottomBorder { Val = BorderValues.Single, Size = 12U, Space = 1U, Color = "auto" }));
-        }
-        pPr.Append(new Justification { Val = zarovnani });
-        pPr.Append(Znacka(format));
-
-        return new Paragraph(pPr, new Run(format.CloneNode(true), new Text(text) { Space = SpaceProcessingModeValues.Preserve }));
-    }
-
     private static string CisloUkolu(VyzvaExportPozadavekViewModel p)
         => string.IsNullOrWhiteSpace(p.CisloUkoluVp)
             ? "Číslo úkolu VP EIS:"
@@ -232,30 +207,9 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
 
     private static void AppendUvod(Body body, VyzvaExportViewModel model)
     {
-        // Hlavička úřadu převzatá ze vzoru: na střed, první řádek proložený o 2 b., pod adresou čára.
-        body.Append(OdstavecZahlavi("Sekce vyzbrojování a akvizic Ministerstva obrany",
-            JustificationValues.Center, tucne: true, velikost: PrvniRadekUradu, prolozeni: 40));
-        body.Append(OdstavecZahlavi("odbor komunikačních a informačních systémů", JustificationValues.Center, tucne: true));
-        body.Append(OdstavecZahlavi("náměstí Svobody 471/4, Praha 6, PSČ 160 01, datová schránka hjyaavk",
-            JustificationValues.Center, velikost: Male, caraPod: true));
-
-        // Č. j. a datum doplní uživatel ve Wordu — vzor je má prázdné (spec B3). Zarážka 5040
-        // a výchozí tabulátory 708 (Nastaveni) staví „V Praze dne“ tam, kde je ve vzoru.
-        // Prázdné řádky vzoru nad a pod nahrazují mezery odstavce.
-        var formatCj = Format();
-        body.Append(new Paragraph(
-            new ParagraphProperties(
-                new Tabs(new TabStop { Val = TabStopValues.Left, Position = 5040 }),
-                new SpacingBetweenLines { Before = PrazdnyRadek.ToString(Inv), After = PrazdnyRadek.ToString(Inv) },
-                new Justification { Val = JustificationValues.Both },
-                Znacka(formatCj)),
-            new Run(
-                formatCj.CloneNode(true),
-                new Text("Čj."), new TabChar(), new TabChar(), new TabChar(), new Text("V Praze dne"))));
-
-        body.Append(Odstavec(
-            $"Výzva k poskytnutí plnění č. {model.KodVyzvy} pro {model.InformacniSystem}",
-            tucne: true, zarovnani: JustificationValues.Both, po: PrazdnyRadek));
+        // Hlavička úřadu, „Čj. … V Praze dne“ (hodnoty doplní uživatel ve Wordu, spec B3)
+        // a nadpis výzvy 1:1 ze vzoru.
+        body.Append(VyzvaWordVzor.HlavickaUradu(model.KodVyzvy, model.InformacniSystem));
 
         // Název zákona opravený proti vzoru („zakázkách" → „zakázek", spec B9).
         body.Append(Odstavec(
@@ -505,7 +459,7 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
     private static SectionProperties Stranka(MainDocumentPart mainPart)
     {
         var zahlavi = mainPart.AddNewPart<HeaderPart>();
-        zahlavi.Header = new Header(OdstavecZahlavi("Příloha č.1 k Čj. MO ", JustificationValues.Right));
+        zahlavi.Header = VyzvaWordVzor.Zahlavi();
         zahlavi.Header.Save();
 
         // Pole PAGE jako ve vzoru: každý běh nese 10 b. a \* MERGEFORMAT zachová formát i po
@@ -515,7 +469,7 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
         var zapati = mainPart.AddNewPart<FooterPart>();
         zapati.Footer = new Footer(new Paragraph(
             new ParagraphProperties(
-                new ParagraphStyleId { Val = StylZapati },
+                new ParagraphStyleId { Val = VyzvaWordVzor.StylZapati },
                 new Justification { Val = JustificationValues.Center },
                 Znacka(format)),
             BehPole(new FieldChar { FieldCharType = FieldCharValues.Begin }),
@@ -533,79 +487,10 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
             {
                 Top = 1417, Right = 1417U, Bottom = 1417, Left = 1417U,
                 Header = 708U, Footer = 708U, Gutter = 0U,
-            });
-    }
-
-    /// <summary>
-    /// Část stylů podle vzoru: výchozí Times New Roman 12 b. česky a jednoduché řádkování, styly
-    /// Záhlaví a Zápatí se zarážkami vzoru a výchozí tabulka s okraji buněk 0,19 cm. Bez ní Word
-    /// dosadí vlastní výchozí hodnoty, které se liší verzí Wordu.
-    /// </summary>
-    private static void Styly(MainDocumentPart mainPart)
-    {
-        static Style Odstavcovy(string id, string nazev, OpenXmlElement? vlastnosti = null)
-        {
-            var styl = new Style(new StyleName { Val = nazev }) { Type = StyleValues.Paragraph, StyleId = id };
-            if (id != StylNormalni) styl.Append(new BasedOn { Val = StylNormalni });
-            if (vlastnosti is not null) styl.Append(vlastnosti);
-            return styl;
-        }
-
-        static StyleParagraphProperties ZarazkyZahlavi() => new(new Tabs(
-            new TabStop { Val = TabStopValues.Center, Position = 4536 },
-            new TabStop { Val = TabStopValues.Right, Position = SirkaTextu }));
-
-        var normalni = Odstavcovy(StylNormalni, "Normal");
-        normalni.Default = true;
-        normalni.Append(new PrimaryStyle());
-
-        var part = mainPart.AddNewPart<StyleDefinitionsPart>();
-        part.Styles = new Styles(
-            new DocDefaults(
-                new RunPropertiesDefault(new RunPropertiesBaseStyle(
-                    new RunFonts { Ascii = Pismo, HighAnsi = Pismo, EastAsia = Pismo, ComplexScript = Pismo },
-                    new FontSize { Val = Telo.ToString(Inv) },
-                    new FontSizeComplexScript { Val = Telo.ToString(Inv) },
-                    new Languages { Val = "cs-CZ", EastAsia = "cs-CZ" })),
-                new ParagraphPropertiesDefault(new ParagraphPropertiesBaseStyle(
-                    new SpacingBetweenLines { After = "0", Line = "240", LineRule = LineSpacingRuleValues.Auto }))),
-            normalni,
-            Odstavcovy(StylZahlavi, "header", ZarazkyZahlavi()),
-            Odstavcovy(StylZapati, "footer", ZarazkyZahlavi()),
-            new Style(
-                new StyleName { Val = "Normal Table" },
-                new UIPriority { Val = 99 },
-                new SemiHidden(),
-                new UnhideWhenUsed(),
-                new StyleTableProperties(
-                    new TableIndentation { Width = 0, Type = TableWidthUnitValues.Dxa },
-                    new TableCellMarginDefault(
-                        new TopMargin { Width = "0", Type = TableWidthUnitValues.Dxa },
-                        new TableCellLeftMargin { Width = 108, Type = TableWidthValues.Dxa },
-                        new BottomMargin { Width = "0", Type = TableWidthUnitValues.Dxa },
-                        new TableCellRightMargin { Width = 108, Type = TableWidthValues.Dxa })))
-            {
-                Type = StyleValues.Table, StyleId = "TableNormal", Default = true,
-            });
-        part.Styles.Save();
-    }
-
-    /// <summary>
-    /// Nastavení jako ve vzoru: výchozí tabulátory po 1,25 cm (řádek „Čj.“) a režim Wordu 2013+,
-    /// aby se dokument neotevíral v režimu kompatibility.
-    /// </summary>
-    private static void Nastaveni(MainDocumentPart mainPart)
-    {
-        var part = mainPart.AddNewPart<DocumentSettingsPart>();
-        part.Settings = new DocumentFormat.OpenXml.Wordprocessing.Settings(
-            new DefaultTabStop { Val = 708 },
-            new Compatibility(new CompatibilitySetting
-            {
-                Name = CompatSettingNameValues.CompatibilityMode,
-                Uri = "http://schemas.microsoft.com/office/word",
-                Val = "15",
-            }));
-        part.Settings.Save();
+            },
+            // Sloupce a mřížka stránky jako ve vzoru.
+            new Columns { Space = "708" },
+            new DocGrid { LinePitch = 360 });
     }
 
     /// <summary>

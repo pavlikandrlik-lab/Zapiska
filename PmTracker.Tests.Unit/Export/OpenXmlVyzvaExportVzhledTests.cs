@@ -64,21 +64,64 @@ public sealed class OpenXmlVyzvaExportVzhledTests
         var styly = doc.MainDocumentPart!.StyleDefinitionsPart!.Styles!;
 
         // Bez vlastních stylů dosazuje Word svoje výchozí: čísla bodů a stránky bezpatkovým
-        // písmem, řádkování 1,15, text v buňce nalepený na čáru.
+        // písmem, řádkování 1,15, text v buňce nalepený na čáru. Hodnoty jsou ze vzoru.
         var pismo = styly.DocDefaults!.RunPropertiesDefault!.RunPropertiesBaseStyle!;
         pismo.RunFonts!.Ascii!.Value.Should().Be("Times New Roman");
-        pismo.FontSize!.Val!.Value.Should().Be("24");
         pismo.Languages!.Val!.Value.Should().Be("cs-CZ", "kontrola pravopisu česky");
+        styly.DocDefaults.ParagraphPropertiesDefault!.ParagraphPropertiesBaseStyle?.SpacingBetweenLines
+            .Should().BeNull("bez mezer a s jednoduchým řádkováním jako ve vzoru");
 
-        var odstavec = styly.DocDefaults.ParagraphPropertiesDefault!.ParagraphPropertiesBaseStyle!.SpacingBetweenLines!;
-        odstavec.Line!.Value.Should().Be("240", "jednoduché řádkování jako ve vzoru");
-        odstavec.LineRule!.Value.Should().Be(LineSpacingRuleValues.Auto);
-        odstavec.After!.Value.Should().Be("0");
+        var normalni = styly.Elements<Style>().Single(s => s.Type! == StyleValues.Paragraph && s.Default?.Value == true);
+        normalni.StyleRunProperties!.FontSize!.Val!.Value.Should().Be("24", "styl Normální vzoru má 12 b.");
 
         var tabulka = styly.Elements<Style>().Single(s => s.Type! == StyleValues.Table && s.Default?.Value == true);
         var okraje = tabulka.StyleTableProperties!.TableCellMarginDefault!;
         okraje.TableCellLeftMargin!.Width!.Value.Should().Be(108);
         okraje.TableCellRightMargin!.Width!.Value.Should().Be(108);
+    }
+
+    /// <summary>
+    /// Hlavička převzatá 1:1 z XML vzoru (2026-10-07): styl Záhlaví s úrovní osnovy, prázdné
+    /// řádky kolem „Čj.“, nadpis výzvy stylem Nadpis 2 a záhlaví stránky stylem Záhlaví.
+    /// </summary>
+    [Fact]
+    public void Hlavicka_JeStrukturouStejnaJakoVzor()
+    {
+        using var doc = VyzvaExportTestModel.Otevrit(VyzvaExportTestModel.VsechnyTvary());
+        var main = doc.MainDocumentPart!;
+        var hlavicka = Odstavce(main.Document.Body!).Take(8).ToList();
+
+        static string? Styl(Paragraph p) => p.ParagraphProperties?.ParagraphStyleId?.Val?.Value;
+        static int? Osnova(Paragraph p) => p.ParagraphProperties?.OutlineLevel?.Val?.Value;
+
+        hlavicka.Take(3).Select(Styl).Should().OnlyContain(s => s == "Zhlav", "hlavička úřadu má ve vzoru styl Záhlaví");
+        hlavicka.Take(3).Select(Osnova).Should().Equal(0, 0, null);
+
+        hlavicka.Select(p => p.InnerText).Should().Equal(
+            "Sekce vyzbrojování a akvizic Ministerstva obrany",
+            "odbor komunikačních a informačních systémů",
+            "náměstí Svobody 471/4, Praha 6, PSČ 160 01, datová schránka hjyaavk",
+            "",
+            "Čj.V Praze dne",
+            "",
+            "Výzva k poskytnutí plnění č. 8/2026 pro FIS",
+            "");
+        hlavicka.Skip(3).Take(3).Should().OnlyContain(
+            p => p.ParagraphProperties!.Tabs!.Elements<TabStop>().Single().Position! == 5040,
+            "prázdné řádky kolem „Čj.“ nesou ve vzoru stejnou zarážku");
+        Styl(hlavicka[6]).Should().Be("Nadpis2", "nadpis výzvy má ve vzoru styl Nadpis 2");
+
+        var styly = main.StyleDefinitionsPart!.Styles!.Elements<Style>().ToDictionary(s => s.StyleId!.Value!);
+        styly["Zhlav"].StyleParagraphProperties!.Tabs!.Elements<TabStop>().Select(t => t.Position!.Value)
+            .Should().Equal(4536, 9072);
+        styly["Nadpis2"].StyleParagraphProperties!.OutlineLevel!.Val!.Value.Should().Be(1);
+
+        var zahlavi = main.HeaderParts.Single().Header.Elements<Paragraph>().Single();
+        Styl(zahlavi).Should().Be("Zhlav");
+        zahlavi.ParagraphProperties!.Justification!.Val!.Value.Should().Be(JustificationValues.Right);
+
+        main.Document.Body!.Elements<SectionProperties>().Single().GetFirstChild<DocGrid>()!.LinePitch!.Value
+            .Should().Be(360, "mřížka stránky vzoru");
     }
 
     [Fact]
