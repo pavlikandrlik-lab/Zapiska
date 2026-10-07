@@ -375,35 +375,21 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 /* Aktivní položka hlavní navigace — odchylka č. 4 (docs/known-issues/ds-fis-odchylky.md):
-   vanilla gov-navigation aktuální stránku vizuálně neoznačuje. Jen tokeny DS. */
-.app-main-nav a[aria-current="page"] {
-    background-color: var(--button-outlined-primary-hover);
-    box-shadow: inset 0 -3px 0 var(--color-primary-600);
-}
-
-/* Tmavý motiv (odchylka č. 4): --color-primary-600 má proti pozadí navigace
-   (--color-neutral-950) i proti tmavé výplni (--color-primary-950) jen ~1,7:1 —
-   pod WCAG 1.4.11 (3:1). Světlejší token DS dává ~5,2:1 proti oběma. */
-:root[data-theme="dark"] .app-main-nav a[aria-current="page"] {
-    box-shadow: inset 0 -3px 0 var(--color-primary-400);
+   vanilla gov-navigation aktuální stránku vizuálně neoznačuje. Podbarvení tokenem stisknutého
+   tlačítka DS, o stupeň sytější než hover (--button-outlined-primary-hover), aby šla vybraná
+   položka odlišit od položky pod myší. Bez podtržení (uživatel 2026-10-07). :hover drží barvu —
+   hover DS (.gov-navigation>ul>li>a:hover) má vyšší specifičnost a vybranou položku by zesvětlil. */
+.app-main-nav a[aria-current="page"],
+.app-main-nav a[aria-current="page"]:hover {
+    background-color: var(--button-outlined-primary-active);
 }
 
 /* Odchylka č. 6: nižší hlavní navigace (25 px místo 48 px). Výšku položek dává token
    --height-component-l, který sdílí všechny komponenty velikosti L — proto se přepisuje
-   jen uvnitř navigace a jen na desktopu; v mobilním menu zůstávají dotykové cíle 48 px.
-   Řádek textu (27 px) je pak vyšší než položka a vnitřní podtržení by přeškrtlo písmena
-   s dolní dotahovou (j, y) — podtržení aktivní položky proto jde těsně pod ni. */
+   jen uvnitř navigace a jen na desktopu; v mobilním menu zůstávají dotykové cíle 48 px. */
 @media (min-width: 48em) {
     .app-main-nav {
         --height-component-l: 25px;
-    }
-
-    .app-main-nav a[aria-current="page"] {
-        box-shadow: 0 3px 0 var(--color-primary-600);
-    }
-
-    :root[data-theme="dark"] .app-main-nav a[aria-current="page"] {
-        box-shadow: 0 3px 0 var(--color-primary-400);
     }
 }
 

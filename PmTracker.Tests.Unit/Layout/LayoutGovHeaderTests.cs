@@ -88,13 +88,18 @@ public sealed class LayoutGovHeaderTests
     }
 
     [Fact]
-    public void AktivniPolozkaNavigace_MaVTmavemMotivuKontrastniPodtrzeni()
+    public void AktivniPolozkaNavigace_JePodbarvenaBezPodtrzeni()
     {
-        // Odchylka č. 4: v tmavém motivu má --color-primary-600 proti pozadí navigace
-        // (--color-neutral-950) jen ~1,7:1 → podtržení aktivní položky musí přepnout na
-        // světlejší token (WCAG 1.4.11 ≥ 3:1).
-        var block = Block(SiteCssBezKomentaru(), ":root[data-theme=\"dark\"] .app-main-nav a[aria-current=\"page\"]");
-        block.Should().Contain("box-shadow: inset 0 -3px 0 var(--color-primary-400)");
+        // Odchylka č. 4 (uživatel 2026-10-07): bez podtržení, jen podbarvení tokenem stisknutého
+        // tlačítka — o stupeň sytější než hover, aby šla odlišit od položky pod myší. Selektor
+        // na začátku řádku = mimo @media, platí tedy i v rozbaleném mobilním menu. :hover drží
+        // barvu, jinak by ji přebil hover DS (.gov-navigation>ul>li>a:hover má vyšší specifičnost).
+        var css = SiteCssBezKomentaru();
+        var block = Block(css,
+            ".app-main-nav a[aria-current=\"page\"],\n.app-main-nav a[aria-current=\"page\"]:hover");
+        block.Should().Contain("background-color: var(--button-outlined-primary-active)");
+        css.Should().NotMatchRegex(@"aria-current=""page""\][^{]*\{[^}]*box-shadow",
+            "podtržení vybrané položky je zrušené");
     }
 
     [Fact]

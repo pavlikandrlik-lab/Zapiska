@@ -87,10 +87,12 @@ v `gov-icon` více kořenů ikon.
 **Proč se odchylujeme:** aplikace má šest sekcí a uživatelé byli zvyklí vidět, kde jsou.
 
 **Jak je odchylka provedena:** `_Layout.cshtml` dává aktivnímu odkazu `aria-current="page"`
-(přístupnost, v souladu s DS). Vizuál řeší `.app-main-nav a[aria-current="page"]`
-v `site.css` (třída `app-main-nav` na `<nav class="gov-navigation">`), jen tokeny DS.
-V tmavém motivu má podtržení `--color-primary-400` místo `--color-primary-600`: tmavý
-token má proti pozadí navigace jen ~1,7:1, světlejší ~5,2:1 (WCAG 1.4.11 žádá 3:1).
+(přístupnost, v souladu s DS), a to i Přehledu. Vizuál řeší `.app-main-nav a[aria-current="page"]`
+v `site.css` (třída `app-main-nav` na `<nav class="gov-navigation">`), jen tokeny DS: podbarvení
+`--button-outlined-primary-active` (stisknuté tlačítko; světlý motiv `--color-primary-200`,
+tmavý `--color-primary-900`), o stupeň sytější než hover, aby šla vybraná položka odlišit od
+položky pod myší. Stejná barva platí i pro `:hover` vybrané položky. Podtržení bylo do
+2026-10-07; uživatel ho nechce (zaoblené konce podle rohů odkazu), zvýraznění podbarvením ano.
 
 **Podklad pro centrální úpravu DS:** doplnit do `templates.css` styl
 `.gov-navigation a[aria-current="page"]`. Patří do DS gov.
@@ -118,10 +120,6 @@ zabírá zbytečně moc místa, 25 px se mu líbí víc.
 **Jak je odchylka provedena:** token `--height-component-l` sdílí všechny komponenty
 velikosti L, proto se nemění globálně. `site.css` ho přepisuje jen na `.app-main-nav`
 a jen od 48em. V rozbaleném mobilním menu zůstávají dotykové cíle 48 px.
-
-Řádek textu položky (27 px) je pak vyšší než položka. Podtržení aktivní položky
-(odchylka č. 4) by přeškrtlo písmena s dolní dotahovou, proto je na desktopu těsně
-pod položkou (`box-shadow: 0 3px 0`), ne uvnitř.
 
 ## 7. Obsah hlavičky přes celou šířku obrazovky (2026-10-06)
 
