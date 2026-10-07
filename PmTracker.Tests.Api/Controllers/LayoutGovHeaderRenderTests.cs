@@ -67,11 +67,16 @@ public sealed class LayoutGovHeaderRenderTests
         nav.Should().Contain("<a href=\"/Projekty\" aria-current=\"page\">");
     }
 
-    [Fact]
-    public async Task Dashboard_NezvyraznujeZadnouPolozku()
+    [Theory]
+    [InlineData("/")]
+    [InlineData("/Dashboard/Focus")]
+    public async Task Prehled_JeZvyraznenyNaHlavniStranceIPodstrankach(string path)
     {
-        var nav = NavSegment(await GetAsync("/", _fixture.AdminOsobaId));
-        nav.Should().NotContain("aria-current");
+        var nav = NavSegment(await GetAsync(path, _fixture.AdminOsobaId));
+
+        Regex.Matches(nav, "aria-current=\"page\"").Should().HaveCount(1);
+        nav.Should().Contain("<a href=\"/dashboard\" aria-current=\"page\">",
+            "Přehled se zvýrazňuje jako ostatní sekce (uživatel 2026-10-07)");
     }
 
     [Fact]

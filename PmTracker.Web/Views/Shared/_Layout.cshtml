@@ -75,10 +75,9 @@
 <body class="app-body">
     @{
         var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).ToLowerInvariant();
-        var suppressActiveNavigation = string.Equals(currentController, "dashboard", System.StringComparison.OrdinalIgnoreCase);
-        // aria-current="page" pro položku aktuální sekce; null = Razor atribut nevypíše.
-        // Na dashboardu se nezvýrazňuje nic (stejně jako dřív NavClass).
-        string? NavCurrent(string controller) => !suppressActiveNavigation && currentController == controller ? "page" : null;
+        // aria-current="page" pro položku aktuální sekce, i pro Přehled (uživatel 2026-10-07);
+        // null = Razor atribut nevypíše.
+        string? NavCurrent(string controller) => currentController == controller ? "page" : null;
         var nav = ViewData["NavPermissions"] as NavPermissionsViewModel;
         var roleList = nav?.CurrentUserRoles is { Count: > 0 } roles
             ? string.Join(", ", roles)
