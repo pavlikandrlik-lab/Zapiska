@@ -210,10 +210,10 @@ public sealed class VyzvyTiskTests
     }
 
     /// <summary>
-    /// Text požadavku se do náhledu dostane jako formátovaný rich text a skript se do něj
-    /// nedostane (spec 2026-09-08 §5.7). Obsah PDF se ověřuje přes HTML, které dostal
-    /// generátor — samotná odpověď je falešný PDF payload. Kotví se na ASCII, protože
-    /// Razor kóduje diakritiku na číselné entity.
+    /// Text požadavku se do PDF dostane formátovaný a skript z editoru ne (spec 2026-09-08 §5.7).
+    /// Obsah PDF se ověřuje přes HTML, které dostal generátor — samotná odpověď je falešný PDF
+    /// payload. PDF je převod Wordu (2026-10-07), takže HTML nese vlastní skript sazby; ověřuje se
+    /// proto, že jiný skript v něm není (text odstraněného prvku zůstává jako neškodný text).
     /// </summary>
     [Fact]
     public async Task VyzvaTisk_NahledVysaziTextPozadavku_BezSkriptu()
@@ -234,19 +234,21 @@ public sealed class VyzvyTiskTests
 
         var html = RenderedPrintHtml();
 
-        html.Should().Contain("vyzva-pozadavek", "text se sází do vlastního bloku s TNR 12");
         html.Should().Contain("<strong>sestavu</strong>",
-            "formátování z editoru se v náhledu zachová, nesmí se zakódovat");
-        html.Should().NotContain("<script", "sanitizace běží i při stavbě dokumentu");
+            "formátování z editoru se v PDF zachová, nesmí se zakódovat");
+        System.Text.RegularExpressions.Regex.Matches(html, "<script").Count.Should().Be(1,
+            "sanitizace běží i při stavbě dokumentu — jediný skript je sazba převodu, ne vstup pracovníka");
+        html.Should().NotContain("<script>alert");
     }
 
     /// <summary>
-    /// Náhled má strukturu finálního vzoru, stejnou jako Word (spec 2026-09-10 část B).
-    /// Kotví se na data-* atributy — text je v HTML zakódovaný. ServiceDesk je v testech
-    /// vypnutý, takže PNF nemá akceptovanou kalkulaci a v sekci 2 nesmí být tabulka.
+    /// PDF je převod Wordu výzvy (uživatel 2026-10-07: „dej do stejného formátu i PDF“): stejné
+    /// části jako Word, záhlaví a číslo stránky na každé stránce, rozměr stránky z Wordu.
+    /// ServiceDesk je v testech vypnutý, takže PNF nemá akceptovanou kalkulaci a v sekci 2
+    /// nesmí být tabulka.
     /// </summary>
     [Fact]
-    public async Task VyzvaTisk_NahledMaStrukturuVzoru()
+    public async Task VyzvaTisk_PdfJePrevodWordu()
     {
         var (projectId, vyzvaId) = await SeedAsync();
 
@@ -255,18 +257,52 @@ public sealed class VyzvyTiskTests
             $"/Export/Vyzva/{vyzvaId}/Tisk?projektId={projectId}&asUser={_fixture.AdminOsobaId}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var html = RenderedPrintHtml();
+        var pozadavek = _fixture.Factory.Services.GetRequiredService<FakePdfRenderer>().LastRequest!;
+        var html = pozadavek.Html;
 
-        foreach (var sekce in Enumerable.Range(1, 7))
+        foreach (var sekce in new[]
+                 {
+                     "Popis předmětu dílčí VZ", "Počet člověkohodin", "Celková cena za člověkohodiny",
+                     "Identifikační údaje nabyvatele", "Termín a místo plnění", "Lhůta pro písemné potvrzení Výzvy",
+                     "Datum a místo potvrzení výzvy dodavatelem",
+                 })
         {
-            html.Should().Contain($"data-vyzva-sekce=\"{sekce}\"");
+            html.Should().Contain(sekce);
         }
-        html.Should().Contain("data-vyzva-poradi=\"I.\"", "pořadí požadavků římsky");
-        html.Should().Contain("data-vyzva-strucne-popisy", "stručné popisy patří do sekce 1");
-        html.Should().Contain("data-vyzva-tabulka=\"rekapitulace-cinnosti\"");
-        html.Should().Contain("data-vyzva-tabulka=\"rekapitulace-licence\"");
-        html.Should().NotContain("data-vyzva-tabulka=\"cinnosti\"", "bez akceptované kalkulace žádná tabulka");
+
+        html.Should().Contain(">I.</span>", "pořadí požadavků římsky jako číslování Wordu");
+        html.Should().Contain("Stručné popisy požadavků:");
+        html.Should().NotContain("Jednotková sazba", "bez akceptované kalkulace žádná tabulka činností");
         html.Should().NotContain("XXXX", "prázdná pole zůstávají prázdná, ne zástupná");
         html.Should().NotContain("Vazba na PMP");
+
+        pozadavek.HeaderTemplate.Should().Contain("Příloha č.1 k Čj. MO", "záhlaví Wordu na každé stránce");
+        pozadavek.FooterTemplate.Should().Contain("pageNumber", "číslo stránky ze zápatí Wordu");
+        pozadavek.PreferCssPageSize.Should().BeTrue("rozměr stránky z Wordu, ne zaokrouhlené A4 prohlížeče");
+        pozadavek.StylesheetPath.Should().BeNull("převod si nese styly sám");
+    }
+
+    /// <summary>Když PDF nevznikne, vrátí se týž převod Wordu jako HTML k tisku z prohlížeče.</summary>
+    [Fact]
+    public async Task VyzvaTisk_KdyzPdfSelze_VratiHtmlPrevodWordu()
+    {
+        var (projectId, vyzvaId) = await SeedAsync();
+        var renderer = _fixture.Factory.Services.GetRequiredService<FakePdfRenderer>();
+        renderer.ShouldFail = true;
+        try
+        {
+            using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+            var response = await client.GetAsync(
+                $"/Export/Vyzva/{vyzvaId}/Tisk?projektId={projectId}&asUser={_fixture.AdminOsobaId}");
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            response.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
+            response.Content.Headers.ContentType.CharSet.Should().Be("utf-8");
+            (await response.Content.ReadAsStringAsync()).Should().Contain("Identifikační údaje nabyvatele");
+        }
+        finally
+        {
+            renderer.ShouldFail = false;
+        }
     }
 }

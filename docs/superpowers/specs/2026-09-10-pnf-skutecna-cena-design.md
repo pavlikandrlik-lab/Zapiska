@@ -323,6 +323,22 @@ Záměrné odchylky od vzoru:
 - text požadavku má jednotné pravidlo podle prvního požadavku vzoru: mezi odstavci prázdný
   řádek, před seznamem a uvnitř seznamu žádný.
 
+### PDF ve stejném formátu (2026-10-07)
+
+Uživatel: „dej do stejného formátu i PDF.“ PDF (náhled výzvy) nemá vlastní šablonu. Je to převod
+vygenerovaného Wordu do HTML (`WordNaHtml`), které vysází prohlížeč na serveru. Obsah, pořadí,
+prázdné řádky i formát mají jediný zdroj — Word, a tím vzor. Záhlaví a číslo stránky ze zápatí
+Wordu jsou na každé stránce. Pravidla sazby Wordu, která převod napodobuje, jsou změřená na
+výzvě z dat vzoru vykreslené Wordem (popis ve `WordNaHtml`). Ověřeno stránku po stránce: 17 stran
+jako Word, každá končí stejným řádkem.
+
+Odchylka, kterou prohlížeč nenapodobí: v odstavci do bloku Word smrští mezery až o čtvrtinu, aby
+se vešlo další slovo, ale když by bez něj stačilo řádek roztáhnout jen málo, raději roztahuje.
+Prohlížeč slovo vždy přidá. Ve výzvě z dat vzoru se tím liší dvě místa zalomení v jedné položce
+seznamu (jednopísmenné „v“ a „a“ zůstanou na konci řádku místo na začátku dalšího); počet řádků
+ani zlom stránky se nemění. Poslední řádek odstavce do bloku má v PDF mezery o čtvrtinu užší než
+ve Wordu.
+
 ## B10. Dopad na kód
 
 - `VyzvaExportBuilder`: římské pořadí, prefix „RU", příznaky činností a licence, položky licence

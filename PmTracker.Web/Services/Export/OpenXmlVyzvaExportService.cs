@@ -18,8 +18,8 @@ public interface IVyzvaWordExportService
 /// nese <see cref="VyzvaWordVzor"/> — styly, číslování, hlavička, tabulky, pevný text i prázdné
 /// řádky převzaté z XML vzoru; tady se jen skládá pořadí a doplňují data. Od vzoru se záměrně liší
 /// opravy z spec 2026-09-10 B9 a o řádek větší mezera před bodem 1 (uživatel 2026-10-06).
-/// Čte tutéž projekci jako náhled <c>Views/Export/VyzvaTemplate.cshtml</c> — pořadí a obsah částí
-/// musí zůstat shodné. Údaje, které aplikace nemá (č. j., datum, termín), zůstávají prázdné.
+/// PDF výzvy je převod tohoto dokumentu (<see cref="WordNaHtml"/>), nemá vlastní šablonu. Údaje,
+/// které aplikace nemá (č. j., datum, termín), zůstávají prázdné.
 /// </summary>
 public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
 {

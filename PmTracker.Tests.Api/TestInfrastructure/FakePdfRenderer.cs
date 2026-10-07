@@ -14,12 +14,14 @@ public sealed class FakePdfRenderer : IPdfRenderer
 
     public string? LastHtml { get; private set; }
     public string? LastStylesheetPath { get; private set; }
+    public PdfRenderRequest? LastRequest { get; private set; }
     public bool ShouldFail { get; set; }
 
     public Task<PdfRenderResult> RenderAsync(PdfRenderRequest request, CancellationToken ct)
     {
         LastHtml = request.Html;
         LastStylesheetPath = request.StylesheetPath;
+        LastRequest = request;
 
         return Task.FromResult(ShouldFail
             ? PdfRenderResult.Failure("test: generátor záměrně selhal")

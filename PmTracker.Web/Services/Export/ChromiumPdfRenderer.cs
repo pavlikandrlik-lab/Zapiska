@@ -97,10 +97,11 @@ public sealed class ChromiumPdfRenderer : IPdfRenderer, IDisposable
         return await page.PdfDataAsync(new PdfOptions
         {
             Format = PaperFormat.A4,
+            PreferCSSPageSize = request.PreferCssPageSize,
             PrintBackground = true,
             DisplayHeaderFooter = true,
-            HeaderTemplate = PdfFooterTemplate.EmptyHeaderHtml,
-            FooterTemplate = PdfFooterTemplate.Html,
+            HeaderTemplate = request.HeaderTemplate ?? PdfFooterTemplate.EmptyHeaderHtml,
+            FooterTemplate = request.FooterTemplate ?? PdfFooterTemplate.Html,
             // Změřeno 2026-09-04: když šablona deklaruje @page margin (a pdf-export.css
             // deklaruje 5 mm), Chromium ji respektuje a tyhle hodnoty ignoruje — okraje
             // se NEsčítají. Zůstávají tu jako záloha pro případ šablony bez @page.
