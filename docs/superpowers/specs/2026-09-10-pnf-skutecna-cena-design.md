@@ -303,6 +303,26 @@ Cena v Kč s DPH.
 | „Vazba na PMP č. …" u jednoho požadavku | vždy „Bližší podrobnosti jsou uvedeny v PNF …" |
 | čísla bez oddělovače tisíců | `N2` |
 
+## B9a. Vzhled 1:1 ze vzoru (upřesnění 2026-10-07)
+
+Uživatel: „co je ve vzoru vidět, musí být ve vygenerovaném Wordu stejné.“ Formát se proto nepíše
+ručně podle bodů B1–B8, ale přebírá z XML vzoru (`VyzvaWordVzor`, `VyzvaWordVzor.Tabulky.cs`):
+styly, motiv, nastavení, číslování, hlavička, záhlaví, zápatí, tabulky, pevný text sekcí 4–7
+i prázdné řádky. Kde se B1–B8 se vzorem rozcházely, platí vzor. Například „Číslo úkolu VP EIS“
+v sekci 2 je kurzívou 12 b., tabulky v sekci 2 mají šedou hlavičku a písmo Calibri a podpisy
+nejsou tabulka.
+
+Záměrné odchylky od vzoru:
+
+- opravy z B9;
+- prázdné údaje (č. j., datum, termín, POL/PPOL);
+- o řádek větší mezera před bodem 1 (uživatel 2026-10-06);
+- prázdný řádek před „Licenční rozšíření“ pod tabulkou činností (vzor tento případ nemá);
+- ruční zalomení stránek vzoru se nepřebírají. Sekce 2–4 začínají na nové stránce vlastností
+  nadpisu a před nimi není prázdný řádek, aby nevznikla prázdná stránka;
+- text požadavku má jednotné pravidlo podle prvního požadavku vzoru: mezi odstavci prázdný
+  řádek, před seznamem a uvnitř seznamu žádný.
+
 ## B10. Dopad na kód
 
 - `VyzvaExportBuilder`: římské pořadí, prefix „RU", příznaky činností a licence, položky licence
