@@ -9,79 +9,14 @@ namespace PmTracker.Tests.Unit.Export;
 
 /// <summary>
 /// Word výzvy podle finálního vzoru (spec 2026-09-10 část B). Kotví se na strukturu dokumentu —
-/// pořadí, tabulky, buňky, číslování — ne na vzhled.
-/// Čtyři požadavky pokrývají všechny tvary kalkulace: I. jen činnosti, II. jen licence,
-/// III. obojí, IV. bez akceptované kalkulace.
+/// pořadí, tabulky, buňky, číslování — ne na vzhled (ten hlídá <see cref="OpenXmlVyzvaExportVzhledTests"/>).
+/// Model se všemi tvary kalkulace staví <see cref="VyzvaExportTestModel"/>.
 /// </summary>
 public sealed class OpenXmlVyzvaExportStrukturaTests
 {
-    private static VyzvaExportKalkulaceRadekViewModel Radek(string kod, string nazev, decimal? cena) => new()
-    {
-        Kod = kod, Nazev = nazev,
-        Rozsah = cena.HasValue ? 1m : null, Sazba = cena,
-        CenaBezDph = cena, CenaDph = cena * 0.21m, CenaSDph = cena * 1.21m,
-    };
+    private static VyzvaExportViewModel VsechnyTvary(string? html = null) => VyzvaExportTestModel.VsechnyTvary(html);
 
-    private static VyzvaExportKalkulaceRadekViewModel[] Radky(decimal? cena) => new[]
-    {
-        Radek("A", "Analýza", cena), Radek("B", "Programové úpravy", cena),
-        Radek("C", "Testování", cena), Radek("D", "Implementace", cena),
-    };
-
-    private static VyzvaExportLicenceRadekViewModel[] Licence() => new[]
-    {
-        new VyzvaExportLicenceRadekViewModel
-        {
-            Kod = 1, Nazev = "XRG – RSS Rozhraní", CenaBezDph = 94470m, CenaDph = 19838.70m, CenaSDph = 114308.70m,
-        },
-    };
-
-    private static VyzvaExportPozadavekViewModel Pozadavek(
-        string poradi, string htl, bool cinnosti, bool licence, string? html = null) => new()
-    {
-        PoradoveOznaceni = poradi,
-        ZaznamId = 1,
-        CisloUkoluVp = "RU867-5",
-        Nazev = $"Pozadavek {htl}",
-        CisloHtl = htl,
-        PozadavekHtml = html,
-        Kalkulace = new VyzvaExportKalkulaceViewModel
-        {
-            Radky = Radky(cinnosti ? 100m : null),
-            CelkemBezDph = cinnosti ? 400m : 0m,
-            CelkemDph = cinnosti ? 84m : 0m,
-            CelkemSDph = cinnosti ? 484m : 0m,
-            MaCinnosti = cinnosti,
-            MaLicenci = licence,
-            LicenceRadky = licence ? Licence() : Array.Empty<VyzvaExportLicenceRadekViewModel>(),
-            CenaLicence = licence ? 94470m : null,
-        },
-    };
-
-    private static VyzvaExportViewModel Model(params VyzvaExportPozadavekViewModel[] pozadavky) => new()
-    {
-        VyzvaId = 10,
-        ProjektId = 1,
-        KodVyzvy = "8/2026",
-        PoradoveVRoce = 8,
-        Rok = 2026,
-        CisloRamcoveSmlouvy = "23106000271",
-        MistoPlneni = "FIS (EIS): VZ 8201, Tychonova 1, 160 01 Praha 6",
-        InformacniSystem = "FIS",
-        Pozadavky = pozadavky,
-        CelkemBezDph = pozadavky.Sum(p => p.Kalkulace.CelkemBezDph),
-        LicenceBezDph = pozadavky.Sum(p => p.Kalkulace.CenaLicence ?? 0m),
-    };
-
-    private static VyzvaExportViewModel VsechnyTvary(string? html = null) => Model(
-        Pozadavek("I.", "358333", cinnosti: true, licence: false, html),
-        Pozadavek("II.", "358310", cinnosti: false, licence: true),
-        Pozadavek("III.", "361652", cinnosti: true, licence: true),
-        Pozadavek("IV.", "364451", cinnosti: false, licence: false));
-
-    private static WordprocessingDocument Otevrit(VyzvaExportViewModel model)
-        => WordprocessingDocument.Open(
-            new MemoryStream(new OpenXmlVyzvaExportService().BuildDocument(model), writable: false), false);
+    private static WordprocessingDocument Otevrit(VyzvaExportViewModel model) => VyzvaExportTestModel.Otevrit(model);
 
     private static string Druh(Table t)
     {
@@ -106,8 +41,8 @@ public sealed class OpenXmlVyzvaExportStrukturaTests
 
         main.HeaderParts.Should().ContainSingle().Which.Header.InnerText.Should().Contain("Příloha č.1 k Čj. MO");
         body.Elements<Paragraph>().First().InnerText.Should().NotContain("Příloha", "záhlaví patří do záhlaví stránky");
-        main.FooterParts.Should().ContainSingle().Which.Footer.Descendants<SimpleField>()
-            .Should().Contain(f => f.Instruction!.Value!.Contains("PAGE"), "zápatí nese číslo stránky");
+        main.FooterParts.Should().ContainSingle().Which.Footer.Descendants<FieldCode>()
+            .Should().Contain(f => f.Text.Contains("PAGE"), "zápatí nese číslo stránky");
     }
 
     [Fact]
@@ -249,7 +184,7 @@ public sealed class OpenXmlVyzvaExportStrukturaTests
     }
 
     [Fact]
-    public void Zaver_TerminPrazdny_PodpisySeJmeny_TriZalomeniStranky()
+    public void Zaver_TerminPrazdny_PodpisySeJmeny()
     {
         using var doc = Otevrit(VsechnyTvary());
         var body = doc.MainDocumentPart!.Document.Body!;
@@ -258,8 +193,6 @@ public sealed class OpenXmlVyzvaExportStrukturaTests
             .InnerText.Trim().Should().Be("Termín pro splnění dílčí veřejné zakázky do:", "komentář autora: nechat volné");
         body.InnerText.Should().Contain("Ing. Petr ZÁBOREC").And.Contain("Ing. Břetislav MOC")
             .And.Contain("předseda správní rady");
-        body.Descendants<Break>().Count(b => b.Type is not null && b.Type.Value == BreakValues.Page)
-            .Should().Be(3, "zalomení před sekcemi 2, 3 a 4");
     }
 
     /// <summary>Dokument musí projít validací schématu Office — Word toleruje víc, než by měl.</summary>

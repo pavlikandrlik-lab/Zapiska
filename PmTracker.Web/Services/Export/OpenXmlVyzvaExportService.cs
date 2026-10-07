@@ -15,7 +15,10 @@ public interface IVyzvaWordExportService
 /// <summary>
 /// Staví .docx výzvy přesně podle finálního vzoru (spec 2026-09-10 část B): A4, Times New
 /// Roman 12 v těle a 10 v tabulkách, záhlaví s přílohou, zápatí s číslem stránky, skutečné
-/// seznamy Wordu. Čte tutéž projekci jako náhled <c>Views/Export/VyzvaTemplate.cshtml</c> —
+/// seznamy Wordu. Hlavičku, záhlaví stránky, styly a nastavení přebírá 1:1 z XML vzoru
+/// (<see cref="VyzvaWordVzor"/>) — bez vlastních stylů by si Word dosadil výchozí formát po svém
+/// (bezpatková čísla bodů, řádkování 1,15).
+/// Čte tutéž projekci jako náhled <c>Views/Export/VyzvaTemplate.cshtml</c> —
 /// pořadí a obsah částí musí zůstat shodné. Údaje, které aplikace nemá (č. j., datum, termín),
 /// zůstávají prázdné k doplnění ve Wordu.
 /// </summary>
@@ -26,9 +29,9 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
 
     private const int Telo = 24;            // 12 b. — styl Normal vzoru
     private const int Male = 20;            // 10 b. — tabulky a štítky v sekci 2
-    private const int PrvniRadekUradu = 32; // 16 b.
     private const int Podpisy = 18;         // 9 b.
     private const int SirkaTextu = 9072;    // A4 11906 − 2 × okraj 1417 (twipy)
+    private const int PrazdnyRadek = 276;   // výška prázdného řádku Times New Roman 12 b. (twipy)
 
     private const int NumSekce = 1;
     private const int NumPozadavkySekce1 = 2;
@@ -64,13 +67,18 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
                 ?? throw new InvalidOperationException("Word body nebyl inicializován.");
             var cislovani = new Cislovani();
 
+            var styly = mainPart.AddNewPart<StyleDefinitionsPart>();
+            styly.Styles = VyzvaWordVzor.Styly();
+            styly.Styles.Save();
+            var nastaveni = mainPart.AddNewPart<DocumentSettingsPart>();
+            nastaveni.Settings = VyzvaWordVzor.Nastaveni();
+            nastaveni.Settings.Save();
+
+            // Sekce 2, 3 a 4 začínají na nové stránce vlastností nadpisu (Nadpis novaStrana).
             AppendUvod(body, model);
             AppendPredmet(body, model, cislovani);
-            ZalomitStranku(body);
             AppendClovekohodiny(body, model);
-            ZalomitStranku(body);
             AppendCelkovaCena(body, model);
-            ZalomitStranku(body);
             AppendZavery(body, model);
 
             cislovani.Zapsat(mainPart);
@@ -90,17 +98,30 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
 
     private static string DphProcenta => (VyzvaExportViewModel.DphSazba * 100m).ToString("0.##", Cs);
 
-    private static Run Beh(string text, bool tucne = false, int velikost = Telo)
-        => new(
-            OpenXmlWordElements.CreateRunProperties(velikost, tucne, italic: false, strike: false, underline: false),
-            new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+    private static RunProperties Format(bool tucne = false, int velikost = Telo)
+        => OpenXmlWordElements.CreateRunProperties(velikost, tucne, italic: false, strike: false, underline: false);
 
-    /// <summary>Vlastnosti odstavce v pořadí, které vyžaduje schéma (keepNext, numPr, spacing, jc).</summary>
+    private static Run Beh(string text, bool tucne = false, int velikost = Telo)
+        => new(Format(tucne, velikost), new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+
+    /// <summary>
+    /// Formát konce odstavce. Podle něj Word kreslí číslo bodu seznamu a výšku prázdného řádku —
+    /// ve vzoru je u nadpisů tučný, proto jsou tučná i čísla 1.–7. a římská čísla požadavků.
+    /// </summary>
+    private static ParagraphMarkRunProperties Znacka(RunProperties format)
+        => new(format.ChildElements.Select(e => e.CloneNode(true)));
+
+    /// <summary>
+    /// Vlastnosti odstavce v pořadí, které vyžaduje schéma
+    /// (keepNext, pageBreakBefore, numPr, spacing, jc, rPr).
+    /// </summary>
     private static ParagraphProperties Vlastnosti(
-        int po = 120, int pred = 0, JustificationValues? zarovnani = null, int? numId = null, bool drzetSDalsim = false)
+        int po = 120, int pred = 0, JustificationValues? zarovnani = null, int? numId = null,
+        bool drzetSDalsim = false, bool novaStrana = false, RunProperties? znacka = null)
     {
         var pPr = new ParagraphProperties();
         if (drzetSDalsim) pPr.Append(new KeepNext());
+        if (novaStrana) pPr.Append(new PageBreakBefore());
         if (numId.HasValue)
         {
             pPr.Append(new NumberingProperties(
@@ -109,24 +130,31 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
         }
         pPr.Append(new SpacingBetweenLines { Before = pred.ToString(Inv), After = po.ToString(Inv) });
         if (zarovnani.HasValue) pPr.Append(new Justification { Val = zarovnani.Value });
+        if (znacka is not null) pPr.Append(Znacka(znacka));
         return pPr;
     }
 
     private static Paragraph Odstavec(
         string text, bool tucne = false, int velikost = Telo, JustificationValues? zarovnani = null,
-        int po = 120, int pred = 0, int? numId = null, bool drzetSDalsim = false)
-        => new(Vlastnosti(po, pred, zarovnani, numId, drzetSDalsim), Beh(text, tucne, velikost));
+        int po = 120, int pred = 0, int? numId = null, bool drzetSDalsim = false, bool novaStrana = false)
+    {
+        var format = Format(tucne, velikost);
+        return new Paragraph(
+            Vlastnosti(po, pred, zarovnani, numId, drzetSDalsim, novaStrana, format),
+            new Run(format.CloneNode(true), new Text(text) { Space = SpaceProcessingModeValues.Preserve }));
+    }
 
-    /// <summary>Nadpis sekce 1.–7. — číslovaný seznam Wordu arabsky.</summary>
-    private static void Nadpis(Body body, string text)
-        => body.Append(Odstavec(text, tucne: true, pred: 240, numId: NumSekce, drzetSDalsim: true));
+    /// <summary>
+    /// Nadpis sekce 1.–7. — číslovaný seznam Wordu arabsky. Novou stránku (sekce 2–4) dává
+    /// vlastnost nadpisu „začít na nové stránce“, ne samostatný odstavec se zalomením: ten se po
+    /// tabulce končící na konci stránky přesunul na další stránku a nechal ji prázdnou.
+    /// </summary>
+    private static void Nadpis(Body body, string text, bool novaStrana = false)
+        => body.Append(Odstavec(text, tucne: true, pred: 240, numId: NumSekce, drzetSDalsim: true, novaStrana: novaStrana));
 
     /// <summary>Nadpis požadavku — římská řada Wordu, v sekci 1 a 2 každá zvlášť od I.</summary>
     private static void NadpisPozadavku(Body body, string? nazev, int numId)
         => body.Append(Odstavec(nazev ?? string.Empty, tucne: true, pred: 180, numId: numId, drzetSDalsim: true));
-
-    private static void ZalomitStranku(Body body)
-        => body.Append(new Paragraph(new Run(new Break { Type = BreakValues.Page })));
 
     private static string CisloUkolu(VyzvaExportPozadavekViewModel p)
         => string.IsNullOrWhiteSpace(p.CisloUkoluVp)
@@ -179,20 +207,9 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
 
     private static void AppendUvod(Body body, VyzvaExportViewModel model)
     {
-        body.Append(Odstavec("Sekce vyzbrojování a akvizic Ministerstva obrany", tucne: true, velikost: PrvniRadekUradu, po: 0));
-        body.Append(Odstavec("odbor komunikačních a informačních systémů", tucne: true, po: 0));
-        body.Append(Odstavec("náměstí Svobody 471/4, Praha 6, PSČ 160 01, datová schránka hjyaavk", velikost: Male, po: 240));
-
-        // Č. j. a datum doplní uživatel ve Wordu — vzor je má prázdné (spec B3).
-        body.Append(new Paragraph(
-            Vlastnosti(po: 240),
-            new Run(
-                OpenXmlWordElements.CreateRunProperties(Telo, bold: false, italic: false, strike: false, underline: false),
-                new Text("Čj."), new TabChar(), new TabChar(), new TabChar(), new Text("V Praze dne"))));
-
-        body.Append(Odstavec(
-            $"Výzva k poskytnutí plnění č. {model.KodVyzvy} pro {model.InformacniSystem}",
-            tucne: true, zarovnani: JustificationValues.Both, pred: 240, po: 240));
+        // Hlavička úřadu, „Čj. … V Praze dne“ (hodnoty doplní uživatel ve Wordu, spec B3)
+        // a nadpis výzvy 1:1 ze vzoru.
+        body.Append(VyzvaWordVzor.HlavickaUradu(model.KodVyzvy, model.InformacniSystem));
 
         // Název zákona opravený proti vzoru („zakázkách" → „zakázek", spec B9).
         body.Append(Odstavec(
@@ -206,8 +223,9 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
 
         body.Append(Odstavec("k poskytnutí plnění", tucne: true, zarovnani: JustificationValues.Center));
 
+        // Před sekcí 1 o řádek víc místa než dřív (připomínka uživatele 2026-10-06).
         body.Append(new Paragraph(
-            Vlastnosti(zarovnani: JustificationValues.Both),
+            Vlastnosti(po: 120 + PrazdnyRadek, zarovnani: JustificationValues.Both, znacka: Format()),
             Beh("veřejné zakázky „"),
             Beh("Technické zhodnocení APV a DZ", tucne: true),
             Beh("“ pořadové číslo "),
@@ -228,8 +246,9 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
         }
         body.Append(table);
 
-        body.Append(Odstavec(PodrobneNavrhy, zarovnani: JustificationValues.Both, pred: 120));
-        body.Append(Odstavec("Stručné popisy požadavků:", tucne: true, drzetSDalsim: true));
+        body.Append(Odstavec(PodrobneNavrhy, zarovnani: JustificationValues.Both, pred: 120, po: 0));
+        // Ve vzoru dva prázdné řádky.
+        body.Append(Odstavec("Stručné popisy požadavků:", tucne: true, pred: 2 * PrazdnyRadek, drzetSDalsim: true));
 
         foreach (var p in model.Pozadavky)
         {
@@ -246,7 +265,7 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
 
     private static void AppendClovekohodiny(Body body, VyzvaExportViewModel model)
     {
-        Nadpis(body, "Počet člověkohodin s rozčleněním dle sazeb a informačních systémů");
+        Nadpis(body, "Počet člověkohodin s rozčleněním dle sazeb a informačních systémů", novaStrana: true);
 
         foreach (var p in model.Pozadavky)
         {
@@ -273,7 +292,8 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
 
             if (k.MaLicenci)
             {
-                body.Append(Odstavec("Licenční rozšíření", velikost: Male, pred: k.MaCinnosti ? 120 : 0, drzetSDalsim: true));
+                // Pod tabulkou činností prázdný řádek, jinak štítek splývá s tabulkou.
+                body.Append(Odstavec("Licenční rozšíření", velikost: Male, pred: k.MaCinnosti ? PrazdnyRadek : 0, drzetSDalsim: true));
                 var table = Tabulka(7);
                 table.Append(HlavickaTabulky(HlavickaLicenci));
                 foreach (var r in k.LicenceRadky)
@@ -295,15 +315,16 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
     private static void AppendCelkovaCena(Body body, VyzvaExportViewModel model)
     {
         Nadpis(body, "Celková cena za člověkohodiny, příp. související rozšíření licence APV a DZ "
-                     + "IS GINIS® DEFENCE");
+                     + "IS GINIS® DEFENCE", novaStrana: true);
 
-        body.Append(Odstavec("Individuální úpravy:", drzetSDalsim: true));
+        // Štítky rekapitulací odsazené řádkem od nadpisu i od tabulky nad nimi (připomínka 2026-10-06).
+        body.Append(Odstavec("Individuální úpravy:", pred: PrazdnyRadek, drzetSDalsim: true));
         body.Append(Rekapitulace(
             model.Pozadavky.Where(p => p.Kalkulace.MaCinnosti)
                 .Select(p => (p.PoradoveOznaceni, p.Nazev, p.Kalkulace.CelkemBezDph)),
             model.CelkemBezDph, model.CelkemDph, model.CelkemSDph));
 
-        body.Append(Odstavec("Licenční rozšíření:", pred: 120, drzetSDalsim: true));
+        body.Append(Odstavec("Licenční rozšíření:", pred: 120 + PrazdnyRadek, drzetSDalsim: true));
         body.Append(Rekapitulace(
             model.Pozadavky.Where(p => p.Kalkulace.MaLicenci)
                 .Select(p => (p.PoradoveOznaceni, p.Nazev, p.Kalkulace.CenaLicence ?? 0m)),
@@ -348,7 +369,7 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
 
     private static void AppendZavery(Body body, VyzvaExportViewModel model)
     {
-        Nadpis(body, "Identifikační údaje nabyvatele");
+        Nadpis(body, "Identifikační údaje nabyvatele", novaStrana: true);
         foreach (var radek in new[]
                  {
                      "Česká republika – Ministerstvo obrany", "Tychonova 1", "160 00 Praha 6",
@@ -438,15 +459,24 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
     private static SectionProperties Stranka(MainDocumentPart mainPart)
     {
         var zahlavi = mainPart.AddNewPart<HeaderPart>();
-        zahlavi.Header = new Header(Odstavec("Příloha č.1 k Čj. MO ", zarovnani: JustificationValues.Right, po: 0));
+        zahlavi.Header = VyzvaWordVzor.Zahlavi();
         zahlavi.Header.Save();
 
+        // Pole PAGE jako ve vzoru: každý běh nese 10 b. a \* MERGEFORMAT zachová formát i po
+        // aktualizaci pole — jednoduché pole by Word vykreslil výchozím písmem.
+        var format = Format(velikost: Male);
+        Run BehPole(OpenXmlElement obsah) => new(format.CloneNode(true), obsah);
         var zapati = mainPart.AddNewPart<FooterPart>();
         zapati.Footer = new Footer(new Paragraph(
-            new ParagraphProperties(new Justification { Val = JustificationValues.Center }),
-            new SimpleField(new Run(
-                OpenXmlWordElements.CreateRunProperties(Male, bold: false, italic: false, strike: false, underline: false),
-                new Text("1"))) { Instruction = " PAGE " }));
+            new ParagraphProperties(
+                new ParagraphStyleId { Val = VyzvaWordVzor.StylZapati },
+                new Justification { Val = JustificationValues.Center },
+                Znacka(format)),
+            BehPole(new FieldChar { FieldCharType = FieldCharValues.Begin }),
+            BehPole(new FieldCode(" PAGE   \\* MERGEFORMAT ") { Space = SpaceProcessingModeValues.Preserve }),
+            BehPole(new FieldChar { FieldCharType = FieldCharValues.Separate }),
+            BehPole(new Text("1")),
+            BehPole(new FieldChar { FieldCharType = FieldCharValues.End })));
         zapati.Footer.Save();
 
         return new SectionProperties(
@@ -457,7 +487,10 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
             {
                 Top = 1417, Right = 1417U, Bottom = 1417, Left = 1417U,
                 Header = 708U, Footer = 708U, Gutter = 0U,
-            });
+            },
+            // Sloupce a mřížka stránky jako ve vzoru.
+            new Columns { Space = "708" },
+            new DocGrid { LinePitch = 360 });
     }
 
     /// <summary>
@@ -499,6 +532,10 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
             part.Numbering.Save();
         }
 
+        /// <summary>
+        /// Řada nadpisů (sekce, požadavky). Čísla tučně jako ve vzoru — drží i po úpravě textu
+        /// nadpisu ve Wordu, kdy by se formát konce odstavce mohl změnit.
+        /// </summary>
         private static AbstractNum Jednourovnovy(int id, NumberFormatValues format)
             => new(
                 new MultiLevelType { Val = MultiLevelValues.SingleLevel },
@@ -507,7 +544,8 @@ public sealed class OpenXmlVyzvaExportService : IVyzvaWordExportService
                     new NumberingFormat { Val = format },
                     new LevelText { Val = "%1." },
                     new LevelJustification { Val = LevelJustificationValues.Left },
-                    new PreviousParagraphProperties(new Indentation { Left = "360", Hanging = "360" }))
+                    new PreviousParagraphProperties(new Indentation { Left = "360", Hanging = "360" }),
+                    new NumberingSymbolRunProperties(new Bold()))
                 { LevelIndex = 0 })
             { AbstractNumberId = id };
 
