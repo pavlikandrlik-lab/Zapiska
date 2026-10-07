@@ -67,6 +67,12 @@ public sealed class VyzvaExportBuilder : IVyzvaExportBuilder
         var vyzva = await _db.Vyzvy.AsNoTracking().FirstOrDefaultAsync(v => v.Id == vyzvaId, ct);
         if (vyzva == null) return null;
 
+        var mistoPlneniProjektu = await _db.Projekty.AsNoTracking()
+            .Where(p => p.Id == vyzva.ProjektId)
+            .Select(p => p.MistoPlneni)
+            .FirstOrDefaultAsync(ct);
+        var mistoPlneni = VyzvaMistoPlneni.Platne(vyzva.Stav, vyzva.MistoPlneniSnapshot, mistoPlneniProjektu);
+
         var polozky = await _db.ZaznamExterniOdkazy.AsNoTracking()
             .Where(ev => ev.VyzvaId == vyzvaId)
             .Select(ev => new { ev.Id, ev.ZaznamId, ev.Cislo, ev.Pozadavek })
@@ -124,8 +130,8 @@ public sealed class VyzvaExportBuilder : IVyzvaExportBuilder
             PoradoveVRoce = vyzva.PoradoveVRoce,
             Rok = vyzva.Rok,
             CisloRamcoveSmlouvy = vyzva.CisloRamcoveSmlouvySnapshot,
-            MistoPlneni = vyzva.MistoPlneniSnapshot,
-            InformacniSystem = InformacniSystem(vyzva.MistoPlneniSnapshot),
+            MistoPlneni = mistoPlneni,
+            InformacniSystem = InformacniSystem(mistoPlneni),
             Pozadavky = pozadavky,
             CelkemBezDph = celkemBez,
             CelkemDph = Dph(celkemBez),

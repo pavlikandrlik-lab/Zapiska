@@ -305,4 +305,30 @@ public sealed class VyzvyTiskTests
             renderer.ShouldFail = false;
         }
     }
+
+    /// <summary>
+    /// Bod 5 výzvy v Přípravě tiskne místo plnění, které má projekt teď, ne to z doby založení
+    /// výzvy (uživatel 2026-10-07). SeedAsync místo plnění projektu při dalším testu vrátí.
+    /// </summary>
+    [Fact]
+    public async Task VyzvaTisk_VPriprave_MistoPlneniZAktualnihoProjektu()
+    {
+        var (projectId, vyzvaId) = await SeedAsync();
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var projekt = await dbContext.Projekty.FirstAsync(p => p.Id == projectId);
+            projekt.MistoPlneni = "EIS (FIS): VZ 9999, Testovaci 5, 110 00 Praha 1";
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync(
+            $"/Export/Vyzva/{vyzvaId}/Tisk?projektId={projectId}&asUser={_fixture.AdminOsobaId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var html = RenderedPrintHtml();
+        html.Should().Contain("<strong>EIS (FIS): </strong>", "tučně je část po dvojtečku jako ve vzoru");
+        html.Should().Contain("VZ 9999, Testovaci 5, 110 00 Praha 1");
+        html.Should().NotContain("VZ 8201", "stará hodnota z doby založení výzvy");
+    }
 }

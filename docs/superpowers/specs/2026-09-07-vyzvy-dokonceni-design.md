@@ -326,7 +326,7 @@ tabulky, součty s DPH, podpisová doložka). Ohýbat ho by poškodilo obě stra
 | 2 | Počet člověkohodin | kapitola za každé PNF: název, popis, vazba na PMP, kalkulační tabulka A–D |
 | 3 | Celková cena | souhrn individuálních úprav, licenční rozšíření, celkový součet |
 | 4 | Identifikační údaje nabyvatele | statický blok |
-| 5 | Termín a místo plnění | termín + `MistoPlneniSnapshot` |
+| 5 | Termín a místo plnění | termín + místo plnění (viz §9.4) |
 | 6 | Lhůta pro potvrzení | statický text (5 dnů dle čl. IV) |
 | 7 | Podpisová doložka | dvě jména a funkce |
 
@@ -335,9 +335,9 @@ tabulky, součty s DPH, podpisová doložka). Ohýbat ho by poškodilo obě stra
 | V dokumentu | Zdroj |
 |---|---|
 | Číslo výzvy | `VyzvaEntity.Kod` |
-| IS v nadpisu | první token `MistoPlneniSnapshot` (`FIS (EIS): VZ 8201` → `FIS`) |
+| IS v nadpisu | první token místa plnění (`FIS (EIS): VZ 8201` → `FIS`) |
 | Číslo rámcové dohody | `CisloRamcoveSmlouvySnapshot` |
-| Místo plnění | `MistoPlneniSnapshot` |
+| Místo plnění | výzva v Přípravě: `ProjektEntity.MistoPlneni` (aktuální); jinak `MistoPlneniSnapshot`, uložený při opuštění Přípravy (uživatel 2026-10-07, `VyzvaMistoPlneni`) |
 | Poř. č. | `a`, `b`, `c`, … dle pořadí v seznamu |
 | Č. úkolu VP | `ProjektovyZaznam.CisloViditelne` |
 | Název požadavku | `ProjektovyZaznam.Nazev` |

@@ -26,6 +26,53 @@ public sealed class VyzvaServiceTransitionsTests
         v.OdeslalOsobaId.Should().Be(7);
     }
 
+    [Theory]
+    [InlineData(VyzvaStav.Odeslano)]
+    [InlineData(VyzvaStav.Zruseno)]
+    public async Task OpusteniPripravy_UlozeAktualniMistoPlneniProjektu(VyzvaStav novyStav)
+    {
+        using var db = VyzvaServiceTestHarness.CreateDb();
+        await VyzvaServiceTestHarness.SeedProjektAsync(db);
+        db.Vyzvy.Add(NewVyzva(53, VyzvaStav.Priprava));
+        await db.SaveChangesAsync();
+
+        var svc = VyzvaServiceTestHarness.CreateService(db);
+        await svc.ZmenitStavAsync(53, novyStav, 7, DateTime.UtcNow, CancellationToken.None);
+
+        (await db.Vyzvy.FindAsync(53))!.MistoPlneniSnapshot.Should().Be("FIS (EIS): VZ 8201",
+            "tiskne se to, co bylo v projektu v okamžiku odeslání");
+    }
+
+    [Fact]
+    public async Task OpusteniPripravy_ProjektBezMistaPlneni_PonechaUlozenouHodnotu()
+    {
+        using var db = VyzvaServiceTestHarness.CreateDb();
+        await VyzvaServiceTestHarness.SeedProjektAsync(db);
+        (await db.Projekty.FindAsync(1))!.MistoPlneni = null;
+        db.Vyzvy.Add(NewVyzva(54, VyzvaStav.Priprava));
+        await db.SaveChangesAsync();
+
+        var svc = VyzvaServiceTestHarness.CreateService(db);
+        await svc.ZmenitStavAsync(54, VyzvaStav.Odeslano, 7, DateTime.UtcNow, CancellationToken.None);
+
+        (await db.Vyzvy.FindAsync(54))!.MistoPlneniSnapshot.Should().Be("F");
+    }
+
+    [Fact]
+    public async Task NavratDoPripravy_UlozenouHodnotuNemeni()
+    {
+        using var db = VyzvaServiceTestHarness.CreateDb();
+        await VyzvaServiceTestHarness.SeedProjektAsync(db);
+        db.Vyzvy.Add(NewVyzva(55, VyzvaStav.Odeslano));
+        await db.SaveChangesAsync();
+
+        var svc = VyzvaServiceTestHarness.CreateService(db);
+        await svc.ZmenitStavAsync(55, VyzvaStav.Priprava, 7, DateTime.UtcNow, CancellationToken.None);
+
+        (await db.Vyzvy.FindAsync(55))!.MistoPlneniSnapshot.Should().Be("F",
+            "v Přípravě se tiskne z projektu, uložená hodnota se přepíše až dalším odesláním");
+    }
+
     [Fact]
     public async Task NepovolenyPrechod_Error()
     {

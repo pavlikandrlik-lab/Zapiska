@@ -94,6 +94,50 @@ public sealed class VyzvaExportBuilderTests
     }
 
     [Fact]
+    public async Task Build_VyzvaVPriprave_MistoPlneniZAktualnihoProjektu()
+    {
+        using var db = await SeedAsync();
+        var projekt = await db.Projekty.FindAsync(1);
+        projekt!.MistoPlneni = "EIS (FIS): VZ 9999, Nová 2, 110 00 Praha 1";
+        await db.SaveChangesAsync();
+
+        var model = await Builder(db, new FakeTicketing()).BuildAsync(VyzvaId, CancellationToken.None);
+
+        model!.MistoPlneni.Should().Be("EIS (FIS): VZ 9999, Nová 2, 110 00 Praha 1",
+            "výzva v Přípravě se řídí projektem, i když se změnil po jejím založení");
+        model.InformacniSystem.Should().Be("EIS");
+    }
+
+    [Theory]
+    [InlineData(VyzvaStav.Odeslano)]
+    [InlineData(VyzvaStav.Zruseno)]
+    public async Task Build_VyzvaMimoPripravu_MistoPlneniZUlozeneHodnoty(VyzvaStav stav)
+    {
+        using var db = await SeedAsync();
+        (await db.Projekty.FindAsync(1))!.MistoPlneni = "EIS (FIS): VZ 9999";
+        (await db.Vyzvy.FindAsync(VyzvaId))!.Stav = stav;
+        await db.SaveChangesAsync();
+
+        var model = await Builder(db, new FakeTicketing()).BuildAsync(VyzvaId, CancellationToken.None);
+
+        model!.MistoPlneni.Should().Be("FIS (EIS): VZ 8201",
+            "odeslaná výzva se tiskne tak, jak šla dodavateli");
+        model.InformacniSystem.Should().Be("FIS");
+    }
+
+    [Fact]
+    public async Task Build_ProjektBezMistaPlneni_PouzijeUlozenouHodnotu()
+    {
+        using var db = await SeedAsync();
+        (await db.Projekty.FindAsync(1))!.MistoPlneni = null;
+        await db.SaveChangesAsync();
+
+        var model = await Builder(db, new FakeTicketing()).BuildAsync(VyzvaId, CancellationToken.None);
+
+        model!.MistoPlneni.Should().Be("FIS (EIS): VZ 8201");
+    }
+
+    [Fact]
     public async Task Build_PozadavkyMajiRimskaPoradovaCislaAUdajeZeZaznamu()
     {
         using var db = await SeedAsync((100, "336865"), (200, "341837"));

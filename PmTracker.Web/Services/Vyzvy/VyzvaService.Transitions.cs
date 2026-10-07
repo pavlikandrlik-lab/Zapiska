@@ -18,6 +18,16 @@ public sealed partial class VyzvaService
             return Fail<VyzvaDetail>(VyzvaErrorCode.InvalidStateTransition,
                 $"Přechod {puvodni} → {novyStav} není povolen");
 
+        if (puvodni == VyzvaStav.Priprava)
+        {
+            // Opuštěním Přípravy se místo plnění zmrazí — viz VyzvaMistoPlneni.
+            var mistoPlneniProjektu = await _db.Projekty
+                .Where(p => p.Id == vyzva.ProjektId)
+                .Select(p => p.MistoPlneni)
+                .FirstOrDefaultAsync(ct);
+            vyzva.MistoPlneniSnapshot = VyzvaMistoPlneni.Platne(puvodni, vyzva.MistoPlneniSnapshot, mistoPlneniProjektu);
+        }
+
         vyzva.Stav = novyStav;
 
         if (novyStav == VyzvaStav.Odeslano)
