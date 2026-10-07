@@ -9,4 +9,8 @@ public sealed record BreadcrumbTrail(IReadOnlyList<Breadcrumb> Items, string? Ba
     /// <summary>Cíl šipky ←: explicitní BackUrl (origin/kanonická záložka entity, C1 2026-07-10),
     /// jinak URL předposledního drobečku (rodič aktuálního); null když je jen kořen.</summary>
     public string? ParentUrl => BackUrl ?? (Items.Count >= 2 ? Items[Items.Count - 2].Url : null);
+
+    /// <summary>Lišta se zobrazí jen při zanoření — aspoň dva drobečky, tedy stránka s rodičem.
+    /// Kořen sekce (Přehled, Projekty, Osoby, Můj profil…) ji nemá (uživatel 2026-10-07).</summary>
+    public bool IsNested => Items.Count >= 2;
 }

@@ -110,4 +110,14 @@ public sealed class LayoutGovHeaderTests
         var block = Block(SiteCssBezKomentaru(), ".docs-content h1,\n.docs-content h2,\n.docs-content h3");
         block.Should().Contain("scroll-margin-top: var(--app-sticky-top)");
     }
+
+    [Fact]
+    public void CaraPodMenu_JeNaHlavicce_NeNaDrobeckoveListe()
+    {
+        // Kořeny sekcí nemají drobečkovou lištu (uživatel 2026-10-07); čára pod menu proto
+        // patří hlavičce, jinak by obsah splynul s menu. Lišta si nechává jen spodní čáru.
+        var css = SiteCssBezKomentaru();
+        Block(css, ".gov-header").Should().Contain("border-bottom: 1px solid var(--pm-border)");
+        Block(css, ".app-breadcrumb-bar").Should().NotContain("border-top");
+    }
 }

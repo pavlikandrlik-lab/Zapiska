@@ -17,33 +17,37 @@ public sealed class BreadcrumbPhase2RenderTests
 
     public BreadcrumbPhase2RenderTests(ApiSqlFixture fixture) => _fixture = fixture;
 
+    /// <summary>Uživatel 2026-10-07: kořen sekce (zanoření 0) drobečkovou lištu nemá.</summary>
     [Theory]
-    [InlineData("/Osoby", "Osoby")]
-    [InlineData("/Nastaveni", "Nastavení")]
-    [InlineData("/Profil", "Můj profil")]
-    [InlineData("/Jednani", "Jednání")]
-    [InlineData("/Dashboard", "Přehled")]
-    public async Task SectionLanding_RendersRootBreadcrumb(string path, string label)
+    [InlineData("/")]
+    [InlineData("/Dashboard")]
+    [InlineData("/Projekty")]
+    [InlineData("/Osoby")]
+    [InlineData("/Nastaveni")]
+    [InlineData("/Profil")]
+    [InlineData("/Jednani")]
+    [InlineData("/Ciselniky")]
+    [InlineData("/Dokumentace/Technicka/Strom-dokumentace")]
+    public async Task SectionLanding_HasNoBreadcrumbBar(string path)
     {
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"{path}?asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain("app-breadcrumb-bar");
-        html.Should().Contain("aria-current=\"page\"");
-        html.Should().Contain(HtmlEncoder.Default.Encode(label));
+        html.Should().NotContain("class=\"app-breadcrumb-bar\"");
     }
 
     [Fact]
-    public async Task CiselnikyIndex_RendersRootCrumb()
+    public async Task CiselnikDetail_RendersUnderCiselniky()
     {
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync($"/Ciselniky?asUser={_fixture.AdminOsobaId}");
+        var response = await client.GetAsync($"/Ciselniky/Detail/typy-ukolu?asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain("app-breadcrumb-bar");
+        html.Should().Contain("class=\"app-breadcrumb-bar\"");
+        html.Should().Contain("app-breadcrumb-back");
         html.Should().Contain(HtmlEncoder.Default.Encode("Číselníky"));
     }
 
@@ -65,15 +69,14 @@ public sealed class BreadcrumbPhase2RenderTests
     }
 
     [Fact]
-    public async Task DocumentationTree_RendersRootCrumb_AndDropsLocalBreadcrumb()
+    public async Task DocumentationTree_HasNoBreadcrumbBar_AndDropsLocalBreadcrumb()
     {
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync($"/Dokumentace/Technicka/Strom-dokumentace?asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        html.Should().Contain("app-breadcrumb-bar");
-        html.Should().Contain(HtmlEncoder.Default.Encode("Dokumentace"));
+        html.Should().NotContain("class=\"app-breadcrumb-bar\"", "strom dokumentace je kořen sekce");
         html.Should().NotContain("docs-breadcrumb");   // lokální breadcrumb nahrazen frame lištou
     }
 

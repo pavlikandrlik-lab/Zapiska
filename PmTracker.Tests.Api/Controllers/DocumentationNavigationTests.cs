@@ -37,8 +37,16 @@ public sealed class DocumentationNavigationTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        // Lokální docs-breadcrumb nahrazen jednotnou frame lištou pod menu (2026-07-04).
-        html.Should().Contain("app-breadcrumb-bar");
+        // Lokální docs-breadcrumb nahrazen jednotnou frame lištou pod menu (2026-07-04). Strom
+        // dokumentace je kořen sekce a lištu nemá (zanoření 0, uživatel 2026-10-07).
+        if (route.EndsWith("/Strom-dokumentace", StringComparison.Ordinal))
+        {
+            html.Should().NotContain("class=\"app-breadcrumb-bar\"");
+        }
+        else
+        {
+            html.Should().Contain("class=\"app-breadcrumb-bar\"");
+        }
         html.Should().Contain("Technická dokumentace");
         html.Should().Contain("Uživatelské a provozní");
         html.Should().Contain(expectedMarker);

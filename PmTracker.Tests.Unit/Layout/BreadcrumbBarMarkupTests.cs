@@ -34,4 +34,12 @@ public sealed class BreadcrumbBarMarkupTests
         var css = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/css/site.css"));
         css.Should().Contain(".app-breadcrumb-bar");
     }
+
+    [Fact]
+    public void Partial_RendersOnlyNestedTrail()
+    {
+        var cshtml = File.ReadAllText(ResolvePath("PmTracker.Web/Views/Shared/_BreadcrumbBar.cshtml"));
+        cshtml.Should().Contain("@if (Model is { IsNested: true })",
+            "zanoření 0 (kořen sekce) lištu nemá — uživatel 2026-10-07");
+    }
 }

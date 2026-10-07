@@ -1,5 +1,5 @@
 @model PmTracker.Web.Models.ViewModels.BreadcrumbTrail
-@if (Model is { Items.Count: > 0 })
+@if (Model is { IsNested: true })
 {
     <nav class="app-breadcrumb-bar" aria-label="Drobečková navigace">
         @if (Model.ParentUrl is not null)

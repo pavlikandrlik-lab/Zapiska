@@ -13,7 +13,9 @@ public abstract partial class BaseController
     protected void SetBreadcrumbs(string? backUrl, params Breadcrumb[] items)
         => ViewData["Breadcrumbs"] = new BreadcrumbTrail(items, backUrl);
 
-    /// <summary>Top-level seznam sekce (např. „Projekty") — jediný kořenový drobeček, bez ✕/←.</summary>
+    /// <summary>Top-level seznam sekce (např. „Projekty") — jediný kořenový drobeček. Lišta se
+    /// při zanoření 0 nevykreslí (<see cref="BreadcrumbTrail.IsNested"/>, uživatel 2026-10-07);
+    /// volání zůstává, aby každá stránka deklarovala své místo v navigaci.</summary>
     protected void SetSectionRootBreadcrumb(string text)
         => SetBreadcrumbs(new Breadcrumb(text, null, null, false));
 

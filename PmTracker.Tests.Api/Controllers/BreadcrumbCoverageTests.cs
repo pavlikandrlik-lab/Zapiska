@@ -22,11 +22,11 @@ public sealed class BreadcrumbCoverageTests
     }
 
     [Fact]
-    public async Task SearchPage_RendersBreadcrumbBar()
+    public async Task SearchPage_HasNoBreadcrumbBar()
     {
+        // Uživatel 2026-10-07: Hledání je zanoření 0, lištu nemá.
         var html = await GetOkAsync($"/Search?q=test&asUser={_fixture.AdminOsobaId}");
-        html.Should().Contain("app-breadcrumb-bar");
-        html.Should().Contain("Hledání");
+        html.Should().NotContain("class=\"app-breadcrumb-bar\"");
     }
 
     [Fact]

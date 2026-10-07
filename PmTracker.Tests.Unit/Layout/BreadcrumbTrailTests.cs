@@ -64,4 +64,30 @@ public sealed class BreadcrumbTrailTests
         trail.Items[^1].Should().Be(current);
         trail.Items[^1].Url.Should().BeNull();
     }
+
+    /// <summary>Uživatel 2026-10-07: lišta jen při zanoření — kořen sekce sám o sobě ne.</summary>
+    [Fact]
+    public void IsNested_False_ForSingleRoot()
+    {
+        new BreadcrumbTrail(new[] { new Breadcrumb("Osoby", null, null, false) })
+            .IsNested.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsNested_False_ForSingleRoot_EvenWithBackUrl()
+    {
+        // Jinak by zůstala osamocená šipka ← bez drobečků.
+        new BreadcrumbTrail(new[] { new Breadcrumb("Osoby", null, null, false) }, "/Projekty")
+            .IsNested.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsNested_True_WhenParentExists()
+    {
+        new BreadcrumbTrail(new[]
+        {
+            new Breadcrumb("Přehled", "/", null, false),
+            new Breadcrumb("Moje úkoly", null, null, true),
+        }).IsNested.Should().BeTrue();
+    }
 }
