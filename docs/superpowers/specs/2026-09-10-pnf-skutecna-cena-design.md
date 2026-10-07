@@ -303,6 +303,42 @@ Cena v Kč s DPH.
 | „Vazba na PMP č. …" u jednoho požadavku | vždy „Bližší podrobnosti jsou uvedeny v PNF …" |
 | čísla bez oddělovače tisíců | `N2` |
 
+## B9a. Vzhled 1:1 ze vzoru (upřesnění 2026-10-07)
+
+Uživatel: „co je ve vzoru vidět, musí být ve vygenerovaném Wordu stejné.“ Formát se proto nepíše
+ručně podle bodů B1–B8, ale přebírá z XML vzoru (`VyzvaWordVzor`, `VyzvaWordVzor.Tabulky.cs`):
+styly, motiv, nastavení, číslování, hlavička, záhlaví, zápatí, tabulky, pevný text sekcí 4–7
+i prázdné řádky. Kde se B1–B8 se vzorem rozcházely, platí vzor. Například „Číslo úkolu VP EIS“
+v sekci 2 je kurzívou 12 b., tabulky v sekci 2 mají šedou hlavičku a písmo Calibri a podpisy
+nejsou tabulka.
+
+Záměrné odchylky od vzoru:
+
+- opravy z B9;
+- prázdné údaje (č. j., datum, termín, POL/PPOL);
+- o řádek větší mezera před bodem 1 (uživatel 2026-10-06);
+- prázdný řádek před „Licenční rozšíření“ pod tabulkou činností (vzor tento případ nemá);
+- ruční zalomení stránek vzoru se nepřebírají. Sekce 2–4 začínají na nové stránce vlastností
+  nadpisu a před nimi není prázdný řádek, aby nevznikla prázdná stránka;
+- text požadavku má jednotné pravidlo podle prvního požadavku vzoru: mezi odstavci prázdný
+  řádek, před seznamem a uvnitř seznamu žádný.
+
+### PDF ve stejném formátu (2026-10-07)
+
+Uživatel: „dej do stejného formátu i PDF.“ PDF (náhled výzvy) nemá vlastní šablonu. Je to převod
+vygenerovaného Wordu do HTML (`WordNaHtml`), které vysází prohlížeč na serveru. Obsah, pořadí,
+prázdné řádky i formát mají jediný zdroj — Word, a tím vzor. Záhlaví a číslo stránky ze zápatí
+Wordu jsou na každé stránce. Pravidla sazby Wordu, která převod napodobuje, jsou změřená na
+výzvě z dat vzoru vykreslené Wordem (popis ve `WordNaHtml`). Ověřeno stránku po stránce: 17 stran
+jako Word, každá končí stejným řádkem.
+
+Odchylka, kterou prohlížeč nenapodobí: v odstavci do bloku Word smrští mezery až o čtvrtinu, aby
+se vešlo další slovo, ale když by bez něj stačilo řádek roztáhnout jen málo, raději roztahuje.
+Prohlížeč slovo vždy přidá. Ve výzvě z dat vzoru se tím liší dvě místa zalomení v jedné položce
+seznamu (jednopísmenné „v“ a „a“ zůstanou na konci řádku místo na začátku dalšího); počet řádků
+ani zlom stránky se nemění. Poslední řádek odstavce do bloku má v PDF mezery o čtvrtinu užší než
+ve Wordu.
+
 ## B10. Dopad na kód
 
 - `VyzvaExportBuilder`: římské pořadí, prefix „RU", příznaky činností a licence, položky licence

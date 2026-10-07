@@ -17,7 +17,6 @@ public sealed class ExportController : BaseController
     private const string WordContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     private const string PdfContentType = "application/pdf";
     private const string PdfViewPath = "~/Views/Export/PdfTemplate.cshtml";
-    private const string VyzvaViewPath = "~/Views/Export/VyzvaTemplate.cshtml";
     private readonly IExportTemplateUseCase _exportTemplateUseCase;
     private readonly IProjectService _projectService;
     private readonly IMeetingService _meetingService;
@@ -243,8 +242,9 @@ public sealed class ExportController : BaseController
     /// HTML tisk — tisk tak nikdy nepřestane fungovat (spec §8).
     /// </summary>
     /// <summary>
-    /// Výzva k poskytnutí plnění podle resortního formuláře (spec 2026-09-07 §9).
-    /// Word i PDF staví ze stejné projekce, aby se obsah obou formátů nemohl rozejít.
+    /// Výzva k poskytnutí plnění podle resortního formuláře (spec 2026-09-07 §9). PDF je převod
+    /// Wordu výzvy (uživatel 2026-10-07: „dej do stejného formátu i PDF“) — obsah i formát má
+    /// jediný zdroj, PDF se od Wordu a tím od vzoru nemůže rozejít.
     /// </summary>
     [HttpGet("Vyzva/{vyzvaId:int}/Tisk")]
     [Authorize(Policy = "permission:vyzvy.word.export")]
@@ -256,17 +256,22 @@ public sealed class ExportController : BaseController
         var accessCheck = await EnsureProjectReadableAsync(model.ProjektId, ct);
         if (accessCheck is not null) return accessCheck;
 
-        var html = await _viewRenderer.RenderToStringAsync(ControllerContext, VyzvaViewPath, model);
-        var stylesheetPath = Path.Combine(_environment.WebRootPath, "css", "pdf-export.css");
+        var dokument = WordNaHtml.Preved(
+            _vyzvaWordExportService.BuildDocument(model), $"Výzva č. {model.KodVyzvy}");
 
-        var result = await _pdfRenderer.RenderAsync(
-            new PdfRenderRequest { Html = html, StylesheetPath = stylesheetPath }, ct);
+        var result = await _pdfRenderer.RenderAsync(new PdfRenderRequest
+        {
+            Html = dokument.Html,
+            HeaderTemplate = dokument.ZahlaviSablona,
+            FooterTemplate = dokument.ZapatiSablona,
+            PreferCssPageSize = true,
+        }, ct);
 
         if (!result.Succeeded)
         {
             _logger.LogWarning(
                 "PDF výzvy se nevyrobilo ({Duvod}), tisk pokračuje HTML cestou.", result.FailureReason);
-            return View(VyzvaViewPath, model);
+            return Content(dokument.Html, "text/html; charset=utf-8");
         }
 
         Response.Headers.ContentDisposition = new ContentDispositionHeaderValue("inline")

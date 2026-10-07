@@ -51,8 +51,10 @@ public sealed class OpenXmlVyzvaExportStrukturaTests
         using var doc = Otevrit(VsechnyTvary());
         var body = doc.MainDocumentPart!.Document.Body!;
 
+        // Bez vlastní velikosti platí styl Normální vzoru — 12 b.
         body.Elements<Paragraph>().Single(p => p.InnerText.StartsWith("Podrobné návrhy požadavků"))
-            .Descendants<Run>().Should().OnlyContain(r => r.RunProperties!.FontSize!.Val == "24", "tělo 12 b.");
+            .Descendants<Run>().Should().OnlyContain(r => r.RunProperties == null || r.RunProperties.FontSize == null
+                || r.RunProperties.FontSize.Val == "24", "tělo 12 b.");
         body.Elements<Table>().First().Descendants<Run>()
             .Should().OnlyContain(r => r.RunProperties!.FontSize!.Val == "20", "tabulky 10 b.");
     }
