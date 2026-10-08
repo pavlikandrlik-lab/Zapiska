@@ -96,9 +96,9 @@ stop-words ani řazení podle relevance. Prakticky:
 
 - **Kratší dotaz než 3 znaky** se nevyhledává.
 - **Speciální znaky** (`%`, `_`) se berou doslova, regulární výrazy nejsou podporované.
-- **Fráze přes formátování** — v popisu a vyjádřeních se fráze v uvozovkách najde, jen
-  když v textu stojí souvisle. Když je uprostřed jinak formátovaná (část tučně, odkaz)
-  nebo zalomená na další řádek, nenajde se; hledej ji bez uvozovek.
+- **Fráze přes formátování** — Fráze v uvozovkách se najde i přes formátování (tučné
+  slovo, odkaz) a zalomení řádku. Hledá se v textu bez HTML, takže hledání slova jako
+  „strong“ nenajde formátovací značky.
 - **Bez scope na jeden projekt** — globální hledání neumí omezit na projekt; pro to
   použij filtr v záznamech projektu.
 

@@ -109,7 +109,10 @@ Databáze má collation `Czech_CI_AS` — nerozlišuje velikost písmen, ale **r
   jako celek (LIKE `%fráze%`), vždy se hledá i krátký; slova mimo uvozovky beze změny.
   Neuzavřená fráze běží do konce dotazu. `hl` nese fráze v uvozovkách
   (`SearchQueryText.ToHighlightQuery`), podsvícení je rozkládá stejně (`highlightTerms`).
-  Omezení: fráze přes HTML formátování v popisu/vyjádření se nenajde.
+  Omezení: fráze přes HTML formátování v popisu/vyjádření se nenajde. Od 2026-10-08 se
+  hledá nad sloupci čistého textu (`popis_prosty_text`, `text_vyjadreni_prosty_text`;
+  `pozadavek_prosty_text` připravený pro výzvy), plněnými háčkem `RichTextSearchTextSync`
+  při uložení a jednorázovým dopočtem při startu. Omezení „fráze přes formátování“ odpadá.
 - **Minimální délka dotazu: 3 znaky.**
 
 ### 2.6 Řazení
