@@ -10,6 +10,20 @@ public sealed class PmTrackerDbContext : DbContext
     {
     }
 
+    // Čistý text formátovaných polí pro hledání — viz RichTextSearchTextSync. Ostatní
+    // přetížení SaveChanges/SaveChangesAsync volají tato dvě.
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        RichTextSearchTextSync.Apply(ChangeTracker);
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        RichTextSearchTextSync.Apply(ChangeTracker);
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
     public DbSet<CiselnikStavuProjektuEntity> CiselnikStavuProjektu => Set<CiselnikStavuProjektuEntity>();
     public DbSet<CiselnikStavuUkoluEntity> CiselnikStavuUkolu => Set<CiselnikStavuUkoluEntity>();
     public DbSet<CiselnikKategoriiZaznamuEntity> CiselnikKategoriiZaznamu => Set<CiselnikKategoriiZaznamuEntity>();
