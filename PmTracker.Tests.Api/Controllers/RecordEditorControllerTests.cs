@@ -676,7 +676,14 @@ public sealed class RecordEditorControllerTests
         html.Should().NotContain("data-schedule-step-actual");
         html.Should().NotContain("schedule-step-gantt-stack");
         Regex.Matches(html, "data-schedule-axis").Count.Should().Be(1);
-        Regex.Matches(html, "data-schedule-gantt-today").Count.Should().Be(2);
+        // „Dnes" a „Termín" jsou od 6128ff5 (2026-07-01) popisky DNES/TERMÍN na ose, ne svislé
+        // čáry v pruzích. V editoru je block.js pozicuje z dat bloku do atributů osy.
+        html.Should().NotContain("data-schedule-gantt-today", "svislá čára „Dnes“ v pruzích byla odstraněna");
+        html.Should().MatchRegex("data-schedule-today=\"\\d{4}-\\d{2}-\\d{2}\"", "z dneška block.js spočítá popisek DNES");
+        html.Should().MatchRegex("data-schedule-deadline=\"\\d{4}-\\d{2}-\\d{2}\"", "z termínu block.js spočítá popisek TERMÍN");
+        var osa = Regex.Match(html, "<div[^>]*data-schedule-axis=\"overview\"[^>]*>").Value;
+        osa.Should().Contain("data-axis-today-pct=").And.Contain("data-axis-deadline-pct=",
+            "osa nese místo pro pozici popisků DNES a TERMÍN");
         html.Should().Contain("Plán / Skutečnost / Dnes / Termín");
     }
 

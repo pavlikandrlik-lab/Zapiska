@@ -344,6 +344,19 @@ public sealed class ApiSqlFixture : IAsyncLifetime
         await dbContext.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Datum založení záznamu. Plán kroku 1 se počítá od založení (plan(0) = start), takže
+    /// harmonogram nasetovaný před ním (SeedDatumScheduleAsync s minulým startem) by měl
+    /// kroky před založením oříznuté na nulovou délku.
+    /// </summary>
+    public async Task SetRecordFoundingDateAsync(int recordId, DateTime datumZalozeni)
+    {
+        await using var dbContext = CreateDbContext();
+        var record = await dbContext.ProjektoveZaznamy.SingleAsync(x => x.Id == recordId);
+        record.DatumZalozeni = datumZalozeni.Date;
+        await dbContext.SaveChangesAsync();
+    }
+
     /// <summary>Projektové (viditelné) číslo záznamu — drobečky i karty ho používají místo databázového Id.</summary>
     public async Task<string> GetRecordVisibleNumberAsync(int recordId)
     {

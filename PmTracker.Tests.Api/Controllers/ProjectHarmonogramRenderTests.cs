@@ -126,8 +126,12 @@ public sealed class ProjectHarmonogramRenderTests
         html.Should().Contain("data-timeline-axis");
         html.Should().Contain("data-axis-start=");
         html.Should().Contain("data-axis-end=");
-        html.Should().Contain("schedule-overview-marker today");
-        html.Should().Contain("schedule-overview-marker deadline");
+        // „Dnes" a „Termín" jsou od 6128ff5 (2026-07-01) popisky DNES/TERMÍN na ose, ne svislé
+        // čáry v pruzích; server dodá jejich pozici v % (JS je vykreslí na ose).
+        html.Should().NotContain("schedule-overview-marker", "svislé čáry „Dnes“/„Termín“ v pruzích byly odstraněny");
+        var osa = Regex.Match(html, "<div[^>]*data-schedule-axis=\"overview\"[^>]*>").Value;
+        osa.Should().MatchRegex("data-axis-today-pct=\"\\d+(\\.\\d+)?\"", "popisek DNES na ose");
+        osa.Should().MatchRegex("data-axis-deadline-pct=\"\\d+(\\.\\d+)?\"", "popisek TERMÍN na ose");
         html.Should().NotContain("Legenda: Plán / Skutečnost / Termín úkolu");
         html.Should().NotContain("schedule-layered-track schedule-layered-track--overview");
 
@@ -140,7 +144,7 @@ public sealed class ProjectHarmonogramRenderTests
     }
 
     [Fact]
-    public async Task Detail_ShouldRenderBreakdown_WithOwnAxis_AndTodayMarker()
+    public async Task Detail_ShouldRenderBreakdown_WithOwnAxis_AndTodayLabelOnAxis()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiHarmonogramBreakdownOwner");
         var projectId = await _fixture.EnsureProjectAsync("APIHARM2");
@@ -161,8 +165,12 @@ public sealed class ProjectHarmonogramRenderTests
         html.Should().Contain("data-axis-start=");
         html.Should().Contain("data-axis-end=");
         html.Should().Contain("schedule-layered-track schedule-layered-track--step");
-        html.Should().Contain("schedule-layered-marker today");
-        html.Should().NotContain("schedule-layered-marker deadline");
+        // „Dnes" je od 6128ff5 (2026-07-01) popisek DNES na ose rozpadu, ne čára v pruhu kroku.
+        html.Should().NotContain("schedule-layered-marker", "svislá čára „Dnes“ v pruzích kroků byla odstraněna");
+        var osa = Regex.Match(html, "<div[^>]*data-schedule-axis=\"breakdown\"[^>]*>").Value;
+        osa.Should().MatchRegex("data-axis-today-pct=\"\\d+(\\.\\d+)?\"", "popisek DNES na ose rozpadu");
+        osa.Should().MatchRegex("data-axis-deadline-pct=\"\\d+(\\.\\d+)?\"", "popisek TERMÍN na ose rozpadu");
+        html.Should().Contain("schedule-layered-legend-swatch today", "legenda rozpadu vysvětluje DNES");
     }
 
     [Fact]
@@ -232,7 +240,11 @@ public sealed class ProjectHarmonogramRenderTests
         var subsystemId = await _fixture.EnsureSubsystemAsync("APIHARMSUBTCK", ownerId);
         await _fixture.EnsureProjectTeamMemberAsync(projectId, ownerId);
         var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API harmonogram ticks record");
-        await _fixture.SeedDatumScheduleAsync(recordId, DateTime.UtcNow.AddDays(-30), new HashSet<int> { 1, 2 });
+        // Záznam založený před prvním krokem plánu: krok 1 = [založení, plán kroku 1] má kladnou
+        // délku. Se založením „dnes“ by plán kroku 1 (před 23 dny) skončil dřív, než začal.
+        var start = DateTime.UtcNow.AddDays(-30);
+        await _fixture.SetRecordFoundingDateAsync(recordId, start);
+        await _fixture.SeedDatumScheduleAsync(recordId, start, new HashSet<int> { 1, 2 });
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var html = await (await client.GetAsync($"/Projekty/Detail/{projectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}")).Content.ReadAsStringAsync();
