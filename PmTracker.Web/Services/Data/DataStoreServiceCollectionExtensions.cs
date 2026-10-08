@@ -219,6 +219,9 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<ISettingsModalModelFactory, SettingsModalModelFactory>();
         services.AddScoped<ISettingsService, SettingsService>();
         services.AddHostedService<SqlStartupValidatorHostedService>();
+        // Až po kontrole schématu — bez sloupců 1_4_7 by dopočet spadl na SQL chybě
+        // místo srozumitelné hlášky validátoru. Hosted services startují v pořadí registrace.
+        services.AddHostedService<RichTextSearchTextBackfillHostedService>();
         services.AddHostedService<PriorityMatrixBootstrapHostedService>();
         services.AddHostedService<PriorityMatrixNightlyRebuildHostedService>();
         services.AddHostedService<PriorityMatrixQueuedRebuildHostedService>();

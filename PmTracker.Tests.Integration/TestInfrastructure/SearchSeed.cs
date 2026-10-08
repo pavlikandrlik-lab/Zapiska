@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using PmTracker.Web.Services.Common;
 
 namespace PmTracker.Tests.Integration.TestInfrastructure;
 
@@ -84,20 +85,24 @@ public sealed class SearchSeed
 
     // cislo_zaznamu má unique index (projekt_id, cislo_zaznamu), takže se dopočítává
     // per projekt — jinak druhý záznam ve stejném projektu spadne na duplicitní klíč.
+    //
+    // Jako aplikace: čistý text plní PmTrackerDbContext; přímý INSERT ho musí doplnit sám.
+    // withPlainText: false = data z doby před 1_4_7.
     public Task<int> AddRecordAsync(int projektId, string nazev, string? popis = null,
-        string? cisloViditelne = null) => ScalarAsync("""
+        string? cisloViditelne = null, bool withPlainText = true) => ScalarAsync("""
         INSERT INTO dbo.projektove_zaznamy
             (projekt_id, kategorie_id, cislo_zaznamu, cislo_viditelne, nazev, popis,
-             vlastnik_id, datum_zalozeni, datum_ukonceni, subsystem_id)
+             popis_prosty_text, vlastnik_id, datum_zalozeni, datum_ukonceni, subsystem_id)
         OUTPUT INSERTED.id
         VALUES (@projekt, @kategorie,
                 (SELECT ISNULL(MAX(cislo_zaznamu), 0) + 1 FROM dbo.projektove_zaznamy WHERE projekt_id = @projekt),
-                @cisloViditelne, @nazev, @popis,
+                @cisloViditelne, @nazev, @popis, @popisProstyText,
                 @vlastnik, SYSUTCDATETIME(), SYSUTCDATETIME(), @subsystem);
         """,
         ("@projekt", projektId), ("@kategorie", KategorieId),
         ("@cisloViditelne", (object?)cisloViditelne ?? DBNull.Value),
         ("@nazev", nazev), ("@popis", (object?)popis ?? DBNull.Value),
+        ("@popisProstyText", (object?)(withPlainText ? RichTextSearchText.FromHtml(popis) : null) ?? DBNull.Value),
         ("@vlastnik", OsobaId), ("@subsystem", SubsystemId));
 
     // jednani.cas_zacatek je NOT NULL (time), bez defaultu.
@@ -108,10 +113,15 @@ public sealed class SearchSeed
                 (SELECT TOP (1) id FROM dbo.ciselnik_stavu_jednani ORDER BY id));
         """, ("@projekt", projektId), ("@cislo", cisloJednani));
 
-    public Task<int> AddStatementAsync(int zaznamId, int jednaniId, string text) => ScalarAsync("""
-        INSERT INTO dbo.vyjadreni (zaznam_id, jednani_id, autor_osoba_id, text_vyjadreni, datum_vyjadreni)
-        OUTPUT INSERTED.id VALUES (@zaznam, @jednani, @autor, @text, SYSUTCDATETIME());
-        """, ("@zaznam", zaznamId), ("@jednani", jednaniId), ("@autor", OsobaId), ("@text", text));
+    // Jako aplikace: čistý text plní PmTrackerDbContext; přímý INSERT ho musí doplnit sám.
+    // withPlainText: false = data z doby před 1_4_7.
+    public Task<int> AddStatementAsync(int zaznamId, int jednaniId, string text, bool withPlainText = true) => ScalarAsync("""
+        INSERT INTO dbo.vyjadreni
+            (zaznam_id, jednani_id, autor_osoba_id, text_vyjadreni, text_vyjadreni_prosty_text, datum_vyjadreni)
+        OUTPUT INSERTED.id VALUES (@zaznam, @jednani, @autor, @text, @textProstyText, SYSUTCDATETIME());
+        """,
+        ("@zaznam", zaznamId), ("@jednani", jednaniId), ("@autor", OsobaId), ("@text", text),
+        ("@textProstyText", (object?)(withPlainText ? RichTextSearchText.FromHtml(text) : null) ?? DBNull.Value));
 
     public Task<int> AddExternalLinkAsync(int zaznamId, string cislo) => ScalarAsync("""
         INSERT INTO dbo.zaznam_externi_odkazy (zaznam_id, typ_odkazu_id, cislo)
