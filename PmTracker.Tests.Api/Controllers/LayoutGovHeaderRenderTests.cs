@@ -50,6 +50,8 @@ public sealed class LayoutGovHeaderRenderTests
         html.Should().Contain("js-gov-header__navigation-trigger", "hamburger pro úzký displej");
         html.Should().Contain("class=\"gov-search app-search\"",
             "vyhledávání zůstává v hlavičce");
+        html.Should().Contain("<gov-button slot=\"button\" native-type=\"submit\"",
+            "bez native-type=\"submit\" tlačítko Hledat formulář neodešle (gov-button má výchozí button)");
 
         html.Should().NotMatchRegex(@"app-header(?![\w-])", "stará třída hlavičky (app-header-wide je odchylka č. 7)");
         html.Should().NotContain("app-topbar");

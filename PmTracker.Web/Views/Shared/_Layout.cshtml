@@ -114,7 +114,9 @@
                    pm-search (Fáze 2D) zatím nepodporuje slot="button-erase" (clear query button)
                    ani atributy identifier + autocomplete na vnořeném gov-form-input.
                    Seznam výsledků kreslí global-search.js (odchylka č. 1). Šířku dává .app-search
-                   (roste s hlavičkou, odchylka č. 7), ne pevná gov-search--fixed-width. *@
+                   (roste s hlavičkou, odchylka č. 7), ne pevná gov-search--fixed-width.
+                   Tlačítko Hledat potřebuje native-type="submit" jako v kitu — gov-button má výchozí
+                   "button" a formulář by neodeslal (fungoval by jen Enter). *@
                 <form data-global-search
                       method="get"
                       asp-controller="Search"
@@ -130,7 +132,7 @@
                                     data-global-search-erase aria-label="Smazat dotaz">
                             <gov-icon size="s" slot="icon-start" name="x" type="components"></gov-icon>
                         </gov-button>
-                        <gov-button slot="button" color="primary" size="s" type="solid">
+                        <gov-button slot="button" native-type="submit" color="primary" size="s" type="solid">
                             Hledat
                         </gov-button>
                     </gov-form-search>

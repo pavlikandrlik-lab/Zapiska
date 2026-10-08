@@ -63,4 +63,27 @@ public sealed class HeaderLayoutScenariosTests
 
         await page.Context.CloseAsync();
     }
+
+    /// <summary>
+    /// 2026-10-08: tlačítko Hledat nereagovalo, fungoval jen Enter. gov-button má výchozí
+    /// native-type="button", takže vnitřní &lt;button&gt; formulář neodeslal; kit DS má u tlačítka
+    /// gov-form-search native-type="submit".
+    /// </summary>
+    [Fact]
+    public async Task Hledani_KlikNaHledat_OtevreStrankuVysledku()
+    {
+        var page = await _fixture.NewPageAsync();
+        await page.SetViewportSizeAsync(1400, 900);
+        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty?asUser={_fixture.AdminOsobaId}");
+        var input = page.Locator("[data-global-search] input[name='q']");
+        await Assertions.Expect(input).ToHaveAttributeAsync("role", "combobox");
+
+        await input.FillAsync("test");
+        await page.Locator("[data-global-search] gov-button[slot='button'] button").ClickAsync();
+
+        await page.WaitForURLAsync("**/Search?**q=test**", new() { Timeout = 10_000 });
+        page.Url.Should().Contain("/Search");
+
+        await page.Context.CloseAsync();
+    }
 }
