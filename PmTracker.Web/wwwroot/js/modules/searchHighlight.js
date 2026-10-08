@@ -52,14 +52,41 @@ function unwrap(mark) {
     parent.normalize();
 }
 
+// Uvozovky fráze — rovné i typografické (české „…“, anglické “…”), jako SearchQueryText.QuoteChars.
+const QUOTES = /["\u201E\u201C\u201D]/;
+
 /**
- * Slova dotazu k podsvícení, delší první (ať „záloha" nepřebije „zálohování"). Krátká slova
- * vedle delších vynechá; dotaz jen z krátkých slov („50 %") vrátí celý — stejně jako server.
+ * Výrazy dotazu k podsvícení, delší první (ať „záloha" nepřebije „zálohování"). Stejný rozklad
+ * jako SearchQueryText.SplitTerms na serveru: text v uvozovkách je jedna fráze (i krátká),
+ * neuzavřená fráze běží do konce; krátká slova vedle fráze nebo delšího slova vynechá, dotaz
+ * jen z krátkých slov („50 %") vrátí celý.
  */
 export function highlightTerms(query) {
-    const words = [...new Set(String(query ?? "").split(/\s+/).filter(Boolean))];
-    const longWords = words.filter((word) => word.length >= MIN_TERM_LENGTH);
-    return (longWords.length > 0 ? longWords : words).sort((a, b) => b.length - a.length);
+    const parts = [];
+    String(query ?? "").split(QUOTES).forEach((segment, index) => {
+        const words = segment.split(/\s+/).filter(Boolean);
+        if (index % 2 === 1) {
+            if (words.length > 0) {
+                parts.push({ text: words.join(" "), phrase: true });
+            }
+        } else {
+            words.forEach((word) => parts.push({ text: word, phrase: false }));
+        }
+    });
+
+    const hasLongTerm = parts.some((part) => part.phrase || part.text.length >= MIN_TERM_LENGTH);
+    const terms = parts
+        .filter((part) => part.phrase || !hasLongTerm || part.text.length >= MIN_TERM_LENGTH)
+        .map((part) => part.text);
+    return [...new Set(terms)].sort((a, b) => b.length - a.length);
+}
+
+/**
+ * Regulární výraz pro podsvícení. Mezera ve frázi odpovídá libovolné mezeře v textu stránky —
+ * zalomení řádku i pevné mezeře.
+ */
+export function buildHighlightPattern(terms) {
+    return new RegExp(terms.map((term) => escapeRegExp(term).replace(/ /g, "\\s+")).join("|"), "giu");
 }
 
 /**
@@ -76,7 +103,7 @@ export function highlightSearchTerms(root, query, { durationMs = DEFAULT_DURATIO
         return [];
     }
 
-    const pattern = new RegExp(terms.map(escapeRegExp).join("|"), "giu");
+    const pattern = buildHighlightPattern(terms);
     const textNodes = [];
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {

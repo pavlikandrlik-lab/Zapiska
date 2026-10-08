@@ -56,6 +56,43 @@ public sealed class SearchQueryTextTests
         SearchQueryText.MaxTerms.Should().Be(6);
     }
 
+    /// <summary>
+    /// Uživatel 2026-10-08: text v uvozovkách se hledá jako celek (jako Google), slova bez
+    /// uvozovek dál jednotlivě. Uvozovky rovné i české, neuzavřená fráze běží do konce dotazu.
+    /// </summary>
+    [Theory]
+    [InlineData("\"stav migrace a dat\"", new[] { "stav migrace a dat" })]
+    [InlineData("„stav migrace a dat“", new[] { "stav migrace a dat" })]
+    [InlineData("“stav migrace a dat”", new[] { "stav migrace a dat" })]
+    [InlineData("\"stav migrace\" a dat", new[] { "stav migrace", "dat" })]
+    [InlineData("dat \"stav   migrace\"", new[] { "dat", "stav migrace" })]
+    [InlineData("\"stav migrace", new[] { "stav migrace" })]
+    [InlineData("\"\" migrace", new[] { "migrace" })]
+    [InlineData("\"IS\" migrace a", new[] { "IS", "migrace" })]
+    public void SplitTerms_TextVUvozovkachJeJedenCelek(string input, string[] expected)
+    {
+        SearchQueryText.SplitTerms(input).Should().Equal(expected);
+    }
+
+    [Fact]
+    public void SplitTerms_FrazeSePocitaDoStropuJakoJednoSlovo()
+    {
+        SearchQueryText.SplitTerms("\"jedna dva tri\" ctyri pet sest sedm osm devet")
+            .Should().Equal(new[] { "jedna dva tri", "ctyri", "pet", "sest", "sedm", "osm" });
+    }
+
+    /// <summary>Odkaz hl nese fráze v uvozovkách, aby je detail podsvítil celé.</summary>
+    [Fact]
+    public void ToHighlightQuery_FrazeVUvozovkach_SlovaSamostatne()
+    {
+        SearchQueryText.ToHighlightQuery(new[] { "stav migrace a dat", "dat" })
+            .Should().Be("\"stav migrace a dat\" dat");
+        // Krátký výraz se hledal jen díky uvozovkám (nebo dotazu jen z krátkých slov) —
+        // bez nich by ho podsvícení vedle delšího slova vynechalo.
+        SearchQueryText.ToHighlightQuery(new[] { "IS", "migrace" })
+            .Should().Be("\"IS\" migrace");
+    }
+
     [Theory]
     [InlineData("50 %", "50 [%]")]
     [InlineData("a_b", "a[_]b")]

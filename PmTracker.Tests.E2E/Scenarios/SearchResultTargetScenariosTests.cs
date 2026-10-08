@@ -66,6 +66,32 @@ public sealed class SearchResultTargetScenariosTests
         }
     }
 
+    /// <summary>
+    /// Uživatel 2026-10-08: fráze v uvozovkách se podsvítí jako jeden celek, i s krátkým slovem
+    /// uvnitř („z“). Fráze leží v názvu záznamu — přes formátování (tučné slovo ve vyjádření)
+    /// se fráze nehledá ani nepodsvítí, viz wiki globálního vyhledávání.
+    /// </summary>
+    [Fact]
+    public async Task OdkazSFrazi_PodsvitiFraziJakoCelek()
+    {
+        var (recordId, _) = await CreateRecordWithCommentsAsync();
+        var page = await _fixture.NewPageAsync();
+
+        try
+        {
+            await page.GotoAsync(RecordUrl(recordId, $"&hl={Uri.EscapeDataString("\"cíl z vyhledávání\"")}"));
+
+            var card = page.Locator($".record-card[data-record-id='{recordId}']");
+            var marks = card.Locator("mark.app-search-flash");
+            await Expect(marks).ToHaveTextAsync(new[] { "cíl z vyhledávání" });
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+            await DeleteRecordAsync(recordId);
+        }
+    }
+
     private async Task<(int RecordId, int TargetCommentId)> CreateRecordWithCommentsAsync()
     {
         await using var db = CreateDbContext();

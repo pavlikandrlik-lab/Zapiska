@@ -257,6 +257,30 @@ public sealed class RecordSearchServiceTests
         item.DetailUrl.Should().Be($"/Projekty/Detail/{seed.ProjektId}?recordId={zaznamId}&hl=stav%20migrace%20dat");
     }
 
+    /// <summary>
+    /// Uživatel 2026-10-08: text v uvozovkách se hledá jako celek, slova bez uvozovek kdekoli.
+    /// </summary>
+    [Fact]
+    public async Task Hledani_FrazeVUvozovkach_NajdeJenSouvislyText()
+    {
+        var db = await _fixture.CreateDatabaseAsync("search_fraze");
+        var seed = await SearchSeed.CreateAsync(db.ConnectionString);
+        var souvisle = await seed.AddRecordAsync(seed.ProjektId, "Stav migrace a dat");
+        await seed.AddRecordAsync(seed.ProjektId, "Migrace dat a stav");
+
+        var service = CreateService(db.ConnectionString);
+
+        var fraze = await service.SearchAsync("\"stav migrace a dat\"", User(isSuperAdmin: true), 7, default);
+        var item = fraze.Categories.Single().Items.Single();
+        item.ZaznamId.Should().Be(souvisle);
+        item.Snippet!.Match.Should().Be("Stav migrace a dat", "podsvítí se celá fráze, jak je v datech");
+        item.DetailUrl.Should().Be(
+            $"/Projekty/Detail/{seed.ProjektId}?recordId={souvisle}&hl=%22stav%20migrace%20a%20dat%22");
+
+        var slova = await service.SearchAsync("stav migrace a dat", User(isSuperAdmin: true), 7, default);
+        slova.TotalCount.Should().Be(2, "bez uvozovek stačí, že jsou všechna slova v záznamu");
+    }
+
     [Fact]
     public async Task Hledani_NajdeZaznamPodleCislaExterniVazby()
     {

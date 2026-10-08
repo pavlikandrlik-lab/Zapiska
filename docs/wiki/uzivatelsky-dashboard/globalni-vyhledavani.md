@@ -66,11 +66,18 @@ stop-words ani řazení podle relevance. Prakticky:
 - **Slova kratší než tři znaky se vedle delších přeskakují** — spojky a předložky jako
   „a“, „v“, „na“. „stav migrace a dat“ hledá „stav“, „migrace“ a „dat“ a jen ta se po
   otevření výsledku podsvítí. Dotaz jen z krátkých slov („50 %“) se hledá celý.
+- **Text v uvozovkách se hledá jako celek** (jako na Googlu) — `"stav migrace a dat"`
+  najde jen záznamy, kde ta slova stojí přesně v tomto pořadí, a podsvítí je celá, včetně
+  „a“. Jde kombinovat se slovy: `"stav migrace" dat`. Platí rovné i české uvozovky
+  (`"…"`, `„…“`); fráze se počítá jako jedno slovo do limitu šesti.
 - **`%` a `_` se berou doslova** — hledání „50 %“ hledá opravdu „50 %“.
 - **Řazení je vzestupné** podle názvu (texty i čísla), bez skórování.
 
 ## Tipy pro efektivní hledání
 
+- **Přesné znění** — dej text do uvozovek: `"oprava importu faktur"`.
+- **Krátká zkratka vedle dalších slov** — dej ji do uvozovek, jinak se přeskočí:
+  `"IS" migrace`.
 - **Číslo externího záznamu** — zadáním 6-ciferného `id` ticketu (např. `363139`)
   najdeš záznam(y) s touto externí vazbou.
 - **Část názvu** — „FIS“ najde „FIS-EIS Modernizace“.
@@ -89,6 +96,9 @@ stop-words ani řazení podle relevance. Prakticky:
 
 - **Kratší dotaz než 3 znaky** se nevyhledává.
 - **Speciální znaky** (`%`, `_`) se berou doslova, regulární výrazy nejsou podporované.
+- **Fráze přes formátování** — v popisu a vyjádřeních se fráze v uvozovkách najde, jen
+  když v textu stojí souvisle. Když je uprostřed jinak formátovaná (část tučně, odkaz)
+  nebo zalomená na další řádek, nenajde se; hledej ji bez uvozovek.
 - **Bez scope na jeden projekt** — globální hledání neumí omezit na projekt; pro to
   použij filtr v záznamech projektu.
 

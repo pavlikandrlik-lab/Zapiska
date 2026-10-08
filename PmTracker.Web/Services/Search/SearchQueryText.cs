@@ -22,7 +22,7 @@ public static class SearchQueryText
     /// </summary>
     public const int MinTermLength = 3;
 
-    /// <summary>Strop počtu hledaných slov, aby dotaz nerostl bez hranic.</summary>
+    /// <summary>Strop počtu hledaných výrazů (slov a frází), aby dotaz nerostl bez hranic.</summary>
     public const int MaxTerms = 6;
 
     /// <summary>
@@ -51,6 +51,21 @@ public static class SearchQueryText
     private const CompareOptions AccentInsensitive =
         CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace;
 
+    /// <summary>
+    /// Uvozovky, které ohraničují frázi: rovné i typografické (české „…“, anglické “…”).
+    /// Každá přepíná dovnitř a ven, takže sedí i česká „ s uzavírací “.
+    /// </summary>
+    private static readonly char[] QuoteChars = { '"', '\u201E', '\u201C', '\u201D' };
+
+    /// <summary>
+    /// Rozloží dotaz na hledané výrazy (uživatel 2026-10-08, jako Google): text v uvozovkách
+    /// je jedna fráze hledaná jako celek, ostatní text se dělí na slova. Fráze se hledá vždy —
+    /// je to výslovná volba, i když je krátká („"IS"“). Krátké slovo vedle fráze nebo delšího
+    /// slova se vynechá, viz <see cref="MinTermLength"/>. Neuzavřená fráze běží do konce
+    /// dotazu, aby našeptávání fungovalo už během psaní. Výrazy jdou v pořadí dotazu, fráze
+    /// se do <see cref="MaxTerms"/> počítá jako jeden. Protějšek v JS: highlightTerms
+    /// v searchHighlight.js.
+    /// </summary>
     public static IReadOnlyList<string> SplitTerms(string? query)
     {
         var trimmed = query?.Trim();
@@ -59,12 +74,40 @@ public static class SearchQueryText
             return Array.Empty<string>();
         }
 
-        var words = trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        var longWords = words.Where(word => word.Length >= MinTermLength).ToArray();
-        return (longWords.Length > 0 ? longWords : words)
+        var parts = new List<(string Text, bool IsPhrase)>();
+        var segments = trimmed.Split(QuoteChars);
+        for (var i = 0; i < segments.Length; i++)
+        {
+            var words = segments[i].Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            // Liché úseky leží mezi uvozovkami (i neuzavřený poslední).
+            if (i % 2 == 1)
+            {
+                if (words.Length > 0)
+                {
+                    parts.Add((string.Join(' ', words), true));
+                }
+            }
+            else
+            {
+                parts.AddRange(words.Select(word => (word, false)));
+            }
+        }
+
+        var hasLongTerm = parts.Any(part => part.IsPhrase || part.Text.Length >= MinTermLength);
+        return parts
+            .Where(part => part.IsPhrase || !hasLongTerm || part.Text.Length >= MinTermLength)
+            .Select(part => part.Text)
             .Take(MaxTerms)
             .ToList();
     }
+
+    /// <summary>
+    /// Výrazy zpět jako dotaz pro podsvícení na detailu (parametr hl). Fráze a krátké výrazy
+    /// jdou v uvozovkách — jinak by je podsvícení rozložilo na slova, resp. vynechalo —, takže
+    /// se na kartě podsvítí přesně to, podle čeho se hledalo.
+    /// </summary>
+    public static string ToHighlightQuery(IEnumerable<string> terms) => string.Join(' ', terms.Select(term =>
+        term.Contains(' ') || term.Length < MinTermLength ? $"\"{term}\"" : term));
 
     /// <summary>
     /// Escapuje zástupné znaky LIKE hranatými závorkami — stejně jako zbytek projektu.

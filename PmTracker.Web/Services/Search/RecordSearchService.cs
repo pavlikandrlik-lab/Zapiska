@@ -204,8 +204,9 @@ public sealed class RecordSearchService : IRecordSearchService
             url += $"&vyjadreniId={vyjadreniId}";
         }
 
-        // Jen slova, podle kterých se hledalo — ne syrový dotaz se spojkami (viz MinTermLength).
-        return url + "&hl=" + Uri.EscapeDataString(string.Join(' ', terms));
+        // Jen výrazy, podle kterých se hledalo — ne syrový dotaz se spojkami (viz MinTermLength);
+        // fráze v uvozovkách, aby se podsvítily celé.
+        return url + "&hl=" + Uri.EscapeDataString(SearchQueryText.ToHighlightQuery(terms));
     }
 
     /// <summary>

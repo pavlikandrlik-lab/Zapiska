@@ -105,6 +105,11 @@ Databáze má collation `Czech_CI_AS` — nerozlišuje velikost písmen, ale **r
   Slova kratší než 3 znaky se vedle delších vynechají z hledání, z odkazu `hl` i z podsvícení
   (`SearchQueryText.MinTermLength`, `searchHighlight.js`); dotaz jen z krátkých slov se hledá
   celý. Doplněno 2026-10-08 — spojka „a“ rozsvítila každé „a“ na kartě.
+- Fráze (2026-10-08, jako Google): text v uvozovkách `"…"`/`„…“` je jeden výraz hledaný
+  jako celek (LIKE `%fráze%`), vždy se hledá i krátký; slova mimo uvozovky beze změny.
+  Neuzavřená fráze běží do konce dotazu. `hl` nese fráze v uvozovkách
+  (`SearchQueryText.ToHighlightQuery`), podsvícení je rozkládá stejně (`highlightTerms`).
+  Omezení: fráze přes HTML formátování v popisu/vyjádření se nenajde.
 - **Minimální délka dotazu: 3 znaky.**
 
 ### 2.6 Řazení
