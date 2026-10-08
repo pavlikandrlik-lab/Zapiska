@@ -9,6 +9,12 @@ namespace PmTracker.Web.Services.Data;
 /// 2026-10-08). Běží při startu hned po kontrole schématu a doplní jen řádky, kde HTML je
 /// a čistý text chybí (NULL). Po prvním běhu nemá co dělat. Nové a upravené texty plní
 /// PmTrackerDbContext při uložení.
+///
+/// Review M3 (2026-10-08): dávka se stránkuje podle Id (ne OFFSET od začátku) — jinak dotaz
+/// skenuje znovu od prvního řádku při každé dávce a práce roste s druhou mocninou počtu
+/// řádků. Selhání (např. timeout DB při startu) se zaloguje a start aplikace pokračuje —
+/// další start dopočet zopakuje. Dřív selhání shodilo celý hosting (500.30) za jednorázovou
+/// dávkovou úlohu, ne chybějící předpoklad schématu.
 /// </summary>
 public sealed class RichTextSearchTextBackfillHostedService : IHostedService
 {
@@ -26,12 +32,29 @@ public sealed class RichTextSearchTextBackfillHostedService : IHostedService
 
     public async Task StartAsync(CancellationToken ct)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<PmTrackerDbContext>();
-        var doplneno = await BackfillAsync(db, ct);
-        if (doplneno > 0)
+        try
         {
-            _logger.LogInformation("Čistý text pro hledání doplněn u {Pocet} řádků.", doplneno);
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<PmTrackerDbContext>();
+
+            await ZalogujPocetAsync("popis záznamů", DoplnPopisyAsync(db, ct));
+            await ZalogujPocetAsync("text vyjádření", DoplnVyjadreniAsync(db, ct));
+            await ZalogujPocetAsync("požadavek externích odkazů", DoplnPozadavkyAsync(db, ct));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex,
+                "Dopočet čistého textu pro hledání selhal; hledání ve starších popisech a vyjádřeních " +
+                "může být neúplné. Další start aplikace dopočet zopakuje.");
+        }
+    }
+
+    private async Task ZalogujPocetAsync(string popisek, Task<int> dopln)
+    {
+        var pocet = await dopln;
+        if (pocet > 0)
+        {
+            _logger.LogInformation("Čistý text pro hledání doplněn u {Pocet} řádků ({Popisek}).", pocet, popisek);
         }
     }
 
@@ -40,31 +63,38 @@ public sealed class RichTextSearchTextBackfillHostedService : IHostedService
     public static async Task<int> BackfillAsync(PmTrackerDbContext db, CancellationToken ct)
     {
         var celkem = 0;
-
-        celkem += await DoplnAsync(
-            db.ProjektoveZaznamy.Where(z => z.Popis != null && z.PopisProstyText == null).OrderBy(z => z.Id),
-            z => z.PopisProstyText = RichTextSearchText.FromHtml(z.Popis), db, ct);
-        celkem += await DoplnAsync(
-            db.Vyjadreni.Where(v => v.TextVyjadreni != null && v.TextVyjadreniProstyText == null).OrderBy(v => v.Id),
-            v => v.TextVyjadreniProstyText = RichTextSearchText.FromHtml(v.TextVyjadreni), db, ct);
-        celkem += await DoplnAsync(
-            db.ZaznamExterniOdkazy.Where(o => o.Pozadavek != null && o.PozadavekProstyText == null).OrderBy(o => o.Id),
-            o => o.PozadavekProstyText = RichTextSearchText.FromHtml(o.Pozadavek), db, ct);
-
+        celkem += await DoplnPopisyAsync(db, ct);
+        celkem += await DoplnVyjadreniAsync(db, ct);
+        celkem += await DoplnPozadavkyAsync(db, ct);
         return celkem;
     }
 
-    // Vybírá vždy znovu první dávku chybějících: doplněné řádky z dotazu vypadnou, protože
-    // FromHtml pro neprázdné HTML vrátí řetězec (i prázdný), nikdy NULL. OrderBy(Id) na
-    // volajícím místě je nutný kvůli deterministickému Take (jinak EF hlásí warning).
+    private static Task<int> DoplnPopisyAsync(PmTrackerDbContext db, CancellationToken ct) => DoplnAsync(
+        lastId => db.ProjektoveZaznamy.Where(z => z.Id > lastId && z.Popis != null && z.PopisProstyText == null).OrderBy(z => z.Id),
+        z => z.Id, z => z.PopisProstyText = RichTextSearchText.FromHtml(z.Popis), db, ct);
+
+    private static Task<int> DoplnVyjadreniAsync(PmTrackerDbContext db, CancellationToken ct) => DoplnAsync(
+        lastId => db.Vyjadreni.Where(v => v.Id > lastId && v.TextVyjadreni != null && v.TextVyjadreniProstyText == null).OrderBy(v => v.Id),
+        v => v.Id, v => v.TextVyjadreniProstyText = RichTextSearchText.FromHtml(v.TextVyjadreni), db, ct);
+
+    private static Task<int> DoplnPozadavkyAsync(PmTrackerDbContext db, CancellationToken ct) => DoplnAsync(
+        lastId => db.ZaznamExterniOdkazy.Where(o => o.Id > lastId && o.Pozadavek != null && o.PozadavekProstyText == null).OrderBy(o => o.Id),
+        o => o.Id, o => o.PozadavekProstyText = RichTextSearchText.FromHtml(o.Pozadavek), db, ct);
+
+    // Stránkuje podle Id (Where Id > lastId), ne OFFSET od začátku — jinak dotaz skenuje
+    // znovu od prvního řádku při každé dávce a práce roste s druhou mocninou počtu řádků
+    // (review M3). dotaz dostane poslední Id dávky a vrátí frontu od něj dál; doplněné
+    // řádky z dotazu vypadnou, protože FromHtml pro neprázdné HTML vrátí řetězec (i
+    // prázdný), nikdy NULL.
     private static async Task<int> DoplnAsync<T>(
-        IOrderedQueryable<T> chybejici, Action<T> dopln, PmTrackerDbContext db, CancellationToken ct)
+        Func<int, IOrderedQueryable<T>> dotaz, Func<T, int> id, Action<T> dopln, PmTrackerDbContext db, CancellationToken ct)
         where T : class
     {
         var pocet = 0;
+        var posledniId = 0;
         while (true)
         {
-            var davka = await chybejici.Take(Davka).ToListAsync(ct);
+            var davka = await dotaz(posledniId).Take(Davka).ToListAsync(ct);
             if (davka.Count == 0)
             {
                 return pocet;
@@ -74,6 +104,7 @@ public sealed class RichTextSearchTextBackfillHostedService : IHostedService
             await db.SaveChangesAsync(ct);
             db.ChangeTracker.Clear();
             pocet += davka.Count;
+            posledniId = davka.Max(id);
         }
     }
 }
