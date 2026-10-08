@@ -316,7 +316,7 @@ public sealed class ZaznamExterniOdkazEntity
     public string? Pozadavek { get; set; }
 
     /// <summary>
-    /// Čistý text popisu pro hledání (RichTextSearchText); plní PmTrackerDbContext při uložení.
+    /// Čistý text požadavku do výzvy pro hledání (RichTextSearchText); plní PmTrackerDbContext při uložení.
     /// Zatím se nehledá — připraveno pro hledání ve výzvách (uživatel 2026-10-08).
     /// </summary>
     public string? PozadavekProstyText { get; set; }
@@ -377,7 +377,7 @@ public sealed class VyjadreniEntity
     public int AutorOsobaId { get; set; }
     public string TextVyjadreni { get; set; } = string.Empty;
 
-    /// <summary>Čistý text popisu pro hledání (RichTextSearchText); plní PmTrackerDbContext při uložení.</summary>
+    /// <summary>Čistý text vyjádření pro hledání (RichTextSearchText); plní PmTrackerDbContext při uložení.</summary>
     public string? TextVyjadreniProstyText { get; set; }
     public DateTime DatumVyjadreni { get; set; }
 }
