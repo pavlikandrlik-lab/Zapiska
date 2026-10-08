@@ -15,34 +15,37 @@ internal static class RichTextSearchTextSync
 {
     public static void Apply(ChangeTracker tracker)
     {
-        tracker.DetectChanges();
-
-        foreach (var entry in tracker.Entries<ProjektovyZaznamEntity>())
+        // Jediný průchod: Entries() samo spustí DetectChanges (při zapnuté automatické
+        // detekci), vlastní volání ani Entries<T>() pro každý typ by k uložení přidaly další
+        // průchody všech sledovaných entit. S vypnutou detekcí platí, co volající sám označil
+        // — stejně jako pro SaveChanges.
+        foreach (var entry in tracker.Entries())
         {
-            if (HtmlChanged(entry, nameof(ProjektovyZaznamEntity.Popis)))
+            switch (entry.Entity)
             {
-                entry.Entity.PopisProstyText = RichTextSearchText.FromHtml(entry.Entity.Popis);
-            }
-        }
-
-        foreach (var entry in tracker.Entries<VyjadreniEntity>())
-        {
-            if (HtmlChanged(entry, nameof(VyjadreniEntity.TextVyjadreni)))
-            {
-                entry.Entity.TextVyjadreniProstyText = RichTextSearchText.FromHtml(entry.Entity.TextVyjadreni);
-            }
-        }
-
-        foreach (var entry in tracker.Entries<ZaznamExterniOdkazEntity>())
-        {
-            if (HtmlChanged(entry, nameof(ZaznamExterniOdkazEntity.Pozadavek)))
-            {
-                entry.Entity.PozadavekProstyText = RichTextSearchText.FromHtml(entry.Entity.Pozadavek);
+                case ProjektovyZaznamEntity:
+                    Sync(entry, nameof(ProjektovyZaznamEntity.Popis), nameof(ProjektovyZaznamEntity.PopisProstyText));
+                    break;
+                case VyjadreniEntity:
+                    Sync(entry, nameof(VyjadreniEntity.TextVyjadreni), nameof(VyjadreniEntity.TextVyjadreniProstyText));
+                    break;
+                case ZaznamExterniOdkazEntity:
+                    Sync(entry, nameof(ZaznamExterniOdkazEntity.Pozadavek), nameof(ZaznamExterniOdkazEntity.PozadavekProstyText));
+                    break;
             }
         }
     }
 
-    private static bool HtmlChanged<T>(EntityEntry<T> entry, string htmlProperty) where T : class
-        => entry.State == EntityState.Added
-           || (entry.State == EntityState.Modified && entry.Property(htmlProperty).IsModified);
+    // Zápis přes záznam změn (CurrentValue), ne do objektu — EF hodnotu rovnou označí jako
+    // změněnou, takže do UPDATE se dostane i bez další detekce změn.
+    private static void Sync(EntityEntry entry, string htmlProperty, string plainProperty)
+    {
+        var html = entry.Property(htmlProperty);
+        var htmlChanged = entry.State == EntityState.Added
+                          || (entry.State == EntityState.Modified && html.IsModified);
+        if (htmlChanged)
+        {
+            entry.Property(plainProperty).CurrentValue = RichTextSearchText.FromHtml((string?)html.CurrentValue);
+        }
+    }
 }

@@ -66,6 +66,54 @@ public sealed class RichTextSearchTextSyncTests
     }
 
     [Fact]
+    public async Task Ulozeni_ProchaziSledovaneEntityNejvysDvakrat()
+    {
+        // Dřív háček volal DetectChanges sám a pak ještě v každém ze tří Entries<T>() —
+        // s uložením 5 průchodů všech sledovaných entit místo 1 (drobnost z review 2026-10-08).
+        await using var db = Db();
+        var zaznam = new ProjektovyZaznamEntity { Id = 1, Nazev = "N", Popis = "<p>pes</p>" };
+        db.ProjektoveZaznamy.Add(zaznam);
+        await db.SaveChangesAsync();
+
+        var pruchody = 0;
+        db.ChangeTracker.DetectedAllChanges += (_, _) => pruchody++;
+        zaznam.Popis = "<p>kočka</p>";
+        await db.SaveChangesAsync();
+
+        pruchody.Should().BeLessThanOrEqualTo(2, "jeden průchod háčku a jeden uložení samotného EF");
+        zaznam.PopisProstyText.Should().Be("kočka");
+    }
+
+    [Fact]
+    public async Task VypnutaAutomatickaDetekce_CistyTextSePresToUlozi()
+    {
+        // Háček píše přes záznam změn EF, ne do objektu — jinak by se s vypnutou automatickou
+        // detekcí změn čistý text spočítal, ale do DB neodešel.
+        var nazev = Guid.NewGuid().ToString();
+        PmTrackerDbContext Kontext() => new(new DbContextOptionsBuilder<PmTrackerDbContext>()
+            .UseInMemoryDatabase(nazev).Options);
+
+        await using (var db = Kontext())
+        {
+            db.ProjektoveZaznamy.Add(new ProjektovyZaznamEntity { Id = 1, Nazev = "N", Popis = "<p>staré</p>" });
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = Kontext())
+        {
+            db.ChangeTracker.AutoDetectChangesEnabled = false;
+            var zaznam = await db.ProjektoveZaznamy.SingleAsync();
+            db.Entry(zaznam).Property(x => x.Popis).CurrentValue = "<p>nové <b>slovo</b></p>";
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = Kontext())
+        {
+            (await db.ProjektoveZaznamy.SingleAsync()).PopisProstyText.Should().Be("nové slovo");
+        }
+    }
+
+    [Fact]
     public void ZadnyZapisNeobchaziHacek()
     {
         // ExecuteUpdate / přímé SQL by čistý text obešlo — nad HTML sloupci se nesmí použít.
