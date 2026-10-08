@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text.RegularExpressions;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Data;
@@ -117,11 +116,27 @@ public sealed class RichTextSearchTextSyncTests
     public void ZadnyZapisNeobchaziHacek()
     {
         // ExecuteUpdate / přímé SQL by čistý text obešlo — nad HTML sloupci se nesmí použít.
-        var zdroje = Directory.GetFiles(ResolvePath("PmTracker.Web"), "*.cs", SearchOption.AllDirectories)
-            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
-            .Select(File.ReadAllText);
-        zdroje.Should().NotContain(s => Regex.IsMatch(s,
-            @"ExecuteUpdate[^;]*(Popis|TextVyjadreni|Pozadavek)\b|UPDATE\s+dbo\.(projektove_zaznamy|vyjadreni|zaznam_externi_odkazy)\s+SET[^;]*(popis|text_vyjadreni|pozadavek)\s*=",
-            RegexOptions.IgnoreCase));
+        var poruseni = Directory.GetFiles(ResolvePath("PmTracker.Web"), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                        && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .SelectMany(f => RichTextHtmlWriteGuard.FindRawHtmlWrites(File.ReadAllText(f))
+                .Select(prikaz => $"{Path.GetFileName(f)}: {prikaz}"))
+            .ToList();
+
+        poruseni.Should().BeEmpty("HTML popisu, vyjádření a požadavku se zapisuje jen přes EF (háček čistého textu)");
+    }
+
+    [Fact]
+    public void UpgradeSkriptPo147_PriZmeneHtmlVynulujeCistyText()
+    {
+        // docs/technical/06-database-bootstrap-migrations.md, 5.7 — jinak hledání tiše vrací
+        // staré výsledky, dokud někdo nespustí db_reset_prosty_text_hledani.sql.
+        var poruseni = Directory.GetFiles(ResolvePath("."), "db_upgrade_*.sql")
+            .Where(RichTextHtmlWriteGuard.IsMigrationAfterPlainTextColumns)
+            .SelectMany(f => RichTextHtmlWriteGuard.FindHtmlWritesWithoutPlainReset(File.ReadAllText(f))
+                .Select(prikaz => $"{Path.GetFileName(f)}: {prikaz}"))
+            .ToList();
+
+        poruseni.Should().BeEmpty("příkaz, který mění popis/text_vyjadreni/pozadavek, musí nastavit *_prosty_text = NULL");
     }
 }
