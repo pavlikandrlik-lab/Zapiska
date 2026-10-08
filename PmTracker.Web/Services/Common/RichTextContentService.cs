@@ -332,11 +332,45 @@ public sealed partial class RichTextContentService : IRichTextContentService
         return uri.ToString();
     }
 
+    /// <summary>
+    /// Upraví platné HTML tak, aby ho přijal XML parser. Bez toho se HTML odjinud než
+    /// z editoru (Word, starší data) celé zobrazilo jako text i se značkami a značky šly
+    /// i do čistého textu pro hledání (drobnost z review 2026-10-08). Co ani pak není
+    /// XML, zůstává pro záložní cestu — je to text, který HTML jen připomíná.
+    /// </summary>
     private static string NormalizeHtmlForXml(string html)
     {
         var normalized = BreakTagRegex().Replace(html, "<br />");
-        return normalized.Replace("&nbsp;", "&#160;", StringComparison.OrdinalIgnoreCase);
+        normalized = normalized.Replace("&nbsp;", "&#160;", StringComparison.OrdinalIgnoreCase);
+        // Značky s předponou z Wordu (<o:p>) — XML je odmítne kvůli nedeklarované předponě.
+        normalized = PrefixedTagRegex().Replace(normalized, string.Empty);
+        // Prázdné značky (<img>, <hr>) v HTML nemají uzavírací značku, v XML ji musí mít.
+        normalized = VoidTagRegex().Replace(normalized, "<${name}${attrs} />");
+        // Názvy značek na malá písmena — HTML velikost písmen nerozlišuje, XML ano (<P>…</p>).
+        normalized = TagNameRegex().Replace(normalized,
+            match => match.Groups["open"].Value + match.Groups["name"].Value.ToLowerInvariant());
+        return NamedEntityRegex().Replace(normalized, DecodeNamedEntity);
     }
+
+    // Pojmenované entity HTML (&ndash;, &copy;) XML nezná — na znak. Pět entit, které XML zná
+    // a které nesou význam (&amp; &lt; …), zůstává; neznámá entita taky (dál neprojde parserem).
+    private static string DecodeNamedEntity(Match match)
+    {
+        if (XmlEntityNames.Contains(match.Groups["name"].Value))
+        {
+            return match.Value;
+        }
+
+        var decoded = WebUtility.HtmlDecode(match.Value);
+        return decoded == match.Value || decoded.AsSpan().IndexOfAny("&<>\"'") >= 0
+            ? match.Value
+            : decoded;
+    }
+
+    private static readonly HashSet<string> XmlEntityNames = new(StringComparer.Ordinal)
+    {
+        "amp", "lt", "gt", "quot", "apos"
+    };
 
     /// <summary>
     /// Kóduje jen znaky, které v HTML něco znamenají (&amp;, &lt;, &gt; a uvozovky
@@ -426,4 +460,17 @@ public sealed partial class RichTextContentService : IRichTextContentService
 
     [GeneratedRegex(@"<[^>]+>", RegexOptions.CultureInvariant)]
     private static partial Regex AnyTagRegex();
+
+    [GeneratedRegex(@"<\s*/?\s*[A-Za-z][\w.-]*:[\w.-]+[^>]*>", RegexOptions.CultureInvariant)]
+    private static partial Regex PrefixedTagRegex();
+
+    [GeneratedRegex(@"<\s*(?<name>img|hr|input|meta|link|wbr|col|area|source|embed|param|track)\b(?<attrs>[^>]*?)\s*/?\s*>",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex VoidTagRegex();
+
+    [GeneratedRegex(@"(?<open></?)(?<name>[A-Za-z][A-Za-z0-9]*)", RegexOptions.CultureInvariant)]
+    private static partial Regex TagNameRegex();
+
+    [GeneratedRegex(@"&(?<name>[A-Za-z][A-Za-z0-9]*);", RegexOptions.CultureInvariant)]
+    private static partial Regex NamedEntityRegex();
 }

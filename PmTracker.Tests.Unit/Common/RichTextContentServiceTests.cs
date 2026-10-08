@@ -141,5 +141,34 @@ public sealed class RichTextContentServiceTests
 
         result.Should().Be("<p>Řádek 1<br>Řádek &lt;2&gt; &amp; víc</p>");
     }
+
+    // Drobnost z review 2026-10-08: HTML, které XML parser nepřijme, se dřív celé
+    // zobrazilo jako text i se značkami a do čistého textu pro hledání šly značky taky.
+    // Platné HTML z jiného zdroje než z editoru (Word, starší data) se teď převede.
+    [Theory]
+    [InlineData("<p>A &ndash; B &copy; C</p>", "<p>A – B © C</p>")]
+    [InlineData("<p>Obrázek:<img src=\"x.png\"> a čára<hr></p>", "<p>Obrázek: a čára</p>")]
+    [InlineData("<P>Velká <STRONG>písmena</strong></p>", "<p>Velká <strong>písmena</strong></p>")]
+    [InlineData("<p class=\"MsoNormal\">Text z Wordu<o:p></o:p></p>", "<p>Text z Wordu</p>")]
+    [InlineData("<p>a&NBSP;b</p>", "<p>a b</p>")]
+    public void ToSafeHtml_HtmlMimoEditor_PrevedeMistoZobrazeniZnacek(string input, string expected)
+    {
+        _sut.ToSafeHtml(input).Should().Be(expected);
+    }
+
+    [Fact]
+    public void ToPlainText_PojmenovanaEntita_DaZnakBezZnacek()
+    {
+        _sut.ToPlainText("<p>A &ndash; <strong>B</strong></p>").Should().Be("A – B");
+    }
+
+    [Theory]
+    [InlineData("Stiskni <Enter> a pokračuj", "<p>Stiskni &lt;Enter&gt; a pokračuj</p>")]
+    [InlineData("<p>a &neexistuje; b</p>", "<p>&lt;p&gt;a &amp;neexistuje; b&lt;/p&gt;</p>")]
+    public void ToSafeHtml_TextJenPripominajiciHtml_ZobraziDoslova(string input, string expected)
+    {
+        // Záložní cesta zůstává: co ani po úpravě není HTML, se zobrazí tak, jak to autor napsal.
+        _sut.ToSafeHtml(input).Should().Be(expected);
+    }
 }
 

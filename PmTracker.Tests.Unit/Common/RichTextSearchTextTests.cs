@@ -13,6 +13,7 @@ public sealed class RichTextSearchTextTests
     [InlineData("<p>A &amp; B &lt;tag&gt;</p>", "A & B <tag>")]
     [InlineData("<p><a href=\"https://x.cz\">odkaz</a> text</p>", "odkaz text")]
     [InlineData("prostý text bez značek", "prostý text bez značek")]
+    [InlineData("<p>Termín &ndash; <strong>březen</strong></p>", "Termín – březen")]
     public void FromHtml_VratiTextBezZnacekSJednouMezerou(string html, string expected)
     {
         RichTextSearchText.FromHtml(html).Should().Be(expected);
