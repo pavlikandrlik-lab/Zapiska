@@ -1,7 +1,22 @@
 # Návrh změny harmonogramu — opravy k udělání (zadáno 2026-10-08)
 
-Dvě připomínky uživatele k návrhům změny harmonogramu. Stav je ověřený v kódu, oprava zatím
+Tři připomínky uživatele k návrhům změny harmonogramu. Stav je ověřený v kódu, oprava zatím
 neproběhla.
+
+## Rozhodnutí uživatele (2026-10-08)
+
+1. **Důvod změny:** v návrhu změny termínu nebo harmonogramu dát autorovi pole pro text, proč
+   změnu chce. Schvalovateli ho ukázat jako sdělení autora. Využít k tomu prvek „důvod“
+   (`zaznam_historie_terminu.duvod`), který dnes nese jen pevné „Úprava záznamu“ — viz
+   Související vyjasnění na konci.
+2. **Opakovaný návrh při aktivním návrhu:** ověřit po kliknutí, ještě před přechodem na
+   editor návrhu. Když návrh nejde založit, zobrazit dialog (`gov-dialog` se stavem error),
+   ne chybovou stránku. Dialog má přednost před infobarem. Zašedlá položka se nedělá.
+3. **Režim vyplňování v návrhu:** opravit, aby se přepínač do návrhu ukládal a po schválení se
+   přepnutí opravdu provedlo. Schvalovatel vidí stav z návrhu, ne ze záznamu. Když se stav
+   v návrhu liší od záznamu, zobrazit nad záznamem `gov-infobar` (error, bold, ikona
+   `components/exclamation-triangle-fill`, `closable` false). Podbarvení přepínače v editoru
+   návrhu (požadavek z prvního zadání) zůstává.
 
 ## 1. Opakovaný návrh při aktivním návrhu končí chybovou stránkou
 
