@@ -7,6 +7,9 @@ const FLASH_CLASS = "app-search-flash";
 const FADING_CLASS = "app-search-flash--fading";
 const DEFAULT_DURATION_MS = 15000;
 const FADE_MS = 1000;
+// Musí sedět se serverem (SearchQueryText.MinTermLength): krátké slovo vedle delších se
+// nehledá, a tak se ani nepodsvítí — jinak spojka „a“ rozsvítí každé „a“ na kartě.
+const MIN_TERM_LENGTH = 3;
 
 // Do těchto míst se nesahá: ovládací prvky, skryté formuláře (úprava vyjádření nese
 // v <textarea> HTML jako text), editor Quill a už vložené značky.
@@ -50,6 +53,16 @@ function unwrap(mark) {
 }
 
 /**
+ * Slova dotazu k podsvícení, delší první (ať „záloha" nepřebije „zálohování"). Krátká slova
+ * vedle delších vynechá; dotaz jen z krátkých slov („50 %") vrátí celý — stejně jako server.
+ */
+export function highlightTerms(query) {
+    const words = [...new Set(String(query ?? "").split(/\s+/).filter(Boolean))];
+    const longWords = words.filter((word) => word.length >= MIN_TERM_LENGTH);
+    return (longWords.length > 0 ? longWords : words).sort((a, b) => b.length - a.length);
+}
+
+/**
  * Obalí výskyty slov z query uvnitř root do <mark class="app-search-flash"> a po durationMs
  * je plynule odstraní. Vrací vložené značky.
  */
@@ -58,9 +71,7 @@ export function highlightSearchTerms(root, query, { durationMs = DEFAULT_DURATIO
         return [];
     }
 
-    // Delší slova první, ať „záloha" nepřebije „zálohování".
-    const terms = [...new Set(String(query || "").split(/\s+/).filter(Boolean))]
-        .sort((a, b) => b.length - a.length);
+    const terms = highlightTerms(query);
     if (terms.length === 0) {
         return [];
     }

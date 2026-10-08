@@ -42,7 +42,8 @@ public sealed class SearchResultTargetScenariosTests
             await Expect(card.Locator($"[data-comment-id='{targetCommentId}']")).ToHaveCountAsync(0);
 
             await page.Clock.InstallAsync();
-            await page.GotoAsync(RecordUrl(recordId, $"&vyjadreniId={targetCommentId}&hl={Uri.EscapeDataString("řešení zálohy")}"));
+            // Spojka „a“ v hl se nepodsvítí (2026-10-08: jinak se rozsvítilo každé „a“ na kartě).
+            await page.GotoAsync(RecordUrl(recordId, $"&vyjadreniId={targetCommentId}&hl={Uri.EscapeDataString("řešení a zálohy")}"));
 
             card = page.Locator($".record-card[data-record-id='{recordId}']");
             var target = card.Locator($"[data-comment-id='{targetCommentId}']");

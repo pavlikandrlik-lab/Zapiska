@@ -238,6 +238,25 @@ public sealed class RecordSearchServiceTests
         item.DetailUrl.Should().Be($"/Projekty/Detail/{seed.ProjektId}?recordId={zaznamId}&hl=z%C3%A1lohov%C3%A1n%C3%AD");
     }
 
+    /// <summary>
+    /// 2026-10-08: spojka „a“ v dotazu se nesmí dostat do odkazu — detail by podsvítil každé
+    /// písmeno „a“ na kartě. Odkaz nese jen slova, podle kterých se opravdu hledalo.
+    /// </summary>
+    [Fact]
+    public async Task Hledani_OdkazNeseJenHledanaSlova_BezKratkych()
+    {
+        var db = await _fixture.CreateDatabaseAsync("search_odkaz_kratka_slova");
+        var seed = await SearchSeed.CreateAsync(db.ConnectionString);
+        var zaznamId = await seed.AddRecordAsync(seed.ProjektId, "Informace o stavu migrace dat");
+
+        var service = CreateService(db.ConnectionString);
+        var result = await service.SearchAsync("stav migrace a dat", User(isSuperAdmin: true), 7, default);
+
+        var item = result.Categories.Single().Items.Single();
+        item.Snippet!.Match.Should().Be("stav");
+        item.DetailUrl.Should().Be($"/Projekty/Detail/{seed.ProjektId}?recordId={zaznamId}&hl=stav%20migrace%20dat");
+    }
+
     [Fact]
     public async Task Hledani_NajdeZaznamPodleCislaExterniVazby()
     {

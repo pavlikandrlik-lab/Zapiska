@@ -102,6 +102,9 @@ Databáze má collation `Czech_CI_AS` — nerozlišuje velikost písmen, ale **r
 - V EF Core se zapisuje jako `EF.Functions.Like(EF.Functions.Collate(x, "Latin1_General_CI_AI"), pattern)`.
 - Vstup se escapuje (`\` `%` `_` `[`) a `LIKE` dostane `ESCAPE '\'`, aby dotaz „50 %" hledal doslova „50 %".
 - Víceslovný dotaz: všechna slova musí padnout (AND mezi slovy, OR mezi poli), max 6 slov.
+  Slova kratší než 3 znaky se vedle delších vynechají z hledání, z odkazu `hl` i z podsvícení
+  (`SearchQueryText.MinTermLength`, `searchHighlight.js`); dotaz jen z krátkých slov se hledá
+  celý. Doplněno 2026-10-08 — spojka „a“ rozsvítila každé „a“ na kartě.
 - **Minimální délka dotazu: 3 znaky.**
 
 ### 2.6 Řazení

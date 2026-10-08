@@ -63,6 +63,9 @@ stop-words ani řazení podle relevance. Prakticky:
   i „záznamech“, ale „záznamu“ **nenajde** „záznam“. Zkus kratší tvar nebo kořen slova.
 - **Víceslovný dotaz vyžaduje všechna slova**, ne nutně vedle sebe. Bere se prvních
   6 slov.
+- **Slova kratší než tři znaky se vedle delších přeskakují** — spojky a předložky jako
+  „a“, „v“, „na“. „stav migrace a dat“ hledá „stav“, „migrace“ a „dat“ a jen ta se po
+  otevření výsledku podsvítí. Dotaz jen z krátkých slov („50 %“) se hledá celý.
 - **`%` a `_` se berou doslova** — hledání „50 %“ hledá opravdu „50 %“.
 - **Řazení je vzestupné** podle názvu (texty i čísla), bez skórování.
 

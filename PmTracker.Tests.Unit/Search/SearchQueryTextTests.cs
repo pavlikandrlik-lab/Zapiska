@@ -20,15 +20,40 @@ public sealed class SearchQueryTextTests
     [InlineData("ab")]
     public void SplitTerms_PodPrahemVraciPrazdno(string? input)
     {
-        // Práh 3 znaky se vyhodnocuje nad celým dotazem, ne nad jednotlivými slovy.
+        // Práh 3 znaky pro celý dotaz.
         SearchQueryText.SplitTerms(input).Should().BeEmpty();
     }
 
-    [Fact]
-    public void SplitTerms_OmezujePocetSlov()
+    /// <summary>
+    /// 2026-10-08: „stav migrace a dat“ se rozpadlo na hledání písmen — spojka „a“ byla slovem
+    /// dotazu, LIKE '%a%' a podsvícení pak označily každé „a“ na kartě. Krátké slovo vedle
+    /// delších se nehledá ani nepodsvítí.
+    /// </summary>
+    [Theory]
+    [InlineData("stav migrace a dat", new[] { "stav", "migrace", "dat" })]
+    [InlineData("revize v systému", new[] { "revize", "systému" })]
+    [InlineData("podklady na jednání", new[] { "podklady", "jednání" })]
+    public void SplitTerms_ZahodiSlovaKratsiNezPrah(string input, string[] expected)
     {
-        SearchQueryText.SplitTerms("a b c d e f g h i")
-            .Should().HaveCount(SearchQueryText.MaxTerms);
+        SearchQueryText.SplitTerms(input).Should().Equal(expected);
+    }
+
+    [Theory]
+    [InlineData("50 %", new[] { "50", "%" })]
+    [InlineData("IS SD", new[] { "IS", "SD" })]
+    public void SplitTerms_DotazJenZKratkychSlov_HledaSeCely(string input, string[] expected)
+    {
+        // Bez delšího slova by se nehledalo nic — „50 %“ má dál najít „Čerpání 50 % rozpočtu“.
+        SearchQueryText.SplitTerms(input).Should().Equal(expected);
+    }
+
+    [Fact]
+    public void SplitTerms_OmezujePocetSlov_KratkaSlovaSeNepocitaji()
+    {
+        SearchQueryText.SplitTerms("a b c d e f jedna dva tri ctyri pet sest sedm")
+            .Should().Equal(new[] { "jedna", "dva", "tri", "ctyri", "pet", "sest" },
+                "strop počítá jen slova, která se opravdu hledají");
+        SearchQueryText.MaxTerms.Should().Be(6);
     }
 
     [Theory]

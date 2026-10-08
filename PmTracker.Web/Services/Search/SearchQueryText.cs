@@ -14,7 +14,15 @@ public static class SearchQueryText
     /// <summary>Kratší dotaz se do databáze vůbec neposílá.</summary>
     public const int MinQueryLength = 3;
 
-    /// <summary>Strop počtu slov, aby dotaz nerostl bez hranic.</summary>
+    /// <summary>
+    /// Kratší slovo vedle delších se nehledá ani nepodsvítí. Spojky a předložky („a“, „v“,
+    /// „na“) by jinak jako LIKE '%a%' prošly téměř vším a detail by podsvítil každé „a“ na
+    /// kartě (uživatel 2026-10-08: „vyhledávání se rozpadne na hledání po písmenech“).
+    /// Dotaz jen z krátkých slov („50 %“) se hledá celý. Protějšek v JS: searchHighlight.js.
+    /// </summary>
+    public const int MinTermLength = 3;
+
+    /// <summary>Strop počtu hledaných slov, aby dotaz nerostl bez hranic.</summary>
     public const int MaxTerms = 6;
 
     /// <summary>
@@ -51,8 +59,9 @@ public static class SearchQueryText
             return Array.Empty<string>();
         }
 
-        return trimmed
-            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+        var words = trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var longWords = words.Where(word => word.Length >= MinTermLength).ToArray();
+        return (longWords.Length > 0 ? longWords : words)
             .Take(MaxTerms)
             .ToList();
     }

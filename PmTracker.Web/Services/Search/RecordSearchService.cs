@@ -181,7 +181,7 @@ public sealed class RecordSearchService : IRecordSearchService
                 Snippet: snippet,
                 CisloJednani: cisloJednani,
                 VyjadreniId: vyjadreniId,
-                DetailUrl: BuildDetailUrl(row.ProjektId, row.Id, vyjadreniId, trimmed)));
+                DetailUrl: BuildDetailUrl(row.ProjektId, row.Id, vyjadreniId, terms)));
         }
 
         _logger.LogDebug("Vyhledávání '{Query}': {Count} výsledků.", trimmed, items.Count);
@@ -196,7 +196,7 @@ public sealed class RecordSearchService : IRecordSearchService
     /// Odkaz na záznam v detailu projektu. Detail podle vyjadreniId otevře vyjádření se
     /// shodou (i když není mezi prvními načtenými) a slova z hl na kartě dočasně podsvítí.
     /// </summary>
-    private static string BuildDetailUrl(int projektId, int zaznamId, int? vyjadreniId, string query)
+    private static string BuildDetailUrl(int projektId, int zaznamId, int? vyjadreniId, IReadOnlyList<string> terms)
     {
         var url = $"/Projekty/Detail/{projektId}?recordId={zaznamId}";
         if (vyjadreniId is not null)
@@ -204,7 +204,8 @@ public sealed class RecordSearchService : IRecordSearchService
             url += $"&vyjadreniId={vyjadreniId}";
         }
 
-        return url + "&hl=" + Uri.EscapeDataString(query);
+        // Jen slova, podle kterých se hledalo — ne syrový dotaz se spojkami (viz MinTermLength).
+        return url + "&hl=" + Uri.EscapeDataString(string.Join(' ', terms));
     }
 
     /// <summary>
