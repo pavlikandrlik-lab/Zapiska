@@ -5,7 +5,7 @@ import {
     highlightTerms,
     buildHighlightPattern,
     findHighlightRanges,
-    groupTextNodesByBlock
+    groupHighlightItems
 } from "../../../PmTracker.Web/wwwroot/js/modules/searchHighlight.js";
 
 // 2026-10-08: „stav migrace a dat“ podsvítilo na kartě každé písmeno „a“. Krátká slova vedle
@@ -74,47 +74,85 @@ test("slova v různých uzlech zůstanou samostatné shody", () => {
         [{ index: 1, start: 0, end: 6 }, { index: 2, start: 1, end: 7 }]);
 });
 
-// groupTextNodesByBlock: rozhoduje, jestli textové uzly spadají do stejného blokového
-// elementu (fráze se v něm smí spojit přes formátování), nebo ne (popisek a hodnota v
-// různých blocích nesmí vytvořit falešnou frázi). Duck-typed fake uzlu: jen parentElement
-// s closest(), jak to používá reálný text node (pattern jako tests/js/dom/formSubmitterAttr.test.js).
+// groupHighlightItems (review M1 + M2): textové a oddělovací položky se spojují jen
+// uvnitř jednoho .richtext-render containeru (karta popisu/vyjádření) — tam fráze smí jít
+// přes formátování i přes <br>/odstavec/položku seznamu. Mimo něj (container null) je
+// každý textový uzel vlastní skupina, přesně jako před touto větví — popisek a hodnota v
+// plain <div> (_ZaznamDetailPartial.cshtml) nesmí vytvořit falešnou frázi. Duck-typed
+// položky: { node: { data }, container } / { separator: true, container }, žádné DOM.
 
-function fakeTextNode(data, closestResult) {
-    return {
-        data,
-        parentElement: { closest: () => closestResult }
-    };
+function textItem(data, container) {
+    return { node: { data }, container };
 }
 
-test("uzly ve dvou různých blokách — dvě skupiny, fráze mezi nimi se nespojí", () => {
-    const blockLabel = { name: "dt" };
-    const blockValue = { name: "dd" };
-    const nodeLabel = fakeTextNode("Vlastník", blockLabel);
-    const nodeValue = fakeTextNode(" Pavel", blockValue);
-    const root = { name: "root" };
+function breakItem(container) {
+    return { separator: true, container };
+}
 
-    const groups = groupTextNodesByBlock([nodeLabel, nodeValue], root);
-    assert.deepEqual(groups, [[nodeLabel], [nodeValue]]);
+// Replikuje to, co s jednou skupinou dělá highlightSearchTerms: oddělovač dodá do
+// spojeného textu "\n" (matchuje \s+, ale nejde ho obalit <mark>, nemá uzel), výsledné
+// úseky se pak omezí jen na textové položky.
+function wrappableRanges(group, pattern) {
+    const texts = group.map((entry) => (entry.separator ? "\n" : entry.node.data));
+    return findHighlightRanges(texts, pattern).filter((range) => !group[range.index].separator);
+}
 
-    const pattern = buildHighlightPattern(["Vlastník Pavel"]);
-    const ranges = groups.flatMap((group) => findHighlightRanges(group.map((node) => node.data), pattern));
+test("fráze přes <br> v jednom containeru — podsvítí jen textové položky, ne oddělovač", () => {
+    const container = { name: "richtext" };
+    const items = [textItem("pes a", container), breakItem(container), textItem("kočka", container)];
+
+    const groups = groupHighlightItems(items);
+    assert.deepEqual(groups, [items]);
+
+    const ranges = wrappableRanges(groups[0], buildHighlightPattern(["pes a kočka"]));
+    assert.deepEqual(ranges, [{ index: 0, start: 0, end: 5 }, { index: 2, start: 0, end: 5 }]);
+});
+
+test("fráze přes dva odstavce v jednom containeru se spojí přes oddělovač", () => {
+    const container = { name: "richtext" };
+    const items = [textItem("Rozhodnuto o", container), breakItem(container), textItem("řešení zálohy", container)];
+
+    const groups = groupHighlightItems(items);
+    assert.deepEqual(groups, [items]);
+
+    const ranges = wrappableRanges(groups[0], buildHighlightPattern(["o řešení zálohy"]));
+    assert.deepEqual(ranges, [{ index: 0, start: 11, end: 12 }, { index: 2, start: 0, end: 13 }]);
+});
+
+test("slova v různých odstavcích se nespojí do cizího slova přes oddělovač", () => {
+    const container = { name: "richtext" };
+    const items = [textItem("abc", container), breakItem(container), textItem("def", container)];
+
+    const groups = groupHighlightItems(items);
+    const ranges = wrappableRanges(groups[0], buildHighlightPattern(["cde"]));
     assert.deepEqual(ranges, []);
 });
 
-test("uzly ve stejné bloce — jedna skupina v pořadí dokumentu", () => {
-    const block = { name: "p" };
-    const first = fakeTextNode("Rozhodnuto o ", block);
-    const second = fakeTextNode("řešení", block);
-    const third = fakeTextNode(" zálohy", block);
-    const root = { name: "root" };
+test("mimo .richtext-render (container null) je každý textový uzel vlastní skupina", () => {
+    const items = [
+        textItem("Jan Novák", null),
+        textItem(" ", null),
+        textItem("Pavel Dvořák", null)
+    ];
 
-    assert.deepEqual(groupTextNodesByBlock([first, second, third], root), [[first, second, third]]);
+    const groups = groupHighlightItems(items);
+    assert.deepEqual(groups, [[items[0]], [items[1]], [items[2]]]);
+
+    const pattern = buildHighlightPattern(["Novák Pavel"]);
+    const ranges = groups.flatMap((group) => wrappableRanges(group, pattern));
+    assert.deepEqual(ranges, [], "popisek a hodnota v plain <div> nesmí vytvořit falešnou frázi");
 });
 
-test("closest() bez shody — uzly se seskupí pod root", () => {
-    const root = { name: "root" };
-    const first = fakeTextNode("a", null);
-    const second = fakeTextNode("b", null);
+test("oddělovač mimo .richtext-render (container null) se zahodí", () => {
+    const items = [textItem("a", null), breakItem(null), textItem("b", null)];
 
-    assert.deepEqual(groupTextNodesByBlock([first, second], root), [[first, second]]);
+    assert.deepEqual(groupHighlightItems(items), [[items[0]], [items[2]]]);
+});
+
+test("dva různé containery — dvě skupiny", () => {
+    const containerA = { name: "richtext-a" };
+    const containerB = { name: "richtext-b" };
+    const items = [textItem("první", containerA), textItem("druhý", containerB)];
+
+    assert.deepEqual(groupHighlightItems(items), [[items[0]], [items[1]]]);
 });

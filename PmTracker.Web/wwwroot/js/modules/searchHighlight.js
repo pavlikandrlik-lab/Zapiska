@@ -89,10 +89,6 @@ export function buildHighlightPattern(terms) {
     return new RegExp(terms.map((term) => escapeRegExp(term).replace(/ /g, "\\s+")).join("|"), "giu");
 }
 
-// Text uvnitř jednoho z těchto elementů je souvislý (tučné slovo, odkaz, kurzíva jsou jen
-// inline). Mezi nimi se nespojuje — popisek a hodnota nesmí dát falešnou frázi.
-const BLOCK_SELECTOR = "p, li, dd, dt, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, div, section, article, header, footer";
-
 /**
  * Shody vzoru v souvislém textu bloku rozloženém do více textových uzlů. Vrací úseky po
  * uzlech: index uzlu a rozsah v jeho textu. Jedna fráze přes tučné slovo = víc úseků.
@@ -119,24 +115,79 @@ export function findHighlightRanges(texts, pattern) {
     return ranges;
 }
 
+// Formátovaný text (popis záznamu, vyjádření, komentáře) — viz _ZaznamDetailPartial.cshtml,
+// _ZaznamCommentsPartial.cshtml, Jednani/_TaskItemPartial.cshtml. Jen tady se smí fráze
+// spojit přes formátování i přes <br>/odstavec/položku seznamu (review M1) — mimo tento
+// container (karta samotná je plain <div>) se nic nespojuje, jinak popisek a hodnota vedle
+// sebe (<s>Jan Novák</s> <strong>Pavel Dvořák</strong>) dají falešnou frázi (review M2).
+const RICHTEXT_SELECTOR = ".richtext-render";
+
+// Značky, jejichž začátek odpovídá \n v RichTextContentService.ToPlainText na serveru.
+const BREAK_SELECTOR = "br, p, li, ul, ol, blockquote, pre, h1, h2, h3, h4, h5, h6, div, dd, dt, td, th";
+
 /**
- * Rozdělí textové uzly do skupin podle nejbližšího blokového předka (BLOCK_SELECTOR), nebo
- * pod root, když žádný takový předek není. Skupiny v pořadí prvního výskytu, uzly uvnitř
- * skupiny v pořadí dokumentu — fráze se smí spojit jen uvnitř jedné skupiny (jednoho bloku).
+ * Textové a oddělovací položky podstromu root v pořadí dokumentu. Textová položka
+ * { node, container }, oddělovací { separator: true, container } — container je nejbližší
+ * .richtext-render předek (i sám element), nebo null mimo něj. Oddělovače mimo
+ * .richtext-render se nenesou dál (nic tam nespojují).
  */
-export function groupTextNodesByBlock(nodes, root) {
+function collectHighlightItems(root) {
+    const items = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const parent = node.parentElement;
+            if (!parent || parent.closest(SKIP_SELECTOR) || isInsideCustomElement(parent, root)) {
+                continue;
+            }
+
+            items.push({ node, container: parent.closest(RICHTEXT_SELECTOR) });
+            continue;
+        }
+
+        if (!node.matches(BREAK_SELECTOR) || node.closest(SKIP_SELECTOR) || isInsideCustomElement(node, root)) {
+            continue;
+        }
+
+        const container = node.closest(RICHTEXT_SELECTOR);
+        if (container) {
+            items.push({ separator: true, container });
+        }
+    }
+    return items;
+}
+
+/**
+ * Rozdělí položky do skupin: uvnitř jednoho .richtext-render containeru se spojí všechny
+ * textové i oddělovací položky do jedné skupiny v pořadí dokumentu. Mimo něj (container
+ * null) je každý textový uzel vlastní skupina — přesně jako před touto větví — a oddělovač
+ * bez containeru se zahodí (nic tam nespojuje).
+ */
+export function groupHighlightItems(items) {
     const keys = [];
     const groups = new Map();
-    for (const node of nodes) {
-        const key = node.parentElement.closest(BLOCK_SELECTOR) ?? root;
-        let group = groups.get(key);
-        if (!group) {
-            group = [];
-            groups.set(key, group);
-            keys.push(key);
+
+    for (const item of items) {
+        if (item.container) {
+            let group = groups.get(item.container);
+            if (!group) {
+                group = [];
+                groups.set(item.container, group);
+                keys.push(item.container);
+            }
+            group.push(item);
+            continue;
         }
-        group.push(node);
+
+        if (item.separator) {
+            continue;
+        }
+
+        const key = Symbol("outsideRichtext");
+        groups.set(key, [item]);
+        keys.push(key);
     }
+
     return keys.map((key) => groups.get(key));
 }
 
@@ -155,20 +206,14 @@ export function highlightSearchTerms(root, query, { durationMs = DEFAULT_DURATIO
     }
 
     const pattern = buildHighlightPattern(terms);
-    const textNodes = [];
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        const parent = node.parentElement;
-        if (!parent || parent.closest(SKIP_SELECTOR) || isInsideCustomElement(parent, root)) {
-            continue;
-        }
-
-        textNodes.push(node);
-    }
+    const items = collectHighlightItems(root);
 
     const marks = [];
-    for (const group of groupTextNodesByBlock(textNodes, root)) {
-        const ranges = findHighlightRanges(group.map((node) => node.data), pattern);
+    for (const group of groupHighlightItems(items)) {
+        // Oddělovač dodá do spojeného textu "\n" (matchuje \s+ v patternu jako <br> nebo
+        // odstavec na serveru), ale nemá uzel — obalit <mark> smí jen textové položky.
+        const texts = group.map((entry) => (entry.separator ? "\n" : entry.node.data));
+        const ranges = findHighlightRanges(texts, pattern).filter((range) => !group[range.index].separator);
         if (ranges.length === 0) {
             continue;
         }
@@ -180,12 +225,13 @@ export function highlightSearchTerms(root, query, { durationMs = DEFAULT_DURATIO
             rangesByIndex.set(range.index, list);
         }
 
-        group.forEach((node, index) => {
+        group.forEach((entry, index) => {
             const nodeRanges = rangesByIndex.get(index);
             if (!nodeRanges) {
                 return;
             }
 
+            const node = entry.node;
             const fragment = document.createDocumentFragment();
             let lastEnd = 0;
             for (const range of nodeRanges) {

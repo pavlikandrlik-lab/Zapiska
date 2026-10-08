@@ -112,7 +112,33 @@ public sealed class SearchResultTargetScenariosTests
         }
     }
 
-    private async Task<(int RecordId, int TargetCommentId)> CreateRecordWithCommentsAsync()
+    /// <summary>
+    /// Review M1 (2026-10-08): &lt;br&gt; nedává textový uzel, takže „pes a&lt;br&gt;kočka“ se
+    /// bez virtuálního oddělovače spojí na „pes akočka“ a fráze se nenajde. Server (ToPlainText)
+    /// z &lt;br&gt; dělá \n, podsvícení ho musí zrcadlit.
+    /// </summary>
+    [Fact]
+    public async Task OdkazSFraziPresZalomeni_PodsvitiFrazi()
+    {
+        var (recordId, targetCommentId) = await CreateRecordWithCommentsAsync(
+            targetStatementHtml: "<p>Rozhodnuto o <strong>řešení</strong><br>zálohy</p>");
+        var page = await _fixture.NewPageAsync();
+        try
+        {
+            await page.GotoAsync(RecordUrl(recordId, $"&vyjadreniId={targetCommentId}&hl={Uri.EscapeDataString("\"o řešení zálohy\"")}"));
+            var target = page.Locator($".record-card[data-record-id='{recordId}'] [data-comment-id='{targetCommentId}']");
+            var marks = target.Locator("[data-comment-text] mark.app-search-flash");
+            await Expect(marks).ToHaveTextAsync(new[] { "o", "řešení", "zálohy" });
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+            await DeleteRecordAsync(recordId);
+        }
+    }
+
+    private async Task<(int RecordId, int TargetCommentId)> CreateRecordWithCommentsAsync(
+        string targetStatementHtml = "<p>Rozhodnuto o <strong>řešení</strong> zálohy</p>")
     {
         await using var db = CreateDbContext();
         var subsystemId = await db.ProjektSubsystemy.AsNoTracking()
@@ -157,7 +183,7 @@ public sealed class SearchResultTargetScenariosTests
             ZaznamId = record.Id,
             JednaniId = meeting.Id,
             AutorOsobaId = _fixture.AdminOsobaId,
-            TextVyjadreni = "<p>Rozhodnuto o <strong>řešení</strong> zálohy</p>",
+            TextVyjadreni = targetStatementHtml,
             DatumVyjadreni = new DateTime(2026, 1, 1, 9, 0, 0, DateTimeKind.Utc)
         };
         db.Vyjadreni.Add(target);
