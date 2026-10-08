@@ -192,6 +192,16 @@ export function groupHighlightItems(items) {
 }
 
 /**
+ * Úseky k obalení v jedné skupině z groupHighlightItems. Oddělovač dodá do spojeného textu
+ * "\n" (matchuje \s+ v patternu jako <br> nebo odstavec na serveru), ale nemá uzel — obalit
+ * <mark> smí jen textové položky.
+ */
+export function findWrappableRanges(group, pattern) {
+    const texts = group.map((entry) => (entry.separator ? "\n" : entry.node.data));
+    return findHighlightRanges(texts, pattern).filter((range) => !group[range.index].separator);
+}
+
+/**
  * Obalí výskyty slov z query uvnitř root do <mark class="app-search-flash"> a po durationMs
  * je plynule odstraní. Vrací vložené značky.
  */
@@ -210,10 +220,7 @@ export function highlightSearchTerms(root, query, { durationMs = DEFAULT_DURATIO
 
     const marks = [];
     for (const group of groupHighlightItems(items)) {
-        // Oddělovač dodá do spojeného textu "\n" (matchuje \s+ v patternu jako <br> nebo
-        // odstavec na serveru), ale nemá uzel — obalit <mark> smí jen textové položky.
-        const texts = group.map((entry) => (entry.separator ? "\n" : entry.node.data));
-        const ranges = findHighlightRanges(texts, pattern).filter((range) => !group[range.index].separator);
+        const ranges = findWrappableRanges(group, pattern);
         if (ranges.length === 0) {
             continue;
         }

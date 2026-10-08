@@ -5,6 +5,7 @@ import {
     highlightTerms,
     buildHighlightPattern,
     findHighlightRanges,
+    findWrappableRanges,
     groupHighlightItems
 } from "../../../PmTracker.Web/wwwroot/js/modules/searchHighlight.js";
 
@@ -89,13 +90,19 @@ function breakItem(container) {
     return { separator: true, container };
 }
 
-// Replikuje to, co s jednou skupinou dělá highlightSearchTerms: oddělovač dodá do
-// spojeného textu "\n" (matchuje \s+, ale nejde ho obalit <mark>, nemá uzel), výsledné
-// úseky se pak omezí jen na textové položky.
-function wrappableRanges(group, pattern) {
-    const texts = group.map((entry) => (entry.separator ? "\n" : entry.node.data));
-    return findHighlightRanges(texts, pattern).filter((range) => !group[range.index].separator);
-}
+// Testy volají stejnou funkci jako highlightSearchTerms (dřív si ji kopírovaly — rozbitý
+// filtr oddělovačů v produkci by node testy nechytily).
+const wrappableRanges = findWrappableRanges;
+
+test("oddělovač nikdy nedostane úsek k obalení, ani když na něm shoda leží", () => {
+    const container = { name: "richtext" };
+    const group = [textItem("pes", container), breakItem(container), textItem("kočka", container)];
+
+    const ranges = findWrappableRanges(group, buildHighlightPattern(["pes kočka"]));
+
+    assert.ok(ranges.every((range) => !group[range.index].separator));
+    assert.deepEqual(ranges, [{ index: 0, start: 0, end: 3 }, { index: 2, start: 0, end: 5 }]);
+});
 
 test("fráze přes <br> v jednom containeru — podsvítí jen textové položky, ne oddělovač", () => {
     const container = { name: "richtext" };
