@@ -115,6 +115,13 @@ DECLARE @richtextUnicode INT = CASE
     THEN 1 ELSE 0 END;
     -- 1_4_6: rich text v Unicode (NVARCHAR(MAX)) a bez entit pro písmena
 
+DECLARE @prostyText INT = CASE
+    WHEN COL_LENGTH(N'dbo.projektove_zaznamy', N'popis_prosty_text') IS NOT NULL
+     AND COL_LENGTH(N'dbo.vyjadreni', N'text_vyjadreni_prosty_text') IS NOT NULL
+     AND COL_LENGTH(N'dbo.zaznam_externi_odkazy', N'pozadavek_prosty_text') IS NOT NULL
+    THEN 1 ELSE 0 END;
+    -- 1_4_7: čistý text formátovaných polí pro hledání
+
 -- ---------------------------------------------------------------------------
 -- Otisky jednotlivých skriptů (v pořadí nasazování)
 -- ---------------------------------------------------------------------------
@@ -344,6 +351,10 @@ INSERT @r VALUES (340, N'db_upgrade_1_4_5_record_edit_lock',
 INSERT @r VALUES (350, N'db_upgrade_1_4_6_richtext_unicode',
     CASE WHEN @richtextUnicode = 1 THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
     N'popis, text_vyjadreni a duvod jsou NVARCHAR(MAX) (bez toho hledání nenajde slova s diakritikou v popisu a vyjádřeních)');
+
+INSERT @r VALUES (360, N'db_upgrade_1_4_7_prosty_text_hledani',
+    CASE WHEN @prostyText = 1 THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
+    N'sloupce popis_prosty_text, text_vyjadreni_prosty_text a pozadavek_prosty_text (bez nich aplikace nenastartuje)');
 
 -- ---------------------------------------------------------------------------
 -- Výstup

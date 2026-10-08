@@ -58,7 +58,8 @@ Dokument popisuje standardní databázový lifecycle: inicializaci baseline, apl
 33. `db_upgrade_1_4_4_search_cleanup.sql`
 34. `db_upgrade_1_4_5_record_edit_lock.sql`
 35. `db_upgrade_1_4_6_richtext_unicode.sql`
-36. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
+36. `db_upgrade_1_4_7_prosty_text_hledani.sql`
+37. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
 
 ### 5.2 Fresh install
 ```powershell

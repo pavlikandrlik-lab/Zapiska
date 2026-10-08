@@ -44,6 +44,7 @@ internal sealed class MeetingCommentEntityConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.JednaniId).HasColumnName("jednani_id");
         builder.Property(x => x.AutorOsobaId).HasColumnName("autor_osoba_id");
         builder.Property(x => x.TextVyjadreni).HasColumnName("text_vyjadreni");
+        builder.Property(x => x.TextVyjadreniProstyText).HasColumnName("text_vyjadreni_prosty_text");
         builder.Property(x => x.DatumVyjadreni).HasColumnName("datum_vyjadreni");
     }
 }

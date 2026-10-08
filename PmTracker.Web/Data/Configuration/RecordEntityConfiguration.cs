@@ -28,6 +28,7 @@ internal sealed class RecordEntityConfiguration : IEntityTypeConfiguration<Proje
         builder.Property(x => x.Nazev).HasColumnName("nazev");
         builder.Property(x => x.Cil).HasColumnName("cil").HasMaxLength(500);
         builder.Property(x => x.Popis).HasColumnName("popis");
+        builder.Property(x => x.PopisProstyText).HasColumnName("popis_prosty_text");
         builder.Property(x => x.VlastnikId).HasColumnName("vlastnik_id");
         builder.Property(x => x.DatumZalozeni).HasColumnName("datum_zalozeni");
         builder.Property(x => x.DatumUkonceni).HasColumnName("datum_ukonceni");
@@ -247,6 +248,7 @@ internal sealed class RecordExternalLinkEntityConfiguration : IEntityTypeConfigu
         builder.Property(x => x.VyzvaId).HasColumnName("vyzva_id");
         builder.Property(x => x.ZaradidDoVyzvy).HasColumnName("zaradid_do_vyzvy").HasDefaultValue(false);
         builder.Property(x => x.Pozadavek).HasColumnName("pozadavek");
+        builder.Property(x => x.PozadavekProstyText).HasColumnName("pozadavek_prosty_text");
         builder.Property(x => x.KalkulaceCena).HasColumnName("kalkulace_cena").HasColumnType("decimal(18,2)");
         builder.Property(x => x.KalkulaceId).HasColumnName("kalkulace_id");
         builder.Property(x => x.KalkulaceNacteno).HasColumnName("kalkulace_nacteno");

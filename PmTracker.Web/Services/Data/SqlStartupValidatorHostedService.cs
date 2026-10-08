@@ -29,6 +29,17 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         "dbo.zaznam_harmonogram_krok"
     };
 
+    /// <summary>
+    /// Sloupce čistého textu pro hledání (db_upgrade_1_4_7). Bez nich spadne každé uložení
+    /// záznamu nebo vyjádření, proto je start musí ohlásit i s názvem skriptu.
+    /// </summary>
+    internal static readonly (string Table, string Column)[] ProstyTextColumns =
+    {
+        ("dbo.projektove_zaznamy", "popis_prosty_text"),
+        ("dbo.vyjadreni", "text_vyjadreni_prosty_text"),
+        ("dbo.zaznam_externi_odkazy", "pozadavek_prosty_text"),
+    };
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<SqlStartupValidatorHostedService> _logger;
 
@@ -109,6 +120,15 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         {
             throw new InvalidOperationException(
                 "V DB chybí tabulka dbo.zaznam_edit_zamek. Obnovte databázi přes PMTracker_insert_sql nebo spusťte db_upgrade_1_4_5_record_edit_lock.sql.");
+        }
+
+        foreach (var (table, column) in ProstyTextColumns)
+        {
+            if (!await HasColumnAsync(dbContext, table, column, ct))
+            {
+                throw new InvalidOperationException(
+                    $"V DB chybí sloupec {table}.{column}. Spusťte db_upgrade_1_4_7_prosty_text_hledani.sql.");
+            }
         }
 
         var hasCommentAuthorColumn = await HasColumnAsync(dbContext, "dbo.vyjadreni", "autor_osoba_id", ct);

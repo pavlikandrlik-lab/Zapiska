@@ -180,6 +180,9 @@ public sealed class ProjektovyZaznamEntity
     public string Nazev { get; set; } = string.Empty;
     public string? Cil { get; set; }
     public string? Popis { get; set; }
+
+    /// <summary>Čistý text popisu pro hledání (RichTextSearchText); plní PmTrackerDbContext při uložení.</summary>
+    public string? PopisProstyText { get; set; }
     public int VlastnikId { get; set; }
     public DateTime DatumZalozeni { get; set; }
     public DateTime DatumUkonceni { get; set; }
@@ -313,6 +316,12 @@ public sealed class ZaznamExterniOdkazEntity
     public string? Pozadavek { get; set; }
 
     /// <summary>
+    /// Čistý text popisu pro hledání (RichTextSearchText); plní PmTrackerDbContext při uložení.
+    /// Zatím se nehledá — připraveno pro hledání ve výzvách (uživatel 2026-10-08).
+    /// </summary>
+    public string? PozadavekProstyText { get; set; }
+
+    /// <summary>
     /// Snímek skutečné ceny z akceptované kalkulace — HOT_KALKULACE.cena, celková včetně licence,
     /// bez DPH. Plní ho výhradně IKalkulaceSnapshotService při harvestu; uložení záznamu na něj
     /// nesahá (spec 2026-09-10 A3). NULL = kalkulace není známá.
@@ -367,6 +376,9 @@ public sealed class VyjadreniEntity
     public int JednaniId { get; set; }
     public int AutorOsobaId { get; set; }
     public string TextVyjadreni { get; set; } = string.Empty;
+
+    /// <summary>Čistý text popisu pro hledání (RichTextSearchText); plní PmTrackerDbContext při uložení.</summary>
+    public string? TextVyjadreniProstyText { get; set; }
     public DateTime DatumVyjadreni { get; set; }
 }
 
