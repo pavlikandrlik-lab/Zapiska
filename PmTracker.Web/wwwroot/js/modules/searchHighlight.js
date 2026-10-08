@@ -89,6 +89,57 @@ export function buildHighlightPattern(terms) {
     return new RegExp(terms.map((term) => escapeRegExp(term).replace(/ /g, "\\s+")).join("|"), "giu");
 }
 
+// Text uvnitř jednoho z těchto elementů je souvislý (tučné slovo, odkaz, kurzíva jsou jen
+// inline). Mezi nimi se nespojuje — popisek a hodnota nesmí dát falešnou frázi.
+const BLOCK_SELECTOR = "p, li, dd, dt, td, th, h1, h2, h3, h4, h5, h6, blockquote, pre, div, section, article, header, footer";
+
+/**
+ * Shody vzoru v souvislém textu bloku rozloženém do více textových uzlů. Vrací úseky po
+ * uzlech: index uzlu a rozsah v jeho textu. Jedna fráze přes tučné slovo = víc úseků.
+ */
+export function findHighlightRanges(texts, pattern) {
+    const joined = texts.join("");
+    const ranges = [];
+    for (const match of joined.matchAll(pattern)) {
+        if (match[0].length === 0) {
+            continue;
+        }
+        const matchStart = match.index;
+        const matchEnd = match.index + match[0].length;
+        let offset = 0;
+        texts.forEach((text, index) => {
+            const start = Math.max(matchStart, offset);
+            const end = Math.min(matchEnd, offset + text.length);
+            if (start < end) {
+                ranges.push({ index, start: start - offset, end: end - offset });
+            }
+            offset += text.length;
+        });
+    }
+    return ranges;
+}
+
+/**
+ * Rozdělí textové uzly do skupin podle nejbližšího blokového předka (BLOCK_SELECTOR), nebo
+ * pod root, když žádný takový předek není. Skupiny v pořadí prvního výskytu, uzly uvnitř
+ * skupiny v pořadí dokumentu — fráze se smí spojit jen uvnitř jedné skupiny (jednoho bloku).
+ */
+export function groupTextNodesByBlock(nodes, root) {
+    const keys = [];
+    const groups = new Map();
+    for (const node of nodes) {
+        const key = node.parentElement.closest(BLOCK_SELECTOR) ?? root;
+        let group = groups.get(key);
+        if (!group) {
+            group = [];
+            groups.set(key, group);
+            keys.push(key);
+        }
+        group.push(node);
+    }
+    return keys.map((key) => groups.get(key));
+}
+
 /**
  * Obalí výskyty slov z query uvnitř root do <mark class="app-search-flash"> a po durationMs
  * je plynule odstraní. Vrací vložené značky.
@@ -112,28 +163,44 @@ export function highlightSearchTerms(root, query, { durationMs = DEFAULT_DURATIO
             continue;
         }
 
-        pattern.lastIndex = 0;
-        if (pattern.test(node.data)) {
-            textNodes.push(node);
-        }
+        textNodes.push(node);
     }
 
     const marks = [];
-    for (const node of textNodes) {
-        const fragment = document.createDocumentFragment();
-        let lastIndex = 0;
-        for (const match of node.data.matchAll(pattern)) {
-            fragment.append(node.data.slice(lastIndex, match.index));
-            const mark = document.createElement("mark");
-            mark.className = FLASH_CLASS;
-            mark.textContent = match[0];
-            fragment.append(mark);
-            marks.push(mark);
-            lastIndex = match.index + match[0].length;
+    for (const group of groupTextNodesByBlock(textNodes, root)) {
+        const ranges = findHighlightRanges(group.map((node) => node.data), pattern);
+        if (ranges.length === 0) {
+            continue;
         }
 
-        fragment.append(node.data.slice(lastIndex));
-        node.replaceWith(fragment);
+        const rangesByIndex = new Map();
+        for (const range of ranges) {
+            const list = rangesByIndex.get(range.index) ?? [];
+            list.push(range);
+            rangesByIndex.set(range.index, list);
+        }
+
+        group.forEach((node, index) => {
+            const nodeRanges = rangesByIndex.get(index);
+            if (!nodeRanges) {
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            let lastEnd = 0;
+            for (const range of nodeRanges) {
+                fragment.append(node.data.slice(lastEnd, range.start));
+                const mark = document.createElement("mark");
+                mark.className = FLASH_CLASS;
+                mark.textContent = node.data.slice(range.start, range.end);
+                fragment.append(mark);
+                marks.push(mark);
+                lastEnd = range.end;
+            }
+
+            fragment.append(node.data.slice(lastEnd));
+            node.replaceWith(fragment);
+        });
     }
 
     if (marks.length > 0) {

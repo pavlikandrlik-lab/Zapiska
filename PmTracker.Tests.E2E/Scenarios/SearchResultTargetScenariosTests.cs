@@ -68,8 +68,7 @@ public sealed class SearchResultTargetScenariosTests
 
     /// <summary>
     /// Uživatel 2026-10-08: fráze v uvozovkách se podsvítí jako jeden celek, i s krátkým slovem
-    /// uvnitř („z“). Fráze leží v názvu záznamu — přes formátování (tučné slovo ve vyjádření)
-    /// se fráze nehledá ani nepodsvítí, viz wiki globálního vyhledávání.
+    /// uvnitř („z“). Fráze leží v názvu záznamu.
     /// </summary>
     [Fact]
     public async Task OdkazSFrazi_PodsvitiFraziJakoCelek()
@@ -84,6 +83,27 @@ public sealed class SearchResultTargetScenariosTests
             var card = page.Locator($".record-card[data-record-id='{recordId}']");
             var marks = card.Locator("mark.app-search-flash");
             await Expect(marks).ToHaveTextAsync(new[] { "cíl z vyhledávání" });
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+            await DeleteRecordAsync(recordId);
+        }
+    }
+
+    /// <summary>Uživatel 2026-10-08: fráze se podsvítí i přes tučné slovo.</summary>
+    [Fact]
+    public async Task OdkazSFraziPresFormatovani_PodsvitiCelouFrazi()
+    {
+        var (recordId, targetCommentId) = await CreateRecordWithCommentsAsync();
+        var page = await _fixture.NewPageAsync();
+        try
+        {
+            await page.GotoAsync(RecordUrl(recordId, $"&vyjadreniId={targetCommentId}&hl={Uri.EscapeDataString("\"o řešení zálohy\"")}"));
+            var target = page.Locator($".record-card[data-record-id='{recordId}'] [data-comment-id='{targetCommentId}']");
+            var marks = target.Locator("[data-comment-text] mark.app-search-flash");
+            // Tři úseky (před, uvnitř a za <strong>); Playwright text porovnává bez krajních mezer.
+            await Expect(marks).ToHaveTextAsync(new[] { "o", "řešení", "zálohy" });
         }
         finally
         {
