@@ -8,7 +8,7 @@ namespace PmTracker.Web.TagHelpers;
 /// <pre><pm-button variant="Primary" size="Medium" icon="save">Uložit</pm-button></pre>
 ///
 /// Renderuje gov-button s centralizovaným mapováním semantických variant
-/// (Primary/Secondary/Destructive/Ghost) na gov atributy color/type.
+/// (Primary/Secondary/Destructive/Ghost/GhostOutlined) na gov atributy color/type.
 ///
 /// Dokumentace: docs/architecture/buttons.md
 /// </summary>
@@ -52,6 +52,10 @@ public sealed class PmButtonTagHelper : TagHelper
             // potřeba výraznější rozeznavatelnost, view přešly na Secondary.
             // Viz docs/architecture/buttons.md.
             PmButtonVariant.Ghost => ("neutral", "base"),
+            // Uživatel 2026-10-08: stránkování vyjádření (Další / Předchozí / Zobrazit vše)
+            // bylo jako base špatně vidět. Globální Ghost se nemění (outlined kolidoval se
+            // Secondary), proto samostatná varianta jen tam, kde je potřeba.
+            PmButtonVariant.GhostOutlined => ("neutral", "outlined"),
             _ => ("primary", "outlined")
         };
 

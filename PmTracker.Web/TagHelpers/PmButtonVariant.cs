@@ -13,5 +13,7 @@ public enum PmButtonVariant
     /// <summary>Destruktivní akce (smazat, odstranit).</summary>
     Destructive,
     /// <summary>Tiché akce (toggle, link-like button).</summary>
-    Ghost
+    Ghost,
+    /// <summary>Tichá akce, která má být vidět — neutrální s ohraničením (stránkování vyjádření).</summary>
+    GhostOutlined
 }

@@ -14,7 +14,7 @@ Thin-wrapper nad `<gov-button>`. Jeden bod změny mapování při upgrade gov DS
 
 | Atribut | Typ | Default | Popis |
 |---|---|---|---|
-| `variant` | Primary/Secondary/Destructive/Ghost | Secondary | Semantická varianta |
+| `variant` | Primary/Secondary/Destructive/Ghost/GhostOutlined | Secondary | Semantická varianta |
 | `size` | Small/Medium/Large | Medium | Velikost |
 | `icon` | string | — | Jméno ikony ze sady gov |
 | `icon-position` | start/end | start | Pozice ikony |
@@ -30,11 +30,18 @@ Thin-wrapper nad `<gov-button>`. Jeden bod změny mapování při upgrade gov DS
 | Secondary | primary | outlined |
 | Destructive | error | solid |
 | Ghost | neutral | base |
+| GhostOutlined | neutral | outlined |
 
 **Historie Ghost variant:**
 - do 2026-04-19 odpoledne: Ghost = `(neutral, base)` — tiché pozadí bez borderu.
 - 2026-04-19 odpoledne: dočasně přepnuto na `(neutral, outlined)` kvůli reportované nízké viditelnosti.
 - 2026-04-19 večer: **vráceno zpět na `(neutral, base)`**. Outlined Ghost kolidoval vizuálně se Secondary a rozmazával hierarchii. Kde je potřeba výraznosti, view přešly na `variant="Secondary"` (Profil reset volby, Rozpad harmonogramu, Navrhnout termín a harmonogram, Zamítnout návrh). Ghost zůstává vyhrazený pro decorative/tichou akci: Zpět (PageHeader), Zobrazit více (dashboard panely), filter chips, admin sekce.
+
+**GhostOutlined (2026-10-08):** uživatel chtěl stránkování vyjádření (Další / Předchozí /
+Zobrazit vše) výraznější, ale dál neutrální — ne modré jako Secondary. Globální Ghost se
+kvůli zkušenosti z 2026-04-19 nemění; `GhostOutlined` je samostatná varianta s kombinací DS
+gov `neutral` + `outlined` (tokeny `--button-outlined-neutral*`), použitá jen tam, kde je
+potřeba.
 
 ## Kdy použít kterou variantu
 
@@ -42,6 +49,8 @@ Thin-wrapper nad `<gov-button>`. Jeden bod změny mapování při upgrade gov DS
 - **Secondary** — běžné akce (Zrušit, Zpět, Přidat). Několik na stránce je OK.
 - **Destructive** — smazání, ztráta dat. Vždy s potvrzením.
 - **Ghost** — tiché akce v tabulkách, inline (Rozbalit, Více).
+- **GhostOutlined** — tichá akce, která má být vidět: načítání dalších položek v seznamu
+  (stránkování vyjádření).
 
 ## Přechod z .btn
 

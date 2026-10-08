@@ -109,6 +109,18 @@ public sealed class PmButtonTagHelperTests
     }
 
     [Fact]
+    public async Task GhostOutlined_Rendruje_GovButtonOutlinedNeutral()
+    {
+        // Uživatel 2026-10-08: tichá akce, která má být vidět (stránkování vyjádření) —
+        // barva Ghost (neutral), ale s ohraničením. Kombinace DS gov s vlastními tokeny
+        // --button-outlined-neutral*. Ghost sám zůstává base (viz test výše).
+        var helper = new PmButtonTagHelper { Variant = PmButtonVariant.GhostOutlined };
+        var output = await RenderAsync(helper);
+        output.Attributes["color"].Value.Should().Be("neutral");
+        output.Attributes["type"].Value.Should().Be("outlined");
+    }
+
+    [Fact]
     public async Task Small_Size_NastaviAtributSize()
     {
         var helper = new PmButtonTagHelper { Size = PmComponentSize.Small };

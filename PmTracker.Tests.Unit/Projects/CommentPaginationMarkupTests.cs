@@ -58,6 +58,19 @@ public sealed class CommentPaginationMarkupTests
             "load-all tlačítko obsahuje text „Zobrazit vše\" (stejný pro ASC i DESC)");
     }
 
+    /// <summary>
+    /// Uživatel 2026-10-08: Další / Předchozí / Zobrazit vše byly Ghost (neutral base) a špatně
+    /// viditelné — zůstávají neutrální, ale s ohraničením (GhostOutlined = neutral outlined).
+    /// </summary>
+    [Fact]
+    public void PaginationButtons_AreGhostOutlined()
+    {
+        var view = LoadText("PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml");
+
+        view.Should().MatchRegex(@"<pm-button variant=""GhostOutlined""\s+size=""Small""\s+data-record-comments-load-more=""true""");
+        view.Should().MatchRegex(@"<pm-button variant=""GhostOutlined""\s+size=""Small""\s+data-record-comments-load-all=""true""");
+    }
+
     [Fact]
     public void Css_ShouldAlignPaginationToRight()
     {
