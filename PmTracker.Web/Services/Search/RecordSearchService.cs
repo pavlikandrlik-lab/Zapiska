@@ -20,18 +20,15 @@ public sealed class RecordSearchService : IRecordSearchService
 
     private readonly PmTrackerDbContext _db;
     private readonly IProjectVisibilityResolver _visibility;
-    private readonly IRichTextContentService _richText;
     private readonly ILogger<RecordSearchService> _logger;
 
     public RecordSearchService(
         PmTrackerDbContext db,
         IProjectVisibilityResolver visibility,
-        IRichTextContentService richText,
         ILogger<RecordSearchService> logger)
     {
         _db = db;
         _visibility = visibility;
-        _richText = richText;
         _logger = logger;
     }
 
@@ -69,14 +66,17 @@ public sealed class RecordSearchService : IRecordSearchService
         {
             var pattern = SearchQueryText.ToContainsPattern(term);
 
+            // Hledá se v čistém textu (bez HTML) — fráze najde text i přes formátování
+            // a značky samotné se nenajdou (uživatel 2026-10-08).
             q = q.Where(z =>
                 EF.Functions.Like(EF.Functions.Collate(z.Nazev, coll), pattern)
                 || (z.CisloViditelne != null
                     && EF.Functions.Like(EF.Functions.Collate(z.CisloViditelne, coll), pattern))
                 || (z.Cil != null && EF.Functions.Like(EF.Functions.Collate(z.Cil, coll), pattern))
-                || (z.Popis != null && EF.Functions.Like(EF.Functions.Collate(z.Popis, coll), pattern))
+                || (z.PopisProstyText != null && EF.Functions.Like(EF.Functions.Collate(z.PopisProstyText, coll), pattern))
                 || _db.Vyjadreni.Any(v => v.ZaznamId == z.Id
-                    && EF.Functions.Like(EF.Functions.Collate(v.TextVyjadreni, coll), pattern))
+                    && v.TextVyjadreniProstyText != null
+                    && EF.Functions.Like(EF.Functions.Collate(v.TextVyjadreniProstyText, coll), pattern))
                 || _db.ZaznamExterniOdkazy.Any(o => o.ZaznamId == z.Id
                     && EF.Functions.Like(EF.Functions.Collate(o.Cislo, coll), pattern)));
         }
@@ -92,7 +92,7 @@ public sealed class RecordSearchService : IRecordSearchService
                 z.Nazev,
                 z.CisloViditelne,
                 z.Cil,
-                z.Popis,
+                z.PopisProstyText,
                 SubsystemKod = _db.Subsystemy
                     .Where(s => s.Id == z.SubsystemId)
                     .Select(s => s.Kod)
@@ -103,7 +103,7 @@ public sealed class RecordSearchService : IRecordSearchService
                     .Select(v => new
                     {
                         v.Id,
-                        v.TextVyjadreni,
+                        v.TextVyjadreniProstyText,
                         CisloJednani = _db.Jednani
                             .Where(j => j.Id == v.JednaniId)
                             .Select(j => (int?)j.CisloJednani)
@@ -132,7 +132,7 @@ public sealed class RecordSearchService : IRecordSearchService
 
             if (snippet is null)
             {
-                snippet = SearchQueryText.BuildSnippet(PlainText(row.Popis), terms)
+                snippet = SearchQueryText.BuildSnippet(row.PopisProstyText, terms)
                           ?? SearchQueryText.BuildSnippet(row.Cil, terms);
                 if (snippet is not null)
                 {
@@ -147,7 +147,7 @@ public sealed class RecordSearchService : IRecordSearchService
             {
                 foreach (var v in row.Vyjadreni)
                 {
-                    snippet = SearchQueryText.BuildSnippet(PlainText(v.TextVyjadreni), terms);
+                    snippet = SearchQueryText.BuildSnippet(v.TextVyjadreniProstyText, terms);
                     if (snippet is not null)
                     {
                         kind = SearchMatchKind.Vyjadreni;
@@ -208,13 +208,4 @@ public sealed class RecordSearchService : IRecordSearchService
         // fráze v uvozovkách, aby se podsvítily celé.
         return url + "&hl=" + Uri.EscapeDataString(SearchQueryText.ToHighlightQuery(terms));
     }
-
-    /// <summary>
-    /// Popis a vyjádření jsou HTML z editoru (značky, entity jako &amp;amp; a &amp;lt;).
-    /// Náhled se staví z prostého textu; konce odstavců a položek seznamu se slijí do
-    /// jedné mezery, ať náhled zůstane na jednom řádku.
-    /// </summary>
-    private string PlainText(string? richText) =>
-        string.Join(' ', _richText.ToPlainText(richText)
-            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 }

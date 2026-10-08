@@ -45,7 +45,7 @@ public sealed class RecordSearchServiceTests
     private static RecordSearchService CreateService(string connectionString)
     {
         var db = IntegrationTestHelper.CreateDbContext(connectionString);
-        return new RecordSearchService(db, new ProjectVisibilityResolver(), new RichTextContentService(),
+        return new RecordSearchService(db, new ProjectVisibilityResolver(),
             NullLogger<RecordSearchService>.Instance);
     }
 
@@ -421,6 +421,46 @@ public sealed class RecordSearchServiceTests
         var result = await service.SearchAsync("záloha", User(isSuperAdmin: true), 7, default);
 
         result.TotalCount.Should().Be(7);
+    }
+
+    /// <summary>Uživatel 2026-10-08: fráze se najde i přes formátování a zalomení.</summary>
+    [Fact]
+    public async Task Hledani_FrazePresFormatovani_SeNajde()
+    {
+        var db = await _fixture.CreateDatabaseAsync("search_fraze_format");
+        var seed = await SearchSeed.CreateAsync(db.ConnectionString);
+        var zaznamId = await seed.AddRecordAsync(seed.ProjektId, "Nesouvisející",
+            popis: "<p>Dnes pes a <strong>kočka</strong><br>spali</p>");
+        var jednaniId = await seed.AddMeetingAsync(seed.ProjektId, cisloJednani: 3);
+        var druhyId = await seed.AddRecordAsync(seed.ProjektId, "Jiný");
+        await seed.AddStatementAsync(druhyId, jednaniId, "<p>Rozhodnuto o <em>řešení</em> zálohy</p>");
+
+        var service = CreateService(db.ConnectionString);
+
+        var popis = await service.SearchAsync("\"pes a kočka spali\"", User(isSuperAdmin: true), 7, default);
+        var item = popis.Categories.Single().Items.Single();
+        item.ZaznamId.Should().Be(zaznamId);
+        item.Snippet!.Match.Should().Be("pes a kočka spali");
+
+        var vyjadreni = await service.SearchAsync("\"o řešení zálohy\"", User(isSuperAdmin: true), 7, default);
+        vyjadreni.Categories.Single().Items.Single().ZaznamId.Should().Be(druhyId);
+    }
+
+    /// <summary>Hledání nesmí najít samotné HTML značky (dřív „strong" našlo vše tučné).</summary>
+    [Theory]
+    [InlineData("strong")]
+    [InlineData("href")]
+    public async Task Hledani_NenajdeHtmlZnacky(string dotaz)
+    {
+        var db = await _fixture.CreateDatabaseAsync("search_html_znacky_" + dotaz);
+        var seed = await SearchSeed.CreateAsync(db.ConnectionString);
+        await seed.AddRecordAsync(seed.ProjektId, "Záznam",
+            popis: "<p>text <strong>tučně</strong> <a href=\"https://x.cz\">odkaz</a></p>");
+
+        var result = await CreateService(db.ConnectionString)
+            .SearchAsync(dotaz, User(isSuperAdmin: true), 7, default);
+
+        result.TotalCount.Should().Be(0);
     }
 
     [Fact]
