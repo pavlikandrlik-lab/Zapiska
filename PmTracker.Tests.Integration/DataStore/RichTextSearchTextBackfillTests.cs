@@ -1,4 +1,6 @@
 using FluentAssertions;
+using Microsoft.Data.SqlClient;
+using PmTracker.Tests.Common;
 using PmTracker.Tests.Integration.TestInfrastructure;
 using PmTracker.Web.Services.Data;
 
@@ -36,5 +38,45 @@ public sealed class RichTextSearchTextBackfillTests
 
         (await RichTextSearchTextBackfillHostedService.BackfillAsync(ctx, default))
             .Should().Be(0, "druhý běh nemá co dělat — prázdné HTML dalo \"\", ne NULL");
+    }
+
+    /// <summary>
+    /// Review I1 (2026-10-08): HTML změněné mimo EF (rollback na binárky <= 1.4.6, budoucí
+    /// SQL migrace, ruční SSMS oprava) nechá čistý text zastaralý — backfill doplňuje jen
+    /// NULL, takže ho nic neopraví. db_reset_prosty_text_hledani.sql čistý text vynuluje,
+    /// a teprve pak ho backfill dopočte znovu ze skutečného (nového) HTML.
+    /// </summary>
+    [Fact]
+    public async Task ResetSkript_VynulujeZastaralyCistyText_ABackfillHoDopocteZNovehoHtml()
+    {
+        var db = await _fixture.CreateDatabaseAsync("reset_prosty_text");
+        var seed = await SearchSeed.CreateAsync(db.ConnectionString);
+        var zaznamId = await seed.AddRecordAsync(seed.ProjektId, "Starý", popis: "<p>staré</p>");
+
+        // Simulace: binárky <= 1.4.6 (nebo ruční SQL) upraví HTML, ale čistý text neumí
+        // vynulovat — zůstává zastaralé.
+        await using (var connection = new SqlConnection(db.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE dbo.projektove_zaznamy SET popis = N'<p>nové <b>slovo</b></p>' WHERE id = @id";
+            command.Parameters.AddWithValue("@id", zaznamId);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await using var ctxPredResetem = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        (await ctxPredResetem.ProjektoveZaznamy.FindAsync(zaznamId))!.PopisProstyText.Should().Be("staré",
+            "HTML se změnilo mimo EF — čistý text bez resetu zůstává zastaralý");
+
+        await SqlScriptRunner.ExecuteScriptsAsync(db.ConnectionString,
+            [Path.Combine(RepositoryPaths.Root, "db_reset_prosty_text_hledani.sql")]);
+
+        await using var ctxPoResetu = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        (await ctxPoResetu.ProjektoveZaznamy.FindAsync(zaznamId))!.PopisProstyText.Should().BeNull(
+            "reset vynuluje čistý text, aby ho příští start (backfill) dopočetl znovu");
+
+        await RichTextSearchTextBackfillHostedService.BackfillAsync(ctxPoResetu, default);
+
+        (await ctxPoResetu.ProjektoveZaznamy.FindAsync(zaznamId))!.PopisProstyText.Should().Be("nové slovo");
     }
 }

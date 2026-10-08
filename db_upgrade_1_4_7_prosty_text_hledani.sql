@@ -16,6 +16,12 @@
 --     spolehlivě odstranit) a dál ho plní při každém uložení.
 --   * NEDOTKNE se žádné jiné tabulky ani indexu.
 --
+-- INVARIANT (review I1, 2026-10-08): Každý SQL příkaz, který mění popis, text_vyjadreni
+-- nebo pozadavek, musí ve stejném příkazu nastavit odpovídající *_prosty_text na NULL —
+-- čistý text pak dopočte další start aplikace. Když se to nestalo (návrat na binárky
+-- <= 1.4.6, ruční oprava v SSMS), spusť db_reset_prosty_text_hledani.sql a restartuj
+-- aplikaci.
+--
 -- Idempotence: skript lze spustit opakovaně.
 -- =============================================================================
 SET NOCOUNT ON;

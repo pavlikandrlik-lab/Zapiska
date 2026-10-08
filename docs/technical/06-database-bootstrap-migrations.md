@@ -108,6 +108,19 @@ SELECT COUNT(*) AS superadmins_count FROM authz.superadmins;
 - `dbo.ciselnik_organizace`
 - `dbo.ciselnik_organizacni_celky`
 
+### 5.7 Invariant: čistý text pro hledání (popis, text_vyjadreni, pozadavek)
+Od `db_upgrade_1_4_7_prosty_text_hledani.sql` platí pro psaní i aplikaci upgrade skriptů
+tento invariant: **každý SQL příkaz, který mění `popis`, `text_vyjadreni` nebo `pozadavek`,
+musí ve stejném příkazu nastavit odpovídající `*_prosty_text` na NULL** — čistý text pak
+dopočte další start aplikace (`RichTextSearchTextBackfillHostedService`). Bez toho zůstane
+čistý text zastaralý a hledání v dotčených řádcích tiše vrací starý/neúplný výsledek.
+
+Když se to nestalo (návrat na binárky ≤ 1.4.6 proti DB s 1_4_7, ruční oprava v SSMS, nebo
+budoucí migrace, co HTML přepíše bez vynulování plain sloupce — přesně jako
+`db_upgrade_1_4_6_richtext_unicode.sql`), spusť `db_reset_prosty_text_hledani.sql` a
+restartuj aplikaci. Je to údržbový skript, ne migrace — nepatří do číslovaného seznamu
+v 5.1 ani do `db_check_applied_upgrades.sql`.
+
 ## 6. Verifikace
 - SQL skripty skončí `exit code 0` bez `RAISERROR`.
 - Povinné číselníky a authz tabulky existují.

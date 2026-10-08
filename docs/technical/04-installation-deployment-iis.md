@@ -87,6 +87,9 @@ iisreset
 - Vrať předchozí publish balíček.
 - Obnov předchozí `appsettings.Production.json`.
 - Pokud byla aplikována nekompatibilní DB změna, proveď DBA-approved restore z backupu.
+- Po běhu starších binárek (≤ 1.4.6) proti DB, která už má `db_upgrade_1_4_7_prosty_text_hledani.sql`:
+  spusť `db_reset_prosty_text_hledani.sql` a až pak nastartuj novou verzi — jinak zůstane
+  čistý text pro hledání zastaralý.
 
 ## 8. Troubleshooting
 - 500.30 po nasazení:
