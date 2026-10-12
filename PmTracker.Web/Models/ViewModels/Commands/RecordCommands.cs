@@ -92,13 +92,25 @@ public sealed class SaveRecordCommand
 
     public const int DuvodZmenyMaxLength = 1000;
 
+    private string? _duvodZmeny;
+
     /// <summary>
     /// Důvod změny z návrhu změny termínu a harmonogramu (uživatel 2026-10-08) — nepovinné sdělení
     /// autora schvalovateli; po schválení se uloží do zaznam_historie_terminu.duvod. Přímá úprava
     /// záznamu ho nepoužívá.
     /// </summary>
+    /// <remarks>
+    /// Review fix M1 (2026-10-12): textarea má <c>maxlength="1000"</c> a prohlížeč počítá každé
+    /// zalomení jako 1 znak (textarea.value používá \n), ale multipart form-data odesílá \r\n.
+    /// Setter normalizuje \r\n i osamocené \r na \n hned při model bindingu, takže
+    /// [StringLength] i uložená hodnota vidí stejnou délku, jakou povolil prohlížeč.
+    /// </remarks>
     [StringLength(DuvodZmenyMaxLength)]
-    public string? DuvodZmeny { get; set; }
+    public string? DuvodZmeny
+    {
+        get => _duvodZmeny;
+        set => _duvodZmeny = value?.Replace("\r\n", "\n").Replace("\r", "\n");
+    }
 }
 
 public sealed class DeleteRecordCommand
