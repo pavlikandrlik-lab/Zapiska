@@ -147,8 +147,12 @@
     @* Task 6 (2026-10-12): upozornění, že návrh mění přepínač „Automatické vyplňování
        harmonogramu" proti aktuálnímu stavu záznamu. Atributy infobaru rozhodnuté uživatelem
        (global-constraints.md): color="error" type="bold" closable="false" +
-       components/exclamation-triangle-fill. *@
-    @if (Model.IsProposalDecisionDetail && Model.ProposalChangesHarmonogramRezim)
+       components/exclamation-triangle-fill.
+       Review fix M3 (2026-10-12): gate na ProposalRezimChangeMessage, ne na
+       ProposalChangesHarmonogramRezim — starší čekající návrhy (bez ChangesHarmonogramRezim)
+       mohou nést ruční data pro auto-eligible kroky a infobar se musí zobrazit i beze změny
+       přepínače (BuildProposalDetailAsync nastaví zprávu, ale ne ProposalChangesHarmonogramRezim). *@
+    @if (Model.IsProposalDecisionDetail && !string.IsNullOrWhiteSpace(Model.ProposalRezimChangeMessage))
     {
         <gov-infobar color="error" type="bold" closable="false" data-proposal-rezim-infobar>
             <gov-icon slot="icon" type="components" name="exclamation-triangle-fill"></gov-icon>

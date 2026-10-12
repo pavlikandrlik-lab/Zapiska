@@ -57,7 +57,10 @@ public sealed partial class RecordProposalService
                 else if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
                 {
                     // Task 5 (2026-10-12): přepínač „Automatické vyplňování harmonogramu" se po
-                    // schválení provede — switch do Auto naplánuje harvest (shodně se SaveRecord).
+                    // schválení provede. Switch do Auto naplánuje harvest nad rámec SaveRecord
+                    // (review fix M2, 2026-10-12) — SaveRecord harvest při přepnutí na Auto
+                    // nezakládá, spoléhá na periodický sync; schválení ho plánuje navíc, aby se
+                    // kroky doplnily dřív.
                     if (await ApplyApprovedScheduleProposalAsync(proposal, currentUser, ct))
                     {
                         harvestRecordIdToEnqueue = proposal.ZaznamId;

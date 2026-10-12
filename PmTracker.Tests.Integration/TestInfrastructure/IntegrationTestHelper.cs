@@ -27,9 +27,12 @@ internal static class IntegrationTestHelper
         return new PmTrackerDbContext(options);
     }
 
-    public static IntegrationTestDataStore CreateDataStore(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
+    public static IntegrationTestDataStore CreateDataStore(
+        PmTrackerDbContext dbContext,
+        TimeProvider? timeProvider = null,
+        Action<IServiceCollection>? configureServices = null)
     {
-        return new IntegrationTestDataStore(BuildServiceProvider(dbContext, timeProvider));
+        return new IntegrationTestDataStore(BuildServiceProvider(dbContext, timeProvider, configureServices));
     }
 
     public static IExportTemplateUseCase CreateExportTemplateUseCase(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
@@ -45,7 +48,10 @@ internal static class IntegrationTestHelper
     public static ISettingsAuthzCommands CreateSettingsAuthzCommands(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
         => BuildServiceProvider(dbContext, timeProvider).GetRequiredService<ISettingsAuthzCommands>();
 
-    private static IServiceProvider BuildServiceProvider(PmTrackerDbContext dbContext, TimeProvider? timeProvider = null)
+    private static IServiceProvider BuildServiceProvider(
+        PmTrackerDbContext dbContext,
+        TimeProvider? timeProvider = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder()
@@ -81,6 +87,11 @@ internal static class IntegrationTestHelper
             PmTracker.Web.Services.Schedules.HarmonogramSkutecnostSyncService>();
         services.AddSingleton(dbContext);
         services.AddSingleton(timeProvider ?? TimeProvider.System);
+
+        // Review fix M2 (2026-10-12): malý seam pro testovací double (např. IHarvestScheduler) —
+        // registrace tady běží PO AddPmTrackerDataStore, takže poslední registrace vyhrává při
+        // GetRequiredService (ASP.NET Core DI). Žádné restrukturování, jen optional override hook.
+        configureServices?.Invoke(services);
 
         return services.BuildServiceProvider();
     }

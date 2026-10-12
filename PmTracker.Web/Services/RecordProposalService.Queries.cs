@@ -218,6 +218,10 @@ public sealed partial class RecordProposalService
             // Task 6 (2026-10-12): ulož stav přepínače ZE ZÁZNAMU před přepsáním payloadem níže —
             // potřebný jako srovnávací základ pro ProposalChangesHarmonogramRezim.
             var recordAutoFill = model.HarmonogramAutoFillSwitchOn;
+            // Review fix M3 (2026-10-12): rezim JEDNOTLIVÝCH kroků ze ZÁZNAMU před přepsáním —
+            // potřebný níže pro infobar u starších návrhů (bez ChangesHarmonogramRezim), které
+            // nesou ruční data pro auto-eligible kroky.
+            var recordKrokRezimByPoradi = model.HarmonogramBlok.Kroky.ToDictionary(k => k.KrokIndex, k => k.SkutecnostRezim);
             ApplySchedulePayloadToModel(model, schedulePayload);
             var canDecide = await _authorizationPolicy.CanDecideProjectProposalAsync(projectId, currentUser, ct);
             ConfigureProposalDetailEditor(
@@ -245,6 +249,33 @@ public sealed partial class RecordProposalService
                         : model.HarmonogramAutoFillSwitchOn
                             ? "Návrh přepíná harmonogram na automatické vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 budou znovu plnit ze ServiceDesku."
                             : "Návrh přepíná harmonogram na ruční vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 přestanou plnit ze ServiceDesku.";
+                }
+            }
+            else
+            {
+                // Review fix M3 (2026-10-12): spec known-issues §Poznámky k řešení — infobar se má
+                // zobrazit i tehdy, když návrh nese ruční data (ManualActualKroky) pro kroky, které
+                // jsou na ZÁZNAMU automatické. Reálně dosažitelné jen u návrhů čekajících ještě před
+                // nasazením HarmonogramRezim/ChangesHarmonogramRezim (starý payload) — nový editor
+                // při ruční editaci auto-eligible kroku vždy zároveň přepne switch, což už hlásí
+                // větev výše. Switch samotný se NEMĚNÍ (zůstává stav záznamu, žádné zvýraznění) —
+                // jen upozornění, že schválení auto-eligible kroky s ručním datem přepne na Manual
+                // (DecisionCommands.ApplyApprovedScheduleProposalAsync: beze změny rezimu se
+                // ManualActualKroky aplikují neomezeně — acceptAutoEligibleKroky:true).
+                var autoEligibleKrokyZRucnichDat = schedulePayload.ManualActualKroky
+                    .Select(mk => mk.Poradi)
+                    .Where(poradi => !HarmonogramManualSteps.IsManual(poradi))
+                    .Where(poradi => !recordKrokRezimByPoradi.TryGetValue(poradi, out var rezim)
+                        || rezim == SkutecnostRezimEnum.Auto)
+                    .Distinct()
+                    .OrderBy(poradi => poradi)
+                    .ToList();
+
+                if (autoEligibleKrokyZRucnichDat.Count > 0)
+                {
+                    model.ProposalRezimChangeMessage =
+                        $"Návrh obsahuje ruční data u kroků {FormatCzechPoradiList(autoEligibleKrokyZRucnichDat)}, " +
+                        "které jsou na záznamu vyplňované automaticky. Po schválení se tyto kroky přepnou na ruční vyplňování.";
                 }
             }
 
@@ -423,6 +454,21 @@ public sealed partial class RecordProposalService
         model.HarmonogramBlok = CloneScheduleBlock(
             model.HarmonogramBlok,
             permissions: ScheduleEditorPermissionSet.ForFullEdit(model.HarmonogramBlok.Permissions.IsTaskCategory));
+    }
+
+    /// <summary>
+    /// Review fix M3 (2026-10-12): česky skloňovaný výčet pořadí kroků do infobaru —
+    /// "3", "3 a 6", "3, 6 a 7" (čárky mezi prvními, „a" před posledním).
+    /// </summary>
+    private static string FormatCzechPoradiList(IReadOnlyList<int> poradi)
+    {
+        var texty = poradi.Select(p => p.ToString(CultureInfo.InvariantCulture)).ToList();
+        return texty.Count switch
+        {
+            0 => string.Empty,
+            1 => texty[0],
+            _ => string.Join(", ", texty.Take(texty.Count - 1)) + " a " + texty[^1]
+        };
     }
 
     private void ApplySchedulePayloadToModel(ZaznamEditViewModel model, SchedulePlanProposalPayload payload)
