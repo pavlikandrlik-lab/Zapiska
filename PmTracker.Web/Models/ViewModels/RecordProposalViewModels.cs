@@ -132,6 +132,11 @@ public sealed class SchedulePlanProposalPayload
     /// na krok řádek v <c>zaznam_harmonogram_krok</c>.
     /// </summary>
     public List<ManualActualKrokDto> ManualActualKroky { get; set; } = [];
+
+    /// <summary>
+    /// Sdělení autora návrhu (uživatel 2026-10-08). Null u návrhů bez důvodu i u starších návrhů.
+    /// </summary>
+    public string? DuvodZmeny { get; set; }
 }
 
 /// <summary>

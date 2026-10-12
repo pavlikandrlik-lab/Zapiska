@@ -89,6 +89,16 @@ public sealed class SaveRecordCommand
     /// je nepošle, ale server defensivně filtruje).
     /// </summary>
     public string? HarmonogramRezim { get; set; }
+
+    public const int DuvodZmenyMaxLength = 1000;
+
+    /// <summary>
+    /// Důvod změny z návrhu změny termínu a harmonogramu (uživatel 2026-10-08) — nepovinné sdělení
+    /// autora schvalovateli; po schválení se uloží do zaznam_historie_terminu.duvod. Přímá úprava
+    /// záznamu ho nepoužívá.
+    /// </summary>
+    [StringLength(DuvodZmenyMaxLength)]
+    public string? DuvodZmeny { get; set; }
 }
 
 public sealed class DeleteRecordCommand

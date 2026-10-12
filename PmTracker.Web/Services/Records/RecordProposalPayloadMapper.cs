@@ -84,7 +84,8 @@ public sealed class RecordProposalPayloadMapper
                 ChangesTermDeadline = changesTermDeadline,
                 ChangesSchedulePlan = planned.Count > 0,
                 ChangesScheduleActual = actual.Count > 0 || command.ManualActualKroky.Count > 0,
-                ManualActualKroky = command.ManualActualKroky.Select(Manual).ToList()
+                ManualActualKroky = command.ManualActualKroky.Select(Manual).ToList(),
+                DuvodZmeny = string.IsNullOrWhiteSpace(command.DuvodZmeny) ? null : command.DuvodZmeny.Trim()
             }
         };
     }

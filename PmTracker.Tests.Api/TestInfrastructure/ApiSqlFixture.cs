@@ -272,7 +272,8 @@ public sealed class ApiSqlFixture : IAsyncLifetime
                 ProjektId = projectId,
                 ZaznamId = recordId,
                 TerminUkonceni = DateTime.Today.AddDays(45),
-                ChangesTermDeadline = true
+                ChangesTermDeadline = true,
+                DuvodZmeny = duvodZmeny
             }
         });
 
