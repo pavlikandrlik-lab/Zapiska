@@ -24,6 +24,15 @@
         })
         : null;
 
+    // Task 6 (2026-10-12): rezim master switch — podbarvení na detailu návrhu (ProposalChangesHarmonogramRezim)
+    // a původní stav v editoru návrhu (data-record-rezim-original pro rezim-master-switch.js). Razor
+    // nevynechá data-* s null hodnotou → atribut se skládá ručně (global-constraints.md).
+    var rezimSwitchClass = "record-editor-tabs-rezim-switch"
+        + (Model.IsProposalDecisionDetail && Model.ProposalChangesHarmonogramRezim ? " proposal-field-changed" : "");
+    var rezimOriginalAttr = Model.IsSchedulePlanProposalEditor
+        ? $"data-record-rezim-original=\"{(Model.HarmonogramAutoFillSwitchOn ? "Auto" : "Manual")}\""
+        : "";
+
     // Lego pm-tabs architecture: filtrujeme jen viditelné taby a per-pozice volíme tag
     // (pm-tab-left | pm-tab | pm-tab-right). Skryté taby v markupu vůbec nejsou —
     // disabled/hidden tab znemožňoval správné vykreslení outer rohů sousedů.
@@ -135,6 +144,18 @@
         </section>
     }
 
+    @* Task 6 (2026-10-12): upozornění, že návrh mění přepínač „Automatické vyplňování
+       harmonogramu" proti aktuálnímu stavu záznamu. Atributy infobaru rozhodnuté uživatelem
+       (global-constraints.md): color="error" type="bold" closable="false" +
+       components/exclamation-triangle-fill. *@
+    @if (Model.IsProposalDecisionDetail && Model.ProposalChangesHarmonogramRezim)
+    {
+        <gov-infobar color="error" type="bold" closable="false" data-proposal-rezim-infobar>
+            <gov-icon slot="icon" type="components" name="exclamation-triangle-fill"></gov-icon>
+            @Model.ProposalRezimChangeMessage
+        </gov-infobar>
+    }
+
     <div class="record-editor-tabs-row" data-record-editor-tabs-row>
     <pm-tabs persist="hash"
              persist-key="record-edit"
@@ -175,12 +196,18 @@
            input HarmonogramRezim při Save form submitu (transactional s datumy v jednom POST). *@
         @* C3 (2026-07-10): na schvalování návrhu (IsProposalDecisionDetail) je switch
            read-only — pravidlo „vše read-only, žádný editovatelný prvek". Stav zůstává
-           viditelný (schvalovatel má vidět Auto/Manual režim). *@
+           viditelný (schvalovatel má vidět Auto/Manual režim).
+           Task 6 (2026-10-12): v editoru návrhu nese data-record-rezim-original (původní stav
+           na záznamu) — rezim-master-switch.js ho porovná s aktuálním přepnutím a podbarví
+           přepínač stejně jako ostatní změněná pole návrhu; na detailu je podbarvený rovnou,
+           když návrh režim mění (ProposalChangesHarmonogramRezim). Razor nevynechá data-*
+           s null hodnotou — atribut se skládá ručně (global-constraints.md). *@
         <gov-form-switch size="m"
-                         class="record-editor-tabs-rezim-switch"
+                         class="@rezimSwitchClass"
                          data-record-rezim-switch
                          data-record-zaznam-id="@Model.Id"
                          data-record-projekt-id="@Model.ProjektId"
+                         @Html.Raw(rezimOriginalAttr)
                          disabled="@(Model.IsProposalDecisionDetail ? "disabled" : null)"
                          @(Model.HarmonogramAutoFillSwitchOn ? "checked" : null)>
             <span slot="label"><label>Automatické vyplňování harmonogramu</label></span>

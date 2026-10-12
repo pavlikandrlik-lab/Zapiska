@@ -84,6 +84,13 @@
 
     // 2) Update všechny auto-eligible cells (data-skutecnost-rezim → CSS visibility)
     applyRezimToCells(form, rezim);
+
+    // Editor návrhu (uživatel 2026-10-08): přepínač přepnutý opačně než na záznamu se podbarví
+    // stejně jako ostatní změněná pole návrhu.
+    const original = sw.getAttribute('data-record-rezim-original');
+    if (original) {
+      sw.classList.toggle('proposal-field-changed', original !== rezim);
+    }
   }
 
   function init() {

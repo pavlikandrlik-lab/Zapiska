@@ -87,6 +87,12 @@ public sealed class ZaznamEditViewModel
     public string? ProposalAuthorName { get; set; }
     public DateTime? ProposalCreatedAtLocal { get; set; }
     public string? ProposalAuthorMessage { get; set; }
+
+    // Task 6 (2026-10-12): schvalovatel vidí stav přepínače „Automatické vyplňování
+    // harmonogramu" Z NÁVRHU (HarmonogramAutoFillSwitchOn se v detailu přepíše na navržený
+    // stav) a je upozorněn, že se liší od stavu na záznamu.
+    public bool ProposalChangesHarmonogramRezim { get; set; }
+    public string? ProposalRezimChangeMessage { get; set; }
     public bool AllowBasicMetadataEdit { get; set; } = true;
     public bool AllowTermDeadlineEdit { get; set; } = true;
     public bool ShowExternalTab { get; set; } = true;

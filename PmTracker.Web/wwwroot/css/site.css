@@ -2458,6 +2458,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background: transparent;
 }
 
+/* Task 6 (2026-10-12): rezim master switch (gov-form-switch) je custom element bez vlastního
+   display — bez tohoto pravidla by .proposal-field-changed podbarvení (background/padding)
+   kolabovalo na nulovou výšku. */
+.record-editor-tabs-rezim-switch.proposal-field-changed {
+    display: inline-flex;
+}
+
 /* Proposal editable field — podbarvené zelené pole v návrhu. User report
    2026-04-19: "tento je přes citrix blbě vidět, aplikace běží přes citrix" →
    ztmavnění o pár odstínů (Tailwind green-600) a zvýšení opacity. */

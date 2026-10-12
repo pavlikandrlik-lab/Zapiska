@@ -184,4 +184,41 @@ public sealed class ScheduleProposalGuardScenariosTests
             await DeleteRecordAsync(recordId);
         }
     }
+
+    /// <summary>
+    /// Task 6 (2026-10-12): v editoru návrhu se přepínač „Automatické vyplňování harmonogramu"
+    /// podbarví (.proposal-field-changed) stejně jako ostatní změněná pole návrhu, když se liší
+    /// od původního stavu na záznamu (data-record-rezim-original), a odbarví se po přepnutí zpět.
+    /// </summary>
+    [Fact]
+    public async Task EditorNavrhu_PrepnutiRezimu_PodbarviPrepinac_ZpetOdbarvi()
+    {
+        var recordId = await CreateTaskRecordAsync();
+        var page = await _fixture.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/Navrhy/CreateScheduleProposal?projektId={_fixture.ProjectId}&zaznamId={recordId}&asUser={_fixture.AdminOsobaId}");
+            var sw = page.Locator("gov-form-switch[data-record-rezim-switch]");
+            await Expect(sw).ToHaveAttributeAsync("data-record-rezim-original", "Auto");
+
+            // Ruling (2026-10-12): DispatchEventAsync("gov-change", new { detail = ... }) nevytváří
+            // CustomEvent s detail — Playwright .NET volí typ události podle jména, ne podle
+            // dodaných dat, takže event.detail v handleru zůstává undefined. Fallback z briefu:
+            // window.dispatchEvent přes page.EvaluateAsync, které vytvoří skutečný CustomEvent.
+            const string dispatchGovChange =
+                "([sel, checked]) => document.querySelector(sel).dispatchEvent(new CustomEvent('gov-change', { bubbles: true, detail: { checked } }))";
+            const string selector = "gov-form-switch[data-record-rezim-switch]";
+
+            // gov-change s detail.checked je autoritativní vstup handleru (rezim-master-switch.js).
+            await page.EvaluateAsync(dispatchGovChange, new object[] { selector, false });
+            await Expect(sw).ToHaveClassAsync(new Regex("proposal-field-changed"));
+            await page.EvaluateAsync(dispatchGovChange, new object[] { selector, true });
+            await Expect(sw).Not.ToHaveClassAsync(new Regex("proposal-field-changed"));
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+            await DeleteRecordAsync(recordId);
+        }
+    }
 }

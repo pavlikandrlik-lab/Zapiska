@@ -215,6 +215,9 @@ public sealed partial class RecordProposalService
                 ?? throw new InvalidOperationException("Payload návrhu harmonogramu je neplatný.");
             var fieldTooltips = BuildScheduleProposalFieldDiffTooltips(model, schedulePayload);
             var scheduleTypeTooltips = BuildScheduleProposalScheduleDiffTooltips(model, schedulePayload);
+            // Task 6 (2026-10-12): ulož stav přepínače ZE ZÁZNAMU před přepsáním payloadem níže —
+            // potřebný jako srovnávací základ pro ProposalChangesHarmonogramRezim.
+            var recordAutoFill = model.HarmonogramAutoFillSwitchOn;
             ApplySchedulePayloadToModel(model, schedulePayload);
             var canDecide = await _authorizationPolicy.CanDecideProjectProposalAsync(projectId, currentUser, ct);
             ConfigureProposalDetailEditor(
@@ -224,6 +227,19 @@ public sealed partial class RecordProposalService
                 fieldTooltips,
                 scheduleTypeTooltips,
                 "Zvýrazněná pole ukazují hodnoty navržené ke schválení. Po najetí se zobrazí původní a navržená hodnota.");
+
+            // Task 6: schvalovatel vidí stav přepínače z NÁVRHU, ne ze záznamu — a je upozorněn,
+            // že návrh mění režim. null = starší návrh / žádná změna přepínače → ponech stav záznamu.
+            var proposedRezim = HarmonogramAutoFillRule.Normalize(schedulePayload.HarmonogramRezim);
+            if (proposedRezim is not null)
+            {
+                model.HarmonogramAutoFillSwitchOn = proposedRezim == HarmonogramAutoFillRule.Auto;
+                model.ProposalChangesHarmonogramRezim = model.HarmonogramAutoFillSwitchOn != recordAutoFill;
+                model.ProposalRezimChangeMessage = !model.ProposalChangesHarmonogramRezim ? null
+                    : model.HarmonogramAutoFillSwitchOn
+                        ? "Návrh přepíná harmonogram na automatické vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 budou znovu plnit ze ServiceDesku."
+                        : "Návrh přepíná harmonogram na ruční vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 přestanou plnit ze ServiceDesku.";
+            }
 
             // Task 4 (2026-10-12): sdělení autora návrhu (nepovinný důvod změny) — schvalovatel ho
             // vidí vždy, i u starších návrhů persistovaných před zavedením pole (ProposalAuthorMessage null).
