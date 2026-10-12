@@ -229,16 +229,23 @@ public sealed partial class RecordProposalService
                 "Zvýrazněná pole ukazují hodnoty navržené ke schválení. Po najetí se zobrazí původní a navržená hodnota.");
 
             // Task 6: schvalovatel vidí stav přepínače z NÁVRHU, ne ze záznamu — a je upozorněn,
-            // že návrh mění režim. null = starší návrh / žádná změna přepínače → ponech stav záznamu.
-            var proposedRezim = HarmonogramAutoFillRule.Normalize(schedulePayload.HarmonogramRezim);
-            if (proposedRezim is not null)
+            // že návrh mění režim. Fix round 1 (2026-10-12, Important finding): editor VŽDY
+            // posílá hidden HarmonogramRezim (i beze změny) — gate musí být ChangesHarmonogramRezim
+            // (= návrh rezim OPRAVDU mění), ne jen "HarmonogramRezim != null". Jinak by detail
+            // ukazoval cizí (nezamýšlený) stav a falešný infobar u návrhu, který harmonogram
+            // vůbec nemění. ChangesHarmonogramRezim=false → ponech stav záznamu, žádný infobar.
+            if (schedulePayload.ChangesHarmonogramRezim)
             {
-                model.HarmonogramAutoFillSwitchOn = proposedRezim == HarmonogramAutoFillRule.Auto;
-                model.ProposalChangesHarmonogramRezim = model.HarmonogramAutoFillSwitchOn != recordAutoFill;
-                model.ProposalRezimChangeMessage = !model.ProposalChangesHarmonogramRezim ? null
-                    : model.HarmonogramAutoFillSwitchOn
-                        ? "Návrh přepíná harmonogram na automatické vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 budou znovu plnit ze ServiceDesku."
-                        : "Návrh přepíná harmonogram na ruční vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 přestanou plnit ze ServiceDesku.";
+                var proposedRezim = HarmonogramAutoFillRule.Normalize(schedulePayload.HarmonogramRezim);
+                if (proposedRezim is not null)
+                {
+                    model.HarmonogramAutoFillSwitchOn = proposedRezim == HarmonogramAutoFillRule.Auto;
+                    model.ProposalChangesHarmonogramRezim = model.HarmonogramAutoFillSwitchOn != recordAutoFill;
+                    model.ProposalRezimChangeMessage = !model.ProposalChangesHarmonogramRezim ? null
+                        : model.HarmonogramAutoFillSwitchOn
+                            ? "Návrh přepíná harmonogram na automatické vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 budou znovu plnit ze ServiceDesku."
+                            : "Návrh přepíná harmonogram na ruční vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 přestanou plnit ze ServiceDesku.";
+                }
             }
 
             // Task 4 (2026-10-12): sdělení autora návrhu (nepovinný důvod změny) — schvalovatel ho

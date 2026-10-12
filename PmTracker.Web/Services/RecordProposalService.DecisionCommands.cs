@@ -267,20 +267,40 @@ public sealed partial class RecordProposalService
 
         // Uživatel 2026-10-08: přepínač v návrhu se po schválení opravdu provede (dřív se neukládal).
         // Stejné pravidlo jako RecordService.SaveRecord: přepínač řídí jen kroky 1/3/4/6/7/10.
-        var targetRezim = HarmonogramAutoFillRule.Normalize(schedulePayload.HarmonogramRezim);
+        // Fix round 1 (2026-10-12, Important finding): editor VŽDY posílá hidden HarmonogramRezim
+        // (i beze změny) — gate musí být ChangesHarmonogramRezim (= návrh rezim OPRAVDU mění),
+        // ne jen "HarmonogramRezim != null". Jinak schválení tiše přepisuje rezim, který se
+        // mezitím přímou editací změnil (stale overwrite), a zakládá prázdné krok řádky pro
+        // auto-eligible kroky i u návrhů, které harmonogram vůbec nemění.
+        var targetRezim = schedulePayload.ChangesHarmonogramRezim
+            ? HarmonogramAutoFillRule.Normalize(schedulePayload.HarmonogramRezim)
+            : null;
         var targetAuto = targetRezim == HarmonogramAutoFillRule.Auto;
         var switchedToAuto = false;
         if (targetRezim is not null)
         {
-            var target = targetAuto ? SkutecnostRezimEnum.Auto : SkutecnostRezimEnum.Manual;
             foreach (var poradi in Enumerable.Range(1, 10).Where(p => !HarmonogramManualSteps.IsManual(p)))
             {
-                var row = GetOrCreateKrok(poradi);
-                if (row.SkutecnostRezim != (byte)target)
+                if (targetAuto)
                 {
-                    switchedToAuto |= targetAuto;
-                    row.SkutecnostRezim = (byte)target;
-                    row.UpdatedAt = nowUtc;
+                    // Chybějící krok řádek už znamená Auto (GetOrCreateKrok defaultuje na Auto) —
+                    // nikdy nezakládej řádek jen proto, že potvrzuje Auto; jen přepni existující
+                    // Manual řádek zpět na Auto.
+                    if (krokByPoradi.TryGetValue(poradi, out var existing) && existing.SkutecnostRezim != (byte)SkutecnostRezimEnum.Auto)
+                    {
+                        switchedToAuto = true;
+                        existing.SkutecnostRezim = (byte)SkutecnostRezimEnum.Auto;
+                        existing.UpdatedAt = nowUtc;
+                    }
+                }
+                else
+                {
+                    var row = GetOrCreateKrok(poradi);
+                    if (row.SkutecnostRezim != (byte)SkutecnostRezimEnum.Manual)
+                    {
+                        row.SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual;
+                        row.UpdatedAt = nowUtc;
+                    }
                 }
             }
         }

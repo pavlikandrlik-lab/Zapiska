@@ -347,6 +347,178 @@ public sealed class ScheduleProposalRezimTests
         detail.ProposalRezimChangeMessage.Should().BeNull();
     }
 
+    /// <summary>
+    /// Fix round 1 (2026-10-12, Important finding): editor VŽDY posílá hidden HarmonogramRezim
+    /// (i když se nezměnil) — ChangesHarmonogramRezim je jediný signál, že návrh rezim opravdu
+    /// MĚNÍ. Návrh odeslaný beze změny (HarmonogramRezim == aktuální stav záznamu) nesmí po
+    /// schválení přepsat rezim, který se mezitím na záznamu změnil přímou editací.
+    /// </summary>
+    [Fact]
+    public async Task NavrhBezZmenyRezimu_ZaznamMezitimRucne_SchvaleniRezimNezmeni()
+    {
+        var db = await _fixture.CreateDatabaseAsync("schedule_proposal_rezim_stale_overwrite");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var proposerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RezimLead7");
+        var managerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RezimManager7");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "REZIM7");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "REZIM7_SYS", proposerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, proposerId, SubsystemRoleCodes.Lead);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, managerId, ProjectRoleCodes.ProjectManager);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, managerId, subsystemId, "U", "RezimStaleOverwrite");
+        var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+
+        // Záznam bez krok řádků = Auto. Editor VŽDY posílá HarmonogramRezim — tady "Auto", stejné
+        // jako aktuální stav → ChangesHarmonogramRezim bude false. Návrh jen posouvá termín.
+        var editor = store.BuildScheduleProposalEditor(projectId, recordId, proposer);
+        var original = editor.TerminUkonceni!.Value.Date;
+        var command = BuildEditCommand(editor);
+        command.TerminUkonceni = original.AddDays(14);
+        command.HarmonogramRezim = "Auto";
+        store.SubmitScheduleProposal(command, proposer);
+
+        var proposalId = await dbContext.ZaznamNavrhy.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId && x.TypNavrhu == RecordProposalTypeCodes.SchedulePlanChange)
+            .Select(x => x.Id)
+            .SingleAsync();
+
+        // Mezitím (po odeslání návrhu) se záznam přímou editací přepne na Manual — pending lock
+        // ChangesHarmonogramRezim=false nechránil harmonogram, takže to je legitimní přímá editace.
+        foreach (var poradi in new byte[] { 1, 3, 4, 6, 7, 10 })
+        {
+            dbContext.ZaznamHarmonogramKroky.Add(new ZaznamHarmonogramKrokEntity
+            {
+                ZaznamId = recordId,
+                Poradi = poradi,
+                SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual,
+                SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Manual,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+        await dbContext.SaveChangesAsync();
+
+        var manager = IntegrationTestHelper.BuildUser(
+            managerId,
+            visibleProjectIds: [projectId],
+            grants: [IntegrationTestHelper.AllowProjectPermission(PermissionKeys.ProposalsAccept, projectId)]);
+        store.ApproveProposal(new ProposalDecisionCommand { ProjektId = projectId, ProposalId = proposalId }, manager);
+
+        var kroky = await dbContext.ZaznamHarmonogramKroky.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId)
+            .ToListAsync();
+        foreach (var poradi in new byte[] { 1, 3, 4, 6, 7, 10 })
+        {
+            kroky.Single(k => k.Poradi == poradi).SkutecnostRezim.Should().Be((byte)SkutecnostRezimEnum.Manual,
+                $"návrh nenesl ÚMYSL změnit rezim (ChangesHarmonogramRezim=false) — mezitímní přímá editace na Manual se nesmí přepsat");
+        }
+        var record = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
+        record.DatumUkonceni.Date.Should().Be(original.AddDays(14), "posun termínu se naopak uplatnit měl");
+    }
+
+    /// <summary>
+    /// Fix round 1 (2026-10-12): návrh beze změny rezimu nesmí založit prázdné krok řádky pro
+    /// auto-eligible kroky jen proto, že editor hidden pole vždy posílá (viz předchozí test).
+    /// </summary>
+    [Fact]
+    public async Task NavrhBezZmenyRezimu_ZaznamBezKroku_SchvaleniNezalozPrazdneRadky()
+    {
+        var db = await _fixture.CreateDatabaseAsync("schedule_proposal_rezim_no_empty_rows");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var proposerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RezimLead8");
+        var managerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RezimManager8");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "REZIM8");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "REZIM8_SYS", proposerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, proposerId, SubsystemRoleCodes.Lead);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, managerId, ProjectRoleCodes.ProjectManager);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, managerId, subsystemId, "U", "RezimNoEmptyRows");
+        var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+
+        var editor = store.BuildScheduleProposalEditor(projectId, recordId, proposer);
+        var original = editor.TerminUkonceni!.Value.Date;
+        var command = BuildEditCommand(editor);
+        command.TerminUkonceni = original.AddDays(14);
+        command.HarmonogramRezim = "Auto"; // stejné jako aktuální stav bez krok řádků → beze změny
+        store.SubmitScheduleProposal(command, proposer);
+
+        var proposalId = await dbContext.ZaznamNavrhy.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId && x.TypNavrhu == RecordProposalTypeCodes.SchedulePlanChange)
+            .Select(x => x.Id)
+            .SingleAsync();
+
+        var manager = IntegrationTestHelper.BuildUser(
+            managerId,
+            visibleProjectIds: [projectId],
+            grants: [IntegrationTestHelper.AllowProjectPermission(PermissionKeys.ProposalsAccept, projectId)]);
+        store.ApproveProposal(new ProposalDecisionCommand { ProjektId = projectId, ProposalId = proposalId }, manager);
+
+        var krokCount = await dbContext.ZaznamHarmonogramKroky.AsNoTracking().CountAsync(x => x.ZaznamId == recordId);
+        krokCount.Should().Be(0, "beze změny rezimu se nesmí založit prázdné krok řádky pro auto-eligible kroky");
+    }
+
+    /// <summary>
+    /// Fix round 1 (2026-10-12): detail návrhu beze změny rezimu musí ukázat AKTUÁLNÍ stav
+    /// záznamu (ne stav z návrhu) a žádný infobar, i když se záznam mezitím přímou editací
+    /// přepnul na Manual.
+    /// </summary>
+    [Fact]
+    public async Task DetailNavrhu_RezimBezZmeny_ZaznamMezitimZmenen_BezInfobaru()
+    {
+        var db = await _fixture.CreateDatabaseAsync("schedule_proposal_rezim_detail_stale");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+
+        var proposerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RezimLead9");
+        var managerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RezimManager9");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "REZIM9");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "REZIM9_SYS", proposerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, proposerId, SubsystemRoleCodes.Lead);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, managerId, ProjectRoleCodes.ProjectManager);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, managerId, subsystemId, "U", "RezimDetailStale");
+        var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+
+        var editor = store.BuildScheduleProposalEditor(projectId, recordId, proposer);
+        var original = editor.TerminUkonceni!.Value.Date;
+        var command = BuildEditCommand(editor);
+        command.TerminUkonceni = original.AddDays(14);
+        command.HarmonogramRezim = "Auto";
+        store.SubmitScheduleProposal(command, proposer);
+
+        var proposalId = await dbContext.ZaznamNavrhy.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId && x.TypNavrhu == RecordProposalTypeCodes.SchedulePlanChange)
+            .Select(x => x.Id)
+            .SingleAsync();
+
+        // Mezitím (po odeslání návrhu) se záznam přímou editací přepne na Manual.
+        foreach (var poradi in new byte[] { 1, 3, 4, 6, 7, 10 })
+        {
+            dbContext.ZaznamHarmonogramKroky.Add(new ZaznamHarmonogramKrokEntity
+            {
+                ZaznamId = recordId,
+                Poradi = poradi,
+                SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual,
+                SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Manual,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+        await dbContext.SaveChangesAsync();
+
+        var manager = IntegrationTestHelper.BuildUser(
+            managerId,
+            visibleProjectIds: [projectId],
+            grants: [IntegrationTestHelper.AllowProjectPermission(PermissionKeys.ProposalsAccept, projectId)]);
+        var detail = store.BuildProposalDetail(projectId, proposalId, manager);
+
+        detail.ProposalChangesHarmonogramRezim.Should().BeFalse();
+        detail.ProposalRezimChangeMessage.Should().BeNull();
+        detail.HarmonogramAutoFillSwitchOn.Should().BeFalse("beze změny rezimu v návrhu se zobrazí AKTUÁLNÍ stav záznamu (Manual), ne stav z návrhu");
+    }
+
     private static SaveRecordCommand BuildEditCommand(ZaznamEditViewModel editor)
     {
         var subsystemOption = editor.Subsystemy.First(candidate =>
