@@ -2,9 +2,11 @@
 // když k záznamu už čeká návrh, ukáže dialog místo chybové stránky. Server kontrolu drží i sám
 // (přímý odkaz, souběh) — vrátí zpět s hláškou (NavrhyController.CreateScheduleProposal).
 import { appendCurrentAsUser } from "../navigationShared.js";
+import { isAdapterClick } from "../eventBus.js";
 
 const LINK_SELECTOR = "[data-schedule-proposal-check-url]";
 const CLOSE_DELAY_MS = 400; // gov-dialog close transition (stejně jako recordEditor/draft.js)
+const AVAILABILITY_TIMEOUT_MS = 5000; // review fix M4: fetch bez timeoutu nechával tlačítko "mrtvé"
 let checkInFlight = false;
 
 /** Co udělat s odpovědí ověření. Neznámá odpověď = pokračovat, rozhodne server. */
@@ -37,7 +39,7 @@ function createButton(label, { color, type, href }) {
     return button;
 }
 
-function openBlockedDialog({ title, message, proposalUrl }) {
+function openBlockedDialog({ title, message, proposalUrl }, trigger) {
     const dialog = document.createElement("gov-dialog");
     dialog.setAttribute("role", "alertdialog");
     dialog.setAttribute("label-tag", "h3");
@@ -78,7 +80,14 @@ function openBlockedDialog({ title, message, proposalUrl }) {
         if (closed) return;
         closed = true;
         dialog.open = false;
-        window.setTimeout(() => dialog.remove(), CLOSE_DELAY_MS);
+        window.setTimeout(() => {
+            dialog.remove();
+            // Review fix M5 (2026-10-12): fokus po zavření zpět na prvek, kterým se dialog otevřel
+            // (stejný vzor jako closeRecordEditorCloseGuard({ restoreFocus }) v recordEditor/draft.js).
+            if (trigger instanceof HTMLElement && trigger.isConnected) {
+                trigger.focus({ preventScroll: true });
+            }
+        }, CLOSE_DELAY_MS);
     };
     okButton.addEventListener("click", close);
     dialog.addEventListener("gov-close", close);
@@ -91,7 +100,50 @@ function openBlockedDialog({ title, message, proposalUrl }) {
     return dialog;
 }
 
+/**
+ * Review fix M4 (2026-10-12): dotaz na dostupnost s timeoutem. Vlastní AbortController +
+ * setTimeout (ne AbortSignal.timeout — širší kompatibilita), timeoutPromise soupeří s fetchem přes
+ * Promise.race, takže i fetchImpl, který signal nerespektuje (nikdy se nevyřeší), po timeoutMs
+ * doběhne na "navigate" — "server rozhodne" (Review Focus 2). Beze zbytečného čekání na fetch.
+ */
+export function fetchScheduleProposalDecision(checkUrl, { fetchImpl = fetch, timeoutMs = AVAILABILITY_TIMEOUT_MS } = {}) {
+    const controller = new AbortController();
+    let timeoutId;
+    const timeoutPromise = new Promise((resolve) => {
+        timeoutId = setTimeout(() => {
+            controller.abort();
+            resolve({ action: "navigate" });
+        }, timeoutMs);
+    });
+
+    const fetchPromise = (async () => {
+        try {
+            const response = await fetchImpl(checkUrl, {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+                signal: controller.signal
+            });
+            if (!response.ok) {
+                return { action: "navigate" };
+            }
+            return resolveScheduleProposalCheck(await response.json());
+        } catch {
+            // Síť / neplatná odpověď / abort — pokračuje se na editor, rozhodne server.
+            return { action: "navigate" };
+        }
+    })();
+
+    return Promise.race([fetchPromise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+}
+
 async function handleClick(event) {
+    // Review fix I1 (2026-10-12): ignorovat syntetický click z gov-click adaptéru (eventBus.js).
+    // Ten click nenese skutečné modifikátory (gov-button ho emituje stejně při Ctrl/Cmd/Shift
+    // kliku), takže by se omylem vyhodnotil jako "plain left click" i při kliku do nové karty.
+    // Rozhoduje jen původní trusted click (myš na vnitřním <a>, nebo klávesnice Enter).
+    if (isAdapterClick(event)) {
+        return;
+    }
     const link = event.target instanceof Element ? event.target.closest(LINK_SELECTOR) : null;
     if (!link || !isPlainLeftClick(event)) {
         return;
@@ -108,19 +160,11 @@ async function handleClick(event) {
     }
     checkInFlight = true;
     try {
-        const response = await fetch(appendCurrentAsUser(checkUrl), {
-            headers: { Accept: "application/json" },
-            credentials: "same-origin"
-        });
-        const decision = response.ok
-            ? resolveScheduleProposalCheck(await response.json())
-            : { action: "navigate" };
+        const decision = await fetchScheduleProposalDecision(appendCurrentAsUser(checkUrl));
         if (decision.action === "dialog") {
-            openBlockedDialog(decision);
+            openBlockedDialog(decision, link);
             return;
         }
-    } catch {
-        // Síť / neplatná odpověď — pokračuje se na editor, rozhodne server.
     } finally {
         checkInFlight = false;
     }

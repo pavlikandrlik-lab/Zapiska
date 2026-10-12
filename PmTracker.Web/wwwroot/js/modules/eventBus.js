@@ -11,6 +11,14 @@
 // Dokumentace: docs/architecture/js-modules.md
 
 const dispatched = new WeakSet();
+// Review fix I1 (2026-10-12): syntetické "click" eventy, které adaptér sám vytvořil a
+// vydispatchoval. gov-button při kliknutí s modifikátorem (Ctrl/Cmd/Shift) emituje "gov-click"
+// bez ohledu na modifikátory, takže adaptér by vytvořil "plain" click i pro klik do nové karty.
+// Konzumenti, kteří rozlišují modifikátory (např. scheduleProposalGuard.js), musí tento
+// syntetický click ignorovat a spolehnout se na původní trusted click z vnitřního <a>/<button>,
+// který modifikátory nese správně. isAdapterClick nepoužívá event.isTrusted, protože
+// programová volání host.click() mají být dál hlídaná.
+const adapterClicks = new WeakSet();
 
 export function installGovClickAdapter(root = document) {
     root.addEventListener("gov-click", (event) => {
@@ -26,8 +34,14 @@ export function installGovClickAdapter(root = document) {
             composed: true,
             detail: 1
         });
+        adapterClicks.add(native);
         target.dispatchEvent(native);
     });
+}
+
+/** True pro syntetický click vytvořený adaptérem výše (ne trusted klik uživatele/klávesnice). */
+export function isAdapterClick(event) {
+    return adapterClicks.has(event);
 }
 
 export const appEventBus = {
@@ -41,9 +55,12 @@ export const appEventBus = {
     }
 };
 
-// Autoinstall při načtení, pokud je document ready
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => installGovClickAdapter());
-} else {
-    installGovClickAdapter();
+// Autoinstall při načtení, pokud je document ready. typeof-guard kvůli node --test (bez DOM),
+// stejný vzor jako na konci scheduleProposalGuard.js, které teď isAdapterClick importuje.
+if (typeof document !== "undefined") {
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => installGovClickAdapter());
+    } else {
+        installGovClickAdapter();
+    }
 }

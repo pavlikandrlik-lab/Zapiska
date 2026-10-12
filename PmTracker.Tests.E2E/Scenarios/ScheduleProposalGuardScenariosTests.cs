@@ -105,12 +105,67 @@ public sealed class ScheduleProposalGuardScenariosTests
         {
             var url = $"{_fixture.BaseUrl}/Zaznamy/Detail/{recordId}?asUser={_fixture.AdminOsobaId}";
             await page.GotoAsync(url);
-            await page.Locator("[data-schedule-proposal-check-url]").DispatchEventAsync("click");
+            // Review fix I1 (2026-10-12): trusted klik, ne DispatchEventAsync — ten obchází
+            // gov-button vnitřní <a> a tím i gov-click adaptér (eventBus.js), takže by neprokázal
+            // skutečné chování. gov-button host je pro Playwright "not visible" (Stencil) → Force.
+            await page.Locator("[data-schedule-proposal-check-url]").ClickAsync(new() { Force = true });
 
             var dialog = page.Locator("gov-dialog[data-schedule-proposal-blocked-dialog]");
             await Expect(dialog).ToHaveCountAsync(1);
             await Expect(dialog).ToContainTextAsync("Návrh nelze založit");
             await Expect(page).ToHaveURLAsync(url);
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+            await DeleteRecordAsync(recordId);
+        }
+    }
+
+    /// <summary>
+    /// Review fix I1 (2026-10-12): Ctrl/Cmd-click na tlačítko na stránce záznamu dřív otevřel
+    /// novou kartu (správně — nativní akce odkazu) A ZÁROVEŇ naviguoval i aktuální kartu, protože
+    /// gov-click adaptér (eventBus.js) re-dispatchoval click bez modifikátorů a guard ho vyhodnotil
+    /// jako "plain left click". Po fixu (isAdapterClick) guard syntetický click ignoruje — aktuální
+    /// karta musí zůstat na /Zaznamy/Detail a dialog se nesmí objevit; nová karta (pokud ji
+    /// Chromium v této konfiguraci otevře) se jen zavře.
+    /// </summary>
+    [Fact]
+    public async Task NavrhSCekajicimNavrhem_CtrlKlikNaDetailu_NenavigujeAniNeukazeDialog()
+    {
+        var recordId = await CreateTaskRecordAsync();
+        await InsertPendingScheduleProposalAsync(recordId);
+        var page = await _fixture.NewPageAsync();
+        try
+        {
+            var url = $"{_fixture.BaseUrl}/Zaznamy/Detail/{recordId}?asUser={_fixture.AdminOsobaId}";
+            await page.GotoAsync(url);
+
+            IPage? popup = null;
+            void OnPage(object? sender, IPage opened) => popup = opened;
+            page.Context.Page += OnPage;
+            try
+            {
+                await page.Locator("[data-schedule-proposal-check-url]").ClickAsync(new()
+                {
+                    Force = true,
+                    Modifiers = new[] { KeyboardModifier.ControlOrMeta }
+                });
+                // Dost času na to, aby se guard (pokud by chyboval) stihl dotázat a navigovat.
+                await page.WaitForTimeoutAsync(500);
+            }
+            finally
+            {
+                page.Context.Page -= OnPage;
+            }
+
+            if (popup is not null)
+            {
+                await popup.CloseAsync();
+            }
+
+            await Expect(page).ToHaveURLAsync(url);
+            await Expect(page.Locator("gov-dialog[data-schedule-proposal-blocked-dialog]")).ToHaveCountAsync(0);
         }
         finally
         {
@@ -127,7 +182,8 @@ public sealed class ScheduleProposalGuardScenariosTests
         try
         {
             await page.GotoAsync($"{_fixture.BaseUrl}/Zaznamy/Detail/{recordId}?asUser={_fixture.AdminOsobaId}");
-            await page.Locator("[data-schedule-proposal-check-url]").DispatchEventAsync("click");
+            // Review fix I1 (2026-10-12): trusted klik (viz vysvětlení v testu výše).
+            await page.Locator("[data-schedule-proposal-check-url]").ClickAsync(new() { Force = true });
 
             await Expect(page).ToHaveURLAsync(new Regex(@"/Navrhy/CreateScheduleProposal(\?|$)"));
             await Expect(page.Locator("gov-dialog[data-schedule-proposal-blocked-dialog]")).ToHaveCountAsync(0);
