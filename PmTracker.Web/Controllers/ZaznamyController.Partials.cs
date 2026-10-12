@@ -112,6 +112,7 @@ public sealed partial class ZaznamyController
         record.ScheduleUrl ??= Url.Action(nameof(RecordSchedulePartial), new { projektId, zaznamId = summary.Id });
         record.RecordPageUrl ??= Url.Action(nameof(Detail), new { id = summary.Id, returnUrl = ProjektDetailTabUrl(projektId, "zaznamy") });
         summary.ScheduleProposalUrl ??= Url.Action("CreateScheduleProposal", "Navrhy", new { projektId, zaznamId = summary.Id });
+        summary.ScheduleProposalCheckUrl ??= Url.Action("ScheduleProposalAvailability", "Navrhy", new { projektId, zaznamId = summary.Id });
     }
 
     private void PrepareRecordCommentsPresentation(ZaznamCommentsPanelViewModel model, ZaznamCardSummaryViewModel summary)

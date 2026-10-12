@@ -285,6 +285,7 @@ public sealed partial class ProjektyController : BaseController
         record.ScheduleUrl = Url.Action("RecordSchedulePartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordSchedulePartial?projektId={projectId}&zaznamId={summary.Id}";
         record.RecordPageUrl = Url.Action("Detail", "Zaznamy", new { id = summary.Id, returnUrl = ProjektDetailTabUrl(projectId, RecordsTab) }) ?? $"/Zaznamy/Detail/{summary.Id}";
         summary.ScheduleProposalUrl = Url.Action("CreateScheduleProposal", "Navrhy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Navrhy/CreateScheduleProposal?projektId={projectId}&zaznamId={summary.Id}";
+        summary.ScheduleProposalCheckUrl = Url.Action("ScheduleProposalAvailability", "Navrhy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Navrhy/ScheduleProposalAvailability?projektId={projectId}&zaznamId={summary.Id}";
     }
 
     private void PrepareProjectScheduleTabPresentation(ProjektHarmonogramTabViewModel model)

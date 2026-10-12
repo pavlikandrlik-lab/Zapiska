@@ -91,6 +91,9 @@ public sealed class ZaznamCardSummaryViewModel
     public bool CanCreateScheduleProposal { get; set; }
     public string EditButtonLabel { get; set; } = "Upravit";
     public string? ScheduleProposalUrl { get; set; }
+    // Task 2 (2026-10-12): endpoint pro ověření dostupnosti PŘED přechodem na editor návrhu
+    // (scheduleProposalGuard.js) — čekající návrh ukáže dialog místo chybové stránky.
+    public string? ScheduleProposalCheckUrl { get; set; }
     public int CurrentUserOsobaId { get; set; }
 }
 

@@ -26,6 +26,9 @@ public sealed class ZaznamDetailPageViewModel
     public bool CanCreateScheduleProposal { get; set; }
     public string? EditUrl { get; set; }
     public string? ScheduleProposalUrl { get; set; }
+    // Task 2 (2026-10-12): endpoint pro ověření dostupnosti PŘED přechodem na editor návrhu
+    // (scheduleProposalGuard.js) — čekající návrh ukáže dialog místo chybové stránky.
+    public string? ScheduleProposalCheckUrl { get; set; }
     public string? PrintPdfUrl { get; set; }
     public string? PrintWordUrl { get; set; }
     public string? BackUrl { get; set; }

@@ -53,7 +53,8 @@
             }
             @if (Model.CanCreateScheduleProposal && !string.IsNullOrWhiteSpace(Model.ScheduleProposalUrl))
             {
-                <pm-button variant="Secondary" size="Small" href="@Model.ScheduleProposalUrl">Navrhnout změnu harmonogramu</pm-button>
+                <pm-button variant="Secondary" size="Small" href="@Model.ScheduleProposalUrl"
+                           data-schedule-proposal-check-url="@Model.ScheduleProposalCheckUrl">Navrhnout změnu harmonogramu</pm-button>
             }
         </div>
     </div>

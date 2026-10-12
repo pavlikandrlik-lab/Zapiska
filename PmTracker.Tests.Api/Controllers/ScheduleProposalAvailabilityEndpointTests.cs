@@ -94,4 +94,38 @@ public sealed class ScheduleProposalAvailabilityEndpointTests
         var location = response.Headers.Location!.ToString();
         location.Should().StartWith(returnUrl);
     }
+
+    /// <summary>
+    /// Task 2 (2026-10-12): karta záznamu nese data-schedule-proposal-check-url — scheduleProposalGuard.js
+    /// ho před přechodem na editor návrhu zavolá a podle odpovědi buď naviguje, nebo ukáže dialog.
+    /// </summary>
+    [Fact]
+    public async Task RecordsTabPartial_Karta_NeseCheckUrl()
+    {
+        var (projectId, subsystemId, leadId) = await SeedProjectAsync("APAVAIL5");
+        var recordId = await _fixture.EnsureRecordAsync(projectId, leadId, subsystemId, "U", "Avail5");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Projekty/RecordsTabPartial/{projectId}?asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain(
+            $"data-schedule-proposal-check-url=\"/Navrhy/ScheduleProposalAvailability?projektId={projectId}&amp;zaznamId={recordId}\"");
+    }
+
+    [Fact]
+    public async Task DetailStranka_TlacitkoNeseCheckUrl()
+    {
+        var (projectId, subsystemId, leadId) = await SeedProjectAsync("APAVAIL6");
+        var recordId = await _fixture.EnsureRecordAsync(projectId, leadId, subsystemId, "U", "Avail6");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Detail/{recordId}?asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain(
+            $"data-schedule-proposal-check-url=\"/Navrhy/ScheduleProposalAvailability?projektId={projectId}&amp;zaznamId={recordId}\"");
+    }
 }

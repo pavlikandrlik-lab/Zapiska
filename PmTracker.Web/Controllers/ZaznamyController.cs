@@ -96,6 +96,8 @@ public sealed partial class ZaznamyController : BaseController
         model.EditUrl = Url.Action(nameof(Edit), new { id = recordId, projektId, returnUrl = pageUrl });
         model.ScheduleProposalUrl = Url.Action("CreateScheduleProposal", "Navrhy",
             new { projektId, zaznamId = recordId, returnUrl = pageUrl });
+        model.ScheduleProposalCheckUrl = Url.Action("ScheduleProposalAvailability", "Navrhy",
+            new { projektId, zaznamId = recordId });
         model.PrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = recordId, projektId, autoPrint = true });
         model.PrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = recordId, projektId });
         model.BackUrl = NormalizeLocalReturnUrl(returnUrl) ?? ProjektDetailTabUrl(projektId, "zaznamy");

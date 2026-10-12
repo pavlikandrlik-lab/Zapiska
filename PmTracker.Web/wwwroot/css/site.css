@@ -7793,3 +7793,11 @@ pm-button gov-icon {
     margin-top: 16px;
 }
 /* === konec stránky zamčeného záznamu === */
+
+/* === Task 2 (2026-10-12): dialog „Návrh nelze založit" === */
+.schedule-proposal-blocked-dialog-footer {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+/* === konec dialogu „Návrh nelze založit" === */
