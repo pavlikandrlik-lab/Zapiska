@@ -1,7 +1,10 @@
 # Návrh změny harmonogramu — opravy k udělání (zadáno 2026-10-08)
 
-Tři připomínky uživatele k návrhům změny harmonogramu. Stav je ověřený v kódu, oprava zatím
-neproběhla.
+**Stav:** opraveno 2026-10-12 (commity 691d6b0, 48d2d9f, c524ea6, 59df659, 7ebf87a, eb27f12,
+4ad21b7, 33dbd55).
+
+Tři připomínky uživatele k návrhům změny harmonogramu. Stav byl ověřený v kódu, oprava je
+popsaná u každého bodu a v sekcích níže.
 
 ## Rozhodnutí uživatele (2026-10-08)
 
@@ -9,18 +12,38 @@ neproběhla.
    změnu chce. Schvalovateli ho ukázat jako sdělení autora. Využít k tomu prvek „důvod“
    (`zaznam_historie_terminu.duvod`), který dnes nese jen pevné „Úprava záznamu“ — viz
    Související vyjasnění na konci.
+   **Vyřešeno (59df659, 7ebf87a):** editor návrhu má nepovinné pole „Důvod změny (volitelné)“,
+   schvalovatel ho vidí v boxu „Sdělení autora návrhu“ a při schválení se text zapíše do
+   `zaznam_historie_terminu.duvod`, pokud návrh termín opravdu měnil.
 2. **Opakovaný návrh při aktivním návrhu:** ověřit po kliknutí, ještě před přechodem na
    editor návrhu. Když návrh nejde založit, zobrazit dialog (`gov-dialog` se stavem error),
    ne chybovou stránku. Dialog má přednost před infobarem. Zašedlá položka se nedělá.
+   **Vyřešeno (691d6b0, 48d2d9f, c524ea6):** klik nejdřív ověří dostupnost jedním pravidlem a
+   při čekajícím návrhu nebo chybějícím oprávnění zobrazí dialog „Návrh nelze založit“ místo
+   přechodu na editor; přímé otevření URL editoru při blokaci přesměruje zpět s červenou
+   hláškou nahoře stránky.
 3. **Režim vyplňování v návrhu:** opravit, aby se přepínač do návrhu ukládal a po schválení se
    přepnutí opravdu provedlo. Schvalovatel vidí stav z návrhu, ne ze záznamu. Když se stav
    v návrhu liší od záznamu, zobrazit nad záznamem `gov-infobar` (error, bold, ikona
    `components/exclamation-triangle-fill`, `closable` false). Podbarvení přepínače v editoru
    návrhu (požadavek z prvního zadání) zůstává.
+   **Vyřešeno (eb27f12, 4ad21b7, 33dbd55):** přepínač se ukládá do payloadu návrhu a při
+   schválení se uplatní stejně jako přímá úprava záznamu, jen když návrh režim opravdu mění;
+   schvalovatel vidí stav podle návrhu a červený infobar s vysvětlením důsledku.
 
 ## 1. Opakovaný návrh při aktivním návrhu končí chybovou stránkou
 
-**Současný stav.** Položka „Navrhnout změnu harmonogramu“ v menu karty záznamu
+**Vyřešeno.** Jedno pravidlo `GetScheduleProposalAvailabilityAsync` (a JSON endpoint
+`/Navrhy/ScheduleProposalAvailability`) teď rozhoduje před otevřením editoru. Klik na
+„Navrhnout změnu harmonogramu“ v menu karty i na stránce záznamu ho zavolá nejdřív; při
+čekajícím návrhu se zobrazí dialog „Návrh nelze založit“ (text: „K záznamu už existuje aktivní
+návrh na změnu termínu a harmonogramu. Nový návrh půjde založit, až bude čekající návrh
+schválen nebo zamítnut.“) s tlačítky „Rozumím“ a „Zobrazit čekající návrh“ (druhé jen když
+uživatel smí vidět tab Návrhy). Přímé otevření URL editoru při blokaci (čekající návrh nebo bez
+oprávnění) přesměruje zpět na záznam s červenou hláškou nahoře stránky místo chybové stránky.
+Ctrl/Cmd/Shift-klik nebo prostřední tlačítko (nová karta) se nezachytává — rozhoduje server.
+
+**Původní stav.** Položka „Navrhnout změnu harmonogramu“ v menu karty záznamu
 (`_ZaznamPartial.cshtml`) a na stránce záznamu (`ZaznamDetailPage.cshtml`) se zobrazuje jen
 podle oprávnění (`CanCreateScheduleProposal`). Na čekající návrh se nedívá. Kliknutí otevře
 `GET /Navrhy/CreateScheduleProposal` a až `RecordProposalService.BuildScheduleProposalEditorAsync`
@@ -46,6 +69,15 @@ chybové stránce, i když hláška sama je správná.
   zpět na záznam s hláškou.
 
 ## 2. Přepínač „Automatické vyplňování harmonogramu“ v návrhu
+
+**Vyřešeno.** `SchedulePlanProposalPayload` teď nese `HarmonogramRezim` (`null` u starých
+návrhů = beze změny). Při schválení se uplatní stejně jako
+`RecordService.SaveRecord.ApplyHarmonogramRezimAsync` u přímé úpravy záznamu, a jen když se
+režim z návrhu od záznamu skutečně liší. V editoru návrhu se přepínač podbarví, když je
+přepnutý opačně než na záznamu.
+Na stránce schvalování ukazuje přepínač stav z návrhu (ne ze záznamu) a nad záznamem se
+zobrazí `gov-infobar` (error, bold, ikona `components/exclamation-triangle-fill`, `closable`
+false) s textem podle směru přepnutí.
 
 **Kdo ho může přepnout.** Přepínač nemá vlastní oprávnění. Ukáže se každému, kdo otevře
 editor záznamu nebo editor návrhu změny harmonogramu u úkolu (`_EditZaznamForm.cshtml`,
@@ -93,3 +125,9 @@ Uživatel se ptal, k čemu slouží „důvod změny termínu“. Ve sloupci
 `RecordService.SaveRecord`, když se při uložení změní termín. Uživatel ho nikde nezadává a
 aplikace ho nikde nečte; historie termínu v UI a v PDF ukazuje jen původní data. Sloupec je
 přežitek a jde ho zrušit, v hledání se nepoužívá.
+
+**Update 2026-10-12.** Sloupec teď přestal být přežitek. Od schválení návrhu s vyplněným
+polem „Důvod změny“ se jeho text zapíše do `zaznam_historie_terminu.duvod` — ale jen tehdy,
+když schválený návrh termín skutečně měnil; bez vyplněného důvodu se zapíše „Schválený návrh
+#<id>“. Dřív schválení návrhu nezapisovalo do historie termínu vůbec žádný řádek — psala ji
+jen přímá úprava záznamu (`RecordService.SaveRecord`, pevně „Úprava záznamu“).

@@ -43,6 +43,51 @@ změnil termín.
 | **Volitelné: dopad na další kroky** | — | Popis kaskádových efektů |
 | **Volitelné: požadovaný schvalovatel** | — | Lze cílit na konkrétního leadera |
 
+## Důvod změny
+
+Ve formuláři návrhu je nepovinné pole **Důvod změny** — volný text do 1000 znaků, pod
+záložkami nad tlačítky. Je vidět jak na záložce *Základní*, tak na záložce *Harmonogram*, a
+platí pro celý návrh, ne jen pro jednu záložku.
+
+Schvalovatel ho v detailu návrhu vidí v boxu **Sdělení autora návrhu** — jméno autora, datum a
+čas podání a text se zachovanými zalomením řádků. Když pole zůstane prázdné, box ukáže „Autor
+důvod změny neuvedl.“
+
+Když schválení návrhu skutečně změní termín záznamu, text se zapíše do historie termínu k
+novému řádku. Když autor důvod nevyplnil, zapíše se „Schválený návrh #&lt;číslo návrhu&gt;“,
+aby v historii zůstalo vidět, že termín nezměnila přímá úprava záznamu, ale schválený návrh.
+
+## Když už návrh čeká
+
+K jednomu záznamu může čekat na rozhodnutí jen jeden návrh na změnu termínu a harmonogramu
+najednou. Pokud se o založení dalšího návrhu pokusíš dřív, než je ten čekající schválený nebo
+zamítnutý — ať z menu „…“ na kartě záznamu, nebo z tlačítka na stránce záznamu — otevře se
+místo editoru návrhu okno **Návrh nelze založit** s vysvětlením, že nový návrh půjde založit,
+až bude čekající návrh vyřízený. Okno má dvě tlačítka:
+
+- **Rozumím** — jen zavře okno,
+- **Zobrazit čekající návrh** — otevře detail toho čekajícího návrhu; tlačítko se nabídne jen
+  tomu, kdo smí vidět tab *Návrhy*.
+
+Otevření odkazu do nové záložky (Ctrl/Cmd/Shift-klik nebo prostřední tlačítko myši) se
+nezachytává — chová se jako běžný odkaz.
+
+## Automatické vyplňování v návrhu
+
+U úkolů je v editoru návrhu (na záložce *Harmonogram*) i přepínač **Automatické vyplňování
+harmonogramu** — stejný, jaký je v běžném editoru záznamu. Jeho nastavení je součástí návrhu:
+pokud ho v návrhu přehodíš oproti tomu, jak je nastavený na záznamu, přepínač se v editoru
+zvýrazní (stejně jako ostatní změněná pole), aby bylo vidět, že návrh mění i tohle.
+
+Po schválení se režim z návrhu uplatní stejně, jako by ho někdo přepnul přímo na záznamu — ale
+jen pokud se opravdu liší od toho, co má záznam dnes. Týká se kroků 1, 3, 4, 6, 7 a 10;
+přepnutí na automatické vyplňování navíc spustí nové načtení dat ze ServiceDesku.
+
+Schvalovatel vidí přepínač ve stavu, jaký navrhuje návrh (ne aktuální stav záznamu). Pokud
+návrh režim skutečně mění, nad záznamem se zobrazí červený pruh s upozorněním, co schválení
+udělá — že se kroky 1, 3, 4, 6, 7 a 10 po schválení přestanou (nebo naopak znovu začnou) plnit
+ze ServiceDesku.
+
 ## Po uložení
 
 ### 1. Návrh se vytvoří
