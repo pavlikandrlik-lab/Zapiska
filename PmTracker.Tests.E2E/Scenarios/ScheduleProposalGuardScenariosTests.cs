@@ -138,4 +138,50 @@ public sealed class ScheduleProposalGuardScenariosTests
             await DeleteRecordAsync(recordId);
         }
     }
+
+    /// <summary>
+    /// Review fix 1 (2026-10-12): primární hlášený scénář je menu karty záznamu v záložce
+    /// Záznamy (ne stránka záznamu) — položka "Navrhnout změnu harmonogramu" je uvnitř panelu
+    /// [data-record-menu], který nese data-stop-propagation a je ovládaný ui/anchoredMenu.js
+    /// (panel se mountuje do #floating-panel-root). Reálný trusted klik (ClickAsync) na kotvě
+    /// ověří, že capture-phase listener scheduleProposalGuard.js vyhraje PŘED nativní navigací
+    /// odkazu — DispatchEventAsync by to neprokázal (untrusted event nespustí default akci
+    /// odkazu vůbec, viz RED evidence v task-2-report.md).
+    /// </summary>
+    [Fact]
+    public async Task NavrhSCekajicimNavrhem_ZMenuKartyZaznamu_UkazeDialog_ZustaneNaStrance()
+    {
+        var recordId = await CreateTaskRecordAsync();
+        await InsertPendingScheduleProposalAsync(recordId);
+        var page = await _fixture.NewPageAsync();
+        try
+        {
+            var listUrl = $"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=zaznamy&asUser={_fixture.AdminOsobaId}";
+            await page.GotoAsync(listUrl);
+
+            var card = page.Locator($".record-card[data-record-id='{recordId}']");
+            await Expect(card).ToHaveCountAsync(1);
+
+            // gov-button host (menu trigger) je pro Playwright „not visible" (Stencil) —
+            // DispatchEvent obchází actionability, stejný vzor jako RecordScheduleToggleScenariosTests.
+            await card.Locator("[data-record-menu-trigger]").DispatchEventAsync("click");
+
+            // Panel menu se mountuje mimo kartu, do #floating-panel-root.
+            var menuItem = page.Locator("[data-record-menu] [data-schedule-proposal-check-url]");
+            await Expect(menuItem).ToBeVisibleAsync();
+
+            // Reálný trusted klik na plain <a> — ne gov-button, takže by měl být actionable.
+            await menuItem.ClickAsync();
+
+            var dialog = page.Locator("gov-dialog[data-schedule-proposal-blocked-dialog]");
+            await Expect(dialog).ToHaveCountAsync(1);
+            await Expect(dialog).ToContainTextAsync("Návrh nelze založit");
+            await Expect(page).ToHaveURLAsync(listUrl);
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+            await DeleteRecordAsync(recordId);
+        }
+    }
 }
