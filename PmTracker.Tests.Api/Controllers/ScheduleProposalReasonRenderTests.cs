@@ -44,4 +44,37 @@ public sealed class ScheduleProposalReasonRenderTests
         editResponse.StatusCode.Should().Be(HttpStatusCode.OK, editHtml);
         editHtml.Should().NotContain("name=\"DuvodZmeny\"");
     }
+
+    [Fact]
+    public async Task DetailNavrhu_SDuvodem_ZobraziZakodovaneSeZalomenim()
+    {
+        var (projectId, subsystemId, leadId) = await SeedProjectAsync("APREASON2");
+        var recordId = await _fixture.EnsureRecordAsync(projectId, leadId, subsystemId, "U", "Reason2");
+        var proposalId = await _fixture.EnsurePendingScheduleProposalAsync(
+            projectId, subsystemId, recordId, leadId, duvodZmeny: "<b>tučně</b>\nřádek");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Navrhy/ProposalDetail?projektId={projectId}&proposalId={proposalId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+
+        html.Should().Contain("data-proposal-author-message-text");
+        html.Should().Contain("&lt;b&gt;", "Razor kóduje HTML značky v textu");
+        html.Should().NotContain("<b>tučně</b>", "nekódovaná značka by byla XSS");
+    }
+
+    [Fact]
+    public async Task DetailNavrhu_BezDuvodu_ZobraziChybejiciDuvod()
+    {
+        var (projectId, subsystemId, leadId) = await SeedProjectAsync("APREASON3");
+        var recordId = await _fixture.EnsureRecordAsync(projectId, leadId, subsystemId, "U", "Reason3");
+        var proposalId = await _fixture.EnsurePendingScheduleProposalAsync(projectId, subsystemId, recordId, leadId);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Navrhy/ProposalDetail?projektId={projectId}&proposalId={proposalId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+
+        html.Should().Contain("data-proposal-author-message-empty");
+    }
 }

@@ -81,6 +81,12 @@ public sealed class ZaznamEditViewModel
     public string? ProposalSummaryNote { get; set; }
     public IReadOnlyDictionary<string, string> ProposalChangedFieldTooltips { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyDictionary<int, string> ProposalChangedScheduleTypeTooltips { get; set; } = new Dictionary<int, string>();
+
+    // Sdělení autora návrhu změny termínu a harmonogramu na stránce schvalování (uživatel 2026-10-08).
+    public bool ShowProposalAuthorMessage { get; set; }
+    public string? ProposalAuthorName { get; set; }
+    public DateTime? ProposalCreatedAtLocal { get; set; }
+    public string? ProposalAuthorMessage { get; set; }
     public bool AllowBasicMetadataEdit { get; set; } = true;
     public bool AllowTermDeadlineEdit { get; set; } = true;
     public bool ShowExternalTab { get; set; } = true;

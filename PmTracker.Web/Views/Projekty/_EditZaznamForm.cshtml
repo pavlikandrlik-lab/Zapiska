@@ -117,6 +117,24 @@
         </gov-message>
     }
 
+    @* Task 4 (2026-10-12): sdělení autora návrhu na detailu schvalování — nad záložkami, vždy
+       viditelné. ProposalAuthorMessage null = starší návrh bez pole i návrh beze sdělení. *@
+    @if (Model.IsProposalDecisionDetail && Model.ShowProposalAuthorMessage)
+    {
+        <section class="record-proposal-author-message" data-proposal-author-message aria-labelledby="proposal-author-message-title">
+            <h3 id="proposal-author-message-title">Sdělení autora návrhu</h3>
+            <p class="muted">@Model.ProposalAuthorName@(Model.ProposalCreatedAtLocal is DateTime vytvoreno ? $" · {vytvoreno:dd.MM.yyyy HH:mm}" : "")</p>
+            @if (!string.IsNullOrWhiteSpace(Model.ProposalAuthorMessage))
+            {
+                <p class="record-proposal-author-message-text" data-proposal-author-message-text>@Model.ProposalAuthorMessage</p>
+            }
+            else
+            {
+                <p class="muted" data-proposal-author-message-empty>Autor důvod změny neuvedl.</p>
+            }
+        </section>
+    }
+
     <div class="record-editor-tabs-row" data-record-editor-tabs-row>
     <pm-tabs persist="hash"
              persist-key="record-edit"

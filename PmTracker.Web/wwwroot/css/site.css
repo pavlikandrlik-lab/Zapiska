@@ -2473,6 +2473,24 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background-color: rgba(22, 163, 74, 0.16);
 }
 
+/* Task 4 (2026-10-12): sdělení autora návrhu na detailu schvalování — nepovinný důvod změny
+   termínu a harmonogramu, viditelný schvalovateli nad záložkami. */
+.record-proposal-author-message {
+    border: 1px solid var(--pm-border);
+    border-radius: var(--gov-radius-sm);
+    padding: 12px 16px;
+    background: var(--pm-surface);
+}
+
+.record-proposal-author-message h3 {
+    margin: 0 0 4px;
+}
+
+.record-proposal-author-message-text {
+    white-space: pre-line;
+    margin: 0;
+}
+
 .record-editor-actions {
     position: sticky;
     bottom: 0;

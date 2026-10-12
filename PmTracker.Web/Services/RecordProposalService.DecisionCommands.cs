@@ -206,11 +206,28 @@ public sealed partial class RecordProposalService
             .FirstOrDefaultAsync(x => x.Id == proposal.ZaznamId.Value && x.ProjektId == proposal.ProjektId, ct)
             ?? throw new InvalidOperationException($"Záznam {proposal.ZaznamId.Value} nebyl nalezen.");
         var oldRecordSnapshot = RecordAuditSnapshot.FromEntity(record);
+        var oldDeadline = record.DatumUkonceni.Date;
 
         // Datum-model: aplikuj návrh schedule na krok rows (plán + skutečnost datumy).
         if (schedulePayload.ChangesTermDeadline)
         {
             record.DatumUkonceni = schedulePayload.TerminUkonceni.Date;
+        }
+
+        // Task 4 (2026-10-12): dřív schválení historii termínu nezapisovalo vůbec (zapisoval jen
+        // RecordService.SaveRecord). Zapiš jen když se termín skutečně změnil.
+        if (record.DatumUkonceni.Date != oldDeadline)
+        {
+            _dbContext.ZaznamHistorieTerminu.Add(new ZaznamHistorieTerminuEntity
+            {
+                ZaznamId = record.Id,
+                PuvodniDatum = oldDeadline,
+                NoveDatum = record.DatumUkonceni.Date,
+                DatumZmeny = _timeProvider.GetLocalNow().LocalDateTime,
+                Duvod = string.IsNullOrWhiteSpace(schedulePayload.DuvodZmeny)
+                    ? $"Schválený návrh #{proposal.Id}"
+                    : schedulePayload.DuvodZmeny.Trim()
+            });
         }
 
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;

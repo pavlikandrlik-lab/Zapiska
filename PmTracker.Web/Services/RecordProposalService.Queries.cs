@@ -60,16 +60,11 @@ public sealed partial class RecordProposalService
             .Concat(proposals.Where(x => x.DecidedByOsobaId.HasValue).Select(x => x.DecidedByOsobaId!.Value))
             .Distinct()
             .ToList();
-        var peopleById = await _dbContext.Osoby.AsNoTracking()
+        var personRows = await _dbContext.Osoby.AsNoTracking()
             .Where(x => personIds.Contains(x.Id))
-            .Select(x => new
-            {
-                x.Id,
-                Display = string.IsNullOrWhiteSpace(x.Titul)
-                    ? $"{x.Jmeno} {x.Prijmeni}"
-                    : $"{x.Titul} {x.Jmeno} {x.Prijmeni}"
-            })
-            .ToDictionaryAsync(x => x.Id, x => x.Display, ct);
+            .Select(x => new { x.Id, x.Titul, x.Jmeno, x.Prijmeni })
+            .ToListAsync(ct);
+        var peopleById = personRows.ToDictionary(x => x.Id, x => BuildPersonDisplayName(x.Titul, x.Jmeno, x.Prijmeni));
         var subsystemIds = proposals.Select(x => x.SubsystemId).Distinct().ToList();
         var subsystemById = await _dbContext.Subsystemy.AsNoTracking()
             .Where(x => subsystemIds.Contains(x.Id))
@@ -229,6 +224,20 @@ public sealed partial class RecordProposalService
                 fieldTooltips,
                 scheduleTypeTooltips,
                 "Zvýrazněná pole ukazují hodnoty navržené ke schválení. Po najetí se zobrazí původní a navržená hodnota.");
+
+            // Task 4 (2026-10-12): sdělení autora návrhu (nepovinný důvod změny) — schvalovatel ho
+            // vidí vždy, i u starších návrhů persistovaných před zavedením pole (ProposalAuthorMessage null).
+            model.ShowProposalAuthorMessage = true;
+            model.ProposalAuthorMessage = schedulePayload.DuvodZmeny;
+            var authorRow = await _dbContext.Osoby.AsNoTracking()
+                .Where(x => x.Id == proposal.CreatedByOsobaId)
+                .Select(x => new { x.Titul, x.Jmeno, x.Prijmeni })
+                .FirstOrDefaultAsync(ct);
+            model.ProposalAuthorName = authorRow is not null
+                ? BuildPersonDisplayName(authorRow.Titul, authorRow.Jmeno, authorRow.Prijmeni)
+                : $"Osoba #{proposal.CreatedByOsobaId}";
+            model.ProposalCreatedAtLocal = TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.SpecifyKind(proposal.CreatedAt, DateTimeKind.Utc), _timeProvider.LocalTimeZone);
             return model;
         }
 
@@ -595,6 +604,14 @@ public sealed partial class RecordProposalService
             PrefillCreateFormUrl = null
         };
     }
+
+    /// <summary>
+    /// Sdílené formátování jména osoby (titul + jméno + příjmení, titul vynechán je-li prázdný).
+    /// Použito v návrhovém listu (Autor/RozhodlUzivatel) i na detailu návrhu harmonogramu
+    /// (sdělení autora, Task 4 2026-10-12) — jedno místo pravdy pro zobrazení jména.
+    /// </summary>
+    private static string BuildPersonDisplayName(string? titul, string jmeno, string prijmeni)
+        => string.IsNullOrWhiteSpace(titul) ? $"{jmeno} {prijmeni}" : $"{titul} {jmeno} {prijmeni}";
 
     private static string GetProposalTypeLabel(string typeCode)
         => string.Equals(typeCode, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase)
