@@ -128,4 +128,70 @@ public sealed class ScheduleProposalAvailabilityEndpointTests
         html.Should().Contain(
             $"data-schedule-proposal-check-url=\"/Navrhy/ScheduleProposalAvailability?projektId={projectId}&amp;zaznamId={recordId}\"");
     }
+
+    /// <summary>
+    /// Review fix M7a (2026-10-12): [Authorize(Policy="permission:proposals.schedule.create")] je
+    /// jen PROJEKTOVÁ brána — AuthorizationSnapshotBuilder (MEDIUM-1 fix) propaguje subsystémově
+    /// scopované role do PerProjectPermissions pro CELÝ projekt, takže vedoucí JAKÉHOKOLI
+    /// subsystému v projektu tuto deklarativní bránu projde. Skutečné omezení na "jen vlastní
+    /// subsystém" dělá až RecordProposalAuthorizationPolicy.EvaluateRecordAccessAsync
+    /// (CreatableSubsystemIds). Tento test ověřuje přesně mezeru z ledgeru: vedoucí subsystému A
+    /// otevírající návrh pro záznam v subsystému B (stejný projekt) musí dostat 302 s NoPermission
+    /// hláškou, ne 500.
+    /// </summary>
+    [Fact]
+    public async Task Dostupnost_VedouciJinehoSubsystemuVeStejnemProjektu_NemaOpravneniNePadaNa500()
+    {
+        var leadOfA = await _fixture.EnsurePersonAsync("APAVAIL7LeadA");
+        var projectId = await _fixture.EnsureProjectAsync("APAVAIL7");
+        var subsystemA = await _fixture.EnsureSubsystemAsync("APAVAIL7_SUBA", leadOfA);
+        var subsystemB = await _fixture.EnsureSubsystemAsync("APAVAIL7_SUBB", leadOfA);
+        // Žádné EnsureProjectTeamMemberAsync zde — ten přidělí libovolnou (první v číselníku)
+        // projektovou roli, která může nést proposals.edit.any (admin bypass na všechny
+        // subsystémy) a confoundovat přesně to, co se testuje. Vedoucí subsystému A dostává
+        // CanAccessProject jen z propagace proposals.schedule.create (ProjectReadGrantKeys).
+        await _fixture.EnsureSubsystemLeadAsync(projectId, subsystemA, leadOfA);
+        // leadOfA je vedoucí JEN subsystému A — záznam patří do subsystému B.
+        var recordInB = await _fixture.EnsureRecordAsync(projectId, leadOfA, subsystemB, "U", "Avail7RecordB");
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+
+        var createResponse = await client.GetAsync(
+            $"/Navrhy/CreateScheduleProposal?projektId={projectId}&zaznamId={recordInB}&asUser={leadOfA}");
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Redirect,
+            "deklarativní [Authorize] propustí (projektová propagace), ale servisní vrstva musí vrátit 302, ne 500");
+
+        var availabilityResponse = await client.GetAsync(
+            $"/Navrhy/ScheduleProposalAvailability?projektId={projectId}&zaznamId={recordInB}&asUser={leadOfA}");
+        availabilityResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = JsonDocument.Parse(await availabilityResponse.Content.ReadAsStringAsync()).RootElement;
+        json.GetProperty("canCreate").GetBoolean().Should().BeFalse();
+        json.GetProperty("message").GetString().Should().Be(ScheduleProposalAvailability.NoPermissionMessage);
+    }
+
+    /// <summary>
+    /// Review fix M7b (2026-10-12): endpoint zavolaný jako vedoucí subsystému (ne superadmin) pro
+    /// záznam VLASTNÍHO subsystému s čekajícím návrhem. Skutečné pravidlo (ověřeno kódem):
+    /// RecordProposalAuthorizationPolicy.EvaluateProjectAccessAsync.CanViewTab =
+    /// canDecide || creatableSubsystemIds.Count > 0 — vedoucí jakéhokoli subsystému v projektu má
+    /// CreatableSubsystemIds.Count > 0, takže CanViewTab je VŽDY true, i bez proposals.accept.
+    /// proposalUrl se proto musí vyplnit i vedoucímu, který o návrhu jen nerozhoduje.
+    /// </summary>
+    [Fact]
+    public async Task Dostupnost_VedouciSVlastnimCekajicimNavrhem_ProposalUrlSeVyplni()
+    {
+        var (projectId, subsystemId, leadId) = await SeedProjectAsync("APAVAIL8");
+        var recordId = await _fixture.EnsureRecordAsync(projectId, leadId, subsystemId, "U", "Avail8");
+        var proposalId = await _fixture.EnsurePendingScheduleProposalAsync(projectId, subsystemId, recordId, leadId);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync(
+            $"/Navrhy/ScheduleProposalAvailability?projektId={projectId}&zaznamId={recordId}&asUser={leadId}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        json.GetProperty("canCreate").GetBoolean().Should().BeFalse();
+        var proposalUrl = json.GetProperty("proposalUrl").GetString();
+        proposalUrl.Should().NotBeNull("CanViewTab je pro vedoucího subsystému vždy true");
+        proposalUrl.Should().Contain($"proposalId={proposalId}");
+    }
 }
