@@ -11,6 +11,7 @@ public interface IRecordProposalService
     Task<ProjektNavrhyTabViewModel> BuildProjectProposalsTabAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
     Task<ZaznamEditViewModel> BuildCreateRecordProposalEditorAsync(int projectId, CurrentUserContextViewModel currentUser, int? meetingId = null, CancellationToken ct = default);
     Task<ZaznamEditViewModel> BuildScheduleProposalEditorAsync(int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
+    Task<ScheduleProposalAvailability> GetScheduleProposalAvailabilityAsync(int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
     Task<ZaznamEditViewModel> BuildProposalDetailAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
     // BuildEditableRecordEditorFromProposalAsync smazáno v redesignu 2026-04-23 — bypass workflow.
     Task<ZaznamEditViewModel> BuildPrefilledCreateRecordEditorFromProposalAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default);

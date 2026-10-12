@@ -288,6 +288,7 @@ public sealed class ProjektyControllerTeamAuthzTests
         public Task<ProjektNavrhyTabViewModel> BuildProjectProposalsTabAsync(int projectId, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ZaznamEditViewModel> BuildCreateRecordProposalEditorAsync(int projectId, CurrentUserContextViewModel currentUser, int? meetingId = null, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ZaznamEditViewModel> BuildScheduleProposalEditorAsync(int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<ScheduleProposalAvailability> GetScheduleProposalAvailabilityAsync(int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ZaznamEditViewModel> BuildProposalDetailAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ZaznamEditViewModel> BuildPrefilledCreateRecordEditorFromProposalAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();
         public Task SubmitCreateRecordProposalAsync(SaveRecordCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();

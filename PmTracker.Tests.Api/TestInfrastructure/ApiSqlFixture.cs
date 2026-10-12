@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Common;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
+using PmTracker.Web.Models.ViewModels;
 
 namespace PmTracker.Tests.Api.TestInfrastructure;
 
@@ -232,6 +233,55 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             ProjektId = projectId,
             SubsystemId = subsystemId,
             TypNavrhu = "CREATE_RECORD",
+            Stav = "PENDING",
+            PayloadJson = payload,
+            CreatedByOsobaId = authorOsobaId,
+            CreatedAt = DateTime.UtcNow
+        };
+        dbContext.ZaznamNavrhy.Add(proposal);
+        await dbContext.SaveChangesAsync();
+        return proposal.Id;
+    }
+
+    /// <summary>
+    /// Task 1 (2026-10-12): pending návrh změny termínu a harmonogramu pro Api testy dostupnosti
+    /// a záložní cesty v NavrhyController. Vrací existující čekající návrh záznamu, pokud už je
+    /// (filtrovaný unique index UX_zaznam_navrhy_pending_schedule_per_record druhý nepustí).
+    /// Pozn.: HarmonogramRezim, ChangesHarmonogramRezim a DuvodZmeny v SchedulePlanProposalPayload
+    /// vzniknou v Task 3 a 5 — do té doby se parametry harmonogramRezim/duvodZmeny nepropisují
+    /// do payloadu (jen existující vlastnosti).
+    /// </summary>
+    public async Task<int> EnsurePendingScheduleProposalAsync(
+        int projectId, int subsystemId, int recordId, int authorOsobaId, string? harmonogramRezim = null, string? duvodZmeny = null)
+    {
+        await using var dbContext = CreateDbContext();
+        var existing = await dbContext.ZaznamNavrhy
+            .Where(x => x.ZaznamId == recordId && x.Stav == "PENDING" && x.TypNavrhu == RecordProposalTypeCodes.SchedulePlanChange)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync();
+        if (existing.HasValue)
+        {
+            return existing.Value;
+        }
+
+        var payload = System.Text.Json.JsonSerializer.Serialize(new RecordProposalPayload
+        {
+            ProposalType = RecordProposalTypeCodes.SchedulePlanChange,
+            SchedulePlan = new SchedulePlanProposalPayload
+            {
+                ProjektId = projectId,
+                ZaznamId = recordId,
+                TerminUkonceni = DateTime.Today.AddDays(45),
+                ChangesTermDeadline = true
+            }
+        });
+
+        var proposal = new ZaznamNavrhEntity
+        {
+            ProjektId = projectId,
+            ZaznamId = recordId,
+            SubsystemId = subsystemId,
+            TypNavrhu = RecordProposalTypeCodes.SchedulePlanChange,
             Stav = "PENDING",
             PayloadJson = payload,
             CreatedByOsobaId = authorOsobaId,

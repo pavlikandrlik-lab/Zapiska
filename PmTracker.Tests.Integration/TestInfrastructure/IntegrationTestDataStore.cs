@@ -96,6 +96,9 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
     public ZaznamEditViewModel BuildScheduleProposalEditor(int projektId, int zaznamId, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordProposalService>().BuildScheduleProposalEditorAsync(projektId, zaznamId, currentUser).GetAwaiter().GetResult();
 
+    public ScheduleProposalAvailability GetScheduleProposalAvailability(int projektId, int zaznamId, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IRecordProposalService>().GetScheduleProposalAvailabilityAsync(projektId, zaznamId, currentUser).GetAwaiter().GetResult();
+
     public int SaveRecord(SaveRecordCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordService>().SaveRecordAsync(command, currentUser).GetAwaiter().GetResult();
 

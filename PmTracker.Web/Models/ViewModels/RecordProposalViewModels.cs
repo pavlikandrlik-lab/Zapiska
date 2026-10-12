@@ -48,6 +48,33 @@ public static class RecordProposalEditorModes
     public const string SchedulePlanProposal = "schedule-plan-proposal";
 }
 
+public enum ScheduleProposalBlockReason
+{
+    None,
+    NoPermission,
+    PendingProposal
+}
+
+/// <summary>
+/// Lze k záznamu založit návrh změny termínu a harmonogramu? Jediné pravidlo pro editor návrhu,
+/// ověření po kliknutí (dialog) i záložní cestu v controlleru (uživatel 2026-10-08: dialog,
+/// ne chybová stránka).
+/// </summary>
+public sealed record ScheduleProposalAvailability(
+    bool CanCreate,
+    ScheduleProposalBlockReason Reason,
+    string? Message,
+    int? PendingProposalId)
+{
+    public const string PendingTitle = "Návrh nelze založit";
+    public const string PendingMessage =
+        "K záznamu už existuje aktivní návrh na změnu termínu a harmonogramu. Nový návrh půjde založit, až bude čekající návrh schválen nebo zamítnut.";
+    public const string NoPermissionMessage =
+        "Návrh změny termínu a harmonogramu může vytvořit jen vedoucí relevantního subsystému nebo jeho zástupce.";
+
+    public static readonly ScheduleProposalAvailability Available = new(true, ScheduleProposalBlockReason.None, null, null);
+}
+
 public sealed class RecordProposalPayload
 {
     public string ProposalType { get; set; } = string.Empty;

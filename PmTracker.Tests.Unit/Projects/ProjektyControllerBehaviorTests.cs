@@ -585,6 +585,9 @@ public sealed class ProjektyControllerBehaviorTests
         public Task<ZaznamEditViewModel> BuildScheduleProposalEditorAsync(int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => throw new NotSupportedException();
 
+        public Task<ScheduleProposalAvailability> GetScheduleProposalAvailabilityAsync(int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task<ZaznamEditViewModel> BuildProposalDetailAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => throw new NotSupportedException();
 

@@ -52,12 +52,50 @@ public sealed class NavrhyController : BaseController
             return NotFound();
         }
 
+        // Uživatel 2026-10-08: čekající návrh (ani chybějící oprávnění) = návrat s hláškou, ne
+        // chybová stránka. Hlavní cesta je dialog po kliknutí (scheduleProposalGuard.js); sem se
+        // dostane přímý odkaz, druhá karta nebo souběh.
+        var availability = await _recordProposalService.GetScheduleProposalAvailabilityAsync(projektId, zaznamId, CurrentUserContext, ct);
+        if (!availability.CanCreate)
+        {
+            TempData["ErrorMessage"] = availability.Message;
+            return Redirect(NormalizeLocalReturnUrl(returnUrl)
+                ?? Url.Action("Detail", "Projekty", new { id = projektId, tab = "zaznamy", recordId = zaznamId })
+                ?? $"/Projekty/Detail/{projektId}?tab=zaznamy&recordId={zaznamId}");
+        }
+
         var model = await _recordProposalService.BuildScheduleProposalEditorAsync(projektId, zaznamId, CurrentUserContext, ct);
         PrepareProposalEditorModel(model, returnUrl);
         SetProjectBreadcrumbs(projektId, model.ProjektNazev, model.ProjektZkratka,
             currentText: "Návrh změny harmonogramu",
             backUrl: model.BackUrl);
         return View("~/Views/Projekty/EditZaznamPage.cshtml", model);
+    }
+
+    [HttpGet]
+    [Authorize(Policy = "permission:proposals.schedule.create")]
+    public async Task<IActionResult> ScheduleProposalAvailability(int projektId, int zaznamId, CancellationToken ct = default)
+    {
+        if (!CurrentUserContext.CanAccessProject(projektId))
+        {
+            return NotFound();
+        }
+
+        var availability = await _recordProposalService.GetScheduleProposalAvailabilityAsync(projektId, zaznamId, CurrentUserContext, ct);
+        string? proposalUrl = null;
+        if (availability.PendingProposalId is int pendingId
+            && await _recordProposalService.CanViewProposalTabAsync(projektId, CurrentUserContext, ct))
+        {
+            proposalUrl = Url.Action(nameof(ProposalDetail), new { projektId, proposalId = pendingId });
+        }
+
+        return Json(new
+        {
+            canCreate = availability.CanCreate,
+            title = availability.CanCreate ? null : PmTracker.Web.Models.ViewModels.ScheduleProposalAvailability.PendingTitle,
+            message = availability.Message,
+            proposalUrl
+        });
     }
 
     [HttpGet]

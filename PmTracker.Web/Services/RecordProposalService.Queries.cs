@@ -157,16 +157,10 @@ public sealed partial class RecordProposalService
 
     public async Task<ZaznamEditViewModel> BuildScheduleProposalEditorAsync(int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
     {
-        var access = await _authorizationPolicy.EvaluateRecordAccessAsync(projectId, recordId, currentUser, ct);
-        if (!access.CanCreateScheduleProposal)
+        var availability = await GetScheduleProposalAvailabilityAsync(projectId, recordId, currentUser, ct);
+        if (!availability.CanCreate)
         {
-            throw new InvalidOperationException("Návrh změny termínu a harmonogramu může vytvořit jen vedoucí relevantního subsystému nebo jeho zástupce.");
-        }
-
-        var pendingLock = await _pendingScheduleProposalLockEvaluator.EvaluateAsync(recordId, ct);
-        if (pendingLock.HasPendingProposal)
-        {
-            throw new InvalidOperationException(pendingLock.Message ?? "Pro tento záznam už existuje čekající návrh změny harmonogramu.");
+            throw new InvalidOperationException(availability.Message);
         }
 
         var model = await _projectEditQuery.GetEditModelAsync(recordId, ct);
@@ -177,6 +171,23 @@ public sealed partial class RecordProposalService
 
         ConfigureScheduleProposalEditor(model);
         return model;
+    }
+
+    public async Task<ScheduleProposalAvailability> GetScheduleProposalAvailabilityAsync(
+        int projectId, int recordId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+    {
+        var access = await _authorizationPolicy.EvaluateRecordAccessAsync(projectId, recordId, currentUser, ct);
+        if (!access.CanCreateScheduleProposal)
+        {
+            return new ScheduleProposalAvailability(false, ScheduleProposalBlockReason.NoPermission,
+                ScheduleProposalAvailability.NoPermissionMessage, null);
+        }
+
+        var pendingLock = await _pendingScheduleProposalLockEvaluator.EvaluateAsync(recordId, ct);
+        return pendingLock.HasPendingProposal
+            ? new ScheduleProposalAvailability(false, ScheduleProposalBlockReason.PendingProposal,
+                ScheduleProposalAvailability.PendingMessage, pendingLock.ProposalId)
+            : ScheduleProposalAvailability.Available;
     }
 
     public async Task<ZaznamEditViewModel> BuildProposalDetailAsync(int projectId, int proposalId, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
