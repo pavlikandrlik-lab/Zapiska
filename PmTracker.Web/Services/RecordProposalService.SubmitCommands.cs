@@ -139,12 +139,21 @@ public sealed partial class RecordProposalService
         // (planned) změny + manuální DELAY pro kroky 2/5/8/9.
         ValidateAutoStepsNotInScheduleProposal(command);
 
-        var payload = _payloadMapper.BuildSchedulePayload(command, record.DatumUkonceni);
+        // Task 5 (2026-10-12): currentAutoFill = stav přepínače na záznamu v okamžiku odeslání —
+        // mapper proti němu porovná navržený rezim (ChangesHarmonogramRezim).
+        var currentKroky = await _dbContext.ZaznamHarmonogramKroky.AsNoTracking()
+            .Where(k => k.ZaznamId == record.Id)
+            .Select(k => new { k.Poradi, k.SkutecnostRezim })
+            .ToListAsync(ct);
+        var currentAutoFill = HarmonogramAutoFillRule.IsAutoFill(currentKroky.Select(k => ((int)k.Poradi, k.SkutecnostRezim)));
+
+        var payload = _payloadMapper.BuildSchedulePayload(command, record.DatumUkonceni, currentAutoFill);
         var schedulePayload = payload.SchedulePlan;
         if (schedulePayload is null
             || (!schedulePayload.ChangesTermDeadline
                 && !schedulePayload.ChangesSchedulePlan
-                && !schedulePayload.ChangesScheduleActual))
+                && !schedulePayload.ChangesScheduleActual
+                && !schedulePayload.ChangesHarmonogramRezim))
         {
             throw new InvalidOperationException("Návrh neobsahuje žádnou změnu termínu ani harmonogramu.");
         }

@@ -1,4 +1,5 @@
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Services.Records;
 
@@ -59,7 +60,7 @@ public sealed class RecordProposalPayloadMapper
         };
     }
 
-    public RecordProposalPayload BuildSchedulePayload(SaveRecordCommand command, DateTime originalDeadline)
+    public RecordProposalPayload BuildSchedulePayload(SaveRecordCommand command, DateTime originalDeadline, bool currentAutoFill)
     {
         var changesTermDeadline = command.TerminUkonceni.Date != originalDeadline.Date;
         var planned = command.HarmonogramHodnoty
@@ -70,6 +71,11 @@ public sealed class RecordProposalPayloadMapper
             .Where(v => v.SkutecnostDatum.HasValue)
             .Select(v => new SaveRecordHarmonogramValueCommand { Poradi = v.Poradi, SkutecnostDatum = v.SkutecnostDatum })
             .ToList();
+
+        // Task 5 (2026-10-12): přepínač „Automatické vyplňování harmonogramu" se ukládá do
+        // návrhu. null = starší návrh nebo žádná volba přepínače → beze změny po schválení.
+        var rezim = HarmonogramAutoFillRule.Normalize(command.HarmonogramRezim);
+        var changesRezim = rezim is not null && (rezim == HarmonogramAutoFillRule.Auto) != currentAutoFill;
 
         return new RecordProposalPayload
         {
@@ -85,7 +91,9 @@ public sealed class RecordProposalPayloadMapper
                 ChangesSchedulePlan = planned.Count > 0,
                 ChangesScheduleActual = actual.Count > 0 || command.ManualActualKroky.Count > 0,
                 ManualActualKroky = command.ManualActualKroky.Select(Manual).ToList(),
-                DuvodZmeny = string.IsNullOrWhiteSpace(command.DuvodZmeny) ? null : command.DuvodZmeny.Trim()
+                DuvodZmeny = string.IsNullOrWhiteSpace(command.DuvodZmeny) ? null : command.DuvodZmeny.Trim(),
+                HarmonogramRezim = rezim,
+                ChangesHarmonogramRezim = changesRezim
             }
         };
     }

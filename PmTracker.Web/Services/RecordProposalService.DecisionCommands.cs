@@ -6,6 +6,7 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Records;
+using PmTracker.Web.Services.Schedules;
 
 namespace PmTracker.Web.Services;
 
@@ -55,7 +56,12 @@ public sealed partial class RecordProposalService
                 }
                 else if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
                 {
-                    await ApplyApprovedScheduleProposalAsync(proposal, currentUser, ct);
+                    // Task 5 (2026-10-12): přepínač „Automatické vyplňování harmonogramu" se po
+                    // schválení provede — switch do Auto naplánuje harvest (shodně se SaveRecord).
+                    if (await ApplyApprovedScheduleProposalAsync(proposal, currentUser, ct))
+                    {
+                        harvestRecordIdToEnqueue = proposal.ZaznamId;
+                    }
                     localApprovedRecordId = proposal.ZaznamId;
                 }
                 else
@@ -192,7 +198,11 @@ public sealed partial class RecordProposalService
         return proposal;
     }
 
-    private async Task ApplyApprovedScheduleProposalAsync(ZaznamNavrhEntity proposal, CurrentUserContextViewModel currentUser, CancellationToken ct)
+    /// <summary>
+    /// Task 5 (2026-10-12): vrací, zda se má po commitu naplánovat ServiceDesk harvest — true jen
+    /// když návrh reálně přepnul aspoň jeden auto-eligible krok (1/3/4/6/7/10) na Auto.
+    /// </summary>
+    private async Task<bool> ApplyApprovedScheduleProposalAsync(ZaznamNavrhEntity proposal, CurrentUserContextViewModel currentUser, CancellationToken ct)
     {
         if (!proposal.ZaznamId.HasValue)
         {
@@ -255,6 +265,26 @@ public sealed partial class RecordProposalService
             return r;
         }
 
+        // Uživatel 2026-10-08: přepínač v návrhu se po schválení opravdu provede (dřív se neukládal).
+        // Stejné pravidlo jako RecordService.SaveRecord: přepínač řídí jen kroky 1/3/4/6/7/10.
+        var targetRezim = HarmonogramAutoFillRule.Normalize(schedulePayload.HarmonogramRezim);
+        var targetAuto = targetRezim == HarmonogramAutoFillRule.Auto;
+        var switchedToAuto = false;
+        if (targetRezim is not null)
+        {
+            var target = targetAuto ? SkutecnostRezimEnum.Auto : SkutecnostRezimEnum.Manual;
+            foreach (var poradi in Enumerable.Range(1, 10).Where(p => !HarmonogramManualSteps.IsManual(p)))
+            {
+                var row = GetOrCreateKrok(poradi);
+                if (row.SkutecnostRezim != (byte)target)
+                {
+                    switchedToAuto |= targetAuto;
+                    row.SkutecnostRezim = (byte)target;
+                    row.UpdatedAt = nowUtc;
+                }
+            }
+        }
+
         if (schedulePayload.ChangesSchedulePlan)
         {
             foreach (var pv in schedulePayload.PlannedHarmonogramHodnoty.Where(x => x.Poradi is >= 1 and <= 10))
@@ -269,6 +299,13 @@ public sealed partial class RecordProposalService
         {
             foreach (var av in schedulePayload.ActualHarmonogramHodnoty.Where(x => x.Poradi is >= 1 and <= 10))
             {
+                // Auto rezim ↔ ruční skutečnost = mutuálně výlučné stavy (Review Focus 5): pokud
+                // návrh přepíná na Auto, auto-eligible kroky se ze zbytkových dat payloadu nesmí
+                // přepsat ručně — po tomto bloku je řídí jen SD sync.
+                if (targetAuto && !HarmonogramManualSteps.IsManual(av.Poradi))
+                {
+                    continue;
+                }
                 var row = GetOrCreateKrok(av.Poradi);
                 row.SkutecnostDatum = av.SkutecnostDatum?.Date;
                 row.SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual;
@@ -279,7 +316,16 @@ public sealed partial class RecordProposalService
             }
         }
 
-        foreach (var applied in ManualActualKrokApplier.Compute(schedulePayload.ManualActualKroky, acceptAutoEligibleKroky: true))
+        // Review Focus 5: návrh „Auto", který nese ruční data pro auto-eligible kroky (stará
+        // ManualActualKroky z doby, kdy byl návrh v ručním režimu), se po přepnutí na Auto
+        // neuplatní — vyfiltruj je PŘED Compute, aby acceptAutoEligibleKroky:false neshledilo
+        // validní manuální kroky (2/5/8/9) za chybu (shodně s RecordService.SaveRecord, které
+        // takové záznamy tiše „continue"uje).
+        var manualActualKrokyToApply = targetAuto
+            ? schedulePayload.ManualActualKroky.Where(mk => HarmonogramManualSteps.IsManual(mk.Poradi)).ToList()
+            : schedulePayload.ManualActualKroky;
+
+        foreach (var applied in ManualActualKrokApplier.Compute(manualActualKrokyToApply, acceptAutoEligibleKroky: !targetAuto))
         {
             var row = GetOrCreateKrok(applied.Poradi);
             row.SkutecnostDatum = applied.AbsolutniDatum.ToDateTime(TimeOnly.MinValue);
@@ -300,6 +346,7 @@ public sealed partial class RecordProposalService
             oldRecordSnapshot,
             RecordAuditSnapshot.FromEntity(record)));
         await _dbContext.SaveChangesAsync(ct);
+        return switchedToAuto;
     }
 
     /// <summary>

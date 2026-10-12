@@ -75,7 +75,8 @@ public sealed class PendingScheduleProposalLockEvaluator : IPendingSchedulePropo
         var schedulePayload = payload?.SchedulePlan;
         var locksTermDeadline = schedulePayload?.ChangesTermDeadline ?? true;
         var locksSchedule = (schedulePayload?.ChangesSchedulePlan ?? false)
-            || (schedulePayload?.ChangesScheduleActual ?? false);
+            || (schedulePayload?.ChangesScheduleActual ?? false)
+            || (schedulePayload?.ChangesHarmonogramRezim ?? false);
         // Plán D: KrokKey, pro které pending návrh obsahuje ruční skutečnost.
         // UI je musí pro přímou editaci (schéma 1) uzamknout, jinak by přímý
         // zápis kolidoval s návrhem, který čeká na schválení.

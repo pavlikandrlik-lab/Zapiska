@@ -24,7 +24,26 @@ public sealed class RecordProposalPayloadMapperScheduleTests
     [InlineData(null, null)]
     public void BuildSchedulePayload_PrenasiDuvodZmeny_OrezanyNeboNull(string? vstup, string? ocekavany)
     {
-        var payload = new RecordProposalPayloadMapper().BuildSchedulePayload(Command(vstup), new DateTime(2026, 10, 31));
+        var payload = new RecordProposalPayloadMapper().BuildSchedulePayload(Command(vstup), new DateTime(2026, 10, 31), currentAutoFill: true);
         payload.SchedulePlan!.DuvodZmeny.Should().Be(ocekavany);
+    }
+
+    /// <summary>
+    /// Task 5 (2026-10-12): přepínač „Automatické vyplňování harmonogramu" se ukládá do návrhu
+    /// (HarmonogramRezim) spolu s tím, zda proti aktuálnímu stavu záznamu (currentAutoFill)
+    /// jde o skutečnou změnu (ChangesHarmonogramRezim) — řídí schválení i lock pending návrhu.
+    /// </summary>
+    [Theory]
+    [InlineData("Manual", true, "Manual", true)]
+    [InlineData("Auto", true, "Auto", false)]
+    [InlineData("Auto", false, "Auto", true)]
+    [InlineData(null, true, null, false)]
+    public void BuildSchedulePayload_NeseRezimAZmenu(string? rezim, bool soucasneAuto, string? ocekavanyRezim, bool ocekavanaZmena)
+    {
+        var command = Command(null);
+        command.HarmonogramRezim = rezim;
+        var plan = new RecordProposalPayloadMapper().BuildSchedulePayload(command, new DateTime(2026, 10, 31), soucasneAuto).SchedulePlan!;
+        plan.HarmonogramRezim.Should().Be(ocekavanyRezim);
+        plan.ChangesHarmonogramRezim.Should().Be(ocekavanaZmena);
     }
 }

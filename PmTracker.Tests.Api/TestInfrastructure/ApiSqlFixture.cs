@@ -247,9 +247,9 @@ public sealed class ApiSqlFixture : IAsyncLifetime
     /// Task 1 (2026-10-12): pending návrh změny termínu a harmonogramu pro Api testy dostupnosti
     /// a záložní cesty v NavrhyController. Vrací existující čekající návrh záznamu, pokud už je
     /// (filtrovaný unique index UX_zaznam_navrhy_pending_schedule_per_record druhý nepustí).
-    /// Pozn.: HarmonogramRezim, ChangesHarmonogramRezim a DuvodZmeny v SchedulePlanProposalPayload
-    /// vzniknou v Task 3 a 5 — do té doby se parametry harmonogramRezim/duvodZmeny nepropisují
-    /// do payloadu (jen existující vlastnosti).
+    /// Task 5 (2026-10-12): harmonogramRezim se propisuje do payloadu jako HarmonogramRezim +
+    /// ChangesHarmonogramRezim (null = beze změny, jinak vždy "změna" — testy řeší jen render,
+    /// ne reálné porovnání proti stavu záznamu).
     /// </summary>
     public async Task<int> EnsurePendingScheduleProposalAsync(
         int projectId, int subsystemId, int recordId, int authorOsobaId, string? harmonogramRezim = null, string? duvodZmeny = null)
@@ -273,7 +273,9 @@ public sealed class ApiSqlFixture : IAsyncLifetime
                 ZaznamId = recordId,
                 TerminUkonceni = DateTime.Today.AddDays(45),
                 ChangesTermDeadline = true,
-                DuvodZmeny = duvodZmeny
+                DuvodZmeny = duvodZmeny,
+                HarmonogramRezim = harmonogramRezim,
+                ChangesHarmonogramRezim = harmonogramRezim is not null
             }
         });
 

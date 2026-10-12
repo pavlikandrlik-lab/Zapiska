@@ -268,9 +268,7 @@ public sealed partial class ProjectService
             // auto-fill chování pro kroky napojené na ServiceDesk vyjádření. Bez tohoto filtru
             // user editující datum kroku 2 by viděl po reload switch=OFF (= Manual rezim
             // pro celý harmonogram), což je nesprávně.
-            HarmonogramAutoFillSwitchOn = !krokRows
-                .Any(k => !HarmonogramManualSteps.IsManual(k.Poradi)
-                       && (Models.Entities.SkutecnostRezimEnum)k.SkutecnostRezim == Models.Entities.SkutecnostRezimEnum.Manual),
+            HarmonogramAutoFillSwitchOn = HarmonogramAutoFillRule.IsAutoFill(krokRows.Select(k => ((int)k.Poradi, k.SkutecnostRezim))),
             HarmonogramBlok = BuildScheduleBlockViewModel(
                 record.Id,
                 "record-editor",

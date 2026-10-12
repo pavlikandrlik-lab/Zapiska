@@ -137,6 +137,21 @@ public sealed class SchedulePlanProposalPayload
     /// Sdělení autora návrhu (uživatel 2026-10-08). Null u návrhů bez důvodu i u starších návrhů.
     /// </summary>
     public string? DuvodZmeny { get; set; }
+
+    /// <summary>
+    /// Task 5 (2026-10-12): stav přepínače „Automatické vyplňování harmonogramu" v návrhu —
+    /// "Auto"/"Manual" podle přepínače v editoru návrhu; null u starších návrhů (= beze změny
+    /// režimu). Po schválení se aplikuje na auto-eligible kroky 1/3/4/6/7/10 stejně jako
+    /// RecordService.SaveRecord.
+    /// </summary>
+    public string? HarmonogramRezim { get; set; }
+
+    /// <summary>
+    /// Task 5: zda <see cref="HarmonogramRezim"/> proti aktuálnímu stavu záznamu (v okamžiku
+    /// odeslání návrhu) skutečně představuje změnu. Řídí „návrh neobsahuje žádnou změnu" guard
+    /// při odeslání a lock pending návrhu (PendingScheduleProposalLockEvaluator).
+    /// </summary>
+    public bool ChangesHarmonogramRezim { get; set; }
 }
 
 /// <summary>
