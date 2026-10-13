@@ -84,7 +84,6 @@ public sealed class ResolverSwapSafetyTests
             "dashboard.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "search.index",
             "vyzvy.create", "vyzvy.pnf.assign", "vyzvy.pnf.reassign",
             "vyzvy.state.change", "vyzvy.word.export"
         }, "GEST má komentátorský balíček, read-only a správu výzev");
@@ -113,8 +112,7 @@ public sealed class ResolverSwapSafetyTests
             "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
             "dashboard.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
-            "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "search.index"
+            "export.word.jednani", "export.word.projekt", "export.word.ukol"
         }, "HOST je read-only pozorovatel po per-action redesignu");
     }
 
@@ -162,7 +160,6 @@ public sealed class ResolverSwapSafetyTests
         "proposals.takeover",
         "records.assign.meeting", "records.create", "records.delete", "records.edit",
         "records.schedule.edit",
-        "search.index",
         "team.candidates.search", "team.member.add", "team.member.remove",
         "team.role.assign", "team.role.deactivate",
         "team.subsystem.create", "team.subsystem.deactivate", "team.subsystem.reorder",

@@ -187,6 +187,10 @@ Filtry vlevo (které gov šablona předpokládá) se zatím nenaplňují — nen
 | Konfigurace | `PmTracker:Search` — zůstává nanejvýš `Enabled` |
 | Entity | `SearchReindexCheckpointEntity` + `DbSet` |
 
+> **Dodatek 2026-10-13:** zrušen i klíč `search.index` (`db_upgrade_1_4_8_drop_search_index.sql`).
+> Policy `permission:search.index` se bez `projektId` vyhodnocovala globálně a hledání vracelo
+> 403 všem projektovým a subsystémovým rolím. Pravidlo §2.3 (viditelnost projektu) je jediné.
+
 Složka `PmTracker.Web/Services/Search/` má dnes **23 souborů**. Po přestavbě zůstane jádro v řádu jednotek: služba sestavující dotaz, její rozhraní, kontrakty výsledku a DI registrace.
 
 ---

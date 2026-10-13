@@ -14,7 +14,7 @@
 --     stará runtime cesta; v produkci nevznikla, chybělo právo CREATE TABLE).
 --   * DROP dbo.search_reindex_checkpoint — zavedena v db_upgrade_1_1_5.
 --   * Smaže klíč `search.reindex` z authz (endpoint POST /Search/Reindex zaniká).
---     Klíč `search.index` ZŮSTÁVÁ — drží ho všech 12 rolí a vyhledávání funguje dál.
+--     Klíč `search.index` tato migrace NEMAŽE (zrušil ho až db_upgrade_1_4_8_drop_search_index.sql).
 --     Kategorie SEARCH se proto NEMAŽE (na rozdíl od vzoru 1_4_1, kde osiřela).
 --   * Žádná business data se nemažou.
 --
@@ -73,7 +73,7 @@ BEGIN
     PRINT N'[1.4.4] klíč search.reindex smazán';
 END
 
--- Kategorie SEARCH se NEMAŽE — drží ji search.index, který zůstává.
+-- Kategorie SEARCH se tu NEMAŽE — uklízí ji až 1_4_8 spolu se search.index.
 
 -- -----------------------------------------------------------------------------
 -- 3. Kontrola výsledku
@@ -82,7 +82,7 @@ SELECT
     SearchIndexZrusena     = CASE WHEN OBJECT_ID(N'dbo.SearchIndex', N'U') IS NULL THEN N'ANO' ELSE N'NE' END,
     CheckpointZrusen       = CASE WHEN OBJECT_ID(N'dbo.search_reindex_checkpoint', N'U') IS NULL THEN N'ANO' ELSE N'NE' END,
     SearchReindexZrusen    = CASE WHEN NOT EXISTS (SELECT 1 FROM authz.permissions WHERE klic = N'search.reindex') THEN N'ANO' ELSE N'NE' END,
-    SearchIndexKlicZustava = CASE WHEN EXISTS (SELECT 1 FROM authz.permissions WHERE klic = N'search.index') THEN N'ANO' ELSE N'CHYBA' END;
+    SearchIndexKlic        = CASE WHEN EXISTS (SELECT 1 FROM authz.permissions WHERE klic = N'search.index') THEN N'ANO (zruší 1_4_8)' ELSE N'NE (zrušen v 1_4_8)' END;
 
 COMMIT TRANSACTION;
 

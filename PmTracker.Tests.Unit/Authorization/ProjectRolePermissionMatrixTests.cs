@@ -38,7 +38,6 @@ public sealed class ProjectRolePermissionMatrixTests
         "proposals.takeover",
         "records.assign.meeting", "records.create", "records.delete", "records.edit",
         "records.schedule.edit",
-        "search.index",
         "team.candidates.search", "team.member.add", "team.member.remove",
         "team.role.assign", "team.role.deactivate",
         "team.subsystem.create", "team.subsystem.deactivate", "team.subsystem.reorder",
@@ -78,8 +77,7 @@ public sealed class ProjectRolePermissionMatrixTests
             "dashboard.nes.view", "dashboard.records.view", "dashboard.statistics.view",
             "dashboard.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
-            "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "search.index"
+            "export.word.jednani", "export.word.projekt", "export.word.ukol"
         });
     }
 
@@ -96,7 +94,6 @@ public sealed class ProjectRolePermissionMatrixTests
             "dashboard.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "search.index",
             "vyzvy.create", "vyzvy.pnf.assign", "vyzvy.pnf.reassign",
             "vyzvy.state.change", "vyzvy.word.export"
         });

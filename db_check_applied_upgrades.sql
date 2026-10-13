@@ -82,6 +82,11 @@ IF OBJECT_ID(N'authz.permissions', N'U') IS NOT NULL
     EXEC sp_executesql
         N'SELECT @c = COUNT(*) FROM authz.permissions WHERE klic = N''schedule.preview'';',
         N'@c INT OUTPUT', @c = @schedule_preview OUTPUT;
+DECLARE @search_index INT;          -- 1_4_8: zrušený klíč search.index v authz.permissions
+IF OBJECT_ID(N'authz.permissions', N'U') IS NOT NULL
+    EXEC sp_executesql
+        N'SELECT @c = COUNT(*) FROM authz.permissions WHERE klic = N''search.index'';',
+        N'@c INT OUTPUT', @c = @search_index OUTPUT;
 
 DECLARE @pozadavek INT = CASE
     WHEN COL_LENGTH(N'dbo.zaznam_externi_odkazy', N'pozadavek') IS NOT NULL THEN 1 ELSE 0 END;
@@ -355,6 +360,13 @@ INSERT @r VALUES (350, N'db_upgrade_1_4_6_richtext_unicode',
 INSERT @r VALUES (360, N'db_upgrade_1_4_7_prosty_text_hledani',
     CASE WHEN @prostyText = 1 THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
     N'sloupce popis_prosty_text, text_vyjadreni_prosty_text a pozadavek_prosty_text (bez nich aplikace nenastartuje)');
+
+INSERT @r VALUES (370, N'db_upgrade_1_4_8_drop_search_index',
+    CASE WHEN @search_index IS NULL THEN N'NELZE OVĚŘIT (authz schéma chybí)'
+         WHEN @search_index = 0 THEN N'APLIKOVÁN'
+         ELSE N'CHYBÍ' END,
+    N'absence zrušeného klíče search.index v authz.permissions (spouštět až po nasazení aplikace; nalezeno: '
+        + ISNULL(CAST(@search_index AS NVARCHAR(10)), N'-') + N')');
 
 -- ---------------------------------------------------------------------------
 -- Výstup

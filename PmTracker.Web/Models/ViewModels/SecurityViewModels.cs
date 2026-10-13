@@ -120,9 +120,6 @@ public static class PermissionKeys
     public const string SettingsSyncRun = "settings.sync.run";
     public const string SettingsSdView = "settings.sd.view";
 
-    // --- 14. Hledání -----------------------------------------------------------
-    public const string SearchIndex = "search.index";
-
     // Sekce 15 (SchedulePreview) odstraněna 2026-07-14 — klíč hlídal ScheduleController.Recalc
     // smazaný ve Fázi 7a harmonogram datum-model migrace (52d6607); žádný endpoint ho nekontroloval.
 
@@ -231,9 +228,6 @@ public static class PermissionKeys
         new(SettingsSyncConfigure, "Konfigurace sync jobu", "SETTINGS", "GLOBAL", "Úprava konfigurace synchronizačního jobu."),
         new(SettingsSyncRun, "Spustit sync job", "SETTINGS", "GLOBAL", "Manuální spuštění synchronizačního jobu."),
         new(SettingsSdView, "SD konektor (admin přehled)", "SETTINGS", "GLOBAL", "Otevřít SD konektor s admin přehledem."),
-
-        // 14. Hledání
-        new(SearchIndex, "Fulltext hledání", "SEARCH", "GLOBAL", "Globální fulltext hledání."),
 
         // =====================================================================
         // DEPRECATED (pre-redesign). Mapping test vynucuje existenci i v seedu

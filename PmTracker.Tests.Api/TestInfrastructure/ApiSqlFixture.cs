@@ -147,7 +147,14 @@ public sealed class ApiSqlFixture : IAsyncLifetime
     /// A4 (2026-07-09): přiřadí osobě roli vedoucího subsystému v projektu (projekt_subsystemy +
     /// obsazeni_subsystemu_projektu). Potřebné pro lead-gated stránky (návrhy záznamů).
     /// </summary>
-    public async Task EnsureSubsystemLeadAsync(int projectId, int subsystemId, int osobaId)
+    public Task EnsureSubsystemLeadAsync(int projectId, int subsystemId, int osobaId)
+        => EnsureSubsystemRoleAsync(projectId, subsystemId, osobaId, SubsystemRoleCodes.Lead);
+
+    /// <summary>
+    /// Přiřadí osobě libovolnou subsystémovou roli (kód z ciselnik_roli_subsystemu) v projektu.
+    /// 2026-10-13: testy oprávnění zástupce vedoucího subsystému (SubsystemRoleCodes.DeputyLead).
+    /// </summary>
+    public async Task EnsureSubsystemRoleAsync(int projectId, int subsystemId, int osobaId, string roleCode)
     {
         await using var dbContext = CreateDbContext();
 
@@ -169,15 +176,15 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             projectSubsystemId = link.Id;
         }
 
-        var leadRoleId = await dbContext.CiselnikRoliSubsystemu
-            .Where(x => x.Kod == PmTracker.Web.Models.ViewModels.SubsystemRoleCodes.Lead)
+        var roleId = await dbContext.CiselnikRoliSubsystemu
+            .Where(x => x.Kod == roleCode)
             .Select(x => x.Id)
             .FirstAsync();
 
         var alreadyAssigned = await dbContext.ObsazeniSubsystemuProjektu
             .AnyAsync(x => x.ProjektSubsystemId == projectSubsystemId.Value
                 && x.OsobaId == osobaId
-                && x.RoleSubsystemuId == leadRoleId
+                && x.RoleSubsystemuId == roleId
                 && x.DatumOdebrani == null);
         if (!alreadyAssigned)
         {
@@ -185,7 +192,7 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             {
                 ProjektSubsystemId = projectSubsystemId.Value,
                 OsobaId = osobaId,
-                RoleSubsystemuId = leadRoleId,
+                RoleSubsystemuId = roleId,
                 DatumPrirazeni = DateTime.UtcNow
             });
             await dbContext.SaveChangesAsync();
