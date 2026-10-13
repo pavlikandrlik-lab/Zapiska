@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Web.Controllers;
 
@@ -80,6 +82,44 @@ public sealed partial class ZaznamyController
 
         PrepareRecordCommentsPresentation(model, record.Summary);
         return PartialView("~/Views/Projekty/_ZaznamCommentsPartial.cshtml", model);
+    }
+
+    /// <summary>
+    /// Okno tiketu jen pro čtení (2026-10-13, spec 2026-04-21 §5.2): obsah tiketu ze ServiceDesku
+    /// a přiřazení vyjádření ke krokům, bez možnosti je měnit. Guard = přístup k projektu
+    /// záznamu, stejně jako stránka záznamu — žádný klíč. projektId se nebere od klienta, ale
+    /// odvozuje z vazby, takže podvržené id vrátí 404. Bez harvestu: GET nic nezapisuje.
+    /// Builder přes [FromServices], aby se neměnil konstruktor controlleru.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> VyjadreniNahled(
+        int externiOdkazId,
+        int zaznamId,
+        [FromServices] IVyjadreniModalViewModelBuilder builder,
+        CancellationToken ct = default)
+    {
+        if (externiOdkazId <= 0 || zaznamId <= 0)
+        {
+            return BadRequest();
+        }
+
+        var projektId = await (from eo in _db.ZaznamExterniOdkazy.AsNoTracking()
+                               join z in _db.ProjektoveZaznamy.AsNoTracking() on eo.ZaznamId equals z.Id
+                               where eo.Id == externiOdkazId && eo.ZaznamId == zaznamId
+                               select (int?)z.ProjektId)
+                              .FirstOrDefaultAsync(ct);
+        if (projektId is null || !CurrentUserContext.CanAccessProject(projektId.Value))
+        {
+            return NotFound();
+        }
+
+        var vm = await builder.BuildAsync(externiOdkazId, zaznamId, canEdit: false, canAddAddon: false, ct);
+        if (vm is null)
+        {
+            return NotFound();
+        }
+
+        return PartialView("~/Views/Vyjadreni/_ChatModal.cshtml", vm);
     }
 
     private void PrepareRecordCardShellPresentation(ProjektZaznamCardShellViewModel record, int projektId)

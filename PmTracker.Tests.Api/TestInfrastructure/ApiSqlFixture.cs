@@ -1,4 +1,9 @@
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Tests.Common;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
@@ -20,6 +25,24 @@ public sealed class ApiSqlFixture : IAsyncLifetime
 
     public PmTrackerWebAppFactory Factory { get; private set; } = null!;
 
+    /// <summary>Falešný ServiceDesk sdílený kolekcí (viz <see cref="ServiceDeskFactory"/>).</summary>
+    public FakeServiceDesk ServiceDesk { get; } = new();
+
+    private WebApplicationFactory<Program>? _serviceDeskFactory;
+
+    /// <summary>
+    /// Aplikace se zapnutým (falešným) ServiceDeskem. Hlavní <see cref="Factory"/> má SD vypnutý
+    /// (DisabledTicketingQueryService) a řada testů na tom stojí — proto samostatná instance.
+    /// </summary>
+    public WebApplicationFactory<Program> ServiceDeskFactory => _serviceDeskFactory ??= Factory.WithWebHostBuilder(builder =>
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<ITicketingQueryService>();
+            services.RemoveAll<IVyjadreniQueryService>();
+            services.AddSingleton<ITicketingQueryService>(ServiceDesk);
+            services.AddSingleton<IVyjadreniQueryService>(ServiceDesk);
+        }));
+
     public int AdminOsobaId => Database.AdminOsobaId;
 
     public async Task InitializeAsync()
@@ -38,6 +61,7 @@ public sealed class ApiSqlFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        _serviceDeskFactory?.Dispose();
         Factory.Dispose();
         await _databaseManager.DisposeAsync();
     }
