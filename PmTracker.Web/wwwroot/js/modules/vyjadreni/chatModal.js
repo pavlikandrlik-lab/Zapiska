@@ -39,7 +39,7 @@ import { appendCurrentAsUser } from "../navigationShared.js";
     dialogEl.setAttribute('data-modal-container', '');
     dialogEl.setAttribute('data-modal-variant', 'chat-modal');
     dialogEl.innerHTML = `
-      <div slot="label">Vyjádření a termíny</div>
+      <div slot="title">Vyjádření a termíny</div>
       <div class="pm-chat-modal__content" data-chat-modal-content></div>
       <div slot="footer" style="display:flex; justify-content:flex-end">
         <pm-button variant="Primary" data-chat-modal-close>Zavřít</pm-button>

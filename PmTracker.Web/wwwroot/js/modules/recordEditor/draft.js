@@ -468,7 +468,8 @@ export function promptRecordEditorDiscard(form, trigger) {
         dialog.setAttribute("data-record-editor-close-guard", "true");
 
         const titleSlot = document.createElement("span");
-        titleSlot.setAttribute("slot", "label");
+        // gov-dialog 4.7.0 vykresluje nadpis jen ze slotu "title" (slot "label" nemá).
+        titleSlot.setAttribute("slot", "title");
         titleSlot.textContent = "Máte neuložené změny.";
         dialog.appendChild(titleSlot);
 
