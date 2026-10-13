@@ -6,7 +6,7 @@
 }
 <pm-tab-panel key="external" class="record-modal-panel" data-record-modal-panel="external">
     <div class="section-divider">Externí vazby</div>
-    <div data-external-links-editor>
+    <div data-external-links-editor data-external-readonly="@(externalReadonly ? "true" : "false")">
         <div class="external-links" data-external-links>
             @for (var i = 0; i < Model.ExterniVazby.Count; i++)
             {

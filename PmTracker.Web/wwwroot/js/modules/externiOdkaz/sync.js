@@ -11,6 +11,8 @@
  *    Save flow pre-fill datumů pro nový externí odkaz; refresh stránky obnoví
  *    rozpracovanou editaci.
  */
+import { appendCurrentAsUser } from "../navigationShared.js";
+
 (function (global) {
   'use strict';
 
@@ -28,6 +30,25 @@
     const form = row.closest('[data-record-editor-project-id]');
     if (!form) return '';
     return form.getAttribute('data-record-editor-project-id') || '';
+  }
+
+  function buildSyncForm(cislo, projektId) {
+    const form = new FormData();
+    form.append('cislo', cislo);
+    form.append('projektId', projektId);
+    form.append('__RequestVerificationToken', getCsrfToken());
+    return form;
+  }
+
+  // 2026-10-13: ověření tiketu selhalo jinak než „nenalezeno" — chybí oprávnění (403) nebo
+  // ServiceDesk neodpověděl. Dřív obojí končilo hláškou „Tiket se nepodařilo dohledat".
+  function setSyncError(row, kind) {
+    row.removeAttribute('data-not-found');
+    if (kind) {
+      row.setAttribute('data-sync-error', kind);
+    } else {
+      row.removeAttribute('data-sync-error');
+    }
   }
 
   function bufferKey(projektId, cislo) {
@@ -129,6 +150,7 @@
       setChatEnabled(row, false);
       setDatesVisible(row, false);
       row.removeAttribute('data-not-found');
+      row.removeAttribute('data-sync-error');
       return;
     }
 
@@ -138,19 +160,28 @@
       return;
     }
 
-    const form = new FormData();
-    form.append('cislo', cislo);
-    form.append('projektId', projektId);
-    form.append('__RequestVerificationToken', getCsrfToken());
-
     try {
-      const resp = await fetch('/ExterniOdkaz/Sync', {
-        method: 'POST',
-        body: form,
-        credentials: 'same-origin',
-      });
+      // typeOnly (editor návrhu): jen typ tiketu — GET /ExterniOdkaz/Typ smí i držitel
+      // proposals.record.create. Plný sync (vyjádření + 4 datumy) jen v editoru záznamu.
+      const resp = typeOnly
+        ? await fetch(appendCurrentAsUser('/ExterniOdkaz/Typ?cislo=' + encodeURIComponent(cislo)
+            + '&projektId=' + encodeURIComponent(projektId)), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+          })
+        : await fetch(appendCurrentAsUser('/ExterniOdkaz/Sync'), {
+            method: 'POST',
+            body: buildSyncForm(cislo, projektId),
+            credentials: 'same-origin',
+          });
+      if (resp.status === 403) {
+        setDatesVisible(row, false);
+        setSyncError(row, 'forbidden');
+        return;
+      }
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
+      setSyncError(row, null);
       if (data.nalezeno) {
         // Typ + odvozená viditelnost (cena/výzva) — potřebné i v návrhu (metadata tiketu).
         setTypDisplay(row, data.typ);
@@ -187,7 +218,7 @@
     } catch (err) {
       console.warn('ExterniOdkaz.Sync selhal:', err);
       setDatesVisible(row, false);
-      row.setAttribute('data-not-found', 'true');
+      setSyncError(row, 'unavailable');
     }
   }
 
@@ -317,6 +348,9 @@
 
   function syncPrefilledInputs() {
     document.querySelectorAll('[data-external-cislo]').forEach(function (input) {
+      // Detail návrhu (rozhodnutí) je jen pro čtení: typ i datumy vykreslil server. Synchronizace
+      // by nic nezměnila a uživateli bez klíče by jen označila tikety jako chybné (2026-10-13).
+      if (input.closest('[data-external-readonly="true"]')) return;
       if (input.value && /^\d{6}$/.test(input.value.trim())) {
         const proposalMode = typeof input.closest === 'function'
           && input.closest('[data-is-proposal-editor="true"]') != null;
