@@ -541,7 +541,11 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             await dbContext.SaveChangesAsync();
         }
 
+        // Stav po vytěžení: zdroj Automat a datum skutečnosti. Bez data buňka vytěženou
+        // skutečnost nepozná (HarmonogramDateBlokBuilder → ZdrojSkutecnosti.None). Existující
+        // datum (další tiket na stejném kroku) se nepřepisuje.
         var krok = await dbContext.ZaznamHarmonogramKroky.FirstAsync(x => x.ZaznamId == recordId && x.Poradi == (byte)poradi);
+        krok.SkutecnostDatum ??= datum;
         krok.SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Automat;
         krok.SkutecnostRezim = (byte)SkutecnostRezimEnum.Auto;
         await dbContext.SaveChangesAsync();

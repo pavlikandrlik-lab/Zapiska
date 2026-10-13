@@ -86,7 +86,7 @@ Zdroj: `PermissionKeys.cs` + `PermissionSeedConfiguration.cs`.
 | Klíč | ScopeLevel | Popis |
 |---|---|---|
 | `externiodkazy.sync` | PROJECT | Ruční synchronizace externího odkazu se SD |
-| `vyjadreni.modal.open` | PROJECT | Otevření chat modalu s vyjádřeními |
+| `vyjadreni.modal.open` | PROJECT | Editační okno vyjádření v editoru záznamu (přiřazování kroků). Okno jen pro čtení klíč nepotřebuje. |
 | `vyjadreni.refresh` | PROJECT | Refresh vyjádření z externího zdroje |
 | `vyjadreni.vazba.create` | PROJECT | Vytvoření vazby na krok harmonogramu |
 | `vyjadreni.vazba.delete` | PROJECT | Smazání vazby na krok harmonogramu |

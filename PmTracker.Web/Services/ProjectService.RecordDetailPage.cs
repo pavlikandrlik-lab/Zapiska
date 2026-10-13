@@ -15,14 +15,7 @@ public sealed partial class ProjectService
     /// datumů jako text). NULL = záznam neexistuje nebo na něj uživatel nemá přístup.
     /// Oprávnění a URL doplňuje controller (presentation vrstva).
     /// </summary>
-    public Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, CancellationToken ct = default)
-        => BuildRecordDetailPageAsync(projectId, recordId, canOpenVyjadreni: false, ct);
-
-    /// <param name="canOpenVyjadreni">
-    /// Smí uživatel otevřít okno vyjádření (<c>vyjadreni.modal.open</c>)? Jen pak se u vytěžené
-    /// skutečnosti nabídne odkaz „odkud pochází" — jinak by vedl na akci, kterou server odmítne.
-    /// </param>
-    public async Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, bool canOpenVyjadreni, CancellationToken ct = default)
+    public async Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, CancellationToken ct = default)
     {
         var shell = await BuildRecordCardShellAsync(projectId, recordId, ct);
         if (shell is null)
@@ -48,9 +41,10 @@ public sealed partial class ProjectService
                 Mode = "record-editor",
                 Permissions = ScheduleEditorPermissionSet.ForReadOnly(),
                 CanEditManualActual = false,
-                Kroky = canOpenVyjadreni
-                    ? await AttachSourceVyjadreniAsync(recordId, schedule.HarmonogramBlok.Kroky, ct)
-                    : schedule.HarmonogramBlok.Kroky
+                // Odkaz na zdrojový tiket vidí každý, kdo vidí záznam — okno jen pro čtení
+                // (2026-10-13). Výběr vazby = stejné pravidlo jako editor (ResolveMatched).
+                VyjadreniOknoUpravy = false,
+                Kroky = await AttachSourceVyjadreniAsync(recordId, schedule.HarmonogramBlok.Kroky, ct)
             };
 
         // Jen zkratka + název pro drobečky — BuildProjektDetailAsync by načetl celou

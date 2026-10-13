@@ -90,6 +90,14 @@ public sealed record HarmonogramBlockViewModel
     public bool CanEditManualActual { get; set; }
 
     /// <summary>
+    /// Bublina skutečnosti otevře editační okno (přiřazování kroků, klíč vyjadreni.modal.open).
+    /// Výchozí false = okno jen pro čtení (GET /Zaznamy/VyjadreniNahled), které smí každý, kdo
+    /// záznam vidí. true nastavuje výhradně editor záznamu (ZaznamyController.PrepareRecordEditorModel);
+    /// návrhy a stránka záznamu zůstávají jen pro čtení (spec 2026-04-21 §5.2).
+    /// </summary>
+    public bool VyjadreniOknoUpravy { get; init; }
+
+    /// <summary>
     /// 7b (2026-06-17): v návrhu ZALOŽENÍ se vyplňuje pouze PLÁN; skutečnost vznikne až po
     /// založení reálného záznamu klasickou cestou (nový záznam ještě neexistuje, skutečnost
     /// nelze). Když <c>true</c>, skutečnostní sloupec v editoru nerenderuje vstupy — jen
@@ -248,6 +256,9 @@ public sealed class ScheduleBlockManualCellViewModel
     public bool CanEditManualActual { get; init; }
 
     public bool IsLocked { get; init; }
+
+    /// <summary>Viz <see cref="HarmonogramBlockViewModel.VyjadreniOknoUpravy"/>.</summary>
+    public bool VyjadreniOknoUpravy { get; init; }
 }
 
 public sealed class HarmonogramSouhrnViewModel

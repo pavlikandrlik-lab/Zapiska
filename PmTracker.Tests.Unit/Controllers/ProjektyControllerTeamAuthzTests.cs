@@ -226,8 +226,6 @@ public sealed class ProjektyControllerTeamAuthzTests
             => Task.FromResult<ZaznamScheduleBlockViewModel?>(null);
         public Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, CancellationToken ct = default)
             => Task.FromResult<ZaznamDetailPageViewModel?>(null);
-        public Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, bool canOpenVyjadreni, CancellationToken ct = default)
-            => Task.FromResult<ZaznamDetailPageViewModel?>(null);
         public Task<ZaznamCardDetailViewModel?> BuildRecordCardDetailAsync(int projectId, int recordId, CancellationToken ct = default)
             => Task.FromResult<ZaznamCardDetailViewModel?>(null);
         public Task<ZaznamCommentsPanelViewModel?> BuildRecordCommentsPanelAsync(int projectId, int recordId, CancellationToken ct = default)
