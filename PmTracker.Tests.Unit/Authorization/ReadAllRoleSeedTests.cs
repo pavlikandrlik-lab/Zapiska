@@ -36,8 +36,7 @@ public sealed class ReadAllRoleSeedTests
             "dashboard.view",
             "export.pdf.jednani", "export.pdf.projekt", "export.pdf.ukol",
             "export.word.jednani", "export.word.projekt", "export.word.ukol",
-            "projects.read.all",
-            "search.index"
-        }, "READ_ALL má read + per-entita export + search.index + projects.read.all");
+            "projects.read.all"
+        }, "READ_ALL má read + per-entita export + projects.read.all");
     }
 }

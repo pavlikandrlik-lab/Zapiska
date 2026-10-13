@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
@@ -49,17 +50,20 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
     private readonly IVyjadreniQueryService _vyjadreni;
     private readonly ITicketingQueryService _ticketing;
     private readonly AdLoginCache _adLoginCache;
+    private readonly ILogger<VyjadreniModalViewModelBuilder> _logger;
 
     public VyjadreniModalViewModelBuilder(
         PmTrackerDbContext db,
         IVyjadreniQueryService vyjadreni,
         ITicketingQueryService ticketing,
-        AdLoginCache adLoginCache)
+        AdLoginCache adLoginCache,
+        ILogger<VyjadreniModalViewModelBuilder> logger)
     {
         _db = db;
         _vyjadreni = vyjadreni;
         _ticketing = ticketing;
         _adLoginCache = adLoginCache;
+        _logger = logger;
     }
 
     public Task<VyjadreniModalViewModel?> BuildAsync(int externiOdkazId, int zaznamId, bool canEdit, CancellationToken ct)
@@ -96,9 +100,30 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
             return vm;
         }
 
-        var tiket = await _ticketing.GetZaznamAsync(eo.Cislo, ct).ConfigureAwait(false);
+        // Obsah tiketu se čte živě ze ServiceDesku. Při výpadku nespadnout na HTTP 500 —
+        // okno ukáže varování a přiřazení kroků z lokálních vazeb (typ z lokální externí vazby,
+        // aby stepper věděl, které kroky k tiketu patří).
+        HotZaznamDto? tiket = null;
+        IReadOnlyList<HotVyjadreniDto> list = Array.Empty<HotVyjadreniDto>();
+        try
+        {
+            tiket = await _ticketing.GetZaznamAsync(eo.Cislo, ct).ConfigureAwait(false);
+            list = await _vyjadreni.GetVyjadreniForTicketAsync(eo.Cislo, sinceUtc: null, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Okno vyjádření: ServiceDesk nedostupný pro tiket {Cislo}.", eo.Cislo);
+            vm.ServiceDeskNedostupny = true;
+            vm.EmptyMessage = "ServiceDesk je teď nedostupný, obsah tiketu nelze načíst. Přiřazení kroků odpovídá poslednímu vytěžení.";
+        }
+
+        var lokalniTyp = await _db.CiselnikTypuExternichOdkazu.AsNoTracking()
+            .Where(t => t.Id == eo.TypOdkazuId)
+            .Select(t => t.Kod)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+
         vm.TiketStrucne = tiket?.Strucne;
-        vm.TiketTyp = tiket?.TypZaznamu;
+        vm.TiketTyp = tiket?.TypZaznamu ?? lokalniTyp;
         vm.TiketUzivatel = tiket?.Uzivatel;
         vm.TiketSubsystem = tiket?.Subsystem;
         vm.TiketModul = tiket?.Modul;
@@ -140,7 +165,6 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
             })
             .ToList();
 
-        var list = await _vyjadreni.GetVyjadreniForTicketAsync(eo.Cislo, sinceUtc: null, ct).ConfigureAwait(false);
         var bindingByHotId = activeBindings.ToDictionary(b => b.HotVyjadreniId);
 
         var bubliny = new List<BublinaViewModel>(list.Count + 1);
@@ -185,16 +209,19 @@ public sealed class VyjadreniModalViewModelBuilder : IVyjadreniModalViewModelBui
         }
         vm.Bubliny = bubliny;
 
-        // Reálná vyjádření (mimo synthetic intro) — pokud žádná, ukázat empty message.
-        if (bubliny.All(b => b.IsTicketIntro))
+        if (!vm.ServiceDeskNedostupny)
         {
-            vm.EmptyMessage = "Žádná vyjádření zatím nejsou dostupná (buď ještě nebyla vytěžena, nebo ServiceDesk je offline).";
-        }
-        else
-        {
-            // Spec 2026-04-29-modal-vyjadreni-dropdown §3 — per-bubble option computation
-            // (1:1 + chronologie validation). Také Assigned* properties pro UI badge / dropdown.
-            ComputePerBubbleStepOptions(vm, activeBindings);
+            // Reálná vyjádření (mimo synthetic intro) — pokud žádná, ukázat empty message.
+            if (bubliny.All(b => b.IsTicketIntro))
+            {
+                vm.EmptyMessage = "Žádná vyjádření zatím nejsou dostupná (buď ještě nebyla vytěžena, nebo ServiceDesk je offline).";
+            }
+            else
+            {
+                // Spec 2026-04-29-modal-vyjadreni-dropdown §3 — per-bubble option computation
+                // (1:1 + chronologie validation). Také Assigned* properties pro UI badge / dropdown.
+                ComputePerBubbleStepOptions(vm, activeBindings);
+            }
         }
 
         return vm;

@@ -244,8 +244,9 @@ public sealed class ScheduleProposalGuardScenariosTests
             // DispatchEvent obchází actionability, stejný vzor jako RecordScheduleToggleScenariosTests.
             await card.Locator("[data-record-menu-trigger]").DispatchEventAsync("click");
 
-            // Panel menu se mountuje mimo kartu, do #floating-panel-root.
-            var menuItem = page.Locator("[data-record-menu] [data-schedule-proposal-check-url]");
+            // Panel menu se mountuje mimo kartu, do #floating-panel-root. V plném běhu sady jsou
+            // v projektu i karty z jiných testů → položku vybrat podle záznamu (konec URL ověření).
+            var menuItem = page.Locator($"[data-record-menu] [data-schedule-proposal-check-url$='zaznamId={recordId}']");
             await Expect(menuItem).ToBeVisibleAsync();
 
             // Reálný trusted klik na plain <a> — ne gov-button, takže by měl být actionable.

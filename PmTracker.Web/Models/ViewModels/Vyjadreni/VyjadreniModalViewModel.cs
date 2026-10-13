@@ -45,6 +45,12 @@ public sealed class VyjadreniModalViewModel
     /// UI ji zobrazí jako gov-alert info banner.
     /// </summary>
     public string? EmptyMessage { get; set; }
+
+    /// <summary>
+    /// ServiceDesk při sestavení okna neodpověděl (2026-10-13). Okno pak ukáže varování
+    /// a přiřazení kroků z lokálních vazeb místo „HTTP 500".
+    /// </summary>
+    public bool ServiceDeskNedostupny { get; set; }
 }
 
 public sealed class BublinaViewModel

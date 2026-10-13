@@ -55,4 +55,16 @@ public sealed class ExterniOdkazSyncJsTests
 
         body.Should().Contain("value", "rozhoduje se podle toho, jestli je pole prázdné");
     }
+
+    [Fact]
+    public void Sync_TypVNavrhuBezHarvestu_ChybyNejsouNenalezeno_DetailNavrhuNesynchronizuje()
+    {
+        var sync = Js("externiOdkaz/sync.js");
+
+        sync.Should().Contain("'/ExterniOdkaz/Typ?cislo='", "editor návrhu potřebuje jen typ — bez klíče externiodkazy.sync");
+        sync.Should().Contain("appendCurrentAsUser", "AJAX nese identitu stejně jako ostatní moduly");
+        sync.Should().Contain("resp.status === 403", "chybějící oprávnění se nesmí hlásit jako nenalezený tiket");
+        sync.Should().Contain("data-sync-error");
+        sync.Should().Contain("[data-external-readonly=\"true\"]", "detail návrhu je jen pro čtení, nesynchronizuje se");
+    }
 }

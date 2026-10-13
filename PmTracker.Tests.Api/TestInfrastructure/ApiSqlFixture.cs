@@ -1,4 +1,9 @@
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Tests.Common;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
@@ -20,6 +25,24 @@ public sealed class ApiSqlFixture : IAsyncLifetime
 
     public PmTrackerWebAppFactory Factory { get; private set; } = null!;
 
+    /// <summary>Falešný ServiceDesk sdílený kolekcí (viz <see cref="ServiceDeskFactory"/>).</summary>
+    public FakeServiceDesk ServiceDesk { get; } = new();
+
+    private WebApplicationFactory<Program>? _serviceDeskFactory;
+
+    /// <summary>
+    /// Aplikace se zapnutým (falešným) ServiceDeskem. Hlavní <see cref="Factory"/> má SD vypnutý
+    /// (DisabledTicketingQueryService) a řada testů na tom stojí — proto samostatná instance.
+    /// </summary>
+    public WebApplicationFactory<Program> ServiceDeskFactory => _serviceDeskFactory ??= Factory.WithWebHostBuilder(builder =>
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<ITicketingQueryService>();
+            services.RemoveAll<IVyjadreniQueryService>();
+            services.AddSingleton<ITicketingQueryService>(ServiceDesk);
+            services.AddSingleton<IVyjadreniQueryService>(ServiceDesk);
+        }));
+
     public int AdminOsobaId => Database.AdminOsobaId;
 
     public async Task InitializeAsync()
@@ -38,6 +61,7 @@ public sealed class ApiSqlFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        _serviceDeskFactory?.Dispose();
         Factory.Dispose();
         await _databaseManager.DisposeAsync();
     }
@@ -147,7 +171,14 @@ public sealed class ApiSqlFixture : IAsyncLifetime
     /// A4 (2026-07-09): přiřadí osobě roli vedoucího subsystému v projektu (projekt_subsystemy +
     /// obsazeni_subsystemu_projektu). Potřebné pro lead-gated stránky (návrhy záznamů).
     /// </summary>
-    public async Task EnsureSubsystemLeadAsync(int projectId, int subsystemId, int osobaId)
+    public Task EnsureSubsystemLeadAsync(int projectId, int subsystemId, int osobaId)
+        => EnsureSubsystemRoleAsync(projectId, subsystemId, osobaId, SubsystemRoleCodes.Lead);
+
+    /// <summary>
+    /// Přiřadí osobě libovolnou subsystémovou roli (kód z ciselnik_roli_subsystemu) v projektu.
+    /// 2026-10-13: testy oprávnění zástupce vedoucího subsystému (SubsystemRoleCodes.DeputyLead).
+    /// </summary>
+    public async Task EnsureSubsystemRoleAsync(int projectId, int subsystemId, int osobaId, string roleCode)
     {
         await using var dbContext = CreateDbContext();
 
@@ -169,15 +200,15 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             projectSubsystemId = link.Id;
         }
 
-        var leadRoleId = await dbContext.CiselnikRoliSubsystemu
-            .Where(x => x.Kod == PmTracker.Web.Models.ViewModels.SubsystemRoleCodes.Lead)
+        var roleId = await dbContext.CiselnikRoliSubsystemu
+            .Where(x => x.Kod == roleCode)
             .Select(x => x.Id)
             .FirstAsync();
 
         var alreadyAssigned = await dbContext.ObsazeniSubsystemuProjektu
             .AnyAsync(x => x.ProjektSubsystemId == projectSubsystemId.Value
                 && x.OsobaId == osobaId
-                && x.RoleSubsystemuId == leadRoleId
+                && x.RoleSubsystemuId == roleId
                 && x.DatumOdebrani == null);
         if (!alreadyAssigned)
         {
@@ -185,7 +216,7 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             {
                 ProjektSubsystemId = projectSubsystemId.Value,
                 OsobaId = osobaId,
-                RoleSubsystemuId = leadRoleId,
+                RoleSubsystemuId = roleId,
                 DatumPrirazeni = DateTime.UtcNow
             });
             await dbContext.SaveChangesAsync();
@@ -467,6 +498,56 @@ public sealed class ApiSqlFixture : IAsyncLifetime
         var krok = await dbContext.ZaznamHarmonogramKroky
             .FirstAsync(x => x.ZaznamId == recordId && x.Poradi == (byte)poradi);
         krok.SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Automat;
+        await dbContext.SaveChangesAsync();
+
+        return odkaz.Id;
+    }
+
+    /// <summary>
+    /// Externí vazba s konkrétním číslem a typem tiketu + aktivní vazba vyjádření na krok.
+    /// Na rozdíl od <see cref="SeedHarvestedActualAsync"/> řídí test číslo, typ, id vyjádření
+    /// i datum — potřebné pro falešný ServiceDesk a pro výběr vazby u více tiketů (2026-10-13).
+    /// Krok musí existovat (SeedDatumScheduleAsync).
+    /// </summary>
+    public async Task<int> SeedTicketBindingAsync(int recordId, string cislo, string typKod, int poradi, long hotVyjadreniId, DateTime datum)
+    {
+        await using var dbContext = CreateDbContext();
+
+        var typId = await dbContext.CiselnikTypuExternichOdkazu.Where(x => x.Kod == typKod).Select(x => x.Id).FirstAsync();
+        var odkaz = await dbContext.ZaznamExterniOdkazy
+            .FirstOrDefaultAsync(x => x.ZaznamId == recordId && x.Cislo == cislo);
+        if (odkaz is null)
+        {
+            odkaz = new ZaznamExterniOdkazEntity { ZaznamId = recordId, TypOdkazuId = typId, Cislo = cislo };
+            dbContext.ZaznamExterniOdkazy.Add(odkaz);
+            await dbContext.SaveChangesAsync();
+        }
+
+        var hasBinding = await dbContext.VyjadreniVazby.AnyAsync(x => x.ZaznamId == recordId
+            && x.ExterniOdkazId == odkaz.Id && x.Poradi == (byte)poradi && x.Stav == (byte)VazbaStav.Active);
+        if (!hasBinding)
+        {
+            dbContext.VyjadreniVazby.Add(new ZaznamHarmonogramVyjadreniVazbaEntity
+            {
+                ZaznamId = recordId,
+                Poradi = (byte)poradi,
+                ExterniOdkazId = odkaz.Id,
+                HotVyjadreniId = hotVyjadreniId,
+                DatumVyjadreni = datum,
+                Source = (byte)VazbaSource.Auto,
+                Stav = (byte)VazbaStav.Active,
+                CreatedAt = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        // Stav po vytěžení: zdroj Automat a datum skutečnosti. Bez data buňka vytěženou
+        // skutečnost nepozná (HarmonogramDateBlokBuilder → ZdrojSkutecnosti.None). Existující
+        // datum (další tiket na stejném kroku) se nepřepisuje.
+        var krok = await dbContext.ZaznamHarmonogramKroky.FirstAsync(x => x.ZaznamId == recordId && x.Poradi == (byte)poradi);
+        krok.SkutecnostDatum ??= datum;
+        krok.SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Automat;
+        krok.SkutecnostRezim = (byte)SkutecnostRezimEnum.Auto;
         await dbContext.SaveChangesAsync();
 
         return odkaz.Id;

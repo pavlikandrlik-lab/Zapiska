@@ -61,10 +61,23 @@ public static class HarmonogramSkutecnostResolver
         int krokPoradi,
         IReadOnlyList<BindingKandidat> allBindingsForZaznam,
         int? preferredExterniOdkazId)
-    {
-        var matched = allBindingsForZaznam
-            .Where(b => HarmonogramKrokDatumMapping.GetPredikatKey(b.TypZaznamu, krokPoradi) == b.PredikatKey);
+        => ResolveMatched(
+            krokPoradi,
+            allBindingsForZaznam.Where(b => HarmonogramKrokDatumMapping.GetPredikatKey(b.TypZaznamu, krokPoradi) == b.PredikatKey),
+            preferredExterniOdkazId);
 
+    /// <summary>
+    /// Výběr vítězné vazby nad kandidáty, kteří už k <paramref name="krokPoradi"/> patří
+    /// (bez filtru predikátem podle typu tiketu). Pro volající, kteří mají uložené vazby
+    /// s pořadím z harvestu a nechtějí kvůli typu tiketu volat ServiceDesk — stránka záznamu.
+    /// Pravidlo je totožné s <see cref="Resolve"/>: krok 1 = MIN bez preferred, ostatní
+    /// = preferred, jinak MAX.
+    /// </summary>
+    public static ResolvedSkutecnost ResolveMatched(
+        int krokPoradi,
+        IEnumerable<BindingKandidat> matched,
+        int? preferredExterniOdkazId)
+    {
         // Spec 2026-04-28 §2: Krok 1 „příprava zadání" agreguje napříč externími vazbami
         // jako MIN (nejdřívější datum založení tiketu). Ostatní kroky 3, 4, 6, 7, 10
         // používají MAX (nejpozdější datum vyjádření) — výchozí stav z C-Q2.

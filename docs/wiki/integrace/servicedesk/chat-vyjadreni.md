@@ -15,13 +15,21 @@ Slouží k:
 
 ## Kde najít
 
-Editor záznamu (s externí vazbou na SD ticket) → tlačítko **Otevřít chat**.
+Okno se otevírá kliknutím na bublinu 💬 u vytěžené skutečnosti kroku harmonogramu (tabulka
+na stránce záznamu, editor záznamu, editor a detail návrhu) a v editoru záznamu tlačítkem
+💬 na kartě externí vazby.
 
-Tlačítko je k dispozici jen pokud:
+Okno má dva režimy:
 
-- Záznam má vyplněnou externí vazbu (existující 6-ciferné ticket id)
-- Aplikace má `Ticketing.Enabled = true`
-- User má `vyjadreni.view` permission
+- **Jen pro čtení** — obsah tiketu ze ServiceDesku a přiřazení vyjádření ke krokům (štítek
+  „Krok N“), bez možnosti je měnit. Otevře ho každý, kdo vidí záznam; žádný klíč není
+  potřeba. Takto se okno otevírá vždy ze stránky záznamu a z návrhů.
+- **Úpravy** — přiřazování a odpojování kroků, znovuvytěžení. Jen v editoru záznamu a jen
+  s klíčem `vyjadreni.modal.open`; jednotlivé akce hlídají `vyjadreni.vazba.create`,
+  `vyjadreni.vazba.delete` a `vyjadreni.reharvest`.
+
+Když ServiceDesk neodpovídá, okno se otevře s varováním a ukáže přiřazení kroků podle
+posledního vytěžení.
 
 ## Co modal zobrazuje
 

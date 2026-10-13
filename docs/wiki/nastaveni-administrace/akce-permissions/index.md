@@ -23,7 +23,7 @@ Příklady:
 - `comments.edit.own` — `comments` doména, `edit` akce, `own` scope
 - `dashboard.nes.view` — `dashboard` doména, `nes` panel, `view` akce
 
-## Kompletní katalog (75 klíčů ve 14 kategoriích)
+## Kompletní katalog (72 klíčů ve 13 kategoriích)
 
 Zdroj: `PermissionKeys.cs` + `PermissionSeedConfiguration.cs`.
 
@@ -86,7 +86,7 @@ Zdroj: `PermissionKeys.cs` + `PermissionSeedConfiguration.cs`.
 | Klíč | ScopeLevel | Popis |
 |---|---|---|
 | `externiodkazy.sync` | PROJECT | Ruční synchronizace externího odkazu se SD |
-| `vyjadreni.modal.open` | PROJECT | Otevření chat modalu s vyjádřeními |
+| `vyjadreni.modal.open` | PROJECT | Editační okno vyjádření v editoru záznamu (přiřazování kroků). Okno jen pro čtení klíč nepotřebuje. |
 | `vyjadreni.refresh` | PROJECT | Refresh vyjádření z externího zdroje |
 | `vyjadreni.vazba.create` | PROJECT | Vytvoření vazby na krok harmonogramu |
 | `vyjadreni.vazba.delete` | PROJECT | Smazání vazby na krok harmonogramu |
@@ -165,12 +165,10 @@ Zdroj: `PermissionKeys.cs` + `PermissionSeedConfiguration.cs`.
 | `settings.sync.run` | GLOBAL | Manuální spuštění synchronizačního jobu |
 | `settings.sd.view` | GLOBAL | Otevřít SD konektor s admin přehledem |
 
-### 14. Hledání (`SEARCH`) — 2 klíče
-
-| Klíč | ScopeLevel | Popis |
-|---|---|---|
-| `search.index` | GLOBAL | Globální fulltext hledání |
-| `search.reindex` | GLOBAL | Administrátorská akce: full reindex FTS |
+> Sekce 14 (`SEARCH` / `search.index`, `search.reindex`) odstraněna — `search.reindex` zanikl
+> 2026-09 s indexovou vrstvou (`db_upgrade_1_4_4_search_cleanup.sql`), `search.index` 2026-10-13
+> (`db_upgrade_1_4_8_drop_search_index.sql`). Hledání smí každý přihlášený; výsledky omezuje
+> viditelnost projektů — kdo nevidí projekt, nenajde ani jeho záznamy.
 
 > Sekce 15 (`SCHEDULE` / `schedule.preview`) odstraněna 2026-07-14 — klíč hlídal endpoint
 > smazaný při harmonogram datum-model migraci; viz `db_upgrade_1_4_1_drop_schedule_preview.sql`.

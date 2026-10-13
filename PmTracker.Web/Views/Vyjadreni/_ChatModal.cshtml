@@ -12,6 +12,7 @@
 
 <div class="pm-chat-modal"
      data-chat-modal-root
+     data-chat-modal-mode="@(canEdit ? "edit" : "read")"
      data-zaznam-id="@Model.ZaznamId"
      data-externi-odkaz-id="@Model.ExterniOdkazId"
      data-projekt-id="@Model.ProjektId"
@@ -67,7 +68,13 @@
         </div>
     </header>
 
-    @if (!string.IsNullOrWhiteSpace(Model.EmptyMessage))
+    @if (Model.ServiceDeskNedostupny)
+    {
+        <gov-alert variant="warning" role="status" data-chat-modal-sd-offline>
+            @Model.EmptyMessage
+        </gov-alert>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.EmptyMessage))
     {
         <gov-alert variant="info" role="status">
             @Model.EmptyMessage
@@ -238,6 +245,14 @@
                 Přetáhněte krok (vpravo) svisle na vyjádření (vlevo). Krok se přilepí k nejbližšímu vyjádření u kurzoru.
             </small>
             <div class="pm-chat-modal__status" data-chat-status aria-live="polite"></div>
+        </footer>
+    }
+    @if (!canEdit)
+    {
+        @* 2026-10-13 (spec 2026-04-21 §5.2): okno jen pro čtení — obsah tiketu a přiřazení kroků
+           bez možnosti je měnit. Úpravy přiřazení patří do editoru záznamu. *@
+        <footer class="pm-chat-modal__footer" data-chat-modal-readonly-hint>
+            <small class="pm-chat-modal__hint">Jen pro čtení. Přiřazení vyjádření ke krokům se upravuje v editoru záznamu.</small>
         </footer>
     }
 

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.ServiceDesk;
 
 namespace PmTracker.Web.Controllers;
 
@@ -78,8 +80,46 @@ public sealed partial class ZaznamyController
             return NotFound();
         }
 
-        PrepareRecordCommentsPresentation(model, record.Summary);
+        await PrepareRecordCommentsPresentationAsync(model, record.Summary, ct);
         return PartialView("~/Views/Projekty/_ZaznamCommentsPartial.cshtml", model);
+    }
+
+    /// <summary>
+    /// Okno tiketu jen pro čtení (2026-10-13, spec 2026-04-21 §5.2): obsah tiketu ze ServiceDesku
+    /// a přiřazení vyjádření ke krokům, bez možnosti je měnit. Guard = přístup k projektu
+    /// záznamu, stejně jako stránka záznamu — žádný klíč. projektId se nebere od klienta, ale
+    /// odvozuje z vazby, takže podvržené id vrátí 404. Bez harvestu: GET nic nezapisuje.
+    /// Builder přes [FromServices], aby se neměnil konstruktor controlleru.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> VyjadreniNahled(
+        int externiOdkazId,
+        int zaznamId,
+        [FromServices] IVyjadreniModalViewModelBuilder builder,
+        CancellationToken ct = default)
+    {
+        if (externiOdkazId <= 0 || zaznamId <= 0)
+        {
+            return BadRequest();
+        }
+
+        var projektId = await (from eo in _db.ZaznamExterniOdkazy.AsNoTracking()
+                               join z in _db.ProjektoveZaznamy.AsNoTracking() on eo.ZaznamId equals z.Id
+                               where eo.Id == externiOdkazId && eo.ZaznamId == zaznamId
+                               select (int?)z.ProjektId)
+                              .FirstOrDefaultAsync(ct);
+        if (projektId is null || !CurrentUserContext.CanAccessProject(projektId.Value))
+        {
+            return NotFound();
+        }
+
+        var vm = await builder.BuildAsync(externiOdkazId, zaznamId, canEdit: false, canAddAddon: false, ct);
+        if (vm is null)
+        {
+            return NotFound();
+        }
+
+        return PartialView("~/Views/Vyjadreni/_ChatModal.cshtml", vm);
     }
 
     private void PrepareRecordCardShellPresentation(ProjektZaznamCardShellViewModel record, int projektId)
@@ -93,7 +133,6 @@ public sealed partial class ZaznamyController
             && CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, projektId);
         var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projektId)
             && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
-        var canAddGeneralComment = CurrentUserContext.HasPermission(PermissionKeys.CommentsAdd, projektId);
 
         summary.CanEditRecord = canEditRecord;
         summary.CanEditSchedule = canEditSchedule;
@@ -104,7 +143,6 @@ public sealed partial class ZaznamyController
         summary.CanManageSchedule = canEditSchedule;
         summary.CanCreateScheduleProposal = canCreateScheduleProposal;
         summary.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
-        summary.CanAddComment = canEditRecord || canAddGeneralComment || canCommentAsSubsystemLead;
         summary.EditButtonLabel = canEditRecord ? "Upravit" : "GANTT";
         summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         record.DetailUrl ??= Url.Action(nameof(RecordDetailPartial), new { projektId, zaznamId = summary.Id });
@@ -115,27 +153,24 @@ public sealed partial class ZaznamyController
         summary.ScheduleProposalCheckUrl ??= Url.Action("ScheduleProposalAvailability", "Navrhy", new { projektId, zaznamId = summary.Id });
     }
 
-    private void PrepareRecordCommentsPresentation(ZaznamCommentsPanelViewModel model, ZaznamCardSummaryViewModel summary)
+    private async Task PrepareRecordCommentsPresentationAsync(ZaznamCommentsPanelViewModel model, ZaznamCardSummaryViewModel summary, CancellationToken ct)
     {
         var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId);
-        var canAddGeneralComment = CurrentUserContext.HasPermission(PermissionKeys.CommentsAdd, model.ProjektId);
         var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, model.ProjektId)
             && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
-        // F4 redesign 2026-04-23: „subsystem lead bez records.edit" = v comment formuláři vidí
-        // pouze DRAFT jednání (smí psát zápis jen tam). comments.add tento specifický invariant
-        // NEPRELEPÍ — generický komentář se váže na stejný subsystem-lead workflow a restrikce
-        // draft-only chrání proti zápisu v uzavřených jednáních.
-        if (!canEditRecord && canCommentAsSubsystemLead)
-        {
-            model.OtevrenaJednani = model.OtevrenaJednani
-                .Where(item => item.IsDraft)
-                .ToList();
-        }
+
+        // Nabídka jednání = přesně ta, kde by AddComment prošel (sdílená CommentAuthorizationPolicy,
+        // 2026-10-13). Dřív se tu ptalo jen na comments.add v projektu — subsystémový grant ho dává
+        // vedoucímu/zástupci pro celý projekt, takže u cizího subsystému viděl editor, který server odmítl.
+        var allowedMeetingIds = await _recordService.GetMeetingIdsAllowingNewCommentAsync(
+            summary.Id, model.OtevrenaJednani, CurrentUserContext, ct);
+        model.OtevrenaJednani = model.OtevrenaJednani
+            .Where(item => allowedMeetingIds.Contains(item.Id))
+            .ToList();
 
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.CanEditRecord = canEditRecord;
         model.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
-        model.CanAddComment = model.OtevrenaJednani.Count > 0
-            && (canEditRecord || canAddGeneralComment || canCommentAsSubsystemLead);
+        model.CanAddComment = model.OtevrenaJednani.Count > 0;
     }
 }

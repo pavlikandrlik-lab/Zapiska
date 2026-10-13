@@ -53,7 +53,7 @@ Hlavní kategorie (reprezentativní výběr):
 - **Export:** `export.pdf.projekt/.jednani/.ukol`, `export.word.projekt/.jednani/.ukol`
 - **Nastavení:** `settings.roles.assign`, `settings.sync.configure`, `settings.sync.run`, `settings.sd.view`
 - **Číselníky:** `ciselniky.row.edit`, `ciselniky.row.delete`
-- **Ostatní:** `search.index`, `search.reindex`, `schedule.preview`, `externiodkazy.sync`
+- **Ostatní:** `externiodkazy.sync` (hledání nemá klíč — rozsah výsledků dává viditelnost projektů)
 
 Pre-redesign klíče (`records.schedule.add`, `records.comment.subsystemlead`, `team.manage`, `people.manage`, `ciselniky.edit`, `settings.manage`, `export.pdf`, `export.word`) byly smazány migrací `db_upgrade_1_3_8_authz_per_action_redesign.sql`.
 

@@ -1,13 +1,31 @@
 /**
  * Plán C — chat modal shell (Task 15).
- * Fetchuje partial z /Vyjadreni/Modal?externiOdkazId=X&zaznamId=Y, vloží do gov-dialog,
- * inicializuje drag-drop (Task 16), autosave (Task 17), reharvest (Task 18).
+ * Fetchuje partial okna vyjádření — /Zaznamy/VyjadreniNahled (jen pro čtení) nebo
+ * /Vyjadreni/Modal (úpravy) — vloží do gov-dialog, inicializuje drag-drop (Task 16),
+ * autosave (Task 17), reharvest (Task 18).
  */
+import { appendCurrentAsUser } from "../navigationShared.js";
+
 (function (global) {
   'use strict';
 
   let dialogEl = null;
-  let currentCtx = null; // { externiOdkazId, zaznamId }
+  let currentCtx = null; // { externiOdkazId, zaznamId, mode }
+
+  // Režim okna určuje server atributem data-external-chat-mode na bublině (2026-10-13):
+  // "read" = obsah tiketu bez úprav (stačí vidět záznam), "edit" = přiřazování kroků
+  // (klíč vyjadreni.modal.open). Bez atributu "edit" — karty externí vazby v editoru a
+  // SD konektor (inspect.js volá open(id)) se chovají jako dřív.
+  const MODE_READ = 'read';
+  const MODE_EDIT = 'edit';
+
+  function modalUrl(ctx) {
+    const query = 'externiOdkazId=' + encodeURIComponent(ctx.externiOdkazId)
+      + '&zaznamId=' + encodeURIComponent(ctx.zaznamId);
+    return appendCurrentAsUser(ctx.mode === MODE_READ
+      ? '/Zaznamy/VyjadreniNahled?' + query
+      : '/Vyjadreni/Modal?' + query);
+  }
 
   function ensureDialog() {
     if (dialogEl) return dialogEl;
@@ -21,7 +39,7 @@
     dialogEl.setAttribute('data-modal-container', '');
     dialogEl.setAttribute('data-modal-variant', 'chat-modal');
     dialogEl.innerHTML = `
-      <div slot="label">Vyjádření a termíny</div>
+      <div slot="title">Vyjádření a termíny</div>
       <div class="pm-chat-modal__content" data-chat-modal-content></div>
       <div slot="footer" style="display:flex; justify-content:flex-end">
         <pm-button variant="Primary" data-chat-modal-close>Zavřít</pm-button>
@@ -34,8 +52,12 @@
     return dialogEl;
   }
 
-  async function open(externiOdkazId, zaznamId) {
-    currentCtx = { externiOdkazId: String(externiOdkazId), zaznamId: String(zaznamId) };
+  async function open(externiOdkazId, zaznamId, mode) {
+    currentCtx = {
+      externiOdkazId: String(externiOdkazId),
+      zaznamId: String(zaznamId),
+      mode: mode === MODE_READ ? MODE_READ : MODE_EDIT
+    };
     const el = ensureDialog();
     const container = el.querySelector('[data-chat-modal-content]');
     container.innerHTML = '<p class="pm-chat-modal__loading">Načítám…</p>';
@@ -88,10 +110,11 @@
     const preserveAnchor = opts.preserveAnchor === true;
     const anchorId = preserveAnchor ? captureScrollAnchor(container) : null;
     try {
-      const url = `/Vyjadreni/Modal?externiOdkazId=${encodeURIComponent(currentCtx.externiOdkazId)}&zaznamId=${encodeURIComponent(currentCtx.zaznamId)}`;
-      const resp = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } });
+      const resp = await fetch(modalUrl(currentCtx), { credentials: 'same-origin', headers: { 'Accept': 'text/html' } });
       if (!resp.ok) {
-        container.innerHTML = `<gov-alert variant="error">Nepodařilo se načíst vyjádření (HTTP ${resp.status}).</gov-alert>`;
+        container.innerHTML = resp.status === 403
+          ? '<gov-alert variant="error">K úpravě přiřazení vyjádření nemáte oprávnění.</gov-alert>'
+          : `<gov-alert variant="error">Nepodařilo se načíst vyjádření (HTTP ${resp.status}).</gov-alert>`;
         return;
       }
       const html = await resp.text();
@@ -167,7 +190,7 @@
       console.warn('Chat open: vazba ještě nemá Id a buffer není dostupný — uložte záznam.');
       return;
     }
-    open(externiOdkazId, zaznamId);
+    open(externiOdkazId, zaznamId, btn.getAttribute('data-external-chat-mode'));
   }
 
   /**

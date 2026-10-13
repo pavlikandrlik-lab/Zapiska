@@ -15,11 +15,13 @@ namespace PmTracker.Web.Controllers;
 /// Po zadání 6místného čísla tiketu UI volá POST /ExterniOdkaz/Sync —
 /// server dohledá záznam v intranetNEW ServiceDesku přes
 /// <see cref="ITicketingQueryService.GetZaznamAsync"/> a vrátí Typ + Strucné.
+/// Editor návrhu založení volá jen GET /ExterniOdkaz/Typ (2026-10-13) — typ tiketu bez
+/// vyjádření a harvestu.
 /// </summary>
 /// <remarks>
-/// Autorizace: manuální check <c>records.edit</c> vůči <c>projektId</c>
-/// z form body (policy attribute by nefungoval — endpoint nemá projektId
-/// v route a records.edit je project-scoped).
+/// Autorizace: manuální check <c>externiodkazy.sync</c> (Typ: nebo <c>proposals.record.create</c>)
+/// vůči <c>projektId</c> z požadavku (policy attribute by nefungoval — endpoint nemá projektId
+/// v route a klíče jsou project-scoped).
 /// </remarks>
 [Authorize]
 [Route("ExterniOdkaz")]
@@ -105,5 +107,41 @@ public sealed class ExterniOdkazController : Controller
             DatumPrevzeti: metadata.DatumPrevzeti,
             Vyjadreni: preview,
             Popis: dto.Popis));
+    }
+
+    /// <summary>
+    /// Jen typ tiketu pro editor návrhu založení (2026-10-13). Smí, kdo má v projektu
+    /// externiodkazy.sync NEBO proposals.record.create — dva [Authorize(Policy)] atributy by se
+    /// vyhodnotily jako AND, proto OR v těle. GET bez vedlejších efektů (žádný harvest).
+    /// </summary>
+    [HttpGet("Typ")]
+    public async Task<IActionResult> Typ([FromQuery] string? cislo, [FromQuery] int projektId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(cislo) || !SixDigits.IsMatch(cislo))
+        {
+            return BadRequest(new { error = "Číslo tiketu musí být přesně 6 cifer." });
+        }
+
+        var osobaId = _currentUser.OsobaId;
+        if (osobaId is null)
+        {
+            return Forbid();
+        }
+
+        var smi = await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.ExterniOdkazySync, projektId, null, ct)
+            || await _authz.HasPermissionAsync(osobaId.Value, PermissionKeys.ProposalsRecordCreate, projektId, null, ct);
+        if (!smi)
+        {
+            return Forbid();
+        }
+
+        var dto = await _ticketing.GetZaznamAsync(cislo, ct);
+        var typ = VyjadreniHarvestService.NormalizeTypZaznamu(dto?.TypZaznamu);
+        return Ok(new ExterniOdkazTypResponse(
+            Nalezeno: dto is not null,
+            Cislo: cislo,
+            Typ: typ.Length == 0 ? null : typ,
+            Strucne: dto?.Strucne,
+            Popis: dto?.Popis));
     }
 }

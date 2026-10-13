@@ -139,6 +139,7 @@
             <pm-button variant="Ghost"
                        size="Small"
                        data-external-chat-open="true"
+                       data-external-chat-mode="@(Model.VyjadreniOknoUpravy ? "edit" : "read")"
                        data-external-odkaz-id="@krok.SourceExterniOdkazId.Value"
                        data-external-zaznam-id="@Model.ZaznamId"
                        data-schedule-actual-from-vyjadreni
@@ -227,6 +228,7 @@ else if (isManualKrok)
                                size="Small"
                                native-type="button"
                                data-external-chat-open="true"
+                               data-external-chat-mode="@(Model.VyjadreniOknoUpravy ? "edit" : "read")"
                                data-external-odkaz-id="@krok.SourceExterniOdkazId.Value"
                                data-external-zaznam-id="@Model.ZaznamId"
                                data-schedule-actual-from-vyjadreni

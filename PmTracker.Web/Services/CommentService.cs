@@ -38,20 +38,15 @@ public sealed class CommentService(
 
         await EnsureMeetingAllowsCommentChangesAsync(meeting, ct);
 
-        var leadEquivalentBySubsystem = await ResolveLeadEquivalentOsobaIdsBySubsystemAsync(record.ProjektId, ct);
-        var subsystemLeadEquivalentOsobaIds = leadEquivalentBySubsystem.GetValueOrDefault(record.SubsystemId, []);
-        // Je osoba vedoucím/zástupcem NĚKTERÉHO subsystému projektu? Pak podléhá subsystémovému
-        // omezení komentářů (jen vlastní subsystém v DRAFT), nehledě na zděděný comments.add.
-        var isSubsystemLeadEquivalentInProject = leadEquivalentBySubsystem.Values
-            .Any(ids => ids.Contains(currentUser.OsobaId));
+        var addContext = await ResolveAddCommentContextAsync(record.ProjektId, record.SubsystemId, currentUser.OsobaId, ct);
         var meetingState = await dbContext.CiselnikStavuJednani
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
         var canAdd = commentAuthorizationPolicy.CanAddComment(
             currentUser,
             record.ProjektId,
-            subsystemLeadEquivalentOsobaIds,
-            isSubsystemLeadEquivalentInProject,
+            addContext.SubsystemLeadEquivalentOsobaIds,
+            addContext.IsSubsystemLeadEquivalentInProject,
             IsDraftMeeting(meetingState));
         if (!canAdd)
         {
@@ -304,6 +299,54 @@ public sealed class CommentService(
 
     private static bool IsDraftMeeting(CiselnikStavuJednaniEntity? status)
         => string.Equals(status?.Kod, "DRAFT", StringComparison.OrdinalIgnoreCase);
+
+    public async Task<IReadOnlySet<int>> GetMeetingIdsAllowingNewCommentAsync(
+        int zaznamId,
+        IReadOnlyCollection<JednaniOptionViewModel> meetings,
+        CurrentUserContextViewModel currentUser,
+        CancellationToken ct = default)
+    {
+        if (meetings.Count == 0)
+        {
+            return new HashSet<int>();
+        }
+
+        var record = await dbContext.ProjektoveZaznamy
+            .AsNoTracking()
+            .Where(x => x.Id == zaznamId)
+            .Select(x => new { x.ProjektId, x.SubsystemId })
+            .FirstOrDefaultAsync(ct);
+        if (record is null)
+        {
+            return new HashSet<int>();
+        }
+
+        var addContext = await ResolveAddCommentContextAsync(record.ProjektId, record.SubsystemId, currentUser.OsobaId, ct);
+        return meetings
+            .Where(meeting => commentAuthorizationPolicy.CanAddComment(
+                currentUser,
+                record.ProjektId,
+                addContext.SubsystemLeadEquivalentOsobaIds,
+                addContext.IsSubsystemLeadEquivalentInProject,
+                meeting.IsDraft))
+            .Select(meeting => meeting.Id)
+            .ToHashSet();
+    }
+
+    /// <summary>
+    /// Vstupy CommentAuthorizationPolicy.CanAddComment — jediné místo výpočtu, sdílené uložením
+    /// i nabídkou jednání ve formuláři. Je osoba vedoucím/zástupcem NĚKTERÉHO subsystému projektu?
+    /// Pak podléhá subsystémovému omezení (jen vlastní subsystém v DRAFT), nehledě na zděděný comments.add.
+    /// </summary>
+    private async Task<AddCommentContext> ResolveAddCommentContextAsync(int projektId, int subsystemId, int osobaId, CancellationToken ct)
+    {
+        var leadEquivalentBySubsystem = await ResolveLeadEquivalentOsobaIdsBySubsystemAsync(projektId, ct);
+        return new AddCommentContext(
+            leadEquivalentBySubsystem.GetValueOrDefault(subsystemId, []),
+            leadEquivalentBySubsystem.Values.Any(ids => ids.Contains(osobaId)));
+    }
+
+    private sealed record AddCommentContext(IReadOnlyList<int> SubsystemLeadEquivalentOsobaIds, bool IsSubsystemLeadEquivalentInProject);
 
     private Task<IReadOnlyList<int>> ResolveLeadEquivalentOsobaIdsAsync(int projectId, int subsystemId, CancellationToken ct)
         => projectRoleCache.GetLeadEquivalentOsobaIdsAsync(projectId, subsystemId, ct);

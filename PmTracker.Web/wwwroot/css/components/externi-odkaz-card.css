@@ -168,6 +168,29 @@
   padding-top: 0.5rem;
 }
 
+/* 2026-10-13: ověření tiketu selhalo jinak než „nenalezeno" — chybějící oprávnění (403)
+   nebo výpadek ServiceDesku se nesmí tvářit jako neexistující tiket. */
+.external-row[data-sync-error] {
+  background: var(--pm-warning-subtle, #fef3c7);
+  border-color: var(--pm-warning, #f59e0b);
+}
+
+.external-row[data-sync-error]::after {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  color: var(--pm-warning-strong, #92400e);
+  font-size: 0.8125rem;
+  padding-top: 0.5rem;
+}
+
+.external-row[data-sync-error="forbidden"]::after {
+  content: "K ověření tiketu nemáte oprávnění.";
+}
+
+.external-row[data-sync-error="unavailable"]::after {
+  content: "Tiket se teď nepodařilo ověřit, ServiceDesk neodpovídá.";
+}
+
 /* Text požadavku do výzvy (2026-09-08). Přes šířku pole karty pod datumy; sloupec 5
    zůstává volný pro koš, stejně jako u bloku datumů. */
 .external-row > .external-field-pozadavek {

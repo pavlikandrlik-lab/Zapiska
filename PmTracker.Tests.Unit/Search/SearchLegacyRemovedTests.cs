@@ -32,7 +32,7 @@ public sealed class SearchLegacyRemovedTests
         var seed = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Security/PermissionSeedConfiguration.cs"));
 
         seed.Should().NotContain("search.reindex");
-        seed.Should().Contain("search.index", "vyhledávání zůstává, klíč pro jeho použití taky");
+        seed.Should().NotContain("search.index", "od 2026-10-13 hledání hlídá jen přihlášení (SearchIndexKeyRemovalTests)");
     }
 
     [Fact]

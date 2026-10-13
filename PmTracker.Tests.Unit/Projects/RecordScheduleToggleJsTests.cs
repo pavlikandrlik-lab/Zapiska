@@ -20,26 +20,23 @@ public sealed class RecordScheduleToggleJsTests
         RepoRoot(), "PmTracker.Web/wwwroot/js/modules", name));
 
     /// <summary>
-    /// 2026-09-03: odkaz „odkud skutečnost pochází" se v read-only nabídne jen tomu, kdo smí
-    /// okno vyjádření otevřít — jinak by ikona vedla na akci, kterou server odmítne.
+    /// 2026-10-13: odkaz „odkud skutečnost pochází" vidí každý, kdo vidí záznam — otevře okno
+    /// tiketu jen pro čtení (bez klíče). Editační okno nabízí jen editor záznamu.
     /// </summary>
     [Fact]
-    public void SourceVyjadreniLink_IsGatedByModalOpenPermission()
+    public void SourceVyjadreniLink_JeVzdyJenProCteni()
     {
-        var controller = File.ReadAllText(Path.Combine(
-            RepoRoot(), "PmTracker.Web/Controllers/ZaznamyController.cs"));
-        controller.Should().Contain("PermissionKeys.VyjadreniModalOpen",
-            "stránka záznamu se ptá na oprávnění otevřít okno vyjádření");
-        controller.Should().Contain("BuildRecordDetailPageAsync(projektId.Value, id, canOpenVyjadreni",
-            "a předává ho do skládání stránky");
+        var controller = File.ReadAllText(Path.Combine(RepoRoot(), "PmTracker.Web/Controllers/ZaznamyController.cs"));
+        controller.Should().NotContain("canOpenVyjadreni", "stránka záznamu už odkaz podle klíče neskrývá");
+        controller.Should().Contain("VyjadreniOknoUpravy = CurrentUserContext.HasPermission(PermissionKeys.VyjadreniModalOpen",
+            "režim úprav nastavuje jen editor");
 
-        var composition = File.ReadAllText(Path.Combine(
-            RepoRoot(), "PmTracker.Web/Services/ProjectService.RecordDetailPage.cs"));
-        composition.Should().Contain("AttachSourceVyjadreniAsync",
-            "zdrojová vazba se ke krokům doplňuje jen v této větvi");
-        System.Text.RegularExpressions.Regex.IsMatch(
-            composition, @"canOpenVyjadreni\s*\?\s*await AttachSourceVyjadreniAsync", System.Text.RegularExpressions.RegexOptions.Singleline)
-            .Should().BeTrue("bez oprávnění se zdrojová vazba ke krokům vůbec nedoplní");
+        var composition = File.ReadAllText(Path.Combine(RepoRoot(), "PmTracker.Web/Services/ProjectService.RecordDetailPage.cs"));
+        composition.Should().Contain("Kroky = await AttachSourceVyjadreniAsync", "zdroj se doplňuje vždy");
+        composition.Should().Contain("VyjadreniOknoUpravy = false");
+
+        var cell = File.ReadAllText(Path.Combine(RepoRoot(), "PmTracker.Web/Views/Shared/_ScheduleBlockManualCell.cshtml"));
+        cell.Should().Contain("data-external-chat-mode=");
     }
 
     [Fact]

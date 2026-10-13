@@ -93,11 +93,11 @@ public sealed class ProjectVisibilityResolverTests
     {
         var user = User(perProject: new Dictionary<int, IReadOnlySet<string>>
         {
-            [42] = new HashSet<string> { "search.index" }
+            [42] = new HashSet<string> { PermissionKeys.SettingsView }
         });
 
         _resolver.Resolve(user).Should().BeEmpty(
-            "search.index není project-read klíč, sám o sobě projekt nezpřístupní");
+            "settings.view není project-read klíč, sám o sobě projekt nezpřístupní");
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class ProjectVisibilityResolverTests
             User(perProject: new Dictionary<int, IReadOnlySet<string>>
             {
                 [3] = new HashSet<string> { PermissionKeys.RecordsEdit }, // projektová role bez obsazení
-                [7] = new HashSet<string> { "search.index" }              // klíč, který ke čtení neopravňuje
+                [7] = new HashSet<string> { PermissionKeys.SettingsView }  // klíč, který ke čtení neopravňuje
             }),
             User(
                 visibleProjectIds: [2],

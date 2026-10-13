@@ -38,17 +38,17 @@ public sealed class SearchMigrationTests
 
         sql.Should().Contain("search.reindex", "klíč hlídal endpoint, který zaniká");
 
-        // search.index drží všech 12 rolí a vyhledávání zůstává — nesmí ho odnést
-        // žádný DELETE. Zmínka v kontrolním SELECTu je naopak žádoucí: administrátor
-        // z ní pozná, že klíč migraci přežil.
+        // 1_4_4 klíč search.index nemaže — v její době ho aplikace ještě vyžadovala. Ruší ho
+        // až 1_4_8, spouštěná po nasazení verze bez klíče. Zmínka v kontrolním SELECTu je
+        // naopak žádoucí: administrátor z ní pozná, jestli už 1_4_8 proběhla.
         foreach (var statement in DeleteStatements(sql))
         {
             statement.Should().NotContain("search.index",
-                "search.index drží všech 12 rolí a vyhledávání zůstává — klíč se NESMÍ mazat");
+                "1_4_4 klíč search.index nemaže — ruší ho až 1_4_8 po nasazení verze bez klíče");
         }
 
         sql.Should().NotContain("permission_categories",
-            "kategorie SEARCH neosiřela (drží ji search.index), na rozdíl od vzoru 1_4_1");
+            "kategorii SEARCH uklízí až 1_4_8 spolu se search.index");
     }
 
     /// <summary>Vrátí každý DELETE příkaz od klíčového slova po nejbližší středník.</summary>

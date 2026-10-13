@@ -7,9 +7,11 @@ using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
 
-// search.index drží všech 12 rolí (seed) — gatuje přístup k vyhledávání.
-// Bez téhle policy by byl klíč mrtvý a hledání otevřené každému přihlášenému.
-[Authorize(Policy = "permission:search.index")]
+// Hledání smí každý přihlášený (rozhodnutí 2026-10-13). Rozsah výsledků určuje výhradně
+// ProjectVisibilityResolver uvnitř RecordSearchService (spec 2026-09-17 §2.3) — kdo nevidí
+// žádný projekt, dostane prázdný výsledek. Dřívější policy permission:search.index se bez
+// projektId vyhodnocovala globálně a vracela 403 všem projektovým a subsystémovým rolím.
+[Authorize]
 [EnableRateLimiting("search")]
 public sealed class SearchController : BaseController
 {

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using Microsoft.Data.SqlClient;
 using Microsoft.Playwright;
@@ -8,7 +9,7 @@ namespace PmTracker.Tests.E2E.Scenarios;
 /// <summary>
 /// V editoru NÁVRHU založení záznamu se externí vazba musí otypovat (Typ z tiketu) — sync už
 /// není úplně vypnutý, jen odkládá harvest (4 datumy). Bez toho by schválení návrhu padlo na
-/// „chybí typ externího záznamu". SD sync je stubovaný přes route interception.
+/// „chybí typ externího záznamu". SD typ je stubovaný přes route interception na /ExterniOdkaz/Typ.
 /// </summary>
 [Collection(E2ECollection.CollectionName)]
 public sealed class RecordProposalExternalTypeScenariosTests
@@ -24,15 +25,14 @@ public sealed class RecordProposalExternalTypeScenariosTests
 
         var page = await _fixture.NewPageAsync();
 
-        // Stub SD sync: jakýkoli 6-ciferný ticket → typ PMP, bez harvest datumů.
-        await page.RouteAsync("**/ExterniOdkaz/Sync", async route =>
+        // Stub typu tiketu: editor návrhu volá GET /ExterniOdkaz/Typ (jen typ, bez harvestu).
+        await page.RouteAsync(new Regex(@"/ExterniOdkaz/Typ\?"), async route =>
         {
             await route.FulfillAsync(new()
             {
                 Status = 200,
                 ContentType = "application/json",
-                Body = "{\"nalezeno\":true,\"cislo\":\"334565\",\"typ\":\"PMP\",\"strucne\":\"Stub\"," +
-                       "\"datumObjednani\":null,\"planDodani\":null,\"datumDodani\":null,\"datumPrevzeti\":null,\"vyjadreni\":[]}"
+                Body = "{\"nalezeno\":true,\"cislo\":\"334565\",\"typ\":\"PMP\",\"strucne\":\"Stub\",\"popis\":null}"
             });
         });
 

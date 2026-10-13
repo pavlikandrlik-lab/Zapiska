@@ -68,14 +68,10 @@ public sealed partial class ZaznamyController : BaseController
             return NotFound();
         }
 
-        // Odkaz „odkud skutečnost pochází" nabídneme jen tomu, kdo okno vyjádření smí otevřít —
-        // jinak by ikona vedla na akci, kterou server odmítne. Samotné akce v okně (re-harvest,
-        // vazby) mají vlastní oprávnění na serveru.
-        var canOpenVyjadreni = CurrentUserContext.HasPermission(PermissionKeys.VyjadreniModalOpen, projektId.Value);
-        var model = await _recordService.BuildRecordDetailPageAsync(projektId.Value, id, canOpenVyjadreni, ct);
+        var model = await _recordService.BuildRecordDetailPageAsync(projektId.Value, id, ct);
         if (model is null) return NotFound();
 
-        PrepareRecordDetailPagePresentation(model, returnUrl);
+        await PrepareRecordDetailPagePresentationAsync(model, returnUrl, ct);
         SetProjectBreadcrumbs(
             model.ProjektId, model.ProjektNazev, model.ProjektZkratka,
             currentText: $"Záznam #{model.Summary.CisloViditelne}",
@@ -83,7 +79,7 @@ public sealed partial class ZaznamyController : BaseController
         return View("~/Views/Projekty/ZaznamDetailPage.cshtml", model);
     }
 
-    private void PrepareRecordDetailPagePresentation(ZaznamDetailPageViewModel model, string? returnUrl)
+    private async Task PrepareRecordDetailPagePresentationAsync(ZaznamDetailPageViewModel model, string? returnUrl, CancellationToken ct)
     {
         var projektId = model.ProjektId;
         var recordId = model.Summary.Id;
@@ -103,7 +99,7 @@ public sealed partial class ZaznamyController : BaseController
         model.BackUrl = NormalizeLocalReturnUrl(returnUrl) ?? ProjektDetailTabUrl(projektId, "zaznamy");
 
         // Vyjádření: stejná presentation jako na kartě (oprávnění, filtr draft jednání).
-        PrepareRecordCommentsPresentation(model.Comments, model.Summary);
+        await PrepareRecordCommentsPresentationAsync(model.Comments, model.Summary, ct);
         model.Comments.CurrentUserOsobaId = CurrentUserContext.OsobaId;
     }
 
@@ -288,7 +284,9 @@ public sealed partial class ZaznamyController : BaseController
         model.HarmonogramBlok = model.HarmonogramBlok with
         {
             Permissions = schedulePermissions,
-            CanEditManualActual = schedulePermissions.CanEditManualActual
+            CanEditManualActual = schedulePermissions.CanEditManualActual,
+            // Editační okno vyjádření (přiřazování kroků) jen v editoru a jen s klíčem okna.
+            VyjadreniOknoUpravy = CurrentUserContext.HasPermission(PermissionKeys.VyjadreniModalOpen, model.ProjektId)
         };
         model.ActiveEditorTab = !canEditRecord && canManageSchedule && model.JeUkolKategorie
             ? EditorTabSchedule

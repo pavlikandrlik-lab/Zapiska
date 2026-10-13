@@ -67,9 +67,6 @@ public sealed partial class RecordService : IRecordService
     public Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, CancellationToken ct = default)
         => projectService.BuildRecordDetailPageAsync(projectId, recordId, ct);
 
-    public Task<ZaznamDetailPageViewModel?> BuildRecordDetailPageAsync(int projectId, int recordId, bool canOpenVyjadreni, CancellationToken ct = default)
-        => projectService.BuildRecordDetailPageAsync(projectId, recordId, canOpenVyjadreni, ct);
-
     public Task<ZaznamCardDetailViewModel?> BuildRecordCardDetailAsync(int projectId, int recordId, CancellationToken ct = default)
         => projectService.BuildRecordCardDetailAsync(projectId, recordId, ct);
 
@@ -99,4 +96,8 @@ public sealed partial class RecordService : IRecordService
 
     public Task DeleteCommentAsync(DeleteCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
         => commentService.DeleteCommentAsync(command, currentUser, ct);
+
+    public Task<IReadOnlySet<int>> GetMeetingIdsAllowingNewCommentAsync(
+        int zaznamId, IReadOnlyCollection<JednaniOptionViewModel> meetings, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+        => commentService.GetMeetingIdsAllowingNewCommentAsync(zaznamId, meetings, currentUser, ct);
 }
