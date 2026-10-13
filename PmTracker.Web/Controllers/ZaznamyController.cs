@@ -71,7 +71,7 @@ public sealed partial class ZaznamyController : BaseController
         var model = await _recordService.BuildRecordDetailPageAsync(projektId.Value, id, ct);
         if (model is null) return NotFound();
 
-        PrepareRecordDetailPagePresentation(model, returnUrl);
+        await PrepareRecordDetailPagePresentationAsync(model, returnUrl, ct);
         SetProjectBreadcrumbs(
             model.ProjektId, model.ProjektNazev, model.ProjektZkratka,
             currentText: $"Záznam #{model.Summary.CisloViditelne}",
@@ -79,7 +79,7 @@ public sealed partial class ZaznamyController : BaseController
         return View("~/Views/Projekty/ZaznamDetailPage.cshtml", model);
     }
 
-    private void PrepareRecordDetailPagePresentation(ZaznamDetailPageViewModel model, string? returnUrl)
+    private async Task PrepareRecordDetailPagePresentationAsync(ZaznamDetailPageViewModel model, string? returnUrl, CancellationToken ct)
     {
         var projektId = model.ProjektId;
         var recordId = model.Summary.Id;
@@ -99,7 +99,7 @@ public sealed partial class ZaznamyController : BaseController
         model.BackUrl = NormalizeLocalReturnUrl(returnUrl) ?? ProjektDetailTabUrl(projektId, "zaznamy");
 
         // Vyjádření: stejná presentation jako na kartě (oprávnění, filtr draft jednání).
-        PrepareRecordCommentsPresentation(model.Comments, model.Summary);
+        await PrepareRecordCommentsPresentationAsync(model.Comments, model.Summary, ct);
         model.Comments.CurrentUserOsobaId = CurrentUserContext.OsobaId;
     }
 

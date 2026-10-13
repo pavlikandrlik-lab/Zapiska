@@ -274,9 +274,6 @@ public sealed partial class ProjektyController : BaseController
         // (per-action klíč pro zápis v jednání).
         summary.CanCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId)
             && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
-        summary.CanAddComment = summary.CanEditRecord
-            || CurrentUserContext.HasPermission(PermissionKeys.CommentsAdd, projectId)
-            || summary.CanCommentAsSubsystemLeader;
         summary.CanCreateScheduleProposal = canCreateScheduleProposal;
         summary.EditButtonLabel = summary.CanEditRecord ? "Upravit" : "GANTT";
         summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;

@@ -21,4 +21,9 @@ public interface IRecordService
     Task AddCommentAsync(AddCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
     Task UpdateCommentAsync(UpdateCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
     Task DeleteCommentAsync(DeleteCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default);
+    Task<IReadOnlySet<int>> GetMeetingIdsAllowingNewCommentAsync(
+        int zaznamId,
+        IReadOnlyCollection<JednaniOptionViewModel> meetings,
+        CurrentUserContextViewModel currentUser,
+        CancellationToken ct = default);
 }

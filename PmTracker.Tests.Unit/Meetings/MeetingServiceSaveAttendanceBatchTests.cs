@@ -173,6 +173,7 @@ public sealed class MeetingServiceSaveAttendanceBatchTests
         public Task AddCommentAsync(AddCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => Task.CompletedTask;
         public Task UpdateCommentAsync(UpdateCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => Task.CompletedTask;
         public Task DeleteCommentAsync(DeleteCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<IReadOnlySet<int>> GetMeetingIdsAllowingNewCommentAsync(int zaznamId, IReadOnlyCollection<JednaniOptionViewModel> meetings, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => Task.FromResult<IReadOnlySet<int>>(new HashSet<int>());
         public Task SaveMeetingNoteAsync(SaveMeetingNoteCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => Task.CompletedTask;
         public Task SaveMeetingNotesBatchAsync(int meetingId, IEnumerable<(int ZaznamId, string Text)> rows, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => Task.CompletedTask;
     }

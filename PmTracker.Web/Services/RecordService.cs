@@ -96,4 +96,8 @@ public sealed partial class RecordService : IRecordService
 
     public Task DeleteCommentAsync(DeleteCommentCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
         => commentService.DeleteCommentAsync(command, currentUser, ct);
+
+    public Task<IReadOnlySet<int>> GetMeetingIdsAllowingNewCommentAsync(
+        int zaznamId, IReadOnlyCollection<JednaniOptionViewModel> meetings, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+        => commentService.GetMeetingIdsAllowingNewCommentAsync(zaznamId, meetings, currentUser, ct);
 }

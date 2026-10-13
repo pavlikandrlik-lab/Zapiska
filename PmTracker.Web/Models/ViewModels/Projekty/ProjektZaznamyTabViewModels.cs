@@ -87,7 +87,6 @@ public sealed class ZaznamCardSummaryViewModel
     // uživatelé bez RecordsScheduleEdit musí přes ProposalsScheduleCreate (viz CanCreateScheduleProposal).
     public bool CanManageSchedule { get; set; }
     public bool CanCommentAsSubsystemLeader { get; set; }
-    public bool CanAddComment { get; set; }
     public bool CanCreateScheduleProposal { get; set; }
     public string EditButtonLabel { get; set; } = "Upravit";
     public string? ScheduleProposalUrl { get; set; }
@@ -175,7 +174,6 @@ public sealed class ZaznamCardViewModel
     // F4 redesign 2026-04-23: CanAddSchedule smazáno (viz ZaznamCardSummaryViewModel).
     public bool CanManageSchedule { get; set; }
     public bool CanCommentAsSubsystemLeader { get; set; }
-    public bool CanAddComment { get; set; }
     public string EditButtonLabel { get; set; } = "Upravit";
     public int CurrentUserOsobaId { get; set; }
 }
