@@ -2498,6 +2498,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin: 0;
 }
 
+/* Nápověda pod polem „Důvod změny“ v editoru návrhu — zarovnaná s polem vlevo
+   (.record-editor-footnote patří poznámce pod tlačítky, je zarovnaná vpravo). */
+.record-proposal-reason-hint {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+}
+
 .record-editor-actions {
     position: sticky;
     bottom: 0;

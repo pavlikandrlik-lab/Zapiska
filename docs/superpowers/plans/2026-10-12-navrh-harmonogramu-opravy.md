@@ -16,7 +16,7 @@
 ## Global Constraints
 
 - **DS FIS pravidlo (bez výjimky):** AI nikdy needituje `PmTracker.Web/wwwroot/assets/gov/**` ani `assets/ds-fis/ds-fis.css` / `assets/ds-fis/ds-fis.js`.
-- **DS gov 4.7.0, ověřeno v bundlu 2026-10-12:** `gov-dialog` props `open`, `block-close`, `block-backdrop-close`, `role`, `label-tag`, `accessible-close-label` …; sloty `icon`, `label`, `footer`. **Atribut „status“ neexistuje** — stav chyby = `gov-icon slot="icon" color="error"`. `gov-infobar` props `color`, `type`, `role`, `closable`; sloty `icon`, `headline`. `gov-icon` props `size`, `color`, `name`, `type`. `gov-button` barvy přes `color`/`type` (Primary = `primary`/`solid`, Secondary = `primary`/`outlined`).
+- **DS gov 4.7.0, ověřeno v bundlu 2026-10-12:** `gov-dialog` props `open`, `block-close`, `block-backdrop-close`, `role`, `label-tag`, `accessible-close-label` …; sloty `icon`, `title`, `footer` (oprava 2026-10-13: slot `label` gov-dialog nemá — nadpis se nevykreslil; komponenta je bez shadow DOM). **Atribut „status“ neexistuje** — stav chyby = `gov-icon slot="icon" color="error"`. `gov-infobar` props `color`, `type`, `role`, `closable`; sloty `icon`, `headline`. `gov-icon` props `size`, `color`, `name`, `type`. `gov-button` barvy přes `color`/`type` (Primary = `primary`/`solid`, Secondary = `primary`/`outlined`).
 - **Dialog:** nikdy `block-close` (X by byl mrtvý); vždy `block-backdrop-close="true"` (zavírá se jen křížkem / tlačítkem).
 - **Infobar (rozhodnutí uživatele):** `color="error"`, `type="bold"`, ikona `components/exclamation-triangle-fill`, `closable="false"`.
 - **Důvod změny je nepovinný** (uživatel: „uživateli umožnil napsat text“), max **1000** znaků, prostý text (ne rich text).

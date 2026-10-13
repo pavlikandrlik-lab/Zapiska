@@ -95,6 +95,26 @@ public sealed class ScheduleProposalGuardScenariosTests
         await command.ExecuteNonQueryAsync();
     }
 
+    /// <summary>
+    /// gov-dialog 4.7.0 vykreslí nadpis jen ze slotu "title". Text v nepoužitém slotu v DOM je
+    /// (ToContainTextAsync projde), ale vidět není. gov-dialog nemá shadow DOM — Stencil slotovaný
+    /// prvek fyzicky přesune do .gov-dialog__title, takže se ověřuje tohle umístění a výška.
+    /// </summary>
+    private static async Task ExpectDialogTitleRenderedAsync(IPage page)
+    {
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const dialog = document.querySelector("gov-dialog[data-schedule-proposal-blocked-dialog]");
+                const title = dialog && [...dialog.querySelectorAll(".gov-dialog__title *")]
+                    .find(el => el.textContent.trim() === "Návrh nelze založit");
+                return !!title && title.getBoundingClientRect().height > 0;
+            }
+            """,
+            null,
+            new() { Timeout = 5000 });
+    }
+
     [Fact]
     public async Task NavrhSCekajicimNavrhem_UkazeDialog_ZustaneNaStrance()
     {
@@ -112,7 +132,7 @@ public sealed class ScheduleProposalGuardScenariosTests
 
             var dialog = page.Locator("gov-dialog[data-schedule-proposal-blocked-dialog]");
             await Expect(dialog).ToHaveCountAsync(1);
-            await Expect(dialog).ToContainTextAsync("Návrh nelze založit");
+            await ExpectDialogTitleRenderedAsync(page);
             await Expect(page).ToHaveURLAsync(url);
         }
         finally
@@ -187,6 +207,8 @@ public sealed class ScheduleProposalGuardScenariosTests
 
             await Expect(page).ToHaveURLAsync(new Regex(@"/Navrhy/CreateScheduleProposal(\?|$)"));
             await Expect(page.Locator("gov-dialog[data-schedule-proposal-blocked-dialog]")).ToHaveCountAsync(0);
+            // Editor se opravdu vykreslil (ne chybová stránka) — navigace skriptem musí nést ?asUser.
+            await Expect(page.Locator("[data-record-proposal-reason]")).ToHaveCountAsync(1);
         }
         finally
         {
@@ -231,7 +253,7 @@ public sealed class ScheduleProposalGuardScenariosTests
 
             var dialog = page.Locator("gov-dialog[data-schedule-proposal-blocked-dialog]");
             await Expect(dialog).ToHaveCountAsync(1);
-            await Expect(dialog).ToContainTextAsync("Návrh nelze založit");
+            await ExpectDialogTitleRenderedAsync(page);
             await Expect(page).ToHaveURLAsync(listUrl);
         }
         finally

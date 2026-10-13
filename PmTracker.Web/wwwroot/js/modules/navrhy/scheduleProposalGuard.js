@@ -55,10 +55,11 @@ function openBlockedDialog({ title, message, proposalUrl }, trigger) {
     icon.setAttribute("color", "error");
     dialog.appendChild(icon);
 
-    const label = document.createElement("span");
-    label.setAttribute("slot", "label");
-    label.textContent = title;
-    dialog.appendChild(label);
+    // gov-dialog 4.7.0 vykresluje nadpis jen ze slotu "title" (slot "label" tu neexistuje).
+    const heading = document.createElement("span");
+    heading.setAttribute("slot", "title");
+    heading.textContent = title;
+    dialog.appendChild(heading);
 
     const text = document.createElement("p");
     text.textContent = message;
@@ -168,7 +169,9 @@ async function handleClick(event) {
     } finally {
         checkInFlight = false;
     }
-    window.location.assign(href);
+    // Navigaci teď dělá skript místo odkazu, proto i tady appendCurrentAsUser (jako u dotazu
+    // výše) — jinak se v dev prostředí ztratí ?asUser a editor spadne na chybějící přihlášení.
+    window.location.assign(appendCurrentAsUser(href));
 }
 
 // Capture fáze: menu karty má data-stop-propagation (bubling by se sem nedostal).
