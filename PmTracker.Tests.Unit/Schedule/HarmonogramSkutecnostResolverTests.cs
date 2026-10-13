@@ -233,4 +233,30 @@ public sealed class HarmonogramSkutecnostResolverTests
         r.VybranyExterniOdkazId.Should().Be(100);
         r.PreferredFallbackApplied.Should().BeFalse();
     }
+
+    [Fact]
+    public void ResolveMatched_Krok1_VraciNejstarsi_IgnorujePreferred()
+    {
+        // Stránka záznamu nemá typ tiketu (bez dotazu do SD) — vazby už jsou pro krok 1.
+        // Pravidlo musí být totožné s Resolve: krok 1 = MIN napříč tikety, preferred neplatí.
+        var pmp = new BindingKandidat(100, "", "", "", D2);
+        var pnf = new BindingKandidat(200, "", "", "", D1);
+
+        var r = HarmonogramSkutecnostResolver.ResolveMatched(1, new[] { pmp, pnf }, preferredExterniOdkazId: 100);
+
+        r.Datum.Should().Be(D1);
+        r.VybranyExterniOdkazId.Should().Be(200);
+    }
+
+    [Fact]
+    public void ResolveMatched_OstatniKrok_PreferredVyhravaJinakNejnovejsi()
+    {
+        var a = new BindingKandidat(100, "", "", "", D1);
+        var b = new BindingKandidat(200, "", "", "", D3);
+
+        HarmonogramSkutecnostResolver.ResolveMatched(7, new[] { a, b }, preferredExterniOdkazId: 100)
+            .VybranyExterniOdkazId.Should().Be(100);
+        HarmonogramSkutecnostResolver.ResolveMatched(7, new[] { a, b }, preferredExterniOdkazId: null)
+            .VybranyExterniOdkazId.Should().Be(200);
+    }
 }

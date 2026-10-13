@@ -81,7 +81,8 @@ public sealed partial class ProjectService
     /// Doplní ke krokům s vytěženou skutečností odkaz na zdrojové vyjádření (ikona „odkud to je").
     /// Bere aktivní vazbu se stejným pořadím — bez dotazu do ServiceDesku, takže zobrazení
     /// nezávisí na jeho dostupnosti (resolver v editoru fingerprinty potřebuje kvůli výběru
-    /// kandidáta, tady stačí uložená vazba). Při více vazbách vyhrává preferovaná, jinak nejnovější.
+    /// kandidáta, tady stačí uložená vazba). Výběr vazby = stejné pravidlo jako editor
+    /// (<c>HarmonogramSkutecnostResolver.ResolveMatched</c>): krok 1 nejstarší, ostatní preferovaná, jinak nejnovější.
     /// </summary>
     private async Task<IReadOnlyList<HarmonogramKrokEditViewModel>> AttachSourceVyjadreniAsync(
         int recordId,
@@ -111,23 +112,27 @@ public sealed partial class ProjectService
             .Where(x => x.ZaznamId == recordId && x.PreferredExterniOdkazId != null)
             .ToDictionaryAsync(x => x.Poradi, x => x.PreferredExterniOdkazId!.Value, ct);
 
-        var byPoradi = vazby
+        var winnerByPoradi = vazby
             .GroupBy(v => v.Poradi)
             .ToDictionary(
                 g => g.Key,
-                g => preferredByPoradi.TryGetValue(g.Key, out var preferred)
-                        && g.FirstOrDefault(v => v.ExterniOdkazId == preferred) is { } match
-                    ? match
-                    : g.OrderByDescending(v => v.DatumVyjadreni).First());
+                g =>
+                {
+                    var resolved = HarmonogramSkutecnostResolver.ResolveMatched(
+                        g.Key,
+                        g.Select(v => new BindingKandidat(v.ExterniOdkazId, "", "", "", v.DatumVyjadreni, v.HotVyjadreniId)),
+                        preferredByPoradi.TryGetValue(g.Key, out var preferred) ? preferred : null);
+                    return resolved.Kandidati.First(k => k.ExterniOdkazId == resolved.VybranyExterniOdkazId);
+                });
 
         return kroky
             .Select(k =>
             {
-                if (byPoradi.TryGetValue((byte)k.KrokIndex, out var vazba))
+                if (winnerByPoradi.TryGetValue((byte)k.KrokIndex, out var winner))
                 {
-                    k.SourceExterniOdkazId = vazba.ExterniOdkazId;
-                    k.SourceVyjadreniId = vazba.HotVyjadreniId > 0 ? vazba.HotVyjadreniId : null;
-                    k.SourceVyjadreniDatum = vazba.DatumVyjadreni;
+                    k.SourceExterniOdkazId = winner.ExterniOdkazId;
+                    k.SourceVyjadreniId = winner.HotVyjadreniId > 0 ? winner.HotVyjadreniId : null;
+                    k.SourceVyjadreniDatum = winner.Datum;
                 }
                 return k;
             })

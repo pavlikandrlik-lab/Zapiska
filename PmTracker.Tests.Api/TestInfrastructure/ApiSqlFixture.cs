@@ -479,6 +479,52 @@ public sealed class ApiSqlFixture : IAsyncLifetime
         return odkaz.Id;
     }
 
+    /// <summary>
+    /// Externí vazba s konkrétním číslem a typem tiketu + aktivní vazba vyjádření na krok.
+    /// Na rozdíl od <see cref="SeedHarvestedActualAsync"/> řídí test číslo, typ, id vyjádření
+    /// i datum — potřebné pro falešný ServiceDesk a pro výběr vazby u více tiketů (2026-10-13).
+    /// Krok musí existovat (SeedDatumScheduleAsync).
+    /// </summary>
+    public async Task<int> SeedTicketBindingAsync(int recordId, string cislo, string typKod, int poradi, long hotVyjadreniId, DateTime datum)
+    {
+        await using var dbContext = CreateDbContext();
+
+        var typId = await dbContext.CiselnikTypuExternichOdkazu.Where(x => x.Kod == typKod).Select(x => x.Id).FirstAsync();
+        var odkaz = await dbContext.ZaznamExterniOdkazy
+            .FirstOrDefaultAsync(x => x.ZaznamId == recordId && x.Cislo == cislo);
+        if (odkaz is null)
+        {
+            odkaz = new ZaznamExterniOdkazEntity { ZaznamId = recordId, TypOdkazuId = typId, Cislo = cislo };
+            dbContext.ZaznamExterniOdkazy.Add(odkaz);
+            await dbContext.SaveChangesAsync();
+        }
+
+        var hasBinding = await dbContext.VyjadreniVazby.AnyAsync(x => x.ZaznamId == recordId
+            && x.ExterniOdkazId == odkaz.Id && x.Poradi == (byte)poradi && x.Stav == (byte)VazbaStav.Active);
+        if (!hasBinding)
+        {
+            dbContext.VyjadreniVazby.Add(new ZaznamHarmonogramVyjadreniVazbaEntity
+            {
+                ZaznamId = recordId,
+                Poradi = (byte)poradi,
+                ExterniOdkazId = odkaz.Id,
+                HotVyjadreniId = hotVyjadreniId,
+                DatumVyjadreni = datum,
+                Source = (byte)VazbaSource.Auto,
+                Stav = (byte)VazbaStav.Active,
+                CreatedAt = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var krok = await dbContext.ZaznamHarmonogramKroky.FirstAsync(x => x.ZaznamId == recordId && x.Poradi == (byte)poradi);
+        krok.SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Automat;
+        krok.SkutecnostRezim = (byte)SkutecnostRezimEnum.Auto;
+        await dbContext.SaveChangesAsync();
+
+        return odkaz.Id;
+    }
+
     public async Task<int> CreateMeetingAsync(int projectId, string stateCode, int meetingNumber)
     {
         await using var dbContext = CreateDbContext();

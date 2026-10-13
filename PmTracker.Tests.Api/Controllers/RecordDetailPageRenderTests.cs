@@ -297,4 +297,31 @@ public sealed class RecordDetailPageRenderTests
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task DetailPage_Krok1SPmpIPnf_UkazeNejstarsiDatum()
+    {
+        // Krok 1 = MIN napříč tikety (spec 2026-04-28 §2). Stránka záznamu dřív brala
+        // nejnovější vazbu, takže ukazovala jiné datum než editor a uložená skutečnost.
+        var (_, recordId) = await SeedTaskWithScheduleAsync("ApiRecPage12");
+        var starsi = DateTime.UtcNow.Date.AddDays(-20);
+        var novejsi = DateTime.UtcNow.Date.AddDays(-10);
+        await _fixture.SeedTicketBindingAsync(recordId, "812001", "PMP", poradi: 1, hotVyjadreniId: 0, datum: starsi);
+        await _fixture.SeedTicketBindingAsync(recordId, "812002", "PNF", poradi: 1, hotVyjadreniId: 0, datum: novejsi);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Detail/{recordId}?asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+
+        // Řádek kroku 1 v tabulce — data-step-index nese i segment grafického přehledu výše.
+        var tableStart = html.IndexOf("schedule-table-wrap", StringComparison.Ordinal);
+        tableStart.Should().BeGreaterThan(0);
+        var rowStart = html.IndexOf("data-step-index=\"1\"", tableStart, StringComparison.Ordinal);
+        rowStart.Should().BeGreaterThan(tableStart);
+        var rowHtml = html[rowStart..html.IndexOf("</tr>", rowStart, StringComparison.Ordinal)];
+
+        rowHtml.Should().Contain(starsi.ToString("dd.MM.yyyy"), "krok 1 bere nejstarší datum (PMP)");
+        rowHtml.Should().NotContain(novejsi.ToString("dd.MM.yyyy"), "ne nejnovější (PNF)");
+    }
 }
