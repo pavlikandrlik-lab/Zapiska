@@ -183,6 +183,34 @@ public sealed class StatusChangeEffectiveDateDataStoreTests
         context.Choice.Options.Select(x => x.JednaniId).Should().Equal(null, meeting889);
     }
 
+    [Fact]
+    public async Task BuildZaznamEdit_OffersChoice_ForExistingRecord()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_editor");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFEDIT");
+        var meeting888 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "OPEN", 888, new DateTime(2026, 10, 8));
+
+        var editor = store.BuildZaznamEdit(arranged.RecordId);
+
+        editor.StavPlatiK.Should().NotBeNull();
+        editor.StavPlatiK!.Options.Select(x => x.JednaniId).Should().Equal(null, meeting888);
+        editor.StavPlatiK.DefaultValue.Should().Be(meeting888.ToString());
+        editor.StavPlatiK.Options[0].Label.Should().Be("Dnes (13.10.2026)");
+    }
+
+    [Fact]
+    public async Task BuildZaznamCreate_HasNoChoice()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_create");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFCREATE");
+
+        store.BuildZaznamCreate(arranged.ProjectId).StavPlatiK.Should().BeNull("založení nezapisuje řádek historie stavů (spec §4.1)");
+    }
+
     private static async Task<int> CreateDatedMeetingAsync(
         PmTrackerDbContext dbContext, int projectId, string stateCode, int number, DateTime date)
     {

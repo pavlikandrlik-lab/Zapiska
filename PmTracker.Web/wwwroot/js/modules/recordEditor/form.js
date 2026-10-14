@@ -835,6 +835,7 @@ export function resolveRecordEditorFieldLabel(rawKey) {
         "kategorie": "Kategorie záznamu",
         "typukolu": "Typ úkolu",
         "stav": "Stav úkolu",
+        "stavplatik": "Změna stavu platí k",
         "nazev": "Název",
         "cil": "Cíl",
         "popis": "Popis",

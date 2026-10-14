@@ -12,6 +12,7 @@
 export * from "./form.js";
 export * from "./richtext.js";
 export * from "./draft.js";
+export * from "./statusEffectiveDate.js";
 
 import {
     initCustomDatePickers,
@@ -32,6 +33,7 @@ import {
 } from "./form.js";
 import { initRichTextEditors } from "./richtext.js";
 import { initRecordEditorDirtyTracking } from "./draft.js";
+import { initStatusEffectiveDate } from "./statusEffectiveDate.js";
 import { initRecordSchedulePlanner } from "../schedule.js";
 import { initConfirmSubmitToggles } from "../ajax.js";
 
@@ -60,6 +62,7 @@ export function initRecordFormEnhancements(scope) {
     initRecordGoalAutoGrow(scope);
     initRecordMeetingDateSync(scope);
     initRecordMeetingNumberPreview(scope);
+    initStatusEffectiveDate(scope);
     initRichTextEditors(scope);
     initRecordSchedulePlanner(scope);
     initRecordEditorDirtyTracking(scope);

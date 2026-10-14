@@ -4361,6 +4361,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 12px;
 }
 
+/* Spec 2026-10-13 §6 — display:grid by atribut hidden přebil. */
+.record-form-row[hidden] {
+    display: none;
+}
+
 .record-form-row-top {
     align-items: end;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;

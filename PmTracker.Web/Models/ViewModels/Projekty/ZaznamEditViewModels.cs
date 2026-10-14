@@ -1,3 +1,5 @@
+using PmTracker.Web.Services.Records;
+
 namespace PmTracker.Web.Models.ViewModels;
 
 public sealed class ZaznamEditViewModel
@@ -31,6 +33,9 @@ public sealed class ZaznamEditViewModel
     public required string Stav { get; set; }
     public required IReadOnlyList<string> KategorieZaznamu { get; set; }
     public required IReadOnlyList<string> StavyUkolu { get; set; }
+
+    /// <summary>Spec 2026-10-13 §6 — volba „Změna stavu platí k“; null = nezobrazuje se (zakládání).</summary>
+    public StatusChangeEffectiveDateChoice? StavPlatiK { get; set; }
     public required IReadOnlyList<string> TypyUkolu { get; set; }
     public DateTime DatumZalozeni { get; set; }
     public DateTime? TerminUkonceni { get; set; }

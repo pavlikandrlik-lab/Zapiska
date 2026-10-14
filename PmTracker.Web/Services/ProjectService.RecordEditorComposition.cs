@@ -128,6 +128,11 @@ public sealed partial class ProjectService
             : new List<PmTracker.Web.Models.Entities.ZaznamHarmonogramKrokEntity>();
         var krokRowByPoradi = krokRows.GroupBy(k => (int)k.Poradi).ToDictionary(g => g.Key, g => g.First());
         var todayDate = timeProvider.GetLocalNow().Date;
+        // Spec 2026-10-13 §6 — při zakládání se volba nezobrazuje (založení nezapisuje historii stavů).
+        var statusEffectiveDate = isCreate || record.Id <= 0
+            ? null
+            : (await StatusChangeEffectiveDateQuery.LoadAsync(
+                dbContext, record.ProjektId, record.Id, record.DatumZalozeni, todayDate, ct)).Choice;
         var harmonogramSouhrn = HarmonogramDateBlokBuilder.BuildSouhrn(
             record.DatumZalozeni, krokRows, record.DatumUkonceni, todayDate);
         // Fáze 3b: server-seed iniciální pozice baru i pro editor (správný bar při otevření,
@@ -258,6 +263,7 @@ public sealed partial class ProjectService
             Stav = record.StavUkoluId.HasValue ? taskStates.FirstOrDefault(x => x.Id == record.StavUkoluId.Value)?.Nazev ?? string.Empty : string.Empty,
             KategorieZaznamu = categories.Select(x => x.Nazev).ToList(),
             StavyUkolu = taskStates.Select(x => x.Nazev).ToList(),
+            StavPlatiK = statusEffectiveDate,
             TypyUkolu = taskTypes.Select(x => x.Nazev).ToList(),
             DatumZalozeni = record.DatumZalozeni,
             TerminUkonceni = record.DatumUkonceni,
