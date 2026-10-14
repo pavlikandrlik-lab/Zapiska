@@ -2,7 +2,10 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Integration.TestInfrastructure;
 using PmTracker.Web.Data;
+using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Tests.Integration.DataStore;
 
@@ -39,6 +42,182 @@ public sealed class StatusChangeEffectiveDateDataStoreTests
         change.JednaniId.Should().BeNull();
     }
 
+    // 13.10.2026 09:00 v Praze.
+    private static readonly DateTimeOffset MorningInPrague = new(2026, 10, 13, 7, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task SaveRecord_StatusChangeBoundToMeeting_StoresMeetingDateAndId()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_meeting");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFMEET");
+        var meeting888 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "OPEN", 888, new DateTime(2026, 10, 8));
+
+        store.SaveRecord(
+            await BuildEditCommandAsync(dbContext, arranged.RecordId, arranged.DoneStatusCode, stavPlatiK: meeting888.ToString()),
+            arranged.User);
+
+        var change = await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking().SingleAsync(x => x.ZaznamId == arranged.RecordId);
+        change.PlatiOd.Should().Be(new DateTime(2026, 10, 8));
+        change.JednaniId.Should().Be(meeting888);
+        change.DatumZmeny.Should().Be(new DateTime(2026, 10, 13, 7, 0, 0), "okamžik uložení zůstává pro audit");
+    }
+
+    [Fact]
+    public async Task SaveRecord_ClosedMeeting_IsRejected_AndNothingIsSaved()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_closed");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFCLOSED");
+        var closed886 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "CLOSED", 886, new DateTime(2026, 9, 24));
+        var statusBefore = await CurrentStatusAsync(dbContext, arranged.RecordId);
+
+        var command = await BuildEditCommandAsync(dbContext, arranged.RecordId, arranged.DoneStatusCode, stavPlatiK: closed886.ToString());
+        var act = () => store.SaveRecord(command, arranged.User);
+
+        act.Should().Throw<RecordValidationException>()
+            .Which.FieldErrors["StavPlatiK"].Should().ContainSingle()
+            .Which.Should().StartWith("Jednání č. 886 teď nejde zvolit");
+        (await CurrentStatusAsync(dbContext, arranged.RecordId)).Should().Be(statusBefore);
+        (await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking().AnyAsync(x => x.ZaznamId == arranged.RecordId)).Should().BeFalse();
+    }
+
+    /// <summary>Review focus 3: id jednání z jiného projektu se nesmí přijmout.</summary>
+    [Fact]
+    public async Task SaveRecord_MeetingFromAnotherProject_IsRejected()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_other_project");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFOTHER");
+        var otherProjectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "SEFOTHER2");
+        var foreignMeeting = await CreateDatedMeetingAsync(dbContext, otherProjectId, "OPEN", 500, new DateTime(2026, 10, 8));
+
+        var command = await BuildEditCommandAsync(dbContext, arranged.RecordId, arranged.DoneStatusCode, stavPlatiK: foreignMeeting.ToString());
+        var act = () => store.SaveRecord(command, arranged.User);
+
+        act.Should().Throw<RecordValidationException>()
+            .Which.FieldErrors["StavPlatiK"].Should().ContainSingle()
+            .Which.Should().Be("Vybrané jednání neexistuje nebo bylo smazáno. Vyberte znovu, k čemu změna stavu platí.");
+    }
+
+    [Fact]
+    public async Task SaveRecord_EffectiveDateBeforePreviousChange_IsRejected()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_lower_bound");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFBOUND");
+        var meeting887 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "OPEN", 887, new DateTime(2026, 10, 1));
+        await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "OPEN", 888, new DateTime(2026, 10, 8));
+        // Předchozí změna stavu platí k 8.10.: úkol je teď hotový, uživatel ho znovu otevírá.
+        await AddStatusChangeAsync(dbContext, arranged.RecordId, toFinal: true, platiOd: new DateTime(2026, 10, 8), jednaniId: null);
+        var runningCode = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+            .Where(x => !x.IsFinal).OrderBy(x => x.Id).Select(x => x.Kod).FirstAsync();
+
+        var command = await BuildEditCommandAsync(dbContext, arranged.RecordId, runningCode, stavPlatiK: meeting887.ToString());
+        var act = () => store.SaveRecord(command, arranged.User);
+
+        act.Should().Throw<RecordValidationException>()
+            .Which.FieldErrors["StavPlatiK"].Should().ContainSingle()
+            .Which.Should().Be("Změna stavu nemůže platit dříve než 08.10.2026 (předchozí změna stavu nebo založení záznamu).");
+    }
+
+    /// <summary>Review focus 5: posunuté datum založení v témže uložení funguje jako spodní mez.</summary>
+    [Fact]
+    public async Task SaveRecord_FoundingDateMovedAfterChosenMeeting_IsRejected()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_founding");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFFOUND");
+        var meeting888 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "OPEN", 888, new DateTime(2026, 10, 8));
+
+        var command = await BuildEditCommandAsync(
+            dbContext, arranged.RecordId, arranged.DoneStatusCode,
+            stavPlatiK: meeting888.ToString(), datumZalozeni: new DateTime(2026, 10, 10));
+        var act = () => store.SaveRecord(command, arranged.User);
+
+        act.Should().Throw<RecordValidationException>()
+            .Which.FieldErrors["StavPlatiK"].Should().ContainSingle()
+            .Which.Should().Be("Změna stavu nemůže platit dříve než 10.10.2026 (předchozí změna stavu nebo založení záznamu).");
+    }
+
+    /// <summary>Review focus 1: nezměněný stav — pole StavPlatiK se ignoruje, i když je nesmyslné.</summary>
+    [Fact]
+    public async Task SaveRecord_UnchangedStatus_IgnoresStavPlatiK_AndWritesNoHistory()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_unchanged");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFSAME");
+        var currentStatusId = await CurrentStatusAsync(dbContext, arranged.RecordId);
+        var currentCode = await dbContext.CiselnikStavuUkolu.AsNoTracking()
+            .Where(x => x.Id == currentStatusId)
+            .Select(x => x.Kod)
+            .SingleAsync();
+
+        store.SaveRecord(await BuildEditCommandAsync(dbContext, arranged.RecordId, currentCode, stavPlatiK: "999999"), arranged.User);
+
+        (await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking().AnyAsync(x => x.ZaznamId == arranged.RecordId)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Query_LockedMeeting_StopsTheOfferLikeClosedOne()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_locked");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFLOCK");
+        var meeting889 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "DRAFT", 889, new DateTime(2026, 10, 22));
+        var locked888 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "OPEN", 888, new DateTime(2026, 10, 8));
+        await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "OPEN", 887, new DateTime(2026, 10, 1));
+        var meeting = await dbContext.Jednani.SingleAsync(x => x.Id == locked888);
+        meeting.UzamklOsobaId = arranged.User.OsobaId;
+        await dbContext.SaveChangesAsync();
+
+        var context = await StatusChangeEffectiveDateQuery.LoadAsync(
+            dbContext, arranged.ProjectId, arranged.RecordId, RecordFoundedOn, new DateTime(2026, 10, 13), CancellationToken.None);
+
+        context.Choice.Options.Select(x => x.JednaniId).Should().Equal(null, meeting889);
+    }
+
+    private static async Task<int> CreateDatedMeetingAsync(
+        PmTrackerDbContext dbContext, int projectId, string stateCode, int number, DateTime date)
+    {
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, stateCode, meetingNumber: number);
+        var meeting = await dbContext.Jednani.SingleAsync(x => x.Id == meetingId);
+        meeting.DatumPlanovane = date;
+        await dbContext.SaveChangesAsync();
+        return meetingId;
+    }
+
+    /// <summary>Přímý zápis změny stavu do historie (a do záznamu) — stav, jaký by zanechalo dřívější uložení.</summary>
+    private static async Task<int> AddStatusChangeAsync(
+        PmTrackerDbContext dbContext, int recordId, bool toFinal, DateTime platiOd, int? jednaniId)
+    {
+        var running = await dbContext.CiselnikStavuUkolu.AsNoTracking().Where(x => !x.IsFinal).OrderBy(x => x.Id).Select(x => x.Id).FirstAsync();
+        var done = await dbContext.CiselnikStavuUkolu.AsNoTracking().Where(x => x.IsFinal).OrderBy(x => x.Id).Select(x => x.Id).FirstAsync();
+        var record = await dbContext.ProjektoveZaznamy.SingleAsync(x => x.Id == recordId);
+        record.StavUkoluId = toFinal ? done : running;
+        var change = new ZaznamHistorieStavuZaznamuEntity
+        {
+            ZaznamId = recordId,
+            PuvodniStav = toFinal ? running : done,
+            NovyStav = toFinal ? done : running,
+            DatumZmeny = new DateTime(2026, 10, 13, 7, 0, 0),
+            PlatiOd = platiOd,
+            JednaniId = jednaniId
+        };
+        dbContext.ZaznamHistorieStavuZaznamu.Add(change);
+        await dbContext.SaveChangesAsync();
+        return change.Id;
+    }
+
+    private static Task<int?> CurrentStatusAsync(PmTrackerDbContext dbContext, int recordId)
+        => dbContext.ProjektoveZaznamy.AsNoTracking().Where(x => x.Id == recordId).Select(x => x.StavUkoluId).SingleAsync();
+
     private sealed record ArrangedTask(int ProjectId, int RecordId, CurrentUserContextViewModel User, string DoneStatusCode);
 
     private static async Task<ArrangedTask> ArrangeTaskAsync(PmTrackerDbContext dbContext, string marker)
@@ -70,6 +249,7 @@ public sealed class StatusChangeEffectiveDateDataStoreTests
         PmTrackerDbContext dbContext,
         int recordId,
         string statusCode,
+        string? stavPlatiK = null,
         DateTime? datumZalozeni = null)
     {
         var record = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
@@ -91,7 +271,8 @@ public sealed class StatusChangeEffectiveDateDataStoreTests
             DatumZalozeni = datumZalozeni ?? record.DatumZalozeni,
             TerminUkonceni = record.DatumUkonceni,
             Subsystem = subsystemCode,
-            CisloZaznamu = record.CisloZaznamu
+            CisloZaznamu = record.CisloZaznamu,
+            StavPlatiK = stavPlatiK
         };
     }
 

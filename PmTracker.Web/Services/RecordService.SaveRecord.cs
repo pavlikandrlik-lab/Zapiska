@@ -46,7 +46,8 @@ public sealed partial class RecordService
         SaveRecordProjectContext Project,
         ProjektovyZaznamEntity? ExistingRecord,
         SaveRecordMeetingContext? MeetingForNumbering,
-        IReadOnlyList<int> NormalizedCollaborationIds);
+        IReadOnlyList<int> NormalizedCollaborationIds,
+        StatusChangeEffectiveDateOption? StatusChangeEffectiveDate);
 
     public async Task<int> SaveRecordAsync(
         SaveRecordCommand command,
@@ -186,7 +187,10 @@ public sealed partial class RecordService
                         PuvodniStav = oldStatus.Value,
                         NovyStav = entity.StavUkoluId.Value,
                         DatumZmeny = timeProvider.GetUtcNow().UtcDateTime,
-                        PlatiOd = GetLocalNow().Date
+                        // Validace volbu naplní vždy, když se stav mění; prázdná zůstane jen při souběhu,
+                        // kdy stav mezi validací a transakcí změnil někdo jiný — pak platí dnes.
+                        PlatiOd = validation.StatusChangeEffectiveDate?.Datum ?? GetLocalNow().Date,
+                        JednaniId = validation.StatusChangeEffectiveDate?.JednaniId
                     });
                 }
             }
@@ -490,6 +494,35 @@ public sealed partial class RecordService
             }
         }
 
+        // Spec 2026-10-13 §4.5 — k čemu platí změna stavu. Jen když vznikne řádek historie
+        // (stejná podmínka jako zápis v transakci); jinak se pole StavPlatiK ignoruje.
+        StatusChangeEffectiveDateOption? statusChangeEffectiveDate = null;
+        if (existingRecord is not null
+            && existingRecord.ProjektId == command.ProjektId
+            && existingRecord.StavUkoluId.HasValue
+            && statusId.HasValue
+            && existingRecord.StavUkoluId.Value != statusId.Value)
+        {
+            var effectiveDateContext = await StatusChangeEffectiveDateQuery.LoadAsync(
+                dbContext, command.ProjektId, existingRecord.Id, command.DatumZalozeni.Date, GetLocalNow().Date, ct);
+            var resolution = StatusChangeEffectiveDatePolicy.Resolve(
+                effectiveDateContext.Choice, effectiveDateContext.Meetings, command.StavPlatiK);
+            if (resolution.Option is null)
+            {
+                AddRecordValidationIssue(
+                    issues,
+                    "StavPlatiK",
+                    resolution.Error!,
+                    "basic",
+                    "status_effective_date_invalid",
+                    command.StavPlatiK);
+            }
+            else
+            {
+                statusChangeEffectiveDate = resolution.Option;
+            }
+        }
+
         var normalizedCollaborationIds = command.VybraniSpolupracovniciIds
             .Where(x => x > 0)
             .Distinct()
@@ -551,7 +584,8 @@ public sealed partial class RecordService
             project!,
             existingRecord,
             meetingForNumbering,
-            normalizedCollaborationIds);
+            normalizedCollaborationIds,
+            statusChangeEffectiveDate);
     }
 
     private static async Task<int?> TryResolveForValidationAsync(

@@ -17,6 +17,12 @@ public sealed class SaveRecordCommand
     [Required]
     public string Stav { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Spec 2026-10-13 §4.5 — k čemu platí změna stavu: prázdné = dnes, jinak id jednání.
+    /// Server ho použije jen při skutečné změně stavu.
+    /// </summary>
+    public string? StavPlatiK { get; set; }
+
     [Required]
     [StringLength(255)]
     public string Nazev { get; set; } = string.Empty;
