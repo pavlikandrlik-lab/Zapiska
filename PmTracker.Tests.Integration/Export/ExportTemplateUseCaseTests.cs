@@ -143,7 +143,8 @@ public sealed class ExportTemplateUseCaseTests
             ZaznamId = recordId,
             PuvodniStav = runningStateId,
             NovyStav = doneStateId,
-            DatumZmeny = new DateTime(2026, 3, 20)
+            DatumZmeny = new DateTime(2026, 3, 20),
+            PlatiOd = new DateTime(2026, 3, 20)
         });
         await dbContext.SaveChangesAsync();
 

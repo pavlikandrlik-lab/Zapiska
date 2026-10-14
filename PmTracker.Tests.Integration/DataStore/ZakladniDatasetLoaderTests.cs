@@ -83,7 +83,9 @@ public sealed class ZakladniDatasetLoaderTests
             ZaznamId = recordId,
             PuvodniStav = nonFinalStateId,
             NovyStav = finalStateId,
-            DatumZmeny = dokonceniDatum
+            // Uloženo o měsíc později, platí k 15.6. — dashboard bere datum platnosti (spec 2026-10-13 §4.9).
+            DatumZmeny = new DateTime(2025, 7, 20, 8, 0, 0),
+            PlatiOd = dokonceniDatum
         });
         await dbContext.SaveChangesAsync();
 

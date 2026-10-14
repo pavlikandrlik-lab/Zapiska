@@ -49,9 +49,35 @@ public sealed class ExportRecordVisibilityEvaluatorTests
             ZaznamId = 100,
             PuvodniStav = RunningStateId,
             NovyStav = DoneStateId,
-            DatumZmeny = new DateTime(2026, 8, 20)
+            DatumZmeny = new DateTime(2026, 8, 20),
+            PlatiOd = new DateTime(2026, 8, 20)
         }
     ];
+
+    /// <summary>
+    /// Spec 2026-10-13 §4.7 — zápis z jednání 8.10 zpracovaný až 13.10: změna uložená 13.10
+    /// platí k 8.10, takže v tisku jednání 8.10 je úkol ukončený.
+    /// </summary>
+    [Fact]
+    public void IsCompletedForMeetingPrint_UsesPlatiOd_NotTheMomentOfSaving()
+    {
+        var evaluator = new ExportRecordVisibilityEvaluator();
+        IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> savedLate =
+        [
+            new()
+            {
+                Id = 1,
+                ZaznamId = 100,
+                PuvodniStav = RunningStateId,
+                NovyStav = DoneStateId,
+                DatumZmeny = new DateTime(2026, 10, 13, 7, 0, 0),
+                PlatiOd = new DateTime(2026, 10, 8)
+            }
+        ];
+
+        evaluator.IsCompletedForMeetingPrint(Record(DoneStateId), TaskStates, savedLate, new DateTime(2026, 10, 8))
+            .Should().BeTrue("rozhoduje datum platnosti, ne okamžik uložení");
+    }
 
     [Fact]
     public void IsCompletedForMeetingPrint_IsFalse_WhenTaskWasClosedAfterTheMeeting()

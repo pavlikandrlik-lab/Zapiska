@@ -48,13 +48,13 @@ public sealed class ZakladniDatasetLoader : IZakladniDatasetLoader
             .Select(h => new DatasetTerminChange(h.ZaznamId, h.DatumZmeny, h.PuvodniDatum, h.NoveDatum))
             .ToListAsync(ct);
 
-        // Datum dokončení = poslední přechod do koncového (final) stavu z historie stavů záznamu.
-        // Záznam, který do žádného final stavu nevstoupil, zůstává null (stále otevřený).
+        // Datum dokončení = datum platnosti posledního přechodu do koncového (final) stavu
+        // (spec 2026-10-13 §4.9). Záznam, který do žádného final stavu nevstoupil, zůstává null.
         var finalStateIds = stavy.Where(s => s.IsFinal).Select(s => s.Id).ToList();
         var dokonceniByRecord = await _db.ZaznamHistorieStavuZaznamu.AsNoTracking()
             .Where(h => recordIds.Contains(h.ZaznamId) && finalStateIds.Contains(h.NovyStav))
             .GroupBy(h => h.ZaznamId)
-            .Select(g => new { ZaznamId = g.Key, Datum = g.Max(x => x.DatumZmeny) })
+            .Select(g => new { ZaznamId = g.Key, Datum = g.Max(x => x.PlatiOd) })
             .ToListAsync(ct);
         var dokonceniMap = dokonceniByRecord.ToDictionary(x => x.ZaznamId, x => x.Datum);
         records = records

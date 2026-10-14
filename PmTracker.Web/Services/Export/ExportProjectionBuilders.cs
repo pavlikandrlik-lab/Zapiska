@@ -240,7 +240,8 @@ public sealed class ExportRecordVisibilityEvaluator : IExportRecordVisibilityEva
         var resolvedStatusId = currentStatusId;
         foreach (var change in statusHistory)
         {
-            if (change.DatumZmeny.Date <= targetDate.Date)
+            // Spec 2026-10-13 §4.7 — rozhoduje datum platnosti, ne okamžik uložení.
+            if (change.PlatiOd.Date <= targetDate.Date)
             {
                 continue;
             }
@@ -810,7 +811,7 @@ public sealed class ExportRecordProjectionBuilder(
         {
             var statusHistoryByRecord = (await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking()
                 .Where(x => recordIds.Contains(x.ZaznamId))
-                .OrderByDescending(x => x.DatumZmeny)
+                .OrderByDescending(x => x.PlatiOd)
                 .ThenByDescending(x => x.Id)
                 .ToListAsync(ct))
                 .GroupBy(x => x.ZaznamId)
