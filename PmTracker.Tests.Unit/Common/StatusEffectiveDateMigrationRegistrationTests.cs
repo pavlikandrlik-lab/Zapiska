@@ -41,6 +41,12 @@ public sealed class StatusEffectiveDateMigrationRegistrationTests
     }
 
     [Fact]
+    public void Migrace_DavaPlatiOdVychoziHodnotu_ProStarouVerziAplikace()
+        => File.ReadAllText(ResolvePath(MigrationFile))
+            .Should().Contain("DF_zaznam_historie_stavu_zaznamu_plati_od",
+                "skript běží před nasazením — stará verze aplikace plati_od nezná a bez výchozí hodnoty by každá změna stavu spadla na NOT NULL");
+
+    [Fact]
     public void StartovaciKontrola_VyzadujeObaSloupce()
     {
         SqlStartupValidatorHostedService.StatusEffectiveDateColumns.Should().BeEquivalentTo(new[]

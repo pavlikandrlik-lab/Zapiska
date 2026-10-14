@@ -21,6 +21,8 @@
 --   * Existujícím řádkům doplní plati_od převodem datum_zmeny z UTC na místní datum
 --     (Central Europe Standard Time). Opraví tím i posun o den u změn uložených
 --     mezi 0:00 a 2:00 místního času.
+--   * plati_od dostane výchozí hodnotu (dnešní datum serveru), aby stará verze aplikace
+--     po spuštění skriptu dál mohla ukládat změny stavu.
 --
 -- POŽADAVEK: SQL Server 2016 nebo novější (AT TIME ZONE). Na starší verzi skript
 --   skončí chybou a nic nezmění.
@@ -63,6 +65,20 @@ IF EXISTS (SELECT 1 FROM sys.columns
 BEGIN
     EXEC sp_executesql N'ALTER TABLE dbo.zaznam_historie_stavu_zaznamu ALTER COLUMN plati_od DATE NOT NULL;';
     PRINT N'[1.4.10] plati_od doplněn u existujících řádků a nastaven jako NOT NULL';
+END
+
+-- Výchozí hodnota drží v chodu starou verzi aplikace mezi spuštěním skriptu a nasazením nové
+-- (i při návratu na starou verzi): stará plati_od nezná a bez výchozí hodnoty by každá změna
+-- stavu spadla na NOT NULL. Nová verze plati_od vždy posílá, výchozí hodnotu nepoužije.
+IF NOT EXISTS (SELECT 1 FROM sys.default_constraints
+               WHERE parent_object_id = OBJECT_ID(N'dbo.zaznam_historie_stavu_zaznamu')
+                 AND name = N'DF_zaznam_historie_stavu_zaznamu_plati_od')
+BEGIN
+    EXEC sp_executesql N'
+    ALTER TABLE dbo.zaznam_historie_stavu_zaznamu
+        ADD CONSTRAINT DF_zaznam_historie_stavu_zaznamu_plati_od
+        DEFAULT (CONVERT(date, SYSDATETIME())) FOR plati_od;';
+    PRINT N'[1.4.10] výchozí hodnota plati_od (dnešní datum serveru) přidána';
 END
 
 IF COL_LENGTH(N'dbo.zaznam_historie_stavu_zaznamu', N'jednani_id') IS NULL

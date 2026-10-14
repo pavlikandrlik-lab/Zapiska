@@ -180,7 +180,7 @@ Nový skript `db_upgrade_1_4_10_zmena_stavu_plati_od.sql`, idempotentní podle v
 3. Doplnění existujících řádků převodem z UTC na místní datum:
    `plati_od = CAST((datum_zmeny AT TIME ZONE 'UTC') AT TIME ZONE 'Central Europe Standard Time' AS date)`.
    Tím se zároveň opraví posun o den u změn uložených mezi 0:00 a 2:00 místního času.
-4. `ALTER COLUMN plati_od DATE NOT NULL`.
+4. `ALTER COLUMN plati_od DATE NOT NULL` + výchozí hodnota `DF_zaznam_historie_stavu_zaznamu_plati_od` = dnešní datum serveru. Skript běží před nasazením, takže stará verze aplikace (mezi skriptem a nasazením i při návratu na starou verzi) `plati_od` nezná. Bez výchozí hodnoty by jí každá změna stavu spadla na NOT NULL. Nová verze `plati_od` vždy posílá.
 5. `ADD jednani_id INT NULL` + cizí klíč na `dbo.jednani(id)` s `ON DELETE NO ACTION` (§4.6).
 6. Index `IX_zaznam_historie_stavu_zaznamu_jednani_id` pro přeplánování a mazání jednání. Obyčejný, ne filtrovaný: filtrovaný index vyžaduje `QUOTED_IDENTIFIER ON` a `sqlcmd` ho bez přepínače `-I` nezapíná.
 

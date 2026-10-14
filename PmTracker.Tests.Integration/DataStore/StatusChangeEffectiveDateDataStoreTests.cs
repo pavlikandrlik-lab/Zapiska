@@ -293,6 +293,27 @@ public sealed class StatusChangeEffectiveDateDataStoreTests
         (await dbContext.Jednani.AsNoTracking().AnyAsync(x => x.Id == meeting888)).Should().BeFalse();
     }
 
+    /// <summary>
+    /// db_upgrade_1_4_10 se spouští před nasazením nové verze: mezi skriptem a nasazením (a při
+    /// návratu na starou verzi) běží aplikace, která plati_od nezná. Její zápis nesmí spadnout.
+    /// </summary>
+    [Fact]
+    public async Task Schema_InsertWithoutPlatiOd_FromOlderAppVersion_StillSucceeds()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_old_app_insert");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFOLDAPP");
+        var running = await dbContext.CiselnikStavuUkolu.AsNoTracking().Where(x => !x.IsFinal).OrderBy(x => x.Id).Select(x => x.Id).FirstAsync();
+        var done = await dbContext.CiselnikStavuUkolu.AsNoTracking().Where(x => x.IsFinal).OrderBy(x => x.Id).Select(x => x.Id).FirstAsync();
+
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($@"
+            INSERT INTO dbo.zaznam_historie_stavu_zaznamu (zaznam_id, puvodni_stav, novy_stav, datum_zmeny)
+            VALUES ({arranged.RecordId}, {running}, {done}, {new DateTime(2026, 10, 13, 7, 0, 0)})");
+
+        (await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking().SingleAsync(x => x.ZaznamId == arranged.RecordId))
+            .PlatiOd.Should().NotBe(default, "databáze doplní výchozí datum");
+    }
+
     private static SaveMeetingCommand MeetingCommand(int id, int projectId, int number, DateTime date, string stateCode) => new()
     {
         Id = id,
