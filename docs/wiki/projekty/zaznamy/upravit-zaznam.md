@@ -51,6 +51,22 @@ Při editaci navíc:
 - **Vytvořil** (read-only, login + displayName)
 - **Datum poslední úpravy** + autor
 
+#### Změna stavu úkolu
+
+Když v editoru změníš **Stav úkolu**, objeví se pod ním pole **Změna stavu platí k**.
+Určuje, ke kterému datu změna platí. Podle toho ji ukáže tisk jednání.
+
+- Nabízí se **dnešní datum** a jednání projektu od nejnovějšího, která jsou
+  v **přípravě** nebo **otevřená pro zápis**. První uzavřené jednání nabídku ukončí,
+  starší jednání už se nenabídnou, ani když jsou otevřená.
+- Předvybrané je nejnovější jednání **otevřené pro zápis**.
+- Změna nemůže platit dříve než předchozí změna stavu ani před založením záznamu.
+- Když jednání přeplánuješ, změny stavu navázané na něj se posunou s ním.
+
+Příklad: zápis z jednání 8.10. zpracováváš až 13.10. a úkol ukončuješ, protože se
+to na jednání řeklo. Zvol „Jednání č. 888 – 08.10.2026" a tisk jednání 888 ukáže
+úkol jako ukončený.
+
 ### Tab 2: Harmonogram
 
 Pro každý krok HS01 / HS02 / …:
