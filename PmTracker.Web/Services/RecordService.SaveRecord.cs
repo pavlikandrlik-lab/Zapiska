@@ -185,7 +185,8 @@ public sealed partial class RecordService
                         ZaznamId = entity.Id,
                         PuvodniStav = oldStatus.Value,
                         NovyStav = entity.StavUkoluId.Value,
-                        DatumZmeny = timeProvider.GetUtcNow().UtcDateTime
+                        DatumZmeny = timeProvider.GetUtcNow().UtcDateTime,
+                        PlatiOd = GetLocalNow().Date
                     });
                 }
             }

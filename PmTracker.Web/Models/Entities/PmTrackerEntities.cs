@@ -280,7 +280,15 @@ public sealed class ZaznamHistorieStavuZaznamuEntity
     public int ZaznamId { get; set; }
     public int PuvodniStav { get; set; }
     public int NovyStav { get; set; }
+
+    /// <summary>Okamžik uložení (UTC) — jen audit; stav k datu se počítá z <see cref="PlatiOd"/>.</summary>
     public DateTime DatumZmeny { get; set; }
+
+    /// <summary>Místní datum, ke kterému změna platí — jediné datum pro tisk i dashboard (spec 2026-10-13 §4.5).</summary>
+    public DateTime PlatiOd { get; set; }
+
+    /// <summary>Jednání, ke kterému změna patří; jen udržuje PlatiOd při přeplánování (spec 2026-10-13 §4.6).</summary>
+    public int? JednaniId { get; set; }
 }
 
 public sealed class ZaznamHistorieStavuProjektuEntity

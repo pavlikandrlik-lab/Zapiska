@@ -60,7 +60,8 @@ Dokument popisuje standardní databázový lifecycle: inicializaci baseline, apl
 35. `db_upgrade_1_4_6_richtext_unicode.sql`
 36. `db_upgrade_1_4_7_prosty_text_hledani.sql`
 37. `db_upgrade_1_4_9_historicka_skutecnost.sql` (před ním lze pro kontrolu spustit `db_upgrade_1_4_9_historicka_skutecnost_analyza.sql` — jen čte)
-38. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
+38. `db_upgrade_1_4_10_zmena_stavu_plati_od.sql`
+39. `db_seed_dev_admin.sql` (pouze neprodukční prostředí)
 
 ### 5.2 Fresh install
 ```powershell

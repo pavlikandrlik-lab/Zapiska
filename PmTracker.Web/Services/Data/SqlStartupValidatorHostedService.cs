@@ -40,6 +40,16 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
         ("dbo.zaznam_externi_odkazy", "pozadavek_prosty_text"),
     };
 
+    /// <summary>
+    /// Sloupce historie stavů (db_upgrade_1_4_10). Bez nich spadne každé uložení změny stavu
+    /// i tisk jednání, proto je start musí ohlásit i s názvem skriptu.
+    /// </summary>
+    internal static readonly (string Table, string Column)[] StatusEffectiveDateColumns =
+    {
+        ("dbo.zaznam_historie_stavu_zaznamu", "plati_od"),
+        ("dbo.zaznam_historie_stavu_zaznamu", "jednani_id"),
+    };
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<SqlStartupValidatorHostedService> _logger;
 
@@ -128,6 +138,15 @@ public sealed class SqlStartupValidatorHostedService : IHostedService
             {
                 throw new InvalidOperationException(
                     $"V DB chybí sloupec {table}.{column}. Spusťte db_upgrade_1_4_7_prosty_text_hledani.sql.");
+            }
+        }
+
+        foreach (var (table, column) in StatusEffectiveDateColumns)
+        {
+            if (!await HasColumnAsync(dbContext, table, column, ct))
+            {
+                throw new InvalidOperationException(
+                    $"V DB chybí sloupec {table}.{column}. Spusťte db_upgrade_1_4_10_zmena_stavu_plati_od.sql.");
             }
         }
 
