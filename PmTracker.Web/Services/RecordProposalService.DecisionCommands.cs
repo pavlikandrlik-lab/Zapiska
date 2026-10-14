@@ -22,6 +22,9 @@ public sealed partial class RecordProposalService
         // strategy.ExecuteAsync closure, protože retry strategie by firework enqueuenula
         // vícekrát a rollback by vedl k enqueue bez reálné DB mutace.
         int? harvestRecordIdToEnqueue = null;
+        // Spec 2026-10-14 R2: po přepnutí na automatiku automat hned doplní kroky z navázaných
+        // vyjádření (harvest sám automat spouští jen při NOVÉM vyjádření). Po commitu, jako harvest.
+        int? automatRecordIdAfterCommit = null;
 
         try
         {
@@ -30,6 +33,7 @@ public sealed partial class RecordProposalService
                 await using var tx = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
                 // Reset per pokus — retry by jinak mohl enqueue-ovat ze starého pokusu.
                 harvestRecordIdToEnqueue = null;
+                automatRecordIdAfterCommit = null;
                 int? localApprovedRecordId = null;
 
                 if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.CreateRecord, StringComparison.OrdinalIgnoreCase))
@@ -41,7 +45,7 @@ public sealed partial class RecordProposalService
                     localApprovedRecordId = await _recordService.SaveRecordAsync(saveCommand, currentUser, ct);
 
                     if (localApprovedRecordId.HasValue
-                        && (createPayload.HarmonogramVazby.Count > 0 || createPayload.ManualActualKroky.Count > 0))
+                        && createPayload.HarmonogramVazby.Count > 0)
                     {
                         var shouldEnqueue = await ApplyApprovedCreateProposalAuxiliariesAsync(
                             localApprovedRecordId.Value,
@@ -57,12 +61,11 @@ public sealed partial class RecordProposalService
                 else if (string.Equals(proposal.TypNavrhu, RecordProposalTypeCodes.SchedulePlanChange, StringComparison.OrdinalIgnoreCase))
                 {
                     // Task 5 (2026-10-12): přepínač „Automatické vyplňování harmonogramu" se po
-                    // schválení provede. Switch do Auto naplánuje harvest nad rámec SaveRecord
-                    // (review fix M2, 2026-10-12) — SaveRecord harvest při přepnutí na Auto
-                    // nezakládá, spoléhá na periodický sync; schválení ho plánuje navíc, aby se
-                    // kroky doplnily dřív.
+                    // schválení provede. Přepnutí na Auto spustí po commitu automat a naplánuje
+                    // harvest (review fix M2 2026-10-12; spec 2026-10-14 R2 — stejně jako SaveRecord).
                     if (await ApplyApprovedScheduleProposalAsync(proposal, currentUser, ct))
                     {
+                        automatRecordIdAfterCommit = proposal.ZaznamId;
                         harvestRecordIdToEnqueue = proposal.ZaznamId;
                     }
                     localApprovedRecordId = proposal.ZaznamId;
@@ -88,6 +91,11 @@ public sealed partial class RecordProposalService
 
                 return localApprovedRecordId;
             });
+
+            if (automatRecordIdAfterCommit.HasValue)
+            {
+                await _skutecnostSync.SyncZaznamBestEffortAsync(automatRecordIdAfterCommit.Value, ct);
+            }
 
             // Post-commit enqueue — bezpečné vůči retry i rollback.
             // T7 — schválení CREATE_RECORD návrhu s externími vazbami (spec §8.2).
@@ -202,8 +210,8 @@ public sealed partial class RecordProposalService
     }
 
     /// <summary>
-    /// Task 5 (2026-10-12): vrací, zda se má po commitu naplánovat ServiceDesk harvest — true jen
-    /// když návrh reálně přepnul aspoň jeden auto-eligible krok (1/3/4/6/7/10) na Auto.
+    /// Task 5 (2026-10-12): vrací, zda návrh přepnul záznam na automatiku — pak se po commitu
+    /// spustí automat a naplánuje ServiceDesk harvest (spec 2026-10-14 R2).
     /// </summary>
     private async Task<bool> ApplyApprovedScheduleProposalAsync(ZaznamNavrhEntity proposal, CurrentUserContextViewModel currentUser, CancellationToken ct)
     {
@@ -259,53 +267,14 @@ public sealed partial class RecordProposalService
             {
                 ZaznamId = record.Id,
                 Poradi = (byte)poradi,
-                SkutecnostRezim = (byte)SkutecnostRezimEnum.Auto,
+                // R3: kroky 2/5/8/9 vznikají jako ruční, ostatní jako automatické.
+                SkutecnostRezim = ScheduleActualApplier.VychoziRezim(poradi),
                 SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Neznamo,
                 UpdatedAt = nowUtc
             };
             _dbContext.ZaznamHarmonogramKroky.Add(r);
             krokByPoradi[poradi] = r;
             return r;
-        }
-
-        // Uživatel 2026-10-08: přepínač v návrhu se po schválení opravdu provede (dřív se neukládal).
-        // Stejné pravidlo jako RecordService.SaveRecord: přepínač řídí jen kroky 1/3/4/6/7/10.
-        // Fix round 1 (2026-10-12, Important finding): editor VŽDY posílá hidden HarmonogramRezim
-        // (i beze změny) — gate musí být ChangesHarmonogramRezim (= návrh rezim OPRAVDU mění),
-        // ne jen "HarmonogramRezim != null". Jinak schválení tiše přepisuje rezim, který se
-        // mezitím přímou editací změnil (stale overwrite), a zakládá prázdné krok řádky pro
-        // auto-eligible kroky i u návrhů, které harmonogram vůbec nemění.
-        var targetRezim = schedulePayload.ChangesHarmonogramRezim
-            ? HarmonogramAutoFillRule.Normalize(schedulePayload.HarmonogramRezim)
-            : null;
-        var targetAuto = targetRezim == HarmonogramAutoFillRule.Auto;
-        var switchedToAuto = false;
-        if (targetRezim is not null)
-        {
-            foreach (var poradi in Enumerable.Range(1, 10).Where(p => !HarmonogramManualSteps.IsManual(p)))
-            {
-                if (targetAuto)
-                {
-                    // Chybějící krok řádek už znamená Auto (GetOrCreateKrok defaultuje na Auto) —
-                    // nikdy nezakládej řádek jen proto, že potvrzuje Auto; jen přepni existující
-                    // Manual řádek zpět na Auto.
-                    if (krokByPoradi.TryGetValue(poradi, out var existing) && existing.SkutecnostRezim != (byte)SkutecnostRezimEnum.Auto)
-                    {
-                        switchedToAuto = true;
-                        existing.SkutecnostRezim = (byte)SkutecnostRezimEnum.Auto;
-                        existing.UpdatedAt = nowUtc;
-                    }
-                }
-                else
-                {
-                    var row = GetOrCreateKrok(poradi);
-                    if (row.SkutecnostRezim != (byte)SkutecnostRezimEnum.Manual)
-                    {
-                        row.SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual;
-                        row.UpdatedAt = nowUtc;
-                    }
-                }
-            }
         }
 
         if (schedulePayload.ChangesSchedulePlan)
@@ -318,44 +287,22 @@ public sealed partial class RecordProposalService
             }
         }
 
-        if (schedulePayload.ChangesScheduleActual)
-        {
-            foreach (var av in schedulePayload.ActualHarmonogramHodnoty.Where(x => x.Poradi is >= 1 and <= 10))
-            {
-                // Auto rezim ↔ ruční skutečnost = mutuálně výlučné stavy (Review Focus 5): pokud
-                // návrh přepíná na Auto, auto-eligible kroky se ze zbytkových dat payloadu nesmí
-                // přepsat ručně — po tomto bloku je řídí jen SD sync.
-                if (targetAuto && !HarmonogramManualSteps.IsManual(av.Poradi))
-                {
-                    continue;
-                }
-                var row = GetOrCreateKrok(av.Poradi);
-                row.SkutecnostDatum = av.SkutecnostDatum?.Date;
-                row.SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual;
-                row.SkutecnostZdroj = av.SkutecnostDatum.HasValue
-                    ? (byte)SkutecnostZdrojEnum.Manual
-                    : (byte)SkutecnostZdrojEnum.Neznamo;
-                row.UpdatedAt = nowUtc;
-            }
-        }
-
-        // Review Focus 5: návrh „Auto", který nese ruční data pro auto-eligible kroky (stará
-        // ManualActualKroky z doby, kdy byl návrh v ručním režimu), se po přepnutí na Auto
-        // neuplatní — vyfiltruj je PŘED Compute, aby acceptAutoEligibleKroky:false neshledilo
-        // validní manuální kroky (2/5/8/9) za chybu (shodně s RecordService.SaveRecord, které
-        // takové záznamy tiše „continue"uje).
-        var manualActualKrokyToApply = targetAuto
-            ? schedulePayload.ManualActualKroky.Where(mk => HarmonogramManualSteps.IsManual(mk.Poradi)).ToList()
-            : schedulePayload.ManualActualKroky;
-
-        foreach (var applied in ManualActualKrokApplier.Compute(manualActualKrokyToApply, acceptAutoEligibleKroky: !targetAuto))
-        {
-            var row = GetOrCreateKrok(applied.Poradi);
-            row.SkutecnostDatum = applied.AbsolutniDatum.ToDateTime(TimeOnly.MinValue);
-            row.SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual;
-            row.SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Manual;
-            row.UpdatedAt = nowUtc;
-        }
+        // Spec 2026-10-14: skutečnost a režim přes stejnou komponentu jako uložení editoru
+        // (ScheduleActualApplier). Uživatel 2026-10-08: přepínač v návrhu se po schválení opravdu
+        // provede. Fix round 1 (2026-10-12): režim se mění jen tehdy, když ho návrh opravdu mění
+        // (ChangesHarmonogramRezim) — editor posílá HarmonogramRezim vždy a bez téhle brány by
+        // schválení přepsalo režim, který se mezitím změnil přímou editací.
+        var cilovyRezim = schedulePayload.ChangesHarmonogramRezim
+            ? HarmonogramAutoFillRule.Normalize(schedulePayload.HarmonogramRezim)
+            : null;
+        IReadOnlyList<ScheduleActualApplier.SkutecnostZmena> zmeny = schedulePayload.ChangesScheduleActual
+            ? schedulePayload.ActualHarmonogramHodnoty
+                .Select(av => new ScheduleActualApplier.SkutecnostZmena(av.Poradi, av.SkutecnostDatum))
+                .ToList()
+            : [];
+        var vysledek = ScheduleActualApplier.Apply(
+            krokByPoradi.Values.ToList(), GetOrCreateKrok, zmeny, cilovyRezim, nowUtc);
+        var switchedToAuto = vysledek.PrepnutoNaAuto;
 
         await _dbContext.SaveChangesAsync(ct);
         if (schedulePayload.ChangesTermDeadline || schedulePayload.ChangesSchedulePlan)
@@ -374,7 +321,7 @@ public sealed partial class RecordProposalService
 
     /// <summary>
     /// Plán D (schéma 3 — CREATE_RECORD): po vytvoření záznamu aplikuje vedlejší efekty
-    /// z payloadu — ruční skutečnosti kroků a pre-bound vazby bublin na kroky.
+    /// z payloadu — pre-bound vazby bublin na kroky (skutečnost návrh založení nenese, HideActual).
     /// Externí odkazy jsou namapovány přes <c>ExterniOdkazIndex</c> = index v pořadí
     /// vložení (query seřazená ASC dle Id).
     ///
@@ -419,36 +366,6 @@ public sealed partial class RecordProposalService
                     CreatedAt = nowUtc,
                     CreatedByOsobaId = currentUser.OsobaId
                 });
-            }
-            await _dbContext.SaveChangesAsync(ct);
-        }
-
-        // ManualActualKroky → UPSERT krok skutečnost datumy (datum-model).
-        var manualApplied = ManualActualKrokApplier.Compute(createPayload.ManualActualKroky, acceptAutoEligibleKroky: true);
-        if (manualApplied.Count > 0)
-        {
-            var existingKroky = await _dbContext.ZaznamHarmonogramKroky
-                .Where(k => k.ZaznamId == newRecordId)
-                .ToListAsync(ct);
-            var krokByPoradi = existingKroky.GroupBy(k => (int)k.Poradi).ToDictionary(g => g.Key, g => g.First());
-            var nowUtcManual = _timeProvider.GetUtcNow().UtcDateTime;
-            foreach (var ov in manualApplied)
-            {
-                if (!krokByPoradi.TryGetValue(ov.Poradi, out var row))
-                {
-                    row = new ZaznamHarmonogramKrokEntity
-                    {
-                        ZaznamId = newRecordId,
-                        Poradi = (byte)ov.Poradi,
-                        UpdatedAt = nowUtcManual
-                    };
-                    _dbContext.ZaznamHarmonogramKroky.Add(row);
-                    krokByPoradi[ov.Poradi] = row;
-                }
-                row.SkutecnostDatum = ov.AbsolutniDatum.ToDateTime(TimeOnly.MinValue);
-                row.SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual;
-                row.SkutecnostZdroj = (byte)SkutecnostZdrojEnum.Manual;
-                row.UpdatedAt = nowUtcManual;
             }
             await _dbContext.SaveChangesAsync(ct);
         }

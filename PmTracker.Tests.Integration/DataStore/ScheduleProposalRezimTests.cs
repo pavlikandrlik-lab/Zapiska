@@ -46,9 +46,9 @@ public sealed class ScheduleProposalRezimTests
         var manualDatum = original.AddDays(-10);
         var command = BuildEditCommand(editor);
         command.HarmonogramRezim = "Manual";
-        command.ManualActualKroky =
+        command.HarmonogramHodnoty =
         [
-            new ManualActualKrokDto { Poradi = 3, AbsolutniDatum = DateOnly.FromDateTime(manualDatum) }
+            new SaveRecordHarmonogramValueCommand { Poradi = 3, SkutecnostDatum = manualDatum }
         ];
         store.SubmitScheduleProposal(command, proposer);
 
@@ -113,9 +113,9 @@ public sealed class ScheduleProposalRezimTests
         var skutecnostB = record.DatumUkonceni.AddDays(-5);
         var command = BuildEditCommand(editor);
         command.HarmonogramRezim = "Auto";
-        command.ManualActualKroky =
+        command.HarmonogramHodnoty =
         [
-            new ManualActualKrokDto { Poradi = 3, AbsolutniDatum = DateOnly.FromDateTime(skutecnostB) }
+            new SaveRecordHarmonogramValueCommand { Poradi = 3, SkutecnostDatum = skutecnostB, SkutecnostDatumPuvodni = skutecnostA }
         ];
         store.SubmitScheduleProposal(command, proposer);
 
@@ -139,7 +139,8 @@ public sealed class ScheduleProposalRezimTests
                 $"krok {poradi} je auto-eligible — přepínač Auto ho musí přepnout");
         }
         var krok3 = kroky.Single(k => k.Poradi == 3);
-        krok3.SkutecnostDatum.Should().Be(skutecnostA, "ruční datum B z návrhu se v Auto rezimu neuplatní");
+        krok3.SkutecnostDatum.Should().BeNull(
+            "ruční datum B z návrhu se v Auto režimu neuplatní a ruční datum A se přepnutím na automatiku smaže (R2)");
     }
 
     [Fact]
@@ -669,6 +670,70 @@ public sealed class ScheduleProposalRezimTests
         detail.ProposalChangesHarmonogramRezim.Should().BeFalse();
         detail.ProposalRezimChangeMessage.Should().BeNull();
         detail.HarmonogramAutoFillSwitchOn.Should().BeFalse("beze změny rezimu v návrhu se zobrazí AKTUÁLNÍ stav záznamu (Manual), ne stav z návrhu");
+    }
+
+    /// <summary>
+    /// Spec 2026-10-14 R2: schválení přepnutí na automatiku smaže data, která nedodal automat,
+    /// a automat krok hned doplní z vyjádření, které už je na záznamu navázané (harvest sám
+    /// automat spouští jen při NOVÉM vyjádření) — stejně jako uložení editoru.
+    /// </summary>
+    [Fact]
+    public async Task NavrhRucneNaAuto_PoSchvaleni_AutomatHnedDoplniKrokZNavazanehoVyjadreni()
+    {
+        var db = await _fixture.CreateDatabaseAsync("schedule_proposal_rezim_auto_sync");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, configureServices: services =>
+        {
+            services.AddScoped<PmTracker.ServiceDesk.Contracts.IVyjadreniQueryService>(_ => new PevnyTypTiketuVyjadreniQueryService("PNF"));
+            services.AddSingleton<IHarvestScheduler>(new RecordingHarvestScheduler());
+        });
+
+        var proposerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RezimLead12");
+        var managerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "RezimManager12");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "REZIM12");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "REZIM12_SYS", proposerId);
+        await IntegrationTestHelper.EnsureProjectSubsystemAsync(dbContext, projectId, subsystemId);
+        await IntegrationTestHelper.EnsureActiveSubsystemRoleAssignmentAsync(dbContext, projectId, subsystemId, proposerId, SubsystemRoleCodes.Lead);
+        await IntegrationTestHelper.EnsureActiveProjectRoleAssignmentAsync(dbContext, projectId, managerId, ProjectRoleCodes.ProjectManager);
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, managerId, subsystemId, "U", "RezimAutoSync");
+
+        var record = await dbContext.ProjektoveZaznamy.AsNoTracking().SingleAsync(x => x.Id == recordId);
+        var rucni = record.DatumUkonceni.AddDays(-20);
+        var zVyjadreni = record.DatumUkonceni.AddDays(-10);
+        await VyjadreniVazbaSeed.SeedPnfVazbaSVyjadrenimAsync(dbContext, recordId, poradi: 6, datum: zVyjadreni);
+        foreach (var poradi in new byte[] { 1, 3, 4, 6, 7, 10 })
+        {
+            dbContext.ZaznamHarmonogramKroky.Add(new ZaznamHarmonogramKrokEntity
+            {
+                ZaznamId = recordId,
+                Poradi = poradi,
+                SkutecnostDatum = poradi == 6 ? rucni : null,
+                SkutecnostRezim = (byte)SkutecnostRezimEnum.Manual,
+                SkutecnostZdroj = poradi == 6 ? (byte)SkutecnostZdrojEnum.Manual : (byte)SkutecnostZdrojEnum.Neznamo,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+        await dbContext.SaveChangesAsync();
+
+        var proposer = IntegrationTestHelper.BuildUser(proposerId, visibleProjectIds: [projectId]);
+        var command = BuildEditCommand(store.BuildScheduleProposalEditor(projectId, recordId, proposer));
+        command.HarmonogramRezim = "Auto";
+        store.SubmitScheduleProposal(command, proposer);
+        var proposalId = await dbContext.ZaznamNavrhy.AsNoTracking()
+            .Where(x => x.ZaznamId == recordId && x.TypNavrhu == RecordProposalTypeCodes.SchedulePlanChange)
+            .Select(x => x.Id)
+            .SingleAsync();
+
+        var manager = IntegrationTestHelper.BuildUser(
+            managerId,
+            visibleProjectIds: [projectId],
+            grants: [IntegrationTestHelper.AllowProjectPermission(PermissionKeys.ProposalsAccept, projectId)]);
+        store.ApproveProposal(new ProposalDecisionCommand { ProjektId = projectId, ProposalId = proposalId }, manager);
+
+        var krok6 = await dbContext.ZaznamHarmonogramKroky.AsNoTracking()
+            .SingleAsync(x => x.ZaznamId == recordId && x.Poradi == 6);
+        krok6.SkutecnostDatum.Should().Be(zVyjadreni, "ruční datum se smaže a automat ho hned nahradí datem z vyjádření");
+        krok6.SkutecnostZdroj.Should().Be((byte)SkutecnostZdrojEnum.Automat);
     }
 
     /// <summary>

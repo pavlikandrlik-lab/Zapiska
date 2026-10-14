@@ -45,6 +45,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
     private readonly IPriorityMatrixRebuildService _priorityMatrixRebuildService;
     private readonly IAuditWriteService _auditWriteService;
     private readonly IHarvestScheduler _harvestScheduler;
+    private readonly IHarmonogramSkutecnostSyncService _skutecnostSync;
     private readonly IExternalLinkProposalTypeResolver _externalLinkTypeResolver;
     private readonly TimeProvider _timeProvider;
 
@@ -58,6 +59,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
         IPriorityMatrixRebuildService priorityMatrixRebuildService,
         IAuditWriteService auditWriteService,
         IHarvestScheduler harvestScheduler,
+        IHarmonogramSkutecnostSyncService skutecnostSync,
         IExternalLinkProposalTypeResolver externalLinkTypeResolver,
         TimeProvider timeProvider)
     {
@@ -70,6 +72,7 @@ public sealed partial class RecordProposalService : IRecordProposalService
         _priorityMatrixRebuildService = priorityMatrixRebuildService;
         _auditWriteService = auditWriteService;
         _harvestScheduler = harvestScheduler;
+        _skutecnostSync = skutecnostSync;
         _externalLinkTypeResolver = externalLinkTypeResolver;
         _timeProvider = timeProvider;
     }
@@ -84,12 +87,5 @@ public sealed partial class RecordProposalService : IRecordProposalService
     }
 
     private RecordProposalPayload DeserializePayload(string payloadJson)
-    {
-        if (string.IsNullOrWhiteSpace(payloadJson))
-        {
-            return new RecordProposalPayload();
-        }
-
-        return JsonSerializer.Deserialize<RecordProposalPayload>(payloadJson) ?? new RecordProposalPayload();
-    }
+        => RecordProposalPayloadJson.Deserialize(payloadJson);
 }

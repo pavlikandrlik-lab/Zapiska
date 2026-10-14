@@ -101,13 +101,6 @@ public sealed class CreateRecordProposalPayload
     public int? JednaniIdProCislo { get; set; }
 
     /// <summary>
-    /// Plán D: ruční skutečnost pro kroky 2/5/8/9, kam vyjádření neplyne.
-    /// Aplikuje se při schválení návrhu jako <c>SkutecnostDatum</c> (absolutní datum)
-    /// na krok řádek v <c>zaznam_harmonogram_krok</c>.
-    /// </summary>
-    public List<ManualActualKrokDto> ManualActualKroky { get; set; } = [];
-
-    /// <summary>
     /// Plán D: předpřipravené vazby bublina-&gt;krok pro nový záznam (schéma 3).
     /// Aplikuje se při schválení návrhu do tabulky <c>zaznam_harmonogram_vyjadreni_vazba</c>
     /// s &lt;c&gt;Source = Manual&lt;/c&gt;.
@@ -121,17 +114,14 @@ public sealed class SchedulePlanProposalPayload
     public int ZaznamId { get; set; }
     public DateTime TerminUkonceni { get; set; }
     public List<SaveRecordHarmonogramValueCommand> PlannedHarmonogramHodnoty { get; set; } = [];
+    /// <summary>
+    /// Spec 2026-10-14 — SEZNAM ZMĚN skutečnosti (ne stav všech kroků). <c>SkutecnostDatum == null</c>
+    /// = smazat. Kroky 1/3/4/6/7/10 obsahuje jen u návrhu v ručním režimu.
+    /// </summary>
     public List<SaveRecordHarmonogramValueCommand> ActualHarmonogramHodnoty { get; set; } = [];
     public bool ChangesTermDeadline { get; set; }
     public bool ChangesSchedulePlan { get; set; }
     public bool ChangesScheduleActual { get; set; }
-
-    /// <summary>
-    /// Plán D: ruční skutečnost pro kroky 2/5/8/9 (ty, kam vyjádření v HOT DB
-    /// neplyne). Aplikuje se při schválení návrhu jako absolutní <c>SkutecnostDatum</c>
-    /// na krok řádek v <c>zaznam_harmonogram_krok</c>.
-    /// </summary>
-    public List<ManualActualKrokDto> ManualActualKroky { get; set; } = [];
 
     /// <summary>
     /// Sdělení autora návrhu (uživatel 2026-10-08). Null u návrhů bez důvodu i u starších návrhů.

@@ -162,11 +162,11 @@ public sealed class ScheduleActualSaveTests
             services.AddSingleton<IHarvestScheduler>(harvest);
         });
         var s = await RecordConcurrencyScenario.SeedAsync(dbContext, store, "SASYNC");
-        var linkId = await SeedVazbaSVyjadrenimAsync(dbContext, s.RecordId, poradi: 6, datum: B);
+        var linkId = await VyjadreniVazbaSeed.SeedPnfVazbaSVyjadrenimAsync(dbContext, s.RecordId, poradi: 6, datum: B);
         await SetKrokAsync(dbContext, s.RecordId, 6, A, SkutecnostZdrojEnum.Manual, SkutecnostRezimEnum.Manual);
 
         var command = s.BuildActualCommand("Auto", 6, A, puvodni: A);
-        command.ExterniVazby = [new SaveRecordExterniVazbaCommand { Id = linkId, Typ = "PNF", Cislo = "123456" }];
+        command.ExterniVazby = [new SaveRecordExterniVazbaCommand { Id = linkId, Typ = "PNF", Cislo = VyjadreniVazbaSeed.Cislo }];
         store.SaveRecord(command, s.CurrentUser);
 
         var k6 = await KrokAsync(dbContext, s.RecordId, 6);
@@ -189,29 +189,5 @@ public sealed class ScheduleActualSaveTests
         store.SaveRecord(s.BuildActualCommand("Auto", 5, A), s.CurrentUser);
 
         harvest.RecordHarvestCalls.Should().BeEmpty();
-    }
-
-    /// <summary>Navázané vyjádření, jak ho založí harvest (v provozu VyjadreniHarvestService).</summary>
-    private static async Task<int> SeedVazbaSVyjadrenimAsync(PmTrackerDbContext db, int recordId, int poradi, DateTime datum)
-    {
-        var typId = await db.CiselnikTypuExternichOdkazu.AsNoTracking()
-            .Where(x => x.Kod == "PNF").Select(x => x.Id).FirstAsync();
-        var link = new ZaznamExterniOdkazEntity { ZaznamId = recordId, TypOdkazuId = typId, Cislo = "123456" };
-        db.ZaznamExterniOdkazy.Add(link);
-        await db.SaveChangesAsync();
-        db.VyjadreniVazby.Add(new ZaznamHarmonogramVyjadreniVazbaEntity
-        {
-            ZaznamId = recordId,
-            Poradi = (byte)poradi,
-            ExterniOdkazId = link.Id,
-            HotVyjadreniId = 987654,
-            DatumVyjadreni = datum,
-            Source = (byte)VazbaSource.Auto,
-            Stav = (byte)VazbaStav.Active,
-            CreatedAt = DateTime.UtcNow
-        });
-        await db.SaveChangesAsync();
-        db.ChangeTracker.Clear();
-        return link.Id;
     }
 }

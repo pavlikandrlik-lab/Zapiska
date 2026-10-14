@@ -59,7 +59,7 @@ public sealed class PendingScheduleProposalLockEvaluator : IPendingSchedulePropo
         {
             try
             {
-                payload = JsonSerializer.Deserialize<RecordProposalPayload>(proposal.PayloadJson);
+                payload = RecordProposalPayloadJson.Deserialize(proposal.PayloadJson);
             }
             catch (JsonException)
             {
@@ -77,13 +77,13 @@ public sealed class PendingScheduleProposalLockEvaluator : IPendingSchedulePropo
         var locksSchedule = (schedulePayload?.ChangesSchedulePlan ?? false)
             || (schedulePayload?.ChangesScheduleActual ?? false)
             || (schedulePayload?.ChangesHarmonogramRezim ?? false);
-        // Plán D: KrokKey, pro které pending návrh obsahuje ruční skutečnost.
-        // UI je musí pro přímou editaci (schéma 1) uzamknout, jinak by přímý
-        // zápis kolidoval s návrhem, který čeká na schválení.
+        // Plán D: kroky, pro které pending návrh obsahuje změnu skutečnosti (spec 2026-10-14:
+        // ActualHarmonogramHodnoty = seznam změn). UI je musí pro přímou editaci (schéma 1)
+        // uzamknout, jinak by přímý zápis kolidoval s návrhem, který čeká na schválení.
         IReadOnlySet<int>? lockedManualKrokKeys = null;
-        if (schedulePayload is not null && schedulePayload.ManualActualKroky.Count > 0)
+        if (schedulePayload is not null && schedulePayload.ActualHarmonogramHodnoty.Count > 0)
         {
-            lockedManualKrokKeys = schedulePayload.ManualActualKroky
+            lockedManualKrokKeys = schedulePayload.ActualHarmonogramHodnoty
                 .Select(x => x.Poradi)
                 .Where(x => x is >= 1 and <= 10)
                 .ToHashSet();

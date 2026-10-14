@@ -134,10 +134,9 @@ public sealed partial class RecordProposalService
             }
         }
 
-        // Phase 6 (DESIGN-5-A + 7-A, 2026-05-01): odmítnout auto-fillované DELAY kroky.
-        // Auto rezim ↔ návrh = mutuálně výlučné stavy. Návrh smí obsahovat jen DURATION
-        // (planned) změny + manuální DELAY pro kroky 2/5/8/9.
-        ValidateAutoStepsNotInScheduleProposal(command);
+        // Spec 2026-10-14: skutečnost kroků 1/3/4/6/7/10 v automatickém cílovém režimu mapper
+        // do payloadu nepošle (přepínač ji jen vyčistil) — dřívější odmítnutí celého návrhu
+        // (ValidateAutoStepsNotInScheduleProposal) by teď blokovalo každý návrh po přepnutí.
 
         // Task 5 (2026-10-12): currentAutoFill = stav přepínače na záznamu v okamžiku odeslání —
         // mapper proti němu porovná navržený rezim (ChangesHarmonogramRezim).
@@ -245,7 +244,6 @@ public sealed partial class RecordProposalService
             throw new InvalidOperationException("Stav úkolu je povinný.");
         }
 
-        ValidateManualActualKroky(command.ManualActualKroky);
         ValidateHarmonogramVazby(command.HarmonogramVazby, command.ExterniVazby.Count);
         // Parita se SaveRecord: návrh nesmí obejít chronologii harmonogramu (klesající plán/skutečnost).
         // U návrhu založení je skutečnost prázdná (nelze ji vyplnit) → kontroluje se de facto jen plán.
@@ -259,15 +257,8 @@ public sealed partial class RecordProposalService
             throw new InvalidOperationException("Termín ukončení nesmí být dříve než datum založení záznamu.");
         }
 
-        ValidateManualActualKroky(command.ManualActualKroky);
         // Parita se SaveRecord: plán i ruční skutečnost musí být chronologické i v návrhu změny harmonogramu.
         ScheduleChronologyValidator.EnsureChronological(command);
-    }
-
-    private void ValidateManualActualKroky(IReadOnlyList<ManualActualKrokDto> manualKroky)
-    {
-        var today = DateOnly.FromDateTime(_timeProvider.GetUtcNow().UtcDateTime.Date);
-        ManualProposalFieldValidator.ValidateManualActualKroky(manualKroky, today);
     }
 
     private static void ValidateHarmonogramVazby(IReadOnlyList<HarmonogramVazbaDto> vazby, int externiVazbyCount)
@@ -326,23 +317,5 @@ public sealed partial class RecordProposalService
                     && (subsystem.Kod == normalized || subsystem.Nazev == normalized)
                 select (int?)subsystem.Id)
             .FirstOrDefaultAsync(ct);
-    }
-
-    /// <summary>
-    /// Datum-model (2026-06-12) — odmítne návrh obsahující skutečnost pro auto-fillované
-    /// kroky 1/3/4/6/7/10. Auto rezim ↔ návrh = mutuálně výlučné stavy; návrh smí měnit
-    /// jen manuální kroky 2/5/8/9. Pevné kroky → bez DB lookupu.
-    /// </summary>
-    private static void ValidateAutoStepsNotInScheduleProposal(SaveRecordCommand command)
-    {
-        if (command.HarmonogramHodnoty.Count == 0) return;
-
-        var autoFilledPoradi = HarmonogramKroky.Vse
-            .Where(k => !k.JeManualni)
-            .Select(k => k.Poradi)
-            .ToHashSet();
-
-        ManualProposalFieldValidator.ValidateAutoStepNotInProposal(
-            command.HarmonogramHodnoty, autoFilledPoradi);
     }
 }

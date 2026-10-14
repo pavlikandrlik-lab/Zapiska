@@ -102,6 +102,8 @@
                                 }
                                 else if (useManualCell)
                                 {
+                                    @* Detail návrhu: změněná skutečnost se zvýrazní stejně jako dřív záložní pole. *@
+                                    <div class="@(delayChanged ? "proposal-field-changed" : null)" title="@delayTooltip">
                                     @await Html.PartialAsync(
                                         "_ScheduleBlockManualCell",
                                         new ScheduleBlockManualCellViewModel
@@ -113,6 +115,7 @@
                                             IsLocked = isKrokLocked,
                                             VyjadreniOknoUpravy = Model.VyjadreniOknoUpravy
                                         })
+                                    </div>
                                 }
                                 else
                                 {

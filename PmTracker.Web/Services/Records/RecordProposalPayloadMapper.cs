@@ -12,9 +12,6 @@ public sealed class RecordProposalPayloadMapper
     private static SaveRecordHarmonogramValueCommand Krok(SaveRecordHarmonogramValueCommand v)
         => new() { Poradi = v.Poradi, PlanDatum = v.PlanDatum, SkutecnostDatum = v.SkutecnostDatum };
 
-    private static ManualActualKrokDto Manual(ManualActualKrokDto x)
-        => new() { Poradi = x.Poradi, AbsolutniDatum = x.AbsolutniDatum, PreferredZdroj = x.PreferredZdroj };
-
     private static HarmonogramVazbaDto Vazba(HarmonogramVazbaDto x)
         => new() { Poradi = x.Poradi, ExterniOdkazIndex = x.ExterniOdkazIndex, HotVyjadreniId = x.HotVyjadreniId, DatumVyjadreni = x.DatumVyjadreni };
 
@@ -54,7 +51,6 @@ public sealed class RecordProposalPayloadMapper
                     .ToList(),
                 HarmonogramHodnoty = command.HarmonogramHodnoty.Select(Krok).ToList(),
                 JednaniIdProCislo = command.JednaniIdProCislo,
-                ManualActualKroky = command.ManualActualKroky.Select(Manual).ToList(),
                 HarmonogramVazby = command.HarmonogramVazby.Select(Vazba).ToList()
             }
         };
@@ -67,14 +63,20 @@ public sealed class RecordProposalPayloadMapper
             .Where(v => v.PlanDatum.HasValue)
             .Select(v => new SaveRecordHarmonogramValueCommand { Poradi = v.Poradi, PlanDatum = v.PlanDatum })
             .ToList();
+        // Spec 2026-10-14: skutečnost jde jako seznam ZMĚN (SkutecnostDatum ≠ SkutecnostDatumPuvodni).
+        // V automatickém cílovém režimu se změny kroků 1/3/4/6/7/10 nepošlou — přepínač je při
+        // přepnutí jen vyčistil a po schválení je stejně řídí automat.
+        var rezim = HarmonogramAutoFillRule.Normalize(command.HarmonogramRezim);
+        var cilAuto = rezim is null ? currentAutoFill : rezim == HarmonogramAutoFillRule.Auto;
         var actual = command.HarmonogramHodnoty
-            .Where(v => v.SkutecnostDatum.HasValue)
-            .Select(v => new SaveRecordHarmonogramValueCommand { Poradi = v.Poradi, SkutecnostDatum = v.SkutecnostDatum })
+            .Where(v => v.Poradi is >= 1 and <= 10)
+            .Where(v => ScheduleActualApplier.JeZmena(v.SkutecnostDatum, v.SkutecnostDatumPuvodni))
+            .Where(v => HarmonogramManualSteps.IsManual(v.Poradi) || !cilAuto)
+            .Select(v => new SaveRecordHarmonogramValueCommand { Poradi = v.Poradi, SkutecnostDatum = v.SkutecnostDatum?.Date })
             .ToList();
 
         // Task 5 (2026-10-12): přepínač „Automatické vyplňování harmonogramu" se ukládá do
         // návrhu. null = starší návrh nebo žádná volba přepínače → beze změny po schválení.
-        var rezim = HarmonogramAutoFillRule.Normalize(command.HarmonogramRezim);
         var changesRezim = rezim is not null && (rezim == HarmonogramAutoFillRule.Auto) != currentAutoFill;
 
         return new RecordProposalPayload
@@ -89,8 +91,7 @@ public sealed class RecordProposalPayloadMapper
                 ActualHarmonogramHodnoty = actual,
                 ChangesTermDeadline = changesTermDeadline,
                 ChangesSchedulePlan = planned.Count > 0,
-                ChangesScheduleActual = actual.Count > 0 || command.ManualActualKroky.Count > 0,
-                ManualActualKroky = command.ManualActualKroky.Select(Manual).ToList(),
+                ChangesScheduleActual = actual.Count > 0,
                 DuvodZmeny = string.IsNullOrWhiteSpace(command.DuvodZmeny) ? null : command.DuvodZmeny.Trim(),
                 HarmonogramRezim = rezim,
                 ChangesHarmonogramRezim = changesRezim
@@ -131,7 +132,6 @@ public sealed class RecordProposalPayloadMapper
                 .ToList(),
             HarmonogramHodnoty = payload.HarmonogramHodnoty.Select(Krok).ToList(),
             JednaniIdProCislo = payload.JednaniIdProCislo,
-            ManualActualKroky = payload.ManualActualKroky.Select(Manual).ToList(),
             HarmonogramVazby = payload.HarmonogramVazby.Select(Vazba).ToList()
         };
     }

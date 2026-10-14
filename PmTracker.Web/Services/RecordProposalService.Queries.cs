@@ -218,11 +218,7 @@ public sealed partial class RecordProposalService
             // Task 6 (2026-10-12): ulož stav přepínače ZE ZÁZNAMU před přepsáním payloadem níže —
             // potřebný jako srovnávací základ pro ProposalChangesHarmonogramRezim.
             var recordAutoFill = model.HarmonogramAutoFillSwitchOn;
-            // Review fix M3 (2026-10-12): rezim JEDNOTLIVÝCH kroků ze ZÁZNAMU před přepsáním —
-            // potřebný níže pro infobar u starších návrhů (bez ChangesHarmonogramRezim), které
-            // nesou ruční data pro auto-eligible kroky.
-            var recordKrokRezimByPoradi = model.HarmonogramBlok.Kroky.ToDictionary(k => k.KrokIndex, k => k.SkutecnostRezim);
-            ApplySchedulePayloadToModel(model, schedulePayload);
+            ApplySchedulePayloadToModel(model, schedulePayload, recordAutoFill);
             var canDecide = await _authorizationPolicy.CanDecideProjectProposalAsync(projectId, currentUser, ct);
             ConfigureProposalDetailEditor(
                 model,
@@ -247,35 +243,32 @@ public sealed partial class RecordProposalService
                     model.ProposalChangesHarmonogramRezim = model.HarmonogramAutoFillSwitchOn != recordAutoFill;
                     model.ProposalRezimChangeMessage = !model.ProposalChangesHarmonogramRezim ? null
                         : model.HarmonogramAutoFillSwitchOn
-                            ? "Návrh přepíná harmonogram na automatické vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 budou znovu plnit ze ServiceDesku."
+                            ? "Návrh přepíná harmonogram na automatické vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 budou znovu plnit ze ServiceDesku; jejich data, která nedodal automat, se smažou."
                             : "Návrh přepíná harmonogram na ruční vyplňování. Po schválení se kroky 1, 3, 4, 6, 7 a 10 přestanou plnit ze ServiceDesku.";
                 }
             }
             else
             {
-                // Review fix M3 (2026-10-12): spec known-issues §Poznámky k řešení — infobar se má
-                // zobrazit i tehdy, když návrh nese ruční data (ManualActualKroky) pro kroky, které
-                // jsou na ZÁZNAMU automatické. Reálně dosažitelné jen u návrhů čekajících ještě před
-                // nasazením HarmonogramRezim/ChangesHarmonogramRezim (starý payload) — nový editor
-                // při ruční editaci auto-eligible kroku vždy zároveň přepne switch, což už hlásí
-                // větev výše. Switch samotný se NEMĚNÍ (zůstává stav záznamu, žádné zvýraznění) —
-                // jen upozornění, že schválení auto-eligible kroky s ručním datem přepne na Manual
-                // (DecisionCommands.ApplyApprovedScheduleProposalAsync: beze změny rezimu se
-                // ManualActualKroky aplikují neomezeně — acceptAutoEligibleKroky:true).
-                var autoEligibleKrokyZRucnichDat = schedulePayload.ManualActualKroky
-                    .Select(mk => mk.Poradi)
-                    .Where(poradi => !HarmonogramManualSteps.IsManual(poradi))
-                    .Where(poradi => !recordKrokRezimByPoradi.TryGetValue(poradi, out var rezim)
-                        || rezim == SkutecnostRezimEnum.Auto)
-                    .Distinct()
-                    .OrderBy(poradi => poradi)
-                    .ToList();
+                // Spec 2026-10-14: návrh beze změny režimu nese změny skutečnosti. Kroky 1/3/4/6/7/10
+                // se uplatní jen u záznamu v ručním režimu (ScheduleActualApplier — stejné pravidlo,
+                // recordAutoFill je režim záznamu). U záznamu v automatickém režimu to schvalovateli
+                // řekneme; reálně jen u návrhů ve starém formátu (převod R4 — dřív se takové kroky
+                // tiše přepnuly na ruční).
+                List<int> autoEligibleKrokyZRucnichDat = recordAutoFill
+                    ? schedulePayload.ActualHarmonogramHodnoty
+                        .Where(av => av.SkutecnostDatum.HasValue)
+                        .Select(av => av.Poradi)
+                        .Where(poradi => !HarmonogramManualSteps.IsManual(poradi))
+                        .Distinct()
+                        .OrderBy(poradi => poradi)
+                        .ToList()
+                    : [];
 
                 if (autoEligibleKrokyZRucnichDat.Count > 0)
                 {
                     model.ProposalRezimChangeMessage =
                         $"Návrh obsahuje ruční data u kroků {FormatCzechPoradiList(autoEligibleKrokyZRucnichDat)}, " +
-                        "které jsou na záznamu vyplňované automaticky. Po schválení se tyto kroky přepnou na ruční vyplňování.";
+                        "které jsou na záznamu vyplňované automaticky. Po schválení se neuplatní.";
                 }
             }
 
@@ -471,29 +464,54 @@ public sealed partial class RecordProposalService
         };
     }
 
-    private void ApplySchedulePayloadToModel(ZaznamEditViewModel model, SchedulePlanProposalPayload payload)
+    private void ApplySchedulePayloadToModel(ZaznamEditViewModel model, SchedulePlanProposalPayload payload, bool recordAutoFill)
     {
         var planByPoradi = payload.PlannedHarmonogramHodnoty
             .GroupBy(v => v.Poradi).ToDictionary(g => g.Key, g => g.Last().PlanDatum);
         var actualByPoradi = payload.ActualHarmonogramHodnoty
             .GroupBy(v => v.Poradi).ToDictionary(g => g.Key, g => g.Last().SkutecnostDatum);
-        var kroky = model.HarmonogramBlok.Kroky.Select(step => new HarmonogramKrokEditViewModel
+        // Spec 2026-10-14: detail ukazuje skutečnost tak, jak ji schválení zapíše — v režimu z návrhu
+        // (jen když ho návrh opravdu mění) a při přepnutí na automatiku bez dat, která nedodal
+        // automat (R2: schválení je smaže).
+        var navrzenyRezim = payload.ChangesHarmonogramRezim
+            ? HarmonogramAutoFillRule.Normalize(payload.HarmonogramRezim)
+            : null;
+        var cilAuto = navrzenyRezim is null ? recordAutoFill : navrzenyRezim == HarmonogramAutoFillRule.Auto;
+        var prepnutiNaAuto = cilAuto && !recordAutoFill;
+        var kroky = model.HarmonogramBlok.Kroky.Select(step =>
         {
-            KrokIndex = step.KrokIndex,
-            Nazev = step.Nazev,
-            BarvaHex = step.BarvaHex,
-            TrvaniDni = step.TrvaniDni,
-            OdchylkaDni = step.OdchylkaDni,
-            BaselineDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pd) && pd.HasValue ? pd.Value : step.BaselineDatum,
-            // Surové plánové datum (null = nevyplněno) → detail návrhu renderuje prázdné pole tam,
-            // kde návrh plán nevyplnil (dřív padalo na default null pro všechny kroky).
-            PlanDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pdRaw) ? pdRaw : step.PlanDatum,
-            SkutecneDatum = actualByPoradi.TryGetValue(step.KrokIndex, out var sd) && sd.HasValue ? sd.Value : step.SkutecneDatum,
-            ZdrojSkutecnosti = step.ZdrojSkutecnosti,
-            SourceVyjadreniId = step.SourceVyjadreniId,
-            SourceVyjadreniDatum = step.SourceVyjadreniDatum,
-            SourceExterniOdkazId = step.SourceExterniOdkazId,
-            IsManualKrok = step.IsManualKrok
+            var autoKrok = !step.IsManualKrok;
+            var smazeSe = prepnutiNaAuto && autoKrok && step.ZdrojSkutecnosti != ZdrojSkutecnosti.FromVyjadreni;
+            var baseline = planByPoradi.TryGetValue(step.KrokIndex, out var pd) && pd.HasValue ? pd.Value : step.BaselineDatum;
+            // Seznam změn (spec 2026-10-14): null = navržené smazání. Změny kroků 1/3/4/6/7/10
+            // v automatickém cílovém režimu schválení neuplatní (infobar to řekne).
+            var skutecne = smazeSe ? null
+                : actualByPoradi.TryGetValue(step.KrokIndex, out var sd) && (!autoKrok || !cilAuto) ? sd?.Date
+                : step.SkutecneDatum;
+            return new HarmonogramKrokEditViewModel
+            {
+                KrokIndex = step.KrokIndex,
+                Nazev = step.Nazev,
+                BarvaHex = step.BarvaHex,
+                TrvaniDni = step.TrvaniDni,
+                // Stejný výpočet jako HarmonogramDateBlokBuilder (skutečnost − konec plánu); šablona
+                // spoléhá na to, že OdchylkaDni má hodnotu právě tehdy, když ji má SkutecneDatum.
+                OdchylkaDni = skutecne.HasValue ? (skutecne.Value.Date - baseline.Date).Days : null,
+                BaselineDatum = baseline,
+                // Surové plánové datum (null = nevyplněno) → detail návrhu renderuje prázdné pole tam,
+                // kde návrh plán nevyplnil (dřív padalo na default null pro všechny kroky).
+                PlanDatum = planByPoradi.TryGetValue(step.KrokIndex, out var pdRaw) ? pdRaw : step.PlanDatum,
+                SkutecneDatum = skutecne,
+                ZdrojSkutecnosti = smazeSe ? ZdrojSkutecnosti.None : step.ZdrojSkutecnosti,
+                SourceVyjadreniId = step.SourceVyjadreniId,
+                SourceVyjadreniDatum = step.SourceVyjadreniDatum,
+                SourceExterniOdkazId = step.SourceExterniOdkazId,
+                SkutecnostRezim = autoKrok
+                    ? (cilAuto ? SkutecnostRezimEnum.Auto : SkutecnostRezimEnum.Manual)
+                    : step.SkutecnostRezim,
+                SkutecnostZdroj = step.SkutecnostZdroj,
+                IsManualKrok = step.IsManualKrok
+            };
         }).ToList();
 
         model.TerminUkonceni = payload.TerminUkonceni;
@@ -541,15 +559,15 @@ public sealed partial class RecordProposalService
 
         foreach (var actual in payload.ActualHarmonogramHodnoty)
         {
-            if (!actual.SkutecnostDatum.HasValue)
-            {
-                continue;
-            }
+            // Spec 2026-10-14: seznam změn — SkutecnostDatum null = navržené smazání.
             var orig = origActualByPoradi.GetValueOrDefault(actual.Poradi);   // DateTime? (nevyplněno = null)
-            if (orig?.Date != actual.SkutecnostDatum.Value.Date)
+            if (orig?.Date != actual.SkutecnostDatum?.Date)
             {
                 var origText = orig.HasValue ? orig.Value.ToString("dd.MM.yyyy") : "—";
-                result[actual.Poradi] = $"Původní skutečnost: {origText} | Navržená: {actual.SkutecnostDatum.Value:dd.MM.yyyy}";
+                var navrhText = actual.SkutecnostDatum.HasValue
+                    ? actual.SkutecnostDatum.Value.ToString("dd.MM.yyyy")
+                    : "— (smazat)";
+                result[actual.Poradi] = $"Původní skutečnost: {origText} | Navržená: {navrhText}";
             }
         }
 

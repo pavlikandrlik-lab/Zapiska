@@ -46,4 +46,44 @@ public sealed class RecordProposalPayloadMapperScheduleTests
         plan.HarmonogramRezim.Should().Be(ocekavanyRezim);
         plan.ChangesHarmonogramRezim.Should().Be(ocekavanaZmena);
     }
+
+    private static SaveRecordCommand CommandSeSkutecnosti(string rezim, params (int Poradi, DateTime? Datum, DateTime? Puvodni)[] kroky)
+        => new()
+        {
+            TerminUkonceni = new DateTime(2026, 10, 31),
+            HarmonogramRezim = rezim,
+            HarmonogramHodnoty = kroky.Select(k => new SaveRecordHarmonogramValueCommand
+            {
+                Poradi = k.Poradi, SkutecnostDatum = k.Datum, SkutecnostDatumPuvodni = k.Puvodni
+            }).ToList()
+        };
+
+    [Fact]
+    public void BuildSchedulePayload_SkutecnostJeSeznamZmen()
+    {
+        var a = new DateTime(2026, 10, 5);
+        var command = CommandSeSkutecnosti("Manual", (2, a, a), (3, null, a), (5, a, null));
+
+        var plan = new RecordProposalPayloadMapper().BuildSchedulePayload(command, new DateTime(2026, 10, 31), currentAutoFill: false).SchedulePlan!;
+
+        plan.ActualHarmonogramHodnoty.Select(x => (x.Poradi, x.SkutecnostDatum)).Should().BeEquivalentTo(new[]
+        {
+            (3, (DateTime?)null),   // smazáno
+            (5, (DateTime?)a)       // nově vyplněno; krok 2 beze změny se nepošle
+        });
+        plan.ChangesScheduleActual.Should().BeTrue();
+    }
+
+    /// <summary>Review Focus 4 — přepnutí na automatiku v návrhu vyčistí vstupy; to nejsou změny.</summary>
+    [Fact]
+    public void BuildSchedulePayload_CilAuto_VynechaZmenyAutoKroku()
+    {
+        var a = new DateTime(2026, 10, 5);
+        var command = CommandSeSkutecnosti("Auto", (3, null, a), (5, a, null));
+
+        var plan = new RecordProposalPayloadMapper().BuildSchedulePayload(command, new DateTime(2026, 10, 31), currentAutoFill: false).SchedulePlan!;
+
+        plan.ActualHarmonogramHodnoty.Should().ContainSingle(x => x.Poradi == 5,
+            "v automatickém režimu se kroky 1/3/4/6/7/10 neposílají, kroky 2/5/8/9 ano");
+    }
 }

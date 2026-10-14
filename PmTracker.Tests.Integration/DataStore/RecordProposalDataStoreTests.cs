@@ -149,9 +149,14 @@ public sealed class RecordProposalDataStoreTests
         var scheduleProposalCommand = BuildEditCommand(scheduleProposalEditor);
         scheduleProposalCommand.TerminUkonceni = originalDeadline.AddDays(10);
         scheduleProposalCommand.HarmonogramRezim = "Manual";
-        scheduleProposalCommand.ManualActualKroky =
+        scheduleProposalCommand.HarmonogramHodnoty =
         [
-            new ManualActualKrokDto { Poradi = 2, AbsolutniDatum = DateOnly.FromDateTime(originalDeadline.AddDays(-15)) }
+            new SaveRecordHarmonogramValueCommand
+            {
+                Poradi = 2,
+                SkutecnostDatum = originalDeadline.AddDays(-15),
+                SkutecnostDatumPuvodni = originalSkutecnost
+            }
         ];
 
         store.SubmitScheduleProposal(scheduleProposalCommand, proposer);
