@@ -127,6 +127,12 @@ DECLARE @prostyText INT = CASE
     THEN 1 ELSE 0 END;
     -- 1_4_7: čistý text formátovaných polí pro hledání
 
+DECLARE @historicka INT;            -- 1_4_9: řádky kroků s historickou skutečností (zdroj 3)
+IF @krok_existuje = 1
+    EXEC sp_executesql
+        N'SELECT @c = COUNT(*) FROM dbo.zaznam_harmonogram_krok WHERE skutecnost_zdroj = 3;',
+        N'@c INT OUTPUT', @c = @historicka OUTPUT;
+
 -- ---------------------------------------------------------------------------
 -- Otisky jednotlivých skriptů (v pořadí nasazování)
 -- ---------------------------------------------------------------------------
@@ -367,6 +373,13 @@ INSERT @r VALUES (370, N'db_upgrade_1_4_8_drop_search_index',
          ELSE N'CHYBÍ' END,
     N'absence zrušeného klíče search.index v authz.permissions (spouštět až po nasazení aplikace; nalezeno: '
         + ISNULL(CAST(@search_index AS NVARCHAR(10)), N'-') + N')');
+
+INSERT @r VALUES (380, N'db_upgrade_1_4_9_historicka_skutecnost',
+    CASE WHEN @historicka IS NULL THEN N'NELZE OVĚŘIT (tabulka zaznam_harmonogram_krok chybí)'
+         WHEN @historicka = 0 THEN N'APLIKOVÁN'
+         ELSE N'CHYBÍ' END,
+    N'žádný krok harmonogramu s historickou skutečností (skutecnost_zdroj = 3); před spuštěním zkontroluj db_upgrade_1_4_9_historicka_skutecnost_analyza.sql (nalezeno: '
+        + ISNULL(CAST(@historicka AS NVARCHAR(10)), N'-') + N')');
 
 -- ---------------------------------------------------------------------------
 -- Výstup

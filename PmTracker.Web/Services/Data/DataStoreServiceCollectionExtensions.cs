@@ -222,6 +222,9 @@ public static class DataStoreServiceCollectionExtensions
         // Až po kontrole schématu — bez sloupců 1_4_7 by dopočet spadl na SQL chybě
         // místo srozumitelné hlášky validátoru. Hosted services startují v pořadí registrace.
         services.AddHostedService<RichTextSearchTextBackfillHostedService>();
+        // db_upgrade_1_4_9: kroky záznamů v automatickém režimu, kterým skript smazal historická
+        // data, doplní automat z už navázaných vyjádření (běží na pozadí, start nečeká).
+        services.AddHostedService<PmTracker.Web.Services.Schedules.HarmonogramAutomatDoplneniHostedService>();
         services.AddHostedService<PriorityMatrixBootstrapHostedService>();
         services.AddHostedService<PriorityMatrixNightlyRebuildHostedService>();
         services.AddHostedService<PriorityMatrixQueuedRebuildHostedService>();

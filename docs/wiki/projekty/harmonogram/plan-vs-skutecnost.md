@@ -39,7 +39,8 @@ Pochází z:
   záznamy (NES / PMP / PNF)
 - **Manuálního zadání uživatele** (Manual režim)
 - **Migrace historických dat** (Historicka — před zavedením auto-fill,
-  cca 2026-04-25)
+  cca 2026-04-25; od verze 0.11 je skript 1_4_9 převádí na ruční, nebo je smaže
+  ve prospěch automatu — viz [Auto-fill skutečnosti](../../integrace/servicedesk/auto-fill-skutecnosti.md))
 
 Reprezentována hodnotou **HS0X_DELAY** (počet dní odchylky od baseline).
 

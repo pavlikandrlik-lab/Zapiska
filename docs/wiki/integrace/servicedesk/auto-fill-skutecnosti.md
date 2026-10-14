@@ -209,11 +209,26 @@ nového predikátu (vývojářská změna).
 
 ### Migrace historických dat
 
-Záznamy existující před zavedením auto-fillu mají `SkutecnostZdroj = Historicka`
-(typicky migrované přes SQL skript). V automatickém režimu je sync přepíše, jakmile pro
-krok najde vyjádření; bez vyjádření je nechá. Zapnutí přepínače „Automatické vyplňování
-harmonogramu“ na záznamu v ručním režimu historická data kroků 1, 3, 4, 6, 7 a 10 smaže
-stejně jako ruční (spec 2026-10-14 R2).
+Zdroj `Historicka` (📜) označoval skutečnost převedenou ze starého modelu harmonogramu.
+Migrace `db_upgrade_1_4_0` starý model smazala bez převodu, takže v aktuální tabulce
+`zaznam_harmonogram_krok` vzniká jen ručním importem. Aplikace ho sama nikdy nezapisuje.
+
+Skript `db_upgrade_1_4_9_historicka_skutecnost.sql` ho převede podle pravidla „buď ručně,
+nebo automat“ (uživatel 2026-10-14):
+
+| Záznam | Kroky 1, 3, 4, 6, 7, 10 | Kroky 2, 5, 8, 9 |
+|---|---|---|
+| v ručním režimu | převede na ruční ✍️ | převede na ruční ✍️ |
+| v automatickém režimu | **smaže**, aplikace při startu doplní automatem | převede na ruční ✍️ |
+
+Před spuštěním ukáže `db_upgrade_1_4_9_historicka_skutecnost_analyza.sql` (jen čte), co se
+změní a u kterých úkolů. Skript spusť před startem aplikace (nebo ji potom restartuj) —
+při startu aplikace doplní automatem prázdné kroky záznamů v automatickém režimu, ke kterým
+už je navázané vyjádření.
+
+**Ruční import skutečnosti:** importuj rovnou jako ruční — `skutecnost_zdroj = 2`
+a u kroků 1, 3, 4, 6, 7 a 10 `skutecnost_rezim = 1` (záznam v ručním režimu). Zdroj 3 už
+nepoužívej.
 
 ## Související
 
