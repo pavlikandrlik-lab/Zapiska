@@ -44,14 +44,15 @@ public sealed class ScheduleTableExtractionTests
     }
 
     /// <summary>2026-09-03: zamčené datumové pole nabízelo křížek „vymazat", který nic nedělal.
-    /// Clearable se váže na to, zda je pole odemčené.</summary>
+    /// Spec 2026-10-14 §4: záložní pole skutečnosti (jen zakládání záznamu) je zamčené natrvalo
+    /// a bez křížku.</summary>
     [Fact]
     public void LockedDateField_DoesNotOfferClearButton()
     {
-        Regex.IsMatch(Table, @"Locked\s*=\s*delayDateDisabled,\s*Clearable\s*=\s*true")
-            .Should().BeFalse("zamčené pole nesmí mít nefunkční křížek");
-        Table.Should().Contain("Clearable = !delayDateDisabled",
-            "křížek jen u odemčeného pole");
+        Regex.IsMatch(Table, @"Locked\s*=\s*true,\s*Clearable\s*=\s*false")
+            .Should().BeTrue("zamčené pole nesmí mít nefunkční křížek");
+        Table.Should().Contain("[\"data-schedule-static-disabled\"] = \"true\"",
+            "form.js nesmí pole po přepnutí kategorie odemknout");
     }
 
     [Fact]

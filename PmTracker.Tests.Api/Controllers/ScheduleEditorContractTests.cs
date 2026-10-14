@@ -206,4 +206,27 @@ public sealed class ScheduleEditorContractTests
         (await KrokAsync(z.RecordId, 5)).SkutecnostRezim.Should().Be((byte)SkutecnostRezimEnum.Auto,
             "řádek kroku 5 se nesmí dotknout (založený seedem jako Auto)");
     }
+
+    /// <summary>
+    /// Spec 2026-10-14 §4 — při zakládání záznamu je skutečnost kroků 1/3/4/6/7/10 zamčená
+    /// natrvalo: form.js po přepnutí kategorie na Úkol pole odemyká (setScheduleDateFieldState),
+    /// ale nový záznam je v automatickém režimu a server by ručně zadané datum tiše zahodil.
+    /// data-schedule-static-disabled odemčení zabrání.
+    /// </summary>
+    [Fact]
+    public async Task Zalozeni_SkutecnostAutoKrokuJeZamcena()
+    {
+        var projectId = await _fixture.EnsureProjectAsync("APICONTR6");
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+
+        var html = await client.GetStringAsync($"/Zaznamy/Create?projektId={projectId}&asUser={_fixture.AdminOsobaId}");
+
+        string Pole(int index) => Regex.Match(html,
+            $"<pm-date-field\\b[^>]*name=\"HarmonogramHodnoty\\[{index}\\]\\.SkutecnostDatum\"[^>]*>").Value;
+        foreach (var index in new[] { 0, 2, 3, 5, 6, 9 })
+        {
+            Pole(index).Should().Contain("locked=\"true\"", $"krok na řádku {index} je automatický")
+                .And.Contain("data-schedule-static-disabled=\"true\"", "změna kategorie pole nesmí odemknout");
+        }
+    }
 }

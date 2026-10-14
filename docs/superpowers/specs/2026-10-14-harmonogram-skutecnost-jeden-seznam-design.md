@@ -1,7 +1,7 @@
 # Skutečnost harmonogramu v jednom seznamu — návrh
 
 **Datum:** 2026-10-14
-**Stav:** schváleno uživatelem (varianta V3, R2 potvrzeno 2026-10-14)
+**Stav:** implementováno 2026-10-14 (varianta V3, R2 potvrzeno uživatelem)
 **Navazuje na:** `docs/superpowers/specs/2026-09-17-record-edit-concurrency-design.md` §6.2 (oprava R6, která část problému způsobila)
 
 ## 1. Problém
@@ -80,3 +80,11 @@ automatický, změny kroků 1/3/4/6/7/10 se do payloadu nedávají.
 - **Souběžná práce na návrzích** (druhá session, commity 2026-10-12/13) → práce ve worktree, před sloučením rebase na aktuální `main`.
 - **Starý JS v mezipaměti** → `manual-zdroj-toggle.js` zůstane jako prázdný modul (R5).
 - **Staré čekající návrhy s ručními daty na záznamu v automatickém režimu** se po schválení nově neuplatní (dřív tiše přepnuly krok na ruční). Infobar detailu návrhu to řekne pravdivě.
+
+## 7. Odchylky od plánu při implementaci
+
+- **Automat se po přepnutí na automatiku volá přímo.** Plán počítal jen s naplánováním harvestu; harvest ale automat (`SyncZaznamAsync`) spouští jen při *novém* vyjádření, takže by vymazané kroky zůstaly prázdné. Uložení editoru, uložení záložky Harmonogram i schválení návrhu proto po commitu volají `IHarmonogramSkutecnostSyncService.SyncZaznamBestEffortAsync` (chyba se zaloguje, uložení platí) a harvest naplánují navíc.
+- **Buňky kroků 1/3/4/6/7/10 v editoru ukazují režim záznamu**, ne režim řádku (stejné pravidlo jako přepínač) — smíšený stav ze starých návrhů nevypadá jako „automatika zapnutá, ale některá data ruční“.
+- **Detail návrhu ukazuje skutečnost tak, jak ji schválení zapíše:** navržené smazání (zvýrazněné, tooltip „— (smazat)“), režim z návrhu a při přepnutí na automatiku bez dat, která schválení smaže. Upozornění o přepnutí na automatiku to říká.
+- **Zakládání záznamu:** skutečnost kroků 1/3/4/6/7/10 je zamčená (§4 to předpokládal, ale pole bylo editovatelné a server ho tiše zahazoval).
+
