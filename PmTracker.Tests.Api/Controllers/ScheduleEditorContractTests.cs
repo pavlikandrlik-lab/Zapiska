@@ -189,4 +189,21 @@ public sealed class ScheduleEditorContractTests
             rezim.Should().Be("Manual", $"záznam je v ručním režimu, krok {poradi} nesmí ukazovat variantu Auto");
         }
     }
+
+    /// <summary>R3 — kroky 2/5/8/9 automat nevyplňuje, výběr kandidáta pro ně nemá smysl.</summary>
+    [Fact]
+    public async Task SelectCandidate_OdmitneRucniKrok()
+    {
+        var z = await ZalozUkolAsync("APICONTR5");
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+
+        var response = await client.SendAsync(ApiTestHttpHelper.BuildAjaxPost(
+            $"/Harmonogram/SelectCandidate?asUser={_fixture.AdminOsobaId}",
+            new StringContent($"{{\"zaznamId\":{z.RecordId},\"poradi\":5,\"externiOdkazId\":null}}",
+                System.Text.Encoding.UTF8, "application/json")));
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        (await KrokAsync(z.RecordId, 5)).SkutecnostRezim.Should().Be((byte)SkutecnostRezimEnum.Auto,
+            "řádek kroku 5 se nesmí dotknout (založený seedem jako Auto)");
+    }
 }

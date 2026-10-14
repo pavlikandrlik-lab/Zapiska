@@ -3,15 +3,13 @@
  *
  * Kontrakt s Razor:
  *  - Input má atribut data-manual-krok-input
- *  - Vedle něj je hidden s name="ManualActualKroky[i].KrokKey" a
- *    vlastním name="ManualActualKroky[i].AbsolutniDatum"
+ *  - Vedle něj je skryté pole name="HarmonogramHodnoty[i].SkutecnostDatum" (pm-date-field)
  *  - Form parent je standardní record editor form, tzn. POST /Zaznamy/Save
  *
  * Validační pravidla (zrcadlí server ManualProposalFieldValidator):
  *  - Budoucí datum → odmítnuto lokálně (server by vrátil 400, radši UX first)
  *  - Chronologie: pokud nové datum > datum dalšího kroku, zobrazí se warning
- *    přes gov-message (inline), ale submit se nezamyká — server si poradí
- *    přes ManualActualKrokApplier cascade logikou
+ *    přes gov-message (inline), ale submit se nezamyká — chronologii hlídá server
  *
  * Na rozdíl od externiOdkaz/sync.js neposíláme POST sami — data jsou součástí
  * record editor form POST do /Zaznamy/Save. Tento modul pouze validuje.

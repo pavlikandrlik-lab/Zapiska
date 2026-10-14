@@ -9,7 +9,7 @@ public static class RecordProposalTypeCodes
 /// <summary>
 /// Plán D — kroky harmonogramu, u kterých skutečnost <b>nepřijde</b> z vytěžování
 /// vyjádření (HOT_VYJADRENI), protože nemají textový trigger v ServiceDesku.
-/// Skutečnost u těchto kroků se zadává ručně (ManualActualKrokDto).
+/// Skutečnost těchto kroků zadává vždy uživatel — automat ani přepínač režimu je nemění.
 ///
 /// Mapování na názvy kroků (podle <c>HarmonogramKroky.Vse</c>):
 /// <list type="bullet">
@@ -142,43 +142,6 @@ public sealed class SchedulePlanProposalPayload
     /// při odeslání a lock pending návrhu (PendingScheduleProposalLockEvaluator).
     /// </summary>
     public bool ChangesHarmonogramRezim { get; set; }
-}
-
-/// <summary>
-/// FIX 2026-05-04: per-krok preference user-vybraného zdroje skutečnosti pro 2/5/8/9.
-/// Manual = user zadal datum ručně (AbsolutniDatum); Auto = user zvolil "z vyjádření"
-/// (= skutečnost krok řádku v Auto rezimu, sync z navázaného HOT_VYJADRENI). Null = legacy behavior.
-/// </summary>
-public sealed class ManualActualKrokDtoExtensions
-{
-    public const string PreferredZdrojManual = "Manual";
-    public const string PreferredZdrojAuto = "Auto";
-}
-
-public sealed class ManualActualKrokDto
-{
-    public int Poradi { get; set; }
-
-    /// <summary>
-    /// Kalendářní datum skutečnosti zadané uživatelem.
-    /// <c>DateOnly</c> = bez časové zóny + bez času = žádný DST / Kind / ±1 den shift.
-    /// Posílá se z JS jako "yyyy-MM-dd" ISO string; default ASP.NET Core binder
-    /// <c>DateOnly</c> přijímá právě tento formát.
-    ///
-    /// FIX 2026-05-02: nullable (DESIGN-10-A NULL semantika) — empty string z formuláře
-    /// (krok ještě nenastal) by jinak ASP.NET binder odmítl s "The value '' is invalid."
-    /// NULL = "krok nenastal" → caller (ManualActualKrokApplier / SaveRecord) skipne.
-    /// </summary>
-    public DateOnly? AbsolutniDatum { get; set; }
-
-    /// <summary>
-    /// FIX 2026-05-04: per-krok 2/5/8/9 preference (chevron dropdown):
-    ///   "Manual" = uložit AbsolutniDatum jako ruční skutečnost (Zdroj=Manual)
-    ///   "Auto"   = preferovat datum z vyjádření (server přepne krok řádek na Rezim=Auto,
-    ///              Zdroj=Neznamo, SkutecnostDatum=null → auto-sync ze ServiceDesk)
-    ///   null     = legacy (proposal flow, žádný UI toggle) → existing semantika podle AbsolutniDatum
-    /// </summary>
-    public string? PreferredZdroj { get; set; }
 }
 
 public sealed class HarmonogramVazbaDto

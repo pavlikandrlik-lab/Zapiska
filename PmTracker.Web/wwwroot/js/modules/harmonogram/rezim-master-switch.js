@@ -10,10 +10,11 @@
  *   3. Manual→Auto: clear values v manual input cells (user explicit požadavek
  *      "auto→manual+vyplň→auto = data se ztratí, žádné dotazy")
  *
- * Žádný server call. Persistence rezimu + datumů proběhne až při form submit (Save tlačítko)
- * v jednom POST /Zaznamy/Save (transactional). Server (RecordService.SaveRecord
- * + ApplyHarmonogramRezimAsync) aplikuje rezim na auto-eligible krok řádky
- * a v Auto rezimu spustí re-fill ze ServiceDesk vyjádření.
+ * Žádný server call. Režim i data jdou až při uložení v jednom POST /Zaznamy/Save.
+ * Server (ScheduleActualApplier, spec 2026-10-14) při přepnutí na Auto smaže data
+ * kroků 1/3/4/6/7/10, která nedodal automat, a automat je hned doplní ze ServiceDesku;
+ * při přepnutí na ruční nechá hodnoty i zdroje beze změny (vstupy jsou předvyplněné
+ * aktuální hodnotou).
  *
  * Side-effect import v bootstrap.js (memory: project_bundle_sync).
  */
@@ -36,9 +37,9 @@
   }
 
   function clearManualInputsInCell(cell) {
-    // Manual→Auto: vyčistit hidden ISO + display value v _AppDateField partial
-    // i (defensivně) hidden input KrokKey v auto-eligible variant (ten zůstává — server
-    // ho potřebuje pro form binding, ale AbsolutniDatum=empty znamená "krok nenastal").
+    // Manual→Auto: vyčistit hidden ISO + display value v _AppDateField partial. Server změny
+    // kroků 1/3/4/6/7/10 v Auto režimu ignoruje (spec 2026-10-14); vyčištění je jen vizuální
+    // potvrzení, že data převezme automat.
     const dateFields = cell.querySelectorAll('pm-date-field[data-manual-krok-auto-eligible]');
     dateFields.forEach((df) => {
       const isoHidden = df.querySelector('input[data-app-date-value]');

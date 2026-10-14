@@ -21,7 +21,6 @@ import "./vyjadreni/chatModalDragDrop.js";
 import "./vyjadreni/chatModalReharvest.js";
 import "./harmonogram/manualKroky.js";
 import "./harmonogram/duration-calendar-binding.js"; // DESIGN-9-F (2026-05-02) — kalendář ⇄ readonly dny.
-import "./harmonogram/manual-zdroj-toggle.js"; // FIX 2026-05-04 — chevron toggle 2/5/8/9 (Ručně ⇄ Z vyjádření).
 import "./harmonogram/rezim-master-switch.js";       // 2026-05-03 — gov-form-switch v tab strip pro Auto/Manual bulk.
 import "./ui/anchoredMenu.js";                      // 2026-09-07 — jedno menu pro kartu záznamu i přesun PNF.
 import "./navrhy/scheduleProposalGuard.js"; // 2026-10-12 — dialog místo chybové stránky u čekajícího návrhu.

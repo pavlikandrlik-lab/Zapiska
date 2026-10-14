@@ -47,14 +47,6 @@ public sealed class SaveRecordCommand
     public List<SaveRecordHarmonogramValueCommand> HarmonogramHodnoty { get; set; } = new();
 
     /// <summary>
-    /// Plán D: ruční skutečnost pro kroky 2/5/8/9. Mimo návrhový workflow
-    /// (přímá editace, schéma 1) má tato kolekce prioritu nad
-    /// <see cref="HarmonogramHodnoty"/>, protože je vyjádřená absolutním
-    /// kalendářním datem, které server převádí na odchylku vůči plánu.
-    /// </summary>
-    public List<ManualActualKrokDto> ManualActualKroky { get; set; } = new();
-
-    /// <summary>
     /// Plán D (schéma 3 — CREATE_RECORD): pre-bound vazby mezi bublinami
     /// HOT_VYJADRENI a kroky harmonogramu nového záznamu. Aplikují se až při
     /// schválení návrhu, kdy teprve vznikne cílový záznam.
@@ -82,11 +74,9 @@ public sealed class SaveRecordCommand
     /// <summary>
     /// FIX 2026-05-04: master switch "Automatické vyplňování harmonogramu" (Auto/Manual).
     /// Hodnota přijatá z form pole <c>HarmonogramRezim</c> kontroluje SkutecnostRezim
-    /// pro auto-eligible krok řádky (kroky 1/3/4/6/7/10). V Manual rezimu navíc
-    /// <see cref="ManualActualKroky"/> může obsahovat ruční datumy i pro tyto kroky.
-    /// V Auto rezimu se serverside spustí sync (re-fill ze ServiceDesk vyjádření) a
-    /// jakékoli odeslané manual datumy pro auto-eligible kroky se ignorují (klient
-    /// je nepošle, ale server defensivně filtruje).
+    /// pro auto-eligible krok řádky (kroky 1/3/4/6/7/10). V ručním režimu jdou změny skutečnosti
+    /// kroků 1/3/4/6/7/10 v HarmonogramHodnoty; v automatickém se ignorují a přepnutí na
+    /// automatiku smaže jejich data, která nedodal automat (spec 2026-10-14 R2).
     /// </summary>
     public string? HarmonogramRezim { get; set; }
 

@@ -61,6 +61,13 @@ public sealed class HarmonogramController : Controller
             return BadRequest(new { error = "Předej ZaznamId a Poradi (1–10)." });
         }
 
+        if (HarmonogramManualSteps.IsManual(request.Poradi))
+        {
+            // R3 (spec 2026-10-14): kroky 2/5/8/9 automat nevyplňuje, kandidát pro ně nemá smysl
+            // a založený řádek by vznikl v režimu Auto.
+            return BadRequest(new { error = $"Krok {request.Poradi} je ruční — automat ho nevyplňuje." });
+        }
+
         var projektId = await GetProjektIdAsync(request.ZaznamId, ct).ConfigureAwait(false);
         if (projektId is null) return NotFound();
         if (!await HasSchedulePermissionAsync(projektId.Value, ct).ConfigureAwait(false)) return Forbid();

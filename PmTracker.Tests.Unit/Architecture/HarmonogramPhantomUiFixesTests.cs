@@ -110,14 +110,6 @@ public sealed class HarmonogramPhantomUiFixesTests
     }
 
     [Fact]
-    public void ManualProposalFieldValidator_ValidateAutoStepNotInProposal_Existuje()
-    {
-        var src = Read("PmTracker.Web/Services/Records/ManualProposalFieldValidator.cs");
-        src.Should().Contain("ValidateAutoStepNotInProposal",
-            "DESIGN-5-A/7-A — auto step rejection validátor v návrhu.");
-    }
-
-    [Fact]
     public void ScheduleEditorPermissionSet_ObsahujeNoveFlagy()
     {
         var src = Read("PmTracker.Web/Services/Schedules/ScheduleEditorPermissionSet.cs");
