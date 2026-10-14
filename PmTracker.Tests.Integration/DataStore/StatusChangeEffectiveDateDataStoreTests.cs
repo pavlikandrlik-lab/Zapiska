@@ -211,6 +211,99 @@ public sealed class StatusChangeEffectiveDateDataStoreTests
         store.BuildZaznamCreate(arranged.ProjectId).StavPlatiK.Should().BeNull("založení nezapisuje řádek historie stavů (spec §4.1)");
     }
 
+    [Fact]
+    public async Task SaveMeeting_Reschedule_MovesBoundStatusChanges()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_reschedule");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFMOVE");
+        var meeting889 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "DRAFT", 889, new DateTime(2026, 10, 22));
+        var changeId = await AddStatusChangeAsync(dbContext, arranged.RecordId, toFinal: true, platiOd: new DateTime(2026, 10, 22), jednaniId: meeting889);
+
+        store.SaveMeeting(MeetingCommand(meeting889, arranged.ProjectId, 889, new DateTime(2026, 10, 20), "DRAFT"), arranged.User);
+
+        var change = await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking().SingleAsync(x => x.Id == changeId);
+        change.PlatiOd.Should().Be(new DateTime(2026, 10, 20), "změna navázaná na jednání jde s jeho datem (spec §4.6)");
+        change.JednaniId.Should().Be(meeting889);
+    }
+
+    [Fact]
+    public async Task SaveMeeting_RescheduleBreakingOrderOfChanges_IsRejected_AndNothingChanges()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_reschedule_order");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFORDER");
+        var meeting889 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "DRAFT", 889, new DateTime(2026, 10, 22));
+        // Ukončeno k jednání 889, pak 25.10. znovu otevřeno „dnes“.
+        var closeId = await AddStatusChangeAsync(dbContext, arranged.RecordId, toFinal: true, platiOd: new DateTime(2026, 10, 22), jednaniId: meeting889);
+        await AddStatusChangeAsync(dbContext, arranged.RecordId, toFinal: false, platiOd: new DateTime(2026, 10, 25), jednaniId: null);
+        var visibleNumber = await dbContext.ProjektoveZaznamy.AsNoTracking()
+            .Where(x => x.Id == arranged.RecordId)
+            .Select(x => x.CisloViditelne ?? x.CisloZaznamu.ToString())
+            .SingleAsync();
+
+        var act = () => store.SaveMeeting(
+            MeetingCommand(meeting889, arranged.ProjectId, 889, new DateTime(2026, 10, 29), "DRAFT"), arranged.User);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage($"Jednání nelze přesunout na 29.10.2026: změna stavu záznamů č. {visibleNumber.Trim()} navázaná na toto jednání*");
+        (await dbContext.Jednani.AsNoTracking().SingleAsync(x => x.Id == meeting889)).DatumPlanovane.Should().Be(new DateTime(2026, 10, 22));
+        (await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking().SingleAsync(x => x.Id == closeId)).PlatiOd.Should().Be(new DateTime(2026, 10, 22));
+    }
+
+    /// <summary>
+    /// Review focus 4: úprava jednání bez změny data na historii nesahá. Navázaná změna má
+    /// záměrně jiné datum než jednání — kdyby přepis proběhl, test to pozná.
+    /// </summary>
+    [Fact]
+    public async Task SaveMeeting_WithoutDateChange_DoesNotTouchStatusHistory()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_meeting_same_date");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFPLACE");
+        var meeting889 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "DRAFT", 889, new DateTime(2026, 10, 22));
+        var changeId = await AddStatusChangeAsync(dbContext, arranged.RecordId, toFinal: true, platiOd: new DateTime(2026, 10, 21), jednaniId: meeting889);
+
+        var command = MeetingCommand(meeting889, arranged.ProjectId, 889, new DateTime(2026, 10, 22), "DRAFT");
+        command.Misto = "Jiná místnost";
+        store.SaveMeeting(command, arranged.User);
+
+        (await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking().SingleAsync(x => x.Id == changeId))
+            .PlatiOd.Should().Be(new DateTime(2026, 10, 21));
+    }
+
+    [Fact]
+    public async Task DeleteMeeting_KeepsPlatiOd_AndClearsBinding()
+    {
+        var db = await _fixture.CreateDatabaseAsync("status_eff_meeting_delete");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext, new PragueTimeProvider(MorningInPrague));
+        var arranged = await ArrangeTaskAsync(dbContext, "SEFDELETE");
+        var meeting888 = await CreateDatedMeetingAsync(dbContext, arranged.ProjectId, "OPEN", 888, new DateTime(2026, 10, 8));
+        var changeId = await AddStatusChangeAsync(dbContext, arranged.RecordId, toFinal: true, platiOd: new DateTime(2026, 10, 8), jednaniId: meeting888);
+
+        store.DeleteMeeting(new DeleteMeetingCommand { JednaniId = meeting888, ProjektId = arranged.ProjectId }, arranged.User);
+
+        var change = await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking().SingleAsync(x => x.Id == changeId);
+        change.JednaniId.Should().BeNull();
+        change.PlatiOd.Should().Be(new DateTime(2026, 10, 8), "změna dál platí k datu, které jednání mělo");
+        (await dbContext.Jednani.AsNoTracking().AnyAsync(x => x.Id == meeting888)).Should().BeFalse();
+    }
+
+    private static SaveMeetingCommand MeetingCommand(int id, int projectId, int number, DateTime date, string stateCode) => new()
+    {
+        Id = id,
+        ProjektId = projectId,
+        CisloJednani = number,
+        DatumPlanovane = date,
+        CasZacatek = new TimeOnly(9, 0),
+        Misto = "Test",
+        StavJednani = stateCode
+    };
+
     private static async Task<int> CreateDatedMeetingAsync(
         PmTrackerDbContext dbContext, int projectId, string stateCode, int number, DateTime date)
     {
