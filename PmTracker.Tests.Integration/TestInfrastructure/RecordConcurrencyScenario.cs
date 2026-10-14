@@ -95,15 +95,17 @@ internal sealed record RecordConcurrencyScenario(
         return command;
     }
 
-    /// <summary>Command s ručním datem skutečnosti pro zadaný krok a režim.</summary>
-    public SaveRecordCommand BuildManualActualCommand(string rezim, int poradi, DateOnly datum)
+    /// <summary>
+    /// Command s datem skutečnosti kroku, jak ho pošle editor: SkutecnostDatum = co uživatel
+    /// nechal ve formuláři, SkutecnostDatumPuvodni = hodnota při vykreslení.
+    /// </summary>
+    public SaveRecordCommand BuildActualCommand(string? rezim, int poradi, DateTime? datum, DateTime? puvodni = null)
     {
         var command = BuildRenameCommand(OriginalNazev);
         command.HarmonogramRezim = rezim;
-        command.ManualActualKroky = new List<ManualActualKrokDto>
-        {
-            new() { Poradi = poradi, AbsolutniDatum = datum }
-        };
+        var row = command.HarmonogramHodnoty.Single(x => x.Poradi == poradi);
+        row.SkutecnostDatum = datum;
+        row.SkutecnostDatumPuvodni = puvodni;
         return command;
     }
 

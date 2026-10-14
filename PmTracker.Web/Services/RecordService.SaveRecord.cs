@@ -90,8 +90,11 @@ public sealed partial class RecordService
             ? null
             : RecordAuditSnapshot.FromEntity(validation.ExistingRecord);
 
-        return await ExecuteInSerializableTransactionAsync(async innerCt =>
+        var prepnutoNaAuto = false;
+        var savedId = await ExecuteInSerializableTransactionAsync(async innerCt =>
         {
+            // Reset per pokus — retry execution strategy by jinak nesl stav ze zahozeného pokusu.
+            prepnutoNaAuto = false;
             ProjektovyZaznamEntity entity;
             if (command.Id.HasValue)
             {
@@ -245,9 +248,9 @@ public sealed partial class RecordService
             var addedExternalLinks = await ReplaceRecordExternalLinksAsync(
                 entity.Id, command.ExterniVazby, smiZaraditDoBufferu, innerCt);
 
-            // Datum-model: UPSERT krok rows (plán datumy + manuální skutečnost + rezim).
-            // Auto skutečnost řeší harvest (SyncZaznamAsync), ne save.
-            _ = await PersistScheduleKrokyAsync(entity, command, isTaskCategory, pendingScheduleProposalLock.LocksSchedule, innerCt);
+            // Spec 2026-10-14: plán + skutečnost + režim přes ScheduleActualApplier.
+            var harmonogram = await PersistScheduleKrokyAsync(entity, command, isTaskCategory, pendingScheduleProposalLock.LocksSchedule, innerCt);
+            prepnutoNaAuto = harmonogram.PrepnutoNaAuto;
 
             // FIX 2026-06-16: flush před priority rebuildem. RebuildForRecordAsync čte spolupráci
             // (ZaznamSpoluprace), kroky a externí vazby přes AsNoTracking = dotaz do DB. EF Core
@@ -280,6 +283,31 @@ public sealed partial class RecordService
 
             return entity.Id;
         }, ct);
+
+        if (prepnutoNaAuto)
+        {
+            await DoplnAutomatPoPrepnutiNaAutoAsync(savedId);
+        }
+        return savedId;
+    }
+
+    /// <summary>
+    /// Spec 2026-10-14 R2: přepnutí na automatiku smazalo data kroků 1/3/4/6/7/10, která nedodal
+    /// automat — automat je hned doplní z vyjádření, která už jsou na záznamu navázaná. Harvest
+    /// sám automat spouští jen při NOVÉM vyjádření, proto se volá přímo; harvest se navíc naplánuje
+    /// kvůli čerstvým datům ze SD. Až po commitu (review finding C-7): retry transakce by jinak
+    /// spouštěl vícekrát a rollback bez reálné změny. Best-effort — uložení už proběhlo.
+    /// </summary>
+    private async Task DoplnAutomatPoPrepnutiNaAutoAsync(int zaznamId)
+    {
+        if (dbContext.Database.CurrentTransaction is not null)
+        {
+            // Vnořené volání (schválení návrhu založení) — commit i následný krok řídí volající.
+            return;
+        }
+        await harmonogramSkutecnostSync.SyncZaznamBestEffortAsync(zaznamId, CancellationToken.None);
+        await harvestScheduler.ScheduleHarvestForRecordAsync(
+            zaznamId, CancellationToken.None, PmTracker.Web.Services.ServiceDesk.SdReactiveSource.RecordSave);
     }
 
     private async Task<SaveRecordValidationContext> ValidateRecordSaveCommandAsync(
@@ -764,11 +792,14 @@ public sealed partial class RecordService
         issues.Add(new RecordValidationIssue(fieldKey, message.Trim(), tab, rule, value));
     }
 
+    private static readonly ScheduleActualApplier.Vysledek BezZmeny = new(false, false);
+
     /// <summary>
-    /// Datum-model UPSERT: zapíše plán datumy (všechny kroky) + manuální skutečnost (kroky 2/5/8/9)
-    /// + rezim do <c>zaznam_harmonogram_krok</c>. Auto skutečnost řeší harvest sync, ne save.
+    /// Datum-model UPSERT: zapíše plán datumy (všechny kroky), skutečnost a režim do
+    /// <c>zaznam_harmonogram_krok</c>. Skutečnost a režim jdou přes <see cref="ScheduleActualApplier"/>
+    /// (spec 2026-10-14) — stejná pravidla jako schválení návrhu. Auto skutečnost doplňuje automat.
     /// </summary>
-    private async Task<bool> PersistScheduleKrokyAsync(
+    private async Task<ScheduleActualApplier.Vysledek> PersistScheduleKrokyAsync(
         PmTracker.Web.Models.Entities.ProjektovyZaznamEntity entity,
         SaveRecordCommand command,
         bool isTaskCategory,
@@ -780,7 +811,7 @@ public sealed partial class RecordService
         // který čeká na rozhodnutí, proto stávající krok řádky zachováme beze změny.
         if (scheduleLocked && isTaskCategory)
         {
-            return false;
+            return BezZmeny;
         }
 
         if (!isTaskCategory)
@@ -790,15 +821,15 @@ public sealed partial class RecordService
                 .ToListAsync(ct);
             if (existingNonTask.Count == 0)
             {
-                return false;
+                return BezZmeny;
             }
             dbContext.ZaznamHarmonogramKroky.RemoveRange(existingNonTask);
-            return true;
+            return new ScheduleActualApplier.Vysledek(true, false);
         }
 
-        if (command.HarmonogramHodnoty.Count == 0 && command.ManualActualKroky.Count == 0)
+        if (command.HarmonogramHodnoty.Count == 0)
         {
-            return false;
+            return BezZmeny;
         }
 
         var nowUtc = DateTime.UtcNow;
@@ -808,14 +839,6 @@ public sealed partial class RecordService
         var byPoradi = existing
             .GroupBy(k => (int)k.Poradi)
             .ToDictionary(g => g.Key, g => g.First());
-
-        var manualByPoradi = command.ManualActualKroky
-            .Where(m => m.Poradi is >= 1 and <= 10)
-            .GroupBy(m => m.Poradi)
-            .ToDictionary(g => g.Key, g => g.Last());
-
-        var rezimManual = string.Equals(command.HarmonogramRezim, "Manual", StringComparison.OrdinalIgnoreCase);
-        var changed = false;
 
         PmTracker.Web.Models.Entities.ZaznamHarmonogramKrokEntity GetOrCreate(int poradi)
         {
@@ -827,7 +850,8 @@ public sealed partial class RecordService
             {
                 ZaznamId = entity.Id,
                 Poradi = (byte)poradi,
-                SkutecnostRezim = (byte)PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Auto,
+                // R3: kroky 2/5/8/9 vznikají jako ruční, ostatní jako automatické.
+                SkutecnostRezim = ScheduleActualApplier.VychoziRezim(poradi),
                 SkutecnostZdroj = (byte)PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Neznamo,
                 UpdatedAt = nowUtc
             };
@@ -836,6 +860,10 @@ public sealed partial class RecordService
             return r;
         }
 
+        // Plán se ukládá jako dřív. Skutečnost jde přes applier a jen u kroků, které uživatel
+        // změnil (SkutecnostDatum ≠ SkutecnostDatumPuvodni) — spec 2026-10-14 R1/R6.
+        var planZmenen = false;
+        var zmeny = new List<ScheduleActualApplier.SkutecnostZmena>();
         foreach (var item in command.HarmonogramHodnoty)
         {
             if (item.Poradi is < 1 or > 10)
@@ -843,51 +871,22 @@ public sealed partial class RecordService
                 continue;
             }
             var row = GetOrCreate(item.Poradi);
-            row.PlanDatum = item.PlanDatum?.Date;
-            if (PmTracker.Web.Models.ViewModels.HarmonogramManualSteps.IsManual(item.Poradi))
+            var plan = item.PlanDatum?.Date;
+            if (row.PlanDatum != plan)
             {
-                DateTime? skut = item.SkutecnostDatum?.Date;
-                if (manualByPoradi.TryGetValue(item.Poradi, out var mk) && mk.AbsolutniDatum.HasValue)
-                {
-                    skut = mk.AbsolutniDatum.Value.ToDateTime(TimeOnly.MinValue);
-                }
-                row.SkutecnostDatum = skut;
-                row.SkutecnostRezim = (byte)PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Manual;
-                row.SkutecnostZdroj = skut.HasValue
-                    ? (byte)PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Manual
-                    : (byte)PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Neznamo;
+                row.PlanDatum = plan;
+                row.UpdatedAt = nowUtc;
+                planZmenen = true;
             }
-            else
+            if (ScheduleActualApplier.JeZmena(item.SkutecnostDatum, item.SkutecnostDatumPuvodni))
             {
-                row.SkutecnostRezim = rezimManual
-                    ? (byte)PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Manual
-                    : (byte)PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Auto;
+                zmeny.Add(new ScheduleActualApplier.SkutecnostZmena(item.Poradi, item.SkutecnostDatum?.Date));
             }
-            row.UpdatedAt = nowUtc;
-            changed = true;
         }
 
-        foreach (var mk in manualByPoradi.Values)
-        {
-            // Spec 2026-09-17 §6.2 — v ručním režimu patří i auto-eligible kroky
-            // (1/3/4/6/7/10) uživateli; UI pro ně input renderuje, server ho dosud
-            // zahazoval. V režimu Automatika je dál ignorujeme — tam kroky řídí automat.
-            var isManualStep = PmTracker.Web.Models.ViewModels.HarmonogramManualSteps.IsManual(mk.Poradi);
-            if (!isManualStep && !rezimManual)
-            {
-                continue;
-            }
-            var row = GetOrCreate(mk.Poradi);
-            row.SkutecnostDatum = mk.AbsolutniDatum?.ToDateTime(TimeOnly.MinValue);
-            row.SkutecnostRezim = (byte)PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Manual;
-            row.SkutecnostZdroj = mk.AbsolutniDatum.HasValue
-                ? (byte)PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Manual
-                : (byte)PmTracker.Web.Models.Entities.SkutecnostZdrojEnum.Neznamo;
-            row.UpdatedAt = nowUtc;
-            changed = true;
-        }
-
-        return changed;
+        var vysledek = ScheduleActualApplier.Apply(
+            byPoradi.Values.ToList(), GetOrCreate, zmeny, command.HarmonogramRezim, nowUtc);
+        return vysledek with { Zmeneno = vysledek.Zmeneno || planZmenen };
     }
 
     private static (int Index, int CodePoint)? FindFirstInvalidControlCharacter(string value)
@@ -1213,10 +1212,13 @@ public sealed partial class RecordService
 
         var scheduleLock = await pendingScheduleProposalLockEvaluator.EvaluateAsync(entity.Id, ct);
 
-        return await ExecuteInSerializableTransactionAsync(async innerCt =>
+        var prepnutoNaAuto = false;
+        var savedId = await ExecuteInSerializableTransactionAsync(async innerCt =>
         {
-            var changed = await PersistScheduleKrokyAsync(entity, command, isTaskCategory: true, scheduleLock.LocksSchedule, innerCt);
-            if (changed)
+            prepnutoNaAuto = false;
+            var harmonogram = await PersistScheduleKrokyAsync(entity, command, isTaskCategory: true, scheduleLock.LocksSchedule, innerCt);
+            prepnutoNaAuto = harmonogram.PrepnutoNaAuto;
+            if (harmonogram.Zmeneno)
             {
                 await priorityMatrixRebuildService.RebuildForRecordAsync(entity.Id, innerCt);
                 auditWriteService.Add(currentUser.OsobaId, new AuditWriteEntry(
@@ -1229,6 +1231,12 @@ public sealed partial class RecordService
             }
             return entity.Id;
         }, ct);
+
+        if (prepnutoNaAuto)
+        {
+            await DoplnAutomatPoPrepnutiNaAutoAsync(savedId);
+        }
+        return savedId;
     }
 
     private async Task<T> ExecuteInSerializableTransactionAsync<T>(

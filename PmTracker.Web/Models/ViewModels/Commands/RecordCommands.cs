@@ -149,7 +149,20 @@ public sealed class SaveRecordHarmonogramValueCommand
 {
     public int Poradi { get; set; }
     public DateTime? PlanDatum { get; set; }
+
+    /// <summary>
+    /// Spec 2026-10-14 — skutečnost kroku, jak ji uživatel nechal ve formuláři (prázdné = smazáno
+    /// nebo nevyplněno). V payloadu návrhu (ActualHarmonogramHodnoty) jde jen u změněných kroků.
+    /// </summary>
     public DateTime? SkutecnostDatum { get; set; }
+
+    /// <summary>
+    /// Spec 2026-10-14 R6 — skutečnost, se kterou se editor vykreslil. Server zapíše jen krok,
+    /// kde se <see cref="SkutecnostDatum"/> od této hodnoty liší, takže nedotčený krok si nechá
+    /// hodnotu i zdroj a novější hodnotu automatu z doby editace nepřepíše stará.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public DateTime? SkutecnostDatumPuvodni { get; set; }
 }
 
 public sealed class AddCommentCommand

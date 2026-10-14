@@ -55,18 +55,20 @@ public sealed class HarmonogramPhantomUiFixesTests
     }
 
     [Fact]
-    public void RecordService_SaveRecord_PersistujeManualActualKroky()
+    public void RecordService_SaveRecord_PersistujeSkutecnostPresApplier()
     {
-        // Datum-model (2026-06-12): manuální skutečnost se zapisuje do zaznam_harmonogram_krok
-        // přes PersistScheduleKrokyAsync (UPSERT plan + skutečnost + rezim). Manuální datumy
-        // dostávají Zdroj=Manual.
+        // Datum-model (2026-06-12): skutečnost se zapisuje do zaznam_harmonogram_krok přes
+        // PersistScheduleKrokyAsync. Spec 2026-10-14: jediný seznam HarmonogramHodnoty a jediná
+        // pravidla (ScheduleActualApplier, Zdroj=Manual u ručních dat) — zapíše se jen změněný krok.
         var src = Read("PmTracker.Web/Services/RecordService.SaveRecord.cs");
         src.Should().Contain("PersistScheduleKrokyAsync",
-            "phantom UI bug 1 fix (datum-model): ManualActualKroky persist do krok rows.");
-        src.Should().Contain("command.ManualActualKroky",
-            "Persistence flow musí číst command.ManualActualKroky z input commandu.");
-        src.Should().Contain("SkutecnostZdrojEnum.Manual",
-            "User-zadané manuální datumy musí dostat Zdroj=Manual.");
+            "phantom UI bug 1 fix (datum-model): skutečnost se persistuje do krok rows.");
+        src.Should().Contain("ScheduleActualApplier.Apply",
+            "Spec 2026-10-14: uložení editoru i schválení návrhu používají stejná pravidla zápisu.");
+        src.Should().Contain("SkutecnostDatumPuvodni",
+            "Spec 2026-10-14 R6: zapíše se jen krok, který uživatel opravdu změnil.");
+        src.Should().NotContain("ManualActualKroky",
+            "druhý seznam s vlastním čítačem způsoboval díru v číslování (D1).");
     }
 
     /// <summary>

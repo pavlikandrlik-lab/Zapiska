@@ -166,9 +166,14 @@ public sealed class RecordProposalDataStoreTests
         saveCommand.Nazev = "Lock Record Updated";
         saveCommand.TerminUkonceni = originalDeadline.AddDays(20);
         saveCommand.HarmonogramRezim = "Manual";
-        saveCommand.ManualActualKroky =
+        saveCommand.HarmonogramHodnoty =
         [
-            new ManualActualKrokDto { Poradi = 2, AbsolutniDatum = DateOnly.FromDateTime(originalDeadline.AddDays(-5)) }
+            new SaveRecordHarmonogramValueCommand
+            {
+                Poradi = 2,
+                SkutecnostDatum = originalDeadline.AddDays(-5),
+                SkutecnostDatumPuvodni = originalSkutecnost
+            }
         ];
 
         store.SaveRecord(saveCommand, manager);

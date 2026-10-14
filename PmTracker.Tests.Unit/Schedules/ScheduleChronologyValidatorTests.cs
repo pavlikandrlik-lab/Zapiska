@@ -16,9 +16,6 @@ public sealed class ScheduleChronologyValidatorTests
     private static SaveRecordHarmonogramValueCommand Plan(int poradi, DateTime plan)
         => new() { Poradi = poradi, PlanDatum = plan };
 
-    private static ManualActualKrokDto Actual(int poradi, DateTime datum)
-        => new() { Poradi = poradi, AbsolutniDatum = DateOnly.FromDateTime(datum) };
-
     private static List<RecordValidationIssue> Collect(SaveRecordCommand command)
     {
         var issues = new List<RecordValidationIssue>();
@@ -82,21 +79,45 @@ public sealed class ScheduleChronologyValidatorTests
         issues[0].FieldKey.Should().Be("HarmonogramHodnoty[1].PlanDatum");
     }
 
+    private static SaveRecordHarmonogramValueCommand Skut(int poradi, DateTime datum, DateTime? puvodni = null)
+        => new() { Poradi = poradi, SkutecnostDatum = datum, SkutecnostDatumPuvodni = puvodni };
+
     [Fact]
-    public void DescendingManualActual_ProducesActualChronologyIssue()
+    public void ZmenenaKlesajiciSkutecnost_RucnichKroku_ProducesActualChronologyIssue()
     {
         var command = new SaveRecordCommand
         {
-            ManualActualKroky =
-            [
-                Actual(2, new DateTime(2026, 4, 20)),
-                Actual(5, new DateTime(2026, 4, 5))
-            ]
+            HarmonogramHodnoty = [Skut(2, new DateTime(2026, 4, 20)), Skut(5, new DateTime(2026, 4, 5))]
         };
-
         var issues = Collect(command);
         issues.Should().ContainSingle();
         issues[0].Rule.Should().Be("schedule_actual_chronology");
+        issues[0].FieldKey.Should().Be("HarmonogramHodnoty[1].SkutecnostDatum");
+    }
+
+    [Fact]
+    public void AutoKrokyVAutomatickemRezimu_SeNekontroluji()
+    {
+        var command = new SaveRecordCommand
+        {
+            HarmonogramRezim = "Auto",
+            HarmonogramHodnoty = [Skut(3, new DateTime(2026, 4, 20)), Skut(4, new DateTime(2026, 4, 5))]
+        };
+        Collect(command).Should().BeEmpty("kroky 1/3/4/6/7/10 v automatickém režimu řídí automat");
+    }
+
+    /// <summary>Review Focus 3 — staré nechronologické hodnoty, na které uživatel nesáhl, uložení neblokují.</summary>
+    [Fact]
+    public void NedotceneNechronologickeHodnoty_NeblokujiUlozeni()
+    {
+        var a = new DateTime(2026, 4, 20);
+        var b = new DateTime(2026, 4, 5);
+        var command = new SaveRecordCommand
+        {
+            HarmonogramRezim = "Manual",
+            HarmonogramHodnoty = [Skut(3, a, puvodni: a), Skut(4, b, puvodni: b)]
+        };
+        Collect(command).Should().BeEmpty();
     }
 
     [Fact]

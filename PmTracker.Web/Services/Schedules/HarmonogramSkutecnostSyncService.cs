@@ -17,6 +17,12 @@ public interface IHarmonogramSkutecnostSyncService
     Task<HarmonogramSyncPlan> ComputePlanAsync(int projektovyZaznamId, CancellationToken ct = default);
     Task<HarmonogramSyncResult> ApplyPlanAsync(HarmonogramSyncPlan plan, CancellationToken ct = default);
     Task<HarmonogramSyncResult> SyncZaznamAsync(int projektovyZaznamId, CancellationToken ct = default);
+
+    /// <summary>
+    /// <see cref="SyncZaznamAsync"/> po už provedeném zápisu (uložení, schválení návrhu): chybu
+    /// zaloguje a vrátí false, nevyhodí ji — zápis už je v DB a uživatel nesmí dostat chybu.
+    /// </summary>
+    Task<bool> SyncZaznamBestEffortAsync(int projektovyZaznamId, CancellationToken ct = default);
     Task<IReadOnlyList<BindingKandidat>> GetKandidatiForZaznamAsync(int zaznamId, CancellationToken ct = default);
 }
 
@@ -233,6 +239,22 @@ public sealed class HarmonogramSkutecnostSyncService : IHarmonogramSkutecnostSyn
     {
         var plan = await ComputePlanAsync(projektovyZaznamId, ct).ConfigureAwait(false);
         return await ApplyPlanAsync(plan, ct).ConfigureAwait(false);
+    }
+
+    public async Task<bool> SyncZaznamBestEffortAsync(int projektovyZaznamId, CancellationToken ct = default)
+    {
+        try
+        {
+            await SyncZaznamAsync(projektovyZaznamId, ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex,
+                "HarmonogramSkutecnostSyncService: sync po zápisu selhal pro záznam {ZaznamId} (zápis už proběhl).",
+                projektovyZaznamId);
+            return false;
+        }
     }
 
     public Task<IReadOnlyList<BindingKandidat>> GetKandidatiForZaznamAsync(int zaznamId, CancellationToken ct = default)
