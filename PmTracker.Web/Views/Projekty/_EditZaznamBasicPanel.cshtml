@@ -91,6 +91,31 @@
         </label>
     </div>
 
+    @* Spec 2026-10-13 §6 — viditelné jen po změně stavu (recordEditor/statusEffectiveDate.js). *@
+    @if (Model.StavPlatiK is not null && !metadataLocked)
+    {
+        <div class="record-form-row" data-status-effective-date-row data-original-stav="@Model.Stav" hidden>
+            @if (Model.StavPlatiK.Options.Count > 0)
+            {
+                <label for="stav-plati-k">
+                    Změna stavu platí k
+                    <select id="stav-plati-k" name="StavPlatiK">
+                        @foreach (var option in Model.StavPlatiK.Options)
+                        {
+                            <option value="@option.Value" selected="@(option.Value == Model.StavPlatiK.DefaultValue)">@option.Label</option>
+                        }
+                    </select>
+                </label>
+            }
+            else
+            {
+                <gov-message color="warning">
+                    Stav teď nejde změnit: změna nemůže platit dříve než @Model.StavPlatiK.LowerBound.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) (předchozí změna stavu nebo založení záznamu) a žádné nabízené datum není pozdější.
+                </gov-message>
+            }
+        </div>
+    }
+
     @if (Model.IsCreate && Model.PouzivatIdentJednani)
     {
         <div class="record-form-row">

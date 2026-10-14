@@ -4,7 +4,11 @@ Tento soubor je generován skriptem `scripts/generate-changelog.sh` z verzovaný
 
 ## 0.11 - 2026-10-14
 
+### Přidáno
+- **Změna stavu úkolu platí k datu, které zvolíš.** Při změně stavu v editoru záznamu se objeví pole „Změna stavu platí k“: dnešní datum, nebo jednání v přípravě či otevřené pro zápis (od nejnovějšího, první uzavřené jednání nabídku ukončí). Předvybrané je nejnovější otevřené jednání. Zápis z jednání zpracovaný o pár dní později tak ukáže změnu stavu na správném jednání. Když se jednání přeplánuje, navázané změny stavu se posunou s ním.
+
 ### Opraveno
+- **Tisk jednání ukazuje úkol tak, jak byl ke dni jednání.** Sloupec Stav, modré podbarvení ukončených i krémové podbarvení pozastavených se řídí stavem k datu jednání. Dřív sloupec Stav ukazoval dnešní stav, takže úkol mohl mít „Ukončeno“ bez podbarvení.
 - **Ruční skutečnost harmonogramu se už neztrácí.** Datum zadané ručně u kroků 1, 3, 4, 6, 7 a 10 šlo dřív uložit jen jednou — změna ani smazání se pak tiše neuložily a navíc mohly strhnout ruční data dalších kroků (i 2, 5, 8 a 9). Teď jde datum měnit i mazat kdykoli a uloží se jen kroky, na které uživatel sáhl.
 - **Vypnutí automatického vyplňování už nemaže data ze ServiceDesku.** Uložení po vypnutí přepínače dřív vyprázdnilo kroky, které vyplnil automat. Teď zůstanou a jdou upravit.
 - **Zapnutí automatického vyplňování dělá, co slibuje:** ručně zadaná i historická data kroků 1, 3, 4, 6, 7 a 10 se uložením smažou a automat je hned doplní z vyjádření v ServiceDesku. Buď vyplňuje uživatel, nebo automat — nic mezi. Kroky 2, 5, 8 a 9 zůstávají vždy ruční.
@@ -12,6 +16,7 @@ Tento soubor je generován skriptem `scripts/generate-changelog.sh` z verzovaný
 
 ### Poznámka k nasazení
 - **Historická skutečnost (📜) se převede skriptem `db_upgrade_1_4_9_historicka_skutecnost.sql`:** u úkolů v ručním režimu na ruční, u úkolů v automatickém režimu se u kroků 1, 3, 4, 6, 7 a 10 smaže a doplní ji automat (kroky 2, 5, 8 a 9 vždy na ruční). Před spuštěním ukáže `db_upgrade_1_4_9_historicka_skutecnost_analyza.sql` (jen čte), co se smaže a u kterých úkolů. Skript spusť před startem nové verze, nebo aplikaci po něm restartuj — při startu doplní automat prázdné kroky z už navázaných vyjádření. Stav ukáže `db_check_applied_upgrades.sql`.
+- **Datum platnosti změn stavu přidá skript `db_upgrade_1_4_10_zmena_stavu_plati_od.sql`** (sloupce `plati_od` a `jednani_id` v historii stavů; u starých změn doplní místní datum uložení). Spusť ho **před** startem nové verze — bez něj aplikace nenastartuje a ohlásí název skriptu. Vyžaduje SQL Server 2016 nebo novější. Stav ukáže `db_check_applied_upgrades.sql`.
 - Rozpracované návrhy se nemusí mazat — starý formát se při čtení převede. Starý čekající návrh s ručními daty kroků 1, 3, 4, 6, 7 a 10 u záznamu v automatickém režimu se po schválení v těchto krocích neuplatní; schvalovatel to uvidí v upozornění na detailu návrhu.
 
 

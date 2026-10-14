@@ -35,6 +35,19 @@ s jejich popisem a závěry.
 
 Pro každý záznam volitelně vyjádření zapsaná během jednání.
 
+### Stav úkolu k datu jednání
+
+Zápis ukazuje každý úkol tak, jak byl **ke dni jednání**, ne jak je dnes:
+
+- sloupec **Stav** je stav platný k datu jednání,
+- **modře podbarvený** je úkol, který byl k datu jednání ukončený,
+- **krémově podbarvený** je úkol, který byl k datu jednání pozastavený,
+- ukončený úkol se vytiskne jen na zápise, kde se poprvé hlásí jako hotový; v dalších zápisech už není.
+
+K jakému datu změna stavu platí, volí uživatel při změně stavu v editoru záznamu
+(viz [Upravit záznam](../projekty/zaznamy/upravit-zaznam.md#změna-stavu-úkolu)).
+Tisk projektu a tisk záznamu ukazují dnešní stav.
+
 ### Příští jednání
 
 Pokud je nastaveno datum příštího jednání, zobrazí se v patičce.

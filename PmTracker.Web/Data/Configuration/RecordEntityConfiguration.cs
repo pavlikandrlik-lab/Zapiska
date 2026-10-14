@@ -209,6 +209,8 @@ internal sealed class RecordStateHistoryEntityConfiguration : IEntityTypeConfigu
         builder.Property(x => x.PuvodniStav).HasColumnName("puvodni_stav");
         builder.Property(x => x.NovyStav).HasColumnName("novy_stav");
         builder.Property(x => x.DatumZmeny).HasColumnName("datum_zmeny");
+        builder.Property(x => x.PlatiOd).HasColumnName("plati_od").HasColumnType("date");
+        builder.Property(x => x.JednaniId).HasColumnName("jednani_id");
         builder.HasIndex(x => x.ZaznamId)
             .HasDatabaseName("IX_zaznam_historie_stavu_zaznamu_zaznam_id");
     }

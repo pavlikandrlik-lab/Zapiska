@@ -37,6 +37,11 @@ public sealed partial class MeetingService
                 throw new InvalidOperationException("Uzavřené jednání nelze upravovat. Nejprve jednání otevřete.");
             }
 
+            if (existing.DatumPlanovane.Date != command.DatumPlanovane.Date)
+            {
+                await MoveBoundStatusChangesAsync(existing.Id, command.DatumPlanovane.Date, ct);
+            }
+
             var old = MeetingAuditSnapshot.FromEntity(existing);
             existing.CisloJednani = command.CisloJednani;
             existing.DatumPlanovane = command.DatumPlanovane.Date;
@@ -95,6 +100,15 @@ public sealed partial class MeetingService
             .Where(x => x.JednaniId == command.JednaniId)
             .ToListAsync(ct);
 
+        // Spec 2026-10-13 §4.6 — změna stavu dál platí k datu, které jednání mělo; ruší se jen vazba.
+        var boundStatusChanges = await dbContext.ZaznamHistorieStavuZaznamu
+            .Where(x => x.JednaniId == command.JednaniId)
+            .ToListAsync(ct);
+        foreach (var change in boundStatusChanges)
+        {
+            change.JednaniId = null;
+        }
+
         var oldMeeting = MeetingAuditSnapshot.FromEntity(meeting);
         var oldAttendanceSnapshots = attendanceRows.Select(AttendanceAuditSnapshot.FromEntity).ToList();
         var oldCommentSnapshots = commentRows.Select(CommentAuditSnapshot.FromEntity).ToList();
@@ -108,7 +122,7 @@ public sealed partial class MeetingService
             dbContext.Vyjadreni.RemoveRange(commentRows);
         }
 
-        if (attendanceRows.Count > 0 || commentRows.Count > 0)
+        if (attendanceRows.Count > 0 || commentRows.Count > 0 || boundStatusChanges.Count > 0)
         {
             await dbContext.SaveChangesAsync(ct);
         }
@@ -463,4 +477,65 @@ public sealed partial class MeetingService
         return result;
     }
 
+    /// <summary>
+    /// Spec 2026-10-13 §4.6 — změny stavu navázané na jednání jdou s jeho datem. Změny každého
+    /// záznamu musí podle pořadí uložení (id) mít neklesající plati_od, jinak by přepočet stavu
+    /// k datu jednání dával nesmysly; takové přeplánování se odmítne a nic se neuloží.
+    /// </summary>
+    private async Task MoveBoundStatusChangesAsync(int meetingId, DateTime newDate, CancellationToken ct)
+    {
+        var bound = await dbContext.ZaznamHistorieStavuZaznamu
+            .Where(x => x.JednaniId == meetingId)
+            .ToListAsync(ct);
+        if (bound.Count == 0)
+        {
+            return;
+        }
+
+        var recordIds = bound.Select(x => x.ZaznamId).Distinct().ToList();
+        var history = await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking()
+            .Where(x => recordIds.Contains(x.ZaznamId))
+            .ToListAsync(ct);
+        var brokenRecordIds = history
+            .GroupBy(x => x.ZaznamId)
+            .Where(group => !IsNonDecreasing(group
+                .OrderBy(x => x.Id)
+                .Select(x => x.JednaniId == meetingId ? newDate : x.PlatiOd.Date)))
+            .Select(group => group.Key)
+            .ToList();
+
+        if (brokenRecordIds.Count > 0)
+        {
+            var numbers = (await dbContext.ProjektoveZaznamy.AsNoTracking()
+                    .Where(x => brokenRecordIds.Contains(x.Id))
+                    .ToListAsync(ct))
+                .Select(ResolveVisibleRecordNumber)
+                .OrderBy(x => x, StringComparer.CurrentCulture)
+                .ToList();
+            throw new InvalidOperationException(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Jednání nelze přesunout na {newDate:dd.MM.yyyy}: změna stavu záznamů č. {string.Join(", ", numbers)} navázaná na toto jednání by platila mimo pořadí ostatních změn stavu těchto záznamů. Ponechte původní datum, nebo zvolte datum mezi sousedními změnami."));
+        }
+
+        foreach (var change in bound)
+        {
+            change.PlatiOd = newDate;
+        }
+    }
+
+    private static bool IsNonDecreasing(IEnumerable<DateTime> dates)
+    {
+        DateTime? previous = null;
+        foreach (var date in dates)
+        {
+            if (previous.HasValue && date < previous.Value)
+            {
+                return false;
+            }
+
+            previous = date;
+        }
+
+        return true;
+    }
 }

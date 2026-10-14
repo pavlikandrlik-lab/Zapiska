@@ -33,7 +33,7 @@ Poslední bod je podstatný: obsluha uložení stavů úkolů v kódu **zůstala
 | U3 | Vyjádření zůstávají **sytě modrým písmem** beze změny — sytější odstín je na světlém podbarvení čitelný. |
 | U4 | Platí pro **PDF i Word**. |
 | U5 | V tisku jednání se ukončenost bere **ke dni toho jednání**, ne z dneška. |
-| U6 | Nesrovnalost sloupce „Stav" (ukazuje dnešní stav, ne stav k datu jednání) se v této změně **neřeší**. |
+| U6 | Nesrovnalost sloupce „Stav" (ukazuje dnešní stav, ne stav k datu jednání) se v této změně **neřeší**. *(2026-10-13: vyřešeno, viz `2026-10-13-zmena-stavu-k-jednani-design.md`.)* |
 
 ## 4. Pravidla
 
@@ -147,6 +147,8 @@ Test evaluátoru je čistě paměťový — pracuje s entitami, databázi nepot�
 U Wordu se kontroluje **vygenerovaný dokument**, ne model; navazuje na stávající `BuildDocument_ShouldShadeWholePausedRecordRow`.
 
 ## 9. Mimo rozsah
+
+> **2026-10-13:** obě omezení z této sekce řeší `2026-10-13-zmena-stavu-k-jednani-design.md`. Tisk jednání bere sloupec Stav i pozastavení ke dni jednání.
 
 **Sloupec „Stav" ukazuje v tisku jednání dnešní stav**, ne stav k datu jednání (`ExportProjectionBuilders.cs:895`). Na starším zápise tak může být podbarvený řádek, u kterého je napsáno „Rozpracováno" — protože k datu jednání hotový byl, ale mezitím se znovu otevřel. Rozhodnutí U6: neřeší se zde.
 

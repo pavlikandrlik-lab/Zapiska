@@ -6,26 +6,13 @@ using Xunit;
 namespace PmTracker.Tests.Unit.Export;
 
 /// <summary>
-/// Podbarvení ukončených úkolů (2026-09-05): v tisku jednání se ukončenost bere
-/// ke dni toho jednání, ne z dneška (rozhodnutí U5). Testy pracují s entitami,
-/// databázi nepotřebují.
+/// Stav úkolu ke dni jednání (spec 2026-10-13 §4.7). Z něj se v tisku jednání odvodí
+/// sloupec Stav, pozastavení i ukončení (§4.8). Testy pracují s entitami, databázi nepotřebují.
 /// </summary>
 public sealed class ExportRecordVisibilityEvaluatorTests
 {
     private const int RunningStateId = 1;
     private const int DoneStateId = 2;
-    private const int PausedButFinalStateId = 3;
-
-    private static readonly Dictionary<int, CiselnikStavuUkoluEntity> TaskStates = new()
-    {
-        [RunningStateId] = new CiselnikStavuUkoluEntity
-            { Id = RunningStateId, Kod = "RUN", Nazev = "Rozpracováno", IsFinal = false },
-        [DoneStateId] = new CiselnikStavuUkoluEntity
-            { Id = DoneStateId, Kod = "DONE", Nazev = "Ukončeno", IsFinal = true },
-        // Rozporný řádek, jaký může v databázi vzniknout ručním zásahem.
-        [PausedButFinalStateId] = new CiselnikStavuUkoluEntity
-            { Id = PausedButFinalStateId, Kod = "PAUSE", Nazev = "Pozastaveno", IsFinal = true }
-    };
 
     private static ProjektovyZaznamEntity Record(int? currentStateId) => new()
     {
@@ -40,72 +27,82 @@ public sealed class ExportRecordVisibilityEvaluatorTests
         DatumZalozeni = new DateTime(2026, 1, 5)
     };
 
-    /// <summary>Úkol byl 20.8. přepnut z Rozpracováno na Ukončeno.</summary>
-    private static IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> ClosedOn20August() =>
-    [
-        new()
-        {
-            Id = 1,
-            ZaznamId = 100,
-            PuvodniStav = RunningStateId,
-            NovyStav = DoneStateId,
-            DatumZmeny = new DateTime(2026, 8, 20)
-        }
-    ];
+    private static ZaznamHistorieStavuZaznamuEntity Change(int id, int from, int to, DateTime platiOd, DateTime? savedAt = null) => new()
+    {
+        Id = id,
+        ZaznamId = 100,
+        PuvodniStav = from,
+        NovyStav = to,
+        DatumZmeny = savedAt ?? platiOd,
+        PlatiOd = platiOd
+    };
+
+    /// <summary>Stejné řazení, v jakém historii předává BuildExportRecordsAsync.</summary>
+    private static IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> NewestFirst(params ZaznamHistorieStavuZaznamuEntity[] changes)
+        => changes.OrderByDescending(x => x.PlatiOd).ThenByDescending(x => x.Id).ToList();
 
     [Fact]
-    public void IsCompletedForMeetingPrint_IsFalse_WhenTaskWasClosedAfterTheMeeting()
+    public void ResolveStatus_ReturnsPreviousState_WhenChangeTakesEffectAfterTheMeeting()
     {
-        var evaluator = new ExportRecordVisibilityEvaluator();
+        var history = NewestFirst(Change(1, RunningStateId, DoneStateId, new DateTime(2026, 8, 20)));
 
-        var result = evaluator.IsCompletedForMeetingPrint(
-            Record(DoneStateId), TaskStates, ClosedOn20August(), new DateTime(2026, 6, 10));
-
-        result.Should().BeFalse(
-            "na červnovém zápise úkol ještě běžel — dnešní stav se do historického tisku promítnout nesmí");
+        new ExportRecordVisibilityEvaluator()
+            .ResolveStatusForMeetingPrint(Record(DoneStateId), history, new DateTime(2026, 6, 10))
+            .Should().Be(RunningStateId, "na červnovém zápise úkol ještě běžel");
     }
 
     [Fact]
-    public void IsCompletedForMeetingPrint_IsTrue_WhenTaskWasAlreadyClosedAtTheMeeting()
+    public void ResolveStatus_ReturnsNewState_WhenChangeTookEffectBeforeTheMeeting()
     {
-        var evaluator = new ExportRecordVisibilityEvaluator();
+        var history = NewestFirst(Change(1, RunningStateId, DoneStateId, new DateTime(2026, 8, 20)));
 
-        var result = evaluator.IsCompletedForMeetingPrint(
-            Record(DoneStateId), TaskStates, ClosedOn20August(), new DateTime(2026, 9, 1));
-
-        result.Should().BeTrue();
+        new ExportRecordVisibilityEvaluator()
+            .ResolveStatusForMeetingPrint(Record(DoneStateId), history, new DateTime(2026, 9, 1))
+            .Should().Be(DoneStateId);
     }
 
     [Fact]
-    public void IsCompletedForMeetingPrint_CountsChangeOnTheMeetingDayAsAlreadyApplied()
+    public void ResolveStatus_CountsChangeEffectiveOnTheMeetingDayAsApplied()
     {
-        var evaluator = new ExportRecordVisibilityEvaluator();
+        var history = NewestFirst(Change(1, RunningStateId, DoneStateId, new DateTime(2026, 8, 20)));
 
-        var result = evaluator.IsCompletedForMeetingPrint(
-            Record(DoneStateId), TaskStates, ClosedOn20August(), new DateTime(2026, 8, 20));
-
-        result.Should().BeTrue("stav se bere ke konci dne jednání");
+        new ExportRecordVisibilityEvaluator()
+            .ResolveStatusForMeetingPrint(Record(DoneStateId), history, new DateTime(2026, 8, 20))
+            .Should().Be(DoneStateId, "změna platná v den jednání se počítá jako platná");
     }
 
     [Fact]
-    public void IsCompletedForMeetingPrint_IsFalse_ForPausedStateMarkedFinal()
+    public void ResolveStatus_UsesPlatiOd_NotTheMomentOfSaving()
     {
+        var history = NewestFirst(Change(
+            1, RunningStateId, DoneStateId, platiOd: new DateTime(2026, 10, 8), savedAt: new DateTime(2026, 10, 13, 7, 0, 0)));
+
+        new ExportRecordVisibilityEvaluator()
+            .ResolveStatusForMeetingPrint(Record(DoneStateId), history, new DateTime(2026, 10, 8))
+            .Should().Be(DoneStateId);
+    }
+
+    /// <summary>
+    /// Spec 2026-10-13 §4.4 — omylem ukončeno k 889 a znovuotevřeno zase k 889: obě změny
+    /// platí týž den, rozhoduje pořadí uložení a úkol nikde nevyjde jako ukončený.
+    /// </summary>
+    [Fact]
+    public void ResolveStatus_SameDayCloseAndReopen_LastSavedWins()
+    {
+        var history = NewestFirst(
+            Change(1, RunningStateId, DoneStateId, new DateTime(2026, 10, 22)),
+            Change(2, DoneStateId, RunningStateId, new DateTime(2026, 10, 22)));
         var evaluator = new ExportRecordVisibilityEvaluator();
 
-        var result = evaluator.IsCompletedForMeetingPrint(
-            Record(PausedButFinalStateId), TaskStates, [], new DateTime(2026, 9, 1));
-
-        result.Should().BeFalse("rozhodnutí U1 — pozastavení nikdy neplatí za ukončení");
+        evaluator.ResolveStatusForMeetingPrint(Record(RunningStateId), history, new DateTime(2026, 10, 22))
+            .Should().Be(RunningStateId);
+        evaluator.ResolveStatusForMeetingPrint(Record(RunningStateId), history, new DateTime(2026, 10, 8))
+            .Should().Be(RunningStateId);
     }
 
     [Fact]
-    public void IsCompletedForMeetingPrint_IsFalse_WhenRecordHasNoTaskState()
-    {
-        var evaluator = new ExportRecordVisibilityEvaluator();
-
-        var result = evaluator.IsCompletedForMeetingPrint(
-            Record(null), TaskStates, [], new DateTime(2026, 9, 1));
-
-        result.Should().BeFalse("informace a rozhodnutí nemají stav úkolu, nemohou být ukončené");
-    }
+    public void ResolveStatus_ReturnsNull_WhenRecordHasNoTaskState()
+        => new ExportRecordVisibilityEvaluator()
+            .ResolveStatusForMeetingPrint(Record(null), [], new DateTime(2026, 9, 1))
+            .Should().BeNull("informace a rozhodnutí nemají stav úkolu");
 }

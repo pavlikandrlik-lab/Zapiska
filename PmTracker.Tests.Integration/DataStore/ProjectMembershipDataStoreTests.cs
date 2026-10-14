@@ -672,14 +672,16 @@ public sealed class ProjectMembershipDataStoreTests
                 ZaznamId = becameFinalRecordId,
                 PuvodniStav = openStateId,
                 NovyStav = doneStateId,
-                DatumZmeny = new DateTime(2025, 8, 30)
+                DatumZmeny = new DateTime(2025, 8, 30),
+                PlatiOd = new DateTime(2025, 8, 30)
             },
             new ZaznamHistorieStavuZaznamuEntity
             {
                 ZaznamId = alreadyFinalRecordId,
                 PuvodniStav = openStateId,
                 NovyStav = doneStateId,
-                DatumZmeny = new DateTime(2025, 8, 10)
+                DatumZmeny = new DateTime(2025, 8, 10),
+                PlatiOd = new DateTime(2025, 8, 10)
             });
 
         var meetings = await dbContext.Jednani

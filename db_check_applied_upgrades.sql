@@ -133,6 +133,12 @@ IF @krok_existuje = 1
         N'SELECT @c = COUNT(*) FROM dbo.zaznam_harmonogram_krok WHERE skutecnost_zdroj = 3;',
         N'@c INT OUTPUT', @c = @historicka OUTPUT;
 
+DECLARE @platiOd INT = CASE
+    WHEN COL_LENGTH(N'dbo.zaznam_historie_stavu_zaznamu', N'plati_od') IS NOT NULL
+     AND COL_LENGTH(N'dbo.zaznam_historie_stavu_zaznamu', N'jednani_id') IS NOT NULL
+    THEN 1 ELSE 0 END;
+    -- 1_4_10: datum, ke kterému změna stavu platí, a vazba na jednání
+
 -- ---------------------------------------------------------------------------
 -- Otisky jednotlivých skriptů (v pořadí nasazování)
 -- ---------------------------------------------------------------------------
@@ -381,6 +387,10 @@ INSERT @r VALUES (380, N'db_upgrade_1_4_9_historicka_skutecnost',
     N'žádný krok harmonogramu s historickou skutečností (skutecnost_zdroj = 3); před spuštěním zkontroluj db_upgrade_1_4_9_historicka_skutecnost_analyza.sql (nalezeno: '
         + ISNULL(CAST(@historicka AS NVARCHAR(10)), N'-') + N')');
 
+INSERT @r VALUES (390, N'db_upgrade_1_4_10_zmena_stavu_plati_od',
+    CASE WHEN @platiOd = 1 THEN N'APLIKOVÁN' ELSE N'CHYBÍ' END,
+    N'sloupce zaznam_historie_stavu_zaznamu.plati_od a jednani_id (bez nich aplikace nenastartuje)');
+
 -- ---------------------------------------------------------------------------
 -- Výstup
 -- ---------------------------------------------------------------------------
@@ -404,6 +414,7 @@ SELECT poznamka FROM (VALUES
     (3, N'Stav PŘESKOČIT = skript mění tabulky, které migrace 1.4.0 ruší (zaznam_harmonogram_hodnoty, ciselnik_harmonogram_typu). Při skoku rovnou na 1.4.0 je spouštět nemusíš; při postupném nasazování je spusť v pořadí.'),
     (4, N'db_upgrade_1_4_0 vyžaduje již existující tabulku zaznam_harmonogram_vyjadreni_vazba (z 1_3_6) a spouští se AŽ PO nasazení nové verze aplikace (Fáze 7 — smazané staré EF entity).'),
     (5, N'Před spuštěním upgrade skriptů udělej zálohu DB. 1_3_3 a 1_4_0 jsou destruktivní (mažou data harmonogramu — dle designu zahoditelná, po nasazení se znovu vytěží).'),
-    (6, N'Nové authz per-action klíče (po 1_3_8) doseeduje aplikace při startu (PermissionSeeder) — skript je nevkládá.')
+    (6, N'Nové authz per-action klíče (po 1_3_8) doseeduje aplikace při startu (PermissionSeeder) — skript je nevkládá.'),
+    (7, N'db_upgrade_1_4_10 spusť PŘED startem nové verze aplikace (bez sloupců nenastartuje). Vyžaduje SQL Server 2016 nebo novější.')
 ) AS n(id, poznamka)
 ORDER BY id;

@@ -48,11 +48,11 @@ public interface IExportRecordVisibilityEvaluator
         DateTime? previousMeetingDate);
 
     /// <summary>
-    /// Byl úkol ukončený ke dni jednání? Podbarvení ukončených (2026-09-05), rozhodnutí U5.
+    /// Stav úkolu ke dni jednání (spec 2026-10-13 §4.7). Null = záznam stav úkolu nemá.
+    /// Z něj se v tisku jednání odvodí sloupec Stav, pozastavení i ukončení (§4.8).
     /// </summary>
-    bool IsCompletedForMeetingPrint(
+    int? ResolveStatusForMeetingPrint(
         ProjektovyZaznamEntity record,
-        IReadOnlyDictionary<int, CiselnikStavuUkoluEntity> taskStates,
         IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> statusHistory,
         DateTime anchorMeetingDate);
 }
@@ -213,24 +213,11 @@ public sealed class ExportRecordVisibilityEvaluator : IExportRecordVisibilityEva
         return !IsFinalTaskStatus(statusAtPreviousMeeting, taskStates);
     }
 
-    public bool IsCompletedForMeetingPrint(
+    public int? ResolveStatusForMeetingPrint(
         ProjektovyZaznamEntity record,
-        IReadOnlyDictionary<int, CiselnikStavuUkoluEntity> taskStates,
         IReadOnlyList<ZaznamHistorieStavuZaznamuEntity> statusHistory,
         DateTime anchorMeetingDate)
-    {
-        var statusAtAnchorMeeting = ResolveTaskStatusAtDate(record.StavUkoluId, statusHistory, anchorMeetingDate);
-        if (!statusAtAnchorMeeting.HasValue)
-        {
-            return false;
-        }
-
-        // Pozor: viditelnost dál používá holé is_final (IsFinalTaskStatus), zatímco
-        // podbarvení jde přes TaskStatusRules, které navíc vylučuje pozastavení.
-        // Rozporný stav v databázi tedy řádek skryje, ale nepodbarví — a startovní
-        // varování na něj upozorní (spec §6).
-        return TaskStatusRules.IsCompleted(taskStates.GetValueOrDefault(statusAtAnchorMeeting.Value));
-    }
+        => ResolveTaskStatusAtDate(record.StavUkoluId, statusHistory, anchorMeetingDate);
 
     private static int? ResolveTaskStatusAtDate(
         int? currentStatusId,
@@ -240,7 +227,8 @@ public sealed class ExportRecordVisibilityEvaluator : IExportRecordVisibilityEva
         var resolvedStatusId = currentStatusId;
         foreach (var change in statusHistory)
         {
-            if (change.DatumZmeny.Date <= targetDate.Date)
+            // Spec 2026-10-13 §4.7 — rozhoduje datum platnosti, ne okamžik uložení.
+            if (change.PlatiOd.Date <= targetDate.Date)
             {
                 continue;
             }
@@ -802,15 +790,15 @@ public sealed class ExportRecordProjectionBuilder(
                 .FirstOrDefault();
         var previousMeetingNumber = previousMeeting?.CisloJednani;
 
-        // Ukončenost k datu jednání (2026-09-05, rozhodnutí U5). Mimo tisk jednání
-        // zůstává null a příznak se odvodí z dnešního stavu záznamu.
-        HashSet<int>? completedRecordIds = null;
+        // Stav ke dni jednání (spec 2026-10-13 §4.8, U6). Mimo tisk jednání zůstává null
+        // a řádek se vykreslí z dnešního stavu záznamu.
+        Dictionary<int, int?>? statusAtAnchorByRecord = null;
 
         if (applyMeetingSnapshotRules && anchorMeeting is not null)
         {
             var statusHistoryByRecord = (await dbContext.ZaznamHistorieStavuZaznamu.AsNoTracking()
                 .Where(x => recordIds.Contains(x.ZaznamId))
-                .OrderByDescending(x => x.DatumZmeny)
+                .OrderByDescending(x => x.PlatiOd)
                 .ThenByDescending(x => x.Id)
                 .ToListAsync(ct))
                 .GroupBy(x => x.ZaznamId)
@@ -830,16 +818,14 @@ public sealed class ExportRecordProjectionBuilder(
                     previousMeetingDate))
                 .ToList();
 
-            completedRecordIds = records
-                .Where(record => exportRecordVisibilityEvaluator.IsCompletedForMeetingPrint(
+            statusAtAnchorByRecord = records.ToDictionary(
+                record => record.Id,
+                record => exportRecordVisibilityEvaluator.ResolveStatusForMeetingPrint(
                     record,
-                    taskStates,
-                    statusHistoryByRecord.TryGetValue(record.Id, out var completionHistory)
-                        ? completionHistory
+                    statusHistoryByRecord.TryGetValue(record.Id, out var anchorHistory)
+                        ? anchorHistory
                         : Array.Empty<ZaznamHistorieStavuZaznamuEntity>(),
-                    anchorMeetingDate))
-                .Select(record => record.Id)
-                .ToHashSet();
+                    anchorMeetingDate));
         }
 
         var filteredComments = anchorMeeting is null
@@ -921,6 +907,10 @@ public sealed class ExportRecordProjectionBuilder(
                 : null;
             var subsystem = subsystems.GetValueOrDefault(record.SubsystemId);
             var hasProjectOrder = subsystemOrderById.TryGetValue(record.SubsystemId, out var subsystemOrder);
+            var printedStatusId = statusAtAnchorByRecord is not null
+                ? statusAtAnchorByRecord[record.Id]
+                : record.StavUkoluId;
+            var printedStatus = printedStatusId.HasValue ? taskStates.GetValueOrDefault(printedStatusId.Value) : null;
 
             return new PdfExportRecordViewModel
             {
@@ -936,14 +926,9 @@ public sealed class ExportRecordProjectionBuilder(
                 Kategorie = category?.Nazev ?? "-",
                 TypUkoluKod = taskType?.Kod,
                 TypUkolu = taskType?.Nazev,
-                Stav = record.StavUkoluId.HasValue ? taskStates.GetValueOrDefault(record.StavUkoluId.Value)?.Nazev ?? "-" : "-",
-                IsPaused = record.StavUkoluId.HasValue
-                    && TaskStatusRules.IsPausedName(taskStates.GetValueOrDefault(record.StavUkoluId.Value)?.Nazev),
-                IsCompleted = completedRecordIds is not null
-                    ? completedRecordIds.Contains(record.Id)
-                    : TaskStatusRules.IsCompleted(record.StavUkoluId.HasValue
-                        ? taskStates.GetValueOrDefault(record.StavUkoluId.Value)
-                        : null),
+                Stav = printedStatusId.HasValue ? printedStatus?.Nazev ?? "-" : "-",
+                IsPaused = TaskStatusRules.IsPausedName(printedStatus?.Nazev),
+                IsCompleted = TaskStatusRules.IsCompleted(printedStatus),
                 Vlastnik = BuildDisplayNameFromOsoba(people.GetValueOrDefault(record.VlastnikId)),
                 SubsystemKod = subsystem?.Kod ?? "-",
                 Subsystem = subsystem?.Nazev ?? "-",
