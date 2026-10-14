@@ -3,7 +3,7 @@
 @using PmTracker.Web.Models.ViewModels
 @{
     var krok = Model.Krok;
-    var manualInputIndex = Model.ManualInputIndex;
+    var hodnotaIndex = Model.HodnotaIndex;
     var isLocked = Model.IsLocked;
     var canEdit = Model.CanEditManualActual && !isLocked;
     var isManualKrok = krok.IsManualKrok;
@@ -43,12 +43,9 @@
         && krok.Kandidati.Count >= 2;
 }
 
-@* Plán D Task 8 — render skutečnosti kroku na základě ZdrojSkutecnosti:
-   1) FromVyjadreni: read-only odchylka + chat ikona (otevře vyjádření)
-   2) Manual / None u manual kroku (2/5/8/9): editovatelný date input nebo read-only span
-   3) None u auto kroku (1/3/4/6/7/10): varovná ikona "automat zatím nenašel vyjádření"
-   Plán 4 Feature C Task 6 — na všechny varianty navázán wrapper s badge (audit zdroj)
-   a volitelným toggle switch (Auto ⇄ Ručně) vpravo nahoře.
+@* Buňka skutečnosti kroku (spec 2026-10-14): kroky 2/5/8/9 vstup (nebo read-only span),
+   kroky 1/3/4/6/7/10 varianta Auto (bublina z vyjádření / uložené datum / varování) a varianta
+   Manual (vstup). Plán 4 Feature C Task 6 — na všechny varianty navázán wrapper s badge (audit zdroj).
 *@
 <div class="schedule-actual-cell"
      data-schedule-actual-cell
@@ -110,206 +107,103 @@
 
     <div class="schedule-actual-cell__main">
 @*
-    FIX 2026-05-04: pro auto-eligible kroky (1/3/4/6/7/10, isManualKrok=false) renderuje cell
-    OBĚ varianty (auto bubble + manual editable input). CSS pravidla v site.css na atributu
-    data-skutecnost-rezim ovládají počáteční viditelnost. Master switch v JS přepíná atribut
-    bez reload — viditelnost se mění CSS-only. Form vždy obsahuje hidden KrokKey + AbsolutniDatum
-    inputy (s prázdnou hodnotou pokud Auto), takže Save flow uložím rezim + datumy v jednom POST.
+    Spec 2026-10-14: skutečnost kroku jde jediným polem HarmonogramHodnoty[i].SkutecnostDatum.
+    Kroky 1/3/4/6/7/10 mají dvě varianty řízené atributem data-skutecnost-rezim na buňce
+    (CSS components/schedule-actual-cell-feature-c.css): Auto = co vyplnil automat nebo co je
+    uložené, Manual = editovatelný vstup. Kroky 2/5/8/9 jsou vždy ruční (R3) — automat je
+    nevyplňuje (HarmonogramKrokDatumMapping je nemapuje), proto nemají variantu Auto.
 *@
 @{
-    var renderManualForAutoEligible = !isManualKrok && manualInputIndex >= 0 && canEdit;
-}
-@if (zdroj == PmTracker.Web.Services.Records.ZdrojSkutecnosti.FromVyjadreni)
-{
-    var datumLabel = krok.SourceVyjadreniDatum?.ToString("dd.MM.yyyy") ?? string.Empty;
-    var tooltip = string.IsNullOrEmpty(datumLabel)
-        ? "Skutečnost pochází z navázaného vyjádření."
-        : $"Z vyjádření {datumLabel}";
-    @* FIX 2026-05-04: visible datum musí odpovídat tooltipu — autoritativní datum je
-       SourceVyjadreniDatum (datum konkrétního vyjádření, na které je krok navázán),
-       ne computed SkutecneDatum (baseline + odchylka). Computed SkutecneDatum vracelo
-       stejný datum pro všechny FromVyjadreni kroky (chybný diff/baseline scenario),
-       i když tooltip ukazoval správný per-krok datum. *@
-    var visibleDatum = krok.SourceVyjadreniDatum?.ToString("dd.MM.yyyy")
-        ?? (krok.SkutecneDatum?.ToString("dd.MM.yyyy") ?? "—");
-    <div class="schedule-actual-from-vyjadreni" data-schedule-actual-source="vyjadreni" data-rezim-show-on="Auto">
-        <span class="schedule-actual-datum" data-manual-krok-readonly>@visibleDatum</span>
-        @if (krok.SourceExterniOdkazId.HasValue && Model.ZaznamId > 0)
-        {
-            <pm-button variant="Ghost"
-                       size="Small"
-                       data-external-chat-open="true"
-                       data-external-chat-mode="@(Model.VyjadreniOknoUpravy ? "edit" : "read")"
-                       data-external-odkaz-id="@krok.SourceExterniOdkazId.Value"
-                       data-external-zaznam-id="@Model.ZaznamId"
-                       data-schedule-actual-from-vyjadreni
-                       title="@tooltip"
-                       aria-label="@tooltip">
-                <gov-icon size="s" name="chat" type="components" aria-hidden="true"></gov-icon>
-            </pm-button>
-        }
-    </div>
-    @if (renderManualForAutoEligible)
+    var skutecneDisplay = krok.SkutecneDatum?.ToString("dd.MM.yyyy");
+    var readonlyTooltip = isLocked
+        ? "Skutečnost tohoto kroku je uzamčená — čeká se na rozhodnutí návrhu."
+        : "Nemáte oprávnění editovat skutečnost.";
+    var vstupModel = new ScheduleBlockManualCellViewModel
     {
-        <partial name="_ScheduleBlockManualCellInput" model="@(new PmTracker.Web.Models.ViewModels.ScheduleBlockManualCellViewModel
-        {
-            Krok = krok,
-            ManualInputIndex = manualInputIndex,
-            ZaznamId = Model.ZaznamId,
-            CanEditManualActual = canEdit,
-            IsLocked = isLocked
-        })" />
-    }
+        Krok = krok,
+        HodnotaIndex = hodnotaIndex,
+        ZaznamId = Model.ZaznamId,
+        CanEditManualActual = canEdit,
+        IsLocked = isLocked
+    };
 }
-else if (isManualKrok)
+@if (isManualKrok)
 {
-    @* FIX 2026-05-04: Manuální krok 2/5/8/9 — render OBOU variant (manual input + bubble z vyjádření)
-       + chevron-down dropdown pro výběr "Ručně" / "Z vyjádření". Volba se posílá v hidden inputu
-       ManualActualKroky[i].PreferredZdroj ("Manual" / "Auto"). Server (RecordService.SaveRecord)
-       Auto = krok řádek na Rezim=Auto, Zdroj=Neznamo, SkutecnostDatum=null (auto-sync). *@
     if (canEdit)
     {
-        var hasManualDate = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
-            && krok.SkutecneDatum.HasValue;
-        var isoValue = hasManualDate ? krok.SkutecneDatum!.Value.ToString("yyyy-MM-dd") : string.Empty;
-        var displayValue = hasManualDate ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy") : string.Empty;
-        var hasVyjadreniBinding = krok.SourceVyjadreniDatum.HasValue;
-        var initialPreferredZdroj = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.FromVyjadreni
-            ? "Auto"
-            : "Manual";
-        var manualVariantShowOn = hasVyjadreniBinding ? "Manual" : null;
-        var vyjadreniDatumDisplay = krok.SourceVyjadreniDatum?.ToString("dd.MM.yyyy") ?? string.Empty;
-        var vyjadreniDatumTooltip = string.IsNullOrEmpty(vyjadreniDatumDisplay)
-            ? "Datum z vyjádření zatím není dostupné."
-            : $"Z vyjádření {vyjadreniDatumDisplay}";
-
-        <input type="hidden"
-               name="ManualActualKroky[@manualInputIndex].Poradi"
-               value="@krok.KrokIndex"
-               data-manual-krok-keyhidden />
-        <input type="hidden"
-               name="ManualActualKroky[@manualInputIndex].PreferredZdroj"
-               value="@initialPreferredZdroj"
-               data-manual-krok-preferred-zdroj
-               data-manual-krok-key="@krok.KrokIndex" />
-
-        <div class="schedule-actual-manual schedule-actual-manual-editable"
-             data-schedule-actual-source="manual"
-             data-rezim-show-on="@manualVariantShowOn">
-            @await Html.PartialAsync(
-                "_AppDateField",
-                new AppDateFieldViewModel
-                {
-                    Name = $"ManualActualKroky[{manualInputIndex}].AbsolutniDatum",
-                    IsoValue = isoValue,
-                    DisplayValue = displayValue,
-                    Locked = false,
-                    Clearable = true,  // FIX 2026-05-05: user musí mít možnost smazat datum z manuálního kroku
-                    AriaLabel = $"Skutečnost kroku {krok.Nazev}",
-                    ContainerCssClass = "schedule-actual-manual-date",
-                    ExtraDataAttributes = new Dictionary<string, object?>
-                    {
-                        ["data-manual-krok-input"] = "true",
-                        ["data-manual-krok-index"] = krok.KrokIndex.ToString(),
-                        ["data-manual-krok-key"] = krok.KrokIndex.ToString()
-                    }
-                })
-        </div>
-
-        @if (hasVyjadreniBinding)
-        {
-            <div class="schedule-actual-from-vyjadreni"
-                 data-schedule-actual-source="vyjadreni"
-                 data-rezim-show-on="Auto">
-                <span class="schedule-actual-datum" data-manual-krok-readonly>@vyjadreniDatumDisplay</span>
-                @if (krok.SourceExterniOdkazId.HasValue && Model.ZaznamId > 0)
-                {
-                    <pm-button variant="Ghost"
-                               size="Small"
-                               native-type="button"
-                               data-external-chat-open="true"
-                               data-external-chat-mode="@(Model.VyjadreniOknoUpravy ? "edit" : "read")"
-                               data-external-odkaz-id="@krok.SourceExterniOdkazId.Value"
-                               data-external-zaznam-id="@Model.ZaznamId"
-                               data-schedule-actual-from-vyjadreni
-                               title="@vyjadreniDatumTooltip"
-                               aria-label="@vyjadreniDatumTooltip">
-                        <gov-icon size="s" name="chat" type="components" aria-hidden="true"></gov-icon>
-                    </pm-button>
-                }
-            </div>
-
-            @* Chevron dropdown — výběr "Ručně" / "Z vyjádření". Klient JS aktualizuje
-               data-skutecnost-rezim na cell + hidden PreferredZdroj. Pre-selected = current ZdrojSkutecnosti. *@
-            <details class="schedule-actual-cell__dropdown"
-                     data-manual-zdroj-dropdown
-                     data-krok-key="@krok.KrokIndex">
-                <summary class="schedule-actual-cell__dropdown-summary"
-                         title="Zvolit zdroj skutečnosti"
-                         aria-label="Zvolit zdroj skutečnosti">
-                    <span class="schedule-actual-cell__dropdown-chevron" aria-hidden="true">▼</span>
-                </summary>
-                <ul class="schedule-actual-cell__dropdown-list" role="menu">
-                    <li role="none">
-                        <button type="button" role="menuitem"
-                                class="schedule-actual-cell__dropdown-btn"
-                                data-manual-zdroj-select="Manual"
-                                aria-current="@(initialPreferredZdroj == "Manual" ? "true" : "false")">
-                            <span aria-hidden="true">✍️</span>
-                            <span>Ručně</span>
-                        </button>
-                    </li>
-                    <li role="none">
-                        <button type="button" role="menuitem"
-                                class="schedule-actual-cell__dropdown-btn"
-                                data-manual-zdroj-select="Auto"
-                                aria-current="@(initialPreferredZdroj == "Auto" ? "true" : "false")">
-                            <gov-icon size="s" name="chat" type="components" aria-hidden="true"></gov-icon>
-                            <span>Z vyjádření</span>
-                        </button>
-                    </li>
-                </ul>
-            </details>
-        }
+        <partial name="_ScheduleBlockManualCellInput" model="@vstupModel" />
     }
     else
     {
-        var readonlyLabel = krok.ZdrojSkutecnosti == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual
-                && krok.SkutecneDatum.HasValue
-            ? krok.SkutecneDatum!.Value.ToString("dd.MM.yyyy")
-            : "—";
-        var lockedTooltip = isLocked
-            ? "Skutečnost tohoto kroku je uzamčená — čeká se na rozhodnutí návrhu."
-            : "Nemáte oprávnění editovat skutečnost.";
         <div class="schedule-actual-manual schedule-actual-manual-readonly" data-schedule-actual-source="manual">
             <span class="schedule-actual-datum"
                   data-manual-krok-readonly
                   data-manual-krok-locked="@(isLocked ? "true" : "false")"
-                  title="@lockedTooltip">@readonlyLabel</span>
+                  title="@readonlyTooltip">@(skutecneDisplay ?? "—")</span>
         </div>
     }
 }
 else
 {
-    @* Auto krok bez vazby — varovná ikona (Auto rezim variant) *@
-    <div class="schedule-actual-pending" data-schedule-actual-source="none" data-rezim-show-on="Auto">
-        <span class="schedule-actual-datum" data-manual-krok-readonly>—</span>
-        <span class="schedule-actual-warning"
-              data-manual-krok-warning
-              title="Automat zatím nenašel vhodné vyjádření.">
-            <gov-icon size="s" name="exclamation-triangle-fill" type="components" aria-hidden="true"></gov-icon>
-        </span>
-    </div>
-    @if (renderManualForAutoEligible)
+    @* Varianta Auto *@
+    if (zdroj == PmTracker.Web.Services.Records.ZdrojSkutecnosti.FromVyjadreni)
     {
-        <partial name="_ScheduleBlockManualCellInput" model="@(new PmTracker.Web.Models.ViewModels.ScheduleBlockManualCellViewModel
-        {
-            Krok = krok,
-            ManualInputIndex = manualInputIndex,
-            ZaznamId = Model.ZaznamId,
-            CanEditManualActual = canEdit,
-            IsLocked = isLocked
-        })" />
+        var tooltip = krok.SourceVyjadreniDatum is { } vyjDatum
+            ? $"Z vyjádření {vyjDatum:dd.MM.yyyy}"
+            : "Skutečnost pochází z navázaného vyjádření.";
+        var visibleDatum = krok.SourceVyjadreniDatum?.ToString("dd.MM.yyyy") ?? skutecneDisplay ?? "—";
+        <div class="schedule-actual-from-vyjadreni" data-schedule-actual-source="vyjadreni" data-rezim-show-on="Auto">
+            <span class="schedule-actual-datum" data-manual-krok-readonly>@visibleDatum</span>
+            @if (krok.SourceExterniOdkazId.HasValue && Model.ZaznamId > 0)
+            {
+                <pm-button variant="Ghost"
+                           size="Small"
+                           data-external-chat-open="true"
+                           data-external-chat-mode="@(Model.VyjadreniOknoUpravy ? "edit" : "read")"
+                           data-external-odkaz-id="@krok.SourceExterniOdkazId.Value"
+                           data-external-zaznam-id="@Model.ZaznamId"
+                           data-schedule-actual-from-vyjadreni
+                           title="@tooltip"
+                           aria-label="@tooltip">
+                    <gov-icon size="s" name="chat" type="components" aria-hidden="true"></gov-icon>
+                </pm-button>
+            }
+        </div>
+    }
+    else if (zdroj == PmTracker.Web.Services.Records.ZdrojSkutecnosti.Manual && skutecneDisplay is not null)
+    {
+        @* Ruční (✍️) nebo historické (📜) datum uložené na kroku. V Auto režimu se jen zobrazí —
+           nová data tam nevzniknou (přepnutí na automatiku je maže, R2), zůstat mohou jen
+           z migrace starých delay hodnot (1_3_10, Historická + Auto). *@
+        <div class="schedule-actual-stored" data-schedule-actual-source="stored" data-rezim-show-on="Auto">
+            <span class="schedule-actual-datum" data-manual-krok-readonly>@skutecneDisplay</span>
+        </div>
+    }
+    else
+    {
+        <div class="schedule-actual-pending" data-schedule-actual-source="none" data-rezim-show-on="Auto">
+            <span class="schedule-actual-datum" data-manual-krok-readonly>—</span>
+            <span class="schedule-actual-warning"
+                  data-manual-krok-warning
+                  title="Automat zatím nenašel vhodné vyjádření.">
+                <gov-icon size="s" name="exclamation-triangle-fill" type="components" aria-hidden="true"></gov-icon>
+            </span>
+        </div>
+    }
+
+    @* Varianta Manual *@
+    if (canEdit)
+    {
+        <partial name="_ScheduleBlockManualCellInput" model="@vstupModel" />
+    }
+    else
+    {
+        <div class="schedule-actual-manual schedule-actual-manual-readonly" data-schedule-actual-source="manual" data-rezim-show-on="Manual">
+            <span class="schedule-actual-datum"
+                  data-manual-krok-readonly
+                  data-manual-krok-locked="@(isLocked ? "true" : "false")"
+                  title="@readonlyTooltip">@(skutecneDisplay ?? "—")</span>
+        </div>
     }
 }
     </div>

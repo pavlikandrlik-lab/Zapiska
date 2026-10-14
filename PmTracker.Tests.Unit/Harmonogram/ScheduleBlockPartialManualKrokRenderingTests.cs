@@ -15,6 +15,7 @@ public sealed class ScheduleBlockPartialManualKrokRenderingTests
 {
     private const string PartialPath = "PmTracker.Web/Views/Shared/_ScheduleTable.cshtml";
     private const string ManualCellPartialPath = "PmTracker.Web/Views/Shared/_ScheduleBlockManualCell.cshtml";
+    private const string ManualCellInputPartialPath = "PmTracker.Web/Views/Shared/_ScheduleBlockManualCellInput.cshtml";
 
     private static string LoadRepoText(string relativePath)
     {
@@ -37,7 +38,8 @@ public sealed class ScheduleBlockPartialManualKrokRenderingTests
     /// <summary>Složený text obou partials — skutečnost se renderuje v jednom z nich.</summary>
     private static string LoadCombinedPartialText()
     {
-        return LoadRepoText(PartialPath) + "\n" + LoadRepoText(ManualCellPartialPath);
+        return LoadRepoText(PartialPath) + "\n" + LoadRepoText(ManualCellPartialPath)
+            + "\n" + LoadRepoText(ManualCellInputPartialPath);
     }
 
     [Fact]
@@ -69,9 +71,6 @@ public sealed class ScheduleBlockPartialManualKrokRenderingTests
     {
         var text = LoadCombinedPartialText();
         text.Should().Contain(
-            "ZdrojSkutecnosti.None",
-            "Task 8: musí existovat větev pro None (auto krok bez vazby).");
-        text.Should().Contain(
             "data-manual-krok-warning",
             "Task 8: varovná ikona musí mít stabilní hook pro JS/testy.");
     }
@@ -80,18 +79,16 @@ public sealed class ScheduleBlockPartialManualKrokRenderingTests
     public void Partial_Renders_DateInput_For_Manual_State()
     {
         var text = LoadCombinedPartialText();
-        text.Should().Contain(
-            "data-manual-krok-input",
-            "Task 8: JS modul manualKroky.js se váže přes data-manual-krok-input.");
-        text.Should().Contain(
-            "ManualActualKroky[",
-            "Datum-model: form POST váže pole na ManualActualKroky[i].Poradi/AbsolutniDatum.");
-        text.Should().Contain(
-            ".Poradi",
-            "Datum-model: pořadí kroku (1–10) se posílá jako hidden místo Guid KrokKey.");
-        text.Should().Contain(
-            ".AbsolutniDatum",
-            "Task 8: AbsolutniDatum se posílá jako yyyy-MM-dd z date inputu.");
+        text.Should().Contain("data-manual-krok-input",
+            "JS modul manualKroky.js se váže přes data-manual-krok-input.");
+        text.Should().Contain("HarmonogramHodnoty[",
+            "Spec 2026-10-14 R1: skutečnost jde jediným seznamem HarmonogramHodnoty[i].");
+        text.Should().Contain(".SkutecnostDatumPuvodni",
+            "Spec 2026-10-14 R6: s vstupem jde hodnota při vykreslení.");
+        text.Should().NotContain("ManualActualKroky",
+            "druhý seznam s vlastním čítačem způsoboval díru v číslování (D1).");
+        text.Should().NotContain("data-manual-zdroj-dropdown",
+            "volba Ručně / Z vyjádření u kroků 2/5/8/9 byla mrtvý kód (D5).");
     }
 
     [Fact]

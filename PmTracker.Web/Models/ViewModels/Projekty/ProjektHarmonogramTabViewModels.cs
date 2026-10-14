@@ -248,8 +248,12 @@ public sealed class ScheduleBlockManualCellViewModel
 {
     public required HarmonogramKrokEditViewModel Krok { get; init; }
 
-    /// <summary>Pořadí inputu v rámci <c>ManualActualKroky[i]</c> kolekce ve form POST.</summary>
-    public int ManualInputIndex { get; init; }
+    /// <summary>
+    /// Spec 2026-10-14 R1 — index řádku v <c>HarmonogramHodnoty[i]</c> (pevný 0–9 podle pořadí
+    /// řádku tabulky). Skutečnost jde stejným indexem jako Poradi a PlanDatum, takže díra
+    /// v číslování nemůže vzniknout.
+    /// </summary>
+    public required int HodnotaIndex { get; init; }
 
     public int ZaznamId { get; init; }
 

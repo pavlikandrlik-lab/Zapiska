@@ -630,8 +630,8 @@ export class ScheduleBlockRenderer {
         return null;
     }
 
-    // Plán: [name$=".PlanDatum"]. Skutečnost: manuální input (ManualActualKroky[*].AbsolutniDatum)
-    // nebo fallback HarmonogramHodnoty[*].SkutecnostDatum; pro auto kroky read-only z data-step-actual-iso.
+    // Plán: [name$=".PlanDatum"]. Skutečnost: HarmonogramHodnoty[*].SkutecnostDatum (spec 2026-10-14),
+    // prázdné pole (vyčištěné přepínačem) → uložená hodnota z data-step-actual-iso.
     computeDateModel() {
         const startDate = this.getStartDate();
         let planCursor = new Date(startDate.getTime());
@@ -651,8 +651,7 @@ export class ScheduleBlockRenderer {
             plan.push({ start: planStart, end: planEnd });
             planCursor = new Date(planEnd.getTime());
 
-            const actualIso = this.rowDateIso(row, "AbsolutniDatum")
-                || this.rowDateIso(row, "SkutecnostDatum")
+            const actualIso = this.rowDateIso(row, "SkutecnostDatum")
                 || (String(row.dataset.stepActualIso || "").trim() || null);
             const actualDate = parseIsoDate(actualIso);
             const actualStart = new Date(actualCursor.getTime());

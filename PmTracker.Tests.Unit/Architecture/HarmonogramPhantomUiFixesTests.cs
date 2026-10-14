@@ -78,7 +78,8 @@ public sealed class HarmonogramPhantomUiFixesTests
     [Fact]
     public void ScheduleBlockManualCell_ManualKrokInput_MaClearable()
     {
-        var src = Read("PmTracker.Web/Views/Shared/_ScheduleBlockManualCell.cshtml");
+        // Spec 2026-10-14: vstup skutečnosti je jediný sdílený partial pro všechny kroky.
+        var src = Read("PmTracker.Web/Views/Shared/_ScheduleBlockManualCellInput.cshtml");
         src.Should().Contain("Clearable = true",
             "FIX 2026-05-05: manuální krok 2/5/8/9 musí mít clearable date field (jiný způsob smazat datum neexistuje).");
     }

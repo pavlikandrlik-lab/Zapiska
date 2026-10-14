@@ -59,7 +59,8 @@ public sealed class ScheduleTableExtractionTests
     {
         // Kontrakt form bindingu a stavové logiky se přesunem NESMÍ změnit.
         Table.Should().Contain("HarmonogramHodnoty[", "plánové datum drží form binding");
-        Table.Should().Contain("var manualInputIndex = 0;", "čítač manual inputů se přesunul s tabulkou");
+        Table.Should().Contain("HodnotaIndex = i", "spec 2026-10-14 R1: skutečnost jde indexem řádku, žádný vlastní čítač");
+        Table.Should().NotContain("manualInputIndex", "vlastní čítač způsoboval díru v číslování (D1)");
         Table.Should().Contain("Model.HideActual", "7b větev skrytí skutečnosti");
         Table.Should().Contain("EditorChangedTypeTooltips", "proposal-diff zvýraznění kroků");
         Table.Should().Contain("_ScheduleBlockManualCell", "manual/auto buňky renderuje původní sub-partial");

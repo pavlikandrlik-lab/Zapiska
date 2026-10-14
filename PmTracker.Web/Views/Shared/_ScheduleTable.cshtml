@@ -3,9 +3,6 @@
     // Stránka záznamu (2026-07-14): tabulková část harmonogramu vyčleněná z _ScheduleBlock,
     // aby ji mohl použít editor (přes _ScheduleBlock) i read-only tabulkový režim na
     // stránce záznamu. ČISTÝ PŘESUN — výstup se nesmí lišit.
-    // Plán D Task 8: pořadí manual kroků v rámci ManualActualKroky[] binding.
-    // Počítá se jen pro kroky, u kterých opravdu renderujeme manual input/read-only.
-    var manualInputIndex = 0;
     var lockedManualKrokKeys = Model.LockedManualKrokKeys ?? new HashSet<int>();
 }
         <div class="schedule-table-wrap">
@@ -91,40 +88,13 @@
                             </td>
                             <td>
                                 @{
-                                    // Plán D Task 8: Skutečnost sloupec — rozhodnutí mezi 4 scénáři:
-                                    //  A) Manual krok {2,5,8,9} → date input (editable/read-only) přes _ScheduleBlockManualCell
-                                    //  B) Auto krok s ZdrojSkutecnosti.FromVyjadreni → read-only odchylka + chat ikona
-                                    //  C) Auto krok s ZdrojSkutecnosti.None → warning ikona (jen u existujícího záznamu)
-                                    //  D) Ostatní (Create flow, legacy) → původní delay input UI
-                                    //
-                                    // U Create flow (RecordId = 0) ještě neexistuje žádná vazba / skutečnost,
-                                    // takže ani warning ani read-only zobrazení nedává smysl — padá to na legacy
-                                    // delay input, který umožní pre-fill. Manual kroky ale renderujeme vždy
-                                    // (i u Create — schéma 3 pre-bound vazby).
-                                    var zdrojSkut = krok.ZdrojSkutecnosti;
                                     var isKrokLocked = krok.KrokIndex >= 1 && lockedManualKrokKeys.Contains(krok.KrokIndex);
-                                    var hasExistingRecord = Model.RecordId > 0;
-                                    var useManualCell = krok.IsManualKrok;
-                                    var useFromVyjadreniCell = !useManualCell
-                                        && hasExistingRecord
-                                        && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.FromVyjadreni;
-                                    var useNoneCell = !useManualCell
-                                        && !useFromVyjadreniCell
-                                        && hasExistingRecord
-                                        && zdrojSkut == PmTracker.Web.Services.Records.ZdrojSkutecnosti.None;
-                                    // FIX 2026-05-04: master switch Manual rezim podporuje ruční datum i pro auto-eligible
-                                    // kroky 1/3/4/6/7/10. Tj. assignedManualIndex se přiděluje VŠEM task-eligible cells
-                                    // (ne jen 2/5/8/9). Cell partial render obě varianty (auto bubble + manual input)
-                                    // a CSS pravidlo na data-skutecnost-rezim řídí výchozí viditelnost.
-                                    // 7b: u skrytého skutečnostního sloupce (návrh založení) NErenderujeme žádný
-                                    // skutečnostní input → manualInputIndex se nesmí inkrementovat.
-                                    var allowManualForAutoEligible = !useManualCell && hasExistingRecord && Model.CanEditManualActual;
-                                    var canShowManualForRezim = !Model.HideActual && (useManualCell || allowManualForAutoEligible);
-                                    var assignedManualIndex = canShowManualForRezim ? manualInputIndex++ : -1;
+                                    // Spec 2026-10-14 R1: skutečnost jde polem HarmonogramHodnoty[i].SkutecnostDatum
+                                    // se stejným indexem i jako Poradi a PlanDatum výše → díra v číslování nevznikne.
+                                    // U existujícího záznamu obsluhuje všechny kroky ruční buňka (varianty Auto/Manual
+                                    // řídí přepínač). Záložní zamčené pole níže zůstává jen pro zakládání záznamu.
+                                    var useManualCell = krok.IsManualKrok || Model.RecordId > 0;
                                 }
-                                @* Datum-model (Fáze 3b): skutečnost (datum) řeší manuální buňka přes
-                                   ManualActualKroky[]; plán už nese HarmonogramHodnoty[i].PlanDatum výše.
-                                   Žádné offset DELAY páry. *@
                                 @if (Model.HideActual)
                                 {
                                     @* 7b: návrh založení vyplňuje pouze plán; skutečnost až po založení. *@
@@ -137,35 +107,7 @@
                                         new ScheduleBlockManualCellViewModel
                                         {
                                             Krok = krok,
-                                            ManualInputIndex = assignedManualIndex,
-                                            ZaznamId = Model.RecordId,
-                                            CanEditManualActual = Model.CanEditManualActual,
-                                            IsLocked = isKrokLocked,
-                                            VyjadreniOknoUpravy = Model.VyjadreniOknoUpravy
-                                        })
-                                }
-                                else if (useFromVyjadreniCell)
-                                {
-                                    @await Html.PartialAsync(
-                                        "_ScheduleBlockManualCell",
-                                        new ScheduleBlockManualCellViewModel
-                                        {
-                                            Krok = krok,
-                                            ManualInputIndex = assignedManualIndex,
-                                            ZaznamId = Model.RecordId,
-                                            CanEditManualActual = Model.CanEditManualActual,
-                                            IsLocked = isKrokLocked,
-                                            VyjadreniOknoUpravy = Model.VyjadreniOknoUpravy
-                                        })
-                                }
-                                else if (useNoneCell)
-                                {
-                                    @await Html.PartialAsync(
-                                        "_ScheduleBlockManualCell",
-                                        new ScheduleBlockManualCellViewModel
-                                        {
-                                            Krok = krok,
-                                            ManualInputIndex = assignedManualIndex,
+                                            HodnotaIndex = i,
                                             ZaznamId = Model.RecordId,
                                             CanEditManualActual = Model.CanEditManualActual,
                                             IsLocked = isKrokLocked,
@@ -174,7 +116,8 @@
                                 }
                                 else
                                 {
-                                    // Datum-model (Fáze 3b): fallback (Create flow / ostatní) — skutečnost je
+                                    // Zakládání záznamu: kroky 1/3/4/6/7/10 ještě nemají skutečnost — zamčené pole.
+                                    // Datum-model (Fáze 3b): skutečnost je
                                     // datum kroku (HarmonogramHodnoty[i].SkutecnostDatum), žádné offsety/steppery.
                                     // Prázdné = krok ještě nenastal.
                                     var hasActualDate = krok.OdchylkaDni.HasValue;

@@ -152,6 +152,14 @@ public sealed partial class ProjectService
             ? await harmonogramSkutecnostSync.GetKandidatiForZaznamAsync(record.Id, ct).ConfigureAwait(false)
             : Array.Empty<BindingKandidat>() as IReadOnlyList<BindingKandidat>;
 
+        // FIX 2026-05-04: master switch reflektuje JEN auto-eligible kroky (1/3/4/6/7/10).
+        // Manuální kroky 2/5/8/9 mají skutečnost vždy Manual (HarmonogramManualSteps),
+        // jejich rezim na Manual NESMÍ flipnout master switch — switch řídí jen
+        // auto-fill chování pro kroky napojené na ServiceDesk vyjádření. Bez tohoto filtru
+        // user editující datum kroku 2 by viděl po reload switch=OFF (= Manual rezim
+        // pro celý harmonogram), což je nesprávně.
+        var zaznamAutoFill = HarmonogramAutoFillRule.IsAutoFill(krokRows.Select(k => ((int)k.Poradi, k.SkutecnostRezim)));
+
         var baseKroky = HarmonogramDateBlokBuilder.BuildKroky(record.DatumZalozeni, krokRows, todayDate);
         var harmonogramBlokKroky = baseKroky.Select(baseKrok =>
         {
@@ -205,7 +213,14 @@ public sealed partial class ProjectService
                 SourceVyjadreniDatum = winner?.Datum,
                 SourceExterniOdkazId = winner?.ExterniOdkazId,
                 DelayHodnotaId = krokRow?.Id,
-                SkutecnostRezim = (PmTracker.Web.Models.Entities.SkutecnostRezimEnum)(krokRow?.SkutecnostRezim ?? 0),
+                // Spec 2026-10-14 R2 „nic mezi“: buňka kroku 1/3/4/6/7/10 ukazuje režim ZÁZNAMU
+                // (stejné pravidlo jako přepínač), ne řádku — smíšený stav ze starých návrhů
+                // nesmí vypadat jako „automatika zapnutá, ale některá data ruční“.
+                SkutecnostRezim = HarmonogramManualSteps.IsManual(poradi)
+                    ? (PmTracker.Web.Models.Entities.SkutecnostRezimEnum)(krokRow?.SkutecnostRezim ?? 0)
+                    : zaznamAutoFill
+                        ? PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Auto
+                        : PmTracker.Web.Models.Entities.SkutecnostRezimEnum.Manual,
                 SkutecnostZdroj = (PmTracker.Web.Models.Entities.SkutecnostZdrojEnum)(krokRow?.SkutecnostZdroj ?? 0),
                 PreferredExterniOdkazId = krokRow?.PreferredExterniOdkazId,
                 CanToggleRezim = canToggleRezim,
@@ -262,13 +277,7 @@ public sealed partial class ProjectService
             }).ToList(),
             VlastnikId = record.VlastnikId,
             JeUkolKategorie = isTaskCategory,
-            // FIX 2026-05-04: master switch reflektuje JEN auto-eligible kroky (1/3/4/6/7/10).
-            // Manuální kroky 2/5/8/9 mají skutečnost vždy Manual (HarmonogramManualSteps),
-            // jejich rezim na Manual NESMÍ flipnout master switch — switch řídí jen
-            // auto-fill chování pro kroky napojené na ServiceDesk vyjádření. Bez tohoto filtru
-            // user editující datum kroku 2 by viděl po reload switch=OFF (= Manual rezim
-            // pro celý harmonogram), což je nesprávně.
-            HarmonogramAutoFillSwitchOn = HarmonogramAutoFillRule.IsAutoFill(krokRows.Select(k => ((int)k.Poradi, k.SkutecnostRezim))),
+            HarmonogramAutoFillSwitchOn = zaznamAutoFill,
             HarmonogramBlok = BuildScheduleBlockViewModel(
                 record.Id,
                 "record-editor",
