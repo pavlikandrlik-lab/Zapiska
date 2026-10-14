@@ -1,142 +1,86 @@
 ---
 title: Manuální skutečnost a režim Auto/Ručně
-description: Jak ručně zadat skutečnost kroku a kdy aplikace přestane přepisovat.
+description: Jak ručně zadat skutečnost kroku, co dělá přepínač Automatické vyplňování harmonogramu a které kroky jsou vždy ruční.
 ---
 
-# Manuální skutečnost — režim Auto vs. Ručně
+# Manuální skutečnost — automatické a ruční vyplňování
 
-Auto-fill ze SD je výborný default, ale někdy ho user chce **přepsat ručně**:
+Skutečnost kroku harmonogramu je datum, kdy krok opravdu skončil. Vyplňuje ji buď
+**automat** z vyjádření v ServiceDesku, nebo **uživatel**. Nic mezi: když je automatika
+zapnutá, vyplňuje kroky automat; když je vypnutá, vyplňujete je vy.
 
-- Auto-fill vybral jiné vyjádření než user chce
-- User chce zafixovat aktuální hodnotu (žádné další přepisování)
-- SD vyjádření existuje ale klasifikace je *None* (auto-fill ho ignoruje)
+## Kroky, které jsou vždy ruční — 2, 5, 8 a 9
 
-Pro tyto situace má každý krok harmonogramu **přepínač Auto / Ručně**.
+Kroky **2, 5, 8 a 9** v ServiceDesku žádné vyjádření nemají, automat je proto nikdy
+nevyplňuje. Jejich skutečnost zadáváte vždy ručně, ať je přepínač v jakékoli poloze.
+Přepínač je nemění.
 
-## Default režim — Auto
+## Přepínač „Automatické vyplňování harmonogramu“
 
-Pokud nic nezměníš, krok je v režimu **Auto**:
+Přepínač je v editoru záznamu vpravo v řádku záložek a platí pro **celý záznam** —
+pro kroky **1, 3, 4, 6, 7 a 10**. Změna se projeví až uložením záznamu.
 
-- Sync služba periodicky aktualizuje skutečnost ze SD vyjádření
-- Pokud dorazí novější vyjádření, **přepíše dřívější**
-- Pohyb harvestu = pohyb hodnoty
+### Zapnuto — vyplňuje automat (výchozí stav)
 
-V buňce skutečnosti je badge **🤖 Automat** (nebo *— Neznámo* pokud žádné
-vyjádření zatím není).
+- Automat bere skutečnost z vyjádření navázaných na externí vazby záznamu a přepisuje ji,
+  když dorazí novější vyjádření.
+- U kroku je bublina s datem vyjádření a ikonou, která otevře okno tiketu.
+- Když automat zatím vhodné vyjádření nenašel, je v buňce „—“ a varovná ikona.
 
-## Přepnutí na režim Ručně
+### Vypnutí — vyplňujete vy
 
-Tlačítko **[Auto | Ručně]** v buňce skutečnosti přepíná režim.
+- Kroky 1, 3, 4, 6, 7 a 10 si po uložení **ponechají stávající data** (i ta od automatu)
+  a jdou upravit. Nic se nesmaže.
+- Automat je od té chvíle nepřepisuje.
 
-Klikneš → confirm dialog ("Přepnout na Ručně? Sync služba pak skutečnost
-nepřepíše."):
+### Zapnutí — data převezme automat
 
-- **Potvrdíš** → režim se změní, hodnota zůstává
-- **Zrušíš** → nic se nemění
+- Uložením se **smažou všechna data kroků 1, 3, 4, 6, 7 a 10, která nedodal automat**
+  — ručně zadaná (✍️) i historická (📜).
+- Automat je hned doplní z vyjádření, která už jsou na záznamu navázaná, a dál z nových.
+- Krok, ke kterému žádné vyjádření není, zůstane prázdný.
 
-Po přepnutí na Ručně:
+## Zadání, změna a smazání data
 
-- Sync služba krok **nepřepíše**, i kdyby dorazila nová vyjádření
-- Hodnota zůstane na tom co tam je teď
-- Badge se změní na **✍️ Manual**
+V ručním režimu (a u kroků 2, 5, 8 a 9 vždy) je ve sloupci Skutečnost pole s kalendářem.
 
-## Tlačítko viditelné jen pro relevantní kroky
+- Pole je předvyplněné aktuální skutečností, ať pochází odkudkoli.
+- Datum jde **kdykoli změnit i smazat** (křížek u pole). Uloží se jen kroky, na které jste
+  sáhli — ostatní si ponechají hodnotu i zdroj.
+- Skutečnost kroku nesmí být dříve než skutečnost předchozího kroku. Kontrolují se jen
+  hodnoty, které jste v tomto uložení změnili, takže stará data uložení neblokují.
 
-Tlačítko Auto / Ručně je k dispozici **pouze pokud**:
+## Zdroj skutečnosti
 
-1. Krok existuje v `zaznam_harmonogram_hodnoty` (`DelayHodnotaId` je vyplněné)
-2. User má permission `harmonogram.toggle-rezim`
-3. Krok není uzamčený `pendingScheduleProposalLock` (není rozjetý
-   [návrh](../navrhy/) na změnu plánu)
+Ikona vedle hodnoty říká, odkud datum pochází:
 
-Pokud podmínky nesplněné, tlačítko není v UI.
-
-## Manuální zadání hodnoty
-
-V režimu Ručně můžeš **přímo zadat číslo dní** do buňky skutečnosti:
-
-1. Klikni do buňky → otevře se inline editor
-2. Zadej číslo (celé, kladné nebo záporné)
-3. Enter → uloží
-
-### Validace
-
-- Musí být **celé číslo** (žádné desetinné)
-- Rozsah dle business pravidel (typicky -90 až +180 dní)
-- Mimo rozsah → inline chyba
-
-## Audit zdroje
-
-Po každé změně skutečnosti se aktualizuje **`SkutecnostZdroj`**:
-
-| Akce | Nový zdroj |
+| Ikona | Zdroj |
 |---|---|
-| Auto-fill (sync) | 🤖 Automat |
-| User zadal ručně | ✍️ Manual |
-| Migrace dat (před auto-fill) | 📜 Historicka |
-| Reset / žádná hodnota | — Neznámo |
+| 🤖 | Automat — z vyjádření v ServiceDesku |
+| ✍️ | Ručně zadané uživatelem |
+| 📜 | Historická data převedená před zavedením automatu |
+| — | Bez hodnoty |
 
-Badge je **vidět vedle hodnoty**. Tooltip vysvětluje detaily ("Skutečnost
-vyplněná automatem ze SD vyjádření #1234").
+## Výběr jiného vyjádření (dropdown ▼)
 
-## Dropdown alternativních kandidátů
-
-Pokud má krok **více vyjádření klasifikovaných stejným predikátem**, je
-k dispozici **dropdown s kandidáty**:
-
-```
-Skutečnost: +2 dny 🤖
-
-[ Vybrat kandidáta ▾ ]
-  ✓ Vyjádření #1234 (24.4.2026): "Dodáno..."  ← aktuálně zvolené
-    Vyjádření #1235 (25.4.2026): "Oprava: dodávka..."
-    Vyjádření #1236 (26.4.2026): "Finální verze..."
-```
-
-Klik na jiného kandidáta:
-
-- Aplikace **automaticky přepne na režim Ručně**
-- Hodnota se přepočítá z data zvoleného vyjádření
-- Badge se změní na ✍️ Manual
-
-Důvod: výběr kandidáta = explicitní user volba, sync nemá přepisovat.
-
-## Vrátit zpět na Auto
-
-Pokud po čase chceš **vrátit krok na Auto**:
-
-1. Klikni *Auto* na přepínači
-2. Aplikace se zeptá: "Spustit sync teď?"
-   - **Ano** → re-harvest, hodnota se přepočítá z aktuálních vyjádření
-   - **Ne** → režim se přepne ale hodnota zůstává; další periodický sync
-     ji eventuálně přepíše
-
-Permission `harmonogram.toggle-rezim`.
+Když má krok 1, 3, 4, 6, 7 nebo 10 v automatickém režimu **víc vhodných vyjádření**,
+nabídne buňka šipku ▼ se seznamem kandidátů. Výběrem určíte, ze kterého vyjádření
+automat datum bere — krok zůstává v automatickém režimu. U kroků 2, 5, 8 a 9 ani
+v ručním režimu se dropdown nenabízí.
 
 ## Vztah k návrhům
 
-Pokud existuje [návrh](../navrhy/) na změnu plánu pro tento krok:
+Čeká-li na záznamu [návrh změny termínu a harmonogramu](../navrhy/navrhnout-zmenu-planu.md),
+je harmonogram do rozhodnutí uzamčený — přepínač ani skutečnost nejdou měnit přímo.
+Schválení zapíše skutečnost stejnými pravidly jako uložení editoru.
 
-- Krok je **uzamčený** (`pendingScheduleProposalLock`)
-- Tlačítko Auto/Ručně je **disabled**
-- Manuální editace není možná
-- Auto-fill běží dál na pozadí, ale výsledek se nezobrazuje na buňce
-
-Po vyřešení návrhu (apply / zamítnutí / stažení) se krok odemkne.
-
-## Hromadné akce
-
-V aktuální verzi UI nejsou hromadné akce typu "přepnout všechny kroky
-záznamu na Ručně". Akce se dělá per-krok.
-
-## Permissions
+## Oprávnění
 
 | Akce | Klíč |
 |---|---|
-| Vidět skutečnost | `harmonogram.view` (implicitní) |
-| Editovat hodnotu (Ručně) | `harmonogram.edit` |
-| Přepínat Auto/Ručně | `harmonogram.toggle-rezim` |
-| Vybrat kandidáta z dropdownu | `harmonogram.select-candidate` |
+| Upravit skutečnost a přepínač při úpravě záznamu | `records.edit` |
+| Upravit jen harmonogram (záložka Harmonogram) | `records.schedule.edit` |
+| Vybrat jiné vyjádření z dropdownu | `records.schedule.edit` |
 
 ## Související
 

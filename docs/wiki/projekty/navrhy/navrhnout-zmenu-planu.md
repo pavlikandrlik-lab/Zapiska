@@ -80,8 +80,12 @@ pokud ho v návrhu přehodíš oproti tomu, jak je nastavený na záznamu, přep
 zvýrazní (stejně jako ostatní změněná pole), aby bylo vidět, že návrh mění i tohle.
 
 Po schválení se režim z návrhu uplatní stejně, jako by ho někdo přepnul přímo na záznamu — ale
-jen pokud se opravdu liší od toho, co má záznam dnes. Týká se kroků 1, 3, 4, 6, 7 a 10;
-přepnutí na automatické vyplňování navíc spustí nové načtení dat ze ServiceDesku.
+jen pokud se opravdu liší od toho, co má záznam dnes. Týká se kroků 1, 3, 4, 6, 7 a 10.
+Když návrh přepíná na automatické vyplňování, smažou se po schválení data těchto kroků, která
+nedodal automat (ručně zadaná i historická), a automat je hned doplní ze ServiceDesku.
+
+Návrh nese jen kroky, jejichž skutečnost jste změnili; smazání data je také změna. Detail
+návrhu ukazuje skutečnost tak, jak ji schválení zapíše.
 
 Schvalovatel vidí přepínač ve stavu, jaký navrhuje návrh (ne aktuální stav záznamu). Pokud
 návrh režim skutečně mění, nad záznamem se zobrazí červený pruh s upozorněním, co schválení

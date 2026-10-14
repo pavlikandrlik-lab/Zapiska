@@ -52,8 +52,9 @@ V záložce *Harmonogram* projektu nebo v editoru záznamu → tab *Harmonogram*
                 ↓
 4. Buňka HS04 ukazuje "+2 dny" 🤖 (z vyjádření "Dodáno o 2 dny později")
                 ↓
-5. Pokud chceš zafixovat tu hodnotu, přepneš na Ručně
-   Pokud chceš jiné vyjádření, použiješ dropdown alternativních kandidátů
+5. Pokud chceš data vyplňovat sám, vypneš přepínač „Automatické vyplňování
+   harmonogramu“ (platí pro celý záznam). Pokud chceš jiné vyjádření, použiješ
+   dropdown alternativních kandidátů
 ```
 
 ## Když dorazí novější vyjádření
@@ -98,11 +99,13 @@ V `zaznam_harmonogram_hodnoty` chybí řádek s `ZpozdeniTypId` pro tento krok.
 
 **Vyřešení**: doplnit v editoru záznamu nebo migraci.
 
-### 3. Krok je v režimu Ručně
+### 3. Záznam je v ručním režimu
 
-User cíleně přepnul krok na Ručně — sync nepřepíše.
+Přepínač „Automatické vyplňování harmonogramu“ je vypnutý — sync kroky 1, 3, 4, 6, 7
+a 10 nepřepíše.
 
-**Vyřešení**: přepnout zpět na Auto (pokud chceš auto-fill).
+**Vyřešení**: zapnout přepínač a uložit. Data, která nedodal automat, se smažou a automat
+je hned doplní — viz [Manuální skutečnost](manualni-skutecnost.md).
 
 ### 4. Žádná externí vazba
 
@@ -132,8 +135,8 @@ Re-harvest spustí sync **okamžitě**, bez čekání na další periodický job
 Auto-fill běží **automaticky** bez uživatelské akce. Permission keys
 relevantní pro úpravu chování:
 
-- `harmonogram.toggle-rezim` — přepínat Auto / Ručně
-- `harmonogram.select-candidate` — fixovat preferred kandidáta
+- `records.edit` / `records.schedule.edit` — přepínat automatické vyplňování (při uložení záznamu)
+- `records.schedule.edit` — vybrat jiného kandidáta z dropdownu
 - `vyjadreni.reharvest` — manuálně spustit re-harvest
 
 Bez těchto klíčů sync stále běží, jen ho user nemůže ovlivnit.

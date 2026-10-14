@@ -196,8 +196,9 @@ jako TINYINT (enum `SkutecnostZdrojEnum`).
 
 Pokud má krok více vyjádření matching predikát, default volba = **nejnovější**.
 Někdy to není správně (např. dodavatel pošle "dodávka 15.4." a později
-"oprava: dodávka 18.4." — chceme tu druhou). User pak musí ručně přepnout
-na **Ručně** a vybrat preferred kandidáta z dropdownu.
+"oprava: dodávka 18.4." — chceme tu druhou). User pak vybere preferred
+kandidáta z dropdownu ▼ u kroku — krok zůstává v automatickém režimu. Kdo chce
+data vyplňovat sám, vypne přepínač „Automatické vyplňování harmonogramu“.
 
 ### None klasifikace
 
@@ -209,8 +210,10 @@ nového predikátu (vývojářská změna).
 ### Migrace historických dat
 
 Záznamy existující před zavedením auto-fillu mají `SkutecnostZdroj = Historicka`
-(typicky migrované přes SQL skript). Sync je **nezasahuje** — historická data
-respektuje jako manuální.
+(typicky migrované přes SQL skript). V automatickém režimu je sync přepíše, jakmile pro
+krok najde vyjádření; bez vyjádření je nechá. Zapnutí přepínače „Automatické vyplňování
+harmonogramu“ na záznamu v ručním režimu historická data kroků 1, 3, 4, 6, 7 a 10 smaže
+stejně jako ruční (spec 2026-10-14 R2).
 
 ## Související
 
