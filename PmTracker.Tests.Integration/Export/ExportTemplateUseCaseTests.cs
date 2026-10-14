@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.Tests.Integration.TestInfrastructure;
+using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 
@@ -190,5 +191,136 @@ public sealed class ExportTemplateUseCaseTests
 
         model.Zaznamy.Single(item => item.ZaznamId == doneRecordId).IsCompleted.Should().BeTrue();
         model.Zaznamy.Single(item => item.ZaznamId == runningRecordId).IsCompleted.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Spec 2026-10-13 §4.8 — tabulka z návrhu. Úkol ukončený 13.10. při zpracování zápisu
+    /// s volbou „k jednání 888“, „dnes“ a „k jednání 889“. Sloupec Stav, podbarvení
+    /// i viditelnost se v každém tisku řídí stavem ke dni toho jednání.
+    /// </summary>
+    [Fact]
+    public async Task BuildMeetingTemplate_PrintsWholeRowAtMeetingDate_ForEachEffectiveDateChoice()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_row_at_meeting_date");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var timeProvider = new FixedTimeProvider(new DateTimeOffset(2026, 10, 13, 9, 0, 0, TimeSpan.Zero));
+        var useCase = IntegrationTestHelper.CreateExportTemplateUseCase(dbContext, timeProvider);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExpRowAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExpRowOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "EXPROW");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "EXPROW_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        var running = await dbContext.CiselnikStavuUkolu.AsNoTracking().Where(x => !x.IsFinal).OrderBy(x => x.Id).FirstAsync();
+        var done = await dbContext.CiselnikStavuUkolu.AsNoTracking().Where(x => x.IsFinal).OrderBy(x => x.Id).FirstAsync();
+
+        var meeting887 = await CreateDatedMeetingAsync(dbContext, projectId, "OPEN", 887, new DateTime(2026, 10, 1));
+        var meeting888 = await CreateDatedMeetingAsync(dbContext, projectId, "OPEN", 888, new DateTime(2026, 10, 8));
+        var meeting889 = await CreateDatedMeetingAsync(dbContext, projectId, "DRAFT", 889, new DateTime(2026, 10, 22));
+
+        var closedFor888 = await CreateTaskWithStatusChangeAsync(
+            dbContext, projectId, ownerId, subsystemId, "ExpRowK888", running.Id, done.Id, new DateTime(2026, 10, 8), meeting888);
+        var closedToday = await CreateTaskWithStatusChangeAsync(
+            dbContext, projectId, ownerId, subsystemId, "ExpRowDnes", running.Id, done.Id, new DateTime(2026, 10, 13), null);
+        var closedFor889 = await CreateTaskWithStatusChangeAsync(
+            dbContext, projectId, ownerId, subsystemId, "ExpRowK889", running.Id, done.Id, new DateTime(2026, 10, 22), meeting889);
+
+        var print887 = await useCase.BuildMeetingTemplateAsync(meeting887, currentUser, autoPrint: false);
+        var print888 = await useCase.BuildMeetingTemplateAsync(meeting888, currentUser, autoPrint: false);
+        var print889 = await useCase.BuildMeetingTemplateAsync(meeting889, currentUser, autoPrint: false);
+
+        AssertRow(print887, closedFor888, running.Nazev, completed: false);
+        AssertRow(print888, closedFor888, done.Nazev, completed: true);
+        print889.Zaznamy.Should().NotContain(x => x.ZaznamId == closedFor888, "ukončený už k minulému jednání 888");
+
+        AssertRow(print887, closedToday, running.Nazev, completed: false);
+        AssertRow(print888, closedToday, running.Nazev, completed: false);
+        AssertRow(print889, closedToday, done.Nazev, completed: true);
+
+        AssertRow(print887, closedFor889, running.Nazev, completed: false);
+        AssertRow(print888, closedFor889, running.Nazev, completed: false);
+        AssertRow(print889, closedFor889, done.Nazev, completed: true);
+    }
+
+    /// <summary>
+    /// Spec 2026-10-13 §4.8 — pozastavení se v tisku jednání bere ke dni jednání, stejně jako
+    /// sloupec Stav. Úkol pozastavený až po jednání 888 není v jeho tisku krémový.
+    /// </summary>
+    [Fact]
+    public async Task BuildMeetingTemplate_TaskPausedAfterTheMeeting_IsNotPausedInThatMeetingsPrint()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_paused_at_meeting_date");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var timeProvider = new FixedTimeProvider(new DateTimeOffset(2026, 10, 13, 9, 0, 0, TimeSpan.Zero));
+        var useCase = IntegrationTestHelper.CreateExportTemplateUseCase(dbContext, timeProvider);
+
+        var adminId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExpPauseAdmin");
+        var ownerId = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "ExpPauseOwner");
+        var projectId = await IntegrationTestHelper.EnsureProjectAsync(dbContext, "EXPPAUSE");
+        var subsystemId = await IntegrationTestHelper.EnsureSubsystemAsync(dbContext, "EXPPAUSE_SYS", adminId);
+        var currentUser = IntegrationTestHelper.BuildUser(adminId, isSuperAdmin: true, visibleProjectIds: new[] { projectId });
+
+        var running = await dbContext.CiselnikStavuUkolu.AsNoTracking().Where(x => !x.IsFinal).OrderBy(x => x.Id).FirstAsync();
+        // Seed číselníku pozastavení nemá; v produkci se stav udržuje přímo v databázi.
+        var paused = new CiselnikStavuUkoluEntity { Kod = "PAUSE_T", Nazev = "Pozastaveno", IsFinal = false };
+        dbContext.CiselnikStavuUkolu.Add(paused);
+        await dbContext.SaveChangesAsync();
+
+        var meeting888 = await CreateDatedMeetingAsync(dbContext, projectId, "OPEN", 888, new DateTime(2026, 10, 8));
+        var meeting889 = await CreateDatedMeetingAsync(dbContext, projectId, "DRAFT", 889, new DateTime(2026, 10, 22));
+        var recordId = await CreateTaskWithStatusChangeAsync(
+            dbContext, projectId, ownerId, subsystemId, "ExpPause", running.Id, paused.Id, new DateTime(2026, 10, 13), null);
+
+        var print888 = await useCase.BuildMeetingTemplateAsync(meeting888, currentUser, autoPrint: false);
+        var print889 = await useCase.BuildMeetingTemplateAsync(meeting889, currentUser, autoPrint: false);
+
+        var rowAt888 = print888.Zaznamy.Should().ContainSingle(x => x.ZaznamId == recordId).Which;
+        rowAt888.Stav.Should().Be(running.Nazev);
+        rowAt888.IsPaused.Should().BeFalse();
+
+        var rowAt889 = print889.Zaznamy.Should().ContainSingle(x => x.ZaznamId == recordId).Which;
+        rowAt889.Stav.Should().Be("Pozastaveno");
+        rowAt889.IsPaused.Should().BeTrue();
+    }
+
+    private static void AssertRow(PdfExportTemplateViewModel print, int recordId, string expectedStav, bool completed)
+    {
+        var row = print.Zaznamy.Should().ContainSingle(x => x.ZaznamId == recordId).Which;
+        row.Stav.Should().Be(expectedStav);
+        row.IsCompleted.Should().Be(completed);
+        row.IsPaused.Should().BeFalse();
+    }
+
+    private static async Task<int> CreateDatedMeetingAsync(
+        PmTrackerDbContext dbContext, int projectId, string stateCode, int number, DateTime date)
+    {
+        var meetingId = await IntegrationTestHelper.CreateMeetingAsync(dbContext, projectId, stateCode, meetingNumber: number);
+        var meeting = await dbContext.Jednani.SingleAsync(x => x.Id == meetingId);
+        meeting.DatumPlanovane = date;
+        await dbContext.SaveChangesAsync();
+        return meetingId;
+    }
+
+    /// <summary>Úkol založený 1.9.; změna stavu uložená 13.10. a platná k <paramref name="platiOd"/>.</summary>
+    private static async Task<int> CreateTaskWithStatusChangeAsync(
+        PmTrackerDbContext dbContext, int projectId, int ownerId, int subsystemId, string marker,
+        int fromStateId, int toStateId, DateTime platiOd, int? jednaniId)
+    {
+        var recordId = await IntegrationTestHelper.EnsureRecordAsync(dbContext, projectId, ownerId, subsystemId, "U", marker);
+        var record = await dbContext.ProjektoveZaznamy.SingleAsync(x => x.Id == recordId);
+        record.DatumZalozeni = new DateTime(2026, 9, 1);
+        record.StavUkoluId = toStateId;
+        dbContext.ZaznamHistorieStavuZaznamu.Add(new ZaznamHistorieStavuZaznamuEntity
+        {
+            ZaznamId = recordId,
+            PuvodniStav = fromStateId,
+            NovyStav = toStateId,
+            DatumZmeny = new DateTime(2026, 10, 13, 7, 0, 0),
+            PlatiOd = platiOd,
+            JednaniId = jednaniId
+        });
+        await dbContext.SaveChangesAsync();
+        return recordId;
     }
 }
