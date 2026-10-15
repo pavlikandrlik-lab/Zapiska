@@ -53,6 +53,13 @@ public sealed class CommentService(
             throw new InvalidOperationException("Nemáte oprávnění přidat vyjádření k tomuto záznamu.");
         }
 
+        var closedStates = await LoadClosedTaskStatesAsync([record.StavUkoluId], ct);
+        if (record.StavUkoluId is { } stateId && closedStates.TryGetValue(stateId, out var closedState))
+        {
+            throw new InvalidOperationException(
+                $"Záznam {ResolveVisibleRecordNumber(record)} je uzavřený (stav „{closedState.Nazev}“), vyjádření nelze přidat. Nejprve ho znovu otevřete změnou stavu.");
+        }
+
         var note = new VyjadreniEntity
         {
             ZaznamId = command.ZaznamId,
@@ -207,6 +214,8 @@ public sealed class CommentService(
             .Where(x => x.ProjektId == meeting.ProjektId && recordIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, ct);
         var leadEquivalentOsobaIdsBySubsystem = await ResolveLeadEquivalentOsobaIdsBySubsystemAsync(meeting.ProjektId, ct);
+        var closedStates = await LoadClosedTaskStatesAsync(
+            recordsById.Values.Select(x => x.StavUkoluId).ToList(), ct);
         var localNow = GetLocalNow();
         var notes = new List<VyjadreniEntity>(normalizedRows.Count);
 
@@ -224,6 +233,12 @@ public sealed class CommentService(
             if (!commentAuthorizationPolicy.CanSaveMeetingNote(currentUser, record.ProjektId, subsystemLeadEquivalentOsobaIds, isDraftMeeting))
             {
                 throw new InvalidOperationException("Nemáte oprávnění zapsat poznámku k tomuto záznamu v rámci jednání.");
+            }
+
+            if (record.StavUkoluId is { } recordStateId && closedStates.TryGetValue(recordStateId, out var closedState))
+            {
+                throw new InvalidOperationException(
+                    $"Záznam {ResolveVisibleRecordNumber(record)} je uzavřený (stav „{closedState.Nazev}“), poznámku nelze zapsat. Nejprve ho znovu otevřete změnou stavu.");
             }
 
             notes.Add(new VyjadreniEntity
@@ -251,6 +266,30 @@ public sealed class CommentService(
 
         await dbContext.SaveChangesAsync(ct);
     }
+
+    private async Task<Dictionary<int, CiselnikStavuUkoluEntity>> LoadClosedTaskStatesAsync(
+        IReadOnlyCollection<int?> stateIds, CancellationToken ct)
+    {
+        var ids = stateIds.Where(x => x.HasValue).Select(x => x!.Value).Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        var states = await dbContext.CiselnikStavuUkolu
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.Id))
+            .ToListAsync(ct);
+        return states
+            .Where(TaskStatusRules.IsClosedForComments)
+            .ToDictionary(x => x.Id);
+    }
+
+    /// <summary>Číslo, které uživatel vidí na kartě záznamu — interní id by mu v hlášce nic neřeklo.</summary>
+    private static string ResolveVisibleRecordNumber(ProjektovyZaznamEntity record)
+        => string.IsNullOrWhiteSpace(record.CisloViditelne)
+            ? record.CisloZaznamu.ToString(CultureInfo.InvariantCulture)
+            : record.CisloViditelne.Trim();
 
     private string NormalizeCommentText(string text)
     {
