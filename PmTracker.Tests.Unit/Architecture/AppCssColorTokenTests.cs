@@ -132,4 +132,23 @@ public sealed class AppCssColorTokenTests
 
         offenders.Should().BeEmpty("hover musí být v obou motivech vidět");
     }
+
+    /// <summary>
+    /// var(--x) bez záložní hodnoty u proměnné, kterou žádné CSS nedefinuje, zneplatní celou
+    /// deklaraci (např. border-radius spadne na 0). Nedefinované proměnné (nastavované až z JS
+    /// nebo inline) si proto záložní hodnotu musí nechat.
+    /// </summary>
+    [Fact]
+    public void VariablesWithoutFallback_AreDefined()
+    {
+        var defined = AppCss.DefinedVariables();
+        var offenders = AppCss.AppCssFiles()
+            .SelectMany(AppCss.Declarations)
+            .SelectMany(d => Regex.Matches(d.Value, @"var\((--[\w-]+)\)").Select(m => (d, name: m.Groups[1].Value)))
+            .Where(x => !defined.Contains(x.name) && !RuntimeVariables.Contains(x.name))
+            .Select(x => $"{x.d.File}:{x.d.Line} {x.d.Selector} {{ {x.d.Property}: {x.d.Value} }}")
+            .ToList();
+
+        offenders.Should().BeEmpty($"nedefinovaná proměnná bez záložní hodnoty zneplatní deklaraci:{Environment.NewLine}{string.Join(Environment.NewLine, offenders)}");
+    }
 }

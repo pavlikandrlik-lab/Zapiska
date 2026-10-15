@@ -4193,9 +4193,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .comment-closed-note {
     margin: 0;
-    padding: var(--gov-spacing-xs) 0;
+    padding: var(--gov-spacing-xs, 0.5rem) 0;
     color: var(--text-secondary);
-    font-size: var(--gov-font-size-s);
+    font-size: var(--gov-font-size-s, 0.875rem);
 }
 
 .comment-pagination-actions {
@@ -4426,7 +4426,7 @@ gov-dialog[data-modal-container] {
 
 /* Úprava #10 RESOLVED (2026-04-21): gov-dialog variantní šířka.
    Root cause (ověřeno Playwright probe): gov-dialog 4.2.9 dist CSS používá
-   .gov-dialog__dialog { max-width: var(--max-width); max-height: 75vh }.
+   .gov-dialog__dialog { max-width: var(--max-width, 52.5rem); max-height: 75vh }.
    Naše dřívější --gov-dialog-max-width rules se nenapíchly → všechny modaly měly
    defaultních 840px. gov-dialog NEMÁ shadow DOM → override max-height jde přes
    přímý class selector na .gov-dialog__dialog. */
@@ -5501,7 +5501,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 @media (min-width: 1900px) {
     .meeting-attendance-grid {
         grid-auto-flow: column;
-        grid-template-rows: repeat(var(--attendance-rows), auto);
+        grid-template-rows: repeat(var(--attendance-rows, 1), auto);
         grid-template-columns: none;
         grid-auto-columns: 1fr;
     }
@@ -5964,8 +5964,8 @@ pm-tab-last-in-row > span[data-pm-tab-inner] {
     padding: 10px 22px;
     color: var(--text-secondary);
     background: var(--background-block-secondary);
-    border-top-left-radius: var(--pm-tab-radius);
-    border-top-right-radius: var(--pm-tab-radius);
+    border-top-left-radius: var(--pm-tab-radius, 10px);
+    border-top-right-radius: var(--pm-tab-radius, 10px);
     cursor: pointer;
     user-select: none;
     font-size: 14px;
@@ -6187,7 +6187,7 @@ pm-tab-panel {
     clear: both;
     position: relative;
     z-index: 0;
-    border-radius: var(--pm-tab-radius);
+    border-radius: var(--pm-tab-radius, 10px);
 }
 
 pm-tab-panel:not([active]) {
@@ -6935,7 +6935,7 @@ html {
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;
-    height: calc(100dvh - var(--app-header-h));
+    height: calc(100dvh - var(--app-header-h, 151px));
     min-height: 0;
     /* A3: obsah nesmí být nalepený na footer — panely mají interní scroll, výška drží. */
     padding-bottom: var(--app-content-bottom-gap);
