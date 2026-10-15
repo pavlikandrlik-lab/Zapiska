@@ -4276,6 +4276,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 8px;
 }
 
+.comment-closed-note {
+    margin: 0;
+    padding: var(--gov-spacing-xs, 0.5rem) 0;
+    color: var(--pm-text-muted);
+    font-size: var(--gov-font-size-s, 0.875rem);
+}
+
 .comment-pagination-actions {
     display: flex;
     gap: 8px;

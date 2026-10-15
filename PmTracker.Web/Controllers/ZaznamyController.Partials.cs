@@ -159,18 +159,26 @@ public sealed partial class ZaznamyController
         var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, model.ProjektId)
             && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
 
-        // Nabídka jednání = přesně ta, kde by AddComment prošel (sdílená CommentAuthorizationPolicy,
-        // 2026-10-13). Dřív se tu ptalo jen na comments.add v projektu — subsystémový grant ho dává
-        // vedoucímu/zástupci pro celý projekt, takže u cizího subsystému viděl editor, který server odmítl.
-        var allowedMeetingIds = await _recordService.GetMeetingIdsAllowingNewCommentAsync(
-            summary.Id, model.OtevrenaJednani, CurrentUserContext, ct);
-        model.OtevrenaJednani = model.OtevrenaJednani
-            .Where(item => allowedMeetingIds.Contains(item.Id))
-            .ToList();
+        if (model.IsRecordClosed)
+        {
+            // Uzavřený záznam (is_final) nepřijímá nová vyjádření: žádná nabídka jednání, žádný editor.
+            model.OtevrenaJednani = Array.Empty<JednaniOptionViewModel>();
+        }
+        else
+        {
+            // Nabídka jednání = přesně ta, kde by AddComment prošel (sdílená CommentAuthorizationPolicy,
+            // 2026-10-13). Dřív se tu ptalo jen na comments.add v projektu — subsystémový grant ho dává
+            // vedoucímu/zástupci pro celý projekt, takže u cizího subsystému viděl editor, který server odmítl.
+            var allowedMeetingIds = await _recordService.GetMeetingIdsAllowingNewCommentAsync(
+                summary.Id, model.OtevrenaJednani, CurrentUserContext, ct);
+            model.OtevrenaJednani = model.OtevrenaJednani
+                .Where(item => allowedMeetingIds.Contains(item.Id))
+                .ToList();
+        }
 
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.CanEditRecord = canEditRecord;
         model.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
-        model.CanAddComment = model.OtevrenaJednani.Count > 0;
+        model.CanAddComment = !model.IsRecordClosed && model.OtevrenaJednani.Count > 0;
     }
 }
