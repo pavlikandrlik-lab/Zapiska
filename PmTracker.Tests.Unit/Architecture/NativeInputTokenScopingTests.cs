@@ -12,8 +12,10 @@ namespace PmTracker.Tests.Unit.Architecture;
 /// Bug 2026-04-19 večer: řádek site.css:5243 `:root[data-theme="dark"] input[type="text"]`
 /// bez exclusionu → gov-form-search vnitřní input dostal bg #111b2d nepříbuzný s
 /// host wrapperem → user: "ve tmavém režimu je uvnitř search pole tmavý element".
+/// Od 2026-10-15 nejsou tmavá pravidla; motiv přepínají gov tokeny, scoping se proto hlídá
+/// na základním pravidle nativních inputů.
 /// </summary>
-public sealed class DarkThemeInputScopingTests
+public sealed class NativeInputTokenScopingTests
 {
     private static string LocateRepositoryRoot()
     {
@@ -39,7 +41,7 @@ public sealed class DarkThemeInputScopingTests
     [InlineData("datetime-local")]
     [InlineData("number")]
     [InlineData("search")]
-    public void DarkThemeInputOverride_MustExcludeGovWebComponents(string inputType)
+    public void NativeInputTokenRule_MustExcludeGovWebComponents(string inputType)
     {
         var cssPath = Path.Combine(LocateRepositoryRoot(), "PmTracker.Web", "wwwroot", "css", "site.css");
         var source = File.ReadAllText(cssPath);
@@ -47,9 +49,10 @@ public sealed class DarkThemeInputScopingTests
         // Selektor musí mít každou z těchto exclusion — jinak globální pravidlo
         // pronikne do gov-form-input vnitřního <input type="text"> a pokazí vizuál.
         var pattern = new Regex(
-            $@":root\[data-theme=""dark""\]\s+input\[type=""{Regex.Escape(inputType)}""\]:not\(gov-form-input input\):not\(gov-form-search input\):not\(\[role=""search""\] input\)");
+            $@"input\[type=""{Regex.Escape(inputType)}""\]:not\(gov-form-input input\):not\(gov-form-search input\):not\(\[role=""search""\] input\)[^{{]*\{{[^}}]*background-color:\s*var\(--background-block-primary\)",
+            RegexOptions.Singleline);
 
         pattern.IsMatch(source).Should().BeTrue(
-            $"dark-theme override pro input[type=\"{inputType}\"] musí mít scope :not(gov-form-input input):not(gov-form-search input):not([role=\"search\"] input)");
+            $"základní pravidlo input[type={inputType}] s gov tokeny musí vynechat vnitřní input gov-form-input/gov-form-search (bug 2026-04-19)");
     }
 }

@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace PmTracker.Tests.Unit.Search;
 
 /// <summary>
-/// Ověřuje dark mode CSS pro globální vyhledávání.
+/// Ověřuje CSS globálního vyhledávání v obou motivech přes gov tokeny (2026-10-15).
 /// POZOR: gov-form-search, gov-form-input a gov-button jsou nyní skutečné Web Components
 /// z @gov-design-system-ce/components (CDN) — jejich dark mode řídí design system.
 /// Vlastní dark overrides pro gov-* třídy v site.css jsou ZAKÁZÁNY.
@@ -54,11 +54,11 @@ public sealed class GlobalSearchDarkModeCssTests
     }
 
     [Fact]
-    public void Css_MaDarkMode_Override_Pro_AppSearchDropdown()
+    public void Css_AppSearchDropdown_PouzivaGovToken()
     {
         var css = LoadSiteCss();
-        css.Should().Contain("[data-theme=\"dark\"] .app-search-dropdown",
-            "site.css musí mít dark mode override pro .app-search-dropdown (naše vlastní komponenta)");
+        css.Should().MatchRegex(@"\.app-search-dropdown\s*\{[^}]*background:\s*var\(--background-block-primary\)",
+            ".app-search-dropdown (naše vlastní komponenta) bere plochu z gov tokenu, který se přepíná s motivem");
     }
 
     [Fact]
@@ -72,12 +72,12 @@ public sealed class GlobalSearchDarkModeCssTests
     }
 
     [Fact]
-    public void Css_DarkMode_MaOverride_ProBadgeBarvy()
+    public void Css_BadgeBarvy_ZTokenu()
     {
         var css = LoadSiteCss();
-        css.Should().Contain("[data-theme=\"dark\"] .global-search-item__badge--zaznam",
-            "dark mode musí mít override pro barvu badge záznamu");
-        css.Should().Contain("[data-theme=\"dark\"] .global-search-item__badge--vyjadreni",
-            "dark mode musí mít override pro barvu badge vyjádření");
+        css.Should().MatchRegex(@"\.global-search-item__badge--zaznam\s*\{[^}]*color:\s*var\(--",
+            "barva badge záznamu je token, takže se přepíná s motivem");
+        css.Should().MatchRegex(@"\.global-search-item__badge--vyjadreni\s*\{[^}]*color:\s*var\(--",
+            "barva badge vyjádření je token, takže se přepíná s motivem");
     }
 }

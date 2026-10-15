@@ -72,4 +72,30 @@ public sealed class AppCssColorTokenTests
 
         offenders.Should().BeEmpty("barva patří do gov tokenu (nebo aplikačního --app-* v tokens.css), jinak se v tmavém motivu nepřepne");
     }
+
+    [Fact]
+    public void DarkThemeSelectors_OnlyInTokensCss()
+    {
+        var offenders = AppCss.AppCssFiles()
+            .Where(file => file != "tokens.css")
+            .SelectMany(AppCss.Declarations)
+            .Where(d => d.Selector.Contains("data-theme", StringComparison.Ordinal))
+            .Select(d => $"{d.File}:{d.Line} {d.Selector}")
+            .Distinct()
+            .ToList();
+
+        offenders.Should().BeEmpty("tmavý motiv přepínají gov tokeny; pravidlo :root[data-theme=\"dark\"] .x je ruční paleta navíc");
+    }
+
+    [Fact]
+    public void TokensCss_DarkBlockOnlyDefinesTokensAndColorScheme()
+    {
+        var offenders = AppCss.Declarations("tokens.css")
+            .Where(d => d.Selector.Contains("data-theme", StringComparison.Ordinal))
+            .Where(d => !d.Property.StartsWith("--", StringComparison.Ordinal) && d.Property != "color-scheme")
+            .Select(d => $"tokens.css:{d.Line} {d.Selector} {{ {d.Property} }}")
+            .ToList();
+
+        offenders.Should().BeEmpty();
+    }
 }

@@ -282,26 +282,6 @@ mark.app-search-flash.app-search-flash--fading {
     opacity: 0.75;
 }
 
-/* dark mode overrides pro suggest dlaždice */
-:root[data-theme="dark"] .global-search-item__title {
-    color: var(--text-primary);
-}
-
-:root[data-theme="dark"] .global-search-item__badge--zaznam {
-    background: rgba(0, 94, 165, 0.2);
-    color: #7ab3e8;
-}
-
-:root[data-theme="dark"] .global-search-item__badge--vyjadreni {
-    background: rgba(124, 58, 237, 0.2);
-    color: #c4b5fd;
-}
-
-:root[data-theme="dark"] .global-search-item__link:hover,
-:root[data-theme="dark"] .global-search-item.is-active .global-search-item__link {
-    background-color: rgba(255, 255, 255, 0.06);
-}
-
 /* ── End global search ──────────────────────────────────────────────────── */
 
 /* ── Hlavička gov (2026-09-23) ──────────────────────────────────────────── */
@@ -2045,15 +2025,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     padding-right: 70px;
 }
 
-:root[data-theme="dark"] .app-date-clear {
-    color: #94a3b8;
-}
-
-:root[data-theme="dark"] .app-date-clear:hover {
-    color: #f87171;
-    background: rgba(248, 113, 113, 0.12);
-}
-
 .app-date-panel {
     position: absolute;
     top: calc(100% + 8px);
@@ -2665,7 +2636,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: 1px solid var(--app-schedule-segment-edge);
 }
 
-
 .timeline-axis {
     position: relative;
     height: 28px;
@@ -2750,16 +2720,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .timeline-axis-event.deadline .timeline-axis-event-label {
     background: var(--background-primary);
-}
-
-:root[data-theme="dark"] .timeline-axis-event.today .timeline-axis-event-label {
-    background: #e2e8f0;
-    color: #0f172a;
-}
-
-:root[data-theme="dark"] .timeline-axis-event.deadline .timeline-axis-event-label {
-    background: #93c5fd;
-    color: #0f172a;
 }
 
 .schedule-timeline-axis {
@@ -2991,18 +2951,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     color: var(--text-status-error);
 }
 
-:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input,
-:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input:focus-within {
-    border-color: #f87171;
-    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.5);
-    background: rgba(248, 113, 113, 0.08);
-}
-
-:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .app-date-display-input,
-:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-duration-days-readonly {
-    color: #fca5a5;
-}
-
 .schedule-stacked-part-top {
     border: none;
     border-bottom: 1px solid var(--border-subtle);
@@ -3183,8 +3131,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     position: relative;
     height: 18px;
     border-radius: 999px;
-    /* gantt track pozadí — gov primary-subtle s fallbackem; user může override
-       přes --schedule-track-color nebo na úrovni :root[data-theme="dark"] */
+    /* dráha ganttu — gov token, přepíná se s motivem sám (2026-10-15) */
     background: var(--background-neutral-subtle);
     /* overflow:visible (dříve hidden): markery „Dnes"/„Termín" se na krajích neořežou.
        Bezpečné — segmenty už nepřetékají (+1px hack odstraněn, šířka ≤ 100 %), a samy mají
@@ -3236,7 +3183,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
         0 0 0 1px var(--app-schedule-segment-inner) inset,
         0 1px 2px var(--app-schedule-segment-outline);
 }
-
 
 .schedule-overview-axis-row {
     display: grid;
@@ -3326,7 +3272,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .schedule-layered-track--step .schedule-layered-segment.actual {
     height: 8px;
 }
-
 
 .schedule-layered-legend {
     display: flex;
@@ -4574,10 +4519,8 @@ gov-dialog[data-modal-container][data-modal-scrollable="true"] .modal-content {
 }
 
 /* .external-row — duplicitní hardcoded #fafafa definice odstraněna 2026-04-29.
-   Authoritative pravidlo žije v externi-odkaz-card.css (používá var(--pm-surface)
-   s gov design tokens fallback chain → reaguje na dark mode přes :root[data-theme=dark]
-   override v core.css). Tahle site.css verze přebíjela jen kvůli pozdějšímu load order
-   → karta v dark mode vždy bílá. */
+   Authoritative pravidlo žije v externi-odkaz-card.css (gov tokeny). Tahle site.css verze
+   přebíjela jen kvůli pozdějšímu load order → karta v dark mode vždy bílá. */
 
 .external-actions {
     display: flex;
@@ -6565,530 +6508,6 @@ pm-tab-panel.sync-tab-panel-content[active] {
     display: grid;
     gap: 6px;
     font-weight: 600;
-}
-
-
-:root[data-theme="dark"] .app-search-dropdown {
-    background: #111b2d;
-    border-color: #31415e;
-}
-
-/* dark-theme overrides pro .gov-switch* aproximaci odstraněny — komponenta gov-form-switch má vlastní theming přes shadow DOM. */
-
-:root[data-theme="dark"] .badge {
-    background: #203552;
-    color: #b9d5ff;
-}
-
-:root[data-theme="dark"] .pill {
-    background: #1f2f4a;
-    color: #d8e5fb;
-}
-
-:root[data-theme="dark"] .record-card,
-:root[data-theme="dark"] .meeting-card,
-:root[data-theme="dark"] .project-card,
-:root[data-theme="dark"] .ciselnik-tile,
-:root[data-theme="dark"] .settings-link,
-:root[data-theme="dark"] .comment,
-:root[data-theme="dark"] .task-item,
-:root[data-theme="dark"] .office-picker,
-:root[data-theme="dark"] .office-search-item,
-:root[data-theme="dark"] .office-search-panel,
-:root[data-theme="dark"] .search-results,
-:root[data-theme="dark"] .result-item {
-    background: var(--background-block-primary);
-}
-
-:root[data-theme="dark"] .project-card {
-    background: var(--background-block-primary);
-}
-
-:root[data-theme="dark"] .comment-avatar {
-    background: color-mix(in srgb, var(--background-primary) 20%, transparent);
-}
-
-:root[data-theme="dark"] .btn {
-    background: var(--background-block-primary);
-    border-color: var(--border-subtle);
-    color: var(--text-primary);
-}
-
-:root[data-theme="dark"] .btn:hover {
-    background: var(--background-neutral-subtle);
-    border-color: var(--border-primary);
-    color: var(--text-primary-color);
-}
-
-:root[data-theme="dark"] .btn.primary {
-    background: var(--background-primary);
-    border-color: var(--border-primary);
-    color: #f8fbff;
-}
-
-:root[data-theme="dark"] .btn.primary:hover {
-    background: var(--button-solid-primary-hover);
-    border-color: var(--border-primary);
-    color: #f8fbff;
-}
-
-:root[data-theme="dark"] .btn.ghost {
-    background: transparent;
-    border-color: var(--border-subtle);
-    color: var(--text-primary-color);
-}
-
-:root[data-theme="dark"] .btn.ghost:hover {
-    background: var(--background-neutral-subtle);
-    border-color: var(--border-primary);
-    color: var(--text-primary-color);
-}
-
-:root[data-theme="dark"] .btn.danger {
-    border-color: #f87171;
-    color: #fca5a5;
-}
-
-:root[data-theme="dark"] .btn.danger:hover {
-    border-color: #ef4444;
-    color: #fecaca;
-    background: rgba(248, 113, 113, 0.12);
-}
-
-:root[data-theme="dark"] .record-delete-summary {
-    background: rgba(24, 31, 39, 0.78);
-}
-
-:root[data-theme="dark"] .dashboard-hero {
-    background:
-        radial-gradient(circle at top right, rgba(96, 165, 250, 0.16), transparent 38%),
-        linear-gradient(180deg, rgba(16, 24, 40, 0.94), rgba(20, 31, 50, 0.96));
-}
-
-:root[data-theme="dark"] .dashboard-stat {
-    background: rgba(15, 23, 42, 0.62);
-    border-color: rgba(96, 165, 250, 0.2);
-}
-
-:root[data-theme="dark"] .dashboard-card-primary {
-    background:
-        linear-gradient(180deg, rgba(59, 130, 246, 0.14), rgba(15, 23, 42, 0.92)),
-        var(--background-block-primary);
-}
-
-:root[data-theme="dark"] .dashboard-card-placeholder {
-    background:
-        repeating-linear-gradient(-45deg, rgba(148, 163, 184, 0.08), rgba(148, 163, 184, 0.08) 12px, transparent 12px, transparent 24px),
-        var(--background-block-primary);
-}
-
-/*
- * Dark theme override pro nativní formulářové kontrolní prvky.
- * POZOR: scope `:not(gov-form-input input):not(gov-form-search input):not([role="search"] input)`
- * musí být na KAŽDÉM input[type=...] selektoru. Gov-form-input a gov-form-search
- * renderují vnitřní <input type="text"> v LIGHT DOM — bez exclusion se globální
- * pravidlo aplikuje uvnitř host wrapperu a vznikne tmavší vnořený box
- * (rgb(17,27,45) uvnitř rgb(38,38,38) host → user: "uvnitř nějaký tmavý element").
- * Viz docs/architecture/components-theming.md a memory feedback_gov_web_components_css_scoping.
- */
-:root[data-theme="dark"] input[type="text"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="email"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="date"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="time"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="datetime-local"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="number"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="search"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] select:not(gov-form-select select):not(pm-select select),
-:root[data-theme="dark"] textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
-    /* Bug fix 2026-04-29: musí být `background-color`, ne `background` shorthand!
-       Shorthand by přepsal background-image (chevron na native <select> je vyrobený
-       přes 2× linear-gradient v řádku ~1787) a chevron by zmizel v dark mode. */
-    background-color: #111b2d;
-    border-color: #31415e;
-    color: #e6edfa;
-}
-
-/* Native <select> chevron — v dark mode použít světlejší barvu, gradient by jinak
-   slyl s tmavým pozadím. Bez tohoto override by gradient color #64748b zůstal,
-   což je sice viditelné, ale subtilní. Lehčí color = lepší čitelnost. */
-:root[data-theme="dark"] select:not(gov-form-select select):not(pm-select select) {
-    background-image: linear-gradient(45deg, transparent 50%, #93c5fd 50%), linear-gradient(135deg, #93c5fd 50%, transparent 50%);
-}
-
-:root[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-    filter: invert(0.9);
-}
-
-:root[data-theme="dark"] .richtext-host .ql-toolbar.ql-snow {
-    background: #16233a;
-    border-color: #31415e;
-}
-
-:root[data-theme="dark"] .richtext-host .ql-container.ql-snow {
-    background: #111b2d;
-    border-color: #31415e;
-    color: #e6edfa;
-}
-
-:root[data-theme="dark"] .richtext-host .ql-snow .ql-stroke {
-    stroke: #d7e5ff;
-}
-
-:root[data-theme="dark"] .richtext-host .ql-snow .ql-fill {
-    fill: #d7e5ff;
-}
-
-:root[data-theme="dark"] .richtext-host .ql-snow .ql-picker {
-    color: #d7e5ff;
-}
-
-:root[data-theme="dark"] .record-form-number input[disabled] {
-    background: #16233a;
-    border-color: #31415e;
-    color: #9fb6dc;
-}
-
-:root[data-theme="dark"] .tag {
-    background: #31251e;
-    color: #ffba8d;
-}
-
-:root[data-theme="dark"] .chip {
-    background: #1d2f50;
-    color: #bfdaff;
-}
-
-:root[data-theme="dark"] .chip-link {
-    color: #bfdaff;
-}
-
-:root[data-theme="dark"] .icon-btn {
-    background: #0f1b2e;
-    border-color: #2f4264;
-    color: #c9dcff;
-}
-
-:root[data-theme="dark"] .icon-btn:hover {
-    border-color: #6aa6ff;
-    color: #9fc5ff;
-}
-
-:root[data-theme="dark"] .meeting-detail-header .muted,
-:root[data-theme="dark"] .meeting-status .muted,
-:root[data-theme="dark"] .meeting-date {
-    color: #d1ddf3;
-}
-
-:root[data-theme="dark"] .meeting-status-badge {
-    background: #2f5a8d;
-    color: #ecf4ff;
-}
-
-:root[data-theme="dark"] .meeting-status .tag {
-    background: #3a2b1f;
-    border: 1px solid #6e4b31;
-    color: #ffd6b6;
-}
-
-:root[data-theme="dark"] .chip-collab {
-    background: #1f3558;
-    color: #c9dcff;
-    border-color: #33598b;
-}
-
-:root[data-theme="dark"] .chip-tooltip {
-    background: #0f1b2e;
-    border-color: #2f4264;
-    box-shadow: 0 16px 28px rgba(0, 0, 0, 0.45);
-}
-
-:root[data-theme="dark"] .chip-tooltip::before {
-    background: #0f1b2e;
-    border-left-color: #2f4264;
-    border-top-color: #2f4264;
-}
-
-:root[data-theme="dark"] .chip-tooltip-row {
-    color: #a8b6cf;
-}
-
-:root[data-theme="dark"] .chip-sub {
-    color: #d8e6fd;
-}
-
-:root[data-theme="dark"] .docs-sidebar,
-:root[data-theme="dark"] .docs-content,
-:root[data-theme="dark"] .docs-toc {
-    background: var(--background-block-primary);
-    border-color: var(--border-subtle);
-}
-
-:root[data-theme="dark"] .docs-header p,
-:root[data-theme="dark"] .docs-breadcrumb {
-    color: #a8b6cf;
-}
-
-:root[data-theme="dark"] .docs-nav-link {
-    color: #b8d2ff;
-}
-
-:root[data-theme="dark"] .docs-nav-link:hover {
-    background: var(--background-neutral-subtle);
-}
-
-:root[data-theme="dark"] .docs-nav-link.active {
-    background: rgba(156, 200, 255, 0.12);
-    color: var(--text-primary-color);
-}
-
-:root[data-theme="dark"] .docs-content code {
-    background: #1d2d4d;
-}
-
-:root[data-theme="dark"] .docs-content pre {
-    border-color: #31415e;
-    background: #0f1b2e;
-}
-
-:root[data-theme="dark"] .docs-content th,
-:root[data-theme="dark"] .docs-content td,
-:root[data-theme="dark"] .docs-content hr {
-    border-color: #31415e;
-}
-
-:root[data-theme="dark"] .docs-toc-link,
-:root[data-theme="dark"] .docs-breadcrumb a {
-    color: #a9c9ff;
-}
-
-:root[data-theme="dark"] .print-format-popover {
-    background: var(--background-block-primary);
-    border-color: var(--border-subtle);
-    box-shadow: var(--app-shadow-soft);
-}
-
-:root[data-theme="dark"] .print-format-subtitle,
-:root[data-theme="dark"] .print-format-note {
-    color: #a8b6cf;
-}
-
-:root[data-theme="dark"] .print-format-close {
-    border-color: #31415e;
-    color: #c9dcff;
-}
-
-:root[data-theme="dark"] .collab-picker,
-:root[data-theme="dark"] .collab-options {
-    background: var(--background-block-primary);
-}
-
-:root[data-theme="dark"] .office-search-panel {
-    border-color: var(--border-subtle);
-    box-shadow: var(--app-shadow-soft);
-}
-
-:root[data-theme="dark"] .office-search-item {
-    border-bottom-color: var(--border-subtle);
-}
-
-:root[data-theme="dark"] .office-search-item:hover,
-:root[data-theme="dark"] .office-search-item.active {
-    background: var(--background-neutral-subtle);
-}
-
-:root[data-theme="dark"] .office-search-secondary {
-    color: #a8b6cf;
-}
-
-:root[data-theme="dark"] .office-search-warning {
-    color: #ff9a9a;
-}
-
-:root[data-theme="dark"] .office-search-info {
-    border-bottom-color: #2f4264;
-}
-
-:root[data-theme="dark"] .office-search-info.error {
-    color: #ff9a9a;
-}
-
-:root[data-theme="dark"] .ad-location-hint {
-    color: #8df0af;
-}
-
-:root[data-theme="dark"] .ciselnik-color-swatch {
-    border-color: rgba(191, 218, 255, 0.45);
-}
-
-:root[data-theme="dark"] .field-error-message {
-    color: #ff9a9a;
-}
-
-:root[data-theme="dark"] .schedule-mini-gantt-track,
-:root[data-theme="dark"] .schedule-overview-track,
-:root[data-theme="dark"] .schedule-layered-track,
-:root[data-theme="dark"] .gantt-step-track {
-    background: #25344d;
-    box-shadow: inset 0 0 0 1px rgba(191, 218, 255, 0.2);
-}
-
-:root[data-theme="dark"] .schedule-mini-legend {
-    color: #9fb6dc;
-}
-
-:root[data-theme="dark"] .timeline-axis {
-    border-bottom-color: rgba(148, 163, 184, 0.42);
-}
-
-:root[data-theme="dark"] .timeline-axis-tick {
-    background: rgba(148, 163, 184, 0.35);
-}
-
-:root[data-theme="dark"] .timeline-axis-tick.edge {
-    background: rgba(191, 218, 255, 0.52);
-}
-
-:root[data-theme="dark"] .timeline-axis-label {
-    color: #d5e3f7;
-    background: rgba(30, 41, 59, 0.9);
-    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.5);
-}
-
-:root[data-theme="dark"] .schedule-overview-segment,
-:root[data-theme="dark"] .schedule-layered-segment.planned {
-    box-shadow: inset 0 0 0 1px rgba(191, 218, 255, 0.2);
-}
-
-:root[data-theme="dark"] .schedule-overview-segment[data-schedule-segment-kind="actual"],
-:root[data-theme="dark"] .schedule-layered-segment.actual {
-    border-color: rgba(226, 232, 240, 0.62);
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.12) inset,
-        0 1px 2px rgba(15, 23, 42, 0.3);
-}
-
-:root[data-theme="dark"] .schedule-layered-legend-swatch.deadline {
-    background: #dbeafe;
-}
-
-:root[data-theme="dark"] .schedule-layered-legend-swatch.today {
-    background: #111111;
-}
-
-:root[data-theme="dark"] .subsystem-scroll-indicator-rail {
-    background: rgba(191, 218, 255, 0.28);
-}
-
-:root[data-theme="dark"] .subsystem-scroll-indicator-bubble {
-    border-color: rgba(191, 218, 255, 0.25);
-    background: color-mix(in srgb, var(--background-block-primary) 88%, var(--background-primary) 12%);
-}
-
-:root[data-theme="dark"] .field-invalid {
-    border-color: #ef6f67 !important;
-    box-shadow: inset 0 0 0 1px rgba(239, 111, 103, 0.35) !important;
-}
-
-:root[data-theme="dark"] .app-date-trigger,
-:root[data-theme="dark"] .app-time-trigger {
-    color: #d5e3fb;
-}
-
-:root[data-theme="dark"] .app-date-trigger:disabled,
-:root[data-theme="dark"] .app-time-trigger:disabled {
-    color: #6f809f;
-}
-
-:root[data-theme="dark"] .app-date-panel {
-    background: var(--background-block-primary);
-    border-color: var(--border-subtle);
-    box-shadow: var(--app-shadow-soft);
-}
-
-:root[data-theme="dark"] .app-time-panel {
-    background: var(--background-block-primary);
-    border-color: var(--border-subtle);
-    box-shadow: var(--app-shadow-soft);
-}
-
-:root[data-theme="dark"] .app-date-select {
-    border-color: var(--border-subtle);
-    background-color: var(--background-block-primary);
-    color: var(--text-primary);
-}
-
-:root[data-theme="dark"] .app-date-nav-btn,
-:root[data-theme="dark"] .app-date-weekdays span,
-:root[data-theme="dark"] .app-date-day {
-    color: #9dc4ff;
-}
-
-:root[data-theme="dark"] .app-date-day.outside {
-    color: #5d7597;
-}
-
-:root[data-theme="dark"] .app-date-day:hover {
-    background: rgba(120, 170, 255, 0.16);
-}
-
-:root[data-theme="dark"] .app-date-day.selected {
-    background: rgba(156, 200, 255, 0.18);
-    color: var(--text-primary-color);
-}
-
-:root[data-theme="dark"] .app-time-option {
-    background: var(--background-block-primary);
-    border-color: var(--border-subtle);
-    color: var(--text-primary);
-}
-
-:root[data-theme="dark"] .app-time-option:hover {
-    background: var(--background-neutral-subtle);
-}
-
-:root[data-theme="dark"] .app-time-option.selected {
-    background: rgba(156, 200, 255, 0.18);
-    border-color: var(--border-primary);
-    color: var(--text-primary-color);
-}
-
-:root[data-theme="dark"] .filter-shell {
-    background: #16233a;
-    border-color: #2f4264;
-}
-
-:root[data-theme="dark"] .filter-toggle,
-:root[data-theme="dark"] .filter-grid label,
-:root[data-theme="dark"] .filter-inline {
-    color: #d9e5fb;
-}
-
-:root[data-theme="dark"] .active-filter-chip {
-    background: #223552;
-    border-color: #35507a;
-    color: #e6eefc;
-}
-
-:root[data-theme="dark"] .active-filter-chip-remove {
-    color: #b8caea;
-}
-
-:root[data-theme="dark"] .active-filter-chip-remove:hover {
-    background: rgba(230, 238, 252, 0.08);
-    color: #f8fbff;
-}
-
-:root[data-theme="dark"] .filter-actions {
-    border-top-color: #2f4264;
-}
-
-:root[data-theme="dark"] .filter-save-status,
-:root[data-theme="dark"] .profile-preference-status {
-    color: #c7d7f3;
-}
-
-:root[data-theme="dark"] input[type="checkbox"] {
-    accent-color: #84aef7;
 }
 
 /* Sémantika barev kategorií (2026-06-11) — gov tokeny, theme-aware (light/dark).
