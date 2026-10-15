@@ -49,6 +49,34 @@ public sealed class TaskStatusRulesTests
         => TaskStatusRules.IsCompleted(null).Should().BeFalse();
 
     [Fact]
+    public void IsClosedForComments_IsTrueForFinalState()
+        => TaskStatusRules
+            .IsClosedForComments(new CiselnikStavuUkoluEntity { Nazev = "Ukončeno", IsFinal = true })
+            .Should().BeTrue();
+
+    [Fact]
+    public void IsClosedForComments_IsFalseForNonFinalState()
+        => TaskStatusRules
+            .IsClosedForComments(new CiselnikStavuUkoluEntity { Nazev = "Rozpracováno", IsFinal = false })
+            .Should().BeFalse();
+
+    [Fact]
+    public void IsClosedForComments_IsFalseForPausedNonFinalState()
+        => TaskStatusRules
+            .IsClosedForComments(new CiselnikStavuUkoluEntity { Nazev = "Pozastaveno", IsFinal = false })
+            .Should().BeFalse("pozastavené záznamy se dál dopisují (rozhodnutí uživatele 2026-10-14)");
+
+    [Fact]
+    public void IsClosedForComments_FollowsIsFinalOnlyEvenForPausedName()
+        => TaskStatusRules
+            .IsClosedForComments(new CiselnikStavuUkoluEntity { Nazev = "Pozastaveno", IsFinal = true })
+            .Should().BeTrue("pro vyjádření platí holé is_final, bez výjimky podle názvu (na rozdíl od IsCompleted)");
+
+    [Fact]
+    public void IsClosedForComments_IsFalseForUnknownState()
+        => TaskStatusRules.IsClosedForComments(null).Should().BeFalse();
+
+    [Fact]
     public void Export_UsesSharedPauseRule_NotItsOwnLiteral()
     {
         var source = File.ReadAllText(ResolvePath("PmTracker.Web/Services/Export/ExportProjectionBuilders.cs"));
