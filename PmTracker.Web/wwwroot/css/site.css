@@ -3132,7 +3132,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 18px;
     border-radius: 999px;
     /* dráha ganttu — gov token, přepíná se s motivem sám (2026-10-15) */
-    background: var(--background-neutral-subtle);
+    background: var(--background-primary-subtle);
     /* overflow:visible (dříve hidden): markery „Dnes"/„Termín" se na krajích neořežou.
        Bezpečné — segmenty už nepřetékají (+1px hack odstraněn, šířka ≤ 100 %), a samy mají
        border-radius (pill tvar nezávisí na ořezu stopy). 2026-06-23 redesign osy. */
@@ -3213,7 +3213,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 18px;
     border-radius: 999px;
     /* layered track pozadí — sdílí token s overview track */
-    background: var(--background-neutral-subtle);
+    background: var(--background-primary-subtle);
     overflow: hidden;
     box-shadow: inset 0 0 0 1px var(--border-subtlest);
 }
@@ -5963,7 +5963,7 @@ pm-tab-last-in-row > span[data-pm-tab-inner] {
     display: block;
     padding: 10px 22px;
     color: var(--text-secondary);
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
     border-top-left-radius: var(--pm-tab-radius);
     border-top-right-radius: var(--pm-tab-radius);
     cursor: pointer;
@@ -6021,7 +6021,7 @@ pm-tab-left::before {
     left: -10px;
     width: 10px;
     height: 10px;
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
     z-index: 1;
 }
 
@@ -6033,7 +6033,7 @@ pm-tab-last-in-row::after {
     right: -10px;
     width: 10px;
     height: 10px;
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
     z-index: 1;
 }
 
@@ -6046,7 +6046,7 @@ pm-tab-left > span[data-pm-tab-inner]::before {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--background-page);
+    background: var(--background-block-primary);
     z-index: 2;
 }
 
@@ -6059,7 +6059,7 @@ pm-tab-last-in-row > span[data-pm-tab-inner]::after {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--background-page);
+    background: var(--background-block-primary);
     z-index: 2;
 }
 
@@ -6107,7 +6107,7 @@ pm-tab[active] > span[data-pm-tab-inner]::before {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
     z-index: 2;
 }
 
@@ -6119,7 +6119,7 @@ pm-tab[active] > span[data-pm-tab-inner]::after {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
     z-index: 2;
 }
 
@@ -6132,7 +6132,7 @@ pm-tab-left[active] > span[data-pm-tab-inner]::before {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--background-page);
+    background: var(--background-block-primary);
     z-index: 2;
 }
 
@@ -6144,7 +6144,7 @@ pm-tab-left[active] > span[data-pm-tab-inner]::after {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
     z-index: 2;
 }
 
@@ -6158,7 +6158,7 @@ pm-tab-last-in-row[active] > span[data-pm-tab-inner]::before {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
     z-index: 2;
 }
 
@@ -6171,7 +6171,7 @@ pm-tab-last-in-row[active] > span[data-pm-tab-inner]::after {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--background-page);
+    background: var(--background-block-primary);
     z-index: 2;
 }
 
@@ -6215,7 +6215,7 @@ pm-tab-list:has(pm-tab-left:only-child) pm-tab-left::after {
     right: -10px;
     width: 10px;
     height: 10px;
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
     z-index: 1;
 }
 
@@ -6232,7 +6232,7 @@ pm-tab-list:has(pm-tab-left:only-child) pm-tab-left[active] > span[data-pm-tab-i
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--background-page);
+    background: var(--background-block-primary);
     z-index: 2;
 }
 

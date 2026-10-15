@@ -98,4 +98,20 @@ public sealed class AppCssColorTokenTests
 
         offenders.Should().BeEmpty();
     }
+
+    /// <summary>
+    /// Vykrojené rohy záložek pm-tab (kruhy ::before/::after) se kreslí barvou plochy, na které
+    /// záložky leží — panel/karta, ne stránka. S --background-page kreslily v tmavém motivu černý kruh.
+    /// </summary>
+    [Fact]
+    public void PmTabCornerCircles_DoNotUsePageBackground()
+    {
+        var offenders = AppCss.Declarations("site.css")
+            .Where(d => d.Selector.Contains("data-pm-tab-inner]::", StringComparison.Ordinal))
+            .Where(d => d.Value.Contains("--background-page", StringComparison.Ordinal))
+            .Select(d => $"site.css:{d.Line} {d.Selector}")
+            .ToList();
+
+        offenders.Should().BeEmpty("roh záložky musí mít barvu panelu (--background-block-*)");
+    }
 }
