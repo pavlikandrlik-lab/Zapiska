@@ -367,7 +367,14 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             .Where(x => x.Kod == categoryCode)
             .Select(x => x.Id)
             .FirstAsync();
-        var stateId = await dbContext.CiselnikStavuUkolu.Select(x => x.Id).FirstAsync();
+        // Běžící (nefinální) stav jako v IntegrationTestHelper. Bez filtru bral první řádek číselníku,
+        // a ten je po MERGE v PMTracker_insert_sql „Hotovo“ (is_final) — záznam pak byl uzavřený
+        // a nepřijímal vyjádření (pravidlo 2026-10-14).
+        var stateId = await dbContext.CiselnikStavuUkolu
+            .Where(x => !x.IsFinal)
+            .OrderBy(x => x.Id)
+            .Select(x => x.Id)
+            .FirstAsync();
         var hasProjectSubsystem = await dbContext.ProjektSubsystemy
             .AnyAsync(x => x.ProjektId == projectId && x.SubsystemId == subsystemId && !x.DatumOdebrani.HasValue);
         if (!hasProjectSubsystem)
@@ -572,6 +579,35 @@ public sealed class ApiSqlFixture : IAsyncLifetime
         dbContext.Jednani.Add(meeting);
         await dbContext.SaveChangesAsync();
         return meeting.Id;
+    }
+
+    public async Task CloseRecordAsync(int recordId)
+    {
+        await using var dbContext = CreateDbContext();
+
+        var finalStateId = await dbContext.CiselnikStavuUkolu
+            .Where(x => x.IsFinal)
+            .OrderBy(x => x.Id)
+            .Select(x => x.Id)
+            .FirstAsync();
+        var record = await dbContext.ProjektoveZaznamy.FirstAsync(x => x.Id == recordId);
+        record.StavUkoluId = finalStateId;
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task AddCommentAsync(int recordId, int meetingId, int authorOsobaId, string text)
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.Vyjadreni.Add(new VyjadreniEntity
+        {
+            ZaznamId = recordId,
+            JednaniId = meetingId,
+            AutorOsobaId = authorOsobaId,
+            TextVyjadreni = text,
+            DatumVyjadreni = DateTime.Now
+        });
+        await dbContext.SaveChangesAsync();
     }
 
     public async Task EnsureProjectTeamMemberAsync(int projectId, int osobaId)

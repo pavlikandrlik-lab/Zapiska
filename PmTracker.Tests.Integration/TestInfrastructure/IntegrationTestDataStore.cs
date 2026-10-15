@@ -132,6 +132,9 @@ internal sealed class IntegrationTestDataStore(IServiceProvider services)
     public void AddComment(AddCommentCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordService>().AddCommentAsync(command, currentUser).GetAwaiter().GetResult();
 
+    public void SaveMeetingNotesBatch(int meetingId, IEnumerable<(int ZaznamId, string Text)> rows, CurrentUserContextViewModel currentUser)
+        => services.GetRequiredService<IMeetingService>().SaveMeetingNotesBatchAsync(meetingId, rows, currentUser).GetAwaiter().GetResult();
+
     public void UpdateComment(UpdateCommentCommand command, CurrentUserContextViewModel currentUser)
         => services.GetRequiredService<IRecordService>().UpdateCommentAsync(command, currentUser).GetAwaiter().GetResult();
 

@@ -166,4 +166,10 @@
             </div>
         </form>
     }
+    else if (Model.IsRecordClosed)
+    {
+        <p class="comment-closed-note" data-record-closed-note="true">
+            Záznam je uzavřený, nové vyjádření nelze přidat. Pro doplnění ho nejprve znovu otevřete změnou stavu.
+        </p>
+    }
 </div>

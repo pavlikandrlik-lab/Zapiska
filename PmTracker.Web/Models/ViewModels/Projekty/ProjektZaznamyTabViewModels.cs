@@ -121,6 +121,7 @@ public sealed class ZaznamCommentsPanelViewModel
     public bool CanLoadMore { get; init; }
     public bool CanLoadAll { get; init; }
     public bool IsFullyLoaded { get; init; }
+    public bool IsRecordClosed { get; init; }
     public bool CanEditRecord { get; set; }
     public bool CanCommentAsSubsystemLeader { get; set; }
     public bool CanAddComment { get; set; }

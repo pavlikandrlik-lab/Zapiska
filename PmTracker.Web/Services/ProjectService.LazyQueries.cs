@@ -292,7 +292,8 @@ public sealed partial class ProjectService
             .Select(x => new
             {
                 x.Id,
-                x.VlastnikId
+                x.VlastnikId,
+                x.StavUkoluId
             })
             .FirstOrDefaultAsync(ct);
         if (record is null)
@@ -327,6 +328,10 @@ public sealed partial class ProjectService
             ? new Dictionary<int, CiselnikStavuJednaniEntity>()
             : meetingStateIds.Where(allMeetingStates.ContainsKey).ToDictionary(id => id, id => allMeetingStates[id]);
         var meetingOptions = await BuildOpenMeetingOptionsForProjectAsync(projectId, ct);
+        var taskStates = await lookupCache.GetTaskStatesAsync(ct);
+        var isRecordClosed = record.StavUkoluId is { } recordStateId
+            && taskStates.TryGetValue(recordStateId, out var recordState)
+            && TaskStatusRules.IsClosedForComments(recordState);
         var loadedCount = comments.Count;
         var isFullyLoaded = loadedCount >= totalCount;
 
@@ -340,6 +345,7 @@ public sealed partial class ProjectService
             CanLoadMore = !isFullyLoaded,
             CanLoadAll = !isFullyLoaded,
             IsFullyLoaded = isFullyLoaded,
+            IsRecordClosed = isRecordClosed,
             OtevrenaJednani = meetingOptions,
             Vyjadreni = comments
                 .Select(comment =>
