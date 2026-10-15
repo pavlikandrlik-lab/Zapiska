@@ -36,25 +36,25 @@
     padding: 0 0.2rem;
     border-radius: 0.25rem;
     font-size: 0.85rem;
-    background: var(--gov-color-neutral-bg, #f2f4f7);
-    color: var(--gov-color-text-secondary, #475467);
+    background: var(--background-neutral-subtlest);
+    color: var(--text-secondary);
     user-select: none;
     cursor: help;
 }
 
 .schedule-actual-cell__badge[data-zdroj="Automat"] {
-    background: var(--gov-color-primary-bg, #dbeafe);
-    color: var(--gov-color-primary, #1e40af);
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
 }
 
 .schedule-actual-cell__badge[data-zdroj="Manual"] {
-    background: var(--gov-color-warning-bg, #fef3c7);
-    color: var(--gov-color-warning-strong, #92400e);
+    background: var(--background-status-warning-subtlest);
+    color: var(--text-status-warning);
 }
 
 .schedule-actual-cell__badge[data-zdroj="Historicka"] {
-    background: var(--gov-color-neutral-bg, #f2f4f7);
-    color: var(--gov-color-text-muted, #98a2b3);
+    background: var(--background-neutral-subtlest);
+    color: var(--text-secondary);
 }
 
 .schedule-actual-cell__toggle {
@@ -62,10 +62,10 @@
     align-items: center;
     justify-content: center;
     padding: 0.1rem 0.5rem;
-    border: 1px solid var(--gov-color-neutral-border, #d0d5dd);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.25rem;
     background: #fff;
-    color: var(--gov-color-text, #1f2937);
+    color: var(--text-primary);
     font-size: 0.7rem;
     font-weight: 500;
     line-height: 1;
@@ -74,12 +74,12 @@
 }
 
 .schedule-actual-cell__toggle:hover:not(:disabled) {
-    background: var(--gov-color-neutral-bg-hover, #f9fafb);
-    border-color: var(--gov-color-primary, #1e40af);
+    background: var(--background-neutral-subtle);
+    border-color: var(--border-primary);
 }
 
 .schedule-actual-cell__toggle:focus-visible {
-    outline: 2px solid var(--gov-color-primary, #1e40af);
+    outline: 2px solid var(--border-primary);
     outline-offset: 1px;
 }
 
@@ -89,15 +89,15 @@
 }
 
 .schedule-actual-cell__toggle[data-current-rezim="Auto"] {
-    background: var(--gov-color-primary-bg, #dbeafe);
-    border-color: var(--gov-color-primary, #1e40af);
-    color: var(--gov-color-primary-strong, #1e3a8a);
+    background: var(--background-primary-subtlest);
+    border-color: var(--border-primary);
+    color: var(--text-primary-color);
 }
 
 .schedule-actual-cell__toggle[data-current-rezim="Manual"] {
-    background: var(--gov-color-warning-bg, #fef3c7);
-    border-color: var(--gov-color-warning-strong, #92400e);
-    color: var(--gov-color-warning-strong, #92400e);
+    background: var(--background-status-warning-subtlest);
+    border-color: var(--border-warning);
+    color: var(--text-status-warning);
 }
 
 .schedule-actual-cell__main {
@@ -107,10 +107,10 @@
 
 .schedule-actual-cell__error {
     font-size: 0.75rem;
-    color: var(--gov-color-danger, #dc2626);
+    color: var(--text-status-error);
     padding: 0.25rem 0.5rem;
     border-left: 2px solid currentColor;
-    background: var(--gov-color-danger-bg, #fee2e2);
+    background: var(--background-status-error-subtlest);
     border-radius: 0 0.25rem 0.25rem 0;
 }
 
@@ -127,10 +127,10 @@
     width: 1.25rem;
     height: 1.25rem;
     padding: 0;
-    border: 1px solid var(--gov-color-neutral-border, #d0d5dd);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.25rem;
     background: #fff;
-    color: var(--gov-color-text-secondary, #475467);
+    color: var(--text-secondary);
     cursor: pointer;
     list-style: none;
     transition: background 0.1s, border-color 0.1s;
@@ -141,14 +141,14 @@
 }
 
 .schedule-actual-cell__dropdown-summary:hover {
-    background: var(--gov-color-neutral-bg-hover, #f9fafb);
-    border-color: var(--gov-color-primary, #1e40af);
+    background: var(--background-neutral-subtle);
+    border-color: var(--border-primary);
 }
 
 .schedule-actual-cell__dropdown[open] > .schedule-actual-cell__dropdown-summary {
-    background: var(--gov-color-primary-bg, #dbeafe);
-    border-color: var(--gov-color-primary, #1e40af);
-    color: var(--gov-color-primary-strong, #1e3a8a);
+    background: var(--background-primary-subtlest);
+    border-color: var(--border-primary);
+    color: var(--text-primary-color);
 }
 
 .schedule-actual-cell__dropdown-chevron {
@@ -167,7 +167,7 @@
     margin: 0;
     padding: 0.25rem;
     background: #fff;
-    border: 1px solid var(--gov-color-neutral-border, #d0d5dd);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.375rem;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     list-style: none;
@@ -196,7 +196,7 @@
     padding: 0.35rem 0.5rem;
     border: none;
     background: transparent;
-    color: var(--gov-color-text, #1f2937);
+    color: var(--text-primary);
     font-size: 0.8rem;
     text-align: left;
     cursor: pointer;
@@ -205,17 +205,17 @@
 }
 
 .schedule-actual-cell__dropdown-btn:hover:not(:disabled) {
-    background: var(--gov-color-neutral-bg-hover, #f9fafb);
+    background: var(--background-neutral-subtle);
 }
 
 .schedule-actual-cell__dropdown-btn:focus-visible {
-    outline: 2px solid var(--gov-color-primary, #1e40af);
+    outline: 2px solid var(--border-primary);
     outline-offset: -2px;
 }
 
 .schedule-actual-cell__dropdown-item--selected .schedule-actual-cell__dropdown-btn {
-    background: var(--gov-color-primary-bg, #dbeafe);
-    color: var(--gov-color-primary-strong, #1e3a8a);
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
     font-weight: 500;
 }
 
@@ -223,8 +223,8 @@
     font-size: 0.7rem;
     padding: 0.05rem 0.3rem;
     border-radius: 0.2rem;
-    background: var(--gov-color-neutral-bg, #f2f4f7);
-    color: var(--gov-color-text-secondary, #475467);
+    background: var(--background-neutral-subtlest);
+    color: var(--text-secondary);
     font-weight: 600;
     letter-spacing: 0.03em;
 }
@@ -232,7 +232,7 @@
 .schedule-actual-cell__dropdown-item-cislo {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.75rem;
-    color: var(--gov-color-text-secondary, #475467);
+    color: var(--text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -241,11 +241,11 @@
 .schedule-actual-cell__dropdown-item-datum {
     font-variant-numeric: tabular-nums;
     font-size: 0.8rem;
-    color: var(--gov-color-text, #1f2937);
+    color: var(--text-primary);
 }
 
 .schedule-actual-cell__dropdown-item-check {
-    color: var(--gov-color-primary, #1e40af);
+    color: var(--text-primary-color);
     font-weight: 700;
 }
 

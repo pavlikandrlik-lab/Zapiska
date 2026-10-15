@@ -159,7 +159,7 @@ export class ScheduleBlockRenderer {
             .sort((left, right) => left.stepIndex - right.stepIndex);
         const inlineDelayColor = String(root.style.getPropertyValue("--record-schedule-delay-color") || "").trim();
         const computedDelayColor = window.getComputedStyle(root).getPropertyValue("--record-schedule-delay-color").trim();
-        this.delayColor = inlineDelayColor || computedDelayColor || "var(--schedule-delay)";
+        this.delayColor = inlineDelayColor || computedDelayColor || "var(--app-schedule-delay)";
     }
 
     collectSegmentMap(selector) {

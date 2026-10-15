@@ -21,7 +21,7 @@ public sealed class ProposalCardCssTests
         var css = Css();
         css.Should().Contain(".proposal-card {",
             "každý návrh potřebuje vlastní sub-kartu s orámováním");
-        css.Should().Contain("var(--gov-color-border)",
+        css.Should().Contain("var(--border-subtle)",
             "border barva musí používat gov token pro dark-mode kompatibilitu");
     }
 
