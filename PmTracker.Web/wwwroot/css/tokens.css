@@ -79,3 +79,51 @@
     --pm-z-modal: 1000;
     --pm-z-toast: 2000;
 }
+
+/* ---------------------------------------------------------
+ * Aplikační barvy (2026-10-15)
+ * Barvy aplikace jsou sémantické tokeny gov DS 4.7.0 (--background-*, --text-*,
+ * --border-*, --icon-*, --status-*), které přepíná gov podle data-theme.
+ * Sem patří jen barvy, které gov nemá. Tohle je jediný soubor aplikace, který
+ * smí obsahovat data-theme a barevné literály (hlídá AppCssColorTokenTests).
+ * --------------------------------------------------------- */
+:root {
+    /* Stíny — gov DS nemá tokeny stínů. */
+    --app-shadow-soft: 0 2px 8px rgba(11, 12, 12, 0.08);
+    --app-shadow-raised: 0 8px 24px rgba(11, 12, 12, 0.14);
+
+    /* Kategorie Rozhodnutí — fialová mimo gov paletu, odlišná od semaforu úkolů
+       (zelená/oranžová/červená) a modré Informace. Viz docs/wiki/projekty/zaznamy/barvy-karet.md. */
+    --app-category-decision: #7c3aed;
+    --app-category-decision-subtle: #f3e8ff;
+
+    /* Harmonogram — duhová paleta kroků a skluz (dříve v site.css :root). */
+    --app-schedule-step-1: #ef4444;
+    --app-schedule-step-2: #f97316;
+    --app-schedule-step-3: #f59e0b;
+    --app-schedule-step-4: #84cc16;
+    --app-schedule-step-5: #22c55e;
+    --app-schedule-step-6: #14b8a6;
+    --app-schedule-step-7: #06b6d4;
+    --app-schedule-step-8: #3b82f6;
+    --app-schedule-step-9: #6366f1;
+    --app-schedule-step-10: #8b5cf6;
+    --app-schedule-step-11: #d946ef;
+    --app-schedule-delay: #dc2626;
+
+    /* Překryvy pruhů harmonogramu. Pruhy mají barvy z Excelu (HarmonogramKroky.cs),
+       stejné v obou motivech — proto i tyto hodnoty jsou v obou motivech stejné. */
+    --app-schedule-stripe: rgba(255, 255, 255, 0.55);
+    --app-schedule-segment-inner: rgba(255, 255, 255, 0.35);
+    --app-schedule-segment-edge: rgba(15, 23, 42, 0.42);
+}
+
+:root[data-theme="dark"] {
+    /* Nativní ovládací prvky (select, datum, čas, posuvníky) v tmavém provedení. */
+    color-scheme: dark;
+
+    --app-shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.28);
+    --app-shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --app-category-decision: #c4b5fd;
+    --app-category-decision-subtle: #2e1065;
+}

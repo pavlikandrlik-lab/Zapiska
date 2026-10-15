@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 
 namespace PmTracker.Tests.Unit.Layout;
@@ -106,5 +107,29 @@ public sealed class TokensCssTests
         // Vezmi jeden reprezentativní token z pm (--color-primary-600) a ověř, že je v gov
         pmContent.Should().Contain("var(--color-primary-600", "pm-color-primary odkazuje na --color-primary-600");
         govContent.Should().Contain("--color-primary-600:", "--color-primary-600 musí existovat v gov DS");
+    }
+
+    [Theory]
+    [InlineData("--app-shadow-soft")]
+    [InlineData("--app-shadow-raised")]
+    [InlineData("--app-category-decision")]
+    [InlineData("--app-category-decision-subtle")]
+    [InlineData("--app-schedule-step-1")]
+    [InlineData("--app-schedule-step-11")]
+    [InlineData("--app-schedule-delay")]
+    [InlineData("--app-schedule-stripe")]
+    [InlineData("--app-schedule-segment-inner")]
+    [InlineData("--app-schedule-segment-edge")]
+    public void TokensCss_DefinesAppToken(string token)
+    {
+        File.ReadAllText(TokensCssPath).Should().Contain($"{token}:", $"aplikační token {token} patří do tokens.css");
+    }
+
+    [Fact]
+    public void TokensCss_DarkThemeSwitchesNativeControlsToDarkColorScheme()
+    {
+        var css = File.ReadAllText(TokensCssPath);
+        Regex.IsMatch(css, @":root\[data-theme=""dark""\]\s*\{[^}]*color-scheme:\s*dark", RegexOptions.Singleline)
+            .Should().BeTrue("bez color-scheme zůstanou nativní select/datum/posuvníky v tmavém motivu světlé");
     }
 }
