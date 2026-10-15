@@ -7,41 +7,7 @@
 @import "components/zakladni-report.css";
 
 :root {
-    --schedule-step-1: #ef4444;
-    --schedule-step-2: #f97316;
-    --schedule-step-3: #f59e0b;
-    --schedule-step-4: #84cc16;
-    --schedule-step-5: #22c55e;
-    --schedule-step-6: #14b8a6;
-    --schedule-step-7: #06b6d4;
-    --schedule-step-8: #3b82f6;
-    --schedule-step-9: #6366f1;
-    --schedule-step-10: #8b5cf6;
-    --schedule-step-11: #d946ef;
-    --schedule-delay: #dc2626;
     --app-picker-panel-width: 250px;
-
-    /* --pm-* aliasy na gov design tokens (2026-04-29). Tyto proměnné se používají
-       v 91 místech napříč site.css, externi-odkaz-card.css, vyzvy-panel.css.
-       Aliasování na gov tokens (--background-neutral-white, --border-subtle, atd.)
-       zajistí, že karty + bordery reagují na :root[data-theme="dark"] override
-       z gov-design-system core.css. Bez tohoto bloku karta externí vazby a další
-       komponenty zůstávaly bílé i v dark mode (fallback hex se aktivoval, protože
-       --pm-* nikde nebyly definovány). */
-    /* Light mode: bílá / off-white. Dark mode override níže (:root[data-theme="dark"])
-       sjednocuje na #111b2d s native input/select v site.css:5620.
-       Důležité: gov design tokens v dark dávají neutral šedou (color-neutral-950 = #262626),
-       ale projekt používá custom blue-tinted dark surface #111b2d (definováno historicky
-       v site.css :root[data-theme="dark"] overrides pro inputy). User chce sjednocení
-       na #111b2d, ne na neutral šedou. */
-    --pm-surface: #ffffff;
-    --pm-surface-alt: #f8fafc;
-    --pm-border: var(--border-subtle, var(--gov-color-neutral-border, #e2e8f0));
-    --pm-text: var(--text-primary, #0f172a);
-    --pm-text-muted: var(--text-secondary, var(--gov-color-text-secondary, #64748b));
-    --pm-warning: var(--gov-color-warning, #f59e0b);
-    --pm-warning-subtle: var(--background-warning-subtle, #fef3c7);
-    --pm-warning-strong: var(--text-warning-strong, #92400e);
     --pm-font-mono: ui-monospace, SFMono-Regular, Menlo, "IBM Plex Mono", Consolas, monospace;
     /* Odstup přilepených postranních panelů a cílů kotev od horního okraje okna.
        Hlavička není přilepená (spec 2026-09-23 §12.5), proto nezávisí na její výšce. */
@@ -50,8 +16,8 @@
 
 .app-body {
     min-height: 100vh;
-    background: var(--gov-color-bg);
-    color: var(--app-text-primary);
+    background: var(--background-page);
+    color: var(--text-primary);
     display: flex;
     flex-direction: column;
 }
@@ -63,7 +29,7 @@
     border-radius: 9px;
     overflow: hidden;
     flex-shrink: 0;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     background: #ffffff;
 }
 
@@ -82,7 +48,7 @@
 }
 
 .app-subtitle {
-    color: var(--app-muted);
+    color: var(--text-secondary);
     font-size: 12px;
 }
 
@@ -135,10 +101,10 @@
     top: calc(100% + 4px);
     left: 0;
     right: 0;
-    background: var(--gov-color-surface);
-    border: 1px solid var(--gov-color-border);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-sm);
-    box-shadow: var(--gov-shadow-soft);
+    box-shadow: var(--app-shadow-soft);
     z-index: 100;
     max-height: 360px;
     overflow-y: auto;
@@ -168,7 +134,7 @@
 .app-search-item:focus,
 .app-search-item.is-active,
 .app-search-item[aria-selected="true"] {
-    background: var(--pm-surface);
+    background: var(--background-block-secondary);
 }
 
 /* 80 / 20 — text vlevo, metadata vpravo. */
@@ -194,20 +160,20 @@
     flex: 0 0 20%;
     text-align: right;
     font-size: 0.8125rem;
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
     white-space: nowrap;
 }
 
 .app-search-item__snippet {
     font-size: 0.8125rem;
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
 }
 
 /* Tmavý text natvrdo, ať je čitelný na žlutém podkladu i v dark mode
    (color: inherit by ve tmavém motivu dalo světlý text na žluté). */
 .app-search-hl {
-    background: #fde68a;
-    color: #1f2937;
+    background: var(--background-secondary-subtle);
+    color: var(--text-primary);
     padding: 0 0.0625rem;
     border-radius: 2px;
 }
@@ -216,8 +182,8 @@
    jako zvýraznění v dropdownu, po 15 s plynule zmizí. Tmavý text drží kontrast i v tmavém
    motivu. */
 mark.app-search-flash {
-    background-color: #fde68a;
-    color: #1f2937;
+    background-color: var(--background-secondary-subtle);
+    color: var(--text-primary);
     border-radius: 2px;
     transition: background-color 1s ease, color 1s ease;
 }
@@ -237,7 +203,7 @@ mark.app-search-flash.app-search-flash--fading {
 
 .global-search-empty {
     padding: 12px 16px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     font-size: 14px;
 }
 
@@ -258,7 +224,7 @@ mark.app-search-flash.app-search-flash--fading {
 
 .global-search-item__link:hover,
 .global-search-item.is-active .global-search-item__link {
-    background-color: var(--gov-color-primary-bg, color-mix(in srgb, var(--gov-color-primary) 8%, transparent));
+    background-color: var(--background-primary-subtlest);
 }
 
 .global-search-item__header {
@@ -271,7 +237,7 @@ mark.app-search-flash.app-search-flash--fading {
 .global-search-item__title {
     font-size: 14px;
     font-weight: 600;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
     flex: 1 1 auto;
     min-width: 0;
     white-space: nowrap;
@@ -290,18 +256,18 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .global-search-item__badge--zaznam {
-    background: color-mix(in srgb, var(--gov-color-primary) 12%, transparent);
-    color: var(--gov-color-primary);
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
 }
 
 .global-search-item__badge--vyjadreni {
-    background: color-mix(in srgb, #7c3aed 10%, transparent);
-    color: #7c3aed;
+    background: var(--app-category-decision-subtle);
+    color: var(--app-category-decision);
 }
 
 .global-search-item__snippet {
     font-size: 12px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     margin-top: 3px;
     line-height: 1.4;
     white-space: nowrap;
@@ -311,40 +277,9 @@ mark.app-search-flash.app-search-flash--fading {
 
 .global-search-item__projekt {
     font-size: 11px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     margin-top: 2px;
     opacity: 0.75;
-}
-
-/* Dark mode override pro --pm-* tokens — sjednoceno s native input/select v dark
-   (background-color: #111b2d, border #31415e — viz site.css ~5620). Karty externí
-   vazby, vyzvy, reassign modal teď v dark mode mají stejnou tmavě modrou jako inputy. */
-:root[data-theme="dark"] {
-    --pm-surface: #111b2d;
-    --pm-surface-alt: #16233a;
-    --pm-border: #31415e;
-    --pm-text: #e6edfa;
-    --pm-text-muted: #8b9bb8;
-}
-
-/* dark mode overrides pro suggest dlaždice */
-:root[data-theme="dark"] .global-search-item__title {
-    color: var(--app-text-primary);
-}
-
-:root[data-theme="dark"] .global-search-item__badge--zaznam {
-    background: rgba(0, 94, 165, 0.2);
-    color: #7ab3e8;
-}
-
-:root[data-theme="dark"] .global-search-item__badge--vyjadreni {
-    background: rgba(124, 58, 237, 0.2);
-    color: #c4b5fd;
-}
-
-:root[data-theme="dark"] .global-search-item__link:hover,
-:root[data-theme="dark"] .global-search-item.is-active .global-search-item__link {
-    background-color: rgba(255, 255, 255, 0.06);
 }
 
 /* ── End global search ──────────────────────────────────────────────────── */
@@ -367,7 +302,7 @@ mark.app-search-flash.app-search-flash--fading {
 
 .app-user-menu__info span {
     font-size: 12px;
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
 }
 
 .app-user-menu__sep {
@@ -407,9 +342,9 @@ mark.app-search-flash.app-search-flash--fading {
     min-width: 280px;
     max-width: min(360px, calc(100vw - 24px));
     border-radius: var(--gov-radius);
-    border: 1px solid var(--gov-color-border);
-    background: var(--gov-color-surface);
-    box-shadow: var(--gov-shadow-soft);
+    border: 1px solid var(--border-subtle);
+    background: var(--background-block-primary);
+    box-shadow: var(--app-shadow-soft);
     padding: 14px;
     z-index: 1200;
     display: grid;
@@ -425,7 +360,7 @@ mark.app-search-flash.app-search-flash--fading {
 .print-format-subtitle {
     margin: 0;
     font-size: 13px;
-    color: var(--app-muted);
+    color: var(--text-secondary);
 }
 
 .print-format-actions {
@@ -452,7 +387,7 @@ mark.app-search-flash.app-search-flash--fading {
 .print-format-note {
     margin: 0;
     font-size: 12px;
-    color: var(--app-muted);
+    color: var(--text-secondary);
 }
 
 .print-format-close {
@@ -461,10 +396,10 @@ mark.app-search-flash.app-search-flash--fading {
     right: 8px;
     width: 26px;
     height: 26px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 999px;
     background: transparent;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     font-size: 18px;
     line-height: 1;
     cursor: pointer;
@@ -475,8 +410,8 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .print-format-close:hover {
-    border-color: var(--gov-color-primary);
-    color: var(--gov-color-primary);
+    border-color: var(--border-primary);
+    color: var(--text-primary-color);
 }
 
 .record-editor-popover {
@@ -484,9 +419,9 @@ mark.app-search-flash.app-search-flash--fading {
     min-width: 300px;
     max-width: min(360px, calc(100vw - 24px));
     border-radius: var(--gov-radius);
-    border: 1px solid var(--gov-color-border);
-    background: var(--gov-color-surface);
-    box-shadow: var(--gov-shadow-soft);
+    border: 1px solid var(--border-subtle);
+    background: var(--background-block-primary);
+    box-shadow: var(--app-shadow-soft);
     padding: 18px 18px 14px;
     z-index: 1200;
     display: grid;
@@ -502,7 +437,7 @@ mark.app-search-flash.app-search-flash--fading {
 .record-editor-popover-subtitle {
     margin: 0;
     font-size: 14px;
-    color: var(--app-muted);
+    color: var(--text-secondary);
 }
 
 .record-editor-popover-actions {
@@ -530,14 +465,14 @@ mark.app-search-flash.app-search-flash--fading {
 .record-editor-popover-note {
     margin: 0;
     font-size: 12px;
-    color: var(--app-muted);
+    color: var(--text-secondary);
 }
 
 .record-editor-popover-reset {
     border: none;
     background: transparent;
     padding: 0;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
     font-weight: 600;
     text-align: left;
     cursor: pointer;
@@ -549,10 +484,10 @@ mark.app-search-flash.app-search-flash--fading {
     right: 8px;
     width: 26px;
     height: 26px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-sm);
     background: transparent;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     font-size: 18px;
     line-height: 1;
     cursor: pointer;
@@ -563,14 +498,14 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .record-editor-popover-close:hover {
-    border-color: var(--gov-color-primary);
-    color: var(--gov-color-primary);
+    border-color: var(--border-primary);
+    color: var(--text-primary-color);
 }
 
 /* Čára pod hlavní navigací. Dřív ji kreslila drobečková lišta (border-top); kořeny sekcí
    ale lištu nemají (uživatel 2026-10-07) a obsah by splynul s menu. */
 .gov-header {
-    border-bottom: 1px solid var(--pm-border);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 /* Drobečková lišta (frame bar pod hlavičkou) — navigace zanoření. Hlavička není přilepená
@@ -582,18 +517,18 @@ mark.app-search-flash.app-search-flash--fading {
     gap: 0.5rem;
     min-height: 2.25rem;
     padding: 0.25rem 1rem;
-    background: var(--pm-surface);
-    border-bottom: 1px solid var(--pm-border);
+    background: var(--background-block-primary);
+    border-bottom: 1px solid var(--border-subtle);
     font-size: 0.875rem;
 }
 .app-breadcrumb-back {
     display: inline-flex;
     align-items: center;
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
     padding: 0.125rem;
     border-radius: 0.25rem;
 }
-.app-breadcrumb-back:hover { color: var(--pm-text); background: var(--pm-border); }
+.app-breadcrumb-back:hover { color: var(--text-primary); background: var(--background-neutral-subtle); }
 .app-breadcrumb-list {
     display: flex;
     align-items: center;
@@ -616,7 +551,7 @@ mark.app-search-flash.app-search-flash--fading {
 }
 .app-breadcrumb-item:not(:first-child)::before {
     content: "›";
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
     padding: 0 0.25rem;
 }
 .app-breadcrumb-link,
@@ -630,19 +565,19 @@ mark.app-search-flash.app-search-flash--fading {
     overflow: hidden;
 }
 .app-breadcrumb-text { overflow: hidden; text-overflow: ellipsis; }
-.app-breadcrumb-link { color: var(--pm-text); }
+.app-breadcrumb-link { color: var(--text-primary); }
 /* Podtržení celého odkazu (název i „| zkratka"), ne jen názvu — dřív zkratka nebyla podtržená. */
 .app-breadcrumb-link:hover { text-decoration: underline; }
-.app-breadcrumb-current { color: var(--pm-text-muted); font-weight: 600; }
-.app-breadcrumb-suffix { color: var(--pm-text-muted); font-weight: 400; }
+.app-breadcrumb-current { color: var(--text-secondary); font-weight: 600; }
+.app-breadcrumb-suffix { color: var(--text-secondary); font-weight: 400; }
 .app-breadcrumb-close {
     display: inline-flex;
     align-items: center;
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
     padding: 0.0625rem;
     border-radius: 0.25rem;
 }
-.app-breadcrumb-close:hover { color: var(--pm-text); background: var(--pm-border); }
+.app-breadcrumb-close:hover { color: var(--text-primary); background: var(--background-neutral-subtle); }
 
 /* Úzká šířka: schovej všechny drobečky kromě aktuálního, nech ← + aktuální. */
 @media (max-width: 640px) {
@@ -680,7 +615,7 @@ mark.app-search-flash.app-search-flash--fading {
    Zde zůstává jen styling jednotlivých KARET (sdílený i s list-page Focus/Profil). */
 
 .dashboard-panel-placeholder {
-    padding: var(--d-pad-card, 1.5rem);
+    padding: var(--d-pad-card);
 }
 
 /* .dashboard-panel-header (+ h2) a .dashboard-panel-count → odstraněno 2026-06-08
@@ -698,11 +633,11 @@ mark.app-search-flash.app-search-flash--fading {
     display: block;
     /* App standard tokeny (govcz.css) — flipují light/dark automaticky.
        --gov-color-surface: #fff ↔ #1b2128; --gov-color-border flipuje taktéž. */
-    border: 1px solid var(--gov-color-border, rgba(0, 43, 73, 0.1));
-    border-radius: var(--d-radius, 0.85rem);
-    background: var(--gov-color-surface, #ffffff);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--d-radius);
+    background: var(--background-block-primary);
     /* A2: svislý padding 70 % — šetří ~7px nahoře+dole na 13". */
-    padding: calc(var(--d-pad-card, 1rem) * 0.7) var(--d-pad-card, 1rem);
+    padding: calc(var(--d-pad-card) * 0.7) var(--d-pad-card);
     color: inherit;
     text-decoration: none;
     transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
@@ -728,7 +663,7 @@ mark.app-search-flash.app-search-flash--fading {
 .dashboard-focus-item {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) clamp(150px, 14vw, 240px);
-    gap: var(--d-gap-item, 1.1rem);
+    gap: var(--d-gap-item);
     align-items: start;
 }
 
@@ -739,8 +674,8 @@ mark.app-search-flash.app-search-flash--fading {
 .dashboard-news-item:hover,
 .dashboard-news-item:focus-visible {
     transform: translateY(-1px);
-    border-color: rgba(0, 43, 73, 0.22);
-    box-shadow: 0 10px 24px rgba(0, 43, 73, 0.08);
+    border-color: var(--border-subtle);
+    box-shadow: var(--app-shadow-raised);
 }
 
 .dashboard-focus-item-top,
@@ -766,8 +701,8 @@ mark.app-search-flash.app-search-flash--fading {
     margin: 0;
     display: grid;
     gap: 0.3rem 0.7rem;
-    color: var(--app-muted);
-    font-size: var(--d-fs-label, 0.88rem);
+    color: var(--text-secondary);
+    font-size: var(--d-fs-label);
 }
 
 .dashboard-focus-meta > div {
@@ -778,16 +713,16 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .dashboard-focus-meta dt {
-    color: var(--app-muted);
+    color: var(--text-secondary);
     text-transform: uppercase;
-    font-size: var(--d-fs-label, 0.72rem);
+    font-size: var(--d-fs-label);
     letter-spacing: 0.04em;
     font-weight: 600;
 }
 
 .dashboard-focus-meta dd {
     margin: 0;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
     font-weight: 500;
     overflow-wrap: anywhere;
 }
@@ -797,15 +732,15 @@ mark.app-search-flash.app-search-flash--fading {
     gap: 0.6rem;
     flex-wrap: wrap;
     margin-top: 0.2rem;
-    color: var(--app-muted);
+    color: var(--text-secondary);
     /* A2: meta menší než titulek (poměr ≤1.25) — vlastník/datum nemají konkurovat názvu. */
-    font-size: var(--d-fs-label, 0.82rem);
+    font-size: var(--d-fs-label);
 }
 
 .dashboard-item-project,
 .dashboard-news-label {
-    color: var(--gov-color-primary);
-    font-size: var(--d-fs-base, 0.92rem);
+    color: var(--text-primary-color);
+    font-size: var(--d-fs-base);
     font-weight: 700;
 }
 
@@ -815,9 +750,9 @@ mark.app-search-flash.app-search-flash--fading {
     margin: 0.15rem 0;
     /* A2 (2026-07-08): base místo title — 18px titulek na ~170px dlaždici tlačil 3. řádek
        mimo panel-min (150px na 13"); s base (~15.7px) + těsnějším spacingem se dlaždice vejde. */
-    font-size: var(--d-fs-base, 0.95rem);
+    font-size: var(--d-fs-base);
     font-weight: 700;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 /* C2 (2026-07-10): úpravy pro inline tok dlaždice jednání (flex-wrap blok výše).
@@ -834,8 +769,8 @@ mark.app-search-flash.app-search-flash--fading {
 
 .dashboard-item-description {
     margin: 0.3rem 0 0;
-    color: var(--app-text-primary);
-    font-size: var(--d-fs-base, 1rem);
+    color: var(--text-primary);
+    font-size: var(--d-fs-base);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -954,13 +889,13 @@ mark.app-search-flash.app-search-flash--fading {
     font-size: 12px;
     font-family: "IBM Plex Mono", "Menlo", "Consolas", monospace;
     /* gov error-strong text — fallback orange-brown pro light mode */
-    color: var(--text-error-strong, var(--gov-color-error, #9a3412));
+    color: var(--text-status-error);
     opacity: 0.85;
 }
 
 .modal-submit-diagnostics {
     margin-top: 10px;
-    border-top: 1px solid var(--border-subtle, var(--gov-color-neutral-border, #f4b6b0));
+    border-top: 1px solid var(--border-subtle);
     padding-top: 8px;
 }
 
@@ -1003,11 +938,11 @@ mark.app-search-flash.app-search-flash--fading {
     overflow: auto;
     white-space: pre-wrap;
     word-break: break-word;
-    background: var(--background-neutral-white, #fff);
-    border: 1px solid var(--border-subtle, var(--gov-color-neutral-border, #d0d5dd));
+    background: var(--background-neutral-white);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.35rem;
     padding: 8px 10px;
-    color: var(--text-primary, #6b211b);
+    color: var(--text-primary);
     font-family: "IBM Plex Mono", "Menlo", "Consolas", monospace;
     font-size: 12px;
     line-height: 1.4;
@@ -1022,10 +957,10 @@ mark.app-search-flash.app-search-flash--fading {
     gap: 6px;
     padding: 6px 12px;
     min-height: 30px;
-    border: 1px solid var(--gov-color-border, var(--border-subtle, #d0d5dd));
-    border-radius: var(--gov-radius-sm, 0.25rem);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--gov-radius-sm);
     background: transparent;
-    color: var(--gov-color-primary, var(--text-primary, inherit));
+    color: var(--text-primary-color);
     font-size: 13px;
     font-weight: 500;
     line-height: 1.2;
@@ -1035,39 +970,39 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .modal-submit-action-btn:hover {
-    border-color: var(--gov-color-primary, currentColor);
-    background: var(--background-neutral-subtle, transparent);
+    border-color: var(--border-primary);
+    background: var(--background-neutral-subtle);
 }
 
 .modal-submit-action-btn:focus-visible {
-    outline: 2px solid var(--gov-color-primary);
+    outline: 2px solid var(--border-primary);
     outline-offset: 1px;
 }
 
 .modal-submit-action-btn--primary {
-    background: var(--gov-color-primary, currentColor);
-    border-color: var(--gov-color-primary, currentColor);
-    color: #fff;
+    background: var(--background-primary);
+    border-color: var(--border-primary);
+    color: var(--text-white-fixed);
 }
 
 .modal-submit-action-btn--primary:hover {
-    background: var(--gov-color-primary-strong, var(--gov-color-primary));
-    border-color: var(--gov-color-primary-strong, var(--gov-color-primary));
-    color: #fff;
+    background: var(--button-solid-primary-hover);
+    border-color: var(--border-primary);
+    color: var(--text-white-fixed);
 }
 
 .field-error-message {
     margin-top: 6px;
     /* gov error text token — fallback red pro light mode */
-    color: var(--text-error, var(--gov-color-error, #b42318));
+    color: var(--text-status-error);
     font-size: 13px;
     font-weight: 600;
     line-height: 1.3;
 }
 
 .field-invalid {
-    border-color: #d83b34 !important;
-    box-shadow: inset 0 0 0 1px rgba(216, 59, 52, 0.25) !important;
+    border-color: var(--border-error) !important;
+    box-shadow: inset 0 0 0 1px var(--border-error) !important;
 }
 
 .docs-page {
@@ -1081,11 +1016,11 @@ mark.app-search-flash.app-search-flash--fading {
     gap: 8px;
     font-size: 13px;
     margin-bottom: 12px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .docs-breadcrumb a {
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
     text-decoration: none;
 }
 
@@ -1096,8 +1031,7 @@ mark.app-search-flash.app-search-flash--fading {
 .access-body {
     min-height: 100vh;
     background:
-        radial-gradient(circle at top, rgba(53, 104, 190, 0.14), transparent 42%),
-        linear-gradient(180deg, rgba(241, 245, 249, 0.9), rgba(248, 250, 252, 1));
+        var(--background-page);
 }
 
 .access-main {
@@ -1109,10 +1043,10 @@ mark.app-search-flash.app-search-flash--fading {
 
 .access-card {
     width: min(680px, 100%);
-    background: var(--gov-color-surface);
-    border: 1px solid var(--gov-color-border);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
     border-radius: 22px;
-    box-shadow: var(--gov-shadow-soft);
+    box-shadow: var(--app-shadow-soft);
     padding: 28px;
     display: grid;
     gap: 16px;
@@ -1123,8 +1057,8 @@ mark.app-search-flash.app-search-flash--fading {
     width: fit-content;
     padding: 6px 12px;
     border-radius: 999px;
-    background: rgba(53, 104, 190, 0.12);
-    color: var(--gov-color-primary);
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
     font-weight: 700;
     font-size: 12px;
     letter-spacing: 0.06em;
@@ -1139,12 +1073,12 @@ mark.app-search-flash.app-search-flash--fading {
 
 .access-card-message {
     font-size: 16px;
-    color: var(--gov-color-text);
+    color: var(--text-primary);
 }
 
 .access-card-status {
     font-size: 13px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
 }
 
@@ -1152,7 +1086,7 @@ mark.app-search-flash.app-search-flash--fading {
     display: grid;
     gap: 10px;
     padding-top: 12px;
-    border-top: 1px solid var(--gov-color-border);
+    border-top: 1px solid var(--border-subtle);
 }
 
 .access-card-contacts {
@@ -1162,7 +1096,7 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .access-card-contacts a {
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
 }
 
 .docs-header h1 {
@@ -1171,7 +1105,7 @@ mark.app-search-flash.app-search-flash--fading {
 
 .docs-header p {
     margin: 0;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .docs-layout {
@@ -1185,8 +1119,8 @@ mark.app-search-flash.app-search-flash--fading {
 .docs-sidebar,
 .docs-content,
 .docs-toc {
-    background: var(--gov-color-surface);
-    border: 1px solid var(--gov-color-border);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     padding: 14px;
 }
@@ -1206,7 +1140,7 @@ mark.app-search-flash.app-search-flash--fading {
 .docs-nav-link {
     display: block;
     font-size: 14px;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
     text-decoration: none;
     border-radius: 4px;
     padding: 8px 10px;
@@ -1214,12 +1148,12 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .docs-nav-link:hover {
-    background: var(--app-nav-hover);
+    background: var(--background-neutral-subtle);
 }
 
 .docs-nav-link.active {
-    background: #dfeaf5;
-    color: var(--gov-color-primary-strong);
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
     font-weight: 700;
 }
 
@@ -1256,7 +1190,7 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .docs-content code {
-    background: #f1f5f9;
+    background: var(--background-neutral-subtlest);
     border-radius: var(--gov-radius-sm);
     padding: 1px 6px;
     font-size: 13px;
@@ -1264,8 +1198,8 @@ mark.app-search-flash.app-search-flash--fading {
 
 .docs-content pre {
     overflow: auto;
-    border: 1px solid var(--gov-color-border);
-    background: #f8fafc;
+    border: 1px solid var(--border-subtle);
+    background: var(--background-neutral-subtlest);
     border-radius: 10px;
     padding: 10px;
 }
@@ -1278,21 +1212,21 @@ mark.app-search-flash.app-search-flash--fading {
 
 .docs-content th,
 .docs-content td {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     padding: 8px;
     text-align: left;
 }
 
 .docs-content hr {
     border: 0;
-    border-top: 1px solid var(--gov-color-border);
+    border-top: 1px solid var(--border-subtle);
     margin: 20px 0;
 }
 
 .docs-toc-link {
     display: block;
     font-size: 13px;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
     text-decoration: none;
     margin-bottom: 6px;
 }
@@ -1358,7 +1292,7 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .project-header-divider {
-    color: var(--app-muted);
+    color: var(--text-secondary);
     font-size: 14px;
 }
 
@@ -1428,8 +1362,8 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .card {
-    background: var(--gov-color-surface);
-    border: 1px solid var(--gov-color-border);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     padding: 16px;
     box-shadow: none;
@@ -1447,8 +1381,7 @@ mark.app-search-flash.app-search-flash--fading {
     grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
     align-items: stretch;
     background:
-        radial-gradient(circle at top right, rgba(29, 78, 216, 0.12), transparent 38%),
-        linear-gradient(180deg, rgba(248, 251, 255, 0.96), rgba(240, 246, 255, 0.92));
+        var(--background-block-primary);
 }
 
 .dashboard-hero-copy {
@@ -1462,7 +1395,7 @@ mark.app-search-flash.app-search-flash--fading {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
 }
 
 .dashboard-hero-title {
@@ -1474,7 +1407,7 @@ mark.app-search-flash.app-search-flash--fading {
 .dashboard-hero-description {
     margin: 0;
     max-width: 72ch;
-    color: var(--app-muted);
+    color: var(--text-secondary);
     font-size: 15px;
     line-height: 1.6;
 }
@@ -1487,8 +1420,8 @@ mark.app-search-flash.app-search-flash--fading {
 
 .dashboard-stat {
     border-radius: 10px;
-    border: 1px solid rgba(29, 78, 216, 0.14);
-    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid var(--border-subtle);
+    background: var(--background-block-primary);
     padding: 14px 16px;
     display: grid;
     gap: 6px;
@@ -1498,12 +1431,12 @@ mark.app-search-flash.app-search-flash--fading {
     font-size: 26px;
     font-weight: 800;
     line-height: 1;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 .dashboard-stat-label {
     font-size: 13px;
-    color: var(--app-muted);
+    color: var(--text-secondary);
 }
 
 .dashboard-section {
@@ -1540,20 +1473,19 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .dashboard-card:hover {
-    border-color: var(--gov-color-primary);
+    border-color: var(--border-primary);
     transform: translateY(-1px);
 }
 
 .dashboard-card-primary {
     background:
-        linear-gradient(180deg, rgba(29, 78, 216, 0.07), rgba(255, 255, 255, 0.98)),
-        var(--gov-color-surface);
+        var(--background-primary-subtlest);
 }
 
 .dashboard-card-placeholder {
     background:
-        repeating-linear-gradient(-45deg, rgba(148, 163, 184, 0.07), rgba(148, 163, 184, 0.07) 12px, transparent 12px, transparent 24px),
-        var(--gov-color-surface);
+        repeating-linear-gradient(-45deg, var(--border-subtlest), var(--border-subtlest) 12px, transparent 12px, transparent 24px),
+        var(--background-block-primary);
 }
 
 .dashboard-card-head {
@@ -1570,7 +1502,7 @@ mark.app-search-flash.app-search-flash--fading {
 
 .dashboard-card p {
     margin: 0;
-    color: var(--app-muted);
+    color: var(--text-secondary);
     line-height: 1.55;
 }
 
@@ -1578,7 +1510,7 @@ mark.app-search-flash.app-search-flash--fading {
     margin-top: auto;
     font-size: 13px;
     font-weight: 600;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
 }
 
 .project-grid {
@@ -1603,9 +1535,9 @@ mark.app-search-flash.app-search-flash--fading {
     width: auto;
     min-width: 0;
     padding: 6px 10px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 999px;
-    background: var(--gov-color-surface);
+    background: var(--background-block-primary);
 }
 
 .projects-status-filters-panel {
@@ -1614,9 +1546,9 @@ mark.app-search-flash.app-search-flash--fading {
     justify-self: end;
     max-width: 320px;
     padding: 12px 14px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.96);
+    background: var(--background-block-primary);
 }
 
 .projects-status-filters-panel[hidden] {
@@ -1629,10 +1561,10 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .project-card {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     padding: 18px;
-    background: var(--gov-color-surface);
+    background: var(--background-block-primary);
     box-shadow: none;
     display: grid;
     gap: 12px;
@@ -1645,13 +1577,13 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .project-card:hover {
-    border-color: var(--gov-color-primary);
-    background: #fafafa;
+    border-color: var(--border-primary);
+    background: var(--background-block-secondary);
 }
 
 .project-card:focus-visible,
 .meeting-card:focus-visible {
-    outline: 2px solid var(--gov-color-primary);
+    outline: 2px solid var(--border-primary);
     outline-offset: 2px;
 }
 
@@ -1664,7 +1596,7 @@ mark.app-search-flash.app-search-flash--fading {
     font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .project-card-header {
@@ -1678,7 +1610,7 @@ mark.app-search-flash.app-search-flash--fading {
     display: flex;
     gap: 6px;
     align-items: center;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     font-size: 13px;
 }
 
@@ -1692,7 +1624,7 @@ mark.app-search-flash.app-search-flash--fading {
 .table td {
     text-align: left;
     padding: 10px 10px;
-    border-bottom: 1px solid var(--gov-color-border);
+    border-bottom: 1px solid var(--border-subtle);
     font-size: 14px;
     vertical-align: top;
 }
@@ -1701,7 +1633,7 @@ mark.app-search-flash.app-search-flash--fading {
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .table-actions {
@@ -1734,7 +1666,7 @@ mark.app-search-flash.app-search-flash--fading {
     gap: 6px;
     min-width: min(360px, 100%);
     font-size: 14px;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 .table-tools-search input[type="search"] {
@@ -1758,22 +1690,22 @@ mark.app-search-flash.app-search-flash--fading {
 .table-sort-button::after {
     content: "↕";
     font-size: 11px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .table-sort-button.is-active::after,
 .table-sort-button[data-table-sort-direction="asc"]::after {
     content: "↑";
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
 }
 
 .table-sort-button[data-table-sort-direction="desc"]::after {
     content: "↓";
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
 }
 
 .table-empty-row {
-    color: var(--app-muted);
+    color: var(--text-secondary);
     font-style: italic;
 }
 
@@ -1783,9 +1715,9 @@ mark.app-search-flash.app-search-flash--fading {
    v _TaskItemPartial.cshtml — ten má vlastní pravidlo níže. */
 
 .comment-action-chip {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     background: transparent;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
     text-decoration: none;
     padding: 7px 12px;
     border-radius: var(--gov-radius-sm);
@@ -1807,12 +1739,12 @@ mark.app-search-flash.app-search-flash--fading {
 .comment-action-chip::marker { content: ""; }
 
 .comment-action-chip:hover {
-    border-color: var(--gov-color-primary);
-    background: var(--background-neutral-subtle, transparent);
+    border-color: var(--border-primary);
+    background: var(--background-neutral-subtle);
 }
 
 .comment-action-chip:focus-visible {
-    outline: 2px solid var(--gov-color-primary);
+    outline: 2px solid var(--border-primary);
     outline-offset: 1px;
 }
 
@@ -1820,9 +1752,9 @@ mark.app-search-flash.app-search-flash--fading {
     width: 34px;
     height: 34px;
     border-radius: var(--gov-radius-sm);
-    border: 1px solid var(--gov-color-border);
-    background: #fff;
-    color: var(--gov-color-muted);
+    border: 1px solid var(--border-subtle);
+    background: var(--background-block-primary);
+    color: var(--text-secondary);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1833,12 +1765,12 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .icon-btn:hover {
-    border-color: var(--gov-color-primary);
-    color: var(--gov-color-primary);
+    border-color: var(--border-primary);
+    color: var(--text-primary-color);
 }
 
 .icon-btn:focus-visible {
-    outline: 2px solid var(--gov-color-primary);
+    outline: 2px solid var(--border-primary);
     outline-offset: 1px;
 }
 
@@ -1858,17 +1790,19 @@ select:not(gov-form-select select):not(pm-select select),
 textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
     width: 100%;
     border-radius: var(--gov-radius-sm);
-    border: 1px solid var(--gov-color-border);
-    background: var(--gov-color-surface);
+    border: 1px solid var(--border-subtle);
+    /* Stejně jako gov-form-input: plocha bloku, jemný rámeček. background-color, ne zkratka —
+       ta by smazala chevron selectu (background-image níže). */
+    background-color: var(--background-block-primary);
     padding: 10px 12px;
     font-size: 16px;
     line-height: 1.35;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 select:not(gov-form-select select):not(pm-select select) {
     min-height: 44px;
-    background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
+    background-image: linear-gradient(45deg, transparent 50%, var(--icon-neutral) 50%), linear-gradient(135deg, var(--icon-neutral) 50%, transparent 50%);
     background-position: calc(100% - 19px) 18px, calc(100% - 13px) 18px;
     background-size: 6px 6px, 6px 6px;
     background-repeat: no-repeat;
@@ -1918,17 +1852,33 @@ textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
 
 .richtext-host .ql-toolbar.ql-snow {
     border-radius: 6px 6px 0 0;
-    border-color: var(--gov-color-border);
-    background: color-mix(in srgb, var(--gov-color-surface) 96%, #e2e8f0);
+    border-color: var(--border-subtle);
+    background: var(--background-block-secondary);
 }
 
 .richtext-host .ql-container.ql-snow {
     border-radius: 0 0 6px 6px;
-    border-color: var(--gov-color-border);
-    background: var(--gov-color-surface);
-    color: var(--app-text-primary);
+    border-color: var(--border-subtle);
+    background: var(--background-block-primary);
+    color: var(--text-primary);
     font-size: 16px;
     height: auto;
+}
+
+.richtext-host .ql-snow .ql-stroke {
+    stroke: var(--icon-default);
+}
+
+.richtext-host .ql-snow .ql-fill {
+    fill: var(--icon-default);
+}
+
+.richtext-host .ql-snow .ql-picker {
+    color: var(--text-primary);
+}
+
+.richtext-host .ql-editor.ql-blank::before {
+    color: var(--text-placeholder);
 }
 
 .richtext-host .ql-editor {
@@ -1980,8 +1930,8 @@ textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
 input:focus:not(gov-form-input input):not(gov-form-search input):not(.app-search input):not([role="search"] input),
 select:focus:not(gov-form-select select):not(pm-select select),
 textarea:focus:not(gov-form-input textarea):not(pm-textarea textarea) {
-    border-color: var(--gov-color-primary);
-    box-shadow: inset 0 0 0 1px rgba(0, 94, 165, 0.25);
+    border-color: var(--border-primary);
+    box-shadow: inset 0 0 0 1px var(--border-primary);
     outline: none;
 }
 
@@ -2019,7 +1969,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 28px;
     border: none;
     background: transparent;
-    color: #1f2937;
+    color: var(--text-primary);
     padding: 0;
     display: inline-flex;
     align-items: center;
@@ -2029,7 +1979,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .app-date-trigger:disabled,
 .app-time-trigger:disabled {
-    color: #94a3b8;
+    color: var(--text-tertiary);
     cursor: default;
 }
 
@@ -2044,7 +1994,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 22px;
     border: none;
     background: transparent;
-    color: #6b7280;
+    color: var(--text-secondary);
     padding: 0;
     display: none; /* default skryté, zobrazení řízeno data-app-date-has-value (níže) */
     align-items: center;
@@ -2056,12 +2006,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .app-date-clear:hover {
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.08);
+    color: var(--text-status-error);
+    background: var(--background-status-error-subtlest);
 }
 
 .app-date-clear:disabled {
-    color: #cbd5e1;
+    color: var(--text-disabled);
     cursor: default;
 }
 
@@ -2075,15 +2025,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     padding-right: 70px;
 }
 
-:root[data-theme="dark"] .app-date-clear {
-    color: #94a3b8;
-}
-
-:root[data-theme="dark"] .app-date-clear:hover {
-    color: #f87171;
-    background: rgba(248, 113, 113, 0.12);
-}
-
 .app-date-panel {
     position: absolute;
     top: calc(100% + 8px);
@@ -2091,10 +2032,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: var(--app-picker-panel-width);
     max-width: min(var(--app-picker-panel-width), calc(100vw - 32px));
     z-index: 280;
-    background: var(--gov-color-surface);
-    border: 1px solid var(--gov-color-border);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
-    box-shadow: var(--gov-shadow-soft);
+    box-shadow: var(--app-shadow-soft);
     padding: 8px 9px 9px;
 }
 
@@ -2105,10 +2046,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: var(--app-picker-panel-width);
     max-width: min(var(--app-picker-panel-width), calc(100vw - 32px));
     z-index: 90;
-    background: var(--gov-color-surface);
-    border: 1px solid var(--gov-color-border);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
-    box-shadow: var(--gov-shadow-soft);
+    box-shadow: var(--app-shadow-soft);
     padding: 10px 12px 12px;
 }
 
@@ -2126,22 +2067,22 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: none;
     border-radius: 4px;
     background: transparent;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
     font-size: 21px;
     line-height: 1;
     cursor: pointer;
 }
 
 .app-date-nav-btn:hover {
-    background: var(--app-nav-hover);
+    background: var(--background-neutral-subtle);
 }
 
 .app-date-select {
     min-height: 30px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-sm);
-    background-color: var(--gov-color-surface);
-    color: var(--app-text-primary);
+    background-color: var(--background-block-primary);
+    color: var(--text-primary);
     font-size: 11px;
     font-weight: 600;
     line-height: 1.2;
@@ -2158,7 +2099,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .app-date-weekdays span {
     text-align: center;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
     font-size: 12px;
     font-weight: 700;
 }
@@ -2176,7 +2117,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: none;
     border-radius: 999px;
     background: transparent;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
@@ -2186,16 +2127,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .app-date-day:hover {
-    background: var(--app-nav-hover);
+    background: var(--background-neutral-subtle);
 }
 
 .app-date-day.outside {
-    color: #7f9bbf;
+    color: var(--text-secondary);
 }
 
 .app-date-day.selected {
-    background: var(--app-nav-active-bg);
-    color: var(--gov-color-primary);
+    background: var(--background-block-primary);
+    color: var(--text-primary-color);
 }
 
 /* Datum-model chronologie: den mimo povolené pořadí (min/max) — nevybíratelný. */
@@ -2216,10 +2157,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .app-time-option {
     min-height: 38px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-sm);
-    background: var(--gov-color-surface);
-    color: var(--app-text-primary);
+    background: var(--background-block-primary);
+    color: var(--text-primary);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -2227,19 +2168,19 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .app-time-option:hover {
-    background: var(--app-nav-hover);
+    background: var(--background-neutral-subtle);
 }
 
 .app-time-option.selected {
-    background: var(--app-nav-active-bg);
-    border-color: var(--app-nav-active-border);
-    color: var(--gov-color-primary);
+    background: var(--background-block-primary);
+    border-color: var(--border-primary);
+    color: var(--text-primary-color);
 }
 
 .project-card:focus-visible,
 .meeting-card:focus-visible,
 .ciselnik-tile:focus-visible {
-    outline: 2px solid var(--gov-color-primary);
+    outline: 2px solid var(--border-primary);
     outline-offset: 1px;
 }
 
@@ -2248,8 +2189,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     padding: 4px 10px;
     border-radius: 999px;
-    background: #dfeaf5;
-    color: var(--gov-color-primary-strong);
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
     font-size: 12px;
     font-weight: 600;
 }
@@ -2259,40 +2200,40 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     padding: 4px 10px;
     border-radius: 999px;
-    background: #ededed;
+    background: var(--background-neutral-subtlest);
     font-size: 12px;
     font-weight: 600;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 .pill.ghost {
     background: transparent;
-    border: 1px dashed var(--gov-color-border);
-    color: var(--gov-color-muted);
+    border: 1px dashed var(--border-subtle);
+    color: var(--text-secondary);
 }
 
 .tag {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 999px;
-    background: #f9e1de;
-    color: #8a1c16;
+    background: var(--background-status-error-subtlest);
+    color: var(--text-status-error);
     font-size: 12px;
     font-weight: 600;
 }
 
 .lock {
-    color: #b91c1c;
+    color: var(--text-status-error);
     font-weight: 600;
 }
 
 .unlock {
-    color: #0f766e;
+    color: var(--text-status-success);
     font-weight: 600;
 }
 
 .muted {
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .permission-key-help {
@@ -2353,7 +2294,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     padding: 1px 3px;
     border: none;
     background: transparent;
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
     cursor: pointer;
     border-radius: 4px;
     font-size: 0.75rem;
@@ -2361,8 +2302,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .project-menu-lock:hover {
-    color: var(--gov-color-primary, #2362a2);
-    background: var(--pm-surface);
+    color: var(--text-primary-color);
+    background: var(--background-block-secondary);
 }
 
 /* Ikona reflektuje stav; hover ukáže opačnou (afordance přepnutí). Literal name kvůli
@@ -2380,17 +2321,17 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .tab {
     padding: 10px 16px;
     border-radius: 6px 6px 0 0;
-    border: 1px solid var(--gov-color-border);
-    background: var(--gov-color-surface);
+    border: 1px solid var(--border-subtle);
+    background: var(--background-block-primary);
     font-weight: 500;
     cursor: pointer;
 }
 
 .tab.active {
-    background: var(--gov-color-surface);
-    color: var(--gov-color-primary);
-    border-color: var(--gov-color-border);
-    box-shadow: inset 0 -3px 0 var(--gov-color-primary);
+    background: var(--background-block-primary);
+    color: var(--text-primary-color);
+    border-color: var(--border-subtle);
+    box-shadow: inset 0 -3px 0 var(--border-primary);
 }
 
 .tab-panel {
@@ -2431,7 +2372,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    strukturu .proposal-field-editable (padding = rámeček kolem CELÉHO pole + srovnatelná
    sytost), aby se podbarvilo celé pole, ne jen ikona kalendáře (2026-06-29). */
 .proposal-field-changed {
-    background: rgba(245, 158, 11, 0.22);
+    background: var(--background-status-warning-subtle);
     border-radius: var(--gov-radius-sm);
     padding: 4px 6px;
 }
@@ -2439,7 +2380,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .proposal-field-changed .app-date-display-input,
 .proposal-field-changed .schedule-days-input-stacked,
 .proposal-field-changed .app-date-trigger {
-    background-color: rgba(245, 158, 11, 0.16);
+    background-color: var(--background-status-warning-subtlest);
 }
 
 /* Bordered buňka harmonogramu (.schedule-stacked-input) má vlastní bílé pozadí deklarované
@@ -2447,7 +2388,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    (vyšší specificita) podbarví CELOU buňku oranžově; vnitřní input/„X dnů" jsou průhledné,
    ať prosvítá oranžová celé buňky (ne jen ikona/rámeček). 2026-06-29. */
 .schedule-stacked-input.proposal-field-changed {
-    background: rgba(245, 158, 11, 0.22);
+    background: var(--background-status-warning-subtle);
     padding: 0;
 }
 
@@ -2469,7 +2410,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    2026-04-19: "tento je přes citrix blbě vidět, aplikace běží přes citrix" →
    ztmavnění o pár odstínů (Tailwind green-600) a zvýšení opacity. */
 .proposal-field-editable {
-    background: rgba(22, 163, 74, 0.22);
+    background: var(--background-status-success-subtle);
     border-radius: var(--gov-radius-sm);
     padding: 4px 6px;
 }
@@ -2477,16 +2418,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .proposal-field-editable .app-date-display-input,
 .proposal-field-editable .schedule-days-input-stacked,
 .proposal-field-editable .app-date-trigger {
-    background-color: rgba(22, 163, 74, 0.16);
+    background-color: var(--background-status-success-subtlest);
 }
 
 /* Task 4 (2026-10-12): sdělení autora návrhu na detailu schvalování — nepovinný důvod změny
    termínu a harmonogramu, viditelný schvalovateli nad záložkami. */
 .record-proposal-author-message {
-    border: 1px solid var(--pm-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-sm);
     padding: 12px 16px;
-    background: var(--pm-surface);
+    background: var(--background-block-primary);
 }
 
 .record-proposal-author-message h3 {
@@ -2516,7 +2457,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 6px;
     margin-top: 8px;
     padding: 14px 0 4px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--gov-color-surface) 24px);
+    background: linear-gradient(180deg, transparent, var(--background-block-primary) 24px);
     z-index: 5;
 }
 
@@ -2546,7 +2487,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgba(15, 23, 42, 0.55);
+    background: var(--background-overlay-page);
 }
 
 .record-editor-close-guard-modal {
@@ -2559,9 +2500,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .record-editor-close-guard-dialog {
     width: min(420px, 100%);
     border-radius: var(--gov-radius);
-    border: 1px solid var(--gov-color-border);
-    background: var(--gov-color-surface);
-    box-shadow: var(--gov-shadow-soft);
+    border: 1px solid var(--border-subtle);
+    background: var(--background-block-primary);
+    box-shadow: var(--app-shadow-soft);
     padding: 18px;
 }
 
@@ -2572,7 +2513,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .record-editor-close-guard-text {
     margin: 10px 0 0;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     line-height: 1.5;
 }
 
@@ -2584,9 +2525,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .record-editor-close-guard-actions .btn:last-child {
-    background: #b42318;
-    border-color: #b42318;
-    color: #fff;
+    background: var(--background-status-error);
+    border-color: var(--border-error);
+    color: var(--text-white-fixed);
 }
 
 /* Schedule in modal */
@@ -2596,10 +2537,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-summary-grid {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     padding: 10px 12px;
-    background: #fafafa;
+    background: var(--background-neutral-subtlest);
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 6px 10px;
@@ -2607,18 +2548,18 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-status-line.ok {
-    color: #166534;
+    color: var(--text-status-success);
 }
 
 .schedule-status-line.late {
-    color: #b91c1c;
+    color: var(--text-status-error);
 }
 
 .schedule-mini-gantt {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     padding: 10px 12px;
-    background: var(--gov-color-surface);
+    background: var(--background-block-primary);
     display: grid;
     gap: 8px;
 }
@@ -2650,7 +2591,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .schedule-mini-gantt-track {
     height: 14px;
     border-radius: 999px;
-    background: #e2e8f0;
+    background: var(--background-neutral-subtle);
     position: relative;
     overflow: hidden;
 }
@@ -2674,7 +2615,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     overflow: hidden;
     text-overflow: clip;
     /* Datum-model: pevná barva kroku z inline --seg-color (plán = plná). */
-    background: var(--seg-color, var(--schedule-delay));
+    background: var(--seg-color);
 }
 
 /* Editor skutečnost: stejná pevná barva kroku, šrafovaná + nižší. */
@@ -2686,21 +2627,20 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background:
         repeating-linear-gradient(
             135deg,
-            rgba(255, 255, 255, 0.55) 0,
-            rgba(255, 255, 255, 0.55) 4px,
+            var(--app-schedule-stripe) 0,
+            var(--app-schedule-stripe) 4px,
             transparent 4px,
             transparent 8px
         ),
-        var(--seg-color, var(--schedule-delay));
-    border: 1px solid rgba(15, 23, 42, 0.42);
+        var(--seg-color, var(--app-schedule-delay));
+    border: 1px solid var(--app-schedule-segment-edge);
 }
-
 
 .timeline-axis {
     position: relative;
     height: 28px;
     margin-bottom: 4px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+    border-bottom: 1px solid var(--border-subtle);
     overflow: hidden;
 }
 
@@ -2709,11 +2649,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     top: 0;
     bottom: 0;
     width: 1px;
-    background: rgba(100, 116, 139, 0.3);
+    background: var(--border-subtle);
 }
 
 .timeline-axis-tick.edge {
-    background: rgba(71, 85, 105, 0.55);
+    background: var(--border-neutral);
 }
 
 .timeline-axis-tick.edge-end {
@@ -2733,9 +2673,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     line-height: 1.1;
     padding: 1px 4px;
     border-radius: 4px;
-    background: rgba(248, 250, 252, 0.92);
-    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
-    color: var(--gov-color-muted);
+    background: var(--background-block-primary);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+    color: var(--text-secondary);
     white-space: nowrap;
     pointer-events: none;
 }
@@ -2769,27 +2709,17 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     line-height: 1.1;
     padding: 1px 4px;
     border-radius: 4px;
-    color: #ffffff;
+    color: var(--text-white-fixed);
     white-space: nowrap;
     pointer-events: none;
 }
 
 .timeline-axis-event.today .timeline-axis-event-label {
-    background: #0f172a;
+    background: var(--background-neutral-secondary);
 }
 
 .timeline-axis-event.deadline .timeline-axis-event-label {
-    background: #1d4ed8;
-}
-
-:root[data-theme="dark"] .timeline-axis-event.today .timeline-axis-event-label {
-    background: #e2e8f0;
-    color: #0f172a;
-}
-
-:root[data-theme="dark"] .timeline-axis-event.deadline .timeline-axis-event-label {
-    background: #93c5fd;
-    color: #0f172a;
+    background: var(--background-primary);
 }
 
 .schedule-timeline-axis {
@@ -2808,105 +2738,105 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .schedule-step-dot {
     width: 12px;
     height: 12px;
     border-radius: 4px;
-    background: #94a3b8;
+    background: var(--background-neutral-disabled);
 }
 
 .schedule-step-delay-dot {
-    background: var(--schedule-delay);
+    background: var(--app-schedule-delay);
 }
 
 .schedule-step-dot.step-1,
 .schedule-rainbow-segment.step-1,
 .schedule-mini-gantt-segment.step-1,
 .gantt-step-segment.step-1 {
-    background: var(--schedule-step-1);
+    background: var(--app-schedule-step-1);
 }
 
 .schedule-step-dot.step-2,
 .schedule-rainbow-segment.step-2,
 .schedule-mini-gantt-segment.step-2,
 .gantt-step-segment.step-2 {
-    background: var(--schedule-step-2);
+    background: var(--app-schedule-step-2);
 }
 
 .schedule-step-dot.step-3,
 .schedule-rainbow-segment.step-3,
 .schedule-mini-gantt-segment.step-3,
 .gantt-step-segment.step-3 {
-    background: var(--schedule-step-3);
+    background: var(--app-schedule-step-3);
 }
 
 .schedule-step-dot.step-4,
 .schedule-rainbow-segment.step-4,
 .schedule-mini-gantt-segment.step-4,
 .gantt-step-segment.step-4 {
-    background: var(--schedule-step-4);
+    background: var(--app-schedule-step-4);
 }
 
 .schedule-step-dot.step-5,
 .schedule-rainbow-segment.step-5,
 .schedule-mini-gantt-segment.step-5,
 .gantt-step-segment.step-5 {
-    background: var(--schedule-step-5);
+    background: var(--app-schedule-step-5);
 }
 
 .schedule-step-dot.step-6,
 .schedule-rainbow-segment.step-6,
 .schedule-mini-gantt-segment.step-6,
 .gantt-step-segment.step-6 {
-    background: var(--schedule-step-6);
+    background: var(--app-schedule-step-6);
 }
 
 .schedule-step-dot.step-7,
 .schedule-rainbow-segment.step-7,
 .schedule-mini-gantt-segment.step-7,
 .gantt-step-segment.step-7 {
-    background: var(--schedule-step-7);
+    background: var(--app-schedule-step-7);
 }
 
 .schedule-step-dot.step-8,
 .schedule-rainbow-segment.step-8,
 .schedule-mini-gantt-segment.step-8,
 .gantt-step-segment.step-8 {
-    background: var(--schedule-step-8);
+    background: var(--app-schedule-step-8);
 }
 
 .schedule-step-dot.step-9,
 .schedule-rainbow-segment.step-9,
 .schedule-mini-gantt-segment.step-9,
 .gantt-step-segment.step-9 {
-    background: var(--schedule-step-9);
+    background: var(--app-schedule-step-9);
 }
 
 .schedule-step-dot.step-10,
 .schedule-rainbow-segment.step-10,
 .schedule-mini-gantt-segment.step-10,
 .gantt-step-segment.step-10 {
-    background: var(--schedule-step-10);
+    background: var(--app-schedule-step-10);
 }
 
 .schedule-step-dot.step-11,
 .schedule-rainbow-segment.step-11,
 .schedule-mini-gantt-segment.step-11,
 .gantt-step-segment.step-11 {
-    background: var(--schedule-step-11);
+    background: var(--app-schedule-step-11);
 }
 
 .schedule-mini-legend {
     margin-top: -4px;
     font-size: 12px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .schedule-table-wrap {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-lg);
     overflow-x: auto;
     overflow-y: visible;
@@ -2982,9 +2912,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: stretch;
     min-width: 0;
     gap: 0;
-    border: 1px solid #ccd7ea;
+    border: 1px solid var(--border-subtle);
     border-radius: 10px;
-    background: #fff;
+    background: var(--background-block-primary);
     overflow: visible;
     position: relative;
 }
@@ -2997,8 +2927,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-stacked-input:focus-within {
-    border-color: #3568be;
-    box-shadow: inset 0 0 0 1px rgba(53, 104, 190, 0.35);
+    border-color: var(--border-primary);
+    box-shadow: inset 0 0 0 1px var(--border-primary);
     z-index: 12;
 }
 
@@ -3007,35 +2937,23 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    dříve než datum začátku (= datum konce předchozího kroku). Form submit guard blokuje Save. */
 [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input,
 [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input:focus-within {
-    border-color: #dc2626;
-    box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.4);
-    background: rgba(220, 38, 38, 0.04);
+    border-color: var(--border-error);
+    box-shadow: inset 0 0 0 1px var(--border-error);
+    background: var(--background-status-error-subtlest);
 }
 
 [data-schedule-step-row][data-schedule-duration-invalid="true"] .app-date-display-input {
-    color: #b91c1c;
+    color: var(--text-status-error);
     font-weight: 600;
 }
 
 [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-duration-days-readonly {
-    color: #b91c1c;
-}
-
-:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input,
-:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input:focus-within {
-    border-color: #f87171;
-    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.5);
-    background: rgba(248, 113, 113, 0.08);
-}
-
-:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .app-date-display-input,
-:root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-duration-days-readonly {
-    color: #fca5a5;
+    color: var(--text-status-error);
 }
 
 .schedule-stacked-part-top {
     border: none;
-    border-bottom: 1px solid #ccd7ea;
+    border-bottom: 1px solid var(--border-subtle);
     background: transparent;
     padding: 0 4px;
     min-height: 20px;
@@ -3092,7 +3010,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: grid;
     grid-template-rows: 20px 20px;
     border: none;
-    border-left: 1px solid #ccd7ea;
+    border-left: 1px solid var(--border-subtle);
     border-radius: 0;
     overflow: hidden;
     background: transparent;
@@ -3142,7 +3060,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .schedule-duration-days-readonly {
     font-size: 0.9rem;
-    color: var(--gov-color-text-secondary, #475467);
+    color: var(--text-secondary);
     white-space: nowrap;
     user-select: none;
     font-variant-numeric: tabular-nums;
@@ -3164,11 +3082,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-card {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-lg);
-    background: var(--gov-color-surface);
+    background: var(--background-block-primary);
     padding: 12px 14px;
-    box-shadow: var(--gov-shadow-soft);
+    box-shadow: var(--app-shadow-soft);
 }
 
 .schedule-card-header {
@@ -3206,21 +3124,20 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .schedule-overview-axis-spacer {
     font-size: 13px;
     font-weight: 600;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 .schedule-overview-track {
     position: relative;
     height: 18px;
     border-radius: 999px;
-    /* gantt track pozadí — gov primary-subtle s fallbackem; user může override
-       přes --schedule-track-color nebo na úrovni :root[data-theme="dark"] */
-    background: var(--schedule-track-color, var(--background-primary-subtle, #dce6f5));
+    /* dráha ganttu — gov token, přepíná se s motivem sám (2026-10-15) */
+    background: var(--background-primary-subtle);
     /* overflow:visible (dříve hidden): markery „Dnes"/„Termín" se na krajích neořežou.
        Bezpečné — segmenty už nepřetékají (+1px hack odstraněn, šířka ≤ 100 %), a samy mají
        border-radius (pill tvar nezávisí na ořezu stopy). 2026-06-23 redesign osy. */
     overflow: visible;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+    box-shadow: inset 0 0 0 1px var(--border-subtlest);
 }
 
 .schedule-overview-segment {
@@ -3241,9 +3158,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     overflow: hidden;
     text-overflow: clip;
     opacity: 0.96;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    box-shadow: inset 0 0 0 1px var(--app-schedule-segment-outline);
     /* Datum-model: barva kroku je vždy pevná (--seg-color z inline stylu). Plán = plná. */
-    background: var(--seg-color, var(--schedule-delay));
+    background: var(--seg-color);
 }
 
 /* Skutečnost: stejná pevná barva kroku, ale šrafovaná + o kousek nižší, aby šla odlišit od plánu. */
@@ -3255,18 +3172,17 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background:
         repeating-linear-gradient(
             135deg,
-            rgba(255, 255, 255, 0.55) 0,
-            rgba(255, 255, 255, 0.55) 4px,
+            var(--app-schedule-stripe) 0,
+            var(--app-schedule-stripe) 4px,
             transparent 4px,
             transparent 8px
         ),
-        var(--seg-color, var(--schedule-delay));
-    border: 1px solid rgba(15, 23, 42, 0.42);
+        var(--seg-color, var(--app-schedule-delay));
+    border: 1px solid var(--app-schedule-segment-edge);
     box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.35) inset,
-        0 1px 2px rgba(15, 23, 42, 0.14);
+        0 0 0 1px var(--app-schedule-segment-inner) inset,
+        0 1px 2px var(--app-schedule-segment-outline);
 }
-
 
 .schedule-overview-axis-row {
     display: grid;
@@ -3297,9 +3213,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 18px;
     border-radius: 999px;
     /* layered track pozadí — sdílí token s overview track */
-    background: var(--schedule-track-color, var(--background-primary-subtle, #dce6f5));
+    background: var(--background-primary-subtle);
     overflow: hidden;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+    box-shadow: inset 0 0 0 1px var(--border-subtlest);
 }
 
 .schedule-layered-track--step {
@@ -3327,29 +3243,29 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     top: 0;
     bottom: 0;
     opacity: 0.94;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    box-shadow: inset 0 0 0 1px var(--app-schedule-segment-outline);
     /* Datum-model: plán = plná, pevná barva kroku (--seg-color z inline stylu). */
-    background: var(--seg-color, var(--schedule-delay));
+    background: var(--seg-color);
 }
 
 .schedule-layered-segment.actual {
     top: 50%;
     height: 8px;
     transform: translateY(-50%);
-    border: 1px solid rgba(15, 23, 42, 0.42);
+    border: 1px solid var(--app-schedule-segment-edge);
     /* Skutečnost: stejná pevná barva kroku, šrafovaná + nižší (8px) → odlišení od plánu. */
     background:
         repeating-linear-gradient(
             135deg,
-            rgba(255, 255, 255, 0.55) 0,
-            rgba(255, 255, 255, 0.55) 4px,
+            var(--app-schedule-stripe) 0,
+            var(--app-schedule-stripe) 4px,
             transparent 4px,
             transparent 8px
         ),
-        var(--seg-color, var(--schedule-delay));
+        var(--seg-color, var(--app-schedule-delay));
     box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.35) inset,
-        0 1px 2px rgba(15, 23, 42, 0.14);
+        0 0 0 1px var(--app-schedule-segment-inner) inset,
+        0 1px 2px var(--app-schedule-segment-outline);
     z-index: 4;
 }
 
@@ -3357,13 +3273,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 8px;
 }
 
-
 .schedule-layered-legend {
     display: flex;
     flex-wrap: wrap;
     gap: 6px 14px;
     font-size: 12px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     align-items: center;
 }
 
@@ -3386,34 +3301,34 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-layered-legend-swatch.planned {
-    background: linear-gradient(180deg, rgba(53, 104, 190, 0.95), rgba(32, 76, 145, 0.95));
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    background: var(--background-primary);
+    box-shadow: inset 0 0 0 1px var(--app-schedule-segment-outline);
 }
 
 .schedule-layered-legend-swatch.actual {
     background-image: repeating-linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.55) 0,
-        rgba(255, 255, 255, 0.55) 4px,
+        var(--app-schedule-stripe) 0,
+        var(--app-schedule-stripe) 4px,
         transparent 4px,
         transparent 8px
     );
-    background-color: var(--record-schedule-delay-color, var(--schedule-delay));
-    border: 1px solid rgba(15, 23, 42, 0.42);
+    background-color: var(--record-schedule-delay-color);
+    border: 1px solid var(--app-schedule-segment-edge);
 }
 
 .schedule-layered-legend-swatch.deadline {
     width: 2px;
     height: 16px;
     border-radius: 999px;
-    background: var(--schedule-marker-deadline-color, var(--app-text-primary, #1e293b));
+    background: var(--background-primary);
 }
 
 .schedule-layered-legend-swatch.today {
     width: 2px;
     height: 16px;
     border-radius: 999px;
-    background: var(--schedule-marker-today-color, var(--gov-color-text, #111111));
+    background: var(--background-neutral-secondary);
 }
 
 .schedule-layered-summary {
@@ -3421,17 +3336,17 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     flex-wrap: wrap;
     gap: 6px 14px;
     font-size: 12px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .schedule-badge-ok {
-    background: #dcfce7;
-    color: #166534;
+    background: var(--background-status-success-subtlest);
+    color: var(--text-status-success);
 }
 
 .schedule-badge-late {
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--background-status-error-subtlest);
+    color: var(--text-status-error);
 }
 
 .schedule-subsystem-group {
@@ -3457,10 +3372,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .gantt-picker {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-lg);
-    background: var(--gov-color-surface);
-    box-shadow: var(--gov-shadow-soft);
+    background: var(--background-block-primary);
+    box-shadow: var(--app-shadow-soft);
     padding: 10px;
     display: grid;
     gap: 8px;
@@ -3479,7 +3394,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: flex-start;
     font-size: 13px;
     padding: 6px 4px;
-    border-bottom: 1px solid var(--gov-color-border);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .gantt-picker-item:last-child {
@@ -3496,10 +3411,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .gantt-task {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-lg);
-    background: var(--gov-color-surface);
-    box-shadow: var(--gov-shadow-soft);
+    background: var(--background-block-primary);
+    box-shadow: var(--app-shadow-soft);
     padding: 12px;
     display: grid;
     gap: 10px;
@@ -3519,7 +3434,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .gantt-steps {
-    border-top: 1px solid var(--gov-color-border);
+    border-top: 1px solid var(--border-subtle);
     padding-top: 10px;
     display: grid;
     gap: 6px;
@@ -3555,17 +3470,17 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .gantt-step-offset {
     font-size: 12px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
 
 .gantt-step-offset.late {
-    color: #b91c1c;
+    color: var(--text-status-error);
 }
 
 .gantt-step-offset.ahead {
-    color: #166534;
+    color: var(--text-status-success);
 }
 
 .gantt-task[data-gantt-pinned="false"] {
@@ -3582,17 +3497,17 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     gap: 8px;
     font-weight: 600;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .record-card {
     display: flex;
     gap: 16px;
-    background: var(--gov-color-surface);
-    border: 1px solid var(--gov-color-border);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     overflow: visible;
-    box-shadow: var(--gov-shadow-soft);
+    box-shadow: var(--app-shadow-soft);
     /* Žádný margin-bottom: svislé mezery mezi dlaždicemi řeší výhradně grid gap
        kontejneru .card-list (parita s harmonogramem .schedule-card). */
 }
@@ -3617,17 +3532,17 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 @keyframes cross-nav-pulse {
     0% {
-        box-shadow: 0 0 0 3px var(--gov-color-primary, #2362a2);
+        box-shadow: 0 0 0 3px var(--status-focus);
     }
     100% {
-        box-shadow: 0 0 0 3px rgba(35, 98, 162, 0);
+        box-shadow: 0 0 0 3px transparent;
     }
 }
 
 .record-bar {
     width: 6px;
     /* Default = neutrální (kategorie bez sémantiky / custom per-projekt). */
-    background: var(--gov-color-muted);
+    background: var(--background-neutral-disabled);
     /* Zaoblit levé rohy, ať proužek kopíruje zaoblení karty (karta má
        overflow:visible kvůli jiným prvkům, proto neořízne). */
     border-radius: var(--gov-radius) 0 0 var(--gov-radius);
@@ -3703,7 +3618,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .record-subtitle {
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     font-size: 13px;
     margin-top: 3px;
 }
@@ -3720,7 +3635,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 8px 16px;
     margin-top: 8px;
     font-size: 12px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .proposal-section-grid {
@@ -3736,7 +3651,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .proposal-card {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     padding: 12px;
 }
@@ -3769,9 +3684,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .chip-collab {
-    background: #e9f5ff;
-    color: #1e3a8a;
-    border: 1px solid #bfdbfe;
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
+    border: 1px solid var(--border-primary);
 }
 
 /* R7 (2026-07-13): indikátor rozbalení přesunut vlevo (mezi kraj karty a kategorii). */
@@ -3813,10 +3728,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 2px;
     min-width: 250px;
     padding: 6px;
-    background: var(--pm-surface);
-    border: 1px solid var(--pm-border);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+    box-shadow: var(--app-shadow-raised);
 }
 
 .record-actions-menu[hidden] {
@@ -3839,7 +3754,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .record-actions-menu-item:hover,
 .record-actions-menu-item:focus-visible {
-    background: rgba(37, 99, 235, 0.10);
+    background: var(--background-primary-subtlest);
 }
 
 .record-detail-shell,
@@ -3853,9 +3768,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 10px;
     margin: 12px 0 8px;
     padding: 14px 16px;
-    border: 1px dashed var(--gov-color-border);
+    border: 1px dashed var(--border-subtle);
     border-radius: var(--gov-radius-lg);
-    background: color-mix(in srgb, var(--gov-color-surface) 92%, #e2e8f0 8%);
+    background: var(--background-neutral-subtlest);
 }
 
 /* Bug fix 2026-04-19: `display: grid` v .record-loading-placeholder přebíjel
@@ -3873,7 +3788,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .record-loading-line {
     height: 12px;
     border-radius: 999px;
-    background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%);
+    background: linear-gradient(90deg, var(--background-neutral-subtle) 0%, var(--background-neutral-subtlest) 50%, var(--background-neutral-subtle) 100%);
     background-size: 220px 100%;
     animation: record-loading-shimmer 1.4s linear infinite;
 }
@@ -3909,10 +3824,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 12px;
     margin: 12px 0 8px;
     padding: 12px 14px;
-    border: 1px solid #fecaca;
+    border: 1px solid var(--border-error);
     border-radius: var(--gov-radius-lg);
-    background: #fef2f2;
-    color: #991b1b;
+    background: var(--background-status-error-subtlest);
+    color: var(--text-status-error);
 }
 
 .record-collab-block {
@@ -3930,18 +3845,18 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 6px;
     margin: 12px 0 8px;
     font-size: 13px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .record-history strong {
-    color: #0f172a;
+    color: var(--text-primary);
     margin-left: 6px;
 }
 
 .record-description {
     margin: 10px 0 8px;
     font-size: 13px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .record-description .label {
@@ -3968,8 +3883,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 6px;
     padding: 6px 10px;
     border-radius: 999px;
-    background: #eff6ff;
-    color: #1d4ed8;
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
     font-size: 12px;
     font-weight: 600;
 }
@@ -3990,7 +3905,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .chip-link:focus-visible {
-    outline: 2px solid var(--gov-color-primary);
+    outline: 2px solid var(--border-primary);
     outline-offset: 2px;
 }
 
@@ -4000,11 +3915,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     top: calc(100% + 8px);
     min-width: 290px;
     max-width: 380px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-sm);
-    background: var(--gov-color-surface);
-    color: var(--app-text-primary);
-    box-shadow: var(--gov-shadow-soft);
+    background: var(--background-block-primary);
+    color: var(--text-primary);
+    box-shadow: var(--app-shadow-soft);
     padding: 10px 12px;
     z-index: 24;
     opacity: 0;
@@ -4020,9 +3935,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     top: -6px;
     width: 10px;
     height: 10px;
-    background: var(--gov-color-surface);
-    border-left: 1px solid var(--gov-color-border);
-    border-top: 1px solid var(--gov-color-border);
+    background: var(--background-block-primary);
+    border-left: 1px solid var(--border-subtle);
+    border-top: 1px solid var(--border-subtle);
     transform: rotate(45deg);
 }
 
@@ -4037,7 +3952,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     font-size: 13px;
     font-weight: 700;
     margin-bottom: 7px;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
 }
 
 .chip-tooltip-row {
@@ -4046,15 +3961,15 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 8px;
     font-size: 12px;
     margin-bottom: 3px;
-    color: var(--app-muted);
+    color: var(--text-secondary);
 }
 
 .chip-tooltip-row strong {
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 .chip-sub {
-    color: #0f172a;
+    color: var(--text-primary);
     font-weight: 500;
     opacity: 0.9;
 }
@@ -4080,11 +3995,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .comment {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     padding: 12px 14px;
     margin-bottom: 0;
-    background: var(--gov-color-surface);
+    background: var(--background-block-primary);
     overflow: hidden;
 }
 
@@ -4119,12 +4034,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 6px;
     padding: 0 4px 2px;
     font-size: 12px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .comment-author {
     font-weight: 600;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
     font-size: 12px;
 }
 
@@ -4153,9 +4068,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: inline-flex;
     align-items: center;
     padding: 2px 8px;
-    background: color-mix(in srgb, var(--gov-color-primary) 10%, transparent);
+    background: var(--background-primary-subtlest);
     border-radius: 10px;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
     font-size: 12px;
     font-weight: 500;
     white-space: nowrap;
@@ -4232,7 +4147,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .richtext-render .ql-indent-8 { margin-left: 12rem; }
 
 .richtext-render a {
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
     text-decoration: underline;
     text-underline-offset: 0.12em;
 }
@@ -4279,7 +4194,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .comment-closed-note {
     margin: 0;
     padding: var(--gov-spacing-xs, 0.5rem) 0;
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
     font-size: var(--gov-font-size-s, 0.875rem);
 }
 
@@ -4403,9 +4318,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .record-form-number input[disabled] {
-    border-color: #cbd5e1;
-    background: #f8fafc;
-    color: #475569;
+    border-color: var(--border-subtle);
+    background: var(--background-neutral-subtlest);
+    color: var(--text-secondary);
     cursor: not-allowed;
     opacity: 1;
 }
@@ -4414,7 +4329,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: grid;
     gap: 6px;
     font-weight: 600;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 .form-grid label.checkbox-inline {
@@ -4448,7 +4363,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     gap: 8px;
     font-weight: 600;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 .confirm-delete-check input[type="checkbox"] {
@@ -4461,9 +4376,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: grid;
     gap: 8px;
     padding: 14px 16px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.72);
+    background: var(--background-block-primary);
 }
 
 .small {
@@ -4594,7 +4509,7 @@ gov-dialog[data-modal-container][data-modal-scrollable="true"] .modal-content {
     font-size: 13px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     margin-top: 10px;
 }
 
@@ -4604,10 +4519,8 @@ gov-dialog[data-modal-container][data-modal-scrollable="true"] .modal-content {
 }
 
 /* .external-row — duplicitní hardcoded #fafafa definice odstraněna 2026-04-29.
-   Authoritative pravidlo žije v externi-odkaz-card.css (používá var(--pm-surface)
-   s gov design tokens fallback chain → reaguje na dark mode přes :root[data-theme=dark]
-   override v core.css). Tahle site.css verze přebíjela jen kvůli pozdějšímu load order
-   → karta v dark mode vždy bílá. */
+   Authoritative pravidlo žije v externi-odkaz-card.css (gov tokeny). Tahle site.css verze
+   přebíjela jen kvůli pozdějšímu load order → karta v dark mode vždy bílá. */
 
 .external-actions {
     display: flex;
@@ -4621,16 +4534,16 @@ gov-dialog[data-modal-container][data-modal-scrollable="true"] .modal-content {
 .collab-picker {
     display: grid;
     gap: 8px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
-    background: #fafafa;
+    background: var(--background-neutral-subtlest);
     padding: 10px;
 }
 
 .collab-options {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-sm);
-    background: var(--gov-color-surface);
+    background: var(--background-block-primary);
     max-height: 220px;
     overflow: auto;
 }
@@ -4645,7 +4558,7 @@ label.collab-option {
     align-items: center;
     gap: 10px;
     padding: 6px 10px;
-    border-bottom: 1px solid var(--gov-color-border);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .collab-option:last-child {
@@ -4671,7 +4584,7 @@ label.collab-option {
 .collab-option-org {
     margin-left: auto;
     flex: 0 0 auto;
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
     font-size: 13px;
 }
 
@@ -4690,10 +4603,10 @@ label.collab-option {
 }
 
 .office-search-panel {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-sm);
-    background: var(--gov-color-surface);
-    box-shadow: var(--gov-shadow-soft);
+    background: var(--background-block-primary);
+    box-shadow: var(--app-shadow-soft);
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
@@ -4740,8 +4653,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .office-search-item {
     border: none;
-    border-bottom: 1px solid #d8dbdd;
-    background: var(--gov-color-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--background-block-primary);
     color: inherit;
     text-align: left;
     padding: 10px 12px;
@@ -4756,13 +4669,13 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .office-search-item:hover,
 .office-search-item.active {
-    background: var(--app-nav-hover);
+    background: var(--background-neutral-subtle);
 }
 
 .office-search-item.disabled {
     cursor: not-allowed;
     opacity: 0.6;
-    background: #f8fafc;
+    background: var(--background-neutral-subtlest);
 }
 
 .office-search-primary {
@@ -4773,18 +4686,18 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .office-search-secondary {
     font-size: 12px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .office-search-warning {
     font-size: 12px;
-    color: #c53030;
+    color: var(--text-status-error);
 }
 
 .office-search-info {
     padding: 10px 12px;
     font-size: 13px;
-    border-bottom: 1px solid #e7edf7;
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .office-search-info:last-child {
@@ -4792,11 +4705,11 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .office-search-info.error {
-    color: #b91c1c;
+    color: var(--text-status-error);
 }
 
 .office-search-info.empty {
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .ad-location-hint {
@@ -4806,7 +4719,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     margin-top: 6px;
     font-size: 12px;
     font-weight: 700;
-    color: #15803d;
+    color: var(--text-status-success);
 }
 
 .ad-location-hint::before {
@@ -4817,8 +4730,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     width: 16px;
     height: 16px;
     border-radius: 999px;
-    background: #22c55e;
-    color: #fff;
+    background: var(--background-status-success);
+    color: var(--text-white-fixed);
     font-size: 11px;
     line-height: 1;
 }
@@ -4829,10 +4742,10 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .task-item {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 10px;
     padding: 12px;
-    background: #f8fafc;
+    background: var(--background-neutral-subtlest);
 }
 
 .task-item textarea {
@@ -4845,19 +4758,19 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .search-results {
-    border: 1px dashed var(--gov-color-border);
+    border: 1px dashed var(--border-subtle);
     border-radius: var(--gov-radius-lg);
     padding: 10px;
     display: grid;
     gap: 8px;
-    background: #f8fafc;
+    background: var(--background-neutral-subtlest);
 }
 
 .result-item {
     padding: 8px 10px;
     border-radius: 10px;
-    background: #fff;
-    border: 1px solid var(--gov-color-border);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
 }
 
 .subsystem-group {
@@ -4881,7 +4794,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     right: 10px;
     width: 4px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--gov-color-border) 74%, transparent 26%);
+    background: var(--background-neutral-subtle);
 }
 
 .subsystem-scroll-indicator-bubble {
@@ -4892,10 +4805,10 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     transform: translateY(0);
     transition: transform 140ms ease-out;
     padding: 10px 12px;
-    border: 1px solid color-mix(in srgb, var(--gov-color-border) 78%, #fff 22%);
+    border: 1px solid var(--border-subtle);
     border-radius: 999px 0 0 999px;
-    background: color-mix(in srgb, #fff 90%, var(--gov-color-primary) 10%);
-    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+    background: var(--background-block-primary);
+    box-shadow: var(--app-shadow-raised);
     backdrop-filter: blur(14px);
 }
 
@@ -4903,7 +4816,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     display: block;
     font-size: 0.88rem;
     line-height: 1.25;
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
     white-space: nowrap;
 }
 
@@ -4926,10 +4839,10 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .filter-shell {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-lg);
     padding: 10px 12px;
-    background: rgba(255, 255, 255, 0.85);
+    background: var(--background-block-primary);
     margin-bottom: 16px;
     /* Řádek 1 = „Filtry" + použité chipy vedle sebe; panel se zalomí pod (2026-06-10). */
     display: flex;
@@ -4989,10 +4902,10 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 999px;
-    background: #edf3fb;
-    color: var(--app-text-primary);
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary);
     padding: 6px 8px 6px 10px;
     font-size: 13px;
     line-height: 1;
@@ -5005,7 +4918,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 .active-filter-chip-remove {
     border: none;
     background: transparent;
-    color: var(--app-muted);
+    color: var(--text-secondary);
     border-radius: 999px;
     width: 20px;
     height: 20px;
@@ -5018,12 +4931,12 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .active-filter-chip-remove:hover {
-    background: rgba(15, 23, 42, 0.08);
-    color: var(--app-text-primary);
+    background: var(--background-block-secondary);
+    color: var(--text-primary);
 }
 
 .active-filter-chip-remove:focus-visible {
-    outline: 2px solid var(--gov-color-primary);
+    outline: 2px solid var(--border-primary);
     outline-offset: 2px;
 }
 
@@ -5050,7 +4963,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     align-items: center;
     gap: 8px;
     font-weight: 600;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     padding-top: 22px;
 }
 
@@ -5066,7 +4979,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 .filter-actions {
     margin-top: 14px;
     padding-top: 12px;
-    border-top: 1px solid var(--gov-color-border);
+    border-top: 1px solid var(--border-subtle);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -5075,7 +4988,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .filter-save-status {
     font-size: 13px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .stack-lg {
@@ -5118,10 +5031,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     flex-direction: column;
     gap: var(--pm-spacing-xs);
     padding: var(--pm-spacing-m) var(--pm-spacing-m) var(--pm-spacing-s);
-    background: linear-gradient(170deg,
-        color-mix(in srgb, var(--pm-color-primary) 4%, var(--pm-color-background)) 0%,
-        color-mix(in srgb, var(--pm-color-primary) 10%, var(--pm-color-background)) 100%);
-    border-right: 1px solid var(--pm-color-border);
+    background: var(--background-block-primary);
+    border-right: 1px solid var(--border-subtle);
     position: relative;
 }
 
@@ -5132,14 +5043,14 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     right: 0;
     bottom: 0;
     width: 3px;
-    background: var(--pm-color-primary);
+    background: var(--background-primary);
 }
 
 .meeting-project-overview__ticker {
     font-size: 10px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--pm-color-primary);
+    color: var(--text-primary-color);
     font-weight: var(--pm-font-weight-bold);
 }
 
@@ -5155,8 +5066,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     align-items: center;
     padding: 3px 9px;
     border-radius: var(--pm-radius-s);
-    background: var(--pm-color-primary);
-    color: var(--pm-color-background);
+    background: var(--background-primary);
+    color: var(--text-white-fixed);
     font-size: 10px;
     font-weight: var(--pm-font-weight-bold);
     letter-spacing: 0.05em;
@@ -5169,7 +5080,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     gap: 5px;
     font-size: 11px;
     font-weight: var(--pm-font-weight-semibold);
-    color: var(--pm-color-neutral);
+    color: var(--text-secondary);
 }
 
 .meeting-project-overview__stav::before {
@@ -5181,15 +5092,15 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-project-overview__stav--running {
-    color: var(--pm-color-success);
+    color: var(--text-status-success);
 }
 
 .meeting-project-overview__stav--paused {
-    color: var(--pm-color-warning);
+    color: var(--text-status-warning);
 }
 
 .meeting-project-overview__stav--done {
-    color: var(--pm-color-neutral);
+    color: var(--text-secondary);
 }
 
 .meeting-project-overview__nazev {
@@ -5198,16 +5109,16 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     font-weight: var(--pm-font-weight-semibold);
     letter-spacing: -0.01em;
     line-height: 1.25;
-    color: var(--pm-color-text);
+    color: var(--text-primary);
 }
 
 .meeting-project-overview__meta {
     margin: 0;
     padding: var(--pm-spacing-xs) 0 0;
     font-size: var(--pm-font-size-xs);
-    color: var(--pm-color-text-muted);
+    color: var(--text-secondary);
     line-height: 1.5;
-    border-top: 1px solid color-mix(in srgb, var(--pm-color-border) 60%, transparent);
+    border-top: 1px solid var(--border-subtlest);
 }
 
 .meeting-project-overview__meta dt {
@@ -5215,13 +5126,13 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     font-weight: var(--pm-font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--pm-color-text-muted);
+    color: var(--text-secondary);
     margin-top: var(--pm-spacing-xs);
 }
 
 .meeting-project-overview__meta dd {
     margin: 2px 0 0;
-    color: var(--pm-color-text);
+    color: var(--text-primary);
 }
 
 .meeting-project-overview__stats {
@@ -5232,8 +5143,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-project-overview__stat {
-    background: var(--pm-color-background);
-    border: 1px solid var(--pm-color-border);
+    background: var(--background-page);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--pm-radius-m);
     padding: var(--pm-spacing-xs) var(--pm-spacing-s);
     text-align: center;
@@ -5243,7 +5154,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     display: block;
     font-size: var(--pm-font-size-l);
     font-weight: var(--pm-font-weight-bold);
-    color: var(--pm-color-primary-strong);
+    color: var(--text-primary-color);
     line-height: 1;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
@@ -5256,7 +5167,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     font-weight: var(--pm-font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--pm-color-text-muted);
+    color: var(--text-secondary);
 }
 
 .meeting-project-overview__actions {
@@ -5295,7 +5206,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .meeting-project-overview__history {
     margin-top: var(--pm-spacing-xs);
-    border-top: 1px dashed var(--pm-color-border);
+    border-top: 1px dashed var(--border-subtle);
     padding-top: var(--pm-spacing-s);
 }
 
@@ -5305,7 +5216,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     gap: 6px;
     background: transparent;
     border: 1px solid transparent;
-    color: var(--pm-color-primary);
+    color: var(--text-primary-color);
     font: inherit;
     font-size: var(--pm-font-size-xs);
     font-weight: var(--pm-font-weight-medium);
@@ -5316,12 +5227,12 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-project-overview__history-toggle:hover {
-    background: color-mix(in srgb, var(--pm-color-primary) 8%, transparent);
-    border-color: color-mix(in srgb, var(--pm-color-primary) 20%, transparent);
+    background: var(--background-primary-subtlest);
+    border-color: var(--border-primary);
 }
 
 .meeting-project-overview__history-toggle:focus-visible {
-    outline: 2px solid var(--pm-color-primary);
+    outline: 2px solid var(--border-primary);
     outline-offset: 2px;
 }
 
@@ -5350,7 +5261,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
     .meeting-project-overview__sidebar {
         border-right: none;
-        border-bottom: 1px solid var(--pm-color-border);
+        border-bottom: 1px solid var(--border-subtle);
     }
 
     .meeting-project-overview__sidebar::after {
@@ -5376,9 +5287,9 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-year-group {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-lg);
-    background: color-mix(in srgb, var(--gov-color-primary) 4%, var(--gov-color-surface));
+    background: var(--background-neutral-subtlest);
     overflow: hidden;
 }
 
@@ -5397,7 +5308,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-year-toggle:hover {
-    background: color-mix(in srgb, var(--gov-color-primary) 8%, var(--gov-color-surface));
+    background: var(--background-neutral-subtle);
 }
 
 .meeting-year-toggle-main {
@@ -5415,7 +5326,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .meeting-year-count {
     font-size: 14px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 /* gov-icon chevron — šipka se swapuje přes JS (chevron-down/chevron-up),
@@ -5437,10 +5348,10 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-card {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     padding: 11px;
-    background: #fff;
+    background: var(--background-block-primary);
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -5450,8 +5361,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-card:hover {
-    border-color: var(--gov-color-primary);
-    box-shadow: 0 12px 20px rgba(15, 23, 42, 0.1);
+    border-color: var(--border-primary);
+    box-shadow: var(--app-shadow-raised);
 }
 
 .meeting-card-top {
@@ -5496,19 +5407,19 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     font-size: 14px;
     font-weight: 600;
     line-height: 1.3;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .meeting-number {
     font-size: 17px;
     font-weight: 700;
     line-height: 1.2;
-    color: var(--gov-color-text);
+    color: var(--text-primary);
     margin: 0;
 }
 
 .meeting-place {
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     font-size: 13px;
 }
 
@@ -5601,9 +5512,9 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     align-items: baseline;
     gap: 12px;
     padding: 8px 10px;
-    border: 1px solid var(--pm-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 6px;
-    background: var(--pm-surface);
+    background: var(--background-block-primary);
 }
 
 /* Decentní číslo řádku uvnitř karty — jen vizuální orientace (netiskne se,
@@ -5613,7 +5524,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     content: counter(attendance-row) ".";
     flex: 0 0 auto;
     min-width: 1.6em;
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
     font-size: 0.75rem;
     user-select: none;
 }
@@ -5695,7 +5606,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-detail-header .muted {
-    color: color-mix(in srgb, var(--app-text-primary) 65%, transparent);
+    color: var(--text-secondary);
 }
 
 .meeting-detail-actions .btn {
@@ -5720,7 +5631,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     justify-content: flex-end;
     margin-top: 14px;
     padding-top: 12px;
-    border-top: 1px solid var(--gov-color-border);
+    border-top: 1px solid var(--border-subtle);
 }
 
 .ciselniky-layout {
@@ -5747,8 +5658,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     gap: 10px;
     padding: 12px 14px;
     border-radius: 14px;
-    border: 1px solid var(--gov-color-border);
-    background: #fff;
+    border: 1px solid var(--border-subtle);
+    background: var(--background-block-primary);
     transition: all 0.2s ease;
 }
 
@@ -5762,8 +5673,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .ciselnik-tile.active,
 .ciselnik-tile:hover {
-    border-color: var(--gov-color-primary);
-    box-shadow: 0 12px 20px rgba(15, 23, 42, 0.1);
+    border-color: var(--border-primary);
+    box-shadow: var(--app-shadow-raised);
 }
 
 .ciselnik-title {
@@ -5772,7 +5683,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .ciselnik-arrow {
     font-size: 18px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .ciselnik-color-chip {
@@ -5786,7 +5697,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     width: 14px;
     height: 14px;
     border-radius: 3px;
-    border: 1px solid rgba(15, 23, 42, 0.22);
+    border: 1px solid var(--border-subtle);
     flex: 0 0 auto;
 }
 
@@ -5812,12 +5723,12 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     gap: 8px;
     align-items: baseline;
     padding-bottom: 6px;
-    border-bottom: 1px solid var(--gov-color-border);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .search-admin-status dt {
     font-size: 12px;
-    color: var(--app-muted);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
@@ -5843,12 +5754,12 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     display: grid;
     gap: 2px;
     padding-bottom: 8px;
-    border-bottom: 1px solid var(--gov-color-border);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .profile-meta dt {
     font-size: 12px;
-    color: var(--app-muted);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
@@ -5884,10 +5795,10 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     grid-template-columns: 1fr auto;
     gap: 2px 10px;
     align-items: start;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 10px;
     padding: 10px 12px;
-    background: var(--gov-color-surface);
+    background: var(--background-block-primary);
 }
 
 .settings-link-title {
@@ -5895,7 +5806,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .settings-link-sub {
-    color: var(--app-muted);
+    color: var(--text-secondary);
     font-size: 12px;
 }
 
@@ -5903,7 +5814,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     min-width: 28px;
     height: 24px;
     border-radius: 999px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     display: grid;
     place-items: center;
     font-size: 12px;
@@ -5912,7 +5823,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .settings-link.active,
 .settings-link:hover {
-    border-color: var(--gov-color-primary);
+    border-color: var(--border-primary);
 }
 
 .settings-panel[data-settings-panel][aria-busy="true"] {
@@ -5956,7 +5867,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .settings-role-checklist {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 10px;
     padding: 12px;
     margin: 0;
@@ -5975,9 +5886,9 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     align-items: start;
     gap: 10px;
     padding: 8px 6px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+    border-bottom: 1px solid var(--border-subtle);
     font-weight: 600;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 .form-grid .settings-role-check:last-child {
@@ -6051,8 +5962,8 @@ pm-tab-last-in-row > span[data-pm-tab-inner] {
     float: left;
     display: block;
     padding: 10px 22px;
-    color: var(--text-secondary, var(--pm-text-muted, #64748b));
-    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    color: var(--text-secondary);
+    background: var(--background-block-secondary);
     border-top-left-radius: var(--pm-tab-radius, 10px);
     border-top-right-radius: var(--pm-tab-radius, 10px);
     cursor: pointer;
@@ -6073,13 +5984,13 @@ pm-tab[active] > span[data-pm-tab-inner],
 pm-tab-left[active] > span[data-pm-tab-inner],
 pm-tab-right[active] > span[data-pm-tab-inner],
 pm-tab-last-in-row[active] > span[data-pm-tab-inner] {
-    background: var(--pm-tab-active-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
-    color: var(--text-primary, var(--app-text-primary, #0f172a));
+    background: var(--background-block-primary);
+    color: var(--text-primary);
     font-weight: 700;
     /* Aktivní tab vizuálně označen modrým podtržením textu (gov primary token).
        text-decoration místo border-bottom — podtržení sedí pod text, ne pod celý tab. */
     text-decoration: underline;
-    text-decoration-color: var(--gov-color-primary, #005ea5);
+    text-decoration-color: var(--text-primary-color);
     text-decoration-thickness: 3px;
     text-underline-offset: 4px;
 }
@@ -6096,7 +6007,7 @@ pm-tab:focus-visible,
 pm-tab-left:focus-visible,
 pm-tab-right:focus-visible,
 pm-tab-last-in-row:focus-visible {
-    outline: 2px solid var(--color-focus, var(--gov-color-primary, #2563eb));
+    outline: 2px solid var(--status-focus);
     outline-offset: 2px;
 }
 
@@ -6110,7 +6021,7 @@ pm-tab-left::before {
     left: -10px;
     width: 10px;
     height: 10px;
-    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    background: var(--background-block-secondary);
     z-index: 1;
 }
 
@@ -6122,7 +6033,7 @@ pm-tab-last-in-row::after {
     right: -10px;
     width: 10px;
     height: 10px;
-    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    background: var(--background-block-secondary);
     z-index: 1;
 }
 
@@ -6135,7 +6046,7 @@ pm-tab-left > span[data-pm-tab-inner]::before {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--pm-tab-page-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    background: var(--background-block-primary);
     z-index: 2;
 }
 
@@ -6148,7 +6059,7 @@ pm-tab-last-in-row > span[data-pm-tab-inner]::after {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--pm-tab-page-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    background: var(--background-block-primary);
     z-index: 2;
 }
 
@@ -6165,7 +6076,7 @@ pm-tab-last-in-row[active]::before {
     left: -10px;
     width: 10px;
     height: 10px;
-    background: var(--pm-tab-active-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    background: var(--background-block-primary);
     z-index: 1;
 }
 
@@ -6179,7 +6090,7 @@ pm-tab-last-in-row[active]::after {
     right: -10px;
     width: 10px;
     height: 10px;
-    background: var(--pm-tab-active-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    background: var(--background-block-primary);
     z-index: 1;
 }
 
@@ -6196,7 +6107,7 @@ pm-tab[active] > span[data-pm-tab-inner]::before {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    background: var(--background-block-secondary);
     z-index: 2;
 }
 
@@ -6208,7 +6119,7 @@ pm-tab[active] > span[data-pm-tab-inner]::after {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    background: var(--background-block-secondary);
     z-index: 2;
 }
 
@@ -6221,7 +6132,7 @@ pm-tab-left[active] > span[data-pm-tab-inner]::before {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--pm-tab-page-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    background: var(--background-block-primary);
     z-index: 2;
 }
 
@@ -6233,7 +6144,7 @@ pm-tab-left[active] > span[data-pm-tab-inner]::after {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    background: var(--background-block-secondary);
     z-index: 2;
 }
 
@@ -6247,7 +6158,7 @@ pm-tab-last-in-row[active] > span[data-pm-tab-inner]::before {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    background: var(--background-block-secondary);
     z-index: 2;
 }
 
@@ -6260,7 +6171,7 @@ pm-tab-last-in-row[active] > span[data-pm-tab-inner]::after {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--pm-tab-page-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    background: var(--background-block-primary);
     z-index: 2;
 }
 
@@ -6271,8 +6182,8 @@ pm-tab-last-in-row[active] > span[data-pm-tab-inner]::after {
 pm-tab-panel {
     display: block;
     padding: 16px;
-    background: var(--pm-tab-active-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
-    color: var(--text-primary, var(--app-text-primary, #0f172a));
+    background: var(--background-block-primary);
+    color: var(--text-primary);
     clear: both;
     position: relative;
     z-index: 0;
@@ -6304,12 +6215,12 @@ pm-tab-list:has(pm-tab-left:only-child) pm-tab-left::after {
     right: -10px;
     width: 10px;
     height: 10px;
-    background: var(--pm-tab-inactive-bg, var(--background-block-secondary, var(--pm-surface-alt, #f1f5f9)));
+    background: var(--background-block-secondary);
     z-index: 1;
 }
 
 pm-tab-list:has(pm-tab-left:only-child) pm-tab-left[active]::after {
-    background: var(--pm-tab-active-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    background: var(--background-block-primary);
 }
 
 pm-tab-list:has(pm-tab-left:only-child) pm-tab-left > span[data-pm-tab-inner]::after,
@@ -6321,7 +6232,7 @@ pm-tab-list:has(pm-tab-left:only-child) pm-tab-left[active] > span[data-pm-tab-i
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    background: var(--pm-tab-page-bg, var(--background-block-primary, var(--pm-surface, #ffffff)));
+    background: var(--background-block-primary);
     z-index: 2;
 }
 
@@ -6345,7 +6256,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
 }
 
 .sync-job-card__upcoming {
-    border-top: 1px dashed var(--border-subtle, #e5e7eb);
+    border-top: 1px dashed var(--border-subtle);
     padding-top: 12px;
     display: grid;
     gap: 6px;
@@ -6363,7 +6274,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
     font-size: 13px;
     display: grid;
     gap: 2px;
-    color: var(--text-primary, var(--app-text-primary));
+    color: var(--text-primary);
 }
 
 .sync-job-card__upcoming-hint {
@@ -6376,9 +6287,9 @@ pm-tab-panel.sync-tab-panel-content[active] {
     display: grid;
     gap: 14px;
     padding: 16px 18px;
-    border: 1px solid var(--border-subtle, #d1d5db);
+    border: 1px solid var(--border-subtle);
     border-radius: 10px;
-    background: var(--background-block-primary, var(--pm-surface, #ffffff));
+    background: var(--background-block-primary);
 }
 
 .sync-job-card__head {
@@ -6395,7 +6306,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
 .sync-job-card__desc {
     margin: 0;
     font-size: 13px;
-    color: var(--text-secondary, var(--pm-text-muted, #64748b));
+    color: var(--text-secondary);
 }
 
 .sync-job-card__form {
@@ -6416,7 +6327,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
 
 .sync-job-card__label {
     font-weight: 600;
-    color: var(--text-primary, var(--app-text-primary));
+    color: var(--text-primary);
 }
 
 .sync-job-card__actions {
@@ -6427,7 +6338,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
 }
 
 .sync-job-card__status {
-    border-top: 1px solid var(--border-subtle, #e5e7eb);
+    border-top: 1px solid var(--border-subtle);
     padding-top: 12px;
     display: grid;
     gap: 8px;
@@ -6449,7 +6360,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
 
 .sync-job-card__status-dl dt {
     font-weight: 600;
-    color: var(--text-secondary, var(--pm-text-muted, #64748b));
+    color: var(--text-secondary);
 }
 
 .sync-job-card__status-dl dd {
@@ -6473,9 +6384,9 @@ pm-tab-panel.sync-tab-panel-content[active] {
 }
 
 .profile-role-card {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-lg);
-    background: var(--gov-color-surface);
+    background: var(--background-block-primary);
     padding: 0 14px 14px;
 }
 
@@ -6503,13 +6414,13 @@ pm-tab-panel.sync-tab-panel-content[active] {
 }
 
 .profile-role-scope {
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
     font-weight: 400;
     font-size: 0.875rem;
 }
 
 .profile-role-scope strong {
-    color: var(--pm-text);
+    color: var(--text-primary);
 }
 
 .profile-role-name {
@@ -6517,7 +6428,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
 }
 
 .profile-role-summary-meta {
-    color: var(--gov-color-text-secondary);
+    color: var(--text-secondary);
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
@@ -6542,7 +6453,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
 .profile-preference-status {
     min-height: 20px;
     font-size: 13px;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
 }
 
 .preferences-list {
@@ -6560,7 +6471,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.35rem 0.5rem;
-    border: 1px solid var(--pm-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 6px;
 }
 
@@ -6576,14 +6487,14 @@ pm-tab-panel.sync-tab-panel-content[active] {
     padding: 0.2rem;
     border: none;
     background: transparent;
-    color: var(--pm-text-muted);
+    color: var(--text-secondary);
     cursor: pointer;
     border-radius: 4px;
 }
 
 .preference-row-remove:hover {
-    color: var(--gov-color-error-500, #c52a3a);
-    background: var(--pm-surface);
+    color: var(--text-status-error);
+    background: var(--background-block-secondary);
 }
 
 .profile-rights-filters {
@@ -6599,556 +6510,32 @@ pm-tab-panel.sync-tab-panel-content[active] {
     font-weight: 600;
 }
 
-
-:root[data-theme="dark"] .app-search-dropdown {
-    background: #111b2d;
-    border-color: #31415e;
-}
-
-/* dark-theme overrides pro .gov-switch* aproximaci odstraněny — komponenta gov-form-switch má vlastní theming přes shadow DOM. */
-
-:root[data-theme="dark"] .badge {
-    background: #203552;
-    color: #b9d5ff;
-}
-
-:root[data-theme="dark"] .pill {
-    background: #1f2f4a;
-    color: #d8e5fb;
-}
-
-:root[data-theme="dark"] .record-card,
-:root[data-theme="dark"] .meeting-card,
-:root[data-theme="dark"] .project-card,
-:root[data-theme="dark"] .ciselnik-tile,
-:root[data-theme="dark"] .settings-link,
-:root[data-theme="dark"] .comment,
-:root[data-theme="dark"] .task-item,
-:root[data-theme="dark"] .office-picker,
-:root[data-theme="dark"] .office-search-item,
-:root[data-theme="dark"] .office-search-panel,
-:root[data-theme="dark"] .search-results,
-:root[data-theme="dark"] .result-item {
-    background: var(--gov-color-surface);
-}
-
-:root[data-theme="dark"] .project-card {
-    background: var(--gov-color-surface);
-}
-
-:root[data-theme="dark"] .comment-avatar {
-    background: color-mix(in srgb, var(--gov-color-primary) 20%, transparent);
-}
-
-:root[data-theme="dark"] .btn {
-    background: var(--gov-color-surface);
-    border-color: var(--gov-color-border);
-    color: var(--app-text-primary);
-}
-
-:root[data-theme="dark"] .btn:hover {
-    background: var(--app-nav-hover);
-    border-color: var(--gov-color-primary);
-    color: var(--gov-color-primary);
-}
-
-:root[data-theme="dark"] .btn.primary {
-    background: var(--gov-color-primary);
-    border-color: var(--gov-color-primary);
-    color: #f8fbff;
-}
-
-:root[data-theme="dark"] .btn.primary:hover {
-    background: var(--gov-color-primary-strong);
-    border-color: var(--gov-color-primary-strong);
-    color: #f8fbff;
-}
-
-:root[data-theme="dark"] .btn.ghost {
-    background: transparent;
-    border-color: var(--gov-color-border);
-    color: var(--gov-color-primary);
-}
-
-:root[data-theme="dark"] .btn.ghost:hover {
-    background: var(--app-nav-hover);
-    border-color: var(--gov-color-primary);
-    color: var(--gov-color-primary);
-}
-
-:root[data-theme="dark"] .btn.danger {
-    border-color: #f87171;
-    color: #fca5a5;
-}
-
-:root[data-theme="dark"] .btn.danger:hover {
-    border-color: #ef4444;
-    color: #fecaca;
-    background: rgba(248, 113, 113, 0.12);
-}
-
-:root[data-theme="dark"] .record-delete-summary {
-    background: rgba(24, 31, 39, 0.78);
-}
-
-:root[data-theme="dark"] .dashboard-hero {
-    background:
-        radial-gradient(circle at top right, rgba(96, 165, 250, 0.16), transparent 38%),
-        linear-gradient(180deg, rgba(16, 24, 40, 0.94), rgba(20, 31, 50, 0.96));
-}
-
-:root[data-theme="dark"] .dashboard-stat {
-    background: rgba(15, 23, 42, 0.62);
-    border-color: rgba(96, 165, 250, 0.2);
-}
-
-:root[data-theme="dark"] .dashboard-card-primary {
-    background:
-        linear-gradient(180deg, rgba(59, 130, 246, 0.14), rgba(15, 23, 42, 0.92)),
-        var(--gov-color-surface);
-}
-
-:root[data-theme="dark"] .dashboard-card-placeholder {
-    background:
-        repeating-linear-gradient(-45deg, rgba(148, 163, 184, 0.08), rgba(148, 163, 184, 0.08) 12px, transparent 12px, transparent 24px),
-        var(--gov-color-surface);
-}
-
-/*
- * Dark theme override pro nativní formulářové kontrolní prvky.
- * POZOR: scope `:not(gov-form-input input):not(gov-form-search input):not([role="search"] input)`
- * musí být na KAŽDÉM input[type=...] selektoru. Gov-form-input a gov-form-search
- * renderují vnitřní <input type="text"> v LIGHT DOM — bez exclusion se globální
- * pravidlo aplikuje uvnitř host wrapperu a vznikne tmavší vnořený box
- * (rgb(17,27,45) uvnitř rgb(38,38,38) host → user: "uvnitř nějaký tmavý element").
- * Viz docs/architecture/components-theming.md a memory feedback_gov_web_components_css_scoping.
- */
-:root[data-theme="dark"] input[type="text"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="email"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="date"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="time"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="datetime-local"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="number"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] input[type="search"]:not(gov-form-input input):not(gov-form-search input):not([role="search"] input),
-:root[data-theme="dark"] select:not(gov-form-select select):not(pm-select select),
-:root[data-theme="dark"] textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
-    /* Bug fix 2026-04-29: musí být `background-color`, ne `background` shorthand!
-       Shorthand by přepsal background-image (chevron na native <select> je vyrobený
-       přes 2× linear-gradient v řádku ~1787) a chevron by zmizel v dark mode. */
-    background-color: #111b2d;
-    border-color: #31415e;
-    color: #e6edfa;
-}
-
-/* Native <select> chevron — v dark mode použít světlejší barvu, gradient by jinak
-   slyl s tmavým pozadím. Bez tohoto override by gradient color #64748b zůstal,
-   což je sice viditelné, ale subtilní. Lehčí color = lepší čitelnost. */
-:root[data-theme="dark"] select:not(gov-form-select select):not(pm-select select) {
-    background-image: linear-gradient(45deg, transparent 50%, #93c5fd 50%), linear-gradient(135deg, #93c5fd 50%, transparent 50%);
-}
-
-:root[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-    filter: invert(0.9);
-}
-
-:root[data-theme="dark"] .richtext-host .ql-toolbar.ql-snow {
-    background: #16233a;
-    border-color: #31415e;
-}
-
-:root[data-theme="dark"] .richtext-host .ql-container.ql-snow {
-    background: #111b2d;
-    border-color: #31415e;
-    color: #e6edfa;
-}
-
-:root[data-theme="dark"] .richtext-host .ql-snow .ql-stroke {
-    stroke: #d7e5ff;
-}
-
-:root[data-theme="dark"] .richtext-host .ql-snow .ql-fill {
-    fill: #d7e5ff;
-}
-
-:root[data-theme="dark"] .richtext-host .ql-snow .ql-picker {
-    color: #d7e5ff;
-}
-
-:root[data-theme="dark"] .record-form-number input[disabled] {
-    background: #16233a;
-    border-color: #31415e;
-    color: #9fb6dc;
-}
-
-:root[data-theme="dark"] .tag {
-    background: #31251e;
-    color: #ffba8d;
-}
-
-:root[data-theme="dark"] .chip {
-    background: #1d2f50;
-    color: #bfdaff;
-}
-
-:root[data-theme="dark"] .chip-link {
-    color: #bfdaff;
-}
-
-:root[data-theme="dark"] .icon-btn {
-    background: #0f1b2e;
-    border-color: #2f4264;
-    color: #c9dcff;
-}
-
-:root[data-theme="dark"] .icon-btn:hover {
-    border-color: #6aa6ff;
-    color: #9fc5ff;
-}
-
-:root[data-theme="dark"] .meeting-detail-header .muted,
-:root[data-theme="dark"] .meeting-status .muted,
-:root[data-theme="dark"] .meeting-date {
-    color: #d1ddf3;
-}
-
-:root[data-theme="dark"] .meeting-status-badge {
-    background: #2f5a8d;
-    color: #ecf4ff;
-}
-
-:root[data-theme="dark"] .meeting-status .tag {
-    background: #3a2b1f;
-    border: 1px solid #6e4b31;
-    color: #ffd6b6;
-}
-
-:root[data-theme="dark"] .chip-collab {
-    background: #1f3558;
-    color: #c9dcff;
-    border-color: #33598b;
-}
-
-:root[data-theme="dark"] .chip-tooltip {
-    background: #0f1b2e;
-    border-color: #2f4264;
-    box-shadow: 0 16px 28px rgba(0, 0, 0, 0.45);
-}
-
-:root[data-theme="dark"] .chip-tooltip::before {
-    background: #0f1b2e;
-    border-left-color: #2f4264;
-    border-top-color: #2f4264;
-}
-
-:root[data-theme="dark"] .chip-tooltip-row {
-    color: #a8b6cf;
-}
-
-:root[data-theme="dark"] .chip-sub {
-    color: #d8e6fd;
-}
-
-:root[data-theme="dark"] .docs-sidebar,
-:root[data-theme="dark"] .docs-content,
-:root[data-theme="dark"] .docs-toc {
-    background: var(--gov-color-surface);
-    border-color: var(--gov-color-border);
-}
-
-:root[data-theme="dark"] .docs-header p,
-:root[data-theme="dark"] .docs-breadcrumb {
-    color: #a8b6cf;
-}
-
-:root[data-theme="dark"] .docs-nav-link {
-    color: #b8d2ff;
-}
-
-:root[data-theme="dark"] .docs-nav-link:hover {
-    background: var(--app-nav-hover);
-}
-
-:root[data-theme="dark"] .docs-nav-link.active {
-    background: rgba(156, 200, 255, 0.12);
-    color: var(--gov-color-primary);
-}
-
-:root[data-theme="dark"] .docs-content code {
-    background: #1d2d4d;
-}
-
-:root[data-theme="dark"] .docs-content pre {
-    border-color: #31415e;
-    background: #0f1b2e;
-}
-
-:root[data-theme="dark"] .docs-content th,
-:root[data-theme="dark"] .docs-content td,
-:root[data-theme="dark"] .docs-content hr {
-    border-color: #31415e;
-}
-
-:root[data-theme="dark"] .docs-toc-link,
-:root[data-theme="dark"] .docs-breadcrumb a {
-    color: #a9c9ff;
-}
-
-:root[data-theme="dark"] .print-format-popover {
-    background: var(--gov-color-surface);
-    border-color: var(--gov-color-border);
-    box-shadow: var(--gov-shadow-soft);
-}
-
-:root[data-theme="dark"] .print-format-subtitle,
-:root[data-theme="dark"] .print-format-note {
-    color: #a8b6cf;
-}
-
-:root[data-theme="dark"] .print-format-close {
-    border-color: #31415e;
-    color: #c9dcff;
-}
-
-:root[data-theme="dark"] .collab-picker,
-:root[data-theme="dark"] .collab-options {
-    background: var(--gov-color-surface);
-}
-
-:root[data-theme="dark"] .office-search-panel {
-    border-color: var(--gov-color-border);
-    box-shadow: var(--gov-shadow-soft);
-}
-
-:root[data-theme="dark"] .office-search-item {
-    border-bottom-color: var(--gov-color-border);
-}
-
-:root[data-theme="dark"] .office-search-item:hover,
-:root[data-theme="dark"] .office-search-item.active {
-    background: var(--app-nav-hover);
-}
-
-:root[data-theme="dark"] .office-search-secondary {
-    color: #a8b6cf;
-}
-
-:root[data-theme="dark"] .office-search-warning {
-    color: #ff9a9a;
-}
-
-:root[data-theme="dark"] .office-search-info {
-    border-bottom-color: #2f4264;
-}
-
-:root[data-theme="dark"] .office-search-info.error {
-    color: #ff9a9a;
-}
-
-:root[data-theme="dark"] .ad-location-hint {
-    color: #8df0af;
-}
-
-:root[data-theme="dark"] .ciselnik-color-swatch {
-    border-color: rgba(191, 218, 255, 0.45);
-}
-
-:root[data-theme="dark"] .field-error-message {
-    color: #ff9a9a;
-}
-
-:root[data-theme="dark"] .schedule-mini-gantt-track,
-:root[data-theme="dark"] .schedule-overview-track,
-:root[data-theme="dark"] .schedule-layered-track,
-:root[data-theme="dark"] .gantt-step-track {
-    background: #25344d;
-    box-shadow: inset 0 0 0 1px rgba(191, 218, 255, 0.2);
-}
-
-:root[data-theme="dark"] .schedule-mini-legend {
-    color: #9fb6dc;
-}
-
-:root[data-theme="dark"] .timeline-axis {
-    border-bottom-color: rgba(148, 163, 184, 0.42);
-}
-
-:root[data-theme="dark"] .timeline-axis-tick {
-    background: rgba(148, 163, 184, 0.35);
-}
-
-:root[data-theme="dark"] .timeline-axis-tick.edge {
-    background: rgba(191, 218, 255, 0.52);
-}
-
-:root[data-theme="dark"] .timeline-axis-label {
-    color: #d5e3f7;
-    background: rgba(30, 41, 59, 0.9);
-    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.5);
-}
-
-:root[data-theme="dark"] .schedule-overview-segment,
-:root[data-theme="dark"] .schedule-layered-segment.planned {
-    box-shadow: inset 0 0 0 1px rgba(191, 218, 255, 0.2);
-}
-
-:root[data-theme="dark"] .schedule-overview-segment[data-schedule-segment-kind="actual"],
-:root[data-theme="dark"] .schedule-layered-segment.actual {
-    border-color: rgba(226, 232, 240, 0.62);
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.12) inset,
-        0 1px 2px rgba(15, 23, 42, 0.3);
-}
-
-:root[data-theme="dark"] .schedule-layered-legend-swatch.deadline {
-    background: #dbeafe;
-}
-
-:root[data-theme="dark"] .schedule-layered-legend-swatch.today {
-    background: #111111;
-}
-
-:root[data-theme="dark"] .subsystem-scroll-indicator-rail {
-    background: rgba(191, 218, 255, 0.28);
-}
-
-:root[data-theme="dark"] .subsystem-scroll-indicator-bubble {
-    border-color: rgba(191, 218, 255, 0.25);
-    background: color-mix(in srgb, var(--gov-color-surface) 88%, var(--gov-color-primary) 12%);
-}
-
-:root[data-theme="dark"] .field-invalid {
-    border-color: #ef6f67 !important;
-    box-shadow: inset 0 0 0 1px rgba(239, 111, 103, 0.35) !important;
-}
-
-:root[data-theme="dark"] .app-date-trigger,
-:root[data-theme="dark"] .app-time-trigger {
-    color: #d5e3fb;
-}
-
-:root[data-theme="dark"] .app-date-trigger:disabled,
-:root[data-theme="dark"] .app-time-trigger:disabled {
-    color: #6f809f;
-}
-
-:root[data-theme="dark"] .app-date-panel {
-    background: var(--gov-color-surface);
-    border-color: var(--gov-color-border);
-    box-shadow: var(--gov-shadow-soft);
-}
-
-:root[data-theme="dark"] .app-time-panel {
-    background: var(--gov-color-surface);
-    border-color: var(--gov-color-border);
-    box-shadow: var(--gov-shadow-soft);
-}
-
-:root[data-theme="dark"] .app-date-select {
-    border-color: var(--gov-color-border);
-    background-color: var(--gov-color-surface);
-    color: var(--app-text-primary);
-}
-
-:root[data-theme="dark"] .app-date-nav-btn,
-:root[data-theme="dark"] .app-date-weekdays span,
-:root[data-theme="dark"] .app-date-day {
-    color: #9dc4ff;
-}
-
-:root[data-theme="dark"] .app-date-day.outside {
-    color: #5d7597;
-}
-
-:root[data-theme="dark"] .app-date-day:hover {
-    background: rgba(120, 170, 255, 0.16);
-}
-
-:root[data-theme="dark"] .app-date-day.selected {
-    background: rgba(156, 200, 255, 0.18);
-    color: var(--gov-color-primary);
-}
-
-:root[data-theme="dark"] .app-time-option {
-    background: var(--gov-color-surface);
-    border-color: var(--gov-color-border);
-    color: var(--app-text-primary);
-}
-
-:root[data-theme="dark"] .app-time-option:hover {
-    background: var(--app-nav-hover);
-}
-
-:root[data-theme="dark"] .app-time-option.selected {
-    background: rgba(156, 200, 255, 0.18);
-    border-color: var(--gov-color-primary);
-    color: var(--gov-color-primary);
-}
-
-:root[data-theme="dark"] .filter-shell {
-    background: #16233a;
-    border-color: #2f4264;
-}
-
-:root[data-theme="dark"] .filter-toggle,
-:root[data-theme="dark"] .filter-grid label,
-:root[data-theme="dark"] .filter-inline {
-    color: #d9e5fb;
-}
-
-:root[data-theme="dark"] .active-filter-chip {
-    background: #223552;
-    border-color: #35507a;
-    color: #e6eefc;
-}
-
-:root[data-theme="dark"] .active-filter-chip-remove {
-    color: #b8caea;
-}
-
-:root[data-theme="dark"] .active-filter-chip-remove:hover {
-    background: rgba(230, 238, 252, 0.08);
-    color: #f8fbff;
-}
-
-:root[data-theme="dark"] .filter-actions {
-    border-top-color: #2f4264;
-}
-
-:root[data-theme="dark"] .filter-save-status,
-:root[data-theme="dark"] .profile-preference-status {
-    color: #c7d7f3;
-}
-
-:root[data-theme="dark"] input[type="checkbox"] {
-    accent-color: #84aef7;
-}
-
 /* Sémantika barev kategorií (2026-06-11) — gov tokeny, theme-aware (light/dark).
    Třídy record-cat--* počítá _ZaznamPartial podle názvu i kódu (odolné vůči
    editovatelnému číselníku / CHAR paddingu). Úkol=akce, Informace=info, Rozhodnutí=závěr. */
 .record-cat--task .record-bar {
-    background: var(--gov-color-warning);
+    background: var(--background-status-warning);
 }
 
 .record-cat--info .record-bar {
-    background: var(--gov-color-primary);
+    background: var(--background-primary);
 }
 
 .record-cat--decision .record-bar {
-    background: var(--record-cat-decision);
+    background: var(--app-category-decision);
 }
 
 /* Hotový úkol (finální stav → data-filter-aktivni="false") = zelená (bezpečí/
    hotovo), přebíjí jantarovou kategorie Úkol. Vyšší specificita (class+attr). */
 .record-cat--task[data-filter-aktivni="false"] .record-bar {
-    background: var(--gov-color-success);
+    background: var(--background-status-success);
 }
 
 /* Aktivní úkol PO TERMÍNU (data-record-overdue="true") = červená (urgence),
    přebíjí jantarovou. Hotové úkoly mají overdue=false (počítá se jen pro aktivní),
    takže zelená zůstává. Semafor: zelená=hotovo, jantarová=běží, červená=po termínu. */
 .record-cat--task[data-record-overdue="true"] .record-bar {
-    background: var(--gov-color-accent);
+    background: var(--background-status-error);
 }
 
 @media (max-width: 1220px) {
@@ -7308,7 +6695,7 @@ html {
     display: flex;
     flex-direction: row;
     gap: 0;
-    border-bottom: 2px solid var(--gov-color-border);
+    border-bottom: 2px solid var(--border-subtle);
     margin-bottom: 1.25rem;
 }
 
@@ -7320,18 +6707,18 @@ html {
     background: transparent;
     font-size: 1rem;
     font-weight: 500;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
     cursor: pointer;
     transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 .dashboard-tab:hover {
-    color: var(--gov-color-primary);
+    color: var(--text-primary-color);
 }
 
 .dashboard-tab.active {
-    color: var(--gov-color-primary);
-    border-bottom-color: var(--gov-color-primary);
+    color: var(--text-primary-color);
+    border-bottom-color: var(--border-primary);
     font-weight: 700;
 }
 
@@ -7352,11 +6739,11 @@ html {
 }
 
 .dashboard-kpi-card {
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.85rem;
     padding: 1.25rem 1rem;
     text-align: center;
-    background: var(--gov-color-surface);
+    background: var(--background-block-primary);
 }
 
 .dashboard-kpi-card .kpi-value {
@@ -7364,13 +6751,13 @@ html {
     font-size: 1.75rem;
     font-weight: 700;
     line-height: 1.2;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
 }
 
 .dashboard-kpi-card .kpi-label {
     display: block;
     font-size: 0.8125rem;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     margin-top: 0.25rem;
 }
 
@@ -7383,11 +6770,11 @@ html {
 }
 
 .kpi-trend-up {
-    color: #16a34a;
+    color: var(--text-status-success);
 }
 
 .kpi-trend-down {
-    color: #dc2626;
+    color: var(--text-status-error);
 }
 
 /* Category badges (.badge-danger / .badge-warning / .badge-caution) odstraněny
@@ -7400,13 +6787,13 @@ html {
 }
 
 .dashboard-expandable-row:hover td {
-    background: rgba(0, 43, 73, 0.04);
+    background: var(--background-block-secondary);
 }
 
 .dashboard-step-detail {
     display: none;
     padding: 0.75rem 1rem;
-    background: rgba(0, 43, 73, 0.02);
+    background: var(--background-neutral-subtlest);
 }
 
 .dashboard-step-detail.expanded {
@@ -7424,25 +6811,25 @@ html {
 
 .dashboard-category-filter {
     padding: 6px 14px;
-    border: 1px solid var(--gov-color-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 999px;
-    background: var(--gov-color-surface);
+    background: var(--background-block-primary);
     font-size: 0.875rem;
     font-weight: 500;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
 .dashboard-category-filter:hover {
-    border-color: var(--gov-color-primary);
-    color: var(--gov-color-primary);
+    border-color: var(--border-primary);
+    color: var(--text-primary-color);
 }
 
 .dashboard-category-filter.active {
-    border-color: var(--gov-color-primary);
-    background: var(--gov-color-primary);
-    color: #fff;
+    border-color: var(--border-primary);
+    background: var(--background-primary);
+    color: var(--text-white-fixed);
 }
 
 /* Placeholder message */
@@ -7450,7 +6837,7 @@ html {
 .dashboard-placeholder-message {
     padding: 2.5rem 1rem;
     text-align: center;
-    color: var(--gov-color-muted);
+    color: var(--text-secondary);
     font-size: 0.9375rem;
 }
 
@@ -7461,16 +6848,16 @@ html {
     min-width: 100px;
     min-height: 36px;
     border-radius: var(--gov-radius-sm);
-    border: 1px solid var(--gov-color-border);
-    background: var(--gov-color-surface);
-    background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
+    border: 1px solid var(--border-subtle);
+    background: var(--background-block-primary);
+    background-image: linear-gradient(45deg, transparent 50%, var(--icon-neutral) 50%), linear-gradient(135deg, var(--icon-neutral) 50%, transparent 50%);
     background-position: calc(100% - 19px) 14px, calc(100% - 13px) 14px;
     background-size: 6px 6px, 6px 6px;
     background-repeat: no-repeat;
     appearance: none;
     padding: 6px 34px 6px 12px;
     font-size: 0.9375rem;
-    color: var(--app-text-primary);
+    color: var(--text-primary);
     cursor: pointer;
 }
 
@@ -7636,7 +7023,7 @@ html {
 .dashboard-panel-footer {
     flex: 0 0 auto;
     padding: var(--d-gap-item) var(--d-pad-card);
-    border-top: 1px solid var(--gov-color-border);
+    border-top: 1px solid var(--border-subtle);
     display: flex;
     justify-content: flex-end;
     gap: 8px;
@@ -7774,7 +7161,7 @@ pm-button gov-icon {
 /* Segmentovaný přepínač Graf/Tabulka. */
 .schedule-view-switch {
     display: flex;
-    border: 1px solid var(--pm-border);
+    border: 1px solid var(--border-subtle);
     border-radius: 6px;
     overflow: hidden;
 }
@@ -7789,7 +7176,7 @@ pm-button gov-icon {
 }
 
 .schedule-view-switch-btn[aria-pressed="true"] {
-    background: rgba(37, 99, 235, 0.12);
+    background: var(--background-primary-subtlest);
     font-weight: 600;
 }
 

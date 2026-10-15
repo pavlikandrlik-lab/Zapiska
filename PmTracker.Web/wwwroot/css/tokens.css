@@ -14,48 +14,32 @@
  */
 
 :root {
-    /* Barvy — semantické aliasy */
-    --pm-color-primary: var(--color-primary-600, #005ea5);
-    --pm-color-primary-strong: var(--color-primary-700, #003d6b);
-    --pm-color-primary-soft: var(--color-primary-100, #e6f0f9);
-    --pm-color-success: var(--color-success-600, #00703c);
-    --pm-color-warning: var(--color-warning-600, #b25000);
-    --pm-color-error: var(--color-error-600, #d4351c);
-    --pm-color-neutral: var(--color-secondary-500, #626262);
-
-    --pm-color-text: var(--text-primary, #1d1d1b);
-    /* gov DS 4.2.7 nemá --text-subtle; používáme --text-secondary jako nejbližší */
-    --pm-color-text-muted: var(--text-secondary, #505050);
-    --pm-color-background: var(--background-page, #ffffff);
-    --pm-color-surface: var(--background-neutral-subtle, #f5f5f5);
-    --pm-color-border: var(--border-subtle, #d0d0d0);
-
     /* Spacing — 4pt grid vycházející z gov */
     /* gov DS 4.2.7 nemá --spacing-3xs; ponecháváme hardcoded fallback */
     --pm-spacing-3xs: 2px;
-    --pm-spacing-2xs: var(--spacing-2xs, 4px);
-    --pm-spacing-xs: var(--spacing-xs, 8px);
-    --pm-spacing-s: var(--spacing-s, 12px);
-    --pm-spacing-m: var(--spacing-m, 16px);
-    --pm-spacing-l: var(--spacing-l, 24px);
-    --pm-spacing-xl: var(--spacing-xl, 32px);
-    --pm-spacing-2xl: var(--spacing-2xl, 48px);
-    --pm-spacing-3xl: var(--spacing-3xl, 64px);
+    --pm-spacing-2xs: var(--spacing-2xs);
+    --pm-spacing-xs: var(--spacing-xs);
+    --pm-spacing-s: var(--spacing-s);
+    --pm-spacing-m: var(--spacing-m);
+    --pm-spacing-l: var(--spacing-l);
+    --pm-spacing-xl: var(--spacing-xl);
+    --pm-spacing-2xl: var(--spacing-2xl);
+    --pm-spacing-3xl: var(--spacing-3xl);
 
     /* Radius — gov DS 4.2.7 používá prefix --corner-radius-*, ne --radius-* */
-    --pm-radius-s: var(--corner-radius-s, 4px);
-    --pm-radius-m: var(--corner-radius-m, 6px);
-    --pm-radius-l: var(--corner-radius-l, 12px);
+    --pm-radius-s: var(--corner-radius-s);
+    --pm-radius-m: var(--corner-radius-m);
+    --pm-radius-l: var(--corner-radius-l);
     --pm-radius-round: 9999px;
 
     /* Typografie */
-    --pm-font-family-body: var(--font-family, system-ui, -apple-system, "Segoe UI", sans-serif);
-    --pm-font-family-display: var(--font-family, system-ui, -apple-system, "Segoe UI", sans-serif);
-    --pm-font-size-xs: var(--font-size-body-xs, 12px);
-    --pm-font-size-s: var(--font-size-body-s, 14px);
-    --pm-font-size-m: var(--font-size-body-m, 16px);
-    --pm-font-size-l: var(--font-size-body-l, 18px);
-    --pm-font-size-xl: var(--font-size-headline-s, 24px);
+    --pm-font-family-body: var(--font-family);
+    --pm-font-family-display: var(--font-family);
+    --pm-font-size-xs: var(--font-size-body-xs);
+    --pm-font-size-s: var(--font-size-body-s);
+    --pm-font-size-m: var(--font-size-body-m);
+    --pm-font-size-l: var(--font-size-body-l);
+    --pm-font-size-xl: var(--font-size-headline-s);
     /* gov DS nemá --font-weight-* tokeny; ponecháváme hardcoded hodnoty */
     --pm-font-weight-normal: 400;
     --pm-font-weight-medium: 500;
@@ -78,4 +62,53 @@
     --pm-z-overlay: 500;
     --pm-z-modal: 1000;
     --pm-z-toast: 2000;
+}
+
+/* ---------------------------------------------------------
+ * Aplikační barvy (2026-10-15)
+ * Barvy aplikace jsou sémantické tokeny gov DS 4.7.0 (--background-*, --text-*,
+ * --border-*, --icon-*, --status-*), které přepíná gov podle data-theme.
+ * Sem patří jen barvy, které gov nemá. Tohle je jediný soubor aplikace, který
+ * smí obsahovat data-theme a barevné literály (hlídá AppCssColorTokenTests).
+ * --------------------------------------------------------- */
+:root {
+    /* Stíny — gov DS nemá tokeny stínů. */
+    --app-shadow-soft: 0 2px 8px rgba(11, 12, 12, 0.08);
+    --app-shadow-raised: 0 8px 24px rgba(11, 12, 12, 0.14);
+
+    /* Kategorie Rozhodnutí — fialová mimo gov paletu, odlišná od semaforu úkolů
+       (zelená/oranžová/červená) a modré Informace. Viz docs/wiki/projekty/zaznamy/barvy-karet.md. */
+    --app-category-decision: #7c3aed;
+    --app-category-decision-subtle: #f3e8ff;
+
+    /* Harmonogram — duhová paleta kroků a skluz (dříve v site.css :root). */
+    --app-schedule-step-1: #ef4444;
+    --app-schedule-step-2: #f97316;
+    --app-schedule-step-3: #f59e0b;
+    --app-schedule-step-4: #84cc16;
+    --app-schedule-step-5: #22c55e;
+    --app-schedule-step-6: #14b8a6;
+    --app-schedule-step-7: #06b6d4;
+    --app-schedule-step-8: #3b82f6;
+    --app-schedule-step-9: #6366f1;
+    --app-schedule-step-10: #8b5cf6;
+    --app-schedule-step-11: #d946ef;
+    --app-schedule-delay: #dc2626;
+
+    /* Překryvy pruhů harmonogramu. Pruhy mají barvy z Excelu (HarmonogramKroky.cs),
+       stejné v obou motivech — proto i tyto hodnoty jsou v obou motivech stejné. */
+    --app-schedule-stripe: rgba(255, 255, 255, 0.55);
+    --app-schedule-segment-inner: rgba(255, 255, 255, 0.35);
+    --app-schedule-segment-edge: rgba(15, 23, 42, 0.42);
+    --app-schedule-segment-outline: rgba(15, 23, 42, 0.18);
+}
+
+:root[data-theme="dark"] {
+    /* Nativní ovládací prvky (select, datum, čas, posuvníky) v tmavém provedení. */
+    color-scheme: dark;
+
+    --app-shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.28);
+    --app-shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --app-category-decision: #c4b5fd;
+    --app-category-decision-subtle: #2e1065;
 }

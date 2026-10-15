@@ -54,14 +54,14 @@ public sealed class JednaniIndexSidebarTests
     }
 
     [Fact]
-    public void JednaniIndexCss_ShouldUsePmTokens()
+    public void JednaniIndexCss_ShouldUseGovTokens()
     {
         var css = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/css/site.css"));
         css.Should().MatchRegex(
             @"\.meeting-project-overview\s*\{[\s\S]*?grid-template-columns\s*:\s*minmax\(\s*260px\s*,\s*300px\s*\)\s+1fr",
             "2-sloupcový grid 260-300px sidebar + fluid meetings");
-        css.Should().Contain("--pm-color-primary",
-            "styly využívají --pm-* tokeny (ne hardcoded barvy)");
+        css.Should().MatchRegex(@"\.meeting-project-overview__zkratka\s*\{[^}]*background:\s*var\(--background-primary\)",
+            "styly využívají gov tokeny (ne hardcoded barvy, 2026-10-15)");
     }
 
     [Fact]

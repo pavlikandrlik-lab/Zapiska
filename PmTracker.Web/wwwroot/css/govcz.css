@@ -1,55 +1,8 @@
 :root {
-    --gov-color-primary: #005ea5;
-    --gov-color-primary-strong: #003d6b;
-    --gov-color-accent: #d4351c;
-    --gov-color-success: #00703c;
-    --gov-color-warning: #b58800;
-    --gov-color-muted: #505a5f;
-    --gov-color-border: #b1b4b6;
-    --gov-color-bg: #f3f2f1;
-    --gov-color-surface: #ffffff;
-    /* Barva kategorie Rozhodnutí (mimo gov paletu — fialová, distinktní od
-       semaforu úkolů a modré Informace). Dark varianta níže. */
-    --record-cat-decision: #7c3aed;
-    --gov-shadow-soft: 0 2px 8px rgba(11, 12, 12, 0.08);
     --gov-radius: 8px;
     --gov-radius-sm: 6px;
     --gov-radius-lg: 12px;
     --gov-font: "Roboto", Arial, Helvetica, sans-serif;
-    --app-bg-start: #f3f2f1;
-    --app-bg-mid: #f3f2f1;
-    --app-bg-end: #f3f2f1;
-    --app-nav-hover: #f3f2f1;
-    --app-nav-active-bg: #ffffff;
-    --app-nav-active-border: #005ea5;
-    --app-text-primary: #0b0c0c;
-    --app-muted: #505a5f;
-}
-
-:root[data-theme="dark"] {
-    --gov-color-primary: #9cc8ff;
-    --gov-color-primary-strong: #c2ddff;
-    --gov-color-accent: #ff8a75;
-    --gov-color-success: #7ed9a6;
-    --gov-color-warning: #f5cf67;
-    --gov-color-muted: #a7b0ba;
-    --gov-color-border: #47515b;
-    --gov-color-bg: #0f1419;
-    --gov-color-surface: #1b2128;
-    /* Rozhodnutí — světlejší fialová pro kontrast na tmavém pozadí. */
-    --record-cat-decision: #c4b5fd;
-    --gov-shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.28);
-    --gov-radius: 8px;
-    --gov-radius-sm: 6px;
-    --gov-radius-lg: 12px;
-    --app-bg-start: #0f1419;
-    --app-bg-mid: #0f1419;
-    --app-bg-end: #0f1419;
-    --app-nav-hover: #25303b;
-    --app-nav-active-bg: #1b2128;
-    --app-nav-active-border: #9cc8ff;
-    --app-text-primary: #f3f5f7;
-    --app-muted: #a7b0ba;
 }
 
 * {
@@ -59,8 +12,8 @@
 body {
     margin: 0;
     font-family: var(--gov-font);
-    color: var(--app-text-primary);
-    background: var(--gov-color-bg);
+    color: var(--text-primary);
+    background: var(--background-page);
     line-height: 1.5;
     text-rendering: optimizeLegibility;
 }

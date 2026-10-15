@@ -50,17 +50,17 @@
   text-align: left;
   cursor: pointer;
   color: inherit;
-  background: var(--gov-color-surface);
-  border: 1px solid var(--gov-color-border);
+  background: var(--background-block-primary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--gov-radius);
-  box-shadow: var(--gov-shadow-soft);
+  box-shadow: var(--app-shadow-soft);
   /* Ať proužek kopíruje zaoblení karty. */
   overflow: hidden;
 }
 
-.vyzvy-tile-bar { flex: 0 0 6px; width: 6px; background: var(--gov-color-muted); }
-.vyzvy-tile--priprava .vyzvy-tile-bar { background: var(--gov-color-warning); }
-.vyzvy-tile--odeslano .vyzvy-tile-bar { background: var(--gov-color-success); }
+.vyzvy-tile-bar { flex: 0 0 6px; width: 6px; background: var(--background-neutral-disabled); }
+.vyzvy-tile--priprava .vyzvy-tile-bar { background: var(--background-status-warning); }
+.vyzvy-tile--odeslano .vyzvy-tile-bar { background: var(--background-status-success); }
 
 .vyzvy-tile-body {
   flex: 1;
@@ -73,28 +73,28 @@
 
 .vyzvy-tile-head { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .vyzvy-tile-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vyzvy-tile-count { font-size: 0.8125rem; color: var(--gov-color-muted); }
+.vyzvy-tile-count { font-size: 0.8125rem; color: var(--text-secondary); }
 
-.vyzvy-tile:hover { border-color: var(--gov-color-primary); }
+.vyzvy-tile:hover { border-color: var(--border-primary); }
 
 /* Vybraná dlaždice: primární rámeček (zdvojený vnitřním stínem, ať neposkakuje layout)
    a podbarvení. */
 .vyzvy-tile.is-selected {
-  border-color: var(--gov-color-primary);
-  background: var(--gov-color-bg);
-  box-shadow: inset 0 0 0 1px var(--gov-color-primary);
+  border-color: var(--border-primary);
+  background: var(--background-page);
+  box-shadow: inset 0 0 0 1px var(--border-primary);
 }
 
 .vyzvy-tile.is-drag-over {
   border-style: dashed;
-  border-color: var(--gov-color-primary);
-  background: var(--gov-color-bg);
+  border-color: var(--border-primary);
+  background: var(--background-page);
 }
 
 .vyzvy-content { min-width: 0; }
 .vyzvy-pane-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.75rem; margin-bottom: 0.75rem; }
 .vyzvy-pane-title { margin: 0; font-size: 1rem; font-weight: 600; }
-.vyzvy-pane-meta { font-size: 0.8125rem; color: var(--gov-color-muted); }
+.vyzvy-pane-meta { font-size: 0.8125rem; color: var(--text-secondary); }
 .vyzvy-pane-empty { padding: 0.75rem 0; }
 
 /* Patička panelu: součet a tisk vpravo dole. */
@@ -106,7 +106,7 @@
   gap: 0.75rem;
   margin-top: 1rem;
   padding-top: 0.75rem;
-  border-top: 1px solid var(--gov-color-border);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .vyzvy-pane-soucet { margin: 0; }
@@ -118,9 +118,9 @@
   display: inline-flex;
   align-items: center;
   padding: 0.35rem 0.75rem;
-  border: 1px solid var(--gov-color-border);
-  border-radius: var(--gov-radius-sm, 4px);
-  background: var(--gov-color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--gov-radius-sm);
+  background: var(--background-block-primary);
   color: inherit;
   font-size: 0.875rem;
   font-weight: 600;
@@ -128,11 +128,11 @@
   cursor: pointer;
 }
 
-.vyzvy-pane-footer a:hover { border-color: var(--gov-color-primary); }
+.vyzvy-pane-footer a:hover { border-color: var(--border-primary); }
 
 .vyzvy-pane-footer a[data-vyzva-word] {
-  border-color: var(--gov-color-primary);
-  box-shadow: inset 0 0 0 1px var(--gov-color-primary);
+  border-color: var(--border-primary);
+  box-shadow: inset 0 0 0 1px var(--border-primary);
 }
 
 /* Karta PNF — stejný jazyk jako dlaždice výzvy, dva řádky. */
@@ -142,14 +142,14 @@
 .vyzvy-pnf {
   display: flex;
   align-items: stretch;
-  background: var(--gov-color-surface);
-  border: 1px solid var(--gov-color-border);
+  background: var(--background-block-primary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--gov-radius);
-  box-shadow: var(--gov-shadow-soft);
+  box-shadow: var(--app-shadow-soft);
   overflow: hidden;
 }
 
-.vyzvy-pnf-bar { flex: 0 0 6px; width: 6px; background: var(--gov-color-muted); }
+.vyzvy-pnf-bar { flex: 0 0 6px; width: 6px; background: var(--background-neutral-disabled); }
 
 .vyzvy-pnf-body {
   flex: 1;
@@ -161,9 +161,9 @@
 }
 
 .vyzvy-pnf-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.45rem; font-weight: 600; }
-.vyzvy-pnf-cislo { font-family: var(--pm-font-mono, monospace); }
+.vyzvy-pnf-cislo { font-family: var(--pm-font-mono); }
 .vyzvy-pnf-nazev { min-width: 0; font-weight: 400; overflow-wrap: anywhere; }
-.vyzvy-pnf-meta { font-size: 0.8125rem; color: var(--gov-color-muted); }
+.vyzvy-pnf-meta { font-size: 0.8125rem; color: var(--text-secondary); }
 .vyzvy-pnf-cena { font-variant-numeric: tabular-nums; }
 
 .vyzvy-pnf[draggable="true"] { cursor: grab; }
@@ -179,11 +179,11 @@
   white-space: nowrap;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--app-text-primary);
-  background: var(--gov-color-surface);
-  border: 1px solid var(--gov-color-primary);
+  color: var(--text-primary);
+  background: var(--background-block-primary);
+  border: 1px solid var(--border-primary);
   border-radius: var(--gov-radius-sm);
-  box-shadow: var(--gov-shadow-soft);
+  box-shadow: var(--app-shadow-soft);
 }
 
 .vyzvy-drag-chip[hidden] { display: none; }
@@ -192,7 +192,7 @@
 .vyzvy-zaznam { margin-bottom: 1.25rem; }
 .vyzvy-zaznam-hlavicka { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; margin: 0 0 0.5rem; font-size: 0.95rem; }
 .vyzvy-zaznam-cislo { font-weight: 700; }
-.vyzvy-zaznam-nazev { color: var(--gov-color-muted); }
+.vyzvy-zaznam-nazev { color: var(--text-secondary); }
 
 /* Měnič stavu v hlavičce panelu. Uzavření má vlastní tlačítko v liště, tohle menu
    pokrývá zbylé přechody (zrušení, znovuotevření). */
@@ -206,10 +206,10 @@
   margin: 0.25rem 0 0;
   padding: 0.25rem;
   list-style: none;
-  background: var(--gov-color-surface);
-  border: 1px solid var(--gov-color-border);
+  background: var(--background-block-primary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--gov-radius-sm);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+  box-shadow: var(--app-shadow-raised);
 }
 .vyzvy-stav-menu-list > li::before { content: none !important; }
 .vyzvy-stav-menu.open .vyzvy-stav-menu-list { display: block; }
@@ -217,10 +217,10 @@
   display: block; width: 100%; text-align: left;
   border: 0; background: transparent; padding: 0.4rem 0.6rem; cursor: pointer; color: inherit;
 }
-.vyzvy-stav-menu-list button:hover { background: var(--gov-color-bg); }
+.vyzvy-stav-menu-list button:hover { background: var(--background-page); }
 
 .vyzvy-switch-wrap { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
-.vyzvy-switch-status { font-size: 0.8125rem; color: var(--gov-color-muted); }
+.vyzvy-switch-status { font-size: 0.8125rem; color: var(--text-secondary); }
 
 /* Kontextové menu ⋯ u karty PNF. Panel se za běhu mountuje do #floating-panel-root,
    takže tady jen jeho vzhled — pozicování řeší ui/floating.js. */
@@ -231,18 +231,18 @@
   cursor: pointer;
   padding: 0.2rem 0.35rem;
   line-height: 1;
-  color: var(--gov-color-muted);
+  color: var(--text-secondary);
   border-radius: 4px;
 }
-.vyzvy-pnf-dots:hover { background: var(--gov-color-bg); }
+.vyzvy-pnf-dots:hover { background: var(--background-page); }
 
 .vyzvy-pnf-menu-panel {
   min-width: 220px;
   padding: 0.25rem;
-  background: var(--gov-color-surface);
-  border: 1px solid var(--gov-color-border);
+  background: var(--background-block-primary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--gov-radius-sm);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+  box-shadow: var(--app-shadow-raised);
 }
 .vyzvy-pnf-menu-item {
   display: block;
@@ -255,4 +255,4 @@
   color: inherit;
   border-radius: 4px;
 }
-.vyzvy-pnf-menu-item:hover { background: var(--gov-color-bg); }
+.vyzvy-pnf-menu-item:hover { background: var(--background-page); }

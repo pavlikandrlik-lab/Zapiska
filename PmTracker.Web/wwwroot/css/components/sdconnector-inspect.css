@@ -13,7 +13,7 @@
 }
 
 .sdc-inspect__subtitle {
-    color: var(--gov-color-text-secondary, #475467);
+    color: var(--text-secondary);
     margin-bottom: 0.5rem;
 }
 
@@ -52,16 +52,16 @@
 }
 
 .sdc-inspect__status[data-kind="error"] {
-    color: var(--gov-color-danger, #dc2626);
+    color: var(--text-status-error);
 }
 
 .sdc-inspect__status[data-kind="ok"] {
-    color: var(--gov-color-success, #16a34a);
+    color: var(--text-status-success);
 }
 
 .sdc-inspect__header-box {
     padding: 0.75rem 1rem;
-    background: var(--gov-color-neutral-bg, #f2f4f7);
+    background: var(--background-neutral-subtlest);
     border-radius: 0.5rem;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.9rem;
@@ -95,8 +95,8 @@
 }
 
 .sdc-inspect__raw-col pre {
-    background: #0f172a;
-    color: #e2e8f0;
+    background: var(--background-neutral-secondary);
+    color: var(--text-white-fixed);
     padding: 1rem;
     overflow: auto;
     font-size: 0.85rem;
@@ -130,9 +130,9 @@
 
 .sdc-friendly-bubble {
     padding: 0.75rem 1rem;
-    border: 1px solid var(--gov-color-neutral-border, #d0d5dd);
+    border: 1px solid var(--border-subtle);
     border-radius: 0.5rem;
-    background: #fff;
+    background: var(--background-block-primary);
 }
 
 .sdc-friendly-bubble__header {
@@ -140,23 +140,23 @@
     gap: 0.5rem;
     align-items: baseline;
     font-size: 0.85rem;
-    color: var(--gov-color-text-secondary, #475467);
+    color: var(--text-secondary);
     flex-wrap: wrap;
 }
 
 .sdc-friendly-bubble__classification {
     padding: 0.15rem 0.5rem;
     border-radius: 0.25rem;
-    background: var(--gov-color-primary-bg, #dbeafe);
-    color: var(--gov-color-primary, #1e40af);
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
     font-size: 0.75rem;
     font-weight: 600;
     margin-left: auto;
 }
 
 .sdc-friendly-bubble__classification[data-predicate="None"] {
-    background: var(--gov-color-neutral-bg, #f2f4f7);
-    color: var(--gov-color-text-secondary, #475467);
+    background: var(--background-neutral-subtlest);
+    color: var(--text-secondary);
 }
 
 .sdc-friendly-bubble__plain {

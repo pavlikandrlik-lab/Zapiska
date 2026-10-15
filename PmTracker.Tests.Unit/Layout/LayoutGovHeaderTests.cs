@@ -117,7 +117,7 @@ public sealed class LayoutGovHeaderTests
         // Kořeny sekcí nemají drobečkovou lištu (uživatel 2026-10-07); čára pod menu proto
         // patří hlavičce, jinak by obsah splynul s menu. Lišta si nechává jen spodní čáru.
         var css = SiteCssBezKomentaru();
-        Block(css, ".gov-header").Should().Contain("border-bottom: 1px solid var(--pm-border)");
+        Block(css, ".gov-header").Should().Contain("border-bottom: 1px solid var(--border-subtle)");
         Block(css, ".app-breadcrumb-bar").Should().NotContain("border-top");
     }
 }
