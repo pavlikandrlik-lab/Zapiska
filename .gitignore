@@ -65,3 +65,7 @@ PmTracker.Web/appsettings.Production.json
 SD_servicedesk/
 PmTracker.archimate
 PmTracker.Web/wwwroot/pm-modal-harness.html
+
+# Referenční zdroják ze ServiceDesku (výpočet penalizace NES/PMP/PNF) — jen podklad
+# pro přenos algoritmu do PM Trackeru, neverzovat (uživatel 2026-10-15).
+/Hotline.cs
