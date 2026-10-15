@@ -55,7 +55,7 @@ public sealed class ThemePaletteAuditTests
         await page.Context.CloseAsync();
     }
 
-    /// <summary>Vlastní běžící úkol s harmonogramem a otevřené jednání (vzor RecordDetailPageScenariosTests).</summary>
+    /// <summary>Vlastní běžící úkol s harmonogramem a jednání projektu (vzor RecordDetailPageScenariosTests).</summary>
     private async Task<(int RecordId, int MeetingId)> SeedRecordAndMeetingAsync()
     {
         await using var connection = new SqlConnection(_fixture.Database.ConnectionString);
@@ -99,12 +99,15 @@ public sealed class ThemePaletteAuditTests
                 END
             END
 
-            DECLARE @mid INT = (SELECT TOP (1) id FROM dbo.jednani WHERE projekt_id = @p AND cislo_jednani = 9941);
+            -- Detail jednání: stačí jakékoli jednání projektu. Vlastní se zakládá jen když žádné není,
+            -- a to se starým datem a nízkým číslem — nové „nejnovější“ jednání by na přehledu /Jednani
+            -- odsunulo jednání jiných scénářů do sbalené historie (BreadcrumbBackOriginScenariosTests).
+            DECLARE @mid INT = (SELECT TOP (1) id FROM dbo.jednani WHERE projekt_id = @p ORDER BY id);
             IF @mid IS NULL
             BEGIN
                 DECLARE @stateId INT = (SELECT TOP (1) id FROM dbo.ciselnik_stavu_jednani WHERE kod = N'OPEN');
                 INSERT INTO dbo.jednani (projekt_id, cislo_jednani, datum_planovane, cas_zacatek, misto, stav_jednani_id)
-                VALUES (@p, 9941, CONVERT(DATE, GETDATE()), '09:00', @marker, @stateId);
+                VALUES (@p, 9701, DATEADD(day, -400, CONVERT(DATE, GETDATE())), '09:00', @marker, @stateId);
                 SET @mid = CAST(SCOPE_IDENTITY() AS INT);
             END
 
