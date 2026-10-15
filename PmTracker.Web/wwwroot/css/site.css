@@ -134,7 +134,7 @@
 .app-search-item:focus,
 .app-search-item.is-active,
 .app-search-item[aria-selected="true"] {
-    background: var(--background-block-primary);
+    background: var(--background-block-secondary);
 }
 
 /* 80 / 20 — text vlevo, metadata vpravo. */
@@ -1578,7 +1578,7 @@ mark.app-search-flash.app-search-flash--fading {
 
 .project-card:hover {
     border-color: var(--border-primary);
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
 }
 
 .project-card:focus-visible,
@@ -2303,7 +2303,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .project-menu-lock:hover {
     color: var(--text-primary-color);
-    background: var(--background-block-primary);
+    background: var(--background-block-secondary);
 }
 
 /* Ikona reflektuje stav; hover ukáže opačnou (afordance přepnutí). Literal name kvůli
@@ -4931,7 +4931,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .active-filter-chip-remove:hover {
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
     color: var(--text-primary);
 }
 
@@ -6494,7 +6494,7 @@ pm-tab-panel.sync-tab-panel-content[active] {
 
 .preference-row-remove:hover {
     color: var(--text-status-error);
-    background: var(--background-block-primary);
+    background: var(--background-block-secondary);
 }
 
 .profile-rights-filters {
@@ -6787,7 +6787,7 @@ html {
 }
 
 .dashboard-expandable-row:hover td {
-    background: var(--background-neutral-subtlest);
+    background: var(--background-block-secondary);
 }
 
 .dashboard-step-detail {

@@ -114,4 +114,22 @@ public sealed class AppCssColorTokenTests
 
         offenders.Should().BeEmpty("roh záložky musí mít barvu panelu (--background-block-*)");
     }
+
+    /// <summary>
+    /// Hover na ploše bloku: v tmavém motivu je --background-neutral-subtlest = --background-block-primary
+    /// (38,38,38), hover by splynul. Plocha pod kurzorem patří --background-block-secondary (gov: 246 / 69).
+    /// </summary>
+    [Fact]
+    public void HoverStates_DoNotUseColorsEqualToBlockSurfaceInDarkTheme()
+    {
+        var offenders = AppCss.AppCssFiles()
+            .SelectMany(AppCss.Declarations)
+            .Where(d => Regex.IsMatch(d.Selector, @":hover|:focus|is-active|aria-selected"))
+            .Where(d => d.Property.StartsWith("background", StringComparison.Ordinal))
+            .Where(d => Regex.IsMatch(d.Value, @"var\(--background-(neutral-subtlest|block-primary)\)"))
+            .Select(d => $"{d.File}:{d.Line} {d.Selector}")
+            .ToList();
+
+        offenders.Should().BeEmpty("hover musí být v obou motivech vidět");
+    }
 }
