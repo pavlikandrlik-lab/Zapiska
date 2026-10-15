@@ -42,5 +42,6 @@ Pravidla:
 
 ## Tmavý režim
 
-Barvy používají design tokeny gov-design-system (`--gov-color-*`), takže se
-automaticky přizpůsobí světlému i tmavému režimu (zůstávají čitelné na obou pozadích).
+Barvy používají sémantické tokeny gov DS (`--text-status-*`, `--background-primary` …), které se
+v tmavém režimu přepnou samy, takže zůstávají čitelné na obou pozadích. Fialová Rozhodnutí je
+aplikační token `--app-category-decision` se světlou a tmavou variantou.

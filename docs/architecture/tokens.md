@@ -1,43 +1,52 @@
-# Design tokens
+# Design tokeny
 
-Aplikační CSS proměnné (`--pm-*`) jsou aliasy nad gov-design-system tokeny
-(`--color-*`, `--spacing-*`, atd. — gov DS NEpoužívá prefix `--gov-`).
-Zdroj: `PmTracker.Web/wwwroot/css/tokens.css`.
+**Barvy** jsou sémantické tokeny gov DS 4.7.0 (DS FIS v1.0.0), které gov sám přepíná podle
+`data-theme` (světlý / tmavý motiv). Zdroj: `PmTracker.Web/wwwroot/assets/gov/styles/tokens.css`
+(1:1 kopie kitu, needituje se). Aplikace nemá vlastní paletu ani tmavá pravidla (od 2026-10-15).
+
+**Ostatní tokeny** (spacing, radius, typografie, z-index) jsou aliasy `--pm-*` nad gov tokeny
+v `PmTracker.Web/wwwroot/css/tokens.css`.
 
 ## Pravidla
 
-1. Žádné hardcoded hodnoty v CSS — barva, spacing, radius, font-size → vždy token
-2. Používej `--pm-*`, ne přímé `--color-*` v aplikačním CSS — `--pm-*` izoluje aplikaci od gov upgrade
-3. Breakpointy v media queries jsou číselně shodné s gov DS
-4. Z-index vždy z `--pm-z-*` stacku, nikdy ad-hoc číslo
+1. Barva = sémantický gov token (`--background-*`, `--text-*`, `--border-*`, `--icon-*`, `--status-*`). Žádný hex, `rgb()`, `color-mix()` ani záložní hodnota `var(--x, #hex)`.
+2. Co gov nemá, je aplikační token `--app-*` definovaný jen v `css/tokens.css` (jediný soubor s `data-theme` a barevnými literály).
+3. Žádné pravidlo `:root[data-theme="dark"] .x` — tmavý motiv přepínají tokeny.
+4. Hlavička (`.gov-header`, logo, název, účet, pole hledání) se nestyluje — je zmražená.
+5. Breakpointy v media queries jsou číselně shodné s gov DS; z-index vždy z `--pm-z-*` stacku.
 
-## Kategorie tokenů
+## Kdy který token
 
-### Barvy
+| Co | Token |
+|---|---|
+| Pozadí stránky | `--background-page` |
+| Karta, panel, input, dropdown | `--background-block-primary` |
+| Zvýrazněná / vedlejší plocha, hover na ploše bloku | `--background-block-secondary` |
+| Jemná šedá plocha (řádek, placeholder) | `--background-neutral-subtlest` / `--background-neutral-subtle` |
+| Světle modrá plocha (odznak, vybraný řádek) | `--background-primary-subtlest` / `--background-primary-subtle` |
+| Plná modrá (tlačítko, štítek TERMÍN) | `--background-primary` + text `--text-white-fixed` |
+| Hlavní / vedlejší / tlumený text | `--text-primary` / `--text-secondary` / `--text-tertiary` |
+| Odkaz, modrý text | `--text-primary-color` |
+| Rámeček / jemný oddělovač / výrazný rámeček | `--border-subtle` / `--border-subtlest` / `--border-primary` |
+| Chyba, úspěch, upozornění | `--text-status-*`, `--background-status-*(-subtlest)`, `--border-error/success/warning` |
+| Fokus | `--status-focus` |
+| Ikona | `--icon-default` / `--icon-neutral` |
+
+### Aplikační tokeny (`css/tokens.css`)
 
 | Token | Význam |
 |---|---|
-| `--pm-color-primary` | Hlavní akční barva |
-| `--pm-color-primary-strong` | Hover state |
-| `--pm-color-primary-soft` | Pozadí primárních prvků |
-| `--pm-color-success` | Úspěch / OK stav |
-| `--pm-color-warning` | Upozornění |
-| `--pm-color-error` | Chyba / destruktivní |
-| `--pm-color-text` | Hlavní text |
-| `--pm-color-text-muted` | Sekundární text |
-| `--pm-color-background` | Pozadí stránky |
-| `--pm-color-surface` | Pozadí karty / panelu |
-| `--pm-color-border` | Hraniční linie |
+| `--app-shadow-soft`, `--app-shadow-raised` | Stíny (gov nemá tokeny stínů); v tmavém motivu silnější |
+| `--app-category-decision(-subtle)` | Fialová kategorie **Rozhodnutí** (gov barvy jsou obsazené semaforem úkolů). Viz [Barvy karet záznamů](../wiki/projekty/zaznamy/barvy-karet.md). |
+| `--app-schedule-step-1…11`, `--app-schedule-delay` | Duhová paleta kroků a skluz |
+| `--app-schedule-stripe`, `-segment-inner`, `-segment-edge`, `-segment-outline` | Překryvy pruhů harmonogramu; pruhy mají barvy z Excelu (`HarmonogramKroky.cs`), stejné v obou motivech |
 
-#### Feature barvy (mimo obecnou paletu)
+## Kontroly
 
-| Token | Význam |
-|---|---|
-| `--record-cat-decision` | Barva kategorie **Rozhodnutí** u karet záznamů (fialová — `#7c3aed` light / `#c4b5fd` dark; theme-aware). Mimo gov paletu, protože gov barvy jsou obsazené semaforem úkolů. Zdroj: `govcz.css`. Viz [Barvy karet záznamů](../wiki/projekty/zaznamy/barvy-karet.md). |
+- `AppCssColorTokenTests` (Unit): žádná stará proměnná, žádná nedefinovaná proměnná v barvě, žádný barevný literál mimo `tokens.css`, žádný `data-theme` mimo `tokens.css`, rohy záložek a hover vidět v obou motivech.
+- `ThemePaletteAuditTests` (E2E): na 10 stránkách v obou motivech žádná barva mimo paletu gov + `--app-*` a žádný text pod WCAG kontrastem.
 
-> Pozn.: Ostatní barvy karet záznamů používají gov tokeny — Úkol `--gov-color-warning`,
-> Informace `--gov-color-primary`, hotový úkol `--gov-color-success`, po termínu
-> `--gov-color-accent`, ostatní `--gov-color-muted`.
+## Ostatní tokeny
 
 ### Spacing (4pt grid)
 
