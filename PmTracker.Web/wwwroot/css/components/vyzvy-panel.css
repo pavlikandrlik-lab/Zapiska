@@ -209,7 +209,7 @@
   background: var(--background-block-primary);
   border: 1px solid var(--border-subtle);
   border-radius: var(--gov-radius-sm);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+  box-shadow: var(--app-shadow-raised);
 }
 .vyzvy-stav-menu-list > li::before { content: none !important; }
 .vyzvy-stav-menu.open .vyzvy-stav-menu-list { display: block; }
@@ -242,7 +242,7 @@
   background: var(--background-block-primary);
   border: 1px solid var(--border-subtle);
   border-radius: var(--gov-radius-sm);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+  box-shadow: var(--app-shadow-raised);
 }
 .vyzvy-pnf-menu-item {
   display: block;

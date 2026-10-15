@@ -64,7 +64,7 @@
     padding: 0.1rem 0.5rem;
     border: 1px solid var(--border-subtle);
     border-radius: 0.25rem;
-    background: #fff;
+    background: var(--background-block-primary);
     color: var(--text-primary);
     font-size: 0.7rem;
     font-weight: 500;
@@ -129,7 +129,7 @@
     padding: 0;
     border: 1px solid var(--border-subtle);
     border-radius: 0.25rem;
-    background: #fff;
+    background: var(--background-block-primary);
     color: var(--text-secondary);
     cursor: pointer;
     list-style: none;
@@ -166,10 +166,10 @@
     max-width: 20rem;
     margin: 0;
     padding: 0.25rem;
-    background: #fff;
+    background: var(--background-block-primary);
     border: 1px solid var(--border-subtle);
     border-radius: 0.375rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--app-shadow-soft);
     list-style: none;
     max-height: 50vh;
     overflow-y: auto;

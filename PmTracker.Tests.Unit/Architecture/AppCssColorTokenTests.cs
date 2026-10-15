@@ -47,4 +47,29 @@ public sealed class AppCssColorTokenTests
 
         offenders.Should().BeEmpty("nedefinovaná proměnná spadne na záložní (světlou) hodnotu i v tmavém motivu");
     }
+
+    private static readonly Regex ColorLiteral = new(@"#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?)\(|(?<![\w-])(white|black)(?![\w-])", RegexOptions.IgnoreCase);
+
+    /// <summary>Pojmenované výjimky: hlavička je podle zadání 2026-10-15 zmražená.</summary>
+    private static readonly HashSet<string> AllowedLiterals = new(StringComparer.Ordinal)
+    {
+        ".app-logo|background",   // rámeček loga v hlavičce zůstává bílý v obou motivech
+    };
+
+    public static IEnumerable<object[]> FilesWithoutColorLiterals() =>
+        AppCss.AppCssFiles().Where(file => file != "tokens.css").Select(file => new object[] { file });
+
+    [Theory]
+    [MemberData(nameof(FilesWithoutColorLiterals))]
+    public void ColorProperties_UseTokensNotLiterals(string file)
+    {
+        var offenders = AppCss.Declarations(file)
+            .Where(d => AppCss.IsColorProperty(d.Property))
+            .Where(d => ColorLiteral.IsMatch(d.Value))
+            .Where(d => !AllowedLiterals.Contains($"{d.Selector}|{d.Property}"))
+            .Select(d => $"{d.File}:{d.Line} {d.Selector} {{ {d.Property}: {d.Value} }}")
+            .ToList();
+
+        offenders.Should().BeEmpty("barva patří do gov tokenu (nebo aplikačního --app-* v tokens.css), jinak se v tmavém motivu nepřepne");
+    }
 }

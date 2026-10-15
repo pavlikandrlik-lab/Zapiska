@@ -172,8 +172,8 @@
 /* Tmavý text natvrdo, ať je čitelný na žlutém podkladu i v dark mode
    (color: inherit by ve tmavém motivu dalo světlý text na žluté). */
 .app-search-hl {
-    background: #fde68a;
-    color: #1f2937;
+    background: var(--background-secondary-subtle);
+    color: var(--text-primary);
     padding: 0 0.0625rem;
     border-radius: 2px;
 }
@@ -182,8 +182,8 @@
    jako zvýraznění v dropdownu, po 15 s plynule zmizí. Tmavý text drží kontrast i v tmavém
    motivu. */
 mark.app-search-flash {
-    background-color: #fde68a;
-    color: #1f2937;
+    background-color: var(--background-secondary-subtle);
+    color: var(--text-primary);
     border-radius: 2px;
     transition: background-color 1s ease, color 1s ease;
 }
@@ -256,13 +256,13 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .global-search-item__badge--zaznam {
-    background: color-mix(in srgb, var(--background-primary) 12%, transparent);
+    background: var(--background-primary-subtlest);
     color: var(--text-primary-color);
 }
 
 .global-search-item__badge--vyjadreni {
-    background: color-mix(in srgb, #7c3aed 10%, transparent);
-    color: #7c3aed;
+    background: var(--app-category-decision-subtle);
+    color: var(--app-category-decision);
 }
 
 .global-search-item__snippet {
@@ -694,8 +694,8 @@ mark.app-search-flash.app-search-flash--fading {
 .dashboard-news-item:hover,
 .dashboard-news-item:focus-visible {
     transform: translateY(-1px);
-    border-color: rgba(0, 43, 73, 0.22);
-    box-shadow: 0 10px 24px rgba(0, 43, 73, 0.08);
+    border-color: var(--border-subtle);
+    box-shadow: var(--app-shadow-raised);
 }
 
 .dashboard-focus-item-top,
@@ -1002,13 +1002,13 @@ mark.app-search-flash.app-search-flash--fading {
 .modal-submit-action-btn--primary {
     background: var(--background-primary);
     border-color: var(--border-primary);
-    color: #fff;
+    color: var(--text-white-fixed);
 }
 
 .modal-submit-action-btn--primary:hover {
     background: var(--button-solid-primary-hover);
     border-color: var(--border-primary);
-    color: #fff;
+    color: var(--text-white-fixed);
 }
 
 .field-error-message {
@@ -1021,8 +1021,8 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .field-invalid {
-    border-color: #d83b34 !important;
-    box-shadow: inset 0 0 0 1px rgba(216, 59, 52, 0.25) !important;
+    border-color: var(--border-error) !important;
+    box-shadow: inset 0 0 0 1px var(--border-error) !important;
 }
 
 .docs-page {
@@ -1051,8 +1051,7 @@ mark.app-search-flash.app-search-flash--fading {
 .access-body {
     min-height: 100vh;
     background:
-        radial-gradient(circle at top, rgba(53, 104, 190, 0.14), transparent 42%),
-        linear-gradient(180deg, rgba(241, 245, 249, 0.9), rgba(248, 250, 252, 1));
+        var(--background-page);
 }
 
 .access-main {
@@ -1078,7 +1077,7 @@ mark.app-search-flash.app-search-flash--fading {
     width: fit-content;
     padding: 6px 12px;
     border-radius: 999px;
-    background: rgba(53, 104, 190, 0.12);
+    background: var(--background-primary-subtlest);
     color: var(--text-primary-color);
     font-weight: 700;
     font-size: 12px;
@@ -1173,7 +1172,7 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .docs-nav-link.active {
-    background: #dfeaf5;
+    background: var(--background-primary-subtlest);
     color: var(--text-primary-color);
     font-weight: 700;
 }
@@ -1211,7 +1210,7 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .docs-content code {
-    background: #f1f5f9;
+    background: var(--background-neutral-subtlest);
     border-radius: var(--gov-radius-sm);
     padding: 1px 6px;
     font-size: 13px;
@@ -1220,7 +1219,7 @@ mark.app-search-flash.app-search-flash--fading {
 .docs-content pre {
     overflow: auto;
     border: 1px solid var(--border-subtle);
-    background: #f8fafc;
+    background: var(--background-neutral-subtlest);
     border-radius: 10px;
     padding: 10px;
 }
@@ -1402,8 +1401,7 @@ mark.app-search-flash.app-search-flash--fading {
     grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
     align-items: stretch;
     background:
-        radial-gradient(circle at top right, rgba(29, 78, 216, 0.12), transparent 38%),
-        linear-gradient(180deg, rgba(248, 251, 255, 0.96), rgba(240, 246, 255, 0.92));
+        var(--background-block-primary);
 }
 
 .dashboard-hero-copy {
@@ -1442,8 +1440,8 @@ mark.app-search-flash.app-search-flash--fading {
 
 .dashboard-stat {
     border-radius: 10px;
-    border: 1px solid rgba(29, 78, 216, 0.14);
-    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid var(--border-subtle);
+    background: var(--background-block-primary);
     padding: 14px 16px;
     display: grid;
     gap: 6px;
@@ -1501,13 +1499,12 @@ mark.app-search-flash.app-search-flash--fading {
 
 .dashboard-card-primary {
     background:
-        linear-gradient(180deg, rgba(29, 78, 216, 0.07), rgba(255, 255, 255, 0.98)),
-        var(--background-block-primary);
+        var(--background-primary-subtlest);
 }
 
 .dashboard-card-placeholder {
     background:
-        repeating-linear-gradient(-45deg, rgba(148, 163, 184, 0.07), rgba(148, 163, 184, 0.07) 12px, transparent 12px, transparent 24px),
+        repeating-linear-gradient(-45deg, var(--border-subtlest), var(--border-subtlest) 12px, transparent 12px, transparent 24px),
         var(--background-block-primary);
 }
 
@@ -1571,7 +1568,7 @@ mark.app-search-flash.app-search-flash--fading {
     padding: 12px 14px;
     border: 1px solid var(--border-subtle);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.96);
+    background: var(--background-block-primary);
 }
 
 .projects-status-filters-panel[hidden] {
@@ -1601,7 +1598,7 @@ mark.app-search-flash.app-search-flash--fading {
 
 .project-card:hover {
     border-color: var(--border-primary);
-    background: #fafafa;
+    background: var(--background-neutral-subtlest);
 }
 
 .project-card:focus-visible,
@@ -1776,7 +1773,7 @@ mark.app-search-flash.app-search-flash--fading {
     height: 34px;
     border-radius: var(--gov-radius-sm);
     border: 1px solid var(--border-subtle);
-    background: #fff;
+    background: var(--background-block-primary);
     color: var(--text-secondary);
     display: inline-flex;
     align-items: center;
@@ -1814,7 +1811,9 @@ textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
     width: 100%;
     border-radius: var(--gov-radius-sm);
     border: 1px solid var(--border-subtle);
-    background: var(--background-block-primary);
+    /* Stejně jako gov-form-input: plocha bloku, jemný rámeček. background-color, ne zkratka —
+       ta by smazala chevron selectu (background-image níže). */
+    background-color: var(--background-block-primary);
     padding: 10px 12px;
     font-size: 16px;
     line-height: 1.35;
@@ -1823,7 +1822,7 @@ textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
 
 select:not(gov-form-select select):not(pm-select select) {
     min-height: 44px;
-    background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
+    background-image: linear-gradient(45deg, transparent 50%, var(--icon-neutral) 50%), linear-gradient(135deg, var(--icon-neutral) 50%, transparent 50%);
     background-position: calc(100% - 19px) 18px, calc(100% - 13px) 18px;
     background-size: 6px 6px, 6px 6px;
     background-repeat: no-repeat;
@@ -1874,7 +1873,7 @@ textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
 .richtext-host .ql-toolbar.ql-snow {
     border-radius: 6px 6px 0 0;
     border-color: var(--border-subtle);
-    background: color-mix(in srgb, var(--background-block-primary) 96%, #e2e8f0);
+    background: var(--background-block-secondary);
 }
 
 .richtext-host .ql-container.ql-snow {
@@ -1884,6 +1883,22 @@ textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
     color: var(--text-primary);
     font-size: 16px;
     height: auto;
+}
+
+.richtext-host .ql-snow .ql-stroke {
+    stroke: var(--icon-default);
+}
+
+.richtext-host .ql-snow .ql-fill {
+    fill: var(--icon-default);
+}
+
+.richtext-host .ql-snow .ql-picker {
+    color: var(--text-primary);
+}
+
+.richtext-host .ql-editor.ql-blank::before {
+    color: var(--text-placeholder);
 }
 
 .richtext-host .ql-editor {
@@ -1936,7 +1951,7 @@ input:focus:not(gov-form-input input):not(gov-form-search input):not(.app-search
 select:focus:not(gov-form-select select):not(pm-select select),
 textarea:focus:not(gov-form-input textarea):not(pm-textarea textarea) {
     border-color: var(--border-primary);
-    box-shadow: inset 0 0 0 1px rgba(0, 94, 165, 0.25);
+    box-shadow: inset 0 0 0 1px var(--border-primary);
     outline: none;
 }
 
@@ -1974,7 +1989,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 28px;
     border: none;
     background: transparent;
-    color: #1f2937;
+    color: var(--text-primary);
     padding: 0;
     display: inline-flex;
     align-items: center;
@@ -1984,7 +1999,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .app-date-trigger:disabled,
 .app-time-trigger:disabled {
-    color: #94a3b8;
+    color: var(--text-tertiary);
     cursor: default;
 }
 
@@ -1999,7 +2014,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     height: 22px;
     border: none;
     background: transparent;
-    color: #6b7280;
+    color: var(--text-secondary);
     padding: 0;
     display: none; /* default skryté, zobrazení řízeno data-app-date-has-value (níže) */
     align-items: center;
@@ -2011,12 +2026,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .app-date-clear:hover {
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.08);
+    color: var(--text-status-error);
+    background: var(--background-status-error-subtlest);
 }
 
 .app-date-clear:disabled {
-    color: #cbd5e1;
+    color: var(--text-disabled);
     cursor: default;
 }
 
@@ -2145,7 +2160,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .app-date-day.outside {
-    color: #7f9bbf;
+    color: var(--text-secondary);
 }
 
 .app-date-day.selected {
@@ -2203,7 +2218,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     padding: 4px 10px;
     border-radius: 999px;
-    background: #dfeaf5;
+    background: var(--background-primary-subtlest);
     color: var(--text-primary-color);
     font-size: 12px;
     font-weight: 600;
@@ -2214,7 +2229,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     padding: 4px 10px;
     border-radius: 999px;
-    background: #ededed;
+    background: var(--background-neutral-subtlest);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
@@ -2230,19 +2245,19 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 999px;
-    background: #f9e1de;
-    color: #8a1c16;
+    background: var(--background-status-error-subtlest);
+    color: var(--text-status-error);
     font-size: 12px;
     font-weight: 600;
 }
 
 .lock {
-    color: #b91c1c;
+    color: var(--text-status-error);
     font-weight: 600;
 }
 
 .unlock {
-    color: #0f766e;
+    color: var(--text-status-success);
     font-weight: 600;
 }
 
@@ -2386,7 +2401,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    strukturu .proposal-field-editable (padding = rámeček kolem CELÉHO pole + srovnatelná
    sytost), aby se podbarvilo celé pole, ne jen ikona kalendáře (2026-06-29). */
 .proposal-field-changed {
-    background: rgba(245, 158, 11, 0.22);
+    background: var(--background-status-warning-subtle);
     border-radius: var(--gov-radius-sm);
     padding: 4px 6px;
 }
@@ -2394,7 +2409,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .proposal-field-changed .app-date-display-input,
 .proposal-field-changed .schedule-days-input-stacked,
 .proposal-field-changed .app-date-trigger {
-    background-color: rgba(245, 158, 11, 0.16);
+    background-color: var(--background-status-warning-subtlest);
 }
 
 /* Bordered buňka harmonogramu (.schedule-stacked-input) má vlastní bílé pozadí deklarované
@@ -2402,7 +2417,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    (vyšší specificita) podbarví CELOU buňku oranžově; vnitřní input/„X dnů" jsou průhledné,
    ať prosvítá oranžová celé buňky (ne jen ikona/rámeček). 2026-06-29. */
 .schedule-stacked-input.proposal-field-changed {
-    background: rgba(245, 158, 11, 0.22);
+    background: var(--background-status-warning-subtle);
     padding: 0;
 }
 
@@ -2424,7 +2439,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    2026-04-19: "tento je přes citrix blbě vidět, aplikace běží přes citrix" →
    ztmavnění o pár odstínů (Tailwind green-600) a zvýšení opacity. */
 .proposal-field-editable {
-    background: rgba(22, 163, 74, 0.22);
+    background: var(--background-status-success-subtle);
     border-radius: var(--gov-radius-sm);
     padding: 4px 6px;
 }
@@ -2432,7 +2447,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .proposal-field-editable .app-date-display-input,
 .proposal-field-editable .schedule-days-input-stacked,
 .proposal-field-editable .app-date-trigger {
-    background-color: rgba(22, 163, 74, 0.16);
+    background-color: var(--background-status-success-subtlest);
 }
 
 /* Task 4 (2026-10-12): sdělení autora návrhu na detailu schvalování — nepovinný důvod změny
@@ -2471,7 +2486,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 6px;
     margin-top: 8px;
     padding: 14px 0 4px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--background-block-primary) 24px);
+    background: linear-gradient(180deg, transparent, var(--background-block-primary) 24px);
     z-index: 5;
 }
 
@@ -2501,7 +2516,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgba(15, 23, 42, 0.55);
+    background: var(--background-overlay-page);
 }
 
 .record-editor-close-guard-modal {
@@ -2539,9 +2554,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .record-editor-close-guard-actions .btn:last-child {
-    background: #b42318;
-    border-color: #b42318;
-    color: #fff;
+    background: var(--background-status-error);
+    border-color: var(--border-error);
+    color: var(--text-white-fixed);
 }
 
 /* Schedule in modal */
@@ -2554,7 +2569,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     padding: 10px 12px;
-    background: #fafafa;
+    background: var(--background-neutral-subtlest);
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 6px 10px;
@@ -2562,11 +2577,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-status-line.ok {
-    color: #166534;
+    color: var(--text-status-success);
 }
 
 .schedule-status-line.late {
-    color: #b91c1c;
+    color: var(--text-status-error);
 }
 
 .schedule-mini-gantt {
@@ -2605,7 +2620,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .schedule-mini-gantt-track {
     height: 14px;
     border-radius: 999px;
-    background: #e2e8f0;
+    background: var(--background-neutral-subtle);
     position: relative;
     overflow: hidden;
 }
@@ -2629,7 +2644,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     overflow: hidden;
     text-overflow: clip;
     /* Datum-model: pevná barva kroku z inline --seg-color (plán = plná). */
-    background: var(--seg-color, var(--app-schedule-delay));
+    background: var(--seg-color);
 }
 
 /* Editor skutečnost: stejná pevná barva kroku, šrafovaná + nižší. */
@@ -2641,13 +2656,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background:
         repeating-linear-gradient(
             135deg,
-            rgba(255, 255, 255, 0.55) 0,
-            rgba(255, 255, 255, 0.55) 4px,
+            var(--app-schedule-stripe) 0,
+            var(--app-schedule-stripe) 4px,
             transparent 4px,
             transparent 8px
         ),
         var(--seg-color, var(--app-schedule-delay));
-    border: 1px solid rgba(15, 23, 42, 0.42);
+    border: 1px solid var(--app-schedule-segment-edge);
 }
 
 
@@ -2655,7 +2670,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     position: relative;
     height: 28px;
     margin-bottom: 4px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+    border-bottom: 1px solid var(--border-subtle);
     overflow: hidden;
 }
 
@@ -2664,11 +2679,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     top: 0;
     bottom: 0;
     width: 1px;
-    background: rgba(100, 116, 139, 0.3);
+    background: var(--border-subtle);
 }
 
 .timeline-axis-tick.edge {
-    background: rgba(71, 85, 105, 0.55);
+    background: var(--border-neutral);
 }
 
 .timeline-axis-tick.edge-end {
@@ -2688,8 +2703,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     line-height: 1.1;
     padding: 1px 4px;
     border-radius: 4px;
-    background: rgba(248, 250, 252, 0.92);
-    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
+    background: var(--background-block-primary);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
     color: var(--text-secondary);
     white-space: nowrap;
     pointer-events: none;
@@ -2724,17 +2739,17 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     line-height: 1.1;
     padding: 1px 4px;
     border-radius: 4px;
-    color: #ffffff;
+    color: var(--text-white-fixed);
     white-space: nowrap;
     pointer-events: none;
 }
 
 .timeline-axis-event.today .timeline-axis-event-label {
-    background: #0f172a;
+    background: var(--background-neutral-secondary);
 }
 
 .timeline-axis-event.deadline .timeline-axis-event-label {
-    background: #1d4ed8;
+    background: var(--background-primary);
 }
 
 :root[data-theme="dark"] .timeline-axis-event.today .timeline-axis-event-label {
@@ -2770,7 +2785,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     width: 12px;
     height: 12px;
     border-radius: 4px;
-    background: #94a3b8;
+    background: var(--background-neutral-disabled);
 }
 
 .schedule-step-delay-dot {
@@ -2937,9 +2952,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     align-items: stretch;
     min-width: 0;
     gap: 0;
-    border: 1px solid #ccd7ea;
+    border: 1px solid var(--border-subtle);
     border-radius: 10px;
-    background: #fff;
+    background: var(--background-block-primary);
     overflow: visible;
     position: relative;
 }
@@ -2952,8 +2967,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-stacked-input:focus-within {
-    border-color: #3568be;
-    box-shadow: inset 0 0 0 1px rgba(53, 104, 190, 0.35);
+    border-color: var(--border-primary);
+    box-shadow: inset 0 0 0 1px var(--border-primary);
     z-index: 12;
 }
 
@@ -2962,18 +2977,18 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    dříve než datum začátku (= datum konce předchozího kroku). Form submit guard blokuje Save. */
 [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input,
 [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input:focus-within {
-    border-color: #dc2626;
-    box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.4);
-    background: rgba(220, 38, 38, 0.04);
+    border-color: var(--border-error);
+    box-shadow: inset 0 0 0 1px var(--border-error);
+    background: var(--background-status-error-subtlest);
 }
 
 [data-schedule-step-row][data-schedule-duration-invalid="true"] .app-date-display-input {
-    color: #b91c1c;
+    color: var(--text-status-error);
     font-weight: 600;
 }
 
 [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-duration-days-readonly {
-    color: #b91c1c;
+    color: var(--text-status-error);
 }
 
 :root[data-theme="dark"] [data-schedule-step-row][data-schedule-duration-invalid="true"] .schedule-stacked-input,
@@ -2990,7 +3005,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .schedule-stacked-part-top {
     border: none;
-    border-bottom: 1px solid #ccd7ea;
+    border-bottom: 1px solid var(--border-subtle);
     background: transparent;
     padding: 0 4px;
     min-height: 20px;
@@ -3047,7 +3062,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: grid;
     grid-template-rows: 20px 20px;
     border: none;
-    border-left: 1px solid #ccd7ea;
+    border-left: 1px solid var(--border-subtle);
     border-radius: 0;
     overflow: hidden;
     background: transparent;
@@ -3175,7 +3190,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
        Bezpečné — segmenty už nepřetékají (+1px hack odstraněn, šířka ≤ 100 %), a samy mají
        border-radius (pill tvar nezávisí na ořezu stopy). 2026-06-23 redesign osy. */
     overflow: visible;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+    box-shadow: inset 0 0 0 1px var(--border-subtlest);
 }
 
 .schedule-overview-segment {
@@ -3196,9 +3211,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     overflow: hidden;
     text-overflow: clip;
     opacity: 0.96;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    box-shadow: inset 0 0 0 1px var(--app-schedule-segment-outline);
     /* Datum-model: barva kroku je vždy pevná (--seg-color z inline stylu). Plán = plná. */
-    background: var(--seg-color, var(--app-schedule-delay));
+    background: var(--seg-color);
 }
 
 /* Skutečnost: stejná pevná barva kroku, ale šrafovaná + o kousek nižší, aby šla odlišit od plánu. */
@@ -3210,16 +3225,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background:
         repeating-linear-gradient(
             135deg,
-            rgba(255, 255, 255, 0.55) 0,
-            rgba(255, 255, 255, 0.55) 4px,
+            var(--app-schedule-stripe) 0,
+            var(--app-schedule-stripe) 4px,
             transparent 4px,
             transparent 8px
         ),
         var(--seg-color, var(--app-schedule-delay));
-    border: 1px solid rgba(15, 23, 42, 0.42);
+    border: 1px solid var(--app-schedule-segment-edge);
     box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.35) inset,
-        0 1px 2px rgba(15, 23, 42, 0.14);
+        0 0 0 1px var(--app-schedule-segment-inner) inset,
+        0 1px 2px var(--app-schedule-segment-outline);
 }
 
 
@@ -3254,7 +3269,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     /* layered track pozadí — sdílí token s overview track */
     background: var(--background-neutral-subtle);
     overflow: hidden;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+    box-shadow: inset 0 0 0 1px var(--border-subtlest);
 }
 
 .schedule-layered-track--step {
@@ -3282,29 +3297,29 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     top: 0;
     bottom: 0;
     opacity: 0.94;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    box-shadow: inset 0 0 0 1px var(--app-schedule-segment-outline);
     /* Datum-model: plán = plná, pevná barva kroku (--seg-color z inline stylu). */
-    background: var(--seg-color, var(--app-schedule-delay));
+    background: var(--seg-color);
 }
 
 .schedule-layered-segment.actual {
     top: 50%;
     height: 8px;
     transform: translateY(-50%);
-    border: 1px solid rgba(15, 23, 42, 0.42);
+    border: 1px solid var(--app-schedule-segment-edge);
     /* Skutečnost: stejná pevná barva kroku, šrafovaná + nižší (8px) → odlišení od plánu. */
     background:
         repeating-linear-gradient(
             135deg,
-            rgba(255, 255, 255, 0.55) 0,
-            rgba(255, 255, 255, 0.55) 4px,
+            var(--app-schedule-stripe) 0,
+            var(--app-schedule-stripe) 4px,
             transparent 4px,
             transparent 8px
         ),
         var(--seg-color, var(--app-schedule-delay));
     box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.35) inset,
-        0 1px 2px rgba(15, 23, 42, 0.14);
+        0 0 0 1px var(--app-schedule-segment-inner) inset,
+        0 1px 2px var(--app-schedule-segment-outline);
     z-index: 4;
 }
 
@@ -3341,20 +3356,20 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-layered-legend-swatch.planned {
-    background: linear-gradient(180deg, rgba(53, 104, 190, 0.95), rgba(32, 76, 145, 0.95));
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    background: var(--background-primary);
+    box-shadow: inset 0 0 0 1px var(--app-schedule-segment-outline);
 }
 
 .schedule-layered-legend-swatch.actual {
     background-image: repeating-linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.55) 0,
-        rgba(255, 255, 255, 0.55) 4px,
+        var(--app-schedule-stripe) 0,
+        var(--app-schedule-stripe) 4px,
         transparent 4px,
         transparent 8px
     );
-    background-color: var(--record-schedule-delay-color, var(--app-schedule-delay));
-    border: 1px solid rgba(15, 23, 42, 0.42);
+    background-color: var(--record-schedule-delay-color);
+    border: 1px solid var(--app-schedule-segment-edge);
 }
 
 .schedule-layered-legend-swatch.deadline {
@@ -3380,13 +3395,13 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .schedule-badge-ok {
-    background: #dcfce7;
-    color: #166534;
+    background: var(--background-status-success-subtlest);
+    color: var(--text-status-success);
 }
 
 .schedule-badge-late {
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--background-status-error-subtlest);
+    color: var(--text-status-error);
 }
 
 .schedule-subsystem-group {
@@ -3516,11 +3531,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .gantt-step-offset.late {
-    color: #b91c1c;
+    color: var(--text-status-error);
 }
 
 .gantt-step-offset.ahead {
-    color: #166534;
+    color: var(--text-status-success);
 }
 
 .gantt-task[data-gantt-pinned="false"] {
@@ -3575,7 +3590,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
         box-shadow: 0 0 0 3px var(--status-focus);
     }
     100% {
-        box-shadow: 0 0 0 3px rgba(35, 98, 162, 0);
+        box-shadow: 0 0 0 3px transparent;
     }
 }
 
@@ -3724,9 +3739,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .chip-collab {
-    background: #e9f5ff;
-    color: #1e3a8a;
-    border: 1px solid #bfdbfe;
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
+    border: 1px solid var(--border-primary);
 }
 
 /* R7 (2026-07-13): indikátor rozbalení přesunut vlevo (mezi kraj karty a kategorii). */
@@ -3771,7 +3786,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background: var(--background-block-primary);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+    box-shadow: var(--app-shadow-raised);
 }
 
 .record-actions-menu[hidden] {
@@ -3794,7 +3809,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .record-actions-menu-item:hover,
 .record-actions-menu-item:focus-visible {
-    background: rgba(37, 99, 235, 0.10);
+    background: var(--background-primary-subtlest);
 }
 
 .record-detail-shell,
@@ -3810,7 +3825,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     padding: 14px 16px;
     border: 1px dashed var(--border-subtle);
     border-radius: var(--gov-radius-lg);
-    background: color-mix(in srgb, var(--background-block-primary) 92%, #e2e8f0 8%);
+    background: var(--background-neutral-subtlest);
 }
 
 /* Bug fix 2026-04-19: `display: grid` v .record-loading-placeholder přebíjel
@@ -3828,7 +3843,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .record-loading-line {
     height: 12px;
     border-radius: 999px;
-    background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%);
+    background: linear-gradient(90deg, var(--background-neutral-subtle) 0%, var(--background-neutral-subtlest) 50%, var(--background-neutral-subtle) 100%);
     background-size: 220px 100%;
     animation: record-loading-shimmer 1.4s linear infinite;
 }
@@ -3864,10 +3879,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 12px;
     margin: 12px 0 8px;
     padding: 12px 14px;
-    border: 1px solid #fecaca;
+    border: 1px solid var(--border-error);
     border-radius: var(--gov-radius-lg);
-    background: #fef2f2;
-    color: #991b1b;
+    background: var(--background-status-error-subtlest);
+    color: var(--text-status-error);
 }
 
 .record-collab-block {
@@ -3889,7 +3904,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .record-history strong {
-    color: #0f172a;
+    color: var(--text-primary);
     margin-left: 6px;
 }
 
@@ -3923,8 +3938,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     gap: 6px;
     padding: 6px 10px;
     border-radius: 999px;
-    background: #eff6ff;
-    color: #1d4ed8;
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
     font-size: 12px;
     font-weight: 600;
 }
@@ -4009,7 +4024,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .chip-sub {
-    color: #0f172a;
+    color: var(--text-primary);
     font-weight: 500;
     opacity: 0.9;
 }
@@ -4108,7 +4123,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: inline-flex;
     align-items: center;
     padding: 2px 8px;
-    background: color-mix(in srgb, var(--background-primary) 10%, transparent);
+    background: var(--background-primary-subtlest);
     border-radius: 10px;
     color: var(--text-primary-color);
     font-size: 12px;
@@ -4233,9 +4248,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .comment-closed-note {
     margin: 0;
-    padding: var(--gov-spacing-xs, 0.5rem) 0;
+    padding: var(--gov-spacing-xs) 0;
     color: var(--text-secondary);
-    font-size: var(--gov-font-size-s, 0.875rem);
+    font-size: var(--gov-font-size-s);
 }
 
 .comment-pagination-actions {
@@ -4358,9 +4373,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .record-form-number input[disabled] {
-    border-color: #cbd5e1;
-    background: #f8fafc;
-    color: #475569;
+    border-color: var(--border-subtle);
+    background: var(--background-neutral-subtlest);
+    color: var(--text-secondary);
     cursor: not-allowed;
     opacity: 1;
 }
@@ -4418,7 +4433,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     padding: 14px 16px;
     border: 1px solid var(--border-subtle);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.72);
+    background: var(--background-block-primary);
 }
 
 .small {
@@ -4578,7 +4593,7 @@ gov-dialog[data-modal-container][data-modal-scrollable="true"] .modal-content {
     gap: 8px;
     border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
-    background: #fafafa;
+    background: var(--background-neutral-subtlest);
     padding: 10px;
 }
 
@@ -4695,7 +4710,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .office-search-item {
     border: none;
-    border-bottom: 1px solid #d8dbdd;
+    border-bottom: 1px solid var(--border-subtle);
     background: var(--background-block-primary);
     color: inherit;
     text-align: left;
@@ -4717,7 +4732,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 .office-search-item.disabled {
     cursor: not-allowed;
     opacity: 0.6;
-    background: #f8fafc;
+    background: var(--background-neutral-subtlest);
 }
 
 .office-search-primary {
@@ -4733,13 +4748,13 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .office-search-warning {
     font-size: 12px;
-    color: #c53030;
+    color: var(--text-status-error);
 }
 
 .office-search-info {
     padding: 10px 12px;
     font-size: 13px;
-    border-bottom: 1px solid #e7edf7;
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .office-search-info:last-child {
@@ -4747,7 +4762,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .office-search-info.error {
-    color: #b91c1c;
+    color: var(--text-status-error);
 }
 
 .office-search-info.empty {
@@ -4761,7 +4776,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     margin-top: 6px;
     font-size: 12px;
     font-weight: 700;
-    color: #15803d;
+    color: var(--text-status-success);
 }
 
 .ad-location-hint::before {
@@ -4772,8 +4787,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     width: 16px;
     height: 16px;
     border-radius: 999px;
-    background: #22c55e;
-    color: #fff;
+    background: var(--background-status-success);
+    color: var(--text-white-fixed);
     font-size: 11px;
     line-height: 1;
 }
@@ -4787,7 +4802,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     border: 1px solid var(--border-subtle);
     border-radius: 10px;
     padding: 12px;
-    background: #f8fafc;
+    background: var(--background-neutral-subtlest);
 }
 
 .task-item textarea {
@@ -4805,13 +4820,13 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     padding: 10px;
     display: grid;
     gap: 8px;
-    background: #f8fafc;
+    background: var(--background-neutral-subtlest);
 }
 
 .result-item {
     padding: 8px 10px;
     border-radius: 10px;
-    background: #fff;
+    background: var(--background-block-primary);
     border: 1px solid var(--border-subtle);
 }
 
@@ -4836,7 +4851,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     right: 10px;
     width: 4px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--background-neutral-subtle) 74%, transparent 26%);
+    background: var(--background-neutral-subtle);
 }
 
 .subsystem-scroll-indicator-bubble {
@@ -4847,10 +4862,10 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     transform: translateY(0);
     transition: transform 140ms ease-out;
     padding: 10px 12px;
-    border: 1px solid color-mix(in srgb, var(--border-subtle) 78%, #fff 22%);
+    border: 1px solid var(--border-subtle);
     border-radius: 999px 0 0 999px;
-    background: color-mix(in srgb, #fff 90%, var(--background-primary) 10%);
-    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+    background: var(--background-block-primary);
+    box-shadow: var(--app-shadow-raised);
     backdrop-filter: blur(14px);
 }
 
@@ -4884,7 +4899,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-lg);
     padding: 10px 12px;
-    background: rgba(255, 255, 255, 0.85);
+    background: var(--background-block-primary);
     margin-bottom: 16px;
     /* Řádek 1 = „Filtry" + použité chipy vedle sebe; panel se zalomí pod (2026-06-10). */
     display: flex;
@@ -4946,7 +4961,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     gap: 8px;
     border: 1px solid var(--border-subtle);
     border-radius: 999px;
-    background: #edf3fb;
+    background: var(--background-primary-subtlest);
     color: var(--text-primary);
     padding: 6px 8px 6px 10px;
     font-size: 13px;
@@ -4973,7 +4988,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .active-filter-chip-remove:hover {
-    background: rgba(15, 23, 42, 0.08);
+    background: var(--background-neutral-subtlest);
     color: var(--text-primary);
 }
 
@@ -5073,9 +5088,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     flex-direction: column;
     gap: var(--pm-spacing-xs);
     padding: var(--pm-spacing-m) var(--pm-spacing-m) var(--pm-spacing-s);
-    background: linear-gradient(170deg,
-        color-mix(in srgb, var(--background-primary) 4%, var(--background-page)) 0%,
-        color-mix(in srgb, var(--background-primary) 10%, var(--background-page)) 100%);
+    background: var(--background-block-primary);
     border-right: 1px solid var(--border-subtle);
     position: relative;
 }
@@ -5162,7 +5175,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     font-size: var(--pm-font-size-xs);
     color: var(--text-secondary);
     line-height: 1.5;
-    border-top: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+    border-top: 1px solid var(--border-subtlest);
 }
 
 .meeting-project-overview__meta dt {
@@ -5271,8 +5284,8 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-project-overview__history-toggle:hover {
-    background: color-mix(in srgb, var(--background-primary) 8%, transparent);
-    border-color: color-mix(in srgb, var(--border-primary) 20%, transparent);
+    background: var(--background-primary-subtlest);
+    border-color: var(--border-primary);
 }
 
 .meeting-project-overview__history-toggle:focus-visible {
@@ -5333,7 +5346,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 .meeting-year-group {
     border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius-lg);
-    background: color-mix(in srgb, var(--background-primary) 4%, var(--background-block-primary));
+    background: var(--background-neutral-subtlest);
     overflow: hidden;
 }
 
@@ -5352,7 +5365,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-year-toggle:hover {
-    background: color-mix(in srgb, var(--background-primary) 8%, var(--background-block-primary));
+    background: var(--background-neutral-subtle);
 }
 
 .meeting-year-toggle-main {
@@ -5395,7 +5408,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     padding: 11px;
-    background: #fff;
+    background: var(--background-block-primary);
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -5406,7 +5419,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .meeting-card:hover {
     border-color: var(--border-primary);
-    box-shadow: 0 12px 20px rgba(15, 23, 42, 0.1);
+    box-shadow: var(--app-shadow-raised);
 }
 
 .meeting-card-top {
@@ -5545,7 +5558,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 @media (min-width: 1900px) {
     .meeting-attendance-grid {
         grid-auto-flow: column;
-        grid-template-rows: repeat(var(--attendance-rows, 1), auto);
+        grid-template-rows: repeat(var(--attendance-rows), auto);
         grid-template-columns: none;
         grid-auto-columns: 1fr;
     }
@@ -5650,7 +5663,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 }
 
 .meeting-detail-header .muted {
-    color: color-mix(in srgb, var(--text-primary) 65%, transparent);
+    color: var(--text-secondary);
 }
 
 .meeting-detail-actions .btn {
@@ -5703,7 +5716,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     padding: 12px 14px;
     border-radius: 14px;
     border: 1px solid var(--border-subtle);
-    background: #fff;
+    background: var(--background-block-primary);
     transition: all 0.2s ease;
 }
 
@@ -5718,7 +5731,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 .ciselnik-tile.active,
 .ciselnik-tile:hover {
     border-color: var(--border-primary);
-    box-shadow: 0 12px 20px rgba(15, 23, 42, 0.1);
+    box-shadow: var(--app-shadow-raised);
 }
 
 .ciselnik-title {
@@ -5741,7 +5754,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     width: 14px;
     height: 14px;
     border-radius: 3px;
-    border: 1px solid rgba(15, 23, 42, 0.22);
+    border: 1px solid var(--border-subtle);
     flex: 0 0 auto;
 }
 
@@ -5930,7 +5943,7 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     align-items: start;
     gap: 10px;
     padding: 8px 6px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+    border-bottom: 1px solid var(--border-subtle);
     font-weight: 600;
     color: var(--text-primary);
 }
@@ -6008,8 +6021,8 @@ pm-tab-last-in-row > span[data-pm-tab-inner] {
     padding: 10px 22px;
     color: var(--text-secondary);
     background: var(--background-neutral-subtlest);
-    border-top-left-radius: var(--pm-tab-radius, 10px);
-    border-top-right-radius: var(--pm-tab-radius, 10px);
+    border-top-left-radius: var(--pm-tab-radius);
+    border-top-right-radius: var(--pm-tab-radius);
     cursor: pointer;
     user-select: none;
     font-size: 14px;
@@ -6231,7 +6244,7 @@ pm-tab-panel {
     clear: both;
     position: relative;
     z-index: 0;
-    border-radius: var(--pm-tab-radius, 10px);
+    border-radius: var(--pm-tab-radius);
 }
 
 pm-tab-panel:not([active]) {
@@ -7338,11 +7351,11 @@ html {
 }
 
 .kpi-trend-up {
-    color: #16a34a;
+    color: var(--text-status-success);
 }
 
 .kpi-trend-down {
-    color: #dc2626;
+    color: var(--text-status-error);
 }
 
 /* Category badges (.badge-danger / .badge-warning / .badge-caution) odstraněny
@@ -7355,13 +7368,13 @@ html {
 }
 
 .dashboard-expandable-row:hover td {
-    background: rgba(0, 43, 73, 0.04);
+    background: var(--background-neutral-subtlest);
 }
 
 .dashboard-step-detail {
     display: none;
     padding: 0.75rem 1rem;
-    background: rgba(0, 43, 73, 0.02);
+    background: var(--background-neutral-subtlest);
 }
 
 .dashboard-step-detail.expanded {
@@ -7397,7 +7410,7 @@ html {
 .dashboard-category-filter.active {
     border-color: var(--border-primary);
     background: var(--background-primary);
-    color: #fff;
+    color: var(--text-white-fixed);
 }
 
 /* Placeholder message */
@@ -7418,7 +7431,7 @@ html {
     border-radius: var(--gov-radius-sm);
     border: 1px solid var(--border-subtle);
     background: var(--background-block-primary);
-    background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
+    background-image: linear-gradient(45deg, transparent 50%, var(--icon-neutral) 50%), linear-gradient(135deg, var(--icon-neutral) 50%, transparent 50%);
     background-position: calc(100% - 19px) 14px, calc(100% - 13px) 14px;
     background-size: 6px 6px, 6px 6px;
     background-repeat: no-repeat;
@@ -7503,7 +7516,7 @@ html {
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;
-    height: calc(100dvh - var(--app-header-h, 151px));
+    height: calc(100dvh - var(--app-header-h));
     min-height: 0;
     /* A3: obsah nesmí být nalepený na footer — panely mají interní scroll, výška drží. */
     padding-bottom: var(--app-content-bottom-gap);
@@ -7744,7 +7757,7 @@ pm-button gov-icon {
 }
 
 .schedule-view-switch-btn[aria-pressed="true"] {
-    background: rgba(37, 99, 235, 0.12);
+    background: var(--background-primary-subtlest);
     font-weight: 600;
 }
 
