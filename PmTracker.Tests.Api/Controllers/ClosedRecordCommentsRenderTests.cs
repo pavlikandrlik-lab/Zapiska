@@ -1,6 +1,7 @@
 using System.Net;
 using FluentAssertions;
 using PmTracker.Tests.Api.TestInfrastructure;
+using PmTracker.Web.Models.ViewModels;
 
 namespace PmTracker.Tests.Api.Controllers;
 
@@ -89,6 +90,20 @@ public sealed class ClosedRecordCommentsRenderTests
         html.Should().Contain("ApiCls4 uzavrene jednani");
         CountOccurrences(html, "data-comment-edit-toggle").Should().Be(1, "jen vyjádření u otevřeného jednání jde upravit");
         CountOccurrences(html, "action=\"/Zaznamy/DeleteComment\"").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ClosedRecord_ViewerWithoutRecordsEdit_SeesNoClosedNote()
+    {
+        var s = await SeedAsync("ApiCls5", 9989);
+        var deputyId = await _fixture.EnsurePersonAsync("ApiCls5Deputy");
+        await _fixture.EnsureSubsystemRoleAsync(s.ProjectId, s.SubsystemId, deputyId, SubsystemRoleCodes.DeputyLead);
+
+        var html = await CommentsHtmlAsync(s.ProjectId, s.ClosedRecordId, deputyId);
+
+        html.Should().NotContain("action=\"/Zaznamy/AddComment\"");
+        html.Should().NotContain("data-record-closed-note",
+            "výzva „znovu otevřete změnou stavu“ nemá smysl pro toho, kdo stav měnit nesmí");
     }
 
     private static int CountOccurrences(string text, string needle)
