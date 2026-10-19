@@ -1,8 +1,8 @@
 # Projektový dashboard — přestavba: prodlení podle penalizačního algoritmu, nový vzhled, Statistiky
 
-**Stav:** návrh k odsouhlasení (2026-10-15)
+**Stav:** návrh k odsouhlasení (2026-10-15, revize 2026-10-19: zdroj předávek = databáze ServiceDesku, rozhodnutí §16 uzavřena)
 **Navazuje na:** [2026-06-28 Základní report](2026-06-28-projekt-dashboard-zakladni-report-design.md) (provider pattern + ECharts), [dashboard-prodleni.md](../../specs/dashboard-prodleni.md) (původní definice prodlení — **touto specifikací nahrazena**)
-**Referenční zdroják algoritmu:** `Hotline.cs` v rootu repa (gitignored, kopie ve `SD_servicedesk/Hotline.cs`), třída `PenaltyCalculation.TicketPenaltyCalculator`, ř. 1327–1967
+**Referenční zdrojáky** (root repa, v `.gitignore`): `Hotline.cs` = BusinessLayer, výpočet `PenaltyCalculation.TicketPenaltyCalculator` ř. 1327–1967; `Hotline (2).cs` = DataLayer, třída `DataLayer.Hotline` (zdroj předávek a SLA, `MOSD_External`, `TicketExternal_SlaCache`); `Details.cshtml` = detail ticketu
 
 ---
 
@@ -29,7 +29,7 @@ Záložky **Záznamy** a **NES v prodlení** zůstávají pod stejnými názvy, 
 
 **V rozsahu**
 - Port penalizačního algoritmu z `Hotline.cs` (NES, PMP, PNF) do PM Trackeru jako čistá, testovatelná doménová služba.
-- Rekonstrukce workflow událostí U1–U11 ze zdroje dat podle rozhodnutí R1 (§6).
+- Čtení workflow událostí U1–U11 a SLA hodin z databáze ServiceDesku (§6), druhý read-only connection string.
 - Přestavba shellu dashboardu: hlavička, souhrnný pás, `pm-tabs`.
 - Nový obsah a vzhled záložek Záznamy, NES v prodlení a Statistiky.
 - Rozšíření Excel exportu záložky NES v prodlení o penalizační sloupce.
@@ -49,6 +49,7 @@ Záložky **Záznamy** a **NES v prodlení** zůstávají pod stejnými názvy, 
 | „Penalizační logika (pracovní dny, svátky, U1–U11) je **trvale mimo scope** PM Trackeru" (2026-04-23) | `docs/specs/dashboard-prodleni.md` §Definice prodlení, `docs/technical/12-servicedesk-schema-reference.md` §5.5, §5.8, §7 | Penalizace **dnů** je v rozsahu, penále v Kč zůstává mimo. Dokumenty se upraví a starý spec dostane banner „nahrazeno". |
 | Metrika prodlení = `DATEDIFF(DAY, termín, dnes)` | tamtéž | Metrika = počet **penalizovaných dnů** podle algoritmu (§5) |
 | Statistiky = roční KPI + čtvrtletní tabulka | `_StatisticsPanel` | Statistiky = Základní report rozšířený o nové grafy (§11) |
+| Strukturovaná workflow data ServiceDesku (`TransferType` 1–11) nepoužívat, spolehlivé jsou jen texty vyjádření | spec 2026-04-21 §8.1, §11 | Pro **výpočet penále** se `ticket_external_workflow` používá, protože z ní počítá penále i starý ServiceDesk a cílem je shoda 1:1. Vytěžování vyjádření do harmonogramu zůstává textové beze změny. |
 
 ## 5. Penalizační algoritmus (popis pro lidi)
 
@@ -68,7 +69,7 @@ Záložky **Záznamy** a **NES v prodlení** zůstávají pod stejnými názvy, 
 ### 5.2 Pravidla podle typu
 
 **NES — řízení časem SLA, potom dny**
-- Ticket dostane SLA hodiny podle `dulezitost` (NES I/II/III, Vada A–D, viz R2).
+- Ticket dostane SLA hodiny podle `dulezitost` z tabulky `ticket_external_sla` (§6.1, §5.4 body 5–6).
 - Každá obrátka odečte ze zbývajícího SLA odpracovaný čas. Počítají se celé pracovní dny (24 h), víkendy a státní svátky se přeskakují. Když je ticket zpátky u nás, hodiny stojí.
 - Když obrátka SLA vyčerpá, deadline je okamžik vyčerpání. Penalizují se **pracovní dny** od deadlinu do konce obrátky a ticket přechází do režimu „řízen dny".
 - V režimu „řízen dny" se každá další obrátka penalizuje celá, od dne předání do dne vrácení.
@@ -108,79 +109,80 @@ T09/T10 (dodavatel nestihl požádat o prodloužení včas) je v originálu **vy
 
 ### 5.4 Věrnost portu
 
-Port je **1:1** včetně zvláštností originálu. Odchylky jsou jen ty, které výslovně schválíš (R5). Zvláštnosti, které přenášíme beze změny:
+Port je **1:1** včetně zvláštností originálu. Odchylky jsou jen ty vyjmenované v §16. Zvláštnosti, které přenášíme beze změny:
 1. PMP počítá kalendářní dny, NES a PNF pracovní.
 2. Hledání prodloužení (`GetProlongationSegment`) najde U11 jen tehdy, když po obrátce existuje U3. U ticketu, který je stále u dodavatele, prodloužení uplatní až závěrečné prominutí T14.
 3. U NES s parametrem `beforebound = true` se U11 hledá i před aktuální obrátkou.
 4. „Pracovní čas" znamená celý pracovní den 00:00–24:00, ne pracovní doba 8–16.
+5. SLA hodiny se hledají **přesnou shodou** textu `HOT_ZAZNAMY.dulezitost` s `ticket_external_sla.sla_name` (bez ořezu mezer, rozlišují se velká a malá písmena).
+6. SLA hodiny (`double`) se převádějí na celé hodiny přes `Convert.ToInt32`, tedy zaokrouhlením na nejbližší celé číslo, při .5 na sudé (2,5 → 2; 3,5 → 4).
 
-Technické změny, které chování nemění: `DateTime.Now` se nahradí injektovaným `TimeProvider`, string důvody strukturovanými záznamy, celočíselné dělení v textu T01 správným výpočtem hodin (týká se jen zobrazení) a mutace přes `ref` čistými návratovými hodnotami.
+Technické změny, které chování nemění: `DateTime.Now` se nahradí injektovaným `TimeProvider`, string důvody strukturovanými záznamy, celočíselné dělení v textu T01 správným výpočtem hodin (týká se jen zobrazení) a mutace přes `ref` čistými návratovými hodnotami. Statická SLA cache originálu (načte se jednou za běh aplikace) se nahradí `IMemoryCache` s platností 1 hodina.
 
-## 6. Zdroj workflow událostí — hlavní otevřená otázka (R1)
+## 6. Zdroj workflow událostí a SLA hodin (uzavřeno 2026-10-19)
 
-`Hotline.cs` čte události z `ticket.TicketExternal.Workflow`, které plní `MOSD_External`: synchronizační databáze starého ServiceDesku s dodavatelským systémem. V `intranetNEW`, kam má PM Tracker read-only přístup, **žádná workflow tabulka není**. Ověřil to discovery skript `SD_servicedesk/01_discovery.sql` §7 (výsledky v `results_hot/`).
+Zjištěno z datové vrstvy starého ServiceDesku (`Hotline (2).cs`, třída `DataLayer.Hotline`, v rootu repa a v `.gitignore`). ServiceDesk používá **dvě databáze**:
 
-| Varianta | Popis | Pro | Proti |
-|---|---|---|---|
-| **A — texty `HOT_VYJADRENI` (doporučeno)** | Události se rekonstruují textovým matchem vyjádření, stejně jako u existujícího harvestu (`HarvestPredicates`). Termíny se parsují z textu („s termínem plnění dodavatele dd.MM.yyyy", „#schvalenizmenyterminu … na dd.MM.yyyy"). | Žádná nová DB ani connection string. Respektuje dřívější zásadu „strukturovaná data SD lžou, spolehlivé jsou texty" (spec 2026-04-21 §8.1). Fráze jsou už zčásti známé a otestované. | Fráze U3 a U10 jsou zatím jen odhad a dodavatel u eventu nemusí jít z textu vyčíst. Výsledek proto musí projít kontrolou parity proti ServiceDesku (Fáze 0 a §15). |
-| B — napojení na DB `MOSD_External` | Druhý read-only connection string na synchronizační DB a mapování její workflow tabulky. | Data 1:1 s tím, co počítá ServiceDesk | Neznámé schéma a server, další přístupová práva na intranetu. Jde proti zásadě z 2026-04-21. |
+| Connection string starého SD | Databáze | Co z ní čte |
+|---|---|---|
+| `HotlineDB` | `intranetNEW` | tickety `HOT_*`, už napojeno přes `TicketingReadOnly` |
+| `ServiceDeskEntities` (EF6) | vlastní databáze ServiceDesku | předávky a SLA hodiny |
 
-**Doporučení: A**, s povinnou Fází 0. Diagnostický SQL skript `sd_diagnostika_prodleni_udalosti.sql` spustíš na produkci (read-only) a skript ukáže:
-- počty výskytů kandidátních frází pro U1/U2/U3/U5/U10/U11 za poslední 2 roky po typech ticketů,
-- vzorky celých textů (TOP 20 na frázi), aby šlo potvrdit fráze U3, U10 a U11 a formát dat,
-- tickety s U1/U2 bez rozpoznaného U3, které nejsou u dodavatele (indikátor chybějící fráze),
-- odhad SLA hodin pro NES: rozdělení `sla_deadline − první předání` v pracovních hodinách podle `dulezitost` (podklad pro R2),
-- jestli text předání obsahuje název dodavatele (rozhoduje o podpoře T00).
+V `intranetNEW` workflow tabulka není (discovery `SD_servicedesk/01_discovery.sql` §7, 399 tabulek).
 
-Dokud Fáze 0 nepotvrdí katalog frází, nezačne se psát extraktor (plán, Task 3).
+### 6.1 Tabulky v databázi ServiceDesku
 
-### 6.1 Katalog frází (výchozí návrh, Fáze 0 ho potvrdí nebo opraví)
+| Tabulka | Sloupce, které použijeme | Význam |
+|---|---|---|
+| `ticket_external` | `id`, `external_id`, `sla_name`, `supplier_tag` | Ticket synchronizovaný s dodavatelem. `external_id` = `HOT_ZAZNAMY.id` jako text, páruje se po `Trim()` (`MOSD_External.ExtendingTicketsWithExternal`). |
+| `ticket_external_workflow` | `date`, `supplier`, `transfertype`, `dt_param` + cizí klíč na `ticket_external` | Předávky U1–U11. `dt_param` je termín plnění (U1/U2 u PMP/PNF) nebo schválený nový termín (U11). |
+| `ticket_external_sla` | `sla_name`, `sla_hours` | SLA hodiny podle důležitosti. `sla_name` obsahuje hodnoty `HOT_ZAZNAMY.dulezitost` (NES I, NES II, NES III, Vada A–D). |
 
-| Událost | Fráze (substring, case-insensitive) | Typy | Odkud známe |
-|---|---|---|---|
-| U1 | „Záznam byl založen a předán dodavateli k řešení pod značkou:" | PMP | `HarvestPredicates.PhraseK3` |
-| U1/U2 | „Záznam byl předán dodavateli k řešení. Kalkulace byla akceptována." | PNF | `PhraseK6` |
-| U1/U2 | „Záznam byl předán dodavateli k řešení." | NES | `PhraseNesObjednani` |
-| U2 + termín | „předal záznam dodavateli :" + „s termínem plnění dodavatele" | PMP/PNF | `PhrasePlanPartA/B` |
-| U3 | „Záznam byl převzat k řešení dne" / „Dodavatel přidal řešení" | vše | schema ref §5.8, k ověření |
-| U5 | „Záznam byl převeden do archivu." | vše | `PhraseK10` |
-| U10 | neznámá | vše | Fáze 0 |
-| U11 + termín | „#schvalenizmenyterminu" … „na dd.MM.yyyy" | vše | `Hotline.UpdateTerminSplneni` ř. 759 |
+Přesné názvy a typy sloupců, hlavně cizího klíče ve `ticket_external_workflow`, se ověří dotazem do `sys.columns` (plán, Task 0), protože zdroják mapuje přes EF `.edmx`, který nemáme.
 
-Fráze se přesunou do jedné sdílené třídy `ServiceDeskFraze`, kterou budou používat `HarvestPredicates` i nový extraktor. Nikde nebudou duplicitní konstanty.
+### 6.2 Konfigurace a přístup
 
-**Pozor na prefixy:** krátká NES fráze je prefix fráze K6 (paměť `feedback_nes_vs_pmp_pnf_text_overlap`). Klasifikace proto vždy rozlišuje typ ticketu (`HOT_ZAZNAMY.typ_zaznamu`, Trim+ToUpper podle `feedback_typzaznamu_char5_normalization`).
+- Nový connection string `ConnectionStrings:ServiceDeskExternalReadOnly` v `appsettings.json` a nastavení `Ticketing:ExternalConnectionStringName`. Hodnotu i čtecí právo loginu PM Trackeru na tři tabulky zajišťuje správce. PM Tracker se k serveru nijak neváže.
+- Bez connection stringu nebo při `Ticketing:Enabled = false` se použije `Disabled*` fallback a záložka NES ukáže placeholder (§13).
+- Kontext `ServiceDeskExternalReadOnlyDbContext` je read-only stejně jako `TicketingReadOnlyDbContext` (`SaveChanges` vyhodí výjimku).
+
+### 6.3 Které tickety se hodnotí
+
+- **Jen tickety synchronizované s dodavatelem**, tedy ty, které mají řádek v `ticket_external`. Ostatní se neřeší a **nikde se nezobrazují** (rozhodnutí 2026-10-19).
+- Ticket patří do IS přes moduly (`HOT_MODULY.id_IS`), stejně jako dnes.
+- Bez `HOT_ZAZNAMY.id` je ticket mimo rozsah.
 
 ## 7. Architektura
 
 ```
-HOT_ZAZNAMY + HOT_VYJADRENI (intranetNEW, read-only)
-   │  IProdleniQueryService (ServiceDesk.Sql)          ← 2 dotazy na IS: kandidáti + vyjádření s frázemi
-   ▼
-WorkflowUdalostExtractor (text → List<WorkflowUdalost>)   ← čistá funkce, katalog ServiceDeskFraze
-   ▼
-PenaltyCalculator (port TicketPenaltyCalculator)          ← čistá funkce: vstup ticket + události + čas
-   │   ├─ ICeskeSvatky (výpočet: pevné svátky + Velký pátek od 2016 + Velikonoční pondělí)
-   │   └─ ISlaHodinyProvider (konfigurace Prodleni:SlaHodiny)
-   ▼
-ProdleniService (Web)                                     ← skládá, třídí, cache 10 min per (IS, den)
-   ├─ NES v prodlení záložka (seznam, hrozí, nelze vyhodnotit, souhrn per dodavatel)
-   ├─ Souhrnný pás dashboardu (počty)
-   ├─ Statistiky — sekce ServiceDesk (penalizované dny v období)
-   └─ Excel export
+HOT_ZAZNAMY (intranetNEW)                 ticket_external + _workflow + _sla (DB ServiceDesku)
+   │  TicketingReadOnlyDbContext              │  ServiceDeskExternalReadOnlyDbContext
+   └──────────────┬───────────────────────────┘
+                  ▼
+   IProdleniQueryService (ServiceDesk.Sql)   ← tickety IS spárované s ticket_external, jejich předávky, SLA katalog
+                  ▼
+   PenaltyCalculator (port TicketPenaltyCalculator)   ← čistá funkce: ticket + události + SLA hodiny + čas
+       └─ ICeskeSvatky (port MOSD_External.GetCzechHolidays: pevné svátky + Velký pátek od 2016 + Velikonoční pondělí)
+                  ▼
+   ProdleniService (Web)                     ← skládá, třídí, cache 10 min per (IS, den)
+       ├─ NES v prodlení záložka (seznam, hrozí, nelze vyhodnotit, souhrn per dodavatel)
+       ├─ Souhrnný pás dashboardu (počty)
+       ├─ Statistiky — sekce ServiceDesk (penalizované dny v období)
+       └─ Excel export
 ```
 
 **Umístění**
-- `PmTracker.ServiceDesk.Contracts`: `IProdleniQueryService`, DTO `ProdleniKandidatDto`, `WorkflowVyjadreniDto`.
-- `PmTracker.ServiceDesk.Sql`: `SqlProdleniQueryService` + `DisabledProdleniQueryService` (vzor Disabled* fallbacků).
-- `PmTracker.Web/Services/ServiceDesk/Prodleni/`: `ServiceDeskFraze`, `WorkflowUdalost`, `WorkflowUdalostExtractor`, `PenaltyCalculator`, `PenaltyResult`, `PenaltyReason`, `PenaltyReasonFormatter`, `CeskeSvatky`, `SlaHodinyOptions`, `ProdleniService`, `ProdleniPrehled`.
+- `PmTracker.ServiceDesk.Contracts`: `IProdleniQueryService`, DTO `ProdleniTicketDto`, `WorkflowUdalostDto`, `SlaKatalogDto`, `AkceptovanaKalkulaceDto`.
+- `PmTracker.ServiceDesk.Sql`: `ServiceDeskExternalReadOnlyDbContext` + entity `TicketExternalEntity`, `TicketExternalWorkflowEntity`, `TicketExternalSlaEntity`; `SqlProdleniQueryService` + `DisabledProdleniQueryService`.
+- `PmTracker.Web/Services/ServiceDesk/Prodleni/`: `WorkflowUdalost`, `PenaltyCalculator`, `PenaltyResult`, `PenaltyReason`, `PenaltyReasonFormatter`, `CeskeSvatky`, `ProdleniService`, `ProdleniPrehled`.
 
 **Výkon**
-- Kandidáti: neararchivované tickety IS, plus pro Statistiky tickety archivované v období. Dotaz přes moduly IS, stejně jako dnes.
-- Vyjádření: jeden dotaz `WHERE pid IN (…chunk ≤ 1 000…) AND (popis LIKE f1 OR … fN)` filtruje v DB jen řádky s frázemi. Klasifikace pak proběhne v paměti.
+- Tickety: z `intranetNEW` nearchivované tickety IS (pro Statistiky i archivované v období), z databáze ServiceDesku `ticket_external` s `external_id` v této množině. Spojení proběhne v paměti, protože jde o dvě databáze.
+- Předávky: jeden dotaz `WHERE <FK> IN (…chunk ≤ 1 000…)`.
+- SLA katalog: celá tabulka `ticket_external_sla` (desítky řádků), cache 1 h.
 - Výsledek `ProdleniPrehled` se cachuje v `IMemoryCache` po dobu 10 minut, klíč je `(isId, referenční den, rozsah)`. Projekty sdílející IS sdílejí cache.
 
-**Referenční čas:** lokální čas serveru přes `TimeProvider` (stejně jako `ProjectDashboardController`). Data v `HOT_*` jsou v lokálním čase.
+**Referenční čas:** lokální čas serveru přes `TimeProvider` (stejně jako `ProjectDashboardController`). Originál pracuje s `DateTime.Now` i s daty z obou databází jako s lokálním časem. Ověří se na vzorku: `ticket_external_workflow.date` předání proti času odpovídajícího vyjádření v `HOT_VYJADRENI`.
 
 ## 8. Dashboard — celková podoba
 
@@ -221,17 +223,17 @@ Obsah zůstává (úkoly s problematickými kroky harmonogramu: V prodlení / Č
 
 ```
 ┌ KPI ───────────────────────────────────────────────────────────────────────┐
-│ [5 aktivně v prodlení] [38 penalizovaných dnů] [3 hrozí prodlení] [1 nelze] │
+│ [5 v prodlení u dodavatele] [38 penalizovaných dnů] [3 hrozí prodlení] [1 nelze] │
 └────────────────────────────────────────────────────────────────────────────┘
 ┌ Penalizované dny podle dodavatele ──────┐ ┌ V prodlení podle typu ────────┐
 │ Dodavatel A ████████████████ 24         │ │ NES ██████ 3                   │
 │ Dodavatel B ███████ 11                  │ │ PMP ██ 1                       │
 │ Dodavatel C ██ 3                        │ │ PNF ██ 1                       │
 └─────────────────────────────────────────┘ └────────────────────────────────┘
-[Vše] [NES] [PMP] [PNF]   [☐ jen běžící prodlení]                 [Export do Excelu]
+[Vše] [NES] [PMP] [PNF]                                            [Export do Excelu]
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ Ticket  Typ         Stručně        Dodavatel  Kde je        Termín   Dny ▼ │
-│ #123456 NES · Vada B Chyba výpočtu  Dod. A     u dodavatele 03.10.   12    │
+│ Ticket  Typ         Stručně        Dodavatel  U dodavatele od  Termín  Dny ▼│
+│ #123456 NES · Vada B Chyba výpočtu  Dod. A     01.10. 09:12     02.10.  12   │
 │   ▸ Proč: 1) Předáno 01.10. 09:12, SLA 16 h vyčerpáno 02.10. …            │
 │          2) Prodloužení schváleno do 10.10. — dny do 10.10. prominuty     │
 │          [časová osa: U2 ●──────────● dnes]                               │
@@ -239,22 +241,21 @@ Obsah zůstává (úkoly s problematickými kroky harmonogramu: V prodlení / Č
 ▸ Hrozí prodlení (3)       ▸ Nelze vyhodnotit (1)
 ```
 
-**Kdo je „v prodlení":** neararchivovaný ticket IS s penalizovanými dny > 0.
-- *Běží:* ticket je u dodavatele a jeho poslední obrátka je po deadlinu, takže přibývají další dny.
-- *Ukončené:* ticket je zpět u nás, penále z minulých obrátek trvá.
+**Kdo je „v prodlení"** (rozhodnutí 2026-10-19): synchronizovaný ticket IS, který je **právě u dodavatele** (poslední předávka je U1/U2 bez následného U3) a má penalizované dny > 0. Ticket vrácený zpět k nám v prodlení není, i když mu z minulých obrátek penále zůstalo. Pravidlo platí pro NES i PMP/PNF, protože algoritmus počítá dny jen za dobu u dodavatele.
+- Zobrazený počet dnů = všechny penalizované dny ticketu u daného dodavatele (i z dřívějších obrátek), stejně jako sloupec „Dní penále" ve ServiceDesku.
 
-**Hrozí prodlení:** ticket je u dodavatele a ještě nemá penále. Pro NES zbývá ≤ 48 h SLA, pro PMP/PNF zbývá do termínu ≤ 5 dní. Prahy jsou převzaté z filtrů starého ServiceDesku (`GetCounterHodinyKReseni`, `GetCounterDnyKReseni`), viz R4.
+**Hrozí prodlení:** ticket je u dodavatele a ještě nemá penále. Pro NES zbývá ≤ 48 h SLA, pro PMP/PNF zbývá do termínu ≤ 5 dní. Prahy jsou převzaté z filtrů starého ServiceDesku (`GetCounterHodinyKReseni`, `GetCounterDnyKReseni`).
 
-**Nelze vyhodnotit:** engine vrátil chybu: „nemá iniciační událost", „neznámá důležitost pro SLA", „předání bez termínu plnění" (R5) nebo „neznámý typ". Každý takový ticket je vidět s důvodem, nic tiše nemizí.
+**Nelze vyhodnotit:** synchronizovaný ticket u dodavatele, u kterého engine vrátil chybu: „nemá iniciační událost (U1)", „důležitost nemá záznam v `ticket_external_sla`" (§16) nebo „neznámý typ". Je vidět s důvodem, aby chyba dat nezmizela potichu.
 
-**Sloupce:** ticket (odkaz do ServiceDesku), typ + důležitost (`gov-tag`), stručně, dodavatel, kde je (u dodavatele od X / zpět od Y), termín (SLA deadline nebo termín plnění, případně poznámka „prodlouženo do"), penalizované dny s nápovědou pracovní/kalendářní.
+**Sloupce:** ticket (odkaz do ServiceDesku), typ + důležitost (`gov-tag`), stručně, dodavatel, u dodavatele od (datum poslední předávky), termín (SLA deadline nebo termín plnění, případně poznámka „prodlouženo do"), penalizované dny s nápovědou pracovní/kalendářní.
 - Řadí se podle dnů sestupně.
 - Více dodavatelů na ticketu = jeden řádek na dodavatele, s hvězdičkou a vysvětlivkou T00 (stejně jako Excel ze ServiceDesku).
 - Rozbalení řádku ukáže **časovou osu obrátek** (předání → převzetí, prodloužení, dnešek) a **odůvodnění** složené z kódů T.
 
 **Grafy:** horizontální sloupce v jednom odstínu, seřazené sestupně. Dva malé grafy vedle sebe, na úzké obrazovce pod sebou.
 
-**Excel export** přidá sloupce: Penalizované dny, Typ dní (pracovní/kalendářní), Běží (ano/ne), Odůvodnění (komentář buňky), Penalizované dny (seznam dat v komentáři), Chyba výpočtu.
+**Excel export** přidá sloupce: Penalizované dny, Typ dní (pracovní/kalendářní), U dodavatele od, Odůvodnění (komentář buňky), Penalizované dny (seznam dat v komentáři), Chyba výpočtu.
 
 **Bez napojení na IS:** placeholder zůstává, jen v novém vzhledu (karta s ikonou a odkazem na nastavení IS).
 
@@ -352,10 +353,10 @@ Karty grafů jdou dvě vedle sebe (`flex: 1 1 420px`), na úzké obrazovce pod s
 
 | Situace | Chování |
 |---|---|
-| `Ticketing:Enabled=false` nebo projekt bez IS | Ticketové dlaždice se nevykreslí. Záložka NES ukáže placeholder s odkazem. Sekce ServiceDesk ve Statistikách = jedna informační karta. |
-| SD DB nedostupná nebo vyprší čas | Záložka NES ukáže chybovou kartu „ServiceDesk teď neodpovídá — zkuste to za chvíli" s tlačítkem Zkusit znovu. Souhrnný pás ukáže u ticketových dlaždic „—" s tooltipem. Statistiky vykreslí ostatní sekce. Chyba se loguje s isId. |
-| Ticket bez iniciační události nebo s neznámou důležitostí | Sekce „Nelze vyhodnotit" s důvodem |
-| `SlaHodiny` chybí v konfiguraci | Start aplikace selže validací options s hláškou, kterou jde zkopírovat (paměť `feedback_operator_messages_must_be_runnable`): přesný JSON blok k doplnění. |
+| `Ticketing:Enabled=false`, chybí connection string `ServiceDeskExternalReadOnly` nebo projekt bez IS | Ticketové dlaždice se nevykreslí. Záložka NES ukáže placeholder s odkazem. Sekce ServiceDesk ve Statistikách = jedna informační karta. |
+| `intranetNEW` nebo databáze ServiceDesku nedostupná, vyprší čas, chybí čtecí právo | Záložka NES ukáže chybovou kartu „ServiceDesk teď neodpovídá — zkuste to za chvíli" s tlačítkem Zkusit znovu. Souhrnný pás ukáže u ticketových dlaždic „—" s tooltipem. Statistiky vykreslí ostatní sekce. Chyba se loguje s isId. |
+| Ticket bez iniciační události (U1) nebo s důležitostí, která nemá řádek v `ticket_external_sla` | Sekce „Nelze vyhodnotit" s důvodem. Chybějící důležitost se navíc zaloguje jednou za načtení katalogu, s přesnou hodnotou `dulezitost`. |
+| Ticket bez řádku v `ticket_external` (nesynchronizovaný) | Neřeší se a nezobrazuje (§6.3) |
 | Ticket bez `HOT_ZAZNAMY.id` | Mimo rozsah, ignoruje se (paměť `feedback_sd_ticket_id_required`) |
 
 ## 14. Oprávnění
@@ -369,18 +370,20 @@ Beze změny klíčů: `dashboard.view`, `dashboard.records.view`, `dashboard.nes
 
 - **Engine (unit, golden):** scénáře T01–T14 pro každý typ, víc dodavatelů (T00), prominutí T14, půlnoc 23:59:59, víkend a svátek uvnitř obrátky, ticket stále u dodavatele (fixní `TimeProvider`).
 - **České svátky:** Velký pátek a Velikonoční pondělí 2016–2030 proti tabulce a pevné svátky.
-- **Extraktor:** reálné texty z Fáze 0 (anonymizované), prefixová past NES vs. K6, parsování dat, CHAR(5) typ s mezerami.
-- **Parita se ServiceDeskem (akceptační):** vyexportuješ ze starého ServiceDesku sestavu „Dní penále" (`GetListOfOverallSupplierDueTicketsToExcel`) pro 20–30 reálných ticketů. PM Tracker musí dát stejné penalizované dny. Rozdíly se vysvětlí a buď opraví, nebo zapíšou jako známá odchylka zdroje dat (varianta A). Reálná data nejdou do gitu, porovnání proběhne lokálně.
+- **Dotazová služba:** párování `external_id` s mezerami na `HOT_ZAZNAMY.id`, ticket bez `ticket_external` vyřazen, chunkování předávek, CHAR(5) typ s mezerami (InMemory kontexty obou databází).
+- **Parita se ServiceDeskem (akceptační):** vyexportuješ ze starého ServiceDesku sestavu „Dní penále" (`GetListOfOverallSupplierDueTicketsToExcel`) pro 20–30 reálných ticketů. PM Tracker musí dát stejné penalizované dny. Protože engine čte stejná data jako ServiceDesk, každý rozdíl je chyba portu a opraví se. Reálná data nejdou do gitu, porovnání proběhne lokálně.
 - **Providery Statistik:** golden-vektor testy (vstup dataset, výstup `ChartData`) bez DB, stejně jako u stávajících providerů.
 - **Api render testy:** kotvení na atributy a ASCII, ne na český text (paměť `feedback_razor_encodes_diacritics_in_html_tests`).
 - **Reálný prohlížeč:** Playwright proti lokální app (paměť `feedback_verify_ui_in_real_browser`): proklikání všech záložek a dlaždic, snímky ve světlém i tmavém režimu, úzká šířka. Snímky dostaneš ke kontrole.
 
-## 16. Rozhodnutí, která potřebuju od tebe
+## 16. Rozhodnutí (stav 2026-10-19)
 
-| # | Otázka | Moje doporučení |
+| # | Otázka | Rozhodnutí |
 |---|---|---|
-| **R1** | Zdroj workflow událostí: **A** texty `HOT_VYJADRENI`, nebo **B** napojení na DB `MOSD_External`? | **A** + Fáze 0 (diagnostický skript spustíš na produkci) |
-| **R2** | SLA hodiny podle důležitosti NES (NES I/II/III, Vada A–D): hodnoty ze smlouvy | Pošli hodnoty ze smlouvy. Fáze 0 je zároveň odhadne z dat, takže uvidíme, jestli sedí. |
-| **R3** | Které tickety vstupují do seznamu? | Neararchivované. Archivované jen do statistik za období. |
-| **R4** | Prahy „hrozí prodlení" | NES ≤ 48 h SLA, PMP/PNF ≤ 5 dní (jako ServiceDesk) |
-| **R5** | U PMP/PNF předání **bez rozpoznaného termínu plnění** originál penalizuje celou obrátku od data předání (T04). U textové extrakce to může znamenat jen to, že jsme termín nepřečetli. | **Odchylka:** ticket dát do „Nelze vyhodnotit — v předání chybí termín plnění" místo penalizace. Ostatní zvláštnosti (§5.4) ponechat 1:1. |
+| R1 | Zdroj předávek | **Databáze ServiceDesku** (`ticket_external*`), stejná data jako starý ServiceDesk (§6). Textová rekonstrukce z `HOT_VYJADRENI` odpadá. |
+| R2 | SLA hodiny podle důležitosti | Z tabulky `ticket_external_sla`, ne z konfigurace PM Trackeru. |
+| R3 | Které tickety vstupují do seznamu | Jen synchronizované (`ticket_external`) a právě u dodavatele (§10). Nesynchronizované se neřeší a neukazují. Archivované jen do statistik za období. |
+| R4 | Prahy „hrozí prodlení" | NES ≤ 48 h SLA, PMP/PNF ≤ 5 dní, převzato ze ServiceDesku. *Zatím jsi nepotvrdil, platí, dokud neřekneš jinak.* |
+| R5 | Předání PMP/PNF bez termínu | Odpadá: termín je ve sloupci `dt_param`, žádné parsování textu. Chová se 1:1 jako originál (T04). |
+| R6 | Důležitost bez řádku v `ticket_external_sla` | Originál by přes `Convert.ToInt32(null)` dosadil 0 h SLA a penalizoval od prvního dne. Podle tebe důležitost u NES nikdy není prázdná, takže tahle situace znamená chybu dat nebo katalogu → **„Nelze vyhodnotit"** s důvodem, žádné falešné penále. |
+| R7 | Connection string a přístup | Vyplňuje správce v `appsettings.json` (`ConnectionStrings:ServiceDeskExternalReadOnly`), čtecí právo zajišťuje také správce. |
