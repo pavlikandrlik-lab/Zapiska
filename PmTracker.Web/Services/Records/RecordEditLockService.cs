@@ -11,6 +11,10 @@ public sealed record RecordEditLockResult(bool Acquired, int? HolderOsobaId, Dat
 public interface IRecordEditLockService
 {
     Task<RecordEditLockResult> TryAcquireAsync(int zaznamId, int osobaId, CancellationToken ct = default);
+
+    /// <summary>Stejná odpověď jako <see cref="TryAcquireAsync"/>, ale bez zápisu (režim „Zobrazit jako“).</summary>
+    Task<RecordEditLockResult> PeekAsync(int zaznamId, int osobaId, CancellationToken ct = default);
+
     Task HeartbeatAsync(int zaznamId, int osobaId, CancellationToken ct = default);
     Task ReleaseAsync(int zaznamId, int osobaId, CancellationToken ct = default);
 }
@@ -60,6 +64,20 @@ WHEN NOT MATCHED
         if (zamek is null || zamek.OsobaId == osobaId)
         {
             return new RecordEditLockResult(true, osobaId, zamek?.ZiskanoAt);
+        }
+
+        return new RecordEditLockResult(false, zamek.OsobaId, zamek.ZiskanoAt);
+    }
+
+    public async Task<RecordEditLockResult> PeekAsync(int zaznamId, int osobaId, CancellationToken ct = default)
+    {
+        var expiryUtc = timeProvider.GetUtcNow().UtcDateTime - Ttl;
+        var zamek = await dbContext.ZaznamEditZamky.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.ZaznamId == zaznamId, ct);
+
+        if (zamek is null || zamek.OsobaId == osobaId || zamek.HeartbeatAt < expiryUtc)
+        {
+            return new RecordEditLockResult(true, osobaId, zamek?.OsobaId == osobaId ? zamek.ZiskanoAt : null);
         }
 
         return new RecordEditLockResult(false, zamek.OsobaId, zamek.ZiskanoAt);

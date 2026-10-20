@@ -109,6 +109,9 @@ public sealed class ZaznamyControllerEditAuthzTests
         public Task<RecordEditLockResult> TryAcquireAsync(int zaznamId, int osobaId, CancellationToken ct = default)
             => Task.FromResult(new RecordEditLockResult(true, osobaId, DateTime.UtcNow));
 
+        public Task<RecordEditLockResult> PeekAsync(int zaznamId, int osobaId, CancellationToken ct = default)
+            => Task.FromResult(new RecordEditLockResult(true, osobaId, null));
+
         public Task HeartbeatAsync(int zaznamId, int osobaId, CancellationToken ct = default)
             => Task.CompletedTask;
 
