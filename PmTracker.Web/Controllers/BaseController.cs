@@ -133,7 +133,11 @@ public abstract partial class BaseController : Controller
             // Jen skutečný kód celku (resolver ho normalizuje na null). Žádný fallback na
             // OrganizacniCelek — ten je bez celku zástupné "-" a hlavička by ukázala „Jméno – -".
             CurrentUserOrgCode = CurrentUserContext.OrganizacniCelekKod,
-            CurrentUserRoles = CurrentUserContext.RoleKody
+            CurrentUserRoles = CurrentUserContext.RoleKody,
+            CanStartViewAs = CurrentUserContext.IsSuperAdmin && CurrentUserContext.ViewAs is null,
+            ViewAs = CurrentUserContext.ViewAs is { } viewAs
+                ? new ViewAsBarViewModel(CurrentUserContext.DisplayName, viewAs.RealDisplayName)
+                : null
         };
 
         await next();

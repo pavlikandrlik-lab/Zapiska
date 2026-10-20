@@ -9,6 +9,7 @@ using PmTracker.Web.Services.Audit;
 using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Schedules;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Security.ViewAs;
 using IPmAuthorizationService = PmTracker.Web.Services.Security.IAuthorizationService;
 
 namespace PmTracker.Web.Controllers;
@@ -103,6 +104,7 @@ public sealed class HarmonogramController : Controller
     public sealed record PreviewSyncRequest(int ZaznamId);
 
     [HttpPost("PreviewSync")]
+    [AllowDuringViewAs]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> PreviewSync([FromBody] PreviewSyncRequest request, CancellationToken ct)
     {

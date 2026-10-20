@@ -6,6 +6,7 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Export;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Security.ViewAs;
 using PmTracker.Web.Services.Vyzvy;
 
 namespace PmTracker.Web.Controllers;
@@ -224,6 +225,7 @@ public sealed class ExportController : BaseController
     }
 
     [HttpPost("Pdf")]
+    [AllowDuringViewAs]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = "permission:export.pdf.projekt")]
     public IActionResult Pdf(PdfExportRequestViewModel request)

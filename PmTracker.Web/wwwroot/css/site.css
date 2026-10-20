@@ -579,6 +579,25 @@ mark.app-search-flash.app-search-flash--fading {
 }
 .app-breadcrumb-close:hover { color: var(--text-primary); background: var(--background-neutral-subtle); }
 
+/* Lišta „Zobrazit jako“ (superadmin vidí aplikaci očima jiného uživatele, jen pro čtení).
+   Nosný layout jen flex + wrap (Edge na i15); na úzkém displeji tlačítko spadne pod text. */
+.app-view-as-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--background-status-warning-subtle);
+    border-bottom: 1px solid var(--border-warning);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+.app-view-as-bar__icon { flex: 0 0 auto; }
+.app-view-as-bar__text { flex: 1 1 16rem; min-width: 0; margin: 0; }
+.app-view-as-bar__real { color: var(--text-secondary); margin-left: 0.5rem; }
+.app-view-as-bar__form { flex: 0 0 auto; margin: 0 0 0 auto; }
+.app-view-as-modal__note { margin: 0 0 1rem; color: var(--text-secondary); }
+
 /* Úzká šířka: schovej všechny drobečky kromě aktuálního, nech ← + aktuální. */
 @media (max-width: 640px) {
     .app-breadcrumb-item:not(:last-child) { display: none; }
