@@ -115,5 +115,5 @@ Náhled: [assets/2026-10-20-prehled-nadpisy-nahled.png](assets/2026-10-20-prehle
 | `PmTracker.Web/Views/Dashboard/Index.cshtml` | `h1` (skrytý), tři `h2`, `aria-labelledby` |
 | `PmTracker.Web/wwwroot/css/site.css` | `.dashboard-panel-heading`, `.app-sr-only`, úprava komentáře o odstranění hlaviček |
 | `PmTracker.Tests.Api/Controllers/DashboardBlockHeadingsRenderTests.cs` | nový render test |
-| `PmTracker.Tests.Unit/...` | test `PageTitle` (do existujícího testu `DashboardService`, pokud existuje) |
+| `PmTracker.Tests.Unit/Home/DashboardBlockTitlesTests.cs` | nový test: `PageTitle` detailních stránek = `DashboardBlockTitles.*` |
 | `docs/k-otestovani.md` | nová sekce |
