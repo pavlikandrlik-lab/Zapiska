@@ -45,7 +45,7 @@ Nasazení: kód je jen v lokálním `main` (bez pushe). Žádná změna DB sché
 
 ## 2. Přehled — nadpisy bloků
 
-**Hotovo 2026-10-20:** spec `docs/superpowers/specs/2026-10-20-prehled-nadpisy-bloku-design.md`, plán `docs/superpowers/plans/2026-10-20-prehled-nadpisy-bloku.md`.
+**Hotovo 2026-10-20:** merge `45dd77d`, spec `docs/superpowers/specs/2026-10-20-prehled-nadpisy-bloku-design.md`, plán `docs/superpowers/plans/2026-10-20-prehled-nadpisy-bloku.md`.
 
 **Co to dělá:**
 - Tři bloky Přehledu mají kompaktní nadpis: „Na co se soustředit“, „Nejbližší jednání“, „Co je nového“. Texty jsou stejné jako titulky stránek „Zobrazit více“ a berou se z jednoho místa v kódu.
