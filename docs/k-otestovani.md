@@ -68,7 +68,7 @@ Nasazení: kód je jen v lokálním `main` (bez pushe). Žádná změna DB sché
 
 ## 3. Tisk jednání a „Znovu vytěžit“ pro projektové role
 
-**Hotovo 2026-10-20:** plán `docs/superpowers/plans/2026-10-20-tisk-jednani-projektove-role.md`.
+**Hotovo 2026-10-20:** merge `14c0703`, plán `docs/superpowers/plans/2026-10-20-tisk-jednani-projektove-role.md`.
 
 **Co se opravilo:**
 - PM, vedoucí subsystému a další role bez globální role (vlastník, admin projektu, gestor, host, zástupce, metodik) dostávali u tisku a Wordu jednání ze **seznamu Jednání** a ze **záložky Jednání v projektu** „Přístup odepřen“. Z detailu jednání to fungovalo už od července. Odkazy teď nesou projekt. Kombinace „PM + vedoucí subsystému“ nebyla příčinou: stejně dopadl každý bez globální role, superadmin a správce aplikace chybu neviděli.
