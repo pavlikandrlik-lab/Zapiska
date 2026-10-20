@@ -29,8 +29,8 @@
             {
                 var detailUrl = Url.Action("Detail", new { id = jednani.Id, returnUrl = overviewReturnUrl, asUser })
                     ?? $"/Jednani/Detail/{jednani.Id}?returnUrl={Uri.EscapeDataString(overviewReturnUrl)}";
-                var meetingPdfUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = jednani.Id, autoPrint = true }) ?? $"/Export/Jednani/{jednani.Id}/Tisk?autoPrint=true";
-                var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = jednani.Id }) ?? $"/Export/Jednani/{jednani.Id}/Word";
+                var meetingPdfUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = jednani.Id, projektId = Model.ProjektId, autoPrint = true }) ?? $"/Export/Jednani/{jednani.Id}/Tisk?projektId={Model.ProjektId}&autoPrint=true";
+                var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = jednani.Id, projektId = Model.ProjektId }) ?? $"/Export/Jednani/{jednani.Id}/Word?projektId={Model.ProjektId}";
                 <div class="meeting-card-slot" data-meeting-card-wrap data-meeting-id="@jednani.Id">
                     @await Html.PartialAsync("_MeetingCard", new MeetingCardViewModel
                     {

@@ -63,3 +63,28 @@ Nasazení: kód je jen v lokálním `main` (bez pushe). Žádná změna DB sché
 - [ ] V režimu „Zobrazit jako“ jsou nadpisy pod žlutou lištou a Přehled se načte celý.
 
 **Známá omezení (vědomě):** žádná.
+
+---
+
+## 3. Tisk jednání a „Znovu vytěžit“ pro projektové role
+
+**Hotovo 2026-10-20:** plán `docs/superpowers/plans/2026-10-20-tisk-jednani-projektove-role.md`.
+
+**Co se opravilo:**
+- PM, vedoucí subsystému a další role bez globální role (vlastník, admin projektu, gestor, host, zástupce, metodik) dostávali u tisku a Wordu jednání ze **seznamu Jednání** a ze **záložky Jednání v projektu** „Přístup odepřen“. Z detailu jednání to fungovalo už od července. Odkazy teď nesou projekt. Kombinace „PM + vedoucí subsystému“ nebyla příčinou: stejně dopadl každý bez globální role, superadmin a správce aplikace chybu neviděli.
+- Vlastník, admin projektu a PM dostávali „Přístup odepřen“ u **„Znovu vytěžit“** v okně vyjádření tiketu. Opraveno. Server navíc ověřuje, že tiket patří do projektu: dřív šlo podvrženým projektem vytěžit tiket cizího projektu.
+- Nový automatický test hlídá všechny odkazy a formuláře na akce s projektovým oprávněním (dnes 37 odkazů a 14 formulářů), aby žádný neztratil projekt.
+
+**Ověřeno lokálně v prohlížeči:** za Ing. Janu Testerovou (PM + vedoucí subsystému v projektu PMT) přes „Zobrazit jako“ vrátil tisk PDF i Word ze seznamu Jednání, ze záložky projektu i z detailu jednání soubor. „Znovu vytěžit“ za ni proběhlo. Uživatel bez role v projektu tisk dál neotevře.
+
+**Otestovat (přihlášen jako PM nebo vedoucí subsystému bez admin role, nebo superadmin přes „Zobrazit jako“):**
+- [ ] Jednání → karta jednání → tiskárna → PDF: otevře se tisk, ne „Přístup odepřen“.
+- [ ] Totéž → WORD: stáhne se dokument.
+- [ ] Detail projektu → záložka Jednání → tisk PDF i Word.
+- [ ] Detail jednání → tisk PDF i Word (fungovalo i dřív, nesmí se rozbít).
+- [ ] Jednání ze starších let (rozbalit historii) → tisk funguje.
+- [ ] Uživatel ve více projektech: tisk jednání z každého projektu funguje.
+- [ ] Jako PM, vlastník nebo admin projektu (ne přes „Zobrazit jako“, ten zápisy blokuje): záznam s externím odkazem → okno vyjádření → „Znovu vytěžit“ → proběhne, ne „Vytěžování selhalo (HTTP 403)“.
+- [ ] Uživatel bez role v projektu tisk jednání toho projektu dál neotevře.
+
+**Známá omezení (vědomě):** staré záložky nebo přímé URL tisku bez `projektId` fungují jen globálním uživatelům, stejně jako dřív.
