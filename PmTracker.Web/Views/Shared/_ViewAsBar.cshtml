@@ -1,0 +1,17 @@
+@model PmTracker.Web.Models.ViewModels.ViewAsBarViewModel
+@{
+    // Zachová ?asUser (dev identita) stejně jako Projekty/Detail.cshtml.
+    var asUser = Context.Request.Query["asUser"].ToString();
+    var stopUrl = Url.Action("Ukoncit", "PohledJako", new { asUser }) ?? "/PohledJako/Ukoncit";
+}
+<div class="app-view-as-bar" role="status" data-view-as-bar>
+    <gov-icon class="app-view-as-bar__icon" name="eye" type="components" aria-hidden="true"></gov-icon>
+    <p class="app-view-as-bar__text">
+        Prohlížíte aplikaci jako <strong data-view-as-target>@Model.TargetDisplayName</strong>, jen pro čtení.
+        <span class="app-view-as-bar__real">Váš účet: @Model.RealDisplayName</span>
+    </p>
+    <form class="app-view-as-bar__form" method="post" action="@stopUrl">
+        @Html.AntiForgeryToken()
+        <gov-button native-type="submit" type="outlined" color="primary" size="s" data-view-as-stop>Zrušit pohled jako</gov-button>
+    </form>
+</div>

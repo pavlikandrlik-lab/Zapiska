@@ -172,6 +172,14 @@
                                 <gov-button type="base" color="primary" size="m" expanded role="menuitem"
                                             href="@(profileUrl + "#moje-prava")">Moje práva</gov-button>
                             </li>
+                            @if (nav?.CanStartViewAs == true)
+                            {
+                                <li role="presentation">
+                                    <gov-button type="base" color="primary" size="m" expanded role="menuitem"
+                                                data-view-as-start
+                                                data-modal-url="@Url.Action("Vyber", "PohledJako")">Zobrazit jako…</gov-button>
+                                </li>
+                            }
                         </ul>
                     </gov-dropdown>
                 </gov-flex>
@@ -208,6 +216,11 @@
             </nav>
         </div>
     </header>
+
+    @if (nav?.ViewAs is { } viewAsBar)
+    {
+        <partial name="_ViewAsBar" model="viewAsBar" />
+    }
 
     @{
         var breadcrumbTrail = ViewData["Breadcrumbs"] as PmTracker.Web.Models.ViewModels.BreadcrumbTrail;

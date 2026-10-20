@@ -12,6 +12,7 @@ using PmTracker.Web.Services.People;
 using PmTracker.Web.Services.Profile;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Security.ViewAs;
 using PmTracker.Web.Services.Documentation;
 using PmTracker.Web.Services.Dashboard;
 using PmTracker.Web.Services.Home;
@@ -65,9 +66,15 @@ public static class DataStoreServiceCollectionExtensions
                     maxRetryDelay: TimeSpan.FromSeconds(5),
                     errorNumbersToAdd: null);
             });
+
+            // Pohled jako: pojistka jen-pro-čtení. sp je scope requestu (DbContextOptions jsou scoped).
+            optionsBuilder.AddInterceptors(sp.GetRequiredService<ViewAsWriteGuardInterceptor>());
         });
 
         services.AddScoped<IUserContextResolver, UserContextResolver>();
+        services.AddScoped<ViewAsRequestState>();
+        services.AddScoped<IViewAsService, ViewAsService>();
+        services.AddScoped<ViewAsWriteGuardInterceptor>();
         services.AddScoped<PermissionSeeder>();
         services.AddScoped<IActiveDirectoryService, ActiveDirectoryService>();
         // Shared sync infrastructure — per-T singletony

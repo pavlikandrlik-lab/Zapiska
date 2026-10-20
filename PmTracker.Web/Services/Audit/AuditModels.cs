@@ -15,7 +15,9 @@ public enum AuditActionType
     Approve,
     Reject,
     Assign,
-    Reorder
+    Reorder,
+    ViewAsStart,
+    ViewAsStop
 }
 
 public enum AuditEntityType
@@ -40,7 +42,10 @@ public enum AuditEntityType
     /// Review finding S-3: admin re-harvest externí vazby (/Vyjadreni/ReHarvest
     /// nebo /SDConnector/ReHarvest). Entity ID = externiOdkazId.
     /// </summary>
-    SdExterniOdkaz
+    SdExterniOdkaz,
+
+    /// <summary>Zahájení / ukončení režimu „Zobrazit jako“. Entity ID = cílová osoba_id.</summary>
+    ViewAs
 }
 
 public static class AuditActorIds
@@ -75,6 +80,8 @@ internal static class AuditVocabulary
         AuditActionType.Reject => "reject",
         AuditActionType.Assign => "assign",
         AuditActionType.Reorder => "reorder",
+        AuditActionType.ViewAsStart => "view_as_start",
+        AuditActionType.ViewAsStop => "view_as_stop",
         _ => throw new ArgumentOutOfRangeException(nameof(actionType), actionType, null)
     };
 
@@ -97,6 +104,7 @@ internal static class AuditVocabulary
         AuditEntityType.AuthzPermission => "authz_permission",
         AuditEntityType.AuthzRolePermission => "authz_role_permission",
         AuditEntityType.SdExterniOdkaz => "sd_externi_odkaz",
+        AuditEntityType.ViewAs => "pohled_jako",
         _ => throw new ArgumentOutOfRangeException(nameof(entityType), entityType, null)
     };
 }

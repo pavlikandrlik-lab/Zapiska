@@ -186,6 +186,13 @@ public class AuthorizationPolicyEnforcementTests
             // master switch persistuje rezim při Save přes HarmonogramRezim, ne přes endpoint.
             "PmTracker.Web.Controllers.HarmonogramController.SelectCandidate",
             "PmTracker.Web.Controllers.HarmonogramController.PreviewSync",
+
+            // ---- PohledJakoController (režim „Zobrazit jako“) ----
+            // Superadmin není permission klíč (authz.superadmins), proto body-check v akci.
+            // Ukoncit musí projít i během pohledu, kdy kontext patří cílové osobě bez práv —
+            // ukončení řídí skutečná identita (cookie + superadmin ověřené v ViewAsService).
+            "PmTracker.Web.Controllers.PohledJakoController.Zahajit",
+            "PmTracker.Web.Controllers.PohledJakoController.Ukoncit",
         };
 
         // Act

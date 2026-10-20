@@ -5,6 +5,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Security.ViewAs;
 
 namespace PmTracker.Web.Services.Security;
 
@@ -44,6 +45,8 @@ public sealed class UserContextResolver : IUserContextResolver
     private readonly ITextNormalizer _textNormalizer;
     private readonly IPersonIdentityMatcher _personIdentityMatcher;
     private readonly IAuthorizationService _authzService;
+    private readonly IViewAsService _viewAsService;
+    private readonly ViewAsRequestState _viewAsState;
 
     public UserContextResolver(
         PmTrackerDbContext dbContext,
@@ -51,7 +54,9 @@ public sealed class UserContextResolver : IUserContextResolver
         ILogger<UserContextResolver> logger,
         ITextNormalizer textNormalizer,
         IPersonIdentityMatcher personIdentityMatcher,
-        IAuthorizationService authzService)
+        IAuthorizationService authzService,
+        IViewAsService viewAsService,
+        ViewAsRequestState viewAsState)
     {
         _dbContext = dbContext;
         _environment = environment;
@@ -59,6 +64,8 @@ public sealed class UserContextResolver : IUserContextResolver
         _textNormalizer = textNormalizer;
         _personIdentityMatcher = personIdentityMatcher;
         _authzService = authzService;
+        _viewAsService = viewAsService;
+        _viewAsState = viewAsState;
     }
 
     /// <summary>
@@ -310,12 +317,18 @@ public sealed class UserContextResolver : IUserContextResolver
             }
         }
 
+        // Pohled jako: skutečná osoba je vyřešená, teď se rozhodne, za koho se request vyhodnotí.
+        // Identita přihlášeného (HttpContext.User) se nemění — jen osoba_id kontextu.
+        var realOsobaId = osobaId.Value;
+        var viewAs = await _viewAsService.EvaluateAsync(httpContext, realOsobaId, ct);
+        var effectiveOsobaId = viewAs?.TargetOsobaId ?? realOsobaId;
+
         var osoba = await (
                 from person in _dbContext.Osoby.AsNoTracking()
                 join organizationalUnit in _dbContext.CiselnikOrganizacniCelky.AsNoTracking()
                     on person.OrganizacniCelekId equals organizationalUnit.Id into organizationalUnitGroup
                 from organizationalUnit in organizationalUnitGroup.DefaultIfEmpty()
-                where person.Id == osobaId.Value
+                where person.Id == effectiveOsobaId
                 select new ResolvedPersonRow(
                     person.Id,
                     person.Titul,
@@ -331,7 +344,7 @@ public sealed class UserContextResolver : IUserContextResolver
         {
             _logger.LogWarning(
                 "User context resolution failed. Reason=ResolvedPersonMissingInDatabase OsobaId={OsobaId}",
-                osobaId);
+                effectiveOsobaId);
 
             return UserContextResolutionResult.Forbidden("Přihlášená osoba v databázi neexistuje.");
         }
@@ -394,15 +407,22 @@ public sealed class UserContextResolver : IUserContextResolver
             RoleKody = roleCodes,
             VisibleProjectIds = visibleProjectIds,
             DeletedProjectIds = resolvedDeletedProjectIds,
-            Authorization = authzSnapshot
+            Authorization = authzSnapshot,
+            ViewAs = viewAs is null ? null : new ViewAsInfo(viewAs.RealOsobaId, viewAs.RealDisplayName)
         };
 
+        if (viewAs is not null)
+        {
+            _viewAsState.Activate(viewAs.RealOsobaId, context.OsobaId);
+        }
+
         _logger.LogInformation(
-            "User context resolved successfully. OsobaId={OsobaId} IsSuperAdmin={IsSuperAdmin} RoleCount={RoleCount} VisibleProjectCount={VisibleProjectCount}",
+            "User context resolved successfully. OsobaId={OsobaId} IsSuperAdmin={IsSuperAdmin} RoleCount={RoleCount} VisibleProjectCount={VisibleProjectCount} ViewAsRealOsobaId={ViewAsRealOsobaId}",
             context.OsobaId,
             context.IsSuperAdmin,
             context.RoleKody.Count,
-            context.VisibleProjectIds.Count);
+            context.VisibleProjectIds.Count,
+            viewAs?.RealOsobaId);
 
         return UserContextResolutionResult.Success(context);
     }

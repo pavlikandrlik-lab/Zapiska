@@ -1,0 +1,42 @@
+@model ViewAsModalViewModel
+@{
+    Layout = "_ModalLayout";
+    ViewData["ModalTitleId"] = "view-as-modal-title";
+    ViewData["ModalOverflowVisible"] = true;
+}
+
+<h2 id="view-as-modal-title">Zobrazit aplikaci jako jiný uživatel</h2>
+
+<p class="app-view-as-modal__note">
+    Aplikace se zobrazí s právy a viditelností vybraného uživatele. V tomto režimu nelze nic ukládat;
+    pohled ukončíte tlačítkem v liště pod hlavičkou.
+</p>
+
+<form class="form-grid"
+      data-view-as-modal
+      asp-controller="PohledJako"
+      asp-action="Zahajit"
+      method="post"
+      data-ajax-submit="true">
+    <div class="office-picker"
+         data-person-picker="single"
+         data-person-picker-search-url="@Model.SearchUrl"
+         data-person-picker-placeholder="Vyhledejte osobu podle jména, e-mailu nebo loginu..."
+         data-person-picker-empty="Nenalezeny žádné odpovídající osoby.">
+        <input type="hidden" name="OsobaId" value="" data-person-picker-hidden required />
+        <label class="office-search-label">Osoba</label>
+        <div class="office-searchbox" data-floating-anchor>
+            <input type="search" autocomplete="off" data-person-picker-input required />
+            <div class="office-search-panel" data-person-picker-panel data-floating-panel data-floating-kind="person-search" data-floating-match-width="true" hidden>
+                <div class="office-search-results" data-person-picker-results role="listbox" aria-label="Výsledky osob"></div>
+            </div>
+        </div>
+    </div>
+
+    @await Html.PartialAsync(
+        "_ModalFormActions",
+        new ModalFormActionsViewModel
+        {
+            SubmitLabel = "Zobrazit jako"
+        })
+</form>

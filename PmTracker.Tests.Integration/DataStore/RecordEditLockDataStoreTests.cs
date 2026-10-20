@@ -138,4 +138,62 @@ public sealed class RecordEditLockDataStoreTests
         (await dbContext.ZaznamEditZamky.AsNoTracking().AnyAsync(x => x.ZaznamId == scenario.RecordId))
             .Should().BeFalse("vlastní zámek se po uložení uvolní");
     }
+
+    [Fact]
+    public async Task Peek_ShouldReportHolder_WithoutWriting()
+    {
+        var db = await _fixture.CreateDatabaseAsync("lock_peek_holder");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+        var scenario = await RecordConcurrencyScenario.SeedAsync(dbContext, store, "LOCKPEEK1");
+        var viewer = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "LockPeekViewer");
+        var service = new RecordEditLockService(dbContext, TimeProvider.System);
+        await service.TryAcquireAsync(scenario.RecordId, scenario.OsobaId);
+        var before = await dbContext.ZaznamEditZamky.AsNoTracking().SingleAsync(x => x.ZaznamId == scenario.RecordId);
+
+        var result = await service.PeekAsync(scenario.RecordId, viewer);
+
+        result.Acquired.Should().BeFalse();
+        result.HolderOsobaId.Should().Be(scenario.OsobaId);
+        var after = await dbContext.ZaznamEditZamky.AsNoTracking().SingleAsync(x => x.ZaznamId == scenario.RecordId);
+        after.OsobaId.Should().Be(before.OsobaId);
+        after.HeartbeatAt.Should().Be(before.HeartbeatAt, "nahlédnutí nesmí prodloužit cizí zámek");
+    }
+
+    [Fact]
+    public async Task Peek_FreeRecord_ReportsAcquired_AndCreatesNoLock()
+    {
+        var db = await _fixture.CreateDatabaseAsync("lock_peek_free");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+        var scenario = await RecordConcurrencyScenario.SeedAsync(dbContext, store, "LOCKPEEK2");
+        var service = new RecordEditLockService(dbContext, TimeProvider.System);
+
+        var result = await service.PeekAsync(scenario.RecordId, scenario.OsobaId);
+
+        result.Acquired.Should().BeTrue();
+        (await dbContext.ZaznamEditZamky.AnyAsync(x => x.ZaznamId == scenario.RecordId))
+            .Should().BeFalse("nahlédnutí nesmí založit zámek");
+    }
+
+    [Fact]
+    public async Task Peek_ExpiredForeignLock_ReportsAcquired()
+    {
+        var db = await _fixture.CreateDatabaseAsync("lock_peek_expired");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var store = IntegrationTestHelper.CreateDataStore(dbContext);
+        var scenario = await RecordConcurrencyScenario.SeedAsync(dbContext, store, "LOCKPEEK3");
+        var viewer = await IntegrationTestHelper.EnsurePersonAsync(dbContext, "LockPeekViewer3");
+        var old = DateTime.UtcNow - RecordEditLockService.Ttl - TimeSpan.FromMinutes(1);
+        dbContext.ZaznamEditZamky.Add(new PmTracker.Web.Models.Entities.ZaznamEditZamekEntity
+        {
+            ZaznamId = scenario.RecordId, OsobaId = scenario.OsobaId, ZiskanoAt = old, HeartbeatAt = old
+        });
+        await dbContext.SaveChangesAsync();
+        var service = new RecordEditLockService(dbContext, TimeProvider.System);
+
+        var result = await service.PeekAsync(scenario.RecordId, viewer);
+
+        result.Acquired.Should().BeTrue("vypršelý zámek by si cílový uživatel převzal");
+    }
 }

@@ -5,6 +5,7 @@ using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Models.ViewModels.ExterniOdkaz;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Security.ViewAs;
 using PmTracker.Web.Services.ServiceDesk;
 using IPmAuthorizationService = PmTracker.Web.Services.Security.IAuthorizationService;
 
@@ -47,6 +48,7 @@ public sealed class ExterniOdkazController : Controller
     }
 
     [HttpPost("Sync")]
+    [AllowDuringViewAs]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Sync(
         [FromForm] string cislo,
