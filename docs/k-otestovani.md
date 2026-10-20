@@ -40,3 +40,26 @@ Nasazení: kód je jen v lokálním `main` (bez pushe). Žádná změna DB sché
 - Stránka, kam cílová osoba nesmí (prázdná 403), lištu nemá. Stačí se vrátit zpět nebo na Přehled.
 - Některé starší akce mimo modaly (chat vyjádření, synchronizace tiketu, přetažení vazby) při pokusu o změnu ukážou obecnou chybu místo konkrétní hlášky. Zápis je i tak zablokovaný.
 - Vyhledávání osob v modalu nemusí najít jméno, když hledáš bez diakritiky (převzatý existující dotaz).
+
+---
+
+## 2. Přehled — nadpisy bloků
+
+**Hotovo 2026-10-20:** spec `docs/superpowers/specs/2026-10-20-prehled-nadpisy-bloku-design.md`, plán `docs/superpowers/plans/2026-10-20-prehled-nadpisy-bloku.md`.
+
+**Co to dělá:**
+- Tři bloky Přehledu mají kompaktní nadpis: „Na co se soustředit“, „Nejbližší jednání“, „Co je nového“. Texty jsou stejné jako titulky stránek „Zobrazit více“ a berou se z jednoho místa v kódu.
+- Nadpis zabere 32 px. Počet viditelných karet záznamů se nezměnil (lokálně 1400×900 = 5 karet, 1920×1080 = 6 karet, stejně jako dřív).
+- Nadpis je vidět hned, i během načítání (nad šedým skeletonem) a i když se obsah bloku nenačte.
+- Pro čtečky obrazovky má stránka skrytý nadpis „Přehled“ a každý blok je pojmenovaný svým nadpisem.
+
+**Otestovat:**
+- [ ] Přehled na i15 / Edge: tři nadpisy, malé tučné písmo, každý na jednom řádku.
+- [ ] Levý blok: vejde se stejný počet karet záznamů jako dřív. Seznam roluje a nadpis zůstává nahoře.
+- [ ] Pravý sloupec: jednání a novinky se dělí výškou jako dřív, nic se neořezává. Bez jednání: nadpis + „Nejsou naplánovaná žádná blízká jednání.“, novinky dostanou zbytek.
+- [ ] Při načítání stránky je nadpis vidět už nad šedým skeletonem.
+- [ ] Tmavý motiv a úzké okno: nadpisy čitelné, nic nepřetéká.
+- [ ] „Zobrazit více“ u bloku → titulek záložky i drobečková navigace mají stejný název jako nadpis bloku.
+- [ ] V režimu „Zobrazit jako“ jsou nadpisy pod žlutou lištou a Přehled se načte celý.
+
+**Známá omezení (vědomě):** žádná.
