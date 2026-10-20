@@ -78,63 +78,27 @@
 
 | Fáze | Tasky | Hodiny |
 |---|---|---|
-| 0 Ověření schématu | 0 | 0,5 |
+| 0 Spojovací sloupec | 0 | 0 |
 | A Engine prodlení | 1–5 | 7–8,5 |
 | B Shell, Záznamy, NES | 6–9 | 7–9 |
 | C Statistiky | 10–14 | 8–10 |
 | D Úklid, dokumentace, ověření | 15–16 | 2–3 |
-| **Celkem** | | **25–31 h** |
+| **Celkem** | | **25–30 h** |
 
-Tvoje ruční ověření zvlášť: dotaz na schéma (~0,25 h), parita se ServiceDeskem (~1 h), závěrečný proklik (~0,5 h).
+Tvoje ruční ověření zvlášť: název spojovacího sloupce (~5 min), parita se ServiceDeskem (~1 h), závěrečný proklik (~0,5 h).
 
 ---
 
-## Fáze 0 — ověření schématu (gate pro Task 3)
+## Fáze 0 — spojovací sloupec
 
-### Task 0: Schéma tabulek `ticket_external*`
+### Task 0: Název sloupce, který váže předávku na ticket
 
-Zdroják mapuje tabulky přes EF `.edmx`, který nemáme. Známe názvy tabulek a sloupců z kódu (`Hotline (2).cs` ř. 840–845, 1062–1115, 1216–1266), ale ne typy, délky a cizí klíč workflow.
+Jediná věc o databázi ServiceDesku, kterou z `Hotline (2).cs` nevyčtu: kód jde přes EF navigaci `ticket.ticket_external_workflow` (ř. 1069, 1218) a cizí klíč je schovaný v `.edmx`. Ostatní sloupce jsou v kódu vyjmenované (ř. 840–845, 1062–1115, 1216–1266).
 
-**Files:**
-- Create: `scripts/sd_schema_ticket_external.sql` (read-only, jen metadata a SLA katalog, žádná citlivá data)
+- [ ] **Step 1:** Od tebe název sloupce v `ticket_external_workflow`, který ukazuje na `ticket_external.id` (SSMS: databáze → Tables → `ticket_external_workflow` → Keys / Columns). Zapíše se do spec §6.1.
+- [ ] **Step 2: GATE pro Task 3.** Tasky 1–2 na tom nezávisí.
 
-**Interfaces:**
-- Produces: přesné názvy a typy sloupců → podklad pro entity v Task 3. Výsledek se zapíše do spec §6.1.
-
-- [ ] **Step 1: Napsat skript**
-
-```sql
--- scripts/sd_schema_ticket_external.sql — READ-ONLY. Spustit v databázi ServiceDesku
--- (ta, na kterou míří connection string ServiceDeskEntities starého ServiceDesku).
-SET NOCOUNT ON;
-
--- (1) Sloupce tří tabulek
-SELECT t.name AS tabulka, c.column_id, c.name AS sloupec, ty.name AS typ,
-       c.max_length, c.precision, c.scale, c.is_nullable
-FROM sys.tables t
-JOIN sys.columns c ON c.object_id = t.object_id
-JOIN sys.types ty ON ty.user_type_id = c.user_type_id
-WHERE t.name IN ('ticket_external', 'ticket_external_workflow', 'ticket_external_sla')
-ORDER BY t.name, c.column_id;
-
--- (2) Cizí klíče (vazba workflow → ticket_external)
-SELECT fk.name, OBJECT_NAME(fk.parent_object_id) AS tabulka,
-       COL_NAME(fkc.parent_object_id, fkc.parent_column_id) AS sloupec,
-       OBJECT_NAME(fk.referenced_object_id) AS cil,
-       COL_NAME(fkc.referenced_object_id, fkc.referenced_column_id) AS cil_sloupec
-FROM sys.foreign_keys fk
-JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
-WHERE OBJECT_NAME(fk.parent_object_id) LIKE 'ticket[_]external%';
-
--- (3) SLA katalog (důležitost → hodiny)
-SELECT sla_name, sla_hours FROM ticket_external_sla ORDER BY sla_name;
-
--- (4) Rozložení typů předávek
-SELECT transfertype, COUNT(*) AS pocet FROM ticket_external_workflow GROUP BY transfertype ORDER BY transfertype;
-```
-
-- [ ] **Step 2: Commit** `chore(prodleni): read-only dotaz na schéma tabulek ticket_external*`
-- [ ] **Step 3: GATE.** Skript spustíš a pošleš výstup. Zapíšu ho do spec §6.1 a podle něj napíšu entity v Task 3. Tasky 1–2 na něm nezávisí a můžou běžet souběžně.
+Typy číselných sloupců se nezjišťují: dotazy v Task 4 je převádějí `CAST(... AS int)` / `CAST(... AS float)`, takže na `tinyint`/`smallint`/`real` nezáleží.
 
 ---
 
@@ -341,12 +305,12 @@ Formatter: `PenaltyReasonFormatterTests` — pro každý kód jedna věta obsahu
 
 **Files:**
 - Create: `PmTracker.ServiceDesk.Sql/ServiceDeskExternalReadOnlyDbContext.cs`, `Entities/TicketExternalEntity.cs`, `Entities/TicketExternalWorkflowEntity.cs`, `Entities/TicketExternalSlaEntity.cs`
-- Create: `scripts/dev/servicedesk_external_schema.sql` (lokální replika: `CREATE TABLE` podle výstupu Task 0 + 3 smyšlené tickety a SLA katalog, idempotentní `IF OBJECT_ID(...) IS NULL`)
+- Create: `scripts/dev/servicedesk_external_schema.sql` (lokální replika: `CREATE TABLE` se sloupci z `Hotline (2).cs` a spojovacím sloupcem z Task 0 + 3 smyšlené tickety a SLA katalog, idempotentní `IF OBJECT_ID(...) IS NULL`)
 - Modify: `PmTracker.ServiceDesk.Sql/ServiceDeskServiceCollectionExtensions.cs`, `PmTracker.Web/appsettings.example.json`
 - Test: `PmTracker.Tests.Unit/ServiceDesk/ServiceDeskExternalReadOnlyDbContextTests.cs`
 
 **Interfaces:**
-- Produces (názvy vlastností C#, sloupce a typy podle výstupu Task 0; níže sloupce známé z `Hotline (2).cs`):
+- Produces (sloupce známé z `Hotline (2).cs`, spojovací sloupec z Task 0; čtení přes projekci s `CAST`, takže na přesném číselném typu nezáleží):
 
 ```csharp
 internal sealed class TicketExternalEntity        // ticket_external
@@ -389,7 +353,7 @@ Konfigurace: `Ticketing:ExternalConnectionStringName` (výchozí `ServiceDeskExt
 
 (Ukázka se zástupnými hodnotami je stejná konvence jako stávající `TicketingReadOnly` v example souboru. Skutečnou hodnotu vyplňuje správce.)
 
-- [ ] **Step 1: Failing testy:** `SaveChanges_vyhodi`, `Mapovani_tabulek_a_sloupcu` (EF model metadata: `GetTableName()` a `GetColumnName()` přesně podle Task 0), `Bez_connection_stringu_registruje_disabled_query_service`, `S_connection_stringem_registruje_sql_query_service`
+- [ ] **Step 1: Failing testy:** `SaveChanges_vyhodi`, `Mapovani_tabulek_a_sloupcu` (EF model metadata: `GetTableName()` a `GetColumnName()` podle `Hotline (2).cs` a Task 0), `Bez_connection_stringu_registruje_disabled_query_service`, `S_connection_stringem_registruje_sql_query_service`
 - [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~ServiceDeskExternalReadOnly"`
 - [ ] **Step 3: Implementace + lokální replika** (spustit `scripts/dev/servicedesk_external_schema.sql` na lokální Colima DB, paměť `feedback_local_dev_db_upgrade_self`)
 - [ ] **Step 4: PASS**

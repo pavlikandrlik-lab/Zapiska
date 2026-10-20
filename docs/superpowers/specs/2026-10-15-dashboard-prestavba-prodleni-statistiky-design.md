@@ -138,7 +138,7 @@ V `intranetNEW` workflow tabulka není (discovery `SD_servicedesk/01_discovery.s
 | `ticket_external_workflow` | `date`, `supplier`, `transfertype`, `dt_param` + cizí klíč na `ticket_external` | Předávky U1–U11. `dt_param` je termín plnění (U1/U2 u PMP/PNF) nebo schválený nový termín (U11). |
 | `ticket_external_sla` | `sla_name`, `sla_hours` | SLA hodiny podle důležitosti. `sla_name` obsahuje hodnoty `HOT_ZAZNAMY.dulezitost` (NES I, NES II, NES III, Vada A–D). |
 
-Přesné názvy a typy sloupců, hlavně cizího klíče ve `ticket_external_workflow`, se ověří dotazem do `sys.columns` (plán, Task 0), protože zdroják mapuje přes EF `.edmx`, který nemáme.
+Neznámý je jen název spojovacího sloupce `ticket_external_workflow` → `ticket_external.id` (zdroják jde přes EF navigaci, mapování je v `.edmx`, který nemáme). Dodá ho uživatel (plán, Task 0). Číselné typy se neřeší: dotazy převádějí hodnoty `CAST`em.
 
 ### 6.2 Konfigurace a přístup
 
