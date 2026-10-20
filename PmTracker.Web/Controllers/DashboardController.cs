@@ -106,10 +106,10 @@ public sealed class DashboardController : BaseController
         {
             item.DetailUrl = Url.Action("Detail", "Jednani", new { id = item.MeetingId, returnUrl = "/dashboard/meetings" })
                 ?? $"/Jednani/Detail/{item.MeetingId}";
-            item.PrintPdfUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = item.MeetingId, autoPrint = true })
-                ?? $"/Export/Jednani/{item.MeetingId}/Tisk?autoPrint=true";
-            item.PrintWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = item.MeetingId })
-                ?? $"/Export/Jednani/{item.MeetingId}/Word";
+            item.PrintPdfUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = item.MeetingId, projektId = item.ProjectId, autoPrint = true })
+                ?? $"/Export/Jednani/{item.MeetingId}/Tisk?projektId={item.ProjectId}&autoPrint=true";
+            item.PrintWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = item.MeetingId, projektId = item.ProjectId })
+                ?? $"/Export/Jednani/{item.MeetingId}/Word?projektId={item.ProjectId}";
         }
     }
 
