@@ -84,7 +84,7 @@ public sealed class DashboardService : IDashboardService
         return new DashboardFocusListPageViewModel
         {
             CurrentUserContext = currentUser,
-            PageTitle = "Na co se soustředit",
+            PageTitle = DashboardBlockTitles.Focus,
             Subtitle = "Relevantní neukončené záznamy přes všechny vaše projekty.",
             BackUrl = "/dashboard",
             BackLabel = "Zpět na přehled",
@@ -97,7 +97,7 @@ public sealed class DashboardService : IDashboardService
         return new DashboardMeetingsListPageViewModel
         {
             CurrentUserContext = currentUser,
-            PageTitle = "Nejbližší jednání",
+            PageTitle = DashboardBlockTitles.Meetings,
             Subtitle = "Budoucí jednání v projektech, kde jste aktivně zapojený.",
             BackUrl = "/dashboard",
             BackLabel = "Zpět na přehled",
@@ -113,7 +113,7 @@ public sealed class DashboardService : IDashboardService
         return new DashboardNewsListPageViewModel
         {
             CurrentUserContext = currentUser,
-            PageTitle = "Co je nového",
+            PageTitle = DashboardBlockTitles.News,
             Subtitle = "Poslední relevantní změny od ostatních uživatelů.",
             BackUrl = "/dashboard",
             BackLabel = "Zpět na přehled",

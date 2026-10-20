@@ -638,7 +638,30 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 /* .dashboard-panel-header (+ h2) a .dashboard-panel-count → odstraněno 2026-06-08
-   (hlavičky panelů smazány kvůli úspoře místa). */
+   (úspora místa). Od 2026-10-20 jen kompaktní nadpis .dashboard-panel-heading (spec
+   2026-10-20 Přehled — nadpisy bloků): 32 px, počet viditelných karet se nemění. */
+.dashboard-panel-heading {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0.5rem var(--d-pad-card) 0.25rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Jen pro čtečky obrazovky (skrytý h1 stránky). */
+.app-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
 
 .dashboard-page-actions {
     display: flex;
@@ -7037,7 +7060,7 @@ html {
     container-name: dashpanel;
 }
 
-/* .dashboard-panel-header → odstraněno 2026-06-08. */
+/* .dashboard-panel-header → odstraněno 2026-06-08; nadpis bloku viz .dashboard-panel-heading. */
 
 .dashboard-panel-footer {
     flex: 0 0 auto;

@@ -1,14 +1,18 @@
 @model DashboardPageViewModel
+@using PmTracker.Web.Services.Dashboard
 @{
     ViewData["Title"] = Model.PageTitle;
     ViewData["BodyClass"] = "dashboard-page"; // pro _Layout full-width bypass
 }
 
 <section class="dashboard-shell" data-dashboard-shell>
+    <h1 class="app-sr-only">Přehled</h1>
     <div class="dashboard-body">
         <section class="dashboard-panel dashboard-section--focus"
                  data-dashboard-panel="focus"
-                 data-dashboard-panel-url="@Model.FocusPanelUrl">
+                 data-dashboard-panel-url="@Model.FocusPanelUrl"
+                 aria-labelledby="dashboard-focus-heading">
+            <h2 class="dashboard-panel-heading" id="dashboard-focus-heading">@DashboardBlockTitles.Focus</h2>
             <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
                 <div class="record-loading-line"></div>
                 <div class="record-loading-line short"></div>
@@ -23,7 +27,9 @@
         <div class="dashboard-rail">
             <section class="dashboard-panel dashboard-section--meetings"
                      data-dashboard-panel="meetings"
-                     data-dashboard-panel-url="@Model.MeetingsPanelUrl">
+                     data-dashboard-panel-url="@Model.MeetingsPanelUrl"
+                     aria-labelledby="dashboard-meetings-heading">
+                <h2 class="dashboard-panel-heading" id="dashboard-meetings-heading">@DashboardBlockTitles.Meetings</h2>
                 <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
                     <div class="record-loading-line"></div>
                     <div class="record-loading-line short"></div>
@@ -33,7 +39,9 @@
 
             <section class="dashboard-panel dashboard-section--news"
                      data-dashboard-panel="news"
-                     data-dashboard-panel-url="@Model.NewsPanelUrl">
+                     data-dashboard-panel-url="@Model.NewsPanelUrl"
+                     aria-labelledby="dashboard-news-heading">
+                <h2 class="dashboard-panel-heading" id="dashboard-news-heading">@DashboardBlockTitles.News</h2>
                 <div class="dashboard-panel-placeholder" data-dashboard-panel-placeholder>
                     <div class="record-loading-line"></div>
                     <div class="record-loading-line short"></div>
