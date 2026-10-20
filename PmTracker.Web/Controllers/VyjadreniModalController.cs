@@ -266,9 +266,26 @@ public sealed class VyjadreniModalController : Controller
     [HttpPost("ReHarvest")]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = "permission:vyjadreni.reharvest")]
-    public async Task<IActionResult> ReHarvest([FromForm] int externiOdkazId, CancellationToken ct)
+    public async Task<IActionResult> ReHarvest([FromForm] int externiOdkazId, [FromForm] int projektId, CancellationToken ct)
     {
         if (externiOdkazId <= 0) return BadRequest();
+
+        // projektId nese authz kontext pro policy vyjadreni.reharvest (projektové role ho mají jen
+        // na svůj projekt). Je-li zadané, musí patřit k externímu odkazu — jinak by šlo autorizovat
+        // proti spravovanému projektu a vytěžit tiket cizího projektu. Bez projektId projde policy
+        // jen globální uživatel (zpětná kompatibilita, vzor ExportController.JednaniTisk).
+        if (projektId != 0)
+        {
+            var ownerProjektId = await (from eo in _db.ZaznamExterniOdkazy.AsNoTracking()
+                                        join z in _db.ProjektoveZaznamy.AsNoTracking() on eo.ZaznamId equals z.Id
+                                        where eo.Id == externiOdkazId
+                                        select (int?)z.ProjektId)
+                                       .FirstOrDefaultAsync(ct);
+            if (ownerProjektId != projektId)
+            {
+                return NotFound();
+            }
+        }
 
         try
         {

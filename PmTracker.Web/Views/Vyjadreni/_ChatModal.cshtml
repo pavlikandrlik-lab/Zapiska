@@ -56,6 +56,7 @@
                 <form class="pm-chat-modal__reharvest-form" data-reharvest-form method="post" action="/Vyjadreni/ReHarvest">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="externiOdkazId" value="@Model.ExterniOdkazId" />
+                    <input type="hidden" name="projektId" value="@Model.ProjektId" />
                     <pm-button variant="Secondary"
                                size="Small"
                                native-type="submit"
