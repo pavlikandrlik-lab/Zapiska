@@ -430,6 +430,12 @@ public sealed class CurrentUserContextViewModel
     /// </summary>
     public AuthorizationSnapshot? Authorization { get; init; }
 
+    /// <summary>
+    /// Režim „Zobrazit jako“: kontext patří cílové osobě, tady je skutečně přihlášený superadmin.
+    /// Null = běžný provoz.
+    /// </summary>
+    public ViewAsInfo? ViewAs { get; init; }
+
     public bool IsProjectReadOnly(int projektId)
     {
         return projektId > 0 && DeletedProjectIds.Contains(projektId);

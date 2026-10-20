@@ -10,4 +10,6 @@ public sealed class NavPermissionsViewModel
     public string? CurrentUserOrg { get; init; }
     public string? CurrentUserOrgCode { get; init; }
     public IReadOnlyList<string> CurrentUserRoles { get; init; } = Array.Empty<string>();
+    public bool CanStartViewAs { get; init; }
+    public ViewAsBarViewModel? ViewAs { get; init; }
 }

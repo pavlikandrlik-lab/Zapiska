@@ -12,6 +12,10 @@ public static class AjaxErrorCodes
     public const string RecordStale = "RECORD_STALE";
     public const string NonJsonResponse = "NON_JSON_RESPONSE";
     public const string EmptyAjaxResponse = "EMPTY_AJAX_RESPONSE";
+
+    /// <summary>Režim „Zobrazit jako“ je jen pro čtení. Nesmí být HTTP_403 — ajax.js by spustil session recovery.</summary>
+    public const string ViewAsReadOnly = "VIEW_AS_READ_ONLY";
+    public const string ViewAsInvalidTarget = "VIEW_AS_INVALID_TARGET";
 }
 
 /// <summary>
