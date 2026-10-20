@@ -61,7 +61,8 @@ public sealed class AppController : Controller
         // Best-effort: keep-alive drží relaci a jeho selhání uživateli hlásí vypršenou relaci.
         // Zámek je proti tomu vedlejší — když se heartbeat nepovede, nejhorší následek je
         // vypršení zámku po TTL, a to nesmí shodit celý keep-alive.
-        if (zaznamId is > 0)
+        // Pohled jako: heartbeat by prodloužil zámek cílového uživatele — vynechat.
+        if (zaznamId is > 0 && resolution.UserContext.ViewAs is null)
         {
             try
             {

@@ -129,7 +129,11 @@ public sealed partial class ZaznamyController : BaseController
 
         // Spec 2026-09-17 §4.2 — zámek karty. Získává se PO autorizaci, ale PŘED těžkým
         // dotazem i harvest triggerem: nemá smysl připravovat editor, který se nezobrazí.
-        var lockResult = await _editLockService.TryAcquireAsync(id, CurrentUserContext.OsobaId, ct);
+        // Pohled jako je jen pro čtení: zámek se jen přečte (stejná stránka „záznam upravuje X“
+        // jako u cílového uživatele), ale nezaloží ani neprodlouží.
+        var lockResult = CurrentUserContext.ViewAs is null
+            ? await _editLockService.TryAcquireAsync(id, CurrentUserContext.OsobaId, ct)
+            : await _editLockService.PeekAsync(id, CurrentUserContext.OsobaId, ct);
         if (!lockResult.Acquired)
         {
             return await BuildRecordEditLockedResultAsync(id, projektId.Value, lockResult, ct);
@@ -144,7 +148,7 @@ public sealed partial class ZaznamyController : BaseController
         // harvest vyjádření pro všechny externí vazby záznamu. Jen pro uživatele,
         // kteří mají records.edit (schedule-only role nemá business need otevírat
         // harvest flow).
-        if (canEditRecord)
+        if (canEditRecord && CurrentUserContext.ViewAs is null)
         {
             await _harvestScheduler.ScheduleHarvestForRecordAsync(id, ct).ConfigureAwait(false);
         }
