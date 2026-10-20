@@ -114,6 +114,27 @@ Viz komentáře přímo v `AuthorizationPolicyEnforcementTests.cs` (`PmTracker.T
 
 ---
 
+## Pohled jako (superadmin)
+
+Superadmin (`authz.superadmins`) může v menu účtu zvolit **Zobrazit jako…** a procházet aplikaci
+s právy a viditelností jiné osoby. Pod hlavičkou je lišta s tlačítkem **Zrušit pohled jako**.
+
+- Identita přihlášeného (Windows Auth) se nemění. `UserContextResolver` po nalezení skutečné osoby
+  vyhodnotí cookie `pmtracker.viewas` (`{skutečný}-{cíl}`) přes `IViewAsService` a sestaví kontext
+  pro cílovou osobu. `CurrentUserContextViewModel.ViewAs` nese skutečnou osobu.
+- Cookie platí jen pro superadmina, jehož `osoba_id` je v první části hodnoty. Jinak se ignoruje a smaže.
+  Je to session cookie (končí zavřením prohlížeče).
+- **Jen pro čtení**, ve třech vrstvách: `ViewAsReadOnlyMiddleware` odmítne ne-GET (výjimky:
+  `[AllowDuringViewAs]` pro čtecí POSTy, `[ViewAsControl]` pro zahájení/ukončení). Editor a keep-alive
+  zámek karty jen čtou (`IRecordEditLockService.PeekAsync`). `ViewAsWriteGuardInterceptor` zablokuje
+  jakýkoli zapisující SQL z requestu v pohledu.
+- Audit: `authz.audit_log`, `entity_type = 'pohled_jako'`, akce `view_as_start` / `view_as_stop`,
+  `actor_osoba_id` = skutečný superadmin.
+- Nová POST akce, která jen čte a má v pohledu fungovat, dostane `[AllowDuringViewAs]`. Zápis jí
+  pojistka stejně nedovolí.
+
+---
+
 ## FAQ
 
 **Proč neexistuje runtime UI pro vytváření rolí?**
