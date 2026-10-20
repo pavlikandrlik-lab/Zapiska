@@ -145,6 +145,8 @@ app.UseAuthentication();
 // aby PermissionAuthorizationHandler mohl číst osoba z ICurrentUserAccessor
 // při vyhodnocení [Authorize(Policy = "permission:xxx")] policies.
 app.UseMiddleware<UserContextMiddleware>();
+// Pohled jako: blokace zápisu. Za UserContextMiddleware (aktivuje stav), před MVC.
+app.UseMiddleware<ViewAsReadOnlyMiddleware>();
 app.UseAuthorization();
 
 // M-3: Rate limiter middleware musí být PO UseAuthorization (user context známý)

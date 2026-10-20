@@ -39,4 +39,23 @@ public sealed class MiddlewareOrderingTests
             "UserContextMiddleware must run BEFORE UseAuthorization() — " +
             "it must populate HttpContext.Items[OsobaId] before the authorization handlers run (HIGH-1)");
     }
+
+    [Fact]
+    public void Program_ShouldPlaceViewAsMiddleware_AfterUserContext_AndBeforeAuthorization()
+    {
+        var programPath = Path.Combine(ArchitectureTestBase.RepoRoot(), "PmTracker.Web", "Program.cs");
+        var lines = File.ReadAllLines(programPath);
+
+        int? userCtxLine = null, viewAsLine = null, authzLine = null;
+        for (var i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].Contains("UseMiddleware<UserContextMiddleware>")) userCtxLine = i;
+            if (lines[i].Contains("UseMiddleware<ViewAsReadOnlyMiddleware>")) viewAsLine = i;
+            if (lines[i].Contains("app.UseAuthorization()")) authzLine = i;
+        }
+
+        viewAsLine.Should().NotBeNull("blokace zápisu v pohledu jako musí být v pipeline");
+        (userCtxLine < viewAsLine).Should().BeTrue("stav pohledu aktivuje až resolver v UserContextMiddleware");
+        (viewAsLine < authzLine).Should().BeTrue("blokace má platit dřív, než se spustí MVC");
+    }
 }
