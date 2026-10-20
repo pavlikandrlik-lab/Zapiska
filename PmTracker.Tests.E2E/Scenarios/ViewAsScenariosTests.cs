@@ -43,11 +43,16 @@ public sealed class ViewAsScenariosTests
         await page.GotoAsync($"{_fixture.BaseUrl}/Projekty?asUser={_fixture.AdminOsobaId}");
         await Assertions.Expect(page.Locator("[data-view-as-bar]")).ToHaveCountAsync(0);
 
-        await page.Locator("[data-view-as-start]").DispatchEventAsync("click");
+        var userMenu = page.Locator("gov-dropdown.app-user-menu");
+        await userMenu.Locator("gov-button button").First.ClickAsync(new() { Force = true });
+        (await userMenu.EvaluateAsync<bool>("d => d.getState()")).Should().BeTrue();
+        await page.Locator("[data-view-as-start] button").ClickAsync(new() { Force = true });
         // Modal je gov-dialog[data-modal-container]; panel výsledků pickeru se montuje jako plovoucí
         // (mimo formulář), proto ho hledáme na stránce.
         var modal = page.Locator("gov-dialog[data-modal-container]");
         await Assertions.Expect(modal.Locator("[data-view-as-modal]")).ToHaveCountAsync(1);
+        (await userMenu.EvaluateAsync<bool>("d => d.getState()"))
+            .Should().BeFalse("menu účtu se po otevření modalu z jeho položky musí zavřít, jinak visí nad dialogem");
 
         await modal.Locator("[data-person-picker-input]").FillAsync(TargetJmeno);
         var option = page.Locator("[data-person-picker-results] .office-search-item:not(.disabled)").First;

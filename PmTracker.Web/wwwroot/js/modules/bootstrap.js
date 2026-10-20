@@ -162,6 +162,15 @@ configureModalRuntime({
     initPermissionMetadataBindings
 });
 
+// Položka gov-dropdownu (menu účtu) otevírající modal: dropdown by jinak zůstal otevřený nad dialogem.
+function closeEnclosingDropdown(trigger) {
+    const dropdown = trigger.closest("gov-dropdown");
+    if (!dropdown || typeof dropdown.getState !== "function") {
+        return;
+    }
+    void dropdown.getState().then((open) => (open ? dropdown.toggle() : undefined));
+}
+
 function handleDocumentClick(event) {
     const target = event.target instanceof Element
         ? event.target
@@ -277,6 +286,7 @@ function handleDocumentClick(event) {
     const openUrl = target.closest("[data-modal-url]");
     if (openUrl) {
         event.preventDefault();
+        closeEnclosingDropdown(openUrl);
         openUrlModal(openUrl.getAttribute("data-modal-url"), openUrl);
         return;
     }
