@@ -36,4 +36,37 @@ public sealed class DashboardBlockHeadingsRenderTests
 
         html.Should().Contain($"<title>{expectedTitle} - Zápiska</title>", "titulek detailní stránky = název bloku na Přehledu");
     }
+
+    [Theory]
+    [InlineData("focus", DashboardBlockTitles.Focus)]
+    [InlineData("meetings", DashboardBlockTitles.Meetings)]
+    [InlineData("news", DashboardBlockTitles.News)]
+    public async Task Index_BlockHasHeading_LabelledBy_AndHeadingPrecedesLazyContent(string block, string expectedTitle)
+    {
+        var html = await GetDecodedAsync("/dashboard");
+
+        var headingId = $"dashboard-{block}-heading";
+        html.Should().Contain($"<h2 class=\"dashboard-panel-heading\" id=\"{headingId}\">{expectedTitle}</h2>");
+
+        var sectionStart = html.IndexOf($"data-dashboard-panel=\"{block}\"", StringComparison.Ordinal);
+        sectionStart.Should().BeGreaterThan(0);
+        var sectionTagStart = html.LastIndexOf("<section", sectionStart, StringComparison.Ordinal);
+        var sectionTag = html[sectionTagStart..html.IndexOf('>', sectionStart)];
+        sectionTag.Should().Contain($"aria-labelledby=\"{headingId}\"");
+
+        var headingAt = html.IndexOf($"id=\"{headingId}\"", StringComparison.Ordinal);
+        var placeholderAt = html.IndexOf("data-dashboard-panel-placeholder", sectionStart, StringComparison.Ordinal);
+        var contentAt = html.IndexOf("data-dashboard-panel-content", sectionStart, StringComparison.Ordinal);
+        headingAt.Should().BeGreaterThan(sectionStart).And.BeLessThan(placeholderAt,
+            "nadpis je v kostře nad skeletonem — vidět i během načítání a při chybě načtení obsahu");
+        placeholderAt.Should().BeLessThan(contentAt);
+    }
+
+    [Fact]
+    public async Task Index_HasVisuallyHiddenH1()
+    {
+        var html = await GetDecodedAsync("/dashboard");
+
+        html.Should().Contain("<h1 class=\"app-sr-only\">Přehled</h1>");
+    }
 }
