@@ -93,7 +93,7 @@ Nasazení: kód je jen v lokálním `main` (bez pushe). Žádná změna DB sché
 
 ## 4. Detail jednání se záznamy
 
-**Hotovo 2026-10-21:** merge `MERGE_HASH`, plán `docs/superpowers/plans/2026-10-21-detail-jednani-zaznamy.md`.
+**Hotovo 2026-10-21:** merge `1152bc5`, plán `docs/superpowers/plans/2026-10-21-detail-jednani-zaznamy.md`.
 
 **Co to dělá:**
 - **Jednání v přípravě nebo otevřené:** nahoře úzký pruh s datem, místem, stavem a akcemi (Uložit stav / Uzavřít jednání, Tisk, Nový záznam, Upravit jednání, Smazat). Pod ním je účast na jeden řádek, rozbalitelná, a pod ní celá stránka Záznamy (filtry + karty). Je to stejná komponenta jako záložka Záznamy v projektu, ne kopie.
