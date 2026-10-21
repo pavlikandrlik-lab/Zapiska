@@ -8,6 +8,7 @@ using PmTracker.Web.Controllers;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Export;
 
 namespace PmTracker.Tests.Unit.Meetings;
 
@@ -76,7 +77,10 @@ public sealed class JednaniControllerExceptionHandlingTests
             timeProvider: TimeProvider.System,
             loggerFactory: NullLoggerFactory.Instance,
             meetingService,
-            Moq.Mock.Of<IProjectService>())
+            Moq.Mock.Of<IProjectService>(),
+            Moq.Mock.Of<IRecordProposalService>(),
+            Moq.Mock.Of<IExportTemplateUseCase>(),
+            Moq.Mock.Of<IViewRenderer>())
         {
             ControllerContext = new ControllerContext
             {

@@ -32,6 +32,7 @@ import "./schedule-feature-c/preview-sync.js";    // Phase 12 (DESIGN-9-C) — p
 import "./vyzvy/panelController.js";                // 2026-09-08 — nese i bootstrap panelu (dřív samostatný modul).
 import "./vyzvy/dragDrop.js";                       // 2026-09-07 — tažení PNF na dlaždice railu.
 import "./vyzvy/switchController.js";
+import "./meetingMinutes.js";                         // 2026-10-21 — výška iframe se zápisem uzavřeného jednání.
 
 import { initCommentSortUi } from "./comments.js";
 import {

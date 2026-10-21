@@ -48,6 +48,15 @@ public sealed class JednaniDetailViewModel : BaseViewModel
     public bool CanEditRecords { get; set; }
     public bool HasSubsystemLeadPermission { get; set; }
     public int CurrentUserOsobaId { get; set; }
+
+    /// <summary>Uzavřené jednání (MeetingStatePolicy.IsReadOnly) — detail ukáže jen pruh se stavem a zápis.</summary>
+    public bool IsReadOnly { get; init; }
+
+    /// <summary>Záložka Záznamy v kontextu jednání (jen otevřené / příprava).</summary>
+    public ProjektZaznamyTabViewModel? ZaznamyTab { get; set; }
+
+    /// <summary>HTML zápis jednání (šablona tisku) pro iframe srcdoc — jen uzavřené jednání a export.pdf.jednani.</summary>
+    public string? ZapisHtml { get; set; }
 }
 
 public sealed class UcastViewModel

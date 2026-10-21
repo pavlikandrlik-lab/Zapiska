@@ -5655,6 +5655,48 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     min-width: 128px;
 }
 
+/* Detail jednání (plán 2026-10-21): kompaktní pruh — stav, akce a účast nahoře, záznamy / zápis pod ním. */
+.meeting-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--gov-radius);
+}
+
+.meeting-strip__info,
+.meeting-strip__status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+}
+
+.meeting-strip .meeting-status-controls .wide-select {
+    min-width: 0;
+}
+
+.meeting-strip .meeting-detail-actions {
+    margin-left: auto;
+}
+
+.meeting-strip .meeting-detail-actions form {
+    margin: 0;
+}
+
+.meeting-minutes-frame {
+    display: block;
+    width: 100%;
+    min-height: 70vh;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--gov-radius);
+    background: var(--background-block-primary);
+}
+
 .meeting-content textarea {
     width: 100%;
     min-height: 128px;

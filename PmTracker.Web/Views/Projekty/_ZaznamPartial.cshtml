@@ -161,7 +161,7 @@
             <div class="record-detail-shell" data-record-detail-shell>
                 @if (Model.DetailLoaded && Model.Detail is not null)
                 {
-                    @await Html.PartialAsync("_ZaznamDetailPartial", Model.Detail)
+                    @await Html.PartialAsync("~/Views/Projekty/_ZaznamDetailPartial.cshtml", Model.Detail)
                 }
                 else
                 {
@@ -182,7 +182,7 @@
                  data-record-comments-loaded="@(Model.CommentsLoaded ? "true" : "false")">
                 @if (Model.CommentsLoaded && Model.Comments is not null)
                 {
-                    @await Html.PartialAsync("_ZaznamCommentsPartial", Model.Comments)
+                    @await Html.PartialAsync("~/Views/Projekty/_ZaznamCommentsPartial.cshtml", Model.Comments)
                 }
                 else
                 {

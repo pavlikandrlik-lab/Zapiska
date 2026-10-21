@@ -8,6 +8,7 @@ using PmTracker.Web.Controllers;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Export;
 
 namespace PmTracker.Tests.Unit.Meetings;
 
@@ -171,7 +172,10 @@ public sealed class JednaniControllerBehaviorTests
             loggerFactory: NullLoggerFactory.Instance,
             meetingService,
             projectService ?? Moq.Mock.Of<IProjectService>(x =>
-                x.ProjektExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()) == Task.FromResult(true)))
+                x.ProjektExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()) == Task.FromResult(true)),
+            Moq.Mock.Of<IRecordProposalService>(),
+            Moq.Mock.Of<IExportTemplateUseCase>(),
+            Moq.Mock.Of<IViewRenderer>())
         {
             ControllerContext = new ControllerContext
             {
