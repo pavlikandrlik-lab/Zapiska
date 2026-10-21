@@ -27,7 +27,11 @@
     <div class="meeting-strip__info">
         <strong>@Model.Jednani.Datum.ToString("dd.MM.yyyy") v @Model.Jednani.CasZacatek.ToString("HH\\:mm")</strong>
         <span class="muted">Místo: @Model.Jednani.Misto</span>
-        <span class="badge meeting-status-badge" data-meeting-strip-status>@Model.Jednani.Stav</span>
+        @if (!canEditMeetingFields)
+        {
+            @* Kdo stav mění, vidí ho ve výběru „Uložit stav“ — štítek by ho jen opakoval. *@
+            <span class="badge meeting-status-badge" data-meeting-strip-status>@Model.Jednani.Stav</span>
+        }
         @if (isLocked)
         {
             <span class="muted">Uzamkl: @(string.IsNullOrWhiteSpace(Model.Jednani.UzamklOsoba) ? "-" : Model.Jednani.UzamklOsoba)</span>

@@ -5490,17 +5490,31 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .meeting-attendance-card {
     display: grid;
-    gap: 12px;
+    gap: 0.5rem;
     overflow-x: auto;
+    /* Plán 2026-10-21: kompaktně nahoře — jeden řádek (nadpis · souhrn · akce), seznam se rozbalí pod ním. */
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
 .meeting-attendance-header {
-    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
 }
 
 .meeting-attendance-summary {
-    display: grid;
-    gap: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+}
+
+.meeting-attendance-summary h2 {
+    font-size: 1rem;
+    line-height: 1.5;
 }
 
 .meeting-attendance-summary h2,
@@ -5676,16 +5690,24 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     gap: 0.25rem 0.75rem;
 }
 
+.meeting-strip .meeting-status-controls {
+    justify-content: flex-start;
+    gap: 0.5rem;
+}
+
+.meeting-strip .meeting-status-controls .inline-form {
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+}
+
 .meeting-strip .meeting-status-controls .wide-select {
+    width: auto;
     min-width: 0;
 }
 
 .meeting-strip .meeting-detail-actions {
-    margin-left: auto;
-}
-
-.meeting-strip .meeting-detail-actions form {
-    margin: 0;
+    margin: 0 0 0 auto;
 }
 
 .meeting-minutes-frame {

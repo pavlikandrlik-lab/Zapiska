@@ -50,6 +50,7 @@ public sealed class MeetingDetailRecordsRenderTests
         html.Should().Contain($"data-project-filter-storage-id=\"jednani-{meetingId}\"");
         html.Should().Contain("data-meeting-strip");
         html.Should().NotContain("data-meeting-minutes-frame");
+        html.Should().NotContain("data-meeting-strip-status", "kdo mění stav, vidí ho ve výběru — štítek by ho opakoval");
     }
 
     [Fact]
@@ -100,5 +101,6 @@ public sealed class MeetingDetailRecordsRenderTests
         html.Should().NotContain("data-meeting-create-record");
         html.Should().NotContain("uiContext=meeting", "bez records.edit žádný odkaz do editoru z jednání");
         html.Should().NotContain("name=\"UzavritJednani\"");
+        html.Should().Contain("data-meeting-strip-status", "kdo stav nemění, vidí ho jako štítek v pruhu");
     }
 }
