@@ -134,6 +134,12 @@ public sealed class ZaznamCommentsPanelViewModel
     public int CurrentUserOsobaId { get; set; }
     public IReadOnlyList<VyjadreniViewModel> Vyjadreni { get; init; } = Array.Empty<VyjadreniViewModel>();
     public IReadOnlyList<JednaniOptionViewModel> OtevrenaJednani { get; set; } = Array.Empty<JednaniOptionViewModel>();
+
+    /// <summary>Jednání, ze kterého je panel otevřený (detail jednání); null = bez kontextu.</summary>
+    public int? KontextJednaniId { get; set; }
+
+    /// <summary>Předvolba výběru „Vazba na jednání“ — kontext, jen pokud je v povolené nabídce.</summary>
+    public int? PredvybraneJednaniId { get; set; }
 }
 
 public sealed class SubsystemGroupViewModel

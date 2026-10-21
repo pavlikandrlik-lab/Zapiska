@@ -8,7 +8,7 @@ public sealed class RecordUiFlowResolver : IRecordUiFlowResolver
     private const string UiContextMeeting = "meeting";
     private const string RecordsTab = "zaznamy";
 
-    public RecordCommentAjaxFlow ResolveCommentAjaxFlow(string? uiContext, int projektId, int zaznamId, int? meetingId)
+    public RecordCommentAjaxFlow ResolveCommentAjaxFlow(string? uiContext, int projektId, int zaznamId, int? meetingId, int? kontextJednaniId = null)
     {
         if (string.Equals(uiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && meetingId.HasValue)
         {
@@ -28,7 +28,8 @@ public sealed class RecordUiFlowResolver : IRecordUiFlowResolver
             RefreshScope = "record-comments",
             ControllerName = "Zaznamy",
             ActionName = "RecordCommentsPartial",
-            RouteValues = new RouteValueDictionary(new { projektId, zaznamId }),
+            // kontextJednaniId: panel vyjádření v detailu jednání po obnovení dál předvybírá to jednání.
+            RouteValues = new RouteValueDictionary(new { projektId, zaznamId, kontextJednaniId }),
             UiContext = UiContextProject,
             Tab = RecordsTab
         };

@@ -79,6 +79,10 @@
                                         <input type="hidden" name="uiContext" value="project" />
                                         <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
                                         <input type="hidden" name="Id" value="@vyjadreni.Id" />
+                                        @if (Model.KontextJednaniId.HasValue)
+                                        {
+                                            <input type="hidden" name="kontextJednaniId" value="@Model.KontextJednaniId" />
+                                        }
                                         <pm-button variant="Destructive" size="Small" native-type="submit" aria-label="Smazat vyjádření" title="Smazat vyjádření">
                                             <gov-icon size="s" name="trash3" type="components" aria-hidden="true"></gov-icon>
                                         </pm-button>
@@ -94,6 +98,10 @@
                                 <input type="hidden" name="uiContext" value="project" />
                                 <input type="hidden" name="zaznamId" value="@Model.ZaznamId" />
                                 <input type="hidden" name="Id" value="@vyjadreni.Id" />
+                                @if (Model.KontextJednaniId.HasValue)
+                                {
+                                    <input type="hidden" name="kontextJednaniId" value="@Model.KontextJednaniId" />
+                                }
                                 <textarea rows="3"
                                           name="Text"
                                           required
@@ -149,6 +157,10 @@
             <input type="hidden" name="projektId" value="@Model.ProjektId" />
             <input type="hidden" name="uiContext" value="project" />
             <input type="hidden" name="ZaznamId" value="@Model.ZaznamId" />
+            @if (Model.KontextJednaniId.HasValue)
+            {
+                <input type="hidden" name="kontextJednaniId" value="@Model.KontextJednaniId" />
+            }
             <textarea rows="4"
                       name="Text"
                       placeholder="Přidat vyjádření..."
@@ -159,7 +171,7 @@
                     <option value="">Vazba na jednání</option>
                     @foreach (var jednani in Model.OtevrenaJednani)
                     {
-                        <option value="@jednani.Id">@jednani.Label</option>
+                        <option value="@jednani.Id" selected="@(jednani.Id == Model.PredvybraneJednaniId)">@jednani.Label</option>
                     }
                 </select>
                 <pm-button variant="Primary" size="Small" native-type="submit">Uložit</pm-button>

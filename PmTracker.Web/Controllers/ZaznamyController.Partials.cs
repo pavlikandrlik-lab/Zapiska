@@ -61,7 +61,7 @@ public sealed partial class ZaznamyController
     }
 
     [HttpGet]
-    public async Task<IActionResult> RecordCommentsPartial(int projektId, int zaznamId, int? limit, bool loadAll = false, CancellationToken ct = default)
+    public async Task<IActionResult> RecordCommentsPartial(int projektId, int zaznamId, int? limit, bool loadAll = false, int? kontextJednaniId = null, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(projektId))
         {
@@ -80,6 +80,7 @@ public sealed partial class ZaznamyController
             return NotFound();
         }
 
+        model.KontextJednaniId = kontextJednaniId;
         await PrepareRecordCommentsPresentationAsync(model, record.Summary, ct);
         return PartialView("~/Views/Projekty/_ZaznamCommentsPartial.cshtml", model);
     }
@@ -180,5 +181,10 @@ public sealed partial class ZaznamyController
         model.CanEditRecord = canEditRecord;
         model.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
         model.CanAddComment = !model.IsRecordClosed && model.OtevrenaJednani.Count > 0;
+        // Předvolba z detailu jednání jen z povolené nabídky — cizí / nepovolené jednání se tiše
+        // ignoruje (plán 2026-10-21, D1/D2); jiné jednání jde dál vybrat na kliknutí.
+        model.PredvybraneJednaniId = model.KontextJednaniId is int kontext && model.OtevrenaJednani.Any(x => x.Id == kontext)
+            ? kontext
+            : null;
     }
 }
