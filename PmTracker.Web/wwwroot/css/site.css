@@ -1343,8 +1343,7 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .page-header + .header-actions,
-.page-header + .projects-header-actions,
-.page-header + .meeting-detail-header {
+.page-header + .projects-header-actions {
     margin-top: -4px;
     margin-bottom: 14px;
 }
@@ -5465,16 +5464,6 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     font-size: 13px;
 }
 
-.meeting-layout {
-    display: grid;
-    gap: 20px;
-}
-
-.meeting-content {
-    display: grid;
-    gap: 20px;
-}
-
 .meeting-task-header {
     display: flex;
     align-items: center;
@@ -5490,17 +5479,31 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .meeting-attendance-card {
     display: grid;
-    gap: 12px;
+    gap: 0.5rem;
     overflow-x: auto;
+    /* Plán 2026-10-21: kompaktně nahoře — jeden řádek (nadpis · souhrn · akce), seznam se rozbalí pod ním. */
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
 .meeting-attendance-header {
-    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
 }
 
 .meeting-attendance-summary {
-    display: grid;
-    gap: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+}
+
+.meeting-attendance-summary h2 {
+    font-size: 1rem;
+    line-height: 1.5;
 }
 
 .meeting-attendance-summary h2,
@@ -5606,14 +5609,6 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     .meeting-attendance-row .meeting-attendance-select { width: 100%; }
 }
 
-.meeting-status {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
 .meeting-status-controls {
     display: flex;
     gap: 10px;
@@ -5638,26 +5633,58 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     min-width: 128px;
 }
 
-.meeting-detail-header {
-    display: grid;
-    gap: 6px;
-}
-
-.meeting-detail-header p {
-    margin: 0;
-}
-
-.meeting-detail-header .muted {
-    color: var(--text-secondary);
-}
-
 .meeting-detail-actions .btn {
     min-width: 128px;
 }
 
-.meeting-content textarea {
+/* Detail jednání (plán 2026-10-21): kompaktní pruh — stav, akce a účast nahoře, záznamy / zápis pod ním. */
+.meeting-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--gov-radius);
+}
+
+.meeting-strip__info,
+.meeting-strip__status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+}
+
+.meeting-strip .meeting-status-controls {
+    justify-content: flex-start;
+    gap: 0.5rem;
+}
+
+.meeting-strip .meeting-status-controls .inline-form {
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+}
+
+.meeting-strip .meeting-status-controls .wide-select {
+    width: auto;
+    min-width: 0;
+}
+
+.meeting-strip .meeting-detail-actions {
+    margin: 0 0 0 auto;
+}
+
+.meeting-minutes-frame {
+    display: block;
     width: 100%;
-    min-height: 128px;
+    min-height: 70vh;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--gov-radius);
+    background: var(--background-block-primary);
 }
 
 .meeting-note-input {
@@ -6631,7 +6658,6 @@ pm-tab-panel.sync-tab-panel-content[active] {
         align-items: stretch;
     }
 
-    .meeting-layout,
     .ciselniky-layout,
     .settings-layout,
     .profile-layout,

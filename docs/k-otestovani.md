@@ -88,3 +88,55 @@ Nasazení: kód je jen v lokálním `main` (bez pushe). Žádná změna DB sché
 - [ ] Uživatel bez role v projektu tisk jednání toho projektu dál neotevře.
 
 **Známá omezení (vědomě):** staré záložky nebo přímé URL tisku bez `projektId` fungují jen globálním uživatelům, stejně jako dřív.
+
+---
+
+## 4. Detail jednání se záznamy
+
+**Hotovo 2026-10-21:** merge `MERGE_HASH`, plán `docs/superpowers/plans/2026-10-21-detail-jednani-zaznamy.md`.
+
+**Co to dělá:**
+- **Jednání v přípravě nebo otevřené:** nahoře úzký pruh s datem, místem, stavem a akcemi (Uložit stav / Uzavřít jednání, Tisk, Nový záznam, Upravit jednání, Smazat). Pod ním je účast na jeden řádek, rozbalitelná, a pod ní celá stránka Záznamy (filtry + karty). Je to stejná komponenta jako záložka Záznamy v projektu, ne kopie.
+- **Vyjádření** na kartě má jako „Vazba na jednání“ předvybrané toto jednání (u přípravy přípravné vyjádření). Jiné jednání jde vybrat. Předvolba zůstane i po uložení, úpravě a smazání vyjádření.
+- **Tužka** otevře editor „z jednání“. Po změně stavu má „Změna stavu platí k“ předvybrané toto jednání, pokud ho pravidla ze 13. 10. nabízejí. Jinak platí výchozí volba jako dřív. Uložení i „Zrušit a vrátit se“ vede zpět do jednání.
+- **Nový záznam** z pruhu založí záznam k tomuto jednání.
+- **Filtry** v jednání jsou jen pro toto jednání a jen do zavření prohlížeče. Nejde je uložit jako výchozí a záložku Záznamy projektu neovlivní.
+- **Uzavřené jednání:** jen pruh se stavem (a „Otevřít jednání“ pro toho, kdo smí) a pod ním zápis, stejný jako PDF tisk.
+- Kdo stav jednání mění, vidí ho ve výběru. Ostatní ho vidí jako štítek.
+
+**Ověřeno lokálně v prohlížeči za všechny role** (dočasné testovací osoby, po průchodu smazané; záznam vlastního a cizího subsystému; jednání otevřené, v přípravě a uzavřené):
+
+| Role | Pruh: stav, Nový záznam, Upravit, Smazat, tužka | Vyjádření v otevřeném jednání (vlastní / cizí subsystém) | Vyjádření v přípravě (vlastní / cizí) | Uzavřené jednání |
+|---|---|---|---|---|
+| Superadmin, Administrátor aplikace | ano | předvybráno / předvybráno, uloženo | předvybráno / předvybráno | zápis + Otevřít jednání |
+| Vlastník, Admin projektu, PM, PM + vedoucí | ano | předvybráno / předvybráno, uloženo | předvybráno / předvybráno | zápis + Otevřít jednání |
+| Gestor, Metodik subsystému | ne | předvybráno / předvybráno, uloženo | předvybráno / předvybráno | zápis |
+| Vedoucí, Zástupce vedoucího subsystému | ne | jen příprava, nic nepředvybráno / bez formuláře | předvybráno, uloženo / bez formuláře | zápis |
+| Host, Read-all | ne | bez formuláře | bez formuláře | zápis |
+| Bez role v projektu | stránka neexistuje (404) | – | – | – |
+
+Navíc prošlo:
+- Tužka ze staršího otevřeného jednání předvybrala to jednání, ne nejnovější, a změna stavu se uložila k jeho datu.
+- Server odmítl podvržené akce: editor a Nový záznam z jednání pro gestora, hosta, vedoucího, zástupce a read-all (403); vyjádření vedoucího k otevřenému jednání nebo k cizímu subsystému (odmítnuto).
+- „Zobrazit jako“ ukázal stránku jen pro čtení.
+- Filtry jsou oddělené od projektu i od ostatních jednání.
+- Tmavý motiv i šířka 375 px bez vodorovného posuvníku.
+- V konzoli prohlížeče žádné chyby.
+
+**Otestovat (PM nebo admin projektu, ne superadmin; vedoucí subsystému; host):**
+- [ ] Otevřené jednání: pruh nahoře na jeden řádek, účast rozbalitelná, záznamy pod ní. Totéž u jednání v přípravě.
+- [ ] Vyjádření na kartě: předvybrané toto jednání. Uložení ho zapíše k tomuto jednání a výběr zůstane.
+- [ ] Jiné jednání jde ve výběru zvolit.
+- [ ] Tužka → změnit stav → „Změna stavu platí k“ = toto jednání → Uložit → zpět v detailu jednání. V tisku jednání má záznam nový stav.
+- [ ] Nový záznam z pruhu → založí se k tomuto jednání.
+- [ ] Filtry v jednání neovlivní záložku Záznamy projektu a naopak. Po zavření prohlížeče jsou výchozí.
+- [ ] Uzavřené jednání: jen pruh a zápis. Zápis odpovídá PDF tisku, stránka má jeden posuvník.
+- [ ] Vedoucí subsystému: v přípravě píše vyjádření ke svému subsystému (předvybráno), v otevřeném jednání ne.
+- [ ] Host: vidí záznamy i zápis, nic nemění.
+- [ ] Záložka Záznamy v detailu projektu funguje jako dřív (tužka, vyjádření bez předvolby, uložení filtrů jako výchozích).
+- [ ] i15 / Edge: světlý i tmavý motiv, úzké okno.
+
+**Známá omezení (vědomě):**
+- Žádné značky „má / nemá vyjádření k tomuto jednání“ (rozhodnutí R7, udělá se později jinak).
+- Zápis uzavřeného jednání má vzhled tisku (bílý papír i v tmavém motivu).
+- Předvolba jde změnit (rozhodnutí 2026-10-21: pevná volba ne, kvůli kolizním stavům).

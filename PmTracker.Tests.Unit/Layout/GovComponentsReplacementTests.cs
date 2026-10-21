@@ -80,7 +80,7 @@ public sealed class GovComponentsReplacementTests
             "_ProjectFilterShell.cshtml nesmí obsahovat starou .gov-switch CSS aproximaci");
 
         var recordsTab = ReadView("Projekty", "_ProjectRecordsTab.cshtml");
-        recordsTab.Should().Contain("PartialAsync(\"_ProjectFilterShell\"",
+        recordsTab.Should().MatchRegex(@"PartialAsync\(""(~/Views/Projekty/)?_ProjectFilterShell(\.cshtml)?""",
             "_ProjectRecordsTab.cshtml musí mountovat sdílený filter shell partial (DRY)");
 
         var projectModal = ReadView("Projekty", "ProjectModal.cshtml");

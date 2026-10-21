@@ -85,8 +85,13 @@ public sealed partial class MeetingService
             closedStatusCode = currentMeeting.StavKod;
         }
 
+        // Uzavřené jednání (plán 2026-10-21): sdílené pravidlo s nabídkou vyjádření a změny stavu.
+        var meetingState = await dbContext.CiselnikStavuJednani.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
+
         return new JednaniDetailViewModel
         {
+            IsReadOnly = MeetingStatePolicy.IsReadOnly(meeting, meetingState),
             ProjektId = project.Id,
             ProjektNazev = project.CelyNazev,
             ProjektZkratka = project.Zkratka,

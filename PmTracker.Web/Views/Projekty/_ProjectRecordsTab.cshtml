@@ -22,7 +22,7 @@
          data-record-meeting-comment-states-url="@Model.MeetingCommentStatesUrl">
     @* Akce (Tisk projektu / Nový záznam / Nový návrh) přesunuty do tab stripu
        v Detail.cshtml (.tabs-actions) kvůli úspoře místa — user 2026-06-10. *@
-    @await Html.PartialAsync("_ProjectFilterShell", Model.FilterShell)
+    @await Html.PartialAsync("~/Views/Projekty/_ProjectFilterShell.cshtml", Model.FilterShell)
 
     <div class="records-shell" data-records-view="subsystem" data-subsystem-grouped-shell>
         <aside class="subsystem-scroll-indicator" data-subsystem-scroll-indicator hidden aria-live="polite">
@@ -44,7 +44,7 @@
                     <div class="card-list">
                         @foreach (var zaznam in skupina.Zaznamy)
                         {
-                            @await Html.PartialAsync("_ZaznamPartial", zaznam)
+                            @await Html.PartialAsync("~/Views/Projekty/_ZaznamPartial.cshtml", zaznam)
                         }
                     </div>
                 </div>

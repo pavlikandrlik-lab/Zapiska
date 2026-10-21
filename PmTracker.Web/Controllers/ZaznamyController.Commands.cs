@@ -110,7 +110,7 @@ public sealed partial class ZaznamyController
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = "permission:comments.add")]
-    public async Task<IActionResult> AddComment(int projektId, AddCommentCommand command, string? uiContext, int? meetingId, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> AddComment(int projektId, AddCommentCommand command, string? uiContext, int? meetingId, int? kontextJednaniId, string? returnUrl, CancellationToken ct = default)
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId ?? command.JednaniId, returnUrl);
         return await ExecuteValidatedCommandAsync(
@@ -119,14 +119,14 @@ public sealed partial class ZaznamyController
             invalidFallbackMessage: InvalidFormFallbackMessage,
             onInvalidRedirect: redirect,
             onSuccessRedirect: () => Task.FromResult<IActionResult>(redirect()),
-            onAjaxSuccess: () => Task.FromResult<IActionResult>(BuildCommentAjaxSuccessResult(uiContext, projektId, command.ZaznamId, meetingId ?? command.JednaniId, "Vyjádření bylo uloženo.")),
+            onAjaxSuccess: () => Task.FromResult<IActionResult>(BuildCommentAjaxSuccessResult(uiContext, projektId, command.ZaznamId, meetingId ?? command.JednaniId, "Vyjádření bylo uloženo.", kontextJednaniId)),
             operation: () => _recordService.AddCommentAsync(command, CurrentUserContext, ct));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = "permission:comments.edit.own")]
-    public async Task<IActionResult> UpdateComment(int projektId, UpdateCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> UpdateComment(int projektId, UpdateCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, int? kontextJednaniId, string? returnUrl, CancellationToken ct = default)
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId, returnUrl);
         return await ExecuteValidatedCommandAsync(
@@ -139,7 +139,7 @@ public sealed partial class ZaznamyController
             (
                 !zaznamId.HasValue || zaznamId.Value <= 0
                     ? AjaxErrorResult("Chybí ID záznamu pro obnovu vyjádření.")
-                    : BuildCommentAjaxSuccessResult(uiContext, projektId, zaznamId.Value, meetingId, "Vyjádření bylo upraveno.")
+                    : BuildCommentAjaxSuccessResult(uiContext, projektId, zaznamId.Value, meetingId, "Vyjádření bylo upraveno.", kontextJednaniId)
             )),
             operation: () => _recordService.UpdateCommentAsync(command, CurrentUserContext, ct));
     }
@@ -147,7 +147,7 @@ public sealed partial class ZaznamyController
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = "permission:comments.delete.own")]
-    public async Task<IActionResult> DeleteComment(int projektId, DeleteCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> DeleteComment(int projektId, DeleteCommentCommand command, int? zaznamId, string? uiContext, int? meetingId, int? kontextJednaniId, string? returnUrl, CancellationToken ct = default)
     {
         var redirect = () => ResolveCommentRedirect(uiContext, projektId, meetingId, returnUrl);
         return await ExecuteCommandAsync(
@@ -156,13 +156,13 @@ public sealed partial class ZaznamyController
             onAjaxSuccess: () => Task.FromResult<IActionResult>(
                 !zaznamId.HasValue || zaznamId.Value <= 0
                     ? AjaxErrorResult("Chybí ID záznamu pro obnovu vyjádření.")
-                    : BuildCommentAjaxSuccessResult(uiContext, projektId, zaznamId.Value, meetingId, "Vyjádření bylo smazáno.")),
+                    : BuildCommentAjaxSuccessResult(uiContext, projektId, zaznamId.Value, meetingId, "Vyjádření bylo smazáno.", kontextJednaniId)),
             operation: () => _recordService.DeleteCommentAsync(command, CurrentUserContext, ct));
     }
 
-    private IActionResult BuildCommentAjaxSuccessResult(string? uiContext, int projektId, int zaznamId, int? meetingId, string message)
+    private IActionResult BuildCommentAjaxSuccessResult(string? uiContext, int projektId, int zaznamId, int? meetingId, string message, int? kontextJednaniId = null)
     {
-        var flow = _recordUiFlowResolver.ResolveCommentAjaxFlow(uiContext, projektId, zaznamId, meetingId);
+        var flow = _recordUiFlowResolver.ResolveCommentAjaxFlow(uiContext, projektId, zaznamId, meetingId, kontextJednaniId);
         return AjaxSuccessResult(
             refreshScope: flow.RefreshScope,
             refreshUrl: Url.Action(flow.ActionName, flow.ControllerName, flow.RouteValues),

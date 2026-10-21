@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Export;
 using PmTracker.Web.Services.Security;
 
 namespace PmTracker.Web.Controllers;
@@ -11,19 +12,30 @@ namespace PmTracker.Web.Controllers;
 [Authorize]
 public sealed partial class JednaniController : BaseController
 {
+    private const string MinutesTemplateViewPath = "~/Views/Export/PdfTemplate.cshtml";
+
     private readonly IMeetingService _meetingService;
     private readonly IProjectService _projectService;
+    private readonly IRecordProposalService _recordProposalService;
+    private readonly IExportTemplateUseCase _exportTemplateUseCase;
+    private readonly IViewRenderer _viewRenderer;
 
     public JednaniController(
         IUserContextResolver userContextResolver,
         TimeProvider timeProvider,
         ILoggerFactory loggerFactory,
         IMeetingService meetingService,
-        IProjectService projectService)
+        IProjectService projectService,
+        IRecordProposalService recordProposalService,
+        IExportTemplateUseCase exportTemplateUseCase,
+        IViewRenderer viewRenderer)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _meetingService = meetingService;
         _projectService = projectService;
+        _recordProposalService = recordProposalService;
+        _exportTemplateUseCase = exportTemplateUseCase;
+        _viewRenderer = viewRenderer;
     }
 
     public async Task<IActionResult> Index(int? projektId, CancellationToken ct = default)
@@ -71,6 +83,23 @@ public sealed partial class JednaniController : BaseController
         model.HasSubsystemLeadPermission = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, model.ProjektId);
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.PageTitle = $"Jednání č. {model.Jednani.CisloJednani}";
+
+        // Plán 2026-10-21: otevřené / připravované jednání = záložka Záznamy v kontextu jednání
+        // (vyjádření a změna stavu předvybírají toto jednání); uzavřené = zápis jako v PDF tisku.
+        if (!model.IsReadOnly)
+        {
+            var zaznamyTab = await _projectService.BuildProjectRecordsTabAsync(model.ProjektId, ct);
+            await PrepareRecordsTabPresentationAsync(zaznamyTab, _recordProposalService, model.Jednani.Id, ct);
+            model.ZaznamyTab = zaznamyTab;
+        }
+        else if (CurrentUserContext.HasPermission(PermissionKeys.ExportPdfJednani, model.ProjektId))
+        {
+            // Stejná šablona a data jako tisk (bez PDF a bez autoPrint). Do iframe jde přes srcdoc:
+            // globální X-Frame-Options DENY / frame-ancestors 'none' (Program.cs) by vložení
+            // vlastní stránky přes src zablokovaly a uvolňovat je kvůli tomu nechceme.
+            var template = await _exportTemplateUseCase.BuildMeetingTemplateAsync(model.Jednani.Id, CurrentUserContext, autoPrint: false, ct);
+            model.ZapisHtml = await _viewRenderer.RenderToStringAsync(ControllerContext, MinutesTemplateViewPath, template);
+        }
 
         // C1 (2026-07-10): origin (returnUrl z přehledu /Jednani, dashboard novinek, …)
         // se propisuje do breadcrumb ← (validace + kanonický tab=jednani fallback

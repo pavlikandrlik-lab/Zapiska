@@ -4,8 +4,8 @@
     ViewData["BodyClass"] = "dashboard-page";
     var uzavrenyStav = Model.StavyJednani.FirstOrDefault(x => string.Equals(x.Value, Model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase));
     var otevrenyStav = Model.StavyJednani.FirstOrDefault(x => string.Equals(x.Value, Model.OtevrenyStavKod, StringComparison.OrdinalIgnoreCase));
-    var isLocked = !string.IsNullOrWhiteSpace(Model.UzavrenyStavKod)
-        && string.Equals(Model.Jednani.StavKod, Model.UzavrenyStavKod, StringComparison.OrdinalIgnoreCase);
+    // Uzavřené jednání = sdílené MeetingStatePolicy.IsReadOnly (kód CLOSED, název „uzav…“ nebo zamčené).
+    var isLocked = Model.IsReadOnly;
     var canEditMeetingFields = Model.CanEditMeeting && !isLocked;
     var meetingPrintUrl = Url.Action("JednaniTisk", "Export", new { jednaniId = Model.Jednani.Id, projektId = Model.ProjektId, autoPrint = true }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Tisk?projektId={Model.ProjektId}&autoPrint=true";
     var meetingWordUrl = Url.Action("JednaniWord", "Export", new { jednaniId = Model.Jednani.Id, projektId = Model.ProjektId }) ?? $"/Export/Jednani/{Model.Jednani.Id}/Word?projektId={Model.ProjektId}";
@@ -20,27 +20,94 @@
         : $"Celkem {Model.Ucast.Count} osob · {string.Join(" · ", attendanceSummaryItems)}";
 }
 
-@* Navigaci „zpět" a titulek jednání nese drobečková lišta (frame bar pod menu);
-   samostatný _PageHeader odstraněn (2026-07-04). *@
-<section class="meeting-detail-header">
-    <p class="muted">@Model.Jednani.Datum.ToString("dd.MM.yyyy") v @Model.Jednani.CasZacatek.ToString("HH\\:mm")</p>
-    <p class="muted">Místo: @Model.Jednani.Misto</p>
-    @if (isLocked)
+@* Navigaci „zpět" a titulek jednání nese drobečková lišta (frame bar pod menu).
+   Plán 2026-10-21: stav, akce a účast kompaktně nahoře v pruhu; pod ním záznamy jednání
+   (otevřené / příprava) nebo zápis jako v PDF tisku (uzavřené). *@
+<section class="meeting-strip" data-meeting-strip aria-label="Jednání č. @Model.Jednani.CisloJednani">
+    <div class="meeting-strip__info">
+        <strong>@Model.Jednani.Datum.ToString("dd.MM.yyyy") v @Model.Jednani.CasZacatek.ToString("HH\\:mm")</strong>
+        <span class="muted">Místo: @Model.Jednani.Misto</span>
+        @if (!canEditMeetingFields)
+        {
+            @* Kdo stav mění, vidí ho ve výběru „Uložit stav“ — štítek by ho jen opakoval. *@
+            <span class="badge meeting-status-badge" data-meeting-strip-status>@Model.Jednani.Stav</span>
+        }
+        @if (isLocked)
+        {
+            <span class="muted">Uzamkl: @(string.IsNullOrWhiteSpace(Model.Jednani.UzamklOsoba) ? "-" : Model.Jednani.UzamklOsoba)</span>
+        }
+    </div>
+    @if (Model.CanEditMeeting)
     {
-        <p class="muted">Uzamkl: @(string.IsNullOrWhiteSpace(Model.Jednani.UzamklOsoba) ? "-" : Model.Jednani.UzamklOsoba)</p>
+        <div class="meeting-strip__status meeting-status-controls">
+            @if (canEditMeetingFields)
+            {
+                <form asp-action="SaveStatus" method="post" class="inline-form">
+                    <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
+                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                    <select class="wide-select" name="Stav" aria-label="Stav jednání">
+                        @foreach (var stav in Model.StavyJednani)
+                        {
+                            var selected = string.Equals(stav.Value, Model.Jednani.StavKod, StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(stav.Label, Model.Jednani.Stav, StringComparison.OrdinalIgnoreCase);
+                            if (selected)
+                            {
+                                <option value="@stav.Value" selected="selected">@stav.Label</option>
+                            }
+                            else
+                            {
+                                <option value="@stav.Value">@stav.Label</option>
+                            }
+                        }
+                    </select>
+                    <pm-button variant="Secondary" size="Small" native-type="submit">Uložit stav</pm-button>
+                </form>
+            }
+            @if (isLocked)
+            {
+                if (otevrenyStav is not null)
+                {
+                    <form asp-action="SaveStatus" method="post" class="inline-form">
+                        <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
+                        <input type="hidden" name="Stav" value="@otevrenyStav.Value" />
+                        <input type="hidden" name="OtevritJednani" value="true" />
+                        <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                        <pm-button variant="Secondary" size="Small" native-type="submit">Otevřít jednání</pm-button>
+                    </form>
+                }
+            }
+            else if (uzavrenyStav is not null)
+            {
+                <form asp-action="SaveStatus" method="post" class="inline-form">
+                    <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
+                    <input type="hidden" name="Stav" value="@uzavrenyStav.Value" />
+                    <input type="hidden" name="UzavritJednani" value="true" />
+                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                    <pm-button variant="Ghost" size="Small" native-type="submit">Uzavřít jednání</pm-button>
+                </form>
+            }
+        </div>
     }
     <div class="header-actions meeting-detail-actions">
         @* A6 (2026-07-08): BEZ href — viz Projekty/Detail.cshtml, stejný fix. *@
         <pm-button variant="Ghost"
+                   size="Small"
                    data-print-trigger="true"
                    data-print-pdf-url="@meetingPrintUrl"
                    data-print-word-url="@meetingWordUrl"
                    data-print-label="Tisk jednání č. @Model.Jednani.CisloJednani">
             Tisk
         </pm-button>
+        @if (Model.ZaznamyTab is { CanManageRecords: true } zaznamyTab)
+        {
+            <pm-button variant="Primary" size="Small" href="@zaznamyTab.CreateRecordEditorUrl" data-meeting-create-record>
+                Nový záznam
+            </pm-button>
+        }
         @if (canEditMeetingFields)
         {
             <pm-button variant="Secondary"
+                       size="Small"
                        data-modal-url="@Url.Action("EditMeetingModal", "Jednani", new { projektId = Model.ProjektId, meetingId = Model.Jednani.Id })">
                 Upravit jednání
             </pm-button>
@@ -50,13 +117,14 @@
             <form asp-controller="Jednani" asp-action="Delete" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat jednání č. @Model.Jednani.CisloJednani? Budou smazána i navázaná vyjádření a účast.');">
                 <input type="hidden" name="ProjektId" value="@Model.ProjektId" />
                 <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
-                <pm-button variant="Ghost" native-type="submit">Smazat</pm-button>
+                <pm-button variant="Ghost" size="Small" native-type="submit">Smazat</pm-button>
             </form>
         }
     </div>
 </section>
 
-<div class="meeting-layout">
+@if (!Model.IsReadOnly)
+{
     <section class="card meeting-attendance-card" data-meeting-attendance-card>
         <div class="section-header meeting-attendance-header">
             <div class="meeting-attendance-summary">
@@ -136,76 +204,20 @@
             </form>
         </div>
     </section>
+}
 
-    <section class="meeting-content">
-        <div class="card">
-            <div class="meeting-status">
-                <div>
-                    <h2>Stav jednání</h2>
-                    <p class="muted">Upravte stav nebo jednání uzavřete / otevřete.</p>
-                    @if (isLocked)
-                    {
-                        <p class="tag">Jednání je uzamčeno ve stavu @(uzavrenyStav?.Label ?? Model.Jednani.Stav).</p>
-                    }
-                </div>
-                <div class="meeting-status-controls">
-                    <form asp-action="SaveStatus" method="post" class="inline-form">
-                        <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
-                        <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                        <select class="wide-select" name="Stav" disabled="@(!canEditMeetingFields)">
-                            @foreach (var stav in Model.StavyJednani)
-                            {
-                                var selected = string.Equals(stav.Value, Model.Jednani.StavKod, StringComparison.OrdinalIgnoreCase)
-                                    || string.Equals(stav.Label, Model.Jednani.Stav, StringComparison.OrdinalIgnoreCase);
-                                if (selected)
-                                {
-                                    <option value="@stav.Value" selected="selected">@stav.Label</option>
-                                }
-                                else
-                                {
-                                    <option value="@stav.Value">@stav.Label</option>
-                                }
-                            }
-                        </select>
-                        @if (canEditMeetingFields)
-                        {
-                            <pm-button variant="Secondary" native-type="submit">Uložit stav</pm-button>
-                        }
-                    </form>
-                    @if (Model.CanEditMeeting)
-                    {
-                        if (isLocked)
-                        {
-                            if (otevrenyStav is not null)
-                            {
-                            <form asp-action="SaveStatus" method="post" class="inline-form">
-                                <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
-                                <input type="hidden" name="Stav" value="@otevrenyStav.Value" />
-                                <input type="hidden" name="OtevritJednani" value="true" />
-                                <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                                <pm-button variant="Secondary" native-type="submit">Otevřít jednání</pm-button>
-                            </form>
-                            }
-                        }
-                        else
-                        {
-                            if (uzavrenyStav is not null)
-                            {
-                            <form asp-action="SaveStatus" method="post" class="inline-form">
-                                <input type="hidden" name="JednaniId" value="@Model.Jednani.Id" />
-                                <input type="hidden" name="Stav" value="@uzavrenyStav.Value" />
-                                <input type="hidden" name="UzavritJednani" value="true" />
-                                <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
-                                <pm-button variant="Ghost" native-type="submit">Uzavřít jednání</pm-button>
-                            </form>
-                            }
-                        }
-                    }
-                </div>
-            </div>
-        </div>
-        @* Sekce „Zápis úkolů" (záznamy + jejich vyjádření) odstraněna 2026-07-08 — na detailu
-           jednání zůstávají jen detaily jednání (účast + stav). Vyjádření se evidují ze záložky
-           Záznamy. Server stále počítá Model.Ukoly (integr. test + sdílené helpery), UI ho nerenderuje. *@
+@if (Model.ZaznamyTab is not null)
+{
+    <section class="meeting-records" aria-label="Záznamy jednání">
+        @await Html.PartialAsync("~/Views/Projekty/_ProjectRecordsTab.cshtml", Model.ZaznamyTab)
     </section>
-</div>
+}
+else if (Model.ZapisHtml is not null)
+{
+    @* Zápis uzavřeného jednání = HTML šablona tisku (plán 2026-10-21). srcdoc místo src:
+       globální X-Frame-Options DENY by vložení vlastní stránky zablokovalo. *@
+    <iframe class="meeting-minutes-frame"
+            srcdoc="@Model.ZapisHtml"
+            title="Zápis jednání č. @Model.Jednani.CisloJednani"
+            data-meeting-minutes-frame></iframe>
+}

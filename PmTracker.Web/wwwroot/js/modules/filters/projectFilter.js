@@ -18,6 +18,7 @@
 // ---------------------------------------------------------------------------
 
 const projectFilterStoragePrefix = "pmtracker.projectFilters.v1.project.";
+const meetingFilterStoragePrefix = "pmtracker.meetingFilters.v1.";
 
 /**
  * Sjednocený config pro oba scopes (records, schedule) — DRY refactor 2026-04-30.
@@ -231,7 +232,21 @@ function isGovFormSwitch(el) {
  * objekt, propagace via pm-tab-change event.
  */
 export function getProjectFilterStorageKey(scope, kind) {
-    const projectId = getProjectFilterProjectId(scope);
+    return buildProjectFilterStorageKey(getProjectFilterRoot(scope)?.dataset, kind);
+}
+
+/**
+ * Klíč úložiště filtrů z datasetu kořene filter shellu.
+ * Detail jednání (data-project-filter-storage-id, plán 2026-10-21): vlastní klíč jen pro stav
+ * v sessionStorage; výchozí hodnoty se nečtou ani neukládají ("" = bez úložiště).
+ */
+export function buildProjectFilterStorageKey(dataset, kind) {
+    const storageId = (dataset?.projectFilterStorageId || "").trim();
+    if (storageId) {
+        return kind === "state" ? `${meetingFilterStoragePrefix}${storageId}.state` : "";
+    }
+
+    const projectId = (dataset?.projectId || "").trim();
     if (!projectId || projectId === "0") {
         return "";
     }
@@ -570,6 +585,10 @@ export function restoreProjectFilterScope(scope) {
 export function saveProjectFilterDefaults(scope) {
     const state = persistProjectFilterSessionState(scope);
     const key = getProjectFilterStorageKey(scope, "defaults");
+    if (!key) {
+        // Detail jednání nemá výchozí filtry (tlačítko chybí) — pojistka, ať se nezapíše ani popisek.
+        return;
+    }
     writeJsonStorage(localStorage, key, state);
 
     // Companion label klíč — čitelný název projektu pro správu předvoleb (Profil ▸ Předvolby).

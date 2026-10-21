@@ -104,7 +104,7 @@ public sealed partial class ZaznamyController : BaseController
     }
 
 
-    public async Task<IActionResult> Edit(int id, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> Edit(int id, string? returnUrl, int? jednaniId = null, string? uiContext = null, CancellationToken ct = default)
     {
         // Review finding S-2: autorizační check PŘED těžkou DB query a T5 harvest triggerem.
         // Dříve BuildZaznamEditAsync načetl celý model pro record, který uživatel nesmí editovat
@@ -127,6 +127,13 @@ public sealed partial class ZaznamyController : BaseController
             return Forbid();
         }
 
+        // Kontext jednání (plán 2026-10-21) jen pro jednání projektu záznamu — cizí id se ignoruje.
+        if (jednaniId.HasValue
+            && !await _db.Jednani.AsNoTracking().AnyAsync(x => x.Id == jednaniId.Value && x.ProjektId == projektId.Value, ct))
+        {
+            jednaniId = null;
+        }
+
         // Spec 2026-09-17 §4.2 — zámek karty. Získává se PO autorizaci, ale PŘED těžkým
         // dotazem i harvest triggerem: nemá smysl připravovat editor, který se nezobrazí.
         // Pohled jako je jen pro čtení: zámek se jen přečte (stejná stránka „záznam upravuje X“
@@ -136,7 +143,7 @@ public sealed partial class ZaznamyController : BaseController
             : await _editLockService.PeekAsync(id, CurrentUserContext.OsobaId, ct);
         if (!lockResult.Acquired)
         {
-            return await BuildRecordEditLockedResultAsync(id, projektId.Value, lockResult, ct);
+            return await BuildRecordEditLockedResultAsync(id, projektId.Value, lockResult, jednaniId, ct);
         }
 
         var model = await _projectEditQuery.GetEditModelAsync(id, ct);
@@ -153,7 +160,12 @@ public sealed partial class ZaznamyController : BaseController
             await _harvestScheduler.ScheduleHarvestForRecordAsync(id, ct).ConfigureAwait(false);
         }
 
-        PrepareRecordEditorModel(model, returnUrl, canEditRecord, canManageSchedule);
+        PrepareRecordEditorModel(model, returnUrl, canEditRecord, canManageSchedule, uiContext, jednaniId);
+        if (model.MeetingId.HasValue && model.StavPlatiK is not null)
+        {
+            // Tužka z detailu jednání: „Změna stavu platí k“ předvybere toto jednání (je-li v nabídce).
+            model.StavPlatiK = StatusChangeEffectiveDatePolicy.PreferMeeting(model.StavPlatiK, model.MeetingId.Value);
+        }
         // C1 (2026-07-10): ← = model.BackUrl (origin returnUrl ?? tab=zaznamy / meeting detail).
         SetProjectBreadcrumbs(
             model.ProjektId, model.ProjektNazev, model.ProjektZkratka,
@@ -170,6 +182,7 @@ public sealed partial class ZaznamyController : BaseController
         int zaznamId,
         int projektId,
         RecordEditLockResult lockResult,
+        int? kontextJednaniId,
         CancellationToken ct)
     {
         var holderName = lockResult.HolderOsobaId.HasValue
@@ -195,7 +208,13 @@ public sealed partial class ZaznamyController : BaseController
             CisloViditelne = cisloViditelne,
             HolderDisplayName = holderName,
             SinceLocal = (lockResult.HolderSinceUtc ?? DateTime.UtcNow).ToLocalTime(),
-            RetryUrl = Url.Action("Edit", "Zaznamy", new { id = zaznamId }) ?? $"/Zaznamy/Edit/{zaznamId}",
+            // „Zkusit znovu“ z tužky v detailu jednání otevře editor zase v kontextu jednání.
+            RetryUrl = Url.Action("Edit", "Zaznamy", new
+            {
+                id = zaznamId,
+                jednaniId = kontextJednaniId,
+                uiContext = kontextJednaniId.HasValue ? UiContextMeeting : null
+            }) ?? $"/Zaznamy/Edit/{zaznamId}",
             BackUrl = backUrl
         };
 

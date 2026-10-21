@@ -180,4 +180,52 @@ public sealed class StatusChangeEffectiveDatePolicyTests
         StatusChangeEffectiveDatePolicy.Resolve(choice, meetings, "").Error.Should().Be(
             "Stav teď nejde změnit: změna nemůže platit dříve než 22.10.2026 (předchozí změna stavu nebo založení záznamu) a žádné nabízené datum není pozdější.");
     }
+
+    [Fact]
+    public void PreferMeeting_MeetingInOffer_BecomesDefault()
+    {
+        var today = new DateTime(2026, 10, 21);
+        var meetings = new[]
+        {
+            new StatusChangeMeetingCandidate(1, 888, new DateTime(2026, 10, 8), "OPEN", false),
+            new StatusChangeMeetingCandidate(2, 887, new DateTime(2026, 10, 1), "OPEN", false),
+        };
+        var choice = StatusChangeEffectiveDatePolicy.Build(meetings, today, null, new DateTime(2026, 1, 1));
+        choice.DefaultValue.Should().Be("1", "bez kontextu platí §4.3: nejnovější otevřené");
+
+        var preferred = StatusChangeEffectiveDatePolicy.PreferMeeting(choice, 2);
+
+        preferred.DefaultValue.Should().Be("2");
+        preferred.Options.Should().BeEquivalentTo(choice.Options, "nabídka se nemění, jen výchozí volba");
+    }
+
+    [Fact]
+    public void PreferMeeting_MeetingOutsideOffer_KeepsDefault()
+    {
+        var today = new DateTime(2026, 10, 21);
+        var meetings = new[]
+        {
+            new StatusChangeMeetingCandidate(1, 888, new DateTime(2026, 10, 8), "OPEN", false),
+            new StatusChangeMeetingCandidate(3, 886, new DateTime(2026, 9, 24), "CLOSED", true),
+            new StatusChangeMeetingCandidate(4, 885, new DateTime(2026, 9, 17), "OPEN", false),
+        };
+        var choice = StatusChangeEffectiveDatePolicy.Build(meetings, today, null, new DateTime(2026, 1, 1));
+
+        StatusChangeEffectiveDatePolicy.PreferMeeting(choice, 4).DefaultValue.Should().Be("1", "885 leží za uzavřeným 886 → není v nabídce");
+        StatusChangeEffectiveDatePolicy.PreferMeeting(choice, 999).DefaultValue.Should().Be("1", "neznámé / cizí jednání");
+    }
+
+    [Fact]
+    public void PreferMeeting_MeetingBelowLowerBound_KeepsDefault()
+    {
+        var today = new DateTime(2026, 10, 21);
+        var meetings = new[]
+        {
+            new StatusChangeMeetingCandidate(1, 888, new DateTime(2026, 10, 8), "OPEN", false),
+            new StatusChangeMeetingCandidate(2, 887, new DateTime(2026, 10, 1), "OPEN", false),
+        };
+        var choice = StatusChangeEffectiveDatePolicy.Build(meetings, today, new DateTime(2026, 10, 5), new DateTime(2026, 1, 1));
+
+        StatusChangeEffectiveDatePolicy.PreferMeeting(choice, 2).DefaultValue.Should().Be("1", "887 (1.10.) je pod spodní mezí 5.10.");
+    }
 }

@@ -48,8 +48,8 @@
                     }
                 </div>
             }
-            @await Html.PartialAsync("_PdfRolesBlock", new PmTracker.Web.Models.ViewModels.PdfRolesBlockViewModel(Model.IsMeeting, Model.ProjektoveRole))
-            @await Html.PartialAsync("_PdfAttendanceBlock", Model.Dochazka)
+            @await Html.PartialAsync("~/Views/Export/_PdfRolesBlock.cshtml", new PmTracker.Web.Models.ViewModels.PdfRolesBlockViewModel(Model.IsMeeting, Model.ProjektoveRole))
+            @await Html.PartialAsync("~/Views/Export/_PdfAttendanceBlock.cshtml", Model.Dochazka)
         </header>
 
         <table class="records-table">
@@ -82,7 +82,7 @@
 
                         foreach (var zaznam in subsystemGroup.Records)
                         {
-                            @await Html.PartialAsync("_PdfRecordRow", zaznam)
+                            @await Html.PartialAsync("~/Views/Export/_PdfRecordRow.cshtml", zaznam)
                         }
                     }
                 }

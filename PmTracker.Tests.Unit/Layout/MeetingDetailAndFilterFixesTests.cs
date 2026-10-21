@@ -79,18 +79,20 @@ public sealed class MeetingDetailAndFilterFixesTests
             "gov pozicuje knob ve shadow DOM přes --padding-ver → host padding nefunguje, nutný transform");
     }
 
-    [Fact] // 3 — detail jednání bez záznamů/vyjádření
-    public void MeetingDetail_DoesNotRenderRecordsSection()
+    [Fact] // 3 — detail jednání: stará sekce „Zápis úkolů“ ne, záznamy jen přes sdílenou záložku
+    public void MeetingDetail_UsesSharedRecordsTab_NotRemovedTaskSection()
     {
         var detail = Read("PmTracker.Web/Views/Jednani/Detail.cshtml");
-        // Render markery odstraněné sekce (ne próza — komentář o odstranění je povolený).
+        // Render markery sekce odstraněné 2026-07-08 se nevracejí.
         detail.Should().NotContain("_TaskItemPartial");
         detail.Should().NotContain("meeting-task-header");
         detail.Should().NotContain("task-list");
         detail.Should().NotContain("createRecordInMeetingUrl");
         detail.Should().NotContain("Model.Ukoly.Count");
-        // Detaily jednání zůstávají.
+        // Plán 2026-10-21: záznamy otevřeného jednání = stejná komponenta jako záložka projektu
+        // (žádná kopie markupu), stav a akce v kompaktním pruhu, účast zůstává.
+        detail.Should().Contain("PartialAsync(\"~/Views/Projekty/_ProjectRecordsTab.cshtml\", Model.ZaznamyTab)");
+        detail.Should().Contain("data-meeting-strip");
         detail.Should().Contain("<h2>Účast</h2>");
-        detail.Should().Contain("<h2>Stav jednání</h2>");
     }
 }

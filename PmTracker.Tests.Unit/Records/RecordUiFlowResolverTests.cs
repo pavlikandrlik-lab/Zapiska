@@ -23,6 +23,15 @@ public sealed class RecordUiFlowResolverTests
     }
 
     [Fact]
+    public void ResolveCommentAjaxFlow_ProjectRefresh_KeepsMeetingContext()
+    {
+        var result = _sut.ResolveCommentAjaxFlow("project", 17, 31, null, kontextJednaniId: 55);
+
+        result.RefreshScope.Should().Be("record-comments");
+        result.RouteValues["kontextJednaniId"].Should().Be(55, "obnovený panel vyjádření musí dál předvybírat jednání");
+    }
+
+    [Fact]
     public void ResolveCommentAjaxFlow_ShouldReturnProjectRefresh_WhenMeetingContextMissingMeetingId()
     {
         var result = _sut.ResolveCommentAjaxFlow("meeting", 17, 31, null);

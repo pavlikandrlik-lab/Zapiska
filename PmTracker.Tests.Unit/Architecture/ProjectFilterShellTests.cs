@@ -76,7 +76,9 @@ public sealed class ProjectFilterShellTests
     public void RecordsTab_DelegatesFilterMarkupToSharedPartial()
     {
         var src = Read("PmTracker.Web/Views/Projekty/_ProjectRecordsTab.cshtml");
-        Regex.IsMatch(src, @"PartialAsync\(""_ProjectFilterShell""")
+        // Plná cesta (2026-10-21): záložku vykresluje i detail jednání (JednaniController),
+        // kde by krátké jméno partialu hledalo ve Views/Jednani.
+        Regex.IsMatch(src, @"PartialAsync\(""(~/Views/Projekty/)?_ProjectFilterShell(\.cshtml)?""")
             .Should().BeTrue("_ProjectRecordsTab musí volat PartialAsync na shared filter shell (DRY).");
     }
 
