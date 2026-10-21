@@ -27,6 +27,16 @@ public static class StatusChangeEffectiveDatePolicy
     private const string OpenCode = "OPEN";
     private const string RetryHint = "Vyberte znovu, k čemu změna stavu platí.";
 
+    /// <summary>
+    /// Editor otevřený z detailu jednání (plán 2026-10-21): předvybere toto jednání, je-li v nabídce.
+    /// Jinak výchozí volba podle §4.3 beze změny — nabídku ani ověření při uložení to nemění.
+    /// </summary>
+    public static StatusChangeEffectiveDateChoice PreferMeeting(StatusChangeEffectiveDateChoice choice, int meetingId)
+    {
+        var option = choice.Options.FirstOrDefault(x => x.JednaniId == meetingId);
+        return option is null ? choice : choice with { DefaultValue = option.Value };
+    }
+
     public static StatusChangeEffectiveDateChoice Build(
         IReadOnlyList<StatusChangeMeetingCandidate> meetings,
         DateTime today,

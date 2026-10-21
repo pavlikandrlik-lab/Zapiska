@@ -42,6 +42,46 @@ public sealed class RecordEditorStatusEffectiveDateTests
         Matches(html, $"<option value=\"{draftId}\">").Should().BeTrue();
     }
 
+    [Fact]
+    public async Task Edit_FromMeeting_PreselectsThatMeeting_AndReturnsToIt()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiStavPlatiKMtg");
+        var projectId = await _fixture.EnsureProjectAsync("APISTAVPKMTG");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APISTAVPKMTGS", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API stav plati k z jednani");
+        var olderOpenId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 9721);
+        var newestOpenId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 9722);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Edit/{recordId}?projektId={projectId}&jednaniId={olderOpenId}&uiContext=meeting&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        Matches(html, $"<option value=\"{olderOpenId}\" selected=\"selected\"").Should().BeTrue("editor z jednání předvybere to jednání");
+        Matches(html, $"<option value=\"{newestOpenId}\">").Should().BeTrue("jiné jednání jde vybrat");
+        Matches(html, $"name=\"MeetingId\" value=\"{olderOpenId}\"").Should().BeTrue("uložení se vrátí do detailu jednání");
+    }
+
+    [Fact]
+    public async Task Edit_WithForeignMeetingContext_IgnoresIt()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiStavPlatiKCizi");
+        var projectId = await _fixture.EnsureProjectAsync("APISTAVPKCIZI");
+        var otherProjectId = await _fixture.EnsureProjectAsync("APISTAVPKCIZI2");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APISTAVPKCIZIS", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API stav plati k cizi");
+        var ownOpenId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 9731);
+        var foreignOpenId = await _fixture.CreateMeetingAsync(otherProjectId, "OPEN", 9732);
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Edit/{recordId}?projektId={projectId}&jednaniId={foreignOpenId}&uiContext=meeting&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        Matches(html, $"<option value=\"{ownOpenId}\" selected=\"selected\"").Should().BeTrue("cizí jednání se ignoruje, platí §4.3");
+        Matches(html, $"name=\"MeetingId\" value=\"{foreignOpenId}\"").Should().BeFalse();
+    }
+
     private static bool Matches(string html, string pattern)
         => Regex.IsMatch(html, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 }

@@ -53,6 +53,38 @@ public sealed class RecordEditLockControllerTests
     }
 
     [Fact]
+    public async Task Edit_FromMeeting_LockedPage_RetryKeepsMeetingContext()
+    {
+        // Plán 2026-10-21: tužka z detailu jednání narazí na zámek → „Zkusit znovu“ musí otevřít
+        // editor zase v kontextu jednání (předvolba „Změna stavu platí k“, návrat do jednání).
+        var holderId = await _fixture.EnsurePersonAsync("ApiLockMtgHolder");
+        var projectId = await _fixture.EnsureProjectAsync("APILOCKMTG");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APILOCKMTGSUB", holderId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, holderId, subsystemId, "U", "API lock meeting record");
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 9741);
+
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            dbContext.ZaznamEditZamky.Add(new ZaznamEditZamekEntity
+            {
+                ZaznamId = recordId,
+                OsobaId = holderId,
+                ZiskanoAt = DateTime.UtcNow,
+                HeartbeatAt = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/Edit/{recordId}?projektId={projectId}&jednaniId={meetingId}&uiContext=meeting&asUser={_fixture.AdminOsobaId}");
+        var html = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        html.Should().Contain("data-record-edit-locked=\"true\"");
+        html.Should().MatchRegex($"href=\"[^\"]*/Zaznamy/Edit/{recordId}\\?jednaniId={meetingId}&uiContext=meeting\"[^>]*data-record-edit-locked-retry");
+    }
+
+    [Fact]
     public async Task Edit_ShouldOpenEditor_AndTakeLock_WhenRecordIsFree()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiLockFreeOwner");
