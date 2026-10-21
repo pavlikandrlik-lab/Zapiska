@@ -16,6 +16,12 @@ public sealed class ProjectFilterShellViewModel
     /// <summary>"records" nebo "schedule" — používá se jako data-project-filter-scope.</summary>
     public string Scope { get; init; } = string.Empty;
 
+    /// <summary>Vlastní klíč úložiště filtrů (detail jednání: „jednani-{id}“); null = klíč projektu.</summary>
+    public string? StorageId { get; set; }
+
+    /// <summary>False = bez tlačítka „Uložit jako výchozí“ (filtry jednání jsou jen v relaci).</summary>
+    public bool AllowSaveDefaults { get; set; } = true;
+
     public IReadOnlyList<LookupOptionViewModel> SubsystemyMoznosti { get; init; } = Array.Empty<LookupOptionViewModel>();
     public IReadOnlyList<LookupOptionViewModel> KategorieMoznosti { get; init; } = Array.Empty<LookupOptionViewModel>();
     public IReadOnlyList<LookupOptionViewModel> StavyUkoluMoznosti { get; init; } = Array.Empty<LookupOptionViewModel>();

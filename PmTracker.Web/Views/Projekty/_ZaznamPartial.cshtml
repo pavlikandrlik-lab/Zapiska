@@ -28,7 +28,7 @@
     var projektId = summary.ProjektId;
     var taskPrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = summary.Id, projektId, autoPrint = true }) ?? $"/Export/Ukol/{summary.Id}/Tisk?projektId={projektId}&autoPrint=true";
     var taskPrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = summary.Id, projektId }) ?? $"/Export/Ukol/{summary.Id}/Word?projektId={projektId}";
-    var editRecordUrl = Url.Action("Edit", "Zaznamy", new { id = summary.Id, projektId }) ?? $"/Zaznamy/Edit/{summary.Id}";
+    var editRecordUrl = Model.EditRecordUrl ?? Url.Action("Edit", "Zaznamy", new { id = summary.Id, projektId }) ?? $"/Zaznamy/Edit/{summary.Id}";
     var hasMenuItems = summary.MaHarmonogramHodnotu
         || (summary.CanCreateScheduleProposal && !string.IsNullOrWhiteSpace(summary.ScheduleProposalUrl))
         || !string.IsNullOrWhiteSpace(Model.RecordPageUrl);

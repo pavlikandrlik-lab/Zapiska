@@ -156,7 +156,7 @@ public sealed partial class ProjektyController : BaseController
         model.NavrhyTab.LoadUrl = Url.Action(nameof(NavrhyTabPartial), new { id = projectId }) ?? $"/Projekty/NavrhyTabPartial/{projectId}";
         model.VyzvyTab.LoadUrl = Url.Action(nameof(VyzvyTabPartial), new { id = projectId }) ?? $"/Projekty/VyzvyTabPartial/{projectId}";
 
-        await PrepareRecordsTabPresentationAsync(model.ZaznamyTab, _recordProposalService, ct);
+        await PrepareRecordsTabPresentationAsync(model.ZaznamyTab, _recordProposalService, kontextJednaniId: null, ct);
     }
 
     private async Task PrepareActiveProjectTabAsync(ProjektDetailViewModel model, string requestedTab, CancellationToken ct)

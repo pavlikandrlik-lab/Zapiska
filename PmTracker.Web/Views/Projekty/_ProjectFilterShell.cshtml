@@ -7,7 +7,7 @@
 <div class="filter-shell"
      data-project-filter-scope="@Model.Scope"
      data-project-id="@Model.ProjektId"
-     data-project-zkratka="@Model.Zkratka">
+     data-project-zkratka="@Model.Zkratka"@Html.Raw(Model.StorageId is null ? string.Empty : $" data-project-filter-storage-id=\"{System.Net.WebUtility.HtmlEncode(Model.StorageId)}\"")>
     <button class="filter-toggle" type="button" data-filter-toggle>
         Filtry
         <span class="filter-icon" aria-hidden="true">
@@ -94,7 +94,10 @@
             </gov-form-switch>
         </div>
         <div class="filter-actions">
-            <pm-button variant="Ghost" size="Small" data-filter-save-defaults="@Model.Scope">Uložit jako výchozí</pm-button>
+            @if (Model.AllowSaveDefaults)
+            {
+                <pm-button variant="Ghost" size="Small" data-filter-save-defaults="@Model.Scope">Uložit jako výchozí</pm-button>
+            }
             <span class="filter-save-status" data-filter-save-status="@Model.Scope" aria-live="polite"></span>
         </div>
     </div>

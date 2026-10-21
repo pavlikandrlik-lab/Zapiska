@@ -21,6 +21,9 @@ public sealed class ProjektZaznamyTabViewModel
     public string? MeetingCommentStatesUrl { get; set; }
     public string? ProjectPrintUrl { get; set; }
     public string? ProjectWordUrl { get; set; }
+
+    /// <summary>Jednání, ze kterého se záložka zobrazuje (detail jednání); null = detail projektu.</summary>
+    public int? KontextJednaniId { get; set; }
 }
 
 public sealed class ProjektZaznamGroupViewModel
@@ -43,6 +46,9 @@ public sealed class ProjektZaznamCardShellViewModel
 
     /// <summary>Stránka záznamu (2026-07-14): odkaz na samostatnou stránku (nová karta prohlížeče).</summary>
     public string? RecordPageUrl { get; set; }
+
+    /// <summary>Cíl tužky. Null = výchozí odkaz ve view (záznam mimo záložku Záznamy).</summary>
+    public string? EditRecordUrl { get; set; }
     public ZaznamCardDetailViewModel? Detail { get; set; }
     public ZaznamCommentsPanelViewModel? Comments { get; set; }
     public bool DetailLoaded { get; set; }

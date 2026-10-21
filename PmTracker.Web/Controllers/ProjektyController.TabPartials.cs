@@ -7,15 +7,22 @@ namespace PmTracker.Web.Controllers;
 public sealed partial class ProjektyController
 {
     [HttpGet]
-    public async Task<IActionResult> RecordsTabPartial(int id, CancellationToken ct = default)
+    public async Task<IActionResult> RecordsTabPartial(int id, int? kontextJednaniId, CancellationToken ct = default)
     {
         if (!CurrentUserContext.CanAccessProject(id))
         {
             return NotFound();
         }
 
+        // Kontext jen pro jednání tohoto projektu — cizí id se ignoruje (předvolba, ne oprávnění).
+        if (kontextJednaniId.HasValue
+            && await _meetingService.GetMeetingProjectIdAsync(kontextJednaniId.Value, ct) != id)
+        {
+            kontextJednaniId = null;
+        }
+
         var model = await _projectService.BuildProjectRecordsTabAsync(id, ct);
-        await PrepareRecordsTabPresentationAsync(model, _recordProposalService, ct);
+        await PrepareRecordsTabPresentationAsync(model, _recordProposalService, kontextJednaniId, ct);
         return PartialView("~/Views/Projekty/_ProjectRecordsTab.cshtml", model);
     }
 

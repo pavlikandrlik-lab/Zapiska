@@ -18,6 +18,7 @@ public abstract partial class BaseController
     protected async Task PrepareRecordsTabPresentationAsync(
         ProjektZaznamyTabViewModel model,
         IRecordProposalService recordProposalService,
+        int? kontextJednaniId,
         CancellationToken ct)
     {
         var projectId = model.ProjektId;
@@ -31,28 +32,39 @@ public abstract partial class BaseController
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.CanManageRecords = canManageRecords;
         model.CanCreateRecordProposal = canCreateRecordProposal;
-        model.CreateRecordEditorUrl = Url.Action("Create", "Zaznamy", new { projektId = projectId }) ?? $"/Zaznamy/Create?projektId={projectId}";
+        model.KontextJednaniId = kontextJednaniId;
+        model.CreateRecordEditorUrl = kontextJednaniId.HasValue
+            ? Url.Action("Create", "Zaznamy", new { projektId = projectId, jednaniId = kontextJednaniId, uiContext = "meeting" })
+                ?? $"/Zaznamy/Create?projektId={projectId}&jednaniId={kontextJednaniId}&uiContext=meeting"
+            : Url.Action("Create", "Zaznamy", new { projektId = projectId }) ?? $"/Zaznamy/Create?projektId={projectId}";
         model.CreateRecordProposalUrl = Url.Action("CreateRecordProposal", "Navrhy", new { projektId = projectId }) ?? $"/Navrhy/CreateRecordProposal?projektId={projectId}";
-        model.RefreshUrl = Url.Action("RecordsTabPartial", "Projekty", new { id = projectId }) ?? $"/Projekty/RecordsTabPartial/{projectId}";
+        model.RefreshUrl = Url.Action("RecordsTabPartial", "Projekty", new { id = projectId, kontextJednaniId })
+            ?? $"/Projekty/RecordsTabPartial/{projectId}";
         model.MeetingCommentStatesUrl = Url.Action("RecordMeetingCommentStates", "Projekty", new { id = projectId }) ?? $"/Projekty/RecordMeetingCommentStates/{projectId}";
         model.ProjectPrintUrl = Url.Action("ProjektTisk", "Export", new { projektId = projectId, autoPrint = true }) ?? $"/Export/Projekt/{projectId}/Tisk?autoPrint=true";
         model.ProjectWordUrl = Url.Action("ProjektWord", "Export", new { projektId = projectId }) ?? $"/Export/Projekt/{projectId}/Word";
+        if (kontextJednaniId.HasValue)
+        {
+            // Filtry v jednání: vlastní klíč v relaci, žádné uložené výchozí (R6).
+            model.FilterShell.StorageId = $"jednani-{kontextJednaniId.Value}";
+            model.FilterShell.AllowSaveDefaults = false;
+        }
 
         foreach (var record in model.Zaznamy)
         {
-            PrepareRecordsTabCardShell(record, projectId);
+            PrepareRecordsTabCardShell(record, projectId, kontextJednaniId);
         }
 
         foreach (var group in model.SkupinyZaznamu)
         {
             foreach (var record in group.Zaznamy)
             {
-                PrepareRecordsTabCardShell(record, projectId);
+                PrepareRecordsTabCardShell(record, projectId, kontextJednaniId);
             }
         }
     }
 
-    private void PrepareRecordsTabCardShell(ProjektZaznamCardShellViewModel record, int projectId)
+    private void PrepareRecordsTabCardShell(ProjektZaznamCardShellViewModel record, int projectId, int? kontextJednaniId)
     {
         var summary = record.Summary;
         summary.CanEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, projectId);
@@ -73,9 +85,22 @@ public abstract partial class BaseController
         summary.EditButtonLabel = summary.CanEditRecord ? "Upravit" : "GANTT";
         summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         record.DetailUrl = Url.Action("RecordDetailPartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordDetailPartial?projektId={projectId}&zaznamId={summary.Id}";
-        record.CommentsUrl = Url.Action("RecordCommentsPartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={summary.Id}";
+        record.CommentsUrl = Url.Action("RecordCommentsPartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id, kontextJednaniId })
+            ?? $"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={summary.Id}";
         record.ScheduleUrl = Url.Action("RecordSchedulePartial", "Zaznamy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Zaznamy/RecordSchedulePartial?projektId={projectId}&zaznamId={summary.Id}";
-        record.RecordPageUrl = Url.Action("Detail", "Zaznamy", new { id = summary.Id, returnUrl = ProjektDetailTabUrl(projectId, RecordsTabKey) }) ?? $"/Zaznamy/Detail/{summary.Id}";
+        var recordPageReturnUrl = kontextJednaniId.HasValue
+            ? Url.Action("Detail", "Jednani", new { id = kontextJednaniId.Value }) ?? $"/Jednani/Detail/{kontextJednaniId.Value}"
+            : ProjektDetailTabUrl(projectId, RecordsTabKey);
+        record.RecordPageUrl = Url.Action("Detail", "Zaznamy", new { id = summary.Id, returnUrl = recordPageReturnUrl }) ?? $"/Zaznamy/Detail/{summary.Id}";
+        // Tužka z detailu jednání otevře editor v kontextu jednání (předvolba „Změna stavu platí k“
+        // + návrat do jednání), stejně jako „Nový záznam“ z jednání.
+        record.EditRecordUrl = Url.Action("Edit", "Zaznamy", new
+        {
+            id = summary.Id,
+            projektId = projectId,
+            jednaniId = kontextJednaniId,
+            uiContext = kontextJednaniId.HasValue ? "meeting" : null
+        }) ?? $"/Zaznamy/Edit/{summary.Id}";
         summary.ScheduleProposalUrl = Url.Action("CreateScheduleProposal", "Navrhy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Navrhy/CreateScheduleProposal?projektId={projectId}&zaznamId={summary.Id}";
         summary.ScheduleProposalCheckUrl = Url.Action("ScheduleProposalAvailability", "Navrhy", new { projektId = projectId, zaznamId = summary.Id }) ?? $"/Navrhy/ScheduleProposalAvailability?projektId={projectId}&zaznamId={summary.Id}";
     }
