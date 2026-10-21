@@ -15,7 +15,7 @@ public sealed partial class ProjektyController
         }
 
         var model = await _projectService.BuildProjectRecordsTabAsync(id, ct);
-        await PrepareProjectRecordsTabPresentationAsync(model, ct);
+        await PrepareRecordsTabPresentationAsync(model, _recordProposalService, ct);
         return PartialView("~/Views/Projekty/_ProjectRecordsTab.cshtml", model);
     }
 
