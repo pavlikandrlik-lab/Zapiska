@@ -1343,8 +1343,7 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 .page-header + .header-actions,
-.page-header + .projects-header-actions,
-.page-header + .meeting-detail-header {
+.page-header + .projects-header-actions {
     margin-top: -4px;
     margin-bottom: 14px;
 }
@@ -5465,16 +5464,6 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     font-size: 13px;
 }
 
-.meeting-layout {
-    display: grid;
-    gap: 20px;
-}
-
-.meeting-content {
-    display: grid;
-    gap: 20px;
-}
-
 .meeting-task-header {
     display: flex;
     align-items: center;
@@ -5620,14 +5609,6 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     .meeting-attendance-row .meeting-attendance-select { width: 100%; }
 }
 
-.meeting-status {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
 .meeting-status-controls {
     display: flex;
     gap: 10px;
@@ -5650,19 +5631,6 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 
 .meeting-status-controls .btn {
     min-width: 128px;
-}
-
-.meeting-detail-header {
-    display: grid;
-    gap: 6px;
-}
-
-.meeting-detail-header p {
-    margin: 0;
-}
-
-.meeting-detail-header .muted {
-    color: var(--text-secondary);
 }
 
 .meeting-detail-actions .btn {
@@ -5717,11 +5685,6 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     background: var(--background-block-primary);
-}
-
-.meeting-content textarea {
-    width: 100%;
-    min-height: 128px;
 }
 
 .meeting-note-input {
@@ -6695,7 +6658,6 @@ pm-tab-panel.sync-tab-panel-content[active] {
         align-items: stretch;
     }
 
-    .meeting-layout,
     .ciselniky-layout,
     .settings-layout,
     .profile-layout,
