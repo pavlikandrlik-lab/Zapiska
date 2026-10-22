@@ -4,6 +4,7 @@ using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Web.Services.Export;
 
@@ -602,7 +603,8 @@ public sealed class ExportRecordProjectionBuilder(
     IRichTextContentService richTextContentService,
     IPersonIdentityMatcher personIdentityMatcher,
     IExportCommentProjectionBuilder exportCommentProjectionBuilder,
-    IExportRecordVisibilityEvaluator exportRecordVisibilityEvaluator) : IExportRecordProjectionBuilder
+    IExportRecordVisibilityEvaluator exportRecordVisibilityEvaluator,
+    IRecordSequenceService recordSequenceService) : IExportRecordProjectionBuilder
 {
     private const string NewInformationHighlightColor = "#2563EB";
     private const string PreparationHighlightColor = "#DC2626";
@@ -805,18 +807,13 @@ public sealed class ExportRecordProjectionBuilder(
                 .ToDictionary(group => group.Key, group => group.ToList());
 
             var anchorMeetingDate = anchorMeeting.DatumPlanovane.Date;
-            var previousMeetingDate = previousMeeting?.DatumPlanovane.Date;
 
-            records = records
-                .Where(record => exportRecordVisibilityEvaluator.IsVisibleForMeetingPrint(
-                    record,
-                    taskStates,
-                    statusHistoryByRecord.TryGetValue(record.Id, out var statusHistoryValues)
-                        ? statusHistoryValues
-                        : Array.Empty<ZaznamHistorieStavuZaznamuEntity>(),
-                    anchorMeetingDate,
-                    previousMeetingDate))
-                .ToList();
+            // Spec 2026-10-22 R5: které záznamy do jednání patří, rozhoduje jedna sdílená služba —
+            // stejný seznam ukazuje detail jednání a procházení šipkami.
+            var meetingRecordIds = (await recordSequenceService.GetMeetingSequenceAsync(anchorMeeting.Id, ct))
+                .Select(entry => entry.ZaznamId)
+                .ToHashSet();
+            records = records.Where(record => meetingRecordIds.Contains(record.Id)).ToList();
 
             statusAtAnchorByRecord = records.ToDictionary(
                 record => record.Id,

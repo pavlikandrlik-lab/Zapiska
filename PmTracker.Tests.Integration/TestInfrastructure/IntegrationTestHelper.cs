@@ -9,6 +9,7 @@ using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Common;
 using PmTracker.Web.Services.Data;
 using PmTracker.Web.Services.Export;
+using PmTracker.Web.Services.Records;
 using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.Settings;
 using PmTracker.ServiceDesk.Contracts;
@@ -451,4 +452,7 @@ internal static class IntegrationTestHelper
             EditorTab = "schedule"
         };
     }
+
+    public static IRecordSequenceService CreateRecordSequenceService(PmTrackerDbContext dbContext)
+        => BuildServiceProvider(dbContext).GetRequiredService<IRecordSequenceService>();
 }

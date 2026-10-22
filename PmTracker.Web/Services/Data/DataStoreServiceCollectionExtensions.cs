@@ -204,6 +204,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<IExportRoleProjectionBuilder, ExportRoleProjectionBuilder>();
         services.AddScoped<IExportAttendanceProjectionBuilder, ExportAttendanceProjectionBuilder>();
         services.AddScoped<IExportRecordVisibilityEvaluator, ExportRecordVisibilityEvaluator>();
+        services.AddScoped<IRecordSequenceService, RecordSequenceService>();
         services.AddScoped<IExportRecordProjectionBuilder, ExportRecordProjectionBuilder>();
         services.AddScoped<IExportTemplateSummaryBuilder, ExportTemplateSummaryBuilder>();
         services.AddScoped<IExportTemplateQueries, ExportTemplateQueries>();
