@@ -1,7 +1,7 @@
 # Vyjádření v jednom kompaktním bloku — specifikace
 
 **Datum:** 2026-10-22
-**Stav:** odsouhlaseno s úpravami 2026-10-22 (R8, šedé podbarvení, průchod za všechny role)
+**Stav:** odsouhlaseno s úpravami 2026-10-22 (R8, šedé podbarvení, průchod za všechny role; R10 a R11 doplněny před implementací)
 **Komponenta:** panel vyjádření záznamu (`Views/Projekty/_ZaznamCommentsPartial.cshtml`)
 
 ## 1. Zadání
@@ -43,13 +43,15 @@ Snímek současného stavu: dlaždice s vlastním rámečkem, nad každou jméno
 | R7 | Štítek jde vybrat **klávesnicí** (Tab) a na dotykovém displeji klepnutím. Bublina s autorem a datem se pak ukáže i bez myši. | doplněno (přístupnost) |
 | R8 | U vyjádření k **uzavřenému jednání se ikony Upravit a Smazat neobjeví** ani při najetí myší a server úpravu i smazání odmítne. Je to dnešní chování a zůstává (viz 5.4). | uživatel 2026-10-22 |
 | R9 | Podbarvení řádku pod myší je **jemně šedé**: token `--background-neutral-subtle`. | uživatel 2026-10-22 |
+| R10 | Panel ukáže **posledních 10 vyjádření** (dnes 5). Tlačítko „Další“ dál přidává **po 5** a „Zobrazit vše“ zůstává. | uživatel 2026-10-22 |
+| R11 | Tlačítka **„Další (5)“ / „Předchozí (5)“ a „Zobrazit vše“ jsou v hlavičce vlevo vedle přepínače řazení**, v obou směrech řazení na stejném místě. Server je vykreslí rovnou tam; JS je už nepřesouvá. | uživatel 2026-10-22 |
 
 ## 5. Návrh
 
 ### 5.1 Struktura
 
 ```
-Vyjádření                                   [Řazení: jednání vzestupně]
+Vyjádření              [Předchozí (5)] [Zobrazit vše] [Řazení: jednání vzestupně]
 ┌──────────────────────────────────────────────────────────────────────┐
 │ Dodavatel potvrdil termín dodání podkladů.     [Jednání č. 901 (09.07.2026)] │
 │░Podklady neúplné, chybí harmonogram etap 3 a 4.░[✎][🗑][Jednání č. 903 (14.07.2026)]│ ← myš
@@ -62,9 +64,23 @@ Vyjádření                                   [Řazení: jednání vzestupně]
   bublina při najetí  →  │ Ing. Jana Testerová <jana…>   │
   na štítek jednání      │ Zapsáno 14.07.2026            │
                          └───────────────────────────────┘
-[Další (5)] [Zobrazit vše]
 [editor nového vyjádření]  [Vazba na jednání ▾] [Uložit]
 ```
+
+Hlavička (R11) — stránkování vlevo od řazení, v obou směrech stejně; text tlačítka podle směru jako dnes (sestupně „Další (5)“, vzestupně „Předchozí (5)“):
+
+```cshtml
+<div class="record-comments-header">
+    <h4>Vyjádření</h4>
+    <div class="record-comments-tools">                          @* jen když je co ukázat *@
+        <div class="comment-pagination-actions">[Další (5) | Předchozí (5)] [Zobrazit vše]</div>  @* jen když jsou další *@
+        <pm-button class="comment-sort-toggle" data-comment-sort-toggle>…</pm-button>              @* jen při 2+ vyjádřeních *@
+    </div>
+</div>
+```
+
+- Třídy `record-comments-header--stacked-right` a `comment-pagination-actions--in-header` a přesun bloku v `applyCommentSort` (`comments.js`) odpadnou, protože tlačítka už mají jedno stálé místo.
+- Na úzkém okně se skupina nástrojů zalomí pod nadpis a zůstane zarovnaná vpravo.
 
 Markup jednoho vyjádření (řádku):
 
@@ -118,7 +134,7 @@ Bez `:has`, `max-content` a přechodů navíc. `:hover` a `:focus-within` funguj
 - **Upravit:** jako dnes se editor otevře v řádku přes celou šířku, Zrušit a Uložit beze změny. Po uložení se panel obnoví ze serveru a kontext jednání zůstane (2026-10-21).
 - **Smazat:** potvrzovací dotaz jako dnes.
 - **Řazení** (vzestupně a sestupně podle jednání) přesouvá přímo řádky `[data-comment-item]`. Obal `[data-comment-wrapper]` odpadne. `comments.js` to už dnes umí, takže se logika nemění.
-- **Další / Zobrazit vše:** beze změny, nově načtená vyjádření se přidají do stejného bloku.
+- **Počet a stránkování (R10, R11):** panel otevře posledních 10 vyjádření. „Další (5)“ (vzestupně „Předchozí (5)“) přidá 5 starších, „Zobrazit vše“ načte všechna; nově načtená se přidají do stejného bloku. Obě tlačítka jsou v hlavičce vlevo od řazení a po přepnutí řazení zůstanou na místě. Obnovení panelu po uložení dál drží počet načtených (`recordRefresh.js`), výchozí limit bez parametru je 10 i na stránce záznamu a v detailu jednání.
 - **Cíl z vyhledávání** (rozbalení karty, posun na vyjádření, zvýraznění hledaného textu): beze změny.
 
 ### 5.4 Kdo uvidí ikony Upravit a Smazat (pravidla beze změny)
@@ -145,12 +161,14 @@ Hlídá to dnes Api test `ClosedRecordCommentsRenderTests.CommentInClosedMeeting
   - nová pravidla bloku, řádku, ikon a `.chip-tooltip--end`, vše omezené na `.record-comments`;
   - smazat pravidla, která po změně nic nepoužívá (`.comment-wrapper`, `.comment-meta-outer`, `.comment-author`, `.comment-sep`, `.comment-date`, `.comment-tile-side`), ale jen pokud je opravdu nic jiného nepoužívá (grep);
   - žádná duplicitní pravidla (memory „Duplicate CSS“).
-- `wwwroot/js/modules/comments.js`: logika beze změny. Řazení už dnes přesouvá samotné `[data-comment-item]`, když obal `[data-comment-wrapper]` chybí (fallback pro `_TaskItemPartial`). Aktualizuje se jen komentář v kódu.
+- `wwwroot/js/modules/comments.js`: logika řazení řádků beze změny. Řazení už dnes přesouvá samotné `[data-comment-item]`, když obal `[data-comment-wrapper]` chybí (fallback pro `_TaskItemPartial`). Aktualizuje se komentář v kódu. **Odpadne přesun bloku stránkování** mezi hlavičkou a seznamem podle směru (R11).
+- `Services/ProjectService.LazyQueries.cs`: výchozí počet vyjádření 10 (`RecordCommentsInitialCount`), krok „Další“ zůstává 5 (`RecordCommentsLoadStep`) (R10).
+- `docs/specs/record-comments.md`: počet a poloha tlačítek podle R10 a R11.
 
 **Projeví se na:** kartě záznamu v záložce Záznamy, v detailu jednání a na stránce záznamu.
 
 **Nemění se:**
-- Hlavička „Vyjádření“ s řazením, tlačítka Další a Zobrazit vše, formulář nového vyjádření včetně předvolby jednání.
+- Přepínač řazení a texty tlačítek Další / Předchozí / Zobrazit vše (mění se jen jejich místo, R11), formulář nového vyjádření včetně předvolby jednání.
 - Pravidla, kdo smí vyjádření přidat, upravit a smazat.
 - Tisk, PDF, Word a zápis jednání.
 - Okno vyjádření tiketu ze ServiceDesku (bubliny kroků).
@@ -170,6 +188,8 @@ Hlídá to dnes Api test `ClosedRecordCommentsRenderTests.CommentInClosedMeeting
 | Vyjádření bez data jednání | Štítek „Jednání č. N“, bublina funguje. |
 | Uzavřený záznam | Vyjádření se zobrazí stejně, nové nejde přidat (beze změny). |
 | Jedno vyjádření | Blok s jedním řádkem, řazení se neukazuje (beze změny). |
+| 10 a méně vyjádření | Žádná tlačítka stránkování, v hlavičce jen řazení. |
+| 11 a více vyjádření | 10 posledních, v hlavičce vlevo od řazení „Další (5)“ / „Předchozí (5)“ a „Zobrazit vše“. Po načtení všech tlačítka zmizí. |
 | Žádné vyjádření | „Zatím bez vyjádření.“ bez rámečku bloku (beze změny). |
 | Tmavý motiv | Jen tokeny, podbarvení i bublina čitelné (kontrola v průchodu). |
 
@@ -179,7 +199,9 @@ Hlídá to dnes Api test `ClosedRecordCommentsRenderTests.CommentInClosedMeeting
   - jeden blok `data-comment-list` s počtem `data-comment-item` jako dnes; žádné `comment-meta-outer` ani `comment-wrapper`;
   - každý řádek má štítek s `tabindex="0"` a `aria-describedby`, které ukazuje na `role="tooltip"` s autorem a datem;
   - vyjádření bez data jednání má štítek;
-  - ikony Upravit a Smazat jen u vyjádření, která uživatel smí upravit (PM ano, host ne). Kotvy na atributy, ne na český text (memory).
+  - ikony Upravit a Smazat jen u vyjádření, která uživatel smí upravit (PM ano, host ne). Kotvy na atributy, ne na český text (memory);
+  - bez parametru 10 nejnovějších vyjádření z 12 a `data-record-comments-load-step="5"` (R10);
+  - tlačítka stránkování jsou uvnitř `.record-comments-header` před přepínačem řazení, žádné pod seznamem (R11).
 - **Unit (zdroj CSS):**
   - ikony řádku jsou v klidu skryté a ukáže je `:hover` nebo `:focus-within` řádku;
   - blok ani řádek nemají `overflow: hidden`;
@@ -192,6 +214,7 @@ Hlídá to dnes Api test `ClosedRecordCommentsRenderTests.CommentInClosedMeeting
   - najetí na štítek ukáže bublinu s autorem, odjetí ji schová;
   - najetí na řádek ukáže tužku, klik otevře editor a uložení projde;
   - Tab na štítek ukáže bublinu;
+  - 12 vyjádření: 10 řádků, tlačítka stránkování v hlavičce vlevo od řazení v obou směrech; „Další“ / „Předchozí“ → 12 a tlačítka zmizí (R10, R11); `RecordRichTextScenariosTests` stránkování 10 → 15 → vše;
   - stávající E2E vyjádření (`RecordRichTextScenariosTests`, `RichTextUnicodeScenariosTests`, `SearchResultTargetScenariosTests`) beze změny výsledku.
 - **Průchod v prohlížeči nad spuštěnou aplikací za všechny role** (stálé pravidlo, uživatel 2026-10-22: „všichni budou mít co mají mít“):
   - **Role (12 person):** 11 rolí (Superadmin, Administrátor aplikace, Read-all, Vlastník, Admin projektu, PM, Host, Gestor, Vedoucí, Zástupce vedoucího, Metodik), dále PM + vedoucí v jedné osobě a uživatel bez role v projektu. Každá role má vlastní dočasnou osobu (memory „Průchod za všechny role“).
@@ -208,6 +231,7 @@ Hlídá to dnes Api test `ClosedRecordCommentsRenderTests.CommentInClosedMeeting
     | Bez role v projektu | stránka neexistuje (404) | – | – |
 
   - **Akce:** kdo ikony má, jedno vyjádření upraví (najetí → tužka → uložit) a jedno smaže. U uzavřeného jednání ikony ani při najetí nejsou a podvržený požadavek server odmítne.
+  - **Stránkování (jednou, nezávisí na roli):** záznam s 12 vyjádřeními ukáže 10, tlačítka v hlavičce vlevo od řazení v obou směrech, „Další“ přidá zbylá 2.
   - **Vzhled:** šedé podbarvení při najetí ve světlém i tmavém motivu, Tab na štítek ukáže bublinu, 1400 px a 375 px bez vodorovného posuvníku, konzole bez chyb. Snímek před a po se změřenou výškou.
   - **Úklid:** dočasné osoby a data se po průchodu smažou, před průchodem záloha DB.
 

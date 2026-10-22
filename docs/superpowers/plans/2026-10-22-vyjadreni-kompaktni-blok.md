@@ -2,13 +2,13 @@
 
 > **Pro agentní exekutory:** POVINNÝ SUB-SKILL: superpowers:executing-plans (inline, po úkolech, bez subagentů — uživatel 2026-10-12). Kroky jsou checkboxy (`- [ ]`). Commity do větve `feat/vyjadreni-kompaktni-blok`, na konci merge do lokálního `main`, bez pushe.
 
-**Cíl:** Všechna vyjádření záznamu jsou v jednom ohraničeném bloku. Jednotlivá vyjádření odliší jen jemně šedé podbarvení řádku pod myší. Autor a datum jsou v bublině na štítku jednání. Upravit a Smazat se ukážou při najetí na řádek, ale nikdy u vyjádření k uzavřenému jednání. Cíl výšky: 5 jednořádkových vyjádření ≤ 200 px (dnes 600 px).
+**Cíl:** Všechna vyjádření záznamu jsou v jednom ohraničeném bloku. Jednotlivá vyjádření odliší jen jemně šedé podbarvení řádku pod myší. Autor a datum jsou v bublině na štítku jednání. Upravit a Smazat se ukážou při najetí na řádek, ale nikdy u vyjádření k uzavřenému jednání. Cíl výšky: 5 jednořádkových vyjádření ≤ 200 px (dnes 600 px). Panel ukáže posledních 10 vyjádření (krok „Další“ zůstává 5) a tlačítka stránkování jsou v hlavičce vlevo od řazení (R10, R11).
 
-**Architektura:** Mění se jen sdílený partial `_ZaznamCommentsPartial.cshtml` (karta záznamu, detail jednání, stránka záznamu) a pravidla v `site.css`, omezená na `.record-comments`. Pravidla oprávnění, formuláře, JS háčky a server se nemění. Bublina používá existující vzor `.chip-wrap` + `.chip-tooltip` z karet externích vazeb.
+**Architektura:** Mění se sdílený partial `_ZaznamCommentsPartial.cshtml` (karta záznamu, detail jednání, stránka záznamu), pravidla v `site.css` omezená na `.record-comments`, výchozí počet v `ProjectService.LazyQueries.cs` a v `comments.js` odpadne přesun tlačítek stránkování. Pravidla oprávnění, formuláře a JS háčky se nemění. Bublina používá existující vzor `.chip-wrap` + `.chip-tooltip` z karet externích vazeb.
 
 **Tech Stack:** ASP.NET Core 8 MVC + Razor, CSS (gov DS tokeny), xUnit + FluentAssertions (Api `ApiSqlFixture`, Unit čtení zdrojů), E2E Playwright .NET, ruční průchod Playwright Node proti lokální app.
 
-**Spec:** `docs/superpowers/specs/2026-10-22-vyjadreni-kompaktni-blok-design.md` (R1–R9, 5.4 „kdo uvidí ikony“, matice průchodu v §8).
+**Spec:** `docs/superpowers/specs/2026-10-22-vyjadreni-kompaktni-blok-design.md` (R1–R11, 5.4 „kdo uvidí ikony“, matice průchodu v §8).
 
 ## Global Constraints
 
@@ -18,6 +18,7 @@
 - CSS jen gov tokeny / `--app-*` (`AppCssColorTokenTests`), podbarvení `var(--background-neutral-subtle)`. Žádné `:has`, `max-content`, `[data-theme]`. Nová pravidla jen pod `.record-comments`, protože starý `Views/Jednani/_TaskItemPartial.cshtml` sdílí `.comment` a `.comment-list`. Žádná duplicitní pravidla.
 - `.comment-actions` **zůstává**, používá ho formulář nového vyjádření (výběr jednání + Uložit).
 - Razor: žádné `@* *@` uvnitř tagu s TagHelpery. Api testy kotví na atributy, český text jen po `WebUtility.HtmlDecode`.
+- Výchozí počet vyjádření **10**, krok „Další“ **5**, tlačítka stránkování v hlavičce vlevo od řazení v obou směrech (R10, R11).
 - E2E: jednání s číslem pod 9820 a datem ne dnes.
 - Po dokončení sekce 5 v `docs/k-otestovani.md` (stále ten jeden soubor).
 
@@ -28,6 +29,7 @@
 3. **Režim úpravy:** při `data-editing` zmizí štítek, bublina i ikony a editor má plnou šířku. Po Zrušit se vše vrátí. Ověří E2E.
 4. **Uzavřené jednání:** žádné ikony ani při najetí, server odmítne podvrh. Ověří Api (Task 1 a 2) a E2E.
 5. **Tmavý motiv:** šedé podbarvení je vidět (`neutral-900` na `neutral-950`). Ověří průchod se snímkem a vypočtenou barvou pozadí.
+6. **Obnovení panelu po uložení / smazání při načtených 15:** počet načtených se drží (`recordRefresh.js` posílá `limit: loadedCount`), tlačítka zůstanou v hlavičce. Ověří průchod (akce po „Další“).
 
 ---
 
@@ -35,9 +37,14 @@
 
 | Soubor | Změna |
 |---|---|
-| `PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml` | nový markup seznamu a řádku |
-| `PmTracker.Web/wwwroot/css/site.css` | pravidla bloku, řádku, ikon, `.chip-tooltip--end`; smazat `.comment-wrapper`, `.comment-meta-outer`, `.comment-author`, `.comment-sep`, `.comment-date`, `.comment-tile-side` |
-| `PmTracker.Web/wwwroot/js/modules/comments.js` | jen komentář u řazení (logika beze změny) |
+| `PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml` | nový markup seznamu a řádku; stránkování v hlavičce |
+| `PmTracker.Web/wwwroot/css/site.css` | pravidla bloku, řádku, ikon, `.chip-tooltip--end`, `.record-comments-tools`; smazat `.comment-wrapper`, `.comment-meta-outer`, `.comment-author`, `.comment-sep`, `.comment-date`, `.comment-tile-side`, `--stacked-right`, `--in-header` |
+| `PmTracker.Web/wwwroot/js/modules/comments.js` | komentář u řazení; smazat přesun stránkování |
+| `PmTracker.Web/Services/ProjectService.LazyQueries.cs` | výchozí počet 10, krok 5 |
+| `PmTracker.Tests.Api/Controllers/RecordEditorControllerTests.cs` | výchozí 10 z 12, explicitní limit 15 ze 17 |
+| `PmTracker.Tests.Unit/Projects/CommentPaginationMarkupTests.cs` | poloha v hlavičce místo přesunu |
+| `PmTracker.Tests.E2E/Scenarios/RecordRichTextScenariosTests.cs` | stránkování 10 → 15 → 17 |
+| `docs/specs/record-comments.md` | počet a poloha tlačítek |
 | `PmTracker.Tests.Api/Controllers/ClosedMeetingCommentChangesTests.cs` | **nový:** server odmítne úpravu i smazání u uzavřeného jednání |
 | `PmTracker.Tests.Api/Controllers/CompactCommentsBlockRenderTests.cs` | **nový:** render bloku, bubliny, ikon podle role a stavu jednání |
 | `PmTracker.Tests.Unit/Layout/CompactCommentsBlockCssTests.cs` | **nový:** pravidla CSS |
@@ -165,7 +172,7 @@ git commit -m "test(vyjadreni): server odmítne úpravu i smazání vyjádření
 - Modify: `PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml` (seznam vyjádření, dnes ř. 29–112)
 
 **Interfaces:**
-- Produces (pro Task 3 a 4):
+- Produces (pro Task 3, 4 a 5):
   - třídy `.comment-side`, `.comment-row-actions` s atributem `data-comment-row-actions`;
   - `.chip-wrap`, `.comment-meeting-chip` s `tabindex="0"` a `aria-describedby="vyjadreni-meta-{Id}"`;
   - `.chip-tooltip.chip-tooltip--end` s `id="vyjadreni-meta-{Id}"`, `role="tooltip"` a `data-comment-meta`.
@@ -414,7 +421,7 @@ git commit -m "feat(vyjadreni): jeden blok vyjádření, autor a datum v bublin�
 
 **Interfaces:**
 - Consumes: třídy z Task 2.
-- Produces: vzhled, na který se kotví E2E (Task 4): podbarvení `--background-neutral-subtle` a `opacity` ikon a bubliny.
+- Produces: vzhled, na který se kotví E2E (Task 5): podbarvení `--background-neutral-subtle` a `opacity` ikon a bubliny.
 
 - [ ] **Step 1: Padající unit test**
 
@@ -618,13 +625,255 @@ git commit -m "feat(vyjadreni): kompaktní blok — šedé podbarvení řádku, 
 
 ---
 
-### Task 4: E2E — výška, najetí, klávesnice, úprava, řazení, uzavřené jednání
+### Task 4: 10 vyjádření, stránkování v hlavičce vlevo od řazení (R10, R11)
+
+**Files:**
+- Modify: `PmTracker.Web/Services/ProjectService.LazyQueries.cs` (konstanta ř. 11, `ResolveRecordCommentsLimit` ř. ~374)
+- Modify: `PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml` (hlavička ř. 13–22, blok `.comment-pagination-actions` pod seznamem)
+- Modify: `PmTracker.Web/wwwroot/css/site.css` (`.record-comments-header` ř. ~4022, `.comment-pagination-actions` ř. ~4242, `--stacked-right` / `--in-header` ř. ~4270–4287)
+- Modify: `PmTracker.Web/wwwroot/js/modules/comments.js` (`applyCommentSort` ř. ~67 a ~105–136)
+- Modify: `PmTracker.Tests.Api/Controllers/RecordEditorControllerTests.cs` (`RecordCommentsPartial_ShouldRenderDefaultFiveNewestComments`, `RecordCommentsPartial_WithExplicitLimit_ShouldRenderRequestedSlice`)
+- Modify: `PmTracker.Tests.Api/Controllers/CompactCommentsBlockRenderTests.cs` (nový test)
+- Modify: `PmTracker.Tests.Unit/Projects/CommentPaginationMarkupTests.cs`
+- Modify: `docs/specs/record-comments.md`
+
+**Interfaces:**
+- Consumes: markup panelu z Task 2.
+- Produces (pro Task 5 a 6): `.record-comments-header > .record-comments-tools > (.comment-pagination-actions, .comment-sort-toggle)`; výchozí limit 10, `data-record-comments-load-step="5"`.
+
+- [ ] **Step 1: Padající testy**
+
+`RecordEditorControllerTests` — výchozí počet (přejmenovat a přepsat):
+
+```csharp
+    [Fact]
+    public async Task RecordCommentsPartial_ShouldRenderDefaultTenNewestComments()
+    {
+        var ownerId = await _fixture.EnsurePersonAsync("ApiCommentsOrderOwner");
+        var projectId = await _fixture.EnsureProjectAsync("APIREDCOMMENTORD");
+        var subsystemId = await _fixture.EnsureSubsystemAsync("APIREDCOMMENTSUB", ownerId);
+        var recordId = await _fixture.EnsureRecordAsync(projectId, ownerId, subsystemId, "U", "API comment ordering record");
+        var meetingId = await _fixture.CreateMeetingAsync(projectId, "OPEN", 4201);
+
+        await SeedRecordCommentsAsync(
+            recordId,
+            ownerId,
+            meetingId,
+            Enumerable.Range(1, 12)
+                .Select(index => ($"Comment {index}", new DateTime(2026, 3, index, 9, 0, 0, DateTimeKind.Utc))));
+
+        using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
+        var response = await client.GetAsync($"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={recordId}&asUser={_fixture.AdminOsobaId}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, html);
+        // Spec 2026-10-22 R10: posledních 10 vyjádření, „Další“ dál po 5.
+        Regex.Matches(html, "data-comment-item").Count.Should().Be(10, html);
+        html.Should().Contain("<p>Comment 12</p>");
+        html.Should().Contain("<p>Comment 3</p>");
+        html.Should().NotContain("<p>Comment 2</p>");
+        html.Should().NotContain("<p>Comment 1</p>");
+        html.Should().Contain("data-record-comments-loaded-count=\"10\"");
+        html.Should().Contain("data-record-comments-total-count=\"12\"");
+        html.Should().Contain("data-record-comments-load-step=\"5\"");
+        html.Should().Contain("data-record-comments-load-more=\"true\"");
+        html.Should().Contain("Zobrazit vše");
+    }
+```
+
+(Pokud `SeedRecordCommentsAsync` neukládá text jako `<p>…</p>`, kotvi `Contain` / `NotContain` stejně jako stávající test, tj. `"<p>Comment 2</p>"` pro chybějící a prostý text pro přítomné.)
+
+`RecordEditorControllerTests` — explicitní limit odpovídá „Další“ po prvních 10: 17 vyjádření, `limit=15` → 15 řádků, „Limit comment 17“ až „Limit comment 3“, bez `<p>Limit comment 2</p>` a `<p>Limit comment 1</p>`, `loaded-count="15"`, `total-count="17"`, tlačítka stránkování dál jsou. Datum `new DateTime(2026, 4, index, 9, 0, 0, DateTimeKind.Utc)` (index ≤ 17 je platný den).
+
+`CompactCommentsBlockRenderTests` — nový test:
+
+```csharp
+    [Fact]
+    public async Task Pagination_IsInHeader_LeftOfSortToggle()
+    {
+        var s = await SeedAsync("ApiCmpPag", 9629);
+        await using (var db = _fixture.CreateDbContext())
+        {
+            var openMeetingId = await db.Vyjadreni.Where(x => x.Id == s.OpenCommentId).Select(x => x.JednaniId).SingleAsync();
+            for (var i = 1; i <= 10; i++)
+            {
+                await _fixture.AddCommentAsync(s.RecordId, openMeetingId, s.PmId, $"ApiCmpPag dalsi {i}");
+            }
+        }
+
+        var html = await PanelHtmlAsync(s, s.PmId);
+
+        Regex.Matches(html, "data-comment-item").Count.Should().Be(10, "R10: posledních 10 z 12");
+        var headerStart = html.IndexOf("class=\"record-comments-header\"", StringComparison.Ordinal);
+        var listStart = html.IndexOf("data-comment-list", StringComparison.Ordinal);
+        var loadMore = html.IndexOf("data-record-comments-load-more", StringComparison.Ordinal);
+        var loadAll = html.IndexOf("data-record-comments-load-all", StringComparison.Ordinal);
+        var sortToggle = html.IndexOf("data-comment-sort-toggle", StringComparison.Ordinal);
+        headerStart.Should().BeGreaterThan(-1);
+        loadMore.Should().BeGreaterThan(headerStart).And.BeLessThan(sortToggle, "R11: Další je vlevo od řazení");
+        loadAll.Should().BeGreaterThan(loadMore).And.BeLessThan(sortToggle, "R11: Zobrazit vše je vlevo od řazení");
+        sortToggle.Should().BeLessThan(listStart, "celá skupina je v hlavičce nad seznamem");
+        Regex.Matches(html, "comment-pagination-actions").Count.Should().Be(1, "pod seznamem už žádná tlačítka nejsou");
+    }
+```
+
+`CommentPaginationMarkupTests` — nahraď `Css_ShouldAlignPaginationToRight`, `Css_ShouldDefineInHeaderVariantForAscMode` a `Js_ShouldPositionPaginationByDirection` (a opravu shrnutí třídy: „tlačítka mají stálé místo v hlavičce vlevo od řazení, spec 2026-10-22 R11“):
+
+```csharp
+    [Fact]
+    public void View_RendersPaginationInHeader_BeforeSortToggle()
+    {
+        var view = LoadText("PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml");
+
+        var header = view.IndexOf("class=\"record-comments-header\"", StringComparison.Ordinal);
+        var tools = view.IndexOf("class=\"record-comments-tools\"", StringComparison.Ordinal);
+        var pagination = view.IndexOf("class=\"comment-pagination-actions\"", StringComparison.Ordinal);
+        var sortToggle = view.IndexOf("data-comment-sort-toggle", StringComparison.Ordinal);
+        var list = view.IndexOf("data-comment-list", StringComparison.Ordinal);
+
+        header.Should().BeGreaterThan(-1);
+        tools.Should().BeGreaterThan(header);
+        pagination.Should().BeGreaterThan(tools).And.BeLessThan(sortToggle, "stránkování vlevo od řazení (R11)");
+        sortToggle.Should().BeLessThan(list, "nástroje jsou v hlavičce nad seznamem");
+        view.IndexOf("comment-pagination-actions", list, StringComparison.Ordinal).Should().Be(-1, "pod seznamem žádná tlačítka");
+    }
+
+    [Fact]
+    public void Css_HeaderToolsWrapAndAlignRight()
+    {
+        var css = LoadText("PmTracker.Web/wwwroot/css/site.css");
+
+        css.Should().MatchRegex(@"\.record-comments-header\s*\{[^}]*flex-wrap:\s*wrap", "na úzkém okně se nástroje zalomí pod nadpis");
+        css.Should().MatchRegex(@"\.record-comments-tools\s*\{[^}]*margin-left:\s*auto", "nástroje drží vpravo");
+        css.Should().MatchRegex(@"\.record-comments-tools\s*\{[^}]*flex-wrap:\s*wrap");
+    }
+
+    [Fact]
+    public void PaginationIsNotMovedByDirection()
+    {
+        var css = LoadText("PmTracker.Web/wwwroot/css/site.css");
+        var js = LoadText("PmTracker.Web/wwwroot/js/modules/comments.js");
+
+        css.Should().NotContain("comment-pagination-actions--in-header");
+        css.Should().NotContain("record-comments-header--stacked-right");
+        js.Should().NotContain("comment-pagination-actions--in-header", "tlačítka mají stálé místo (R11)");
+        js.Should().NotContain("record-comments-header--stacked-right");
+        js.Should().NotContain("appendChild(paginationActions)");
+        js.Should().NotContain("btn.textContent =", "JS nesmí setovat textContent na gov-button (gov hydratace duplikuje)");
+    }
+```
+
+- [ ] **Step 2: Spusť, musí selhat**
+
+Run: `dotnet test PmTracker.Tests.Api --filter "FullyQualifiedName~RecordEditorControllerTests.RecordCommentsPartial|FullyQualifiedName~CompactCommentsBlockRenderTests.Pagination" --nologo` a `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~CommentPaginationMarkupTests" --nologo`
+Expected: FAIL — výchozí 5 místo 10; tlačítka pod seznamem; třídy `--in-header` / `--stacked-right` existují; `.record-comments-tools` neexistuje. Explicitní limit 15 ze 17 dnes projde (není to nové chování, jen nové hodnoty).
+
+- [ ] **Step 3: Implementace**
+
+`ProjectService.LazyQueries.cs`:
+
+```csharp
+    // Spec 2026-10-22 R10: panel otevře posledních 10 vyjádření, „Další“ přidá po 5.
+    private const int RecordCommentsInitialCount = 10;
+    private const int RecordCommentsLoadStep = 5;
+```
+
+a v `ResolveRecordCommentsLimit` výchozí hodnota `RecordCommentsInitialCount` místo `RecordCommentsLoadStep` (obě místa: `GetValueOrDefault` i `<= 0`).
+
+`_ZaznamCommentsPartial.cshtml` — hlavička:
+
+```cshtml
+    <div class="record-comments-header">
+        <h4>Vyjádření</h4>
+        @if (Model.Vyjadreni.Count > 1 || Model.CanLoadMore || Model.CanLoadAll)
+        {
+            @*
+                Spec 2026-10-22 R11: stránkování má stálé místo v hlavičce vlevo od řazení (dřív ho JS
+                přesouval podle směru). Labely jsou dva <span>y s data-comment-pagination-label a CSS
+                skrývá neaktivní podle data-comment-sort-direction sekce — textContent na gov-button
+                duplikoval obsah („vidí obojí zároveň“).
+            *@
+            <div class="record-comments-tools">
+                @if (Model.CanLoadMore || Model.CanLoadAll)
+                {
+                    <div class="comment-pagination-actions">
+                        …stávající dvě pm-button GhostOutlined beze změny (Další / Předchozí (LoadStep), Zobrazit vše)…
+                    </div>
+                }
+                @if (Model.Vyjadreni.Count > 1)
+                {
+                    …stávající pm-button comment-sort-toggle beze změny…
+                }
+            </div>
+        }
+    </div>
+```
+
+a blok `@if (Model.CanLoadMore || Model.CanLoadAll) { <div class="comment-pagination-actions">…</div> }` pod seznamem smaž.
+
+`site.css`:
+
+```css
+.record-comments-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin-bottom: 8px;
+}
+
+/* Nástroje hlavičky vyjádření (spec 2026-10-22 R11): stránkování vlevo od řazení,
+   v obou směrech na stejném místě; na úzkém okně se zalomí pod nadpis a drží vpravo. */
+.record-comments-tools {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-left: auto;
+}
+```
+
+`.comment-pagination-actions` bez `margin-top` a `justify-content` (zůstane `display: flex; gap: 8px; align-items: center; flex-wrap: wrap;`). Pravidla `.record-comments-header--stacked-right…` a `.comment-pagination-actions--in-header` i s komentářem smaž.
+
+`comments.js` (`applyCommentSort`): smaž `const paginationActions = …` a celý blok od komentáře „Pozicování pagination tlačítek…“ po konec `if (paginationActions instanceof HTMLElement) {…}`. Před `section.setAttribute("data-comment-sort-direction", …)` dej:
+
+```js
+    // Tlačítka stránkování mají stálé místo v hlavičce vlevo od řazení (spec 2026-10-22 R11).
+    // Text „Další“ / „Předchozí“ přepíná CSS podle data-comment-sort-direction (dva <span>y;
+    // textContent na gov-button duplikoval obsah).
+```
+
+`docs/specs/record-comments.md`: počet 10 + krok 5, tabulka polohy (oba směry: hlavička vlevo od řazení), markup hlavičky, odstranit zmínky o `--in-header` / `--stacked-right` a přesunu v JS, odkaz na spec 2026-10-22 R10/R11.
+
+- [ ] **Step 4: Spusť, musí projít + sousední testy + JS**
+
+Run: `dotnet test PmTracker.Tests.Api --filter "FullyQualifiedName~RecordEditorControllerTests|FullyQualifiedName~CompactCommentsBlockRenderTests|FullyQualifiedName~ClosedRecordCommentsRenderTests|FullyQualifiedName~MeetingContextCommentsTests|FullyQualifiedName~RecordCommentsFormAuthzRenderTests|FullyQualifiedName~MeetingDetailRecordsRenderTests" --nologo`, `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~CommentPaginationMarkupTests|FullyQualifiedName~CompactCommentsBlockCssTests|FullyQualifiedName~AppCssColorTokenTests" --nologo`, `npm test`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add PmTracker.Web/Services/ProjectService.LazyQueries.cs PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml PmTracker.Web/wwwroot/css/site.css PmTracker.Web/wwwroot/js/modules/comments.js PmTracker.Tests.Api/Controllers/RecordEditorControllerTests.cs PmTracker.Tests.Api/Controllers/CompactCommentsBlockRenderTests.cs PmTracker.Tests.Unit/Projects/CommentPaginationMarkupTests.cs docs/specs/record-comments.md
+git commit -m "feat(vyjadreni): 10 posledních vyjádření, stránkování v hlavičce vlevo od řazení"
+```
+
+---
+
+### Task 5: E2E — výška, najetí, klávesnice, úprava, řazení, uzavřené jednání, stránkování
 
 **Files:**
 - Create: `PmTracker.Tests.E2E/Scenarios/CompactCommentsBlockScenariosTests.cs`
+- Modify: `PmTracker.Tests.E2E/Scenarios/RecordRichTextScenariosTests.cs` (`RecordComments_ShouldLoadFiveThenExpandWhilePreservingSortOnLoadedSubset`)
 
 **Interfaces:**
-- Consumes: markup (Task 2) a CSS (Task 3).
+- Consumes: markup (Task 2), CSS (Task 3), hlavička a počet (Task 4).
+
+Doplnění k níže uvedenému souboru (R10, R11):
+- `SeedAsync` dostane parametr `int extraComments = 0`: tolik dalších vyjádření k prvnímu jednání (text „E2E dalsi vyjadreni {n}“, datum o minuty později než první).
+- Nový test `TwelveComments_ShowTen_PaginationInHeaderLeftOfSort_BothDirections` (`extraComments: 7` → 12): 10 řádků; v `.record-comments-header` je `[data-record-comments-load-more]` i `[data-record-comments-load-all]`, jejich pravý okraj (`BoundingBox`) ≤ levý okraj `[data-comment-sort-toggle]` a svislé středy se liší o < 20 px; po kliknutí na řazení platí totéž; po kliknutí na „Další“ 12 řádků a `[data-record-comments-load-more]` 0×.
+- `RecordRichTextScenariosTests`: přejmenovat na `RecordComments_ShouldLoadTenThenExpandWhilePreservingSortOnLoadedSubset`, vytvořit 17 vyjádření, počty 5 → 10, 10 → 15, 12 → 17. Texty prvního řádku („Paging comment 8“, „3“, „1“) zůstanou.
 
 - [ ] **Step 1: Scénář** (seed přes EF jako `MeetingDetailRecordsScenariosTests`, úklid ve `finally`)
 
@@ -825,18 +1074,18 @@ public sealed class CompactCommentsBlockScenariosTests
 - [ ] **Step 2: Spusť nové E2E**
 
 Run: `dotnet test PmTracker.Tests.E2E --filter "FullyQualifiedName~CompactCommentsBlockScenariosTests|FullyQualifiedName~RecordRichTextScenariosTests|FullyQualifiedName~RichTextUnicodeScenariosTests|FullyQualifiedName~SearchResultTargetScenariosTests|FullyQualifiedName~MeetingDetailRecordsScenariosTests" --nologo`
-Expected: nové 3 PASS. Stávající čtyři třídy mají stejný výsledek jako na `main`.
+Expected: nové 4 PASS, upravený test stránkování PASS. Ostatní třídy mají stejný výsledek jako na `main`.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add PmTracker.Tests.E2E/Scenarios/CompactCommentsBlockScenariosTests.cs
-git commit -m "test(vyjadreni): E2E kompaktní blok — výška, bublina, ikony při najetí, uzavřené jednání, řazení"
+git add PmTracker.Tests.E2E/Scenarios/CompactCommentsBlockScenariosTests.cs PmTracker.Tests.E2E/Scenarios/RecordRichTextScenariosTests.cs
+git commit -m "test(vyjadreni): E2E kompaktní blok — výška, bublina, ikony při najetí, uzavřené jednání, řazení, stránkování"
 ```
 
 ---
 
-### Task 5: Plné sady, E2E proti baseline, průchod za všechny role, k-otestovani, merge
+### Task 6: Plné sady, E2E proti baseline, průchod za všechny role, k-otestovani, merge
 
 **Files:**
 - Modify: `docs/k-otestovani.md`
@@ -845,13 +1094,13 @@ git commit -m "test(vyjadreni): E2E kompaktní blok — výška, bublina, ikony 
 
 Run: `dotnet test PmTracker.Tests.Unit --nologo`, `dotnet test PmTracker.Tests.Api --nologo`, `npm test`
 Expected:
-- Unit: 2229 + 5 PASS.
-- Api: 506 + 6 PASS.
+- Unit: 2229 + 5 + 1 PASS (CommentPaginationMarkupTests: 3 testy nahrazeny 3 novými, `CompactCommentsBlockCssTests` 5; přesný počet podle výstupu).
+- Api: 506 + 7 PASS.
 - JS: 45 PASS.
 
 - [ ] **Step 2: E2E celá sada proti baseline `main`**
 
-Dočasný worktree `main` ve scratchpadu, obě sady za sebou (ne souběžně), TRX do scratchpadu, porovnání jmen Pythonem. Expected: žádné nové jméno selhání (baseline 33), nové 3 testy prošly.
+Dočasný worktree `main` ve scratchpadu, obě sady za sebou (ne souběžně), TRX do scratchpadu, porovnání jmen Pythonem. Expected: žádné nové jméno selhání (baseline 33), nové 4 testy a přejmenovaný test stránkování prošly.
 
 - [ ] **Step 3: Průchod v prohlížeči nad spuštěnou aplikací za všechny role** (spec §8, uživatel 2026-10-22)
 
@@ -872,7 +1121,8 @@ Dočasný worktree `main` ve scratchpadu, obě sady za sebou (ne souběžně), T
    - vedoucí upraví své vyjádření v přípravě;
    - podvržená úprava vyjádření k uzavřenému jednání za PM-personu skončí `ok=false`.
 5. Vzhled: tmavý motiv (podbarvení viditelné, vypočtená barva ≠ pozadí bloku), 375 px bez vodorovného posuvníku, Tab na štítek ukáže bublinu, snímky před a po s výškou seznamu.
-6. Úklid: dočasné osoby, vyjádření „Průchod …“ a jejich audit, zámky. Kontrolní dotaz = 0 řádků.
+6. Stránkování (jednou, za PM-personu, R10 a R11): na záznamu 99010 dočasně 12 vyjádření „Průchod stránkování …“ k jednání 7. Ověřit 10 řádků, tlačítka v hlavičce vlevo od řazení v obou směrech (snímek), „Další“ → 12 a tlačítka zmizí. Po „Další“ jedno vyjádření upravit: panel po uložení drží 12 a hlavičku.
+7. Úklid: dočasné osoby, vyjádření „Průchod …“ a jejich audit, zámky. Kontrolní dotaz = 0 řádků.
 
 Expected: matice sedí na 100 %, 0 JS chyb. Odchylku řešit podle superpowers:systematic-debugging, ne úpravou očekávání.
 
@@ -901,8 +1151,9 @@ Doplnit hash merge do sekce 5 a commitnout na `main`. Push ne.
 | 1. Server, uzavřené jednání (charakterizace + mutace) | 0,25 h |
 | 2. Markup + Api testy | 0,75 h |
 | 3. CSS + unit testy + kontrola výšky | 1 h |
-| 4. E2E | 0,75 h |
-| 5. Sady, E2E baseline, průchod za všechny role, k-otestovani, merge | 2 h |
-| **Celkem** | **≈ 4,75 h** |
+| 4. 10 vyjádření, stránkování v hlavičce | 0,75 h |
+| 5. E2E | 1 h |
+| 6. Sady, E2E baseline, průchod za všechny role, k-otestovani, merge | 2 h |
+| **Celkem** | **≈ 5,75 h** |
 
 Tvoje ruční ověření podle sekce 5 v `k-otestovani.md` je navíc.
