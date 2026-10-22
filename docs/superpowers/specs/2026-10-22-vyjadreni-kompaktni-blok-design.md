@@ -1,7 +1,7 @@
 # Vyjádření v jednom kompaktním bloku — specifikace
 
 **Datum:** 2026-10-22
-**Stav:** návrh k odsouhlasení
+**Stav:** odsouhlaseno s úpravami 2026-10-22 (R8, šedé podbarvení, průchod za všechny role)
 **Komponenta:** panel vyjádření záznamu (`Views/Projekty/_ZaznamCommentsPartial.cshtml`)
 
 ## 1. Zadání
@@ -41,6 +41,8 @@ Snímek současného stavu: dlaždice s vlastním rámečkem, nad každou jméno
 | R5 | **Upravit a Smazat** se objeví jako malé ikony na řádku, na kterém je myš nebo fokus, vlevo od štítku jednání. Text se kvůli nim neposouvá. | uživatel (volba „Při najetí na řádek“) |
 | R6 | Platí **všude, kde se panel vyjádření zobrazuje**: karta v záložce Záznamy, detail jednání a stránka záznamu. Je to jedna sdílená komponenta. | doplněno (k potvrzení) |
 | R7 | Štítek jde vybrat **klávesnicí** (Tab) a na dotykovém displeji klepnutím. Bublina s autorem a datem se pak ukáže i bez myši. | doplněno (přístupnost) |
+| R8 | U vyjádření k **uzavřenému jednání se ikony Upravit a Smazat neobjeví** ani při najetí myší a server úpravu i smazání odmítne. Je to dnešní chování a zůstává (viz 5.4). | uživatel 2026-10-22 |
+| R9 | Podbarvení řádku pod myší je **jemně šedé**: token `--background-neutral-subtle`. | uživatel 2026-10-22 |
 
 ## 5. Návrh
 
@@ -99,10 +101,10 @@ Markup jednoho vyjádření (řádku):
 |---|---|
 | Blok `.record-comments .comment-list` | `border: 1px solid var(--border-subtle)`, `border-radius: var(--gov-radius)`, `background: var(--background-block-primary)`, `padding: 4px 0`. Bez `overflow: hidden`, aby se bublina neořízla. |
 | Řádek `.record-comments .comment` | bez rámečku a stínu, `padding: 6px 12px`, `margin: 0`, `display: flow-root` (obsáhne float štítku bez ořezu), `position: relative` |
-| Řádek při najetí nebo fokusu | `.comment:hover, .comment:focus-within { background: var(--background-neutral-subtlest); }` |
+| Řádek při najetí nebo fokusu | `.comment:hover, .comment:focus-within { background: var(--background-neutral-subtle); }`, tedy **jemně šedá**: světlý motiv `neutral-100` = rgb(231, 231, 231) na bílém bloku, tmavý `neutral-900` na `neutral-950`. Ne `--background-neutral-subtlest`: ten je ve světlém motivu téměř bílý (246) a v tmavém **stejný jako pozadí bloku**, takže by podbarvení nebylo vidět. |
 | Text | 14 px jako dnes, `.richtext-render` (řádkování 1,4). První a poslední odstavec bez vnějšího okraje, ať jednořádkový text nepřidává výšku. |
 | Štítek jednání | beze změny (`.comment-meeting-chip`) + `:focus-visible { outline: 2px solid var(--border-primary); outline-offset: 2px; }` |
-| Ikony Upravit a Smazat | `.comment-row-actions`: absolutně umístěné vlevo od štítku, svisle na řádku štítku, pozadí `var(--background-neutral-subtlest)` (zakryje konec textu pod sebou). Klidový stav `opacity: 0; pointer-events: none`. Při `.comment:hover` a `.comment:focus-within` `opacity: 1; pointer-events: auto`. Tlačítka zůstávají v pořadí pro Tab: fokus na nich řádek „otevře“. Ikony jsou pm-button Ghost, malé, tužka a koš (koš v barvě chyby jako dnes). |
+| Ikony Upravit a Smazat | `.comment-row-actions`: absolutně umístěné vlevo od štítku, svisle na řádku štítku, pozadí `var(--background-neutral-subtle)` jako podbarvený řádek (zakryje konec textu pod sebou). Klidový stav `opacity: 0; pointer-events: none`. Při `.comment:hover` a `.comment:focus-within` `opacity: 1; pointer-events: auto`. Tlačítka zůstávají v pořadí pro Tab: fokus na nich řádek „otevře“. Ikony jsou pm-button Ghost, malé, tužka a koš (koš v barvě chyby jako dnes). |
 | Řádek v režimu úpravy (`data-editing="true"`) | pozadí jako při najetí trvale, štítek, bublina i ikony skryté, editor přes celou šířku jako dnes |
 
 Bez `:has`, `max-content` a přechodů navíc. `:hover` a `:focus-within` fungují v Edge na i15 (memory „Edge na i15“).
@@ -115,9 +117,25 @@ Bez `:has`, `max-content` a přechodů navíc. `:hover` a `:focus-within` funguj
 - **Dotykový displej:** klepnutí na štítek ukáže bublinu (fokus). Klepnutí do řádku ho podbarví a ukáže ikony (prohlížeč emuluje `:hover`).
 - **Upravit:** jako dnes se editor otevře v řádku přes celou šířku, Zrušit a Uložit beze změny. Po uložení se panel obnoví ze serveru a kontext jednání zůstane (2026-10-21).
 - **Smazat:** potvrzovací dotaz jako dnes.
-- **Řazení** (vzestupně a sestupně podle jednání) přesouvá přímo řádky `[data-comment-item]`. Obal `[data-comment-wrapper]` v `comments.js` odpadne.
+- **Řazení** (vzestupně a sestupně podle jednání) přesouvá přímo řádky `[data-comment-item]`. Obal `[data-comment-wrapper]` odpadne. `comments.js` to už dnes umí, takže se logika nemění.
 - **Další / Zobrazit vše:** beze změny, nově načtená vyjádření se přidají do stejného bloku.
 - **Cíl z vyhledávání** (rozbalení karty, posun na vyjádření, zvýraznění hledaného textu): beze změny.
+
+### 5.4 Kdo uvidí ikony Upravit a Smazat (pravidla beze změny)
+
+Ikony se vykreslí jen u vyjádření, kde dnes platí `LzeUpravit && (CanEditRecord || (CanEditOwnAsSubsystemLeader && autor = já))`:
+- `LzeUpravit` = jednání **není uzavřené** (`MeetingStatePolicy.IsReadOnly`: kód CLOSED, název „uzav…“ nebo zamčené). Server totéž hlídá v `CommentService.EnsureMeetingAllowsCommentChangesAsync`.
+- `CanEditRecord` = `records.edit` v projektu (Superadmin, Administrátor aplikace, Vlastník, Admin projektu, PM).
+- `CanEditOwnAsSubsystemLeader` = vlastní vyjádření vedoucího nebo zástupce vedoucího ke svému subsystému v jednání **v přípravě**.
+
+**Ověřeno 2026-10-22 v prohlížeči nad dnešním kódem** (osoba Admin aplikace + PM a osoba PM + vedoucí; karta v záložce Záznamy, detail jednání, stránka záznamu):
+- vyjádření k uzavřenému jednání: 0 ikon;
+- vyjádření k otevřenému jednání: tužka i koš;
+- podvržená úprava i smazání vyjádření k uzavřenému jednání: server odmítl (HTTP 400, „Vyjádření u uzavřeného jednání nelze upravovat ani mazat. Nejprve jednání otevřete.“).
+
+Hlídá to dnes Api test `ClosedRecordCommentsRenderTests.CommentInClosedMeeting_HasNoEditOrDeleteControls` (vykreslení). Odmítnutí na serveru dnes žádný test nehlídá, plán ho doplní.
+
+**Známý nesoulad, tato změna ho neřeší:** Gestor a Metodik subsystému mají `comments.edit.own` a server jim úpravu vlastního vyjádření v otevřeném jednání dovolí (`CommentAuthorizationPolicy.CanModifyComment`). UI jim ale tužku nevykreslí, protože ji ukazuje jen držitelům `records.edit` a vedoucím v přípravě. Je to stav před touto změnou a zůstává. Rozhodne se zvlášť.
 
 ## 6. Rozsah
 
@@ -127,7 +145,7 @@ Bez `:has`, `max-content` a přechodů navíc. `:hover` a `:focus-within` funguj
   - nová pravidla bloku, řádku, ikon a `.chip-tooltip--end`, vše omezené na `.record-comments`;
   - smazat pravidla, která po změně nic nepoužívá (`.comment-wrapper`, `.comment-meta-outer`, `.comment-author`, `.comment-sep`, `.comment-date`, `.comment-tile-side`), ale jen pokud je opravdu nic jiného nepoužívá (grep);
   - žádná duplicitní pravidla (memory „Duplicate CSS“).
-- `wwwroot/js/modules/comments.js`: řazení bez obalu `[data-comment-wrapper]`.
+- `wwwroot/js/modules/comments.js`: logika beze změny. Řazení už dnes přesouvá samotné `[data-comment-item]`, když obal `[data-comment-wrapper]` chybí (fallback pro `_TaskItemPartial`). Aktualizuje se jen komentář v kódu.
 
 **Projeví se na:** kartě záznamu v záložce Záznamy, v detailu jednání a na stránce záznamu.
 
@@ -167,18 +185,31 @@ Bez `:has`, `max-content` a přechodů navíc. `:hover` a `:focus-within` funguj
   - blok ani řádek nemají `overflow: hidden`;
   - pravidla jsou omezená na `.record-comments`;
   - `AppCssColorTokenTests` zelené.
-- **JS:** řazení přesouvá `[data-comment-item]` bez obalu (test v `tests/js/dom`).
+- **Api (server, zafixovat dnešní chování):** `UpdateComment` i `DeleteComment` vyjádření k uzavřenému jednání vrátí `ok=false` za PM. Projde už dnes a hlídá, že to platí i po změně.
+- **Řazení:** E2E klik na „Řazení“ otočí pořadí řádků v bloku (JS testy v `tests/js` nemají DOM).
 - **E2E:**
   - 5 jednořádkových vyjádření má seznam ≤ 200 px;
   - najetí na štítek ukáže bublinu s autorem, odjetí ji schová;
   - najetí na řádek ukáže tužku, klik otevře editor a uložení projde;
   - Tab na štítek ukáže bublinu;
   - stávající E2E vyjádření (`RecordRichTextScenariosTests`, `RichTextUnicodeScenariosTests`, `SearchResultTargetScenariosTests`) beze změny výsledku.
-- **Průchod v prohlížeči** (stálé pravidlo):
-  - za role, které upravují (PM, admin projektu), za vedoucího subsystému (jen svoje v přípravě) a za hosta (jen čtení);
-  - na kartě v záložce Záznamy, v detailu jednání a na stránce záznamu;
-  - světlý a tmavý motiv, 1400 px a 375 px, konzole bez chyb;
-  - snímek před a po se změřenou výškou.
+- **Průchod v prohlížeči nad spuštěnou aplikací za všechny role** (stálé pravidlo, uživatel 2026-10-22: „všichni budou mít co mají mít“):
+  - **Role (12 person):** 11 rolí (Superadmin, Administrátor aplikace, Read-all, Vlastník, Admin projektu, PM, Host, Gestor, Vedoucí, Zástupce vedoucího, Metodik), dále PM + vedoucí v jedné osobě a uživatel bez role v projektu. Každá role má vlastní dočasnou osobu (memory „Průchod za všechny role“).
+  - **Data:** jeden záznam vlastního subsystému vedoucích. Vyjádření od různých autorů (včetně vedoucího a zástupce) k jednání v přípravě, k otevřenému a k uzavřenému jednání.
+  - **Místa:** karta v záložce Záznamy, detail otevřeného jednání a stránka záznamu.
+  - **Za každou personu a místo se ověří, co se má vidět:**
+
+    | Role | Blok vyjádření | Bublina na štítku | Ikony Upravit a Smazat při najetí |
+    |---|---|---|---|
+    | Superadmin, Admin aplikace, Vlastník, Admin projektu, PM, PM + vedoucí | ano | u všech vyjádření | u všech vyjádření k jednání v přípravě a otevřenému; **u uzavřeného ne** |
+    | Vedoucí, Zástupce vedoucího | ano | u všech | jen u **vlastního** vyjádření k jednání **v přípravě**; jinde ne |
+    | Gestor, Metodik | ano | u všech | nikde (dnešní stav, viz 5.4) |
+    | Host, Read-all | ano | u všech | nikde |
+    | Bez role v projektu | stránka neexistuje (404) | – | – |
+
+  - **Akce:** kdo ikony má, jedno vyjádření upraví (najetí → tužka → uložit) a jedno smaže. U uzavřeného jednání ikony ani při najetí nejsou a podvržený požadavek server odmítne.
+  - **Vzhled:** šedé podbarvení při najetí ve světlém i tmavém motivu, Tab na štítek ukáže bublinu, 1400 px a 375 px bez vodorovného posuvníku, konzole bez chyb. Snímek před a po se změřenou výškou.
+  - **Úklid:** dočasné osoby a data se po průchodu smažou, před průchodem záloha DB.
 
 ## 9. Rizika
 
