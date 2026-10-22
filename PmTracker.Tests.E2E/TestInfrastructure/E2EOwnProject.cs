@@ -44,7 +44,8 @@ public sealed class E2EOwnProject
         {
             Zkratka = code,
             CelyNazev = $"E2E vlastni projekt {code}",
-            StavId = await db.CiselnikStavuProjektu.OrderBy(x => x.Id).Select(x => x.Id).FirstAsync(),
+            // Běžící projekt — první řádek číselníku je DELETED (projekt jen pro čtení, bez vyjádření).
+            StavId = await db.CiselnikStavuProjektu.Where(x => x.Kod == "RUN").Select(x => x.Id).FirstAsync(),
             PouzivatIdentJednani = false
         };
         var first = new SubsystemEntity { Kod = $"{code}B", Nazev = $"{code} B" };
