@@ -8,6 +8,8 @@ namespace PmTracker.Web.Services;
 
 public sealed partial class ProjectService
 {
+    // Spec 2026-10-22 R10: panel otevře posledních 10 vyjádření, „Další“ přidá po 5.
+    private const int RecordCommentsInitialCount = 10;
     private const int RecordCommentsLoadStep = 5;
 
     private sealed record RecordSummaryRow(
@@ -383,10 +385,10 @@ public sealed partial class ProjectService
             return totalCount;
         }
 
-        var normalizedLimit = limit.GetValueOrDefault(RecordCommentsLoadStep);
+        var normalizedLimit = limit.GetValueOrDefault(RecordCommentsInitialCount);
         if (normalizedLimit <= 0)
         {
-            normalizedLimit = RecordCommentsLoadStep;
+            normalizedLimit = RecordCommentsInitialCount;
         }
 
         return Math.Min(totalCount, normalizedLimit);

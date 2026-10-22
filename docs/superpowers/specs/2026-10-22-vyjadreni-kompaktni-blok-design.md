@@ -142,7 +142,7 @@ Bez `:has`, `max-content` a přechodů navíc. `:hover` a `:focus-within` funguj
 Ikony se vykreslí jen u vyjádření, kde dnes platí `LzeUpravit && (CanEditRecord || (CanEditOwnAsSubsystemLeader && autor = já))`:
 - `LzeUpravit` = jednání **není uzavřené** (`MeetingStatePolicy.IsReadOnly`: kód CLOSED, název „uzav…“ nebo zamčené). Server totéž hlídá v `CommentService.EnsureMeetingAllowsCommentChangesAsync`.
 - `CanEditRecord` = `records.edit` v projektu (Superadmin, Administrátor aplikace, Vlastník, Admin projektu, PM).
-- `CanEditOwnAsSubsystemLeader` = vlastní vyjádření vedoucího nebo zástupce vedoucího ke svému subsystému v jednání **v přípravě**.
+- `CanEditOwnAsSubsystemLeader` = jednání je **v přípravě**. Spolu s podmínkou „autor = já“ dává ikony u **vlastního** vyjádření v přípravě **komukoli**, nejen vedoucímu (název vlastnosti je zavádějící; ověřeno průchodem 2026-10-22).
 
 **Ověřeno 2026-10-22 v prohlížeči nad dnešním kódem** (osoba Admin aplikace + PM a osoba PM + vedoucí; karta v záložce Záznamy, detail jednání, stránka záznamu):
 - vyjádření k uzavřenému jednání: 0 ikon;
@@ -151,7 +151,15 @@ Ikony se vykreslí jen u vyjádření, kde dnes platí `LzeUpravit && (CanEditRe
 
 Hlídá to dnes Api test `ClosedRecordCommentsRenderTests.CommentInClosedMeeting_HasNoEditOrDeleteControls` (vykreslení). Odmítnutí na serveru dnes žádný test nehlídá, plán ho doplní.
 
-**Známý nesoulad, tato změna ho neřeší:** Gestor a Metodik subsystému mají `comments.edit.own` a server jim úpravu vlastního vyjádření v otevřeném jednání dovolí (`CommentAuthorizationPolicy.CanModifyComment`). UI jim ale tužku nevykreslí, protože ji ukazuje jen držitelům `records.edit` a vedoucím v přípravě. Je to stav před touto změnou a zůstává. Rozhodne se zvlášť.
+**Známý nesoulad UI × server, tato změna ho neřeší** (potvrzeno průchodem 2026-10-22 podvrženými požadavky; `CommentAuthorizationPolicy.CanModifyComment`):
+
+| Vlastní vyjádření | UI (ikony) | Server (úprava) |
+|---|---|---|
+| Gestor / Metodik, jednání v přípravě | ukáže | **odmítne** („Nemáte oprávnění upravit toto vyjádření.“) |
+| Gestor / Metodik / Vedoucí, otevřené jednání | neukáže | **povolí** |
+| Vedoucí / Zástupce, jednání v přípravě | ukáže | povolí |
+
+Je to stav před touto změnou a zůstává. Rozhodne se zvlášť (sjednotit UI na `CanModifyComment`, nebo zúžit server).
 
 ## 6. Rozsah
 
@@ -225,9 +233,8 @@ Hlídá to dnes Api test `ClosedRecordCommentsRenderTests.CommentInClosedMeeting
     | Role | Blok vyjádření | Bublina na štítku | Ikony Upravit a Smazat při najetí |
     |---|---|---|---|
     | Superadmin, Admin aplikace, Vlastník, Admin projektu, PM, PM + vedoucí | ano | u všech vyjádření | u všech vyjádření k jednání v přípravě a otevřenému; **u uzavřeného ne** |
-    | Vedoucí, Zástupce vedoucího | ano | u všech | jen u **vlastního** vyjádření k jednání **v přípravě**; jinde ne |
-    | Gestor, Metodik | ano | u všech | nikde (dnešní stav, viz 5.4) |
-    | Host, Read-all | ano | u všech | nikde |
+    | Vedoucí, Zástupce vedoucího, Gestor, Metodik | ano | u všech | jen u **vlastního** vyjádření k jednání **v přípravě**; jinde ne (dnešní pravidlo UI, nesoulad se serverem viz 5.4) |
+    | Host, Read-all | ano | u všech | nikde (vyjádření nepíšou) |
     | Bez role v projektu | stránka neexistuje (404) | – | – |
 
   - **Akce:** kdo ikony má, jedno vyjádření upraví (najetí → tužka → uložit) a jedno smaže. U uzavřeného jednání ikony ani při najetí nejsou a podvržený požadavek server odmítne.
