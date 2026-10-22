@@ -1,7 +1,7 @@
 # Záznam: hlavička, detaily v tabulce, procházení šipkami, mazání data plánu — specifikace
 
 **Datum:** 2026-10-22
-**Stav:** k odsouhlasení (R1–R3, R5–R10, R13, R14 odsouhlasena v rozhovoru 2026-10-22; R4, R11, R12 doplněna — k potvrzení)
+**Stav:** schváleno 2026-10-22 (R1–R14); plán implementace `docs/superpowers/plans/2026-10-22-zaznam-hlavicka-detaily-sipky-plan.md`
 **Komponenty:** karta záznamu (`Views/Projekty/_ZaznamPartial.cshtml`), detaily záznamu (`_ZaznamDetailPartial.cshtml`), stránka záznamu (`ZaznamDetailPage.cshtml`), detail jednání (záložka Záznamy v kontextu jednání), harmonogram v editoru a v návrhu změny (`Views/Shared/_ScheduleTable.cshtml`)
 
 ## 1. Zadání (uživatel, 2026-10-22)
