@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Web.Controllers;
 
@@ -91,7 +92,13 @@ public abstract partial class BaseController
         var recordPageReturnUrl = kontextJednaniId.HasValue
             ? Url.Action("Detail", "Jednani", new { id = kontextJednaniId.Value }) ?? $"/Jednani/Detail/{kontextJednaniId.Value}"
             : ProjektDetailTabUrl(projectId, RecordsTabKey);
-        record.RecordPageUrl = Url.Action("Detail", "Zaznamy", new { id = summary.Id, returnUrl = recordPageReturnUrl }) ?? $"/Zaznamy/Detail/{summary.Id}";
+        // Spec 2026-10-22 R9, R11: stránka záznamu nese seznam pro šipky — z detailu jednání
+        // záznamy jednání, ze záložky Záznamy aktivní záznamy projektu.
+        var recordPageSeznam = kontextJednaniId.HasValue
+            ? RecordSequenceRequest.ForMeeting(kontextJednaniId.Value).ToQueryValue()
+            : RecordSequenceRequest.Active.ToQueryValue();
+        record.RecordPageUrl = Url.Action("Detail", "Zaznamy", new { id = summary.Id, seznam = recordPageSeznam, returnUrl = recordPageReturnUrl })
+            ?? $"/Zaznamy/Detail/{summary.Id}";
         // Tužka z detailu jednání otevře editor v kontextu jednání (předvolba „Změna stavu platí k“
         // + návrat do jednání), stejně jako „Nový záznam“ z jednání.
         record.EditRecordUrl = Url.Action("Edit", "Zaznamy", new
