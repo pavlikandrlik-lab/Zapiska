@@ -7290,6 +7290,21 @@ pm-button gov-icon {
     margin: 4px 0 0;
 }
 
+/* Spec 2026-10-22 R10: procházení záznamů na stránce záznamu (‹ Předchozí · N / M · Další ›). */
+.record-sequence-nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin: 0 0 12px;
+}
+
+.record-sequence-position {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
 /* Wrapper karty kolem vyjádření — nese jen hooky pro AJAX obnovu, vzhled má sloupec sám. */
 .record-card--page-column {
     display: block;

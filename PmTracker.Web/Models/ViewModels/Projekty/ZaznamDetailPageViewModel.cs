@@ -32,4 +32,22 @@ public sealed class ZaznamDetailPageViewModel
     public string? PrintPdfUrl { get; set; }
     public string? PrintWordUrl { get; set; }
     public string? BackUrl { get; set; }
+
+    /// <summary>
+    /// Spec 2026-10-22 R10: procházení záznamů seznamu (jednání / aktivní). NULL = stránka bez šipek
+    /// (bez parametru seznam, s neplatným nebo cizím seznamem, záznam v seznamu není — R12).
+    /// </summary>
+    public RecordSequenceNavigationViewModel? Sequence { get; set; }
+}
+
+/// <summary>Spec 2026-10-22 R10: „‹ Předchozí · N / M · Další ›“ na stránce záznamu.</summary>
+public sealed class RecordSequenceNavigationViewModel
+{
+    /// <summary>Pozice od 1.</summary>
+    public int Position { get; init; }
+    public int Count { get; init; }
+    public string? PreviousUrl { get; init; }
+    public string? PreviousLabel { get; init; }
+    public string? NextUrl { get; init; }
+    public string? NextLabel { get; init; }
 }

@@ -15,6 +15,30 @@
 @* Stránka záznamu (2026-07-14): read-only detail na trvalé URL. Hlavička na plnou šířku,
    pod ní dva sloupce — vlevo vyjádření (jediná zapisující část), vpravo harmonogram
    s přepínačem Graf/Tabulka. Navigaci „zpět" nese drobečková lišta. *@
+@if (Model.Sequence is { } sequence)
+{
+    @* Spec 2026-10-22 R10: procházení záznamů seznamu (jednání / aktivní). Klávesy ← → obsluhuje
+       recordSequenceKeys.js podle data-prev-url / data-next-url (prázdné = kraj seznamu). *@
+    <nav class="record-sequence-nav"
+         aria-label="Procházení záznamů"
+         data-record-sequence-nav
+         data-prev-url="@(sequence.PreviousUrl ?? string.Empty)"
+         data-next-url="@(sequence.NextUrl ?? string.Empty)">
+        <pm-button variant="Secondary"
+                   size="Small"
+                   href="@sequence.PreviousUrl"
+                   disabled="@(sequence.PreviousUrl is null)"
+                   title="@(sequence.PreviousLabel is null ? "Začátek seznamu" : $"Předchozí: {sequence.PreviousLabel} (klávesa ←)")"
+                   data-record-sequence-prev>‹ Předchozí</pm-button>
+        <span class="record-sequence-position" data-record-sequence-position>@sequence.Position / @sequence.Count</span>
+        <pm-button variant="Secondary"
+                   size="Small"
+                   href="@sequence.NextUrl"
+                   disabled="@(sequence.NextUrl is null)"
+                   title="@(sequence.NextLabel is null ? "Konec seznamu" : $"Další: {sequence.NextLabel} (klávesa →)")"
+                   data-record-sequence-next>Další ›</pm-button>
+    </nav>
+}
 <section class="card record-page-header">
     <div class="record-page-header-top">
         <div>

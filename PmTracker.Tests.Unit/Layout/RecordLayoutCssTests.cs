@@ -65,4 +65,12 @@ public sealed class RecordLayoutCssTests
     [Fact]
     public void OldHistoryLayout_Removed()
         => Css.Should().NotContain(".record-history", "markup .record-history nahradila tabulka .record-facts");
+
+    [Fact]
+    public void SequenceNav_IsWrappingFlexRow()
+    {
+        var nav = Rule(".record-sequence-nav");
+        nav.Should().Contain("display: flex").And.Contain("flex-wrap: wrap", "na úzkém okně se zalomí, nepřeteče");
+        Rule(".record-sequence-position").Should().Contain("color: var(--text-secondary)");
+    }
 }

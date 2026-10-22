@@ -28,6 +28,7 @@ public sealed partial class ZaznamyController : BaseController
     private readonly IHarvestScheduler _harvestScheduler;
     private readonly PmTrackerDbContext _db;
     private readonly IRecordEditLockService _editLockService;
+    private readonly IRecordSequenceService _recordSequenceService;
 
     public ZaznamyController(
         IUserContextResolver userContextResolver,
@@ -38,7 +39,8 @@ public sealed partial class ZaznamyController : BaseController
         IRecordUiFlowResolver recordUiFlowResolver,
         IHarvestScheduler harvestScheduler,
         PmTrackerDbContext db,
-        IRecordEditLockService editLockService)
+        IRecordEditLockService editLockService,
+        IRecordSequenceService recordSequenceService)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _recordService = recordService;
@@ -47,15 +49,17 @@ public sealed partial class ZaznamyController : BaseController
         _harvestScheduler = harvestScheduler;
         _db = db;
         _editLockService = editLockService;
+        _recordSequenceService = recordSequenceService;
     }
 
     /// <summary>
     /// Stránka záznamu (2026-07-14): read-only detail na trvalé URL (sdílitelný odkaz).
     /// Guard = přístup k projektu; žádné edit právo se nevyžaduje — stránka ukazuje totéž,
     /// co uživatel vidí na kartě v záložce Záznamy. Autorizace PŘED těžkými dotazy.
+    /// Spec 2026-10-22 R10–R12: <paramref name="seznam"/> (aktivni / jednani-{id}) zapne procházení šipkami.
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> Detail(int id, string? returnUrl, CancellationToken ct = default)
+    public async Task<IActionResult> Detail(int id, string? returnUrl, string? seznam = null, CancellationToken ct = default)
     {
         var projektId = await _db.ProjektoveZaznamy.AsNoTracking()
             .Where(x => x.Id == id)
@@ -71,7 +75,7 @@ public sealed partial class ZaznamyController : BaseController
         var model = await _recordService.BuildRecordDetailPageAsync(projektId.Value, id, ct);
         if (model is null) return NotFound();
 
-        await PrepareRecordDetailPagePresentationAsync(model, returnUrl, ct);
+        await PrepareRecordDetailPagePresentationAsync(model, returnUrl, seznam, ct);
         SetProjectBreadcrumbs(
             model.ProjektId, model.ProjektNazev, model.ProjektZkratka,
             currentText: $"Záznam #{model.Summary.CisloViditelne}",
@@ -79,7 +83,7 @@ public sealed partial class ZaznamyController : BaseController
         return View("~/Views/Projekty/ZaznamDetailPage.cshtml", model);
     }
 
-    private async Task PrepareRecordDetailPagePresentationAsync(ZaznamDetailPageViewModel model, string? returnUrl, CancellationToken ct)
+    private async Task PrepareRecordDetailPagePresentationAsync(ZaznamDetailPageViewModel model, string? returnUrl, string? seznam, CancellationToken ct)
     {
         var projektId = model.ProjektId;
         var recordId = model.Summary.Id;
@@ -88,7 +92,32 @@ public sealed partial class ZaznamyController : BaseController
         model.CanCreateScheduleProposal = model.Summary.JeUkol
             && CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, projektId);
 
-        var pageUrl = Url.Action(nameof(Detail), new { id = recordId }) ?? $"/Zaznamy/Detail/{recordId}";
+        // Spec 2026-10-22 R9–R12: seznam pro šipky počítá server z parametru „seznam“. Neplatný
+        // parametr, jednání jiného projektu nebo záznam mimo seznam = stránka bez šipek.
+        var normalizedReturnUrl = NormalizeLocalReturnUrl(returnUrl);
+        var request = RecordSequenceRequest.Parse(seznam);
+        var sequence = request is null ? null : await _recordSequenceService.ResolveAsync(request, projektId, ct);
+        var seznamValue = sequence is null ? null : request!.ToQueryValue();
+        string PageUrl(int zaznamId)
+            => Url.Action(nameof(Detail), new { id = zaznamId, seznam = seznamValue, returnUrl = normalizedReturnUrl })
+                ?? $"/Zaznamy/Detail/{zaznamId}";
+
+        var position = sequence is null ? null : RecordSequencePosition.Locate(sequence, recordId);
+        if (position is not null)
+        {
+            model.Sequence = new RecordSequenceNavigationViewModel
+            {
+                Position = position.Index + 1,
+                Count = position.Count,
+                PreviousUrl = position.Previous is null ? null : PageUrl(position.Previous.ZaznamId),
+                PreviousLabel = position.Previous?.Label,
+                NextUrl = position.Next is null ? null : PageUrl(position.Next.ZaznamId),
+                NextLabel = position.Next?.Label
+            };
+        }
+
+        // Úprava a návrh se vracejí na stránku i se seznamem a s návratem (R11).
+        var pageUrl = PageUrl(recordId);
         model.EditUrl = Url.Action(nameof(Edit), new { id = recordId, projektId, returnUrl = pageUrl });
         model.ScheduleProposalUrl = Url.Action("CreateScheduleProposal", "Navrhy",
             new { projektId, zaznamId = recordId, returnUrl = pageUrl });
@@ -96,7 +125,7 @@ public sealed partial class ZaznamyController : BaseController
             new { projektId, zaznamId = recordId });
         model.PrintPdfUrl = Url.Action("UkolTisk", "Export", new { zaznamId = recordId, projektId, autoPrint = true });
         model.PrintWordUrl = Url.Action("UkolWord", "Export", new { zaznamId = recordId, projektId });
-        model.BackUrl = NormalizeLocalReturnUrl(returnUrl) ?? ProjektDetailTabUrl(projektId, "zaznamy");
+        model.BackUrl = normalizedReturnUrl ?? ProjektDetailTabUrl(projektId, "zaznamy");
 
         // Vyjádření: stejná presentation jako na kartě (oprávnění, filtr draft jednání).
         await PrepareRecordCommentsPresentationAsync(model.Comments, model.Summary, ct);
