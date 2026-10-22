@@ -188,7 +188,7 @@ public sealed class RecordEditorControllerTests
     }
 
     [Fact]
-    public async Task RecordCommentsPartial_ShouldRenderDefaultFiveNewestComments()
+    public async Task RecordCommentsPartial_ShouldRenderDefaultTenNewestComments()
     {
         var ownerId = await _fixture.EnsurePersonAsync("ApiCommentsOrderOwner");
         var projectId = await _fixture.EnsureProjectAsync("APIREDCOMMENTORD");
@@ -200,7 +200,7 @@ public sealed class RecordEditorControllerTests
             recordId,
             ownerId,
             meetingId,
-            Enumerable.Range(1, 7)
+            Enumerable.Range(1, 12)
                 .Select(index => ($"Comment {index}", new DateTime(2026, 3, index, 9, 0, 0, DateTimeKind.Utc))));
 
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
@@ -208,16 +208,15 @@ public sealed class RecordEditorControllerTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        Regex.Matches(html, "data-comment-item").Count.Should().Be(5, html);
-        html.Should().Contain("Comment 7");
-        html.Should().Contain("Comment 6");
-        html.Should().Contain("Comment 5");
-        html.Should().Contain("Comment 4");
-        html.Should().Contain("Comment 3");
+        // Spec 2026-10-22 R10: posledních 10 vyjádření, „Další“ dál po 5.
+        Regex.Matches(html, "data-comment-item").Count.Should().Be(10, html);
+        html.Should().Contain("<p>Comment 12</p>");
+        html.Should().Contain("<p>Comment 3</p>");
         html.Should().NotContain("<p>Comment 2</p>");
         html.Should().NotContain("<p>Comment 1</p>");
-        html.Should().Contain("data-record-comments-loaded-count=\"5\"");
-        html.Should().Contain("data-record-comments-total-count=\"7\"");
+        html.Should().Contain("data-record-comments-loaded-count=\"10\"");
+        html.Should().Contain("data-record-comments-total-count=\"12\"");
+        html.Should().Contain("data-record-comments-load-step=\"5\"");
         // Load-more button: šablona renderuje title „Zobrazit N dalších vyjádření" +
         // vlastní label „Další (N)" (viz _ZaznamCommentsPartial.cshtml).
         html.Should().Contain("data-record-comments-load-more=\"true\"");
@@ -237,21 +236,22 @@ public sealed class RecordEditorControllerTests
             recordId,
             ownerId,
             meetingId,
-            Enumerable.Range(1, 12)
+            Enumerable.Range(1, 17)
                 .Select(index => ($"Limit comment {index}", new DateTime(2026, 4, index, 9, 0, 0, DateTimeKind.Utc))));
 
+        // Odpovídá „Další“ po výchozích 10 (spec 2026-10-22 R10): limit = 10 + 5.
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
-        var response = await client.GetAsync($"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={recordId}&limit=10&asUser={_fixture.AdminOsobaId}");
+        var response = await client.GetAsync($"/Zaznamy/RecordCommentsPartial?projektId={projectId}&zaznamId={recordId}&limit=15&asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        Regex.Matches(html, "data-comment-item").Count.Should().Be(10, html);
-        html.Should().Contain("Limit comment 12");
-        html.Should().Contain("Limit comment 3");
+        Regex.Matches(html, "data-comment-item").Count.Should().Be(15, html);
+        html.Should().Contain("<p>Limit comment 17</p>");
+        html.Should().Contain("<p>Limit comment 3</p>");
         html.Should().NotContain("<p>Limit comment 2</p>");
         html.Should().NotContain("<p>Limit comment 1</p>");
-        html.Should().Contain("data-record-comments-loaded-count=\"10\"");
-        html.Should().Contain("data-record-comments-total-count=\"12\"");
+        html.Should().Contain("data-record-comments-loaded-count=\"15\"");
+        html.Should().Contain("data-record-comments-total-count=\"17\"");
         html.Should().Contain("data-record-comments-load-more=\"true\"");
         html.Should().Contain("Zobrazit vše");
     }

@@ -11,8 +11,8 @@ namespace PmTracker.Tests.Unit.Projects;
 ///   (CSS-driven visibility podle data-comment-sort-direction na sekci —
 ///   gov-button hydratace duplikovala obsah při textContent swap,
 ///   user 2026-04-19 noc: "Další zobrazit předchozí zobrazit vše zobrazit vše")
-/// - respektovat class .comment-pagination-actions--in-header v ASC režimu
-/// - být zarovnaná vpravo přes justify-content: flex-end
+/// - mít stálé místo v hlavičce vlevo od řazení v obou směrech (spec 2026-10-22 R11;
+///   dřív je JS přesouval pod seznam / pod řazení podle směru)
 /// </summary>
 public sealed class CommentPaginationMarkupTests
 {
@@ -72,44 +72,47 @@ public sealed class CommentPaginationMarkupTests
     }
 
     [Fact]
-    public void Css_ShouldAlignPaginationToRight()
+    public void View_RendersPaginationInHeader_BeforeSortToggle()
     {
-        var css = LoadText("PmTracker.Web/wwwroot/css/site.css");
+        var view = LoadText("PmTracker.Web/Views/Projekty/_ZaznamCommentsPartial.cshtml");
 
-        css.Should().MatchRegex(
-            @"\.comment-pagination-actions\s*\{[^}]*justify-content:\s*flex-end",
-            "pagination tlačítka jsou vždy vpravo");
+        var header = view.IndexOf("class=\"record-comments-header\"", StringComparison.Ordinal);
+        var tools = view.IndexOf("class=\"record-comments-tools\"", StringComparison.Ordinal);
+        var pagination = view.IndexOf("class=\"comment-pagination-actions\"", StringComparison.Ordinal);
+        var sortToggle = view.IndexOf("data-comment-sort-toggle", StringComparison.Ordinal);
+        var list = view.IndexOf("data-comment-list", StringComparison.Ordinal);
+
+        header.Should().BeGreaterThan(-1);
+        tools.Should().BeGreaterThan(header);
+        pagination.Should().BeGreaterThan(tools).And.BeLessThan(sortToggle, "stránkování vlevo od řazení (R11)");
+        sortToggle.Should().BeLessThan(list, "nástroje jsou v hlavičce nad seznamem");
+        view.IndexOf("comment-pagination-actions", list, StringComparison.Ordinal).Should().Be(-1, "pod seznamem žádná tlačítka");
     }
 
     [Fact]
-    public void Css_ShouldDefineInHeaderVariantForAscMode()
+    public void Css_HeaderToolsWrapAndAlignRight()
     {
         var css = LoadText("PmTracker.Web/wwwroot/css/site.css");
 
-        css.Should().Contain(
-            ".comment-pagination-actions--in-header",
-            "musí existovat CSS třída pro ASC režim (pagination v headeru)");
-        css.Should().Contain(
-            ".record-comments-header--stacked-right",
-            "header v ASC musí mít modifier pro sloupcové zarovnání");
+        css.Should().MatchRegex(@"\.record-comments-header\s*\{[^}]*flex-wrap:\s*wrap", "na úzkém okně se nástroje zalomí pod nadpis");
+        css.Should().MatchRegex(@"\.record-comments-tools\s*\{[^}]*margin-left:\s*auto", "nástroje drží vpravo");
+        css.Should().MatchRegex(@"\.record-comments-tools\s*\{[^}]*flex-wrap:\s*wrap");
     }
 
     [Fact]
-    public void Js_ShouldPositionPaginationByDirection()
+    public void PaginationIsNotMovedByDirection()
     {
+        var css = LoadText("PmTracker.Web/wwwroot/css/site.css");
         var js = LoadText("PmTracker.Web/wwwroot/js/modules/comments.js");
 
-        js.Should().Contain(
-            "record-comments-header--stacked-right",
-            "JS přidává třídu stacked-right na header v ASC");
-        js.Should().Contain(
-            "comment-pagination-actions--in-header",
-            "JS přidává třídu in-header na pagination v ASC");
-        // Textová manipulace byla nahrazena CSS-driven visibility — JS už
-        // nesetuje textContent na gov-button (duplikovalo obsah).
-        js.Should().NotContain(
-            "btn.textContent =",
-            "JS nesmí setovat textContent na gov-button (gov hydratace duplikuje)");
+        css.Should().NotContain("comment-pagination-actions--in-header");
+        css.Should().NotContain("record-comments-header--stacked-right");
+        js.Should().NotContain("comment-pagination-actions--in-header", "tlačítka mají stálé místo (R11)");
+        js.Should().NotContain("record-comments-header--stacked-right");
+        js.Should().NotContain("appendChild(paginationActions)");
+        // Textová manipulace byla nahrazena CSS-driven visibility — JS nesetuje
+        // textContent na gov-button (duplikovalo obsah).
+        js.Should().NotContain("btn.textContent =", "JS nesmí setovat textContent na gov-button (gov hydratace duplikuje)");
     }
 
     [Fact]

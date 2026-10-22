@@ -12,12 +12,47 @@
      data-comment-sort-direction="asc">
     <div class="record-comments-header">
         <h4>Vyjádření</h4>
-        @if (Model.Vyjadreni.Count > 1)
+        @if (Model.Vyjadreni.Count > 1 || Model.CanLoadMore || Model.CanLoadAll)
         {
-            <pm-button variant="Secondary" size="Small" class="comment-sort-toggle" data-comment-sort-toggle="true">
-                <span data-comment-sort-label="asc">Řazení: jednání vzestupně</span>
-                <span data-comment-sort-label="desc" hidden>Řazení: jednání sestupně</span>
-            </pm-button>
+            @*
+                Spec 2026-10-22 R11: stránkování má stálé místo v hlavičce vlevo od řazení (dřív ho JS
+                přesouval podle směru). Labely jsou dva <span>y s data-comment-pagination-label a CSS
+                skrývá neaktivní podle data-comment-sort-direction sekce — textContent na gov-button
+                duplikoval obsah (user hlásil „vidí obojí zároveň“).
+            *@
+            <div class="record-comments-tools">
+                @if (Model.CanLoadMore || Model.CanLoadAll)
+                {
+                    <div class="comment-pagination-actions">
+                        @if (Model.CanLoadMore)
+                        {
+                            <pm-button variant="GhostOutlined"
+                                       size="Small"
+                                       data-record-comments-load-more="true"
+                                       title="Zobrazit @Model.LoadStep dalších vyjádření">
+                                <span data-comment-pagination-label="desc">Další (@Model.LoadStep)</span>
+                                <span data-comment-pagination-label="asc">Předchozí (@Model.LoadStep)</span>
+                            </pm-button>
+                        }
+                        @if (Model.CanLoadAll)
+                        {
+                            <pm-button variant="GhostOutlined"
+                                       size="Small"
+                                       data-record-comments-load-all="true"
+                                       title="Zobrazit všechna vyjádření">
+                                Zobrazit vše
+                            </pm-button>
+                        }
+                    </div>
+                }
+                @if (Model.Vyjadreni.Count > 1)
+                {
+                    <pm-button variant="Secondary" size="Small" class="comment-sort-toggle" data-comment-sort-toggle="true">
+                        <span data-comment-sort-label="asc">Řazení: jednání vzestupně</span>
+                        <span data-comment-sort-label="desc" hidden>Řazení: jednání sestupně</span>
+                    </pm-button>
+                }
+            </div>
         }
     </div>
     @if (Model.Vyjadreni.Count == 0)
@@ -103,38 +138,6 @@
                         </form>
                     }
                 </div>
-            }
-        </div>
-    }
-
-    @if (Model.CanLoadMore || Model.CanLoadAll)
-    {
-        <div class="comment-pagination-actions">
-            @*
-                Labely jsou dva <span>y s data-comment-pagination-label a CSS
-                skrývá neaktivní podle rodičovského data-comment-sort-direction.
-                Důvod: gov-button hydratace propaguje children, ale pokud se
-                nastaví textContent na outer, duplikuje — user hlásí "vidí
-                obojí zároveň". CSS-driven pattern se už osvědčil u sort toggle.
-            *@
-            @if (Model.CanLoadMore)
-            {
-                <pm-button variant="GhostOutlined"
-                           size="Small"
-                           data-record-comments-load-more="true"
-                           title="Zobrazit @Model.LoadStep dalších vyjádření">
-                    <span data-comment-pagination-label="desc">Další (@Model.LoadStep)</span>
-                    <span data-comment-pagination-label="asc">Předchozí (@Model.LoadStep)</span>
-                </pm-button>
-            }
-            @if (Model.CanLoadAll)
-            {
-                <pm-button variant="GhostOutlined"
-                           size="Small"
-                           data-record-comments-load-all="true"
-                           title="Zobrazit všechna vyjádření">
-                    Zobrazit vše
-                </pm-button>
             }
         </div>
     }

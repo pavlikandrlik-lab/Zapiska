@@ -109,6 +109,34 @@ public sealed class CompactCommentsBlockRenderTests
     }
 
     [Fact]
+    public async Task Pagination_IsInHeader_LeftOfSortToggle()
+    {
+        var s = await SeedAsync("ApiCmpPag", 9629);
+        await using (var db = _fixture.CreateDbContext())
+        {
+            var openMeetingId = await db.Vyjadreni.Where(x => x.Id == s.OpenCommentId).Select(x => x.JednaniId).SingleAsync();
+            for (var i = 1; i <= 10; i++)
+            {
+                await _fixture.AddCommentAsync(s.RecordId, openMeetingId, s.PmId, $"ApiCmpPag dalsi {i}");
+            }
+        }
+
+        var html = await PanelHtmlAsync(s, s.PmId);
+
+        Regex.Matches(html, "data-comment-item").Count.Should().Be(10, "R10: posledních 10 z 12");
+        var headerStart = html.IndexOf("class=\"record-comments-header\"", StringComparison.Ordinal);
+        var listStart = html.IndexOf("data-comment-list", StringComparison.Ordinal);
+        var loadMore = html.IndexOf("data-record-comments-load-more", StringComparison.Ordinal);
+        var loadAll = html.IndexOf("data-record-comments-load-all", StringComparison.Ordinal);
+        var sortToggle = html.IndexOf("data-comment-sort-toggle", StringComparison.Ordinal);
+        headerStart.Should().BeGreaterThan(-1);
+        loadMore.Should().BeGreaterThan(headerStart).And.BeLessThan(sortToggle, "R11: Další je vlevo od řazení");
+        loadAll.Should().BeGreaterThan(loadMore).And.BeLessThan(sortToggle, "R11: Zobrazit vše je vlevo od řazení");
+        sortToggle.Should().BeLessThan(listStart, "celá skupina je v hlavičce nad seznamem");
+        Regex.Matches(html, "comment-pagination-actions").Count.Should().Be(1, "pod seznamem už žádná tlačítka nejsou");
+    }
+
+    [Fact]
     public async Task Host_NoRowActions_ButTooltips()
     {
         var s = await SeedAsync("ApiCmpHst", 9627);

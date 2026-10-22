@@ -64,7 +64,6 @@ export function applyCommentSort(section, direction) {
 
     const normalizedDirection = normalizeCommentSortDirection(direction);
     const list = section.querySelector("[data-comment-list]");
-    const paginationActions = section.querySelector(".comment-pagination-actions");
 
     if (list instanceof HTMLElement) {
         const items = Array.from(list.querySelectorAll("[data-comment-item]"))
@@ -98,39 +97,9 @@ export function applyCommentSort(section, direction) {
         }
     }
 
-    // Pozicování pagination tlačítek podle směru řazení
-    // (viz docs/specs/record-comments.md):
-    // - DESC (nejnovější nahoře, starší dole): tlačítka POD listem vpravo.
-    //   Další načtené záznamy přibydou dole = další stránka starších vyjádření.
-    //   Texty: „Další", „Zobrazit vše".
-    // - ASC (nejstarší nahoře, nejnovější dole): sort toggle vpravo nahoře
-    //   v headeru; POD ním (sloupcově) tlačítka pagination, vpravo.
-    //   V ASC pagination načítá „předchozí" (starší, přidávají se nad začátek).
-    const header = section.querySelector(".record-comments-header");
-    if (header instanceof HTMLElement) {
-        header.classList.toggle("record-comments-header--stacked-right", normalizedDirection === "asc");
-    }
-
-    if (paginationActions instanceof HTMLElement) {
-        paginationActions.classList.toggle("comment-pagination-actions--in-header", normalizedDirection === "asc");
-
-        if (normalizedDirection === "asc" && header instanceof HTMLElement) {
-            if (paginationActions.parentElement !== header) {
-                header.appendChild(paginationActions);
-            }
-        } else if (normalizedDirection === "desc" && list instanceof HTMLElement) {
-            if (paginationActions.previousElementSibling !== list) {
-                list.after(paginationActions);
-            }
-        }
-
-        // Labely uvnitř pagination tlačítek jsou dva <span>y s
-        // data-comment-pagination-label; aktivní určuje ancestor's
-        // data-comment-sort-direction (viz site.css). Textová manipulace
-        // přes textContent na gov-button způsobovala duplikaci (user hlásil
-        // "vidí obě hodnoty současně"); CSS-driven pattern je robustnější.
-    }
-
+    // Tlačítka stránkování mají stálé místo v hlavičce vlevo od řazení (spec 2026-10-22 R11).
+    // Text „Další“ / „Předchozí“ přepíná CSS podle data-comment-sort-direction (dva <span>y;
+    // textContent na gov-button duplikoval obsah).
     section.setAttribute("data-comment-sort-direction", normalizedDirection);
 }
 
