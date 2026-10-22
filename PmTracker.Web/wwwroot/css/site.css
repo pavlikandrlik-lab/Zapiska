@@ -3743,7 +3743,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: 1px solid var(--border-primary);
 }
 
-/* R7 (2026-07-13): indikátor rozbalení přesunut vlevo (mezi kraj karty a kategorii). */
 /* Spec 2026-10-22 R1: indikátor rozbalení v levém okraji karty (mezi barevným pruhem a obsahem),
    mimo flex hlavičky — štítky, nadpis, detaily i vyjádření začínají na jedné svislé čáře.
    Dřív (R7 2026-07-13) zabíral ve flexu hlavičky vlastní sloupec → odskok hlavičky o 21 px. */
