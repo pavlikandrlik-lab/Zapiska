@@ -36,7 +36,7 @@ public sealed class RecordDetailPageRenderTests
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         // Hlavička (bohatá — detail partial s historií a chips).
         html.Should().Contain("record-page-header");
-        html.Should().Contain("record-history", "hlavička nese historii vlastníka/termínu/subsystému");
+        html.Should().Contain("record-facts", "hlavička nese detaily s historií vlastníka/termínu/subsystému");
         // Vyjádření ve wrapperu karty (kvůli AJAX obnově).
         html.Should().Contain("record-card--page-column");
         html.Should().Contain("data-record-comments-shell");
@@ -102,10 +102,9 @@ public sealed class RecordDetailPageRenderTests
         var html = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
-        // Bohatá hlavička: kategorie, název, historie, souhrnná meta.
+        // Bohatá hlavička: kategorie, název, detaily v tabulce.
         html.Should().Contain("record-page-header");
-        html.Should().Contain("record-history");
-        html.Should().Contain("record-summary-meta");
+        html.Should().Contain("record-facts");
         // Přepínač a oba kontejnery.
         html.Should().Contain("data-schedule-view-toggle=\"graph\"");
         html.Should().Contain("data-schedule-view-toggle=\"table\"");

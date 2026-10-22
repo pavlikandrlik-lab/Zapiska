@@ -58,12 +58,8 @@
             }
         </div>
     </div>
-    @* Termín/vlastník/subsystém (včetně historie) dodává _ZaznamDetailPartial níže —
-       tady jen datum založení, které v něm není. *@
-    <div class="record-summary-meta">
-        <span><span class="label">Založeno:</span> @summary.DatumZalozeni.ToString("dd.MM.yyyy")</span>
-    </div>
-    @* Bohatá část: historie vlastníka/termínu/subsystému, popis, chips externích odkazů, spolupráce. *@
+    @* Detaily (vlastník, subsystém, termín, typ úkolu, založeno — s historií), popis, chips externích
+       odkazů a spolupráce dodává _ZaznamDetailPartial (spec 2026-10-22 R2–R4). *@
     @await Html.PartialAsync("~/Views/Projekty/_ZaznamDetailPartial.cshtml", Model.Detail)
 </section>
 

@@ -113,6 +113,8 @@ public sealed class ZaznamCardDetailViewModel
     public required string AktualniSubsystem { get; init; }
     public string? TypUkolu { get; init; }
     public required IReadOnlyList<string> HistorieTypuUkolu { get; init; }
+    /// <summary>Spec 2026-10-22 R2: datum založení je v tabulce detailů (karta i stránka záznamu).</summary>
+    public required DateTime DatumZalozeni { get; init; }
     public required IReadOnlyList<ExterniOdkazViewModel> ExterniOdkazy { get; init; }
     public required IReadOnlyList<SpolupracovnikViewModel> Spoluprace { get; init; }
 }

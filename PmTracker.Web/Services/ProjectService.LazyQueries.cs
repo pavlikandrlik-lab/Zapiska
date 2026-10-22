@@ -147,6 +147,7 @@ public sealed partial class ProjectService
                 x.Popis,
                 x.VlastnikId,
                 x.DatumUkonceni,
+                x.DatumZalozeni,
                 x.SubsystemId,
                 x.AktualniTypUkoluId
             })
@@ -240,6 +241,7 @@ public sealed partial class ProjectService
             AktualniVlastnik = BuildInlinePersonLabelFromOsoba(people.GetValueOrDefault(record.VlastnikId)),
             HistorieTerminu = termHistory.Select(x => x.PuvodniDatum).Distinct().ToList(),
             AktualniTermin = record.DatumUkonceni,
+            DatumZalozeni = record.DatumZalozeni,
             HistorieSubsystemu = subsystemHistory
                 .Select(x => subsystems.GetValueOrDefault(x.PuvodniSubsystem)?.Nazev ?? "-")
                 .Distinct(Ci)

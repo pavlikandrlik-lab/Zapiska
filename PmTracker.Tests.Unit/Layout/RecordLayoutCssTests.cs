@@ -35,4 +35,34 @@ public sealed class RecordLayoutCssTests
         indicator.Should().Contain("height: 16px", "čtverec — po otočení o 90° nepřesáhne do textu");
         Rule(".record-content").Should().Contain("position: relative").And.Contain("padding: 14px 16px 16px");
     }
+
+    [Fact]
+    public void FactsTable_HasNoBorders_AndUsesTokens()
+    {
+        var facts = Rule(".record-facts");
+        facts.Should().Contain("border-collapse: collapse");
+        facts.Should().Contain("color: var(--text-secondary)");
+        Rule(".record-facts td strong").Should().Contain("color: var(--text-primary)");
+    }
+
+    [Fact]
+    public void FactsTable_NarrowScreen_OnePairPerRow_WithoutModernLayout()
+    {
+        Regex.IsMatch(Css, @"@media \(max-width: 640px\) \{[\s\S]*?\.record-facts tr \{[^}]*display: flex;[^}]*flex-wrap: wrap;")
+            .Should().BeTrue("na úzkém okně jedna dvojice na řádek (spec 4.B)");
+        foreach (Match block in Regex.Matches(Css, @"[^{}]*\.record-facts[^{}]*\{[^}]*\}"))
+        {
+            block.Value.Should().NotContain("max-content").And.NotContain(":has(", "i15 — jen letité vlastnosti");
+        }
+    }
+
+    [Fact]
+    public void SummaryLine_HiddenOnExpandedCard_ExceptScheduleView()
+        => Regex.IsMatch(Css,
+                @"\.record-card:not\(\.collapsed\):not\(\.record-card--schedule-view\) \.record-header \.record-summary-meta \{\s*display: none;")
+            .Should().BeTrue("R3: v tabulce už je; v pohledu Harmonogram je tabulka skrytá, řádek zůstává");
+
+    [Fact]
+    public void OldHistoryLayout_Removed()
+        => Css.Should().NotContain(".record-history", "markup .record-history nahradila tabulka .record-facts");
 }

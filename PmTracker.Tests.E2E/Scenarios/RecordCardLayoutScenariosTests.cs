@@ -62,4 +62,42 @@ public sealed class RecordCardLayoutScenariosTests
             await page.Context.CloseAsync();
         }
     }
+
+    // gov-form-switch: input je pro Playwright „hidden" → DispatchEvent „click" po hydrataci
+    // (vzor RecordScheduleToggleScenariosTests.ToggleViewAsync).
+    private static async Task ToggleScheduleViewAsync(IPage page, int recordId)
+    {
+        var host = page.Locator($".record-card[data-record-id='{recordId}'] gov-form-switch[data-record-view-switch]");
+        await Expect(host).ToHaveClassAsync(new Regex(@"\bhydrated\b"));
+        var input = host.Locator("input").First;
+        await input.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached });
+        await input.DispatchEventAsync("click");
+    }
+
+    [Fact]
+    public async Task ExpandedCard_FactsTableReplacesSummaryLine_ScheduleViewKeepsIt()
+    {
+        var project = await E2EOwnProject.CreateAsync(_fixture.Database.ConnectionString, _fixture.AdminOsobaId);
+        var recordId = await project.AddTaskAsync(1, project.FirstSubsystemId, withSchedule: true);
+        var page = await _fixture.NewPageAsync();
+        try
+        {
+            var card = await OpenExpandedCardAsync(page, project.ProjectId, recordId);
+            var summary = card.Locator(".record-header .record-summary-meta");
+            var facts = card.Locator("[data-record-detail-shell] .record-facts");
+
+            await Expect(facts).ToHaveCountAsync(1);
+            await Expect(summary).ToBeHiddenAsync();
+            Math.Abs(await LeftAsync(facts) - await LeftAsync(card.Locator(".record-title-wrap")))
+                .Should().BeLessThanOrEqualTo(1, "tabulka začíná na stejné svislé čáře jako hlavička");
+
+            await ToggleScheduleViewAsync(page, recordId);
+            await Expect(card).ToHaveClassAsync(new Regex(@"record-card--schedule-view"));
+            await Expect(summary).ToBeVisibleAsync();
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+        }
+    }
 }
