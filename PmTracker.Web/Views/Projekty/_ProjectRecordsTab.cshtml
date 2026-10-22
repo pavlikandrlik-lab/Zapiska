@@ -23,6 +23,11 @@
     @* Akce (Tisk projektu / Nový záznam / Nový návrh) přesunuty do tab stripu
        v Detail.cshtml (.tabs-actions) kvůli úspoře místa — user 2026-06-10. *@
     @await Html.PartialAsync("~/Views/Projekty/_ProjectFilterShell.cshtml", Model.FilterShell)
+    @if (Model.KontextJednaniId.HasValue && Model.SkupinyZaznamu.Count == 0)
+    {
+        @* Spec 2026-10-22 R6: detail jednání ukazuje jen záznamy jednání (= záznamy zápisu). *@
+        <p class="muted records-meeting-empty" data-records-meeting-empty>Do tohoto jednání zatím nepatří žádný záznam.</p>
+    }
 
     <div class="records-shell" data-records-view="subsystem" data-subsystem-grouped-shell>
         <aside class="subsystem-scroll-indicator" data-subsystem-scroll-indicator hidden aria-live="polite">

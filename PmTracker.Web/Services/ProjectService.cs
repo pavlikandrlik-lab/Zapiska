@@ -29,6 +29,8 @@ public sealed partial class ProjectService :
     private readonly TimeProvider timeProvider;
     // Plán 4 Feature C Task 6 UI — pro load BindingKandidati per záznam (dropdown alternativ).
     private readonly PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService harmonogramSkutecnostSync;
+    // Spec 2026-10-22 R6: záznamy jednání pro detail jednání (stejné jako zápis).
+    private readonly PmTracker.Web.Services.Records.IRecordSequenceService recordSequenceService;
 
     public ProjectService(
         PmTrackerDbContext dbContext,
@@ -43,7 +45,8 @@ public sealed partial class ProjectService :
         ILookupTableCache lookupCache,
         IProjectRoleCache projectRoleCache,
         TimeProvider timeProvider,
-        PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService harmonogramSkutecnostSync)
+        PmTracker.Web.Services.Schedules.IHarmonogramSkutecnostSyncService harmonogramSkutecnostSync,
+        PmTracker.Web.Services.Records.IRecordSequenceService recordSequenceService)
     {
         this.dbContext = dbContext;
         this.textNormalizer = textNormalizer;
@@ -58,5 +61,6 @@ public sealed partial class ProjectService :
         this.projectRoleCache = projectRoleCache;
         this.timeProvider = timeProvider;
         this.harmonogramSkutecnostSync = harmonogramSkutecnostSync;
+        this.recordSequenceService = recordSequenceService;
     }
 }

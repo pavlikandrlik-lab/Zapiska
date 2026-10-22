@@ -21,7 +21,10 @@ public sealed partial class ProjektyController
             kontextJednaniId = null;
         }
 
-        var model = await _projectService.BuildProjectRecordsTabAsync(id, ct);
+        // Spec 2026-10-22 R6: obnovení záložky v detailu jednání drží jen záznamy jednání.
+        var model = kontextJednaniId.HasValue
+            ? await _projectService.BuildMeetingRecordsTabAsync(id, kontextJednaniId.Value, ct)
+            : await _projectService.BuildProjectRecordsTabAsync(id, ct);
         await PrepareRecordsTabPresentationAsync(model, _recordProposalService, kontextJednaniId, ct);
         return PartialView("~/Views/Projekty/_ProjectRecordsTab.cshtml", model);
     }

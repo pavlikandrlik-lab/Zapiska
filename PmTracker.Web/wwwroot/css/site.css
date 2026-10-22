@@ -2277,6 +2277,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     color: var(--text-secondary);
 }
 
+/* Spec 2026-10-22 R6: prázdný seznam záznamů v detailu jednání. */
+.records-meeting-empty {
+    margin: 16px 0;
+}
+
 .permission-key-help {
     display: block;
     margin-top: 6px;

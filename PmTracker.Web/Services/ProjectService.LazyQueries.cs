@@ -30,9 +30,26 @@ public sealed partial class ProjectService
         int SubsystemId,
         int VlastnikId);
 
-    public async Task<ProjektZaznamyTabViewModel> BuildProjectRecordsTabAsync(int id, CancellationToken ct = default)
+    public Task<ProjektZaznamyTabViewModel> BuildProjectRecordsTabAsync(int id, CancellationToken ct = default)
+        => BuildRecordsTabAsync(id, onlyRecordIds: null, ct);
+
+    /// <summary>
+    /// Spec 2026-10-22 R6: záložka Záznamy v detailu jednání — jen záznamy, které do jednání patří
+    /// (= záznamy jeho zápisu, <see cref="PmTracker.Web.Services.Records.IRecordSequenceService.GetMeetingSequenceAsync"/>).
+    /// </summary>
+    public async Task<ProjektZaznamyTabViewModel> BuildMeetingRecordsTabAsync(int projectId, int jednaniId, CancellationToken ct = default)
+    {
+        var members = await recordSequenceService.GetMeetingSequenceAsync(jednaniId, ct);
+        return await BuildRecordsTabAsync(projectId, members.Select(x => x.ZaznamId).ToHashSet(), ct);
+    }
+
+    private async Task<ProjektZaznamyTabViewModel> BuildRecordsTabAsync(int id, IReadOnlySet<int>? onlyRecordIds, CancellationToken ct)
     {
         var summaries = await BuildRecordCardSummariesForProjectAsync(id, ct);
+        if (onlyRecordIds is not null)
+        {
+            summaries = summaries.Where(x => onlyRecordIds.Contains(x.Summary.Id)).ToList();
+        }
         var filterShell = await BuildProjectFilterShellAsync(id, "records", ct);
 
         return new ProjektZaznamyTabViewModel
