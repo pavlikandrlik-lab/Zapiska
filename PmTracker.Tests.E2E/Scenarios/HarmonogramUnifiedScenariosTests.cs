@@ -583,7 +583,8 @@ public sealed class HarmonogramUnifiedScenariosTests
         var recordId = Convert.ToInt32(result);
         var dependentTables = new[]
         {
-            "zaznam_harmonogram_hodnoty",
+            // zaznam_harmonogram_hodnoty zrušila db_upgrade_1_4_0; vazby na externí odkazy (NO ACTION) před nimi.
+            "zaznam_harmonogram_vyjadreni_vazba",
             "zaznam_spoluprace",
             "zaznam_externi_odkazy",
             "vyjadreni",

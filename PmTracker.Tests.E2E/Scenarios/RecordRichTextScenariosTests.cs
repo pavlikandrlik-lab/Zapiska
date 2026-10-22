@@ -146,7 +146,7 @@ public sealed class RecordRichTextScenariosTests
     }
 
     [Fact]
-    public async Task RecordComments_ShouldLoadFiveThenExpandWhilePreservingSortOnLoadedSubset()
+    public async Task RecordComments_ShouldLoadTenThenExpandWhilePreservingSortOnLoadedSubset()
     {
         var page = await _fixture.NewPageAsync();
         const string recordName = "E2E paged comments record";
@@ -160,7 +160,8 @@ public sealed class RecordRichTextScenariosTests
                 createdMeetingId = ensuredMeeting.MeetingId;
             }
 
-            await CreateRecordWithCommentsAsync(recordName, _fixture.AdminOsobaId, ensuredMeeting.MeetingId, 12);
+            // Spec 2026-10-22 R10: prvních 10, „Předchozí“ (ASC) po 5, pak vše.
+            await CreateRecordWithCommentsAsync(recordName, _fixture.AdminOsobaId, ensuredMeeting.MeetingId, 17);
 
             await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=zaznamy&asUser={_fixture.AdminOsobaId}");
             await page.EvaluateAsync("() => localStorage.setItem('pmtracker.comments.sortDirection', 'asc')");
@@ -171,7 +172,7 @@ public sealed class RecordRichTextScenariosTests
             await card.Locator("[data-record-toggle]").ClickAsync();
 
             var comments = card.Locator("[data-comment-item]");
-            await Expect(comments).ToHaveCountAsync(5);
+            await Expect(comments).ToHaveCountAsync(10);
             await Expect(card.Locator("[data-record-comments-load-more]")).ToBeVisibleAsync();
             await Expect(card.Locator("[data-record-comments-load-all]")).ToBeVisibleAsync();
 
@@ -179,12 +180,12 @@ public sealed class RecordRichTextScenariosTests
             firstCommentText.Should().Contain("Paging comment 8");
 
             await card.Locator("[data-record-comments-load-more]").ClickAsync();
-            await Expect(comments).ToHaveCountAsync(10);
+            await Expect(comments).ToHaveCountAsync(15);
             var firstAfterLoadMore = (await comments.First.Locator(".comment-text").TextContentAsync())?.Trim();
             firstAfterLoadMore.Should().Contain("Paging comment 3");
 
             await card.Locator("[data-record-comments-load-all]").ClickAsync();
-            await Expect(comments).ToHaveCountAsync(12);
+            await Expect(comments).ToHaveCountAsync(17);
             var firstAfterLoadAll = (await comments.First.Locator(".comment-text").TextContentAsync())?.Trim();
             firstAfterLoadAll.Should().Contain("Paging comment 1");
         }
@@ -229,7 +230,8 @@ public sealed class RecordRichTextScenariosTests
         var recordId = Convert.ToInt32(result);
         var dependentTables = new[]
         {
-            "zaznam_harmonogram_hodnoty",
+            // zaznam_harmonogram_hodnoty zrušila db_upgrade_1_4_0; vazby na externí odkazy (NO ACTION) před nimi.
+            "zaznam_harmonogram_vyjadreni_vazba",
             "zaznam_spoluprace",
             "zaznam_externi_odkazy",
             "vyjadreni",

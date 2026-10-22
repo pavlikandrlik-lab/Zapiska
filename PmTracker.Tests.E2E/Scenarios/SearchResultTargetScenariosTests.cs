@@ -11,7 +11,7 @@ namespace PmTracker.Tests.E2E.Scenarios;
 
 /// <summary>
 /// Odkaz z vyhledávání (RecordSearchService.BuildDetailUrl) otevře na detailu projektu
-/// vyjádření se shodou — i když není mezi prvními pěti načtenými — a hledaný text na
+/// vyjádření se shodou — i když není mezi prvními deseti načtenými (spec 2026-10-22 R10) — a hledaný text na
 /// kartě 15 sekund podsvítí.
 /// </summary>
 [Collection(E2ECollection.CollectionName)]
@@ -35,10 +35,10 @@ public sealed class SearchResultTargetScenariosTests
 
         try
         {
-            // Předpoklad testu: cílové (nejstarší) vyjádření mezi prvními pěti načtenými není.
+            // Předpoklad testu: cílové (nejstarší) vyjádření mezi prvními deseti načtenými není.
             await page.GotoAsync(RecordUrl(recordId));
             var card = page.Locator($".record-card[data-record-id='{recordId}']");
-            await Expect(card.Locator("[data-comment-item]")).ToHaveCountAsync(5);
+            await Expect(card.Locator("[data-comment-item]")).ToHaveCountAsync(10);
             await Expect(card.Locator($"[data-comment-id='{targetCommentId}']")).ToHaveCountAsync(0);
 
             await page.Clock.InstallAsync();
@@ -177,7 +177,7 @@ public sealed class SearchResultTargetScenariosTests
         db.Jednani.Add(meeting);
         await db.SaveChangesAsync();
 
-        // Nejstarší vyjádření nese shodu; panel nejdřív načte pět nejnovějších.
+        // Nejstarší vyjádření nese shodu; panel nejdřív načte deset nejnovějších (R10), proto 12 dalších.
         var target = new VyjadreniEntity
         {
             ZaznamId = record.Id,
@@ -187,7 +187,7 @@ public sealed class SearchResultTargetScenariosTests
             DatumVyjadreni = new DateTime(2026, 1, 1, 9, 0, 0, DateTimeKind.Utc)
         };
         db.Vyjadreni.Add(target);
-        for (var i = 1; i <= 7; i++)
+        for (var i = 1; i <= 12; i++)
         {
             db.Vyjadreni.Add(new VyjadreniEntity
             {
