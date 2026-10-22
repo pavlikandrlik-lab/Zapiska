@@ -3909,6 +3909,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    (přeškrtnuté staré hodnoty) zůstává v buňce hodnoty. */
 .record-facts {
     border-collapse: collapse;
+    /* govcz.css dává tabulkám width: 100 % — dvojice by se rozjely přes celou šířku karty. */
+    width: auto;
     margin: 12px 0 8px;
     font-size: 13px;
     color: var(--text-secondary);

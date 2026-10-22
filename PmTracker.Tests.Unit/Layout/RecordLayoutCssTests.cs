@@ -41,6 +41,7 @@ public sealed class RecordLayoutCssTests
     {
         var facts = Rule(".record-facts");
         facts.Should().Contain("border-collapse: collapse");
+        facts.Should().Contain("width: auto", "govcz.css dává tabulkám width: 100 % — dvojice by se rozjely přes celou kartu");
         facts.Should().Contain("color: var(--text-secondary)");
         Rule(".record-facts td strong").Should().Contain("color: var(--text-primary)");
     }
