@@ -140,3 +140,51 @@ Navíc prošlo:
 - Žádné značky „má / nemá vyjádření k tomuto jednání“ (rozhodnutí R7, udělá se později jinak).
 - Zápis uzavřeného jednání má vzhled tisku (bílý papír i v tmavém motivu).
 - Předvolba jde změnit (rozhodnutí 2026-10-21: pevná volba ne, kvůli kolizním stavům).
+
+---
+
+## 5. Vyjádření v jednom kompaktním bloku
+
+**Hotovo 2026-10-22:** merge `MERGE_HASH`, plán `docs/superpowers/plans/2026-10-22-vyjadreni-kompaktni-blok.md`, spec `docs/superpowers/specs/2026-10-22-vyjadreni-kompaktni-blok-design.md`.
+
+**Co to dělá** (karta v záložce Záznamy, detail jednání i stránka záznamu — jedna sdílená komponenta):
+- Všechna zobrazená vyjádření jsou v **jednom ohraničeném bloku**. Řádky nemají vlastní rámeček. Řádek pod myší (nebo s fokusem klávesnice) se podbarví **jemně šedou**.
+- **Autor a datum** už nejsou trvale nad vyjádřením. Ukáže je **bublina při najetí na štítek jednání** vpravo (i klávesou Tab nebo klepnutím).
+- **Upravit / Smazat** (tužka, koš) se objeví jako ikony **při najetí na řádek**, vlevo od štítku. Text se neposune.
+- U vyjádření k **uzavřenému jednání** se ikony neobjeví ani při najetí. Podvrženou úpravu nebo smazání server odmítne (tak to bylo i dřív, nově to hlídá test).
+- Panel ukáže **posledních 10 vyjádření** (dřív 5). „**Další (5)**“ (při vzestupném řazení „**Předchozí (5)**“) a „**Zobrazit vše**“ jsou v hlavičce **vlevo vedle řazení**, v obou směrech řazení na stejném místě.
+- 5 jednořádkových vyjádření zabere 190 px (dřív 600 px).
+
+**Ověřeno lokálně v prohlížeči za všechny role** (13 dočasných osob, po průchodu smazané; 12 vyjádření různých autorů k jednání v přípravě, otevřenému a uzavřenému; 3 místa):
+
+| Role | Blok, bublina s autorem a datem, šedé podbarvení | Ikony Upravit / Smazat při najetí |
+|---|---|---|
+| Superadmin, Administrátor aplikace, Vlastník, Admin projektu, PM, PM + vedoucí | ano (12/12) | u všech vyjádření k přípravě a otevřenému jednání, **u uzavřeného ne** |
+| Vedoucí, Zástupce vedoucího, Gestor, Metodik | ano (12/12) | jen u **vlastního** vyjádření k jednání **v přípravě** |
+| Host, Read-all | ano (12/12) | nikde |
+| Bez role v projektu | stránka neexistuje (404) | – |
+
+Navíc prošlo:
+- U všech rolí a míst: nejdřív 10 vyjádření, tlačítka v hlavičce vlevo od řazení vzestupně i sestupně, „Zobrazit vše“ → 12 a tlačítka zmizí.
+- Kliknutím: PM po „Další“ upravil vyjádření (panel dál ukazuje 12) a jedno smazal (potvrzovací dotaz). Vedoucí a zástupce upravili své vyjádření v přípravě.
+- Podvržená úprava vyjádření k uzavřenému jednání: odmítnuto („Vyjádření u uzavřeného jednání nelze upravovat ani mazat…“).
+- Tmavý motiv: šedé podbarvení je vidět. Šířka 375 px: bez vodorovného posuvníku, tlačítka v hlavičce se zalomí. Tab na štítek ukáže bublinu.
+- V konzoli prohlížeče žádné chyby.
+
+**Otestovat (PM nebo admin projektu, ne superadmin; vedoucí subsystému; host):**
+- [ ] Záložka Záznamy → karta s vyjádřeními: jeden rámeček kolem všech vyjádření, řádek pod myší šedý.
+- [ ] Najetí na štítek „Jednání č. …“: bublina se jménem autora a „Zapsáno dd.mm.rrrr“. U posledního vyjádření se bublina neořízne.
+- [ ] Najetí na řádek: tužka a koš vlevo od štítku. Tužka otevře editor přes celou šířku, Zrušit / Uložit funguje. Koš se zeptá a smaže.
+- [ ] Vyjádření k uzavřenému jednání: ani při najetí žádné ikony.
+- [ ] Záznam s více než 10 vyjádřeními: vidět 10, vpravo nahoře „Další (5)“ / „Předchozí (5)“ a „Zobrazit vše“ vedle řazení. Po přepnutí řazení zůstanou na místě.
+- [ ] Totéž v detailu otevřeného jednání a na stránce záznamu.
+- [ ] Vedoucí subsystému: ikony jen u svého vyjádření k jednání v přípravě.
+- [ ] Host: bubliny ano, ikony nikde.
+- [ ] Odkaz z vyhledávání na starší vyjádření (mimo prvních 10): karta ho načte, posune se k němu a podsvítí.
+- [ ] i15 / Edge: světlý i tmavý motiv, úzké okno.
+
+**Známá omezení (vědomě):**
+- Autor a datum nejsou vidět na první pohled, jen v bublině (zadání). Tisk a PDF je dál obsahují.
+- Ikony při najetí na chvíli zakryjí konec prvního řádku textu (hlavně na úzkém okně).
+- **Nesoulad UI × server u vlastních vyjádření (stav před touto změnou, nemění se):** Gestor a Metodik v přípravě vidí tužku, ale server úpravu odmítne („Nemáte oprávnění…“). Smazání projde. Gestor, Metodik a Vedoucí u svého vyjádření v otevřeném jednání tužku nevidí, i když by jim server úpravu povolil. Rozhodne se zvlášť.
+- Stránka záznamu má na 375 px vodorovný posuvník kvůli tlačítkům v hlavičce stránky. Bylo to tak i dřív a s vyjádřeními to nesouvisí.
