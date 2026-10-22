@@ -323,4 +323,26 @@ public sealed class ExportTemplateUseCaseTests
         await dbContext.SaveChangesAsync();
         return recordId;
     }
+
+    /// <summary>
+    /// Spec 2026-10-22 R5 — pojistka před přechodem tisku na sdílenou službu. Zápis jednání obsahuje
+    /// přesně záznamy jednání v pořadí zápisu: subsystém v pořadí projektu → kategorie → číslo.
+    /// </summary>
+    [Fact]
+    public async Task BuildMeetingTemplate_ListsMeetingRecordsInMinutesOrder()
+    {
+        var db = await _fixture.CreateDatabaseAsync("export_meeting_members_order");
+        await using var dbContext = IntegrationTestHelper.CreateDbContext(db.ConnectionString);
+        var useCase = IntegrationTestHelper.CreateExportTemplateUseCase(
+            dbContext, new FixedTimeProvider(new DateTimeOffset(2026, 10, 22, 9, 0, 0, TimeSpan.Zero)));
+        var seed = await MeetingSequenceSeed.CreateAsync(dbContext);
+        var currentUser = IntegrationTestHelper.BuildUser(seed.AdminId, isSuperAdmin: true, visibleProjectIds: new[] { seed.ProjectId });
+
+        var print888 = await useCase.BuildMeetingTemplateAsync(seed.Meeting888, currentUser, autoPrint: false);
+        var print887 = await useCase.BuildMeetingTemplateAsync(seed.Meeting887, currentUser, autoPrint: false);
+
+        print888.SubsystemGroups.Select(g => g.Subsystem).Should().Equal("SEQZZ Subsystem", "SEQAA Subsystem");
+        print888.SubsystemGroups.SelectMany(g => g.Records).Select(r => r.ZaznamId).Should().Equal(seed.ExpectedMeeting888);
+        print887.SubsystemGroups.SelectMany(g => g.Records).Select(r => r.ZaznamId).Should().Equal(seed.ExpectedMeeting887);
+    }
 }
