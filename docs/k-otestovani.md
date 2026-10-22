@@ -145,7 +145,7 @@ Navíc prošlo:
 
 ## 5. Vyjádření v jednom kompaktním bloku
 
-**Hotovo 2026-10-22:** merge `MERGE_HASH`, plán `docs/superpowers/plans/2026-10-22-vyjadreni-kompaktni-blok.md`, spec `docs/superpowers/specs/2026-10-22-vyjadreni-kompaktni-blok-design.md`.
+**Hotovo 2026-10-22:** merge `a74ec4d`, plán `docs/superpowers/plans/2026-10-22-vyjadreni-kompaktni-blok.md`, spec `docs/superpowers/specs/2026-10-22-vyjadreni-kompaktni-blok-design.md`.
 
 **Co to dělá** (karta v záložce Záznamy, detail jednání i stránka záznamu — jedna sdílená komponenta):
 - Všechna zobrazená vyjádření jsou v **jednom ohraničeném bloku**. Řádky nemají vlastní rámeček. Řádek pod myší (nebo s fokusem klávesnice) se podbarví **jemně šedou**.
