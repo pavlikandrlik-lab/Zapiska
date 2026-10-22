@@ -191,7 +191,7 @@ Navíc prošlo:
 
 ## 6. Záznam — hlavička vlevo, detaily v tabulce, procházení šipkami, mazání data plánu
 
-**Hotovo 2026-10-22:** merge `@@MERGE@@`, plán `docs/superpowers/plans/2026-10-22-zaznam-hlavicka-detaily-sipky-plan.md`, spec `docs/superpowers/specs/2026-10-22-zaznam-hlavicka-detaily-sipky-plan-design.md`.
+**Hotovo 2026-10-22:** merge `4ca299f`, plán `docs/superpowers/plans/2026-10-22-zaznam-hlavicka-detaily-sipky-plan.md`, spec `docs/superpowers/specs/2026-10-22-zaznam-hlavicka-detaily-sipky-plan-design.md`.
 
 **Co to dělá:**
 - **A – hlavička karty zarovnaná vlevo.** Šipka rozbalení (›) je v levém okraji karty. Štítky, nadpis, detaily i vyjádření začínají na jedné svislé čáře (dřív hlavička odskočila o 21 px).
