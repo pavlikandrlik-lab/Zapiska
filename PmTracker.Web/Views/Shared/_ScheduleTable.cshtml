@@ -65,6 +65,10 @@
                                                 IsoValue = krok.PlanDatum?.ToString("yyyy-MM-dd") ?? string.Empty,
                                                 DisplayValue = krok.PlanDatum?.ToString("dd.MM.yyyy") ?? string.Empty,
                                                 Locked = dateDisabled,
+                                                // Spec 2026-10-22 R13: plán smí smazat, kdo ho smí upravit. Kalendář datum
+                                                // jen vybírá — bez ✕ prázdný plán nešel vrátit. Zámek při změně kategorie
+                                                // ✕ sleduje spolu s kalendářem (form.js, pm-date-field.js).
+                                                Clearable = canEditDuration,
                                                 AriaLabel = $"Datum konce kroku {krok.Nazev}",
                                                 ContainerCssClass = $"schedule-date-field schedule-date-field-stacked{(durationChanged ? " proposal-field-changed" : string.Empty)}",
                                                 ExtraDataAttributes = new Dictionary<string, object?>
@@ -78,7 +82,7 @@
                                               data-schedule-duration-readonly
                                               aria-label="Trvání ve dnech"
                                               title="Trvání kroku v kalendářních dnech (vypočteno z datumu konce a začátku kroku)">
-                                            @krok.TrvaniDni dnů
+                                            @(PmTracker.Web.Services.Schedules.ScheduleDurationText.ForStep(krok.PlanDatum, krok.TrvaniDni))
                                         </span>
                                     </div>
                                 </div>
