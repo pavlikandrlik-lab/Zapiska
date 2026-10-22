@@ -106,6 +106,18 @@ skutečnosti; aktuální krok táhne skutečnost do dneška.
   MaSkutecnost ? SkutecnostEnd : PlanEnd` → mohlo se tvářit „skutečnost = plán"). Nově nevyplněno
   = žádné datum, render dle 3-stavového modelu (Čeká / V prodlení).
 
+## Smazání plánu kroku (spec 2026-10-22, R13 a R14)
+
+- Pole plánu má **✕ (smazat datum)**, když ho uživatel smí upravit. Platí to v editoru záznamu
+  i v návrhu změny harmonogramu (`_ScheduleTable.cshtml`: `Clearable = canEditDuration`).
+  Zamčené pole ✕ nemá.
+- Krok bez plánu má trvání **„–“**. Další krok začíná koncem posledního kroku s plánem.
+  Text počítá server (`ScheduleDurationText`) a v editoru JS (`harmonogram/planDuration.js`).
+- Návrh změny harmonogramu nese i **odstranění plánu**: krok, který plán v záznamu má a ve
+  formuláři přišel prázdný (`RecordProposalPayloadMapper`, `currentPlanSteps`).
+  - Detail návrhu ukáže „Původní plán: X | Navržený: bez plánu“.
+  - Schválení zapíše `NULL`.
+
 ## Hraniční případy
 
 | Případ | Chování |

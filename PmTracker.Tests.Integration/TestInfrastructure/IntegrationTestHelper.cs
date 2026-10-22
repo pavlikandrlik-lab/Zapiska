@@ -422,4 +422,33 @@ internal static class IntegrationTestHelper
         await dbContext.SaveChangesAsync();
         return meeting.Id;
     }
+
+    /// <summary>Příkaz uložení z editoru návrhu změny harmonogramu (základní pole beze změny, harmonogram prázdný).</summary>
+    public static SaveRecordCommand BuildScheduleEditCommand(ZaznamEditViewModel editor)
+    {
+        var subsystemOption = editor.Subsystemy.First(candidate =>
+            string.Equals(candidate.Kod, editor.Subsystem, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(candidate.Nazev, editor.Subsystem, StringComparison.OrdinalIgnoreCase));
+        var subsystem = string.IsNullOrWhiteSpace(subsystemOption.Kod) ? subsystemOption.Nazev : subsystemOption.Kod;
+
+        return new SaveRecordCommand
+        {
+            Id = editor.Id,
+            ProjektId = editor.ProjektId,
+            Kategorie = editor.Kategorie,
+            TypUkolu = editor.TypUkolu,
+            Stav = editor.Stav,
+            Nazev = editor.Nazev,
+            Cil = editor.Cil,
+            Popis = editor.Popis,
+            VlastnikId = editor.VlastnikId,
+            DatumZalozeni = editor.DatumZalozeni,
+            TerminUkonceni = editor.TerminUkonceni ?? editor.DatumZalozeni,
+            Subsystem = subsystem,
+            VybraniSpolupracovniciIds = editor.VybraniSpolupracovniciIds.ToList(),
+            ExterniVazby = [],
+            HarmonogramHodnoty = [],
+            EditorTab = "schedule"
+        };
+    }
 }
