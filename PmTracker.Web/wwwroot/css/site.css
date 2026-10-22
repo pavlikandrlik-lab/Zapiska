@@ -3982,6 +3982,21 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     transform: rotate(45deg);
 }
 
+/* Bublina u štítku při pravém okraji (vyjádření, spec 2026-10-22): zarovnaná vpravo, ať nevyjede z bloku. */
+.chip-tooltip--end {
+    left: auto;
+    right: 0;
+    min-width: 14rem;
+    max-width: min(22rem, 80vw);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.chip-tooltip--end::before {
+    left: auto;
+    right: 14px;
+}
+
 .chip-wrap:hover .chip-tooltip,
 .chip-wrap:focus-within .chip-tooltip {
     opacity: 1;
@@ -4044,67 +4059,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     overflow: hidden;
 }
 
-/* === Layout vyjádření (2026-04-19 noc — redesign iterace 2) =========
-   User feedback po prvním redesignu: "nad vlastním textem je moc místa
-   protože hlavička s informacemi toto místo sbírá, obě tlačítka - Upravit
-   i Smazat budou vpravo (...), Uživatel a datum úpravy bude vpravo nad
-   dlaždicí vyjádření (...), Jednání č. 123 zůstane tam kde je a až se
-   k němu dostane text vyjádření tak se zalomí na další řádku, opticky
-   to bude takový pravý blok jednání a pod tím tlačítka".
-
-   Výsledná struktura:
-     .comment-wrapper
-       .comment-meta-outer   — NAD kartou, vpravo, autor + datum
-       .comment             — karta
-         .comment-tile-side  — float: right, obsahuje Jednání chip + akce
-         .comment-text       — teče vlevo, obtéká side block
-         .comment-edit-form  — skrytý form full-width pod tím vším
-
-   Float: right zajišťuje přirozené obtékání textu kolem bloku.
-   Clear-fix se zajistí přes overflow: hidden na .comment. */
-
-.comment-wrapper {
-    display: block;
-    margin: 0 0 10px 0;
-}
-
-.comment-meta-outer {
-    display: flex;
-    justify-content: flex-end;
-    align-items: baseline;
-    gap: 6px;
-    padding: 0 4px 2px;
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-
-.comment-author {
-    font-weight: 600;
-    color: var(--text-primary);
-    font-size: 12px;
-}
-
-.comment-sep {
-    opacity: 0.45;
-}
-
-.comment-date {
-    font-variant-numeric: tabular-nums;
-}
-
-/* Pravý float blok uvnitř karty: chip nahoře + akční buttony pod ním.
-   Float zajišťuje, že .comment-text teče vlevo a wrappne pod blok až
-   když se blok skončí. */
-.comment-tile-side {
-    float: right;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 6px;
-    margin: 0 0 6px 12px;
-    max-width: 60%;
-}
-
 .comment-meeting-chip {
     display: inline-flex;
     align-items: center;
@@ -4122,7 +4076,82 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     font-size: 14px;
 }
 
-/* Actions (Upravit + Smazat) uvnitř tile-side — side-by-side, stejná velikost. */
+/* === Vyjádření v jednom bloku (spec 2026-10-22) ======================
+   Blok = jeden rámeček; řádky bez vlastního rámečku, odliší je jen jemně šedé
+   podbarvení pod myší / při fokusu. Vpravo float se štítkem jednání (autor a datum
+   v bublině .chip-tooltip--end), Upravit / Smazat jako ikony řádku při najetí.
+   Jen pod .record-comments — _TaskItemPartial (Jednani) sdílí .comment / .comment-list.
+   overflow: visible ruší overflow: hidden základního .comment, jinak by řádek ořízl
+   bublinu i ikony; float obsáhne display: flow-root. */
+.record-comments .comment-list {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--gov-radius);
+    background: var(--background-block-primary);
+    padding: 4px 0;
+}
+
+.record-comments .comment {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 6px 12px;
+    margin: 0;
+    display: flow-root;
+    overflow: visible;
+}
+
+.record-comments .comment:hover,
+.record-comments .comment:focus-within {
+    background: var(--background-neutral-subtle);
+}
+
+.record-comments .comment[data-editing="true"] {
+    background: var(--background-neutral-subtle);
+}
+
+.record-comments .comment-side {
+    float: right;
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin: 0 0 2px 12px;
+    max-width: 60%;
+}
+
+.record-comments .comment-row-actions {
+    position: absolute;
+    right: calc(100% + 6px);
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 4px;
+    padding: 0 4px;
+    border-radius: var(--gov-radius-sm);
+    background: var(--background-neutral-subtle);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.record-comments .comment:hover .comment-row-actions,
+.record-comments .comment:focus-within .comment-row-actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.record-comments .comment-meeting-chip:focus-visible {
+    outline: 2px solid var(--border-primary);
+    outline-offset: 2px;
+}
+
+.record-comments .comment-text > :first-child {
+    margin-top: 0;
+}
+
+.record-comments .comment-text > :last-child {
+    margin-bottom: 0;
+}
+
+/* Akce formuláře nového vyjádření (výběr jednání + Uložit). */
 .comment-actions {
     display: flex;
     gap: 8px;
@@ -4209,8 +4238,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     display: none !important;
 }
 
-/* V edit módu skryjeme pravý side blok a text — edit form má plnou šířku. */
-.comment[data-editing="true"] .comment-tile-side,
+/* V edit módu skryjeme štítek s bublinou, ikony a text — edit form má plnou šířku. */
+.comment[data-editing="true"] .comment-side,
 .comment[data-editing="true"] .comment-text {
     display: none !important;
 }

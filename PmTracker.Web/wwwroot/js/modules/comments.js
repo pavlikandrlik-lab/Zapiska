@@ -89,12 +89,8 @@ export function applyCommentSort(section, direction) {
                     || (aId - bId);
             });
 
-            // Move at wrapper level — _ZaznamCommentsPartial wrapuje .comment
-            // do .comment-wrapper (který drží meta NAD dlaždicí); bez `closest`
-            // by sort oddělil .comment od jeho meta, výsledek je
-            // "všechny metas nahoře, všechny comments dole" (user hlásil
-            // 2026-04-19 noc 2).
-            // _TaskItemPartial (Jednani) wrapper nemá → fallback na item samotný.
+            // Panel vyjádření (spec 2026-10-22) i _TaskItemPartial řadí přímo řádky
+            // [data-comment-item]; obal [data-comment-wrapper] (meta nad dlaždicí) už markup nemá.
             items.forEach((item) => {
                 const movable = item.closest("[data-comment-wrapper]") || item;
                 list.appendChild(movable);
