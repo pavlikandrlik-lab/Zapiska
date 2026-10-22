@@ -88,7 +88,8 @@ public sealed partial class JednaniController : BaseController
         // (vyjádření a změna stavu předvybírají toto jednání); uzavřené = zápis jako v PDF tisku.
         if (!model.IsReadOnly)
         {
-            var zaznamyTab = await _projectService.BuildProjectRecordsTabAsync(model.ProjektId, ct);
+            // Spec 2026-10-22 R6: jen záznamy jednání (= záznamy jeho zápisu); filtry fungují uvnitř nich.
+            var zaznamyTab = await _projectService.BuildMeetingRecordsTabAsync(model.ProjektId, model.Jednani.Id, ct);
             await PrepareRecordsTabPresentationAsync(zaznamyTab, _recordProposalService, model.Jednani.Id, ct);
             model.ZaznamyTab = zaznamyTab;
         }

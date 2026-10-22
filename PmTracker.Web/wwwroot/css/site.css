@@ -2277,6 +2277,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     color: var(--text-secondary);
 }
 
+/* Spec 2026-10-22 R6: prázdný seznam záznamů v detailu jednání. */
+.records-meeting-empty {
+    margin: 16px 0;
+}
+
 .permission-key-help {
     display: block;
     margin-top: 6px;
@@ -3592,6 +3597,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .record-content {
     flex: 1;
     padding: 14px 16px 16px;
+    /* Spec 2026-10-22 R1: kotva indikátoru rozbalení v levém okraji. */
+    position: relative;
 }
 
 .record-header {
@@ -3679,6 +3686,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     color: var(--text-secondary);
 }
 
+/* Spec 2026-10-22 R3: na rozbalené kartě je Termín i Založeno v tabulce detailů — řádek v hlavičce
+   by je opakoval. Sbalená karta a pohled Harmonogram (detail je skrytý) ho ukazují dál. */
+.record-card:not(.collapsed):not(.record-card--schedule-view) .record-header .record-summary-meta {
+    display: none;
+}
+
 .proposal-section-grid {
     display: flex;
     flex-direction: column;
@@ -3730,11 +3743,20 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     border: 1px solid var(--border-primary);
 }
 
-/* R7 (2026-07-13): indikátor rozbalení přesunut vlevo (mezi kraj karty a kategorii). */
+/* Spec 2026-10-22 R1: indikátor rozbalení v levém okraji karty (mezi barevným pruhem a obsahem),
+   mimo flex hlavičky — štítky, nadpis, detaily i vyjádření začínají na jedné svislé čáře.
+   Dřív (R7 2026-07-13) zabíral ve flexu hlavičky vlastní sloupec → odskok hlavičky o 21 px. */
 .record-expand-indicator {
-    display: inline-block;
-    margin-top: 2px;
+    position: absolute;
+    top: 18px;
+    left: 0;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 18px;
+    line-height: 1;
     transform: rotate(90deg);
     transition: transform 0.2s ease;
 }
@@ -3881,17 +3903,66 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     margin-top: 12px;
 }
 
-.record-history {
-    display: grid;
-    gap: 6px;
+/* Spec 2026-10-22 R2–R4: detaily záznamu v tabulce — dvě dvojice popisek | hodnota na řádek.
+   Skutečná <table> drží sloupce zarovnané i v Edge na i15; bez rámečků a pozadí. Historie
+   (přeškrtnuté staré hodnoty) zůstává v buňce hodnoty. */
+.record-facts {
+    border-collapse: collapse;
+    /* govcz.css dává tabulkám width: 100 % — dvojice by se rozjely přes celou šířku karty. */
+    width: auto;
     margin: 12px 0 8px;
     font-size: 13px;
     color: var(--text-secondary);
 }
 
-.record-history strong {
+.record-facts th,
+.record-facts td {
+    padding: 3px 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    vertical-align: top;
+}
+
+.record-facts th {
+    padding-right: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.record-facts td {
+    padding-right: 32px;
+    overflow-wrap: anywhere;
+}
+
+.record-facts td strong {
     color: var(--text-primary);
-    margin-left: 6px;
+}
+
+.record-facts .history {
+    margin-right: 6px;
+}
+
+/* Úzké okno: jedna dvojice na řádek (letitý flex, žádné :has / max-content — i15). */
+@media (max-width: 640px) {
+    .record-facts,
+    .record-facts tbody {
+        display: block;
+    }
+
+    .record-facts tr {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .record-facts th {
+        flex: 0 0 6.5rem;
+    }
+
+    .record-facts td {
+        flex: 1 1 calc(100% - 6.5rem);
+        padding-right: 0;
+    }
 }
 
 .record-description {
@@ -7218,6 +7289,21 @@ pm-button gov-icon {
 .record-page-header .record-title {
     font-size: 20px;
     margin: 4px 0 0;
+}
+
+/* Spec 2026-10-22 R10: procházení záznamů na stránce záznamu (‹ Předchozí · N / M · Další ›). */
+.record-sequence-nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin: 0 0 12px;
+}
+
+.record-sequence-position {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
 }
 
 /* Wrapper karty kolem vyjádření — nese jen hooky pro AJAX obnovu, vzhled má sloupec sám. */

@@ -188,3 +188,63 @@ Navíc prošlo:
 - Ikony při najetí na chvíli zakryjí konec prvního řádku textu (hlavně na úzkém okně).
 - **Nesoulad UI × server u vlastních vyjádření (stav před touto změnou, nemění se):** Gestor a Metodik v přípravě vidí tužku, ale server úpravu odmítne („Nemáte oprávnění…“). Smazání projde. Gestor, Metodik a Vedoucí u svého vyjádření v otevřeném jednání tužku nevidí, i když by jim server úpravu povolil. Rozhodne se zvlášť.
 - Stránka záznamu má na 375 px vodorovný posuvník kvůli tlačítkům v hlavičce stránky. Bylo to tak i dřív a s vyjádřeními to nesouvisí.
+
+## 6. Záznam — hlavička vlevo, detaily v tabulce, procházení šipkami, mazání data plánu
+
+**Hotovo 2026-10-22:** merge `@@MERGE@@`, plán `docs/superpowers/plans/2026-10-22-zaznam-hlavicka-detaily-sipky-plan.md`, spec `docs/superpowers/specs/2026-10-22-zaznam-hlavicka-detaily-sipky-plan-design.md`.
+
+**Co to dělá:**
+- **A – hlavička karty zarovnaná vlevo.** Šipka rozbalení (›) je v levém okraji karty. Štítky, nadpis, detaily i vyjádření začínají na jedné svislé čáře (dřív hlavička odskočila o 21 px).
+- **B – detaily v tabulce.** Karta i stránka záznamu mají dvě dvojice na řádek: Vlastník | Subsystém, Termín | Typ úkolu, Založeno. Přeškrtnutá historie zůstává u hodnoty. Bez typu úkolu jeho buňky chybí. Na úzkém okně (pod 640 px) je jedna dvojice na řádek.
+  - Řádek „Termín · Založeno“ v hlavičce rozbalené karty zmizel, protože obojí je v tabulce. Na sbalené kartě a v pohledu Harmonogram (tabulka je tam skrytá) zůstává.
+  - Stránka záznamu už nemá samostatný řádek „Založeno“.
+- **C – záznamy jednání a procházení šipkami.**
+  - Detail otevřeného nebo připravovaného jednání ukáže **jen záznamy, které do jednání patří**, tedy stejné jako zápis (tisk). Filtry fungují uvnitř nich. Když do jednání nepatří nic: „Do tohoto jednání zatím nepatří žádný záznam.“
+  - V menu › na kartě je **první položka „Otevřít na celou obrazovku“**. Otevře stránku záznamu ve stejné kartě prohlížeče. „Otevřít na nové kartě“ zůstává.
+  - Stránka záznamu otevřená z menu má nahoře **‹ Předchozí · N / M · Další ›** a funguje i **klávesami ← →**. Z detailu jednání se prochází záznamy jednání v pořadí zápisu, ze záložky Záznamy aktivní záznamy projektu ve stejném pořadí. Filtry ani řazení na stránce se nepřebírají. Na krajích se nepřetáčí.
+  - Klávesy nereagují při psaní (pole, výběr, editor vyjádření), v otevřeném okně ani s Alt/Ctrl/Shift/Cmd.
+  - Drobečková lišta vede zpět tam, odkud jsem přišel. Úprava a návrh změny harmonogramu se vrátí na stránku i se šipkami.
+- **D – datum plánu jde smazat.** Pole plánu v harmonogramu má **✕**, kdo plán smí upravit (editor záznamu, návrh změny harmonogramu). Krok bez plánu má trvání **„–“**, další krok se počítá od posledního kroku s plánem.
+  - Návrh změny harmonogramu nese i odstranění plánu. Detail návrhu ukáže „Původní plán: X | Navržený: bez plánu“, schválení plán smaže.
+  - Navíc: trvání kroku se v editoru přepočítá hned po změně data i po ✕ (dřív se nepřepočítávalo vůbec). Vrátila se i kontrola pořadí: plán dřív než plán předchozího kroku pole označí a uložení zastaví (server takové uložení odmítal i dřív).
+
+**Ověřeno lokálně:**
+- Automatické testy: Unit 2272, Api 532, JS 56 – vše zelené; Integration 203/204 (jediné selhání je známé `ProposalRejectAndTakeOver…`); E2E 123 testů, 32 selhání = stejných 32 jmen jako `main` (nová žádná), 6 nových prošlo.
+- Tisk zápisu je stejný jako před změnou. Jednání 906 i 902 mají na `main` i na větvi stejných 14 záznamů ve stejném pořadí.
+- **V prohlížeči za všechny role** (13 dočasných osob, po průchodu smazané; jednání 906 a 902 projektu PMT, záznam #901-1 s dočasným plánem):
+
+| Role | Detail jednání = zápis | Menu → celá obrazovka → ← → → zpět | Záložka Záznamy → aktivní | ✕ u plánu |
+|---|---|---|---|---|
+| Superadmin, Administrátor aplikace, Vlastník, Admin projektu, PM, PM + vedoucí | ano (14 = 14) | ano, „2 / 14“, sousedé podle zápisu | ano, „2 / 14“; uzavřený záznam bez šipek | v editoru (i v návrhu) |
+| Vedoucí, Zástupce vedoucího | ano | ano | ano | jen v návrhu změny harmonogramu; editor odepřen |
+| Gestor, Metodik, Host, Read-all | ano | ano | ano | nikde (editor i návrh odepřeny) |
+| Bez role v projektu | 404 | – | – | – |
+
+Navíc prošlo:
+- PM prošel šipkou → celý seznam jednání 906: pořadí stránek = pořadí zápisu, na posledním → nic neudělá.
+- Hlavička a tabulka na šířce 1400 i 375 px: odskok 0 px, na 375 px jedna dvojice na řádek, karta bez vodorovného posuvníku.
+- Kliknutím: PM v editoru ✕ u kroku 3 → „–“, další krok „14 dnů“ → uložit → v DB `NULL`. Vedoucí v návrhu ✕ u kroku 4 → odeslat → PM v detailu návrhu vidí „Navržený: bez plánu“ a prázdné pole → Schválit → v DB `NULL`.
+- Tmavý motiv: tabulka, navigace i šipka v okraji v pořádku. V konzoli prohlížeče žádné chyby.
+- Odepřený editor nebo návrh vrací v lokálním dev běhu 500 („No DefaultForbidScheme“). V produkci s Windows Auth je to 403, dev artefakt.
+
+**Otestovat (PM nebo admin projektu, ne superadmin; vedoucí subsystému; host):**
+- [ ] Záložka Záznamy: rozbalená karta má štítky, nadpis, tabulku detailů i vyjádření zarovnané na jedné čáře; šipka › je v levém okraji. Sbalená karta ukazuje „Termín · Založeno“.
+- [ ] Tabulka detailů: Vlastník | Subsystém, Termín | Typ úkolu, Založeno. Záznam s historií (změněný termín nebo vlastník): přeškrtnuté staré hodnoty. Informace nebo Rozhodnutí bez typu úkolu: buňky typu chybí.
+- [ ] Přepínač Harmonogram na kartě: řádek „Termín · Založeno“ v hlavičce je vidět.
+- [ ] Stránka záznamu: tabulka detailů místo samostatného „Založeno“.
+- [ ] Detail otevřeného jednání: stejné záznamy jako v jeho zápisu (Tisk). Uzavřený záznam, který byl uzavřený už k minulému jednání, tam není.
+- [ ] Menu › → „Otevřít na celou obrazovku“ (první položka) → stránka ve stejné kartě, „N / M“. Šipky ← → i tlačítka přepínají záznamy v pořadí zápisu, na krajích je tlačítko neaktivní. Drobečková lišta vrátí do jednání.
+- [ ] Totéž ze záložky Záznamy: prochází se jen aktivní záznamy. Uzavřený záznam otevřený z menu šipky nemá.
+- [ ] Na stránce záznamu psát do vyjádření a používat ← →: kurzor se posouvá, stránka se nepřepne.
+- [ ] „Upravit“ na stránce se šipkami → uložit nebo zrušit → návrat na stránku i se šipkami.
+- [ ] Editor záznamu → Harmonogram: ✕ u plánu kroku → pole prázdné, trvání „–“, další krok se přepočítá → uložit → plán kroku je prázdný.
+- [ ] Editor: plán kroku dřív než plán předchozího kroku → pole označené, uložení se zastaví s hláškou.
+- [ ] Vedoucí subsystému: návrh změny harmonogramu → ✕ u plánu → odeslat → PM v detailu návrhu vidí „Navržený: bez plánu“ → Schválit → plán prázdný.
+- [ ] i15 / Edge: světlý i tmavý motiv, úzké okno (tabulka po jedné dvojici).
+
+**Známá omezení (vědomě):**
+- Detail jednání ukazuje **méně záznamů než dřív**: jen ty, které patří do zápisu (záměr R6).
+- Šipky **nerespektují filtry ani řazení** na stránce (R7, R8). Prochází se celý seznam jednání nebo všechny aktivní záznamy.
+- **Graf harmonogramu v editoru** se po změně data ani po ✕ nepřekreslí až do uložení. Tak to bylo i dřív, graf v editoru na datum nereaguje. Karta, stránka záznamu i záložka Harmonogram krok bez plánu nekreslí.
+- Kontrola pořadí plánů v editoru je znovu zapnutá. Kdo dřív uložil nechronologický plán, dostal chybu až ze serveru, teď ji uvidí hned v editoru.
+- Stránka záznamu má na 375 px vodorovný posuvník kvůli tlačítkům v hlavičce stránky. Bylo to tak i dřív (viz sekce 5), touto změnou se to nezhoršilo.

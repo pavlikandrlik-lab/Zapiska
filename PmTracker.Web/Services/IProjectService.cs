@@ -9,6 +9,8 @@ public interface IProjectService
     Task<ProjektListItemViewModel?> GetProjectListItemAsync(int id, CancellationToken ct = default);
     Task<ProjektDetailViewModel> BuildProjektDetailAsync(int id, CancellationToken ct = default);
     Task<ProjektZaznamyTabViewModel> BuildProjectRecordsTabAsync(int id, CancellationToken ct = default);
+    /// <summary>Spec 2026-10-22 R6: záložka Záznamy v detailu jednání — jen záznamy jednání (= zápisu).</summary>
+    Task<ProjektZaznamyTabViewModel> BuildMeetingRecordsTabAsync(int projectId, int jednaniId, CancellationToken ct = default);
     Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> BuildRecordMeetingCommentStatesAsync(int projectId, CancellationToken ct = default);
     Task<ProjektHarmonogramTabViewModel> BuildProjectScheduleTabAsync(int id, CancellationToken ct = default);
     Task<ProjektJednaniTabViewModel> BuildProjectMeetingsTabAsync(int id, CancellationToken ct = default);

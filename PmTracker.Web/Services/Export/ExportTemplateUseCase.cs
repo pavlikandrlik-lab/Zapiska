@@ -74,29 +74,15 @@ public sealed class ExportTemplateUseCase(IExportTemplateQueries queries, TimePr
         };
 
     private static IReadOnlyList<PdfExportSubsystemGroupViewModel> BuildSubsystemGroups(IReadOnlyList<PdfExportRecordViewModel> records, bool useProjectOrder)
-    {
-        return records
-            .GroupBy(record => new
-            {
-                record.SubsystemKod,
-                Subsystem = string.IsNullOrWhiteSpace(record.Subsystem) ? "-" : record.Subsystem,
-                record.SubsystemPoradi,
-                record.SubsystemHasProjectOrder
-            })
-            .OrderBy(group => useProjectOrder ? (group.Key.SubsystemHasProjectOrder ? 0 : 1) : 0)
-            .ThenBy(group => useProjectOrder && group.Key.SubsystemHasProjectOrder ? group.Key.SubsystemPoradi : int.MaxValue)
-            .ThenBy(group => group.Key.Subsystem, StringComparer.CurrentCultureIgnoreCase)
+        => MinutesRecordOrdering.GroupBySubsystem(records, MinutesKey, useProjectOrder)
             .Select(group => new PdfExportSubsystemGroupViewModel
             {
-                Subsystem = group.Key.Subsystem,
-                Records = group
-                    .OrderBy(record => RecordDisplayOrdering.CategoryOrder(record.Kategorie))
-                    .ThenBy(record => record.Kategorie, StringComparer.CurrentCultureIgnoreCase)
-                    .ThenBy(record => record.CisloViditelneA)
-                    .ThenBy(record => record.CisloViditelneB)
-                    .ThenBy(record => record.CisloZaznamu)
-                    .ToList()
+                Subsystem = group.Subsystem,
+                Records = group.Records
             })
             .ToList();
-    }
+
+    private static MinutesOrderKey MinutesKey(PdfExportRecordViewModel record)
+        => new(record.Subsystem, record.SubsystemKod, record.SubsystemPoradi, record.SubsystemHasProjectOrder,
+            record.Kategorie, record.CisloViditelneA, record.CisloViditelneB, record.CisloZaznamu);
 }

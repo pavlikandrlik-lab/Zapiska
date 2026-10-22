@@ -409,6 +409,8 @@ public sealed class ProjektyControllerBehaviorTests
         public Task<ProjektDetailViewModel> BuildProjektDetailAsync(int id, CancellationToken ct = default)
             => Task.FromResult(ProjektDetail);
 
+        public Task<ProjektZaznamyTabViewModel> BuildMeetingRecordsTabAsync(int projectId, int jednaniId, CancellationToken ct = default)
+            => BuildProjectRecordsTabAsync(projectId, ct);
         public Task<ProjektZaznamyTabViewModel> BuildProjectRecordsTabAsync(int id, CancellationToken ct = default)
             => Task.FromResult(new ProjektZaznamyTabViewModel
             {

@@ -56,11 +56,16 @@ public sealed class RecordProposalPayloadMapper
         };
     }
 
-    public RecordProposalPayload BuildSchedulePayload(SaveRecordCommand command, DateTime originalDeadline, bool currentAutoFill)
+    /// <param name="currentPlanSteps">Kroky (pořadí 1–10), které mají v záznamu plán. Spec 2026-10-22
+    /// R14: prázdné pole plánu u takového kroku je navržené odstranění plánu.</param>
+    public RecordProposalPayload BuildSchedulePayload(
+        SaveRecordCommand command, DateTime originalDeadline, bool currentAutoFill, IReadOnlySet<int> currentPlanSteps)
     {
         var changesTermDeadline = command.TerminUkonceni.Date != originalDeadline.Date;
+        // Vyplněné plány jako dřív + odstranění (R14): krok, který plán v záznamu má a ve formuláři
+        // přišel prázdný. Krok bez plánu, který zůstal prázdný, změnou není.
         var planned = command.HarmonogramHodnoty
-            .Where(v => v.PlanDatum.HasValue)
+            .Where(v => v.PlanDatum.HasValue || currentPlanSteps.Contains(v.Poradi))
             .Select(v => new SaveRecordHarmonogramValueCommand { Poradi = v.Poradi, PlanDatum = v.PlanDatum })
             .ToList();
         // Spec 2026-10-14: skutečnost jde jako seznam ZMĚN (SkutecnostDatum ≠ SkutecnostDatumPuvodni).

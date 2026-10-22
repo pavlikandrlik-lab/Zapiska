@@ -5,43 +5,58 @@
     var safeDescriptionHtml = RichTextContentService.ToSafeHtml(Model.Popis);
 }
 
-<div class="record-history">
-    <div>
-        <span class="label">Vlastník:</span>
-        @foreach (var jmeno in Model.HistorieVlastniku)
-        {
-            <span class="history"><s>@jmeno</s></span>
-        }
-        <strong>@Model.AktualniVlastnik</strong>
-    </div>
-    <div>
-        <span class="label">Termín:</span>
-        @foreach (var termin in Model.HistorieTerminu)
-        {
-            <span class="history"><s>@termin.ToString("dd.MM.yyyy")</s></span>
-        }
-        <strong>@(Model.AktualniTermin?.ToString("dd.MM.yyyy") ?? "-")</strong>
-    </div>
-    <div>
-        <span class="label">Subsystém:</span>
-        @foreach (var subsystem in Model.HistorieSubsystemu)
-        {
-            <span class="history"><s>@subsystem</s></span>
-        }
-        <strong>@Model.AktualniSubsystem</strong>
-    </div>
-    @if (!string.IsNullOrWhiteSpace(Model.TypUkolu))
-    {
-        <div>
-            <span class="label">Typ úkolu:</span>
-            @foreach (var typ in Model.HistorieTypuUkolu)
+@{
+    var hasTaskType = !string.IsNullOrWhiteSpace(Model.TypUkolu);
+}
+@* Spec 2026-10-22 R2–R4: detaily ve dvou dvojicích popisek | hodnota na řádek. Historie
+   (přeškrtnuté staré hodnoty) zůstává v buňce hodnoty; bez typu úkolu se jeho buňky nevykreslí. *@
+<table class="record-facts">
+    <tbody>
+        <tr>
+            <th scope="row">Vlastník</th>
+            <td>
+                @foreach (var jmeno in Model.HistorieVlastniku)
+                {
+                    <span class="history"><s>@jmeno</s></span>
+                }
+                <strong>@Model.AktualniVlastnik</strong>
+            </td>
+            <th scope="row">Subsystém</th>
+            <td>
+                @foreach (var subsystem in Model.HistorieSubsystemu)
+                {
+                    <span class="history"><s>@subsystem</s></span>
+                }
+                <strong>@Model.AktualniSubsystem</strong>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row">Termín</th>
+            <td>
+                @foreach (var termin in Model.HistorieTerminu)
+                {
+                    <span class="history"><s>@termin.ToString("dd.MM.yyyy")</s></span>
+                }
+                <strong>@(Model.AktualniTermin?.ToString("dd.MM.yyyy") ?? "-")</strong>
+            </td>
+            @if (hasTaskType)
             {
-                <span class="history"><s>@typ</s></span>
+                <th scope="row">Typ úkolu</th>
+                <td>
+                    @foreach (var typ in Model.HistorieTypuUkolu)
+                    {
+                        <span class="history"><s>@typ</s></span>
+                    }
+                    <strong>@Model.TypUkolu</strong>
+                </td>
             }
-            <strong>@Model.TypUkolu</strong>
-        </div>
-    }
-</div>
+        </tr>
+        <tr>
+            <th scope="row">Založeno</th>
+            <td><strong>@Model.DatumZalozeni.ToString("dd.MM.yyyy")</strong></td>
+        </tr>
+    </tbody>
+</table>
 
 @if (!string.IsNullOrWhiteSpace(safeDescriptionHtml))
 {

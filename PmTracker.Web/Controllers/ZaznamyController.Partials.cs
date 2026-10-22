@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Security;
 using PmTracker.Web.Services.ServiceDesk;
+using PmTracker.Web.Services.Records;
 
 namespace PmTracker.Web.Controllers;
 
@@ -149,7 +150,12 @@ public sealed partial class ZaznamyController
         record.DetailUrl ??= Url.Action(nameof(RecordDetailPartial), new { projektId, zaznamId = summary.Id });
         record.CommentsUrl ??= Url.Action(nameof(RecordCommentsPartial), new { projektId, zaznamId = summary.Id });
         record.ScheduleUrl ??= Url.Action(nameof(RecordSchedulePartial), new { projektId, zaznamId = summary.Id });
-        record.RecordPageUrl ??= Url.Action(nameof(Detail), new { id = summary.Id, returnUrl = ProjektDetailTabUrl(projektId, "zaznamy") });
+        record.RecordPageUrl ??= Url.Action(nameof(Detail), new
+        {
+            id = summary.Id,
+            seznam = RecordSequenceRequest.Active.ToQueryValue(),
+            returnUrl = ProjektDetailTabUrl(projektId, "zaznamy")
+        });
         summary.ScheduleProposalUrl ??= Url.Action("CreateScheduleProposal", "Navrhy", new { projektId, zaznamId = summary.Id });
         summary.ScheduleProposalCheckUrl ??= Url.Action("ScheduleProposalAvailability", "Navrhy", new { projektId, zaznamId = summary.Id });
     }

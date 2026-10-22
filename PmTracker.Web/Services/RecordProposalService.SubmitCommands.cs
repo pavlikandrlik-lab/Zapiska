@@ -142,11 +142,13 @@ public sealed partial class RecordProposalService
         // mapper proti němu porovná navržený rezim (ChangesHarmonogramRezim).
         var currentKroky = await _dbContext.ZaznamHarmonogramKroky.AsNoTracking()
             .Where(k => k.ZaznamId == record.Id)
-            .Select(k => new { k.Poradi, k.SkutecnostRezim })
+            .Select(k => new { k.Poradi, k.SkutecnostRezim, k.PlanDatum })
             .ToListAsync(ct);
         var currentAutoFill = HarmonogramAutoFillRule.IsAutoFill(currentKroky.Select(k => ((int)k.Poradi, k.SkutecnostRezim)));
+        // Spec 2026-10-22 R14: kroky s plánem — prázdné pole plánu u nich je navržené odstranění.
+        var currentPlanSteps = currentKroky.Where(k => k.PlanDatum.HasValue).Select(k => (int)k.Poradi).ToHashSet();
 
-        var payload = _payloadMapper.BuildSchedulePayload(command, record.DatumUkonceni, currentAutoFill);
+        var payload = _payloadMapper.BuildSchedulePayload(command, record.DatumUkonceni, currentAutoFill, currentPlanSteps);
         var schedulePayload = payload.SchedulePlan;
         if (schedulePayload is null
             || (!schedulePayload.ChangesTermDeadline

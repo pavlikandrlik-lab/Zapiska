@@ -208,6 +208,8 @@ public sealed class ProjektyControllerTeamAuthzTests
             => throw new NotSupportedException();
         public Task<ProjektZaznamyTabViewModel> BuildProjectRecordsTabAsync(int id, CancellationToken ct = default)
             => throw new NotSupportedException();
+        public Task<ProjektZaznamyTabViewModel> BuildMeetingRecordsTabAsync(int projectId, int jednaniId, CancellationToken ct = default)
+            => throw new NotSupportedException();
         public Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> BuildRecordMeetingCommentStatesAsync(int projectId, CancellationToken ct = default)
             => throw new NotSupportedException();
         public Task<ProjektHarmonogramTabViewModel> BuildProjectScheduleTabAsync(int id, CancellationToken ct = default)

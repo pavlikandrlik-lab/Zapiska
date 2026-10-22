@@ -135,7 +135,8 @@ public sealed class ZaznamyControllerEditAuthzTests
             recordUiFlowResolver: recordUiFlow,
             harvestScheduler: harvestScheduler,
             db: db,
-            editLockService: new AlwaysAcquiringEditLockService())
+            editLockService: new AlwaysAcquiringEditLockService(),
+            recordSequenceService: Mock.Of<IRecordSequenceService>())
         {
             ControllerContext = new ControllerContext
             {

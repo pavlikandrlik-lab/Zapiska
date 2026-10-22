@@ -224,6 +224,12 @@ export function updateTaskTypeVisibility(categorySelect) {
                 if (trigger instanceof HTMLButtonElement) {
                     trigger.disabled = shouldDisable;
                 }
+
+                // Spec 2026-10-22 R13: ✕ (smazat datum) se zamyká spolu s kalendářem.
+                const clearButton = dateField.querySelector("[data-app-date-clear]");
+                if (clearButton instanceof HTMLButtonElement) {
+                    clearButton.disabled = shouldDisable;
+                }
             });
         };
 

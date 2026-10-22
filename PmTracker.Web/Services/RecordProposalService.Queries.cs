@@ -542,12 +542,19 @@ public sealed partial class RecordProposalService
     {
         var result = new Dictionary<int, string>();
         var origPlanByPoradi = originalModel.HarmonogramBlok.Kroky.ToDictionary(s => s.KrokIndex, s => s.BaselineDatum);
+        var origRawPlanByPoradi = originalModel.HarmonogramBlok.Kroky.ToDictionary(s => s.KrokIndex, s => s.PlanDatum);
         var origActualByPoradi = originalModel.HarmonogramBlok.Kroky.ToDictionary(s => s.KrokIndex, s => s.SkutecneDatum);
 
         foreach (var planned in payload.PlannedHarmonogramHodnoty)
         {
             if (!planned.PlanDatum.HasValue)
             {
+                // Spec 2026-10-22 R14: navržené odstranění plánu (jen u kroku, který plán má).
+                var origRaw = origRawPlanByPoradi.GetValueOrDefault(planned.Poradi);
+                if (origRaw.HasValue)
+                {
+                    result[planned.Poradi] = $"Původní plán: {origRaw.Value:dd.MM.yyyy} | Navržený: bez plánu";
+                }
                 continue;
             }
             var orig = origPlanByPoradi.GetValueOrDefault(planned.Poradi);

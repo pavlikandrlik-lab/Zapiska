@@ -60,7 +60,7 @@
     <div class="record-bar" aria-hidden="true"></div>
     <div class="record-content">
         <header class="record-header" data-record-toggle aria-expanded="false">
-            @* R7 (2026-07-13): indikátor rozbalení vlevo mezi krajem karty a kategorií. *@
+            @* R7 (2026-07-13): indikátor rozbalení vlevo; spec 2026-10-22 R1: v levém okraji karty (CSS), mimo flex hlavičky. *@
             <span class="record-expand-indicator" aria-hidden="true">›</span>
             <div class="record-title-wrap">
                 <div class="record-meta">
@@ -125,8 +125,12 @@
                         <div class="record-actions-menu" data-record-menu hidden role="menu" data-stop-propagation="true">
                             @if (!string.IsNullOrWhiteSpace(Model.RecordPageUrl))
                             {
+                                @* Spec 2026-10-22 R9: stránka záznamu ve stejné kartě prohlížeče — se seznamem
+                                   pro šipky (záznamy jednání / aktivní záznamy) a návratem sem. *@
                                 <a class="record-actions-menu-item" role="menuitem"
-                                   href="@Model.RecordPageUrl" target="_blank" rel="noopener">Otevřít na nové kartě</a>
+                                   href="@Model.RecordPageUrl" data-record-open-page="same-tab">Otevřít na celou obrazovku</a>
+                                <a class="record-actions-menu-item" role="menuitem"
+                                   href="@Model.RecordPageUrl" target="_blank" rel="noopener" data-record-open-page="new-tab">Otevřít na nové kartě</a>
                             }
                             @if (summary.MaHarmonogramHodnotu)
                             {
