@@ -90,6 +90,12 @@ class PmDateFieldElement extends HTMLElement {
                     if (locked) trigger.setAttribute("disabled", "disabled");
                     else trigger.removeAttribute("disabled");
                 }
+                // Spec 2026-10-22 R13: ✕ (smazat datum) se zamyká spolu s kalendářem.
+                const clearButton = wrapper.querySelector("[data-app-date-clear]");
+                if (clearButton) {
+                    if (locked) clearButton.setAttribute("disabled", "disabled");
+                    else clearButton.removeAttribute("disabled");
+                }
                 break;
             }
             case ATTR_ARIA: {
