@@ -51,6 +51,14 @@ Překročení = dnes − plán(aktuální krok)          (znaménkové, v kalend
 - **< 0** → „v předstihu X dní" (zeleně) — plán aktuálního kroku ještě nenastal.
 - **= 0** → „dle plánu".
 - **Všechny kroky vyplněné** (žádný aktuální krok) → **„Dokončeno"**, překročení 0.
+- **Aktuální krok bez vlastního plánu** (spec 2026-10-24) → překročení = **dnes − celkový termín
+  záznamu** a text to řekne: „Aktuální krok: <název> · plán není zadán · celkový termín: zbývá X dní“
+  (resp. „skluz +X dní“, „je dnes“). Dopočtený konec plánu (konec předchozího plánu nebo datum
+  založení) se pro skluz nepoužívá. Štítek Stíháme/Nestíháme a barva se řídí stejným číslem.
+- Počet dní se skloňuje: 1 den, 2–4 dny, 5 a víc dní („zbývá 1 den“, „zbývají 3 dny“).
+- **Plán dokončení** bez jediného plánovaného kroku = „není zadán“, trvání „–“.
+- Texty skládá jen `ScheduleStatusText` (server) a `schedule/scheduleStatus.js` (editor); paritu
+  hlídají sdílené případy `tests/js/schedule/__fixtures__/status-cases.json`.
 
 Zobrazení v souhrnu: **„Aktuální krok: <název> · skluz +X dní"** (resp. „v předstihu", „Dokončeno").
 
@@ -66,7 +74,9 @@ Ruční vstupy musí být chronologické (**neklesající** — stejný den je O
 při Save tvrdě odmítne (`RecordValidationException`, chyba na konkrétním poli) jako pojistka.
 
 - **Plán** — pro každý krok N platí `plán(N) ≥ plán(předchozího kroku s plánem)`. Neklesající
-  napříč kroky 1–10.
+  napříč kroky 1–10. UI: kalendář vypne dny před plánem nejbližšího dřívějšího a po plánu
+  nejbližšího pozdějšího kroku s plánem; kroky bez plánu přeskakuje (`harmonogram/planChronology.js`,
+  spec 2026-10-24).
 - **Ruční skutečnost** (kroky 2/5/8/9) — zadané datum musí být `≥` skutečnost nejbližšího
   **předchozího** kroku se skutečností a `≤` skutečnost nejbližšího **následujícího** kroku se
   skutečností (pokud existují). Tedy zapadne chronologicky mezi známé skutečnosti.
@@ -122,7 +132,8 @@ skutečnosti; aktuální krok táhne skutečnost do dneška.
 
 | Případ | Chování |
 |---|---|
-| Žádný krok vyplněn | Aktuální krok = 1; Překročení = dnes − plán(1) (znaménkově). |
+| Žádný krok vyplněn | Aktuální krok = 1; Překročení = dnes − plán(1) (znaménkově); bez plánu kroku 1 dnes − termín. |
+| Aktuální krok bez plánu | Překročení = dnes − termín; „plán není zadán · celkový termín…“ (spec 2026-10-24). |
 | Všechny kroky vyplněny | „Dokončeno", Překročení 0. |
 | Mezery (vyplněno 4,6,9) | Aktuální = 10 (po posledním vyplněném); mezery 5/7/8 přeskočeny. |
 | Skutečnost před plánem (předstih) | Stav „Splněno"; sjednocený stav může být „v předstihu". |

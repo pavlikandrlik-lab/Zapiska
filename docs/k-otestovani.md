@@ -248,3 +248,52 @@ Navíc prošlo:
 - **Graf harmonogramu v editoru** se po změně data ani po ✕ nepřekreslí až do uložení. Tak to bylo i dřív, graf v editoru na datum nereaguje. Karta, stránka záznamu i záložka Harmonogram krok bez plánu nekreslí.
 - Kontrola pořadí plánů v editoru je znovu zapnutá. Kdo dřív uložil nechronologický plán, dostal chybu až ze serveru, teď ji uvidí hned v editoru.
 - Stránka záznamu má na 375 px vodorovný posuvník kvůli tlačítkům v hlavičce stránky. Bylo to tak i dřív (viz sekce 5), touto změnou se to nezhoršilo.
+
+## 7. Harmonogram — stav u kroku bez plánu, živý přepočet editoru
+
+**Hotovo 2026-10-24:** merge `MERGE_HASH`, plán `docs/superpowers/plans/2026-10-24-harmonogram-stav-bez-planu-plan.md`, spec `docs/superpowers/specs/2026-10-24-harmonogram-stav-bez-planu-design.md`.
+
+**Co to dělá:**
+- **Stav nad harmonogramem u kroku bez plánu.** Když aktuální krok nemá vlastní plánové datum, skluz se počítá k **celkovému termínu záznamu** a text to řekne: „Aktuální krok: 5. vyporadani pripominek · plán není zadán · celkový termín: zbývá 12 dní“ (po termínu „skluz +10 dní“, v den termínu „celkový termín je dnes“). Dřív se počítalo k dopočtenému datu (datum založení nebo plán předchozího kroku) a vycházely nesmysly, např. „skluz +108 dní“.
+  - Když aktuální krok plán má, počítá se dál k němu („skluz +5 dní“, „v předstihu 3 dny“, „dle plánu“), i kdyby dřívější kroky plán neměly.
+  - Štítek **Stíháme/Nestíháme** a barva stavu se řídí stejným číslem, u záznamu bez plánu tedy podle celkového termínu.
+- **Skloňování:** „1 den“, „2–4 dny“, „5 dní“; „zbývá 1 den“, „zbývají 3 dny“. Platí i pro dosavadní texty (dřív „skluz +1 dní“).
+- **Plán dokončení / Plán:** když nemá plán žádný krok, „není zadán“ a v editoru Trvání „–“ (dřív datum založení a „0 dnů“).
+- **Rozpad:** krok se skutečností, ale bez plánu má šedý štítek **„bez plánu“** místo „+N dnů“. Odchylka u kroků s plánem se skloňuje („+1 den“, „+3 dny“, „+5 dnů“, „-2 dny“).
+- **Editor se přepočítává hned.** Výběr data i ✕ u plánu nebo skutečnosti, i změna termínu, hned přepočítá Stav, Plán dokončení, Trvání i graf. Tím je vyřešené známé omezení ze sekce 6 („graf v editoru se nepřekreslí až do uložení“).
+- **Kalendář hlídá pořadí plánů:** vypne dny před plánem nejbližšího dřívějšího a po plánu nejbližšího pozdějšího kroku s plánem; kroky bez plánu přeskakuje, stejný den je povolený. Je to pravidlo, které server kontroloval při uložení i dřív; kalendář ho měl hlídat od Fáze 5, ale kvůli chybě ve skriptu nikdy nehlídal.
+
+**Ověřeno lokálně:**
+- Automatické testy: Unit 2314, Api 536, JS 78 – vše zelené; Integration 203/204 (jediné selhání je známé `ProposalRejectAndTakeOver…`); E2E 125 testů, 32 selhání = stejných 32 jmen jako `main` (nová žádná), 2 nové prošly. Server a editor počítají stav ze stejné sady 19 případů (`tests/js/schedule/__fixtures__/status-cases.json`), včetně přechodu na zimní čas.
+- **V prohlížeči za všechny role** (13 dočasných osob, po průchodu smazané; záznam #901-1 projektu PMT s dočasnou skutečností kroků 1/3/4 z automatu, bez plánu, termín 05.11.2026; dev DB po úklidu shodná se zálohou):
+
+| Role | Stránka záznamu a záložka Harmonogram | Editor | Návrh změny harmonogramu |
+|---|---|---|---|
+| Superadmin, Administrátor aplikace, Vlastník, Admin projektu, PM, PM + vedoucí | „… · plán není zadán · celkový termín: zbývá 12 dní“, Plán „není zadán“, Rozpad „bez plánu“, Stíháme | stejný stav, „není zadán“, Trvání „–“ | – |
+| Vedoucí, Zástupce vedoucího | totéž | odepřen | stejný stav; po výběru plánu kroku 5 hned „v předstihu 6 dní“ |
+| Gestor, Metodik, Host, Read-all | totéž | odepřen | – |
+| Bez role v projektu | 404 | – | – |
+
+Navíc prošlo:
+- PM v editoru: plán kroku 5 (30.10.) → hned „v předstihu 6 dní“, Plán dokončení 30.10.2026, Trvání 114 dnů; plán kroku 6 → meze kalendáře 4/5/6 správně; ✕ u kroku 5 → zpět „plán není zadán · celkový termín: zbývá 12 dní“; termín v Základních údajích na 20.10. → hned „celkový termín: skluz +4 dny“. Nic se neukládalo.
+- Vedoucí v návrhu ✕ u plánu aktuálního kroku → odeslat → PM v detailu návrhu vidí „plán není zadán · celkový termín: zbývá 12 dní“.
+- Záznam 300 (plán i skutečnost): stav k plánu, Rozpad „+4 dny, +9 dnů, 0 dnů, +19 dnů, -21 dnů, -17 dnů“. Plán kroku 3 přehozený před krok 2 (jen v editoru, bez uložení) → krok 2 nemá v kalendáři žádný povolený den, bez chyby.
+- Světlý i tmavý motiv, 1400 i 375 px: editor bez vodorovného posuvníku, „bez plánu“ šedě. V konzoli prohlížeče žádné chyby.
+- Odepřený editor vrací v lokálním dev běhu 500 („No DefaultForbidScheme“). V produkci s Windows Auth je to 403, dev artefakt.
+
+**Otestovat (PM nebo admin projektu, ne superadmin; vedoucí subsystému; host):**
+- [ ] Záznam **bez plánu s napojenou externí vazbou** (skutečnost doplnil automat): stav „Aktuální krok: … · plán není zadán · celkový termín: zbývá N dní“ (nebo „skluz +N dní“ po termínu), Plán „není zadán“, štítek podle termínu. Na kartě (přepínač Harmonogram), na stránce záznamu i v záložce Harmonogram.
+- [ ] Rozpad u takového záznamu: kroky se skutečností mají šedé „bez plánu“.
+- [ ] Záznam s plánem: stav jako dřív, jen se skloňuje („skluz +1 den“, „v předstihu 3 dny“).
+- [ ] Editor → Harmonogram: ✕ u plánu aktuálního kroku → stav se **hned** přepne na „plán není zadán · celkový termín…“; vybrat datum → hned zpět na skluz k plánu. Graf se překreslí hned.
+- [ ] Editor: změnit termín v Základních údajích → stav k celkovému termínu se přepočítá.
+- [ ] Kalendář plánu: dny před plánem předchozího kroku s plánem jsou vypnuté (šedé, „Mimo povolené pořadí“), kroky bez plánu se přeskakují.
+- [ ] Vedoucí: návrh změny harmonogramu → ✕ u plánu aktuálního kroku → PM v detailu návrhu vidí „plán není zadán · celkový termín…“.
+- [ ] Nový záznam (Úkol) v editoru: stav „Aktuální krok: 1. … · plán není zadán · celkový termín: zbývá N dní“.
+- [ ] i15 / Edge: světlý i tmavý motiv.
+
+**Známá omezení (vědomě):**
+- **Dashboard** počítá problémové kroky postaru (dopočtený konec plánu), krok bez plánu tam může vypadat jako po termínu. Neupravuje se do přepracování dashboardu.
+- Detail návrhu ze serveru vykreslí souhrn současného záznamu; prohlížeč ho hned po načtení přepočítá z navržených hodnot (tak to bylo i dřív).
+- Záložka Harmonogram u záznamu se skutečností bez plánu dál ukazuje poznámku „Záznam zatím nemá zadány kroky harmonogramu“ (stávající poznámka, podmínka „trvání 0“).
+- Editor na 375 px: přepínač „Automatické vyplňování harmonogramu“ překrývá záložky. Tato změna na hlavičku záložek nesahá; na `main` jsem to zvlášť neověřoval.
