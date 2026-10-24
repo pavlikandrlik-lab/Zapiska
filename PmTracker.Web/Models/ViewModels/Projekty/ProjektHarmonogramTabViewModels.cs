@@ -267,9 +267,11 @@ public sealed class ScheduleBlockManualCellViewModel
 
 public sealed class HarmonogramSouhrnViewModel
 {
-    /// <summary>Plánové dokončení = plán posledního kroku (plán kroku 10).</summary>
-    public DateTime BaselineDokonceni { get; init; }
+    /// <summary>Plánové dokončení = konec plánu posledního kroku; <c>null</c> = žádný krok nemá plán (spec 2026-10-24 R6).</summary>
+    public DateTime? BaselineDokonceni { get; init; }
     public DateTime TerminUkolu { get; init; }
+
+    /// <summary>Dny od založení do plánového dokončení; 0 bez plánu.</summary>
     public int CelkoveTrvaniDni { get; init; }
 
     /// <summary>Pořadí aktuálního (rozpracovaného) kroku; <c>null</c> = vše vyplněno (Dokončeno).</summary>
@@ -278,10 +280,14 @@ public sealed class HarmonogramSouhrnViewModel
     /// <summary>Název aktuálního kroku pro sjednocený stav v souhrnu.</summary>
     public string? AktualniKrokNazev { get; init; }
 
-    /// <summary>Znaménkové překročení = dnes − plán(aktuální krok); 0 když Dokončeno.</summary>
+    /// <summary>Znaménkové překročení = dnes − plán(aktuální krok), nebo dnes − termín, když aktuální krok
+    /// plán nemá (<see cref="StavVztah"/>); 0 když Dokončeno.</summary>
     public int PrekroceniDni { get; init; }
 
-    public bool Dokonceno { get; init; }
+    /// <summary>Vůči čemu se stav počítá (spec 2026-10-24 R2).</summary>
+    public HarmonogramStavVztah StavVztah { get; init; }
+
+    public bool Dokonceno => StavVztah == HarmonogramStavVztah.Dokonceno;
 
     /// <summary>Odvozené pro gov-tag konzumenty (ProjektHarmonogramUkolViewModel.Stihame, _ProjectScheduleTab).</summary>
     public bool Stihame => Dokonceno || PrekroceniDni <= 0;

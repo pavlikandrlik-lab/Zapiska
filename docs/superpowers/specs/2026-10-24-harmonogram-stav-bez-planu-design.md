@@ -1,7 +1,7 @@
 # Harmonogram: stav a skluz u kroku bez plánu, živý přepočet editoru — specifikace
 
 **Datum:** 2026-10-24
-**Stav:** návrh k revizi; plán implementace `docs/superpowers/plans/2026-10-24-harmonogram-stav-bez-planu-plan.md`
+**Stav:** implementováno 2026-10-24 (větev feat/harmonogram-stav-bez-planu; R1–R11); plán implementace `docs/superpowers/plans/2026-10-24-harmonogram-stav-bez-planu-plan.md`
 **Navazuje na:** `docs/specs/harmonogram-plan-vs-skutecnost.md` (sjednocený stav, datum-model) — tato specifikace ho doplňuje o krok bez plánu
 **Komponenty:** výpočet souhrnu (`Services/Schedules/ScheduleDateCalculator.cs`, `HarmonogramDateBlokBuilder.cs`), souhrn a Rozpad harmonogramu (`Views/Shared/_ScheduleBlock.cshtml`), editor harmonogramu (`wwwroot/js/modules/schedule/block.js`), štítek Stíháme/Nestíháme (karta záznamu, záložka Harmonogram projektu)
 
@@ -53,7 +53,7 @@ Text stavu je dnes zkopírovaný třikrát (dvakrát v `_ScheduleBlock.cshtml`, 
 | R5 | **Barva stavu a štítek Stíháme/Nestíháme** se řídí stejným číslem jako text: zeleně/„Stíháme“, když je hotovo nebo skluz ≤ 0; jinak červeně/„Nestíháme“. U záznamu bez plánu tedy podle celkového termínu. | uživatel |
 | R6 | **Plán dokončení** (editor) a **Plán:** (karta, záložka): když **žádný** krok nemá plán, „není zadán“ a v editoru **Trvání: –**. Když má plán aspoň jeden krok, beze změny (poslední zadané plánové datum, trvání od založení). Trvání se skloňuje stejně jako trvání kroku („1 den“, „3 dny“, „5 dnů“). | uživatel |
 | R7 | **Rozpad:** krok se skutečností, ale bez vlastního plánu, ukazuje místo „+N dnů“ neutrální štítek **„bez plánu“** (bez červené/zelené). | uživatel |
-| R8 | **Odchylka kroku v Rozpadu se skloňuje** stejně jako trvání kroku: „+1 den“, „+3 dny“, „+5 dnů“, „-2 dny“, „0 dnů“ (dnes vždy „dnů“). Text se přesouvá do stejné formátovací funkce jako stav, tak ji nechávám mluvit správně. | doplněno — k potvrzení |
+| R8 | **Odchylka kroku v Rozpadu se skloňuje** stejně jako trvání kroku: „+1 den“, „+3 dny“, „+5 dnů“, „-2 dny“, „0 dnů“ (dnes vždy „dnů“). Text se přesouvá do stejné formátovací funkce jako stav, tak ji nechávám mluvit správně. | doplněno (spec schválen 2026-10-24) |
 | R9 | **Živý přepočet editoru:** výběr data i ✕ u plánu **nebo** skutečnosti hned přepočítá Stav, Plán dokončení, Trvání i graf. | uživatel |
 | R10 | **Meze kalendáře u plánu:** kalendář vypne dny **před plánem nejbližšího dřívějšího kroku s plánem** a **po plánu nejbližšího pozdějšího kroku s plánem**; kroky bez plánu se přeskakují; stejný den je povolený. Je to přesně pravidlo serveru (`ScheduleChronologyValidator`) — co kalendář dovolí, uložení přijme. Meze se přepočítají po každé změně. | uživatel |
 | R11 | **Jedno pravidlo, dvě implementace, jedny testy:** rozhodnutí R2 a texty R3/R4/R6 jsou na serveru v jednom výpočtu a jedné formátovací funkci; editor má jejich JS zrcadlo. Obě strany ověřuje **tatáž sada případů** (jeden JSON soubor čtený xUnit i node:test), stejně jako dnes u osy harmonogramu (`axis-cases.json`). | uživatel (varianta A) |

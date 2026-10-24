@@ -1,0 +1,193 @@
+{
+  "kroky": [
+    { "poradi": 1, "nazev": "1. priprava zadani dodavateli" },
+    { "poradi": 2, "nazev": "2. konzultace terminu s dodavatelem pred vytvorenim zadani" },
+    { "poradi": 3, "nazev": "3. odeslani zadani dodavateli" },
+    { "poradi": 4, "nazev": "4. dodani navrhu reseni" },
+    { "poradi": 5, "nazev": "5. vyporadani pripominek" },
+    { "poradi": 6, "nazev": "6. odeslani pozadavku na vyrobu" },
+    { "poradi": 7, "nazev": "7. dodani funkcionality dodavatelem" },
+    { "poradi": 8, "nazev": "8. pripominkovani" },
+    { "poradi": 9, "nazev": "9. testovani" },
+    { "poradi": 10, "nazev": "10. nasazeni do provozu" }
+  ],
+  "cases": [
+    {
+      "name": "k-planu-skluz-5-dni",
+      "input": { "start": "2026-01-01", "termin": "2026-06-30", "today": "2026-03-01",
+        "steps": [ { "poradi": 1, "plan": "2026-01-20", "skutecnost": "2026-01-22" }, { "poradi": 2, "plan": "2026-02-24" } ] },
+      "expected": { "vztah": "AktualniKrok", "aktualniKrokPoradi": 2, "prekroceniDni": 5, "planoveDokonceni": "2026-02-24",
+        "celkoveTrvaniDni": 54, "stihame": false,
+        "stavText": "Aktuální krok: 2. konzultace terminu s dodavatelem pred vytvorenim zadani · skluz +5 dní",
+        "planDokonceniText": "24.02.2026", "trvaniText": "54 dnů" }
+    },
+    {
+      "name": "k-planu-skluz-1-den",
+      "input": { "start": "2026-01-01", "termin": "2026-06-30", "today": "2026-02-25",
+        "steps": [ { "poradi": 1, "plan": "2026-01-20", "skutecnost": "2026-01-22" }, { "poradi": 2, "plan": "2026-02-24" } ] },
+      "expected": { "vztah": "AktualniKrok", "aktualniKrokPoradi": 2, "prekroceniDni": 1, "planoveDokonceni": "2026-02-24",
+        "celkoveTrvaniDni": 54, "stihame": false,
+        "stavText": "Aktuální krok: 2. konzultace terminu s dodavatelem pred vytvorenim zadani · skluz +1 den",
+        "planDokonceniText": "24.02.2026", "trvaniText": "54 dnů" }
+    },
+    {
+      "name": "k-planu-predstih-3-dny",
+      "input": { "start": "2026-01-01", "termin": "2026-06-30", "today": "2026-02-21",
+        "steps": [ { "poradi": 1, "plan": "2026-01-20", "skutecnost": "2026-01-22" }, { "poradi": 2, "plan": "2026-02-24" } ] },
+      "expected": { "vztah": "AktualniKrok", "aktualniKrokPoradi": 2, "prekroceniDni": -3, "planoveDokonceni": "2026-02-24",
+        "celkoveTrvaniDni": 54, "stihame": true,
+        "stavText": "Aktuální krok: 2. konzultace terminu s dodavatelem pred vytvorenim zadani · v předstihu 3 dny",
+        "planDokonceniText": "24.02.2026", "trvaniText": "54 dnů" }
+    },
+    {
+      "name": "k-planu-predstih-1-den",
+      "input": { "start": "2026-01-01", "termin": "2026-06-30", "today": "2026-02-23",
+        "steps": [ { "poradi": 1, "plan": "2026-01-20", "skutecnost": "2026-01-22" }, { "poradi": 2, "plan": "2026-02-24" } ] },
+      "expected": { "vztah": "AktualniKrok", "aktualniKrokPoradi": 2, "prekroceniDni": -1, "planoveDokonceni": "2026-02-24",
+        "celkoveTrvaniDni": 54, "stihame": true,
+        "stavText": "Aktuální krok: 2. konzultace terminu s dodavatelem pred vytvorenim zadani · v předstihu 1 den",
+        "planDokonceniText": "24.02.2026", "trvaniText": "54 dnů" }
+    },
+    {
+      "name": "k-planu-dle-planu",
+      "input": { "start": "2026-01-01", "termin": "2026-06-30", "today": "2026-02-24",
+        "steps": [ { "poradi": 1, "plan": "2026-01-20", "skutecnost": "2026-01-22" }, { "poradi": 2, "plan": "2026-02-24" } ] },
+      "expected": { "vztah": "AktualniKrok", "aktualniKrokPoradi": 2, "prekroceniDni": 0, "planoveDokonceni": "2026-02-24",
+        "celkoveTrvaniDni": 54, "stihame": true,
+        "stavText": "Aktuální krok: 2. konzultace terminu s dodavatelem pred vytvorenim zadani · dle plánu",
+        "planDokonceniText": "24.02.2026", "trvaniText": "54 dnů" }
+    },
+    {
+      "name": "bez-planu-automat-zbyva-12-dni",
+      "input": { "start": "2026-07-08", "termin": "2026-11-05", "today": "2026-10-24",
+        "steps": [ { "poradi": 1, "skutecnost": "2026-07-10" }, { "poradi": 3, "skutecnost": "2026-08-01" }, { "poradi": 4, "skutecnost": "2026-09-15" } ] },
+      "expected": { "vztah": "CelkovyTermin", "aktualniKrokPoradi": 5, "prekroceniDni": -12, "planoveDokonceni": null,
+        "celkoveTrvaniDni": 0, "stihame": true,
+        "stavText": "Aktuální krok: 5. vyporadani pripominek · plán není zadán · celkový termín: zbývá 12 dní",
+        "planDokonceniText": "není zadán", "trvaniText": "–" }
+    },
+    {
+      "name": "bez-planu-po-terminu-skluz-10-dni",
+      "input": { "start": "2026-07-08", "termin": "2026-10-14", "today": "2026-10-24",
+        "steps": [ { "poradi": 1, "skutecnost": "2026-07-10" }, { "poradi": 3, "skutecnost": "2026-08-01" }, { "poradi": 4, "skutecnost": "2026-09-15" } ] },
+      "expected": { "vztah": "CelkovyTermin", "aktualniKrokPoradi": 5, "prekroceniDni": 10, "planoveDokonceni": null,
+        "celkoveTrvaniDni": 0, "stihame": false,
+        "stavText": "Aktuální krok: 5. vyporadani pripominek · plán není zadán · celkový termín: skluz +10 dní",
+        "planDokonceniText": "není zadán", "trvaniText": "–" }
+    },
+    {
+      "name": "bez-planu-skluz-2-dny",
+      "input": { "start": "2026-07-08", "termin": "2026-10-22", "today": "2026-10-24",
+        "steps": [ { "poradi": 1, "skutecnost": "2026-07-10" }, { "poradi": 3, "skutecnost": "2026-08-01" }, { "poradi": 4, "skutecnost": "2026-09-15" } ] },
+      "expected": { "vztah": "CelkovyTermin", "aktualniKrokPoradi": 5, "prekroceniDni": 2, "planoveDokonceni": null,
+        "celkoveTrvaniDni": 0, "stihame": false,
+        "stavText": "Aktuální krok: 5. vyporadani pripominek · plán není zadán · celkový termín: skluz +2 dny",
+        "planDokonceniText": "není zadán", "trvaniText": "–" }
+    },
+    {
+      "name": "bez-planu-termin-je-dnes",
+      "input": { "start": "2026-07-08", "termin": "2026-10-24", "today": "2026-10-24",
+        "steps": [ { "poradi": 1, "skutecnost": "2026-07-10" }, { "poradi": 3, "skutecnost": "2026-08-01" }, { "poradi": 4, "skutecnost": "2026-09-15" } ] },
+      "expected": { "vztah": "CelkovyTermin", "aktualniKrokPoradi": 5, "prekroceniDni": 0, "planoveDokonceni": null,
+        "celkoveTrvaniDni": 0, "stihame": true,
+        "stavText": "Aktuální krok: 5. vyporadani pripominek · plán není zadán · celkový termín je dnes",
+        "planDokonceniText": "není zadán", "trvaniText": "–" }
+    },
+    {
+      "name": "bez-planu-zbyva-1-den",
+      "input": { "start": "2026-07-08", "termin": "2026-10-25", "today": "2026-10-24",
+        "steps": [ { "poradi": 1, "skutecnost": "2026-07-10" }, { "poradi": 3, "skutecnost": "2026-08-01" }, { "poradi": 4, "skutecnost": "2026-09-15" } ] },
+      "expected": { "vztah": "CelkovyTermin", "aktualniKrokPoradi": 5, "prekroceniDni": -1, "planoveDokonceni": null,
+        "celkoveTrvaniDni": 0, "stihame": true,
+        "stavText": "Aktuální krok: 5. vyporadani pripominek · plán není zadán · celkový termín: zbývá 1 den",
+        "planDokonceniText": "není zadán", "trvaniText": "–" }
+    },
+    {
+      "name": "bez-planu-zbyvaji-3-dny",
+      "input": { "start": "2026-07-08", "termin": "2026-10-27", "today": "2026-10-24",
+        "steps": [ { "poradi": 1, "skutecnost": "2026-07-10" }, { "poradi": 3, "skutecnost": "2026-08-01" }, { "poradi": 4, "skutecnost": "2026-09-15" } ] },
+      "expected": { "vztah": "CelkovyTermin", "aktualniKrokPoradi": 5, "prekroceniDni": -3, "planoveDokonceni": null,
+        "celkoveTrvaniDni": 0, "stihame": true,
+        "stavText": "Aktuální krok: 5. vyporadani pripominek · plán není zadán · celkový termín: zbývají 3 dny",
+        "planDokonceniText": "není zadán", "trvaniText": "–" }
+    },
+    {
+      "name": "bez-planu-zbyva-22-dni",
+      "input": { "start": "2026-07-08", "termin": "2026-11-15", "today": "2026-10-24",
+        "steps": [ { "poradi": 1, "skutecnost": "2026-07-10" }, { "poradi": 3, "skutecnost": "2026-08-01" }, { "poradi": 4, "skutecnost": "2026-09-15" } ] },
+      "expected": { "vztah": "CelkovyTermin", "aktualniKrokPoradi": 5, "prekroceniDni": -22, "planoveDokonceni": null,
+        "celkoveTrvaniDni": 0, "stihame": true,
+        "stavText": "Aktuální krok: 5. vyporadani pripominek · plán není zadán · celkový termín: zbývá 22 dní",
+        "planDokonceniText": "není zadán", "trvaniText": "–" }
+    },
+    {
+      "name": "bez-planu-bez-skutecnosti",
+      "input": { "start": "2026-07-08", "termin": "2026-11-05", "today": "2026-10-24", "steps": [] },
+      "expected": { "vztah": "CelkovyTermin", "aktualniKrokPoradi": 1, "prekroceniDni": -12, "planoveDokonceni": null,
+        "celkoveTrvaniDni": 0, "stihame": true,
+        "stavText": "Aktuální krok: 1. priprava zadani dodavateli · plán není zadán · celkový termín: zbývá 12 dní",
+        "planDokonceniText": "není zadán", "trvaniText": "–" }
+    },
+    {
+      "name": "aktualni-bez-planu-po-kroku-s-planem",
+      "input": { "start": "2026-01-01", "termin": "2026-06-30", "today": "2026-03-01",
+        "steps": [ { "poradi": 1, "plan": "2026-01-20", "skutecnost": "2026-01-22" }, { "poradi": 3, "plan": "2026-04-01" } ] },
+      "expected": { "vztah": "CelkovyTermin", "aktualniKrokPoradi": 2, "prekroceniDni": -121, "planoveDokonceni": "2026-04-01",
+        "celkoveTrvaniDni": 90, "stihame": true,
+        "stavText": "Aktuální krok: 2. konzultace terminu s dodavatelem pred vytvorenim zadani · plán není zadán · celkový termín: zbývá 121 dní",
+        "planDokonceniText": "01.04.2026", "trvaniText": "90 dnů" }
+    },
+    {
+      "name": "aktualni-s-planem-drivejsi-bez-planu",
+      "input": { "start": "2026-07-08", "termin": "2026-11-05", "today": "2026-10-24",
+        "steps": [ { "poradi": 1, "skutecnost": "2026-07-10" }, { "poradi": 2, "plan": "2026-10-20" } ] },
+      "expected": { "vztah": "AktualniKrok", "aktualniKrokPoradi": 2, "prekroceniDni": 4, "planoveDokonceni": "2026-10-20",
+        "celkoveTrvaniDni": 104, "stihame": false,
+        "stavText": "Aktuální krok: 2. konzultace terminu s dodavatelem pred vytvorenim zadani · skluz +4 dny",
+        "planDokonceniText": "20.10.2026", "trvaniText": "104 dnů" }
+    },
+    {
+      "name": "plan-pred-predchozim-se-orizne",
+      "input": { "start": "2026-01-01", "termin": "2026-06-30", "today": "2026-03-01",
+        "steps": [ { "poradi": 1, "plan": "2026-02-10", "skutecnost": "2026-02-11" }, { "poradi": 2, "plan": "2026-02-05" } ] },
+      "expected": { "vztah": "AktualniKrok", "aktualniKrokPoradi": 2, "prekroceniDni": 19, "planoveDokonceni": "2026-02-10",
+        "celkoveTrvaniDni": 40, "stihame": false,
+        "stavText": "Aktuální krok: 2. konzultace terminu s dodavatelem pred vytvorenim zadani · skluz +19 dní",
+        "planDokonceniText": "10.02.2026", "trvaniText": "40 dnů" }
+    },
+    {
+      "name": "trvani-1-den",
+      "input": { "start": "2026-01-01", "termin": "2026-06-30", "today": "2026-01-02",
+        "steps": [ { "poradi": 1, "plan": "2026-01-02" } ] },
+      "expected": { "vztah": "AktualniKrok", "aktualniKrokPoradi": 1, "prekroceniDni": 0, "planoveDokonceni": "2026-01-02",
+        "celkoveTrvaniDni": 1, "stihame": true,
+        "stavText": "Aktuální krok: 1. priprava zadani dodavateli · dle plánu",
+        "planDokonceniText": "02.01.2026", "trvaniText": "1 den" }
+    },
+    {
+      "name": "dokonceno",
+      "input": { "start": "2026-01-01", "termin": "2026-06-30", "today": "2026-03-01",
+        "steps": [
+          { "poradi": 1, "plan": "2026-01-11", "skutecnost": "2026-01-11" }, { "poradi": 2, "plan": "2026-01-12", "skutecnost": "2026-01-12" },
+          { "poradi": 3, "plan": "2026-01-13", "skutecnost": "2026-01-13" }, { "poradi": 4, "plan": "2026-01-14", "skutecnost": "2026-01-14" },
+          { "poradi": 5, "plan": "2026-01-15", "skutecnost": "2026-01-15" }, { "poradi": 6, "plan": "2026-01-16", "skutecnost": "2026-01-16" },
+          { "poradi": 7, "plan": "2026-01-17", "skutecnost": "2026-01-17" }, { "poradi": 8, "plan": "2026-01-18", "skutecnost": "2026-01-18" },
+          { "poradi": 9, "plan": "2026-01-19", "skutecnost": "2026-01-19" }, { "poradi": 10, "plan": "2026-01-20", "skutecnost": "2026-01-20" } ] },
+      "expected": { "vztah": "Dokonceno", "aktualniKrokPoradi": null, "prekroceniDni": 0, "planoveDokonceni": "2026-01-20",
+        "celkoveTrvaniDni": 19, "stihame": true, "stavText": "Dokončeno",
+        "planDokonceniText": "20.01.2026", "trvaniText": "19 dnů" }
+    },
+    {
+      "name": "dokonceno-bez-planu",
+      "input": { "start": "2026-01-01", "termin": "2026-06-30", "today": "2026-03-01",
+        "steps": [
+          { "poradi": 1, "skutecnost": "2026-01-11" }, { "poradi": 2, "skutecnost": "2026-01-12" }, { "poradi": 3, "skutecnost": "2026-01-13" },
+          { "poradi": 4, "skutecnost": "2026-01-14" }, { "poradi": 5, "skutecnost": "2026-01-15" }, { "poradi": 6, "skutecnost": "2026-01-16" },
+          { "poradi": 7, "skutecnost": "2026-01-17" }, { "poradi": 8, "skutecnost": "2026-01-18" }, { "poradi": 9, "skutecnost": "2026-01-19" },
+          { "poradi": 10, "skutecnost": "2026-01-20" } ] },
+      "expected": { "vztah": "Dokonceno", "aktualniKrokPoradi": null, "prekroceniDni": 0, "planoveDokonceni": null,
+        "celkoveTrvaniDni": 0, "stihame": true, "stavText": "Dokončeno",
+        "planDokonceniText": "není zadán", "trvaniText": "–" }
+    }
+  ]
+}

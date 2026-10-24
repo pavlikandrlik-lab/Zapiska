@@ -196,4 +196,81 @@ public sealed class ScheduleDateCalculatorTests
         s.PlanoveDokonceni.Should().Be(new DateTime(2026, 1, 25));
         s.Termin.Should().Be(new DateTime(2026, 1, 25));
     }
+
+    // --- Spec 2026-10-24: krok bez plánu (vztah stavu R2, plánové dokončení R6) ---
+
+    [Fact]
+    public void Summarize_aktualni_krok_bez_planu_pocita_skluz_k_terminu()
+    {
+        // Bez plánu, skutečnost kroků 1/3/4 (automat z externí vazby) → aktuální krok 5 bez plánu.
+        var steps = new[]
+        {
+            Krok(1, null, new DateTime(2026, 1, 3)),
+            Krok(3, null, new DateTime(2026, 1, 20)),
+            Krok(4, null, new DateTime(2026, 2, 10)),
+            Krok(5, null, null),
+        };
+
+        var s = ScheduleDateCalculator.Summarize(Start, steps, termin: new DateTime(2026, 3, 13), today: new DateTime(2026, 3, 1));
+
+        s.AktualniKrokPoradi.Should().Be(5);
+        s.Vztah.Should().Be(HarmonogramStavVztah.CelkovyTermin);
+        s.PrekroceniDni.Should().Be(-12, "dnes − termín; dopočtený konec plánu (datum založení) by dal +59");
+        s.Dokonceno.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Summarize_aktualni_krok_bez_planu_po_kroku_s_planem_pocita_k_terminu()
+    {
+        var steps = new[]
+        {
+            Krok(1, new DateTime(2026, 1, 20), new DateTime(2026, 1, 22)),
+            Krok(2, null, null),
+            Krok(3, new DateTime(2026, 4, 1), null),
+        };
+
+        var s = ScheduleDateCalculator.Summarize(Start, steps, termin: new DateTime(2026, 6, 30), today: new DateTime(2026, 3, 1));
+
+        s.AktualniKrokPoradi.Should().Be(2);
+        s.Vztah.Should().Be(HarmonogramStavVztah.CelkovyTermin, "ne k dopočtenému plánu kroku 1");
+        s.PrekroceniDni.Should().Be(-121);
+    }
+
+    [Fact]
+    public void Summarize_aktualni_krok_s_planem_pocita_k_planu_i_kdyz_drivejsi_kroky_plan_nemaji()
+    {
+        var steps = new[]
+        {
+            Krok(1, null, new DateTime(2026, 1, 3)),
+            Krok(2, new DateTime(2026, 2, 20), null),
+        };
+
+        var s = ScheduleDateCalculator.Summarize(Start, steps, termin: new DateTime(2026, 6, 30), today: new DateTime(2026, 3, 1));
+
+        s.Vztah.Should().Be(HarmonogramStavVztah.AktualniKrok);
+        s.PrekroceniDni.Should().Be(9);
+    }
+
+    [Fact]
+    public void Summarize_bez_jedineho_planu_nema_planove_dokonceni()
+    {
+        var steps = new[] { Krok(1, null, new DateTime(2026, 1, 3)), Krok(2, null, null) };
+
+        var s = ScheduleDateCalculator.Summarize(Start, steps, termin: new DateTime(2026, 6, 30), today: new DateTime(2026, 3, 1));
+
+        s.PlanoveDokonceni.Should().BeNull("dopočtené datum založení není plán");
+    }
+
+    [Fact]
+    public void Summarize_vsechny_vyplnene_bez_planu_je_dokonceno_bez_planoveho_dokonceni()
+    {
+        var steps = Enumerable.Range(1, 10).Select(i => Krok(i, null, new DateTime(2026, 1, 1).AddDays(i))).ToList();
+
+        var s = ScheduleDateCalculator.Summarize(Start, steps, termin: new DateTime(2026, 6, 30), today: new DateTime(2026, 3, 1));
+
+        s.Vztah.Should().Be(HarmonogramStavVztah.Dokonceno);
+        s.Dokonceno.Should().BeTrue();
+        s.PrekroceniDni.Should().Be(0);
+        s.PlanoveDokonceni.Should().BeNull();
+    }
 }

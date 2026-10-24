@@ -17,13 +17,16 @@ public sealed record ScheduleDateStepResult(
     HarmonogramKrokStav Stav,
     bool JeAktualniKrok);
 
-/// <summary>Souhrn harmonogramu (datum-model, sjednocený stav). Viz spec harmonogram-plan-vs-skutecnost.</summary>
+/// <summary>Souhrn harmonogramu (datum-model, sjednocený stav). Viz spec harmonogram-plan-vs-skutecnost a 2026-10-24.</summary>
 public sealed record ScheduleDateSummary(
-    DateTime PlanoveDokonceni,
+    DateTime? PlanoveDokonceni,  // null = žádný krok nemá plán (spec 2026-10-24 R6)
     DateTime Termin,
-    int? AktualniKrokPoradi,   // null = vše vyplněno (Dokončeno)
-    int PrekroceniDni,         // dnes − plán(aktuální krok), znaménkově; 0 když Dokončeno
-    bool Dokonceno);
+    int? AktualniKrokPoradi,     // null = vše vyplněno (Dokončeno)
+    int PrekroceniDni,           // dnes − plán(aktuální krok), resp. dnes − termín (Vztah = CelkovyTermin); 0 když Dokončeno
+    HarmonogramStavVztah Vztah)
+{
+    public bool Dokonceno => Vztah == HarmonogramStavVztah.Dokonceno;
+}
 
 /// <summary>
 /// Datum-model výpočtu harmonogramu (žádné offsety). Plán: segment kroku = [plan(k-1), plan(k)],
@@ -100,13 +103,23 @@ public static class ScheduleDateCalculator
         var normTermin = termin.Date;
         var computed = Compute(start, ordered, today);
 
-        var planoveDokonceni = computed.Count == 0 ? start.Date : computed[^1].PlanEnd;
+        // Spec 2026-10-24 R6: plánové dokončení existuje, jen když aspoň jeden krok má vlastní plán —
+        // jinak by to bylo dopočtené datum založení (konec plánu kroku bez plánu = jeho začátek).
+        DateTime? planoveDokonceni = computed.Count > 0 && ordered.Any(x => x.PlanDatum.HasValue)
+            ? computed[^1].PlanEnd
+            : null;
         var aktualni = computed.FirstOrDefault(x => x.JeAktualniKrok);
 
         if (aktualni is null)   // vše vyplněno → Dokončeno
-            return new ScheduleDateSummary(planoveDokonceni, normTermin, null, 0, Dokonceno: true);
+            return new ScheduleDateSummary(planoveDokonceni, normTermin, null, 0, HarmonogramStavVztah.Dokonceno);
 
-        var prekroceni = (today.Date - aktualni.PlanEnd.Date).Days;
-        return new ScheduleDateSummary(planoveDokonceni, normTermin, aktualni.Poradi, prekroceni, Dokonceno: false);
+        // Spec 2026-10-24 R2: bez vlastního plánu aktuálního kroku se skluz počítá k celkovému termínu.
+        // Dopočtený konec plánu (konec předchozího plánu, nebo datum založení) by dával nesmysl.
+        var maVlastniPlan = ordered.First(x => x.Poradi == aktualni.Poradi).PlanDatum.HasValue;
+        return maVlastniPlan
+            ? new ScheduleDateSummary(planoveDokonceni, normTermin, aktualni.Poradi,
+                (today.Date - aktualni.PlanEnd.Date).Days, HarmonogramStavVztah.AktualniKrok)
+            : new ScheduleDateSummary(planoveDokonceni, normTermin, aktualni.Poradi,
+                (today.Date - normTermin).Days, HarmonogramStavVztah.CelkovyTermin);
     }
 }

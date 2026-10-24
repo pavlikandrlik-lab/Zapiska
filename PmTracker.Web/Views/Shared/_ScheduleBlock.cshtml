@@ -1,4 +1,5 @@
 @model HarmonogramBlockViewModel
+@using PmTracker.Web.Services.Schedules
 @{
     var isEditor = string.Equals(Model.Mode, "record-editor", StringComparison.OrdinalIgnoreCase);
     var rootCssClass = isEditor ? "schedule-editor" : "schedule-card-timeline";
@@ -60,17 +61,13 @@
             </gov-message>
         }
 
-        var stavOk = Model.Souhrn.Dokonceno || Model.Souhrn.PrekroceniDni <= 0;
-        var skluz = Model.Souhrn.PrekroceniDni;
-        var stavText = Model.Souhrn.Dokonceno ? "Dokončeno"
-            : skluz > 0 ? $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · skluz +{skluz} dní"
-            : skluz < 0 ? $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · v předstihu {-skluz} dní"
-            : $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · dle plánu";
+        // Spec 2026-10-24: texty souhrnu skládá jen ScheduleStatusText (JS zrcadlo schedule/scheduleStatus.js).
+        var stavText = ScheduleStatusText.State(Model.Souhrn.StavVztah, Model.Souhrn.AktualniKrokNazev, Model.Souhrn.PrekroceniDni);
         <div class="schedule-summary-grid">
             <div><span class="label">Termín:</span> <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></div>
-            <div><span class="label">Plán dokončení:</span> <strong data-schedule-summary-baseline>@Model.Souhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></div>
-            <div><span class="label">Trvání:</span> <strong data-schedule-summary-duration>@Model.Souhrn.CelkoveTrvaniDni</strong> dnů</div>
-            <div class="schedule-status-line @(stavOk ? "ok" : "late")">
+            <div><span class="label">Plán dokončení:</span> <strong data-schedule-summary-baseline>@ScheduleStatusText.PlanCompletion(Model.Souhrn.BaselineDokonceni)</strong></div>
+            <div><span class="label">Trvání:</span> <strong data-schedule-summary-duration>@ScheduleStatusText.TotalDuration(Model.Souhrn.BaselineDokonceni, Model.Souhrn.CelkoveTrvaniDni)</strong></div>
+            <div class="schedule-status-line @(Model.Souhrn.Stihame ? "ok" : "late")">
                 <span class="label">Stav:</span>
                 <strong data-schedule-summary-state>@stavText</strong>
             </div>
@@ -166,16 +163,11 @@
     }
     else
     {
-        var miniSkluz = Model.Souhrn.PrekroceniDni;
-        var miniStav = Model.Souhrn.Dokonceno ? "Dokončeno"
-            : miniSkluz > 0 ? $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · skluz +{miniSkluz} dní"
-            : miniSkluz < 0 ? $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · v předstihu {-miniSkluz} dní"
-            : $"Aktuální krok: {Model.Souhrn.AktualniKrokNazev} · dle plánu";
-        var miniOk = Model.Souhrn.Dokonceno || miniSkluz <= 0;
+        var miniStav = ScheduleStatusText.State(Model.Souhrn.StavVztah, Model.Souhrn.AktualniKrokNazev, Model.Souhrn.PrekroceniDni);
         <div class="schedule-layered-summary">
-            <span>Plán: <strong data-schedule-summary-baseline>@Model.Souhrn.BaselineDokonceni.ToString("dd.MM.yyyy")</strong></span>
+            <span>Plán: <strong data-schedule-summary-baseline>@ScheduleStatusText.PlanCompletion(Model.Souhrn.BaselineDokonceni)</strong></span>
             <span>Termín: <strong data-schedule-summary-deadline>@Model.Souhrn.TerminUkolu.ToString("dd.MM.yyyy")</strong></span>
-            <span class="schedule-status-line @(miniOk ? "ok" : "late")">Stav: <strong data-schedule-summary-state>@miniStav</strong></span>
+            <span class="schedule-status-line @(Model.Souhrn.Stihame ? "ok" : "late")">Stav: <strong data-schedule-summary-state>@miniStav</strong></span>
         </div>
 
         <div class="gantt-steps schedule-steps" data-schedule-steps data-schedule-record-id="@Model.RecordId" hidden="@(Model.BreakdownExpanded ? null : "hidden")">
@@ -209,10 +201,10 @@
                 var hasPlan = krok.TrvaniDni > 0;
                 var hasActual = krok.OdchylkaDni.HasValue;
                 var odchylka = krok.OdchylkaDni ?? 0;
-                var offsetLabel = odchylka > 0 ? $"+{odchylka} dnů"
-                                : odchylka < 0 ? $"{odchylka} dnů"
-                                : "0 dnů";
-                var offsetCssClass = odchylka > 0 ? "late" : odchylka < 0 ? "ahead" : null;
+                // Spec 2026-10-24 R7, R8: krok bez vlastního plánu má „bez plánu“ (odchylka od dopočteného
+                // konce plánu by byla nesmysl), jinak skloňovaná odchylka. Barva jen u kroku s plánem.
+                var offsetLabel = ScheduleStatusText.StepOffset(krok.PlanDatum, odchylka);
+                var offsetCssClass = krok.PlanDatum is null ? null : odchylka > 0 ? "late" : odchylka < 0 ? "ahead" : null;
                 PmTracker.Web.Services.Schedules.ScheduleBarSegment? bseg = null;
                 if (ovlSeg is not null) { ovlSeg.TryGetValue(krok.KrokIndex, out bseg); }
                 var plannedHiddenStyle = hasPlan && bseg is not null && bseg.PlanWidthPct > 0

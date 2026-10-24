@@ -196,4 +196,21 @@ public sealed class HarmonogramDateBlokBuilderTests
         souhrn.AktualniKrokPoradi.Should().BeNull();
         souhrn.PrekroceniDni.Should().Be(0);
     }
+
+    [Fact]
+    public void BuildSouhrn_bez_planu_se_skutecnosti_nema_plan_dokonceni_a_pocita_k_terminu()
+    {
+        // Spec 2026-10-24: skutečnost kroku 1 z automatu, žádný plán → aktuální krok 2 bez plánu.
+        var rows = new[] { Row(1, null, new DateTime(2026, 1, 3)) };
+
+        var souhrn = HarmonogramDateBlokBuilder.BuildSouhrn(
+            Start, rows, termin: new DateTime(2026, 2, 13), today: Today);
+
+        souhrn.BaselineDokonceni.Should().BeNull("bez plánu není plán dokončení (dřív datum založení)");
+        souhrn.CelkoveTrvaniDni.Should().Be(0);
+        souhrn.StavVztah.Should().Be(HarmonogramStavVztah.CelkovyTermin);
+        souhrn.AktualniKrokPoradi.Should().Be(2);
+        souhrn.PrekroceniDni.Should().Be(-12);
+        souhrn.Stihame.Should().BeTrue("do celkového termínu zbývá 12 dní");
+    }
 }

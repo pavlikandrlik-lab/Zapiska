@@ -115,7 +115,11 @@ public sealed class ScheduleJsSplitTests
         var src = File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/schedule/block.js"));
         src.Should().NotContain("Nestíháme", "souhrn už nepoužívá Stíháme/Nestíháme");
         src.Should().Contain("aktualniIndex", "computeDateModel počítá aktuální krok");
-        src.Should().Contain("Aktuální krok:", "renderSummary sestavuje sjednocený stav");
+        // Spec 2026-10-24 R11: text sjednoceného stavu skládá jen JS zrcadlo serveru (scheduleStatus.js).
+        src.Should().Contain("summarizeSchedule").And.Contain("formatScheduleState",
+            "renderSummary bere sjednocený stav ze sdíleného výpočtu");
+        File.ReadAllText(ResolvePath("PmTracker.Web/wwwroot/js/modules/schedule/scheduleStatus.js"))
+            .Should().Contain("Aktuální krok:", "scheduleStatus.js sestavuje sjednocený stav");
     }
 
     [Fact]
