@@ -251,7 +251,7 @@ Navíc prošlo:
 
 ## 7. Harmonogram — stav u kroku bez plánu, živý přepočet editoru
 
-**Hotovo 2026-10-24:** merge `MERGE_HASH`, plán `docs/superpowers/plans/2026-10-24-harmonogram-stav-bez-planu-plan.md`, spec `docs/superpowers/specs/2026-10-24-harmonogram-stav-bez-planu-design.md`.
+**Hotovo 2026-10-24:** merge `ac6c98b`, plán `docs/superpowers/plans/2026-10-24-harmonogram-stav-bez-planu-plan.md`, spec `docs/superpowers/specs/2026-10-24-harmonogram-stav-bez-planu-design.md`.
 
 **Co to dělá:**
 - **Stav nad harmonogramem u kroku bez plánu.** Když aktuální krok nemá vlastní plánové datum, skluz se počítá k **celkovému termínu záznamu** a text to řekne: „Aktuální krok: 5. vyporadani pripominek · plán není zadán · celkový termín: zbývá 12 dní“ (po termínu „skluz +10 dní“, v den termínu „celkový termín je dnes“). Dřív se počítalo k dopočtenému datu (datum založení nebo plán předchozího kroku) a vycházely nesmysly, např. „skluz +108 dní“.
