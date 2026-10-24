@@ -18,6 +18,7 @@ public sealed class ScheduleStatusTextSourceTests
 
     [Theory]
     [InlineData("PmTracker.Web/Views/Shared/_ScheduleBlock.cshtml")]
+    [InlineData("PmTracker.Web/wwwroot/js/modules/schedule/block.js")]
     public void StatusText_is_composed_only_by_the_formatter(string relativePath)
     {
         var content = File.ReadAllText(Path.Combine(RepoRoot(), relativePath.Replace('/', Path.DirectorySeparatorChar)));
