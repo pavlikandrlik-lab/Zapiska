@@ -126,9 +126,9 @@ public static class HarmonogramDateBlokBuilder
 
         return new HarmonogramSouhrnViewModel
         {
-            BaselineDokonceni = s.PlanoveDokonceni,
+            BaselineDokonceni = s.PlanoveDokonceni ?? start.Date,
             TerminUkolu = s.Termin,
-            CelkoveTrvaniDni = Math.Max(0, (s.PlanoveDokonceni - start.Date).Days),
+            CelkoveTrvaniDni = s.PlanoveDokonceni.HasValue ? Math.Max(0, (s.PlanoveDokonceni.Value - start.Date).Days) : 0,
             AktualniKrokPoradi = s.AktualniKrokPoradi,
             AktualniKrokNazev = aktualniNazev,
             PrekroceniDni = s.PrekroceniDni,
