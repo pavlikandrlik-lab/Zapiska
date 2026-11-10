@@ -134,6 +134,7 @@ skutečnosti; aktuální krok táhne skutečnost do dneška.
 |---|---|
 | Žádný krok vyplněn | Aktuální krok = 1; Překročení = dnes − plán(1) (znaménkově); bez plánu kroku 1 dnes − termín. |
 | Aktuální krok bez plánu | Překročení = dnes − termín; „plán není zadán · celkový termín…“ (spec 2026-10-24). |
+| Nový záznam (žádný plán ani skutečnost) | Aktuální krok = 1, „plán není zadán · celkový termín: zbývá N dní“. Záměr (potvrzeno 2026-11-10): dřívější „dle plánu“ vycházelo jen náhodou (dnes − datum založení = 0). |
 | Všechny kroky vyplněny | „Dokončeno", Překročení 0. |
 | Mezery (vyplněno 4,6,9) | Aktuální = 10 (po posledním vyplněném); mezery 5/7/8 přeskočeny. |
 | Skutečnost před plánem (předstih) | Stav „Splněno"; sjednocený stav může být „v předstihu". |
@@ -152,6 +153,17 @@ skutečnosti; aktuální krok táhne skutečnost do dneška.
   (min/max dle sousedních kroků); editor live-preview musí zrcadlit stejnou logiku výpočtu.
 - CSS (`site.css` / komponenty) — styl lišt: plán plný, skutečnost šrafovaná + nižší výška;
   barvy kroků pevné (jeden zdroj barvy pro plán/skutečnost/Rozpad).
+
+## Dashboard projektu (záložka Záznamy) a pořadí v Přehledu
+
+- Problémové záznamy hodnotí **jen kroky s vlastním plánem** (`DashboardScheduleSnapshotBuilder`).
+  Krok bez plánu není „V prodlení“ ani „Čeká na skutečnost“ — stejný důvod jako u stavu (2026-11-10).
+- **Čeká na skutečnost / Blíží se termín** jen u kroku **bez skutečnosti**. Krok splněný v den plánu
+  nebo dřív je v pořádku (dřív se hlásil jako čekající, když skutečnost = plán).
+- Sloupec **Skutečný termín** v detailu ukazuje jen vyplněnou skutečnost (dřív u „Blíží se termín“
+  datum plánu).
+- Nejbližší plánovaný milník pro pořadí v Přehledu (`PriorityMatrixRebuildService`) se bere jen
+  ze skutečných plánů kroků.
 
 ## Mimo scope této specifikace
 

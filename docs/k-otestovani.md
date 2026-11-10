@@ -293,7 +293,53 @@ Navíc prošlo:
 - [ ] i15 / Edge: světlý i tmavý motiv.
 
 **Známá omezení (vědomě):**
-- **Dashboard** počítá problémové kroky postaru (dopočtený konec plánu), krok bez plánu tam může vypadat jako po termínu. Neupravuje se do přepracování dashboardu.
+- ~~**Dashboard** počítá problémové kroky postaru~~ — opraveno 2026-11-10, viz sekce 8.
 - Detail návrhu ze serveru vykreslí souhrn současného záznamu; prohlížeč ho hned po načtení přepočítá z navržených hodnot (tak to bylo i dřív).
-- Záložka Harmonogram u záznamu se skutečností bez plánu dál ukazuje poznámku „Záznam zatím nemá zadány kroky harmonogramu“ (stávající poznámka, podmínka „trvání 0“).
-- Editor na 375 px: přepínač „Automatické vyplňování harmonogramu“ překrývá záložky. Tato změna na hlavičku záložek nesahá; na `main` jsem to zvlášť neověřoval.
+- Záložka Harmonogram u záznamu se skutečností bez plánu dál ukazuje poznámku „Záznam zatím nemá zadány kroky harmonogramu“ (stávající poznámka, podmínka „trvání 0“). Rozhodnutí 2026-11-10: zatím nechat.
+- Editor na 375 px: přepínač „Automatické vyplňování harmonogramu“ překrývá záložky (od 2026-05-03). Rozhodnutí 2026-11-10: neřešit, mobilní šířka není pro editor relevantní.
+
+## 8. Dashboard — kroky bez plánu; úklid editoru harmonogramu
+
+**Hotovo 2026-11-10:** merge `MERGE_HASH`. Bez samostatné spec (odložené drobnosti ze sekce 7, rozhodnutí 2026-11-10); pravidla dopsaná do `docs/specs/harmonogram-plan-vs-skutecnost.md` (kapitola Dashboard projektu).
+
+**Co to dělá:**
+- **Dashboard projektu → záložka Záznamy** (problémové záznamy) hodnotí jen kroky s **vlastním plánem**. Dřív se u kroku bez plánu dosazoval konec předchozího plánu nebo datum založení, takže:
+  - záznam bez plánu měl všech 10 kroků „Čeká (125 dní)“ s „plánem“ = datum založení (v dev DB záznamy 901-1, 901-2, 901-17);
+  - krok se skutečností z automatu a bez plánu vycházel jako „V prodlení“ (např. +81 dní);
+  - kroky bez plánu za krokem s plánem se hlásily jako „Blíží se termín“ k datu toho plánu.
+- **Krok splněný přesně v den plánu** už nehlásí „Čeká na skutečnost“ (dřív ano: skutečnost = plán se nedala odlišit od nevyplněné).
+- **Sloupec „Skutečný termín“** v rozbaleném detailu ukazuje jen vyplněnou skutečnost. Dřív měl krok „Blíží se termín“ ve sloupci datum plánu.
+- **Pořadí v Přehledu:** nejbližší plánovaný milník se bere jen ze skutečných plánů (záznam bez plánu měl v den založení milník „dnes“).
+- **Editor harmonogramu — úklid:** z `block.js`, `form.js` a `select-candidate.js` odstraněno 449 řádků kódu z offsetového modelu (pole trvání a odchylky ve dnech, tlačítka +/−, Rozpad v editoru, řádek „Skutečné dokončení“), které nic nedělaly. Chování editoru se nemění.
+- Nový záznam v editoru ukazuje „plán není zadán · celkový termín: zbývá N dní“ — potvrzeno jako záměr, zapsáno ve spec harmonogramu.
+
+**Ověřeno lokálně:**
+- Automatické testy: Unit 2329, Api 536, JS 78 – vše zelené. E2E 125 testů: na větvi i na `main` (`085f877`) stejných 32 selhání podle jmen, nová žádná.
+- **V prohlížeči za všechny role** (13 dočasných osob, po průchodu smazané; dev DB po úklidu shodná se zálohou — počty řádků všech tabulek, kroky harmonogramu, zámky, matice priorit):
+
+| Role | Dashboard → Záznamy | Editor záznamu 300 | Návrh změny harmonogramu |
+|---|---|---|---|
+| Superadmin, Administrátor aplikace, Vlastník, Admin projektu, PM, PM + vedoucí | ano, stejný výsledek | ✕ u plánu kroku 8 → hned „plán není zadán · celkový termín: zbývá 51 dní“, krok 8 trvání „–“, krok 9 „61 dnů“, meze kroku 9 od plánu kroku 7 | PM + vedoucí: stejně |
+| Vedoucí, Zástupce vedoucího | ano | odepřen | stejný přepočet jako v editoru |
+| Gestor, Metodik, Host, Read-all | ano | odepřen | odepřen (Read-all nezkoušen) |
+| Bez role v projektu | odepřen | odepřen | – |
+
+Navíc:
+- Srovnání `main` × větev (PM): dashboard na `main` ukazuje 901-1, 901-2, 901-17 s „Čeká (125 dní)“ u všech 10 kroků, na větvi „Žádné záznamy k zobrazení“.
+- Dočasně (pak vráceno) záznam 901-1: plán kroku 1 = 1. 10. bez skutečnosti, krok 2 plán i skutečnost 15. 10., plán kroku 3 = 14. 11. Větev: „Čeká na skutečnost +40 dní“, v detailu krok 1 „Čeká (40 dní)“ a krok 3 bez skutečného termínu; krok 2 ani kroky 4–10 se nehlásí. `main`: navíc krok 2 „Čeká (26 dní)“ a kroky 3–10 se „skutečným termínem“ 14.11.2026.
+- Editor PM na `main` i na větvi: shodné souhrny, meze kalendáře i přepnutí kategorie Úkol → Informace → Úkol. V konzoli žádné chyby.
+- Odepřené stránky vrací v lokálním dev běhu 500 („No DefaultForbidScheme“), v produkci s Windows Auth 403.
+
+**Otestovat (PM nebo admin projektu, ne superadmin):**
+- [ ] Dashboard projektu → Záznamy: záznam bez plánu (i se skutečností z automatu) se neukazuje.
+- [ ] Záznam s propadlým plánem kroku bez skutečnosti: „Čeká na skutečnost“ se správným počtem dní; v detailu bez skutečného termínu.
+- [ ] Krok splněný v den plánu se v detailu neobjeví.
+- [ ] Krok s plánem v příštích 7 dnech: „Blíží se termín“, sloupec Skutečný termín prázdný.
+- [ ] Editor → Harmonogram: výběr data, ✕ u plánu, změna termínu — souhrn a graf se přepočítají jako dřív; přepnutí kategorie a zpět bez chyby.
+- [ ] Vedoucí subsystému: návrh změny harmonogramu — přepočet jako dřív.
+
+**Známá omezení (vědomě):**
+- Záznam **bez plánu** se mezi problémovými neobjeví, ani když mu propadl celkový termín: panel hlídá plán kroků. Stav nad harmonogramem ho přitom ukazuje jako „celkový termín: skluz +N dní“ / Nestíháme. Pokud ho tam chceš, je to nová kategorie.
+- Krok bez skutečnosti **před** posledním splněným krokem (mezera) se dál hlásí jako „Čeká na skutečnost“, i když ho stav harmonogramu přeskakuje. Beze změny.
+- Texty dashboardu se neskloňují („+1 dní“, „Čeká (1 dní)“). Vzhled dashboardu se nemění do jeho přepracování.
+
