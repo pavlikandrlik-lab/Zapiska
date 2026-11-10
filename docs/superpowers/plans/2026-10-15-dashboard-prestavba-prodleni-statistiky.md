@@ -85,7 +85,7 @@
 | D Úklid, dokumentace, ověření | 15–16 | 2–3 |
 | **Celkem** | | **25–30 h** |
 
-Tvoje ruční ověření zvlášť: název spojovacího sloupce (~5 min), parita se ServiceDeskem (~1 h), závěrečný proklik (~0,5 h).
+Tvoje ruční ověření zvlášť: název spojovacího sloupce (hotovo 2026-11-10 z `ServiceDesk.edmx`), parita se ServiceDeskem (~1 h), závěrečný proklik (~0,5 h).
 
 ---
 
@@ -95,10 +95,10 @@ Tvoje ruční ověření zvlášť: název spojovacího sloupce (~5 min), parita
 
 Jediná věc o databázi ServiceDesku, kterou z `Hotline (2).cs` nevyčtu: kód jde přes EF navigaci `ticket.ticket_external_workflow` (ř. 1069, 1218) a cizí klíč je schovaný v `.edmx`. Ostatní sloupce jsou v kódu vyjmenované (ř. 840–845, 1062–1115, 1216–1266).
 
-- [ ] **Step 1:** Od tebe název sloupce v `ticket_external_workflow`, který ukazuje na `ticket_external.id` (SSMS: databáze → Tables → `ticket_external_workflow` → Keys / Columns). Zapíše se do spec §6.1.
-- [ ] **Step 2: GATE pro Task 3.** Tasky 1–2 na tom nezávisí.
+- [x] **Step 1:** Od tebe název sloupce v `ticket_external_workflow`, který ukazuje na `ticket_external.id`. **Hotovo 2026-11-10 z `ServiceDesk.edmx`** (EF6 model `ServiceDeskEntities`, dodal uživatel, root repa, v `.gitignore`): **`id_ticket_external`** (int, NOT NULL), cizí klíč `FK_ticket_external_workflow_ticket_external`. Celé schéma tří tabulek je ve spec §6.1.
+- [x] **Step 2: GATE pro Task 3** — splněno.
 
-Typy číselných sloupců se nezjišťují: dotazy v Task 4 je převádějí `CAST(... AS int)` / `CAST(... AS float)`, takže na `tinyint`/`smallint`/`real` nezáleží.
+Typy sloupců jsou z EDMX známé (spec §6.1): všechny klíče `int`, `sla_hours` `float`, `transfertype` `int`. Projekce v Task 4 je přesto může převádět `CAST`em, pokud by se produkční DB od modelu lišila.
 
 ---
 
@@ -301,16 +301,16 @@ Formatter: `PenaltyReasonFormatterTests` — pro každý kód jedna věta obsahu
 - [ ] **Step 4: Spustit, ověřit PASS.** Když golden hodnota nesedí s ručním průchodem originálem, rozhoduje originál a test se opraví s komentářem „ověřeno průchodem Hotline.cs ř. …".
 - [ ] **Step 5: Commit** `feat(prodleni): port penalizačního algoritmu ze ServiceDesku (NES/PMP/PNF)`
 
-### Task 3: Read-only kontext databáze ServiceDesku *(až po gate Task 0)*
+### Task 3: Read-only kontext databáze ServiceDesku *(gate Task 0 splněn 2026-11-10)*
 
 **Files:**
 - Create: `PmTracker.ServiceDesk.Sql/ServiceDeskExternalReadOnlyDbContext.cs`, `Entities/TicketExternalEntity.cs`, `Entities/TicketExternalWorkflowEntity.cs`, `Entities/TicketExternalSlaEntity.cs`
-- Create: `scripts/dev/servicedesk_external_schema.sql` (lokální replika: `CREATE TABLE` se sloupci z `Hotline (2).cs` a spojovacím sloupcem z Task 0 + 3 smyšlené tickety a SLA katalog, idempotentní `IF OBJECT_ID(...) IS NULL`)
+- Create: `scripts/dev/servicedesk_external_schema.sql` (lokální replika: `CREATE TABLE` přesně podle schématu ze spec §6.1 (`ServiceDesk.edmx`) včetně FK `id_ticket_external` + 3 smyšlené tickety a SLA katalog, idempotentní `IF OBJECT_ID(...) IS NULL`)
 - Modify: `PmTracker.ServiceDesk.Sql/ServiceDeskServiceCollectionExtensions.cs`, `PmTracker.Web/appsettings.example.json`
 - Test: `PmTracker.Tests.Unit/ServiceDesk/ServiceDeskExternalReadOnlyDbContextTests.cs`
 
 **Interfaces:**
-- Produces (sloupce známé z `Hotline (2).cs`, spojovací sloupec z Task 0; čtení přes projekci s `CAST`, takže na přesném číselném typu nezáleží):
+- Produces (sloupce a typy podle spec §6.1 / `ServiceDesk.edmx`; mapují se jen sloupce, které výpočet používá):
 
 ```csharp
 internal sealed class TicketExternalEntity        // ticket_external
@@ -324,8 +324,8 @@ internal sealed class TicketExternalEntity        // ticket_external
 }
 internal sealed class TicketExternalWorkflowEntity // ticket_external_workflow
 {
-    public long Id { get; set; }                  // PK (typ podle Task 0)
-    public int TicketExternalId { get; set; }     // FK na ticket_external.id (název sloupce podle Task 0)
+    public int Id { get; set; }                   // id (PK)
+    public int TicketExternalId { get; set; }     // id_ticket_external (FK na ticket_external.id)
     public DateTime Date { get; set; }            // date
     public int? TransferType { get; set; }        // transfertype
     public string? Supplier { get; set; }         // supplier
@@ -333,7 +333,8 @@ internal sealed class TicketExternalWorkflowEntity // ticket_external_workflow
 }
 internal sealed class TicketExternalSlaEntity     // ticket_external_sla
 {
-    public string SlaName { get; set; } = "";     // sla_name
+    public int Id { get; set; }                   // id (PK)
+    public string SlaName { get; set; } = "";     // sla_name (nvarchar(8))
     public double SlaHours { get; set; }          // sla_hours
 }
 public sealed class ServiceDeskExternalReadOnlyDbContext : DbContext  // SaveChanges* vyhodí InvalidOperationException (vzor TicketingReadOnlyDbContext)
@@ -353,7 +354,7 @@ Konfigurace: `Ticketing:ExternalConnectionStringName` (výchozí `ServiceDeskExt
 
 (Ukázka se zástupnými hodnotami je stejná konvence jako stávající `TicketingReadOnly` v example souboru. Skutečnou hodnotu vyplňuje správce.)
 
-- [ ] **Step 1: Failing testy:** `SaveChanges_vyhodi`, `Mapovani_tabulek_a_sloupcu` (EF model metadata: `GetTableName()` a `GetColumnName()` podle `Hotline (2).cs` a Task 0), `Bez_connection_stringu_registruje_disabled_query_service`, `S_connection_stringem_registruje_sql_query_service`
+- [ ] **Step 1: Failing testy:** `SaveChanges_vyhodi`, `Mapovani_tabulek_a_sloupcu` (EF model metadata: `GetTableName()` a `GetColumnName()` podle spec §6.1, včetně `id_ticket_external` a schématu `dbo`), `Bez_connection_stringu_registruje_disabled_query_service`, `S_connection_stringem_registruje_sql_query_service`
 - [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~ServiceDeskExternalReadOnly"`
 - [ ] **Step 3: Implementace + lokální replika** (spustit `scripts/dev/servicedesk_external_schema.sql` na lokální Colima DB, paměť `feedback_local_dev_db_upgrade_self`)
 - [ ] **Step 4: PASS**
