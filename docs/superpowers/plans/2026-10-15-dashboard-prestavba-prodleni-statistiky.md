@@ -4,6 +4,8 @@
 
 **Revize 2026-10-19:** předávky a SLA hodiny se čtou přímo z databáze ServiceDesku (`ticket_external*`, spec §6). Textová rekonstrukce z vyjádření, diagnostický skript frází a konfigurace SLA hodin v `appsettings` odpadly.
 
+**Revize 2026-11-10 (kontrola proti kódu):** barvy podle převodu na gov tokeny z 2026-10-15 (aliasy `--pm-color-*` zrušené, grafové barvy jako `--app-chart-*` v `css/tokens.css`), skutečné názvy typů a složek testů, JS testy přes `npm test`, pojistka oprávnění, zápis do `docs/k-otestovani.md`, dashboard v E2E auditu palety, typ `Id` předávky `int`.
+
 **Cíl:** Záložku NES v prodlení pohání penalizační algoritmus z `Hotline.cs`. Dashboard dostane nový vzhled se souhrnným pásem a `pm-tabs`. Statistiky se stanou reportem pro projektového manažera nad ECharts.
 
 **Architektura:** Čistý doménový engine (`PenaltyCalculator`, port 1:1) dostává předávky z tabulky `ticket_external_workflow` a SLA hodiny z `ticket_external_sla`, obojí přes druhý read-only kontext `ServiceDeskExternalReadOnlyDbContext`. Tickety a jejich příslušnost k IS dál dodává `TicketingReadOnlyDbContext` (`intranetNEW`). `ProdleniService` výsledky skládá a cachuje pro záložku NES, souhrnný pás, Statistiky a Excel. Statistiky rozšiřují existující Základní report (provider pattern, `ChartData` → ECharts) o nové providery a o slice dat ze ServiceDesku.
@@ -18,7 +20,7 @@
 
 ## Global Constraints
 
-- Barvy jen přes gov DS tokeny přes aliasy `--pm-*` v `:root` v `site.css`. Žádný hex v nových pravidlech a žádné nové `[data-theme="dark"]` pravidlo.
+- Barvy jen přes sémantické gov tokeny (`--background-*`, `--text-*`, `--border-*`, `--icon-*`, `--status-*`; tabulka v `docs/architecture/tokens.md`). Aliasy `--pm-color-*` od 2026-10-15 neexistují. Co gov nemá, je `--app-*` **jen v `css/tokens.css`** (jediný soubor s barevnými literály a `data-theme`). Hlídá `AppCssColorTokenTests` (Unit) a `ThemePaletteAuditTests` (E2E).
 - Nosný layout jen flex/flex-wrap. `:has`/`max-content` smí být jen vylepšení, `:has` nevnořovat (Edge na i15).
 - Nové statické CSS/JS se servírují s `charset=utf-8`. Ověř `Program.cs` StaticFiles `OnPrepareResponse`.
 - Nový ESM modul s vedlejším efektem musí být explicitně importovaný v `wwwroot/js/modules/bootstrap.js`, jinak UI tiše selže.
@@ -30,7 +32,10 @@
 - Connection string `ServiceDeskExternalReadOnly` a čtecí právo zajišťuje správce. Kód se nesmí vázat na konkrétní server ani název databáze. Bez connection stringu běží `Disabled*` fallback.
 - Akceptace kalkulace = zákazový seznam (helper v `SqlTicketingQueryService`), nikdy filtr na jednu hodnotu.
 - Api testy kotvit na atributy a ASCII, ne na českou diakritiku.
-- Dashboard projektu: `projektId` v route každého endpointu.
+- Dashboard projektu: `projektId` v route každého endpointu. Pojistka `Architecture/ProjectScopedPolicyRequestCarriesProjektIdTests` musí zůstat zelená i s novým endpointem `souhrn` a odkazy na něj.
+- `gov-icon` s ikonami Bootstrap vždy `type="components"` (paměť `feedback_gov_icons_are_bootstrap`).
+- Nové chování v JS se píše jako exportované čisté funkce a testuje v `tests/js/dom/*.test.js` (`npm test`), vzor `projectFilterStorageKey.test.js`.
+- Po každé sloučené fázi (A, B, C) doplnit položku do `docs/k-otestovani.md`: co je hotové, merge hash, ruční checklist (paměť `feedback_testing_checklist_md`).
 - Hotovou a otestovanou práci mergovat do lokálního `main`, push jen na pokyn.
 - Uživateli psát česky, výstup testů hlásit česky.
 
@@ -56,14 +61,15 @@
 - `PmTracker.Web/Views/ProjectDashboard/_Souhrn.cshtml`, `_ProdleniTimeline.cshtml`, `_PanelError.cshtml`, `Zakladni/_ChartTable.cshtml`, `Zakladni/_Kpi.cshtml`
 - `PmTracker.Web/wwwroot/css/components/project-dashboard.css`
 - `PmTracker.Web/wwwroot/js/modules/dashboard/echartsTheme.js`, `dashboard/nesPanel.js`
-- testy: `PmTracker.Tests.Unit/ServiceDesk/Prodleni/*`, `PmTracker.Tests.Unit/ServiceDesk/SqlProdleniQueryServiceTests.cs`, `PmTracker.Tests.Unit/Dashboard/Zakladni/*` (nové providery), `PmTracker.Tests.Api/ProjectDashboard/*`
+- testy: `PmTracker.Tests.Unit/ServiceDesk/Prodleni/*`, `PmTracker.Tests.Unit/ServiceDesk/SqlProdleniQueryServiceTests.cs`, `PmTracker.Tests.Unit/Dashboard/Zakladni/*` (nové providery), `PmTracker.Tests.Api/Controllers/ProjectDashboard*RenderTests.cs` (konvence složky `Controllers/`), `tests/js/dom/nesPanelFilter.test.js`, `tests/js/dom/echartsTheme.test.js`, `tests/js/dom/dashboardSouhrnCil.test.js`
 
 **Upravené**
 - `ProjectDashboardController.cs`, `ProjectDashboardService.cs` (+ interface), `ProjectDashboardViewModels.cs`
 - `Views/ProjectDashboard/Index.cshtml`, `_RecordsPanel.cshtml`, `_NesPanel.cshtml`, `Zakladni/Report.cshtml`, `Zakladni/_Chart.cshtml`, `Zakladni/_ChartStatCards.cshtml`, `Zakladni/_ObdobiSelector.cshtml`
 - `ChartData.cs`, `Obdobi.cs`, `ZakladniDataset.cs`, `ZakladniDatasetLoader.cs`, `ZakladniReportBuilder.cs`
 - `echartsRender.js`, `zakladniReport.js`, `projectDashboard.js`, `bootstrap.js`
-- `site.css` (`:root` grafové aliasy, smazání legacy `.dashboard-kpi-*`, `.dashboard-tab*`), `_Layout.cshtml` (link na nové CSS)
+- `css/tokens.css` (`--app-chart-*` pro oba motivy), `docs/architecture/tokens.md` (řádek pro `--app-chart-*`), `site.css` (jen smazání legacy `.dashboard-kpi-*`, `.dashboard-tab*`), `_Layout.cshtml` (link na nové CSS)
+- `PmTracker.Tests.E2E/Scenarios/ThemePaletteAuditTests.cs` (+ dashboard projektu, všechny tři záložky)
 - `NesPanelExcelExportService.cs`, `DataStoreServiceCollectionExtensions.cs`, `ServiceDeskServiceCollectionExtensions.cs`, `appsettings.example.json`
 - dokumentace: `docs/specs/dashboard-prodleni.md`, `docs/technical/12-servicedesk-schema-reference.md`, `docs/user-guide.md`, `install.md`
 
@@ -82,8 +88,8 @@
 | A Engine prodlení | 1–5 | 7–8,5 |
 | B Shell, Záznamy, NES | 6–9 | 7–9 |
 | C Statistiky | 10–14 | 8–10 |
-| D Úklid, dokumentace, ověření | 15–16 | 2–3 |
-| **Celkem** | | **25–30 h** |
+| D Úklid, dokumentace, ověření | 15–16 | 3–4 |
+| **Celkem** | | **26–31 h** |
 
 Tvoje ruční ověření zvlášť: název spojovacího sloupce (hotovo 2026-11-10 z `ServiceDesk.edmx`), parita se ServiceDeskem (~1 h), závěrečný proklik (~0,5 h).
 
@@ -217,7 +223,7 @@ public sealed class CeskeSvatky : ICeskeSvatky
 /// protože ticket_external_workflow.transfertype může nést i jiné kódy, které originál ignoruje.
 public static class TransferTyp { public const int U1 = 1, U2 = 2, U3 = 3, U5 = 5, U10 = 10, U11 = 11; }
 
-public sealed record WorkflowUdalost(long Id, DateTime Datum, int? Typ, string? Dodavatel, DateTime? TerminParam);
+public sealed record WorkflowUdalost(int Id, DateTime Datum, int? Typ, string? Dodavatel, DateTime? TerminParam);
 
 /// SlaHodiny = ticket_external_sla.sla_hours pro dulezitost (null = řádek chybí). Potřebné jen pro NES.
 public sealed record PenaltyInput(int TicketId, string TypZaznamu, string? Dulezitost, double? SlaHodiny,
@@ -292,7 +298,8 @@ public static class PenaltyReasonFormatter { public static string Text(PenaltyRe
 | `Bez_U1_chyba` | jen U3 | `ChybiIniciacniUdalost` |
 | `Typ_s_mezerami_char5` | `TypZaznamu = "PMP  "` | počítá jako PMP |
 | `Neznamy_typ_chyba` | `TypZaznamu = "RU"` | `NeznamyTyp` |
-| `AktualniDeadline_nes_u_dodavatele` | NES II: U1 23.03. 08:00, bez U3, now 25.03. 12:00 (spotřebováno 16+… h) | vrátí okamžik vyčerpání 16 h pracovního času |
+| `AktualniDeadline_nes_u_dodavatele` | NES II (16 h): U1 25.03. 08:00, bez U3, now 25.03. 12:00 | `2026-03-26 00:00` (16 h od 08:00 = konec středy 25.03.; zbývá 12 h → spadá do „hrozí") |
+| `AktualniDeadline_nes_pres_vikend` | NES II (16 h): U1 pá 27.03. 20:00, bez U3 | `2026-03-30 12:00` (pá 4 h, víkend se přeskočí, po 12 h) |
 
 Formatter: `PenaltyReasonFormatterTests` — pro každý kód jedna věta obsahující data ve formátu `dd.MM.yyyy HH:mm` a počet dní. T01 ukazuje hodiny na 2 desetinná místa (opravené dělení).
 
@@ -354,7 +361,7 @@ Konfigurace: `Ticketing:ExternalConnectionStringName` (výchozí `ServiceDeskExt
 
 (Ukázka se zástupnými hodnotami je stejná konvence jako stávající `TicketingReadOnly` v example souboru. Skutečnou hodnotu vyplňuje správce.)
 
-- [ ] **Step 1: Failing testy:** `SaveChanges_vyhodi`, `Mapovani_tabulek_a_sloupcu` (EF model metadata: `GetTableName()` a `GetColumnName()` podle spec §6.1, včetně `id_ticket_external` a schématu `dbo`), `Bez_connection_stringu_registruje_disabled_query_service`, `S_connection_stringem_registruje_sql_query_service`
+- [ ] **Step 1: Failing testy:** `SaveChanges_vyhodi`, `Mapovani_tabulek_a_sloupcu` (EF model metadata: `GetTableName()` a `GetColumnName()` podle spec §6.1, včetně `id_ticket_external` a schématu `dbo`; `external_id` má `IsUnicode() == false`), `Bez_connection_stringu_registruje_disabled_query_service`, `S_connection_stringem_registruje_sql_query_service`
 - [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~ServiceDeskExternalReadOnly"`
 - [ ] **Step 3: Implementace + lokální replika** (spustit `scripts/dev/servicedesk_external_schema.sql` na lokální Colima DB, paměť `feedback_local_dev_db_upgrade_self`)
 - [ ] **Step 4: PASS**
@@ -376,7 +383,7 @@ Konfigurace: `Ticketing:ExternalConnectionStringName` (výchozí `ServiceDeskExt
 public sealed record ProdleniTicketDto(int Id, string Pid, string TypZaznamu, string? Strucne, string? Dulezitost,
     string? Modul, string? Dodavatel, string? Stav, DateTime? Datum, int TicketExternalId, string? SupplierTag);
 
-public sealed record WorkflowUdalostDto(long Id, DateTime Datum, int? TransferType, string? Supplier, DateTime? DtParam);
+public sealed record WorkflowUdalostDto(int Id, DateTime Datum, int? TransferType, string? Supplier, DateTime? DtParam);
 public sealed record SlaKatalogDto(string SlaName, double SlaHours);
 public sealed record AkceptovanaKalkulaceDto(int TicketId, DateTime DatumAkceptace, decimal Cena);
 
@@ -484,8 +491,8 @@ Pravidla:
 
 **Files:**
 - Create: `Services/ProjectDashboard/DashboardSouhrnService.cs`, `Views/ProjectDashboard/_Souhrn.cshtml`, `Views/ProjectDashboard/_PanelError.cshtml`, `wwwroot/css/components/project-dashboard.css`
-- Modify: `ProjectDashboardController.cs` (+ `GET souhrn`), `ProjectDashboardViewModels.cs` (+ `DashboardSouhrnViewModel`, page VM + `IsZkratka`, `SouhrnUrl`), `ProjectDashboardService.BuildDashboardPageAsync`, `Index.cshtml`, `projectDashboard.js`, `bootstrap.js`, `_Layout.cshtml` (link CSS), `site.css` (smazat `.dashboard-tab`, `.dashboard-tab-panel`, `.dashboard-kpi-*`, ř. ~7315–7400; před smazáním `grep -rn` na každý selektor)
-- Test: `PmTracker.Tests.Unit/ProjectDashboard/DashboardSouhrnServiceTests.cs`, `PmTracker.Tests.Api/ProjectDashboard/DashboardShellRenderTests.cs`
+- Modify: `ProjectDashboardController.cs` (+ `GET souhrn`), `ProjectDashboardViewModels.cs` (+ `DashboardSouhrnViewModel`, page VM + `IsZkratka`, `SouhrnUrl`), `ProjectDashboardService.BuildDashboardPageAsync`, `Index.cshtml`, `projectDashboard.js`, `bootstrap.js`, `_Layout.cshtml` (link CSS), `site.css` (smazat `.dashboard-tab`, `.dashboard-tab-panel`, `.dashboard-kpi-*`; před smazáním `grep -rn` na každý selektor, čísla řádků se mění)
+- Test: `PmTracker.Tests.Unit/ProjectDashboard/DashboardSouhrnServiceTests.cs`, `PmTracker.Tests.Api/Controllers/ProjectDashboardShellRenderTests.cs`, `tests/js/dom/dashboardSouhrnCil.test.js` (čistá funkce: dlaždice → klíč záložky + filtr)
 
 **Interfaces:**
 - Consumes: `IProdleniService.GetPrehledAsync`, `IProjectDashboardService.BuildRecordsPanelAsync`
@@ -495,7 +502,8 @@ Pravidla:
 public sealed record SouhrnDlazdice(string Klic, int? Hodnota, string Popisek, string? Doplnek, SouhrnStav Stav, string CilovaZalozka, string? CilovyFiltr);
 public enum SouhrnStav { Ok, Varovani, Kriticke, Nedostupne }
 public sealed class DashboardSouhrnViewModel { public IReadOnlyList<SouhrnDlazdice> Dlazdice { get; init; } = []; }
-// DashboardSouhrnService.BuildAsync(int projektId, UserContext user, DateTime now, CancellationToken ct)
+// DashboardSouhrnService.BuildAsync(int projektId, CurrentUserContextViewModel user, DateTime now, CancellationToken ct)
+// (v režimu „Zobrazit jako" je to kontext cílové osoby — dlaždice se filtrují podle jejích práv automaticky)
 // Klíče: "ukoly-po-terminu" (records.view), "ceka-na-skutecnost" (records.view), "tickety-v-prodleni" (nes.view + IS), "hrozi-prodleni" (nes.view + IS)
 ```
 
@@ -520,16 +528,17 @@ Markup (`Index.cshtml`, kostra):
 
 (Pořadí tag-names `pm-tab-left/pm-tab/pm-tab-right` převzít z `_SyncPanel.cshtml` `TabTagFor`. `?dashTab=` přebije `initial` a uložený stav.)
 
-Dlaždice (`_Souhrn.cshtml`): `<a class="pd-tile pd-tile--{stav}" href="#" data-souhrn-tab="nes" data-souhrn-filter="">` s velkým číslem, popiskem a `gov-icon` (`exclamation-triangle` / `check-circle`). Stav nese i text (`<span class="visually-hidden">Kritické</span>`). CSS: `.pd-souhrn { display:flex; flex-wrap:wrap; gap: var(--pm-spacing-m); } .pd-tile { flex: 1 1 200px; border-left: 4px solid var(--pm-color-border); … } .pd-tile--kriticke { border-left-color: var(--pm-color-error); }`
+Dlaždice (`_Souhrn.cshtml`): `<a class="pd-tile pd-tile--{stav}" href="#" data-souhrn-tab="nes" data-souhrn-filter="">` s velkým číslem, popiskem a `<gov-icon type="components" name="exclamation-triangle-fill">` / `name="check-circle"`. Stav nese i text (`<span class="visually-hidden">Kritické</span>`). CSS: `.pd-souhrn { display:flex; flex-wrap:wrap; gap: var(--pm-spacing-m); } .pd-tile { flex: 1 1 200px; background: var(--background-block-primary); border: 1px solid var(--border-subtle); border-left: 4px solid var(--border-subtle); … } .pd-tile--varovani { border-left-color: var(--border-warning); } .pd-tile--kriticke { border-left-color: var(--border-error); } .pd-tile--ok { border-left-color: var(--border-success); }`
 
 JS (`projectDashboard.js`): lazy-load panelu na `pm-tab-change` (logika `ensureProjectDashboardTabPanelLoaded` zůstává, mění se jen resolvování panelu na `pm-tab-panel[key]`). Načtení souhrnu po `DOMContentLoaded`. Klik na dlaždici volá `tabs.setActive(key)`, po načtení panelu nastaví filtr a dispatchne `pm:dashboard-filter` `{ panel, filter }`. Smazat localStorage logiku (`projectDashboardTabStorageKeyPrefix`), tu převezme `pm-tabs`.
 
 - [ ] **Step 1: Failing testy:**
   - Unit: `Souhrn_bez_nes_opravneni_nema_ticketove_dlazdice`, `Souhrn_bez_is_nema_ticketove_dlazdice`, `Souhrn_nula_je_Ok_stav`, `Souhrn_nedostupny_sd_dava_Nedostupne_a_null_hodnotu`
   - Api: `Index_renderuje_pm_tabs_se_tremi_klici` (atributy `key="zaznamy|nes|statistiky"`), `Souhrn_endpoint_vraci_dlazdice_s_data_souhrn_tab`, `Souhrn_endpoint_bez_pristupu_k_projektu_403`
-- [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~DashboardSouhrn"` a `dotnet test PmTracker.Tests.Api --filter "FullyQualifiedName~DashboardShell"`
+  - JS: `dlazdice_tickety_v_prodleni_vede_na_nes`, `dlazdice_ukoly_po_terminu_vede_na_zaznamy_s_filtrem_delayed`
+- [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~DashboardSouhrn"`, `dotnet test PmTracker.Tests.Api --filter "FullyQualifiedName~ProjectDashboardShell"`, `npm test`
 - [ ] **Step 3: Implementace**
-- [ ] **Step 4: PASS** + `grep -rn "dashboard-tab\b\|dashboard-kpi-" PmTracker.Web --include='*.cshtml' --include='*.js' --include='*.css'` → 0 výsledků
+- [ ] **Step 4: PASS** + `grep -rn "dashboard-tab\b\|dashboard-kpi-" PmTracker.Web --include='*.cshtml' --include='*.js' --include='*.css'` → 0 výsledků + zelené `AppCssColorTokenTests` a `ProjectScopedPolicyRequestCarriesProjektIdTests`
 - [ ] **Step 5: Commit** `feat(dashboard): nový shell — hlavička, souhrnný pás, systémové pm-tabs`
 
 ### Task 7: Záložka Záznamy — vzhled a počty
@@ -538,15 +547,15 @@ JS (`projectDashboard.js`): lazy-load panelu na `pm-tab-change` (logika `ensureP
 
 **Files:**
 - Modify: `_RecordsPanel.cshtml`, `ProjectDashboardViewModels.cs` (`ProjectDashboardRecordsPanelViewModel` + `PocetPodleKategorie`), `projectDashboard.js` (filtr reaguje i na `pm:dashboard-filter`), `project-dashboard.css`
-- Test: `PmTracker.Tests.Api/ProjectDashboard/RecordsPanelRenderTests.cs`, `PmTracker.Tests.Unit/ProjectDashboard/ProjectDashboardRecordCategorizationTests.cs` (počty)
+- Test: `PmTracker.Tests.Api/Controllers/ProjectDashboardRecordsPanelRenderTests.cs`, `PmTracker.Tests.Unit/ProjectDashboard/ProjectDashboardRecordCategorizationTests.cs` (počty)
 
 **Interfaces:**
 - Produces: `IReadOnlyDictionary<DashboardRecordCategory,int> PocetPodleKategorie` (počítá se z `Records`, žádný nový dotaz)
 
-Markup: filtr chipy `<pm-button … data-dashboard-category-filter="delayed">V prodlení <span class="pd-count">5</span></pm-button>`, pro 0 navíc `disabled`. Tabulka `.pd-table` v `.pd-card`, řádek `class="pd-row pd-row--delayed"` (levý pruh přes `box-shadow: inset 3px 0 0 var(--pm-color-error)`), odchylka `<strong class="pd-offset pd-offset--delayed">+14 dní</strong>`. Detail obsahuje `<pm-button href="/Zaznamy/Detail/@id">Otevřít záznam</pm-button>`. Prázdný stav `.pd-empty` s `gov-icon name="check-circle"`.
+Markup: filtr chipy `<pm-button … data-dashboard-category-filter="delayed">V prodlení <span class="pd-count">5</span></pm-button>`, pro 0 navíc `disabled`. Tabulka `.pd-table` v `.pd-card`, řádek `class="pd-row pd-row--delayed"` (levý pruh přes `box-shadow: inset 3px 0 0 var(--border-error)`, u „čeká" `--border-warning`, u „blíží se" `--border-subtle`), odchylka `<strong class="pd-offset pd-offset--delayed">+14 dní</strong>`. Detail obsahuje `<pm-button href="/Zaznamy/Detail/@id">Otevřít záznam</pm-button>`. Prázdný stav `.pd-empty` s `<gov-icon type="components" name="check-circle">`.
 
 - [ ] **Step 1: Failing testy:** `Chipy_maji_pocty` (atribut `data-count`), `Nulova_kategorie_disabled`, `Detail_ma_odkaz_na_zaznam`, `Prazdny_stav_ma_pd_empty`
-- [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Api --filter "FullyQualifiedName~RecordsPanelRender"`
+- [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Api --filter "FullyQualifiedName~ProjectDashboardRecordsPanelRender"`
 - [ ] **Step 3: Implementace**
 - [ ] **Step 4: PASS**
 - [ ] **Step 5: Commit** `feat(dashboard): záložka Záznamy — chipy s počty, karta tabulky, odkaz na záznam`
@@ -556,10 +565,10 @@ Markup: filtr chipy `<pm-button … data-dashboard-category-filter="delayed">V p
 **Files:**
 - Create: `Views/ProjectDashboard/_ProdleniTimeline.cshtml`, `wwwroot/js/modules/dashboard/nesPanel.js`
 - Modify: `_NesPanel.cshtml` (přepis), `ProjectDashboardViewModels.cs` (nový `ProjectDashboardNesPanelViewModel` nad `ProdleniPrehled` + 2× `ChartData`), `ProjectDashboardService.BuildNesPanelAsync` (volá `IProdleniService`), `bootstrap.js` (import `nesPanel.js`)
-- Test: `PmTracker.Tests.Unit/ProjectDashboard/ProjectDashboardServiceNesPanelTests.cs` (přepsat), `PmTracker.Tests.Api/ProjectDashboard/NesPanelRenderTests.cs`
+- Test: `PmTracker.Tests.Unit/ProjectDashboard/ProjectDashboardServiceNesPanelTests.cs` (přepsat), `PmTracker.Tests.Api/Controllers/ProjectDashboardNesPanelRenderTests.cs`, `tests/js/dom/nesPanelFilter.test.js`
 
 **Interfaces:**
-- Consumes: `IProdleniService`, `ChartData` (Task 10 rozšíří kinds — tady použít `ChartKind.Bar`, po Task 10 přepnout na `HorizontalBar`; nebo pořadí Task 10 → Task 8, viz pozn. níže)
+- Consumes: `IProdleniService` (Task 5), `ChartData` s `ChartKind.HorizontalBar` (Task 10 — dělá se před tímto taskem, viz pořadí níže)
 - Produces:
 
 ```csharp
@@ -576,12 +585,13 @@ public sealed class ProjectDashboardNesPanelViewModel
 
 Markup: KPI řada (`.pd-kpis` se 4 `.pd-kpi`), dva grafy (`<partial name="Zakladni/_Chart" model="…">`), filtrační řada (`data-nes-filter-typ="NES|PMP|PNF|"`), tabulka s řádky `data-typ` (v seznamu jsou jen tickety u dodavatele, filtr „běží" odpadl), rozbalovací `<tr hidden data-nes-detail>` s `_ProdleniTimeline` (SVG osa: obrátky jako úsečky, U11 jako kosočtverec, dnešek čárkovaně; pozice v % počítá server, stejný princip jako `data-schedule-ticks` z paměti `feedback_static_schedule_axis_needs_server_ticks`) a `<ol>` odůvodnění přes `PenaltyReasonFormatter.Text`. Pod tabulkou `<details>` „Hrozí prodlení (n)" a „Nelze vyhodnotit (n)". Stav `Nedostupne` = `_PanelError` s tlačítkem `data-dashboard-panel-retry`.
 
-JS `nesPanel.js`: delegovaný `click`/`gov-change` z `document` (paměť `feedback_cloned_rows_need_delegation`), filtr typu, toggle detailu přes třídu `pd-row--open` na `<tr>`, poslech `pm:dashboard-filter`.
+JS `nesPanel.js`: delegovaný `click`/`gov-change` z `document` (paměť `feedback_cloned_rows_need_delegation`), filtr typu, toggle detailu přes třídu `pd-row--open` na `<tr>`, poslech `pm:dashboard-filter`. Rozhodování o viditelnosti řádku je exportovaná čistá funkce `jeRadekViditelny(typRadku, vybranyTyp)` → `tests/js/dom/nesPanelFilter.test.js`.
 
 - [ ] **Step 1: Failing testy:**
   - Unit: `NesPanel_mapuje_prehled_a_grafy`, `NesPanel_graf_dodavatelu_serazeny_sestupne`, `NesPanel_nedostupne_bez_grafu`
   - Api: `Tabulka_ma_data_typ_a_u_dodavatele_od`, `Detail_obsahuje_timeline_svg`, `Nelze_vyhodnotit_sekce_s_poctem`, `Bez_is_placeholder_s_odkazem`, `Nedostupne_ma_retry`
-- [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~NesPanel"` + `dotnet test PmTracker.Tests.Api --filter "FullyQualifiedName~NesPanelRender"`
+  - JS: `prazdny_filtr_ukaze_vse`, `filtr_nes_skryje_pmp_a_pnf`
+- [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~NesPanel"` + `dotnet test PmTracker.Tests.Api --filter "FullyQualifiedName~ProjectDashboardNesPanelRender"` + `npm test`
 - [ ] **Step 3: Implementace**
 - [ ] **Step 4: PASS**
 - [ ] **Step 5: Commit** `feat(dashboard): NES v prodlení poháněné penalizačním algoritmem — KPI, grafy, časová osa, odůvodnění`
@@ -610,8 +620,8 @@ JS `nesPanel.js`: delegovaný `click`/`gov-change` z `document` (paměť `feedba
 
 **Files:**
 - Create: `wwwroot/js/modules/dashboard/echartsTheme.js`, `Views/ProjectDashboard/Zakladni/_ChartTable.cshtml`, `Zakladni/_Kpi.cshtml`
-- Modify: `ChartData.cs`, `ChartJson.cs`, `_Chart.cshtml`, `_ChartStatCards.cshtml`, `echartsRender.js`, `site.css` (`:root` aliasy), `project-dashboard.css` (`.zr-*` → karty), smazat `wwwroot/css/components/zakladni-report.css` (pravidla přesunout)
-- Test: `PmTracker.Tests.Unit/Dashboard/Zakladni/ChartDataTests.cs`, `ChartJsonTests.cs`, `EchartsRenderModuleTests.cs` (rozšířit), `PmTracker.Tests.Api/ProjectDashboard/ChartTableRenderTests.cs`
+- Modify: `ChartData.cs`, `ChartJson.cs`, `_Chart.cshtml`, `_ChartStatCards.cshtml`, `echartsRender.js`, `css/tokens.css` (`--app-chart-*`), `docs/architecture/tokens.md`, `project-dashboard.css` (`.zr-*` → karty), smazat `wwwroot/css/components/zakladni-report.css` (pravidla přesunout; jeho `var(--gov-radius)` je nedefinovaná proměnná → `--pm-radius-m`)
+- Test: `PmTracker.Tests.Unit/Dashboard/Zakladni/ChartDataTests.cs`, `ChartJsonTests.cs`, `EchartsRenderModuleTests.cs` (rozšířit), `PmTracker.Tests.Api/Controllers/ProjectDashboardChartTableRenderTests.cs`, `tests/js/dom/echartsTheme.test.js`
 
 **Interfaces:**
 - Produces:
@@ -627,27 +637,31 @@ public sealed record StatCard(string Label, string Value, string? Note = null, C
 //              public bool IsEmpty => Kind is ChartKind.StatCards or ChartKind.Kpi ? Stats.Count == 0 : Series.All(s => s.Values.All(v => v == 0));
 ```
 
-Tokeny (`site.css` `:root`, hodnoty finálně podle validátoru):
+Kategorické barvy grafů (gov je nemá) do `css/tokens.css`, hodnoty finálně podle validátoru (Step 4):
 
 ```css
---pm-chart-1: var(--color-primary-600);
---pm-chart-2: var(--color-secondary-700);
---pm-chart-3: var(--color-primary-300);
---pm-chart-neutral: var(--color-neutral-400);
---pm-chart-good: var(--color-success-600);
---pm-chart-warning: var(--color-warning-600);
---pm-chart-critical: var(--color-error-600);
---pm-chart-grid: var(--border-subtle);
---pm-chart-axis-text: var(--text-secondary);
---pm-chart-surface: var(--background-page);
+:root {
+    --app-chart-1: var(--color-primary-600);
+    --app-chart-2: var(--color-secondary-700);
+    --app-chart-3: var(--color-primary-300);
+    --app-chart-neutral: var(--color-neutral-400);
+}
+:root[data-theme="dark"] {
+    --app-chart-1: var(--color-primary-300);
+    --app-chart-2: var(--color-secondary-400);
+    --app-chart-3: var(--color-primary-500);
+    --app-chart-neutral: var(--color-neutral-500);
+}
 ```
 
-`echartsTheme.js`: `export function readTheme()` čte `getComputedStyle(document.documentElement)` → objekt ECharts tématu (`color: [chart-1..3]`, `textStyle.color`, osy, mřížka, `tooltip.backgroundColor = surface`). `ColorToken` série → `var(--…)` se resolvuje stejně. `echartsRender.js`: `optionFor` dostane `theme` a mapuje nové kinds (Donut `radius: ["55%","75%"]` + `graphic` text součtu uprostřed; HorizontalBar = prohozené osy, `inverse` kategorie; bary `itemStyle.borderRadius: [4,4,0,0]` resp. `[0,4,4,0]`, `borderColor: surface`, `borderWidth: 2`; čáry `lineStyle.width: 2`, `symbolSize: 8`; legenda jen při ≥ 2 sériích; `tooltip.valueFormatter` s `Unit` a `cs-CZ` formátem). `MutationObserver` na `document.documentElement` atribut `data-theme` → `chart.dispose(); renderOne(el)` pro všechny `[data-echart]`.
+Ostatní role berou přímo sémantické gov tokeny, žádné aliasy: stav dobrý / varování / kritický = `--background-status-success|warning|error`, mřížka = `--border-subtlest`, osy a popisky = `--text-secondary`, plocha a mezery mezi segmenty = `--background-block-primary`.
+
+`echartsTheme.js`: `export function sestavTema(ctiPromennou)` je čistá funkce (dostane čtečku proměnné, vrátí objekt ECharts tématu: `color: [app-chart-1..3]`, `textStyle.color`, osy, mřížka, `tooltip.backgroundColor`). `readTheme()` ji volá s `name => getComputedStyle(document.documentElement).getPropertyValue(name).trim()`. `ColorToken` série → `var(--…)` se resolvuje stejně. `echartsRender.js`: `optionFor` dostane `theme` a mapuje nové kinds (Donut `radius: ["55%","75%"]` + `graphic` text součtu uprostřed; HorizontalBar = prohozené osy, `inverse` kategorie; bary `itemStyle.borderRadius: [4,4,0,0]` resp. `[0,4,4,0]`, `borderColor: surface`, `borderWidth: 2`; čáry `lineStyle.width: 2`, `symbolSize: 8`; legenda jen při ≥ 2 sériích; `tooltip.valueFormatter` s `Unit` a `cs-CZ` formátem). `MutationObserver` na `document.documentElement` atribut `data-theme` → `chart.dispose(); renderOne(el)` pro všechny `[data-echart]`.
 
 `_Chart.cshtml`: `<figure class="pd-card pd-card--@(span)">`, `IsEmpty` → `.pd-empty` s `EmptyMessage`, jinak graf + `<details class="pd-data"><summary>Zobrazit data</summary><partial _ChartTable/></details>`.
 
-- [ ] **Step 1: Failing testy:** `ChartJson_serializuje_span_unit_trend`, `IsEmpty_pro_nulove_serie`, `CardTrend_JeLepsi_podle_polarity`, `ChartTable_renderuje_kategorie_a_serie` (Api, atributy `data-chart-table`), `EchartsRender_mapuje_vsechny_kinds` (stávající test čte JS jako text a hlídá větve — rozšířit o nové kinds a `MutationObserver`)
-- [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~Dashboard.Zakladni"`
+- [ ] **Step 1: Failing testy:** `ChartJson_serializuje_span_unit_trend`, `IsEmpty_pro_nulove_serie`, `CardTrend_JeLepsi_podle_polarity`, `ChartTable_renderuje_kategorie_a_serie` (Api, atributy `data-chart-table`), `EchartsRender_mapuje_vsechny_kinds` (stávající test čte JS jako text a hlídá větve — rozšířit o nové kinds a `MutationObserver`); JS `sestavTema_bere_barvy_z_app_chart_tokenu`, `sestavTema_bez_hodnoty_tokenu_nepouzije_prazdnou_barvu`
+- [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~Dashboard.Zakladni|FullyQualifiedName~AppCssColorToken"` + `npm test`
 - [ ] **Step 3: Implementace**
 - [ ] **Step 4: Validace palety**
 
@@ -683,7 +697,7 @@ public sealed record ServiceDeskSlice(ProdleniPrehled Prodleni, IsRozpocetDto? R
 
 `Obdobi.Predchozi()`: rok → předchozí rok, kvartál → předchozí kvartál (Q1 → Q4 předchozího roku), rozsah → `[Start − délka, Start − 1 s]`. Rozlišení podle nové property `ObdobiDruh Druh`.
 
-Loader: `Dnes` z `TimeProvider` (lokálně). Jednání projektu v období + předchozím, účast stav `PRESENT` → `Pritomen`. SD slice jen když projekt má `ServiceDeskInfoSystemId` a `Prodleni.Stav != BezNapojeni`. Při `Nedostupne` se slice vytvoří se stavem, aby sekce mohla ukázat chybovou kartu.
+Loader: `TaskCategoryIds` stejným pravidlem jako `BuildRecordsPanelAsync` (kód `RecordCategoryCodes.TaskShort` = `U` nebo `Task` = `UKOL`; `U` platí v produkci i v dev seedu, paměť `project_record_category_codes`). `Dnes` z `TimeProvider` (lokálně). Jednání projektu v období + předchozím, účast stav `PRESENT` → `Pritomen`. SD slice jen když projekt má `ServiceDeskInfoSystemId` a `Prodleni.Stav != BezNapojeni`. Při `Nedostupne` se slice vytvoří se stavem, aby sekce mohla ukázat chybovou kartu.
 
 - [ ] **Step 1: Failing testy:**
   - Unit: `Predchozi_rok`, `Predchozi_Q1_je_Q4_minuleho_roku`, `Predchozi_rozsah_stejne_delky`
@@ -754,7 +768,7 @@ Golden testy (dataset Q1 2026, `Dnes = 2026-03-31`):
 **Files:**
 - Modify: `ProjectDashboardController.cs` (`StatisticsPanel` přijme `rok`, `kvartal`, `od`, `doDate` a vrátí `Zakladni/Report.cshtml`; endpoint `zakladni-report` smazat), `Zakladni/Report.cshtml` (sekce s nadpisy `h2` + popisky, flex-wrap mřížka karet), `_ObdobiSelector.cshtml` (URL → `statistics-panel`, popisek „Srovnání s: …" z `Obdobi.Predchozi().Label`, kvartál `selected`), `zakladniReport.js` (po výměně HTML `initEchartsReport`), `IProjectDashboardService` + `ProjectDashboardService` (smazat `BuildStatisticsPanelAsync` a pomocné typy), `ProjectDashboardViewModels.cs` (smazat statistické VM), `IInformacniSystemQueryService` (smazat `GetProdleneAsync` + `ProdlenyTicketDto`, pokud grep nenajde jiné použití)
 - Delete: `_StatisticsPanel.cshtml`, `ProjectDashboardStatisticsYearFilterTests.cs`, testy `GetProdleneAsync`, CSS `.dashboard-year-select-label`, `.dashboard-quarters-table`, `.dashboard-subsystem-table`, `.dashboard-attendance-rate`
-- Test: `PmTracker.Tests.Unit/ProjectDashboard/ProjectDashboardControllerBehaviorTests.cs`, `Dashboard/Zakladni/ZakladniReportWiringTests.cs`, `PmTracker.Tests.Api/ProjectDashboard/StatisticsRenderTests.cs`
+- Test: `PmTracker.Tests.Unit/ProjectDashboard/ProjectDashboardControllerBehaviorTests.cs`, `Dashboard/Zakladni/ZakladniReportWiringTests.cs`, `PmTracker.Tests.Api/Controllers/ProjectDashboardStatisticsRenderTests.cs`
 
 Sekce (nadpis + jednovětý popis):
 - „Přehled": hlavní čísla za období a srovnání s předchozím
@@ -764,9 +778,9 @@ Sekce (nadpis + jednovětý popis):
 - „ServiceDesk a dodavatelé": tickety, prodlení dodavatelů, objednávky
 
 - [ ] **Step 1: Failing testy:** `StatisticsPanel_vraci_report_se_sekcemi` (Api: `data-section="prehled|prubeh|terminy|lide|servicedesk"`), `StatisticsPanel_kvartal_parametr`, `Zakladni_report_endpoint_neexistuje` (404), `Grep_zadny_StatisticsPanelViewModel` (wiring test čte zdroják)
-- [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Api --filter "FullyQualifiedName~StatisticsRender"` + `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~ProjectDashboard|FullyQualifiedName~ZakladniReportWiring"`
+- [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Api --filter "FullyQualifiedName~ProjectDashboardStatisticsRender"` + `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~ProjectDashboard|FullyQualifiedName~ZakladniReportWiring"`
 - [ ] **Step 3: Implementace + mazání.** Před smazáním každého typu `grep -rn "<Typ>" --include='*.cs' --include='*.cshtml' .`. Do `project-dashboard.css` přidat tisk: `@media print { .pd-souhrn, pm-tab-list, .zr-obdobi, .pd-data { display: none; } .pd-card { break-inside: avoid; } pm-tab-panel:not([active]) { display: none; } }` (atribut aktivního panelu ověřit v `pmTabs.js`).
-- [ ] **Step 4: PASS + celé Unit a Api suity** — `dotnet test PmTracker.Tests.Unit && dotnet test PmTracker.Tests.Api`. Expected: zelené (od 2026-10-08 je každé selhání regrese, paměť `project_pre_existing_test_failures`).
+- [ ] **Step 4: PASS + celé Unit, Api a JS suity** — `dotnet test PmTracker.Tests.Unit && dotnet test PmTracker.Tests.Api && npm test`. Expected: vše zelené; výchozí stav 2026-11-10 je Unit 2329, Api 536, JS 78 zelených, takže každé selhání je regrese (paměť `project_pre_existing_test_failures`).
 - [ ] **Step 5: Commit** `feat(statistiky): záložka Statistiky = nový report, odstranění legacy statistik a naivního prodlení`
 
 ---
@@ -776,13 +790,14 @@ Sekce (nadpis + jednovětý popis):
 ### Task 15: Dokumentace
 
 **Files:**
-- Modify: `docs/specs/dashboard-prodleni.md` (banner „Nahrazeno specem 2026-10-15" nahoře, definice prodlení přeškrtnout odkazem), `docs/technical/12-servicedesk-schema-reference.md` (§5.5 nová definice, nová sekce „Databáze ServiceDesku: ticket_external*" se schématem z Task 0, §7 „Penalizace U1–U11" → „Penále v Kč"), `docs/user-guide.md` (sekce Dashboard projektu: souhrnný pás, jak číst prodlení a odůvodnění, Statistiky), `docs/superpowers/specs/2026-10-15-…-design.md` (§6.1 doplnit schéma z Task 0), `install.md` / deploy checklist (connection string `ServiceDeskExternalReadOnly`, `Ticketing:ExternalConnectionStringName`, čtecí právo na `ticket_external`, `ticket_external_workflow`, `ticket_external_sla`)
+- Modify: `docs/specs/dashboard-prodleni.md` (banner „Nahrazeno specem 2026-10-15" nahoře, definice prodlení přeškrtnout odkazem), `docs/technical/12-servicedesk-schema-reference.md` (§5.5 nová definice, nová sekce „Databáze ServiceDesku: ticket_external*" se schématem z Task 0, §7 „Penalizace U1–U11" → „Penále v Kč"), `docs/user-guide.md` (sekce Dashboard projektu: souhrnný pás, jak číst prodlení a odůvodnění, Statistiky), `docs/k-otestovani.md` (souhrnná položka přestavby: co je hotové, merge hashe, ruční checklist všech tří záložek, nasazení connection stringu), `install.md` / deploy checklist (connection string `ServiceDeskExternalReadOnly`, `Ticketing:ExternalConnectionStringName`, čtecí právo na `ticket_external`, `ticket_external_workflow`, `ticket_external_sla`)
 - [ ] **Step 1:** úpravy
 - [ ] **Step 2: Commit** `docs(dashboard): prodlení podle penalizačního algoritmu, Statistiky, konfigurace SLA`
 
 ### Task 16: Ověření v reálném prohlížeči + parita
 
-- [ ] **Step 1: Celé suity** — `dotnet test PmTracker.Tests.Unit`, `dotnet test PmTracker.Tests.Api`, `dotnet test PmTracker.Tests.Integration`, E2E: porovnat jména selhání proti baseline worktree (paměť `project_e2e_baseline_failures`), ne počet.
-- [ ] **Step 2: Lokální app** s env connection stringy (PM DB + lokální `intranetNEW` + lokální replika ze `scripts/dev/servicedesk_external_schema.sql`), dev DB upgradovaná. Playwright skript (bundled driver z E2E bin) projde: dashboard projektu s IS i bez IS; každou dlaždici souhrnu (přepne záložku a filtr); Záznamy (filtr, rozbalení, odkaz); NES (filtry, rozbalení timeline, Hrozí, Nelze vyhodnotit, export stáhne `.xlsx`); Statistiky (rok, kvartál, „Zobrazit data"); přepnutí tmavého režimu s otevřenými grafy (Review Focus 4); šířka 390 px bez horizontálního scrollu. Snímky světlý i tmavý do scratchpadu a poslat ti je.
-- [ ] **Step 3: Parita se ServiceDeskem (s tebou).** Vyexportuješ „Dní penále" ze starého ServiceDesku pro 20–30 ticketů. Lokální skript porovná ticket × dodavatel × dny s výstupem `ProdleniService` (reálná data nejdou do gitu). Engine čte stejná data jako ServiceDesk, takže každý rozdíl je chyba portu: rozebrat po kódech T a opravit. Výjimkou jsou jen tickety s důležitostí bez SLA řádku, kde se záměrně liší (spec §16 R6).
-- [ ] **Step 4: Merge do `main`** po zelených testech a tvém odsouhlasení paritního výsledku. Před nasazením zabalit `publish.zip`.
+- [ ] **Step 1: E2E audit palety** — do `PmTracker.Tests.E2E/Scenarios/ThemePaletteAuditTests.cs` přidat dashboard projektu (všechny tři záložky, grafy vykreslené) pro světlý i tmavý motiv.
+- [ ] **Step 2: Celé suity** — `dotnet test PmTracker.Tests.Unit`, `dotnet test PmTracker.Tests.Api`, `npm test`, `dotnet test PmTracker.Tests.Integration` (známé selhání jen `ProposalRejectAndTakeOver`), E2E: porovnat jména selhání proti baseline 32 jmen (paměť `project_e2e_baseline_failures`), ne počet. Po restartu stroje nejdřív `colima start`.
+- [ ] **Step 3: Lokální app** s env connection stringy (PM DB + lokální `intranetNEW` + lokální replika ze `scripts/dev/servicedesk_external_schema.sql`), dev DB upgradovaná. Playwright skript (bundled driver z E2E bin) projde: dashboard projektu s IS i bez IS; každou dlaždici souhrnu (přepne záložku a filtr); Záznamy (filtr, rozbalení, odkaz); NES (filtry, rozbalení timeline, Hrozí, Nelze vyhodnotit, export stáhne `.xlsx`); Statistiky (rok, kvartál, „Zobrazit data"); přepnutí tmavého režimu s otevřenými grafy (Review Focus 4); šířka 390 px bez horizontálního scrollu. Snímky světlý i tmavý do scratchpadu a poslat ti je.
+- [ ] **Step 4: Parita se ServiceDeskem (s tebou).** Vyexportuješ „Dní penále" ze starého ServiceDesku pro 20–30 ticketů. Lokální skript porovná ticket × dodavatel × dny s výstupem `ProdleniService` (reálná data nejdou do gitu). Engine čte stejná data jako ServiceDesk, takže každý rozdíl je chyba portu: rozebrat po kódech T a opravit. Výjimkou jsou jen tickety s důležitostí bez SLA řádku, kde se záměrně liší (spec §16 R6).
+- [ ] **Step 5: Merge do `main`** po zelených testech a tvém odsouhlasení paritního výsledku, doplnit merge hash do `docs/k-otestovani.md`. Před nasazením zabalit `publish.zip`.

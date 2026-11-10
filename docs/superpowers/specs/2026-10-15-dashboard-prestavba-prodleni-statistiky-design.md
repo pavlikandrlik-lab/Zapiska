@@ -363,7 +363,7 @@ Karty grafů jdou dvě vedle sebe (`flex: 1 1 420px`), na úzké obrazovce pod s
 
 ## 12. Vizuální systém
 
-- **Barvy výhradně přes gov DS tokeny** (paměť `feedback_dark_mode_gov_tokens`). Do `:root` v `site.css` přibudou grafové aliasy `--pm-chart-1…4`, `--pm-chart-status-good/warning/critical/neutral`, `--pm-chart-grid`, `--pm-chart-axis-text` namapované na gov rampy (`--color-primary-*`, `--color-secondary-*`, `--color-neutral-*`, `--color-success/warning/error-*`). Žádný hex, žádné nové `data-theme="dark"` pravidlo.
+- **Barvy výhradně přes sémantické tokeny gov DS** (`--background-*`, `--text-*`, `--border-*`, `--icon-*`, `--status-*`; pravidla v `docs/architecture/tokens.md`, převod 2026-10-15). Staré aliasy `--pm-color-*` už neexistují. Jediné, co gov nemá, jsou kategorické barvy grafů: přibudou jako `--app-chart-1…3` a `--app-chart-neutral` **jen v `css/tokens.css`** pro světlý i tmavý motiv, poskládané z gov ramp (`--color-primary-*`, `--color-secondary-*`, `--color-neutral-*`). Stavové barvy grafů berou přímo gov `--background-status-*` / `--border-error|success|warning`. Hlídají to `AppCssColorTokenTests` (Unit) a `ThemePaletteAuditTests` (E2E).
 - **Paleta se validuje skriptem** `dataviz/scripts/validate_palette.js` pro světlý i tmavý povrch (CVD ΔE ≥ 8 na sousedních párech). Gov DS má jen modrou, jantarovou a neutrální rampu, proto grafy používají **nejvýš 3 kategorické barvy**. Víc kategorií (dodavatelé, vlastníci) se kreslí jedním odstínem a seřazením, nikdy ne duhou.
 - **Stavové barvy** (success/warning/error) jsou vyhrazené pro stav (V prodlení, Hotovo…) a vždy je doplňuje ikona nebo text.
 - **ECharts téma:** `echartsRender.js` při inicializaci přečte vyřešené hodnoty tokenů (`getComputedStyle`) a postaví z nich téma. `MutationObserver` na `<html data-theme>` grafy po přepnutí tématu přebarví.
@@ -371,7 +371,7 @@ Karty grafů jdou dvě vedle sebe (`flex: 1 1 420px`), na úzké obrazovce pod s
   - Mřížka a osy tlumené, tooltip na každém grafu, legenda od 2 sérií, přímé popisky jen u donutu a horizontálních sloupců.
   - Jedna osa Y, nikdy dvě.
 - **Tabulkový pohled:** každá karta grafu má `<details>` „Zobrazit data" se serverově vykreslenou tabulkou z `ChartData`. Slouží pro přístupnost, tisk i ověření čísel.
-- **Karty:** pozadí `--pm-color-background`, okraj `--pm-color-border`, radius `--pm-radius-m`, padding `--pm-spacing-l`. Nadpis 14px semibold, pod ním jednořádkový insight v `--pm-color-text-muted`.
+- **Karty:** pozadí `--background-block-primary`, okraj `--border-subtle`, radius `--pm-radius-m`, padding `--pm-spacing-l`. Nadpis 14px semibold, pod ním jednořádkový insight v `--text-secondary`.
 - **Edge na i15** (paměť `feedback_i15_edge_css_compat`): nosný layout jen přes flex a flex-wrap, žádné `:has`/`max-content` jako nosné. CSS jde do nového `wwwroot/css/components/project-dashboard.css`, které se servíruje s `charset=utf-8`.
 - **Tisk:** `@media print`: karty `break-inside: avoid`, souhrnný pás a záložky se skryjí, aktivní panel se vytiskne.
 
