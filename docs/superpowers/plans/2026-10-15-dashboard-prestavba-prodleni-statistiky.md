@@ -26,7 +26,7 @@
 - Ticket bez `HOT_ZAZNAMY.id` je mimo rozsah. `typ_zaznamu` vždy `Trim().ToUpperInvariant()`.
 - **Hodnotí se jen tickety s řádkem v `ticket_external`** (párování `external_id.Trim()` = `HOT_ZAZNAMY.id`, nečíselné `external_id` se ignoruje stejně jako v `MOSD_External.GetSyncedTickets`). Ostatní se neřeší a nikde nezobrazují.
 - **„V prodlení" = ticket je právě u dodavatele** (poslední předávka 1/2 bez následné 3) **a má penalizované dny > 0.** Platí pro NES, PMP i PNF.
-- SLA hodiny = přesná shoda `HOT_ZAZNAMY.dulezitost` s `ticket_external_sla.sla_name` (ordinal, bez ořezu), převod `Convert.ToInt32`. Chybějící řádek → „Nelze vyhodnotit", nikdy 0 h.
+- SLA hodiny = shoda `HOT_ZAZNAMY.dulezitost.Trim()` s `ticket_external_sla.sla_name.Trim()` (ordinal, velikost písmen se rozlišuje; spec §16 R8), převod `Convert.ToInt32`. Chybějící řádek → „Nelze vyhodnotit", nikdy 0 h.
 - Connection string `ServiceDeskExternalReadOnly` a čtecí právo zajišťuje správce. Kód se nesmí vázat na konkrétní server ani název databáze. Bez connection stringu běží `Disabled*` fallback.
 - Akceptace kalkulace = zákazový seznam (helper v `SqlTicketingQueryService`), nikdy filtr na jednu hodnotu.
 - Api testy kotvit na atributy a ASCII, ne na českou diakritiku.
@@ -98,7 +98,7 @@ Jediná věc o databázi ServiceDesku, kterou z `Hotline (2).cs` nevyčtu: kód 
 - [x] **Step 1:** Od tebe název sloupce v `ticket_external_workflow`, který ukazuje na `ticket_external.id`. **Hotovo 2026-11-10 z `ServiceDesk.edmx`** (EF6 model `ServiceDeskEntities`, dodal uživatel, root repa, v `.gitignore`): **`id_ticket_external`** (int, NOT NULL), cizí klíč `FK_ticket_external_workflow_ticket_external`. Celé schéma tří tabulek je ve spec §6.1.
 - [x] **Step 2: GATE pro Task 3** — splněno.
 
-Typy sloupců jsou z EDMX známé (spec §6.1): všechny klíče `int`, `sla_hours` `float`, `transfertype` `int`. Projekce v Task 4 je přesto může převádět `CAST`em, pokud by se produkční DB od modelu lišila.
+Typy sloupců jsou z EDMX známé (spec §6.1): všechny klíče `int identity`, `sla_hours` `float`, `transfertype` `int`, `external_id` `varchar(50)`. Mapují se přímo, bez `CAST`; test `Mapovani_tabulek_a_sloupcu` v Task 3 je drží.
 
 ---
 
@@ -316,7 +316,7 @@ Formatter: `PenaltyReasonFormatterTests` — pro každý kód jedna věta obsahu
 internal sealed class TicketExternalEntity        // ticket_external
 {
     public int Id { get; set; }                   // id
-    public string? ExternalId { get; set; }       // external_id (= HOT_ZAZNAMY.id jako text)
+    public string ExternalId { get; set; } = "";  // external_id varchar(50) NOT NULL (= HOT_ZAZNAMY.id jako text); mapovat IsUnicode(false), jinak EF pošle nvarchar parametry a SQL převádí sloupec řádek po řádku
     public int? ExternalSyncId { get; set; }      // external_sync_id
     public string? SupplierTag { get; set; }      // supplier_tag
     public string? SlaName { get; set; }          // sla_name (SLA dodavatele, jen zobrazení)
@@ -454,7 +454,7 @@ Pravidla:
 - **V prodlení** = u dodavatele a `PocetDni > 0`. Ticket zpět u nás v seznamu není (spec §10).
 - **Hrozí** = u dodavatele, `PocetDni == 0`, NES: `AktualniDeadline − teď ≤ 48 h`, PMP/PNF: `termín − teď ≤ 5 dní`. Konstanty `HroziNesHodin = 48`, `HroziTerminDni = 5`.
 - **Nelze vyhodnotit** = u dodavatele a výsledek s chybou. Chyba u ticketu, který u dodavatele není, se nezobrazuje.
-- `SlaHodiny` pro engine = `katalog.TryGetValue(dulezitost)` se `StringComparer.Ordinal`. Chybějící hodnota se zaloguje `LogWarning` jednou za načtení katalogu (seznam chybějících důležitostí).
+- `SlaHodiny` pro engine = `katalog.TryGetValue(dulezitost?.Trim())`, kde katalog má klíče `sla_name.Trim()` se `StringComparer.Ordinal` (spec §16 R8). Kolize klíčů po ořezu → vyhrává nižší `id`, `LogWarning`. Chybějící hodnota se zaloguje `LogWarning` jednou za načtení katalogu (seznam chybějících důležitostí).
 - Více dodavatelů = položka na dodavatele s `ViceDodavatelu = true`.
 - Cache: přehled `prodleni:{isId}:{den:yyyyMMdd}:{obdobiOd?}` 10 min, SLA katalog `prodleni:sla` 1 h.
 - Výjimka z `IProdleniQueryService` → `LogWarning` s isId, výsledek `Stav = Nedostupne`, necachovat.
@@ -467,6 +467,8 @@ Pravidla:
   - `Vice_dodavatelu_dve_polozky`
   - `Razeni_podle_dni_sestupne`
   - `Chybejici_sla_zaloguje_jednou` (2 tickety se stejnou chybějící důležitostí → 1 warning)
+  - `Sla_parovani_orezava_mezery_na_obou_stranach` (`dulezitost = "NES II "`, `sla_name = "NES II"` → 16 h; `"nes ii"` se nespáruje)
+  - `Sla_kolize_po_orezu_bere_nizsi_id` (`"NES I"` id 3 a `"NES I "` id 7 → hodnota z id 3 + warning)
   - `Druhe_volani_z_cache` (fake query počítá volání = 1)
   - `GetPrehled_pri_vyjimce_dotazu_vraci_stav_nedostupne` (Review Focus 3)
 - [ ] **Step 2: FAIL** — `dotnet test PmTracker.Tests.Unit --filter "FullyQualifiedName~ProdleniService"`
@@ -531,6 +533,8 @@ JS (`projectDashboard.js`): lazy-load panelu na `pm-tab-change` (logika `ensureP
 - [ ] **Step 5: Commit** `feat(dashboard): nový shell — hlavička, souhrnný pás, systémové pm-tabs`
 
 ### Task 7: Záložka Záznamy — vzhled a počty
+
+**Pojistka (revize 2026-11-10):** výpočet záložky opravený 2026-11-10 (`dd26baf` kroky bez plánu se nehodnotí, `18ca203` skutečný termín jen z vyplněné skutečnosti; `DashboardScheduleSnapshotBuilder`, `DashboardRecordCategorizer`, `ProjectDashboardService.BuildRecordsPanelAsync`) se v tomto tasku **nemění**. Task jen přebírá hotový VM a mění vzhled. Testy `DashboardScheduleSnapshotBuilderTests`, `ProjectDashboardRecordCategorizationTests`, `ProjectDashboardStepDetailTests` a `PriorityMilestoneTests` musí zůstat zelené beze změny.
 
 **Files:**
 - Modify: `_RecordsPanel.cshtml`, `ProjectDashboardViewModels.cs` (`ProjectDashboardRecordsPanelViewModel` + `PocetPodleKategorie`), `projectDashboard.js` (filtr reaguje i na `pm:dashboard-filter`), `project-dashboard.css`

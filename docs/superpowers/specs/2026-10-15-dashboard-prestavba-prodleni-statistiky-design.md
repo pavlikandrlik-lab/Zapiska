@@ -114,7 +114,7 @@ Port je **1:1** včetně zvláštností originálu. Odchylky jsou jen ty vyjmeno
 2. Hledání prodloužení (`GetProlongationSegment`) najde U11 jen tehdy, když po obrátce existuje U3. U ticketu, který je stále u dodavatele, prodloužení uplatní až závěrečné prominutí T14.
 3. U NES s parametrem `beforebound = true` se U11 hledá i před aktuální obrátkou.
 4. „Pracovní čas" znamená celý pracovní den 00:00–24:00, ne pracovní doba 8–16.
-5. SLA hodiny se hledají **přesnou shodou** textu `HOT_ZAZNAMY.dulezitost` s `ticket_external_sla.sla_name` (bez ořezu mezer, rozlišují se velká a malá písmena).
+5. SLA hodiny se hledají shodou textu `HOT_ZAZNAMY.dulezitost` s `ticket_external_sla.sla_name`. Velká a malá písmena se rozlišují jako v originálu. **Odchylka (R8):** na obou stranách se ořežou mezery na začátku a konci; originál neořezává.
 6. SLA hodiny (`double`) se převádějí na celé hodiny přes `Convert.ToInt32`, tedy zaokrouhlením na nejbližší celé číslo, při .5 na sudé (2,5 → 2; 3,5 → 4).
 
 Technické změny, které chování nemění: `DateTime.Now` se nahradí injektovaným `TimeProvider`, string důvody strukturovanými záznamy, celočíselné dělení v textu T01 správným výpočtem hodin (týká se jen zobrazení) a mutace přes `ref` čistými návratovými hodnotami. Statická SLA cache originálu (načte se jednou za běh aplikace) se nahradí `IMemoryCache` s platností 1 hodina.
@@ -150,20 +150,20 @@ V `intranetNEW` workflow tabulka není (discovery `SD_servicedesk/01_discovery.s
 | | `supplier_tag`, `sla_name`, `kp_name` | nvarchar(50) | ano | |
 | | `supplier_id` | nvarchar(10) | ano | |
 | | `product_name`, `version_name`, `category_name` | nvarchar(25) | ano | |
-| `ticket_external_workflow` | `id` | int | ne | PK |
+| `ticket_external_workflow` | `id` | int identity | ne | PK |
 | | **`id_ticket_external`** | int | ne | FK `FK_ticket_external_workflow_ticket_external` → `ticket_external.id` (1 : N) |
 | | `date` | datetime | ne | |
 | | `transfertype` | int | ano | |
 | | `supplier` | nvarchar(50) | ano | |
 | | `dt_param` | datetime | ano | |
-| `ticket_external_sla` | `id` | int | ne | PK |
-| | `sla_name` | nvarchar(8) | ne | originál ji načítá do slovníku (`Dictionary.Add`), duplicita by shodila i starý SD |
+| `ticket_external_sla` | `id` | int identity | ne | PK |
+| | `sla_name` | nvarchar(8) | ne | originál ji načítá do slovníku (`Dictionary.Add`), přesná duplicita by shodila i starý SD; po ořezu mezer (R8) bere PM Tracker při kolizi řádek s nižším `id` a zaloguje varování |
 | | `sla_hours` | float | ne | |
 
 Důsledky:
 - Spojení předávek: `ticket_external_workflow.id_ticket_external = ticket_external.id` (uzavírá Task 0 plánu).
 - `sla_name` má nejvýš 8 znaků. Hodnoty důležitosti NES (`NES I` … `Vada D`, nejdelší `NES III`) i `Neurčeno` se vejdou. PMP/PNF SLA hodiny nepotřebují (řídí je termín plnění z `dt_param`), takže delší `Pozadavek` (9 znaků) nevadí.
-- `HOT_ZAZNAMY.dulezitost` je `nvarchar(10)` (ne `char`), přesná shoda bez ořezu (§5.4 bod 5) tedy neselže na doplňujících mezerách.
+- `HOT_ZAZNAMY.dulezitost` je `nvarchar(10)`. **Typ sloupce ale nezaručuje, že hodnoty nemají mezery na konci:** `typ_zaznamu` je podle průzkumu taky `nvarchar(5)`, a přesto v produkci obsahoval „PMP  " (paměť `feedback_typzaznamu_char5_normalization`). Z průzkumu se to u `dulezitost` ověřit nedá, protože export běžel se `sqlcmd -W`, který mezery na konci ořezává. Párování proto ořezává obě strany (§5.4 bod 5, R8).
 - Ostatní tabulky modelu (`notification`, `notification_category`, `user`, `user_has_notifications`) PM Tracker nečte.
 
 ### 6.2 Konfigurace a přístup
@@ -413,3 +413,4 @@ Beze změny klíčů: `dashboard.view`, `dashboard.records.view`, `dashboard.nes
 | R5 | Předání PMP/PNF bez termínu | Odpadá: termín je ve sloupci `dt_param`, žádné parsování textu. Chová se 1:1 jako originál (T04). |
 | R6 | Důležitost bez řádku v `ticket_external_sla` | Originál by přes `Convert.ToInt32(null)` dosadil 0 h SLA a penalizoval od prvního dne. Podle tebe důležitost u NES nikdy není prázdná, takže tahle situace znamená chybu dat nebo katalogu → **„Nelze vyhodnotit"** s důvodem, žádné falešné penále. |
 | R7 | Connection string a přístup | Vyplňuje správce v `appsettings.json` (`ConnectionStrings:ServiceDeskExternalReadOnly`), čtecí právo zajišťuje také správce. |
+| R8 | Mezery v důležitosti při párování se SLA | Ořez na obou stranách, rozlišení velikosti písmen zůstává (revize 2026-11-10). Originál by u hodnoty s mezerou na konci nenašel SLA a dosadil 0 h. S ořezem se liší jen v tomto případě, který je u originálu sám chybou. |
