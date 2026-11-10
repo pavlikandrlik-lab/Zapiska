@@ -51,6 +51,19 @@ public sealed class ProjectDashboardService : IProjectDashboardService
         };
     }
 
+    internal static ProjectDashboardStepDetailViewModel MapStepDetail(
+        ScheduleStepSnapshot step, DashboardRecordCategory category, DateTime referenceDate)
+        => new()
+        {
+            StepName = step.Name,
+            PlannedDate = step.PlanEndDate,
+            // Jen skutečně vyplněná skutečnost — u kroku bez ní je ActualEndDate dosazený konec plánu.
+            ActualDate = step.MaSkutecnost ? step.ActualEndDate : null,
+            OffsetDays = step.OffsetDays,
+            DaysSincePlanExpired = category == DashboardRecordCategory.AwaitingActual
+                ? (referenceDate - step.PlanEndDate).Days : 0
+        };
+
     public async Task<ProjectDashboardRecordsPanelViewModel> BuildRecordsPanelAsync(int projectId, DateTime referenceDate, CancellationToken ct = default)
     {
         var taskCategoryIds = await _dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
@@ -120,19 +133,7 @@ public sealed class ProjectDashboardService : IProjectDashboardService
                     return new ScheduleDateStep(def.Poradi, row?.PlanDatum, row?.SkutecnostDatum);
                 })
                 .ToList();
-            var computed = ScheduleDateCalculator.Compute(record.DatumZalozeni, steps, referenceDate);
-
-            var snapshots = computed.Select(c =>
-            {
-                // Dashboard kategorizace pracuje jen se SKUTEČNĚ vyplněnou skutečností; projekci
-                // aktuálního kroku do dneška (vizuální prvek lišty) sem nepouštíme (JeAktualniKrok guard).
-                var maRealnouSkutecnost = c.MaSkutecnost && !c.JeAktualniKrok;
-                var nazev = HarmonogramKroky.Vse.First(d => d.Poradi == c.Poradi).Nazev;
-                var actualEnd = maRealnouSkutecnost ? c.SkutecnostEnd : c.PlanEnd;
-                var duration = (c.PlanEnd - c.PlanStart).Days;
-                var offset = maRealnouSkutecnost ? (c.SkutecnostEnd - c.PlanEnd).Days : 0;
-                return new ScheduleStepSnapshot(c.Poradi, nazev, c.PlanEnd, actualEnd, duration, offset);
-            }).ToList();
+            var snapshots = DashboardScheduleSnapshotBuilder.Build(record.DatumZalozeni, steps, referenceDate);
 
             var categorization = DashboardRecordCategorizer.CategorizeRecord(
                 snapshots, referenceDate, DashboardRecordCategorizer.DefaultApproachingThresholdDays);
@@ -153,15 +154,9 @@ public sealed class ProjectDashboardService : IProjectDashboardService
                 TerminUkonceni = record.DatumUkonceni,
                 Category = categorization.Category,
                 WorstOffsetDays = categorization.WorstOffsetDays,
-                ProblematicSteps = categorization.ProblematicSteps.Select(ps => new ProjectDashboardStepDetailViewModel
-                {
-                    StepName = ps.Step.Name,
-                    PlannedDate = ps.Step.PlanEndDate,
-                    ActualDate = ps.StepCategory == DashboardRecordCategory.AwaitingActual ? null : ps.Step.ActualEndDate,
-                    OffsetDays = ps.Step.OffsetDays,
-                    DaysSincePlanExpired = ps.StepCategory == DashboardRecordCategory.AwaitingActual
-                        ? (referenceDate - ps.Step.PlanEndDate).Days : 0
-                }).ToList(),
+                ProblematicSteps = categorization.ProblematicSteps
+                    .Select(ps => MapStepDetail(ps.Step, ps.StepCategory, referenceDate))
+                    .ToList(),
                 ScheduleUrl = $"/Projekty/Detail/{projectId}?tab=harmonogram&recordId={record.Id}"
             });
         }

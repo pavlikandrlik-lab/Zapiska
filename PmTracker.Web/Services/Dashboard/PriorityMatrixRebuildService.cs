@@ -396,7 +396,7 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
                 group => (IReadOnlyList<ZaznamHarmonogramKrokEntity>)group.ToList());
     }
 
-    private static DateOnly? ResolveNearestFutureMilestoneDate(
+    internal static DateOnly? ResolveNearestFutureMilestoneDate(
         DateOnly today,
         DateTime startDate,
         IReadOnlyList<ZaznamHarmonogramKrokEntity> krokRows)
@@ -410,7 +410,11 @@ internal sealed class PriorityMatrixRebuildService : IPriorityMatrixRebuildServi
             })
             .ToList();
         var computed = ScheduleDateCalculator.Compute(startDate.Date, steps, today.ToDateTime(TimeOnly.MinValue));
+        // Milník je jen skutečný plán kroku. Krok bez plánu má konec plánu dopočtený (konec
+        // předchozího plánu nebo datum založení) — u záznamu založeného dnes by to byl milník „dnes“.
+        var poradiSPlanem = steps.Where(s => s.PlanDatum.HasValue).Select(s => s.Poradi).ToHashSet();
         var nextStep = computed
+            .Where(c => poradiSPlanem.Contains(c.Poradi))
             .Where(c => DateOnly.FromDateTime(c.PlanEnd) >= today)
             .OrderBy(c => c.PlanEnd)
             .FirstOrDefault();

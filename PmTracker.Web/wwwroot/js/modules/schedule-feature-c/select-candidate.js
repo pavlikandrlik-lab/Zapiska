@@ -97,22 +97,6 @@
                     chatButton.setAttribute('title', tooltip);
                     chatButton.setAttribute('aria-label', tooltip);
                 }
-
-                // FIX 2026-05-05: pokud je tato cell krok 10 (poslední krok = "Skutečné dokončení"
-                // celého záznamu), aktualizuj globální souhrn pole `[data-schedule-summary-shifted]`.
-                // Server-side render je ze ScheduleTimelineCalculator.Summarize → Steps[^1].ActualEndDate
-                // (= krok 10), tedy bez page reload by user viděl stale hodnotu po chevron změně.
-                // User explicit požadavek: "vždy tahané z hodnoty kroku 10 skutečnosti".
-                const krokPoradi = parseInt(cell.getAttribute('data-krok-poradi') || '0', 10);
-                if (krokPoradi === 10) {
-                    const block = cell.closest('[data-schedule-block]')
-                        || cell.closest('form')
-                        || document;
-                    const summarySpan = block.querySelector('[data-schedule-summary-shifted]');
-                    if (summarySpan instanceof HTMLElement) {
-                        summarySpan.textContent = newDatumText;
-                    }
-                }
             }
         }
 

@@ -8,7 +8,8 @@ public sealed record ScheduleStepSnapshot(
     DateTime PlanEndDate,
     DateTime ActualEndDate,
     int DurationDays,
-    int OffsetDays);
+    int OffsetDays,
+    bool MaSkutecnost);
 
 public sealed record RecordCategorizationResult(
     DashboardRecordCategory Category,
@@ -22,9 +23,9 @@ public static class DashboardRecordCategorizer
     /// <summary>
     /// Categorizes a single schedule step.
     /// - Delayed: actual is behind plan (OffsetDays > 0)
-    /// - AwaitingActual: plan date has passed but actual equals plan (no real actual recorded yet, offset is 0)
-    /// - ApproachingDeadline: plan date is within threshold days in the future, no actual yet (offset is 0)
-    /// Returns null if step is on track.
+    /// - AwaitingActual: no actual yet and the plan date has passed
+    /// - ApproachingDeadline: no actual yet and the plan date is within threshold days in the future
+    /// Returns null if step is on track. A step finished on (or before) its plan date is on track.
     /// </summary>
     public static DashboardRecordCategory? CategorizeStep(ScheduleStepSnapshot step, DateTime referenceDate, int approachingThresholdDays)
     {
@@ -34,15 +35,22 @@ public static class DashboardRecordCategorizer
             return DashboardRecordCategory.Delayed;
         }
 
-        // Plan date is in the past, offset is 0, actual <= plan — waiting for actual data
-        if (step.PlanEndDate < referenceDate && step.OffsetDays == 0 && step.ActualEndDate <= step.PlanEndDate)
+        // Step finished on or before its plan date is on track. Detecting "no actual" from
+        // offset 0 alone flagged a step finished exactly on its plan date as awaiting actual.
+        if (step.MaSkutecnost)
+        {
+            return null;
+        }
+
+        // Plan date is in the past and no actual yet — waiting for actual data
+        if (step.PlanEndDate < referenceDate)
         {
             return DashboardRecordCategory.AwaitingActual;
         }
 
-        // Plan date is in the near future, offset is 0 — approaching deadline
+        // Plan date is in the near future and no actual yet — approaching deadline
         var daysUntilPlan = (step.PlanEndDate - referenceDate).Days;
-        if (daysUntilPlan >= 0 && daysUntilPlan <= approachingThresholdDays && step.OffsetDays == 0)
+        if (daysUntilPlan >= 0 && daysUntilPlan <= approachingThresholdDays)
         {
             return DashboardRecordCategory.ApproachingDeadline;
         }
