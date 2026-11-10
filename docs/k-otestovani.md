@@ -300,7 +300,7 @@ Navíc prošlo:
 
 ## 8. Dashboard — kroky bez plánu; úklid editoru harmonogramu
 
-**Hotovo 2026-11-10:** merge `MERGE_HASH`. Bez samostatné spec (odložené drobnosti ze sekce 7, rozhodnutí 2026-11-10); pravidla dopsaná do `docs/specs/harmonogram-plan-vs-skutecnost.md` (kapitola Dashboard projektu).
+**Hotovo 2026-11-10:** merge `656f634`. Bez samostatné spec (odložené drobnosti ze sekce 7, rozhodnutí 2026-11-10); pravidla dopsaná do `docs/specs/harmonogram-plan-vs-skutecnost.md` (kapitola Dashboard projektu).
 
 **Co to dělá:**
 - **Dashboard projektu → záložka Záznamy** (problémové záznamy) hodnotí jen kroky s **vlastním plánem**. Dřív se u kroku bez plánu dosazoval konec předchozího plánu nebo datum založení, takže:
