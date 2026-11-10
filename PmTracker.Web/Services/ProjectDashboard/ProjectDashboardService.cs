@@ -51,6 +51,19 @@ public sealed class ProjectDashboardService : IProjectDashboardService
         };
     }
 
+    internal static ProjectDashboardStepDetailViewModel MapStepDetail(
+        ScheduleStepSnapshot step, DashboardRecordCategory category, DateTime referenceDate)
+        => new()
+        {
+            StepName = step.Name,
+            PlannedDate = step.PlanEndDate,
+            // Jen skutečně vyplněná skutečnost — u kroku bez ní je ActualEndDate dosazený konec plánu.
+            ActualDate = step.MaSkutecnost ? step.ActualEndDate : null,
+            OffsetDays = step.OffsetDays,
+            DaysSincePlanExpired = category == DashboardRecordCategory.AwaitingActual
+                ? (referenceDate - step.PlanEndDate).Days : 0
+        };
+
     public async Task<ProjectDashboardRecordsPanelViewModel> BuildRecordsPanelAsync(int projectId, DateTime referenceDate, CancellationToken ct = default)
     {
         var taskCategoryIds = await _dbContext.CiselnikKategoriiZaznamu.AsNoTracking()
@@ -141,15 +154,9 @@ public sealed class ProjectDashboardService : IProjectDashboardService
                 TerminUkonceni = record.DatumUkonceni,
                 Category = categorization.Category,
                 WorstOffsetDays = categorization.WorstOffsetDays,
-                ProblematicSteps = categorization.ProblematicSteps.Select(ps => new ProjectDashboardStepDetailViewModel
-                {
-                    StepName = ps.Step.Name,
-                    PlannedDate = ps.Step.PlanEndDate,
-                    ActualDate = ps.StepCategory == DashboardRecordCategory.AwaitingActual ? null : ps.Step.ActualEndDate,
-                    OffsetDays = ps.Step.OffsetDays,
-                    DaysSincePlanExpired = ps.StepCategory == DashboardRecordCategory.AwaitingActual
-                        ? (referenceDate - ps.Step.PlanEndDate).Days : 0
-                }).ToList(),
+                ProblematicSteps = categorization.ProblematicSteps
+                    .Select(ps => MapStepDetail(ps.Step, ps.StepCategory, referenceDate))
+                    .ToList(),
                 ScheduleUrl = $"/Projekty/Detail/{projectId}?tab=harmonogram&recordId={record.Id}"
             });
         }
