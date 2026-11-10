@@ -2,7 +2,8 @@
  * schedule/block.js — ScheduleBlockRenderer class.
  *
  * Fáze 3B Task 2: vyextrahováno ze schedule.js (1697 LOC).
- * Cohesive ~850 LOC unit — kept intact (no internal decomposition).
+ * Živý náhled editoru harmonogramu: souhrn, graf a meze kalendáře plánu. Pole trvání
+ * a odchylky ve dnech, tlačítka +/− a Rozpad z offsetového modelu odstraněny 2026-11-10.
  */
 
 import {
@@ -50,11 +51,6 @@ function toSchedulePercent(valueDate, axisStart, totalDays) {
     return Math.max(0, Math.min(100, (days * 100) / totalDays));
 }
 
-function toScheduleWidthPercent(startDate, endDate, totalDays) {
-    const days = Math.max(0, diffCalendarDays(endDate, startDate));
-    return Math.max(0, Math.min(100, (days * 100) / totalDays));
-}
-
 function formatSchedulePercent(value) {
     return `${Number.isFinite(value) ? value.toFixed(4) : "0.0000"}%`;
 }
@@ -66,10 +62,6 @@ function formatScheduleSegmentWidth(value) {
 
     // Sjednocení souřadnic s osou/markery (2026-06-23): bez +1px hacku, šířka = přesné %.
     return `${value.toFixed(4)}%`;
-}
-
-function formatScheduleOffsetLabel(delay) {
-    return delay > 0 ? `+${delay} dnů` : `${delay} dnů`;
 }
 
 export class ScheduleBlockRenderer {
@@ -87,52 +79,19 @@ export class ScheduleBlockRenderer {
             : null;
         this.summaryDeadline = root.querySelector("[data-schedule-summary-deadline]");
         this.summaryBaseline = root.querySelector("[data-schedule-summary-baseline]");
-        this.summaryShifted = root.querySelector("[data-schedule-summary-shifted]");
         this.summaryDuration = root.querySelector("[data-schedule-summary-duration]");
-        this.summaryDelay = root.querySelector("[data-schedule-summary-delay]");
         this.summaryState = root.querySelector("[data-schedule-summary-state]");
-        this.summaryOverrun = root.querySelector("[data-schedule-summary-overrun]");
         this.statusLine = root.querySelector(".schedule-status-line");
         this.overviewAxis = root.querySelector('[data-schedule-axis="overview"]');
-        this.breakdownAxis = root.querySelector('[data-schedule-axis="breakdown"]');
         // „Dnes"/„Termín" jsou nově popisky DNES/TERMÍN na ose (renderTicksFromList z data-axis-*-pct),
         // ne svislé čáry v pruzích — žádné per-řádkové markery se v block.js nedrží.
+        // Editor nemá Rozpad (ten kreslí jen server na kartě a v záložce), proto ho block.js neřeší.
         this.overviewPlannedSegments = this.collectSegmentMap('[data-schedule-segment-kind="planned"]');
         this.overviewActualSegments = this.collectSegmentMap('[data-schedule-segment-kind="actual"]');
-        this.breakdownRows = Array.from(root.querySelectorAll("[data-schedule-breakdown-track]"))
-            .map((track) => {
-                if (!(track instanceof HTMLElement)) {
-                    return null;
-                }
-
-                const row = track.closest("[data-schedule-step-row]");
-                if (!(row instanceof HTMLElement)) {
-                    return null;
-                }
-
-                const stepIndex = Number.parseInt(row.dataset.stepIndex || "", 10);
-                if (!Number.isInteger(stepIndex)) {
-                    return null;
-                }
-
-                return {
-                    row,
-                    stepIndex,
-                    offset: row.querySelector("[data-schedule-offset]"),
-                    track,
-                    plannedSegment: track.querySelector('[data-schedule-breakdown-segment="planned"]'),
-                    actualSegment: track.querySelector('[data-schedule-breakdown-segment="actual"]')
-                };
-            })
-            .filter((entry) => entry && Number.isInteger(entry.stepIndex))
-            .sort((left, right) => left.stepIndex - right.stepIndex);
         // TODO F-04: editorRows je pole řazené dle stepIndex (KrokIndex, 1-based).
-        // Přístup přes this.editorRows[index] (writeState, applyPlanChronologyBounds)
-        // používá 0-based forEach index — to funguje správně, pokud KrokIndex hodnoty
-        // nemají mezery. Pokud by mezery nastaly (smazaný krok), je potřeba přepsat
-        // na Map<stepIndex, entry> a upravit všechny přístupy (readState, writeState,
-        // applyPlanChronologyBounds, bind). Aktuálně ponecháme pole; při výskytu mezery v KrokIndex
-        // by bylo nutno tuto refaktorizaci dokončit.
+        // Přístup přes this.editorRows[index] (applyPlanChronologyBounds) používá 0-based
+        // forEach index — to funguje správně, pokud KrokIndex hodnoty nemají mezery. Pokud by
+        // mezery nastaly (smazaný krok), je potřeba přepsat na Map<stepIndex, entry>.
         this.editorRows = Array.from(root.querySelectorAll("tr[data-schedule-step-row]"))
             .map((row) => {
                 if (!(row instanceof HTMLTableRowElement)) {
@@ -147,23 +106,14 @@ export class ScheduleBlockRenderer {
                 return {
                     row,
                     stepIndex,
-                    durationInput: row.querySelector("[data-schedule-duration-hidden]") || row.querySelector("[data-schedule-duration]"),
-                    delayInput: row.querySelector("[data-schedule-delay]"),
                     // Spec 2026-10-24: skryté pole plánu uvnitř <pm-date-field>. Selektor
                     // [data-schedule-duration-calendar] trefil obal (nese stejný atribut a je v DOM
                     // dřív), takže meze kalendáře ani přepočet po změně data nikdy nefungovaly.
-                    planInput: row.querySelector('input[name$=".PlanDatum"]'),
-                    durationInc: row.querySelector("[data-schedule-duration-inc]"),
-                    durationDec: row.querySelector("[data-schedule-duration-dec]"),
-                    delayInc: row.querySelector("[data-schedule-delay-inc]"),
-                    delayDec: row.querySelector("[data-schedule-delay-dec]")
+                    planInput: row.querySelector('input[name$=".PlanDatum"]')
                 };
             })
             .filter((entry) => entry && Number.isInteger(entry.stepIndex))
             .sort((left, right) => left.stepIndex - right.stepIndex);
-        const inlineDelayColor = String(root.style.getPropertyValue("--record-schedule-delay-color") || "").trim();
-        const computedDelayColor = window.getComputedStyle(root).getPropertyValue("--record-schedule-delay-color").trim();
-        this.delayColor = inlineDelayColor || computedDelayColor || "var(--app-schedule-delay)";
     }
 
     collectSegmentMap(selector) {
@@ -184,26 +134,7 @@ export class ScheduleBlockRenderer {
     }
 
     isReady() {
-        return this.root instanceof HTMLElement
-            && (this.editorRows.length > 0 || this.breakdownRows.length > 0);
-    }
-
-    normalizeInt(input) {
-        if (!(input instanceof HTMLInputElement)) {
-            return 0;
-        }
-
-        const parsed = Number.parseInt((input.value || "").trim(), 10);
-        return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
-    }
-
-    normalizeSignedInt(input) {
-        if (!(input instanceof HTMLInputElement)) {
-            return 0;
-        }
-
-        const parsed = Number.parseInt((input.value || "").trim(), 10);
-        return Number.isFinite(parsed) ? parsed : 0;
+        return this.root instanceof HTMLElement && this.editorRows.length > 0;
     }
 
     getStartDate() {
@@ -220,76 +151,6 @@ export class ScheduleBlockRenderer {
         }
 
         return parseIsoDate(this.root.dataset.scheduleDeadline) || startDate;
-    }
-
-    readTypeId(input) {
-        if (!(input instanceof HTMLInputElement)) {
-            return 0;
-        }
-
-        const stacked = input.closest(".schedule-stacked-input");
-        if (!(stacked instanceof HTMLElement)) {
-            return 0;
-        }
-
-        const hidden = stacked.querySelector("input[type='hidden']");
-        if (!(hidden instanceof HTMLInputElement)) {
-            return 0;
-        }
-
-        return Number.parseInt(hidden.value || "0", 10) || 0;
-    }
-
-    readState() {
-        if (this.editorRows.length > 0) {
-            return this.editorRows.map((entry) => ({
-                stepIndex: entry.stepIndex,
-                name: String(entry.row.dataset.stepName || "").trim(),
-                color: String(entry.row.dataset.stepColor || "").trim(),
-                duration: this.normalizeInt(entry.durationInput),
-                delay: this.normalizeSignedInt(entry.delayInput),
-                durationTypeId: this.readTypeId(entry.durationInput),
-                delayTypeId: this.readTypeId(entry.delayInput)
-            }));
-        }
-
-        return this.breakdownRows.map((entry) => ({
-            stepIndex: entry.stepIndex,
-            name: String(entry.row.dataset.stepName || "").trim(),
-            color: String(entry.row.dataset.stepColor || "").trim(),
-            duration: Math.max(0, Number.parseInt(entry.row.dataset.stepDuration || "0", 10) || 0),
-            delay: Number.parseInt(entry.row.dataset.stepDelay || "0", 10) || 0,
-            durationTypeId: 0,
-            delayTypeId: 0
-        }));
-    }
-
-    writeState(state) {
-        state.forEach((item, index) => {
-            const entry = this.editorRows[index];
-            if (!entry) {
-                return;
-            }
-
-            if (entry.durationInput instanceof HTMLInputElement) {
-                entry.durationInput.value = String(item.duration);
-            }
-
-            if (entry.delayInput instanceof HTMLInputElement) {
-                entry.delayInput.value = String(item.delay);
-            }
-
-            entry.row.dataset.stepDuration = String(item.duration);
-            entry.row.dataset.stepDelay = String(item.delay);
-        });
-    }
-
-    recalcFromDuration() {
-        this.recalcAll();
-    }
-
-    recalcFromDelay() {
-        this.recalcAll();
     }
 
     setAxisRange(axis, startDate, endDate, monthTicks = null, todayPct = null, deadlinePct = null) {
@@ -446,91 +307,6 @@ export class ScheduleBlockRenderer {
         });
     }
 
-    renderBreakdown(plan, actual, state, startDate, deadlineDate) {
-        if (this.breakdownRows.length === 0) {
-            return;
-        }
-
-        // Rozpad sdílí TUTÉŽ kanonickou osu jako overview (svislé zarovnání) — žádná vlastní osa.
-        const layout = computeAxisLayout({
-            start: startDate,
-            deadline: deadlineDate,
-            today: resolveToday(this.root),
-            steps: buildAxisSteps(plan, actual, state)
-        });
-        const axisStart = layout.axisStart;
-        const axisEnd = layout.axisEnd;
-        const totalDays = layout.totalDays;
-
-        // „Dnes"/„Termín" jsou popisky DNES/TERMÍN na sdílené ose (setAxisRange), ne čáry v každém řádku.
-        this.setAxisRange(this.breakdownAxis, axisStart, axisEnd, layout.monthTicks, layout.todayPct, layout.deadlinePct);
-
-        this.breakdownRows.forEach((entry, index) => {
-            const item = state[index];
-            const planItem = plan[index];
-            const actualItem = actual[index];
-            if (!item || !planItem || !actualItem) {
-                return;
-            }
-
-            if (entry.offset instanceof HTMLElement) {
-                entry.offset.textContent = formatScheduleOffsetLabel(item.delay);
-                entry.offset.classList.toggle("late", item.delay > 0);
-                entry.offset.classList.toggle("ahead", item.delay < 0);
-            }
-
-            if (item.duration <= 0) {
-                this.resetSegmentLayout(entry.plannedSegment);
-                this.resetSegmentLayout(entry.actualSegment);
-                return;
-            }
-
-            const plannedLeft = toSchedulePercent(planItem.start, axisStart, totalDays);
-            const plannedWidth = toScheduleWidthPercent(planItem.start, planItem.end, totalDays);
-            this.applySegmentLayout(
-                entry.plannedSegment,
-                plannedLeft,
-                plannedWidth,
-                `${item.name}: plán ${formatDisplayDate(planItem.start)}-${formatDisplayDate(planItem.end)}`);
-
-            const actualLeft = toSchedulePercent(actualItem.start, axisStart, totalDays);
-            const actualWidth = toScheduleWidthPercent(actualItem.start, actualItem.end, totalDays);
-            this.applySegmentLayout(
-                entry.actualSegment,
-                actualLeft,
-                actualWidth,
-                `${item.name}: skutečnost ${formatDisplayDate(actualItem.start)}-${formatDisplayDate(actualItem.end)}`);
-            // Barva skutečnosti je pevná barva kroku (--seg-color z server renderu); delay-color override zrušen.
-        });
-    }
-
-    getAntiForgeryToken() {
-        // Try the enclosing form first (editor context)
-        if (this.form instanceof HTMLFormElement) {
-            const tokenInput = this.form.querySelector('input[name="__RequestVerificationToken"]');
-            if (tokenInput instanceof HTMLInputElement && tokenInput.value) {
-                return tokenInput.value;
-            }
-        }
-
-        // Fall back to a dedicated data attribute placed by the view
-        const dedicated = this.root.querySelector("[data-schedule-antiforgery]");
-        if (dedicated instanceof HTMLInputElement && dedicated.value) {
-            return dedicated.value;
-        }
-
-        // Last resort: scan the whole document
-        const global = document.querySelector('input[name="__RequestVerificationToken"]');
-        if (global instanceof HTMLInputElement && global.value) {
-            return global.value;
-        }
-
-        return "";
-    }
-
-    // F-07: recalcAll is now async — calls /Schedule/Recalc server endpoint.
-    // Falls back to local buildSchedulePlanAndActual when the fetch fails so the
-    // UI stays functional even if the endpoint is temporarily unavailable.
     // Datum-model (Fáze 3b): editor live-preview počítá POUZE z datumů na frontendu
     // (plán z [name$=".PlanDatum"], skutečnost z manuálního inputu nebo data-step-actual-iso).
     // Žádný server round-trip (/Schedule/Recalc zrušen), žádné offsety. Mirror serverového
@@ -543,7 +319,6 @@ export class ScheduleBlockRenderer {
         const deadlineDate = this.getDeadlineDate(startDate);
         this.renderSummary(state, startDate, deadlineDate);
         this.renderOverview(plan, actual, state, startDate, deadlineDate);
-        this.renderBreakdown(plan, actual, state, startDate, deadlineDate);
         this.applyPlanChronologyBounds();
         queueRainbowSegmentRender(this.root);
     }
@@ -648,136 +423,10 @@ export class ScheduleBlockRenderer {
         return { plan, actual, state, startDate };
     }
 
-    bindNumericStepper(button, input, delta, onChange) {
-        if (!(button instanceof HTMLButtonElement) || !(input instanceof HTMLInputElement)) {
-            return;
-        }
-
-        let repeatDelayTimer = null;
-        let repeatIntervalTimer = null;
-        let suppressClickOnce = false;
-        const repeatDelayMs = 350;
-        const repeatIntervalMs = 70;
-
-        const stopRepeat = () => {
-            if (repeatDelayTimer !== null) {
-                window.clearTimeout(repeatDelayTimer);
-                repeatDelayTimer = null;
-            }
-            if (repeatIntervalTimer !== null) {
-                window.clearInterval(repeatIntervalTimer);
-                repeatIntervalTimer = null;
-            }
-        };
-
-        const stepOnce = () => {
-            if (button.disabled || input.disabled) {
-                return;
-            }
-
-            const isDelayInput = input.hasAttribute("data-schedule-delay");
-            const currentValue = isDelayInput
-                ? this.normalizeSignedInt(input)
-                : this.normalizeInt(input);
-            const nextValue = isDelayInput
-                ? currentValue + delta
-                : Math.max(0, currentValue + delta);
-            input.value = String(nextValue);
-
-            if (nextValue !== currentValue) {
-                onChange();
-            }
-        };
-
-        const startRepeat = () => {
-            suppressClickOnce = true;
-            stepOnce();
-            stopRepeat();
-            repeatDelayTimer = window.setTimeout(() => {
-                repeatIntervalTimer = window.setInterval(() => {
-                    stepOnce();
-                }, repeatIntervalMs);
-            }, repeatDelayMs);
-        };
-
-        button.addEventListener("mousedown", (event) => {
-            if (!(event instanceof MouseEvent) || event.button !== 0) {
-                return;
-            }
-
-            event.preventDefault();
-            startRepeat();
-        });
-
-        button.addEventListener("touchstart", (event) => {
-            event.preventDefault();
-            startRepeat();
-        }, { passive: false });
-
-        button.addEventListener("click", () => {
-            if (suppressClickOnce) {
-                suppressClickOnce = false;
-                return;
-            }
-
-            stepOnce();
-        });
-
-        button.addEventListener("mouseup", stopRepeat);
-        button.addEventListener("mouseleave", stopRepeat);
-        button.addEventListener("touchend", stopRepeat);
-        button.addEventListener("touchcancel", stopRepeat);
-        button.addEventListener("blur", () => {
-            stopRepeat();
-            suppressClickOnce = false;
-        });
-        window.addEventListener("mouseup", (event) => {
-            stopRepeat();
-            if (!(event.target instanceof Element) || !button.contains(event.target)) {
-                suppressClickOnce = false;
-            }
-        });
-    }
-
     bind() {
         if (this.mode !== "record-editor") {
             return;
         }
-
-        this.editorRows.forEach((entry, index) => {
-            if (entry.durationInput instanceof HTMLInputElement) {
-                let durationDebounceTimer = null;
-                entry.durationInput.addEventListener("input", () => {
-                    clearTimeout(durationDebounceTimer);
-                    durationDebounceTimer = setTimeout(() => {
-                        this.recalcFromDuration(index);
-                    }, 150);
-                });
-                entry.durationInput.addEventListener("change", () => {
-                    entry.durationInput.value = String(this.normalizeInt(entry.durationInput));
-                    this.recalcFromDuration(index);
-                });
-            }
-
-            if (entry.delayInput instanceof HTMLInputElement) {
-                let delayDebounceTimer = null;
-                entry.delayInput.addEventListener("input", () => {
-                    clearTimeout(delayDebounceTimer);
-                    delayDebounceTimer = setTimeout(() => {
-                        this.recalcFromDelay(index);
-                    }, 150);
-                });
-                entry.delayInput.addEventListener("change", () => {
-                    entry.delayInput.value = String(this.normalizeSignedInt(entry.delayInput));
-                    this.recalcFromDelay(index);
-                });
-            }
-
-            this.bindNumericStepper(entry.durationInc, entry.durationInput, +1, () => this.recalcFromDuration(index));
-            this.bindNumericStepper(entry.durationDec, entry.durationInput, -1, () => this.recalcFromDuration(index));
-            this.bindNumericStepper(entry.delayInc, entry.delayInput, +1, () => this.recalcFromDelay(index));
-            this.bindNumericStepper(entry.delayDec, entry.delayInput, -1, () => this.recalcFromDelay(index));
-        });
 
         // Spec 2026-10-24 R9: výběr data i ✕ u plánu nebo skutečnosti přepočítá souhrn a graf hned.
         // date.js posílá „change“ ze skrytého pole uvnitř <pm-date-field>; delegace z bloku ho chytí

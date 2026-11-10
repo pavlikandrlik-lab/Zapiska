@@ -157,38 +157,6 @@ export function updateTaskTypeVisibility(categorySelect) {
         const canScheduleEditFull = schedulePermissionMode === "full";
         const canScheduleAddOnly = schedulePermissionMode === "add";
         const canScheduleAny = canScheduleEditFull || canScheduleAddOnly;
-        const canEditDurationInput = (input) => {
-            if (!(input instanceof HTMLInputElement)) {
-                return false;
-            }
-
-            if (input.dataset.scheduleStaticDisabled === "true") {
-                return false;
-            }
-
-            if (canScheduleEditFull) {
-                return true;
-            }
-
-            if (!canScheduleAddOnly) {
-                return false;
-            }
-
-            const originalDuration = Number.parseInt((input.dataset.scheduleOriginalDuration || "").trim(), 10);
-            return !Number.isFinite(originalDuration) || originalDuration <= 0;
-        };
-        const syncStepperButtons = (buttonSelector, inputSelector) => {
-            form.querySelectorAll(buttonSelector)
-                .forEach((button) => {
-                    if (!(button instanceof HTMLButtonElement)) {
-                        return;
-                    }
-
-                    const row = button.closest("[data-schedule-step-row]");
-                    const input = row?.querySelector(inputSelector);
-                    button.disabled = !(input instanceof HTMLInputElement) || input.disabled;
-                });
-        };
 
         const setScheduleDateFieldState = () => {
             form.querySelectorAll(".schedule-date-field[data-app-date-field]").forEach((dateField) => {
@@ -199,21 +167,10 @@ export function updateTaskTypeVisibility(categorySelect) {
                 const valueInput = dateField.querySelector("[data-schedule-date], [data-schedule-delay-date]");
                 const staticDisabled = valueInput instanceof HTMLInputElement
                     && valueInput.dataset.scheduleStaticDisabled === "true";
-                const isDelayDate = valueInput instanceof HTMLInputElement
-                    && valueInput.hasAttribute("data-schedule-delay-date");
-                const row = dateField.closest("[data-schedule-step-row]");
-                // FIX 2026-05-04: po DESIGN-9-F (calendar-primary DURATION redesign) má hidden
-                // input přejmenovaný `data-schedule-duration-hidden` (ne `-duration`). Předtím
-                // se selektor neshodal → linkedInput=null → linkedLocked=true (defensive) →
-                // všechny PLAN datum-pole zamčená i s plnými právy. Fallback změněný na false:
-                // pokud linked input chybí, server-side `locked` na pm-date-field je autoritativní.
-                const linkedInput = row?.querySelector(
-                    isDelayDate
-                        ? "[data-schedule-delay]"
-                        : "[data-schedule-duration-hidden], [data-schedule-duration]"
-                );
-                const linkedLocked = linkedInput instanceof HTMLInputElement ? linkedInput.disabled : false;
-                const shouldDisable = !canScheduleAny || staticDisabled || linkedLocked;
+                // Zámek jednotlivého pole určuje server (`locked` na pm-date-field, data-schedule-static-disabled).
+                // Dřívější vazba na skrytá pole trvání a odchylky (offsetový model) vždy vyšla „nezamčeno“
+                // — ta pole datum-model zrušil — a byla odstraněna 2026-11-10.
+                const shouldDisable = !canScheduleAny || staticDisabled;
                 dateField.dataset.appDateLocked = shouldDisable ? "true" : "false";
 
                 if (valueInput instanceof HTMLInputElement) {
@@ -236,37 +193,10 @@ export function updateTaskTypeVisibility(categorySelect) {
         if (!isTask) {
             schedulePanel.hidden = true;
             schedulePanel.setAttribute("data-schedule-disabled", "true");
-            form.querySelectorAll("[data-schedule-duration], [data-schedule-delay]")
-                .forEach((input) => {
-                    if (input instanceof HTMLInputElement) {
-                        input.disabled = true;
-                    }
-                });
-            form.querySelectorAll("[data-schedule-duration-inc], [data-schedule-duration-dec], [data-schedule-delay-inc], [data-schedule-delay-dec]")
-                .forEach((button) => {
-                    if (button instanceof HTMLButtonElement) {
-                        button.disabled = true;
-                    }
-                });
             setScheduleDateFieldState();
             setRecordFormTab(form, "basic");
         } else {
             schedulePanel.removeAttribute("data-schedule-disabled");
-            form.querySelectorAll("[data-schedule-duration]")
-                .forEach((input) => {
-                    if (input instanceof HTMLInputElement) {
-                        input.disabled = !canEditDurationInput(input);
-                    }
-                });
-            form.querySelectorAll("[data-schedule-delay]")
-                .forEach((input) => {
-                    if (input instanceof HTMLInputElement) {
-                        const staticDisabled = input.dataset.scheduleStaticDisabled === "true";
-                        input.disabled = !canScheduleAny || staticDisabled;
-                    }
-                });
-            syncStepperButtons("[data-schedule-duration-inc], [data-schedule-duration-dec]", "[data-schedule-duration]");
-            syncStepperButtons("[data-schedule-delay-inc], [data-schedule-delay-dec]", "[data-schedule-delay]");
             setScheduleDateFieldState();
 
             if (!form._recordSchedulePlanner && canScheduleAny) {
