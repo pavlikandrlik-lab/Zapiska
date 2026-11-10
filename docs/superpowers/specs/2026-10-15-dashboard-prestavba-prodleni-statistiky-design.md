@@ -135,10 +135,36 @@ V `intranetNEW` workflow tabulka není (discovery `SD_servicedesk/01_discovery.s
 | Tabulka | Sloupce, které použijeme | Význam |
 |---|---|---|
 | `ticket_external` | `id`, `external_id`, `sla_name`, `supplier_tag` | Ticket synchronizovaný s dodavatelem. `external_id` = `HOT_ZAZNAMY.id` jako text, páruje se po `Trim()` (`MOSD_External.ExtendingTicketsWithExternal`). |
-| `ticket_external_workflow` | `date`, `supplier`, `transfertype`, `dt_param` + cizí klíč na `ticket_external` | Předávky U1–U11. `dt_param` je termín plnění (U1/U2 u PMP/PNF) nebo schválený nový termín (U11). |
+| `ticket_external_workflow` | `date`, `supplier`, `transfertype`, `dt_param` + cizí klíč `id_ticket_external` na `ticket_external.id` | Předávky U1–U11. `dt_param` je termín plnění (U1/U2 u PMP/PNF) nebo schválený nový termín (U11). |
 | `ticket_external_sla` | `sla_name`, `sla_hours` | SLA hodiny podle důležitosti. `sla_name` obsahuje hodnoty `HOT_ZAZNAMY.dulezitost` (NES I, NES II, NES III, Vada A–D). |
 
-Neznámý je jen název spojovacího sloupce `ticket_external_workflow` → `ticket_external.id` (zdroják jde přes EF navigaci, mapování je v `.edmx`, který nemáme). Dodá ho uživatel (plán, Task 0). Číselné typy se neřeší: dotazy převádějí hodnoty `CAST`em.
+**Schéma podle `ServiceDesk.edmx`** (EF6 model `ServiceDeskEntities` starého ServiceDesku, dodal uživatel 2026-11-10, v rootu repa a v `.gitignore`; všechny tabulky ve schématu `dbo`, bez přejmenování sloupců):
+
+| Tabulka | Sloupec | Typ | NULL | Pozn. |
+|---|---|---|---|---|
+| `ticket_external` | `id` | int identity | ne | PK |
+| | `external_id` | varchar(50) | ne | `HOT_ZAZNAMY.id` jako text |
+| | `external_sync_id` | int | ano | |
+| | `source` | tinyint | ne | originál nepoužívá |
+| | `supplier_last_mod` | datetime | ano | |
+| | `supplier_tag`, `sla_name`, `kp_name` | nvarchar(50) | ano | |
+| | `supplier_id` | nvarchar(10) | ano | |
+| | `product_name`, `version_name`, `category_name` | nvarchar(25) | ano | |
+| `ticket_external_workflow` | `id` | int | ne | PK |
+| | **`id_ticket_external`** | int | ne | FK `FK_ticket_external_workflow_ticket_external` → `ticket_external.id` (1 : N) |
+| | `date` | datetime | ne | |
+| | `transfertype` | int | ano | |
+| | `supplier` | nvarchar(50) | ano | |
+| | `dt_param` | datetime | ano | |
+| `ticket_external_sla` | `id` | int | ne | PK |
+| | `sla_name` | nvarchar(8) | ne | originál ji načítá do slovníku (`Dictionary.Add`), duplicita by shodila i starý SD |
+| | `sla_hours` | float | ne | |
+
+Důsledky:
+- Spojení předávek: `ticket_external_workflow.id_ticket_external = ticket_external.id` (uzavírá Task 0 plánu).
+- `sla_name` má nejvýš 8 znaků. Hodnoty důležitosti NES (`NES I` … `Vada D`, nejdelší `NES III`) i `Neurčeno` se vejdou. PMP/PNF SLA hodiny nepotřebují (řídí je termín plnění z `dt_param`), takže delší `Pozadavek` (9 znaků) nevadí.
+- `HOT_ZAZNAMY.dulezitost` je `nvarchar(10)` (ne `char`), přesná shoda bez ořezu (§5.4 bod 5) tedy neselže na doplňujících mezerách.
+- Ostatní tabulky modelu (`notification`, `notification_category`, `user`, `user_has_notifications`) PM Tracker nečte.
 
 ### 6.2 Konfigurace a přístup
 
