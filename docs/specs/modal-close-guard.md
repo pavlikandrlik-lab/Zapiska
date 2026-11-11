@@ -3,6 +3,11 @@
 Dokumentuje chování ochrany proti nechtěnému zavření modálu editoru záznamu
 („Máte neuložené změny. Chcete je zahodit?").
 
+> **Stav 2026-11-11:** editor záznamu je od 2026-05-01 stránka (`/Zaznamy/Edit`, `/Zaznamy/Create`),
+> modál z karet zmizel. Ochrana a dirty tracking popsané níže platí beze změny pro odchod ze stránky
+> (šipka zpět, odkaz ←) — viz `RecordEditorHistoryBackScenariosTests`. Kapitoly o křížku a Escape
+> modálu jsou historické.
+
 ---
 
 ## Kontext
@@ -102,11 +107,14 @@ promptRecordEditorDiscard(editorForm, trigger)
 
 ## Pokrytí testy
 
-- E2E: [PmTracker.Tests.E2E/Scenarios/RecordEditModalCloseScenariosTests.cs](../../PmTracker.Tests.E2E/Scenarios/RecordEditModalCloseScenariosTests.cs)
-  - Křížek, Escape, Zrušit — základní zavření
-  - Přepnutí na Harmonogram + křížek / Escape — reprodukce bugu, který
-    opravil commit [TBD]. Test ověřuje, že overlay `[data-record-editor-close-guard]`
-    NENÍ zobrazen a modal se skutečně zavře.
+- E2E: [PmTracker.Tests.E2E/Scenarios/RecordEditorHistoryBackScenariosTests.cs](../../PmTracker.Tests.E2E/Scenarios/RecordEditorHistoryBackScenariosTests.cs)
+  — editor záznamu je od 2026-05-01 stránka (`/Zaznamy/Edit`, `/Zaznamy/Create`), ne modál:
+  - změněný editor: zpět i odkaz ← ukážou dialog `[data-record-editor-close-guard]`, „Pokračovat“ i „Zahodit“ fungují;
+  - čistý editor odejde bez dialogu;
+  - samotná návštěva záložky Harmonogram nevytvoří falešnou změnu (dřívější chyba modálu: planner přepsal
+    hodnoty harmonogramu a zavření blokoval dialog).
+- Testy modálu (`RecordEditModalCloseScenariosTests`, `RecordEditModalSilentRegressionTests`) byly smazány
+  2026-11-11: modál editoru neexistuje, tři testy procházely naprázdno a dva padaly na hledání tlačítka.
 
 ---
 

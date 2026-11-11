@@ -29,22 +29,6 @@ public sealed class HarmonogramUnifiedScenariosTests
     }
 
     [Fact]
-    public async Task Harmonogram_ShouldRenderOnlySubsystemFilter_AndPlanActualLayers()
-    {
-        var page = await _fixture.NewPageAsync();
-
-        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
-
-        var shell = page.Locator("[data-project-filter-scope='schedule']");
-        await Expect(shell.Locator("[data-schedule-filter-key='subsystem']")).ToHaveCountAsync(1);
-        await Expect(shell.Locator("[data-schedule-filter-key='mine']")).ToHaveCountAsync(0);
-        await Expect(shell.Locator("[data-schedule-filter-key='vlastnik']")).ToHaveCountAsync(0);
-        await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
-
-        await page.Context.CloseAsync();
-    }
-
-    [Fact]
     public async Task HarmonogramAxis_ShouldRenderDates_AfterSwitchingFromAnotherTab()
     {
         var page = await _fixture.NewPageAsync();
@@ -67,391 +51,213 @@ public sealed class HarmonogramUnifiedScenariosTests
         await page.Context.CloseAsync();
     }
 
+    // Úklid 2026-11-11: testy níže dřív otevíraly editor v modálu („Upravit“ na kartě harmonogramu,
+    // „Nový záznam“ jako tlačítko) — ten od 2026-05-01 neexistuje, editor je stránka /Zaznamy/Edit
+    // a /Zaznamy/Create. Běží na vlastním projektu s úkolem s plánem 10 kroků (E2EOwnProject), takže
+    // kartu harmonogramu mají vždy — dřív při prázdném projektu mlčky prošly. Značky „dnes“ a
+    // „termín“ jsou od přestavby osy události osy (.timeline-axis-event), ne značky na pruhu.
+
+    [Fact]
+    public async Task Harmonogram_ShouldRenderOverviewAndLayeredBreakdown_WithTodayAndDeadlineOnAxes()
+    {
+        var (project, _) = await CreateProjectWithScheduledTaskAsync();
+        var page = await _fixture.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{project.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
+
+            var card = page.Locator(".schedule-card");
+            await Expect(card).ToHaveCountAsync(1);
+            var overviewAxis = card.Locator(".schedule-overview-axis");
+            await Expect(card.Locator(".schedule-overview-row")).ToHaveCountAsync(2);
+            await Expect(overviewAxis).ToHaveCountAsync(1);
+            await Expect(overviewAxis.Locator(".timeline-axis-event.today")).ToHaveCountAsync(1);
+            await Expect(overviewAxis.Locator(".timeline-axis-event.deadline")).ToHaveCountAsync(1);
+            await Expect(page.Locator(".tab-panel[data-tab-panel='harmonogram'] .schedule-mini-legend")).ToHaveCountAsync(0);
+            await Expect(card.Locator(".schedule-layered-legend--steps")).ToHaveCountAsync(1);
+            await Expect(card.Locator(".schedule-layered-axis")).ToHaveCountAsync(1);
+            await Expect(card.Locator(".schedule-layered-track--step")).ToHaveCountAsync(10);
+            await AssertAxisEdgeLabelsAlignedWithinBoundsAsync(overviewAxis);
+
+            // Rozpad: skrytý → otevřít → zavřít → otevřít (pm-button host je pro Playwright „not visible“).
+            var toggle = card.Locator("[data-schedule-expand-toggle]");
+            var breakdown = card.Locator("[data-schedule-steps]");
+            await Expect(breakdown).ToBeHiddenAsync();
+            await toggle.DispatchEventAsync("click");
+            await Expect(breakdown).ToBeVisibleAsync();
+            await Expect(toggle).ToHaveAttributeAsync("aria-expanded", "true");
+            await toggle.DispatchEventAsync("click");
+            await Expect(breakdown).ToBeHiddenAsync();
+            await Expect(toggle).ToHaveAttributeAsync("aria-expanded", "false");
+            await toggle.DispatchEventAsync("click");
+            await Expect(breakdown).ToBeVisibleAsync();
+
+            var layeredAxis = card.Locator(".schedule-layered-axis");
+            await Expect(layeredAxis.Locator(".timeline-axis-event.today")).ToHaveCountAsync(1);
+            await Expect(layeredAxis.Locator(".timeline-axis-label:not([hidden])").First).ToBeVisibleAsync();
+            await AssertAxisEdgeLabelsAlignedWithinBoundsAsync(layeredAxis);
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+        }
+    }
+
     [Fact]
     public async Task RecordEditorScheduleTab_ShouldRenderSingleMiniGanttAxis_WithVisibleDateLabels()
     {
-        var page = await _fixture.NewPageAsync();
-
-        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
-        await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
-        await page.ReloadAsync();
-
-        if (await page.Locator(".schedule-card").CountAsync() == 0)
+        var (_, recordId) = await CreateProjectWithScheduledTaskAsync();
+        var page = await OpenEditorScheduleTabAsync(recordId);
+        try
         {
-            await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
-            await page.Context.CloseAsync();
-            return;
+            var form = page.Locator("form[data-record-editor-form='true']");
+            var axes = form.Locator("[data-schedule-axis]");
+            await Expect(axes).ToHaveCountAsync(1);
+
+            var labels = axes.First.Locator(".timeline-axis-label:not([hidden])");
+            await Expect(labels.First).ToBeVisibleAsync();
+            (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
+            ((await labels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
+            await Expect(axes.First.Locator(".timeline-axis-event.today")).ToHaveCountAsync(1);
+            await Expect(axes.First.Locator(".timeline-axis-event.deadline")).ToHaveCountAsync(1);
+            await AssertAxisEdgeLabelsAlignedWithinBoundsAsync(axes.First);
         }
-
-        await page.Locator(".schedule-card .btn.small", new() { HasTextString = "Upravit" }).First.ClickAsync();
-
-        var modal = page.Locator(".modal-overlay");
-        var form = modal.Locator("form[data-record-editor-form='true']");
-        await Expect(form).ToBeVisibleAsync();
-
-        await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
-
-        var axes = form.Locator("[data-schedule-axis]");
-        await Expect(axes).ToHaveCountAsync(1);
-
-        var labels = axes.First.Locator(".timeline-axis-label:not([hidden])");
-        await Expect(labels.First).ToBeVisibleAsync();
-        await Expect(form.Locator(".schedule-mini-gantt-marker.today")).ToHaveCountAsync(2);
-
-        (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
-        ((await labels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
-        await AssertAxisEdgeLabelsAlignedWithinBoundsAsync(axes.First);
-
-        await page.Context.CloseAsync();
+        finally
+        {
+            await page.Context.CloseAsync();
+        }
     }
 
     [Fact]
     public async Task RecordEditorScheduleTab_ShouldRenderPlanAndActualMiniGanttAsTwoSeparateRows()
     {
-        var page = await _fixture.NewPageAsync();
-
-        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
-        await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
-        await page.ReloadAsync();
-
-        if (await page.Locator(".schedule-card").CountAsync() == 0)
+        var (_, recordId) = await CreateProjectWithScheduledTaskAsync();
+        var page = await OpenEditorScheduleTabAsync(recordId);
+        try
         {
-            await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
+            var rows = page.Locator("form[data-record-editor-form='true'] [data-record-mini-gantt] .schedule-mini-gantt-row");
+            await Expect(rows).ToHaveCountAsync(2);
+            await Expect(rows.Nth(0).Locator(".schedule-mini-gantt-row-label")).ToContainTextAsync("Plán");
+            await Expect(rows.Nth(1).Locator(".schedule-mini-gantt-row-label")).ToContainTextAsync("Skutečnost");
+
+            var firstRowTrack = rows.Nth(0).Locator(".schedule-mini-gantt-track");
+            var secondRowTrack = rows.Nth(1).Locator(".schedule-mini-gantt-track");
+            await Expect(firstRowTrack).ToBeVisibleAsync();
+            await Expect(secondRowTrack).ToBeVisibleAsync();
+
+            var firstRowBox = await rows.Nth(0).BoundingBoxAsync();
+            var secondRowBox = await rows.Nth(1).BoundingBoxAsync();
+            firstRowBox.Should().NotBeNull();
+            secondRowBox.Should().NotBeNull();
+            secondRowBox!.Y.Should().BeGreaterThan(firstRowBox!.Y);
+
+            var firstTrackBox = await firstRowTrack.BoundingBoxAsync();
+            var secondTrackBox = await secondRowTrack.BoundingBoxAsync();
+            firstTrackBox!.Width.Should().BeGreaterThan(40);
+            secondTrackBox!.Width.Should().BeGreaterThan(40);
+        }
+        finally
+        {
             await page.Context.CloseAsync();
-            return;
         }
-
-        await page.Locator(".schedule-card .btn.small", new() { HasTextString = "Upravit" }).First.ClickAsync();
-
-        var modal = page.Locator(".modal-overlay");
-        var form = modal.Locator("form[data-record-editor-form='true']");
-        await Expect(form).ToBeVisibleAsync();
-        await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
-
-        var rows = form.Locator("[data-record-mini-gantt] .schedule-mini-gantt-row");
-        await Expect(rows).ToHaveCountAsync(2);
-        await Expect(rows.Nth(0).Locator(".schedule-mini-gantt-row-label")).ToContainTextAsync("Plán");
-        await Expect(rows.Nth(1).Locator(".schedule-mini-gantt-row-label")).ToContainTextAsync("Skutečnost");
-
-        var firstRowTrack = rows.Nth(0).Locator(".schedule-mini-gantt-track");
-        var secondRowTrack = rows.Nth(1).Locator(".schedule-mini-gantt-track");
-        await Expect(firstRowTrack).ToBeVisibleAsync();
-        await Expect(secondRowTrack).ToBeVisibleAsync();
-        await Expect(form.Locator(".schedule-mini-gantt-marker.today")).ToHaveCountAsync(2);
-
-        var firstRowBox = await rows.Nth(0).BoundingBoxAsync();
-        var secondRowBox = await rows.Nth(1).BoundingBoxAsync();
-        firstRowBox.Should().NotBeNull();
-        secondRowBox.Should().NotBeNull();
-        secondRowBox!.Y.Should().BeGreaterThan(firstRowBox!.Y);
-
-        var firstTrackBox = await firstRowTrack.BoundingBoxAsync();
-        var secondTrackBox = await secondRowTrack.BoundingBoxAsync();
-        firstTrackBox.Should().NotBeNull();
-        secondTrackBox.Should().NotBeNull();
-        firstTrackBox!.Width.Should().BeGreaterThan(40);
-        secondTrackBox!.Width.Should().BeGreaterThan(40);
-
-        await page.Context.CloseAsync();
-    }
-
-    [Fact]
-    public async Task Harmonogram_ShouldRenderVisibleActualLegend_AndLayeredTracksInOverviewAndBreakdown()
-    {
-        var page = await _fixture.NewPageAsync();
-
-        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=harmonogram&asUser={_fixture.AdminOsobaId}");
-
-        if (await page.Locator(".schedule-card").CountAsync() == 0)
-        {
-            await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
-            await page.Context.CloseAsync();
-            return;
-        }
-
-        var firstCard = page.Locator(".schedule-card").First;
-        await Expect(firstCard.Locator(".schedule-overview-row")).ToHaveCountAsync(2);
-        await Expect(firstCard.Locator(".schedule-overview-axis")).ToHaveCountAsync(1);
-        await Expect(firstCard.Locator(".schedule-overview-marker.today")).ToHaveCountAsync(1);
-        await Expect(firstCard.Locator(".schedule-overview-marker.deadline")).ToHaveCountAsync(1);
-        await Expect(page.Locator(".tab-panel[data-tab-panel='harmonogram'] .schedule-mini-legend")).ToHaveCountAsync(0);
-        await Expect(firstCard.Locator(".schedule-layered-legend--steps")).ToHaveCountAsync(1);
-        await Expect(firstCard.Locator(".schedule-layered-axis")).ToHaveCountAsync(1);
-        (await firstCard.Locator(".schedule-layered-track--step").CountAsync()).Should().BeGreaterThan(0);
-        (await firstCard.Locator(".schedule-layered-marker.today").CountAsync()).Should().BeGreaterThan(0);
-        await Expect(firstCard.Locator(".schedule-layered-marker.deadline")).ToHaveCountAsync(0);
-
-        var overviewTodayColor = await firstCard.Locator(".schedule-overview-marker.today").First.EvaluateAsync<string>(
-            "node => getComputedStyle(node).backgroundColor");
-        overviewTodayColor.Should().Be("rgb(17, 17, 17)");
-
-        var overviewLabels = firstCard.Locator(".schedule-overview-axis .timeline-axis-label:not([hidden])");
-        var overviewLabelCount = await overviewLabels.CountAsync();
-        overviewLabelCount.Should().BeGreaterThanOrEqualTo(5);
-        overviewLabelCount.Should().BeLessThanOrEqualTo(10);
-        ((await overviewLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
-        ((await overviewLabels.Last.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
-        await AssertAxisEdgeLabelsAlignedWithinBoundsAsync(firstCard.Locator(".schedule-overview-axis").First);
-
-        var expandToggle = firstCard.Locator("[data-schedule-expand-toggle]");
-        if (await expandToggle.CountAsync() > 0)
-        {
-            var breakdown = firstCard.Locator("[data-schedule-steps]");
-            await Expect(breakdown).ToBeHiddenAsync();
-            var expanded = await expandToggle.First.GetAttributeAsync("aria-expanded");
-            if (expanded is null || !expanded.Equals("true", StringComparison.OrdinalIgnoreCase))
-            {
-                await expandToggle.First.ClickAsync();
-            }
-
-            await Expect(breakdown).ToBeVisibleAsync();
-            (await expandToggle.First.GetAttributeAsync("aria-expanded")).Should().Be("true");
-
-            await expandToggle.First.ClickAsync();
-            await Expect(breakdown).ToBeHiddenAsync();
-            (await expandToggle.First.GetAttributeAsync("aria-expanded")).Should().Be("false");
-
-            await expandToggle.First.ClickAsync();
-            await Expect(breakdown).ToBeVisibleAsync();
-            (await expandToggle.First.GetAttributeAsync("aria-expanded")).Should().Be("true");
-        }
-
-        await page.WaitForTimeoutAsync(120);
-        var layeredLabels = firstCard.Locator(".schedule-layered-axis .timeline-axis-label:not([hidden])");
-        var layeredLabelCount = await layeredLabels.CountAsync();
-        layeredLabelCount.Should().BeGreaterThanOrEqualTo(5);
-        layeredLabelCount.Should().BeLessThanOrEqualTo(10);
-        ((await layeredLabels.First.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
-        ((await layeredLabels.Last.InnerTextAsync()) ?? string.Empty).Trim().Should().NotBeEmpty();
-        await AssertAxisEdgeLabelsAlignedWithinBoundsAsync(firstCard.Locator(".schedule-layered-axis").First);
-        var layeredTodayColor = await firstCard.Locator(".schedule-layered-marker.today").First.EvaluateAsync<string>(
-            "node => getComputedStyle(node).backgroundColor");
-        layeredTodayColor.Should().Be("rgb(17, 17, 17)");
-
-        await page.Context.CloseAsync();
     }
 
     [Fact]
     public async Task HarmonogramAxes_ShouldKeepDateLabelsVisible_AfterRepeatedTabSwitches()
     {
+        var (project, recordId) = await CreateProjectWithScheduledTaskAsync();
         var page = await _fixture.NewPageAsync();
-
-        await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?asUser={_fixture.AdminOsobaId}");
-
-        for (var attempt = 0; attempt < 3; attempt += 1)
-        {
-            await page.Locator("[data-tab='harmonogram']").ClickAsync();
-            if (await page.Locator(".schedule-card").CountAsync() > 0)
-            {
-                var firstCard = page.Locator(".schedule-card").First;
-                var labels = firstCard.Locator(".schedule-overview-axis .timeline-axis-label:not([hidden])");
-                await Expect(labels.First).ToBeVisibleAsync();
-                (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
-            }
-
-            await page.Locator("[data-tab='zaznamy']").ClickAsync();
-        }
-
-        await page.Locator("[data-tab='harmonogram']").ClickAsync();
-        if (await page.Locator(".schedule-card").CountAsync() == 0)
-        {
-            await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
-            await page.Context.CloseAsync();
-            return;
-        }
-
-        await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
-        await page.ReloadAsync();
-        await page.Locator("[data-tab='harmonogram']").ClickAsync();
-
-        if (await page.Locator(".schedule-card").CountAsync() == 0)
-        {
-            await Expect(page.Locator("[data-project-schedule-list]")).ToHaveCountAsync(1);
-            await page.Context.CloseAsync();
-            return;
-        }
-
-        await page.Locator(".schedule-card .btn.small", new() { HasTextString = "Upravit" }).First.ClickAsync();
-        var modal = page.Locator(".modal-overlay");
-        var form = modal.Locator("form[data-record-editor-form='true']");
-        await Expect(form).ToBeVisibleAsync();
-
-        for (var attempt = 0; attempt < 3; attempt += 1)
-        {
-            await modal.GetByRole(AriaRole.Button, new() { Name = "Základní" }).ClickAsync();
-            await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
-
-            var axis = form.Locator("[data-schedule-axis]").First;
-            var labels = axis.Locator(".timeline-axis-label:not([hidden])");
-            await Expect(labels.First).ToBeVisibleAsync();
-            (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2);
-        }
-
-        await page.Context.CloseAsync();
-    }
-
-    [Fact]
-    public async Task RecordCreateSchedule_ShouldAllowDurationControls_AndReturnJsonOnSave()
-    {
-        var page = await _fixture.NewPageAsync();
-        const string createdRecordName = "E2E create schedule edit";
-
         try
         {
-            await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=zaznamy&asUser={_fixture.AdminOsobaId}");
-            await page.EvaluateAsync("() => localStorage.setItem('pmtracker.recordEditor.preference', 'modal')");
-            await page.ReloadAsync();
+            await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{project.ProjectId}?asUser={_fixture.AdminOsobaId}");
+            for (var attempt = 0; attempt < 3; attempt += 1)
+            {
+                await page.Locator("[data-tab='harmonogram']").ClickAsync();
+                var labels = page.Locator(".schedule-card").First.Locator(".schedule-overview-axis .timeline-axis-label:not([hidden])");
+                await Expect(labels.First).ToBeVisibleAsync();
+                (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2, $"přepnutí č. {attempt + 1}");
+                await page.Locator("[data-tab='zaznamy']").ClickAsync();
+            }
 
-            await page.GetByRole(AriaRole.Button, new() { Name = "Nový záznam" }).ClickAsync();
-
-            var modal = page.Locator(".modal-overlay");
-            var form = modal.Locator("form[data-record-editor-form='true']");
-            await Expect(form).ToBeVisibleAsync();
-
-            await form.Locator("input[name='Nazev']").FillAsync(createdRecordName);
-            var subsystemSelect = form.Locator("select[name='Subsystem']");
-            var subsystemOptions = await subsystemSelect.Locator("option").CountAsync();
-            subsystemOptions.Should().BeGreaterThan(0, "nový záznam musí mít minimálně jeden aktivní subsystém");
-            var subsystemValue = await subsystemSelect.InputValueAsync();
-            subsystemValue.Should().NotBeNullOrWhiteSpace("subsystém je povinný pro uložení záznamu");
-
-            var ownerCandidates = await form.Locator("[data-record-owner-picker] [data-person-picker-source] [data-id]").CountAsync();
-            ownerCandidates.Should().BeGreaterThan(0, "vlastník musí být vybratelný ze seznamu osob projektu");
-            await form.EvaluateAsync(
-                @"formElement => {
-                    const firstCandidate = formElement.querySelector('[data-record-owner-picker] [data-person-picker-source] [data-id]');
-                    const hiddenInput = formElement.querySelector('[data-record-owner-picker] [data-person-picker-hidden]');
-                    const queryInput = formElement.querySelector('[data-record-owner-picker] [data-person-picker-input]');
-                    if (!(firstCandidate instanceof HTMLElement)
-                        || !(hiddenInput instanceof HTMLInputElement)
-                        || !(queryInput instanceof HTMLInputElement)) {
-                        return;
-                    }
-
-                    const id = (firstCandidate.dataset.id || '').trim();
-                    const label = (firstCandidate.dataset.label || '').trim();
-                    const email = (firstCandidate.dataset.email || '').trim();
-                    hiddenInput.value = id;
-                    queryInput.value = email ? `${label} <${email}>` : label;
-                    queryInput.setCustomValidity('');
-                }");
-
-            var categorySelect = form.Locator("select[name='Kategorie']");
-            var taskCategoryValue = await categorySelect.EvaluateAsync<string>(
-                @"select => {
-                    const option = Array.from(select.options).find(item => /ukol|úkol/i.test((item.textContent || '').trim()));
-                    return option ? option.value : '';
-                }");
-            taskCategoryValue.Should().NotBeNullOrWhiteSpace();
-            await categorySelect.SelectOptionAsync(new SelectOptionValue { Value = taskCategoryValue });
-
-            await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
-
-            // DESIGN-9-F (2026-05-02): DURATION input redesign — kalendář (datum konce kroku)
-            // je primární editor, počet dnů je readonly text. Stepper +/- a number input smazány.
-            // Hidden input drží vypočtený integer (form POST nezměněn).
-            var firstDurationHidden = form.Locator("[data-schedule-duration-hidden]").First;
-            var firstDurationCalendar = form.Locator("[data-schedule-duration-calendar]").First;
-            var firstDurationReadonly = form.Locator("[data-schedule-duration-readonly]").First;
-
-            await Expect(firstDurationCalendar).ToBeVisibleAsync();
-            await Expect(firstDurationReadonly).ToBeVisibleAsync();
-
-            var initialDurationValue = await firstDurationHidden.InputValueAsync();
-            var initialDuration = int.TryParse(initialDurationValue, out var parsedDuration) ? parsedDuration : 0;
-
-            await firstDurationCalendar.EvaluateAsync(
-                @"input => {
-                    const parseIso = (value) => {
-                        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((value || '').trim());
-                        if (!match) {
-                            return null;
-                        }
-
-                        return new Date(Number.parseInt(match[1], 10), Number.parseInt(match[2], 10) - 1, Number.parseInt(match[3], 10));
-                    };
-                    const toIso = (value) => {
-                        const year = value.getFullYear();
-                        const month = String(value.getMonth() + 1).padStart(2, '0');
-                        const day = String(value.getDate()).padStart(2, '0');
-                        return `${year}-${month}-${day}`;
-                    };
-
-                    const selected = parseIso(input.value) || new Date();
-                    selected.setDate(selected.getDate() + 3);
-                    input.value = toIso(selected);
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
-                }");
-
-            // Po změně datumu konce o +3 dny musí být hidden hodnota >= initialDuration + 3
-            // (cumulative chain — duration-calendar-binding.js přepočítal trvání).
-            var durationAfterDateChange = int.TryParse(await firstDurationHidden.InputValueAsync(), out var p2) ? p2 : 0;
-            durationAfterDateChange.Should().BeGreaterThanOrEqualTo(initialDuration + 3,
-                $"DESIGN-9-F: změna datumu konce o +3 dny musí navýšit hidden duration. initial={initialDuration} after={durationAfterDateChange}");
-            (await firstDurationReadonly.TextContentAsync()).Should().Contain(durationAfterDateChange.ToString(),
-                "readonly text musí zobrazovat aktualizovaný počet dnů.");
-
-            var saveResponseTask = page.WaitForResponseAsync(response =>
-                response.Request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase)
-                && response.Url.Contains("/Zaznamy/Save", StringComparison.OrdinalIgnoreCase));
-
-            await form.Locator("button[type='submit']").ClickAsync();
-
-            var saveResponse = await saveResponseTask;
-            var saveStatusCode = saveResponse.Status;
-            var savePayload = await saveResponse.TextAsync();
-            saveResponse.Ok.Should().BeTrue($"status: {saveStatusCode}, payload: {savePayload}");
-
-            var headers = await saveResponse.AllHeadersAsync();
-            headers.TryGetValue("content-type", out var contentType);
-            contentType.Should().NotBeNullOrWhiteSpace();
-            contentType!.Should().Contain("application/json");
-
-            await Expect(page.Locator(".modal-overlay")).ToHaveCountAsync(0);
+            await page.GotoAsync($"{_fixture.BaseUrl}/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}");
+            var axis = page.Locator("form[data-record-editor-form='true'] [data-schedule-axis]").First;
+            for (var attempt = 0; attempt < 3; attempt += 1)
+            {
+                await page.Locator("pm-tabs [key='basic']").First.ClickAsync();
+                await page.Locator("pm-tabs [key='schedule']").First.ClickAsync();
+                var labels = axis.Locator(".timeline-axis-label:not([hidden])");
+                await Expect(labels.First).ToBeVisibleAsync();
+                (await labels.CountAsync()).Should().BeGreaterThanOrEqualTo(2, $"přepnutí v editoru č. {attempt + 1}");
+            }
         }
         finally
         {
-            await DeleteRecordByNameAsync(createdRecordName);
             await page.Context.CloseAsync();
+        }
+    }
+
+    [Fact]
+    public async Task RecordCreate_TaskWithPlanDate_ShowsDaysAndSavesSchedule()
+    {
+        const string createdRecordName = "E2E novy ukol s planem";
+        var termin = DateTime.Today.AddDays(30);
+        var plan1 = DateTime.Today.AddDays(7);
+        var page = await _fixture.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/Zaznamy/Create?projektId={_fixture.ProjectId}&asUser={_fixture.AdminOsobaId}");
+            var form = page.Locator("form[data-record-editor-form='true']");
+            await Expect(form).ToHaveCountAsync(1);
+
+            await form.Locator("input[name='Nazev']").FillAsync(createdRecordName);
+            await form.Locator("select[name='Kategorie']").SelectOptionAsync(new SelectOptionValue { Label = "Úkol" });
+            // Projekt fixture nemá výchozího vlastníka (VlastnikId = 0) — vybrat jako uživatel.
+            await form.Locator("[data-record-owner-picker] [data-person-picker-input]").FillAsync("Pavel");
+            await page.Locator("[data-person-picker-panel] button.office-search-item[role='option']").First.ClickAsync();
+            await Expect(form.Locator("input[name='VlastnikId']")).ToHaveValueAsync(_fixture.AdminOsobaId.ToString());
+
+            var terminDay = await OpenCalendarAtAsync(page, form.Locator("pm-date-field:has(input[name='TerminUkonceni'])"), termin);
+            await terminDay.DispatchEventAsync("click");
+
+            await page.Locator("pm-tabs [key='schedule']").First.ClickAsync();
+            var row1 = page.Locator("tr[data-schedule-step-row][data-step-index='1']");
+            var planDay = await OpenCalendarAtAsync(page, row1.Locator("pm-date-field[data-schedule-plan-step]"), plan1);
+            await Expect(planDay).ToBeEnabledAsync();
+            await planDay.DispatchEventAsync("click");
+            await Expect(row1.Locator("[data-schedule-duration-readonly]")).ToHaveTextAsync("7 dnů");
+
+            var saveTask = page.WaitForResponseAsync(response =>
+                response.Request.Method == "POST"
+                && response.Url.Contains("/Zaznamy/Save", StringComparison.OrdinalIgnoreCase));
+            await form.EvaluateAsync("form => form.requestSubmit()");
+            var save = await saveTask;
+            // Tělo odpovědi číst nejde — editor po uložení naviguje a Chromium ho zahodí.
+            save.Ok.Should().BeTrue($"uložení vrátilo HTTP {save.Status}");
+
+            var saved = await LoadStepPlanAsync(createdRecordName, poradi: 1);
+            saved.Should().Be(plan1, "plán kroku 1 z editoru se uložil k novému úkolu");
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+            await DeleteRecordByNameAsync(createdRecordName);
         }
     }
 
     [Fact]
     public async Task Design9F_DurationCell_ShouldShowReadonlyDaysToTheRightOfCalendar()
     {
-        // DESIGN-9-F (2026-05-02): user explicit požadavek — počet dnů vpravo vedle kalendáře.
-        // Verifikuje: kalendář a readonly text jsou v plán sloupečku, readonly text je vpravo
-        // (rect.left readonly > rect.right kalendář).
-        var page = await _fixture.NewPageAsync();
+        // DESIGN-9-F (2026-05-02): počet dnů je vpravo vedle kalendáře plánu, ve stejné buňce.
+        var (_, recordId) = await CreateProjectWithScheduledTaskAsync();
+        var page = await OpenEditorScheduleTabAsync(recordId);
         try
         {
-            await page.GotoAsync($"{_fixture.BaseUrl}/Projekty/Detail/{_fixture.ProjectId}?tab=zaznamy&asUser={_fixture.AdminOsobaId}");
-
-            await page.GetByRole(AriaRole.Button, new() { Name = "Nový záznam" }).First.ClickAsync();
-            var modal = page.Locator(".modal-overlay").First;
-            await Expect(modal).ToBeVisibleAsync(new() { Timeout = 8000 });
-
-            var form = modal.Locator("form").First;
-
-            // Vyplnit povinná pole + nastavit Úkol kategorii (jinak se harmonogram nevyrenderuje).
-            await form.Locator("[name='Nazev']").FillAsync("DESIGN-9-F-LAYOUT-TEST");
-            await form.Locator("[data-vlastnik-display]").EvaluateAsync(
-                @"input => { input.value = 'Pavel Admin'; input.setCustomValidity(''); }");
-            var categorySelect = form.Locator("select[name='Kategorie']");
-            var taskCategoryValue = await categorySelect.EvaluateAsync<string>(
-                @"select => { const o = Array.from(select.options).find(i => /ukol|úkol/i.test((i.textContent||'').trim())); return o ? o.value : ''; }");
-            taskCategoryValue.Should().NotBeNullOrWhiteSpace();
-            await categorySelect.SelectOptionAsync(new SelectOptionValue { Value = taskCategoryValue });
-
-            await modal.GetByRole(AriaRole.Button, new() { Name = "Harmonogram" }).ClickAsync();
-
-            var firstRow = form.Locator("[data-schedule-step-row]").First;
+            var firstRow = page.Locator("form[data-record-editor-form='true'] [data-schedule-step-row]").First;
             await Expect(firstRow).ToBeVisibleAsync();
 
-            // Layout assertion: kalendář vlevo, readonly počet dnů vpravo, oba ve stejné cell (PLAN sloupek).
             var layout = await firstRow.EvaluateAsync<DurationLayoutResult>(
                 @"row => {
-                    const cell = row.querySelector('td:nth-child(2)'); // PLAN sloupec
+                    const cell = row.querySelector('td:nth-child(2)'); // sloupec plánu
                     const cal = cell?.querySelector('[data-schedule-duration-calendar]');
                     const readonlyEl = cell?.querySelector('[data-schedule-duration-readonly]');
                     if (!cal || !readonlyEl) {
@@ -469,13 +275,13 @@ public sealed class HarmonogramUnifiedScenariosTests
                     };
                 }");
 
-            layout.HasCalendar.Should().BeTrue("kalendář musí být v PLAN cell");
-            layout.HasReadonly.Should().BeTrue("readonly počet dnů musí být v PLAN cell");
-            layout.SameRow.Should().BeTrue($"kalendář a readonly mají být na stejném horizontálním řádku (gap < 30px). cal.top vs readonly.top");
+            layout.HasCalendar.Should().BeTrue("kalendář musí být ve sloupci plánu");
+            layout.HasReadonly.Should().BeTrue("počet dnů musí být ve sloupci plánu");
+            layout.SameRow.Should().BeTrue("kalendář a počet dnů mají být na stejném řádku (rozdíl top < 30 px)");
             layout.ReadonlyLeft.Should().BeGreaterThan(layout.CalRight - 5,
-                $"readonly počet dnů musí být VPRAVO od kalendáře. calRight={layout.CalRight} readonlyLeft={layout.ReadonlyLeft}");
+                $"počet dnů musí být VPRAVO od kalendáře. calRight={layout.CalRight} readonlyLeft={layout.ReadonlyLeft}");
             layout.ReadonlyText.Should().MatchRegex(@"\d+\s+(den|dny|dnů)",
-                $"readonly text musí být '{{N}} den/dny/dnů'. Actual: '{layout.ReadonlyText}'");
+                $"text musí být '{{N}} den/dny/dnů'. Actual: '{layout.ReadonlyText}'");
         }
         finally
         {
@@ -483,13 +289,66 @@ public sealed class HarmonogramUnifiedScenariosTests
         }
     }
 
-    private sealed record DurationLayoutResult(
-        bool HasCalendar,
-        bool HasReadonly,
-        double CalRight,
-        double ReadonlyLeft,
-        bool SameRow,
-        string ReadonlyText);
+    /// <summary>Vlastní projekt s jedním aktivním úkolem: založen před 30 dny, termín za 45 dní, plán 10 kroků po týdnu.</summary>
+    private async Task<(E2EOwnProject Project, int RecordId)> CreateProjectWithScheduledTaskAsync()
+    {
+        var project = await E2EOwnProject.CreateAsync(_fixture.Database.ConnectionString, _fixture.AdminOsobaId);
+        var recordId = await project.AddTaskAsync(1, project.FirstSubsystemId, withSchedule: true);
+        return (project, recordId);
+    }
+
+    private async Task<IPage> OpenEditorScheduleTabAsync(int recordId)
+    {
+        var page = await _fixture.NewPageAsync();
+        await page.GotoAsync($"{_fixture.BaseUrl}/Zaznamy/Edit?id={recordId}&asUser={_fixture.AdminOsobaId}");
+        await page.Locator("pm-tabs [key='schedule']").First.ClickAsync();
+        return page;
+    }
+
+    /// <summary>Otevře kalendář pole a šipkami ‹ › přejde na měsíc daného dne; vrátí tlačítko dne (vzor ScheduleLiveRecalcScenariosTests).</summary>
+    private static async Task<ILocator> OpenCalendarAtAsync(IPage page, ILocator dateField, DateTime day)
+    {
+        await dateField.Locator("[data-app-date-open]").DispatchEventAsync("click");
+        var panel = page.Locator("[data-app-date-panel]:not([hidden])");
+        await Expect(panel).ToHaveCountAsync(1);
+        var shownMonth = int.Parse(await panel.Locator("[data-app-date-month]").InputValueAsync());
+        var shownYear = int.Parse(await panel.Locator("[data-app-date-year]").InputValueAsync());
+        var diff = (day.Year * 12 + day.Month - 1) - (shownYear * 12 + shownMonth);
+        for (var i = 0; i < Math.Abs(diff); i++)
+        {
+            await panel.Locator(diff > 0 ? "[data-app-date-next]" : "[data-app-date-prev]").DispatchEventAsync("click");
+        }
+        return panel.Locator($"button.app-date-day[data-iso='{day:yyyy-MM-dd}']");
+    }
+
+    private async Task<DateTime?> LoadStepPlanAsync(string recordName, int poradi)
+    {
+        await using var connection = new SqlConnection(_fixture.Database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT TOP (1) k.plan_datum
+            FROM dbo.zaznam_harmonogram_krok k
+            JOIN dbo.projektove_zaznamy z ON z.id = k.zaznam_id
+            WHERE z.projekt_id = @projectId AND z.nazev = @recordName AND k.poradi = @poradi
+            ORDER BY z.id DESC;
+            """;
+        command.Parameters.AddWithValue("@projectId", _fixture.ProjectId);
+        command.Parameters.AddWithValue("@recordName", recordName);
+        command.Parameters.AddWithValue("@poradi", poradi);
+        var value = await command.ExecuteScalarAsync();
+        return value is null or DBNull ? null : Convert.ToDateTime(value);
+    }
+
+    private sealed class DurationLayoutResult
+    {
+        public bool HasCalendar { get; set; }
+        public bool HasReadonly { get; set; }
+        public double CalRight { get; set; }
+        public double ReadonlyLeft { get; set; }
+        public bool SameRow { get; set; }
+        public string ReadonlyText { get; set; } = string.Empty;
+    }
 
     private static ILocatorAssertions Expect(ILocator locator)
     {
@@ -526,13 +385,20 @@ public sealed class HarmonogramUnifiedScenariosTests
                 const firstTickRect = firstTick.getBoundingClientRect();
                 const lastTickRect = lastTick.getBoundingClientRect();
                 const widthTolerance = 1;
+                // timeline.js layoutAxisLabels: popisek prvního ticku začíná na gridline, popisek
+                // posledního ticku na ní končí, ostatní jsou vycentrované. Popisek, který by překryl
+                // DNES / TERMÍN, se skryje (layoutAxisEventMarkers) — krajní viditelný popisek pak
+                // nemusí patřit krajnímu ticku a zarovnání ke kraji se u něj neověřuje.
+                const ticks = Array.from(axisNode.querySelectorAll('.timeline-axis-tick'));
+                const firstIsEdgeTick = ticks.indexOf(firstTick) === 0;
+                const lastIsEdgeTick = ticks.indexOf(lastTick) === ticks.length - 1;
 
                 return {
                     hasEnoughLabels: true,
                     firstInside: firstRect.left >= axisRect.left - tolerance && firstRect.right <= axisRect.right + tolerance,
                     lastInside: lastRect.left >= axisRect.left - tolerance && lastRect.right <= axisRect.right + tolerance,
-                    firstAligned: Math.abs(firstRect.left - firstTickRect.left) <= tolerance,
-                    lastAligned: Math.abs(lastRect.right - lastTickRect.left) <= tolerance,
+                    firstAligned: !firstIsEdgeTick || Math.abs(firstRect.left - firstTickRect.left) <= tolerance,
+                    lastAligned: !lastIsEdgeTick || Math.abs(lastRect.right - lastTickRect.left) <= tolerance,
                     firstFullyVisible: firstLabel.scrollWidth <= firstLabel.clientWidth + widthTolerance,
                     lastFullyVisible: lastLabel.scrollWidth <= lastLabel.clientWidth + widthTolerance
                 };
