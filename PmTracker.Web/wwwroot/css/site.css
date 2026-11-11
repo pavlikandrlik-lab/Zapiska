@@ -6834,91 +6834,11 @@ html {
    ============================================================ */
 
 /* Shell, záložky a souhrnný pás projektového dashboardu → components/project-dashboard.css
-   (přestavba 2026-11-11, spec 2026-10-15). Legacy .dashboard-tab* a .dashboard-kpi-* smazány. */
+   (přestavba 2026-11-11, spec 2026-10-15). Legacy .dashboard-tab*, .dashboard-kpi-*, rozbalovací řádky,
+   filtry kategorií, výběr roku a placeholder starého panelu smazány. */
 
 /* Category badges (.badge-danger / .badge-warning / .badge-caution) odstraněny
    2026-04-29 — žádné Razor view je nepoužívalo (po nahrazení vyzvy-card za gov-tag). */
-
-/* Expandable rows */
-
-.dashboard-expandable-row {
-    cursor: pointer;
-}
-
-.dashboard-expandable-row:hover td {
-    background: var(--background-block-secondary);
-}
-
-.dashboard-step-detail {
-    display: none;
-    padding: 0.75rem 1rem;
-    background: var(--background-neutral-subtlest);
-}
-
-.dashboard-step-detail.expanded {
-    display: table-row;
-}
-
-/* Category filter buttons */
-
-.dashboard-category-filters {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.dashboard-category-filter {
-    padding: 6px 14px;
-    border: 1px solid var(--border-subtle);
-    border-radius: 999px;
-    background: var(--background-block-primary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-
-.dashboard-category-filter:hover {
-    border-color: var(--border-primary);
-    color: var(--text-primary-color);
-}
-
-.dashboard-category-filter.active {
-    border-color: var(--border-primary);
-    background: var(--background-primary);
-    color: var(--text-white-fixed);
-}
-
-/* Placeholder message */
-
-.dashboard-placeholder-message {
-    padding: 2.5rem 1rem;
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 0.9375rem;
-}
-
-/* Year selector */
-
-.dashboard-year-select {
-    width: auto;
-    min-width: 100px;
-    min-height: 36px;
-    border-radius: var(--gov-radius-sm);
-    border: 1px solid var(--border-subtle);
-    background: var(--background-block-primary);
-    background-image: linear-gradient(45deg, transparent 50%, var(--icon-neutral) 50%), linear-gradient(135deg, var(--icon-neutral) 50%, transparent 50%);
-    background-position: calc(100% - 19px) 14px, calc(100% - 13px) 14px;
-    background-size: 6px 6px, 6px 6px;
-    background-repeat: no-repeat;
-    appearance: none;
-    padding: 6px 34px 6px 12px;
-    font-size: 0.9375rem;
-    color: var(--text-primary);
-    cursor: pointer;
-}
 
 /* ==========================================================================
    Dashboard full-width + non-scrollable layout (úprava #4, 2026-04-20)

@@ -11,10 +11,6 @@ public sealed class DisabledInformacniSystemQueryService : IInformacniSystemQuer
     public Task<IReadOnlyList<InformacniSystemDto>> GetAktivniIsAsync(CancellationToken ct)
         => Task.FromResult<IReadOnlyList<InformacniSystemDto>>(Array.Empty<InformacniSystemDto>());
 
-    public Task<IReadOnlyList<ProdlenyTicketDto>> GetProdleneAsync(
-        int isId, DateTime reference, CancellationToken ct)
-        => Task.FromResult<IReadOnlyList<ProdlenyTicketDto>>(Array.Empty<ProdlenyTicketDto>());
-
     public Task<IsRozpocetDto?> GetRozpocetAsync(int isId, CancellationToken ct)
         => Task.FromResult<IsRozpocetDto?>(null);
 }

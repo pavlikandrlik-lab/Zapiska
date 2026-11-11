@@ -83,8 +83,24 @@ public sealed class ProjectDashboardControllerBehaviorTests
         var result = await controller.StatisticsPanel(AccessibleProjectId);
 
         var partial = result.Should().BeOfType<PartialViewResult>().Subject;
-        partial.ViewName.Should().Be("~/Views/ProjectDashboard/_StatisticsPanel.cshtml");
-        partial.Model.Should().BeOfType<ProjectDashboardStatisticsPanelViewModel>();
+        partial.ViewName.Should().Be("~/Views/ProjectDashboard/Zakladni/Report.cshtml");
+        partial.Model.Should().BeOfType<ZakladniReportViewModel>().Which.Obdobi.Druh.Should().Be(ObdobiDruh.Rok);
+    }
+
+    [Fact]
+    public async Task StatisticsPanel_kvartal_a_rozsah()
+    {
+        var controller = CreateController(new FakeProjectDashboardService(), isSuperAdmin: true, visibleProjectIds: [AccessibleProjectId]);
+
+        var kvartal = await controller.StatisticsPanel(AccessibleProjectId, rok: 2025, kvartal: 2);
+        ((ZakladniReportViewModel)((PartialViewResult)kvartal).Model!).Obdobi.Should().Be(Obdobi.Kvartal(2025, 2));
+
+        var rozsah = await controller.StatisticsPanel(AccessibleProjectId, od: new DateTime(2025, 3, 1), doDate: new DateTime(2025, 3, 31));
+        ((ZakladniReportViewModel)((PartialViewResult)rozsah).Model!).Obdobi.Druh.Should().Be(ObdobiDruh.Rozsah);
+
+        (await controller.StatisticsPanel(AccessibleProjectId, rok: 2025, kvartal: 5)).Should().BeOfType<BadRequestObjectResult>();
+        (await controller.StatisticsPanel(AccessibleProjectId, od: new DateTime(2025, 4, 1), doDate: new DateTime(2025, 3, 1)))
+            .Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
@@ -211,21 +227,6 @@ public sealed class ProjectDashboardControllerBehaviorTests
             return Task.FromResult(new ProjectDashboardRecordsPanelViewModel
             {
                 Records = []
-            });
-        }
-
-        public Task<ProjectDashboardStatisticsPanelViewModel> BuildStatisticsPanelAsync(
-            int projectId,
-            int year,
-            CancellationToken ct)
-        {
-            return Task.FromResult(new ProjectDashboardStatisticsPanelViewModel
-            {
-                SelectedYear = year,
-                AvailableYears = [year],
-                Kpi = new ProjectDashboardKpiViewModel(),
-                Quarters = [],
-                SubsystemStats = []
             });
         }
 

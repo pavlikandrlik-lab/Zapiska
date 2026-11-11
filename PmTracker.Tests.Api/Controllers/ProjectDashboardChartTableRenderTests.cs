@@ -19,7 +19,7 @@ public sealed class ProjectDashboardChartTableRenderTests
     {
         using var client = _fixture.Factory.CreateClient(new() { AllowAutoRedirect = false });
         var response = await client.GetAsync(
-            $"/projekty/{projectId}/dashboard/zakladni-report?rok={DateTime.Today.Year}&asUser={_fixture.AdminOsobaId}");
+            $"/projekty/{projectId}/dashboard/statistics-panel?rok={DateTime.Today.Year}&asUser={_fixture.AdminOsobaId}");
         var html = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(HttpStatusCode.OK, html);
         return html;

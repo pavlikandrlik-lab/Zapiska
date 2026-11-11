@@ -1,24 +1,37 @@
 @model PmTracker.Web.Services.ProjectDashboard.Zakladni.ZakladniReportViewModel
+@using PmTracker.Web.Services.ProjectDashboard.Zakladni
+@*
+    Výběr období Statistik (spec 2026-10-15 §11): rok + kvartál, vedle popisek předchozího období, se kterým
+    se srovnávají trendy. Změna znovu načte panel (zakladniReport.js → loadDashboardPanel).
+*@
 @{
-    var currentYear = System.DateTime.Now.Year;
-    var url = $"/projekty/{Model.ProjektId}/dashboard/zakladni-report";
+    var obdobi = Model.Obdobi;
+    var aktualniRok = DateTime.Now.Year;
+    var vybranyRok = obdobi.Start.Year;
+    var roky = Enumerable.Range(0, 6).Select(i => aktualniRok - i).Append(vybranyRok).Distinct().OrderDescending().ToList();
+    int? vybranyKvartal = obdobi.Druh == ObdobiDruh.Kvartal ? (obdobi.Start.Month - 1) / 3 + 1 : null;
+    var url = $"/projekty/{Model.ProjektId}/dashboard/statistics-panel";
+    var predchozi = obdobi.Predchozi().Label;
 }
-<div class="zr-obdobi" data-zakladni-obdobi data-url="@url">
-    <label>Rok
-        <select data-zakladni-obdobi-rok>
-            @for (var y = currentYear; y >= currentYear - 5; y--)
+<div class="pd-obdobi" data-zakladni-obdobi data-url="@url" data-obdobi="@obdobi.Label">
+    <label class="pd-obdobi__field">
+        <span>Rok</span>
+        <select class="pd-select" data-zakladni-obdobi-rok>
+            @foreach (var y in roky)
             {
-                <option value="@y" selected="@(Model.Obdobi.Label == y.ToString() ? "selected" : null)">@y</option>
+                <option value="@y" selected="@(obdobi.Druh != ObdobiDruh.Rozsah && y == vybranyRok ? "selected" : null)">@y</option>
             }
         </select>
     </label>
-    <label>Kvartál
-        <select data-zakladni-obdobi-kvartal>
-            <option value="">celý rok</option>
+    <label class="pd-obdobi__field">
+        <span>Kvartál</span>
+        <select class="pd-select" data-zakladni-obdobi-kvartal>
+            <option value="" selected="@(vybranyKvartal is null ? "selected" : null)">celý rok</option>
             @for (var q = 1; q <= 4; q++)
             {
-                <option value="@q">Q@q</option>
+                <option value="@q" selected="@(vybranyKvartal == q ? "selected" : null)">Q@q</option>
             }
         </select>
     </label>
+    <p class="pd-obdobi__compare" data-obdobi-srovnani="@predchozi">Srovnání s: @predchozi</p>
 </div>

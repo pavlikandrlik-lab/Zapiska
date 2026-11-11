@@ -113,7 +113,6 @@ import { initTheme } from "./theme.js";
 import { initTableTools } from "./tableTools.js";
 import { handleDashboardClick, initDashboardShell } from "./dashboard.js";
 import {
-    handleProjectDashboardChange,
     handleProjectDashboardClick,
     initProjectDashboardShell
 } from "./projectDashboard.js";
@@ -523,10 +522,6 @@ function handleDocumentChange(event) {
         if (form instanceof HTMLFormElement) {
             initRecordSchedulePlanner(form);
         }
-    }
-
-    if (handleProjectDashboardChange(target)) {
-        return;
     }
 }
 

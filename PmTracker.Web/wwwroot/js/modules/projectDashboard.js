@@ -1,10 +1,5 @@
 import { loadDashboardPanel } from "./dashboard.js";
-import {
-    fetchHtmlFragment,
-    renderLazyLoadError,
-    resolveOrCreateErrorContainer,
-    setLazyLoadingState
-} from "./navigationShared.js";
+import { fetchHtmlFragment } from "./navigationShared.js";
 import { resolveSouhrnCil } from "./dashboard/souhrnCil.js";
 
 // Projektový dashboard (spec 2026-10-15 §8): systémové pm-tabs (persist="storage" řeší
@@ -213,44 +208,6 @@ function handleShellKeydown(event) {
 }
 
 // ---------------------------------------------------------------------------
-// Výběr roku ve Statistikách (legacy panel do přestavby Statistik)
-// ---------------------------------------------------------------------------
-
-async function reloadStatisticsPanel(shell, year) {
-    const panel = resolveTabPanel(shell, "statistiky");
-    if (!(panel instanceof HTMLElement)) {
-        return;
-    }
-
-    const baseUrl = (panel.dataset.dashboardPanelUrl || "").trim();
-    if (!baseUrl) {
-        return;
-    }
-
-    const url = new URL(baseUrl, window.location.origin);
-    url.searchParams.set("year", String(year));
-
-    const content = panel.querySelector("[data-dashboard-panel-content]");
-    const placeholder = panel.querySelector("[data-dashboard-panel-placeholder]");
-    const errorContainer = resolveOrCreateErrorContainer(panel, "data-dashboard-panel-error");
-    if (!(content instanceof HTMLElement)) {
-        return;
-    }
-
-    setLazyLoadingState(panel, placeholder, errorContainer, true);
-
-    try {
-        content.innerHTML = await fetchHtmlFragment(url.href);
-        setLazyLoadingState(panel, placeholder, errorContainer, false);
-        content.dispatchEvent(new CustomEvent("pm:panel-loaded", { bubbles: true, detail: { url: url.href } }));
-    }
-    catch {
-        setLazyLoadingState(panel, placeholder, errorContainer, false);
-        renderLazyLoadError(errorContainer, "Nepodařilo se načíst statistiky.", "data-dashboard-panel-retry");
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Public: init
 // ---------------------------------------------------------------------------
 
@@ -303,32 +260,6 @@ export function handleProjectDashboardClick(target) {
             return false;
         }
         toggleExpandableRow(expandableRow);
-        return true;
-    }
-
-    return false;
-}
-
-// ---------------------------------------------------------------------------
-// Public: change handler (volá bootstrap handleDocumentChange)
-// ---------------------------------------------------------------------------
-
-export function handleProjectDashboardChange(target) {
-    if (!(target instanceof Element)) {
-        return false;
-    }
-
-    const shell = target.closest("[data-project-dashboard-shell]");
-    if (!(shell instanceof HTMLElement)) {
-        return false;
-    }
-
-    const yearSelect = target.closest("[data-dashboard-year-select]");
-    if (yearSelect instanceof HTMLSelectElement) {
-        const year = parseInt(yearSelect.value, 10);
-        if (year > 0) {
-            void reloadStatisticsPanel(shell, year);
-        }
         return true;
     }
 

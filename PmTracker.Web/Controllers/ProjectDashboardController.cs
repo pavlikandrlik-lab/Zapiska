@@ -92,9 +92,15 @@ public sealed class ProjectDashboardController : BaseController
         return PartialView("~/Views/ProjectDashboard/_RecordsPanel.cshtml", model);
     }
 
+    /// <summary>
+    /// Záložka Statistiky (spec 2026-10-15 §11): report za období — rok, kvartál (s rokem) nebo rozsah od–do.
+    /// Bez parametrů aktuální rok.
+    /// </summary>
     [HttpGet("statistics-panel")]
     [Authorize(Policy = "permission:dashboard.statistics.view")]
-    public async Task<IActionResult> StatisticsPanel(int projektId, int? year = null, CancellationToken ct = default)
+    public async Task<IActionResult> StatisticsPanel(
+        int projektId, int? rok = null, int? kvartal = null,
+        DateTime? od = null, DateTime? doDate = null, CancellationToken ct = default)
     {
         if (!await EnsureDashboardAccessAsync(projektId, ct))
         {
@@ -102,8 +108,30 @@ public sealed class ProjectDashboardController : BaseController
         }
 
         var currentYear = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).Year;
-        var model = await _dashboardService.BuildStatisticsPanelAsync(projektId, year ?? currentYear, ct);
-        return PartialView("~/Views/ProjectDashboard/_StatisticsPanel.cshtml", model);
+        Obdobi obdobi;
+        if (od.HasValue || doDate.HasValue)
+        {
+            if (od is not { } zacatek || doDate is not { } konec || konec < zacatek)
+            {
+                return BadRequest(new { error = "Rozsah období potřebuje začátek i konec a konec nesmí být před začátkem." });
+            }
+            obdobi = Obdobi.Rozsah(zacatek, konec);
+        }
+        else if (kvartal.HasValue)
+        {
+            if (kvartal is < 1 or > 4)
+            {
+                return BadRequest(new { error = "Kvartál musí být 1 až 4." });
+            }
+            obdobi = Obdobi.Kvartal(rok ?? currentYear, kvartal.Value);
+        }
+        else
+        {
+            obdobi = Obdobi.Rok(rok ?? currentYear);
+        }
+
+        var model = await _reportBuilder.BuildAsync(projektId, obdobi, ct);
+        return PartialView("~/Views/ProjectDashboard/Zakladni/Report.cshtml", model);
     }
 
     [HttpGet("nes-panel")]
@@ -150,28 +178,6 @@ public sealed class ProjectDashboardController : BaseController
         return File(bytes,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             filename);
-    }
-
-    [HttpGet("zakladni-report")]
-    [Authorize(Policy = "permission:dashboard.statistics.view")]
-    public async Task<IActionResult> ZakladniReport(
-        int projektId, int? rok = null, int? kvartal = null,
-        DateTime? od = null, DateTime? doDate = null, CancellationToken ct = default)
-    {
-        if (!await EnsureDashboardAccessAsync(projektId, ct))
-        {
-            return Forbid();
-        }
-
-        var currentYear = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).Year;
-        Obdobi obdobi = (od.HasValue && doDate.HasValue)
-            ? Obdobi.Rozsah(od.Value, doDate.Value)
-            : kvartal.HasValue
-                ? Obdobi.Kvartal(rok ?? currentYear, kvartal.Value)
-                : Obdobi.Rok(rok ?? currentYear);
-
-        var model = await _reportBuilder.BuildAsync(projektId, obdobi, ct);
-        return PartialView("~/Views/ProjectDashboard/Zakladni/Report.cshtml", model);
     }
 
     private Task<bool> EnsureDashboardAccessAsync(int projectId, CancellationToken ct)

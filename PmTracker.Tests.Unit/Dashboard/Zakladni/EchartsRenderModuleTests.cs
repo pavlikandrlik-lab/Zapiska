@@ -58,7 +58,15 @@ public sealed class EchartsRenderModuleTests
     public void Bootstrap_wires_echarts_report()
         => Read("PmTracker.Web/wwwroot/js/modules/bootstrap.js").Should().Contain("initEchartsReport");
 
+    /// <summary>
+    /// Změna období znovu načte panel přes loadDashboardPanel, ten pošle pm:panel-loaded a na ten
+    /// echartsRender.js inicializuje grafy v novém obsahu. Přetržení kteréhokoli článku = prázdné karty.
+    /// </summary>
     [Fact]
     public void ReportReload_reinitializes_echarts()
-        => Read("PmTracker.Web/wwwroot/js/modules/dashboard/zakladniReport.js").Should().Contain("initEchartsReport");
+    {
+        Read("PmTracker.Web/wwwroot/js/modules/dashboard/zakladniReport.js").Should().Contain("loadDashboardPanel(");
+        Read("PmTracker.Web/wwwroot/js/modules/dashboard.js").Should().Contain("\"pm:panel-loaded\"");
+        Read("PmTracker.Web/wwwroot/js/modules/dashboard/echartsRender.js").Should().Contain("\"pm:panel-loaded\"");
+    }
 }

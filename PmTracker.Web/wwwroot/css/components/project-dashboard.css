@@ -771,6 +771,69 @@ button.pd-tile:focus-visible {
     font-variant-numeric: tabular-nums;
 }
 
+/* --- Statistiky: výběr období a sekce reportu ------------------------------ */
+
+.pd-report {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-xl);
+}
+
+.pd-obdobi {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--pm-spacing-s) var(--pm-spacing-m);
+}
+
+.pd-obdobi__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-2xs);
+    margin: 0;
+    font-size: var(--pm-font-size-s);
+    font-weight: var(--pm-font-weight-semibold);
+    color: var(--text-secondary);
+}
+
+.pd-obdobi__field .pd-select {
+    min-width: 140px;
+    width: auto;
+}
+
+.pd-obdobi__compare {
+    margin: 0 0 6px;
+    font-size: var(--pm-font-size-s);
+    color: var(--text-secondary);
+}
+
+.pd-report__section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-m);
+}
+
+.pd-report__head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-2xs);
+    padding-bottom: var(--pm-spacing-xs);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.pd-report__title {
+    margin: 0;
+    font-size: var(--pm-font-size-xl);
+    font-weight: var(--pm-font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.pd-report__lead {
+    margin: 0;
+    max-width: 78ch;
+    color: var(--text-secondary);
+}
+
 /* --- NES v prodlení: lišta, sekce, odůvodnění, časová osa ----------------- */
 
 .pd-nes {
@@ -1012,7 +1075,13 @@ a.pd-state__action {
 @media print {
     .pd-souhrn,
     .pd-shell pm-tab-list,
-    .pd-shell pm-button {
+    .pd-shell pm-button,
+    .pd-obdobi select {
+        display: none !important;
+    }
+
+    /* Tiskne se jen aktivní záložka. */
+    .pd-shell pm-tab-panel:not([active]) {
         display: none !important;
     }
 
@@ -1022,8 +1091,13 @@ a.pd-state__action {
 
     .pd-chart,
     .pd-kpi,
-    .pd-tl {
+    .pd-tl,
+    .pd-report__head {
         break-inside: avoid;
+    }
+
+    .pd-report__head {
+        break-after: avoid;
     }
 
     /* Tisk má ukázat i sbalené sekce a odůvodnění. */

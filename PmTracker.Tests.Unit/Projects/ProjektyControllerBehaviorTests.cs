@@ -621,9 +621,6 @@ public sealed class ProjektyControllerBehaviorTests
         public Task<ProjectDashboardRecordsPanelViewModel> BuildRecordsPanelAsync(int projectId, DateTime referenceDate, CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<ProjectDashboardStatisticsPanelViewModel> BuildStatisticsPanelAsync(int projectId, int year, CancellationToken ct = default)
-            => throw new NotSupportedException();
-
         public Task<ProjectDashboardNesPanelViewModel> BuildNesPanelAsync(
             int projektId, DateTime reference, CancellationToken ct = default)
             => throw new NotSupportedException();
