@@ -48,6 +48,10 @@ public sealed class ProjectDashboardRecordsPanelViewModel
 {
     public IReadOnlyList<ProjectDashboardRecordRowViewModel> Records { get; init; } = [];
     public bool IsEmpty => Records.Count == 0;
+
+    /// <summary>Počty řádků podle kategorie pro filtrační chipy (vždy všechny tři klíče, bez nového dotazu).</summary>
+    public IReadOnlyDictionary<DashboardRecordCategory, int> PocetPodleKategorie =>
+        Enum.GetValues<DashboardRecordCategory>().ToDictionary(k => k, k => Records.Count(r => r.Category == k));
 }
 
 public sealed class ProjectDashboardRecordRowViewModel

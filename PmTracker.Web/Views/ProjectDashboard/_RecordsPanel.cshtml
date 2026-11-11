@@ -1,144 +1,156 @@
 @model ProjectDashboardRecordsPanelViewModel
+@*
+    Záložka Záznamy (spec 2026-10-15 §9). Výpočet kategorií je beze změny (DashboardRecordCategorizer);
+    mění se vzhled: chipy s počty, karta tabulky se stavovým pruhem řádku, odkaz na záznam.
+*@
+@{
+    var pocty = Model.PocetPodleKategorie;
+    var chipy = new (string Slug, string Label, int Pocet)[]
+    {
+        ("", "Vše", Model.Records.Count),
+        ("delayed", "V prodlení", pocty[DashboardRecordCategory.Delayed]),
+        ("awaiting", "Čeká na skutečnost", pocty[DashboardRecordCategory.AwaitingActual]),
+        ("approaching", "Blíží se termín", pocty[DashboardRecordCategory.ApproachingDeadline]),
+    };
 
-<div class="dashboard-panel-body">
-    <div class="dashboard-category-filter-row">
-        <pm-button variant="Ghost" size="Small" class="active" data-dashboard-category-filter="">
-            Vše
-        </pm-button>
-        <pm-button variant="Ghost" size="Small" data-dashboard-category-filter="delayed">
-            V prodlení
-        </pm-button>
-        <pm-button variant="Ghost" size="Small" data-dashboard-category-filter="awaiting">
-            Čeká na skutečnost
-        </pm-button>
-        <pm-button variant="Ghost" size="Small" data-dashboard-category-filter="approaching">
-            Blíží se termín
-        </pm-button>
-    </div>
+    static (string Slug, string Label, string TagColor) Kategorie(DashboardRecordCategory c) => c switch
+    {
+        DashboardRecordCategory.Delayed => ("delayed", "V prodlení", "error"),
+        DashboardRecordCategory.AwaitingActual => ("awaiting", "Čeká na skutečnost", "warning"),
+        _ => ("approaching", "Blíží se termín", "neutral"),
+    };
 
+    static string Dny(int n) => n == 1 ? "den" : n is >= 2 and <= 4 ? "dny" : "dní";
+}
+
+<div class="pd-records">
     @if (Model.IsEmpty)
     {
-        <p class="muted">Žádné záznamy k zobrazení — všechny úkoly jsou v pořádku.</p>
+        <div class="pd-empty">
+            <gov-icon size="m" name="check-circle-fill" type="components" aria-hidden="true"></gov-icon>
+            <div class="pd-empty__body">
+                <p class="pd-empty__title">Všechny úkoly jsou v termínu</p>
+                <p class="pd-empty__text">Žádný úkol nemá zpožděný krok harmonogramu, nečeká na skutečnost ani se mu neblíží termín.</p>
+            </div>
+        </div>
     }
     else
     {
-        <div class="dashboard-records-table-wrapper">
-            <table class="dashboard-records-table">
-                <thead>
-                    <tr>
-                        <th>Číslo</th>
-                        <th>Název</th>
-                        <th>Subsystém</th>
-                        <th>Vlastník</th>
-                        <th>Termín ukončení</th>
-                        <th>Kategorie</th>
-                        <th>Nejhorší odchylka</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var record in Model.Records)
-                    {
-                        var categorySlug = record.Category switch
-                        {
-                            DashboardRecordCategory.Delayed => "delayed",
-                            DashboardRecordCategory.AwaitingActual => "awaiting",
-                            DashboardRecordCategory.ApproachingDeadline => "approaching",
-                            _ => ""
-                        };
-                        var categoryLabel = record.Category switch
-                        {
-                            DashboardRecordCategory.Delayed => "V prodlení",
-                            DashboardRecordCategory.AwaitingActual => "Čeká na skutečnost",
-                            DashboardRecordCategory.ApproachingDeadline => "Blíží se termín",
-                            _ => ""
-                        };
-                        var tagColor = record.Category switch
-                        {
-                            DashboardRecordCategory.Delayed => "error",
-                            DashboardRecordCategory.AwaitingActual => "warning",
-                            DashboardRecordCategory.ApproachingDeadline => "neutral",
-                            _ => "neutral"
-                        };
-                        <tr data-dashboard-expandable-row
-                            data-category="@categorySlug"
-                            data-record-id="@record.RecordId">
-                            <td>@record.CisloViditelne</td>
-                            <td>@record.Nazev</td>
-                            <td title="@record.Subsystem">@record.SubsystemKod</td>
-                            <td>@record.Vlastnik</td>
-                            <td>@record.TerminUkonceni.ToString("dd.MM.yyyy")</td>
-                            <td>
-                                <gov-tag color="@tagColor" size="s">@categoryLabel</gov-tag>
-                            </td>
-                            <td>
-                                @if (record.WorstOffsetDays > 0)
-                                {
-                                    <span>+@record.WorstOffsetDays&nbsp;dní</span>
-                                }
-                                else
-                                {
-                                    <span class="muted">—</span>
-                                }
-                            </td>
+        <div class="pd-filters" role="group" aria-label="Filtr podle stavu harmonogramu">
+            @foreach (var chip in chipy)
+            {
+                <button type="button"
+                        class="pd-filter@(chip.Slug == "" ? " active" : "")"
+                        aria-pressed="@(chip.Slug == "" ? "true" : "false")"
+                        data-dashboard-category-filter="@chip.Slug"
+                        data-count="@chip.Pocet"
+                        disabled="@(chip.Pocet == 0 && chip.Slug != "" ? "disabled" : null)">
+                    @chip.Label <span class="pd-count">@chip.Pocet</span>
+                </button>
+            }
+        </div>
+
+        <div class="pd-card pd-card--table">
+            <div class="pd-table-scroll">
+                <table class="pd-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Číslo</th>
+                            <th scope="col">Název</th>
+                            <th scope="col">Subsystém</th>
+                            <th scope="col">Vlastník</th>
+                            <th scope="col">Termín ukončení</th>
+                            <th scope="col">Stav</th>
+                            <th scope="col" class="pd-table__num">Odchylka</th>
                         </tr>
-                        <tr class="dashboard-expandable-detail" data-dashboard-expandable-detail="@record.RecordId" hidden>
-                            <td colspan="7">
-                                <div class="dashboard-expandable-detail-body">
-                                    @if (record.ProblematicSteps.Count > 0)
+                    </thead>
+                    <tbody>
+                        @foreach (var record in Model.Records)
+                        {
+                            var (slug, label, tagColor) = Kategorie(record.Category);
+                            <tr class="pd-row pd-row--@slug"
+                                data-dashboard-expandable-row
+                                data-category="@slug"
+                                data-record-id="@record.RecordId"
+                                tabindex="0"
+                                aria-expanded="false">
+                                <td class="pd-table__id">@record.CisloViditelne</td>
+                                <td class="pd-table__name">@record.Nazev</td>
+                                <td title="@record.Subsystem">@record.SubsystemKod</td>
+                                <td>@record.Vlastnik</td>
+                                <td>@record.TerminUkonceni.ToString("dd.MM.yyyy")</td>
+                                <td><gov-tag color="@tagColor" size="s">@label</gov-tag></td>
+                                <td class="pd-table__num">
+                                    @if (record.WorstOffsetDays > 0)
                                     {
-                                        <table class="dashboard-steps-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Krok</th>
-                                                    <th>Plánovaný termín</th>
-                                                    <th>Skutečný termín</th>
-                                                    <th>Odchylka</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach (var step in record.ProblematicSteps)
-                                                {
-                                                    <tr>
-                                                        <td>@step.StepName</td>
-                                                        <td>@step.PlannedDate.ToString("dd.MM.yyyy")</td>
-                                                        <td>
-                                                            @if (step.ActualDate.HasValue)
-                                                            {
-                                                                @step.ActualDate.Value.ToString("dd.MM.yyyy")
-                                                            }
-                                                            else
-                                                            {
-                                                                <span class="muted">—</span>
-                                                            }
-                                                        </td>
-                                                        <td>
-                                                            @if (step.OffsetDays > 0)
-                                                            {
-                                                                <span class="text-danger">+@step.OffsetDays&nbsp;dní</span>
-                                                            }
-                                                            else if (step.DaysSincePlanExpired > 0)
-                                                            {
-                                                                <span class="muted">Čeká (@step.DaysSincePlanExpired&nbsp;dní)</span>
-                                                            }
-                                                            else
-                                                            {
-                                                                <span class="muted">—</span>
-                                                            }
-                                                        </td>
-                                                    </tr>
-                                                }
-                                            </tbody>
-                                        </table>
+                                        <strong class="pd-offset pd-offset--@slug">@(record.Category == DashboardRecordCategory.ApproachingDeadline ? "za" : "+")&nbsp;@record.WorstOffsetDays&nbsp;@Dny(record.WorstOffsetDays)</strong>
                                     }
-                                    <div class="dashboard-expandable-detail-actions">
-                                        <pm-button variant="Ghost" size="Small" href="@record.ScheduleUrl">Přejít na harmonogram</pm-button>
+                                    else
+                                    {
+                                        <span class="pd-muted">—</span>
+                                    }
+                                </td>
+                            </tr>
+                            <tr class="pd-detail" data-dashboard-expandable-detail="@record.RecordId" hidden>
+                                <td colspan="7">
+                                    <div class="pd-detail__body">
+                                        @if (record.ProblematicSteps.Count > 0)
+                                        {
+                                            <table class="pd-steps">
+                                                <thead>
+                                                    <tr>
+                                                        <th scope="col">Krok</th>
+                                                        <th scope="col">Plánovaný termín</th>
+                                                        <th scope="col">Skutečný termín</th>
+                                                        <th scope="col">Odchylka</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var step in record.ProblematicSteps)
+                                                    {
+                                                        <tr>
+                                                            <td>@step.StepName</td>
+                                                            <td>@step.PlannedDate.ToString("dd.MM.yyyy")</td>
+                                                            <td>
+                                                                @if (step.ActualDate.HasValue)
+                                                                {
+                                                                    @step.ActualDate.Value.ToString("dd.MM.yyyy")
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="pd-muted">—</span>
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                                @if (step.OffsetDays > 0)
+                                                                {
+                                                                    <strong class="pd-offset pd-offset--delayed">+&nbsp;@step.OffsetDays&nbsp;@Dny(step.OffsetDays)</strong>
+                                                                }
+                                                                else if (step.DaysSincePlanExpired > 0)
+                                                                {
+                                                                    <span class="pd-offset pd-offset--awaiting">čeká @step.DaysSincePlanExpired&nbsp;@Dny(step.DaysSincePlanExpired)</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="pd-muted">—</span>
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        }
+                                        <div class="pd-detail__actions">
+                                            <pm-button variant="Secondary" size="Small" href="/Zaznamy/Detail/@record.RecordId">Otevřít záznam</pm-button>
+                                            <pm-button variant="Ghost" size="Small" href="@record.ScheduleUrl">Harmonogram</pm-button>
+                                        </div>
                                     </div>
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
     }
 </div>

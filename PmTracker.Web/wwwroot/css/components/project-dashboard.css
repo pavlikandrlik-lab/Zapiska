@@ -301,6 +301,258 @@ button.pd-tile:focus-visible {
     outline-offset: 2px;
 }
 
+/* --- Společné: karta, tabulka, prázdný stav ------------------------------ */
+
+.pd-card {
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--pm-radius-m);
+}
+
+.pd-card--table {
+    overflow: hidden;
+}
+
+.pd-table-scroll {
+    max-height: 70vh;
+    overflow: auto;
+}
+
+.pd-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--pm-font-size-s);
+}
+
+.pd-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: var(--pm-spacing-s) var(--pm-spacing-m);
+    background: var(--background-block-secondary);
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-weight: var(--pm-font-weight-semibold);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.pd-table td {
+    padding: var(--pm-spacing-s) var(--pm-spacing-m);
+    border-bottom: 1px solid var(--border-subtlest);
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.pd-table__num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.pd-table__id {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+}
+
+.pd-table__name {
+    min-width: 220px;
+}
+
+.pd-muted {
+    color: var(--text-tertiary);
+}
+
+/* Řádek se stavovým pruhem vlevo (3 px uvnitř první buňky, bez zásahu do layoutu). */
+.pd-row > td:first-child {
+    box-shadow: inset 3px 0 0 var(--border-subtle);
+}
+
+.pd-row--delayed > td:first-child {
+    box-shadow: inset 3px 0 0 var(--border-error);
+}
+
+.pd-row--awaiting > td:first-child {
+    box-shadow: inset 3px 0 0 var(--border-warning);
+}
+
+.pd-row[data-dashboard-expandable-row] {
+    cursor: pointer;
+}
+
+.pd-row[data-dashboard-expandable-row]:hover > td,
+.pd-row.expanded > td {
+    background: var(--background-block-secondary);
+}
+
+.pd-row[data-dashboard-expandable-row]:focus-visible {
+    outline: 2px solid var(--border-primary);
+    outline-offset: -2px;
+}
+
+.pd-offset {
+    font-weight: var(--pm-font-weight-bold);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.pd-offset--delayed {
+    color: var(--text-status-error);
+}
+
+.pd-offset--awaiting {
+    color: var(--text-status-warning);
+}
+
+.pd-offset--approaching {
+    color: var(--text-secondary);
+}
+
+.pd-detail > td {
+    padding: 0;
+    background: var(--background-block-secondary);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.pd-detail__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-m);
+    padding: var(--pm-spacing-m) var(--pm-spacing-l) var(--pm-spacing-m) calc(var(--pm-spacing-l) + 3px);
+}
+
+.pd-detail__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--pm-spacing-s);
+}
+
+.pd-steps {
+    border-collapse: collapse;
+    font-size: var(--pm-font-size-s);
+}
+
+.pd-steps th,
+.pd-steps td {
+    padding: var(--pm-spacing-2xs) var(--pm-spacing-l) var(--pm-spacing-2xs) 0;
+    text-align: left;
+}
+
+.pd-steps th {
+    color: var(--text-secondary);
+    font-weight: var(--pm-font-weight-semibold);
+}
+
+.pd-empty {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--pm-spacing-m);
+    padding: var(--pm-spacing-xl) var(--pm-spacing-l);
+}
+
+.pd-empty gov-icon {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    top: 0;
+    color: var(--icon-success);
+}
+
+.pd-empty__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-2xs);
+    flex: 1 1 260px;
+}
+
+.pd-empty__title {
+    margin: 0;
+    font-size: var(--pm-font-size-l);
+    font-weight: var(--pm-font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.pd-empty__text {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+/* --- Záložka Záznamy: filtrační chipy ------------------------------------ */
+
+.pd-records {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-m);
+}
+
+.pd-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--pm-spacing-xs);
+}
+
+.pd-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pm-spacing-xs);
+    min-height: 32px;
+    padding: 4px 6px 4px 14px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--pm-radius-round);
+    background: var(--background-block-primary);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: var(--pm-font-size-s);
+    font-weight: var(--pm-font-weight-medium);
+    cursor: pointer;
+}
+
+.pd-filter:hover:not(:disabled) {
+    border-color: var(--border-primary);
+    color: var(--text-primary-color);
+}
+
+.pd-filter:focus-visible {
+    outline: 2px solid var(--border-primary);
+    outline-offset: 2px;
+}
+
+.pd-filter.active {
+    border-color: var(--border-primary);
+    background: var(--background-primary);
+    color: var(--text-white-fixed);
+}
+
+.pd-filter:disabled {
+    cursor: default;
+    color: var(--text-disabled);
+    border-color: var(--border-subtlest);
+}
+
+.pd-count {
+    display: inline-flex;
+    justify-content: center;
+    min-width: 24px;
+    padding: 0 6px;
+    border-radius: var(--pm-radius-round);
+    background: var(--background-neutral-subtle);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--pm-font-weight-semibold);
+}
+
+.pd-filter.active .pd-count {
+    background: var(--background-block-primary);
+    color: var(--text-primary-color);
+}
+
+.pd-filter:disabled .pd-count {
+    background: transparent;
+    color: var(--text-disabled);
+}
+
 /* --- Úzká obrazovka ------------------------------------------------------ */
 
 @media (max-width: 576px) {

@@ -122,7 +122,11 @@ async function activateSouhrnTarget(shell, cil) {
         return;
     }
     if (cil.tab === "zaznamy" && cil.filter) {
-        applyCategoryFilter(shell, cil.filter);
+        // Prázdná kategorie má chip disabled — filtr by ukázal prázdnou tabulku, zůstane „Vše".
+        const chip = shell.querySelector(`[data-dashboard-category-filter="${CSS.escape(cil.filter)}"]`);
+        if (chip instanceof HTMLButtonElement && !chip.disabled) {
+            applyCategoryFilter(shell, cil.filter);
+        }
     }
     shell.dispatchEvent(new CustomEvent("pm:dashboard-filter", {
         bubbles: true,
@@ -140,7 +144,9 @@ function applyCategoryFilter(shell, category) {
             return;
         }
         const btnCategory = btn.getAttribute("data-dashboard-category-filter") ?? "";
-        btn.classList.toggle("active", btnCategory === category);
+        const active = btnCategory === category;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
     });
 
     shell.querySelectorAll("[data-dashboard-expandable-row]").forEach((row) => {
@@ -157,6 +163,7 @@ function applyCategoryFilter(shell, category) {
             if (detail instanceof HTMLElement && !visible) {
                 detail.hidden = true;
                 row.classList.remove("expanded");
+                row.setAttribute("aria-expanded", "false");
             }
         }
     });
@@ -189,6 +196,20 @@ function toggleExpandableRow(row) {
     const isExpanded = !detail.hidden;
     detail.hidden = isExpanded;
     row.classList.toggle("expanded", !isExpanded);
+    row.setAttribute("aria-expanded", isExpanded ? "false" : "true");
+}
+
+// Řádek je fokusovatelný (tabindex=0) — Enter/mezerník ho rozbalí stejně jako klik.
+function handleShellKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " ") {
+        return;
+    }
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || !target.matches("[data-dashboard-expandable-row]")) {
+        return;
+    }
+    event.preventDefault();
+    toggleExpandableRow(target);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +261,7 @@ export function initProjectDashboardShell() {
     }
 
     shell.dataset.projectDashboardReady = "true";
+    shell.addEventListener("keydown", handleShellKeydown);
     void initTabs(shell);
     void loadSouhrn(shell);
 }
