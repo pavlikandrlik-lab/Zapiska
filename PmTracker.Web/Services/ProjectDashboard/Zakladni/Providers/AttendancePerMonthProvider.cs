@@ -53,6 +53,7 @@ public sealed class AttendancePerMonthProvider : IZakladniChartProvider
             note: "0 % znamená, že v měsíci nebylo žádné jednání s evidovanou účastí.") with
         {
             Unit = "%",
+            MaData = ted.Count > 0,
             EmptyMessage = "V období neproběhlo žádné jednání s evidovanou účastí.",
         };
     }

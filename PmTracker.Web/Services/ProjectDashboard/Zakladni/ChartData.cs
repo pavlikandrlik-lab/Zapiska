@@ -82,10 +82,18 @@ public sealed record ChartData
 
     public string? ActionText { get; init; }
 
-    /// <summary>Není co kreslit: karty bez položek, graf bez nenulové hodnoty.</summary>
-    public bool IsEmpty => Kind is ChartKind.StatCards or ChartKind.Kpi
-        ? Stats.Count == 0
-        : Series.All(s => s.Values.All(v => v == 0));
+    /// <summary>
+    /// Provider ví, že data existují, i když jsou všechny hodnoty nulové (0 % účast, 0 % včas).
+    /// null = rozhodnout podle hodnot.
+    /// </summary>
+    public bool? MaData { get; init; }
+
+    /// <summary>Není co kreslit: karty bez položek, graf bez nenulové hodnoty (pokud provider neřekl jinak).</summary>
+    public bool IsEmpty => MaData is bool maData
+        ? !maData
+        : Kind is ChartKind.StatCards or ChartKind.Kpi
+            ? Stats.Count == 0
+            : Series.All(s => s.Values.All(v => v == 0));
 
     public static ChartData ForSeries(
         string key,

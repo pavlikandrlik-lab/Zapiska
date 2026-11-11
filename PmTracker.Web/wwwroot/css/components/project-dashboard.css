@@ -648,6 +648,16 @@ button.pd-tile:focus-visible {
     color: var(--text-secondary);
 }
 
+/* Šipka drží u textu trendu; dlouhý text se zalomí vedle ní, ne pod ni. */
+.pd-kpi__trend > span:first-child {
+    flex: 0 0 auto;
+}
+
+.pd-kpi__trend > span:nth-child(2) {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
 .pd-kpi__verdict {
     font-weight: var(--pm-font-weight-semibold);
 }

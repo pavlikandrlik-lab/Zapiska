@@ -31,7 +31,7 @@ public sealed class PrehledKpiProviderTests
         data.Key.Should().Be("prehled-kpi");
         var karta = Karta(data, "Otevřené úkoly");
         karta.Value.Should().Be("5");
-        karta.Note.Should().Be("z toho 2 po termínu");
+        karta.Note.Should().Be("z toho 2 po termínu ukončení", "dlaždice souhrnu „Úkoly po termínu“ znamená zpožděný krok harmonogramu");
         karta.Status.Should().Be(CardStatus.Warning);
     }
 

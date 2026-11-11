@@ -9,6 +9,8 @@ const kompaktni = new Intl.NumberFormat("cs-CZ", { notation: "compact", maximumF
 
 const VYSKA_GRAFU = 280;
 const VYSKA_RADKU = 32;
+// Do tolika kategorií se na svislé ose ukážou všechny popisky (koše stáří, typy, subsystémy); víc = prořídnou.
+const VSECHNY_POPISKY_DO = 6;
 
 /** Hodnota česky (tisíce, nejvýš jedno desetinné místo) s jednotkou; nečíslo = pomlčka. */
 export function formatHodnota(v, unit) {
@@ -34,7 +36,7 @@ export function vyskaGrafu(d) {
     return VYSKA_GRAFU;
 }
 
-function zaklad(tema, { legenda, tooltip, unit, vodorovnePopisky = false }) {
+function zaklad(tema, { legenda, tooltip, unit, vodorovnePopisky = false, praveMisto = 16 }) {
     return {
         color: tema.color,
         textStyle: { color: tema.textStyle.color, fontFamily: tema.textStyle.fontFamily },
@@ -48,7 +50,7 @@ function zaklad(tema, { legenda, tooltip, unit, vodorovnePopisky = false }) {
             itemHeight: 12,
             textStyle: { color: tema.axis.label }
         },
-        grid: { left: 4, right: vodorovnePopisky ? 56 : 16, top: legenda ? 36 : 12, bottom: 4, containLabel: true },
+        grid: { left: 4, right: vodorovnePopisky ? 56 : praveMisto, top: legenda ? 36 : 12, bottom: 4, containLabel: true },
         tooltip: {
             ...tooltip,
             confine: true,
@@ -83,7 +85,9 @@ function osaKategorii(tema, cats, vodorovne) {
         inverse: vodorovne ? true : undefined,
         axisLabel: vodorovne
             ? { color: tema.axis.label, width: 180, overflow: "truncate" }
-            : { color: tema.axis.label, hideOverlap: true },
+            : cats.length <= VSECHNY_POPISKY_DO
+                ? { color: tema.axis.label, interval: 0, width: 84, overflow: "break" }
+                : { color: tema.axis.label, hideOverlap: true },
         axisLine: { lineStyle: { color: tema.axis.line } },
         axisTick: { show: false }
     };
@@ -136,6 +140,8 @@ function cara(d, tema) {
         ...zaklad(tema, {
             legenda: series.length >= 2,
             unit,
+            // Bez boundaryGap stojí poslední popisek osy přímo na okraji — potřebuje místo vpravo.
+            praveMisto: 32,
             tooltip: { trigger: "axis", axisPointer: { type: "line", lineStyle: { color: tema.axis.line } } }
         }),
         xAxis: { ...osaKategorii(tema, cats, false), boundaryGap: false },

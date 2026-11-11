@@ -104,6 +104,17 @@ public sealed class PrubehProvidersTests
         data.SectionKeyOf(new RecordStatusPieProvider()).Should().Be("prubeh");
         data.CategoryColorTokens.Should().HaveCount(4).And.Contain("--background-status-success");
     }
+
+    [Fact]
+    public void Compliance_vse_pozde_je_nula_procent_ne_prazdny_graf()
+    {
+        var ds = Dataset([Hotovy_(new DateTime(2026, 2, 20), termin: new DateTime(2026, 2, 12))]);
+
+        var data = new DeadlineCompliancePerSubsystemProvider().Build(ds);
+
+        data.Series[0].Values[0].Should().Be(0);
+        data.IsEmpty.Should().BeFalse("úkol se uzavřel, jen pozdě");
+    }
 }
 
 internal static class ChartDataTestExtensions

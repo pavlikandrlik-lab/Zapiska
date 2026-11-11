@@ -29,6 +29,7 @@ public sealed class DeadlineCompliancePerSubsystemProvider : IZakladniChartProvi
             note: "Podíl uzavřených úkolů, které skončily do původního (prvního plánovaného) a do posledního platného termínu.") with
         {
             Unit = "%",
+            MaData = bySubsystem.Count > 0,
             EmptyMessage = "Zatím se neuzavřel žádný úkol.",
         };
     }

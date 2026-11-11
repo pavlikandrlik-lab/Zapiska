@@ -49,7 +49,7 @@ public sealed class PrehledKpiProvider : IZakladniChartProvider
         var otevrene = ukoly.Where(r => JeOtevreny(r, stavy)).ToList();
         var poTerminu = otevrene.Count(r => JePoTerminu(r, dnes));
         return new StatCard("Otevřené úkoly", otevrene.Count.ToString(Cs),
-            Note: poTerminu > 0 ? $"z toho {poTerminu} po termínu" : "žádný po termínu",
+            Note: poTerminu > 0 ? $"z toho {poTerminu} po termínu ukončení" : "žádný po termínu ukončení",
             Status: poTerminu > 0 ? CardStatus.Warning : CardStatus.Neutral);
     }
 

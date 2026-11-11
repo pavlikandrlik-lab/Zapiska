@@ -65,4 +65,19 @@ public sealed class LideProvidersTests
         data.Note.Should().Contain("0 %");
         data.Insight.Should().Contain("80");
     }
+
+    [Fact]
+    public void Attendance_nula_procent_je_udaj_ne_prazdny_graf()
+    {
+        var ds = Dataset() with
+        {
+            Jednani = [new DatasetJednani(1, new DateTime(2026, 2, 3))],
+            Ucasti = [new DatasetUcast(1, false), new DatasetUcast(1, false)],
+        };
+
+        var data = new AttendancePerMonthProvider().Build(ds);
+
+        data.Series.Single().Values.Should().Equal(0, 0, 0);
+        data.IsEmpty.Should().BeFalse("jednání proběhlo, jen nikdo nebyl přítomen");
+    }
 }

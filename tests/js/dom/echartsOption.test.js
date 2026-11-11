@@ -146,3 +146,24 @@ test("vyskaGrafu: vodorovné sloupce rostou s počtem kategorií, ostatní mají
     assert.equal(vyskaGrafu({ kind: "HorizontalBar", categories: ["A"], series: jedna }), 160, "spodní mez, ať graf s jedním řádkem nezmizí");
     assert.ok(vyskaGrafu(hodne) > 280);
 });
+
+test("Line: vpravo zůstane místo na poslední popisek osy (boundaryGap false ho staví na okraj)", () => {
+    const o = optionFor(graf("Line", dve), tema);
+
+    assert.ok(o.grid.right >= 28, `grid.right = ${o.grid.right}`);
+});
+
+test("Svislá osa s nejvýš 6 kategoriemi ukáže všechny popisky a dlouhé zalomí", () => {
+    const o = optionFor(graf("Bar", jedna), tema);
+
+    assert.equal(o.xAxis.axisLabel.interval, 0);
+    assert.equal(o.xAxis.axisLabel.overflow, "break");
+});
+
+test("Svislá osa s mnoha kategoriemi popisky prořídí, aby se nepřekrývaly", () => {
+    const mesice = Array.from({ length: 12 }, (_, i) => `${String(i + 1).padStart(2, "0")}/2026`);
+    const o = optionFor(graf("Bar", [{ label: "x", values: mesice.map(() => 1) }], { categories: mesice }), tema);
+
+    assert.notEqual(o.xAxis.axisLabel.interval, 0);
+    assert.equal(o.xAxis.axisLabel.hideOverlap, true);
+});
