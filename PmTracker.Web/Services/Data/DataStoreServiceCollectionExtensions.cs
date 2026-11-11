@@ -127,6 +127,10 @@ public static class DataStoreServiceCollectionExtensions
         // Plán C/D follow-up: manuální drag-and-drop rebalance přes ChronologyRebalancer.
         // Volaný z VyjadreniModalController.CreateVazba.
         services.AddScoped<IBindingRebalanceService, BindingRebalanceService>();
+        // 2026-11-11: prodlení ticketů podle penalizačního algoritmu starého ServiceDesku
+        // (spec 2026-10-15). Kalendář svátků je bezstavový s cache po rocích.
+        services.AddSingleton<PmTracker.Web.Services.ServiceDesk.Prodleni.ICeskeSvatky,
+            PmTracker.Web.Services.ServiceDesk.Prodleni.CeskeSvatky>();
         // Plán 3 Feature D (2026-04-24, U10): hard constraint validator pro vytvoření
         // nové externí vazby. Volaný ze RecordService.SaveRecordAsync přes
         // ValidateExternalLinksAsync — PŘED SaveChangesAsync.
