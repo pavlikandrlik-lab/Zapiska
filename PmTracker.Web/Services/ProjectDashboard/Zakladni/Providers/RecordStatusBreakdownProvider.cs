@@ -15,7 +15,7 @@ public sealed class RecordStatusBreakdownProvider : IZakladniChartProvider
         var statesById = ds.Stavy.ToDictionary(s => s.Id);
 
         // countByBucket[bucket][subsystemId] = počet
-        var countByBucket = ds.Records
+        var countByBucket = ds.Ukoly
             .GroupBy(r => ZakladniStatusMapper.Bucket(r, statesById))
             .ToDictionary(
                 g => g.Key,

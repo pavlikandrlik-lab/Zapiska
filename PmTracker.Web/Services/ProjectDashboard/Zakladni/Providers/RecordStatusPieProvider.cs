@@ -13,7 +13,7 @@ public sealed class RecordStatusPieProvider : IZakladniChartProvider
     public ChartData Build(ZakladniDataset ds)
     {
         var statesById = ds.Stavy.ToDictionary(s => s.Id);
-        var countByBucket = ds.Records
+        var countByBucket = ds.Ukoly
             .GroupBy(r => ZakladniStatusMapper.Bucket(r, statesById))
             .ToDictionary(g => g.Key, g => (double)g.Count());
 

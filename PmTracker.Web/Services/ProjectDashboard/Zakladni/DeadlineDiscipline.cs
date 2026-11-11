@@ -29,7 +29,7 @@ public static class DeadlineDiscipline
             .GroupBy(c => c.ZaznamId)
             .ToDictionary(g => g.Key, g => g.OrderBy(c => c.DatumZmeny).ToList());
 
-        return ds.Records.Select(r =>
+        return ds.Ukoly.Select(r =>
         {
             var posledni = r.DatumUkonceni;
             var puvodni = changesByRecord.TryGetValue(r.Id, out var changes) && changes.Count > 0

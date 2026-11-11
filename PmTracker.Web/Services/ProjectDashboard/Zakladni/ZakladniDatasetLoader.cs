@@ -1,31 +1,64 @@
 using Microsoft.EntityFrameworkCore;
+using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Data;
+using PmTracker.Web.Models.ViewModels;
+using PmTracker.Web.Services.ServiceDesk.Prodleni;
 
 namespace PmTracker.Web.Services.ProjectDashboard.Zakladni;
 
 /// <summary>
-/// Načte sdílený snapshot základního reportu jedním průchodem DB. Coarse-ohraničeno
-/// projektem + obdobím (DatumZalozeni &lt;= End). Přesný „aktivní v období" predikát
-/// (dle data dokončení z historie stavů) aplikují konkrétní grafy.
+/// Načte sdílený snapshot reportu Statistik jedním průchodem (PM DB + služby ServiceDesku).
+/// Záznamy jsou coarse-ohraničené projektem a koncem období (DatumZalozeni &lt;= End), takže pokrývají
+/// i předchozí období pro trendy. Přesné predikáty období aplikují providery.
 /// </summary>
 public sealed class ZakladniDatasetLoader : IZakladniDatasetLoader
 {
+    private const string PritomenKod = "PRESENT";
+
     private readonly PmTrackerDbContext _db;
-    public ZakladniDatasetLoader(PmTrackerDbContext db) => _db = db;
+    private readonly IProdleniService _prodleni;
+    private readonly IProdleniQueryService _prodleniQuery;
+    private readonly IInformacniSystemQueryService _isQuery;
+    private readonly TimeProvider _time;
+    private readonly ILogger<ZakladniDatasetLoader> _logger;
+
+    public ZakladniDatasetLoader(PmTrackerDbContext db, IProdleniService prodleni, IProdleniQueryService prodleniQuery,
+        IInformacniSystemQueryService isQuery, TimeProvider time, ILogger<ZakladniDatasetLoader> logger)
+    {
+        _db = db;
+        _prodleni = prodleni;
+        _prodleniQuery = prodleniQuery;
+        _isQuery = isQuery;
+        _time = time;
+        _logger = logger;
+    }
 
     public async Task<ZakladniDataset> LoadAsync(int projektId, Obdobi obdobi, CancellationToken ct)
     {
-        var projektNazev = await _db.Projekty.AsNoTracking()
+        var projekt = await _db.Projekty.AsNoTracking()
             .Where(p => p.Id == projektId)
-            .Select(p => p.CelyNazev)
-            .FirstOrDefaultAsync(ct) ?? string.Empty;
+            .Select(p => new { p.CelyNazev, p.ServiceDeskInfoSystemId })
+            .FirstOrDefaultAsync(ct);
 
         var records = await _db.ProjektoveZaznamy.AsNoTracking()
             .Where(r => r.ProjektId == projektId && r.DatumZalozeni <= obdobi.End)
-            .Select(r => new DatasetRecord(r.Id, r.SubsystemId, r.StavUkoluId, r.DatumZalozeni, r.DatumUkonceni, null))
+            .Select(r => new DatasetRecord(r.Id, r.SubsystemId, r.StavUkoluId, r.DatumZalozeni, r.DatumUkonceni, null,
+                r.KategorieId, r.VlastnikId))
             .ToListAsync(ct);
 
         var recordIds = records.Select(r => r.Id).ToList();
+
+        // Stejné pravidlo jako záložka Záznamy: Úkol má kód U (produkce i dev seed) nebo UKOL.
+        var taskCategoryIds = await _db.CiselnikKategoriiZaznamu.AsNoTracking()
+            .Where(c => c.Kod == RecordCategoryCodes.TaskShort || c.Kod == RecordCategoryCodes.Task)
+            .Select(c => c.Id)
+            .ToListAsync(ct);
+
+        var vlastnikIds = records.Select(r => r.VlastnikId).Distinct().ToList();
+        var vlastnici = await _db.Osoby.AsNoTracking()
+            .Where(o => vlastnikIds.Contains(o.Id))
+            .Select(o => new { o.Id, o.Jmeno, o.Prijmeni })
+            .ToListAsync(ct);
 
         var subsystemy = await _db.ProjektSubsystemy.AsNoTracking()
             .Where(ps => ps.ProjektId == projektId && !ps.DatumOdebrani.HasValue)
@@ -61,15 +94,71 @@ public sealed class ZakladniDatasetLoader : IZakladniDatasetLoader
             .Select(r => dokonceniMap.TryGetValue(r.Id, out var d) ? r with { DatumDokonceni = d } : r)
             .ToList();
 
+        // Jednání období + předchozího období (trend účasti).
+        var jednaniOd = obdobi.Predchozi().Start;
+        var jednani = await _db.Jednani.AsNoTracking()
+            .Where(j => j.ProjektId == projektId && j.DatumPlanovane >= jednaniOd && j.DatumPlanovane <= obdobi.End)
+            .Select(j => new DatasetJednani(j.Id, j.DatumPlanovane))
+            .ToListAsync(ct);
+        var jednaniIds = jednani.Select(j => j.Id).ToList();
+        var pritomenId = await _db.CiselnikStavuUcasti.AsNoTracking()
+            .Where(s => s.Kod == PritomenKod)
+            .Select(s => (int?)s.Id)
+            .FirstOrDefaultAsync(ct);
+        var ucasti = await _db.Ucast.AsNoTracking()
+            .Where(u => jednaniIds.Contains(u.JednaniId))
+            .Select(u => new { u.JednaniId, u.StavUcastiId })
+            .ToListAsync(ct);
+
+        var serviceDesk = projekt?.ServiceDeskInfoSystemId is int isId
+            ? await NactiServiceDeskAsync(projektId, isId, obdobi, ct)
+            : null;
+
         return new ZakladniDataset
         {
             Obdobi = obdobi,
-            ProjektNazev = projektNazev,
+            ProjektNazev = projekt?.CelyNazev ?? string.Empty,
             Records = records,
             Subsystemy = subsystemy,
             Stavy = stavy,
             Vyjadreni = vyjadreni,
-            TerminChanges = terminChanges
+            TerminChanges = terminChanges,
+            Dnes = _time.GetLocalNow().DateTime,
+            TaskCategoryIds = taskCategoryIds,
+            Vlastnici = vlastnici
+                .Select(o => new DatasetOsoba(o.Id, $"{o.Jmeno} {o.Prijmeni}".Trim()))
+                .ToList(),
+            Jednani = jednani,
+            Ucasti = ucasti.Select(u => new DatasetUcast(u.JednaniId, u.StavUcastiId == pritomenId)).ToList(),
+            ServiceDesk = serviceDesk,
         };
+    }
+
+    /// <summary>
+    /// Slice ServiceDesku. Bez databáze ServiceDesku (BezNapojeni) sekce není; výpadek se drží ve stavu
+    /// přehledu, aby sekce ukázala chybovou kartu a ostatní sekce reportu se vykreslily dál (spec §13).
+    /// </summary>
+    private async Task<ServiceDeskSlice?> NactiServiceDeskAsync(int projektId, int isId, Obdobi obdobi, CancellationToken ct)
+    {
+        var prodleni = await _prodleni.GetPrehledProObdobiAsync(projektId, obdobi.Start, ct);
+        switch (prodleni.Stav)
+        {
+            case ProdleniStavDat.BezNapojeni:
+                return null;
+            case ProdleniStavDat.Nedostupne:
+                return new ServiceDeskSlice(prodleni, null, []);
+        }
+
+        try
+        {
+            var rozpocet = await _isQuery.GetRozpocetAsync(isId, ct);
+            var kalkulace = await _prodleniQuery.GetAkceptovaneKalkulaceAsync(isId, obdobi.Start, obdobi.End, ct);
+            return new ServiceDeskSlice(prodleni, rozpocet, kalkulace);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Statistiky: rozpočet nebo kalkulace IS {IsId} nejdou načíst.", isId);
+            return new ServiceDeskSlice(ProdleniPrehled.Prazdny(ProdleniStavDat.Nedostupne, isId, prodleni.IsZkratka), null, []);
+        }
     }
 }

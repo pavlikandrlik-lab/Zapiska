@@ -19,6 +19,7 @@ public sealed class RecordsPerSubsystemProviderTests
         var ds = new ZakladniDataset
         {
             Obdobi = Obdobi.Rok(2026),
+            TaskCategoryIds = [0],
             Subsystemy = new[] { new DatasetSubsystem(1, "A", "Subsystém A"), new DatasetSubsystem(2, "B", "Subsystém B") },
             Records = new[] { Rec(1, 1), Rec(2, 1), Rec(3, 2) }
         };
@@ -37,6 +38,7 @@ public sealed class RecordsPerSubsystemProviderTests
         var ds = new ZakladniDataset
         {
             Obdobi = Obdobi.Rok(2026),
+            TaskCategoryIds = [0],
             Subsystemy = new[] { new DatasetSubsystem(1, "A", "Subsystém A"), new DatasetSubsystem(2, "B", "Subsystém B") },
             Records = new[] { Rec(1, 1) }
         };

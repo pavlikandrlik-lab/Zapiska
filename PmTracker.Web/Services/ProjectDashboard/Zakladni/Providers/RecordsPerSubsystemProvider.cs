@@ -11,7 +11,7 @@ public sealed class RecordsPerSubsystemProvider : IZakladniChartProvider
 
     public ChartData Build(ZakladniDataset ds)
     {
-        var countById = ds.Records
+        var countById = ds.Ukoly
             .GroupBy(r => r.SubsystemId)
             .ToDictionary(g => g.Key, g => (double)g.Count());
 
@@ -20,6 +20,6 @@ public sealed class RecordsPerSubsystemProvider : IZakladniChartProvider
 
         return ChartData.ForSeries(Key, ChartKind.Bar, "Záznamy per subsystém", cats,
             new[] { new ChartSeries("Počet", vals) },
-            insight: $"Celkem {ds.Records.Count} záznamů za období.");
+            insight: $"Celkem {ds.Ukoly.Count()} záznamů za období.");
     }
 }

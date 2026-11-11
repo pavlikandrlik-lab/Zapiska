@@ -19,6 +19,7 @@ public sealed class RecordStatusPieProviderTests
         var ds = new ZakladniDataset
         {
             Obdobi = Obdobi.Rok(2026),
+            TaskCategoryIds = [0],
             Stavy = new[]
             {
                 new DatasetState(10, "NEW", "Nový", IsFinal: false),
@@ -42,5 +43,28 @@ public sealed class RecordStatusPieProviderTests
         data.Key.Should().Be("record-status-pie");
         data.Categories.Should().Equal("Nezahájeno", "Rozpracováno", "Hotovo", "Zrušeno");
         data.Series[0].Values.Should().Equal(2d, 2d, 1d, 1d);
+    }
+
+    [Fact]
+    public void Pocita_jen_ukoly_informace_a_rozhodnuti_ne()
+    {
+        // Spec 2026-10-15 §11.2: Informace a Rozhodnutí nemají stav úkolu a padaly do „Nezahájeno".
+        const int Ukol = 7, Informace = 8;
+        var ds = new ZakladniDataset
+        {
+            Obdobi = Obdobi.Rok(2026),
+            TaskCategoryIds = [Ukol],
+            Stavy = new[] { new DatasetState(20, "WIP", "Rozpracováno", IsFinal: false) },
+            Records = new[]
+            {
+                Rec(1, 20) with { KategorieId = Ukol },
+                Rec(2, null) with { KategorieId = Informace },
+                Rec(3, null) with { KategorieId = Informace },
+            }
+        };
+
+        var data = new RecordStatusPieProvider().Build(ds);
+
+        data.Series[0].Values.Should().Equal(0d, 1d, 0d, 0d);
     }
 }

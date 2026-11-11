@@ -9,7 +9,18 @@ public sealed record DatasetRecord(
     int? StavId,
     DateTime DatumZalozeni,
     DateTime DatumUkonceni,
-    DateTime? DatumDokonceni = null);
+    DateTime? DatumDokonceni = null,
+    int KategorieId = 0,
+    int VlastnikId = 0);
+
+/// <summary>Vlastník záznamu (osa grafu vytížení).</summary>
+public sealed record DatasetOsoba(int Id, string Jmeno);
+
+/// <summary>Jednání projektu v období nebo v předchozím období (trend účasti).</summary>
+public sealed record DatasetJednani(int Id, DateTime Datum);
+
+/// <summary>Jedna pozvánka na jednání; <paramref name="Pritomen"/> = stav účasti PRESENT.</summary>
+public sealed record DatasetUcast(int JednaniId, bool Pritomen);
 
 public sealed record DatasetSubsystem(int Id, string Kod, string Nazev);
 
@@ -37,4 +48,20 @@ public sealed record ZakladniDataset
     public IReadOnlyList<DatasetState> Stavy { get; init; } = [];
     public IReadOnlyList<DatasetVyjadreni> Vyjadreni { get; init; } = [];
     public IReadOnlyList<DatasetTerminChange> TerminChanges { get; init; } = [];
+
+    /// <summary>Okamžik sestavení (místní čas) — „otevřeno k dnešku", stáří, po termínu.</summary>
+    public DateTime Dnes { get; init; }
+
+    /// <summary>Kategorie Úkol (kód U nebo UKOL). Úkolové grafy pracují jen s nimi (spec §11.2).</summary>
+    public IReadOnlyCollection<int> TaskCategoryIds { get; init; } = [];
+
+    public IReadOnlyList<DatasetOsoba> Vlastnici { get; init; } = [];
+    public IReadOnlyList<DatasetJednani> Jednani { get; init; } = [];
+    public IReadOnlyList<DatasetUcast> Ucasti { get; init; } = [];
+
+    /// <summary>Data ServiceDesku; null = projekt bez IS nebo aplikace bez databáze ServiceDesku.</summary>
+    public ServiceDeskSlice? ServiceDesk { get; init; }
+
+    /// <summary>Záznamy kategorie Úkol — Informace a Rozhodnutí nemají stav úkolu a zkreslovaly by grafy.</summary>
+    public IEnumerable<DatasetRecord> Ukoly => Records.Where(r => TaskCategoryIds.Contains(r.KategorieId));
 }

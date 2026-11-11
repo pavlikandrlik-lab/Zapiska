@@ -19,6 +19,7 @@ public sealed class RecordStatusBreakdownProviderTests
         var ds = new ZakladniDataset
         {
             Obdobi = Obdobi.Rok(2026),
+            TaskCategoryIds = [0],
             Subsystemy = new[] { new DatasetSubsystem(1, "A", "Subsystém A"), new DatasetSubsystem(2, "B", "Subsystém B") },
             Stavy = new[]
             {
