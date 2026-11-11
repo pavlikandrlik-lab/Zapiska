@@ -417,7 +417,7 @@ public void ResolveCommentAjaxFlow_MeetingContext_ObnoviPanelVyjadreni()
     - testy (`CommentRoleMatrixServerTests`, `CommentIconsByRoleRenderTests`, `CommentAuthorizationPolicyTests.Matice_R1`).
   - Do „Pokrytí testy“ přidat tyto třídy.
   - `k-otestovani.md`:
-    - v §5 smazat odrážku „Nesoulad UI × server…“ a nahradit ji odkazem na novou §9;
+    - v §5 smazat odrážku „Nesoulad UI × server…“ a nahradit ji odkazem na novou §10;
     - pokud se v Tasku 2, Kroku 2 ukázalo, že smazání Gestora v Přípravě dnes neprojde, opravit i větu „Smazání projde“ v historickém popisu na skutečný stav.
 
 - [ ] **Krok 2: Celé sady.**
@@ -429,8 +429,8 @@ public void ResolveCommentAjaxFlow_MeetingContext_ObnoviPanelVyjadreni()
     - E2E na větvi a na worktree `main`; porovnat jména selhání z TRX Pythonem (postup v memory `project_e2e_baseline_failures.md`).
   - Očekávám:
     - Unit, Api a JS vše PASS;
-    - Integration selhává jen `ProposalRejectAndTakeOverE2ETests.RejectAndTakeOver_ThenSaveWithModifiedData_CreatesRecord` (nebo nic, pokud je mezitím opravený);
-    - E2E: na větvi žádné nové jméno selhání proti `main`.
+    - Integration vše PASS (od 2026-11-11, `d91cde9`, je zelený celý);
+    - E2E: na větvi žádné nové jméno selhání proti `main` (baseline od `d91cde9`: 118 testů, 22 známých selhání).
 
 - [ ] **Krok 3: Průchod v prohlížeči** (memory `reference_all_roles_browser_walkthrough.md`, `feedback_verify_ui_in_real_browser.md`).
   - Lokální app s env connection stringem, záloha dev DB, dočasné osoby „Průchod GEST / PROJ_MAN / VEDOUCI / METODIK / HOST“.
@@ -444,12 +444,12 @@ public void ResolveCommentAjaxFlow_MeetingContext_ObnoviPanelVyjadreni()
   - Snímky do scratchpadu, úklid osob a obnova DB ze zálohy.
   - Očekávám: shoda s maticí R1 ve všech buňkách.
 
-- [ ] **Krok 4: `k-otestovani.md` §9 „Vyjádření — kdo smí přidat, upravit a smazat“.** Co se změnilo (tabulka kap. 4 spec), ruční checklist pro Gestora, metodika, vedoucího a PM v Přípravě, Otevřeno a Uzavřeno (asi 20 min), známá omezení podle spec kap. 7.
+- [ ] **Krok 4: `k-otestovani.md` §10 „Vyjádření — kdo smí přidat, upravit a smazat“.** Co se změnilo (tabulka kap. 4 spec), ruční checklist pro Gestora, metodika, vedoucího a PM v Přípravě, Otevřeno a Uzavřeno (asi 20 min), známá omezení podle spec kap. 7.
 
 - [ ] **Krok 5: Commit a merge do `main`.**
-  - `git commit -m "docs(vyjadreni): pravidla úprav podle role, k otestování §9"`
+  - `git commit -m "docs(vyjadreni): pravidla úprav podle role, k otestování §10"`
   - `git checkout main && git merge --no-ff feat/vyjadreni-uprava-podle-role`
-  - Hash doplnit do §9 samostatným commitem. Push jen na pokyn.
+  - Hash doplnit do §10 samostatným commitem. Push jen na pokyn.
 
 ## Odhad
 
@@ -462,4 +462,4 @@ public void ResolveCommentAjaxFlow_MeetingContext_ObnoviPanelVyjadreni()
 | 5 Sady, E2E baseline, průchod 5 rolí × 3 stavy, docs | 1,5 h |
 | **Celkem** | **~5 h** |
 
-Tvůj ruční test asi 20 min (§9).
+Tvůj ruční test asi 20 min (§10).
