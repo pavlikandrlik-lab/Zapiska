@@ -348,7 +348,7 @@ Navíc:
 
 ## 9. Testy — převzetí návrhu, zastaralé E2E testy editoru a harmonogramu
 
-**Hotovo 2026-11-11:** větev `fix/zastarale-testy` (merge hash níže). Mění se jen testy a dokumentace, aplikace ne.
+**Hotovo 2026-11-11:** merge `d91cde9`. Mění se jen testy a dokumentace, aplikace ne.
 
 **Co se změnilo:**
 - **Převzetí návrhu záznamu (rozhodnutí 2026-11-11, varianta B):** převzít návrh do formuláře smí jen ten, kdo smí návrh schválit (`proposals.accept` + `proposals.takeover`). Kód to tak dělal, padal jen Integration test, který dal manažerovi jen `proposals.takeover`. Test dostal i `proposals.accept`; nový test hlídá, že bez práva schválit se převzetí odmítne a návrh dál čeká.
