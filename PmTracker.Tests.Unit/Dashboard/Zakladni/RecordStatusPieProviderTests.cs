@@ -39,7 +39,7 @@ public sealed class RecordStatusPieProviderTests
 
         var data = new RecordStatusPieProvider().Build(ds);
 
-        data.Kind.Should().Be(ChartKind.Pie);
+        data.Kind.Should().Be(ChartKind.Donut, "spec §11.2 vizuál 8: prstenec se součtem uprostřed");
         data.Key.Should().Be("record-status-pie");
         data.Categories.Should().Equal("Nezahájeno", "Rozpracováno", "Hotovo", "Zrušeno");
         data.Series[0].Values.Should().Equal(2d, 2d, 1d, 1d);

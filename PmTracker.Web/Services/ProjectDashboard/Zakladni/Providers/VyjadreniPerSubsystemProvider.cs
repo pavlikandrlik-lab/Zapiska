@@ -1,13 +1,14 @@
 namespace PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers;
 
 /// <summary>
-/// Sekce „vyjádření": počet vyjádření per subsystém (vyjádření → záznam → subsystém). Kde se komunikuje.
+/// Sekce „Lidé a spolupráce": počet vyjádření v období per subsystém (vyjádření → záznam → subsystém).
+/// Kde se komunikuje (spec 2026-10-15 §11.2, vizuál 15). Počítá všechny záznamy, nejen úkoly.
 /// </summary>
 public sealed class VyjadreniPerSubsystemProvider : IZakladniChartProvider
 {
     public string Key => "vyjadreni-per-subsystem";
-    public string SectionKey => "vyjadreni";
-    public int Order => 20;
+    public string SectionKey => "lide";
+    public int Order => 30;
 
     public ChartData Build(ZakladniDataset ds)
     {
@@ -21,7 +22,11 @@ public sealed class VyjadreniPerSubsystemProvider : IZakladniChartProvider
         var cats = ds.Subsystemy.Select(s => s.Nazev).ToList();
         var vals = ds.Subsystemy.Select(s => countBySubsystem.GetValueOrDefault(s.Id)).ToList();
 
-        return ChartData.ForSeries(Key, ChartKind.Bar, "Vyjádření per subsystém", cats,
-            new[] { new ChartSeries("Počet", vals) });
+        return ChartData.ForSeries(Key, ChartKind.Bar, "Vyjádření podle subsystému", cats,
+            new[] { new ChartSeries("Vyjádření", vals) },
+            insight: ds.Vyjadreni.Count > 0 ? $"Za období {ds.Vyjadreni.Count.ToString(UkolyMetriky.Cs)} vyjádření." : null) with
+        {
+            EmptyMessage = "V období nikdo nepřidal vyjádření.",
+        };
     }
 }

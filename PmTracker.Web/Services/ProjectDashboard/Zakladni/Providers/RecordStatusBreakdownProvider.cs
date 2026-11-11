@@ -1,13 +1,13 @@
 namespace PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers;
 
 /// <summary>
-/// Sekce „záznamy": skládaný sloupec stavového rozpadu per subsystém. Kde se práce hromadí
-/// v jakém stavu.
+/// Sekce „Průběh práce": skládaný sloupec stavů úkolů per subsystém přes celou šířku — kde se práce hromadí
+/// (spec 2026-10-15 §11.2, vizuál 9).
 /// </summary>
 public sealed class RecordStatusBreakdownProvider : IZakladniChartProvider
 {
     public string Key => "record-status-breakdown";
-    public string SectionKey => "zaznamy";
+    public string SectionKey => "prubeh";
     public int Order => 30;
 
     public ChartData Build(ZakladniDataset ds)
@@ -27,10 +27,14 @@ public sealed class RecordStatusBreakdownProvider : IZakladniChartProvider
         {
             var perSubsystem = countByBucket.GetValueOrDefault(bucket) ?? new Dictionary<int, double>();
             var vals = ds.Subsystemy.Select(s => perSubsystem.GetValueOrDefault(s.Id)).ToList();
-            return new ChartSeries(ZakladniStatusMapper.Label(bucket), vals);
+            return new ChartSeries(ZakladniStatusMapper.Label(bucket), vals, ZakladniStatusMapper.ColorToken(bucket));
         }).ToList();
 
-        return ChartData.ForSeries(Key, ChartKind.StackedBar, "Stavový rozpad per subsystém", cats, series,
-            insight: "Kolik je v každém subsystému hotovo vs rozděláno vs nezačato.");
+        return ChartData.ForSeries(Key, ChartKind.StackedBar, "Stav úkolů podle subsystému", cats, series,
+            insight: "Kolik je v každém subsystému hotovo, rozpracováno a nezahájeno.") with
+        {
+            Span = ChartSpan.Full,
+            EmptyMessage = "Projekt zatím nemá žádné úkoly.",
+        };
     }
 }

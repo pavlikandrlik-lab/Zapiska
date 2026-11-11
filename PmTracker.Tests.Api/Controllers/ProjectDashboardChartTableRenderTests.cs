@@ -36,9 +36,9 @@ public sealed class ProjectDashboardChartTableRenderTests
 
         var html = await Report(projectId);
 
-        html.Should().Contain("data-chart-key=\"records-per-subsystem\"");
+        html.Should().Contain("data-chart-key=\"record-status-breakdown\"");
         html.Should().Contain("data-echart").And.Contain("data-chart-json=");
-        html.Should().Contain("data-chart-table=\"records-per-subsystem\"");
+        html.Should().Contain("data-chart-table=\"record-status-breakdown\"");
         html.Should().Contain("data-chart-table-row=\"0\"");
         html.Should().Contain("class=\"pd-data\"");
     }

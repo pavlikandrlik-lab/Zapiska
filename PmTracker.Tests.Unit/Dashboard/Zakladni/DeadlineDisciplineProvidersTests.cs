@@ -37,41 +37,12 @@ public sealed class DeadlineDisciplineProvidersTests
     };
 
     [Fact]
-    public void Stats_summarize_discipline()
+    public void Compliance_per_subsystem_puvodni_a_posledni()
     {
-        var provider = new DeadlineDisciplineStatsProvider();
-        provider.SectionKey.Should().Be("terminy");
-        var data = provider.Build(Dataset());
-
-        data.Kind.Should().Be(ChartKind.StatCards);
-        data.Key.Should().Be("deadline-discipline-stats");
-        // dokončené = R1,R2 → dodržel poslední: jen R1 = 50 %; dodržel původní: jen R1 = 50 %.
-        // posunuté = R2 → ø posun 10 dní, ø počet 1.
-        data.Stats.Select(s => s.Value).Should().Equal(
-            "50,0 %",   // dodržel původní
-            "50,0 %",   // dodržel poslední
-            10.0.ToString("0.0", Cs),  // ø posun (dní)
-            1.0.ToString("0.0", Cs));  // ø počet posunů
-    }
-
-    [Fact]
-    public void Compliance_posledni_per_subsystem_is_own_chart()
-    {
-        var provider = new DeadlineCompliancePerSubsystemProvider();
-        provider.Order.Should().Be(20);
-        var data = provider.Build(Dataset());
-        data.Kind.Should().Be(ChartKind.Bar);
-        data.Key.Should().Be("deadline-compliance-posledni");
+        var data = new DeadlineCompliancePerSubsystemProvider().Build(Dataset());
         data.Categories.Should().Equal("Subsystém A", "Subsystém B");
-        data.Series[0].Values.Should().Equal(50d, 0d); // A: 1/2 včas; B: 0 dokončených → 0
-    }
-
-    [Fact]
-    public void Compliance_puvodni_per_subsystem_is_own_chart()
-    {
-        var data = new DeadlineOriginalCompliancePerSubsystemProvider().Build(Dataset());
-        data.Key.Should().Be("deadline-compliance-puvodni");
-        data.Series[0].Values.Should().Equal(50d, 0d);
+        data.Series[0].Values.Should().Equal(50d, 0d); // původní: A 1/2 včas; B bez uzavřených → 0
+        data.Series[1].Values.Should().Equal(50d, 0d); // poslední: A 1/2
     }
 
     [Fact]

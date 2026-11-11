@@ -7,6 +7,9 @@ namespace PmTracker.Web.Services.ProjectDashboard.Zakladni;
 /// </summary>
 public sealed class ZakladniReportBuilder
 {
+    /// <summary>Pořadí sekcí Statistik (spec 2026-10-15 §11.1); neznámé sekce jdou za ně podle pořadí providerů.</summary>
+    public static readonly IReadOnlyList<string> PoradiSekci = ["prehled", "prubeh", "terminy", "lide", "servicedesk"];
+
     private readonly IZakladniDatasetLoader _loader;
     private readonly IReadOnlyList<IZakladniChartProvider> _providers;
 
@@ -30,7 +33,8 @@ public sealed class ZakladniReportBuilder
                     .Select(p => p.Build(dataset))
                     .ToList()
             })
-            .OrderBy(s => s.MinOrder)
+            .OrderBy(s => PoradiSekci.Contains(s.Key) ? PoradiSekci.ToList().IndexOf(s.Key) : int.MaxValue)
+            .ThenBy(s => s.MinOrder)
             .Select(s => new ReportSection(s.Key, s.Charts))
             .ToList();
 
