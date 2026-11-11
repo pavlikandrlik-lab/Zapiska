@@ -55,6 +55,44 @@ public sealed class ThemePaletteAuditTests
         await page.Context.CloseAsync();
     }
 
+    /// <summary>
+    /// Dashboard projektu (spec 2026-10-15 §12): souhrnný pás, Záznamy, NES v prodlení a Statistiky
+    /// s vykreslenými grafy ECharts — barvy grafů jdou z tokenů, i v tmavém motivu.
+    /// </summary>
+    [Theory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    public async Task DashboardProjektu_BarvyZGovPalety_AKontrastVPoradku(string theme)
+    {
+        var page = await _fixture.NewPageAsync();
+        await page.Context.AddCookiesAsync([new Cookie { Name = "pmtracker.theme.mode", Value = theme, Url = _fixture.BaseUrl }]);
+        await SeedRecordAndMeetingAsync();
+
+        var findings = new List<string>();
+        foreach (var tab in new[] { "zaznamy", "nes", "statistiky" })
+        {
+            await page.GotoAsync($"{_fixture.BaseUrl}/projekty/{_fixture.ProjectId}/dashboard?dashTab={tab}&asUser={_fixture.AdminOsobaId}",
+                new() { WaitUntil = WaitUntilState.NetworkIdle });
+            await page.Locator($"pm-tab-panel[key=\"{tab}\"][data-dashboard-panel-loaded=\"true\"]").WaitForAsync(new() { State = WaitForSelectorState.Attached });
+            await page.Locator("[data-souhrn-klic]").First.WaitForAsync(new() { State = WaitForSelectorState.Attached });
+            if (tab == "statistiky")
+            {
+                await page.Locator("[data-echart] svg").First.WaitForAsync(new() { State = WaitForSelectorState.Attached });
+                (await page.Locator("[data-echart] svg").CountAsync()).Should().BeGreaterThan(0, "Statistiky s úkolem musí vykreslit grafy");
+            }
+            await page.WaitForTimeoutAsync(500);
+            (await page.EvaluateAsync<string>("document.documentElement.getAttribute('data-theme')")).Should().Be(theme);
+
+            var result = await page.EvaluateAsync<ColorPaletteAudit.Result>(ColorPaletteAudit.Script);
+            result.PaletteSize.Should().BeGreaterThan(50, "paleta se musí načíst z gov tokens.css");
+            findings.AddRange(result.Off.Select(x => $"dashboard/{tab} mimo paletu: {x}"));
+            findings.AddRange(result.Low.Select(x => $"dashboard/{tab} kontrast: {x}"));
+        }
+
+        findings.Should().BeEmpty($"motiv {theme}: dashboard projektu jen v gov barvách a čitelně. Nálezy:{Environment.NewLine}{string.Join(Environment.NewLine, findings)}{Environment.NewLine}");
+        await page.Context.CloseAsync();
+    }
+
     /// <summary>Vlastní běžící úkol s harmonogramem a jednání projektu (vzor RecordDetailPageScenariosTests).</summary>
     private async Task<(int RecordId, int MeetingId)> SeedRecordAndMeetingAsync()
     {
