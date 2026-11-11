@@ -24,6 +24,11 @@ public static class ZakladniReportServiceCollectionExtensions
         services.AddScoped<IZakladniChartProvider, OwnerWorkloadProvider>();
         services.AddScoped<IZakladniChartProvider, AttendancePerMonthProvider>();
         services.AddScoped<IZakladniChartProvider, VyjadreniPerSubsystemProvider>();
+        // ServiceDesk a dodavatelé (bez dat ji builder nahradí informační kartou)
+        services.AddScoped<IZakladniChartProvider, SdOpenTicketsByTypeProvider>();
+        services.AddScoped<IZakladniChartProvider, SdPenaltyBySupplierProvider>();
+        services.AddScoped<IZakladniChartProvider, SdPenaltyPerMonthProvider>();
+        services.AddScoped<IZakladniChartProvider, SdAcceptedCalculationsProvider>();
         return services;
     }
 }

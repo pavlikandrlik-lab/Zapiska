@@ -77,6 +77,11 @@ public sealed record ChartData
     /// <summary>Text prázdného stavu; null = obecná věta.</summary>
     public string? EmptyMessage { get; init; }
 
+    /// <summary>Odkaz k prázdnému stavu (např. nastavení IS); null = bez odkazu.</summary>
+    public string? ActionUrl { get; init; }
+
+    public string? ActionText { get; init; }
+
     /// <summary>Není co kreslit: karty bez položek, graf bez nenulové hodnoty.</summary>
     public bool IsEmpty => Kind is ChartKind.StatCards or ChartKind.Kpi
         ? Stats.Count == 0

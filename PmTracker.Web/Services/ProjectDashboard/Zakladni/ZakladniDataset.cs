@@ -59,6 +59,9 @@ public sealed record ZakladniDataset
     public IReadOnlyList<DatasetJednani> Jednani { get; init; } = [];
     public IReadOnlyList<DatasetUcast> Ucasti { get; init; } = [];
 
+    /// <summary>IS projektu (projekty.servicedesk_info_system_id); rozliší „bez IS" od „bez databáze ServiceDesku".</summary>
+    public int? ServiceDeskInfoSystemId { get; init; }
+
     /// <summary>Data ServiceDesku; null = projekt bez IS nebo aplikace bez databáze ServiceDesku.</summary>
     public ServiceDeskSlice? ServiceDesk { get; init; }
 

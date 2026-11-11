@@ -19,13 +19,17 @@ else
                 <span class="pd-chart__insight">@Model.Insight</span>
             }
         </figcaption>
-        @if (Model.Kind == ChartKind.StatCards)
-        {
-            <partial name="~/Views/ProjectDashboard/Zakladni/_ChartStatCards.cshtml" model="Model" />
-        }
-        else if (Model.IsEmpty)
+        @if (Model.IsEmpty)
         {
             <p class="pd-chart__empty" data-chart-empty>@(Model.EmptyMessage ?? "Pro toto období nejsou žádná data.")</p>
+            @if (!string.IsNullOrWhiteSpace(Model.ActionUrl))
+            {
+                <a class="pd-state__action pd-chart__action" href="@Model.ActionUrl" data-chart-action>@(Model.ActionText ?? "Otevřít")</a>
+            }
+        }
+        else if (Model.Kind == ChartKind.StatCards)
+        {
+            <partial name="~/Views/ProjectDashboard/Zakladni/_ChartStatCards.cshtml" model="Model" />
         }
         else
         {

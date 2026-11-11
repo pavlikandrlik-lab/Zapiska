@@ -10,10 +10,10 @@ namespace PmTracker.Tests.Unit.Dashboard.Zakladni;
 
 public sealed class ZakladniReportBuilderTests
 {
-    private sealed class StubLoader : IZakladniDatasetLoader
+    private sealed class StubLoader(ServiceDeskSlice? sd = null, int? isId = null) : IZakladniDatasetLoader
     {
         public Task<ZakladniDataset> LoadAsync(int projektId, Obdobi obdobi, CancellationToken ct)
-            => Task.FromResult(new ZakladniDataset { Obdobi = obdobi });
+            => Task.FromResult(new ZakladniDataset { Obdobi = obdobi, ServiceDesk = sd, ServiceDeskInfoSystemId = isId });
     }
 
     private sealed class StubProvider(string key, string section, int order) : IZakladniChartProvider
@@ -52,5 +52,57 @@ public sealed class ZakladniReportBuilderTests
         report.Sections.Select(s => s.Key).Should().Equal("termin", "zakladni");
         // grafy v „zakladni" dle Order: a(10) před b(20).
         report.Sections.Last().Charts.Select(c => c.Key).Should().Equal("a", "b");
+    }
+
+    private static IZakladniChartProvider[] SdSekce() =>
+    [
+        new StubProvider("prehled-kpi", "prehled", 10),
+        new StubProvider("sd-a", "servicedesk", 10),
+        new StubProvider("sd-b", "servicedesk", 20),
+    ];
+
+    [Fact]
+    public async Task Builder_bez_sd_jedna_informacni_karta()
+    {
+        var report = await new ZakladniReportBuilder(new StubLoader(), SdSekce()).BuildAsync(1, Obdobi.Rok(2025), CancellationToken.None);
+
+        var sekce = report.Sections.Single(s => s.Key == "servicedesk");
+        var karta = sekce.Charts.Should().ContainSingle().Subject;
+        karta.IsEmpty.Should().BeTrue();
+        karta.EmptyMessage.Should().Contain("není napojen");
+        karta.ActionUrl.Should().Be("/Projekty");
+    }
+
+    [Fact]
+    public async Task Builder_is_bez_databaze_servicedesku_karta_bez_odkazu()
+    {
+        var report = await new ZakladniReportBuilder(new StubLoader(isId: 1), SdSekce()).BuildAsync(1, Obdobi.Rok(2025), CancellationToken.None);
+
+        var karta = report.Sections.Single(s => s.Key == "servicedesk").Charts.Single();
+        karta.EmptyMessage.Should().Contain("správce");
+        karta.ActionUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Builder_sd_nedostupny_chybova_karta()
+    {
+        var sd = new ServiceDeskSlice(PmTracker.Web.Services.ServiceDesk.Prodleni.ProdleniPrehled.Prazdny(
+            PmTracker.Web.Services.ServiceDesk.Prodleni.ProdleniStavDat.Nedostupne, 1, "FIS"), null, []);
+        var report = await new ZakladniReportBuilder(new StubLoader(sd, 1), SdSekce()).BuildAsync(1, Obdobi.Rok(2025), CancellationToken.None);
+
+        var karta = report.Sections.Single(s => s.Key == "servicedesk").Charts.Single();
+        karta.EmptyMessage.Should().Contain("neodpovídá");
+        report.Sections.Single(s => s.Key == "prehled").Charts.Should().ContainSingle("ostatní sekce se vykreslí dál");
+    }
+
+    [Fact]
+    public async Task Builder_se_sd_vola_providery()
+    {
+        var sd = new ServiceDeskSlice(PmTracker.Web.Services.ServiceDesk.Prodleni.ProdleniPrehled.Prazdny(
+            PmTracker.Web.Services.ServiceDesk.Prodleni.ProdleniStavDat.Ok, 1, "FIS"), null, []);
+        var report = await new ZakladniReportBuilder(new StubLoader(sd, 1), SdSekce()).BuildAsync(1, Obdobi.Rok(2025), CancellationToken.None);
+
+        report.Sections.Select(s => s.Key).Should().Equal("prehled", "servicedesk");
+        report.Sections.Last().Charts.Select(c => c.Key).Should().Equal("sd-a", "sd-b");
     }
 }

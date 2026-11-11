@@ -130,6 +130,7 @@ public sealed class ZakladniDatasetLoader : IZakladniDatasetLoader
                 .ToList(),
             Jednani = jednani,
             Ucasti = ucasti.Select(u => new DatasetUcast(u.JednaniId, u.StavUcastiId == pritomenId)).ToList(),
+            ServiceDeskInfoSystemId = projekt?.ServiceDeskInfoSystemId,
             ServiceDesk = serviceDesk,
         };
     }
