@@ -88,3 +88,30 @@ Endpoint iteruje všechny entity a nahraje je do OpenSearch v dávkách po 500. 
 - `GET http://opensearch-host:9200/pmtracker-search-v1/_count` – počet dokumentů.
 - V navbaru aplikace se objeví vyhledávací pole; stránka `/Search?q=...` vrací výsledky seskupené podle typu entity.
 - Výsledky jsou filtrovány post-filter přes `IPermissionEvaluationService` – uživatel nikdy neuvidí entitu mimo svůj scope.
+
+## 7) ServiceDesk: prodlení ticketů na dashboardu projektu
+
+Záložka **NES v prodlení** a sekce ServiceDesk ve Statistikách počítají penále z předávek ticketů dodavatelům. Ty jsou ve **vlastní databázi starého ServiceDesku**, ne v `intranetNEW` (podrobnosti: `docs/technical/12-servicedesk-schema-reference.md` §5.13).
+
+Konfigurace v `appsettings.Production.json` (vyplňuje správce, PM Tracker se k žádnému serveru neváže):
+
+```json
+"ConnectionStrings": {
+  "TicketingReadOnly": "Server=…;Database=intranetNEW;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;ApplicationIntent=ReadOnly",
+  "ServiceDeskExternalReadOnly": "Server=…;Database=<databáze ServiceDesku>;Integrated Security=True;Encrypt=True;TrustServerCertificate=True;ApplicationIntent=ReadOnly"
+},
+"Ticketing": {
+  "Enabled": true,
+  "ConnectionStringName": "TicketingReadOnly",
+  "ExternalConnectionStringName": "ServiceDeskExternalReadOnly"
+}
+```
+
+- Hodnotu `ServiceDeskExternalReadOnly` najdeš ve `Web.config` starého ServiceDesku (connection string `ServiceDeskEntities`, EF6 – vzít z něj jen server a databázi).
+- Účet aplikačního poolu PM Trackeru potřebuje **čtecí právo** (`SELECT`) na `dbo.ticket_external`, `dbo.ticket_external_workflow` a `dbo.ticket_external_sla`. Zápis se nikdy neprovádí.
+- Prázdný `ServiceDeskExternalReadOnly` nebo `Ticketing:Enabled = false` = prodlení se nepočítá. Záložka NES ukáže upozornění „Napojení na ServiceDesk není v této instalaci zapnuté“, ticketové dlaždice zmizí. Aplikace běží dál.
+- Projekt se k ServiceDesku váže přes informační systém (úprava projektu v přehledu projektů).
+- Chybějící právo nebo nedostupná databáze: záložka NES ukáže „ServiceDesk teď neodpovídá“ s tlačítkem Zkusit znovu, chyba je v logu s `isId`.
+
+**Ověření po nasazení:** dashboard projektu s IS → záložka NES v prodlení se načte bez chybové karty a v logu není `Prodlení ticketů nejde spočítat`. Pokud log hlásí důležitost bez SLA, doplní se řádek do `ticket_external_sla` ve ServiceDesku (PM Tracker ho nevytváří).
+

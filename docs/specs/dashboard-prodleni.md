@@ -1,5 +1,10 @@
 # Specifikace — dashboard projektu: prodlení NES / PMP / PNF
 
+> **Nahrazeno specem 2026-10-15** ([`docs/superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md`](../superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md)).
+> Prodlení se od listopadu 2026 počítá penalizačním algoritmem starého ServiceDesku z předávek dodavateli
+> (`ticket_external_workflow`), ne z `sla_deadline` / `dat_res_t`. Definice prodlení v tomto dokumentu
+> ~~(NES: `sla_deadline < dnes`, PMP/PNF: `dat_res_t < dnes`)~~ už neplatí. Text níže zůstává jen jako historie.
+
 **Stav:** rozpracováno (fáze 5 implementace)
 **Závisí na:** [ticketing-integration.md](ticketing-integration.md) (zastaralý — viz banner)
 **Reálné schéma ticketing DB:** [docs/technical/12-servicedesk-schema-reference.md](../technical/12-servicedesk-schema-reference.md) (zdroj pravdy pro datové typy, enumy a join řetězce)
