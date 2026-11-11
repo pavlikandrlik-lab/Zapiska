@@ -110,9 +110,7 @@ public sealed class ProjectDashboardStatisticsYearFilterTests
 
     private static ProjectDashboardService CreateService(PmTrackerDbContext db)
     {
-        // Statistics panel nevolá query service, stačí inert mock (Plán 5 Sprint B Task 4).
-        var isQueryServiceMock = new Mock<PmTracker.ServiceDesk.Contracts.IInformacniSystemQueryService>();
-
-        return new ProjectDashboardService(db, isQueryServiceMock.Object);
+        // Statistiky přehled prodlení nevolají, stačí inertní mock.
+        return new ProjectDashboardService(db, new Mock<PmTracker.Web.Services.ServiceDesk.Prodleni.IProdleniService>().Object);
     }
 }

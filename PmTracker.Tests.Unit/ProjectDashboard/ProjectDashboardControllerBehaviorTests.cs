@@ -1,3 +1,4 @@
+using PmTracker.Web.Services.ServiceDesk.Prodleni;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -99,7 +100,7 @@ public sealed class ProjectDashboardControllerBehaviorTests
         var partial = result.Should().BeOfType<PartialViewResult>().Subject;
         partial.ViewName.Should().Be("~/Views/ProjectDashboard/_NesPanel.cshtml");
         var model = partial.Model.Should().BeOfType<ProjectDashboardNesPanelViewModel>().Subject;
-        model.IsServiceDeskIntegrated.Should().BeFalse();
+        model.Prehled.Stav.Should().Be(ProdleniStavDat.BezNapojeni);
     }
 
     private static ProjectDashboardController CreateController(
@@ -233,7 +234,9 @@ public sealed class ProjectDashboardControllerBehaviorTests
         {
             return Task.FromResult(new ProjectDashboardNesPanelViewModel
             {
-                IsServiceDeskIntegrated = false
+                Prehled = ProdleniPrehled.Prazdny(ProdleniStavDat.BezNapojeni, null, null),
+                ProjektId = projektId,
+                Nyni = reference
             });
         }
 

@@ -765,6 +765,210 @@ button.pd-tile:focus-visible {
     font-variant-numeric: tabular-nums;
 }
 
+/* --- NES v prodlení: lišta, sekce, odůvodnění, časová osa ----------------- */
+
+.pd-nes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-m);
+}
+
+.pd-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pm-spacing-s) var(--pm-spacing-m);
+}
+
+a.pd-state__action {
+    text-decoration: none;
+}
+
+.pd-subline {
+    display: block;
+    font-size: var(--pm-font-size-xs);
+    font-weight: var(--pm-font-weight-normal);
+    color: var(--text-secondary);
+}
+
+.pd-star {
+    margin-left: 2px;
+    font-weight: var(--pm-font-weight-bold);
+    color: var(--text-primary);
+    text-decoration: none;
+    cursor: help;
+}
+
+.pd-footnote {
+    margin: 0;
+    font-size: var(--pm-font-size-s);
+    color: var(--text-secondary);
+}
+
+.pd-section > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--pm-spacing-xs);
+    padding: var(--pm-spacing-xs) 0;
+    font-weight: var(--pm-font-weight-semibold);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.pd-section > summary:focus-visible {
+    outline: 2px solid var(--border-primary);
+    outline-offset: 2px;
+}
+
+.pd-section__lead {
+    margin: 0 0 var(--pm-spacing-s);
+    max-width: 78ch;
+    font-size: var(--pm-font-size-s);
+    color: var(--text-secondary);
+}
+
+.pd-reasons__title {
+    margin: 0 0 var(--pm-spacing-xs);
+    font-size: var(--pm-font-size-s);
+    font-weight: var(--pm-font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.pd-reasons ol {
+    margin: 0;
+    padding-left: 1.4em;
+    max-width: 96ch;
+    font-size: var(--pm-font-size-s);
+    color: var(--text-primary);
+}
+
+.pd-reasons li + li {
+    margin-top: var(--pm-spacing-2xs);
+}
+
+/* Časová osa: polohy v % dává server, tady jen vzhled značek. */
+.pd-tl {
+    max-width: 880px;
+    padding: 0 10px;
+}
+
+.pd-tl__svg {
+    display: block;
+    overflow: visible;
+}
+
+.pd-tl__marker {
+    overflow: visible;
+}
+
+.pd-tl__axis {
+    stroke: var(--border-subtle);
+    stroke-width: 1;
+}
+
+.pd-tl__obratka {
+    stroke: var(--app-chart-1);
+    stroke-width: 6;
+    stroke-linecap: round;
+}
+
+.pd-tl__obratka--other {
+    stroke: var(--app-chart-neutral);
+}
+
+.pd-tl__penale {
+    fill: var(--border-error);
+}
+
+.pd-tl__termin {
+    stroke: var(--text-primary);
+    stroke-width: 2;
+}
+
+.pd-tl__prodlouzeni {
+    fill: var(--app-chart-2);
+    stroke: var(--background-block-secondary);
+    stroke-width: 2;
+}
+
+.pd-tl__dnes {
+    stroke: var(--text-secondary);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 3;
+}
+
+.pd-tl__dnes-label {
+    fill: var(--text-secondary);
+    font-size: 11px;
+}
+
+.pd-tl__range {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--pm-font-size-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+}
+
+.pd-tl__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--pm-spacing-2xs) var(--pm-spacing-m);
+    margin: var(--pm-spacing-xs) 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--pm-font-size-xs);
+    color: var(--text-secondary);
+}
+
+.pd-tl__legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pm-spacing-2xs);
+}
+
+.pd-tl__key {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 16px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--app-chart-1);
+}
+
+.pd-tl__key--other {
+    background: var(--app-chart-neutral);
+}
+
+.pd-tl__key--penale {
+    border-radius: 2px;
+    background: var(--border-error);
+}
+
+.pd-tl__key--termin {
+    width: 2px;
+    height: 12px;
+    border-radius: 0;
+    background: var(--text-primary);
+}
+
+.pd-tl__key--prodlouzeni {
+    width: 9px;
+    height: 9px;
+    border-radius: 0;
+    background: var(--app-chart-2);
+    transform: rotate(45deg);
+}
+
+.pd-tl__key--dnes {
+    width: 0;
+    height: 12px;
+    border-radius: 0;
+    background: none;
+    border-left: 2px dashed var(--text-secondary);
+}
+
 /* --- Úzká obrazovka ------------------------------------------------------ */
 
 @media (max-width: 576px) {
@@ -800,7 +1004,14 @@ button.pd-tile:focus-visible {
     }
 
     .pd-chart,
-    .pd-kpi {
+    .pd-kpi,
+    .pd-tl {
         break-inside: avoid;
+    }
+
+    /* Tisk má ukázat i sbalené sekce a odůvodnění. */
+    .pd-table-scroll {
+        max-height: none;
+        overflow: visible;
     }
 }

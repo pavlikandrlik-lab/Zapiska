@@ -7,6 +7,7 @@ using PmTracker.Web.Services.Export;
 using PmTracker.Web.Services.ProjectDashboard;
 using PmTracker.Web.Services.ProjectDashboard.Zakladni;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.ServiceDesk.Prodleni;
 
 namespace PmTracker.Web.Controllers;
 
@@ -134,9 +135,14 @@ public sealed class ProjectDashboardController : BaseController
 
         var localNow = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).DateTime;
         var model = await _dashboardService.BuildNesPanelAsync(projektId, localNow, ct);
-        if (!model.IsServiceDeskIntegrated)
+        switch (model.Prehled.Stav)
         {
-            return NotFound(new { error = "Projekt nemá napojení na ServiceDesk, export není k dispozici." });
+            case ProdleniStavDat.BezNapojeni:
+                return NotFound(new { error = "Projekt nemá napojení na ServiceDesk, export není k dispozici." });
+            case ProdleniStavDat.Nedostupne:
+                // Prázdný sešit by vypadal jako „nic není v prodlení" — při výpadku se nevydá nic.
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                    new { error = "ServiceDesk teď neodpovídá, export zkuste za chvíli." });
         }
 
         var bytes = _nesExcelExport.Build(model, localNow);

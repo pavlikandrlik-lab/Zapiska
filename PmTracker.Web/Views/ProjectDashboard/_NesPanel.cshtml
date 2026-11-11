@@ -1,87 +1,274 @@
 @model ProjectDashboardNesPanelViewModel
+@using System.Globalization
+@using PmTracker.Web.Services.ProjectDashboard
+@using PmTracker.Web.Services.ServiceDesk
+@using PmTracker.Web.Services.ServiceDesk.Prodleni
+@*
+    Záložka NES v prodlení (spec 2026-10-15 §10, §13). Data dává penalizační algoritmus (IProdleniService):
+    v seznamu jsou jen tickety právě u dodavatele s penalizovanými dny, řazené podle dnů sestupně.
+    Rozbalení řádku obsluhuje sdílený mechanismus dashboardu (data-dashboard-expandable-row), filtr typu nesPanel.js.
+*@
+@{
+    var prehled = Model.Prehled;
+    var cs = CultureInfo.GetCultureInfo("cs-CZ");
 
-@if (!Model.IsServiceDeskIntegrated)
-{
-    @* Plán 5 Sprint B Task 4: graceful state pro projekty bez napojení na IS.
-       Odkaz na projektový přehled — edit modal (dropdown IS) se řeší přes
-       ProjektyController.EditProjectModal v UI. *@
-    <div class="dashboard-placeholder-message">
-        <p class="muted">
-            @Model.PlaceholderMessage
-            <a asp-controller="Projekty" asp-action="Index">Nastavte napojení na IS</a>
-            v přehledu projektů, aby se zde objevily tickety v prodlení.
-        </p>
-    </div>
-}
-else
-{
-    <section class="pm-nes-panel" aria-labelledby="nes-panel-heading">
-        <header class="pm-nes-panel__header">
-            <h2 id="nes-panel-heading">NES v prodlení — @Model.IsZkratka</h2>
-            <div class="pm-nes-panel__kpi">
-                <span>V prodlení: <strong>@Model.PocetVProdleni</strong></span>
-                <span>Průměr dnů: <strong>@Model.PrumerneProdleniDni.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)</strong></span>
-            </div>
-            @{
-                // Plán 4 Feature C gap #4 (2026-04-24) — Excel export button.
-                // ProjektId není ve VM přímo — řešíme přes ViewContext.RouteData (route /projekty/{id}/dashboard)
-                var projektIdFromRoute = ViewContext.RouteData.Values.TryGetValue("id", out var rid) ? rid?.ToString() : null;
-            }
-            @if (!string.IsNullOrEmpty(projektIdFromRoute) && Model.Items.Count > 0)
-            {
-                <a class="pm-nes-panel__export"
-                   asp-action="NesPanelExport"
-                   asp-route-id="@projektIdFromRoute"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   title="Stáhnout tabulku ve formátu XLSX">
-                    Export do Excelu
-                </a>
-            }
-        </header>
+    string Cas(DateTime? d) => d?.ToString("dd.MM.yyyy HH:mm", cs) ?? "—";
+    string Typ(string typ) => typ.Trim().ToUpperInvariant();
 
-        @if (Model.Items.Count == 0)
+    static string Zbyva(TimeSpan zbyva)
+    {
+        if (zbyva <= TimeSpan.Zero)
         {
-            <p class="muted">Žádné tickety v prodlení.</p>
+            return "termín právě vypršel";
+        }
+        if (zbyva.TotalHours < 24)
+        {
+            return $"{Math.Max(1, (int)Math.Floor(zbyva.TotalHours))} h";
+        }
+        var dny = (int)Math.Floor(zbyva.TotalDays);
+        return zbyva.Hours > 0 ? $"{PenaltyReasonFormatter.Dny(dny)} {zbyva.Hours} h" : PenaltyReasonFormatter.Dny(dny);
+    }
+}
+
+@if (prehled.Stav == ProdleniStavDat.BezNapojeni)
+{
+    <div class="pd-state" data-nes-bez-napojeni>
+        <gov-icon size="m" name="info-circle-fill" type="components" aria-hidden="true"></gov-icon>
+        @if (prehled.IsId is null)
+        {
+            <div class="pd-state__body">
+                <p class="pd-state__title">Projekt není napojen na informační systém ve ServiceDesku</p>
+                <p class="pd-state__text">Prodlení se počítá z předávek ticketů dodavateli. Informační systém projektu vyberete v přehledu projektů, v úpravě projektu.</p>
+            </div>
+            <a class="pd-state__action" href="/Projekty">Nastavit napojení</a>
         }
         else
         {
-            <table class="pm-nes-panel__table">
-                <thead>
-                    <tr>
-                        <th scope="col">Ticket</th>
-                        <th scope="col">Typ</th>
-                        <th scope="col">Stručně</th>
-                        <th scope="col">Dodavatel</th>
-                        <th scope="col">Termín</th>
-                        <th scope="col">Prodlení</th>
-                        <th scope="col">Stav</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in Model.Items)
-                    {
-                        <tr>
-                            <td>
-                                @if (!string.IsNullOrWhiteSpace(item.ServiceDeskUrl))
-                                {
-                                    <a href="@item.ServiceDeskUrl" target="_blank" rel="noopener noreferrer">#@item.TicketId</a>
-                                }
-                                else
-                                {
-                                    <span>#@item.TicketId</span>
-                                }
-                            </td>
-                            <td>@item.TypZaznamu</td>
-                            <td>@item.Strucne</td>
-                            <td>@item.Dodavatel</td>
-                            <td>@item.Termin.ToString("dd.MM.yyyy")</td>
-                            <td><strong>@item.DniProdleni</strong> dní</td>
-                            <td>@item.Stav</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="pd-state__body">
+                <p class="pd-state__title">Napojení na ServiceDesk není v této instalaci zapnuté</p>
+                <p class="pd-state__text">Projekt má informační systém @prehled.IsZkratka, ale aplikace nemá přístup k databázi ServiceDesku. Zapnout ho může správce aplikace.</p>
+            </div>
         }
-    </section>
+    </div>
+}
+else if (prehled.Stav == ProdleniStavDat.Nedostupne)
+{
+    <partial name="~/Views/ProjectDashboard/_PanelError.cshtml" model="@("ServiceDesk teď neodpovídá")" />
+}
+else
+{
+    <div class="pd-nes" data-nes-panel>
+        @if (Model.Kpi is not null)
+        {
+            <partial name="~/Views/ProjectDashboard/Zakladni/_Chart.cshtml" model="Model.Kpi" />
+        }
+
+        @if (prehled.VProdleni.Count == 0)
+        {
+            <div class="pd-empty" data-nes-empty>
+                <gov-icon size="m" name="check-circle-fill" type="components" aria-hidden="true"></gov-icon>
+                <div class="pd-empty__body">
+                    <p class="pd-empty__title">Žádný ticket u dodavatele není v prodlení</p>
+                    <p class="pd-empty__text">Penále se počítá jen za dobu, kdy je ticket u dodavatele. Tickety vrácené zpět se tu neukazují.</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            var typy = new[] { "NES", "PMP", "PNF" };
+            var viceDodavatelu = prehled.VProdleni.Any(p => p.ViceDodavatelu);
+
+            <div class="pd-charts">
+                @if (Model.DnyPodleDodavatele is not null)
+                {
+                    <partial name="~/Views/ProjectDashboard/Zakladni/_Chart.cshtml" model="Model.DnyPodleDodavatele" />
+                }
+                @if (Model.PodleTypu is not null)
+                {
+                    <partial name="~/Views/ProjectDashboard/Zakladni/_Chart.cshtml" model="Model.PodleTypu" />
+                }
+            </div>
+
+            <div class="pd-toolbar" data-nes-tabulka>
+                <div class="pd-filters" role="group" aria-label="Filtr podle typu záznamu">
+                    <button type="button" class="pd-filter active" aria-pressed="true" data-nes-filter-typ="">
+                        Vše <span class="pd-count">@prehled.VProdleni.Count</span>
+                    </button>
+                    @foreach (var typ in typy)
+                    {
+                        var pocet = prehled.VProdleni.Count(p => Typ(p.TypZaznamu) == typ);
+                        <button type="button" class="pd-filter" aria-pressed="false" data-nes-filter-typ="@typ"
+                                disabled="@(pocet == 0 ? "disabled" : null)">
+                            @typ <span class="pd-count">@pocet</span>
+                        </button>
+                    }
+                </div>
+                <pm-button variant="Secondary" size="Small" href="/projekty/@Model.ProjektId/dashboard/nes-panel/export">Export do Excelu</pm-button>
+            </div>
+
+            <div class="pd-card pd-card--table">
+                <div class="pd-table-scroll">
+                    <table class="pd-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Ticket</th>
+                                <th scope="col">Typ</th>
+                                <th scope="col">Stručně</th>
+                                <th scope="col">Dodavatel</th>
+                                <th scope="col">U dodavatele od</th>
+                                <th scope="col">Termín</th>
+                                <th scope="col" class="pd-table__num">Penalizované dny</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < prehled.VProdleni.Count; i++)
+                            {
+                                var p = prehled.VProdleni[i];
+                                var klic = $"nes-{i}";
+                                <tr class="pd-row pd-row--delayed"
+                                    data-nes-row
+                                    data-typ="@Typ(p.TypZaznamu)"
+                                    data-nes-dny="@p.PenalizovaneDny"
+                                    data-dashboard-expandable-row
+                                    data-record-id="@klic"
+                                    tabindex="0"
+                                    aria-expanded="false">
+                                    <td class="pd-table__id">
+                                        <a href="@ServiceDeskUrlBuilder.ForTicket(p.TicketId)" target="_blank" rel="noopener noreferrer"
+                                           title="Otevřít ticket ve ServiceDesku">#@p.TicketId</a>
+                                    </td>
+                                    <td>
+                                        <gov-tag color="neutral" size="s">@Typ(p.TypZaznamu)</gov-tag>
+                                        @if (!string.IsNullOrWhiteSpace(p.Dulezitost))
+                                        {
+                                            <span class="pd-muted">@p.Dulezitost.Trim()</span>
+                                        }
+                                    </td>
+                                    <td class="pd-table__name">@p.Strucne</td>
+                                    <td>
+                                        @(string.IsNullOrWhiteSpace(p.Dodavatel) ? "—" : p.Dodavatel.Trim())@if (p.ViceDodavatelu)
+                                        {
+                                            <abbr class="pd-star" data-nes-vice-dodavatelu title="Ticket přešel mezi dodavateli, penále se počítá pro každého dodavatele zvlášť.">*</abbr>
+                                        }
+                                    </td>
+                                    <td>@Cas(p.UDodavateleOd)</td>
+                                    <td>
+                                        @Cas(p.Termin)
+                                        @if (p.ProdlouzenoDo is { } prodlouzeno)
+                                        {
+                                            <span class="pd-subline">prodlouženo do @prodlouzeno.ToString("dd.MM.yyyy", cs)</span>
+                                        }
+                                    </td>
+                                    <td class="pd-table__num">
+                                        <strong class="pd-offset pd-offset--delayed">@p.PenalizovaneDny</strong>
+                                        <span class="pd-subline">@(p.PracovniDny ? "pracovní" : "kalendářní")</span>
+                                    </td>
+                                </tr>
+                                <tr class="pd-detail" data-dashboard-expandable-detail="@klic" data-nes-detail hidden>
+                                    <td colspan="7">
+                                        <div class="pd-detail__body">
+                                            <partial name="~/Views/ProjectDashboard/_ProdleniTimeline.cshtml"
+                                                     model="ProdleniTimelineBuilder.Sestav(p, Model.Nyni)" />
+                                            @if (p.Duvody.Count > 0)
+                                            {
+                                                <div class="pd-reasons">
+                                                    <p class="pd-reasons__title">Jak se k @PenaltyReasonFormatter.Dny(p.PenalizovaneDny) došlo</p>
+                                                    <ol>
+                                                        @foreach (var duvod in p.Duvody)
+                                                        {
+                                                            <li data-nes-duvod="@duvod.Kod">@PenaltyReasonFormatter.Text(duvod)</li>
+                                                        }
+                                                    </ol>
+                                                </div>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @if (viceDodavatelu)
+            {
+                <p class="pd-footnote">* Ticket přešel mezi dodavateli, penále se počítá pro každého dodavatele zvlášť. Řádek ukazuje dodavatele, u kterého ticket právě je.</p>
+            }
+        }
+
+        @if (prehled.Hrozi.Count > 0)
+        {
+            <details class="pd-section" data-nes-sekce="hrozi" data-nes-sekce-pocet="@prehled.Hrozi.Count">
+                <summary>Hrozí prodlení <span class="pd-count">@prehled.Hrozi.Count</span></summary>
+                <p class="pd-section__lead">Tickety u dodavatele zatím bez penále: u NES zbývá nejvýš @ProdleniService.HroziNesHodin h SLA, u PMP a PNF nejvýš @ProdleniService.HroziTerminDni dní do termínu.</p>
+                <div class="pd-card pd-card--table">
+                    <div class="pd-table-scroll">
+                        <table class="pd-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Ticket</th>
+                                    <th scope="col">Typ</th>
+                                    <th scope="col">Stručně</th>
+                                    <th scope="col">Dodavatel</th>
+                                    <th scope="col">Termín</th>
+                                    <th scope="col" class="pd-table__num">Zbývá</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var h in prehled.Hrozi.OrderBy(h => h.Zbyva))
+                                {
+                                    <tr class="pd-row pd-row--awaiting" data-nes-hrozi-row>
+                                        <td class="pd-table__id">
+                                            <a href="@ServiceDeskUrlBuilder.ForTicket(h.TicketId)" target="_blank" rel="noopener noreferrer"
+                                               title="Otevřít ticket ve ServiceDesku">#@h.TicketId</a>
+                                        </td>
+                                        <td><gov-tag color="neutral" size="s">@Typ(h.TypZaznamu)</gov-tag></td>
+                                        <td class="pd-table__name">@h.Strucne</td>
+                                        <td>@(string.IsNullOrWhiteSpace(h.Dodavatel) ? "—" : h.Dodavatel.Trim())</td>
+                                        <td>@Cas(h.Termin)</td>
+                                        <td class="pd-table__num"><strong class="pd-offset pd-offset--awaiting">@Zbyva(h.Zbyva)</strong></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+        }
+
+        @if (prehled.NelzeVyhodnotit.Count > 0)
+        {
+            <details class="pd-section" data-nes-sekce="nelze" data-nes-sekce-pocet="@prehled.NelzeVyhodnotit.Count">
+                <summary>Nelze vyhodnotit <span class="pd-count">@prehled.NelzeVyhodnotit.Count</span></summary>
+                <p class="pd-section__lead">Tickety u dodavatele, u kterých penále nejde spočítat kvůli chybě dat ve ServiceDesku. Do počtů výše se nezapočítávají.</p>
+                <div class="pd-card pd-card--table">
+                    <div class="pd-table-scroll">
+                        <table class="pd-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Ticket</th>
+                                    <th scope="col">Typ</th>
+                                    <th scope="col">Stručně</th>
+                                    <th scope="col">Důvod</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var n in prehled.NelzeVyhodnotit)
+                                {
+                                    <tr class="pd-row" data-nes-chyba="@n.Chyba">
+                                        <td class="pd-table__id">
+                                            <a href="@ServiceDeskUrlBuilder.ForTicket(n.TicketId)" target="_blank" rel="noopener noreferrer"
+                                               title="Otevřít ticket ve ServiceDesku">#@n.TicketId</a>
+                                        </td>
+                                        <td><gov-tag color="neutral" size="s">@Typ(n.TypZaznamu)</gov-tag></td>
+                                        <td class="pd-table__name">@n.Strucne</td>
+                                        <td>@PenaltyChybaText.Popis(n.Chyba, n.Dulezitost)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+        }
+    </div>
 }

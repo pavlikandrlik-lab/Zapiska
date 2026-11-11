@@ -1,3 +1,6 @@
+using PmTracker.Web.Services.ProjectDashboard.Zakladni;
+using PmTracker.Web.Services.ServiceDesk.Prodleni;
+
 namespace PmTracker.Web.Models.ViewModels;
 
 public sealed class ProjectDashboardPageViewModel : BaseViewModel
@@ -78,28 +81,24 @@ public sealed class ProjectDashboardStepDetailViewModel
     public int DaysSincePlanExpired { get; init; }
 }
 
+/// <summary>
+/// Záložka NES v prodlení (spec 2026-10-15 §10): přehled z penalizačního algoritmu + KPI řada a dva grafy.
+/// Grafy i KPI jsou null, když přehled není spočtený (bez napojení / výpadek).
+/// </summary>
 public sealed class ProjectDashboardNesPanelViewModel
 {
-    public bool IsServiceDeskIntegrated { get; init; }
-    public int? ServiceDeskInfoSystemId { get; init; }
-    public string? IsZkratka { get; init; }
-    public IReadOnlyList<NesPanelItemViewModel> Items { get; init; } = Array.Empty<NesPanelItemViewModel>();
-    public int PocetVProdleni { get; init; }
-    public double PrumerneProdleniDni { get; init; }
-    public string PlaceholderMessage { get; init; } = "Projekt není napojen na žádný Informační systém v ServiceDesku.";
-}
+    public required ProdleniPrehled Prehled { get; init; }
+    public required int ProjektId { get; init; }
 
-public sealed class NesPanelItemViewModel
-{
-    public required int TicketId { get; init; }
-    public required string Pid { get; init; }
-    public required string TypZaznamu { get; init; }
-    public string? Strucne { get; init; }
-    public string? Dodavatel { get; init; }
-    public required DateTime Termin { get; init; }
-    public required int DniProdleni { get; init; }
-    public string? Stav { get; init; }
-    public string? ServiceDeskUrl { get; init; }
+    /// <summary>Okamžik sestavení (místní čas) — poloha „dnes" na časové ose a datum v exportu.</summary>
+    public required DateTime Nyni { get; init; }
+
+    public ChartData? Kpi { get; init; }
+    public ChartData? DnyPodleDodavatele { get; init; }
+    public ChartData? PodleTypu { get; init; }
+
+    /// <summary>Počet ticketů v prodlení (ticket u více dodavatelů se počítá jednou).</summary>
+    public int PocetTicketuVProdleni => Prehled.VProdleni.Select(p => p.TicketId).Distinct().Count();
 }
 
 public sealed class ProjectDashboardStatisticsPanelViewModel

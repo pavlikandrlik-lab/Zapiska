@@ -1,25 +1,26 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using PmTracker.ServiceDesk.Contracts;
 using PmTracker.Web.Data;
 using PmTracker.Web.Models.Entities;
 using PmTracker.Web.Models.ViewModels;
 using PmTracker.Web.Services.Data;
+using PmTracker.Web.Services.ProjectDashboard.Zakladni;
 using PmTracker.Web.Services.Schedules;
 using PmTracker.Web.Services.ServiceDesk;
+using PmTracker.Web.Services.ServiceDesk.Prodleni;
 
 namespace PmTracker.Web.Services.ProjectDashboard;
 
 public sealed class ProjectDashboardService : IProjectDashboardService
 {
     private readonly PmTrackerDbContext _dbContext;
-    private readonly IInformacniSystemQueryService _isQueryService;
+    private readonly IProdleniService _prodleni;
 
-    public ProjectDashboardService(
-        PmTrackerDbContext dbContext,
-        IInformacniSystemQueryService isQueryService)
+    public ProjectDashboardService(PmTrackerDbContext dbContext, IProdleniService prodleni)
     {
         _dbContext = dbContext;
-        _isQueryService = isQueryService;
+        _prodleni = prodleni;
     }
 
     public async Task<ProjectDashboardPageViewModel> BuildDashboardPageAsync(int projectId, CancellationToken ct = default)
@@ -306,49 +307,76 @@ public sealed class ProjectDashboardService : IProjectDashboardService
         };
     }
 
+    /// <summary>
+    /// Záložka NES v prodlení (spec 2026-10-15 §10): přehled počítá <see cref="IProdleniService"/>
+    /// (penalizační algoritmus), tady se z něj skládá jen KPI řada a dva žebříčkové grafy.
+    /// </summary>
     public async Task<ProjectDashboardNesPanelViewModel> BuildNesPanelAsync(
         int projektId, DateTime reference, CancellationToken ct = default)
     {
-        // Plán 5 Sprint B Task 4: unhardcode — NES panel aktivován, pokud projekt
-        // má napojení na IS (projekty.servicedesk_info_system_id). Volá Sprint A
-        // query service pro tickety v prodlení (NES SLA / PMP+PNF DatResT).
-        var projekt = await _dbContext.Projekty.AsNoTracking()
-            .Where(p => p.Id == projektId)
-            .Select(p => new { p.ServiceDeskInfoSystemId })
-            .FirstOrDefaultAsync(ct);
-
-        if (projekt?.ServiceDeskInfoSystemId is not int isId)
+        var prehled = await _prodleni.GetPrehledAsync(projektId, ct);
+        if (prehled.Stav != ProdleniStavDat.Ok)
         {
-            // Bez napojení nebo projekt nenalezen — UI render placeholder s odkazem na edit.
-            return new ProjectDashboardNesPanelViewModel { IsServiceDeskIntegrated = false };
+            return new ProjectDashboardNesPanelViewModel { Prehled = prehled, ProjektId = projektId, Nyni = reference };
         }
 
-        var infoSystem = SdInfoSystemy.ById(isId);
-        var prodlene = await _isQueryService.GetProdleneAsync(isId, reference, ct);
+        var tickety = prehled.VProdleni.Select(p => p.TicketId).Distinct().Count();
+        var hrozi = prehled.Hrozi.Select(p => p.TicketId).Distinct().Count();
+        var nelze = prehled.NelzeVyhodnotit.Count;
 
-        var items = prodlene
-            .Select(p => new NesPanelItemViewModel
-            {
-                TicketId = p.Id,
-                Pid = p.Pid,
-                TypZaznamu = p.TypZaznamu,
-                Strucne = p.Strucne,
-                Dodavatel = p.Dodavatel,
-                Termin = p.Termin,
-                DniProdleni = p.DniProdleni,
-                Stav = p.Stav,
-                ServiceDeskUrl = ServiceDeskUrlBuilder.ForTicket(p.Id)
-            })
+        var kpi = ChartData.ForKpi("nes-kpi", "Prodlení ticketů u dodavatele",
+        [
+            new StatCard("V prodlení u dodavatele", tickety.ToString(CultureInfo.InvariantCulture),
+                Status: tickety > 0 ? CardStatus.Critical : CardStatus.Good),
+            new StatCard("Penalizovaných dnů", prehled.SoucetDni.ToString(CultureInfo.InvariantCulture),
+                Note: "součet za tickety v prodlení"),
+            new StatCard("Hrozí prodlení", hrozi.ToString(CultureInfo.InvariantCulture),
+                Note: $"NES do {ProdleniService.HroziNesHodin} h SLA, PMP/PNF do {ProdleniService.HroziTerminDni} dní",
+                Status: hrozi > 0 ? CardStatus.Warning : CardStatus.Neutral),
+            new StatCard("Nelze vyhodnotit", nelze.ToString(CultureInfo.InvariantCulture),
+                Note: nelze > 0 ? "chyba dat ve ServiceDesku" : null,
+                Status: nelze > 0 ? CardStatus.Warning : CardStatus.Neutral),
+        ]);
+
+        // Žebříček: jeden odstín, seřazeno sestupně (spec §12 — dodavatelé nikdy ne duhou).
+        var dodavatele = prehled.VProdleni
+            .GroupBy(p => string.IsNullOrWhiteSpace(p.Dodavatel) ? "(neuvedeno)" : p.Dodavatel!.Trim())
+            .Select(g => (Nazev: g.Key, Dny: g.Sum(p => p.PenalizovaneDny)))
+            .OrderByDescending(x => x.Dny).ThenBy(x => x.Nazev, StringComparer.CurrentCulture)
             .ToList();
+        var dnyPodleDodavatele = ChartData.ForSeries("nes-dny-podle-dodavatele", ChartKind.HorizontalBar,
+            "Penalizované dny podle dodavatele",
+            dodavatele.Select(x => x.Nazev).ToList(),
+            [new ChartSeries("Penalizované dny", dodavatele.Select(x => (double)x.Dny).ToList())],
+            insight: dodavatele.Count > 0
+                ? $"Nejvíc {dodavatele[0].Nazev}: {PenaltyReasonFormatter.Dny(dodavatele[0].Dny)}"
+                : null) with
+        {
+            Unit = "dní",
+            EmptyMessage = "Žádný ticket u dodavatele není v prodlení.",
+        };
+
+        var typy = prehled.VProdleni
+            .GroupBy(p => p.TypZaznamu.Trim().ToUpperInvariant())
+            .Select(g => (Typ: g.Key, Pocet: g.Select(p => p.TicketId).Distinct().Count()))
+            .OrderByDescending(x => x.Pocet).ThenBy(x => x.Typ, StringComparer.Ordinal)
+            .ToList();
+        var podleTypu = ChartData.ForSeries("nes-podle-typu", ChartKind.HorizontalBar,
+            "V prodlení podle typu",
+            typy.Select(x => x.Typ).ToList(),
+            [new ChartSeries("Tickety v prodlení", typy.Select(x => (double)x.Pocet).ToList())]) with
+        {
+            EmptyMessage = "Žádný ticket u dodavatele není v prodlení.",
+        };
 
         return new ProjectDashboardNesPanelViewModel
         {
-            IsServiceDeskIntegrated = true,
-            ServiceDeskInfoSystemId = isId,
-            IsZkratka = infoSystem?.Zkratka,
-            Items = items,
-            PocetVProdleni = items.Count,
-            PrumerneProdleniDni = items.Count > 0 ? items.Average(x => x.DniProdleni) : 0.0
+            Prehled = prehled,
+            ProjektId = projektId,
+            Nyni = reference,
+            Kpi = kpi,
+            DnyPodleDodavatele = dnyPodleDodavatele,
+            PodleTypu = podleTypu,
         };
     }
 
