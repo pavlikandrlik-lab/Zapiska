@@ -553,6 +553,218 @@ button.pd-tile:focus-visible {
     color: var(--text-disabled);
 }
 
+/* --- KPI dlaždice (NES v prodlení, Statistiky) ---------------------------- */
+
+.pd-kpis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--pm-spacing-m);
+    flex: 1 1 100%;
+}
+
+.pd-kpi {
+    flex: 1 1 170px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-2xs);
+    padding: var(--pm-spacing-m);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--pm-radius-m);
+}
+
+.pd-kpis--inner .pd-kpi {
+    flex-basis: 120px;
+    background: var(--background-block-secondary);
+    border-color: var(--border-subtlest);
+}
+
+.pd-kpi__label {
+    font-size: var(--pm-font-size-s);
+    color: var(--text-secondary);
+}
+
+.pd-kpi__value {
+    display: flex;
+    align-items: center;
+    gap: var(--pm-spacing-xs);
+    font-size: 26px;
+    line-height: 1.15;
+    font-weight: var(--pm-font-weight-bold);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+}
+
+.pd-kpi__value gov-icon {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    top: 0;
+}
+
+.pd-kpi--good .pd-kpi__value gov-icon {
+    color: var(--icon-success);
+}
+
+.pd-kpi--warning .pd-kpi__value gov-icon {
+    color: var(--icon-warning);
+}
+
+.pd-kpi--critical .pd-kpi__value gov-icon {
+    color: var(--icon-error);
+}
+
+.pd-kpi__progress {
+    height: 6px;
+    margin-top: var(--pm-spacing-2xs);
+    border-radius: var(--pm-radius-round);
+    background: var(--background-neutral-subtle);
+    overflow: hidden;
+}
+
+.pd-kpi__progress-bar {
+    display: block;
+    width: var(--pd-progress, 0%);
+    height: 100%;
+    border-radius: var(--pm-radius-round);
+    background: var(--app-chart-1);
+}
+
+.pd-kpi--warning .pd-kpi__progress-bar {
+    background: var(--background-status-warning);
+}
+
+.pd-kpi--critical .pd-kpi__progress-bar {
+    background: var(--background-status-error);
+}
+
+.pd-kpi__trend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--pm-spacing-2xs);
+    font-size: var(--pm-font-size-s);
+    color: var(--text-secondary);
+}
+
+.pd-kpi__verdict {
+    font-weight: var(--pm-font-weight-semibold);
+}
+
+.pd-kpi__trend--better .pd-kpi__verdict {
+    color: var(--text-status-success);
+}
+
+.pd-kpi__trend--worse .pd-kpi__verdict {
+    color: var(--text-status-error);
+}
+
+.pd-kpi__note {
+    font-size: var(--pm-font-size-s);
+    color: var(--text-secondary);
+}
+
+/* --- Karta grafu a tabulkový pohled --------------------------------------- */
+
+.pd-charts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--pm-spacing-m);
+}
+
+.pd-chart {
+    flex: 1 1 420px;
+    min-width: 0;
+    margin: 0;
+    padding: var(--pm-spacing-l);
+}
+
+.pd-chart--full {
+    flex-basis: 100%;
+}
+
+.pd-chart__caption {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: var(--pm-spacing-s);
+}
+
+.pd-chart__title {
+    font-size: 14px;
+    font-weight: var(--pm-font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.pd-chart__insight,
+.pd-chart__note {
+    font-size: var(--pm-font-size-s);
+    color: var(--text-secondary);
+}
+
+.pd-chart__note {
+    margin: var(--pm-spacing-s) 0 0;
+}
+
+.pd-chart__empty {
+    margin: 0;
+    padding: var(--pm-spacing-xl) 0;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.pd-echart {
+    width: 100%;
+    height: 280px;
+}
+
+.pd-data {
+    margin-top: var(--pm-spacing-s);
+    font-size: var(--pm-font-size-s);
+}
+
+.pd-data > summary {
+    width: fit-content;
+    color: var(--text-primary-color);
+    cursor: pointer;
+}
+
+.pd-data > summary:focus-visible {
+    outline: 2px solid var(--border-primary);
+    outline-offset: 2px;
+}
+
+.pd-data__scroll {
+    margin-top: var(--pm-spacing-xs);
+    overflow-x: auto;
+}
+
+.pd-data__table {
+    border-collapse: collapse;
+    min-width: 50%;
+}
+
+.pd-data__table th,
+.pd-data__table td {
+    padding: var(--pm-spacing-2xs) var(--pm-spacing-m) var(--pm-spacing-2xs) 0;
+    border-bottom: 1px solid var(--border-subtlest);
+    color: var(--text-primary);
+    text-align: left;
+    font-weight: var(--pm-font-weight-normal);
+}
+
+.pd-data__table thead th {
+    color: var(--text-secondary);
+    font-weight: var(--pm-font-weight-semibold);
+}
+
+.pd-data__table .pd-table__num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
 /* --- Úzká obrazovka ------------------------------------------------------ */
 
 @media (max-width: 576px) {
@@ -585,5 +797,10 @@ button.pd-tile:focus-visible {
 
     .pd-shell {
         padding: 0;
+    }
+
+    .pd-chart,
+    .pd-kpi {
+        break-inside: avoid;
     }
 }

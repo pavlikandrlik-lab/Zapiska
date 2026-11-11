@@ -24,7 +24,7 @@ public sealed class DeadSvgRemovedTests
     [Fact]
     public void Dead_svg_bar_css_is_gone()
     {
-        var css = File.ReadAllText(Path.Combine(Root(), "PmTracker.Web/wwwroot/css/components/zakladni-report.css".Replace('/', Path.DirectorySeparatorChar)));
+        var css = File.ReadAllText(Path.Combine(Root(), "PmTracker.Web/wwwroot/css/components/project-dashboard.css".Replace('/', Path.DirectorySeparatorChar)));
         css.Should().NotContain(".zr-bar-rect");
         css.Should().NotContain(".zr-bar-value");
         css.Should().NotContain(".zr-bar-label");

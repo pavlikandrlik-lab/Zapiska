@@ -1,0 +1,38 @@
+@model PmTracker.Web.Services.ProjectDashboard.Zakladni.ChartData
+@*
+    Tabulkový pohled na data grafu (spec 2026-10-15 §12): přístupnost, tisk a ověření čísel.
+    Řádky = kategorie, sloupce = série; hodnoty česky a s jednotkou grafu.
+*@
+@{
+    var cs = System.Globalization.CultureInfo.GetCultureInfo("cs-CZ");
+    string Hodnota(double v)
+    {
+        var text = v.ToString("#,0.##", cs);
+        return string.IsNullOrEmpty(Model.Unit) ? text : $"{text} {Model.Unit}";
+    }
+}
+<div class="pd-data__scroll">
+    <table class="pd-data__table" data-chart-table="@Model.Key">
+        <thead>
+            <tr>
+                <th scope="col"><span class="app-sr-only">Kategorie</span></th>
+                @foreach (var s in Model.Series)
+                {
+                    <th scope="col" class="pd-table__num">@s.Label</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @for (var i = 0; i < Model.Categories.Count; i++)
+            {
+                <tr data-chart-table-row="@i">
+                    <th scope="row">@Model.Categories[i]</th>
+                    @foreach (var s in Model.Series)
+                    {
+                        <td class="pd-table__num">@(i < s.Values.Count ? Hodnota(s.Values[i]) : "—")</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

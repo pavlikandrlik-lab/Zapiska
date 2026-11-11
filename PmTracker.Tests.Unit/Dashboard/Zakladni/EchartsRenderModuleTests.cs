@@ -18,16 +18,40 @@ public sealed class EchartsRenderModuleTests
     }
 
     [Fact]
-    public void Module_imports_vendored_echarts_and_renders_svg_by_kind()
+    public void Module_imports_vendored_echarts_and_renders_svg()
     {
         var js = Read("PmTracker.Web/wwwroot/js/modules/dashboard/echartsRender.js");
         js.Should().Contain("../../../lib/echarts/echarts.esm.min.js");
         js.Should().Contain("renderer: \"svg\"");
         js.Should().Contain("data-echart");
-        foreach (var k in new[] { "Bar", "StackedBar", "Pie", "Line" })
+    }
+
+    /// <summary>
+    /// Mapování ChartData → ECharts option je čistá funkce v echartsOption.js (chování testuje
+    /// tests/js/dom/echartsOption.test.js). Tady jen pojistka, že každý grafový ChartKind má větev.
+    /// </summary>
+    [Fact]
+    public void EchartsRender_mapuje_vsechny_kinds()
+    {
+        var js = Read("PmTracker.Web/wwwroot/js/modules/dashboard/echartsOption.js");
+        var grafove = Enum.GetNames<PmTracker.Web.Services.ProjectDashboard.Zakladni.ChartKind>()
+            .Where(k => k is not ("StatCards" or "Kpi")); // karty kreslí server, ne ECharts
+        foreach (var k in grafove)
         {
-            js.Should().Contain(k);
+            js.Should().Contain($"case \"{k}\":", $"ChartKind.{k} musí mít větev v optionFor");
         }
+    }
+
+    /// <summary>Přepnutí motivu grafy přebarví bez reloadu; lazy panel je po načtení inicializuje.</summary>
+    [Fact]
+    public void Render_reaguje_na_motiv_a_nacteni_panelu()
+    {
+        var js = Read("PmTracker.Web/wwwroot/js/modules/dashboard/echartsRender.js");
+        js.Should().Contain("MutationObserver");
+        js.Should().Contain("data-theme");
+        js.Should().Contain("pm:panel-loaded");
+        js.Should().Contain("./echartsTheme.js");
+        js.Should().Contain("./echartsOption.js");
     }
 
     [Fact]

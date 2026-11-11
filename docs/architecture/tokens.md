@@ -40,6 +40,8 @@ v `PmTracker.Web/wwwroot/css/tokens.css`.
 | `--app-category-decision(-subtle)` | Fialová kategorie **Rozhodnutí** (gov barvy jsou obsazené semaforem úkolů). Viz [Barvy karet záznamů](../wiki/projekty/zaznamy/barvy-karet.md). |
 | `--app-schedule-step-1…11`, `--app-schedule-delay` | Duhová paleta kroků a skluz |
 | `--app-schedule-stripe`, `-segment-inner`, `-segment-edge`, `-segment-outline` | Překryvy pruhů harmonogramu; pruhy mají barvy z Excelu (`HarmonogramKroky.cs`), stejné v obou motivech |
+| `--app-chart-1`, `--app-chart-2` | Kategorické barvy grafů dashboardu: modrá (`primary-500`) a jantarová (`secondary-800`). Jediné dva kroky gov ramp, které projdou validátorem palety na světlé i tmavé ploše; třetí kategorická barva v gov rampách není. Série dostává barvu podle významu a v pevném pořadí, nikdy podle pořadí po filtru. |
+| `--app-chart-neutral`, `--app-chart-neutral-strong` | Šedé pro vedlejší nebo neaktivní hodnoty v grafu (Nezahájeno, Zrušeno, Ostatní); výraznější šedá je v tmavém motivu světlá |
 
 ## Kontroly
 

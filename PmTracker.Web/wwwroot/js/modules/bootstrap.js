@@ -118,7 +118,7 @@ import {
     initProjectDashboardShell
 } from "./projectDashboard.js";
 import { initZakladniReport } from "./dashboard/zakladniReport.js";
-import { bindEchartsResize, initEchartsReport } from "./dashboard/echartsRender.js";
+import { bindEchartsLifecycle, initEchartsReport } from "./dashboard/echartsRender.js";
 import { initCrossTabNav } from "./crossTabNav.js";
 import { initRecordEditLock } from "./recordEditor/editLock.js";
 
@@ -681,7 +681,7 @@ export function bootstrapPmTrackerApp() {
         () => initProjectDashboardShell(),
         () => initZakladniReport(),
         () => initEchartsReport(document),
-        () => bindEchartsResize(),
+        () => bindEchartsLifecycle(),
         // Pořadí: editLock musí být PŘED keep-alive koordinátorem — ten si při prvním
         // běhu čte data-record-edit-lock-id z <html> a posílá ho jako heartbeat.
         () => initRecordEditLock(),

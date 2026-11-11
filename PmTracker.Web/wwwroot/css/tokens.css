@@ -101,6 +101,18 @@
     --app-schedule-segment-inner: rgba(255, 255, 255, 0.35);
     --app-schedule-segment-edge: rgba(15, 23, 42, 0.42);
     --app-schedule-segment-outline: rgba(15, 23, 42, 0.18);
+
+    /* Grafy (dashboard projektu) — kategorické barvy, které gov DS nemá. Kroky gov ramp jsou
+       vybrané validátorem palety (dataviz validate_palette.js, 2026-11-11): modrá primary-500
+       a jantarová secondary-800 projdou pásmem světlosti, sytostí, odlišitelností při poruchách
+       barvocitu (ΔE 23,4) i kontrastem 3:1 na světlé (#fff) i tmavé (#262626) ploše karty.
+       Tmavší primary-600 a světlejší kroky neprošly a třetí kategorická barva v gov rampách není —
+       třetí a čtvrtá pozice jsou proto šedé (vedlejší / neaktivní hodnoty). Stavové barvy grafů
+       (hotovo, po termínu) berou přímo gov --background-status-*. */
+    --app-chart-1: var(--color-primary-500);
+    --app-chart-2: var(--color-secondary-800);
+    --app-chart-neutral: var(--color-neutral-400);
+    --app-chart-neutral-strong: var(--color-neutral-700);
 }
 
 :root[data-theme="dark"] {
@@ -111,4 +123,7 @@
     --app-shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.45);
     --app-category-decision: #c4b5fd;
     --app-category-decision-subtle: #2e1065;
+    /* Grafy: modrá a jantarová platí v obou motivech (validováno i na tmavé ploše);
+       výraznější šedá je na tmavé ploše světlá. */
+    --app-chart-neutral-strong: var(--color-neutral-200);
 }

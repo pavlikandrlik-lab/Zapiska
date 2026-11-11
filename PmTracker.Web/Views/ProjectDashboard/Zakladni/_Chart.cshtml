@@ -1,24 +1,44 @@
 @model PmTracker.Web.Services.ProjectDashboard.Zakladni.ChartData
 @using PmTracker.Web.Services.ProjectDashboard.Zakladni
-<figure class="zr-chart" data-chart-key="@Model.Key">
-    <figcaption class="zr-chart-caption">
-        <span class="zr-chart-title">@Model.Title</span>
-        @if (!string.IsNullOrWhiteSpace(Model.Insight))
+@*
+    Jeden vizuál reportu (spec 2026-10-15 §12). KPI řada se kreslí bez karty (dlaždice jsou karty samy),
+    ostatní jako karta: nadpis + jednořádkový insight, graf (ECharts) a tabulkový pohled na stejná data.
+*@
+@if (Model.Kind == ChartKind.Kpi)
+{
+    <partial name="~/Views/ProjectDashboard/Zakladni/_Kpi.cshtml" model="Model" />
+}
+else
+{
+    var span = Model.Span == ChartSpan.Full ? "full" : "half";
+    <figure class="pd-card pd-chart pd-chart--@span" data-chart-key="@Model.Key">
+        <figcaption class="pd-chart__caption">
+            <span class="pd-chart__title">@Model.Title</span>
+            @if (!string.IsNullOrWhiteSpace(Model.Insight))
+            {
+                <span class="pd-chart__insight">@Model.Insight</span>
+            }
+        </figcaption>
+        @if (Model.Kind == ChartKind.StatCards)
         {
-            <span class="zr-chart-insight">@Model.Insight</span>
+            <partial name="~/Views/ProjectDashboard/Zakladni/_ChartStatCards.cshtml" model="Model" />
         }
-    </figcaption>
-    @if (Model.Kind == ChartKind.StatCards)
-    {
-        <partial name="~/Views/ProjectDashboard/Zakladni/_ChartStatCards.cshtml" model="Model" />
-    }
-    else
-    {
-        @* Bar/StackedBar/Pie/Line → klient Apache ECharts (echartsRender.js). Data v JSON atributu. *@
-        <div class="zr-echart" data-echart data-chart-json="@ChartJson.Serialize(Model)" role="img" aria-label="@Model.Title"></div>
-    }
-    @if (!string.IsNullOrWhiteSpace(Model.Note))
-    {
-        <figcaption class="zr-chart-note muted">@Model.Note</figcaption>
-    }
-</figure>
+        else if (Model.IsEmpty)
+        {
+            <p class="pd-chart__empty" data-chart-empty>@(Model.EmptyMessage ?? "Pro toto období nejsou žádná data.")</p>
+        }
+        else
+        {
+            @* Graf kreslí klient (echartsRender.js) z JSON atributu; výška se nastaví podle druhu grafu. *@
+            <div class="pd-echart" data-echart data-chart-json="@ChartJson.Serialize(Model)" role="img" aria-label="@Model.Title"></div>
+            <details class="pd-data">
+                <summary>Zobrazit data</summary>
+                <partial name="~/Views/ProjectDashboard/Zakladni/_ChartTable.cshtml" model="Model" />
+            </details>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.Note))
+        {
+            <p class="pd-chart__note">@Model.Note</p>
+        }
+    </figure>
+}

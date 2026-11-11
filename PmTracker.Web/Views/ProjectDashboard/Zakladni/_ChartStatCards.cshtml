@@ -1,13 +1,14 @@
 @model PmTracker.Web.Services.ProjectDashboard.Zakladni.ChartData
-<div class="zr-statcards">
+@* Malé karty uvnitř karty grafu — stejné dlaždice jako KPI řada, jen bez stavu a trendu. *@
+<div class="pd-kpis pd-kpis--inner">
     @foreach (var s in Model.Stats)
     {
-        <div class="zr-statcard">
-            <div class="zr-statcard-value">@s.Value</div>
-            <div class="zr-statcard-label">@s.Label</div>
+        <div class="pd-kpi">
+            <div class="pd-kpi__label">@s.Label</div>
+            <div class="pd-kpi__value"><span>@s.Value</span></div>
             @if (!string.IsNullOrWhiteSpace(s.Note))
             {
-                <div class="zr-statcard-note muted">@s.Note</div>
+                <div class="pd-kpi__note">@s.Note</div>
             }
         </div>
     }
