@@ -51,12 +51,11 @@ public sealed class PenaltyCalculator
         var wf = Serad(input.Udalosti);
         if (!wf.Any(u => u.Typ == TransferTyp.U1)) return null;
 
-        var otevrena = wf.LastOrDefault(u => u.Typ is TransferTyp.U1 or TransferTyp.U2 or TransferTyp.U3);
-        if (otevrena is null || otevrena.Typ == TransferTyp.U3) return null;
+        var (otevrena, aktualni) = AktualniPredani(wf);
+        if (otevrena is null) return null;
 
         if (Dodavatele(wf).Count > 1)
         {
-            var aktualni = DodavatelVBode(wf, otevrena);
             if (aktualni is null) return null;
             wf = RozdelPodleDodavatele(wf, aktualni);
         }
@@ -93,6 +92,26 @@ public sealed class PenaltyCalculator
         }
     }
 
+    /// <summary>
+    /// Je ticket právě u dodavatele? Ano, když po seřazení (Datum, Id) je poslední událost z {U1, U2, U3} typu U1/U2
+    /// (spec §10). Vrací tu předávku a dodavatele platného v jejím okamžiku (poslední neprázdný dodavatel do ní včetně),
+    /// jinak (null, null).
+    /// </summary>
+    public static (WorkflowUdalost? Predani, string? Dodavatel) AktualniPredani(IReadOnlyList<WorkflowUdalost> udalosti)
+    {
+        var wf = Serad(udalosti);
+        var posledni = wf.LastOrDefault(u => u.Typ is TransferTyp.U1 or TransferTyp.U2 or TransferTyp.U3);
+        if (posledni is null || posledni.Typ == TransferTyp.U3) return (null, null);
+
+        string? dodavatel = null;
+        foreach (var u in wf)
+        {
+            if (!string.IsNullOrEmpty(u.Dodavatel)) dodavatel = u.Dodavatel;
+            if (ReferenceEquals(u, posledni)) break;
+        }
+        return (posledni, dodavatel);
+    }
+
     private DateTime Ted() => _time.GetLocalNow().DateTime;
 
     private static string NormalizujTyp(string? typ) => (typ ?? string.Empty).Trim().ToUpperInvariant();
@@ -102,18 +121,6 @@ public sealed class PenaltyCalculator
 
     private static List<string> Dodavatele(List<WorkflowUdalost> wf)
         => wf.Select(u => u.Dodavatel).OfType<string>().Where(d => d.Length > 0).Distinct().ToList();
-
-    /// <summary>Dodavatel platný v okamžiku dané události = poslední neprázdný dodavatel do ní včetně.</summary>
-    private static string? DodavatelVBode(List<WorkflowUdalost> wf, WorkflowUdalost udalost)
-    {
-        string? aktualni = null;
-        foreach (var u in wf)
-        {
-            if (!string.IsNullOrEmpty(u.Dodavatel)) aktualni = u.Dodavatel;
-            if (ReferenceEquals(u, udalost)) break;
-        }
-        return aktualni;
-    }
 
     private static PenaltyResult ChybovyVysledek(string? dodavatel, PenaltyChyba chyba, bool pracovniDny)
         => new(dodavatel, [], [], chyba, pracovniDny);
