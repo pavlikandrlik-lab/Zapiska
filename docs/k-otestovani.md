@@ -343,3 +343,22 @@ Navíc:
 - Krok bez skutečnosti **před** posledním splněným krokem (mezera) se dál hlásí jako „Čeká na skutečnost“, i když ho stav harmonogramu přeskakuje. Beze změny.
 - Texty dashboardu se neskloňují („+1 dní“, „Čeká (1 dní)“). Vzhled dashboardu se nemění do jeho přepracování.
 
+
+---
+
+## 9. Testy — převzetí návrhu, zastaralé E2E testy editoru a harmonogramu
+
+**Hotovo 2026-11-11:** větev `fix/zastarale-testy` (merge hash níže). Mění se jen testy a dokumentace, aplikace ne.
+
+**Co se změnilo:**
+- **Převzetí návrhu záznamu (rozhodnutí 2026-11-11, varianta B):** převzít návrh do formuláře smí jen ten, kdo smí návrh schválit (`proposals.accept` + `proposals.takeover`). Kód to tak dělal, padal jen Integration test, který dal manažerovi jen `proposals.takeover`. Test dostal i `proposals.accept`; nový test hlídá, že bez práva schválit se převzetí odmítne a návrh dál čeká.
+- **E2E harmonogram (`HarmonogramUnifiedScenariosTests`):** 7 testů padalo, protože otevíraly editor v modálu, který od 2026-05-01 neexistuje (editor je stránka). Šest převedeno na stránku editoru a vlastní projekt s úkolem s plánem (dřív při prázdném projektu mlčky procházely); hlídají totéž: osu s popisky a značkami DNES / TERMÍN, rozpad, mini-Gantt Plán / Skutečnost, přepínání záložek, počet dnů vpravo od kalendáře, založení úkolu s plánem.
+- **Smazané testy zrušeného UI:**
+  - `Harmonogram_ShouldRenderOnlySubsystemFilter…` — harmonogram má od sjednocení filtrů sdílený filtr projektu (opak testu);
+  - `RecordEditModalCloseScenariosTests` (5) a `RecordEditModalSilentRegressionTests` (1) — modál editoru; 3 testy procházely naprázdno. Totéž chování na stránce editoru hlídá `RecordEditorHistoryBackScenariosTests`.
+
+**Ověřeno lokálně:** Integration převzetí 2/2 (nový test bez kontroly `proposals.accept` spadne — ověřeno dočasnou úpravou kódu). E2E celá sada: 118 testů, 22 selhání — všechna z dosavadních 32 známých jmen, nové žádné; z baseline zmizelo 10 (7 harmonogram, 3 modál).
+
+**Otestovat ručně:** nic — aplikace se nemění.
+
+**Známá omezení:** zbylá známá selhání E2E (filtry projektů, nastavení rolí, plovoucí panely, PhaseD, tlačítko „Nový záznam“ v dalších testech) se týkají jiných oblastí a tato změna je neřeší.
