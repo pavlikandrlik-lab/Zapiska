@@ -5,11 +5,13 @@ import {
     resolveOrCreateErrorContainer,
     setLazyLoadingState
 } from "./navigationShared.js";
+import { resolveSouhrnCil } from "./dashboard/souhrnCil.js";
 
-const projectDashboardTabStorageKeyPrefix = "pmtracker.projectDashboard.tab.";
+// Projektový dashboard (spec 2026-10-15 §8): systémové pm-tabs (persist="storage" řeší
+// zapamatovanou záložku), lazy-load panelů na pm-tab-change, souhrnný pás z endpointu souhrn.
 
 // ---------------------------------------------------------------------------
-// Shell resolution
+// Shell, záložky, panely
 // ---------------------------------------------------------------------------
 
 function resolveProjectDashboardShell() {
@@ -17,96 +19,122 @@ function resolveProjectDashboardShell() {
     return shell instanceof HTMLElement ? shell : null;
 }
 
-// ---------------------------------------------------------------------------
-// Tab helpers
-// ---------------------------------------------------------------------------
-
-function resolveTabButtons(shell) {
-    return Array.from(shell.querySelectorAll(".dashboard-tab[data-dashboard-tab]"));
-}
-
-function resolveTabPanels(shell) {
-    return Array.from(shell.querySelectorAll(".dashboard-tab-panel[data-dashboard-tab-panel]"));
+function resolveTabs(shell) {
+    const tabs = shell.querySelector("pm-tabs[data-dashboard-tabs]");
+    return tabs instanceof HTMLElement ? tabs : null;
 }
 
 function resolveTabPanel(shell, tabKey) {
     if (!tabKey) {
         return null;
     }
-    const panel = shell.querySelector(`.dashboard-tab-panel[data-dashboard-tab-panel="${CSS.escape(tabKey)}"]`);
+    const panel = shell.querySelector(`pm-tab-panel[key="${CSS.escape(tabKey)}"][data-dashboard-panel]`);
     return panel instanceof HTMLElement ? panel : null;
 }
 
-function resolveActiveTabKey(shell) {
-    const projectId = (shell.dataset.projectId || "").trim();
-    if (!projectId) {
-        return null;
+const panelLoads = new WeakMap();
+
+// Jeden fetch na panel: klik na dlaždici i pm-tab-change můžou žádat o tentýž panel současně.
+function ensureProjectDashboardTabPanelLoaded(shell, tabKey) {
+    const panel = resolveTabPanel(shell, tabKey);
+    if (!(panel instanceof HTMLElement)) {
+        return Promise.resolve(false);
     }
-    return localStorage.getItem(`${projectDashboardTabStorageKeyPrefix}${projectId}`) || null;
+    if (panel.dataset.dashboardPanelLoaded === "true") {
+        return Promise.resolve(true);
+    }
+    const running = panelLoads.get(panel);
+    if (running) {
+        return running;
+    }
+
+    const load = loadDashboardPanel(panel).then((ok) => {
+        if (ok) {
+            panel.dataset.dashboardPanelLoaded = "true";
+        }
+        panelLoads.delete(panel);
+        return ok;
+    });
+    panelLoads.set(panel, load);
+    return load;
 }
 
-function persistActiveTabKey(shell, tabKey) {
-    const projectId = (shell.dataset.projectId || "").trim();
-    if (!projectId || !tabKey) {
+async function initTabs(shell) {
+    const tabs = resolveTabs(shell);
+    if (!(tabs instanceof HTMLElement)) {
         return;
     }
-    localStorage.setItem(`${projectDashboardTabStorageKeyPrefix}${projectId}`, tabKey);
-}
 
-// ---------------------------------------------------------------------------
-// Tab switching
-// ---------------------------------------------------------------------------
+    await customElements.whenDefined("pm-tabs");
+    // pm-tabs se inicializuje v mikroúloze po připojení — počkat, než zná aktivní záložku.
+    await new Promise((resolve) => queueMicrotask(resolve));
 
-function setActiveProjectDashboardTab(shell, tabKey) {
-    const tabs = resolveTabButtons(shell);
-    const panels = resolveTabPanels(shell);
+    // ?dashTab= přebije záložku uloženou v localStorage (pm-tabs dává uloženému stavu přednost před initial).
+    const forced = (shell.dataset.dashboardForceTab || "").trim();
+    if (forced && typeof tabs.setActive === "function") {
+        tabs.setActive(forced, { silent: true });
+    }
 
-    tabs.forEach((tab) => {
-        tab.classList.toggle("active", tab.getAttribute("data-dashboard-tab") === tabKey);
+    tabs.addEventListener("pm-tab-change", (event) => {
+        const key = event.detail && event.detail.key;
+        if (key) {
+            void ensureProjectDashboardTabPanelLoaded(shell, key);
+        }
     });
 
-    panels.forEach((panel) => {
-        panel.classList.toggle("active", panel.getAttribute("data-dashboard-tab-panel") === tabKey);
-    });
-
-    persistActiveTabKey(shell, tabKey);
+    const active = tabs.activeKey;
+    if (active) {
+        void ensureProjectDashboardTabPanelLoaded(shell, active);
+    }
 }
 
 // ---------------------------------------------------------------------------
-// Lazy-load a tab panel (delegates to dashboard.js loadDashboardPanel)
-// Only loads the panel that has `data-dashboard-panel` on it; the tab panel
-// element itself carries both `data-dashboard-tab-panel` and `data-dashboard-panel`.
+// Souhrnný pás
 // ---------------------------------------------------------------------------
 
-async function ensureProjectDashboardTabPanelLoaded(shell, tabKey) {
-    const tabPanel = resolveTabPanel(shell, tabKey);
-    if (!(tabPanel instanceof HTMLElement)) {
-        return false;
+async function loadSouhrn(shell) {
+    const host = shell.querySelector("[data-dashboard-souhrn]");
+    if (!(host instanceof HTMLElement)) {
+        return;
     }
+    const url = (host.dataset.url || "").trim();
+    if (!url) {
+        host.replaceChildren();
+        return;
+    }
+    try {
+        host.innerHTML = await fetchHtmlFragment(url);
+    }
+    catch {
+        // Pás je doplněk: bez něj záložky fungují dál, prázdný kontejner se skryje (:empty).
+        host.replaceChildren();
+    }
+}
 
-    // Each tab-panel is also a dashboard-panel — delegate to the shared loader.
-    if (!tabPanel.hasAttribute("data-dashboard-panel")) {
-        return false;
+async function activateSouhrnTarget(shell, cil) {
+    const tabs = resolveTabs(shell);
+    if (!(tabs instanceof HTMLElement) || typeof tabs.setActive !== "function") {
+        return;
     }
-
-    // Skip if already loaded (data-dashboard-panel-loaded set after first fetch)
-    if (tabPanel.dataset.dashboardPanelLoaded === "true") {
-        return true;
+    tabs.setActive(cil.tab);
+    const ok = await ensureProjectDashboardTabPanelLoaded(shell, cil.tab);
+    if (!ok) {
+        return;
     }
-
-    const ok = await loadDashboardPanel(tabPanel);
-    if (ok) {
-        tabPanel.dataset.dashboardPanelLoaded = "true";
+    if (cil.tab === "zaznamy" && cil.filter) {
+        applyCategoryFilter(shell, cil.filter);
     }
-    return ok;
+    shell.dispatchEvent(new CustomEvent("pm:dashboard-filter", {
+        bubbles: true,
+        detail: { panel: cil.tab, filter: cil.filter }
+    }));
 }
 
 // ---------------------------------------------------------------------------
-// Category filter
+// Filtr kategorií v záložce Záznamy
 // ---------------------------------------------------------------------------
 
 function applyCategoryFilter(shell, category) {
-    // Update active button
     shell.querySelectorAll("[data-dashboard-category-filter]").forEach((btn) => {
         if (!(btn instanceof HTMLElement)) {
             return;
@@ -115,7 +143,6 @@ function applyCategoryFilter(shell, category) {
         btn.classList.toggle("active", btnCategory === category);
     });
 
-    // Filter table rows
     shell.querySelectorAll("[data-dashboard-expandable-row]").forEach((row) => {
         if (!(row instanceof HTMLElement)) {
             return;
@@ -124,7 +151,6 @@ function applyCategoryFilter(shell, category) {
         const visible = !category || rowCategory === category;
         row.hidden = !visible;
 
-        // If we are hiding a row, also hide its detail row
         const recordId = row.dataset.recordId || "";
         if (recordId) {
             const detail = shell.querySelector(`[data-dashboard-expandable-detail="${CSS.escape(recordId)}"]`);
@@ -137,7 +163,7 @@ function applyCategoryFilter(shell, category) {
 }
 
 // ---------------------------------------------------------------------------
-// Expandable rows
+// Rozbalovací řádky
 // ---------------------------------------------------------------------------
 
 function toggleExpandableRow(row) {
@@ -166,11 +192,11 @@ function toggleExpandableRow(row) {
 }
 
 // ---------------------------------------------------------------------------
-// Year selector (statistics panel reload)
+// Výběr roku ve Statistikách (legacy panel do přestavby Statistik)
 // ---------------------------------------------------------------------------
 
 async function reloadStatisticsPanel(shell, year) {
-    const panel = shell.querySelector('[data-dashboard-tab-panel="statistiky"]');
+    const panel = resolveTabPanel(shell, "statistiky");
     if (!(panel instanceof HTMLElement)) {
         return;
     }
@@ -195,9 +221,7 @@ async function reloadStatisticsPanel(shell, year) {
     try {
         content.innerHTML = await fetchHtmlFragment(url.href);
         setLazyLoadingState(panel, placeholder, errorContainer, false);
-        if (content.dispatchEvent) {
-            content.dispatchEvent(new CustomEvent("pm:panel-loaded", { bubbles: true, detail: { url: url.href } }));
-        }
+        content.dispatchEvent(new CustomEvent("pm:panel-loaded", { bubbles: true, detail: { url: url.href } }));
     }
     catch {
         setLazyLoadingState(panel, placeholder, errorContainer, false);
@@ -216,46 +240,12 @@ export function initProjectDashboardShell() {
     }
 
     shell.dataset.projectDashboardReady = "true";
-
-    const tabs = resolveTabButtons(shell);
-    if (tabs.length === 0) {
-        return;
-    }
-
-    // Determine which tab to activate: prefer persisted, fall back to first
-    const firstTabKey = tabs[0].getAttribute("data-dashboard-tab") || "";
-    const persistedTabKey = resolveActiveTabKey(shell);
-    const availableKeys = new Set(tabs.map((t) => t.getAttribute("data-dashboard-tab")));
-
-    const tabToActivate = persistedTabKey && availableKeys.has(persistedTabKey)
-        ? persistedTabKey
-        : firstTabKey;
-
-    setActiveProjectDashboardTab(shell, tabToActivate);
-
-    // Load only the active panel immediately; others are loaded on first activation
-    void ensureProjectDashboardTabPanelLoaded(shell, tabToActivate);
-
-    // Wire up tab click handlers
-    tabs.forEach((tab) => {
-        if (!(tab instanceof HTMLElement) || tab.dataset.projectDashboardTabReady === "true") {
-            return;
-        }
-        tab.dataset.projectDashboardTabReady = "true";
-
-        tab.addEventListener("click", () => {
-            const key = tab.getAttribute("data-dashboard-tab") || "";
-            if (!key) {
-                return;
-            }
-            setActiveProjectDashboardTab(shell, key);
-            void ensureProjectDashboardTabPanelLoaded(shell, key);
-        });
-    });
+    void initTabs(shell);
+    void loadSouhrn(shell);
 }
 
 // ---------------------------------------------------------------------------
-// Public: click handler (called from bootstrap handleDocumentClick)
+// Public: click handler (volá bootstrap handleDocumentClick)
 // ---------------------------------------------------------------------------
 
 export function handleProjectDashboardClick(target) {
@@ -268,7 +258,15 @@ export function handleProjectDashboardClick(target) {
         return false;
     }
 
-    // Category filter button
+    const tile = target.closest("[data-souhrn-tab]");
+    if (tile instanceof HTMLElement) {
+        const cil = resolveSouhrnCil(tile.dataset);
+        if (cil) {
+            void activateSouhrnTarget(shell, cil);
+        }
+        return true;
+    }
+
     const categoryFilterBtn = target.closest("[data-dashboard-category-filter]");
     if (categoryFilterBtn instanceof HTMLElement) {
         const category = categoryFilterBtn.getAttribute("data-dashboard-category-filter") ?? "";
@@ -276,11 +274,10 @@ export function handleProjectDashboardClick(target) {
         return true;
     }
 
-    // Expandable row toggle
     const expandableRow = target.closest("[data-dashboard-expandable-row]");
     if (expandableRow instanceof HTMLElement) {
-        // Don't expand when clicking a link or button inside the row
-        if (target.closest("a, button")) {
+        // Klik na odkaz nebo tlačítko v řádku řádek nerozbaluje.
+        if (target.closest("a, button, pm-button")) {
             return false;
         }
         toggleExpandableRow(expandableRow);
@@ -291,7 +288,7 @@ export function handleProjectDashboardClick(target) {
 }
 
 // ---------------------------------------------------------------------------
-// Public: change handler (called from bootstrap handleDocumentChange)
+// Public: change handler (volá bootstrap handleDocumentChange)
 // ---------------------------------------------------------------------------
 
 export function handleProjectDashboardChange(target) {

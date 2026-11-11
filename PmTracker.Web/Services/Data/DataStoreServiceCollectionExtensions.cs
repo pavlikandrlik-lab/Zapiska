@@ -174,6 +174,7 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<PmTracker.Web.Services.Vyzvy.IVyzvyPanelBuilder>(sp => sp.GetRequiredService<PmTracker.Web.Services.Vyzvy.VyzvyPanelBuilder>());
         services.AddScoped<PmTracker.Web.Services.Vyzvy.IVyzvaExportBuilder, PmTracker.Web.Services.Vyzvy.VyzvaExportBuilder>();
         services.AddScoped<IProjectDashboardService, ProjectDashboardService>();
+        services.AddScoped<DashboardSouhrnService>();
         // Základní report — rámec grafů. Chart-providery (konkrétní grafy) se registrují níže.
         services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniDatasetLoader,
             PmTracker.Web.Services.ProjectDashboard.Zakladni.ZakladniDatasetLoader>();

@@ -1,0 +1,337 @@
+/* ==========================================================================
+   Projektový dashboard — shell, souhrnný pás, stavy panelů
+   (spec 2026-10-15 §8, §12). Barvy jen gov sémantické tokeny, nosný layout
+   jen flex/flex-wrap (Edge na i15). Importováno z site.css.
+   ========================================================================== */
+
+.pd-shell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-l);
+    width: 100%;
+    padding: 0 var(--pm-spacing-l) var(--pm-spacing-xl);
+}
+
+/* --- Hlavička ----------------------------------------------------------- */
+
+.pd-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--pm-spacing-m);
+    padding-top: var(--pm-spacing-s);
+}
+
+.pd-header__main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-xs);
+    flex: 1 1 320px;
+    min-width: 0;
+}
+
+.pd-header__title {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1.2;
+    font-weight: var(--pm-font-weight-bold);
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+
+.pd-header__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--pm-spacing-xs);
+}
+
+.pd-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 10px;
+    border: 1px solid var(--border-primary);
+    border-radius: var(--pm-radius-round);
+    background: var(--background-primary-subtlest);
+    color: var(--text-primary-color);
+    font-size: var(--pm-font-size-s);
+    font-weight: var(--pm-font-weight-semibold);
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.pd-chip--muted {
+    border-color: var(--border-subtle);
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+a.pd-chip--muted:hover {
+    color: var(--text-primary-color);
+    border-color: var(--border-primary);
+}
+
+/* --- Souhrnný pás --------------------------------------------------------
+   Jediný výrazný prvek stránky: čtyři dlaždice provozního stavu. Stav nese
+   levý akcentní pruh + ikona + text pro čtečky — nikdy jen barva. */
+
+.pd-souhrn {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--pm-spacing-m);
+}
+
+.pd-souhrn:empty {
+    display: none;
+}
+
+.pd-tile {
+    flex: 1 1 200px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--pm-spacing-m) var(--pm-spacing-l);
+    background: var(--background-block-primary);
+    border: 1px solid var(--border-subtle);
+    border-left-width: 4px;
+    border-radius: var(--pm-radius-m);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: left;
+}
+
+button.pd-tile {
+    cursor: pointer;
+}
+
+button.pd-tile:hover {
+    background: var(--background-block-secondary);
+    color: var(--text-primary);
+}
+
+button.pd-tile:focus-visible {
+    outline: 2px solid var(--border-primary);
+    outline-offset: 2px;
+}
+
+.pd-tile__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pm-spacing-s);
+}
+
+.pd-tile__value {
+    font-size: 32px;
+    line-height: 1.1;
+    font-weight: var(--pm-font-weight-bold);
+    font-variant-numeric: tabular-nums;
+}
+
+.pd-tile__label {
+    font-size: var(--pm-font-size-m);
+    font-weight: var(--pm-font-weight-semibold);
+}
+
+.pd-tile__extra {
+    font-size: var(--pm-font-size-s);
+    color: var(--text-secondary);
+}
+
+.pd-tile__icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+}
+
+.pd-tile__icon gov-icon {
+    width: 20px;
+    height: 20px;
+    top: 0;
+}
+
+.pd-tile--ok {
+    border-left-color: var(--border-success);
+}
+
+.pd-tile--ok .pd-tile__value {
+    color: var(--text-secondary);
+}
+
+.pd-tile--ok .pd-tile__icon gov-icon {
+    color: var(--icon-success);
+}
+
+.pd-tile--varovani {
+    border-left-color: var(--border-warning);
+}
+
+.pd-tile--varovani .pd-tile__icon gov-icon {
+    color: var(--icon-warning);
+}
+
+.pd-tile--kriticke {
+    border-left-color: var(--border-error);
+}
+
+.pd-tile--kriticke .pd-tile__value {
+    color: var(--text-status-error);
+}
+
+.pd-tile--kriticke .pd-tile__icon gov-icon {
+    color: var(--icon-error);
+}
+
+.pd-tile--nedostupne .pd-tile__value {
+    color: var(--text-tertiary);
+}
+
+.pd-tile--nedostupne .pd-tile__icon gov-icon {
+    color: var(--icon-neutral);
+}
+
+/* Kostra během načítání */
+.pd-tile--skeleton {
+    min-height: 92px;
+    gap: var(--pm-spacing-s);
+}
+
+.pd-tile__skeleton-number,
+.pd-tile__skeleton-label {
+    display: block;
+    border-radius: var(--pm-radius-s);
+    background: var(--background-neutral-subtle);
+}
+
+.pd-tile__skeleton-number {
+    width: 48px;
+    height: 32px;
+}
+
+.pd-tile__skeleton-label {
+    width: 70%;
+    height: 14px;
+}
+
+/* --- Záložky a panely ---------------------------------------------------- */
+
+.pd-panel__placeholder {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-s);
+    padding: var(--pm-spacing-m) 0;
+}
+
+.pd-empty-note {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+/* Stavová karta panelu: chyba, bez napojení, prázdno. */
+.pd-state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--pm-spacing-m);
+    padding: var(--pm-spacing-l);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--pm-radius-m);
+    background: var(--background-block-primary);
+}
+
+.pd-state gov-icon {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    top: 0;
+    color: var(--icon-neutral);
+}
+
+.pd-state--error {
+    border-color: var(--border-error);
+    background: var(--background-status-error-subtlest);
+}
+
+.pd-state--error gov-icon {
+    color: var(--icon-error);
+}
+
+.pd-state--ok gov-icon {
+    color: var(--icon-success);
+}
+
+.pd-state__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pm-spacing-2xs);
+    flex: 1 1 280px;
+    min-width: 0;
+}
+
+.pd-state__title {
+    margin: 0;
+    font-weight: var(--pm-font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.pd-state__text {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.pd-state__action {
+    align-self: center;
+    padding: 6px 14px;
+    border: 1px solid var(--border-primary);
+    border-radius: var(--pm-radius-s);
+    background: var(--background-block-primary);
+    color: var(--text-primary-color);
+    font: inherit;
+    font-weight: var(--pm-font-weight-semibold);
+    cursor: pointer;
+}
+
+.pd-state__action:hover {
+    background: var(--background-primary-subtlest);
+}
+
+.pd-state__action:focus-visible {
+    outline: 2px solid var(--border-primary);
+    outline-offset: 2px;
+}
+
+/* --- Úzká obrazovka ------------------------------------------------------ */
+
+@media (max-width: 576px) {
+    .pd-shell {
+        padding: 0 var(--pm-spacing-m) var(--pm-spacing-l);
+    }
+
+    .pd-header__title {
+        font-size: 22px;
+    }
+
+    .pd-tile {
+        flex-basis: 140px;
+        padding: var(--pm-spacing-s) var(--pm-spacing-m);
+    }
+
+    .pd-tile__value {
+        font-size: 26px;
+    }
+}
+
+/* --- Tisk: souhrnný pás a záložky pryč, tiskne se aktivní panel ----------- */
+
+@media print {
+    .pd-souhrn,
+    .pd-shell pm-tab-list,
+    .pd-shell pm-button {
+        display: none !important;
+    }
+
+    .pd-shell {
+        padding: 0;
+    }
+}

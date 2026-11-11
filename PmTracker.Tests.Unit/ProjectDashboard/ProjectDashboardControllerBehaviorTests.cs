@@ -113,7 +113,8 @@ public sealed class ProjectDashboardControllerBehaviorTests
             NullLoggerFactory.Instance,
             service,
             new PmTracker.Web.Services.Export.NesPanelExcelExportService(),
-            new ZakladniReportBuilder(new NullDatasetLoader(), System.Array.Empty<IZakladniChartProvider>()))
+            new ZakladniReportBuilder(new NullDatasetLoader(), System.Array.Empty<IZakladniChartProvider>()),
+            new DashboardSouhrnService(service, new Moq.Mock<PmTracker.Web.Services.ServiceDesk.Prodleni.IProdleniService>().Object))
         {
             ControllerContext = new ControllerContext
             {
@@ -196,6 +197,7 @@ public sealed class ProjectDashboardControllerBehaviorTests
                 RecordsPanelUrl = $"/projekty/{projectId}/dashboard/records-panel",
                 NesPanelUrl = $"/projekty/{projectId}/dashboard/nes-panel",
                 StatisticsPanelUrl = $"/projekty/{projectId}/dashboard/statistics-panel",
+                SouhrnUrl = $"/projekty/{projectId}/dashboard/souhrn",
                 BackUrl = $"/projekty/detail/{projectId}"
             });
         }

@@ -3,11 +3,38 @@ namespace PmTracker.Web.Models.ViewModels;
 public sealed class ProjectDashboardPageViewModel : BaseViewModel
 {
     public required ProjektHeaderViewModel Projekt { get; init; }
-    public string ActiveTab { get; set; } = "zaznamy";
+
+    /// <summary>Záložka vynucená odkazem <c>?dashTab=</c>; null = rozhodne uložený stav pm-tabs.</summary>
+    public string? ActiveTab { get; set; }
+
     public required string RecordsPanelUrl { get; init; }
     public required string NesPanelUrl { get; init; }
     public required string StatisticsPanelUrl { get; init; }
+    public required string SouhrnUrl { get; init; }
     public required string BackUrl { get; init; }
+
+    /// <summary>Zkratka napojeného IS (chip v hlavičce); null = projekt bez napojení.</summary>
+    public string? IsZkratka { get; init; }
+
+    /// <summary>Kde se nastavuje IS projektu (editační modal v přehledu projektů) — chip „bez napojení na IS".</summary>
+    public string NastaveniIsUrl { get; init; } = "/Projekty";
+}
+
+/// <summary>Stav dlaždice souhrnného pásu — určuje akcentní barvu i ikonu.</summary>
+public enum SouhrnStav { Ok, Varovani, Kriticke, Nedostupne }
+
+/// <summary>Dlaždice souhrnného pásu dashboardu (spec 2026-10-15 §8).</summary>
+/// <param name="Klic">ukoly-po-terminu | ceka-na-skutecnost | tickety-v-prodleni | hrozi-prodleni</param>
+/// <param name="Hodnota">Velké číslo; null = data nejsou k dispozici (zobrazí se „—").</param>
+/// <param name="Doplnek">Text vedle čísla, např. „38 dní".</param>
+/// <param name="CilovaZalozka">Klíč pm-tab, na který klik přepne.</param>
+/// <param name="CilovyFiltr">Filtr, který se po načtení záložky nastaví.</param>
+public sealed record SouhrnDlazdice(string Klic, int? Hodnota, string Popisek, string? Doplnek, SouhrnStav Stav,
+    string CilovaZalozka, string? CilovyFiltr);
+
+public sealed class DashboardSouhrnViewModel
+{
+    public IReadOnlyList<SouhrnDlazdice> Dlazdice { get; init; } = [];
 }
 
 public enum DashboardRecordCategory

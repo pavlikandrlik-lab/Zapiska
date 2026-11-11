@@ -20,6 +20,7 @@ public sealed class ProjectDashboardController : BaseController
     private readonly IProjectDashboardService _dashboardService;
     private readonly INesPanelExcelExportService _nesExcelExport;
     private readonly ZakladniReportBuilder _reportBuilder;
+    private readonly DashboardSouhrnService _souhrnService;
     private readonly TimeProvider _timeProvider;
 
     public ProjectDashboardController(
@@ -28,12 +29,14 @@ public sealed class ProjectDashboardController : BaseController
         ILoggerFactory loggerFactory,
         IProjectDashboardService dashboardService,
         INesPanelExcelExportService nesExcelExport,
-        ZakladniReportBuilder reportBuilder)
+        ZakladniReportBuilder reportBuilder,
+        DashboardSouhrnService souhrnService)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _dashboardService = dashboardService;
         _nesExcelExport = nesExcelExport;
         _reportBuilder = reportBuilder;
+        _souhrnService = souhrnService;
         _timeProvider = timeProvider;
     }
 
@@ -55,6 +58,23 @@ public sealed class ProjectDashboardController : BaseController
         // Dashboard je podúroveň konkrétního projektu: Projekty › [projekt] › Dashboard.
         SetProjectBreadcrumbs(projektId, model.Projekt.Nazev, model.Projekt.Zkratka, currentText: "Dashboard");
         return View(model);
+    }
+
+    /// <summary>
+    /// Souhrnný pás (spec 2026-10-15 §8): dlaždice podle oprávnění k záložkám, lazy-load po načtení stránky.
+    /// </summary>
+    [HttpGet("souhrn")]
+    [Authorize(Policy = "permission:dashboard.view")]
+    public async Task<IActionResult> Souhrn(int projektId, CancellationToken ct = default)
+    {
+        if (!await EnsureDashboardAccessAsync(projektId, ct))
+        {
+            return Forbid();
+        }
+
+        var localNow = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).DateTime;
+        var model = await _souhrnService.BuildAsync(projektId, CurrentUserContext, localNow, ct);
+        return PartialView("~/Views/ProjectDashboard/_Souhrn.cshtml", model);
     }
 
     [HttpGet("records-panel")]

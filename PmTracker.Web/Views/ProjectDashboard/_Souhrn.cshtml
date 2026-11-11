@@ -1,0 +1,44 @@
+@model DashboardSouhrnViewModel
+@*
+    Souhrnný pás dashboardu (spec 2026-10-15 §8). Stav nese akcentní pruh, ikona i text pro čtečky —
+    nikdy jen barva. Klik na dlaždici přepne záložku a nastaví filtr (projectDashboard.js + souhrnCil.js).
+*@
+@foreach (var d in Model.Dlazdice)
+{
+    var (stav, stavText) = d.Stav switch
+    {
+        SouhrnStav.Ok => ("ok", "V pořádku"),
+        SouhrnStav.Varovani => ("varovani", "Pozor"),
+        SouhrnStav.Kriticke => ("kriticke", "Vyžaduje pozornost"),
+        _ => ("nedostupne", "Data nejsou k dispozici"),
+    };
+    <button type="button" class="pd-tile pd-tile--@stav" data-souhrn-klic="@d.Klic" data-souhrn-tab="@d.CilovaZalozka" data-souhrn-filter="@d.CilovyFiltr">
+        <span class="pd-tile__head">
+            <span class="pd-tile__value">@(d.Hodnota?.ToString() ?? "—")</span>
+            <span class="pd-tile__icon">
+                @* Ikony doslovně — GovIconReferencesTests ověřuje existenci souborů. *@
+                @switch (d.Stav)
+                {
+                    case SouhrnStav.Ok:
+                        <gov-icon size="s" name="check-circle-fill" type="components" aria-hidden="true"></gov-icon>
+                        break;
+                    case SouhrnStav.Varovani:
+                        <gov-icon size="s" name="clock" type="components" aria-hidden="true"></gov-icon>
+                        break;
+                    case SouhrnStav.Kriticke:
+                        <gov-icon size="s" name="exclamation-triangle-fill" type="components" aria-hidden="true"></gov-icon>
+                        break;
+                    default:
+                        <gov-icon size="s" name="info-circle" type="components" aria-hidden="true"></gov-icon>
+                        break;
+                }
+            </span>
+        </span>
+        <span class="pd-tile__label">@d.Popisek</span>
+        @if (!string.IsNullOrEmpty(d.Doplnek))
+        {
+            <span class="pd-tile__extra">@d.Doplnek</span>
+        }
+        <span class="app-sr-only">@stavText</span>
+    </button>
+}

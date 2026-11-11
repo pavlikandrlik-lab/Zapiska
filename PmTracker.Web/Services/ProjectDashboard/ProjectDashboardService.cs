@@ -24,30 +24,36 @@ public sealed class ProjectDashboardService : IProjectDashboardService
 
     public async Task<ProjectDashboardPageViewModel> BuildDashboardPageAsync(int projectId, CancellationToken ct = default)
     {
-        var projekt = await _dbContext.Projekty.AsNoTracking()
+        var radek = await _dbContext.Projekty.AsNoTracking()
             .Where(p => p.Id == projectId)
             .Join(_dbContext.CiselnikStavuProjektu.AsNoTracking(), p => p.StavId, s => s.Id, (p, s) => new { p, s })
-            .Select(x => new ProjektHeaderViewModel
+            .Select(x => new
             {
-                Id = x.p.Id,
-                Nazev = x.p.CelyNazev,
-                Zkratka = x.p.Zkratka,
-                Stav = x.s.Nazev
+                Header = new ProjektHeaderViewModel
+                {
+                    Id = x.p.Id,
+                    Nazev = x.p.CelyNazev,
+                    Zkratka = x.p.Zkratka,
+                    Stav = x.s.Nazev
+                },
+                x.p.ServiceDeskInfoSystemId
             })
             .FirstOrDefaultAsync(ct);
 
-        if (projekt is null)
+        if (radek is null)
         {
             throw new InvalidOperationException($"Projekt s ID {projectId} nebyl nalezen.");
         }
 
         return new ProjectDashboardPageViewModel
         {
-            Projekt = projekt,
+            Projekt = radek.Header,
             RecordsPanelUrl = $"/projekty/{projectId}/dashboard/records-panel",
             NesPanelUrl = $"/projekty/{projectId}/dashboard/nes-panel",
             StatisticsPanelUrl = $"/projekty/{projectId}/dashboard/statistics-panel",
-            BackUrl = $"/Projekty/Detail/{projectId}"
+            SouhrnUrl = $"/projekty/{projectId}/dashboard/souhrn",
+            BackUrl = $"/Projekty/Detail/{projectId}",
+            IsZkratka = radek.ServiceDeskInfoSystemId is int isId ? SdInfoSystemy.ById(isId)?.Zkratka : null
         };
     }
 
