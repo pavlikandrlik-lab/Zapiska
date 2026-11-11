@@ -133,8 +133,17 @@ async function activateSouhrnTarget(shell, cil) {
 // Filtr kategorií v záložce Záznamy
 // ---------------------------------------------------------------------------
 
+// Filtr kategorií patří jen panelu Záznamů — řádky NES v prodlení sdílejí rozbalovací mechanismus
+// (data-dashboard-expandable-row), ale filtr kategorie na ně nesmí sáhnout.
+const RECORDS_PANEL = '[data-dashboard-panel="records"]';
+
 function applyCategoryFilter(shell, category) {
-    shell.querySelectorAll("[data-dashboard-category-filter]").forEach((btn) => {
+    const panel = shell.querySelector(RECORDS_PANEL);
+    if (!(panel instanceof HTMLElement)) {
+        return;
+    }
+
+    panel.querySelectorAll("[data-dashboard-category-filter]").forEach((btn) => {
         if (!(btn instanceof HTMLElement)) {
             return;
         }
@@ -144,7 +153,7 @@ function applyCategoryFilter(shell, category) {
         btn.setAttribute("aria-pressed", active ? "true" : "false");
     });
 
-    shell.querySelectorAll("[data-dashboard-expandable-row]").forEach((row) => {
+    panel.querySelectorAll("[data-dashboard-expandable-row]").forEach((row) => {
         if (!(row instanceof HTMLElement)) {
             return;
         }

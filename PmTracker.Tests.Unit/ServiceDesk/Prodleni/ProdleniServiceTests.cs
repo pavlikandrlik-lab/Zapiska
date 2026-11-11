@@ -59,6 +59,21 @@ public sealed class ProdleniServiceTests
     private readonly FakeQuery _query = new();
     private readonly ZachytavaciLogger _log = new();
     private int _dalsiWfId = 1;
+    private readonly FakeTimeProvider _cas = NovyCas();
+
+    private static FakeTimeProvider NovyCas()
+    {
+        var time = new FakeTimeProvider(new DateTimeOffset(Ted, TimeSpan.Zero));
+        time.SetLocalTimeZone(TimeZoneInfo.Utc);
+        return time;
+    }
+
+#pragma warning disable CS0618 // MemoryCacheOptions.Clock je jediná cesta, jak cache posunout v čase testu.
+    private sealed class HodinyCache(TimeProvider time) : Microsoft.Extensions.Internal.ISystemClock
+    {
+        public DateTimeOffset UtcNow => time.GetUtcNow();
+    }
+#pragma warning restore CS0618
 
     private ProdleniService Sluzba(int? isProjektu = IsId)
     {
@@ -67,10 +82,9 @@ public sealed class ProdleniServiceTests
         db.Projekty.Add(new ProjektEntity { Id = ProjektId, Zkratka = "P10", CelyNazev = "Projekt", StavId = 1, ServiceDeskInfoSystemId = isProjektu });
         db.SaveChanges();
 
-        var time = new FakeTimeProvider(new DateTimeOffset(Ted, TimeSpan.Zero));
-        time.SetLocalTimeZone(TimeZoneInfo.Utc);
+        var time = _cas;
         return new ProdleniService(db, _query, new PenaltyCalculator(new CeskeSvatky(), time), time,
-            new MemoryCache(new MemoryCacheOptions()), _log);
+            new MemoryCache(new MemoryCacheOptions { Clock = new HodinyCache(time) }), _log);
     }
 
     private void Ticket(int id, string typ, string? dulezitost, params WorkflowUdalostDto[] udalosti)
@@ -255,8 +269,24 @@ public sealed class ProdleniServiceTests
 
         p.Stav.Should().Be(ProdleniStavDat.Nedostupne);
         p.IsId.Should().Be(IsId);
-        _query.VolaniTicketu.Should().Be(2, "chybový stav se necachuje");
+        _query.VolaniTicketu.Should().Be(1,
+            "výpadek se krátce pamatuje — souhrn, panel a Statistiky by jinak každý čekaly na timeout SQL");
         _log.Varovani.Should().Contain(v => v.Contains(IsId.ToString()));
+    }
+
+    [Fact]
+    public async Task Vypadek_se_po_minute_zkusi_znovu()
+    {
+        _query.Vyhod = new InvalidOperationException("SQL timeout");
+        var sluzba = Sluzba();
+        await sluzba.GetPrehledAsync(ProjektId, default);
+
+        _query.Vyhod = null;
+        _cas.Advance(TimeSpan.FromSeconds(61));
+        var p = await sluzba.GetPrehledAsync(ProjektId, default);
+
+        p.Stav.Should().Be(ProdleniStavDat.Ok, "po vypršení krátké paměti výpadku se databáze zkusí znovu");
+        _query.VolaniTicketu.Should().Be(2);
     }
 
     [Fact]
@@ -271,5 +301,22 @@ public sealed class ProdleniServiceTests
         _query.PosledniAktivniOd.Should().Be(new DateTime(2026, 1, 1));
         p.Otevrene.Select(o => o.TicketId).Should().Equal(100001);
         p.Penalizace.Select(x => x.TicketId).Should().BeEquivalentTo([100001, 100002]);
+    }
+
+    [Fact]
+    public async Task Archivovany_ticket_u_dodavatele_neni_v_prodleni_a_penale_konci_archivaci()
+    {
+        // Archivován bez převzetí (U5 po U1): obrátka zůstala „otevřená". Bez ořezu by penále rostlo každý den až do dneška.
+        _query.Tickety.Add(new ProdleniTicketDto(100003, "P3", "PMP", null, null, "R_EIS", "Dodavatel A", "archiv", null, 5003, null));
+        _query.Workflow[5003] = [U(1, "2026-02-02 10:00", "2026-02-05 23:59:59", "Dodavatel A"), U(5, "2026-02-20 09:00")];
+
+        var p = await Sluzba().GetPrehledProObdobiAsync(ProjektId, new DateTime(2026, 1, 1), default);
+
+        p.VProdleni.Should().BeEmpty("archivovaný ticket není u dodavatele (spec R3: archivované jen do statistik)");
+        p.Hrozi.Should().BeEmpty();
+        var dny = p.Penalizace.Single(x => x.TicketId == 100003).Dny;
+        dny.Should().NotBeEmpty();
+        dny.Max().Should().BeOnOrBefore(new DateTime(2026, 2, 20), "penále končí poslední událostí ticketu, ne dneškem");
+        dny.Should().HaveCount(15, "PMP kalendářní dny 6.–20. 2.");
     }
 }

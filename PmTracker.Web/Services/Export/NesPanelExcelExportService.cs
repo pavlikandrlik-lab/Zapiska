@@ -145,7 +145,7 @@ public sealed class NesPanelExcelExportService : INesPanelExcelExportService
                 {
                     CellReference = Odkaz(_radek, i),
                     DataType = CellValues.String,
-                    CellValue = new CellValue(hodnoty[i] ?? string.Empty)
+                    CellValue = new CellValue(XmlText(hodnoty[i]))
                 });
             }
             sheetData.Append(row);
@@ -162,7 +162,37 @@ public sealed class NesPanelExcelExportService : INesPanelExcelExportService
         public void Cislo(Row row, int sloupec)
             => row.Elements<Cell>().ElementAt(sloupec).DataType = CellValues.Number;
 
-        public void Komentar(Row row, int sloupec, string text) => _komentare.Add((row.RowIndex!.Value, sloupec, text));
+        public void Komentar(Row row, int sloupec, string text) => _komentare.Add((row.RowIndex!.Value, sloupec, XmlText(text)));
+
+        /// <summary>
+        /// Text pro XML 1.0: texty z ServiceDesku (zkopírované z Wordu) nesou svislý tabulátor a jiné řídicí znaky,
+        /// na kterých by OpenXML zápis spadl a celý export by vrátil 500. Mezerové řídicí znaky → mezera, ostatní pryč.
+        /// </summary>
+        private static string XmlText(string? text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return string.Empty;
+            }
+            var sb = new StringBuilder(text.Length);
+            for (var i = 0; i < text.Length; i++)
+            {
+                var c = text[i];
+                if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+                {
+                    sb.Append(c).Append(text[++i]);
+                }
+                else if (System.Xml.XmlConvert.IsXmlChar(c))
+                {
+                    sb.Append(c);
+                }
+                else if (c is '\v' or '\f')
+                {
+                    sb.Append(' ');
+                }
+            }
+            return sb.ToString();
+        }
 
         public void ZapisKomentare(WorksheetPart worksheetPart, uint listId)
         {

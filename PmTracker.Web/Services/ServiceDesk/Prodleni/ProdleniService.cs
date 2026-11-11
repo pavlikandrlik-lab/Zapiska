@@ -24,6 +24,11 @@ public sealed class ProdleniService : IProdleniService
     private const string ArchivStav = "archiv";
     private const string SlaKlic = "prodleni:sla";
     private static readonly TimeSpan PrehledTtl = TimeSpan.FromMinutes(10);
+    /// <summary>
+    /// Výpadek se pamatuje krátce: souhrnný pás, panel NES i Statistiky se ptají současně a každý by jinak
+    /// čekal na timeout SQL. „Zkusit znovu" po minutě už databázi opravdu zkusí.
+    /// </summary>
+    private static readonly TimeSpan VypadekTtl = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan SlaTtl = TimeSpan.FromHours(1);
 
     private readonly PmTrackerDbContext _db;
@@ -77,7 +82,9 @@ public sealed class ProdleniService : IProdleniService
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _log.LogWarning(ex, "Prodlení ticketů nejde spočítat, ServiceDesk neodpovídá (isId={IsId}).", id);
-            return ProdleniPrehled.Prazdny(ProdleniStavDat.Nedostupne, id, zkratka);
+            var vypadek = ProdleniPrehled.Prazdny(ProdleniStavDat.Nedostupne, id, zkratka);
+            _cache.Set(klic, vypadek, VypadekTtl);
+            return vypadek;
         }
     }
 
@@ -105,9 +112,13 @@ public sealed class ProdleniService : IProdleniService
             var input = new PenaltyInput(t.Id, t.TypZaznamu, t.Dulezitost, sla, t.Dodavatel, udalosti);
             var vysledky = _calc.Spocitej(input);
             var (predani, aktualniDodavatel) = PenaltyCalculator.AktualniPredani(udalosti);
-            var uDodavatele = predani is not null;
+            // Archivovaný ticket (jen ve Statistikách za období, spec R3) u dodavatele není, i když archivace
+            // přišla bez převzetí U3. Jeho otevřená obrátka by jinak sbírala penále až do dneška.
+            var archiv = JeArchiv(t.Stav);
+            var uDodavatele = predani is not null && !archiv;
+            var konecArchivu = archiv && udalosti.Count > 0 ? udalosti[^1].Datum.Date : DateTime.MaxValue;
 
-            if (!JeArchiv(t.Stav)) otevrene.Add(new SynchronizovanyTicket(t.Id, t.TypZaznamu, uDodavatele));
+            if (!archiv) otevrene.Add(new SynchronizovanyTicket(t.Id, t.TypZaznamu, uDodavatele));
 
             var chyba = vysledky.FirstOrDefault(r => r.MaChybu);
             if (chyba is not null)
@@ -120,7 +131,8 @@ public sealed class ProdleniService : IProdleniService
             var viceDodavatelu = vysledky.Count > 1;
             foreach (var r in vysledky)
             {
-                if (r.PocetDni > 0) penalizace.Add(new PenalizaceVObdobi(t.Id, r.Dodavatel, r.PenalizovaneDny));
+                var dny = archiv ? r.PenalizovaneDny.Where(d => d.Date <= konecArchivu).ToList() : r.PenalizovaneDny;
+                if (dny.Count > 0) penalizace.Add(new PenalizaceVObdobi(t.Id, r.Dodavatel, dny));
 
                 // V prodlení je jen dodavatel, u kterého ticket právě je.
                 var jeAktualni = uDodavatele && (!viceDodavatelu || r.Dodavatel == aktualniDodavatel);

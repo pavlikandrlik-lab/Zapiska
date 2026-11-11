@@ -345,7 +345,7 @@ Navíc:
 
 ---
 
-## 9. Dashboard projektu — přestavba, NES v prodlení podle ServiceDesku, nové Statistiky
+## 10. Dashboard projektu — přestavba, NES v prodlení podle ServiceDesku, nové Statistiky
 
 **Hotovo 2026-11-11:** merge `MERGE_HASH`, spec `docs/superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md`, plán `docs/superpowers/plans/2026-10-15-dashboard-prestavba-prodleni-statistiky.md`.
 

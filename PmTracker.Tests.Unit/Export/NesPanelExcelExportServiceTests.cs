@@ -127,6 +127,25 @@ public sealed class NesPanelExcelExportServiceTests
     }
 
     [Fact]
+    public void Export_ridici_znaky_z_wordu_neshodi_sesit()
+    {
+        // „Stručně" zkopírované z Wordu nese svislý tabulátor (\v) a jiné znaky, které XML 1.0 nedovoluje.
+        var model = Model();
+        var polozka = model.Prehled.VProdleni[0] with { Strucne = "Chyba\vvýpočtu\b\u0001 sestavy" };
+        model = new ProjectDashboardNesPanelViewModel
+        {
+            Prehled = model.Prehled with { VProdleni = [polozka, model.Prehled.VProdleni[1]] },
+            ProjektId = 1,
+            Nyni = Vygenerovano,
+        };
+
+        using var doc = Otevri(model);
+
+        Tabulka(doc, "V prodlení").Data[0][3].Should().Be("Chyba výpočtu sestavy");
+        new OpenXmlValidator().Validate(doc).Should().BeEmpty();
+    }
+
+    [Fact]
     public void Build_NullModel_Throws()
     {
         var service = new NesPanelExcelExportService();
