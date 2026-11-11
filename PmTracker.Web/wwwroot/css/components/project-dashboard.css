@@ -916,13 +916,11 @@ a.pd-state__action {
     flex-wrap: wrap;
     gap: var(--pm-spacing-2xs) var(--pm-spacing-m);
     margin: var(--pm-spacing-xs) 0 0;
-    padding: 0;
-    list-style: none;
     font-size: var(--pm-font-size-xs);
     color: var(--text-secondary);
 }
 
-.pd-tl__legend li {
+.pd-tl__item {
     display: inline-flex;
     align-items: center;
     gap: var(--pm-spacing-2xs);
@@ -987,6 +985,19 @@ a.pd-state__action {
 
     .pd-tile__value {
         font-size: 26px;
+    }
+}
+
+/* Tabulka se na úzké obrazovce posouvá do stran; rozbalený detail (osa, odůvodnění, kroky) drží
+   šířku okna a zůstává přilepený vlevo, aby se nemusel číst posouváním. */
+@media (max-width: 768px) {
+    .pd-detail__body {
+        position: sticky;
+        left: 0;
+        box-sizing: border-box;
+        max-width: calc(100vw - 96px);
+        padding-left: var(--pm-spacing-m);
+        padding-right: var(--pm-spacing-m);
     }
 }
 

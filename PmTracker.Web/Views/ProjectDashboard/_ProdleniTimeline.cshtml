@@ -59,24 +59,24 @@
         <span>@Den(Model.OsaOd)</span>
         <span>@Den(Model.OsaDo)</span>
     </div>
-    <ul class="pd-tl__legend">
-        <li><span class="pd-tl__key pd-tl__key--obratka"></span>u dodavatele</li>
+    <div class="pd-tl__legend" aria-label="Legenda časové osy">
+        <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--obratka"></span>u dodavatele</span>
         @if (Model.Obratky.Any(o => o.JinyDodavatel))
         {
-            <li><span class="pd-tl__key pd-tl__key--other"></span>u jiného dodavatele</li>
+            <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--other"></span>u jiného dodavatele</span>
         }
         @if (Model.Penale.Count > 0)
         {
-            <li><span class="pd-tl__key pd-tl__key--penale"></span>penalizované dny</li>
+            <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--penale"></span>penalizované dny</span>
         }
         @if (Model.Termin is not null)
         {
-            <li><span class="pd-tl__key pd-tl__key--termin"></span>termín</li>
+            <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--termin"></span>termín</span>
         }
         @if (Model.Prodlouzeni.Count > 0)
         {
-            <li><span class="pd-tl__key pd-tl__key--prodlouzeni"></span>prodloužený termín</li>
+            <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--prodlouzeni"></span>prodloužený termín</span>
         }
-        <li><span class="pd-tl__key pd-tl__key--dnes"></span>dnes</li>
-    </ul>
+        <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--dnes"></span>dnes</span>
+    </div>
 </div>

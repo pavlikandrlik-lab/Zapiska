@@ -88,6 +88,7 @@ VALUES
     ('900106', 0, N'DOD-A', NULL),        -- NES s důležitostí „NES IV" bez SLA → nelze vyhodnotit
     ('900107', 0, N'DOD-B', NULL),        -- PMP přešel od A k B, u B po termínu → řádek B s T00
     (' 900108 ', 0, N'DOD-C', NULL),      -- PNF, external_id s mezerami → páruje se po Trim
+    ('900109', 0, N'DOD-A', NULL),        -- PMP s prodlouženým termínem (U11), po něm stále u dodavatele → v prodlení
     ('ABC-1', 0, NULL, NULL);             -- nečíselné external_id → ignoruje se
 
 INSERT INTO dbo.ticket_external_workflow (id_ticket_external, [date], transfertype, supplier, dt_param)
@@ -105,6 +106,8 @@ JOIN (VALUES
     ('900107', DATEADD(DAY, -27, @dnes),                  3, NULL, NULL),
     ('900107', DATEADD(DAY, -20, @dnes),                  2, N'Dodavatel B a.s.', DATEADD(SECOND, -1, DATEADD(DAY, -4, @dnes))),
     (' 900108 ', DATEADD(DAY, -12, @dnes),                1, N'Dodavatel C', DATEADD(SECOND, -1, DATEADD(DAY, -3, @dnes))),
+    ('900109', DATEADD(DAY, -25, @dnes),                  1, N'Dodavatel A s.r.o.', DATEADD(SECOND, -1, DATEADD(DAY, -14, @dnes))),
+    ('900109', DATEADD(DAY, -16, @dnes),                  11, N'Dodavatel A s.r.o.', DATEADD(SECOND, -1, DATEADD(DAY, -5, @dnes))),
     ('ABC-1', DATEADD(DAY, -12, @dnes),                   1, N'Dodavatel C', NULL)
 ) v(eid, d, typ, dod, param) ON v.eid = t.external_id;
 

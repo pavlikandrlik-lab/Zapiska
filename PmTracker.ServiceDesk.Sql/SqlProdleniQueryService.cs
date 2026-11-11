@@ -36,12 +36,10 @@ public sealed partial class SqlProdleniQueryService : IProdleniQueryService
 
         var vcetneArchivu = aktivniOd is not null;
         // Ticket bez HOT_ZAZNAMY.id je mimo rozsah PM Trackeru (paměť feedback_sd_ticket_id_required).
-        var zaznamy = await _intranet.HotZaznamy
-            .Where(z => z.Id != null && z.Id != ""
-                     && z.Modul != null && moduly.Contains(z.Modul)
-                     && (vcetneArchivu || z.Stav != ArchivStav))
+        var zaznamy = await ZaznamyIs(_intranet.HotZaznamy, moduly, vcetneArchivu)
             .Select(z => new { z.Id, z.Pid, z.TypZaznamu, z.Strucne, z.Dulezitost, z.Modul, z.Dodavatel, z.Stav, z.Datum })
             .ToListAsync(ct);
+        zaznamy.RemoveAll(z => string.IsNullOrEmpty(z.Id));
         if (zaznamy.Count == 0) return [];
 
         var externi = await TicketExternalPodleIdAsync(zaznamy.Select(z => z.Id).Distinct().ToList(), ct);
@@ -107,11 +105,11 @@ public sealed partial class SqlProdleniQueryService : IProdleniQueryService
         if (moduly.Count == 0) return [];
 
         // I archivované tickety: akceptace v období patří do období bez ohledu na dnešní stav ticketu.
-        var ticketIds = await _intranet.HotZaznamy
-            .Where(z => z.Id != null && z.Id != "" && z.Modul != null && moduly.Contains(z.Modul))
+        var ticketIds = await ZaznamyIs(_intranet.HotZaznamy, moduly, vcetneArchivu: true)
             .Select(z => z.Id)
             .Distinct()
             .ToListAsync(ct);
+        ticketIds.RemoveAll(string.IsNullOrEmpty);
 
         var kalkulace = new List<(long Id, string Pid, string? Akceptace, DateTime? DatumAkceptace, decimal? Cena)>();
         foreach (var chunk in ticketIds.Chunk(Chunk))
@@ -138,6 +136,18 @@ public sealed partial class SqlProdleniQueryService : IProdleniQueryService
             .ToList();
     }
 
+    /// <summary>
+    /// Tickety modulů IS, které mají číslo (ticket bez HOT_ZAZNAMY.id je mimo rozsah PM Trackeru).
+    /// Sloupec <c>id</c> je INT NULL a převodník ho čte jako text (NULL → ""). Do dotazu proto patří jen
+    /// <c>Id != null</c>: porovnání s "" převodník přeloží na <c>[id] &lt;&gt; NULL</c>, což není nikdy pravda
+    /// a dotaz by na SQL Serveru nevrátil nic. Prázdné číslo (InMemory testy) odfiltruje volající v paměti.
+    /// </summary>
+    internal static IQueryable<Entities.HotZaznamEntity> ZaznamyIs(
+        IQueryable<Entities.HotZaznamEntity> zaznamy, IReadOnlyCollection<string> moduly, bool vcetneArchivu)
+        => zaznamy.Where(z => z.Id != null
+                           && z.Modul != null && moduly.Contains(z.Modul)
+                           && (vcetneArchivu || z.Stav != ArchivStav));
+
     private Task<List<string>> ModulyIsAsync(int isId, CancellationToken ct)
         => _intranet.HotModuly.Where(m => m.IdIS == isId).Select(m => m.Zkratka).ToListAsync(ct);
 
@@ -151,8 +161,7 @@ public sealed partial class SqlProdleniQueryService : IProdleniQueryService
         var radky = new List<(int Id, string ExternalId, string? SupplierTag)>();
         foreach (var chunk in cislaTicketu.Chunk(Chunk))
         {
-            var cast = await _sd.TicketExternal
-                .Where(t => chunk.Contains(t.ExternalId.Trim()))
+            var cast = await TicketExternalPodleCisel(_sd.TicketExternal, chunk)
                 .Select(t => new { t.Id, t.ExternalId, t.SupplierTag })
                 .ToListAsync(ct);
             radky.AddRange(cast.Select(t => (t.Id, t.ExternalId.Trim(), t.SupplierTag)));
@@ -167,6 +176,11 @@ public sealed partial class SqlProdleniQueryService : IProdleniQueryService
                 return (prvni.Id, prvni.SupplierTag);
             }, StringComparer.Ordinal);
     }
+
+    /// <summary><c>external_id</c> bývá doplněné mezerami → porovnává se po ořezu na straně serveru.</summary>
+    internal static IQueryable<Entities.TicketExternalEntity> TicketExternalPodleCisel(
+        IQueryable<Entities.TicketExternalEntity> externi, IReadOnlyCollection<string> cislaTicketu)
+        => externi.Where(t => cislaTicketu.Contains(t.ExternalId.Trim()));
 
     private async Task<HashSet<int>> ExterniIdSPredavkouOdAsync(IReadOnlyList<int> externiIds, DateTime od, CancellationToken ct)
     {
