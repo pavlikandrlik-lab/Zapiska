@@ -12,6 +12,8 @@ internal sealed class HotKalkulaceEntity
     public string? Pid { get; set; }
     public string? Akceptace { get; set; }
     public DateTime? Datum { get; set; }
+    /// <summary>datum_akceptace (smalldatetime NULL, ověřeno v sys.columns discovery 2026-04) — Statistiky kalkulací po měsících.</summary>
+    public DateTime? DatumAkceptace { get; set; }
     public decimal? PracnostA { get; set; }
     public decimal? PracnostP { get; set; }
     public decimal? PracnostT { get; set; }

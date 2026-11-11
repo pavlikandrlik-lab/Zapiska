@@ -91,7 +91,7 @@ public sealed class SqlTicketingQueryService : ITicketingQueryService
     /// hodnota se za akceptaci nepovažuje — ServiceDesk stav dopisuje průběžně, takže
     /// nevyplněno znamená „zatím se nic nestalo", ne souhlas.
     /// </summary>
-    private static bool JeAkceptovana(string? akceptace)
+    internal static bool JeAkceptovana(string? akceptace)
     {
         if (string.IsNullOrWhiteSpace(akceptace))
         {
