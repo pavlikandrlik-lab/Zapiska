@@ -38,17 +38,11 @@ public sealed class CommentService(
 
         await EnsureMeetingAllowsCommentChangesAsync(meeting, ct);
 
-        var addContext = await ResolveAddCommentContextAsync(record.ProjektId, record.SubsystemId, currentUser.OsobaId, ct);
         var meetingState = await dbContext.CiselnikStavuJednani
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
-        var canAdd = commentAuthorizationPolicy.CanAddComment(
-            currentUser,
-            record.ProjektId,
-            addContext.SubsystemLeadEquivalentOsobaIds,
-            addContext.IsSubsystemLeadEquivalentInProject,
-            IsDraftMeeting(meetingState));
-        if (!canAdd)
+        var scope = await ResolveCommentScopeAsync(record.ProjektId, record.SubsystemId, IsDraftMeeting(meetingState), ct);
+        if (!commentAuthorizationPolicy.CanAddComment(currentUser, scope))
         {
             throw new InvalidOperationException("Nemáte oprávnění přidat vyjádření k tomuto záznamu.");
         }
@@ -106,7 +100,8 @@ public sealed class CommentService(
         var meetingState = await dbContext.CiselnikStavuJednani
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
-        if (!await CanModifyCommentAsync(comment, record, meetingState, currentUser, ct))
+        var scope = await ResolveCommentScopeAsync(record.ProjektId, record.SubsystemId, IsDraftMeeting(meetingState), ct);
+        if (!commentAuthorizationPolicy.CanEditComment(currentUser, scope, comment.AutorOsobaId))
         {
             throw new InvalidOperationException("Nemáte oprávnění upravit toto vyjádření.");
         }
@@ -154,7 +149,8 @@ public sealed class CommentService(
             var meetingState = await dbContext.CiselnikStavuJednani
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
-            if (!await CanModifyCommentAsync(comment, record, meetingState, currentUser, ct))
+            var scope = await ResolveCommentScopeAsync(record.ProjektId, record.SubsystemId, IsDraftMeeting(meetingState), ct);
+            if (!commentAuthorizationPolicy.CanDeleteComment(currentUser, scope, comment.AutorOsobaId))
             {
                 throw new InvalidOperationException("Nemáte oprávnění smazat toto vyjádření.");
             }
@@ -308,22 +304,6 @@ public sealed class CommentService(
     private DateTime GetUtcNow()
         => timeProvider.GetUtcNow().UtcDateTime;
 
-    private async Task<bool> CanModifyCommentAsync(
-        VyjadreniEntity comment,
-        ProjektovyZaznamEntity record,
-        CiselnikStavuJednaniEntity? meetingState,
-        CurrentUserContextViewModel currentUser,
-        CancellationToken ct)
-    {
-        var subsystemLeadEquivalentOsobaIds = await ResolveLeadEquivalentOsobaIdsAsync(record.ProjektId, record.SubsystemId, ct);
-        return commentAuthorizationPolicy.CanModifyComment(
-            currentUser,
-            record.ProjektId,
-            subsystemLeadEquivalentOsobaIds,
-            comment.AutorOsobaId,
-            IsDraftMeeting(meetingState));
-    }
-
     private async Task EnsureMeetingAllowsCommentChangesAsync(JednaniEntity meeting, CancellationToken ct)
     {
         var status = await dbContext.CiselnikStavuJednani
@@ -360,35 +340,25 @@ public sealed class CommentService(
             return new HashSet<int>();
         }
 
-        var addContext = await ResolveAddCommentContextAsync(record.ProjektId, record.SubsystemId, currentUser.OsobaId, ct);
+        var draftScope = await ResolveCommentScopeAsync(record.ProjektId, record.SubsystemId, isDraftMeeting: true, ct);
+        var openScope = draftScope with { IsDraftMeeting = false };
         return meetings
-            .Where(meeting => commentAuthorizationPolicy.CanAddComment(
-                currentUser,
-                record.ProjektId,
-                addContext.SubsystemLeadEquivalentOsobaIds,
-                addContext.IsSubsystemLeadEquivalentInProject,
-                meeting.IsDraft))
+            .Where(meeting => commentAuthorizationPolicy.CanAddComment(currentUser, meeting.IsDraft ? draftScope : openScope))
             .Select(meeting => meeting.Id)
             .ToHashSet();
     }
 
     /// <summary>
-    /// Vstupy CommentAuthorizationPolicy.CanAddComment — jediné místo výpočtu, sdílené uložením
-    /// i nabídkou jednání ve formuláři. Je osoba vedoucím/zástupcem NĚKTERÉHO subsystému projektu?
-    /// Pak podléhá subsystémovému omezení (jen vlastní subsystém v DRAFT), nehledě na zděděný comments.add.
+    /// Vstup pravidel vyjádření (spec 2026-11-10) — jediné místo výpočtu, sdílené přidáním, úpravou,
+    /// smazáním, nabídkou jednání i příznaky ikon. Osoby subsystémových rolí se berou pro subsystém
+    /// ZÁZNAMU (globální SubsystemId) z ProjectRoleCache.
     /// </summary>
-    private async Task<AddCommentContext> ResolveAddCommentContextAsync(int projektId, int subsystemId, int osobaId, CancellationToken ct)
+    private async Task<CommentScope> ResolveCommentScopeAsync(int projektId, int subsystemId, bool isDraftMeeting, CancellationToken ct)
     {
-        var leadEquivalentBySubsystem = await ResolveLeadEquivalentOsobaIdsBySubsystemAsync(projektId, ct);
-        return new AddCommentContext(
-            leadEquivalentBySubsystem.GetValueOrDefault(subsystemId, []),
-            leadEquivalentBySubsystem.Values.Any(ids => ids.Contains(osobaId)));
+        var subsystemRoleOsobaIds = await projectRoleCache.GetSubsystemRoleOsobaIdsAsync(projektId, subsystemId, ct);
+        var leadEquivalentOsobaIds = await projectRoleCache.GetLeadEquivalentOsobaIdsAsync(projektId, subsystemId, ct);
+        return new CommentScope(projektId, isDraftMeeting, subsystemRoleOsobaIds, leadEquivalentOsobaIds);
     }
-
-    private sealed record AddCommentContext(IReadOnlyList<int> SubsystemLeadEquivalentOsobaIds, bool IsSubsystemLeadEquivalentInProject);
-
-    private Task<IReadOnlyList<int>> ResolveLeadEquivalentOsobaIdsAsync(int projectId, int subsystemId, CancellationToken ct)
-        => projectRoleCache.GetLeadEquivalentOsobaIdsAsync(projectId, subsystemId, ct);
 
     private Task<IReadOnlyDictionary<int, IReadOnlyList<int>>> ResolveLeadEquivalentOsobaIdsBySubsystemAsync(int projectId, CancellationToken ct)
         => projectRoleCache.GetLeadEquivalentOsobaIdsBySubsystemAsync(projectId, ct);

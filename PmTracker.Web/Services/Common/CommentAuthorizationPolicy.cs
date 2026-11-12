@@ -3,11 +3,17 @@ using PmTracker.Web.Models.ViewModels;
 namespace PmTracker.Web.Services.Common;
 
 /// <summary>
-/// Rozhoduje o povoleních komentářů v per-action authz modelu (redesign 2026-04-23).
-/// Backdoor přes <c>records.edit</c> zrušen — admin s <c>comments.edit.any</c> / <c>comments.delete.any</c>
-/// smí upravovat/mazat cizí komentáře; autor vždy svoje (comments.edit.own / delete.own).
-/// Subsystem lead varianta zachována pro scenário „VEDOUCI_SUBSYSTEMU přidává vyjádření
-/// v DRAFT jednání".
+/// Kdo smí přidat, upravit a smazat vyjádření (spec 2026-11-10, docs/specs/record-comments.md):
+/// <list type="bullet">
+/// <item>přímá projektová / globální role s <c>comments.add</c> (admini, Vlastník, Admin projektu, PM, Gestor)
+/// přidává v Přípravě i Otevřeno u všech subsystémů („vyšší bere“, R4);</item>
+/// <item>subsystémové role (vedoucí, zástupce, metodik) jen v Přípravě a jen u záznamů svého subsystému (R1, R3);</item>
+/// <item>vlastní vyjádření smí upravit a smazat, kdo by ho teď na tomtéž místě smel přidat, s klíčem
+/// <c>comments.edit.own</c> / <c>comments.delete.own</c> (R2, R5); cizí jen s <c>comments.edit.any</c> / <c>comments.delete.any</c>;</item>
+/// <item>výjimka 2026-06-16: vedoucí a zástupce s <c>meetings.notes.subsystemlead</c> v Přípravě u svého
+/// subsystému i bez klíčů <c>comments.*</c>.</item>
+/// </list>
+/// Uzavřené jednání a uzavřený záznam hlídá CommentService, ne tato třída.
 /// </summary>
 public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
 {
@@ -27,68 +33,48 @@ public sealed class CommentAuthorizationPolicy : ICommentAuthorizationPolicy
         return currentUser.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projektId);
     }
 
-    public bool CanAddComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, bool isSubsystemLeadEquivalentInProject, bool isDraftMeeting)
+    public bool CanAddComment(CurrentUserContextViewModel currentUser, CommentScope scope)
     {
-        // Vícevrstvá autorizace (rozhodnutí 2026-06-16):
-        // 1) PŘÍMÁ projektová (či globální) role s comments.add → komentuje kdekoli v projektu
-        //    (princip „vyšší bere"; pokrývá i kombinaci projektová role + vedoucí subsystému).
-        if (currentUser.HasDirectProjectPermission(PermissionKeys.CommentsAdd, projektId))
+        // R4: přímá projektová / globální role s comments.add → kdekoli v projektu, Příprava i Otevřeno.
+        if (currentUser.HasDirectProjectPermission(PermissionKeys.CommentsAdd, scope.ProjektId))
         {
             return true;
         }
 
-        // 2) Vedoucí / zástupce vedoucího subsystému → jen VLASTNÍ subsystém a jen v DRAFT jednání.
-        //    comments.add zděděný čistě ze subsystémové role NEopravňuje komentovat cizí subsystém.
-        if (isSubsystemLeadEquivalentInProject)
-        {
-            return isDraftMeeting && CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
-        }
-
-        // 3) Ostatní držitelé comments.add bez vedoucí-subsystému role (např. METODIK subsystému
-        //    přes zděděný grant) — zachované chování dle efektivní sady oprávnění.
-        return currentUser.HasPermission(PermissionKeys.CommentsAdd, projektId);
-    }
-
-    public bool CanModifyComment(CurrentUserContextViewModel currentUser, int projektId, IReadOnlyCollection<int> subsystemLeadEquivalentOsobaIds, int commentAuthorOsobaId, bool isDraftMeeting)
-    {
-        // Admin varianta: comments.edit.any pokrývá úpravu libovolného komentáře.
-        if (currentUser.HasPermission(PermissionKeys.CommentsEditAny, projektId))
-        {
-            return true;
-        }
-
-        var isOwn = commentAuthorOsobaId > 0 && currentUser.OsobaId == commentAuthorOsobaId;
-        if (!isOwn)
+        // R1: subsystémové role jen v Přípravě…
+        if (!scope.IsDraftMeeting)
         {
             return false;
         }
 
-        // Autor vlastního komentáře s comments.edit.own (v DRAFT navíc omezeno na vlastní subsystém).
-        if (currentUser.HasPermission(PermissionKeys.CommentsEditOwn, projektId)
-            && (!isDraftMeeting || CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds)))
+        // …a jen u záznamu svého subsystému (vedoucí, zástupce, metodik — R3). Zděděný comments.add
+        // bez role v subsystému záznamu nestačí.
+        if (currentUser.OsobaId > 0
+            && scope.SubsystemRoleOsobaIds.Contains(currentUser.OsobaId)
+            && currentUser.HasPermission(PermissionKeys.CommentsAdd, scope.ProjektId))
         {
             return true;
         }
 
-        // Rozhodnutí 2026-06-16 (implikovaný CRUD): vedoucí subsystému (meetings.notes.subsystemlead)
-        // smí upravit/smazat VLASTNÍ komentář svého subsystému v DRAFT jednání i bez samostatného
-        // comments.edit.own grantu. Mimo DRAFT / cizí subsystém → ne (CanCommentAsSubsystemLeader).
-        return isDraftMeeting && CanCommentAsSubsystemLeader(currentUser, projektId, subsystemLeadEquivalentOsobaIds);
+        // Výjimka 2026-06-16: vedoucí / zástupce s meetings.notes.subsystemlead i bez comments.add.
+        return CanCommentAsSubsystemLeader(currentUser, scope.ProjektId, scope.SubsystemLeadEquivalentOsobaIds);
     }
 
-    public bool CanDeleteComment(CurrentUserContextViewModel currentUser, int projektId, int commentAuthorOsobaId)
-    {
-        // Admin: comments.delete.any libovolný komentář.
-        if (currentUser.HasPermission(PermissionKeys.CommentsDeleteAny, projektId))
-        {
-            return true;
-        }
+    public bool CanEditComment(CurrentUserContextViewModel currentUser, CommentScope scope, int commentAuthorOsobaId)
+        => currentUser.HasPermission(PermissionKeys.CommentsEditAny, scope.ProjektId)
+            || (IsOwn(currentUser, commentAuthorOsobaId) && CanChangeOwn(currentUser, scope, PermissionKeys.CommentsEditOwn));
 
-        // Autor vlastního: comments.delete.own.
-        return commentAuthorOsobaId > 0
-            && currentUser.OsobaId == commentAuthorOsobaId
-            && currentUser.HasPermission(PermissionKeys.CommentsDeleteOwn, projektId);
-    }
+    public bool CanDeleteComment(CurrentUserContextViewModel currentUser, CommentScope scope, int commentAuthorOsobaId)
+        => currentUser.HasPermission(PermissionKeys.CommentsDeleteAny, scope.ProjektId)
+            || (IsOwn(currentUser, commentAuthorOsobaId) && CanChangeOwn(currentUser, scope, PermissionKeys.CommentsDeleteOwn));
+
+    /// <summary>R2: vlastní smí změnit, kdo by ho teď na tomtéž místě smel přidat a má klíč akce; nebo výjimka 2026-06-16.</summary>
+    private bool CanChangeOwn(CurrentUserContextViewModel currentUser, CommentScope scope, string ownKey)
+        => (CanAddComment(currentUser, scope) && currentUser.HasPermission(ownKey, scope.ProjektId))
+            || (scope.IsDraftMeeting && CanCommentAsSubsystemLeader(currentUser, scope.ProjektId, scope.SubsystemLeadEquivalentOsobaIds));
+
+    private static bool IsOwn(CurrentUserContextViewModel currentUser, int commentAuthorOsobaId)
+        => commentAuthorOsobaId > 0 && currentUser.OsobaId == commentAuthorOsobaId;
 
     public bool CanSaveMeetingNote(
         CurrentUserContextViewModel currentUser,
