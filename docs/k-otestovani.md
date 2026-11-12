@@ -367,7 +367,7 @@ Navíc:
 
 ## 10. Vyjádření — kdo smí přidat, upravit a smazat
 
-**Hotovo 2026-11-12:** větev `feat/vyjadreni-uprava-podle-role` (merge hash níže). Spec `docs/superpowers/specs/2026-11-10-vyjadreni-uprava-podle-role-design.md`, pravidla v `docs/specs/record-comments.md`.
+**Hotovo 2026-11-12:** merge `e755f268`. Spec `docs/superpowers/specs/2026-11-10-vyjadreni-uprava-podle-role-design.md`, pravidla v `docs/specs/record-comments.md`.
 
 **Co se mění pro uživatele:**
 
